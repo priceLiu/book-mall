@@ -21,6 +21,11 @@ import {
   STORY_PRO2_THEME_OUTLINE_SYSTEM,
   STORY_PRO2_THEME_OUTLINE_USER_PREFIX,
 } from "./story-pro2-theme-outline-prompt";
+import {
+  buildScriptStudioContinuationPrompt,
+  buildScriptStudioFirstRoundPrompt,
+  scriptStudioBatchRange,
+} from "./script-studio-prompts";
 import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
 
 function proClientPage(projectId: string): string {
@@ -52,33 +57,85 @@ function hashSalt(args: {
   return [args.llmSection, args.rowKey, args.mediaKind].filter(Boolean).join(":");
 }
 
-/** 2.0 文本节点 · 主题 → 故事大纲（第一步，不创建脚本节点） */
+/** 2.0 文本/脚本节点 · 主题 → 工业化剧本批次（不自动 spawn 下游列） */
 export async function runStoryProStarterThemeOutline(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
+  const isHub = args.node.type === "story-pro-script-hub";
+  const scriptStudioMode = data.scriptStudioMode === true;
   const theme =
+    (typeof data.scriptStudioThemeInput === "string"
+      ? data.scriptStudioThemeInput
+      : ""
+    ).trim() ||
     (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
     (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
   if (!theme) {
     throw new Error("请先填写故事主题或内容");
   }
-  if (!isPro2StoryOutlineTextNode(data)) {
+  if (!scriptStudioMode && !isPro2StoryOutlineTextNode(data)) {
     throw new Error(
       "该文本节点用于提示词/下游引用，不会走故事大纲链路；请使用故事大纲模式的文本节点",
     );
   }
-  const system =
-    (typeof data.themeOutlineSystemPrompt === "string"
-      ? data.themeOutlineSystemPrompt
-      : ""
-    ).trim() || STORY_PRO2_THEME_OUTLINE_SYSTEM;
+  if (isHub && !scriptStudioMode) {
+    throw new Error("该脚本节点未开启工业化剧本创作模式");
+  }
+
+  let prompt: string;
+  let system: string;
+
+  if (scriptStudioMode) {
+    const totalEpisodes = Number(data.scriptStudioTotalEpisodes) || 30;
+    const batchIndex = Number(data.scriptStudioBatchIndex) || 0;
+    const systemKind =
+      data.scriptStudioSystem === "adaptation" ? "adaptation" : "original";
+    const inputMode =
+      data.scriptStudioInputMode === "upload" || data.starterMode === "upload"
+        ? "upload"
+        : "generate";
+    const rawScript =
+      inputMode === "upload"
+        ? String(data.uploadedScriptMd ?? "").trim()
+        : undefined;
+    if (batchIndex <= 0) {
+      prompt = buildScriptStudioFirstRoundPrompt({
+        system: systemKind,
+        totalEpisodes,
+        genre: theme,
+        rawScript,
+      });
+    } else {
+      const { start, end } = scriptStudioBatchRange(batchIndex, totalEpisodes);
+      const frozen = String(data.scriptStudioFrozenBiblesMd ?? "").trim();
+      const completed = String(data.scriptStudioCompletedBatchesMd ?? "").trim();
+      const continuation = buildScriptStudioContinuationPrompt({
+        system: systemKind,
+        totalEpisodes,
+        batchStart: start,
+        batchEnd: end,
+        rawScript,
+      });
+      prompt = [frozen, completed, continuation].filter(Boolean).join("\n\n");
+    }
+    system =
+      "你是资深工业影视总编剧，严格执行用户消息中的工业化剧本生产规范；输出 Markdown，不要 JSON。";
+  } else {
+    system =
+      (typeof data.themeOutlineSystemPrompt === "string"
+        ? data.themeOutlineSystemPrompt
+        : ""
+      ).trim() || STORY_PRO2_THEME_OUTLINE_SYSTEM;
+    prompt = `${STORY_PRO2_THEME_OUTLINE_USER_PREFIX}\n\n${theme}`;
+  }
+
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "story-outline-engine",
     data: {
       ...data,
-      prompt: `${STORY_PRO2_THEME_OUTLINE_USER_PREFIX}\n\n${theme}`,
+      prompt,
       systemPrompt: system,
     },
   };
@@ -88,6 +145,7 @@ export async function runStoryProStarterThemeOutline(
     storyScope: args.storyScope ?? { mediaKind: "themeOutline" },
     node,
     engineKind: "story-outline-engine",
+    executeAsync: args.executeAsync ?? true,
   });
 }
 
@@ -114,6 +172,7 @@ export async function runStoryProScriptHubSection(
     storyScope: args.storyScope ?? { llmSection: args.llmSection },
     node,
     engineKind: "story-outline-engine",
+    executeAsync: args.executeAsync ?? true,
   });
 }
 

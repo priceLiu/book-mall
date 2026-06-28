@@ -14,6 +14,7 @@ export const PROJECT_ASSET_KIND_LABELS: Record<ProjectAssetKind, string> = {
   STYLE: "风格",
   PROMPT: "提示词",
   GROUP_BUNDLE: "组资产",
+  SCRIPT_PACKAGE: "剧本包",
 };
 
 export const PROJECT_ASSET_TAB_KINDS: ProjectAssetKind[] = [
@@ -29,6 +30,7 @@ export const PROJECT_ASSET_TAB_KINDS: ProjectAssetKind[] = [
   "DIGITAL_HUMAN",
   "STYLE",
   "GROUP_BUNDLE",
+  "SCRIPT_PACKAGE",
 ];
 
 export function defaultKindForNodeType(nodeType: string): ProjectAssetKind {

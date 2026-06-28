@@ -31,10 +31,19 @@ import {
   isStoryProBuiltinTemplateId,
   isSbv1BuiltinTemplateId,
   STORY_PRO2_BUILTIN_TEMPLATE_ID,
+  STORY_PRO2_SCRIPT_BUILTIN_TEMPLATE_ID,
+  STORY_PRO2_PRODUCTION_BUILTIN_TEMPLATE_ID,
   STORY_PRO_BUILTIN_TEMPLATE_ID,
   SBV1_BUILTIN_TEMPLATE_ID,
   type CanvasProjectEdition,
 } from "@/lib/canvas/project-edition";
+import { pro2CreateNeedsScriptPackageStep } from "@/lib/canvas/pro2-create-script-package-step";
+import { listPickableScriptPackages } from "@/lib/canvas/list-pickable-script-packages";
+import {
+  applyScriptPackageToNewPro2Graph,
+  type NewProjectScriptPackageAsset,
+} from "@/lib/canvas/pro2-new-project-script-package";
+import type { CanvasGraph } from "@/lib/canvas/types";
 
 type StarterPick =
   | { kind: "blank" }
@@ -60,9 +69,21 @@ function Inner() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerEdition, setPickerEdition] = useState<CanvasProjectEdition>("standard");
+  const [pickerEdition, setPickerEdition] = useState<CanvasProjectEdition>("pro2");
   const [pick, setPick] = useState<StarterPick>({ kind: "blank" });
   const [name, setName] = useState("");
+  const [createStep, setCreateStep] = useState<1 | 2>(1);
+  /** Pro2 · 跳过模板/名称步，直接选剧本或空白画布 */
+  const [pro2ScriptPackageOnly, setPro2ScriptPackageOnly] = useState(false);
+  const [scriptPackageChoice, setScriptPackageChoice] = useState<
+    "skip" | "pick"
+  >("skip");
+  const [scriptPackagePick, setScriptPackagePick] =
+    useState<NewProjectScriptPackageAsset | null>(null);
+  const [scriptPackages, setScriptPackages] = useState<
+    NewProjectScriptPackageAsset[]
+  >([]);
+  const [scriptPackageLoading, setScriptPackageLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!base) {
@@ -94,6 +115,37 @@ function Inner() {
     void load();
   }, [load]);
 
+  const resetCreateWizard = useCallback(() => {
+    setCreateStep(1);
+    setPro2ScriptPackageOnly(false);
+    setScriptPackageChoice("skip");
+    setScriptPackagePick(null);
+    setScriptPackages([]);
+  }, []);
+
+  const openPro2CreateDialog = useCallback(() => {
+    setPickerEdition("pro2");
+    setPick({ kind: "builtin", id: STORY_PRO2_BUILTIN_TEMPLATE_ID });
+    setName("");
+    setScriptPackageChoice("skip");
+    setScriptPackagePick(null);
+    setCreateStep(2);
+    setPro2ScriptPackageOnly(true);
+    setPickerOpen(true);
+    void (async () => {
+      setScriptPackageLoading(true);
+      try {
+        if (base?.trim()) {
+          setScriptPackages(await listPickableScriptPackages(base));
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "加载剧本包失败");
+      } finally {
+        setScriptPackageLoading(false);
+      }
+    })();
+  }, [base]);
+
   const onOpenPicker = useCallback((edition: CanvasProjectEdition) => {
     setPickerEdition(edition);
     if (edition === "pro2") {
@@ -106,11 +158,16 @@ function Inner() {
       setPick({ kind: "blank" });
     }
     setName("");
+    resetCreateWizard();
     setPickerOpen(true);
-  }, []);
+  }, [resetCreateWizard]);
 
   const pro2Projects = useMemo(
-    () => projects.filter((p) => normalizeEdition(p.edition) === "pro2"),
+    () =>
+      projects.filter((p) => {
+        const e = normalizeEdition(p.edition);
+        return e === "pro2" || e === "standard";
+      }),
     [projects],
   );
   const sbv1Projects = useMemo(
@@ -120,27 +177,6 @@ function Inner() {
   const proProjects = useMemo(
     () => projects.filter((p) => normalizeEdition(p.edition) === "pro"),
     [projects],
-  );
-  const standardProjects = useMemo(
-    () => projects.filter((p) => normalizeEdition(p.edition) === "standard"),
-    [projects],
-  );
-
-  const standardBuiltinOptions = useMemo(
-    () =>
-      BUILTIN_CANVAS_TEMPLATES.filter(
-        (t) =>
-          !isStoryProBuiltinTemplateId(t.id) &&
-          !isStoryPro2BuiltinTemplateId(t.id) &&
-          !isSbv1BuiltinTemplateId(t.id),
-      ).map(
-        (t) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-        }),
-      ),
-    [],
   );
 
   const proBuiltinOptions = useMemo(
@@ -155,17 +191,21 @@ function Inner() {
     [],
   );
 
-  const pro2BuiltinOptions = useMemo(
-    () =>
-      BUILTIN_CANVAS_TEMPLATES.filter((t) => isStoryPro2BuiltinTemplateId(t.id)).map(
-        (t) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-        }),
-      ),
-    [],
-  );
+  const pro2BuiltinOptions = useMemo(() => {
+    const items = BUILTIN_CANVAS_TEMPLATES.filter((t) =>
+      isStoryPro2BuiltinTemplateId(t.id),
+    ).map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      highlight: t.id === STORY_PRO2_SCRIPT_BUILTIN_TEMPLATE_ID,
+    }));
+    return items.sort((a, b) => {
+      if (a.id === STORY_PRO2_SCRIPT_BUILTIN_TEMPLATE_ID) return -1;
+      if (b.id === STORY_PRO2_SCRIPT_BUILTIN_TEMPLATE_ID) return 1;
+      return 0;
+    });
+  }, []);
 
   const sbv1BuiltinOptions = useMemo(
     () =>
@@ -177,14 +217,6 @@ function Inner() {
         }),
       ),
     [],
-  );
-
-  const standardUserTemplates = useMemo(
-    () =>
-      userTemplates.filter(
-        (t) => canvasEditionFromTemplateCanvas(t.canvas) === "standard",
-      ),
-    [userTemplates],
   );
 
   const proUserTemplates = useMemo(
@@ -211,6 +243,25 @@ function Inner() {
     [userTemplates],
   );
 
+  const needsScriptPackageStep = useMemo(
+    () =>
+      pickerEdition === "pro2" &&
+      pro2CreateNeedsScriptPackageStep(pick, userTemplates),
+    [pickerEdition, pick, userTemplates],
+  );
+
+  const loadScriptPackages = useCallback(async () => {
+    if (!base?.trim()) return;
+    setScriptPackageLoading(true);
+    try {
+      setScriptPackages(await listPickableScriptPackages(base));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载剧本包失败");
+    } finally {
+      setScriptPackageLoading(false);
+    }
+  }, [base]);
+
   const onCreate = useCallback(async () => {
     if (!base) return;
     setCreating(true);
@@ -227,6 +278,12 @@ function Inner() {
           );
         }
       }
+      if (scriptPackagePick) {
+        canvas = applyScriptPackageToNewPro2Graph(
+          canvas as CanvasGraph,
+          scriptPackagePick,
+        );
+      }
       const finalName = name.trim() || defaultCanvasProjectName();
       const created = await createCanvasProject(base, {
         name: finalName,
@@ -238,7 +295,38 @@ function Inner() {
     } finally {
       setCreating(false);
     }
-  }, [base, name, pick, userTemplates]);
+  }, [base, name, pick, userTemplates, scriptPackagePick]);
+
+  const onPrimaryCreateAction = useCallback(async () => {
+    if (
+      !pro2ScriptPackageOnly &&
+      createStep === 1 &&
+      needsScriptPackageStep
+    ) {
+      setCreateStep(2);
+      if (scriptPackageChoice === "pick") {
+        await loadScriptPackages();
+      }
+      return;
+    }
+    if (
+      (pro2ScriptPackageOnly || createStep === 2) &&
+      scriptPackageChoice === "pick" &&
+      !scriptPackagePick
+    ) {
+      setError("请选择已发布剧本，或改为「空白画布」。");
+      return;
+    }
+    await onCreate();
+  }, [
+    pro2ScriptPackageOnly,
+    createStep,
+    needsScriptPackageStep,
+    scriptPackageChoice,
+    scriptPackagePick,
+    loadScriptPackages,
+    onCreate,
+  ]);
 
   const onDuplicate = useCallback(
     async (id: string, label: string) => {
@@ -262,8 +350,16 @@ function Inner() {
   );
 
   const onDelete = useCallback(
-    async (id: string, label: string) => {
+    async (id: string, label: string, collaborationLocked?: boolean) => {
       if (!base) return;
+      if (collaborationLocked) {
+        await dialogs.alert({
+          title: "无法删除协同画布",
+          message: `「${label}」已绑定脚本包与制作公告栏，属于协同制作画布，不能删除。`,
+          variant: "error",
+        });
+        return;
+      }
       const ok = await dialogs.doubleConfirm({
         first: {
           title: `从我的画布删除「${label}」？`,
@@ -311,17 +407,13 @@ function Inner() {
       ? sbv1BuiltinOptions
       : pickerEdition === "pro2"
         ? pro2BuiltinOptions
-        : pickerEdition === "pro"
-          ? proBuiltinOptions
-          : standardBuiltinOptions;
+        : proBuiltinOptions;
   const filteredUserTemplates =
     pickerEdition === "sbv1"
       ? sbv1UserTemplates
       : pickerEdition === "pro2"
         ? pro2UserTemplates
-        : pickerEdition === "pro"
-          ? proUserTemplates
-          : standardUserTemplates;
+        : proUserTemplates;
 
   return (
     <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
@@ -330,18 +422,10 @@ function Inner() {
           <p className="twenty-eyebrow">canvas-web · projects</p>
           <h1 className="canvas-serif mt-2 text-3xl text-white">我的画布</h1>
           <p className="mt-2 text-sm text-[var(--canvas-muted)]">
-            普通版、影视专业版 1.0/2.0、分镜视频 1.0 分开管理；节点类型互斥，请从对应分区新建或打开画布。
+            影视专业版 1.0/2.0、分镜视频 1.0 分开管理；节点类型互斥，请从对应分区新建或打开画布。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onOpenPicker("standard")}
-            className="twenty-btn-ghost text-sm"
-          >
-            <Plus className="mr-2 size-4" />
-            新建普通版
-          </button>
           <button
             type="button"
             onClick={() => onOpenPicker("pro")}
@@ -360,7 +444,7 @@ function Inner() {
           </button>
           <button
             type="button"
-            onClick={() => onOpenPicker("pro2")}
+            onClick={openPro2CreateDialog}
             className="rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-2 text-sm font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
           >
             <Plus className="mr-2 inline size-4" />
@@ -389,7 +473,7 @@ function Inner() {
         </div>
       ) : projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-12 text-center text-sm text-[var(--canvas-muted)]">
-          还没有画布。请使用上方按钮分别创建普通版或影视专业版画布。
+          还没有画布。请使用上方按钮创建影视专业版或分镜视频画布。
         </div>
       ) : (
         <div className="space-y-10">
@@ -413,7 +497,7 @@ function Inner() {
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
             onRename={onRename}
-            onCreate={() => onOpenPicker("pro2")}
+            onCreate={openPro2CreateDialog}
           />
           <ProjectsSection
             title="影视专业版"
@@ -426,17 +510,6 @@ function Inner() {
             onRename={onRename}
             onCreate={() => onOpenPicker("pro")}
           />
-          <ProjectsSection
-            title="普通版"
-            subtitle="空白画布、海报/三视图模板、快手漫剧全链路等"
-            edition="standard"
-            projects={standardProjects}
-            onDelete={onDelete}
-            onDuplicate={onDuplicate}
-            duplicatingId={duplicatingId}
-            onRename={onRename}
-            onCreate={() => onOpenPicker("standard")}
-          />
         </div>
       )}
 
@@ -446,10 +519,17 @@ function Inner() {
             <header className="flex items-center justify-between border-b border-white/10 px-5 py-3">
               <p className="text-sm font-medium">
                 新建画布 · {canvasEditionLabel(pickerEdition)}
+                {pro2ScriptPackageOnly ||
+                (needsScriptPackageStep && createStep === 2)
+                  ? " · 选择已发布剧本"
+                  : null}
               </p>
               <button
                 type="button"
-                onClick={() => setPickerOpen(false)}
+                onClick={() => {
+                  setPickerOpen(false);
+                  resetCreateWizard();
+                }}
                 className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
                 aria-label="关闭"
               >
@@ -458,6 +538,97 @@ function Inner() {
             </header>
 
             <div className="space-y-4 p-5 text-sm">
+              {pro2ScriptPackageOnly || createStep === 2 ? (
+                <div className="space-y-3">
+                  <label className="block">
+                    <span className="text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                      画布名称
+                    </span>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={defaultCanvasProjectName()}
+                      className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[13px] focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+                    />
+                    <p className="mt-1 text-[10px] text-white/40">
+                      留空将自动生成唯一时间戳名称
+                    </p>
+                  </label>
+                  <p className="text-[12px] text-white/70">
+                    画布为空白协作空间。可选关联已发布剧本：进入后公告栏自动展开，剧组可在其中领取制作任务；各画布进度独立。
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 px-3 py-2 hover:bg-white/5">
+                      <input
+                        type="radio"
+                        name="script-package-choice"
+                        className="mt-0.5"
+                        checked={scriptPackageChoice === "skip"}
+                        onChange={() => {
+                          setScriptPackageChoice("skip");
+                          setScriptPackagePick(null);
+                        }}
+                      />
+                      <span>
+                        <span className="block text-[13px] text-white">空白画布</span>
+                        <span className="text-[11px] text-white/45">
+                          先建空白 2.0 画布，进入后可在公告条关联已发布剧本并领取任务。
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 px-3 py-2 hover:bg-white/5">
+                      <input
+                        type="radio"
+                        name="script-package-choice"
+                        className="mt-0.5"
+                        checked={scriptPackageChoice === "pick"}
+                        onChange={() => {
+                          setScriptPackageChoice("pick");
+                          void loadScriptPackages();
+                        }}
+                      />
+                      <span>
+                        <span className="block text-[13px] text-white">选择已发布剧本</span>
+                        <span className="text-[11px] text-white/45">
+                          打开空白画布并关联该剧本；公告栏展开后可领取角色、分镜等制作任务。
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                  {scriptPackageChoice === "pick" ? (
+                    scriptPackageLoading ? (
+                      <div className="flex items-center gap-2 py-4 text-sm text-white/55">
+                        <Loader2 className="size-4 animate-spin" />
+                        加载已发布剧本…
+                      </div>
+                    ) : scriptPackages.length === 0 ? (
+                      <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-[12px] text-white/50">
+                        暂无已发布剧本。请先在任意 2.0 画布的脚本生成器中发布剧本，或选「空白画布」进入后再关联。
+                      </p>
+                    ) : (
+                      <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-1">
+                        {scriptPackages.map((p) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              className={`w-full rounded-md px-3 py-2 text-left text-[12px] transition hover:bg-white/5 ${
+                                scriptPackagePick?.id === p.id
+                                  ? "border border-cyan-400/40 bg-cyan-500/10 text-cyan-50"
+                                  : "border border-transparent text-white/85"
+                              }`}
+                              onClick={() => setScriptPackagePick(p)}
+                            >
+                              {p.displayName}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  ) : null}
+                </div>
+              ) : (
+                <>
               <label className="block">
                 <span className="text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
                   画布名称
@@ -479,15 +650,6 @@ function Inner() {
                   起步模板 · {canvasEditionLabel(pickerEdition)}
                 </p>
                 <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {pickerEdition === "standard" ? (
-                    <PickCard
-                      selected={pick.kind === "blank"}
-                      onClick={() => setPick({ kind: "blank" })}
-                      title="空白画布"
-                      description="从零开始，自由拖入节点。"
-                      badge="blank"
-                    />
-                  ) : null}
                   {builtinOptions.map((t) => (
                     <PickCard
                       key={t.id}
@@ -495,7 +657,14 @@ function Inner() {
                       onClick={() => setPick({ kind: "builtin", id: t.id })}
                       title={t.name}
                       description={t.description}
-                      badge="内置"
+                      badge={
+                        "highlight" in t && t.highlight ? "推荐" : "内置"
+                      }
+                      accent={
+                        "highlight" in t && t.highlight
+                          ? "cyan"
+                          : undefined
+                      }
                     />
                   ))}
                 </ul>
@@ -520,25 +689,47 @@ function Inner() {
                   </ul>
                 </div>
               ) : null}
+                </>
+              )}
             </div>
 
-            <footer className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
+            <footer className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-3">
+              <div>
+                {!pro2ScriptPackageOnly && createStep === 2 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCreateStep(1)}
+                    className="rounded-md border border-white/10 px-3 py-1.5 text-[12px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
+                  >
+                    上一步
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPickerOpen(false)}
+                onClick={() => {
+                  setPickerOpen(false);
+                  resetCreateWizard();
+                }}
                 className="rounded-md border border-white/10 px-3 py-1.5 text-[12px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
               >
                 取消
               </button>
               <button
                 type="button"
-                onClick={() => void onCreate()}
+                onClick={() => void onPrimaryCreateAction()}
                 disabled={creating}
                 className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:opacity-60"
               >
                 {creating ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
-                创建并进入
+                {!pro2ScriptPackageOnly &&
+                createStep === 1 &&
+                needsScriptPackageStep
+                  ? "下一步"
+                  : "创建并进入"}
               </button>
+              </div>
             </footer>
           </div>
         </div>
@@ -562,7 +753,7 @@ function ProjectsSection({
   subtitle: string;
   edition: CanvasProjectEdition;
   projects: CanvasProjectSummary[];
-  onDelete: (id: string, label: string) => void | Promise<void>;
+  onDelete: (id: string, label: string, collaborationLocked?: boolean) => void | Promise<void>;
   onDuplicate: (id: string, label: string) => void | Promise<void>;
   duplicatingId: string | null;
   onRename: (id: string, nextName: string) => void | Promise<void>;
@@ -642,8 +833,16 @@ function ProjectsSection({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void onDelete(p.id, p.name)}
-                  className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-red-400/40 hover:text-red-300"
+                  disabled={p.collaborationLocked}
+                  onClick={() =>
+                    void onDelete(p.id, p.name, p.collaborationLocked)
+                  }
+                  className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-red-400/40 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:text-[var(--canvas-muted)]"
+                  title={
+                    p.collaborationLocked
+                      ? "协同画布已绑定脚本包，不能删除"
+                      : "删除画布"
+                  }
                 >
                   <Trash2 className="size-3" />
                   删除
@@ -733,13 +932,21 @@ function PickCard({
   selected,
   onClick,
   badge,
+  accent,
 }: {
   title: string;
   description: string;
   selected: boolean;
   onClick: () => void;
   badge: string;
+  accent?: "cyan";
 }) {
+  const accentSelected =
+    accent === "cyan"
+      ? "border-cyan-400/50 bg-cyan-500/10"
+      : "border-[var(--canvas-accent)] bg-[var(--canvas-accent)]/10";
+  const accentBadge =
+    accent === "cyan" ? "bg-cyan-500/20 text-cyan-100" : "bg-white/10";
   return (
     <li>
       <button
@@ -747,13 +954,17 @@ function PickCard({
         onClick={onClick}
         className={`group block w-full rounded-xl border p-3 text-left transition ${
           selected
-            ? "border-[var(--canvas-accent)] bg-[var(--canvas-accent)]/10"
-            : "border-white/10 bg-white/[0.03] hover:border-white/30"
+            ? accentSelected
+            : accent === "cyan"
+              ? "border-cyan-400/20 bg-cyan-950/20 hover:border-cyan-400/35"
+              : "border-white/10 bg-white/[0.03] hover:border-white/30"
         }`}
       >
         <div className="flex items-center justify-between">
           <p className="text-[13px] font-medium text-white">{title}</p>
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+          <span
+            className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)] ${accentBadge}`}
+          >
             {badge}
           </span>
         </div>

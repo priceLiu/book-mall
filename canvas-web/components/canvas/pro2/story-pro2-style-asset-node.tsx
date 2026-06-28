@@ -6,6 +6,7 @@ import { Box } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import { PRO2_STYLE_ASSET_RIGHT_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import {
@@ -31,6 +32,7 @@ import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 /** 2.0 风格素材节点（LibTV 薄卡 · 无底部 Dock / 检视面板） */
 export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
@@ -111,6 +113,8 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
     <div
       className="relative flex h-full w-full min-h-0 min-w-0 cursor-grab flex-col active:cursor-grabbing"
       data-pro2-style-asset={id}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <Pro2NodeResizer
         isVisible={!!selected}
@@ -153,7 +157,8 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
         <div
           className={cn(
             PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
-            "relative flex h-full min-h-0 flex-col overflow-hidden",
+            "relative flex h-full min-h-0 flex-col overflow-hidden transition",
+            hovered && !selected && "ring-1 ring-violet-400/30",
           )}
           style={{ borderColor: pro2NodeBorderColor(!!selected) }}
         >

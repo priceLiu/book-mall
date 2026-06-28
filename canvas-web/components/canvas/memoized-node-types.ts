@@ -24,6 +24,7 @@ import { StoryProSceneColumnNode } from "./nodes/story-pro-scene-column-node";
 import { StoryProScriptHubNode } from "./nodes/story-pro-script-hub-node";
 import { StoryPro2StarterNode } from "./pro2/story-pro2-starter-node";
 import { StoryPro2ImageNode } from "./pro2/story-pro2-image-node";
+import { StoryPro2PlaceholderMediaNode } from "./pro2/story-pro2-placeholder-media-node";
 import { StoryPro2ThreeViewNode } from "./pro2/story-pro2-three-view-node";
 import { StoryPro2StyleAssetNode } from "./pro2/story-pro2-style-asset-node";
 import { StoryPro2ScriptHubNode } from "./pro2/story-pro2-script-hub-node";
@@ -80,6 +81,9 @@ export const memoizedNodeTypes = {
   "story-pro2-scene": memoFlowNode(Pro2ColumnThinNode),
   "story-pro2-frame": memoFlowNode(StoryPro2FrameBoardNode),
   "story-pro2-video": memoFlowNode(Pro2ColumnThinNode),
+  "story-pro2-prop": memoFlowNode(StoryPro2PlaceholderMediaNode),
+  "story-pro2-mood": memoFlowNode(StoryPro2PlaceholderMediaNode),
+  "story-pro2-audio": memoFlowNode(StoryPro2PlaceholderMediaNode),
   "jianying-export-pro2": memoFlowNode(JianyingExportPro2ThinNode),
   "story-pro-starter": memoFlowNode(StoryProStarterNode),
   "story-pro-script-hub": memoFlowNode(StoryProScriptHubNode),

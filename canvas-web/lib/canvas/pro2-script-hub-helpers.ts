@@ -169,7 +169,7 @@ export function resolvePro2HubEffectiveOutline(
   hubId: string,
   d: StoryProScriptHubNodeData,
 ): string {
-  const onHub = d.outlineMd?.trim();
+  const onHub = d.outlineMd?.trim() || d.uploadedScriptMd?.trim();
   if (onHub) return onHub;
   const linked = resolvePro2HubLinkedStarter(nodes, edges, hubId);
   if (!linked) return "";

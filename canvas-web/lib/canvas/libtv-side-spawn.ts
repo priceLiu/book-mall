@@ -214,6 +214,7 @@ export function isLibtvSideSpawnNodeType(nodeType?: string): boolean {
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-three-view" ||
     nodeType === "story-pro2-script-hub" ||
+    nodeType === "story-pro2-style-asset" ||
     nodeType === "sbv1-video-engine"
   );
 }
@@ -227,6 +228,7 @@ export function resolveLibtvSideSpawnNodeType(
   if (itemId === "image") return "story-pro2-image";
   if (itemId === "three-view") return "story-pro2-three-view";
   if (itemId === "script") return "story-pro2-script-hub";
+  if (itemId === "style-asset") return "story-pro2-style-asset";
   if (
     itemId === "video" ||
     itemId === "video-compose" ||

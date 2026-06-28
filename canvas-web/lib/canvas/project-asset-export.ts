@@ -152,6 +152,18 @@ export function exportNodeToProjectAssetDraft(
         }
       }
       break;
+    case "SCRIPT_PACKAGE":
+      payload.markdown =
+        str(d.scriptStudioCompletedBatchesMd) ||
+        str(d.outlineMd) ||
+        str(d.generatedOutlineMd);
+      payload.frozenBiblesMd = str(d.scriptStudioFrozenBiblesMd);
+      payload.frozenBiblesOssUrl = str(d.scriptStudioFrozenBiblesOssUrl);
+      payload.completedBatchesOssUrl = str(d.scriptStudioCompletedBatchesOssUrl);
+      payload.totalEpisodes = d.scriptStudioTotalEpisodes;
+      payload.batchIndex = d.scriptStudioBatchIndex;
+      payload.system = d.scriptStudioSystem;
+      break;
     default:
       if (thumbnailUrl) refs.push({ slotKey: "main", mediaUrl: thumbnailUrl });
   }

@@ -6,6 +6,14 @@ export type ProxyToolsTokenRefresh = {
   expiresIn: number;
 };
 
+const REFRESH_FETCH_TIMEOUT_MS = (() => {
+  const v = Number(process.env.TOOLS_TOKEN_REFRESH_TIMEOUT_MS);
+  return Number.isFinite(v) && v > 0 ? v : 12_000;
+})();
+
+let refreshInflight: Promise<ProxyToolsTokenRefresh | null> | null = null;
+let refreshInflightKey = "";
+
 function toolsServerSecret(): string | null {
   const s = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
   return s && s.length >= 16 ? s : null;
@@ -44,7 +52,20 @@ function isJwtExpired(token: string, skewSec = 30): boolean {
   }
 }
 
-export async function callBookMallRefreshToken(
+async function fetchRefreshToken(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REFRESH_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callBookMallRefreshTokenOnce(
   request: NextRequest,
   bearer: string | null,
   userId?: string | null,
@@ -59,12 +80,15 @@ export async function callBookMallRefreshToken(
   const secret = toolsServerSecret();
   if (secret && userId) {
     headers.set("Authorization", `Bearer ${secret}`);
-    const r = await fetch(`${base.replace(/\/$/, "")}/api/sso/tools/refresh-token`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ userId }),
-      cache: "no-store",
-    });
+    const r = await fetchRefreshToken(
+      `${base.replace(/\/$/, "")}/api/sso/tools/refresh-token`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ userId }),
+        cache: "no-store",
+      },
+    );
     if (r.ok) {
       const data = (await r.json().catch(() => null)) as {
         access_token?: string;
@@ -87,11 +111,14 @@ export async function callBookMallRefreshToken(
   }
   headers.delete("Content-Type");
 
-  const r = await fetch(`${base.replace(/\/$/, "")}/api/sso/tools/refresh-token`, {
-    method: "POST",
-    headers,
-    cache: "no-store",
-  });
+  const r = await fetchRefreshToken(
+    `${base.replace(/\/$/, "")}/api/sso/tools/refresh-token`,
+    {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    },
+  );
   if (!r.ok) return null;
   const data = (await r.json().catch(() => null)) as {
     access_token?: string;
@@ -105,6 +132,27 @@ export async function callBookMallRefreshToken(
         ? data.expires_in
         : 600,
   };
+}
+
+export async function callBookMallRefreshToken(
+  request: NextRequest,
+  bearer: string | null,
+  userId?: string | null,
+): Promise<ProxyToolsTokenRefresh | null> {
+  const key = userId?.trim() || bearer?.slice(-24) || "cookie";
+  if (refreshInflight && refreshInflightKey === key) {
+    return refreshInflight;
+  }
+  refreshInflightKey = key;
+  refreshInflight = callBookMallRefreshTokenOnce(request, bearer, userId).finally(
+    () => {
+      if (refreshInflightKey === key) {
+        refreshInflight = null;
+        refreshInflightKey = "";
+      }
+    },
+  );
+  return refreshInflight;
 }
 
 /**

@@ -22,6 +22,17 @@ import { flowPositionAtViewportCenter } from "./viewport-placement";
 
 const SNAP_GAP = 48;
 
+/** 侧栏 + 菜单 · 空白风格素材节点（待选风格库） */
+export function buildPro2EmptyStyleAssetNodeData(): StoryPro2StyleAssetNodeData {
+  return {
+    presetId: "",
+    label: "素材-风格",
+    styleName: "",
+    stylePrompt: "",
+    imageUrl: "",
+  };
+}
+
 export function buildPro2StyleAssetNodeData(
   preset: StyleLibraryPreset,
 ): StoryPro2StyleAssetNodeData {
@@ -99,9 +110,13 @@ export function spawnPro2StyleAssetFromPreset(args: {
   return nodeId;
 }
 
-const DOCK_STYLE_IMAGE_TYPES = new Set(["story-pro2-image", "sbv1-image"]);
+const DOCK_STYLE_MEDIA_TYPES = new Set([
+  "story-pro2-image",
+  "story-pro2-three-view",
+  "sbv1-image",
+]);
 
-/** Dock 风格库 · 在目标图片节点左侧生成/更新风格素材并连线 */
+/** Dock / + 菜单风格库 · 在目标媒体节点左侧生成/更新风格素材并连线 */
 export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
   preset: StyleLibraryPreset;
   imageNodeId: string;
@@ -119,8 +134,8 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
 }): string {
   const nodes = args.getNodes();
-  const imageNode = nodes.find((n) => n.id === args.imageNodeId);
-  if (!imageNode || !DOCK_STYLE_IMAGE_TYPES.has(imageNode.type ?? "")) {
+  const mediaNode = nodes.find((n) => n.id === args.imageNodeId);
+  if (!mediaNode || !DOCK_STYLE_MEDIA_TYPES.has(mediaNode.type ?? "")) {
     return "";
   }
 
@@ -134,15 +149,13 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
     args.imageNodeId,
   );
 
-  args.updateNodeData(args.imageNodeId, { dockStyleRef: undefined });
-
   if (existing) {
     args.updateNodeData(existing.id, patch);
     selectPro2NodeAfterSpawn(args.setNodes, existing.id);
     return existing.id;
   }
 
-  const abs = absoluteNodePosition(imageNode, nodes);
+  const abs = absoluteNodePosition(mediaNode, nodes);
   const styleW = PRO2_IMAGE_NODE_WIDTH;
   const position = {
     x: abs.x - styleW - SNAP_GAP,

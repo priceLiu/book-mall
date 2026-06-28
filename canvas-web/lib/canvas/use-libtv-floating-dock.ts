@@ -22,25 +22,16 @@ type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
 
-  const pinnedId = useCanvasStore(
-    (s) => s.libtvFloatingDockNodeId,
-    (a, b) => a === b,
-  );
-  const pinnedType = useCanvasStore(
-    (s) => s.libtvFloatingDockNodeType,
-    (a, b) => a === b,
-  );
-
   const rfGlobal = useMemo(
     () => resolveLibtvFloatingDockSelection(rfNodes),
     [rfNodes],
   );
 
-  const activeId = rfGlobal?.nodeId ?? pinnedId;
-  const activeType = rfGlobal?.nodeType ?? pinnedType;
+  // RF 已无选中时 Dock 必须收起；勿回退 pin（否则点空白常需两次才关）
+  if (!rfGlobal) return null;
 
-  if (!activeId || activeType !== nodeType) return null;
-  return activeId;
+  if (rfGlobal.nodeType !== nodeType) return null;
+  return rfGlobal.nodeId;
 }
 
 /**

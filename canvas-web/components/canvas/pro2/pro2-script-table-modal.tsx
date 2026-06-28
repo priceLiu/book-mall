@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Megaphone, X } from "lucide-react";
+
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useCanvasStore } from "@/lib/canvas/store";
+import { confirmAndPublishPro2ScriptHub } from "@/lib/canvas/pro2-publish-script-hub";
+import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import {
@@ -44,6 +49,11 @@ export type Pro2ScriptHubEditorModalProps = {
   onAutoSaveScene: (md: string) => void;
   onAutoSaveCharacter: (md: string) => void;
   onAutoSaveStoryboard: (md: string) => void;
+  /** 脚本 hub id · 用于发布剧本 */
+  hubId?: string;
+  hubData?: StoryProScriptHubNodeData;
+  /** 协作画布 meta 锚点 · 只读快照 */
+  readOnly?: boolean;
 };
 
 /** 2.0 脚本节点 · 大纲 / 场景 / 角色 / 分镜全屏编辑 */
@@ -61,14 +71,19 @@ export function Pro2ScriptHubEditorModal({
   onAutoSaveScene,
   onAutoSaveCharacter,
   onAutoSaveStoryboard,
+  hubId,
+  hubData,
+  readOnly = false,
 }: Pro2ScriptHubEditorModalProps) {
+  const { alert, confirm } = useDialogs();
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [draftOutline, setDraftOutline] = useState(outlineMd);
   const [draftScene, setDraftScene] = useState(sceneMd);
   const [draftCharacter, setDraftCharacter] = useState(characterMd);
   const [draftStoryboard, setDraftStoryboard] = useState(storyboardMd);
-  const [mounted, setMounted] = useState(false);
   const [savedHint, setSavedHint] = useState(false);
   const skipNextSaveRef = useRef(true);
+  const wasOpenRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
   const onAutoSaveOutlineRef = useRef(onAutoSaveOutline);
   const onAutoSaveSceneRef = useRef(onAutoSaveScene);
@@ -79,22 +94,36 @@ export function Pro2ScriptHubEditorModal({
   onAutoSaveCharacterRef.current = onAutoSaveCharacter;
   onAutoSaveStoryboardRef.current = onAutoSaveStoryboard;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const onPublishScript = useCallback(async () => {
+    if (!hubId || !hubData) return;
+    const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
+    const liveData = (live?.data ?? hubData) as StoryProScriptHubNodeData;
+    const pub = await confirmAndPublishPro2ScriptHub(hubId, liveData, {
+      alert,
+      confirm,
+    }, {
+      requireBatch: liveData.scriptStudioMode === true,
+      batchIndex: liveData.scriptStudioBatchIndex,
+    });
+    if (pub) updateNodeData(hubId, pub);
+  }, [hubId, hubData, alert, confirm, updateNodeData]);
 
   useEffect(() => {
     if (!open) {
+      wasOpenRef.current = false;
       document.body.style.overflow = "";
       return;
     }
-    skipNextSaveRef.current = true;
-    setDraftOutline(outlineMd);
-    setDraftScene(sceneMd);
-    setDraftCharacter(characterMd);
-    setDraftStoryboard(storyboardMd);
-    setSavedHint(false);
     document.body.style.overflow = "hidden";
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true;
+      skipNextSaveRef.current = true;
+      setDraftOutline(outlineMd);
+      setDraftScene(sceneMd);
+      setDraftCharacter(characterMd);
+      setDraftStoryboard(storyboardMd);
+      setSavedHint(false);
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -103,10 +132,12 @@ export function Pro2ScriptHubEditorModal({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [open, outlineMd, sceneMd, characterMd, storyboardMd, onClose]);
+    // 仅随 open 开关初始化 draft；勿依赖 md props（store 轮询/自动保存会触发整页闪屏）
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- outlineMd/sceneMd/characterMd/storyboardMd intentionally omitted
+  }, [open, onClose]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || readOnly) return;
     if (skipNextSaveRef.current) {
       skipNextSaveRef.current = false;
       return;
@@ -128,9 +159,9 @@ export function Pro2ScriptHubEditorModal({
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [draftOutline, draftScene, draftCharacter, draftStoryboard, open, tab]);
+  }, [draftOutline, draftScene, draftCharacter, draftStoryboard, open, readOnly, tab]);
 
-  if (!mounted || !open) return null;
+  if (!open) return null;
 
   const subtitle =
     tab === "outline"
@@ -188,16 +219,36 @@ export function Pro2ScriptHubEditorModal({
             size="modal"
           />
         </div>
-        <button
-          type="button"
-          className="nodrag shrink-0 rounded-lg p-2 text-white/50 hover:bg-white/8"
-          onClick={onClose}
-        >
-          <X className="size-5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {hubId && hubData ? (
+            <button
+              type="button"
+              className="nodrag inline-flex items-center gap-1.5 rounded-lg border border-violet-400/35 bg-violet-500/15 px-3 py-1.5 text-[11px] font-medium text-violet-100 transition hover:bg-violet-500/25"
+              title="发布剧本 · 保存后可发布至剧组公告条"
+              onClick={() => void onPublishScript()}
+            >
+              <Megaphone className="size-3.5" />
+              发布剧本
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="nodrag shrink-0 rounded-lg p-2 text-white/50 hover:bg-white/8"
+            onClick={onClose}
+          >
+            <X className="size-5" />
+          </button>
+        </div>
       </header>
 
       {tab === "outline" ? (
+        readOnly ? (
+          <div
+            className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
+          >
+            <StoryHubReadonlyPane md={draftOutline} />
+          </div>
+        ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
           <div
             className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 flex-col overflow-y-auto border-r border-violet-400/10 bg-white`}
@@ -229,6 +280,7 @@ export function Pro2ScriptHubEditorModal({
             </div>
           </div>
         </div>
+        )
       ) : (
         <div
           className={cn(
@@ -236,7 +288,9 @@ export function Pro2ScriptHubEditorModal({
             "min-h-0 flex-1 overflow-auto bg-[#f8f7f4] px-4 py-6 sm:px-8",
           )}
         >
-          {canTable ? (
+          {readOnly ? (
+            <StoryHubReadonlyPane md={tableDraft} />
+          ) : canTable ? (
             tab === "character" ? (
               <StoryCharacterTableEditor
                 value={tableDraft}

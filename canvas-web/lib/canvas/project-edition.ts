@@ -10,6 +10,11 @@ export {
 
 export const STORY_PRO_BUILTIN_TEMPLATE_ID = "builtin/story-pro-pipeline";
 export const STORY_PRO2_BUILTIN_TEMPLATE_ID = "builtin/story-pro2-pipeline";
+/** 剧本创作画布（工业化标准化）· 与 2.0 同 edition（pro2），仅入口/语义不同 */
+export const STORY_PRO2_SCRIPT_BUILTIN_TEMPLATE_ID =
+  "builtin/story-pro2-script-studio";
+export const STORY_PRO2_PRODUCTION_BUILTIN_TEMPLATE_ID =
+  "builtin/story-pro2-production";
 export const SBV1_BUILTIN_TEMPLATE_ID = "builtin/storyboard-video-pipeline";
 
 export function isStoryProBuiltinTemplateId(id: string): boolean {
@@ -17,7 +22,11 @@ export function isStoryProBuiltinTemplateId(id: string): boolean {
 }
 
 export function isStoryPro2BuiltinTemplateId(id: string): boolean {
-  return id === STORY_PRO2_BUILTIN_TEMPLATE_ID;
+  return (
+    id === STORY_PRO2_BUILTIN_TEMPLATE_ID ||
+    id === STORY_PRO2_SCRIPT_BUILTIN_TEMPLATE_ID ||
+    id === STORY_PRO2_PRODUCTION_BUILTIN_TEMPLATE_ID
+  );
 }
 
 export function isSbv1BuiltinTemplateId(id: string): boolean {

@@ -55,6 +55,11 @@ export function pro2StarterLinkedMessage(
   });
   if (fromImage) return "已链接图片 · 在图片节点上传后生成提示词";
   if (fromVideo) return "已链接视频 · 在视频节点上传后生成提示词";
+  const fromScript = incoming.some((e) => {
+    const src = nodes.find((n) => n.id === e.source);
+    return src?.type === "story-pro2-script-hub";
+  });
+  if (fromScript) return "已链接脚本 · 仅作参考，请在下方 Dock 编写提示词";
   return "已链接上游 · 在下方 Dock 输入后发送";
 }
 

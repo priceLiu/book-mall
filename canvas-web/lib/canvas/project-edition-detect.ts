@@ -24,6 +24,9 @@ const STORY_PRO2_NODE_TYPES = new Set([
   "story-pro2-scene",
   "story-pro2-frame",
   "story-pro2-video",
+  "story-pro2-prop",
+  "story-pro2-mood",
+  "story-pro2-audio",
   "jianying-export-pro2",
 ]);
 
@@ -45,6 +48,15 @@ export function canvasProjectEditionFromGraph(
   canvas: unknown,
 ): CanvasProjectEdition {
   if (!canvas || typeof canvas !== "object") return "standard";
+
+  const meta = (canvas as { meta?: { edition?: string; crewBulletinAnchor?: unknown; linkedScriptPackageAssetId?: string } }).meta;
+  if (meta?.edition === "sbv1") return "sbv1";
+  if (meta?.edition === "pro2") return "pro2";
+  /** 空白协作画布 · 仅 meta 存公告栏锚点 */
+  if (meta?.crewBulletinAnchor || meta?.linkedScriptPackageAssetId) {
+    return "pro2";
+  }
+
   const nodes = (canvas as { nodes?: unknown }).nodes;
   if (!Array.isArray(nodes)) return "standard";
   for (const raw of nodes) {

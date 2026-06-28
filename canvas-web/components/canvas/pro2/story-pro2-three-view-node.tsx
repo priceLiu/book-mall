@@ -32,6 +32,7 @@ import {
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ThreeViewNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-library";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "../media-hover-box";
 import { LibtvNodeHeaderPreviewButton } from "../libtv-node-header-preview-button";
@@ -43,6 +44,7 @@ import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
+import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import {
   Pro2ThreeViewNodeEmbeddedDock,
   pro2ThreeViewNodeUsesEmbeddedDock,
@@ -126,6 +128,10 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
         nodeType,
         { alert },
         () => {
+          if (itemId === "style-asset") {
+            openPro2StyleLibraryForMediaNode(id);
+            return;
+          }
           const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
           if (!spawnType) return;
           spawnLibtvNeighborFromAnchor(id, side, spawnType, {
@@ -225,6 +231,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
             selected && "ring-1 ring-violet-400/45",
+            hovered && !selected && "ring-1 ring-violet-400/30",
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
@@ -242,7 +249,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             )}
           </div>
 
-          <div className={LIBTV_MEDIA_STAGE_CLASS}>
+          <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
                 label={generatingLabel}
@@ -278,6 +285,9 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 </p>
               </div>
             )}
+            {!isGenerating ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} placement="center" />
+            ) : null}
           </div>
         </div>
       </div>

@@ -40,6 +40,8 @@ export type Sbv1ImageGenerateSettingsModalProps = {
   data: Sbv1ImageNodeData;
   onClose: () => void;
   onConfirm: (patch: Partial<Sbv1ImageNodeData>) => void;
+  /** 嵌套在其它弹层内时须高于宿主（如角色三视图批量选择 z-1200） */
+  modalZIndex?: number;
 };
 
 /** 分镜视频 1.0 · 图片模型 + 画质 / 清晰度 / 比例（紧凑单弹层） */
@@ -48,6 +50,7 @@ export function Sbv1ImageGenerateSettingsModal({
   data,
   onClose,
   onConfirm,
+  modalZIndex = MODAL_Z,
 }: Sbv1ImageGenerateSettingsModalProps) {
   const mounted = useClientPortalMounted();
   useModalBodyScrollLock(open);
@@ -118,7 +121,7 @@ export function Sbv1ImageGenerateSettingsModal({
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
       style={{
-        zIndex: MODAL_Z,
+        zIndex: modalZIndex,
         isolation: "isolate",
         transform: "translateZ(0)",
         backfaceVisibility: "hidden",

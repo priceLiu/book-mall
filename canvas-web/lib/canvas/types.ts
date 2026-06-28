@@ -119,6 +119,9 @@ export type CanvasNodeType =
   | "story-pro2-scene"
   | "story-pro2-frame"
   | "story-pro2-video"
+  | "story-pro2-prop"
+  | "story-pro2-mood"
+  | "story-pro2-audio"
   | "jianying-export-pro2"
   | "sbv1-image"
   | "sbv1-video-engine"
@@ -170,6 +173,9 @@ export type CanvasContentNodeType =
   | "story-pro2-scene"
   | "story-pro2-frame"
   | "story-pro2-video"
+  | "story-pro2-prop"
+  | "story-pro2-mood"
+  | "story-pro2-audio"
   | "jianying-export-pro2"
   | "sbv1-image"
   | "sbv1-video-engine"
@@ -220,6 +226,9 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "story-pro2-scene",
   "story-pro2-frame",
   "story-pro2-video",
+  "story-pro2-prop",
+  "story-pro2-mood",
+  "story-pro2-audio",
   "jianying-export-pro2",
   "sbv1-image",
   "sbv1-video-engine",
@@ -591,7 +600,16 @@ export type CanvasGraph = {
   edges: CanvasFlowEdge[];
   viewport?: Viewport;
   /** 漫剧轨道标记（pro2 / sbv1 等） */
-  meta?: { edition?: "pro2" | "sbv1" };
+  meta?: {
+    edition?: "pro2" | "sbv1";
+    /** 生产画布 · 建议关联已定稿剧本（非强制） */
+    productionCanvas?: boolean;
+    requireScriptLink?: boolean;
+    /** 关联的 SCRIPT_PACKAGE 资产 id */
+    linkedScriptPackageAssetId?: string;
+    /** 协作画布 · 无节点时公告栏数据锚点 */
+    crewBulletinAnchor?: import("./crew-bulletin-graph-anchor").CrewBulletinGraphAnchor;
+  };
 };
 
 /**
@@ -647,7 +665,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     starterMode: "generate",
     themeInput: "",
     generatedOutlineMd: "",
-    pro2TextPurpose: "story-outline",
+    pro2TextPurpose: "general",
     uploadedScriptMd: "",
     systemPrompt: "",
     providerId: "",
@@ -705,6 +723,9 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     string,
     unknown
   >,
+  "story-pro2-prop": { label: "道具设计", dockInput: "" } as Record<string, unknown>,
+  "story-pro2-mood": { label: "氛围设计", dockInput: "" } as Record<string, unknown>,
+  "story-pro2-audio": { label: "音效设计", dockInput: "" } as Record<string, unknown>,
   "jianying-export-pro2": {
     label: "剪映导出 · 专业版 2.0",
   } as Record<string, unknown>,
@@ -931,6 +952,18 @@ export const NODE_DEFAULT_SIZE: Record<
     width: PRO2_COLUMN_CARD_WIDTH,
     height: PRO2_COLUMN_CARD_HEIGHT,
   },
+  "story-pro2-prop": {
+    width: PRO2_IMAGE_NODE_WIDTH,
+    height: PRO2_IMAGE_NODE_HEIGHT,
+  },
+  "story-pro2-mood": {
+    width: PRO2_IMAGE_NODE_WIDTH,
+    height: PRO2_IMAGE_NODE_HEIGHT,
+  },
+  "story-pro2-audio": {
+    width: PRO2_IMAGE_NODE_WIDTH,
+    height: PRO2_IMAGE_NODE_HEIGHT,
+  },
   "jianying-export-pro2": {
     width: 400,
     height: PRO2_COLUMN_CARD_HEIGHT,
@@ -1019,6 +1052,9 @@ export const NODE_OUTPUT_KIND: Record<
   "story-pro2-scene": "image",
   "story-pro2-frame": "image",
   "story-pro2-video": "video",
+  "story-pro2-prop": "image",
+  "story-pro2-mood": "image",
+  "story-pro2-audio": "audio",
   "jianying-export-pro2": "none",
   "sbv1-image": "image",
   "sbv1-video-engine": "video",
@@ -1096,7 +1132,10 @@ export function isStoryWorkspaceNodeType(t: string): boolean {
     t === "story-pro2-character" ||
     t === "story-pro2-scene" ||
     t === "story-pro2-frame" ||
-    t === "story-pro2-video"
+    t === "story-pro2-video" ||
+    t === "story-pro2-prop" ||
+    t === "story-pro2-mood" ||
+    t === "story-pro2-audio"
   );
 }
 

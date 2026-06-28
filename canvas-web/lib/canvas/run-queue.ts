@@ -187,7 +187,11 @@ function shouldReleaseStoryRunInflight(
   }
   if (
     node &&
-    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    (node.type === "story-pro2-starter" ||
+      node.type === "story-pro-starter" ||
+      (node.type === "story-pro2-script-hub" &&
+        (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
+          true)) &&
     job.mediaKind === "themeOutline"
   ) {
     const st = (
@@ -1847,6 +1851,11 @@ export function useCanvasRunner(
         }
         for (const key of taskByNodeRef.current.keys()) {
           skipReconcileNodeIds.add(key.split(":")[0]!);
+        }
+        for (const id of collectCanvasInflightNodeIds(
+          useCanvasStore.getState().nodes,
+        )) {
+          skipReconcileNodeIds.add(id);
         }
         reconcileStaleInflightRuntimes(
           useCanvasStore.getState().nodes,

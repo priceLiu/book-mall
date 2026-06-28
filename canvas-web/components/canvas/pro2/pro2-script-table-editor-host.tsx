@@ -20,6 +20,10 @@ import {
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
+import {
+  CREW_BULLETIN_META_ANCHOR_ID,
+  hubFieldsFromGraphAnchor,
+} from "@/lib/canvas/crew-bulletin-graph-anchor";
 
 type CachedContent = {
   storyboardMd: string;
@@ -36,30 +40,41 @@ export function Pro2ScriptTableEditorHost() {
   const closeEditor = useCanvasStore((s) => s.closePro2ScriptTableEditor);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const graphMeta = useCanvasStore((s) => s.graphMeta);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const cachedContentRef = useRef<CachedContent | null>(null);
-  const lastEditorNodeIdRef = useRef<string | null>(null);
+  const isMetaAnchor = editorNodeId === CREW_BULLETIN_META_ANCHOR_ID;
+
+  const openSnapshotRef = useRef<{
+    nodeId: string;
+    content: CachedContent;
+  } | null>(null);
 
   const node = useMemo(
     () =>
-      editorNodeId
+      editorNodeId && !isMetaAnchor
         ? nodes.find(
             (n) => n.id === editorNodeId && n.type === "story-pro2-script-hub",
           )
         : undefined,
-    [editorNodeId, nodes],
+    [editorNodeId, isMetaAnchor, nodes],
   );
 
-  const d = (node?.data ?? {}) as StoryProScriptHubNodeData;
+  const metaHubFields = useMemo(() => {
+    if (!isMetaAnchor || !graphMeta?.crewBulletinAnchor) return null;
+    return hubFieldsFromGraphAnchor(graphMeta.crewBulletinAnchor);
+  }, [isMetaAnchor, graphMeta]);
+
+  const d = ((isMetaAnchor ? metaHubFields : node?.data) ??
+    {}) as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
   const sceneCtx = useMemo(
     () =>
-      editorNodeId
+      editorNodeId && !isMetaAnchor
         ? { nodes, edges, hubId: editorNodeId }
         : undefined,
-    [editorNodeId, nodes, edges],
+    [editorNodeId, isMetaAnchor, nodes, edges],
   );
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
   const outlineMd = outlineDisplayMd(d.outlineMd ?? "");
@@ -69,18 +84,32 @@ export function Pro2ScriptTableEditorHost() {
     pro2HubHasSceneTable(d, sceneCtx) ||
     pro2HubHasOutlineContent(d);
 
-  if (editorNodeId !== lastEditorNodeIdRef.current) {
-    lastEditorNodeIdRef.current = editorNodeId;
-    if (!editorNodeId) {
-      cachedContentRef.current = null;
-    }
-  }
+  const liveContent: CachedContent = {
+    storyboardMd,
+    characterMd,
+    sceneMd,
+    outlineMd,
+  };
 
-  if (hasContent) {
-    cachedContentRef.current = { storyboardMd, characterMd, sceneMd, outlineMd };
+  if (!editorNodeId) {
+    openSnapshotRef.current = null;
+  } else if (
+    openSnapshotRef.current?.nodeId !== editorNodeId &&
+    hasContent
+  ) {
+    openSnapshotRef.current = { nodeId: editorNodeId, content: liveContent };
   }
 
   const title = useMemo(() => {
+    if (isMetaAnchor) {
+      const t =
+        graphMeta?.crewBulletinAnchor?.linkedScriptPackageTitle?.replace(
+          /^剧本包 · /,
+          "",
+        ) ||
+        graphMeta?.crewBulletinAnchor?.crewBulletin?.scriptTitle?.trim();
+      return t ? `${t} · 剧本快照` : "剧本快照";
+    }
     if (!node) return "脚本";
     const starter = resolveStarterForHub(nodes, edges, node.id);
     const theme =
@@ -88,7 +117,7 @@ export function Pro2ScriptTableEditorHost() {
         (starter?.data as { systemPrompt?: string })?.systemPrompt ?? "",
       ) || d.outlineMd?.split("\n")[0]?.replace(/^#+\s*/, "")?.slice(0, 32);
     return theme?.trim() ? `${theme.trim()} · 脚本` : "脚本 · 编辑";
-  }, [node, nodes, edges, d.outlineMd]);
+  }, [isMetaAnchor, graphMeta, node, nodes, edges, d.outlineMd]);
 
   const persistOutline = useCallback(
     (md: string) => {
@@ -152,9 +181,36 @@ export function Pro2ScriptTableEditorHost() {
 
   if (!editorNodeId) return null;
 
-  const displayContent = hasContent
-    ? { storyboardMd, characterMd, sceneMd, outlineMd }
-    : cachedContentRef.current;
+  const displayContent =
+    openSnapshotRef.current?.nodeId === editorNodeId
+      ? openSnapshotRef.current.content
+      : hasContent
+        ? liveContent
+        : null;
+
+  if (!displayContent) return null;
+  if (!node && !isMetaAnchor) return null;
+
+  if (isMetaAnchor) {
+    return (
+      <Pro2ScriptHubEditorModal
+        open
+        readOnly
+        title={title}
+        tab={editorTab}
+        onTabChange={setEditorTab}
+        outlineMd={displayContent.outlineMd}
+        sceneMd={displayContent.sceneMd}
+        characterMd={displayContent.characterMd}
+        storyboardMd={displayContent.storyboardMd}
+        onClose={closeEditor}
+        onAutoSaveOutline={() => {}}
+        onAutoSaveScene={() => {}}
+        onAutoSaveCharacter={() => {}}
+        onAutoSaveStoryboard={() => {}}
+      />
+    );
+  }
 
   if (!node || !displayContent) return null;
 
@@ -173,6 +229,8 @@ export function Pro2ScriptTableEditorHost() {
       onAutoSaveScene={persistScene}
       onAutoSaveCharacter={persistCharacter}
       onAutoSaveStoryboard={persistStoryboard}
+      hubId={node.id}
+      hubData={d}
     />
   );
 }

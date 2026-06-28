@@ -1,17 +1,20 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Boxes,
+  Box,
+  Download,
   FileText,
-  FileUp,
   Film,
   Image as ImageIcon,
   LayoutGrid,
   Link2,
   Music,
+  Palette,
   Sparkles,
   Type,
   User,
   Video,
+  Wind,
 } from "lucide-react";
 
 export type Pro2AddMenuItem = {
@@ -23,7 +26,7 @@ export type Pro2AddMenuItem = {
   badge?: "Beta" | "NEW";
   /** 点击后创建/连接的节点 type */
   nodeType?: string;
-  /** 悬停/点击展开二级菜单（如素材库 → 风格库） */
+  /** 悬停/点击展开二级菜单（如资产库 → 风格库） */
   submenu?: Pro2AddMenuSection[];
 };
 
@@ -72,6 +75,24 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
   },
 ];
 
+/** 2.0 · 工作环节（Rail / Dock 工作环节区） */
+const PRO2_STAGE_ITEMS: Pro2AddMenuItem[] = [
+  {
+    id: "character-column",
+    label: "人物设计",
+    icon: User,
+    enabled: true,
+    nodeType: "story-pro2-three-view",
+  },
+  {
+    id: "video-column",
+    label: "分镜视频",
+    icon: Video,
+    enabled: true,
+    nodeType: "sbv1-video-engine",
+  },
+];
+
 /** 图片 / 三视图节点左侧 + · 添加上游输入（文生图：接文本） */
 export const PRO2_IMAGE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   {
@@ -90,6 +111,13 @@ export const PRO2_IMAGE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: ImageIcon,
         enabled: true,
         nodeType: "story-pro2-image",
+      },
+      {
+        id: "style-asset",
+        label: "风格图",
+        icon: Box,
+        enabled: true,
+        nodeType: "story-pro2-style-asset",
       },
       { id: "video", label: "视频", icon: Video, enabled: false },
       {
@@ -136,12 +164,6 @@ export const PRO2_STARTER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: FileText,
         enabled: false,
         badge: "NEW",
-      },
-      {
-        id: "upload-script",
-        label: "上传剧本",
-        icon: FileUp,
-        enabled: true,
       },
       { id: "ref-node", label: "参考节点", icon: Link2, enabled: true },
     ],
@@ -190,7 +212,7 @@ export const PRO2_STYLE_ASSET_RIGHT_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 素材库二级菜单 */
+/** 资产库二级菜单 */
 export const PRO2_ASSET_LIB_SUBMENU: Pro2AddMenuSection[] = [
   {
     items: [
@@ -205,6 +227,37 @@ export const PRO2_ASSET_LIB_SUBMENU: Pro2AddMenuSection[] = [
         label: "特效库",
         icon: Sparkles,
         enabled: false,
+      },
+      {
+        id: "prop-column",
+        label: "道具设计",
+        icon: Box,
+        enabled: true,
+        badge: "NEW",
+        nodeType: "story-pro2-prop",
+      },
+      {
+        id: "mood-column",
+        label: "氛围设计",
+        icon: Wind,
+        enabled: true,
+        badge: "NEW",
+        nodeType: "story-pro2-mood",
+      },
+      {
+        id: "audio-column",
+        label: "音效设计",
+        icon: Music,
+        enabled: true,
+        badge: "NEW",
+        nodeType: "story-pro2-audio",
+      },
+      {
+        id: "scene-column",
+        label: "场景设计",
+        icon: LayoutGrid,
+        enabled: true,
+        nodeType: "story-pro2-image",
       },
     ],
   },
@@ -229,7 +282,7 @@ export const PRO2_TOOLBAR_ADD_MENU: Pro2AddMenuSection[] = [
       ...NODE_ITEMS,
       {
         id: "asset-lib",
-        label: "素材库",
+        label: "资产库",
         icon: Boxes,
         enabled: true,
         badge: "NEW",
@@ -238,10 +291,39 @@ export const PRO2_TOOLBAR_ADD_MENU: Pro2AddMenuSection[] = [
     ],
   },
   {
+    title: "工作环节",
+    items: PRO2_STAGE_ITEMS,
+  },
+  {
     title: "添加资源",
     items: [
       { id: "upload", label: "上传", icon: ImageIcon, enabled: true },
       { id: "history", label: "从生成历史选择", icon: Film, enabled: true },
     ],
+  },
+];
+
+/** 左侧竖向 Rail · 点击在视口中心生成对应环节节点 */
+export const PRO2_STAGE_RAIL_ITEMS: Pro2AddMenuItem[] = [
+  {
+    id: "script",
+    label: "故事剧本",
+    icon: FileText,
+    enabled: true,
+    nodeType: "story-pro2-script-hub",
+  },
+  {
+    id: "style-library",
+    label: "风格定义",
+    icon: Palette,
+    enabled: true,
+  },
+  ...PRO2_STAGE_ITEMS,
+  {
+    id: "export",
+    label: "剪映导出",
+    icon: Download,
+    enabled: true,
+    nodeType: "jianying-export-pro2",
   },
 ];

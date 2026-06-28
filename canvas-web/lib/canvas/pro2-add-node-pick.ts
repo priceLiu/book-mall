@@ -7,12 +7,15 @@ import {
   buildPro2ThreeViewNodeData,
   spawnPro2ScriptHubAt,
 } from "./pro2-spawn-nodes";
+import { NODE_DEFAULT_DATA } from "./types";
 import { PRO2_CHARACTER_THREE_VIEW_HEIGHT, PRO2_CHARACTER_THREE_VIEW_WIDTH } from "./story-pro2-node-chrome";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { buildSbv1ImageNodeData, buildSbv1VideoEngineNodeData, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   resolveLibtvSideSpawnNodeType,
 } from "./libtv-side-spawn";
+import { resolvePro2ProductionGate, pro2ProductionGateAllowsStageSpawn } from "./pro2-production-gate";
+import { useCanvasStore } from "./store";
 import type { CanvasNodeType } from "./types";
 
 export type LibtvCanvasEdition = "pro2" | "sbv1";
@@ -23,6 +26,12 @@ export type Pro2AddNodePickDialogs = {
     message: string;
     variant?: "info" | "warning" | "error";
   }) => Promise<void>;
+  confirm: (opts: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: "info" | "warning" | "error";
+  }) => Promise<boolean>;
 };
 
 export type Pro2AddNodePickStore = {
@@ -33,6 +42,15 @@ export type Pro2AddNodePickStore = {
       | "story-pro2-script-hub"
       | "story-pro2-style-asset"
       | "story-pro2-three-view"
+      | "story-pro2-style"
+      | "story-pro2-character"
+      | "story-pro2-scene"
+      | "story-pro2-frame"
+      | "story-pro2-video"
+      | "story-pro2-prop"
+      | "story-pro2-mood"
+      | "story-pro2-audio"
+      | "jianying-export-pro2"
       | "sbv1-image"
       | "sbv1-video-engine",
     position: { x: number; y: number },
@@ -91,7 +109,28 @@ export async function handlePro2ToolbarAddNodePick(
   const { addNode, setNodes } = store;
   const edition = options?.edition ?? "pro2";
 
-  if (itemId === "style-library") {
+  const gate = resolvePro2ProductionGate(
+    useCanvasStore.getState().nodes,
+    useCanvasStore.getState().graphMeta ?? undefined,
+  );
+  const stagePick =
+    itemId === "character-column" ||
+    itemId === "video-column" ||
+    itemId === "scene-column" ||
+    itemId === "prop-column" ||
+    itemId === "mood-column" ||
+    itemId === "audio-column";
+  if (stagePick && !pro2ProductionGateAllowsStageSpawn(gate)) {
+    const ok = await dialogs.confirm({
+      title: "建议先关联剧本",
+      message: `${gate.message}\n\n仍要继续添加节点吗？`,
+      confirmLabel: "继续添加",
+      variant: "warning",
+    });
+    if (!ok) return;
+  }
+
+  if (itemId === "style-library" || itemId === "style") {
     if (options?.onOpenStyleLibrary) {
       options.onOpenStyleLibrary();
     } else {
@@ -174,6 +213,77 @@ export async function handlePro2ToolbarAddNodePick(
     return;
   }
 
+  if (itemId === "scene-column") {
+    const pos = spawnPosition("story-pro2-image", options, {
+      pro2MediaRole: "scene",
+      label: "场景设计",
+    });
+    const id = addNode(
+      "story-pro2-image",
+      pos,
+      buildPro2ImageNodeData({ pro2MediaRole: "scene", label: "场景设计" }),
+    );
+    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
+  if (
+    itemId === "character-column" ||
+    (itemId === "three-view" && nodeType === "story-pro2-three-view")
+  ) {
+    const pos = spawnPosition("story-pro2-three-view", options);
+    const id = addNode(
+      "story-pro2-three-view",
+      pos,
+      buildPro2ThreeViewNodeData({ label: "角色" }),
+    );
+    if (id) {
+      setNodes((prev) =>
+        prev.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+                height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+                style: {
+                  width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+                  height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+                },
+              }
+            : n,
+        ),
+      );
+      selectPro2NodeAfterSpawn(setNodes, id);
+    }
+    return;
+  }
+
+  if (itemId === "video-column") {
+    spawnVideoEngine(store, options);
+    return;
+  }
+
+  const stageColumnTypes = [
+    "story-pro2-prop",
+    "story-pro2-mood",
+    "story-pro2-audio",
+    "jianying-export-pro2",
+  ] as const;
+  if (
+    nodeType &&
+    (stageColumnTypes as readonly string[]).includes(nodeType)
+  ) {
+    const t = nodeType as (typeof stageColumnTypes)[number];
+    const pos = spawnPosition(t, options);
+    const id = addNode(
+      t,
+      pos,
+      { ...(NODE_DEFAULT_DATA[t] as Record<string, unknown>) },
+    );
+    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
   const label = COMING_SOON[itemId];
   if (label) {
     await dialogs.alert({
@@ -204,6 +314,8 @@ export async function handlePro2SideAddNodePick(
     itemId === "text" ||
     itemId === "image" ||
     itemId === "three-view" ||
+    itemId === "style-asset" ||
+    itemId === "style-asset" ||
     itemId === "script" ||
     itemId === "video" ||
     itemId === "video-compose" ||

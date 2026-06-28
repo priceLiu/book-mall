@@ -3,19 +3,22 @@ import {
   isGatewayAuthResponse,
   requireGatewayV1Auth,
 } from "@/lib/gateway/gateway-v1-route-auth";
-import { parseGatewayV1LogMeta, logMetaToRequestLogFields } from "@/lib/gateway/gateway-v1-log-meta";
+import {
+  parseGatewayV1LogMeta,
+  logMetaToRequestLogFields,
+} from "@/lib/gateway/gateway-v1-log-meta";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import {
   createRequestLog,
-  finalizeRequestLog,
-  forwardChatCompletions,
   forwardChatCompletionsStream,
-  parseOpenAiUsage,
-  pickCredentialForKind,
   mapGatewayPreCreateLogError,
+  pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
-import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  GatewayV1ChatError,
+  runGatewayV1ChatCompletions,
+} from "@/lib/gateway/gateway-v1-chat-service";
 import {
   routeGatewayModel,
   UnknownGatewayModelError,
@@ -48,97 +51,74 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "model required" }, { status: 400 });
   }
 
-  let route;
-  try {
-    route = routeGatewayModel(model);
-  } catch (e) {
-    if (e instanceof UnknownGatewayModelError) {
-      return NextResponse.json({ error: e.message }, { status: 400 });
-    }
-    throw e;
-  }
-  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
-  if (!credentialId) {
-    return NextResponse.json(
-      { error: `No ${route.providerKind} credential bound to this API key` },
-      { status: 400 },
-    );
-  }
-
-  const clientSource = parseGatewayClientSource(
-    logMeta.clientSource ?? request.headers.get("x-gateway-client"),
-  );
-
-  const { model: _modelField, ...restBody } = body;
-  let log;
-  try {
-    log = await createRequestLog({
-      userId: auth.userId,
-      apiKeyId: auth.id,
-      credentialId,
-      model,
-      endpoint: "/v1/chat/completions",
-      clientSource,
-      inputSummary: buildGatewayInputSummary(model, restBody),
-      ...logMetaToRequestLogFields(logMeta),
-    });
-  } catch (e) {
-    const mapped = mapGatewayPreCreateLogError(e);
-    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
-  }
-
   const stream = body.stream === true;
 
-  try {
-    if (stream) {
-      const result = await forwardChatCompletionsStream({
-        credentialId,
-        providerKind: route.providerKind,
-        body,
-      });
-      return new NextResponse(result.body, {
-        status: result.status,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "x-gateway-log-id": log.id,
-        },
-      });
+  if (stream) {
+    let route;
+    try {
+      route = routeGatewayModel(model);
+    } catch (e) {
+      if (e instanceof UnknownGatewayModelError) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+      }
+      throw e;
+    }
+    const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
+    if (!credentialId) {
+      return NextResponse.json(
+        { error: `No ${route.providerKind} credential bound to this API key` },
+        { status: 400 },
+      );
     }
 
-    const result = await forwardChatCompletions({
+    const clientSource = parseGatewayClientSource(
+      logMeta.clientSource ?? request.headers.get("x-gateway-client"),
+    );
+    const { model: _modelField, ...restBody } = body;
+    let log;
+    try {
+      log = await createRequestLog({
+        userId: auth.userId,
+        apiKeyId: auth.id,
+        credentialId,
+        model,
+        endpoint: "/v1/chat/completions",
+        clientSource,
+        inputSummary: buildGatewayInputSummary(model, restBody),
+        ...logMetaToRequestLogFields(logMeta),
+      });
+    } catch (e) {
+      const mapped = mapGatewayPreCreateLogError(e);
+      return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    }
+
+    const result = await forwardChatCompletionsStream({
       credentialId,
       providerKind: route.providerKind,
       body,
     });
-    let parsed: unknown = null;
-    try {
-      parsed = result.text ? JSON.parse(result.text) : null;
-    } catch {
-      parsed = null;
-    }
-    const usage = parseOpenAiUsage(parsed);
-    await finalizeRequestLog(log.id, {
-      status: result.status >= 200 && result.status < 300 ? "SUCCEEDED" : "FAILED",
-      durationMs: result.durationMs,
-      usage,
-      resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
-      failMessage: result.status >= 300 ? result.text.slice(0, 500) : undefined,
-      model,
+    return new NextResponse(result.body, {
+      status: result.status,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "x-gateway-log-id": log.id,
+      },
     });
+  }
+
+  try {
+    const result = await runGatewayV1ChatCompletions({ auth, body, logMeta });
     return new NextResponse(result.text, {
       status: result.status,
       headers: {
         "Content-Type": "application/json",
-        "x-gateway-log-id": log.id,
+        "x-gateway-log-id": result.logId,
       },
     });
   } catch (e) {
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: (e as Error).message,
-      model,
-    });
-    return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    if (e instanceof GatewayV1ChatError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
   }
 }

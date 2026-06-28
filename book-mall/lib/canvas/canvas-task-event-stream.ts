@@ -2,12 +2,17 @@
  * 画布项目 · 任务变更指纹（SSE / 侧栏 invalidate 用，轻量读）。
  */
 import { prisma } from "@/lib/prisma";
+import { fingerprintBulletinFromCanvasJson } from "./crew-bulletin-fingerprint";
 
 export type CanvasTaskSyncSnapshot = {
   fingerprint: string;
   inflightCount: number;
   taskCount: number;
   latestUpdatedAt: string | null;
+  /** 画布项目更新时间 · 公告栏协作订阅 */
+  projectUpdatedAt: string | null;
+  /** graph.meta.crewBulletinAnchor 任务状态指纹 */
+  bulletinFingerprint: string;
 };
 
 type SnapshotRow = {
@@ -65,7 +70,8 @@ export function isCanvasTaskSseEnabled(): boolean {
 async function loadCanvasProjectTaskSyncSnapshot(
   projectId: string,
 ): Promise<CanvasTaskSyncSnapshot> {
-  const rows = await prisma.$queryRaw<SnapshotRow[]>`
+  const [rows, project] = await Promise.all([
+    prisma.$queryRaw<SnapshotRow[]>`
     SELECT
       MAX("updatedAt") AS latest,
       COUNT(*)::bigint AS total,
@@ -80,7 +86,12 @@ async function loadCanvasProjectTaskSyncSnapshot(
     FROM "CanvasGenerationTask"
     WHERE "projectId" = ${projectId}
       AND "deletedAt" IS NULL
-  `;
+  `,
+    prisma.canvasProject.findUnique({
+      where: { id: projectId },
+      select: { updatedAt: true, canvas: true },
+    }),
+  ]);
 
   const row = rows[0];
   const latest = row?.latest ?? null;
@@ -93,6 +104,8 @@ async function loadCanvasProjectTaskSyncSnapshot(
     inflightCount,
     taskCount,
     latestUpdatedAt: latest?.toISOString() ?? null,
+    projectUpdatedAt: project?.updatedAt?.toISOString() ?? null,
+    bulletinFingerprint: fingerprintBulletinFromCanvasJson(project?.canvas),
   };
 }
 

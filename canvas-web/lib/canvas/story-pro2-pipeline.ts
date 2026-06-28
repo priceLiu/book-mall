@@ -12,6 +12,9 @@ export const STORY_PRO2_NODE_TYPES = [
   "story-pro2-scene",
   "story-pro2-frame",
   "story-pro2-video",
+  "story-pro2-prop",
+  "story-pro2-mood",
+  "story-pro2-audio",
   "jianying-export-pro2",
 ] as const;
 

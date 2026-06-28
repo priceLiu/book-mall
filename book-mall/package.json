@@ -24,6 +24,7 @@
     "db:post-billing-setup": "dotenv -e .env.local -- tsx scripts/post-db-billing-setup.ts",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:deploy:runtime": "dotenv -e .env.local -- tsx scripts/prisma-deploy-runtime.ts",
     "db:calibrate-pilot": "dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts",
     "pricing:bootstrap": "dotenv -e .env.local -- tsx scripts/pricing-bootstrap.ts",
     "pricing:import-markdown": "dotenv -e .env.local -- tsx scripts/pricing-import-markdown.ts",

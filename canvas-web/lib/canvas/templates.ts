@@ -16,6 +16,12 @@ import {
   STORY_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-prompts";
 import {
+  STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
+  STORY_PRO2_SCENE_PROMPT,
+  STORY_PRO2_STORYBOARD_PROMPT,
+} from "./story-pro2-theme-outline-prompt";
+import {
   STORY_PRO_CHARACTER_PROMPT,
   STORY_PRO_OUTLINE_USER_PROMPT,
   STORY_PRO_STORYBOARD_PROMPT,
@@ -29,6 +35,8 @@ import {
   STORY_PRO_CONTROL_NODE_WIDTH,
 } from "./story-pro-node-chrome";
 import {
+  PRO2_SCRIPT_NODE_HEIGHT,
+  PRO2_SCRIPT_NODE_WIDTH,
   PRO2_TEXT_NODE_HEIGHT,
   PRO2_TEXT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
@@ -491,8 +499,89 @@ const STORY_PRO2_PIPELINE: CanvasGraph = {
         starterMode: "generate",
         themeInput: "",
         generatedOutlineMd: "",
+        pro2TextPurpose: "general",
         uploadedScriptMd: "",
         systemPrompt: "",
+        providerId: "",
+        modelKey: "",
+        params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+        pipelineStage: "idle",
+      },
+    },
+  ],
+  edges: [],
+};
+
+/**
+ * 剧本创作画布（工业化标准化）· 与 2.0 同 edition（pro2）。
+ */
+const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
+  schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
+  meta: { edition: "pro2" },
+  viewport: { x: 0, y: 0, zoom: 0.85 },
+  nodes: [
+    {
+      id: "sp2-script-hub",
+      type: "story-pro2-script-hub",
+      position: STORY_PRO2_STARTER_ORIGIN,
+      width: PRO2_SCRIPT_NODE_WIDTH,
+      height: PRO2_SCRIPT_NODE_HEIGHT,
+      style: {
+        width: PRO2_SCRIPT_NODE_WIDTH,
+        height: PRO2_SCRIPT_NODE_HEIGHT,
+      },
+      data: {
+        outlineMd: "",
+        characterMd: "",
+        sceneMd: "",
+        storyboardMd: "",
+        scriptStudioMode: true,
+        scriptStudioInputMode: "generate",
+        scriptStudioThemeInput: "",
+        scriptStudioSystem: "original",
+        scriptStudioTotalEpisodes: 30,
+        scriptStudioBatchIndex: 0,
+        providerId: "",
+        modelKey: "",
+        params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+        outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+        promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
+        promptCharacter: STORY_PRO_CHARACTER_PROMPT,
+        promptScene: STORY_PRO2_SCENE_PROMPT,
+        promptStoryboard: STORY_PRO2_STORYBOARD_PROMPT,
+        dockInput: "",
+        dockRefImages: [],
+      },
+    },
+  ],
+  edges: [],
+};
+
+/** 生产画布 · 建议关联已定稿剧本（非强制） */
+const STORY_PRO2_PRODUCTION: CanvasGraph = {
+  schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
+  meta: {
+    edition: "pro2",
+    productionCanvas: true,
+    requireScriptLink: true,
+  },
+  viewport: { x: 0, y: 0, zoom: 0.85 },
+  nodes: [
+    {
+      id: "sp2-prod-starter",
+      type: "story-pro2-starter",
+      position: STORY_PRO2_STARTER_ORIGIN,
+      width: PRO2_TEXT_NODE_WIDTH,
+      height: PRO2_TEXT_NODE_HEIGHT,
+      style: {
+        width: PRO2_TEXT_NODE_WIDTH,
+        height: PRO2_TEXT_NODE_HEIGHT,
+      },
+      data: {
+        starterMode: "generate",
+        themeInput: "",
+        generatedOutlineMd: "",
+        pro2TextPurpose: "general",
         providerId: "",
         modelKey: "",
         params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
@@ -571,6 +660,22 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     description:
       "LibTV 架构：文本节点 + 底部输入坞 + 侧栏 + 号连接下游；业务规则与 1.0 对齐。",
     canvas: STORY_PRO2_PIPELINE,
+  },
+  {
+    id: "builtin/story-pro2-script-studio",
+    category: "builtin",
+    name: "剧本创作（工业化）",
+    description:
+      "小白式主题生成 / 上传原稿翻新 · 10 集/批 · 冻结档案 · 脚本生成器产出分镜脚本。",
+    canvas: STORY_PRO2_SCRIPT_STUDIO,
+  },
+  {
+    id: "builtin/story-pro2-production",
+    category: "builtin",
+    name: "生产画布（关联剧本）",
+    description:
+      "各集分镜/视频制作入口；建议先关联已定稿 SCRIPT_PACKAGE 剧本资产（可跳过）。",
+    canvas: STORY_PRO2_PRODUCTION,
   },
   {
     id: "builtin/storyboard-video-pipeline",

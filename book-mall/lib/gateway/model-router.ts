@@ -9,6 +9,8 @@ import {
 export { resolveVolcengineModelKey };
 
 const DEEPSEEK_MODELS = new Set([
+  "deepseek-v4-flash",
+  "deepseek-v4-pro",
   "deepseek-chat",
   "deepseek-reasoner",
   "deepseek-coder",
@@ -189,8 +191,8 @@ export function routeGatewayModel(model: string): RoutedModel {
   }
 
   if (
-    /^gemini-\d+\.\d-flash(-preview)?$/i.test(m) ||
-    /^google\/gemini-\d+\.\d-flash(-preview)?$/i.test(m)
+    /^gemini-\d+(\.\d+)?-flash(-preview)?$/i.test(m) ||
+    /^google\/gemini-\d+(\.\d+)?-flash(-preview)?$/i.test(m)
   ) {
     return { providerKind: "KIE", requestKind: "CHAT" };
   }

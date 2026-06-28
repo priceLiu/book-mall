@@ -15,6 +15,7 @@ export function isLibtvFreestandingImageNode(
 ): boolean {
   if (!node) return false;
   if (node.type === "sbv1-image") return true;
+  if (node.type === "story-pro2-three-view") return true;
   if (node.type === "story-pro2-image") {
     const role = (node.data as { pro2MediaRole?: string }).pro2MediaRole ?? "generic";
     return role === "generic" || role === "scene";
@@ -71,6 +72,44 @@ export function revertOptimisticLibtvMediaRunStart(
   _setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
 ): void {
   updateNodeData(nodeId, libtvMediaRunIdlePatch());
+}
+
+/** 无 taskId 的 pending/uploading（乐观态落库后任务未提交） */
+export function isOrphanLibtvMediaInflight(data: {
+  uploading?: unknown;
+  runtime?: {
+    status?: string;
+    taskId?: string;
+    ossUrl?: string;
+    ephemeralUrl?: string;
+  } | null;
+}): boolean {
+  const rt = data.runtime;
+  const s = rt?.status;
+  if (rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim()) return false;
+  if (rt?.taskId?.trim()) return false;
+  if (data.uploading) return true;
+  return s === "pending" || s === "running";
+}
+
+export function clearOrphanLibtvMediaInflightInNodes<
+  T extends { type?: string; data?: Record<string, unknown> },
+>(nodes: T[]): T[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    const isMedia =
+      isLibtvFreestandingImageNode(n as Pick<CanvasFlowNode, "type" | "data">) ||
+      n.type === "sbv1-video-engine";
+    if (!isMedia || !isOrphanLibtvMediaInflight((n.data ?? {}) as never)) {
+      return n;
+    }
+    changed = true;
+    return {
+      ...n,
+      data: { ...(n.data ?? {}), ...libtvMediaRunIdlePatch() },
+    };
+  });
+  return changed ? next : nodes;
 }
 
 export function commitLibtvImageRunPendingPatch(

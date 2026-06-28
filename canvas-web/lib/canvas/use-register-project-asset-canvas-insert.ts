@@ -23,6 +23,8 @@ export function useRegisterProjectAssetCanvasInsert() {
   const spawnActions = useCallback(
     () => ({
       getNodes: () => useCanvasStore.getState().nodes,
+      getGraphMeta: () => useCanvasStore.getState().graphMeta ?? null,
+      updateNodeData: useCanvasStore.getState().updateNodeData,
       addNode,
       addNodeInGroup,
       setEdges,

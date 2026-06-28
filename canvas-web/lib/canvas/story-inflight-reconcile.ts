@@ -28,6 +28,10 @@ import type {
   StoryLlmSection,
   StoryScriptHubNodeData,
 } from "./story-workspace-types";
+import {
+  isLibtvFreestandingImageNode,
+  libtvMediaRunIdlePatch,
+} from "./libtv-image-node-run";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { isStoryWorkspaceNodeType } from "./types";
 
@@ -94,6 +98,7 @@ function reconcileHubSection(
     | CanvasNodeRuntime
     | undefined;
   if (!isInflightStatus(rt?.status)) return;
+  if (rt?.status === "pending" && !rt?.taskId) return;
 
   const scope = { llmSection: section };
   const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
@@ -136,11 +141,17 @@ export function reconcileStaleInflightRuntimes(
 ): void {
   const skipNodeIds = opts?.skipNodeIds;
   for (const node of nodes) {
-    if (node.type === "story-pro2-starter" || node.type === "story-pro-starter") {
+    if (
+      node.type === "story-pro2-starter" ||
+      node.type === "story-pro-starter" ||
+      (node.type === "story-pro2-script-hub" &&
+        (node.data as { scriptStudioMode?: boolean }).scriptStudioMode === true)
+    ) {
       const rt = (
         node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
       ).themeOutlineRuntime;
       if (isInflightStatus(rt?.status)) {
+        if (rt?.status === "pending" && !rt?.taskId) continue;
         const scope = { mediaKind: "themeOutline" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (!hasServerInflightForScope(tasks, node.id, scope)) {
@@ -358,8 +369,24 @@ export function reconcileStaleInflightRuntimes(
     );
     if (inflight) continue;
 
-    // 刚提交：本地 pending/running 尚未绑定 taskId，勿误清或误贴历史终态
+    // 刚提交：本地 pending/running 尚未绑定 taskId，勿误贴历史终态；
+    // 但若服务端无进行中任务且本地队列也未跑，则为落库的孤儿乐观态，应清除。
     if (!rt.taskId) {
+      if (
+        !skipNodeIds?.has(node.id) &&
+        (isLibtvFreestandingImageNode(node) ||
+          node.type === "sbv1-video-engine")
+      ) {
+        const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+        const hasServerInflight = nodeTasks.some(
+          (t) =>
+            isServerInflightTaskStatus(t.status) &&
+            !isStaleServerInflightTask(t, nodeTasks),
+        );
+        if (!hasServerInflight) {
+          updateNodeData(node.id, libtvMediaRunIdlePatch());
+        }
+      }
       continue;
     }
 

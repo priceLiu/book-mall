@@ -1,27 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
-import { ArrowUp, Loader2, MapPin } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowUp, ChevronDown, Loader2, MapPin, SlidersHorizontal } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
-import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
+import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
+import { pickDefaultPro2ThreeViewImageEngine } from "@/lib/canvas/pro2-three-view-batch-image";
 import {
-  PRO2_THREE_VIEW_MODEL_KEYS,
-  pickDefaultPro2ThreeViewImageEngine,
-} from "@/lib/canvas/pro2-three-view-batch-image";
+  pro2ThreeViewAsSbv1Settings,
+  sbv1EngineToBatchImage,
+  sbv1PatchToThreeViewNodeData,
+} from "@/lib/canvas/pro2-three-view-engine";
 import type {
   StoryPro2ThreeViewNodeData,
   StoryProCharacterRow,
 } from "@/lib/canvas/story-pro2-workspace-types";
+import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
-import { EnginePicker } from "../engine-picker";
+import {
+  Sbv1ImageGenerateSettingsModal,
+  sbv1ImageSettingsTriggerLabel,
+} from "../sbv1/sbv1-image-generate-settings-modal";
 import {
   Pro2DockHeader,
   Pro2DockToolbar,
@@ -48,6 +55,8 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const storeNode = useMemo(
     () => nodes.find((n) => n.id === nodeId) ?? null,
     [nodes, nodeId],
@@ -70,12 +79,34 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     };
   })?.batchImage;
 
+  const settingsData = useMemo(
+    () => pro2ThreeViewAsSbv1Settings(d, batchImage ?? null),
+    [d, batchImage],
+  );
+
+  const settingsLabel = sbv1ImageSettingsTriggerLabel(settingsData, providers);
+  const hasImageModel = Boolean(
+    settingsData.engine?.providerId?.trim() && settingsData.engine?.modelKey?.trim(),
+  );
+
   useEffect(() => {
-    if (!controller || batchImage?.providerId?.trim()) return;
+    if (!storeNode || hasImageModel) return;
     const pick = pickDefaultPro2ThreeViewImageEngine(providers);
     if (!pick) return;
-    updateNodeData(controller.id, { batchImage: pick });
-  }, [controller, batchImage?.providerId, providers, updateNodeData]);
+    updateNodeData(storeNode.id, sbv1PatchToThreeViewNodeData({
+      engine: {
+        providerId: pick.providerId,
+        modelKey: pick.modelKey,
+        params: pick.params,
+      },
+      aspectRatio: "16:9",
+      resolution: "2K",
+      outputCount: 1,
+    }));
+    if (controllerId) {
+      updateNodeData(controllerId, { batchImage: pick });
+    }
+  }, [storeNode, hasImageModel, providers, updateNodeData, controllerId]);
 
   const upstreamLinks = useMemo(() => {
     if (!storeNode) return [];
@@ -135,29 +166,28 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     [storeNode, updateNodeData, syncCharacterRowPrompt],
   );
 
-  const onPickImageEngine = useCallback(
-    (next: {
-      providerId: string;
-      modelKey: string;
-      params: Record<string, unknown>;
-    }) => {
-      if (!controllerId) return;
-      updateNodeData(controllerId, {
-        batchImage: {
-          providerId: next.providerId,
-          modelKey: next.modelKey,
-          params: next.params,
-        },
-      });
+  const onConfirmSettings = useCallback(
+    (patch: Partial<Sbv1ImageNodeData>) => {
+      if (!storeNode) return;
+      updateNodeData(storeNode.id, sbv1PatchToThreeViewNodeData(patch));
+      const batch = sbv1EngineToBatchImage({ ...settingsData, ...patch });
+      if (batch && controllerId) {
+        updateNodeData(controllerId, { batchImage: batch });
+      }
     },
-    [controllerId, updateNodeData],
+    [storeNode, settingsData, controllerId, updateNodeData],
   );
 
   const onRegenerate = useCallback(() => {
-    if (!storeNode || !controllerId || !d.pro2RowKey) return;
-    batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
-      forceFresh: true,
-    });
+    if (!storeNode) return;
+    if (controllerId && d.pro2RowKey) {
+      batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
+        forceFresh: true,
+      });
+      return;
+    }
+    // 协作画布 · 无控制列：作为独立生图节点直接生成
+    busEnqueueNode(storeNode.id, true);
   }, [storeNode, controllerId, d.pro2RowKey]);
 
   const onOpenStyleLibrary = useCallback(() => {
@@ -168,88 +198,108 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   if (!storeNode) return null;
 
   const styleRef = d.dockStyleRef;
-  const canRegenerate = Boolean(
-    controllerId && d.pro2RowKey && dockInput.trim() && batchImage?.modelKey,
-  );
+  const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+  const styleActive = Boolean(styleRef || linkedStyle);
+  const styleLabel = styleRef?.name ?? linkedStyle?.name;
+  const canRegenerate = Boolean(dockInput.trim() && hasImageModel);
 
   return (
-    <Pro2EmbeddedInputDock
-      header={
-        <Pro2DockHeader
-          refRow={
-            upstreamLinks.length > 0 ? (
-              <Pro2DockUpstreamChips
-                links={upstreamLinks}
-                anchorNodeId={storeNode.id}
-                activeIds={activeRefIds}
-              />
-            ) : null
-          }
-          actionRow={
-            <>
-              <Pro2DockStyleButton
-                active={Boolean(styleRef)}
-                label={styleRef?.name}
-                disabled={isRunning}
-                onClick={onOpenStyleLibrary}
-              />
+    <>
+      <Pro2EmbeddedInputDock
+        header={
+          <Pro2DockHeader
+            refRow={
+              upstreamLinks.length > 0 ? (
+                <Pro2DockUpstreamChips
+                  links={upstreamLinks}
+                  anchorNodeId={storeNode.id}
+                  activeIds={activeRefIds}
+                />
+              ) : null
+            }
+            actionRow={
+              <>
+                <Pro2DockStyleButton
+                  active={styleActive}
+                  label={styleLabel}
+                  disabled={isRunning}
+                  onClick={onOpenStyleLibrary}
+                />
+                <button
+                  type="button"
+                  disabled
+                  title="标记（即将推出）"
+                  className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+                >
+                  <MapPin className="size-4" strokeWidth={1.75} />
+                  <span>标记</span>
+                </button>
+              </>
+            }
+          />
+        }
+        footer={
+          <Pro2DockToolbar className="gap-2">
+            <div className="flex shrink-0 items-center gap-0.5">
               <button
                 type="button"
-                disabled
-                title="标记（即将推出）"
-                className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+                title="图片生成设置"
+                disabled={isRunning}
+                className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => setSettingsOpen(true)}
               >
-                <MapPin className="size-4" strokeWidth={1.75} />
-                <span>标记</span>
+                <SlidersHorizontal className="size-4" />
               </button>
-            </>
-          }
+            </div>
+            <button
+              type="button"
+              disabled={isRunning}
+              className="nodrag flex h-8 min-w-0 flex-1 items-center gap-1 rounded-md px-2 text-left text-[12px] text-white/65 hover:bg-white/[0.06] hover:text-white/90"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <span className="truncate">{settingsLabel}</span>
+              <ChevronDown className="size-3.5 shrink-0 opacity-45" />
+            </button>
+            <button
+              type="button"
+              disabled={!canRegenerate || isRunning}
+              className="nodrag flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+              title={canRegenerate ? "重新生成三视图" : "请先选择生图模型并填写提示词"}
+              onClick={onRegenerate}
+            >
+              {isRunning ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <ArrowUp className="size-3.5" />
+              )}
+            </button>
+          </Pro2DockToolbar>
+        }
+      >
+        <MentionsEditable
+          className={cn(
+            PRO2_DOCK_TEXTAREA_CLASS,
+            RF_FORM_CONTROL,
+            RF_NO_WHEEL,
+            "min-h-[72px] px-3 py-2 text-[12px]",
+          )}
+          placeholder="编辑角色外观提示词；输入 @ 引用风格或参考图…"
+          value={dockInput}
+          mentionables={mentionables}
+          disabled={isRunning}
+          rows={2}
+          mentionInlineThumb
+          mentionEdition="pro2"
+          onChange={onPromptChange}
         />
-      }
-      footer={
-        <Pro2DockToolbar>
-          <div className="min-w-0 flex-1">
-            <EnginePicker
-              role="IMAGE"
-              allowedModelKeys={PRO2_THREE_VIEW_MODEL_KEYS}
-              providerId={batchImage?.providerId ?? ""}
-              modelKey={batchImage?.modelKey ?? ""}
-              params={batchImage?.params ?? {}}
-              onChange={onPickImageEngine}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={!canRegenerate || isRunning}
-            className="nodrag flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-            title={canRegenerate ? "重新生成三视图" : "请先选择生图模型并填写提示词"}
-            onClick={onRegenerate}
-          >
-            {isRunning ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <ArrowUp className="size-3.5" />
-            )}
-          </button>
-        </Pro2DockToolbar>
-      }
-    >
-      <MentionsEditable
-        className={cn(
-          PRO2_DOCK_TEXTAREA_CLASS,
-          RF_FORM_CONTROL,
-          RF_NO_WHEEL,
-          "min-h-[72px] px-3 py-2 text-[12px]",
-        )}
-        placeholder="编辑角色外观提示词；输入 @ 引用风格或参考图…"
-        value={dockInput}
-        mentionables={mentionables}
-        disabled={isRunning}
-        rows={2}
-        mentionInlineThumb
-        mentionEdition="pro2"
-        onChange={onPromptChange}
+      </Pro2EmbeddedInputDock>
+
+      <Sbv1ImageGenerateSettingsModal
+        open={settingsOpen}
+        data={settingsData}
+        onClose={() => setSettingsOpen(false)}
+        onConfirm={onConfirmSettings}
       />
-    </Pro2EmbeddedInputDock>
+    </>
   );
 }

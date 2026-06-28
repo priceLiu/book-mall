@@ -106,8 +106,8 @@ export function StoryScriptHubModal({
 }) {
   const [section, setSection] = useState<HubPreviewSection>("outline");
   const [draft, setDraft] = useState("");
-  const [mounted, setMounted] = useState(false);
   const [savedHint, setSavedHint] = useState(false);
+  const wasOpenRef = useRef(false);
   const [characterRawMd, setCharacterRawMd] = useState(false);
   const [storyboardRawMd, setStoryboardRawMd] = useState(false);
   const [outlineRawMd, setOutlineRawMd] = useState(false);
@@ -184,17 +184,17 @@ export function StoryScriptHubModal({
         : undefined;
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (!open) {
+      wasOpenRef.current = false;
       document.body.style.overflow = "";
       return;
     }
-    setSection(initialSection);
-    setSavedHint(false);
     document.body.style.overflow = "hidden";
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true;
+      setSection(initialSection);
+      setSavedHint(false);
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -203,12 +203,12 @@ export function StoryScriptHubModal({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-    // 仅随 open 开关重置 Tab；勿依赖 onClose（父组件内联函数会导致每次渲染跳回「故事大纲」）
+    // 仅随 open 开关重置 Tab；勿依赖 onClose / initialSection 每次渲染
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onClose intentionally omitted
-  }, [open, initialSection]);
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !wasOpenRef.current) return;
     if (section === "dialogue") {
       setDraft(resolvedStoryboardMd);
       return;
@@ -226,7 +226,9 @@ export function StoryScriptHubModal({
     if (section === "storyboard") {
       setStoryboardRawMd(!canEditStoryboardAsTable(persistedMd));
     }
-  }, [open, section, persistedMd, resolvedStoryboardMd]);
+    // 仅在打开瞬间或切换 Tab 时同步 draft，避免 store 轮询导致闪屏
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- persistedMd/resolvedStoryboardMd intentionally omitted
+  }, [open, section]);
 
   const characterTableMode =
     section === "character" && !characterRawMd && canEditCharacterAsTable(draft || persistedMd);
@@ -291,7 +293,7 @@ export function StoryScriptHubModal({
       ? { minHeight: Math.min(previewBodyH, 2400) }
       : undefined;
 
-  if (!mounted || !open) return null;
+  if (!open) return null;
 
   return createPortal(
     <div

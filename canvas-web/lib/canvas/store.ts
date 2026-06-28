@@ -36,6 +36,7 @@ import {
   mergeCanvasNodeInitialData,
 } from "./clone-node-data";
 import { migrateGraphV1ToV2 } from "./migrate";
+import { clearOrphanLibtvMediaInflightInNodes } from "./libtv-image-node-run";
 import {
   detachChildrenOfRemovedGroups,
   ensureNodeDragHandles,
@@ -235,6 +236,15 @@ type CanvasState = {
   pro2StyleLibImageNodeId: string | null;
   setPro2StyleLibImageNodeId: (nodeId: string | null) => void;
 
+  /** 画布 graph.meta（生产门禁 / 关联剧本等） */
+  graphMeta: CanvasGraph["meta"] | null;
+
+  patchGraphMeta: (
+    updater: (
+      meta: CanvasGraph["meta"] | null | undefined,
+    ) => CanvasGraph["meta"] | null | undefined,
+  ) => void;
+
   hydrate: (projectId: string, graph: CanvasGraph | undefined) => void;
   toGraph: () => CanvasGraph;
 
@@ -396,9 +406,18 @@ export const useCanvasStore = create<CanvasState>()(
       setPro2StyleLibImageNodeId: (nodeId) =>
         set({ pro2StyleLibImageNodeId: nodeId }),
 
+      graphMeta: null,
+
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
-        const g = migrateGraphV1ToV2(raw);
+        const g0 = migrateGraphV1ToV2(raw);
+        const g =
+          Array.isArray(g0.nodes) && g0.nodes.length
+            ? {
+                ...g0,
+                nodes: clearOrphanLibtvMediaInflightInNodes(g0.nodes),
+              }
+            : g0;
         let edges = g.edges as CanvasFlowEdge[];
         const migrated = migratePro2SceneColumnOffCanvas(
           g.nodes as CanvasFlowNode[],
@@ -442,6 +461,7 @@ export const useCanvasStore = create<CanvasState>()(
               pro2ScriptTableEditorNodeId: null,
               libtvFloatingDockNodeId: null,
               libtvFloatingDockNodeType: null,
+              graphMeta: g.meta ?? null,
             }),
           );
           queueMicrotask(applyDeferredLayout);
@@ -460,6 +480,7 @@ export const useCanvasStore = create<CanvasState>()(
             pro2ScriptTableEditorNodeId: null,
             libtvFloatingDockNodeId: null,
             libtvFloatingDockNodeType: null,
+            graphMeta: g.meta ?? null,
           }),
         );
       },
@@ -471,7 +492,16 @@ export const useCanvasStore = create<CanvasState>()(
           nodes: stripPersistedNodeSelection(s.nodes),
           edges: s.edges,
           viewport: s.viewport,
+          ...(s.graphMeta ? { meta: s.graphMeta } : {}),
         };
+      },
+
+      patchGraphMeta: (updater) => {
+        set((state) =>
+          withGraphRevision(state, {
+            graphMeta: updater(state.graphMeta) ?? null,
+          }),
+        );
       },
 
       setNodes: (updater) => {

@@ -199,7 +199,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       }
     }
     let result;
-    if (runnerType === "story-pro-starter" && mediaKind === "themeOutline") {
+    if (
+      (runnerType === "story-pro-starter" ||
+        runnerType === "story-pro-script-hub") &&
+      mediaKind === "themeOutline"
+    ) {
       result = await runStoryProStarterThemeOutline({ ...baseArgs, forceFresh });
     } else if (runnerType === "story-pro-script-hub" && llmSection) {
       result = await runStoryProScriptHubSection({
@@ -318,7 +322,10 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         forceFresh,
         engineKind: node.type,
       });
-    } else if (node.type === "sbv1-image") {
+    } else if (
+      node.type === "sbv1-image" ||
+      node.type === "story-pro2-three-view"
+    ) {
       result = await runSbv1ImageNode({ ...baseArgs, forceFresh });
     } else if (
       node.type === "story-pro2-image" &&

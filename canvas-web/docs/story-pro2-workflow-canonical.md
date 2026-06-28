@@ -74,3 +74,21 @@
 - 不改造 `story-pro-*` 节点 UI  
 - 不做 pro → pro2 自动迁移  
 - 首期不引入 Pixi 全画布  
+
+---
+
+## 8. 工业化剧本创作（script-studio · 2026-06）
+
+与标准 2.0 **同 edition（pro2）**，入口模板 `builtin/story-pro2-script-studio`。
+
+| 能力 | 实现 |
+|------|------|
+| 分批生成 | starter `scriptStudio*` · 10 集/批 · `ScriptStudioBatchPanel` |
+| 冻结档案 | 首轮 4 份 bible → starter/hub + OSS |
+| 解析落列 | `script-studio-run-apply` → hub + character/scene/frame/prop/mood/audio 列 rows |
+| 定稿导出 | hub 工具条「导出剧本包」→ `SCRIPT_PACKAGE` ProjectAsset |
+| 生产关联 | 模板 `builtin/story-pro2-production` · `graphMeta.requireScriptLink` · 关联条 + 软门禁 |
+| 看板 | frame row `episodeNo` / `stageStatus` · `Pro2DirectorOverview` |
+| 协同 | 导出时可设团队可见；关联时 `acquireProjectAssetLease` 认领 |
+
+真源：`docs/2.0 工业标准化脚本生产.md` · 进度 `docs/影视标准化工作流改造.md`。

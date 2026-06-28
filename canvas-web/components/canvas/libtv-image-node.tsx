@@ -37,6 +37,7 @@ import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
 import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
+import { Pro2CrewTaskStatusBadge } from "./pro2/pro2-crew-task-status-badge";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
 import {
   Pro2MediaNodeEmptyState,
@@ -484,6 +485,7 @@ export function LibtvImageNode({
             LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
             selected && chrome.ring,
+            hovered && !selected && "ring-1 ring-cyan-400/35",
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
@@ -525,7 +527,12 @@ export function LibtvImageNode({
             )}
           </div>
 
-          <div className={LIBTV_MEDIA_STAGE_CLASS}>{renderStage()}</div>
+          <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
+            {renderStage()}
+            {!isGenerating && edition === "pro2" ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} placement="center" />
+            ) : null}
+          </div>
         </div>
       </div>
 

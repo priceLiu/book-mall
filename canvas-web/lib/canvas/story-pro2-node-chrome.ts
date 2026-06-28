@@ -68,6 +68,8 @@ export const PRO2_CHARACTER_THREE_VIEW_CARD_HEIGHT = 252;
 /** 2.0 统一输入坞（固定横向长方形 · 内容区可滚动） */
 export const PRO2_DOCK_WIDTH = 560;
 export const PRO2_DOCK_HEIGHT = 288;
+/** 输入坞放大态宽度（点击放大时长边同时展开，且更明显） */
+export const PRO2_DOCK_WIDTH_EXPANDED = 820;
 /** 输入坞放大态高度 */
 export const PRO2_DOCK_HEIGHT_EXPANDED = 456;
 

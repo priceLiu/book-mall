@@ -60,6 +60,10 @@ const EXTRA_INVOKE_MODEL_KEYS = [
   "gpt-image-1",
   "qwen-text-to-image",
   "deepseek-v4-flash",
+  "deepseek-v4-pro",
+  "deepseek-chat",
+  "google/gemini-3-flash-preview",
+  "gemini-3-flash",
   "gemini-2.5-flash",
 ];
 

@@ -234,10 +234,18 @@ export function SaveProjectAssetDialog({
   return createPortal(dialog, document.body);
 }
 
-let openSaveDialog: ((draft: ExportProjectAssetDraft) => void) | null = null;
+let openSaveDialog:
+  | ((
+      draft: ExportProjectAssetDraft,
+      options?: SaveProjectAssetDialogOpenOptions,
+    ) => void)
+  | null = null;
 
 export function registerSaveProjectAssetDialog(
-  opener: (draft: ExportProjectAssetDraft) => void,
+  opener: (
+    draft: ExportProjectAssetDraft,
+    options?: SaveProjectAssetDialogOpenOptions,
+  ) => void,
 ): () => void {
   openSaveDialog = opener;
   return () => {
@@ -245,13 +253,22 @@ export function registerSaveProjectAssetDialog(
   };
 }
 
-export function openSaveProjectAssetDialog(draft: ExportProjectAssetDraft): void {
+export type SaveProjectAssetDialogOpenOptions = {
+  showTeamShare?: boolean;
+};
+
+export function openSaveProjectAssetDialog(
+  draft: ExportProjectAssetDraft,
+  options?: SaveProjectAssetDialogOpenOptions,
+): void {
   if (openSaveDialog) {
-    openSaveDialog(draft);
+    openSaveDialog(draft, options);
   }
   if (typeof window !== "undefined") {
     window.dispatchEvent(
-      new CustomEvent(SAVE_ASSET_OPEN_EVENT, { detail: draft }),
+      new CustomEvent(SAVE_ASSET_OPEN_EVENT, {
+        detail: { draft, ...options },
+      }),
     );
   }
 }
@@ -263,16 +280,27 @@ export function SaveProjectAssetDialogHost({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ExportProjectAssetDraft | null>(null);
+  const [teamShare, setTeamShare] = useState(false);
 
   useEffect(() => {
-    const openDraft = (detail: ExportProjectAssetDraft) => {
+    const openDraft = (
+      detail: ExportProjectAssetDraft,
+      options?: SaveProjectAssetDialogOpenOptions,
+    ) => {
       setDraft(detail);
+      setTeamShare(options?.showTeamShare === true);
       setOpen(true);
     };
     const onEvent = (e: Event) => {
-      const detail = (e as CustomEvent<ExportProjectAssetDraft>).detail;
-      if (!detail) return;
-      openDraft(detail);
+      const raw = (e as CustomEvent<
+        ExportProjectAssetDraft | { draft: ExportProjectAssetDraft; showTeamShare?: boolean }
+      >).detail;
+      if (!raw) return;
+      if (typeof raw === "object" && raw !== null && "draft" in raw) {
+        openDraft(raw.draft, { showTeamShare: raw.showTeamShare });
+      } else {
+        openDraft(raw as ExportProjectAssetDraft);
+      }
     };
     window.addEventListener(SAVE_ASSET_OPEN_EVENT, onEvent);
     const unregister = registerSaveProjectAssetDialog(openDraft);
@@ -286,7 +314,7 @@ export function SaveProjectAssetDialogHost({
     <SaveProjectAssetDialog
       open={open}
       draft={draft}
-      showTeamShare={showTeamShare}
+      showTeamShare={teamShare || showTeamShare}
       onClose={() => {
         setOpen(false);
         setDraft(null);

@@ -38,7 +38,7 @@ export function Pro2CanvasToolbar({
   onOpenMyHistory,
 }: Pro2CanvasToolbarProps) {
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
@@ -73,11 +73,11 @@ export function Pro2CanvasToolbar({
         itemId,
         nodeType,
         { addNode, setNodes },
-        { alert },
+        { alert, confirm },
         { onOpenStyleLibrary, onOpenMyHistory },
       );
     },
-    [addNode, setNodes, alert, onOpenStyleLibrary, onOpenMyHistory],
+    [addNode, setNodes, alert, confirm, onOpenStyleLibrary, onOpenMyHistory],
   );
 
   const onQuickImage = useCallback(() => {

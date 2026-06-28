@@ -20,8 +20,11 @@ import {
   buildGatewayStreamChatResultSummary,
 } from "@/lib/gateway/log-result-summary";
 import {
+  GatewayV1ChatError,
+  runGatewayV1ChatCompletions,
+} from "@/lib/gateway/gateway-v1-chat-service";
+import {
   gatewayV1AudioSpeech,
-  gatewayV1ChatCompletions,
   gatewayV1ChatCompletionsStream,
   gatewayV1CreateTask,
   gatewayV1ImageParsing,
@@ -122,15 +125,30 @@ export async function canvasGwChat(
     ...(opts.params ?? {}),
   };
 
-  const result = await gatewayV1ChatCompletions({
-    apiKeyId: auth.id,
-    body,
-    meta: await canvasGwMeta(userId, {
-      clientPage: opts.clientPage,
-      projectId: opts.projectId,
-      storyTaskId: opts.canvasTaskId,
-    }),
+  const meta = await canvasGwMeta(userId, {
+    clientPage: opts.clientPage,
+    projectId: opts.projectId,
+    storyTaskId: opts.canvasTaskId,
   });
+
+  let result: { text: string; status: number; logId?: string };
+  try {
+    const inProcess = await runGatewayV1ChatCompletions({
+      auth,
+      body,
+      logMeta: meta,
+    });
+    result = inProcess;
+  } catch (e) {
+    if (e instanceof GatewayV1ChatError) {
+      throw new CanvasProjectError(
+        "MODEL_NOT_AVAILABLE",
+        e.message,
+        e.status >= 400 && e.status < 600 ? e.status : 502,
+      );
+    }
+    throw e;
+  }
 
   let parsed: unknown = null;
   try {

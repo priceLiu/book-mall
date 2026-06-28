@@ -11,6 +11,7 @@ import {
   type GatewayV1LogMeta,
 } from "@/lib/gateway/gateway-v1-log-meta";
 import { getBookMallOrigin } from "@/lib/gateway/env";
+import { gatewayFetch } from "@/lib/gateway/format-fetch-error";
 import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
 
 export type GatewayV1RequestOpts = {
@@ -38,7 +39,9 @@ async function gatewayV1Fetch(
     headers.set(k, v);
   }
   const url = `${gatewayV1BaseUrl()}/${path.replace(/^\//, "")}`;
-  return fetch(url, { ...rest, headers, cache: "no-store" });
+  return gatewayFetch(url, { ...rest, headers, cache: "no-store" }, {
+    hop: "internal",
+  });
 }
 
 export async function gatewayV1CreateTask(

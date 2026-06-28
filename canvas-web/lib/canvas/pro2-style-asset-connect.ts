@@ -8,12 +8,14 @@ const STYLE_ASSET_TYPE = "story-pro2-style-asset";
 const STYLE_ASSET_CONNECT_TARGETS = new Set([
   "story-pro2-script-hub",
   "story-pro2-image",
+  "story-pro2-three-view",
   "story-pro2-starter",
   "sbv1-image",
 ]);
 
 const IMAGE_STYLE_LINK_TARGETS = new Set([
   "story-pro2-image",
+  "story-pro2-three-view",
   "sbv1-image",
 ]);
 
@@ -39,7 +41,7 @@ export function validatePro2StyleAssetConnection(
     if (!isPro2StyleAssetConnectTarget(tt)) {
       return {
         ok: false,
-        reason: "风格节点仅可连接脚本、文本或图片节点",
+        reason: "风格节点仅可连接脚本、文本、图片或三视图节点",
       };
     }
     return { ok: true };
@@ -48,7 +50,7 @@ export function validatePro2StyleAssetConnection(
   if (tt === STYLE_ASSET_TYPE) {
     return {
       ok: false,
-      reason: "请从风格节点拖出连线到脚本或图片节点",
+      reason: "请从风格节点拖出连线到脚本、图片或三视图节点",
     };
   }
 
