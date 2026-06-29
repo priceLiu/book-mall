@@ -10,6 +10,8 @@ import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
+  enrichPro2DockUpstreamLinks,
+  pro2DockStyleShownAsChip,
 } from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -78,6 +80,16 @@ export function Pro2ImageNodeEmbeddedDock({
       edges,
     );
   }, [storeNode, nodes, edges]);
+
+  const displayLinks = useMemo(
+    () =>
+      enrichPro2DockUpstreamLinks(
+        upstreamLinks,
+        d.dockStyleRef,
+        storeNode?.id,
+      ),
+    [upstreamLinks, d.dockStyleRef, storeNode?.id],
+  );
 
   const mentionables = useMemo(
     () => buildPro2DockMentionables(upstreamLinks),
@@ -149,6 +161,7 @@ export function Pro2ImageNodeEmbeddedDock({
   const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
   const styleActive = Boolean(styleRef || linkedStyle);
   const styleLabel = styleRef?.name ?? linkedStyle?.name;
+  const showStyleButton = !pro2DockStyleShownAsChip(upstreamLinks, styleRef);
   const canRegenerate =
     mediaRole === "frame" &&
     Boolean(d.pro2ControllerNodeId && d.pro2RowKey && dockInput.trim());
@@ -158,9 +171,9 @@ export function Pro2ImageNodeEmbeddedDock({
       header={
         <Pro2DockHeader
           refRow={
-            upstreamLinks.length > 0 ? (
+            displayLinks.length > 0 ? (
               <Pro2DockUpstreamChips
-                links={upstreamLinks}
+                links={displayLinks}
                 anchorNodeId={storeNode.id}
                 activeIds={activeRefIds}
               />
@@ -168,17 +181,19 @@ export function Pro2ImageNodeEmbeddedDock({
           }
           actionRow={
             <>
-              <Pro2DockStyleButton
-                active={styleActive}
-                label={styleLabel}
-                disabled={isRunning}
-                onClick={onOpenStyleLibrary}
-              />
+              {showStyleButton ? (
+                <Pro2DockStyleButton
+                  active={styleActive}
+                  label={styleLabel}
+                  disabled={isRunning}
+                  onClick={onOpenStyleLibrary}
+                />
+              ) : null}
               <button
                 type="button"
                 disabled
                 title="标记（即将推出）"
-                className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+                className="nodrag flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
               >
                 <MapPin className="size-4" strokeWidth={1.75} />
                 <span>标记</span>

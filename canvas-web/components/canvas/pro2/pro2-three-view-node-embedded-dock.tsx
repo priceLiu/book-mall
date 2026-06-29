@@ -8,7 +8,7 @@ import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
-import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream } from "@/lib/canvas/pro2-dock-upstream-links";
+import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream, enrichPro2DockUpstreamLinks, pro2DockStyleShownAsChip } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultPro2ThreeViewImageEngine } from "@/lib/canvas/pro2-three-view-batch-image";
@@ -118,6 +118,16 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     );
   }, [storeNode, nodes, edges]);
 
+  const displayLinks = useMemo(
+    () =>
+      enrichPro2DockUpstreamLinks(
+        upstreamLinks,
+        d.dockStyleRef,
+        storeNode?.id,
+      ),
+    [upstreamLinks, d.dockStyleRef, storeNode?.id],
+  );
+
   const mentionables = useMemo(
     () => buildPro2DockMentionables(upstreamLinks),
     [upstreamLinks],
@@ -201,6 +211,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
   const styleActive = Boolean(styleRef || linkedStyle);
   const styleLabel = styleRef?.name ?? linkedStyle?.name;
+  const showStyleButton = !pro2DockStyleShownAsChip(upstreamLinks, styleRef);
   const canRegenerate = Boolean(dockInput.trim() && hasImageModel);
 
   return (
@@ -209,9 +220,9 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
         header={
           <Pro2DockHeader
             refRow={
-              upstreamLinks.length > 0 ? (
+              displayLinks.length > 0 ? (
                 <Pro2DockUpstreamChips
-                  links={upstreamLinks}
+                  links={displayLinks}
                   anchorNodeId={storeNode.id}
                   activeIds={activeRefIds}
                 />
@@ -219,17 +230,19 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
             }
             actionRow={
               <>
-                <Pro2DockStyleButton
-                  active={styleActive}
-                  label={styleLabel}
-                  disabled={isRunning}
-                  onClick={onOpenStyleLibrary}
-                />
+                {showStyleButton ? (
+                  <Pro2DockStyleButton
+                    active={styleActive}
+                    label={styleLabel}
+                    disabled={isRunning}
+                    onClick={onOpenStyleLibrary}
+                  />
+                ) : null}
                 <button
                   type="button"
                   disabled
                   title="标记（即将推出）"
-                  className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+                  className="nodrag flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
                 >
                   <MapPin className="size-4" strokeWidth={1.75} />
                   <span>标记</span>

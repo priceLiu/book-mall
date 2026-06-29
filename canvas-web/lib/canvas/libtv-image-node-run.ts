@@ -1,12 +1,16 @@
 import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 
-/** 组内分镜格：走列 batch，不用 Dock 模型选择 */
+/** 组内分镜格：走列 batch，不用 Dock 模型选择（公告栏独立分镜节点除外） */
 export function isLibtvPipelineImageCell(
-  node: Pick<CanvasFlowNode, "type" | "data"> | undefined,
+  node: Pick<CanvasFlowNode, "type" | "data" | "parentId"> | undefined,
 ): boolean {
   if (node?.type !== "story-pro2-image") return false;
-  return (node.data as { pro2MediaRole?: string }).pro2MediaRole === "frame";
+  if ((node.data as { pro2MediaRole?: string }).pro2MediaRole !== "frame") {
+    return false;
+  }
+  const d = node.data as { pro2ControllerNodeId?: string };
+  return Boolean(d.pro2ControllerNodeId?.trim() || node.parentId);
 }
 
 /** sbv1-image · Pro2 独立/场景图格：Dock 模型选择 + sbv1-image runner */
@@ -18,7 +22,10 @@ export function isLibtvFreestandingImageNode(
   if (node.type === "story-pro2-three-view") return true;
   if (node.type === "story-pro2-image") {
     const role = (node.data as { pro2MediaRole?: string }).pro2MediaRole ?? "generic";
-    return role === "generic" || role === "scene";
+    if (role === "generic" || role === "scene" || role === "prop" || role === "mood") {
+      return true;
+    }
+    if (role === "frame") return !isLibtvPipelineImageCell(node);
   }
   return false;
 }
@@ -110,6 +117,16 @@ export function clearOrphanLibtvMediaInflightInNodes<
     };
   });
   return changed ? next : nodes;
+}
+
+export function resolveLibtvImageEngineFromNodeData(
+  data: Record<string, unknown>,
+): { providerId: string; modelKey: string } | null {
+  const engine = (data.engine as { providerId?: string; modelKey?: string }) ?? {};
+  const providerId = engine.providerId?.trim() ?? "";
+  const modelKey = engine.modelKey?.trim() ?? "";
+  if (!providerId || !modelKey) return null;
+  return { providerId, modelKey };
 }
 
 export function commitLibtvImageRunPendingPatch(

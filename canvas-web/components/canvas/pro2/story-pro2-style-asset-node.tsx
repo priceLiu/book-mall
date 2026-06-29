@@ -17,17 +17,18 @@ import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
-  PRO2_IMAGE_NODE_MIN_HEIGHT,
-  PRO2_IMAGE_NODE_MIN_WIDTH,
   PRO2_IMAGE_NODE_WIDTH,
   PRO2_NODE_HANDLE_CLASS,
   pro2NodeBorderColor,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2StyleAssetNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
+import { libtvNodeBorderStyle } from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
-import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
+import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
+import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 
 /** 2.0 风格素材节点（LibTV 薄卡 · 无底部 Dock / 检视面板） */
 export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
@@ -39,6 +40,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   const setEdges = useCanvasStore((s) => s.setEdges);
 
   const d = data as unknown as StoryPro2StyleAssetNodeData;
+  const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-style-asset");
   const previewUrl = d.imageUrl?.trim() ?? "";
   const headerLabel = d.label?.trim() || `素材-风格-${d.styleName || "未命名"}`;
 
@@ -116,12 +118,6 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Pro2NodeResizer
-        isVisible={!!selected}
-        minWidth={PRO2_IMAGE_NODE_MIN_WIDTH}
-        minHeight={PRO2_IMAGE_NODE_MIN_HEIGHT}
-      />
-
       <Handle
         id="style"
         type="source"
@@ -132,15 +128,20 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
         )}
       />
 
+      {selected ? (
+        <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
+      ) : null}
+
       <p
         className={cn(
           RF_NODE_DRAG_HANDLE,
-          "mb-1.5 flex shrink-0 cursor-grab items-center gap-1.5 px-0.5 text-[11px] text-white/55 active:cursor-grabbing",
+          "relative mb-1.5 flex shrink-0 cursor-grab items-center gap-1.5 px-0.5 text-[11px] text-white/55 active:cursor-grabbing",
         )}
         title="拖动标题栏移动节点"
       >
         <Box className="size-3.5 shrink-0" />
-        {headerLabel}
+        <span className="min-w-0 flex-1 truncate">{headerLabel}</span>
+        <Pro2CrewTaskStatusBadge nodeId={id} />
       </p>
 
       <div className="relative min-h-0 flex-1">
@@ -158,9 +159,14 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
           className={cn(
             PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
             "relative flex h-full min-h-0 flex-col overflow-hidden transition",
-            hovered && !selected && "ring-1 ring-violet-400/30",
           )}
-          style={{ borderColor: pro2NodeBorderColor(!!selected) }}
+          style={
+            libtvNodeBorderStyle({
+              selected: !!selected,
+              hovered: hovered && !selected,
+              edition: "neutral",
+            }) ?? { borderColor: pro2NodeBorderColor(!!selected) }
+          }
         >
           {previewUrl ? (
             <div className="relative min-h-0 flex-1 p-2">

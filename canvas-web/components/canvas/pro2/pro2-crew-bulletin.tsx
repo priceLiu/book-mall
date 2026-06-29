@@ -356,7 +356,7 @@ function PhaseActionPanel({
         )}
         {published ? (
           <p className="mt-2 text-[10px] text-white/40">
-            其他环节请点击对应步骤 · 勾选任务后点「领取所选」
+            其他环节请点击对应步骤 · 勾选任务后点「参与制作」
           </p>
         ) : null}
       </div>
@@ -407,7 +407,7 @@ function PhaseActionPanel({
               className="shrink-0 rounded-md border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-[10px] text-cyan-50 transition hover:bg-cyan-500/25 disabled:opacity-40"
               onClick={onClaim}
             >
-              {claiming ? "领取中…" : `领取所选 (${selectedTaskIds.size})`}
+              {claiming ? "参与制作中…" : `参与制作 (${selectedTaskIds.size})`}
             </button>
           ) : null}
         </div>
@@ -417,7 +417,11 @@ function PhaseActionPanel({
           暂无任务。若已生成分镜/角色表，请点「刷新任务」；或重新发布剧本以同步最新清单。
         </p>
       ) : (
-        <>
+        <div
+          className={cn(
+            fullscreen && "flex min-h-0 flex-1 flex-col",
+          )}
+        >
           <CrewBulletinEpisodeFilter
             episodes={episodes}
             value={episodeFilter}
@@ -440,7 +444,7 @@ function PhaseActionPanel({
             contentScale={contentScale}
             fullscreen={fullscreen}
           />
-        </>
+        </div>
       )}
     </div>
   );
@@ -544,7 +548,7 @@ function AuthoringPanel({
         )}
       </div>
       <p className="mt-2 text-[10px] text-white/35">
-        发布：请在脚本生成器节点顶栏点击「发布剧本」；发布后可在此领取制作任务。
+        发布：请在脚本生成器节点顶栏点击「发布剧本」；发布后可在此参与制作任务。
       </p>
     </div>
   );
@@ -882,11 +886,11 @@ export function Pro2CrewBulletin() {
       setSelectedTaskIds(new Set());
       if (result.claimed === 0) {
         await alert({
-          title: "未能领取",
+          title: "未能参与制作",
           message:
             result.skipped > 0
-              ? "所选任务暂无法生成工作节点（如分镜视频/合成等请手动添加节点）。"
-              : "请勾选未领取的任务后再试。",
+              ? "所选任务暂无法生成工作节点（如后期合成等请手动添加节点）。"
+              : "请勾选待参与制作的任务后再试。",
           variant: "warning",
         });
       }

@@ -8,8 +8,6 @@ import { Handle, Position } from "@xyflow/react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   PRO2_CARD_SHELL_CLASS,
-  PRO2_FRAME_BOARD_MIN_HEIGHT,
-  PRO2_FRAME_BOARD_MIN_WIDTH,
   pro2NodeBorderColor,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProCharacterRow } from "@/lib/canvas/story-pro-workspace-types";
@@ -19,7 +17,6 @@ import {
   Pro2CharacterBoardCell,
   pro2CharacterCellStatus,
 } from "./pro2-character-board-cell";
-import { Pro2NodeResizer } from "./pro2-node-resizer";
 
 export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
@@ -68,13 +65,7 @@ export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
   };
 
   return (
-    <div className="relative flex h-full w-full min-h-0 min-w-0 flex-col">
-      <Pro2NodeResizer
-        isVisible={!!selected}
-        minWidth={PRO2_FRAME_BOARD_MIN_WIDTH}
-        minHeight={PRO2_FRAME_BOARD_MIN_HEIGHT}
-      />
-
+    <div className="relative flex h-full w-full min-h-0 min-w-0 flex-col"    >
       <Handle
         id="in_text"
         type="target"

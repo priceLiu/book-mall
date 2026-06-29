@@ -250,13 +250,13 @@ export function NodeStatusBadge({
     case "running":
       return (
         <span className={CANVAS_STATUS_BADGE_RUNNING_CLASS} title="生成中">
-          <Loader2 className="size-3 animate-spin" /> 生成中
+          <Loader2 className="size-3 animate-spin" />
         </span>
       );
     case "pending":
       return (
-        <span className={CANVAS_STATUS_BADGE_PENDING_CLASS}>
-          <Loader2 className="size-3 animate-spin" /> 排队
+        <span className={CANVAS_STATUS_BADGE_PENDING_CLASS} title="排队中">
+          <Loader2 className="size-3 animate-spin" />
         </span>
       );
     case "done":

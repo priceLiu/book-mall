@@ -22,6 +22,7 @@ import {
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
+import { libtvNodeBorderStyle } from "@/lib/canvas/libtv-node-chrome";
 import {
   SBV1_CARD_DRAG_CLASS,
   SBV1_CARD_SHELL_CLASS,
@@ -29,8 +30,6 @@ import {
   SBV1_NODE_HANDLE_CLASS,
   SBV1_NODE_OUTER_CLASS,
   SBV1_VIDEO_COMPOSE_LABEL,
-  SBV1_VIDEO_ENGINE_MIN_WIDTH,
-  SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT,
 } from "@/lib/canvas/sbv1-node-chrome";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
@@ -45,9 +44,10 @@ import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-v
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
-import { Pro2NodeResizer } from "../pro2/pro2-node-resizer";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
+import { Pro2CrewTaskStatusBadge } from "../pro2/pro2-crew-task-status-badge";
+import { crewNodeShowsParticipatingBadge } from "../libtv-node-header-bar";
 import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import {
@@ -60,13 +60,17 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
+  const graphMeta = useCanvasStore((s) => s.graphMeta);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
-  const d = data as unknown as Sbv1VideoEngineNodeData;
+  const d = data as unknown as Sbv1VideoEngineNodeData & {
+    crewTaskId?: string;
+    crewTaskLabel?: string;
+  };
   const saveAsAsset = useSaveNodeAsAsset();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const { succeeded, history } = useNodeTaskHistory(id);
@@ -191,7 +195,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     () => selected && rfNodes.filter((n) => n.selected).length === 1,
     [selected, rfNodes],
   );
-  const showToolbar = Boolean(soleSelected && hasToolbarContent && !isGenerating);
+  const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
+  const showToolbar = Boolean(showFloatingToolbar && hasToolbarContent);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
 
   useLibtvMediaNodeAutoFit({
@@ -248,11 +253,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   return (
     <>
-      <Pro2NodeResizer
-        isVisible={Boolean(selected)}
-        minWidth={SBV1_VIDEO_ENGINE_MIN_WIDTH}
-        minHeight={SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT}
-      />
       <div
         className={SBV1_NODE_OUTER_CLASS}
         data-sbv1-dock-anchor={id}
@@ -308,6 +308,16 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           </>
         ) : null}
 
+        {showFloatingToolbar && !showToolbar ? (
+          <Pro2ImageNodeToolbar
+            passNodeDrag
+            minimal
+            className="absolute left-1/2 z-40 -translate-x-1/2"
+            style={{ top: -60 }}
+            onDuplicateNode={onDuplicateNode}
+          />
+        ) : null}
+
         {showToolbar ? (
           <Pro2ImageNodeToolbar
             passNodeDrag
@@ -333,20 +343,29 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             SBV1_CARD_SHELL_CLASS,
             SBV1_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
-            selected && "ring-1 ring-cyan-400/50",
           )}
+          style={libtvNodeBorderStyle({
+            selected: !!selected,
+            hovered: hovered && !selected,
+            edition: "sbv1",
+          })}
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <Video className="size-3.5 text-white/70" />
-              <p className="text-xs font-medium text-white">{SBV1_VIDEO_COMPOSE_LABEL}</p>
+          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Video className="size-3.5 shrink-0 text-white/70" />
+              <p className="truncate text-xs font-medium text-white">
+                {d.crewTaskLabel?.trim() || SBV1_VIDEO_COMPOSE_LABEL}
+              </p>
             </div>
-            <div className="flex items-center gap-1.5">
+            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} />
+            ) : null}
+            <div className="relative z-[1] flex shrink-0 items-center gap-1.5">
               {hasVideo ? (
                 <button
                   type="button"
                   title="全屏预览"
-                  className="nodrag rounded p-1 text-white/45 transition hover:bg-white/10 hover:text-white/80"
+                  className="nodrag flex size-7 items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
                   onClick={(e) => {
                     e.stopPropagation();
                     setPreviewOpen(true);
@@ -361,7 +380,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             </div>
           </div>
 
-          <div className={SBV1_MEDIA_STAGE_CLASS}>
+          <div className={cn(SBV1_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
                 variant="cyan"

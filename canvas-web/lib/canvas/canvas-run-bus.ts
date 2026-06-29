@@ -13,8 +13,8 @@ export type CanvasStoryRunJob = {
 } & (StoryRunContext | StoryProRunContext);
 
 type CanvasRunBusHandlers = {
-  enqueueNode: (nodeId: string, forceFresh?: boolean) => void;
-  enqueueStoryRun: (job: CanvasStoryRunJob) => void;
+  enqueueNode: (nodeId: string, forceFresh?: boolean) => boolean;
+  enqueueStoryRun: (job: CanvasStoryRunJob) => boolean;
   enqueueNodesSequential: (
     nodeIds: string[],
     opts?: CanvasRunSequentialOpts,
@@ -35,18 +35,18 @@ export function unregisterCanvasRunBus() {
   handlers = null;
 }
 
-export function busEnqueueNode(nodeId: string, forceFresh?: boolean) {
-  busEnqueueStoryRun({ nodeId, forceFresh });
+export function busEnqueueNode(nodeId: string, forceFresh?: boolean): boolean {
+  return busEnqueueStoryRun({ nodeId, forceFresh });
 }
 
-export function busEnqueueStoryRun(job: CanvasStoryRunJob) {
+export function busEnqueueStoryRun(job: CanvasStoryRunJob): boolean {
   if (handlers) {
-    handlers.enqueueStoryRun(job);
-    return;
+    return handlers.enqueueStoryRun(job);
   }
   window.dispatchEvent(
     new CustomEvent("canvas:run-node", { detail: job }),
   );
+  return true;
 }
 
 export function busEnqueueNodesSequential(

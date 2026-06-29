@@ -26,6 +26,7 @@ import { migratePro2TextPurposeAll } from "./pro2-text-purpose";
 import { migrateLegacyPro2ScriptStudioGraph } from "./pro2-script-studio-migrate";
 import { migrateLinkedScriptPackageStarterToMeta } from "./crew-bulletin-graph-anchor";
 import { enrichCrewBulletinGraphAnchorRows } from "./crew-bulletin-graph-anchor";
+import { refreshGraphAnchorCrewBulletin } from "./crew-bulletin-script-package";
 import { normalizeCanvasNodes } from "./normalize-graph-nodes";
 import { migrateStoryComicStarterNode } from "./story-starter-migrate";
 import { migrateStoryOutlineLlmParams } from "./story-llm-params-migrate";
@@ -206,7 +207,7 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
       ? {
           ...meta,
           crewBulletinAnchor: enrichCrewBulletinGraphAnchorRows(
-            meta.crewBulletinAnchor,
+            refreshGraphAnchorCrewBulletin(meta.crewBulletinAnchor),
           ),
         }
       : meta;

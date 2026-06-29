@@ -4,6 +4,7 @@ import {
   buildPro2StarterNodeData,
   buildPro2ThreeViewNodeData,
 } from "./pro2-spawn-nodes";
+import { buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import {
   PRO2_IMAGE_NODE_MIN_WIDTH,
@@ -94,17 +95,29 @@ function spawnCrewWorkNodeAtPosition(
     return nodeId || null;
   }
 
-  if (task.kind === "prop" || task.kind === "mood" || task.kind === "audio") {
-    const nodeType =
-      task.kind === "prop"
-        ? "story-pro2-prop"
-        : task.kind === "mood"
-          ? "story-pro2-mood"
-          : "story-pro2-audio";
+  if (task.kind === "prop" || task.kind === "mood") {
     const mediaRow = row as
       | import("./story-pro-workspace-types").StoryProPropRow
+      | import("./story-pro-workspace-types").StoryProMoodRow
       | undefined;
-    const nodeId = store.addNode(nodeType, pos, {
+    const nodeId = store.addNode("story-pro2-image", pos, {
+      ...buildPro2ImageNodeData(),
+      pro2MediaRole: task.kind,
+      pro2RowKey: task.rowKey,
+      pro2HubNodeId: hubId,
+      dockInput,
+      label: mediaRow?.name?.trim() ?? task.label,
+      ...crewTaskNodeExtras(task),
+    });
+    if (nodeId) selectPro2NodeAfterSpawn(store.setNodes, nodeId);
+    return nodeId || null;
+  }
+
+  if (task.kind === "audio") {
+    const mediaRow = row as
+      | import("./story-pro-workspace-types").StoryProAudioRow
+      | undefined;
+    const nodeId = store.addNode("story-pro2-audio", pos, {
       label: mediaRow?.name?.trim() ?? task.label,
       dockInput,
       scriptStudioSourceRowKey: task.rowKey,
@@ -131,6 +144,28 @@ function spawnCrewWorkNodeAtPosition(
       pro2HubNodeId: hubId,
       dockInput,
       label,
+      ...crewTaskNodeExtras(task),
+    });
+    if (nodeId) selectPro2NodeAfterSpawn(store.setNodes, nodeId);
+    return nodeId || null;
+  }
+
+  if (task.kind === "frameVideo") {
+    const frameRow = row as import("./story-pro-workspace-types").StoryProFrameRow | undefined;
+    const videoPrompt =
+      frameRow?.videoPrompt?.trim() ||
+      frameRow?.prompt?.trim() ||
+      dockInput.trim();
+    const label =
+      frameRow?.frameIndex != null
+        ? `镜 ${frameRow.frameIndex} · 视频`
+        : task.label;
+    const nodeId = store.addNode("sbv1-video-engine", pos, {
+      ...buildSbv1VideoEngineNodeData(),
+      prompt: videoPrompt,
+      crewTaskLabel: label,
+      pro2RowKey: task.rowKey,
+      pro2HubNodeId: hubId,
       ...crewTaskNodeExtras(task),
     });
     if (nodeId) selectPro2NodeAfterSpawn(store.setNodes, nodeId);

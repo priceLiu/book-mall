@@ -62,9 +62,10 @@ description: >-
 | type | 版 | Dock | 顶栏 |
 | --- | --- | --- | --- |
 | `story-pro2-image` | Pro2 | `Pro2ImageInputDock` | 有图 |
+| `story-pro2-image` · `pro2MediaRole=prop/mood` | Pro2 | 同左 | 有图 |
 | `story-pro2-three-view` | Pro2 | `Pro2ThreeViewInputDock` | 有图 |
 | `sbv1-image` | sbv1 | `Sbv1ImageInputDock` | 有图 |
-| `sbv1-video-engine` | sbv1 | `Sbv1VideoEngineFloatingDock` | 无（视频预览钮） |
+| `sbv1-video-engine` | sbv1 / **Pro2 公告栏分镜视频** | `Sbv1VideoEngineFloatingDock` | 无（视频预览钮） |
 
 ### 薄卡（Pro2）
 

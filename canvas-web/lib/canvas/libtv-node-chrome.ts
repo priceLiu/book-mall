@@ -3,6 +3,9 @@
  * 整卡拖动、侧 +、Dock、顶栏工具条须与此一致。
  */
 
+import type { CSSProperties } from "react";
+import { cn } from "@/lib/utils";
+
 /** 内层卡片（非媒体 · 文本 / 脚本 / 薄卡等） */
 export const LIBTV_CONTROL_CARD_BG = "#141418";
 export const LIBTV_CONTROL_CARD_SHELL_CLASS =
@@ -35,7 +38,10 @@ export const LIBTV_VIDEO_NODE_HEADER_HEIGHT = 38;
  * 旧节点（含已手动拉伸/旧版本适配过的）下次进画布会按新算法**重算一次**外框，
  * 确保 `object-contain` 四边贴合、消除历史留边；重算后写回版本号，不再重复探测。
  */
-export const LIBTV_MEDIA_FIT_VERSION = 2;
+export const LIBTV_MEDIA_FIT_VERSION = 5;
+
+/** 生成图自适配 · 预览区（stage）长边目标 px（不含标题栏）· 约空态 350 的 2.5 倍 */
+export const LIBTV_MEDIA_AUTO_FIT_LONG_EDGE = 875;
 
 /** @deprecated 旧常量（偏小，会导致留边）。新代码请用按节点类型区分的上面两个。 */
 export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = LIBTV_IMAGE_NODE_HEADER_HEIGHT;
@@ -64,6 +70,68 @@ export function libtvMediaNodeHeightForWidth(width: number): number {
 
 /** 整卡拖动光标（须配合无 dragHandle 节点） */
 export const LIBTV_CARD_DRAG_CLASS = "cursor-grab active:cursor-grabbing";
+
+/** LibTV 节点壳层交互描边 · hover 2px #A2A2A2；选中 2px 保留版别色 */
+export const LIBTV_NODE_BORDER_HOVER_COLOR = "#A2A2A2";
+
+const LIBTV_NODE_BORDER_SELECTED_PRO2 = "rgba(167, 139, 250, 0.45)";
+const LIBTV_NODE_BORDER_SELECTED_SBV1 = "rgba(34, 211, 238, 0.5)";
+const LIBTV_NODE_BORDER_SELECTED_NEUTRAL = "rgba(255, 255, 255, 0.42)";
+
+export type LibtvNodeBorderEdition = "pro2" | "sbv1" | "neutral";
+
+export function libtvNodeBorderStyle(options: {
+  selected?: boolean;
+  hovered?: boolean;
+  edition?: LibtvNodeBorderEdition;
+}): CSSProperties | undefined {
+  const { selected, hovered, edition = "pro2" } = options;
+  if (selected) {
+    const borderColor =
+      edition === "sbv1"
+        ? LIBTV_NODE_BORDER_SELECTED_SBV1
+        : edition === "neutral"
+          ? LIBTV_NODE_BORDER_SELECTED_NEUTRAL
+          : LIBTV_NODE_BORDER_SELECTED_PRO2;
+    return { borderWidth: 2, borderColor, borderStyle: "solid" };
+  }
+  if (hovered) {
+    return {
+      borderWidth: 2,
+      borderColor: LIBTV_NODE_BORDER_HOVER_COLOR,
+      borderStyle: "solid",
+    };
+  }
+  return undefined;
+}
+
+export function libtvNodeInteractiveBorderClass(options: {
+  selected?: boolean;
+  hovered?: boolean;
+  edition?: LibtvNodeBorderEdition;
+}): string {
+  const style = libtvNodeBorderStyle(options);
+  if (!style) return "border border-white/10";
+  return "border-solid";
+}
+
+/** 媒体节点壳层 className（含 hover / 选中描边） */
+export function libtvMediaNodeShellClass(options: {
+  selected?: boolean;
+  hovered?: boolean;
+  edition: LibtvNodeBorderEdition;
+  className?: string;
+}): string {
+  const { selected, hovered, edition, className } = options;
+  const borderStyle = libtvNodeBorderStyle({ selected, hovered, edition });
+  return cn(
+    LIBTV_MEDIA_CARD_SHELL_CLASS,
+    LIBTV_CARD_DRAG_CLASS,
+    libtvNodeInteractiveBorderClass({ selected, hovered, edition }),
+    !borderStyle && "border border-white/10",
+    className,
+  );
+}
 
 /** 整卡可拖节点 type · 登记于 normalize-graph-nodes `PRO2_LIBTV_DRAG_ANYWHERE_TYPES` */
 export const LIBTV_DRAG_ANYWHERE_NODE_TYPES = [

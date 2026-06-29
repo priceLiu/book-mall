@@ -15,6 +15,7 @@ import {
 import { Handle, Position } from "@xyflow/react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   PRO2_CARD_SHELL_CLASS,
@@ -27,6 +28,7 @@ import {
 import {
   LIBTV_CARD_DRAG_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import {
   pro2StarterHasContent,
@@ -61,10 +63,14 @@ import { promoteEmbeddedPackFromOutline } from "@/lib/canvas/story-hub-runtime";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
+import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
+import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
+import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
+import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
   LibtvTryActionRow,
@@ -94,6 +100,7 @@ const STARTER_TRY_ACTIONS: StarterTryAction[] = [
 
 export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
@@ -103,6 +110,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as StoryPro2StarterNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
+  const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-starter");
   const edges = useCanvasStore((s) => s.edges);
   const outlineMd = d.generatedOutlineMd?.trim() ?? "";
   const uploadedMd = d.uploadedScriptMd?.trim() ?? "";
@@ -115,10 +123,6 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     isStoryOutlineMode &&
     (d.themeOutlineRuntime?.status === "pending" ||
       d.themeOutlineRuntime?.status === "running");
-  const outlineGeneratingLabel =
-    d.themeOutlineRuntime?.status === "running" || d.themeOutlineRuntime?.taskId
-      ? "生成中…"
-      : "提交中…";
   const outlineErrorMessage =
     isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
@@ -378,12 +382,15 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     <div
       className={cn(LIBTV_NODE_OUTER_CLASS, LIBTV_CARD_DRAG_CLASS)}
       data-pro2-dock-anchor={id}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <Pro2NodeResizer
         isVisible={!!selected}
         minWidth={PRO2_TEXT_NODE_MIN_WIDTH}
         minHeight={PRO2_TEXT_NODE_MIN_HEIGHT}
       />
+      {selected ? <Pro2NodeResizeGrip /> : null}
 
       <Handle
         id="in_text"
@@ -434,13 +441,15 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               "OUTLINE",
             )
           }
+          onDuplicateNode={onDuplicateNode}
         />
       ) : null}
 
-      <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "mb-1.5 shrink-0")}>
+      <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
         <GripVertical className="size-3.5 shrink-0 text-white/30" />
         <FileText className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{nodeLabel}</span>
+        <Pro2CrewTaskStatusBadge nodeId={id} />
       </div>
 
       <div
@@ -449,7 +458,13 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           LIBTV_CARD_DRAG_CLASS,
           "flex min-h-0 flex-1 flex-col overflow-hidden",
         )}
-        style={{ borderColor: pro2NodeBorderColor(!!selected) }}
+        style={
+          libtvNodeBorderStyle({
+            selected: !!selected,
+            hovered: hovered && !selected,
+            edition: "neutral",
+          }) ?? { borderColor: pro2NodeBorderColor(!!selected) }
+        }
       >
         {outlineErrorMessage && !isGenerating ? (
           <Pro2NodeErrorBanner
@@ -458,13 +473,12 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           />
         ) : null}
         {isGenerating ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
-            <Loader2 className="size-5 animate-spin" />
-            {outlineGeneratingLabel}
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-3">
+            <Loader2 className="size-5 animate-spin text-violet-200/70" />
           </div>
         ) : displayState === "generated" ? (
           <div
-            className="h-full min-h-0 p-2"
+            className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "h-full min-h-0 p-2")}
             title={hasUploadedScript ? "已上传剧本 · 双击放大查看" : "双击放大编辑"}
             onDoubleClick={(e) => {
               e.preventDefault();
@@ -472,7 +486,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               openEditor();
             }}
           >
-            <div className="pro2-node-scroll h-full overflow-x-auto overflow-y-auto pr-1">
+            <Pro2NodeScrollArea className="h-full pr-1">
               {hasUploadedScript ? (
                 <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-white/75">
                   {displayMd}
@@ -484,7 +498,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
                   className="text-[11px]"
                 />
               )}
-            </div>
+            </Pro2NodeScrollArea>
           </div>
         ) : displayState === "connected" ? (
           <div
@@ -520,7 +534,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               ))}
             </ul>
             <p className="mt-2 text-[10px] leading-relaxed text-white/35">
-              在脚本生成器中创作并发布剧本后，可在公告条领取制作任务；本节点也可用于提示词与下游生图/生视频。
+              在脚本生成器中创作并发布剧本后，可在公告条参与制作任务；本节点也可用于提示词与下游生图/生视频。
             </p>
           </div>
         )}

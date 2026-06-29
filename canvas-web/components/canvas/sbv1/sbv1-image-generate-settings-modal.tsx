@@ -40,6 +40,8 @@ export type Sbv1ImageGenerateSettingsModalProps = {
   data: Sbv1ImageNodeData;
   onClose: () => void;
   onConfirm: (patch: Partial<Sbv1ImageNodeData>) => void;
+  /** 默认 SBV1_IMAGE_MODEL_KEYS；Pro2 分镜图等可传入 PRO2_FRAME_IMAGE_MODEL_KEYS */
+  allowedModelKeys?: string[];
   /** 嵌套在其它弹层内时须高于宿主（如角色三视图批量选择 z-1200） */
   modalZIndex?: number;
 };
@@ -50,6 +52,7 @@ export function Sbv1ImageGenerateSettingsModal({
   data,
   onClose,
   onConfirm,
+  allowedModelKeys,
   modalZIndex = MODAL_Z,
 }: Sbv1ImageGenerateSettingsModalProps) {
   const mounted = useClientPortalMounted();
@@ -158,7 +161,7 @@ export function Sbv1ImageGenerateSettingsModal({
               role="IMAGE"
               embedded
               modelsOnly
-              allowedModelKeys={[...SBV1_IMAGE_MODEL_KEYS]}
+              allowedModelKeys={allowedModelKeys ?? [...SBV1_IMAGE_MODEL_KEYS]}
               providerId={providerId}
               modelKey={modelKey}
               params={engineParams}

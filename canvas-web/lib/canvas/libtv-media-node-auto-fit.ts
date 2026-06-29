@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import {
   LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+  LIBTV_MEDIA_AUTO_FIT_LONG_EDGE,
   LIBTV_MEDIA_FIT_VERSION,
   LIBTV_VIDEO_NODE_HEADER_HEIGHT,
 } from "./libtv-node-chrome";
@@ -20,7 +21,6 @@ import {
 import {
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
-  PRO2_IMAGE_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import { useCanvasStore } from "./store";
 
@@ -78,9 +78,6 @@ export function computeLibtvMediaNodeSize(
     profile === "sbv1-video"
       ? LIBTV_VIDEO_NODE_HEADER_HEIGHT
       : LIBTV_IMAGE_NODE_HEADER_HEIGHT;
-
-  const defaultWidth =
-    profile === "sbv1-video" ? 635 : PRO2_IMAGE_NODE_WIDTH;
   const minWidth =
     profile === "sbv1-video"
       ? SBV1_VIDEO_ENGINE_MIN_WIDTH
@@ -94,7 +91,28 @@ export function computeLibtvMediaNodeSize(
         ? SBV1_IMAGE_NODE_MIN_HEIGHT
         : PRO2_IMAGE_NODE_MIN_HEIGHT;
 
-  let width = defaultWidth;
+  if (profile !== "sbv1-video") {
+    const longEdge = Math.max(nw, nh);
+    const scale = LIBTV_MEDIA_AUTO_FIT_LONG_EDGE / longEdge;
+    let width = Math.ceil(nw * scale);
+    let stageHeight = Math.ceil(nh * scale);
+    let height = headerHeight + stageHeight;
+
+    if (width < minWidth) {
+      width = minWidth;
+      stageHeight = Math.ceil(width * (nh / nw));
+      height = headerHeight + stageHeight;
+    }
+    if (height < minHeight) {
+      height = minHeight;
+      stageHeight = Math.max(1, height - headerHeight);
+      width = Math.ceil(stageHeight * (nw / nh));
+    }
+
+    return { width, height };
+  }
+
+  let width = 635;
   let stageHeight = width * (nh / nw);
   let height = headerHeight + stageHeight;
 

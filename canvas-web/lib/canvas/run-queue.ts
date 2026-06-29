@@ -48,6 +48,7 @@ import {
 import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { formatCanvasTaskError, resolveLibtvRunFailureCode } from "./friendly-task-error";
 import { maybeNotifyCanvasCreditsSettled, markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
+import { clearCanvasNodeRunSession } from "./canvas-run-session";
 import {
   isCanvasTaskTerminalStatus,
   notifyCanvasTaskPanelSync,
@@ -78,6 +79,7 @@ import {
 import {
   commitLibtvMediaRunPendingPatch,
   isLibtvFreestandingImageNode,
+  resolveLibtvImageEngineFromNodeData,
 } from "./libtv-image-node-run";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import { resolveStoryProRunStylePayload } from "./story-pro-run-style-context";
@@ -489,6 +491,7 @@ function applyLibtvMediaRunFailure(
   failMessage: string,
 ): boolean {
   if (!node) return false;
+  clearCanvasNodeRunSession(node.id);
   if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine") {
     updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
     return true;
@@ -871,6 +874,15 @@ export function useCanvasRunner(
         const runData = isLibtvFreestandingImageNode(node)
           ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
           : data;
+        if (isLibtvFreestandingImageNode(node)) {
+          if (!resolveLibtvImageEngineFromNodeData(runData)) {
+            abortSequential(
+              job,
+              "缺少 IMAGE 模型配置，请在输入坞「图片生成设置」中选择生图模型",
+            );
+            return;
+          }
+        }
         const modelKey =
           typeof data.modelKey === "string" ? data.modelKey : undefined;
         const stylePayload = resolveStoryProRunStylePayload(
@@ -1251,8 +1263,28 @@ export function useCanvasRunner(
     drainRef.current = drain;
   }, [drain]);
 
+  const releaseStaleInflightLock = useCallback(
+    (job: QueueItem): boolean => {
+      const key = runKey(job);
+      if (!inflightRef.current.has(key)) return false;
+      const boundTaskId =
+        taskByNodeRef.current.get(key) ??
+        taskByNodeRef.current.get(job.nodeId);
+      if (boundTaskId) return false;
+      const node = useCanvasStore
+        .getState()
+        .nodes.find((n) => n.id === job.nodeId);
+      const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
+        ?.runtime;
+      if (rt?.taskId?.trim()) return false;
+      releaseInflightKey(key);
+      return true;
+    },
+    [releaseInflightKey],
+  );
+
   const enqueueStoryRun = useCallback(
-    (job: QueueItem) => {
+    (job: QueueItem): boolean => {
       if (gatewayLinkBlocked) {
         const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
         const gwMsg = gatewayLinkAccountUrl
@@ -1278,15 +1310,18 @@ export function useCanvasRunner(
             detail: { nodeId: job.nodeId, message: gwMsg },
           }),
         );
-        return;
+        return false;
       }
       const key = runKey(job);
-      if (job.forceFresh && inflightRef.current.has(key)) {
-        // 生成中重复点击忽略（勿 deferred 排队，否则首轮结束后会自动再提交）
-        return;
+      if (inflightRef.current.has(key)) {
+        if (job.forceFresh) {
+          releaseStaleInflightLock(job);
+        }
+        if (inflightRef.current.has(key)) {
+          return false;
+        }
       }
-      if (inflightRef.current.has(key)) return;
-      if (queueRef.current.some((q) => runKey(q) === key)) return;
+      if (queueRef.current.some((q) => runKey(q) === key)) return false;
       const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
       if (
         node &&
@@ -1294,14 +1329,14 @@ export function useCanvasRunner(
         job.llmSection
       ) {
         const st = hubSectionRuntime(node, job.llmSection)?.status;
-        if (isCanvasInflightStatus(st)) return;
+        if (isCanvasInflightStatus(st)) return false;
       }
       const rowSt = storyRowRuntimeStatus(node, job);
       if (
         !job.forceFresh &&
         (rowSt === "running" || rowSt === "pending" || rowSt === "queued")
       ) {
-        return;
+        return false;
       }
       detachNodeTaskRefs(job);
       markCanvasNodeGenerationStarted(job.nodeId);
@@ -1322,13 +1357,22 @@ export function useCanvasRunner(
       queueRef.current.push(job);
       drain();
       pollKickRef.current?.();
+      return true;
     },
-    [drain, setNodeRuntime, updateNodeData, gatewayLinkAccountUrl, gatewayLinkBlocked, detachNodeTaskRefs],
+    [
+      drain,
+      setNodeRuntime,
+      updateNodeData,
+      gatewayLinkAccountUrl,
+      gatewayLinkBlocked,
+      detachNodeTaskRefs,
+      releaseStaleInflightLock,
+    ],
   );
 
   const enqueueNode = useCallback(
     (nodeId: string, forceFresh?: boolean) => {
-      enqueueStoryRun({ nodeId, forceFresh });
+      return enqueueStoryRun({ nodeId, forceFresh });
     },
     [enqueueStoryRun],
   );

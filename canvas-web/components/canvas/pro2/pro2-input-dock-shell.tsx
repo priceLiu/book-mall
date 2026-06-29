@@ -188,7 +188,7 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
   );
 }
 
-/** Dock 顶栏：上行参考缩略图 · 下行操作按钮（标记 / 风格 / 上传等） */
+/** Dock 顶栏：参考缩略图 + 风格 / 标记 / 上传等 · 单行横向排列 */
 export function Pro2DockHeader({
   refRow,
   actionRow,
@@ -201,16 +201,10 @@ export function Pro2DockHeader({
     <div
       className={cn("nodrag shrink-0 border-b", LIBTV_INPUT_DOCK_DIVIDER)}
     >
-      {refRow ? (
-        <div className="hide-scroll-bar flex min-h-[44px] min-w-0 items-center gap-1.5 overflow-x-auto border-b border-white/[0.06] px-3 py-1">
-          {refRow}
-        </div>
-      ) : null}
-      {actionRow ? (
-        <div className="flex min-h-[40px] flex-wrap items-center gap-1.5 px-3 py-1.5">
-          {actionRow}
-        </div>
-      ) : null}
+      <div className="hide-scroll-bar flex min-h-[44px] min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto px-3 py-1.5">
+        {refRow}
+        {actionRow}
+      </div>
     </div>
   );
 }

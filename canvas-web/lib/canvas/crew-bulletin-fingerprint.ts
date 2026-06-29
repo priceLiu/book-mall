@@ -10,7 +10,7 @@ export function crewBulletinStateFingerprint(
   return tasks
     .map(
       (t) =>
-        `${t.id}:${t.status}:${t.assigneeUserId ?? ""}:${t.canvasNodeId ?? ""}:${t.completedAt ?? ""}`,
+        `${t.id}:${t.status}:${t.assigneeUserId ?? ""}:${t.canvasNodeId ?? ""}:${t.completedAt ?? ""}:${t.forkSubmissions?.length ?? 0}`,
     )
     .join(";");
 }

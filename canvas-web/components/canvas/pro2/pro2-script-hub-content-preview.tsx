@@ -13,6 +13,7 @@ import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome"
 import { cn } from "@/lib/utils";
 import { MarkdownView } from "../markdown-view";
 import { Pro2ScriptHubViewTabs } from "./pro2-script-hub-view-tabs";
+import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
 
 const STORYBOARD_COLS = [
   { key: "frameIndex", label: "镜号", className: "w-10 text-center" },
@@ -150,7 +151,7 @@ export function Pro2ScriptHubContentPreview({
     return (
       <div className={cn("flex h-full min-h-0 flex-col", className)}>
         {header}
-        <div className="pro2-node-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto py-2 pl-2 pr-3">
+        <Pro2NodeScrollArea className="py-2 pl-2 pr-1">
           {outlinePreview.trim() ? (
             <MarkdownView
               content={outlinePreview}
@@ -162,7 +163,7 @@ export function Pro2ScriptHubContentPreview({
               {statusMessage ?? emptyMessage}
             </p>
           )}
-        </div>
+        </Pro2NodeScrollArea>
       </div>
     );
   }
@@ -183,7 +184,7 @@ export function Pro2ScriptHubContentPreview({
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
       {header}
-      <div className="pro2-node-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto py-1 pl-2 pr-3">
+      <Pro2NodeScrollArea className="py-1 pl-2 pr-1">
         <table className={TABLE}>
           <thead className="sticky top-0 z-[1]">
             <tr>
@@ -286,7 +287,7 @@ export function Pro2ScriptHubContentPreview({
             </tbody>
           )}
         </table>
-      </div>
+      </Pro2NodeScrollArea>
     </div>
   );
 }

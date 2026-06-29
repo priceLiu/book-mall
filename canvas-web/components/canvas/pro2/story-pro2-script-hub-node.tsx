@@ -22,6 +22,9 @@ import { Handle, Position } from "@xyflow/react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
+import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
+import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
   LibtvTryActionRow,
@@ -59,11 +62,13 @@ import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace
 import {
   LIBTV_CARD_DRAG_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
 import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
+import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2ScriptHubToolbar } from "./pro2-script-hub-toolbar";
 import { Pro2ScriptHubContentPreview } from "./pro2-script-hub-content-preview";
@@ -134,6 +139,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const scriptUploadRef = useRef<HTMLInputElement>(null);
 
   const d = data as unknown as StoryProScriptHubNodeData;
+  const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-script-hub");
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
   const sceneCtx = useMemo(
@@ -199,13 +205,13 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     return resolvePro2HubTableTitle(starter, d.outlineMd ?? "");
   }, [nodes, edges, id, d.outlineMd]);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
-  const { hovered: sideHover, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
+  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const showToolbar = Boolean(selected && hasPreviewContent && !isGenerating);
   const showThinTitle = displayState !== "generated" || isGenerating;
   const previewTitle =
     displayState === "generated" && !isGenerating ? tableTitle : undefined;
   const showSidePlus = Boolean(
-    (sideHover || selected || connectingFromNodeId) &&
+    (hovered || selected || connectingFromNodeId) &&
       (hasPreviewContent || isLinked) &&
       !isGenerating,
   );
@@ -325,6 +331,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         minWidth={PRO2_SCRIPT_NODE_MIN_WIDTH}
         minHeight={PRO2_SCRIPT_NODE_MIN_HEIGHT}
       />
+      {selected ? <Pro2NodeResizeGrip /> : null}
 
       <Handle
         id="in_text"
@@ -368,11 +375,16 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         </>
       ) : null}
 
+      {selected && !showToolbar ? (
+        <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
+      ) : null}
+
       {showThinTitle ? (
-        <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "mb-1.5 shrink-0")}>
+        <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
           <GripVertical className="size-3.5 shrink-0 text-white/30" />
           <FileText className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">{PRO2_SCRIPT_HUB_NODE_LABEL}</span>
+          <Pro2CrewTaskStatusBadge nodeId={id} />
         </div>
       ) : null}
 
@@ -383,6 +395,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
             hubId={id}
             hubData={d}
             tableTitle={tableTitle}
+            onDuplicateNode={onDuplicateNode}
           />
         ) : null}
 
@@ -392,13 +405,22 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
           LIBTV_CARD_DRAG_CLASS,
           "relative flex h-full min-h-0 flex-col overflow-hidden",
         )}
-        style={{ borderColor: pro2NodeBorderColor(!!selected) }}
+        style={
+          libtvNodeBorderStyle({
+            selected: !!selected,
+            hovered: hovered && !selected,
+            edition: "neutral",
+          }) ?? { borderColor: pro2NodeBorderColor(!!selected) }
+        }
       >
         {isGenerating ? (
-          <LibtvMediaGeneratingState label="文案生成中…" variant="violet" />
+          <LibtvMediaGeneratingState variant="violet" />
         ) : displayState === "generated" ? (
           <div
-            className="flex h-full min-h-0 flex-col px-2 py-2"
+            className={cn(
+              LIBTV_NODE_STAGE_DRAG_CLASS,
+              "flex h-full min-h-0 flex-col px-2 py-2",
+            )}
             title="双击放大编辑"
             onDoubleClick={(e) => {
               e.preventDefault();
@@ -459,7 +481,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
               <p>一句话生成剧本：在下方 Dock 输入剧情后发送</p>
               <p>上传剧本生成分镜脚本：点击上方按钮选择 .md / .txt 文件</p>
               <p className="pt-1 text-white/25">
-                完成剧本后在节点顶栏发布，即可在公告条领取制作任务
+                完成剧本后在节点顶栏发布，即可在公告条参与制作任务
               </p>
             </div>
           </div>

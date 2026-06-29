@@ -40,7 +40,7 @@ export async function confirmAndPublishPro2ScriptHub(
     !(await dialogs.confirm({
       title: "发布剧本",
       message:
-        "发布后剧组可在公告条领取角色、场景、道具、分镜等任务；发布者也可领取并执行。是否继续？",
+        "发布后剧组可在公告条参与制作角色、场景、道具、分镜等任务；发布者也可参与并执行。是否继续？",
     }))
   ) {
     return null;

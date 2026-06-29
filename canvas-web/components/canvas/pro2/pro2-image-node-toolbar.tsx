@@ -109,28 +109,32 @@ export function Pro2ImageNodeToolbar({
         className={className}
         style={style}
       >
-        <button
-          type="button"
-          className={ICON_BTN}
-          title="放大预览"
-          disabled={!previewUrl}
-          onClick={onExpandPreview}
-        >
-          <Maximize2 className="size-5" />
-        </button>
-        <button
-          type="button"
-          className={ICON_BTN}
-          title="下载"
-          disabled={!previewUrl || downloading}
-          onClick={() => void onDownload()}
-        >
-          {downloading ? (
-            <Loader2 className="size-5 animate-spin" />
-          ) : (
-            <Download className="size-5" />
-          )}
-        </button>
+        {onExpandPreview ? (
+          <button
+            type="button"
+            className={ICON_BTN}
+            title="放大预览"
+            disabled={!previewUrl}
+            onClick={onExpandPreview}
+          >
+            <Maximize2 className="size-5" />
+          </button>
+        ) : null}
+        {previewUrl ? (
+          <button
+            type="button"
+            className={ICON_BTN}
+            title="下载"
+            disabled={downloading}
+            onClick={() => void onDownload()}
+          >
+            {downloading ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <Download className="size-5" />
+            )}
+          </button>
+        ) : null}
         {onDuplicateNode ? (
           <button
             type="button"

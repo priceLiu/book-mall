@@ -20,6 +20,14 @@ export type CrewTaskStatus =
   | "review"
   | "blocked";
 
+/** 副本节点「完成制作」提交 · 不覆盖主槽位 */
+export type CrewTaskForkSubmission = {
+  nodeId: string;
+  submittedAt: string;
+  assigneeUserId?: string;
+  assigneeDisplayName?: string;
+};
+
 export type CrewBulletinTask = {
   id: string;
   kind: CrewTaskKind;
@@ -34,6 +42,8 @@ export type CrewBulletinTask = {
   canvasNodeId?: string;
   claimedAt?: string;
   completedAt?: string;
+  /** 复制节点上的重复提交记录（不覆盖主任务槽） */
+  forkSubmissions?: CrewTaskForkSubmission[];
 };
 
 export type CrewBulletinState = {
@@ -59,8 +69,8 @@ export const CREW_BULLETIN_KIND_LABELS: Record<CrewTaskKind, string> = {
 };
 
 export const CREW_TASK_STATUS_LABELS: Record<CrewTaskStatus, string> = {
-  unclaimed: "未领取",
-  claimed: "已领取",
+  unclaimed: "待参与制作",
+  claimed: "参与制作",
   generating: "生成中",
   done: "完成",
   review: "待审阅",

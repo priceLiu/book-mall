@@ -25,6 +25,7 @@ import {
   LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_NODE_HANDLE_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import {
   PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT,
@@ -36,13 +37,14 @@ import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-l
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "../media-hover-box";
 import { LibtvNodeHeaderPreviewButton } from "../libtv-node-header-preview-button";
+import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
 } from "./pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
-import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import {
@@ -72,7 +74,6 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const isGenerating = isLibtvMediaGenerating(d);
-  const generatingLabel = d.uploading ? "上传中…" : "生成三视图中…";
   const hasError = Boolean(d.uploadError?.trim());
   const label = d.label?.trim() || "角色";
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
@@ -80,10 +81,19 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
     () => selected && rfNodes.filter((n) => n.selected).length === 1,
     [selected, rfNodes],
   );
-  const showImageTools = Boolean(soleSelected && hasImage && !isGenerating);
+  const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
+  const showImageTools = Boolean(showFloatingToolbar && hasImage);
   const showEmbeddedDock = pro2ThreeViewNodeUsesEmbeddedDock(d, {
     selected: Boolean(selected),
     soleSelected,
+  });
+
+  useLibtvMediaNodeAutoFit({
+    nodeId: id,
+    mediaUrl: previewUrl,
+    kind: "image",
+    profile: "square-image",
+    disabled: !hasImage || (isGenerating && !d.uploading),
   });
 
   const onPick = useCallback(() => inputRef.current?.click(), []);
@@ -146,13 +156,10 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
     [id, nodes, addNode, setNodes, setEdges, alert],
   );
 
+  const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-three-view");
+
   return (
     <>
-      <Pro2NodeResizer
-        isVisible={Boolean(selected && !insideGroup)}
-        minWidth={PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH}
-        minHeight={PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT}
-      />
       <div
         className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
         data-pro2-dock-anchor={id}
@@ -207,6 +214,16 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           </>
         ) : null}
 
+        {showFloatingToolbar && !showImageTools ? (
+          <Pro2ImageNodeToolbar
+            passNodeDrag
+            minimal
+            className="absolute left-1/2 z-40 -translate-x-1/2"
+            style={{ top: -60 }}
+            onDuplicateNode={onDuplicateNode}
+          />
+        ) : null}
+
         {showImageTools ? (
           <Pro2ImageNodeToolbar
             passNodeDrag
@@ -222,6 +239,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 "CHARACTER",
               )
             }
+            onDuplicateNode={onDuplicateNode}
           />
         ) : null}
 
@@ -230,37 +248,40 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             LIBTV_MEDIA_CARD_SHELL_CLASS,
             LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
-            selected && "ring-1 ring-violet-400/45",
-            hovered && !selected && "ring-1 ring-violet-400/30",
           )}
+          style={libtvNodeBorderStyle({
+            selected: !!selected,
+            hovered: hovered && !selected,
+            edition: "pro2",
+          })}
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <ImageIcon className="size-3.5 text-violet-300" />
-              <p className="text-xs font-medium text-white">{label}</p>
+          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <ImageIcon className="size-3.5 shrink-0 text-violet-300" />
+              <p className="truncate text-xs font-medium text-white">{label}</p>
             </div>
-            {isGenerating ? (
-              <Loader2 className="size-3.5 animate-spin text-violet-300" />
-            ) : (
-              <LibtvNodeHeaderPreviewButton
-                visible={hasImage}
-                onClick={() => setPreviewOpen(true)}
-              />
-            )}
+            <Pro2CrewTaskStatusBadge nodeId={id} />
+            <div className="relative z-[1] flex shrink-0 items-center gap-2">
+              {!isGenerating ? (
+                <LibtvNodeHeaderPreviewButton
+                  visible={hasImage}
+                  onClick={() => setPreviewOpen(true)}
+                />
+              ) : (
+                <Loader2 className="size-3.5 animate-spin text-violet-300" />
+              )}
+            </div>
           </div>
 
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
-              <LibtvMediaGeneratingState
-                label={generatingLabel}
-                variant="violet"
-              />
+              <LibtvMediaGeneratingState variant="violet" />
             ) : hasImage ? (
               <MediaHoverBox
                 src={previewUrl}
                 variant="generated"
                 alt={label}
-                fit="contain"
+                fit="cover"
                 hidePreviewOverlay
                 className="absolute inset-0"
               />
@@ -285,9 +306,6 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 </p>
               </div>
             )}
-            {!isGenerating ? (
-              <Pro2CrewTaskStatusBadge nodeId={id} placement="center" />
-            ) : null}
           </div>
         </div>
       </div>

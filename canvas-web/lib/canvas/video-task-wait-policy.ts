@@ -20,10 +20,8 @@ export function isVideoBackgroundWaitAge(
 }
 
 export function resolveVideoGeneratingLabel(
-  isPending: boolean,
-  isBackground: boolean,
+  _isPending: boolean,
+  _isBackground: boolean,
 ): string {
-  if (isBackground) return VIDEO_BACKGROUND_UI_LABEL;
-  if (isPending) return VIDEO_QUEUE_LABEL;
-  return VIDEO_GENERATING_LABEL;
+  return "";
 }

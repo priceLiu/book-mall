@@ -173,8 +173,9 @@ export function buildCrewBulletinFromHub(
 
   const scriptTitle =
     opts?.scriptTitle?.trim() ||
-    hubData.scriptStudioThemeInput?.trim() ||
     resolvePro2HubTableTitle(null, hubData.outlineMd ?? "") ||
+    hubData.crewBulletin?.scriptTitle?.trim() ||
+    hubData.scriptStudioThemeInput?.trim() ||
     "剧本";
 
   tasks.push({

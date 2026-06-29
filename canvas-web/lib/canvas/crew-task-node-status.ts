@@ -25,8 +25,15 @@ export function crewTaskStatusForNodeId(
   nodeId: string,
 ): CrewTaskStatus | undefined {
   const anchor = resolveCrewBulletinAnchor(nodes, graphMeta ?? undefined);
-  return anchor?.bulletin?.tasks.find((t) => t.canvasNodeId === nodeId)
-    ?.status;
+  const tasks = anchor?.bulletin?.tasks;
+  if (!tasks?.length) return undefined;
+  const byNode = tasks.find((t) => t.canvasNodeId === nodeId);
+  if (byNode) return byNode.status;
+  const node = nodes.find((n) => n.id === nodeId);
+  const crewTaskId = (node?.data as { crewTaskId?: string } | undefined)
+    ?.crewTaskId;
+  if (!crewTaskId) return undefined;
+  return tasks.find((t) => t.id === crewTaskId)?.status;
 }
 
 export type CrewTaskNodeBadgeTier = "done" | "active" | "idle";

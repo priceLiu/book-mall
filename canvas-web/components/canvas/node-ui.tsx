@@ -187,7 +187,7 @@ export function NodeEngineFooter({
       >
         {isGenerating ? (
           <>
-            <RefreshCw className="size-3 animate-spin" /> {runningLabel}
+            <RefreshCw className="size-3 animate-spin" />
           </>
         ) : hasGenerated ? (
           <>

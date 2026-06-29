@@ -2,6 +2,7 @@
 /**
  * dev:all 启动前的端口预检：
  *   - 检查 3000-3007 是否被占
+ *   - 若 DATABASE_URL 走 127.0.0.1:6432，检查 PgBouncer 是否在监听
  *   - 如果有占用：打印占用 PID + 命令名，并给出处置建议（kill 命令），随后退出 1
  *   - 全空闲：静默通过
  *
@@ -12,6 +13,10 @@
  *   或：node scripts/dev-preflight.mjs --kill   # 自动 kill -9 占用进程后再退出 0（仅限 macOS / Linux）
  */
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = process.cwd();
 
 const PORTS = [
   { port: 3000, label: "book-mall" },
@@ -67,7 +72,82 @@ function checkFfmpegForDev() {
   }
 }
 
+/** 从 book-mall/.env.local 解析 DATABASE_URL（不打印密钥） */
+function parseDatabaseUrlFromEnvLocal() {
+  const envPath = join(ROOT, "book-mall/.env.local");
+  if (!existsSync(envPath)) return null;
+  const text = readFileSync(envPath, "utf8");
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (key !== "DATABASE_URL") continue;
+    let raw = trimmed.slice(eq + 1).trim();
+    if (
+      (raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'"))
+    ) {
+      raw = raw.slice(1, -1);
+    }
+    try {
+      return new URL(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function tcpPortOpen(host, port) {
+  try {
+    execFileSync("nc", ["-z", host, String(port)], {
+      stdio: "ignore",
+      timeout: 4000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** DATABASE_URL 指向本地 PgBouncer 但未启动时，Prisma 会重试后整页 500 / 极慢 */
+function checkDatabasePreflight() {
+  const url = parseDatabaseUrlFromEnvLocal();
+  if (!url) return true;
+
+  const host = url.hostname;
+  const port = url.port || "5432";
+  const usesPool =
+    port === "6432" || url.searchParams.get("pgbouncer") === "true";
+  if (!usesPool || (host !== "127.0.0.1" && host !== "localhost")) {
+    return true;
+  }
+
+  if (tcpPortOpen(host, port)) return true;
+
+  const RED = "\x1b[31m";
+  const YEL = "\x1b[33m";
+  const GRN = "\x1b[32m";
+  const RST = "\x1b[0m";
+  console.error(
+    `\n${RED}✗ 数据库预检未通过${RST} — \`book-mall/.env.local\` 的 DATABASE_URL 指向 ` +
+      `${YEL}${host}:${port}${RST}（PgBouncer），但本机该端口未监听。\n` +
+      `  这会导致画布/登录等 API 极慢并在 prisma 重试后报 500。\n\n` +
+      `处置（二选一）：\n` +
+      `  ${GRN}A) 启动本地 PgBouncer${RST}：${GRN}./deploy/tencent/pgbouncer/start-local.sh${RST} 后 ${GRN}pnpm dev:all:clean${RST}\n` +
+      `     （需 Docker/Colima 可用；macOS brew 版连远程 CDB 可能仍失败）\n` +
+      `  ${GRN}B) 本地直连 CDB${RST}：将 DATABASE_URL 改为与 DIRECT_DATABASE_URL 相同的主机:24155，\n` +
+      `     去掉 pgbouncer=true，追加 connection_limit=30&pool_timeout=30\n`,
+  );
+  return false;
+}
+
 if (conflicts.length === 0) {
+  if (!checkDatabasePreflight()) {
+    process.exit(1);
+  }
   if (!checkFfmpegForDev()) {
     const YEL = "\x1b[33m";
     const GRN = "\x1b[32m";

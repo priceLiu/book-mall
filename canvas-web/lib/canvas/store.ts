@@ -1023,6 +1023,14 @@ export const useCanvasStore = create<CanvasState>()(
           src.data as Record<string, unknown>,
           preserveContent,
         );
+        if (
+          preserveContent &&
+          typeof (data as { crewTaskId?: string }).crewTaskId === "string"
+        ) {
+          (data as { crewTaskFork?: boolean }).crewTaskFork = true;
+          (data as { crewTaskForkedFromNodeId?: string }).crewTaskForkedFromNodeId =
+            id;
+        }
         set((state) =>
           withGraphRevision(state, {
             nodes: ensureNodeDragHandles([
