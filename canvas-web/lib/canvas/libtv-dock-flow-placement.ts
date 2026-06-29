@@ -2,19 +2,22 @@
 
 import { useCallback, useMemo, useRef } from "react";
 import { useStore } from "@xyflow/react";
-import { PRO2_DOCK_WIDTH } from "@/lib/canvas/story-pro2-node-chrome";
+import {
+  LIBTV_DOCK_FLOW_HEIGHT,
+  LIBTV_DOCK_FLOW_WIDTH,
+} from "@/lib/canvas/libtv-dock-scale";
 import { useCanvasStore } from "./store";
 import type { CanvasFlowNode } from "./types";
 
 /** 节点底边与输入坞之间的画布间距（px · flow 坐标） */
 export const LIBTV_DOCK_GAP = 24;
 
-/** 100% 缩放下 · 输入坞相对节点外框：宽 +30%、高 −10%（基准 1.2×） */
-export const LIBTV_DOCK_WIDTH_RATIO = 1.2 * 1.3;
-export const LIBTV_DOCK_HEIGHT_RATIO = 1.2 * 0.9;
-
-/** @deprecated 使用 LIBTV_DOCK_WIDTH_RATIO / LIBTV_DOCK_HEIGHT_RATIO */
-export const LIBTV_DOCK_SIZE_RATIO = LIBTV_DOCK_WIDTH_RATIO;
+/** @deprecated 坞宽不再随节点缩放；保留常量避免旧 import 报错 */
+export const LIBTV_DOCK_WIDTH_RATIO = 1;
+/** @deprecated 坞高由 16:6 固定；保留常量避免旧 import 报错 */
+export const LIBTV_DOCK_HEIGHT_RATIO = 1;
+/** @deprecated */
+export const LIBTV_DOCK_SIZE_RATIO = 1;
 
 export type LibtvDockFlowPlacement = {
   flowX: number;
@@ -31,6 +34,7 @@ type NodeFlowGeometry = {
 };
 
 type PlacementOpts = {
+  /** @deprecated 坞宽已统一固定，忽略 */
   minFlowWidth?: number;
   defaultNodeWidth?: number;
   defaultNodeHeight?: number;
@@ -57,7 +61,7 @@ function geometryFromStoreNode(
     (typeof node.width === "number" ? node.width : undefined) ??
     nodeStyleSize(node, "width") ??
     opts?.defaultNodeWidth ??
-    PRO2_DOCK_WIDTH;
+    LIBTV_DOCK_FLOW_WIDTH;
   const h =
     (typeof node.height === "number" ? node.height : undefined) ??
     nodeStyleSize(node, "height") ??
@@ -68,18 +72,12 @@ function geometryFromStoreNode(
 
 function placementFromGeometry(
   geometry: NodeFlowGeometry,
-  minFlowWidth: number,
 ): LibtvDockFlowPlacement {
-  const flowW = Math.max(
-    geometry.w * LIBTV_DOCK_WIDTH_RATIO,
-    minFlowWidth > 0 ? minFlowWidth : 0,
-  );
-  const flowH = geometry.h * LIBTV_DOCK_HEIGHT_RATIO;
   return {
     flowX: geometry.x + geometry.w / 2,
     flowY: geometry.y + geometry.h + LIBTV_DOCK_GAP,
-    flowW,
-    flowH,
+    flowW: LIBTV_DOCK_FLOW_WIDTH,
+    flowH: LIBTV_DOCK_FLOW_HEIGHT,
   };
 }
 
@@ -114,7 +112,7 @@ export function useLibtvDockFlowPlacement(
           node.measured?.width ??
           (typeof node.width === "number" ? node.width : undefined) ??
           opts?.defaultNodeWidth ??
-          PRO2_DOCK_WIDTH;
+          LIBTV_DOCK_FLOW_WIDTH;
         const h =
           node.measured?.height ??
           (typeof node.height === "number" ? node.height : undefined) ??
@@ -141,9 +139,8 @@ export function useLibtvDockFlowPlacement(
     if (!nodeId) return null;
     const resolved = geometry ?? storeGeometry;
     if (!resolved) return null;
-    const minW = opts?.minFlowWidth ?? PRO2_DOCK_WIDTH;
-    return placementFromGeometry(resolved, minW);
-  }, [nodeId, geometry, storeGeometry, opts?.minFlowWidth]);
+    return placementFromGeometry(resolved);
+  }, [nodeId, geometry, storeGeometry]);
 }
 
 /** pan/zoom 或 RF 裁剪导致 placement 短暂为 null 时，保留上一帧锚点避免 Dock 卸载 */

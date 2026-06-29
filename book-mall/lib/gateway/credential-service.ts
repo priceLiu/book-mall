@@ -2,7 +2,7 @@ import type { GatewayProviderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encryptApiKey, maskApiKey } from "@/lib/canvas/secret";
 import { syncPersonalGatewayApiKeyBindings } from "@/lib/gateway/api-key-service";
-import { resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
+import { resolveKieApiRoot, resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
 import { testGatewayCredentialConnection } from "@/lib/gateway/gateway-credential-test";
 
 export const GATEWAY_PROVIDER_KINDS = [
@@ -65,7 +65,10 @@ export async function createGatewayCredential(opts: {
     rawBase &&
     (opts.providerKind === "BAILIAN" || opts.providerKind === "DASHSCOPE")
       ? resolveOpenAiCompatibleBaseUrl(opts.providerKind, rawBase)
-      : rawBase;
+      : rawBase &&
+          opts.providerKind === "KIE"
+        ? resolveKieApiRoot(rawBase)
+        : rawBase;
   // 同厂商首条凭证自动设为默认；否则按入参
   const existingCount = await prisma.gatewayVendorCredential.count({
     where: { userId: opts.userId, providerKind: opts.providerKind },
@@ -158,7 +161,9 @@ export async function updateGatewayCredential(
       raw &&
       (row.providerKind === "BAILIAN" || row.providerKind === "DASHSCOPE")
         ? resolveOpenAiCompatibleBaseUrl(row.providerKind, raw)
-        : raw;
+        : raw && row.providerKind === "KIE"
+          ? resolveKieApiRoot(raw)
+          : raw;
   }
 
   const updated = await prisma.gatewayVendorCredential.update({

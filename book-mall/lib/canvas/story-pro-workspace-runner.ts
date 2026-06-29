@@ -26,7 +26,8 @@ import {
   buildScriptStudioFirstRoundPrompt,
   scriptStudioBatchRange,
 } from "./script-studio-prompts";
-import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
+import { isPro2GeneralTextNode, isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
+import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 
 function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
@@ -143,6 +144,74 @@ export async function runStoryProStarterThemeOutline(
     ...args,
     clientPage: proClientPage(args.projectId),
     storyScope: args.storyScope ?? { mediaKind: "themeOutline" },
+    node,
+    engineKind: "story-outline-engine",
+    executeAsync: args.executeAsync ?? true,
+  });
+}
+
+const STORY_PRO2_GENERAL_TEXT_SYSTEM =
+  "你是专业内容创作助手。严格按用户消息中的指令完成任务，直接输出结果正文，不要多余解释或寒暄。";
+
+const STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM =
+  "你是专业视觉提示词工程师。根据用户附带的参考图片，反推一份可直接用于 AI 生图的详细中文提示词。只输出提示词正文，不要解释或寒暄。";
+
+const STORY_PRO2_IMAGE_TO_PROMPT_USER =
+  "请根据所附图片反推一份详细的生图提示词。";
+
+/** 2.0 文本节点 · general 模式：按 Dock 提示词调用 LLM，结果写入节点卡片 */
+export async function runStoryProStarterGeneralText(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const data = args.node.data ?? {};
+  if (!isPro2GeneralTextNode(data)) {
+    throw new Error(
+      "该文本节点用于故事大纲，请使用故事大纲生成；general 模式节点才走提示词 LLM",
+    );
+  }
+  const imageUrls = (args.node.imageInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+  );
+  let prompt =
+    (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
+    (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
+  const preset = String(data.pro2PresetKind ?? "").trim();
+  if (!prompt && preset === "image-to-prompt" && imageUrls.length > 0) {
+    prompt = STORY_PRO2_IMAGE_TO_PROMPT_USER;
+  }
+  if (!prompt && imageUrls.length === 0) {
+    throw new Error("请先填写提示词内容，或链接并上传参考图片");
+  }
+
+  const modelKey = String(data.modelKey ?? args.node.modelKey ?? "").trim();
+  if (imageUrls.length > 0) {
+    assertStoryLlmVisionModel(modelKey, "图片反推提示词");
+  }
+
+  const customSystem =
+    (typeof data.generalTextSystemPrompt === "string"
+      ? data.generalTextSystemPrompt
+      : typeof data.systemPrompt === "string"
+        ? data.systemPrompt
+        : ""
+    ).trim() ||
+    (preset === "image-to-prompt" && imageUrls.length > 0
+      ? STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM
+      : STORY_PRO2_GENERAL_TEXT_SYSTEM);
+
+  const node: CanvasRunNodeInput = {
+    ...args.node,
+    type: "story-outline-engine",
+    data: {
+      ...data,
+      prompt,
+      systemPrompt: customSystem,
+    },
+  };
+  return runStoryLlmEngineNode({
+    ...args,
+    clientPage: proClientPage(args.projectId),
+    storyScope: args.storyScope ?? { mediaKind: "generalText" },
     node,
     engineKind: "story-outline-engine",
     executeAsync: args.executeAsync ?? true,

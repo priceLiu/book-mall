@@ -646,11 +646,17 @@ export async function submitKieJobForLog(opts: {
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
-  const { taskId } = await createKieTaskWithKey(cred.apiKey, {
-    model: opts.model,
-    input: opts.input as never,
-    callBackUrl: opts.callBackUrl ?? null,
-  });
+  const { resolveKieApiRoot } = await import("@/lib/gateway/model-router");
+  const baseUrl = resolveKieApiRoot(cred.baseUrl);
+  const { taskId } = await createKieTaskWithKey(
+    cred.apiKey,
+    {
+      model: opts.model,
+      input: opts.input as never,
+      callBackUrl: opts.callBackUrl ?? null,
+    },
+    baseUrl,
+  );
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
     data: { externalTaskId: taskId, status: "RUNNING" },

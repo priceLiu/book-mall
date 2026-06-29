@@ -10,6 +10,7 @@ import {
   patchPro2TextNodeEngine,
   readPro2TextNodeEngine,
   resolvePro2TextNodeEngineRoles,
+  pro2TextNodeLlmNeedsVision,
   syncPro2TextNodeEngineToDownstream,
   type Pro2TextNodeEngineData,
 } from "@/lib/canvas/pro2-text-node-engine-roles";
@@ -25,8 +26,13 @@ import {
 import {
   GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
   pickDefaultStoryLlmEngine,
+  pickDefaultStoryVisionLlmEngine,
 } from "@/lib/canvas/system-providers";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
+import {
+  isStoryLlmVisionModel,
+  STORY_LLM_VISION_MODEL_KEYS,
+} from "@/lib/canvas/story-llm-vision-models";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "@/lib/canvas/types";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
@@ -36,9 +42,16 @@ type RolePickerConfig = {
   providerIds?: string[];
 };
 
-function rolePickerConfig(role: GatewayModelRole): RolePickerConfig {
+function rolePickerConfig(
+  role: GatewayModelRole,
+  needsVision: boolean,
+): RolePickerConfig {
   if (role === "LLM") {
-    return { allowedModelKeys: [...STORY_LLM_MODEL_KEYS] };
+    return {
+      allowedModelKeys: needsVision
+        ? [...STORY_LLM_VISION_MODEL_KEYS]
+        : [...STORY_LLM_MODEL_KEYS],
+    };
   }
   if (role === "IMAGE") {
     return { allowedModelKeys: [...SBV1_IMAGE_MODEL_KEYS] };
@@ -52,9 +65,12 @@ function rolePickerConfig(role: GatewayModelRole): RolePickerConfig {
 function defaultPickForRole(
   role: GatewayModelRole,
   providers: CanvasProviderDto[],
+  needsVision: boolean,
 ): CanvasEnginePick | null {
   if (role === "LLM") {
-    const pick = pickDefaultStoryLlmEngine(providers);
+    const pick = needsVision
+      ? pickDefaultStoryVisionLlmEngine(providers)
+      : pickDefaultStoryLlmEngine(providers);
     if (!pick) return null;
     return {
       ...pick,
@@ -100,6 +116,10 @@ export function Pro2TextNodeEnginePickers({
       }),
     [data, nodeId, nodes, edges],
   );
+  const llmNeedsVision = useMemo(
+    () => pro2TextNodeLlmNeedsVision(data, { nodeId, nodes, edges }),
+    [data, nodeId, nodes, edges],
+  );
 
   /** 自动补默认引擎仅执行一次（避免反复写 store · 冲掉撤销栈） */
   const seededRolesRef = useRef<Set<string>>(new Set());
@@ -115,23 +135,45 @@ export function Pro2TextNodeEnginePickers({
       if (seededRolesRef.current.has(seedKey)) continue;
 
       const cur = readPro2TextNodeEngine(data, role);
-      if (cur.providerId.trim() && cur.modelKey.trim()) {
-        seededRolesRef.current.add(seedKey);
-        continue;
+      const allowedLlm =
+        role === "LLM" && llmNeedsVision
+          ? STORY_LLM_VISION_MODEL_KEYS
+          : null;
+      if (
+        role === "LLM" &&
+        llmNeedsVision &&
+        cur.modelKey.trim() &&
+        !isStoryLlmVisionModel(cur.modelKey)
+      ) {
+        const pick = defaultPickForRole(role, providers, true);
+        if (pick) {
+          seededRolesRef.current.add(seedKey);
+          updateNodeData(nodeId, patchPro2TextNodeEngine(role, pick));
+          continue;
+        }
       }
-      const pick = defaultPickForRole(role, providers);
+      if (cur.providerId.trim() && cur.modelKey.trim()) {
+        if (
+          !allowedLlm ||
+          allowedLlm.some((k) => k === cur.modelKey.trim())
+        ) {
+          seededRolesRef.current.add(seedKey);
+          continue;
+        }
+      }
+      const pick = defaultPickForRole(role, providers, llmNeedsVision);
       if (!pick) continue;
       seededRolesRef.current.add(seedKey);
       updateNodeData(nodeId, patchPro2TextNodeEngine(role, pick));
     }
-  }, [disabled, roles, data, nodeId, providers, updateNodeData]);
+  }, [disabled, roles, llmNeedsVision, data, nodeId, providers, updateNodeData]);
 
   if (roles.length === 0) return null;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
       {roles.map((role) => {
-        const cfg = rolePickerConfig(role);
+        const cfg = rolePickerConfig(role, llmNeedsVision);
         const cur = readPro2TextNodeEngine(data, role);
         return (
           <div key={role} className="min-w-0 shrink-0">

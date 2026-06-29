@@ -1,5 +1,20 @@
 /** 将 undici「fetch failed」包装为可诊断文案（内部 loopback vs 厂商 upstream）。 */
 
+const UPSTREAM_CHAT_TIMEOUT_MS = 180_000;
+
+function mergeUpstreamAbortSignal(init: RequestInit): RequestInit {
+  if (init.signal) return init;
+  try {
+    return { ...init, signal: AbortSignal.timeout(UPSTREAM_CHAT_TIMEOUT_MS) };
+  } catch {
+    return init;
+  }
+}
+
+function formatUpstreamTimeoutMessage(provider: string): string {
+  return `${provider} API 连接超时，请稍后重试。`;
+}
+
 export function formatGatewayFetchError(
   target: string,
   err: unknown,
@@ -13,9 +28,7 @@ export function formatGatewayFetchError(
       : cause != null
         ? String(cause)
         : "";
-  const isTimeout =
-    /timeout|timed out|connect timeout/i.test(causeMsg) ||
-    (cause as { code?: string })?.code === "UND_ERR_CONNECT_TIMEOUT";
+  const isTimeout = isConnectTimeoutError(err);
 
   if (ctx?.hop === "internal") {
     return new Error(
@@ -28,8 +41,27 @@ export function formatGatewayFetchError(
   const provider = ctx?.providerKind?.trim() || "模型厂商";
   return new Error(
     isTimeout
-      ? `${provider} API 连接超时，请检查网络或 Gateway 凭证 baseUrl 后重试。`
+      ? formatUpstreamTimeoutMessage(provider)
       : `${provider} API 请求失败：${causeMsg || "fetch failed"}`,
+  );
+}
+
+function isConnectTimeoutError(err: unknown): boolean {
+  const cause =
+    err instanceof Error && err.cause != null ? err.cause : err;
+  const causeMsg =
+    cause instanceof Error
+      ? cause.message
+      : cause != null
+        ? String(cause)
+        : "";
+  return (
+    /timeout|timed out|connect timeout|ssl connection timeout|socket timeout/i.test(
+      causeMsg,
+    ) ||
+    (cause as { code?: string })?.code === "UND_ERR_CONNECT_TIMEOUT" ||
+    (cause as { code?: string })?.code === "UND_ERR_HEADERS_TIMEOUT" ||
+    (cause as { code?: string })?.code === "UND_ERR_BODY_TIMEOUT"
   );
 }
 
@@ -38,9 +70,18 @@ export async function gatewayFetch(
   init: RequestInit,
   ctx?: { hop?: "internal" | "upstream"; providerKind?: string },
 ): Promise<Response> {
+  const reqInit =
+    ctx?.hop === "upstream" ? mergeUpstreamAbortSignal(init) : init;
   try {
-    return await fetch(url, init);
+    return await fetch(url, reqInit);
   } catch (e) {
+    if (ctx?.hop === "upstream" && isConnectTimeoutError(e)) {
+      try {
+        return await fetch(url, reqInit);
+      } catch (retryErr) {
+        throw formatGatewayFetchError(url, retryErr, ctx);
+      }
+    }
     throw formatGatewayFetchError(url, e, ctx);
   }
 }

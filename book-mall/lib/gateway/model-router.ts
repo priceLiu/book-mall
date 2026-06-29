@@ -23,6 +23,8 @@ const KIE_CHAT_MODELS = new Set([
   "gemini-2.5-flash",
   "google/gemini-2.5-flash",
   "google/gemini-2.5-flash-preview",
+  "gpt-5-5",
+  "gpt-5.5",
 ]);
 
 const KIE_JOB_PREFIXES = [
@@ -296,6 +298,10 @@ export function resolveOpenAiCompatibleBaseUrl(
     return (baseUrl?.trim() || fallback).replace(/\/$/, "");
   }
 
+  if (kind === "KIE") {
+    return resolveKieApiRoot(baseUrl);
+  }
+
   if (kind !== "BAILIAN" && kind !== "DASHSCOPE") {
     return (baseUrl?.trim() || fallback).replace(/\/$/, "");
   }
@@ -310,6 +316,23 @@ export function resolveOpenAiCompatibleBaseUrl(
   return raw;
 }
 
+/**
+ * KIE OpenAPI 根（https://api.kie.ai）。
+ * 凭证 baseUrl 若误填 gemini/codex 完整路径，在此剥 suffix，避免拼出无效 URL。
+ */
+export function resolveKieApiRoot(baseUrl?: string | null): string {
+  const fallback = defaultBaseUrl("KIE").replace(/\/$/, "");
+  let raw = (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  if (!raw) return fallback;
+  raw = raw.replace(/\/codex\/v1.*$/i, "");
+  raw = raw.replace(
+    /\/gemini-[0-9.]+(?:-[a-z]+)?(?:-preview)?\/v\d+.*$/i,
+    "",
+  );
+  raw = raw.replace(/\/chat\/completions$/i, "");
+  return raw.replace(/\/$/, "") || fallback;
+}
+
 /** KIE Gemini Chat 端点路径段（OpenAI 兼容 /{segment}/v1/chat/completions） */
 export function resolveKieGeminiChatPath(modelKey: string): string {
   const m = modelKey.trim().toLowerCase();
@@ -318,6 +341,11 @@ export function resolveKieGeminiChatPath(modelKey: string): string {
   }
   return "gemini-3-flash";
 }
+
+export {
+  isKieCodexChatModel,
+  resolveKieCodexUpstreamModel,
+} from "@/lib/gateway/kie-codex-chat";
 
 /** 百炼 compatible-mode 上游 model 字段（MiniMax 官方 ID 带 MiniMax/ 前缀） */
 export function resolveBailianChatModelKey(modelKey: string): string {

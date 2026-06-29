@@ -18,7 +18,8 @@ export type StoryProRunContext = {
     | "frameImage"
     | "video"
     | "tts"
-    | "themeOutline";
+    | "themeOutline"
+    | "generalText";
 };
 
 export type StoryProFeasibilityItem = {
@@ -156,6 +157,10 @@ export type StoryProScriptHubNodeData = {
   /** 发布剧本后 · 剧组公告条 */
   crewBulletin?: import("./crew-bulletin-types").CrewBulletinState;
   scriptPublished?: boolean;
+  /** 关联的 SCRIPT_PACKAGE 资产 id（发布同步后写入） */
+  linkedScriptPackageAssetId?: string;
+  /** 按运行栏种类归档的完成快照 */
+  scriptPackageSnapshots?: import("./script-package-snapshots").ScriptPackageSnapshotsByKind;
 };
 
 export type StoryProCharacterRow = {

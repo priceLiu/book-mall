@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback } from "react";
-import { AlertTriangle, Copy, Loader2 } from "lucide-react";
+import { AlertTriangle, Copy } from "lucide-react";
+import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import type { StoryProCharacterRow } from "@/lib/canvas/story-pro-workspace-types";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 import { cn } from "@/lib/utils";
@@ -89,8 +90,8 @@ export function Pro2CharacterBoardCell({
           )}
         </div>
       ) : st === "running" ? (
-        <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center px-4 py-8">
-          <Loader2 className="size-6 animate-spin text-violet-300/70" />
+        <div className="relative min-h-[160px] flex-1">
+          <LibtvMediaGeneratingState variant="violet" />
         </div>
       ) : st === "error" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">

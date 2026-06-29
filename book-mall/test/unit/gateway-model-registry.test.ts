@@ -24,4 +24,11 @@ describe("resolveKnownGatewayModelRegistration", () => {
   it("returns null for unknown model keys", () => {
     expect(resolveKnownGatewayModelRegistration("not-a-real-model-key")).toBeNull();
   });
+
+  it("resolves KIE GPT-5.5 chat", () => {
+    expect(resolveKnownGatewayModelRegistration("gpt-5-5")).toMatchObject({
+      canonicalModelKey: "gpt-5-5-chat",
+      providerKind: "KIE",
+    });
+  });
 });

@@ -58,6 +58,11 @@ import {
   CrewBulletinEpisodeFilter,
   CrewBulletinVirtualTaskList,
 } from "./crew-bulletin-task-list";
+import {
+  Pro2ScriptPackagePanel,
+  useCopyScriptPackageSnapshot,
+} from "./pro2-script-package-panel";
+import { resolveScriptPackageSnapshots } from "@/lib/canvas/script-package-snapshots";
 
 /** 与 Pro2 工具条 / 批次面板一致的 tab 选中高亮 */
 const CREW_PHASE_TAB_ACTIVE =
@@ -260,6 +265,9 @@ function PhaseActionPanel({
   onEpisodeFilterChange,
   contentScale = 1,
   fullscreen = false,
+  scriptPackageSnapshots,
+  scriptTitle,
+  onCopySnapshot,
 }: {
   phase: CrewProductionPhase;
   published: boolean;
@@ -281,7 +289,23 @@ function PhaseActionPanel({
   onEpisodeFilterChange: (v: number | "all") => void;
   contentScale?: number;
   fullscreen?: boolean;
+  scriptPackageSnapshots?: import("@/lib/canvas/script-package-snapshots").ScriptPackageSnapshotsByKind;
+  scriptTitle?: string;
+  onCopySnapshot?: (snapshot: import("@/lib/canvas/script-package-snapshots").ScriptPackageSnapshot) => void;
 }) {
+  if (phase.id === "scriptPackage") {
+    return (
+      <Pro2ScriptPackagePanel
+        snapshots={scriptPackageSnapshots ?? {}}
+        scriptTitle={scriptTitle}
+        contentScale={contentScale}
+        fullscreen={fullscreen}
+        hubNodeId={hubId}
+        onCopySnapshot={onCopySnapshot ?? (() => {})}
+      />
+    );
+  }
+
   if (phase.id === "script") {
     const outlineMd = hubData.outlineMd?.trim() ?? "";
     const onCopyMarkdown = async () => {
@@ -679,6 +703,7 @@ export function Pro2CrewBulletin() {
   const addNode = useCanvasStore((s) => s.addNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const patchGraphMeta = useCanvasStore((s) => s.patchGraphMeta);
+  const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const openTableEditor = useCanvasStore((s) => s.openPro2ScriptTableEditor);
 
   const anchor = useMemo(
@@ -690,6 +715,14 @@ export function Pro2CrewBulletin() {
   const bulletin = anchor?.bulletin;
   const d = anchor?.hubFields ?? ({} as StoryProScriptHubNodeData);
   const isAuthoring = anchor?.mode === "script-studio" && !published;
+
+  const scriptPackageSnapshots = useMemo(
+    () =>
+      anchor
+        ? resolveScriptPackageSnapshots(anchor, graphMeta, nodes)
+        : {},
+    [anchor, graphMeta, nodes],
+  );
 
   const linkedScriptHeadline = useMemo(() => {
     if (anchor?.mode !== "linked-package" || !published) return null;
@@ -709,6 +742,32 @@ export function Pro2CrewBulletin() {
       episodes: eps && eps > 0 ? eps : null,
     };
   }, [anchor?.mode, published, bulletin, graphMeta]);
+
+  const scriptPackageTitle = useMemo(() => {
+    return (
+      bulletin?.scriptTitle?.trim() ||
+      linkedScriptHeadline?.title ||
+      graphMeta?.crewBulletinAnchor?.linkedScriptPackageTitle?.replace(
+        /^剧本包 · /,
+        "",
+      ) ||
+      d.outlineMd?.split("\n")[0]?.replace(/^#\s*/, "").trim() ||
+      undefined
+    );
+  }, [
+    bulletin?.scriptTitle,
+    linkedScriptHeadline?.title,
+    graphMeta,
+    d.outlineMd,
+  ]);
+
+  const onCopySnapshot = useCopyScriptPackageSnapshot({
+    hubNodeId: hubId,
+    duplicateNode,
+    addNode: addNode as never,
+    setNodes,
+    nodes,
+  });
 
   const [collapsed, setCollapsed] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] =
@@ -776,8 +835,19 @@ export function Pro2CrewBulletin() {
   }, [expandedPhaseId]);
 
   const productionPhases = useMemo(
-    () => (bulletin ? computeCrewProductionPhases(bulletin) : []),
-    [bulletin],
+    () =>
+      bulletin
+        ? computeCrewProductionPhases(bulletin, scriptPackageSnapshots)
+        : [],
+    [bulletin, scriptPackageSnapshots],
+  );
+  const workflowPhases = useMemo(
+    () => productionPhases.filter((p) => p.id !== "scriptPackage"),
+    [productionPhases],
+  );
+  const scriptPackagePhase = useMemo(
+    () => productionPhases.find((p) => p.id === "scriptPackage"),
+    [productionPhases],
   );
   const authoringPhases = useMemo(
     () => (isAuthoring ? computeAuthoringPhases(d) : []),
@@ -857,7 +927,14 @@ export function Pro2CrewBulletin() {
   }, [anchor, hubId, d, bulletinPatch]);
 
   const onClaim = useCallback(async () => {
-    if (!anchor || !expandedPhaseId || expandedPhaseId === "authoring") return;
+    if (
+      !anchor ||
+      !expandedPhaseId ||
+      expandedPhaseId === "authoring" ||
+      expandedPhaseId === "scriptPackage"
+    ) {
+      return;
+    }
     const liveAnchor = resolveCrewBulletinAnchor(
       useCanvasStore.getState().nodes,
       useCanvasStore.getState().graphMeta ?? undefined,
@@ -881,7 +958,7 @@ export function Pro2CrewBulletin() {
           userId: user?.id,
           displayName: user?.name ?? user?.email ?? "我",
         },
-        { nodes, edges, addNode: addNode as never, setNodes, setEdges, updateNodeData, patchGraphMeta },
+        { nodes, edges, addNode: addNode as never, setNodes, setEdges, updateNodeData, patchGraphMeta, graphMeta, bookMallBase: base },
       );
       setSelectedTaskIds(new Set());
       if (result.claimed === 0) {
@@ -909,6 +986,7 @@ export function Pro2CrewBulletin() {
     setEdges,
     patchGraphMeta,
     alert,
+    graphMeta,
   ]);
 
   const onRevertDone = useCallback(
@@ -922,9 +1000,11 @@ export function Pro2CrewBulletin() {
         setEdges,
         updateNodeData,
         patchGraphMeta,
+        graphMeta,
+        bookMallBase: base,
       });
     },
-    [anchor, bulletin, nodes, edges, addNode, setNodes, setEdges, updateNodeData, patchGraphMeta],
+    [anchor, bulletin, nodes, edges, addNode, setNodes, setEdges, updateNodeData, patchGraphMeta, graphMeta, base],
   );
 
   const onSubmitDone = useCallback(
@@ -938,9 +1018,11 @@ export function Pro2CrewBulletin() {
         setEdges,
         updateNodeData,
         patchGraphMeta,
+        graphMeta,
+        bookMallBase: base,
       });
     },
-    [anchor, bulletin, nodes, edges, addNode, setNodes, setEdges, updateNodeData, patchGraphMeta],
+    [anchor, bulletin, nodes, edges, addNode, setNodes, setEdges, updateNodeData, patchGraphMeta, graphMeta, base],
   );
 
   const onUploadClick = useCallback(() => {
@@ -1034,34 +1116,48 @@ export function Pro2CrewBulletin() {
               </p>
             </div>
           ) : null}
-          <div className="flex flex-nowrap items-center gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {isAuthoring
-              ? authoringPhases.map((phase, idx) => (
-                  <PhaseChip
-                    key={phase.id}
-                    index={idx + 1}
-                    label={phase.label}
-                    tooltip={phase.subtitle}
-                    status={phase.status}
-                    active={expandedPhaseId === "authoring"}
-                    onClick={() => onPhaseClick("authoring")}
-                  />
-                ))
-              : productionPhases.map((phase, idx) => (
-                  <PhaseChip
-                    key={phase.id}
-                    index={idx + 1}
-                    label={phase.label}
-                    tooltip={
-                      phase.totalCount > 0
-                        ? `${phase.label} · ${phase.doneCount}/${phase.totalCount}`
-                        : phase.label
-                    }
-                    status={phase.status}
-                    active={expandedPhaseId === phase.id}
-                    onClick={() => onPhaseClick(phase.id)}
-                  />
-                ))}
+          <div className="flex items-stretch">
+            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {isAuthoring
+                ? authoringPhases.map((phase, idx) => (
+                    <PhaseChip
+                      key={phase.id}
+                      index={idx + 1}
+                      label={phase.label}
+                      tooltip={phase.subtitle}
+                      status={phase.status}
+                      active={expandedPhaseId === "authoring"}
+                      onClick={() => onPhaseClick("authoring")}
+                    />
+                  ))
+                : workflowPhases.map((phase, idx) => (
+                    <PhaseChip
+                      key={phase.id}
+                      index={idx + 1}
+                      label={phase.label}
+                      tooltip={
+                        phase.totalCount > 0
+                          ? `${phase.label} · ${phase.doneCount}/${phase.totalCount}`
+                          : phase.label
+                      }
+                      status={phase.status}
+                      active={expandedPhaseId === phase.id}
+                      onClick={() => onPhaseClick(phase.id)}
+                    />
+                  ))}
+            </div>
+            {published && scriptPackagePhase ? (
+              <div className="flex shrink-0 items-center border-l border-black/35 px-2 py-1.5">
+                <PhaseChip
+                  index={workflowPhases.length + 1}
+                  label={scriptPackagePhase.label}
+                  tooltip={scriptPackagePhase.subtitle}
+                  status={scriptPackagePhase.status}
+                  active={expandedPhaseId === "scriptPackage"}
+                  onClick={() => onPhaseClick("scriptPackage")}
+                />
+              </div>
+            ) : null}
           </div>
 
           {isAuthoring && expandedPhaseId === "authoring" ? (
@@ -1104,6 +1200,9 @@ export function Pro2CrewBulletin() {
             onEpisodeFilterChange={setEpisodeFilter}
             contentScale={contentScale}
             fullscreen
+            scriptPackageSnapshots={scriptPackageSnapshots}
+            scriptTitle={scriptPackageTitle}
+            onCopySnapshot={onCopySnapshot}
           />
         </CrewBulletinPhaseFullscreen>
       ) : null}

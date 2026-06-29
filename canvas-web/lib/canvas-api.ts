@@ -618,7 +618,8 @@ export async function runCanvasNode(
       | "video"
       | "tts"
       | "sceneRef"
-      | "themeOutline";
+      | "themeOutline"
+      | "generalText";
     /** 影视专业版 · 风格定稿门禁 */
     styleFinalized?: boolean;
     styleAnchor?: {
@@ -1504,6 +1505,17 @@ export async function createProjectAsset(
   return j.asset;
 }
 
+export async function fetchProjectAsset(
+  base: string,
+  assetId: string,
+): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
+  const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(
+    base,
+    `/api/canvas/project-assets/${encodeURIComponent(assetId)}`,
+  );
+  return j.asset;
+}
+
 export async function patchProjectAsset(
   base: string,
   assetId: string,
@@ -1512,6 +1524,7 @@ export async function patchProjectAsset(
     description?: string;
     visibility?: import("@/lib/canvas/project-asset-types").AssetVisibility;
     locked?: boolean;
+    payload?: Record<string, unknown>;
   },
 ): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
   const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(

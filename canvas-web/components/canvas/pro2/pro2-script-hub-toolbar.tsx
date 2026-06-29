@@ -324,7 +324,7 @@ export function Pro2ScriptHubToolbar({
               (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId ===
                 hubId,
           );
-        void syncScriptPackageAssetOnPublish({
+        const assetId = await syncScriptPackageAssetOnPublish({
           base,
           projectId,
           hubId,
@@ -332,6 +332,9 @@ export function Pro2ScriptHubToolbar({
           starterId: starter?.id,
           starterData: (starter?.data ?? {}) as StoryProStarterNodeData,
         });
+        if (assetId) {
+          updateNodeData(hubId, { linkedScriptPackageAssetId: assetId });
+        }
       }
     }
   }, [hubId, hubData, isGenerating, alert, confirm, updateNodeData, base, projectId]);

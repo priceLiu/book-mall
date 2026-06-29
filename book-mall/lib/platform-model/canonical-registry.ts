@@ -106,6 +106,22 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "gpt-5-5-chat",
+    displayName: "GPT-5.5 对话",
+    description: "OpenAI GPT-5.5 · 复杂推理 / 剧本脚本",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 13,
+    primaryVendor: "kie",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "kie", modelKey: "gpt-5-5", providerKind: "KIE" },
+    ]),
+  },
+  {
     canonicalModelKey: "wan2.7-image",
     displayName: "通义万相 2.7 生图",
     description: "多图参考生图",

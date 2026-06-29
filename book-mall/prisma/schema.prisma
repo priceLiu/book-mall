@@ -2422,6 +2422,44 @@ model GatewayRequestLog {
   // 见 migrations/20260716130000_genhotcold_partial_indexes
 }
 
+/// 平台错误追踪（Canvas / Gateway / Book 等；轻量运维日志，非 GatewayRequestLog 替代）
+enum PlatformErrorSource {
+  CANVAS
+  STORY
+  GATEWAY
+  BOOK
+  TOOL
+  SYSTEM
+}
+
+enum PlatformErrorSeverity {
+  ERROR
+  WARN
+}
+
+model PlatformErrorLog {
+  id        String                @id @default(cuid())
+  createdAt DateTime              @default(now())
+  source    PlatformErrorSource
+  severity  PlatformErrorSeverity @default(ERROR)
+  code      String?
+  message   String                @db.Text
+  detail    String?               @db.Text
+  context   Json?
+
+  fingerprint     String?
+  occurrenceCount Int               @default(1)
+
+  resolvedAt   DateTime?
+  resolvedNote String?             @db.Text
+
+  @@index([createdAt(sort: Desc)])
+  @@index([source, createdAt(sort: Desc)])
+  @@index([code])
+  @@index([fingerprint, createdAt(sort: Desc)])
+  @@index([resolvedAt])
+}
+
 /// Gen-HotCold-R2 Phase 5A：GatewayRequestLog 历史归档（只读冷数据）。
 /// 终态且过保留期的日志从主表搬迁至此，主表只留「在飞 + 近期」热数据。
 /// 与主表同结构但**无外键/无 updatedAt 触发**、索引精简；报表按时间在主表/归档表间路由。

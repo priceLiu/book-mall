@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { resolveCrewBulletinAnchor } from "@/lib/canvas/crew-bulletin-context";
 import {
   canCompleteCrewTaskFromNode,
@@ -39,6 +40,7 @@ export function useLibtvNodeDuplicate(
 
 /** 参与制作节点 · 提交「完成制作」 */
 export function useCrewTaskCompleteProduction(nodeId: string) {
+  const base = useBookMallBaseUrl();
   const nodes = useCanvasStore((s) => s.nodes);
   const graphMeta = useCanvasStore((s) => s.graphMeta);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -76,7 +78,7 @@ export function useCrewTaskCompleteProduction(nodeId: string) {
         anchor.bulletin,
         nodeId,
         nodes,
-        { updateNodeData, patchGraphMeta },
+        { updateNodeData, patchGraphMeta, graphMeta, nodes, bookMallBase: base },
       );
     } finally {
       setSubmitting(false);
@@ -88,7 +90,8 @@ export function useCrewTaskCompleteProduction(nodeId: string) {
     nodeId,
     nodes,
     updateNodeData,
-    patchGraphMeta,
+    base,
+    graphMeta,
   ]);
 
   return {

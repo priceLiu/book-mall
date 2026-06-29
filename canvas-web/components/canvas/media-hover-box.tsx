@@ -54,6 +54,8 @@ export type MediaHoverBoxProps = {
   previewIconSize?: "default" | "lg";
   /** LibTV 图片节点：预览改在标题栏 Eye，Stage 不显示居中 Eye */
   hidePreviewOverlay?: boolean;
+  /** 图片 src 加载失败（供 OSS → blob 回退） */
+  onImageError?: () => void;
 };
 
 /** 悬停 overlay · 仅图标（无黑底药丸、无文案）— 见 design.md §15.2 */
@@ -80,6 +82,7 @@ export function MediaHoverBox({
   initialView = "single",
   previewIconSize = "default",
   hidePreviewOverlay = false,
+  onImageError,
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -182,6 +185,7 @@ export function MediaHoverBox({
               alt={alt}
               loading="lazy"
               decoding="async"
+              onError={() => onImageError?.()}
               className={
                 naturalSize
                   ? "block h-auto w-full object-contain"

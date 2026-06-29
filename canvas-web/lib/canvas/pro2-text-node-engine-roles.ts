@@ -75,6 +75,33 @@ export function patchPro2TextNodeEngine(
   return { videoEngine: pick };
 }
 
+export function pro2TextNodeLlmNeedsVision(
+  data: Pro2TextPurposeNodeData,
+  ctx?: {
+    nodeId?: string;
+    nodes?: CanvasFlowNode[];
+    edges?: CanvasFlowEdge[];
+  },
+): boolean {
+  const preset = String(data.pro2PresetKind ?? "").trim();
+  if (preset === "image-to-prompt" || preset === "video-to-prompt") {
+    return true;
+  }
+  const nodeId = ctx?.nodeId?.trim();
+  const nodes = ctx?.nodes;
+  const edges = ctx?.edges;
+  if (nodeId && nodes && edges) {
+    for (const e of edges) {
+      if (e.target !== nodeId) continue;
+      const src = nodes.find((n) => n.id === e.source);
+      if (src && REVERSE_PROMPT_SOURCE_TYPES.has(String(src.type ?? ""))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** 文本节点 Dock 须展示哪些 Gateway role（类型匹配模型，供用户自选） */
 export function resolvePro2TextNodeEngineRoles(
   data: Pro2TextPurposeNodeData,
@@ -89,8 +116,14 @@ export function resolvePro2TextNodeEngineRoles(
 
   const preset = String(data.pro2PresetKind ?? "").trim();
   if (preset === "text-to-video") return ["VIDEO"];
-  if (preset === "image-to-prompt") return ["LLM", "IMAGE"];
-  if (preset === "video-to-prompt") return ["LLM", "VIDEO"];
+  // 反推预设：文本节点只选 LLM；IMAGE/VIDEO 模型在上游媒体节点 Dock 选择
+  if (
+    preset === "image-to-prompt" ||
+    preset === "video-to-prompt" ||
+    (data.pro2TextPurpose === "general" && !preset)
+  ) {
+    return ["LLM"];
+  }
 
   const roles = new Set<GatewayModelRole>();
   const nodeId = ctx?.nodeId?.trim();

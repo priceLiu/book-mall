@@ -1,6 +1,10 @@
 import { crewBulletinFromScriptPackagePayload, refreshGraphAnchorCrewBulletin } from "./crew-bulletin-script-package";
 import { resolveHubRowsForCrewBulletin } from "./crew-bulletin-build";
 import type { CrewBulletinState } from "./crew-bulletin-types";
+import {
+  parseScriptPackageSnapshotsFromPayload,
+  type ScriptPackageSnapshotsByKind,
+} from "./script-package-snapshots";
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
@@ -26,6 +30,8 @@ export type CrewBulletinGraphAnchor = {
   scriptStudioFrameRows?: StoryProScriptHubNodeData["scriptStudioFrameRows"];
   scriptStudioMoodRows?: StoryProScriptHubNodeData["scriptStudioMoodRows"];
   scriptStudioAudioRows?: StoryProScriptHubNodeData["scriptStudioAudioRows"];
+  /** 按运行栏种类归档的完成快照 · 写入 SCRIPT_PACKAGE 资产 */
+  scriptPackageSnapshots?: ScriptPackageSnapshotsByKind;
 };
 
 export function hubFieldsFromGraphAnchor(
@@ -116,6 +122,9 @@ export function buildCrewBulletinGraphAnchorFromAsset(asset: {
     scriptStudioFrameRows: hubFields.scriptStudioFrameRows ?? [],
     scriptStudioMoodRows: hubFields.scriptStudioMoodRows ?? [],
     scriptStudioAudioRows: hubFields.scriptStudioAudioRows ?? [],
+    scriptPackageSnapshots: parseScriptPackageSnapshotsFromPayload(
+      asset.payload,
+    ),
   };
   return enrichCrewBulletinGraphAnchorRows(
     refreshGraphAnchorCrewBulletin(anchor),

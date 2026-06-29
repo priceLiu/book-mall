@@ -13,6 +13,7 @@ import {
   submitCanvasNodeTask,
 } from "@/lib/canvas/canvas-task-service";
 import { assertGatewayApiKeyLinkedForUser } from "@/lib/canvas/book-gateway-link";
+import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 import {
   runAiEngineNode,
   runImageEngineNode,
@@ -35,6 +36,7 @@ import {
   runStoryProSceneRow,
   runStoryProScriptHubSection,
   runStoryProStarterThemeOutline,
+  runStoryProStarterGeneralText,
   runStoryProStyleDraft,
   runStoryProTtsRow,
   runStoryProVideoRow,
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "tts"
     | "sceneRef"
     | "themeOutline"
+    | "generalText"
     | undefined;
   const storyScope =
     rowKey || mediaKind || llmSection
@@ -205,6 +208,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       mediaKind === "themeOutline"
     ) {
       result = await runStoryProStarterThemeOutline({ ...baseArgs, forceFresh });
+    } else if (
+      runnerType === "story-pro-starter" &&
+      mediaKind === "generalText"
+    ) {
+      result = await runStoryProStarterGeneralText({ ...baseArgs, forceFresh });
     } else if (runnerType === "story-pro-script-hub" && llmSection) {
       result = await runStoryProScriptHubSection({
         ...baseArgs,
@@ -393,6 +401,16 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       { status: result.reused ? 200 : 202, headers: jsonHeaders(request) },
     );
   } catch (err) {
+    if (err instanceof CanvasProjectError) {
+      const { recordCanvasPlatformError } = await import("@/lib/platform-error-log");
+      recordCanvasPlatformError({
+        failCode: err.code,
+        failMessage: err.message,
+        projectId,
+        nodeId,
+        userId: guard.user.id,
+      });
+    }
     return canvasErrorToResponse(request, err);
   }
 }

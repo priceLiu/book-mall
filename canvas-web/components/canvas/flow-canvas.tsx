@@ -614,8 +614,15 @@ function FlowCanvasInner({
         uploading: true,
         label: labelOverride ?? normalized.name ?? "粘贴的图片",
       });
+      if (!base) {
+        updateNodeData(id, {
+          uploading: false,
+          uploadError: "画布未就绪，请刷新后重试",
+        });
+        return id;
+      }
       try {
-        const ossUrl = await uploadCanvasImage(base, file);
+        const ossUrl = await uploadCanvasImage(base, normalized);
         updateNodeData(id, { ossUrl, uploading: false });
       } catch (e) {
         updateNodeData(id, {
@@ -1127,7 +1134,6 @@ function FlowCanvasInner({
   useEffect(() => {
     const onPaste = async (event: ClipboardEvent) => {
       if (event.defaultPrevented) return;
-      const t = event.target as HTMLElement | null;
       const dt = event.clipboardData;
       // 不在此处规范化：保留剪贴板「原始字节」交给下游上传（与点击上传一致，
       // 服务端 sharp 统一处理）。提前 canvas 重编码会丢色彩配置导致变暗、并多一次有损往返。
@@ -1137,30 +1143,21 @@ function FlowCanvasInner({
         imageFiles = await resolveClipboardImageFiles(dt);
       }
 
-      if (
-        t &&
-        /^(INPUT|TEXTAREA)$/.test(t.tagName) &&
-        !imageFiles.length
-      ) {
+      // 文本输入中（含 Dock 粘贴区 contenteditable）不抢图片粘贴，避免粘贴文案时误生图节点
+      if (isEditablePasteTarget(event.target)) {
         return;
       }
-      if (t?.isContentEditable && !imageFiles.length) return;
 
       if (imageFiles.length > 0) {
-        const inDockZone = isImagePasteSlotTarget(event.target);
-        const inEditable =
-          isEditablePasteTarget(event.target) && !inDockZone;
-        if (!inEditable) {
-          const pointerPaste = pickPointerImagePasteHandler();
-          if (pointerPaste) {
-            pointerPaste(imageFiles[0]!);
-            event.preventDefault();
-            return;
-          }
-          if (await routeClipboardImageToActivePasteSlot(dt, event.target)) {
-            event.preventDefault();
-            return;
-          }
+        const pointerPaste = pickPointerImagePasteHandler();
+        if (pointerPaste) {
+          pointerPaste(imageFiles[0]!);
+          event.preventDefault();
+          return;
+        }
+        if (await routeClipboardImageToActivePasteSlot(dt, event.target)) {
+          event.preventDefault();
+          return;
         }
         event.preventDefault();
         const ptr = getLastPointerClient();

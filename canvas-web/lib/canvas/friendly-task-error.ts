@@ -1,16 +1,38 @@
 type LlmVendorHint = "kie" | "deepseek" | "bailian" | "volcengine" | "unknown";
 
-/** 根据 modelKey 推断 LLM 实际调用的厂商（Gateway 按 modelKey 路由，非 providerId） */
+/** Gateway 生图 modelKey（非 LLM chat） */
+export function isGatewayImageModelKey(modelKey?: string | null): boolean {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  if (!m) return false;
+  if (
+    m.includes("nano-banana") ||
+    m.startsWith("grok-imagine") ||
+    m.startsWith("gpt-image") ||
+    m.startsWith("seedream") ||
+    m.startsWith("flux-") ||
+    m.includes("text-to-image") ||
+    m.includes("image-to-image") ||
+    m.includes("/edit") ||
+    m === "qwen-text-to-image" ||
+    m.includes("wanx") ||
+    m.includes("wan2.")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** 根据 modelKey 推断 LLM chat 厂商（Gateway 按 modelKey 路由，非 providerId） */
 export function inferLlmVendorFromModelKey(
   modelKey?: string | null,
 ): LlmVendorHint {
   const m = (modelKey ?? "").trim().toLowerCase();
   if (!m) return "unknown";
+  if (isGatewayImageModelKey(m)) return "unknown";
   if (m.startsWith("deepseek")) return "deepseek";
   if (
     m.startsWith("google/") ||
     m.startsWith("gemini") ||
-    m.includes("nano-banana") ||
     m.startsWith("grok-imagine")
   ) {
     return "kie";
@@ -21,20 +43,38 @@ export function inferLlmVendorFromModelKey(
 }
 
 function insufficientBalanceMessage(modelKey?: string | null): string {
+  if (isGatewayImageModelKey(modelKey)) {
+    return "生图账户余额不足，请检查 Gateway 绑定的厂商凭证余额后重试。";
+  }
   const vendor = inferLlmVendorFromModelKey(modelKey);
-  const modelHint = modelKey?.trim() ? `（${modelKey.trim()}）` : "";
   switch (vendor) {
     case "deepseek":
-      return `DeepSeek 账户余额不足${modelHint}。请在 platform.deepseek.com 为 Gateway 绑定的 DeepSeek API Key 充值后重试。`;
+      return "DeepSeek 账户余额不足，请充值 Gateway 绑定的凭证后重试。";
     case "bailian":
-      return `百炼/通义账户余额不足${modelHint}。请在阿里云 DashScope 控制台为 Gateway 绑定的凭证充值后重试。`;
+      return "百炼/通义账户余额不足，请充值 Gateway 绑定的凭证后重试。";
     case "kie":
-      return `KIE 账户余额不足${modelHint}。请在 kie.ai 为 Gateway 绑定的 KIE API Key 充值后重试，或换用 DeepSeek 等非 KIE 模型。`;
+      return "KIE 账户余额不足，请充值 Gateway 绑定的凭证后重试。";
     case "volcengine":
-      return `火山方舟账户余额不足${modelHint}。请在火山引擎控制台充值后重试，或改用其它模型。`;
+      return "火山方舟账户余额不足，请充值后重试，或改用其它模型。";
     default:
-      return `模型账户余额不足${modelHint}。请检查 Gateway 绑定的对应厂商凭证余额，或换用其它模型。`;
+      return "模型账户余额不足，请检查 Gateway 绑定的厂商凭证余额。";
   }
+}
+
+function sanitizeGatewayTechnicalMessage(msg: string): string | null {
+  const trimmed = msg.trim();
+  if (!trimmed) return null;
+  if (
+    /gateway 内部链路|book-mall 自调用|baseurl|api\.kie\.ai|tls 握手|服务器出网|gemini/i.test(
+      trimmed,
+    )
+  ) {
+    return null;
+  }
+  if (trimmed.length > 120) {
+    return `${trimmed.slice(0, 117)}…`;
+  }
+  return trimmed;
 }
 
 /** 从 Gateway / 厂商 JSON 错误体中提取 message */
@@ -76,7 +116,21 @@ function isMislabeledInsufficientCredits(input: {
 }
 
 const STALE_INSUFFICIENT_HINT =
-  "若为历史失败且账户已充值，请关闭节点上的错误提示后点「重新生成」。";
+  "若为历史失败且账户已充值，请关闭错误提示后点「重新生成」。";
+
+function networkFailureMessage(modelKey?: string | null): string {
+  if (isGatewayImageModelKey(modelKey)) {
+    return "生图服务暂时不可用，请稍后重试。";
+  }
+  const vendor = inferLlmVendorFromModelKey(modelKey);
+  if (vendor === "kie") {
+    return "文本模型服务暂时不可用，请稍后重试。";
+  }
+  if (vendor === "deepseek") {
+    return "DeepSeek 服务暂时不可用，请稍后重试。";
+  }
+  return "模型服务暂时不可用，请稍后重试。";
+}
 
 /** run API 抛错 / catch 块：从 HTTP 文案推断 failCode */
 export function resolveLibtvRunFailureCode(rawMessage: string): string {
@@ -93,7 +147,7 @@ export function resolveLibtvRunFailureCode(rawMessage: string): string {
   return "REQUEST_FAILED";
 }
 
-/** 将服务端 failMessage 转为用户可读文案；可选 modelKey 用于区分 DeepSeek / KIE 等同文案错误 */
+/** 将服务端 failMessage 转为用户可读文案；可选 modelKey 用于区分生图 / LLM */
 export function formatCanvasTaskError(
   failCode?: string | null,
   failMessage?: string | null,
@@ -109,7 +163,7 @@ export function formatCanvasTaskError(
     msg.includes("排队超过") ||
     msg.includes("提交生成超时")
   ) {
-    return "提交生成超时, 请重试";
+    return "提交生成超时，请重试";
   }
 
   if (
@@ -118,7 +172,7 @@ export function formatCanvasTaskError(
     blob.includes("rate limit") ||
     blob.includes("too many")
   ) {
-    return "API 调用频率过高（429），请稍等 1～2 分钟后重试；批量任务会排队依次执行。";
+    return "调用频率过高，请稍等 1～2 分钟后重试。";
   }
 
   if (
@@ -132,21 +186,21 @@ export function formatCanvasTaskError(
       blob.includes("403") ||
       blob.includes("欠费")
     ) {
-      return "火山方舟账户欠费或余额不足。请在火山引擎控制台为 Gateway 绑定的凭证充值后重试，或改用其它视频模型。";
+      return "火山方舟账户欠费或余额不足，请充值后重试。";
     }
-    return msg || "火山方舟视频生成失败";
+    return sanitizeGatewayTechnicalMessage(msg) ?? "火山方舟视频生成失败";
   }
 
   if (
     isMislabeledInsufficientCredits({ failCode: code, failMessage: msg }) ||
     (code === "SYSTEM_BUSY" && blob.includes("系统繁忙"))
   ) {
-    return "系统繁忙，积分冻结超时，请稍后重试；若余额充足仍失败，请联系管理员。";
+    return "系统繁忙，请稍后重试。";
   }
 
   if (blob.includes("积分不足")) {
     const base = msg.includes("积分不足")
-      ? `${msg}。请前往主站充值视频积分后重试。`
+      ? `${msg.split("。")[0]}。请前往主站充值后重试。`
       : "平台积分不足，请充值后重试。";
     return `${base} ${STALE_INSUFFICIENT_HINT}`;
   }
@@ -161,17 +215,18 @@ export function formatCanvasTaskError(
   if (
     blob.includes("kie_quota_exceeded") ||
     code === "KIE_QUOTA_EXCEEDED" ||
-    blob.includes("kie.ai") ||
-    (blob.includes("code=402") && blob.includes("kie")) ||
     (blob.includes("credits insufficient") && blob.includes("kie")) ||
     (blob.includes("insufficient credit") && blob.includes("kie")) ||
     (blob.includes("余额不足") && blob.includes("kie"))
   ) {
-    return "KIE 账户余额不足。请在 kie.ai 为 Gateway 绑定的 KIE API Key 充值后重试；分镜视频可改用百炼 Wan R2V、Seedance 等其它模型。";
+    if (isGatewayImageModelKey(modelKey)) {
+      return "KIE 生图账户余额不足，请充值后重试。";
+    }
+    return "KIE 账户余额不足，请充值后重试。";
   }
 
   if (blob.includes("kie chat empty content")) {
-    return "KIE Gemini 返回空内容（可能被安全策略拦截或 reasoning 未输出正文）。请稍后重试，或换 deepseek-chat 等模型。";
+    return "模型返回空内容，请稍后重试或更换模型。";
   }
 
   if (
@@ -183,7 +238,7 @@ export function formatCanvasTaskError(
     blob.includes("server has closed the connection") ||
     blob.includes("can't reach database server")
   ) {
-    return "系统繁忙，任务已加入队列或正在自动重试，请稍候勿重复点击。";
+    return "系统繁忙，任务已加入队列，请稍候勿重复点击。";
   }
 
   if (
@@ -194,7 +249,7 @@ export function formatCanvasTaskError(
     blob.includes("安全") ||
     blob.includes("违规")
   ) {
-    return "内容被模型安全策略拦截。请修改提示词（减少敏感描述）后重试，或更换模型。";
+    return "内容被安全策略拦截，请修改提示词后重试。";
   }
 
   if (
@@ -202,7 +257,7 @@ export function formatCanvasTaskError(
     blob.includes("api 连接超时") ||
     blob.includes("api 请求失败")
   ) {
-    return msg;
+    return networkFailureMessage(modelKey);
   }
 
   if (
@@ -214,16 +269,11 @@ export function formatCanvasTaskError(
     blob.includes("timeout") ||
     blob.includes("timed out")
   ) {
-    const vendor = inferLlmVendorFromModelKey(modelKey);
-    if (vendor === "kie") {
-      return "KIE/Gemini 连接超时或网络中断。请稍后重试，或换用 DeepSeek 模型；若持续失败请检查 Gateway 中 KIE 凭证与 baseUrl。";
-    }
-    if (vendor === "deepseek") {
-      return "DeepSeek 连接超时或网络中断。请稍后重试，并检查 Gateway 中 DeepSeek 凭证是否可用。";
-    }
-    return "模型 API 连接失败（fetch failed）。请稍后重试；若 Gateway 日志仍在 running 则勿重复点击。";
+    return networkFailureMessage(modelKey);
   }
-  if (msg) return msg;
-  if (code) return code;
-  return "生成失败";
+
+  const sanitized = sanitizeGatewayTechnicalMessage(msg);
+  if (sanitized) return sanitized;
+  if (code && code !== "FAILED" && code !== "REQUEST_FAILED") return code;
+  return "生成失败，请稍后重试";
 }

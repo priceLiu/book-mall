@@ -35,6 +35,14 @@ export function pro2StarterHasContent(data: {
   );
 }
 
+/** 文本节点 LLM 生成中（故事大纲 / general 提示词共用 themeOutlineRuntime） */
+export function isPro2StarterTextGenerating(data: {
+  themeOutlineRuntime?: { status?: string };
+}): boolean {
+  const st = data.themeOutlineRuntime?.status;
+  return st === "pending" || st === "running";
+}
+
 export function pro2StarterLinkedMessage(
   edges: CanvasFlowEdge[],
   nodes: CanvasFlowNode[],

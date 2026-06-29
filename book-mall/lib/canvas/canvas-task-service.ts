@@ -130,6 +130,38 @@ import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { type BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
 import { CanvasProjectError } from "./canvas-project-service";
+import { recordCanvasPlatformError } from "@/lib/platform-error-log";
+
+/** Canvas 任务进入 FAILED 时写入 PlatformErrorLog（幂等由 dedup fingerprint 承担） */
+export function logCanvasGenerationTaskFailure(
+  task: Pick<
+    CanvasGenerationTask,
+    | "id"
+    | "projectId"
+    | "nodeId"
+    | "model"
+    | "failCode"
+    | "failMessage"
+    | "inputPayload"
+  >,
+  userId?: string | null,
+): void {
+  const payload = task.inputPayload as { gatewayLogId?: string } | null;
+  recordCanvasPlatformError({
+    failCode: task.failCode,
+    failMessage: task.failMessage,
+    projectId: task.projectId,
+    nodeId: task.nodeId,
+    taskId: task.id,
+    modelKey: task.model,
+    userId,
+    gatewayLogId:
+      typeof payload?.gatewayLogId === "string"
+        ? payload.gatewayLogId
+        : undefined,
+  });
+}
+
 import { assertAccessibleCanvasProject } from "./canvas-project-access";
 
 // —— Types ——
@@ -868,7 +900,7 @@ export async function applyCanvasKieTaskResult(
       ossUrl,
     });
   } else if (record.state === "fail") {
-    await prisma.canvasGenerationTask.update({
+    const updated = await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
         status: "FAILED",
@@ -878,6 +910,7 @@ export async function applyCanvasKieTaskResult(
         completedAt: new Date(),
       },
     });
+    logCanvasGenerationTaskFailure(updated, task.project.userId);
     logKieEvent("warn", "[canvas] task failed", {
       taskId,
       kind: task.kind,
@@ -906,7 +939,7 @@ export async function applyCanvasGatewayPollResult(
   if (!(await claimCanvasTaskForResultApply(taskId))) return;
 
   if (poll.state === "failed") {
-    await prisma.canvasGenerationTask.update({
+    const updated = await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
         status: "FAILED",
@@ -916,6 +949,7 @@ export async function applyCanvasGatewayPollResult(
         completedAt: new Date(),
       },
     });
+    logCanvasGenerationTaskFailure(updated, task.project.userId);
     return;
   }
 

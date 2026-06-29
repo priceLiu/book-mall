@@ -17,20 +17,22 @@ import {
   Wand2,
 } from "lucide-react";
 import { useState } from "react";
+import { useStore } from "@xyflow/react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   downloadMediaUrl,
   guessMediaDownloadFilename,
 } from "@/lib/canvas/download-media-url";
+import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
 import { cn } from "@/lib/utils";
 
 /** LibTV 节点顶栏工具条 · 壳层（规范见 libtv-node-interaction-spec.md §5） */
 export const PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS =
-  "inline-flex w-max max-w-none flex-nowrap items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/98 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]";
+  "inline-flex w-max max-w-none flex-nowrap items-center gap-0.5 rounded-full border border-white/[0.06] bg-[#262626] px-1.5 py-1 shadow-[0_4px_20px_rgba(0,0,0,0.42)]";
 
-/** 带文案的操作钮 */
+/** 带文案的操作钮（字号比画布固定 · 不随 zoom 变化，见 §5.4） */
 export const PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS =
-  "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
+  "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[15px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
 
 /** 仅图标操作钮 */
 export const PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS =
@@ -163,7 +165,7 @@ export function Pro2ImageNodeToolbar({
       >
         <Scan className="size-3.5" />
         <span>全景</span>
-        <span className="rounded bg-sky-500/90 px-1 py-px text-[8px] font-semibold text-white">
+        <span className="rounded bg-sky-500/90 px-1 py-px text-[12px] font-semibold text-white">
           NEW
         </span>
       </button>
@@ -299,6 +301,9 @@ function ToolbarShell({
   style?: React.CSSProperties;
   children: React.ReactNode;
 }) {
+  const zoom = useStore((s) => s.transform[2]);
+  const toolbarScale = computeLibtvNodeToolbarTransformScale(zoom);
+
   return (
     <div
       className={cn(
@@ -306,10 +311,15 @@ function ToolbarShell({
         passNodeDrag
           ? "pointer-events-none [&_button]:pointer-events-auto"
           : "nodrag pointer-events-auto",
-        !style && "absolute left-1/2 z-30 -translate-x-1/2",
+        !style && "absolute left-1/2 z-30",
         className,
       )}
-      style={style}
+      style={{
+        ...style,
+        transform: `translateX(-50%) scale(${toolbarScale})`,
+        transformOrigin: "center bottom",
+        transition: "transform 120ms ease",
+      }}
       {...(passNodeDrag
         ? {}
         : {

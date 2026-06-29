@@ -1,5 +1,6 @@
 "use client";
 
+import { parseReferencedIds } from "@/lib/canvas/dock-mention-parse";
 import {
   forwardRef,
   useCallback,
@@ -135,19 +136,7 @@ export function promptFromDisplay(
   return s;
 }
 
-export function parseReferencedIds(value: string): string[] {
-  const seen: Record<string, boolean> = {};
-  const out: string[] = [];
-  let m: RegExpExecArray | null;
-  TOKEN_RE.lastIndex = 0;
-  while ((m = TOKEN_RE.exec(value)) !== null) {
-    if (m[1] && !seen[m[1]]) {
-      seen[m[1]] = true;
-      out.push(m[1]);
-    }
-  }
-  return out;
-}
+export { parseReferencedIds } from "@/lib/canvas/dock-mention-parse";
 
 type MentionAnchor = { at: number; cursor: number };
 

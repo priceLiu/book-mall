@@ -21,3 +21,7 @@ export function resolvePro2TextPurpose(data: Record<string, unknown>): Pro2TextP
 export function isPro2StoryOutlineTextNode(data: Record<string, unknown>): boolean {
   return resolvePro2TextPurpose(data) === "story-outline";
 }
+
+export function isPro2GeneralTextNode(data: Record<string, unknown>): boolean {
+  return resolvePro2TextPurpose(data) === "general";
+}
