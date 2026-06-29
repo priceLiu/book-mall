@@ -6,7 +6,7 @@ export const RF_NO_DRAG = "nodrag";
 export const RF_NO_WHEEL = "nowheel";
 /** 节点标题栏 · 从此处拖动画布上的节点 */
 export const RF_NODE_DRAG_HANDLE = "canvas-node-drag-handle";
-/** 节点内可滚动区域：不拖拽节点；滚轮仍驱动画布平移（与空白处一致） */
+/** 节点内可滚动区域（Pro2NodeScrollArea）：默认可拖节点；滚轮见 handlePro2NodeScrollWheel */
 export const RF_NODE_SCROLL = RF_NO_DRAG;
 
 /** React Flow 节点 dragHandle 选择器（写入 node.dragHandle，避免每帧 map 全图） */

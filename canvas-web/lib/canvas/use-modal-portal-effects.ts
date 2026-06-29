@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** 弹层 scroll lock 引用计数 · 避免多弹层 / effect 重跑时 overflow 来回切换 */
 let modalScrollLockCount = 0;
@@ -29,7 +29,7 @@ function releaseModalScrollLock(): void {
 /** Portal 挂载后再 createPortal，避免 SSR/hydration 问题 */
 export function useClientPortalMounted(): boolean {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     setMounted(true);
   }, []);
   return mounted;

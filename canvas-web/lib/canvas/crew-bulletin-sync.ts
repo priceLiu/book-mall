@@ -7,9 +7,20 @@ import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
 function nodeRuntimeGenerating(node: CanvasFlowNode | undefined): boolean {
   if (!node) return false;
-  const rt = (node.data as { runtime?: { status?: string } }).runtime;
-  const st = rt?.status;
-  return st === "pending" || st === "running" || st === "submitted";
+  const data = (node.data ?? {}) as {
+    uploading?: unknown;
+    runtime?: {
+      status?: string;
+      ossUrl?: string;
+      ephemeralUrl?: string;
+    } | null;
+  };
+  const s = data.runtime?.status;
+  const rt = data.runtime;
+  if (s === "done" || s === "error" || s === "idle") return false;
+  if (rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim()) return false;
+  if (data.uploading) return true;
+  return s === "running" || s === "pending";
 }
 
 /** 根据画布工作节点 runtime 同步公告条任务状态 */
@@ -41,25 +52,11 @@ export function syncCrewBulletinFromCanvasNodes(
 
       const generating = nodeRuntimeGenerating(workNode);
       let nextStatus: CrewTaskStatus = task.status;
-      if (generating && task.status !== "done") {
+      if (generating) {
         nextStatus = "generating";
-      } else if (!generating && task.status === "generating") {
-        const d = workNode.data as {
-          ossUrl?: string;
-          blobUrl?: string;
-          imageUrl?: string;
-          outputUrl?: string;
-          runtime?: { ossUrl?: string; ephemeralUrl?: string };
-        };
-        const hasOutput = Boolean(
-          d.ossUrl?.trim() ||
-            d.blobUrl?.trim() ||
-            d.imageUrl?.trim() ||
-            d.outputUrl?.trim() ||
-            d.runtime?.ossUrl?.trim() ||
-            d.runtime?.ephemeralUrl?.trim(),
-        );
-        if (hasOutput) nextStatus = "done";
+      } else if (task.status === "generating") {
+        // 生成完成仍保持「参与制作」，须用户点「完成制作」才提交为 done
+        nextStatus = "claimed";
       }
 
       if (nextStatus === task.status) return task;
@@ -70,7 +67,9 @@ export function syncCrewBulletinFromCanvasNodes(
         completedAt:
           nextStatus === "done"
             ? task.completedAt ?? new Date().toISOString()
-            : task.completedAt,
+            : nextStatus === "claimed" && task.status === "generating"
+              ? undefined
+              : task.completedAt,
       };
     }
 

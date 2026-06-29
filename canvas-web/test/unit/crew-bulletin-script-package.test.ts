@@ -109,3 +109,41 @@ describe("patchStarterFromScriptPackage", () => {
     ).toBeGreaterThan(0);
   });
 });
+
+describe("crewBulletinFromScriptPackagePayload rebuild", () => {
+  it("rebuilds character tasks from rows when stored bulletin only has frames", () => {
+    const stored: CrewBulletinState = {
+      hubNodeId: "__crew_bulletin_meta__",
+      scriptTitle: "请帮我编写关于小胖子在校外吃西瓜的故事",
+      totalEpisodes: 5,
+      publishedAt: "2026-01-01T00:00:00.000Z",
+      tasks: [
+        { id: "s1", kind: "script", label: "剧本", rowKey: "script", status: "done" },
+        {
+          id: "f1",
+          kind: "frame",
+          label: "镜1",
+          rowKey: "f1",
+          episodeNo: 1,
+          status: "unclaimed",
+        },
+      ],
+    };
+    const { bulletin } = crewBulletinFromScriptPackagePayload(
+      "asset-x",
+      "剧本包 · 小胖子吃西瓜",
+      {
+        crewBulletin: stored,
+        markdown: "# 大纲",
+        totalEpisodes: 5,
+        scriptStudioCharacterRows: [
+          { key: "c1", name: "小明", role: "学生", appearance: "圆脸" },
+        ],
+        sceneRows: [{ key: "s1", name: "校门外西瓜摊", description: "夏日" }],
+      },
+    );
+    expect(bulletin.scriptTitle).toBe("小胖子吃西瓜");
+    expect(bulletin.tasks.some((t) => t.kind === "character")).toBe(true);
+    expect(bulletin.tasks.some((t) => t.kind === "scene")).toBe(true);
+  });
+});

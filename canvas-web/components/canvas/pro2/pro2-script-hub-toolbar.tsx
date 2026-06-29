@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { Download, LayoutGrid, MapPin, Megaphone, Package, RotateCw, Users, BookmarkPlus } from "lucide-react";
+import { Download, LayoutGrid, MapPin, Megaphone, Package, RotateCw, Users, BookmarkPlus, Copy } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -68,6 +68,7 @@ export type Pro2ScriptHubToolbarProps = {
   hubData: StoryProScriptHubNodeData;
   tableTitle: string;
   className?: string;
+  onDuplicateNode?: () => void;
 };
 
 function pro2HubBatchStore() {
@@ -108,6 +109,7 @@ export function Pro2ScriptHubToolbar({
   hubData,
   tableTitle,
   className,
+  onDuplicateNode,
 }: Pro2ScriptHubToolbarProps) {
   const { alert, confirm } = useDialogs();
   const base = useBookMallBaseUrl();
@@ -397,7 +399,7 @@ export function Pro2ScriptHubToolbar({
           type="button"
           className={TOOL_BTN}
           disabled={isGenerating}
-          title="发布剧本 · 剧组可在公告条领取任务（发布者也可领取）"
+          title="发布剧本 · 剧组可在公告条参与制作（发布者也可参与）"
           onClick={() => void onPublishScript()}
         >
           <Megaphone className="size-3.5" />
@@ -437,6 +439,16 @@ export function Pro2ScriptHubToolbar({
         >
           <Download className="size-4" />
         </button>
+        {onDuplicateNode ? (
+          <button
+            type="button"
+            className={ICON_BTN}
+            title="复制节点"
+            onClick={onDuplicateNode}
+          >
+            <Copy className="size-4" />
+          </button>
+        ) : null}
       </div>
 
       <Pro2FrameGeneratePicker

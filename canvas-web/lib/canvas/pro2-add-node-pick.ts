@@ -98,6 +98,19 @@ function spawnVideoEngine(
   if (id) selectSbv1NodeAfterSpawn(setNodes, id);
 }
 
+function spawnPro2RoleImageNode(
+  store: Pro2AddNodePickStore,
+  options: Pro2ToolbarAddNodePickOptions | undefined,
+  role: "scene" | "prop" | "mood",
+  label: string,
+): void {
+  const { addNode, setNodes } = store;
+  const data = buildPro2ImageNodeData({ pro2MediaRole: role, label });
+  const pos = spawnPosition("story-pro2-image", options, data);
+  const id = addNode("story-pro2-image", pos, data);
+  if (id) selectPro2NodeAfterSpawn(setNodes, id);
+}
+
 /** 底部工具栏 / 空白画布 · 添加节点菜单统一处理 */
 export async function handlePro2ToolbarAddNodePick(
   itemId: string,
@@ -214,16 +227,17 @@ export async function handlePro2ToolbarAddNodePick(
   }
 
   if (itemId === "scene-column") {
-    const pos = spawnPosition("story-pro2-image", options, {
-      pro2MediaRole: "scene",
-      label: "场景设计",
-    });
-    const id = addNode(
-      "story-pro2-image",
-      pos,
-      buildPro2ImageNodeData({ pro2MediaRole: "scene", label: "场景设计" }),
-    );
-    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    spawnPro2RoleImageNode(store, options, "scene", "场景设计");
+    return;
+  }
+
+  if (itemId === "prop-column") {
+    spawnPro2RoleImageNode(store, options, "prop", "道具设计");
+    return;
+  }
+
+  if (itemId === "mood-column") {
+    spawnPro2RoleImageNode(store, options, "mood", "氛围设计");
     return;
   }
 
@@ -264,8 +278,6 @@ export async function handlePro2ToolbarAddNodePick(
   }
 
   const stageColumnTypes = [
-    "story-pro2-prop",
-    "story-pro2-mood",
     "story-pro2-audio",
     "jianying-export-pro2",
   ] as const;
@@ -314,7 +326,6 @@ export async function handlePro2SideAddNodePick(
     itemId === "text" ||
     itemId === "image" ||
     itemId === "three-view" ||
-    itemId === "style-asset" ||
     itemId === "style-asset" ||
     itemId === "script" ||
     itemId === "video" ||

@@ -1,4 +1,4 @@
-import { crewBulletinFromScriptPackagePayload } from "./crew-bulletin-script-package";
+import { crewBulletinFromScriptPackagePayload, refreshGraphAnchorCrewBulletin } from "./crew-bulletin-script-package";
 import { resolveHubRowsForCrewBulletin } from "./crew-bulletin-build";
 import type { CrewBulletinState } from "./crew-bulletin-types";
 import type {
@@ -117,7 +117,9 @@ export function buildCrewBulletinGraphAnchorFromAsset(asset: {
     scriptStudioMoodRows: hubFields.scriptStudioMoodRows ?? [],
     scriptStudioAudioRows: hubFields.scriptStudioAudioRows ?? [],
   };
-  return enrichCrewBulletinGraphAnchorRows(anchor);
+  return enrichCrewBulletinGraphAnchorRows(
+    refreshGraphAnchorCrewBulletin(anchor),
+  );
 }
 
 function payloadField(payload: Record<string, unknown>, key: string): unknown {

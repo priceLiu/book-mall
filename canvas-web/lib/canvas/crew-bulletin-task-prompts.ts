@@ -94,46 +94,48 @@ export type CrewBulletinTableColumn = {
   key: string;
   label: string;
   minWidth: string;
+  /** 全屏表格列宽权重；越大越占剩余宽度 */
+  grow?: number;
 };
 
 const CREW_TABLE_COLUMNS: Partial<Record<CrewTaskKind, CrewBulletinTableColumn[]>> = {
   character: [
-    { key: "名称", label: "角色", minWidth: "88px" },
-    { key: "定位", label: "定位", minWidth: "72px" },
-    { key: "外观", label: "外观", minWidth: "120px" },
-    { key: "提示词", label: "提示词", minWidth: "160px" },
+    { key: "名称", label: "角色", minWidth: "72px", grow: 0.55 },
+    { key: "定位", label: "定位", minWidth: "64px", grow: 0.45 },
+    { key: "外观", label: "外观", minWidth: "160px", grow: 2.2 },
+    { key: "提示词", label: "提示词", minWidth: "200px", grow: 3 },
   ],
   scene: [
-    { key: "名称", label: "场景", minWidth: "96px" },
-    { key: "描述", label: "描述", minWidth: "140px" },
-    { key: "生图", label: "生图", minWidth: "120px" },
-    { key: "环境", label: "环境", minWidth: "120px" },
-    { key: "时间", label: "时间", minWidth: "72px" },
-    { key: "气氛", label: "气氛", minWidth: "88px" },
+    { key: "名称", label: "场景", minWidth: "80px", grow: 0.5 },
+    { key: "描述", label: "描述", minWidth: "120px", grow: 1.4 },
+    { key: "生图", label: "生图", minWidth: "140px", grow: 2 },
+    { key: "环境", label: "环境", minWidth: "120px", grow: 1.2 },
+    { key: "时间", label: "时间", minWidth: "56px", grow: 0.35 },
+    { key: "气氛", label: "气氛", minWidth: "64px", grow: 0.45 },
   ],
   prop: [
-    { key: "名称", label: "道具", minWidth: "88px" },
-    { key: "描述", label: "描述", minWidth: "240px" },
+    { key: "名称", label: "道具", minWidth: "80px", grow: 0.6 },
+    { key: "描述", label: "描述", minWidth: "160px", grow: 3 },
   ],
   mood: [
-    { key: "名称", label: "氛围", minWidth: "88px" },
-    { key: "描述", label: "描述", minWidth: "240px" },
+    { key: "名称", label: "氛围", minWidth: "80px", grow: 0.6 },
+    { key: "描述", label: "描述", minWidth: "160px", grow: 3 },
   ],
   audio: [
-    { key: "名称", label: "音效", minWidth: "88px" },
-    { key: "描述", label: "描述", minWidth: "240px" },
+    { key: "名称", label: "音效", minWidth: "80px", grow: 0.6 },
+    { key: "描述", label: "描述", minWidth: "160px", grow: 3 },
   ],
   frame: [
-    { key: "名称", label: "分镜", minWidth: "96px" },
-    { key: "场景", label: "场景", minWidth: "88px" },
-    { key: "景别", label: "景别", minWidth: "64px" },
-    { key: "画面", label: "画面", minWidth: "160px" },
-    { key: "对白", label: "对白", minWidth: "120px" },
+    { key: "名称", label: "分镜", minWidth: "72px", grow: 0.45 },
+    { key: "场景", label: "场景", minWidth: "72px", grow: 0.5 },
+    { key: "景别", label: "景别", minWidth: "56px", grow: 0.35 },
+    { key: "画面", label: "画面", minWidth: "160px", grow: 2.5 },
+    { key: "对白", label: "对白", minWidth: "120px", grow: 1.5 },
   ],
   frameVideo: [
-    { key: "名称", label: "分镜", minWidth: "96px" },
-    { key: "画面", label: "画面", minWidth: "160px" },
-    { key: "视频", label: "视频", minWidth: "160px" },
+    { key: "名称", label: "分镜", minWidth: "72px", grow: 0.45 },
+    { key: "画面", label: "画面", minWidth: "160px", grow: 2.2 },
+    { key: "视频", label: "视频", minWidth: "160px", grow: 2.2 },
   ],
 };
 
@@ -142,14 +144,14 @@ export function crewBulletinTableColumns(
 ): CrewBulletinTableColumn[] {
   if (!taskKind) {
     return [
-      { key: "名称", label: "任务", minWidth: "120px" },
-      { key: "描述", label: "详情", minWidth: "240px" },
+      { key: "名称", label: "任务", minWidth: "100px", grow: 0.6 },
+      { key: "描述", label: "详情", minWidth: "160px", grow: 3 },
     ];
   }
   return (
     CREW_TABLE_COLUMNS[taskKind] ?? [
-      { key: "名称", label: "任务", minWidth: "120px" },
-      { key: "描述", label: "详情", minWidth: "240px" },
+      { key: "名称", label: "任务", minWidth: "100px", grow: 0.6 },
+      { key: "描述", label: "详情", minWidth: "160px", grow: 3 },
     ]
   );
 }

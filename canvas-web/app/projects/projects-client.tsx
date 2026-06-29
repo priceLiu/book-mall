@@ -556,7 +556,7 @@ function Inner() {
                     </p>
                   </label>
                   <p className="text-[12px] text-white/70">
-                    画布为空白协作空间。可选关联已发布剧本：进入后公告栏自动展开，剧组可在其中领取制作任务；各画布进度独立。
+                    画布为空白协作空间。可选关联已发布剧本：进入后公告栏自动展开，剧组可在其中参与制作任务；各画布进度独立。
                   </p>
                   <div className="flex flex-col gap-2">
                     <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 px-3 py-2 hover:bg-white/5">
@@ -573,7 +573,7 @@ function Inner() {
                       <span>
                         <span className="block text-[13px] text-white">空白画布</span>
                         <span className="text-[11px] text-white/45">
-                          先建空白 2.0 画布，进入后可在公告条关联已发布剧本并领取任务。
+                          先建空白 2.0 画布，进入后可在公告条关联已发布剧本并参与制作任务。
                         </span>
                       </span>
                     </label>
@@ -591,7 +591,7 @@ function Inner() {
                       <span>
                         <span className="block text-[13px] text-white">选择已发布剧本</span>
                         <span className="text-[11px] text-white/45">
-                          打开空白画布并关联该剧本；公告栏展开后可领取角色、分镜等制作任务。
+                          打开空白画布并关联该剧本；公告栏展开后可参与制作角色、分镜等任务。
                         </span>
                       </span>
                     </label>

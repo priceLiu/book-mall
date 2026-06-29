@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   handleLibtvDockWheelScroll,
+  handlePro2NodeScrollWheel,
   isCanvasWheelScrollBlockTarget,
   isCanvasViewportWheelTarget,
   shouldBlockCanvasViewportWheel,
@@ -116,5 +117,42 @@ h</textarea>
 
     expect(consumed).toBe(false);
     expect(scrollEl.scrollTop).toBe(0);
+  it("scrolls pro2 node preview on wheel", () => {
+    document.body.innerHTML = `
+      <div class="react-flow">
+        <div class="pro2-node-scroll" style="height:80px;width:200px;overflow:auto">
+          <div style="height:400px;width:600px">wide table</div>
+        </div>
+      </div>
+    `;
+    const scrollEl = document.querySelector(".pro2-node-scroll") as HTMLElement;
+    Object.defineProperty(scrollEl, "clientHeight", {
+      value: 80,
+      configurable: true,
+    });
+    Object.defineProperty(scrollEl, "scrollHeight", {
+      value: 400,
+      configurable: true,
+    });
+
+    const prevented = handlePro2NodeScrollWheel({
+      target: scrollEl,
+      deltaY: 30,
+      deltaX: 0,
+      deltaMode: 0,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault: () => {},
+      stopPropagation: () => {},
+    } as WheelEvent);
+
+    expect(prevented).toBe(true);
+    expect(scrollEl.scrollTop).toBe(30);
+  });
+
+  it("does not block wheel on pro2-node-scroll (handled separately)", () => {
+    document.body.innerHTML = `<div class="react-flow"><div class="pro2-node-scroll"></div></div>`;
+    const el = document.querySelector(".pro2-node-scroll")!;
+    expect(isCanvasWheelScrollBlockTarget(el)).toBe(false);
   });
 });

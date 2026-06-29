@@ -317,14 +317,15 @@ export function MediaPreviewLightbox({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-black/94"
+      className="canvas-media-preview-lightbox pointer-events-auto fixed inset-0 z-[2000] flex h-[100dvh] w-screen flex-col bg-black/88 backdrop-blur-md"
+      style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
       role="dialog"
       aria-modal="true"
       aria-label={view === "compare" ? "图片对比" : "媒体预览"}
       onClick={onClose}
     >
       <header
-        className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 sm:px-4"
+        className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-white/10 bg-black/75 px-3 py-2 backdrop-blur-sm sm:px-4"
         onClick={(e) => e.stopPropagation()}
       >
         {showCompare ? (
@@ -369,12 +370,16 @@ export function MediaPreviewLightbox({
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto shrink-0 rounded-full border border-white/10 p-1.5 text-white/70 hover:border-white/30 hover:bg-white/10 hover:text-white"
+          className="ml-auto shrink-0 rounded-full border border-white/20 bg-black/40 p-1.5 text-white/85 shadow-lg hover:border-white/35 hover:bg-white/10 hover:text-white"
           aria-label="关闭"
         >
           <X className="size-5" />
         </button>
       </header>
+
+      <p className="pointer-events-none absolute left-1/2 top-14 z-10 -translate-x-1/2 text-[11px] text-white/35">
+        点击背景或按 Esc 关闭
+      </p>
 
       <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3">
         <div

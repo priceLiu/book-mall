@@ -316,27 +316,25 @@ html[data-canvas-modal-open] .pro2-input-dock {
   transition: opacity 0.2s ease-out;
 }
 
-/* Pro2 脚本 / 大纲节点 · 横纵滚动条 */
+/* Pro2 脚本 / 大纲节点 · 横纵滚动条（避开右侧连线 Handle 热区） */
 .pro2-node-scroll {
   scrollbar-gutter: stable;
+  margin-right: 2px;
 }
 .pro2-node-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 .pro2-node-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  background-clip: padding-box;
+  background: rgba(255, 255, 255, 0.32);
 }
 .pro2-node-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
-  background-clip: padding-box;
+  background: rgba(255, 255, 255, 0.48);
 }
 .pro2-node-scroll::-webkit-scrollbar-track {
-  margin: 4px 2px;
-  background: transparent;
+  margin: 2px 0;
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
 }
 
@@ -356,11 +354,11 @@ html[data-canvas-modal-open] .pro2-input-dock {
 .canvas-flow-wrap
   .react-flow__node:not(.react-flow__node-group)
   .react-flow__handle-right:not(.pro2-node-side-plus-handle) {
-  top: 0 !important;
+  top: 28% !important;
   right: -6px !important;
   left: auto !important;
-  width: 20px !important;
-  height: 100% !important;
+  width: 16px !important;
+  height: 44% !important;
   transform: none !important;
   border-radius: 0 !important;
   opacity: 0 !important;
@@ -493,11 +491,13 @@ html[data-canvas-modal-open] .pro2-input-dock {
 }
 
 .canvas-flow-wrap .react-flow__resize-control.handle.pro2-node-resizer-handle {
-  background: rgba(255, 255, 255, 0.32) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  width: 7px !important;
-  height: 7px !important;
-  border-radius: 2px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 4px !important;
+  margin: -4px !important;
+  cursor: nwse-resize !important;
 }
 
 /* 剪映导出节点：加大拖角热区 */

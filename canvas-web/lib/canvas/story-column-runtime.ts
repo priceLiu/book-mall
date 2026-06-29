@@ -11,6 +11,7 @@ import type {
   CanvasNodeRuntime,
   CanvasNodeRunStatus,
 } from "./types";
+import { isLibtvFreestandingImageNode } from "./libtv-image-node-run";
 
 type RowRuntimeSlice = {
   status?: CanvasNodeRunStatus;
@@ -115,6 +116,13 @@ export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
       node.data as { themeOutlineRuntime?: { status?: string } }
     ).themeOutlineRuntime?.status;
     if (isCanvasInflightStatus(rt)) return true;
+  }
+  if (
+    isLibtvFreestandingImageNode(node) ||
+    node.type === "sbv1-video-engine"
+  ) {
+    const d = node.data as { uploading?: boolean; runtime?: { status?: string } };
+    if (d.uploading) return true;
   }
   const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
   return isCanvasInflightStatus(top);

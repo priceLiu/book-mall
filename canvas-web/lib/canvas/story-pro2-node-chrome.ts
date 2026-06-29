@@ -158,11 +158,11 @@ export const PRO2_NODE_RESIZER_LINE = {
   opacity: 0,
 };
 export const PRO2_NODE_RESIZER_HANDLE = {
-  background: "rgba(255,255,255,0.25)",
-  border: "1px solid rgba(255,255,255,0.15)",
-  width: 7,
-  height: 7,
-  borderRadius: 2,
+  background: "rgba(255,255,255,0.28)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  width: 22,
+  height: 22,
+  borderRadius: 4,
 };
 export const PRO2_NODE_HANDLE_CLASS =
   "!h-2 !w-2 !border-white/25 !bg-white/30 transition-opacity";

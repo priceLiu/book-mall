@@ -1,15 +1,22 @@
 import type { CrewBulletinAnchor } from "./crew-bulletin-context";
-import { isCrewBulletinGraphMetaAnchor } from "./crew-bulletin-context";
 import { spawnCrewWorkNodeForTask } from "./crew-bulletin-claim";
+import {
+  patchCrewBulletinOnAnchor,
+  type CrewBulletinPatchStore,
+} from "./crew-bulletin-patch";
 import type {
   CrewBulletinState,
   CrewBulletinTask,
   CrewTaskStatus,
 } from "./crew-bulletin-types";
+import { CREW_TASK_STATUS_LABELS } from "./crew-bulletin-types";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
-export type CrewBulletinClaimStore = {
+export type { CrewBulletinPatchStore } from "./crew-bulletin-patch";
+export { patchCrewBulletinOnAnchor } from "./crew-bulletin-patch";
+
+export type CrewBulletinClaimStore = CrewBulletinPatchStore & {
   nodes: CanvasFlowNode[];
   edges: CanvasFlowEdge[];
   addNode: (
@@ -21,46 +28,11 @@ export type CrewBulletinClaimStore = {
   setEdges: (
     fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[],
   ) => void;
-  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-  patchGraphMeta?: (
-    updater: (
-      meta: import("./types").CanvasGraph["meta"] | null | undefined,
-    ) => import("./types").CanvasGraph["meta"] | null | undefined,
-  ) => void;
 };
 
-export function patchCrewBulletinOnAnchor(
-  anchor: CrewBulletinAnchor,
-  bulletin: CrewBulletinState,
-  patch: {
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    patchGraphMeta?: (
-      updater: (
-        meta: import("./types").CanvasGraph["meta"] | null | undefined,
-      ) => import("./types").CanvasGraph["meta"] | null | undefined,
-    ) => void;
-  },
-): void {
-  if (isCrewBulletinGraphMetaAnchor(anchor)) {
-    patch.patchGraphMeta?.((meta) => {
-      if (!meta?.crewBulletinAnchor) return meta ?? undefined;
-      return {
-        ...meta,
-        crewBulletinAnchor: {
-          ...meta.crewBulletinAnchor,
-          crewBulletin: bulletin,
-        },
-      };
-    });
-    return;
-  }
-  patch.updateNodeData(anchor.nodeId, { crewBulletin: bulletin });
-}
-
 export function crewTaskStatusLine(task: CrewBulletinTask): string {
-  const display = crewTaskDisplayStatus(task.status);
-  const base = crewTaskDisplayStatusLabel(display);
-  if (task.assigneeDisplayName && display !== "not_started") {
+  const base = CREW_TASK_STATUS_LABELS[task.status] ?? task.status;
+  if (task.assigneeDisplayName && task.status !== "unclaimed") {
     return `${base} · ${task.assigneeDisplayName}`;
   }
   return base;
@@ -120,9 +92,13 @@ export function isCrewTaskClaimable(
   return isCrewTaskWorkNodeMissing(task, nodes);
 }
 
-/** 是否可提交完成 */
+/** 是否可提交完成（公告栏 · 主槽位） */
 export function isCrewTaskSubmittable(task: CrewBulletinTask): boolean {
-  return task.status === "claimed" || task.status === "generating";
+  return (
+    task.status === "claimed" ||
+    task.status === "generating" ||
+    task.status === "done"
+  );
 }
 
 /** 是否可撤回误提交 */

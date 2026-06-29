@@ -524,9 +524,7 @@ export function StoryPro2StarterInspector({ id, data, selected }: NodeProps) {
                     <Lock className="size-3.5" /> 工作流已定稿
                   </>
                 ) : isGenerating ? (
-                  <>
-                    <RefreshCw className="size-3.5 animate-spin" /> 解析中…
-                  </>
+                  <RefreshCw className="size-3.5 animate-spin" />
                 ) : hasScriptDraft ? (
                   <>
                     <RefreshCw className="size-3.5" /> 重新解析

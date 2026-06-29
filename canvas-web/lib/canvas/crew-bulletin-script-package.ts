@@ -1,5 +1,8 @@
+import {
+  buildCrewBulletinFromHub,
+  mergeCrewBulletinPreservingClaims,
+} from "./crew-bulletin-build";
 import type { CrewBulletinState, CrewBulletinTask } from "./crew-bulletin-types";
-import { buildCrewBulletinFromHub } from "./crew-bulletin-build";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
 /** 协作画布本地副本：任务清单保留，领取/完成状态重置（各画布独立） */
@@ -24,25 +27,11 @@ export function freshLocalCrewBulletin(
   };
 }
 
-/** 从 SCRIPT_PACKAGE 资产 payload 还原公告条与 hub 行数据 */
-export function crewBulletinFromScriptPackagePayload(
-  assetId: string,
-  displayName: string,
+function hubFieldsFromPayload(
   payload: Record<string, unknown>,
-): {
-  bulletin: CrewBulletinState;
-  hubFields: Partial<StoryProScriptHubNodeData>;
-} {
-  const stored = payload.crewBulletin as CrewBulletinState | undefined;
-  if (stored?.tasks?.length) {
-    const bulletin = freshLocalCrewBulletin(stored);
-    return {
-      bulletin,
-      hubFields: hubFieldsFromScriptPackagePayload(payload, bulletin),
-    };
-  }
-
-  const hubFields: StoryProScriptHubNodeData = {
+  bulletin?: CrewBulletinState,
+): StoryProScriptHubNodeData {
+  return {
     outlineMd: String(payload.markdown ?? ""),
     characterMd: String(payload.characterMd ?? ""),
     sceneMd: String(payload.sceneMd ?? ""),
@@ -52,47 +41,8 @@ export function crewBulletinFromScriptPackagePayload(
     promptOutline: "",
     promptCharacter: "",
     promptStoryboard: "",
-    scriptStudioTotalEpisodes: Number(payload.totalEpisodes) || 30,
-    scriptStudioCharacterRows:
-      (payload.scriptStudioCharacterRows as StoryProScriptHubNodeData["scriptStudioCharacterRows"]) ??
-      [],
-    sceneRows:
-      (payload.sceneRows as StoryProScriptHubNodeData["sceneRows"]) ?? [],
-    scriptStudioPropRows:
-      (payload.scriptStudioPropRows as StoryProScriptHubNodeData["scriptStudioPropRows"]) ??
-      [],
-    scriptStudioFrameRows:
-      (payload.scriptStudioFrameRows as StoryProScriptHubNodeData["scriptStudioFrameRows"]) ??
-      [],
-    scriptStudioMoodRows:
-      (payload.scriptStudioMoodRows as StoryProScriptHubNodeData["scriptStudioMoodRows"]) ??
-      [],
-    scriptStudioAudioRows:
-      (payload.scriptStudioAudioRows as StoryProScriptHubNodeData["scriptStudioAudioRows"]) ??
-      [],
-  };
-
-  const bulletin = freshLocalCrewBulletin(
-    buildCrewBulletinFromHub(`pkg-${assetId}`, hubFields, {
-      scriptTitle: displayName.replace(/^剧本包 · /, "") || displayName,
-    }),
-  );
-
-  return { bulletin, hubFields };
-}
-
-function hubFieldsFromScriptPackagePayload(
-  payload: Record<string, unknown>,
-  bulletin: CrewBulletinState,
-): Partial<StoryProScriptHubNodeData> {
-  return {
-    outlineMd: String(payload.markdown ?? ""),
-    characterMd: String(payload.characterMd ?? ""),
-    sceneMd: String(payload.sceneMd ?? ""),
-    storyboardMd: String(payload.storyboardMd ?? ""),
     scriptStudioTotalEpisodes:
-      bulletin.totalEpisodes ??
-      (Number(payload.totalEpisodes) || 30),
+      bulletin?.totalEpisodes ?? (Number(payload.totalEpisodes) || 30),
     scriptStudioCharacterRows:
       (payload.scriptStudioCharacterRows as StoryProScriptHubNodeData["scriptStudioCharacterRows"]) ??
       [],
@@ -112,6 +62,103 @@ function hubFieldsFromScriptPackagePayload(
       [],
     crewBulletin: bulletin,
     scriptPublished: true,
+  };
+}
+
+function scriptTitleFromAsset(
+  displayName: string,
+  payload: Record<string, unknown>,
+  stored?: CrewBulletinState,
+): string {
+  const fromStored = stored?.scriptTitle?.trim();
+  if (fromStored && !looksLikeThemePrompt(fromStored)) return fromStored;
+  const fromPayload = String(payload.scriptTitle ?? "").trim();
+  if (fromPayload && !looksLikeThemePrompt(fromPayload)) return fromPayload;
+  const fromName = displayName.replace(/^剧本包 · /, "").trim();
+  if (fromName && !looksLikeThemePrompt(fromName)) return fromName;
+  return fromStored || fromName || "剧本";
+}
+
+/** 一句话主题常被误写入 scriptTitle · 优先用资产名 */
+function looksLikeThemePrompt(title: string): boolean {
+  return (
+    title.startsWith("请帮我") ||
+    title.startsWith("帮我") ||
+    title.includes("的故事") ||
+    title.length > 48
+  );
+}
+
+/** 从 payload 行/Markdown 重建任务，并合并旧清单里可能缺失的种类 */
+function rebuildBulletinFromPayload(
+  assetId: string,
+  displayName: string,
+  payload: Record<string, unknown>,
+  stored?: CrewBulletinState,
+): CrewBulletinState {
+  const hubFields = hubFieldsFromPayload(payload, stored);
+  const rebuilt = buildCrewBulletinFromHub(`pkg-${assetId}`, hubFields, {
+    scriptTitle: scriptTitleFromAsset(displayName, payload, stored),
+    publishedBy: stored?.publishedBy,
+  });
+  if (!stored?.tasks?.length) return rebuilt;
+  return mergeBulletinTaskKinds(stored, rebuilt);
+}
+
+/** 保留 stored 的 script 元数据，任务行以 rebuilt 为准（补全缺失的角色/场景等） */
+function mergeBulletinTaskKinds(
+  stored: CrewBulletinState,
+  rebuilt: CrewBulletinState,
+): CrewBulletinState {
+  const storedById = new Map(stored.tasks.map((t) => [t.id, t]));
+  const rebuiltIds = new Set(rebuilt.tasks.map((t) => t.id));
+  const tasks: CrewBulletinTask[] = rebuilt.tasks.map((t) => {
+    const old = storedById.get(t.id);
+    if (!old) return t;
+    return {
+      ...t,
+      label: t.label || old.label,
+      episodeNo: t.episodeNo ?? old.episodeNo,
+      frameIndex: t.frameIndex ?? old.frameIndex,
+    };
+  });
+  for (const old of stored.tasks) {
+    if (!rebuiltIds.has(old.id) && old.kind !== "script") {
+      tasks.push(old);
+    }
+  }
+  return {
+    ...rebuilt,
+    publishedAt: stored.publishedAt || rebuilt.publishedAt,
+    scriptTitle: rebuilt.scriptTitle || stored.scriptTitle,
+    totalEpisodes: rebuilt.totalEpisodes || stored.totalEpisodes,
+    tasks,
+  };
+}
+
+/** 从 SCRIPT_PACKAGE 资产 payload 还原公告条与 hub 行数据 */
+export function crewBulletinFromScriptPackagePayload(
+  assetId: string,
+  displayName: string,
+  payload: Record<string, unknown>,
+): {
+  bulletin: CrewBulletinState;
+  hubFields: Partial<StoryProScriptHubNodeData>;
+} {
+  const stored = payload.crewBulletin as CrewBulletinState | undefined;
+  const rebuilt = rebuildBulletinFromPayload(
+    assetId,
+    displayName,
+    payload,
+    stored,
+  );
+  const bulletin = freshLocalCrewBulletin(rebuilt);
+  return {
+    bulletin,
+    hubFields: {
+      ...hubFieldsFromPayload(payload, bulletin),
+      crewBulletin: bulletin,
+    },
   };
 }
 
@@ -160,5 +207,61 @@ export function patchStarterFromScriptPackage(
     scriptStudioFrameRows: hubFields.scriptStudioFrameRows,
     scriptStudioMoodRows: hubFields.scriptStudioMoodRows,
     scriptStudioAudioRows: hubFields.scriptStudioAudioRows,
+  };
+}
+
+/** 打开协作画布时 · 从 meta 行数据补全可能缺失的公告条任务 */
+export function refreshGraphAnchorCrewBulletin(
+  anchor: import("./crew-bulletin-graph-anchor").CrewBulletinGraphAnchor,
+): import("./crew-bulletin-graph-anchor").CrewBulletinGraphAnchor {
+  const hubFields = {
+    ...hubFieldsFromPayload(
+      {
+        markdown: anchor.linkedScriptPackageMarkdown ?? "",
+        characterMd: anchor.characterMd ?? "",
+        sceneMd: anchor.sceneMd ?? "",
+        storyboardMd: anchor.storyboardMd ?? "",
+        totalEpisodes: anchor.scriptStudioTotalEpisodes,
+        scriptStudioCharacterRows: anchor.scriptStudioCharacterRows,
+        sceneRows: anchor.sceneRows,
+        scriptStudioPropRows: anchor.scriptStudioPropRows,
+        scriptStudioFrameRows: anchor.scriptStudioFrameRows,
+        scriptStudioMoodRows: anchor.scriptStudioMoodRows,
+        scriptStudioAudioRows: anchor.scriptStudioAudioRows,
+      },
+      anchor.crewBulletin,
+    ),
+    crewBulletin: anchor.crewBulletin,
+  };
+  const refreshed = mergeCrewBulletinPreservingClaims(
+    anchor.crewBulletin,
+    buildCrewBulletinFromHub(
+      anchor.linkedScriptPackageAssetId,
+      hubFields,
+      {
+        scriptTitle: scriptTitleFromAsset(
+          anchor.linkedScriptPackageTitle ?? "",
+          {
+            markdown: anchor.linkedScriptPackageMarkdown ?? "",
+          },
+          anchor.crewBulletin,
+        ),
+      },
+    ),
+  );
+  return {
+    ...anchor,
+    crewBulletin: refreshed,
+    scriptStudioCharacterRows:
+      hubFields.scriptStudioCharacterRows ?? anchor.scriptStudioCharacterRows,
+    sceneRows: hubFields.sceneRows ?? anchor.sceneRows,
+    scriptStudioPropRows:
+      hubFields.scriptStudioPropRows ?? anchor.scriptStudioPropRows,
+    scriptStudioFrameRows:
+      hubFields.scriptStudioFrameRows ?? anchor.scriptStudioFrameRows,
+    scriptStudioMoodRows:
+      hubFields.scriptStudioMoodRows ?? anchor.scriptStudioMoodRows,
+    scriptStudioAudioRows:
+      hubFields.scriptStudioAudioRows ?? anchor.scriptStudioAudioRows,
   };
 }

@@ -157,6 +157,17 @@
 
 新功能 **不得** 在 sbv1 复制列节点；sbv1 仅 §2.1–2.3。
 
+### 2.5 跨 edition 共用（Pro2 协作画布 · 禁止重复造节点）
+
+| 场景 | 节点 `type` | 实现 |
+| --- | --- | --- |
+| 公告栏 · **分镜图**领取 | `story-pro2-image` · `pro2MediaRole: "frame"` | `LibtvImageNode` + `LibtvImageInputDock` · **独立分镜**须 `EnginePicker`（`PRO2_FRAME_IMAGE_MODEL_KEYS`） |
+| 公告栏 · **分镜视频**领取 | **`sbv1-video-engine`** | 复用分镜视频 1.0 视频合成 · `Sbv1VideoEngineFloatingDock` · **禁止**新建 Pro2 专用视频节点 |
+| 公告栏 · **道具 / 氛围**领取 | `story-pro2-image` · `pro2MediaRole: "prop" \| "mood"` | 与场景图 **同构** · 仅标题/占位文案不同 |
+| 组内分镜格（列 batch） | `story-pro2-image` · `pro2ControllerNodeId` | 走列 batch · **无** Dock 模型选择 |
+
+**原则**：Pro2 与 sbv1 共享 `LibtvImageNode` / `sbv1-video-engine` 壳层与 Dock；差异只在 `type`、`pro2MediaRole`、spawn 菜单与模型白名单。
+
 ---
 
 ## 3. 功能矩阵（按节点）
@@ -183,7 +194,8 @@
 
 - **样式**：LibTV 媒体卡 `#262626` · 与 sbv1-image 同构 · Stage 用 `LIBTV_MEDIA_STAGE_CLASS`  
 - **功能**：生图/上传 · `@` 上游 · 风格库 · 组内 relayout 不覆盖用户排列  
-- **模型**：`EnginePicker role="IMAGE"`
+- **角色**：`pro2MediaRole` — `generic` · `scene` · `frame` · `prop` · `mood`（公告栏领取时写入）  
+- **模型**：`EnginePicker role="IMAGE"` · 分镜独立节点白名单 `PRO2_FRAME_IMAGE_MODEL_KEYS` · 场景/道具/氛围走 Dock 设置弹层
 
 ### 3.4 `story-pro2-three-view` / 三视图
 

@@ -23,7 +23,7 @@ export function Pro2DockStyleButton({
       disabled={disabled}
       title={label ? `风格：${label}` : "风格库"}
       className={cn(
-        "nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[9px] transition",
+        "nodrag flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[9px] transition",
         active
           ? "border-violet-400/45 bg-violet-500/15 text-violet-100"
           : "border-white/12 bg-white/[0.04] text-white/55 hover:border-white/20 hover:bg-white/8 hover:text-white/80",

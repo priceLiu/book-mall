@@ -4,13 +4,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUp, ChevronDown, Loader2, MapPin, SlidersHorizontal } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
-import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
+import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
+import {
+  optimisticLibtvMediaRunStart,
+  revertOptimisticLibtvMediaRunStart,
+} from "@/lib/canvas/libtv-image-node-run";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
-import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
+import {
+  resolvePro2DockUpstreamLinks,
+  resolvePro2DockStyleFromUpstream,
+  enrichPro2DockUpstreamLinks,
+  pro2DockStyleShownAsChip,
+} from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultPro2ThreeViewImageEngine } from "@/lib/canvas/pro2-three-view-batch-image";
@@ -43,10 +54,13 @@ import { pro2ThreeViewNodeUsesEmbeddedDock } from "./pro2-three-view-node-embedd
 /** 2.0 三视图节点 · 底部输入坞（图标区固定 / 正文可滚动） */
 export function Pro2ThreeViewInputDock() {
   const rfNodes = useNodes();
+  const base = useBookMallBaseUrl();
+  const { alert } = useDialogs();
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -133,6 +147,20 @@ export function Pro2ThreeViewInputDock() {
     );
   }, [storeNode, nodes, edges]);
 
+  const displayLinks = useMemo(
+    () =>
+      enrichPro2DockUpstreamLinks(
+        upstreamLinks,
+        d.dockStyleRef,
+        storeNode?.id,
+      ),
+    [upstreamLinks, d.dockStyleRef, storeNode?.id],
+  );
+  const showStyleButton = !pro2DockStyleShownAsChip(
+    upstreamLinks,
+    d.dockStyleRef,
+  );
+
   const mentionables = useMemo(
     () => buildPro2DockMentionables(upstreamLinks),
     [upstreamLinks],
@@ -193,17 +221,99 @@ export function Pro2ThreeViewInputDock() {
     [storeNode, settingsData, controllerId, updateNodeData],
   );
 
-  const onRegenerate = useCallback(() => {
-    if (!storeNode) return;
+  const onRegenerate = useCallback(async () => {
+    if (!storeNode || isRunning) return;
+
     if (controllerId && d.pro2RowKey) {
-      batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
-        forceFresh: true,
+      const ctrl = nodes.find((n) => n.id === controllerId);
+      if (ctrl) {
+        batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
+          forceFresh: true,
+        });
+        return;
+      }
+    }
+
+    let runEngine = settingsData.engine;
+    if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
+      const seed = pickDefaultPro2ThreeViewImageEngine(providers);
+      if (seed) {
+        runEngine = {
+          providerId: seed.providerId,
+          modelKey: seed.modelKey,
+          params: seed.params,
+        };
+        updateNodeData(
+          storeNode.id,
+          sbv1PatchToThreeViewNodeData({ engine: runEngine }),
+        );
+      }
+    }
+    if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
+      await alert({
+        title: "请选择模型",
+        message:
+          "请先在「图片生成设置」中选择 IMAGE 模型，并确认 Gateway 已绑定凭证。",
+        variant: "warning",
       });
       return;
     }
-    // 协作画布 · 无控制列：作为独立生图节点直接生成
-    busEnqueueNode(storeNode.id, true);
-  }, [storeNode, controllerId, d.pro2RowKey]);
+
+    const prompt = dockInput.trim();
+    const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+    const hasRefs =
+      upstreamLinks.some((l) => l.previewUrl) ||
+      Boolean(settingsData.dockStyleRef?.imageUrl) ||
+      Boolean(linkedStyle);
+    if (!prompt && !hasRefs) {
+      await alert({
+        title: "请输入提示词",
+        message: "请填写角色外观描述，或连接风格/参考图后再生成。",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!base?.trim()) {
+      await alert({
+        title: "画布未就绪",
+        message: "请刷新页面后重试。",
+        variant: "error",
+      });
+      return;
+    }
+
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+    const queued = busEnqueueStoryRun({
+      nodeId: storeNode.id,
+      forceFresh: true,
+    });
+    if (!queued) {
+      revertOptimisticLibtvMediaRunStart(
+        storeNode.id,
+        updateNodeData,
+        setNodeRuntime,
+      );
+      await alert({
+        title: "无法开始生成",
+        message: "该节点已有进行中的生成任务，请稍候完成后再试。",
+        variant: "warning",
+      });
+    }
+  }, [
+    storeNode,
+    isRunning,
+    controllerId,
+    d.pro2RowKey,
+    nodes,
+    updateNodeData,
+    setNodeRuntime,
+    settingsData,
+    providers,
+    dockInput,
+    upstreamLinks,
+    alert,
+    base,
+  ]);
 
   const onOpenStyleLibrary = useCallback(() => {
     if (!storeNode) return;
@@ -233,9 +343,9 @@ export function Pro2ThreeViewInputDock() {
         header={
           <Pro2DockHeader
             refRow={
-              upstreamLinks.length > 0 ? (
+              displayLinks.length > 0 ? (
                 <Pro2DockUpstreamChips
-                  links={upstreamLinks}
+                  links={displayLinks}
                   anchorNodeId={storeNode.id}
                   activeIds={activeRefIds}
                 />
@@ -243,17 +353,19 @@ export function Pro2ThreeViewInputDock() {
             }
             actionRow={
               <>
-                <Pro2DockStyleButton
-                  active={Boolean(styleRef)}
-                  label={styleRef?.name}
-                  disabled={isRunning}
-                  onClick={onOpenStyleLibrary}
-                />
+                {showStyleButton ? (
+                  <Pro2DockStyleButton
+                    active={Boolean(styleRef)}
+                    label={styleRef?.name}
+                    disabled={isRunning}
+                    onClick={onOpenStyleLibrary}
+                  />
+                ) : null}
                 <button
                   type="button"
                   disabled
                   title="标记（即将推出）"
-                  className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+                  className="nodrag flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
                 >
                   <MapPin className="size-4" strokeWidth={1.75} />
                   <span>标记</span>

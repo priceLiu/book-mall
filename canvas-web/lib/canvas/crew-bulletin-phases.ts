@@ -83,14 +83,60 @@ function isActiveTaskStatus(status: CrewBulletinTask["status"]): boolean {
 function phaseStatusFromTasks(
   tasks: CrewBulletinTask[],
   forceDone?: boolean,
+  unlocked = true,
 ): CrewProductionPhaseStatus {
   if (forceDone) return "done";
+  if (!unlocked) return "not_started";
   if (tasks.length === 0) return "not_started";
   const doneCount = tasks.filter((t) => t.status === "done").length;
   if (doneCount === tasks.length) return "done";
   const active = tasks.some((t) => isActiveTaskStatus(t.status));
   if (doneCount > 0 || active) return "in_progress";
-  return "not_started";
+  return "in_progress";
+}
+
+const PRE_FRAME_ASSET_PHASES: CrewProductionPhaseId[] = [
+  "character",
+  "scene",
+  "prop",
+  "mood",
+];
+
+function preFrameAssetsComplete(
+  byKind: Map<CrewTaskKind, CrewBulletinTask[]>,
+): boolean {
+  for (const phaseId of PRE_FRAME_ASSET_PHASES) {
+    for (const kind of PHASE_KINDS[phaseId]) {
+      const tasks = byKind.get(kind) ?? [];
+      if (tasks.length === 0) continue;
+      if (tasks.some((t) => t.status !== "done")) return false;
+    }
+  }
+  return true;
+}
+
+function phaseUnlocked(
+  id: CrewProductionPhaseId,
+  byKind: Map<CrewTaskKind, CrewBulletinTask[]>,
+  phaseTasks: CrewBulletinTask[],
+): boolean {
+  if (id === "script") return true;
+  if (PRE_FRAME_ASSET_PHASES.includes(id)) return true;
+  if (
+    phaseTasks.some((t) => t.status !== "unclaimed" && t.status !== "blocked")
+  ) {
+    return true;
+  }
+  if (
+    id === "frame" ||
+    id === "frameVideo" ||
+    id === "audio" ||
+    id === "dialogue" ||
+    id === "composite"
+  ) {
+    return preFrameAssetsComplete(byKind);
+  }
+  return true;
 }
 
 function phaseSubtitle(
@@ -131,7 +177,8 @@ export function computeCrewProductionPhases(
     const kinds = PHASE_KINDS[id];
     const phaseTasks = kinds.flatMap((k) => byKind.get(k) ?? []);
     const forceDone = id === "script" && phaseTasks.length > 0;
-    const status = phaseStatusFromTasks(phaseTasks, forceDone);
+    const unlocked = phaseUnlocked(id, byKind, phaseTasks);
+    const status = phaseStatusFromTasks(phaseTasks, forceDone, unlocked);
     const doneCount = phaseTasks.filter((t) => t.status === "done").length;
     const totalCount = phaseTasks.length;
     const completedTasks = phaseTasks.filter((t) => t.status === "done");

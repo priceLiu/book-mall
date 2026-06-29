@@ -87,9 +87,8 @@ export function Pro2FrameBoardCell({
           )}
         </div>
       ) : st === "running" ? (
-        <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-[11px] text-white/50">
+        <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center px-4 py-8">
           <Loader2 className="size-6 animate-spin text-violet-300/70" />
-          <span>生成中…</span>
         </div>
       ) : st === "error" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">

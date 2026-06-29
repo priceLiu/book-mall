@@ -37,6 +37,7 @@ import {
   PRO2_NODE_RESIZER_LINE,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import { LIBTV_CARD_DRAG_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { Pro2NodeResizeGrip } from "../pro2/pro2-node-resize-grip";
 import { SBV1_NODE_HANDLE_CLASS, SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import {
   GROUP_COLOR_PRESETS,
@@ -402,21 +403,15 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       ) : null}
 
       <NodeResizer
-        color={isLibtvMediaGroup ? PRO2_NODE_RESIZER_COLOR : color}
+        color={PRO2_NODE_RESIZER_COLOR}
         minWidth={220}
         minHeight={140}
         isVisible={selected}
-        lineStyle={
-          isLibtvMediaGroup
-            ? PRO2_NODE_RESIZER_LINE
-            : { borderColor: color }
-        }
-        handleStyle={
-          isLibtvMediaGroup
-            ? PRO2_NODE_RESIZER_HANDLE
-            : { background: color, border: "none", width: 8, height: 8 }
-        }
+        lineStyle={PRO2_NODE_RESIZER_LINE}
+        handleClassName="pro2-node-resizer-handle"
+        handleStyle={PRO2_NODE_RESIZER_HANDLE}
       />
+      {selected ? <Pro2NodeResizeGrip /> : null}
 
       {isLibtvMediaGroup ? (
         <div className="relative z-10 flex h-8 shrink-0 items-center gap-1 px-2 pt-2">

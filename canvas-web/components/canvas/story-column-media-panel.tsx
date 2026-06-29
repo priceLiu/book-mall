@@ -382,7 +382,8 @@ export function StoryMediaPreviewModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex flex-col bg-black/92 backdrop-blur-md"
+      className="canvas-media-preview-lightbox pointer-events-auto fixed inset-0 z-[2000] flex flex-col bg-black/88 backdrop-blur-md"
+      style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
       onClick={onClose}
     >
       <div

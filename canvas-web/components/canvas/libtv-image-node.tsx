@@ -5,7 +5,7 @@ import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
-import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
+import { AlertTriangle, ImageIcon } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
@@ -18,13 +18,8 @@ import {
   LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_NODE_HANDLE_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
-import {
-  PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT,
-  PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH,
-  PRO2_IMAGE_NODE_MIN_HEIGHT,
-  PRO2_IMAGE_NODE_MIN_WIDTH,
-} from "@/lib/canvas/story-pro2-node-chrome";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types";
 import type { CanvasPortraitNodeFields } from "@/lib/canvas/portrait-node-data";
@@ -37,15 +32,15 @@ import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
 import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
+import { useLibtvNodeDuplicate, crewNodeShowsParticipatingBadge } from "./libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2/pro2-crew-task-status-badge";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
 } from "./pro2/pro2-media-node-empty";
-import { Pro2NodeResizer } from "./pro2/pro2-node-resizer";
-import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import { Pro2NodeSidePlus } from "./pro2/pro2-node-side-plus";
+import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import {
   LibtvMediaGeneratingState,
   isLibtvMediaGenerating,
@@ -79,34 +74,19 @@ export type LibtvImageNodeProps = NodeProps & {
 
 const EDITION_CHROME: Record<
   LibtvImageNodeEdition,
-  { ring: string; icon: string; spinner: string; generating: "violet" | "cyan" }
+  { icon: string; spinner: string; generating: "violet" | "cyan" }
 > = {
   pro2: {
-    ring: "ring-1 ring-cyan-400/50",
     icon: "text-white/70",
     spinner: CANVAS_SEMANTIC_STATUS_CLASS,
-    generating: "cyan",
+    generating: "violet",
   },
   sbv1: {
-    ring: "ring-1 ring-cyan-400/50",
     icon: "text-white/70",
     spinner: CANVAS_SEMANTIC_STATUS_CLASS,
     generating: "cyan",
   },
 };
-
-function generatingLabelFor(
-  edition: LibtvImageNodeEdition,
-  d: LibtvImageNodeData,
-): string {
-  // 上传中只显示扫光 + 旋转图标，不显示「上传中…」文字
-  if (d.uploading && !d.runtime?.status) return "";
-  const role = d.pro2MediaRole;
-  if (role === "character-three-view") return "生成三视图中…";
-  if (role === "scene") return "生成场景图中…";
-  if (role === "frame") return "分镜图生成中…";
-  return "图片生成中…";
-}
 
 /** LibTV 统一图片节点（分镜 1.0 · 影视专业 2.0） */
 export function LibtvImageNode({
@@ -128,6 +108,7 @@ export function LibtvImageNode({
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
+  const graphMeta = useCanvasStore((s) => s.graphMeta);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
@@ -163,7 +144,6 @@ export function LibtvImageNode({
   const errorMessage = hasRuntimeError
     ? d.runtime?.failMessage?.trim() || "生成失败"
     : d.uploadError?.trim() || "生成失败";
-  const generatingLabel = generatingLabelFor(edition, d);
   const showSidePlus = Boolean(
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
@@ -173,9 +153,9 @@ export function LibtvImageNode({
   );
   const showTryMenu =
     !isCharacterThreeView && !hasImage && !isGenerating && !hasError;
+  const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
   const showImageTools = Boolean(
-    soleSelected &&
-      !isGenerating &&
+    showFloatingToolbar &&
       !isCharacterThreeView &&
       (hasImage ||
         Boolean(d.dockInput?.trim()) ||
@@ -273,10 +253,7 @@ export function LibtvImageNode({
     if (isCharacterThreeView) {
       if (isGenerating) {
         return (
-          <LibtvMediaGeneratingState
-            label={generatingLabel}
-            variant={chrome.generating}
-          />
+          <LibtvMediaGeneratingState variant={chrome.generating} />
         );
       }
       if (hasImage) {
@@ -285,7 +262,7 @@ export function LibtvImageNode({
             src={previewUrl}
             variant="generated"
             alt={nodeLabel}
-            fit="contain"
+            fit="cover"
             hidePreviewOverlay
             className="absolute inset-0"
           />
@@ -311,7 +288,7 @@ export function LibtvImageNode({
 
     if (isGenerating) {
       return (
-        <LibtvMediaGeneratingState label={generatingLabel} variant={chrome.generating}>
+        <LibtvMediaGeneratingState variant={chrome.generating}>
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -330,7 +307,7 @@ export function LibtvImageNode({
           src={previewUrl}
           variant="generated"
           alt={nodeLabel}
-          fit="contain"
+          fit="cover"
           hidePreviewOverlay
           className="absolute inset-0"
         />
@@ -388,19 +365,6 @@ export function LibtvImageNode({
 
   return (
     <>
-      <Pro2NodeResizer
-        isVisible={Boolean(selected && !insideGroup)}
-        minWidth={
-          isCharacterThreeView
-            ? PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH
-            : PRO2_IMAGE_NODE_MIN_WIDTH
-        }
-        minHeight={
-          isCharacterThreeView
-            ? PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT
-            : PRO2_IMAGE_NODE_MIN_HEIGHT
-        }
-      />
       <div
         className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
         data-image-paste-host={id}
@@ -460,6 +424,16 @@ export function LibtvImageNode({
           </>
         ) : null}
 
+        {showFloatingToolbar && !showImageTools && !isCharacterThreeView ? (
+          <Pro2ImageNodeToolbar
+            passNodeDrag
+            minimal
+            className="absolute left-1/2 z-40 -translate-x-1/2"
+            style={{ top: -60 }}
+            onDuplicateNode={onDuplicateNode}
+          />
+        ) : null}
+
         {showImageTools ? (
           <Pro2ImageNodeToolbar
             passNodeDrag
@@ -484,16 +458,19 @@ export function LibtvImageNode({
             LIBTV_MEDIA_CARD_SHELL_CLASS,
             LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
-            selected && chrome.ring,
-            hovered && !selected && "ring-1 ring-cyan-400/35",
           )}
+          style={libtvNodeBorderStyle({
+            selected: !!selected,
+            hovered: hovered && !selected,
+            edition,
+          })}
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex items-center gap-2">
+          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <button
                 type="button"
                 className={cn(
-                  "nodrag flex items-center gap-2 rounded-md transition",
+                  "nodrag flex min-w-0 items-center gap-2 rounded-md transition",
                   !hasImage &&
                     !isGenerating &&
                     !isCharacterThreeView &&
@@ -511,27 +488,29 @@ export function LibtvImageNode({
                   }
                 }}
               >
-                <ImageIcon className={cn("size-3.5", chrome.icon)} />
-                <p className="text-xs font-medium text-white">{nodeLabel}</p>
+                <ImageIcon className={cn("size-3.5 shrink-0", chrome.icon)} />
+                <p className="truncate text-xs font-medium text-white">
+                  {nodeLabel}
+                </p>
               </button>
             </div>
-            {isGenerating ? (
-              <Loader2 className={cn("size-3.5 animate-spin", chrome.spinner)} />
-            ) : (
-              <LibtvNodeHeaderActions
-                portraitActive={portraitActive}
-                portraitImporting={portraitImporting}
-                showPreview={hasImage}
-                onPreview={() => setPreviewOpen(true)}
-              />
-            )}
+            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} />
+            ) : null}
+            <div className="relative z-[1] flex shrink-0 items-center gap-2">
+              {!isGenerating ? (
+                <LibtvNodeHeaderActions
+                  portraitActive={portraitActive}
+                  portraitImporting={portraitImporting}
+                  showPreview={hasImage}
+                  onPreview={() => setPreviewOpen(true)}
+                />
+              ) : null}
+            </div>
           </div>
 
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
             {renderStage()}
-            {!isGenerating && edition === "pro2" ? (
-              <Pro2CrewTaskStatusBadge nodeId={id} placement="center" />
-            ) : null}
           </div>
         </div>
       </div>

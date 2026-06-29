@@ -3,6 +3,36 @@ import { computeCrewProductionPhases } from "@/lib/canvas/crew-bulletin-phases";
 import type { CrewBulletinState } from "@/lib/canvas/crew-bulletin-types";
 
 describe("computeCrewProductionPhases", () => {
+  it("marks asset phase in_progress when tasks are unclaimed", () => {
+    const bulletin: CrewBulletinState = {
+      publishedAt: new Date().toISOString(),
+      hubNodeId: "hub-1",
+      scriptTitle: "测试剧",
+      totalEpisodes: 5,
+      tasks: [
+        {
+          id: "script:hub-1",
+          kind: "script",
+          rowKey: "hub-1",
+          label: "测试剧",
+          status: "done",
+        },
+        {
+          id: "character:a",
+          kind: "character",
+          rowKey: "a",
+          label: "张三",
+          status: "unclaimed",
+        },
+      ],
+    };
+
+    const phases = computeCrewProductionPhases(bulletin);
+    expect(phases.find((p) => p.id === "character")?.status).toBe(
+      "in_progress",
+    );
+  });
+
   it("aggregates phase status from bulletin tasks", () => {
     const bulletin: CrewBulletinState = {
       publishedAt: new Date().toISOString(),

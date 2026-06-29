@@ -79,12 +79,21 @@ export type CrewBulletinVirtualTaskListProps = {
   fullscreen?: boolean;
 };
 
-function gridTemplate(columns: CrewBulletinTableColumn[]): string {
+function gridTemplate(
+  columns: CrewBulletinTableColumn[],
+  fullscreen = false,
+): string {
   const checkbox = "36px";
-  const status = "64px";
+  const status = "76px";
   const preview = "52px";
-  const actions = "44px";
-  const dataCols = columns.map((c) => c.minWidth).join(" ");
+  const actions = "48px";
+  const dataCols = columns
+    .map((c) => {
+      if (!fullscreen) return c.minWidth;
+      const grow = c.grow ?? 1;
+      return `minmax(${c.minWidth}, ${grow}fr)`;
+    })
+    .join(" ");
   return `${checkbox} ${dataCols} ${status} ${preview} ${actions}`;
 }
 
@@ -102,6 +111,7 @@ function TaskTableRow({
   previewUrl,
   onPreview,
   contentScale = 1,
+  fullscreen = false,
 }: {
   task: CrewBulletinTask;
   columns: CrewBulletinTableColumn[];
@@ -116,15 +126,16 @@ function TaskTableRow({
   previewUrl?: string;
   onPreview?: (url: string, title: string) => void;
   contentScale?: number;
+  fullscreen?: boolean;
 }) {
-  const grid = gridTemplate(columns);
+  const grid = gridTemplate(columns, fullscreen);
   const smallFontPx = Math.round(9 * contentScale);
 
   return (
     <div
       role="row"
       className={cn(
-        "group grid items-start gap-x-2 border-b border-white/[0.06] px-3 py-2.5 leading-relaxed transition-colors",
+        "group grid w-full items-start gap-x-2 border-b border-white/[0.06] px-3 py-2.5 leading-relaxed transition-colors",
         selectable && onToggleSelect && "cursor-pointer",
         selected && selectable && "bg-white/[0.04]",
       )}
@@ -268,7 +279,7 @@ export function CrewBulletinVirtualTaskList({
     [taskKind, filtered],
   );
 
-  const grid = gridTemplate(columns);
+  const grid = gridTemplate(columns, fullscreen);
 
   const allClaimableSelected =
     filteredClaimable.length > 0 &&
@@ -285,11 +296,16 @@ export function CrewBulletinVirtualTaskList({
 
   return (
     <>
-    <div style={{ backgroundColor: CREW_PANEL_BG, fontSize: `${baseFontPx}px` }}>
+    <div
+      className={cn(
+        fullscreen && "flex min-h-0 flex-1 flex-col",
+      )}
+      style={{ backgroundColor: CREW_PANEL_BG, fontSize: `${baseFontPx}px` }}
+    >
       {onToggleSelect && filteredClaimable.length > 0 ? (
         <label
-          className="flex cursor-pointer items-center gap-2 border-b border-white/[0.06] px-3 py-2 text-[10px] text-white/50 transition-colors hover:bg-[#262626]"
-          style={{ backgroundColor: CREW_PANEL_BG }}
+          className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-white/[0.06] px-3 py-2 text-white/50 transition-colors hover:bg-[#262626]"
+          style={{ backgroundColor: CREW_PANEL_BG, fontSize: `${baseFontPx}px` }}
         >
           <input
             type="checkbox"
@@ -301,21 +317,21 @@ export function CrewBulletinVirtualTaskList({
               );
             }}
           />
-          全选（{filteredClaimable.length} 项可领取）
+          全选（{filteredClaimable.length} 项待参与制作）
         </label>
       ) : null}
 
       <div
         className={cn(
-          "overflow-auto",
-          fullscreen ? "max-h-none min-h-0 flex-1" : "max-h-[min(68vh,560px)]",
+          "overflow-x-auto overflow-y-auto",
+          fullscreen ? "min-h-0 flex-1" : "max-h-[min(68vh,560px)]",
         )}
         style={{ backgroundColor: CREW_PANEL_BG }}
       >
-        <div className="min-w-[780px]">
+        <div className={cn(fullscreen ? "w-full min-w-0" : "min-w-[780px]")}>
           <div
             role="row"
-            className="sticky top-0 z-[1] grid items-center gap-x-2 border-b border-white/10 px-3 py-2 font-medium text-white/45"
+            className="sticky top-0 z-[1] grid w-full items-center gap-x-2 border-b border-white/10 px-3 py-2 font-medium text-white/45"
             style={{
               gridTemplateColumns: grid,
               backgroundColor: CREW_PANEL_BG,
@@ -354,6 +370,7 @@ export function CrewBulletinVirtualTaskList({
                 previewUrl={previewUrl}
                 onPreview={(url, title) => setPreview({ url, title })}
                 contentScale={contentScale}
+                fullscreen={fullscreen}
               />
             );
           })}

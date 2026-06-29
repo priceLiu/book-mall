@@ -24,11 +24,17 @@ import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
+  enrichPro2DockUpstreamLinks,
+  pro2DockStyleShownAsChip,
 } from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultSbv1ImageEngine } from "@/lib/canvas/sbv1-image-models";
+import {
+  pickDefaultPro2FrameImageEngine,
+  PRO2_FRAME_IMAGE_MODEL_KEYS,
+} from "@/lib/canvas/pro2-frame-batch-image";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   isLibtvFreestandingImageNode,
@@ -81,6 +87,12 @@ function framePromptPlaceholder(role?: string): string {
   }
   if (role === "scene") {
     return "编辑场景生图关键词；输入 @ 引用风格或上游图片…";
+  }
+  if (role === "prop") {
+    return "编辑道具生图关键词；输入 @ 引用风格或场景…";
+  }
+  if (role === "mood") {
+    return "编辑氛围生图关键词；输入 @ 引用风格…";
   }
   return "可直接文字生图，或上传图片输入文字指令对图片进行编辑，如：将背景改为雪夜";
 }
@@ -151,12 +163,30 @@ export function LibtvImageInputDock() {
     settingsData.resolution ?? "2K",
   );
 
+  const isFrameFreestanding =
+    pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
+  const imageModelKeys =
+    isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
+      ? PRO2_FRAME_IMAGE_MODEL_KEYS
+      : undefined;
+
   useEffect(() => {
     if (!storeNode || !showModelPicker || engine?.providerId?.trim()) return;
-    const seed = pickDefaultSbv1ImageEngine(providers);
+    const seed =
+      isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
+        ? pickDefaultPro2FrameImageEngine(providers)
+        : pickDefaultSbv1ImageEngine(providers);
     if (!seed) return;
     updateNodeData(storeNode.id, { engine: seed });
-  }, [storeNode, showModelPicker, engine?.providerId, providers, updateNodeData]);
+  }, [
+    storeNode,
+    showModelPicker,
+    engine?.providerId,
+    providers,
+    updateNodeData,
+    isFrameFreestanding,
+    pro2Data.pro2MediaRole,
+  ]);
 
   const upstreamLinks = useMemo(() => {
     if (!storeNode) return [];
@@ -167,6 +197,21 @@ export function LibtvImageInputDock() {
       edges,
     );
   }, [storeNode, nodeType, nodes, edges]);
+
+  const dockStyleRef = settingsData.dockStyleRef ?? pro2Data.dockStyleRef;
+  const displayLinks = useMemo(
+    () =>
+      enrichPro2DockUpstreamLinks(
+        upstreamLinks,
+        dockStyleRef,
+        storeNode?.id,
+      ),
+    [upstreamLinks, dockStyleRef, storeNode?.id],
+  );
+  const showStyleButton = !pro2DockStyleShownAsChip(
+    upstreamLinks,
+    dockStyleRef,
+  );
 
   const mentionables = useMemo(
     () => buildPro2DockMentionables(upstreamLinks),
@@ -246,20 +291,19 @@ export function LibtvImageInputDock() {
   const onRunFreestanding = useCallback(async () => {
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
     if (isRunning) return;
-    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
-    const revertPending = () =>
-      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
 
     let runEngine = engine;
     if (!runEngine?.providerId?.trim()) {
-      const seed = pickDefaultSbv1ImageEngine(providers);
+      const seed =
+        pro2Data.pro2MediaRole === "frame"
+          ? pickDefaultPro2FrameImageEngine(providers)
+          : pickDefaultSbv1ImageEngine(providers);
       if (seed) {
         runEngine = seed;
         updateNodeData(storeNode.id, { engine: seed });
       }
     }
     if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
-      revertPending();
       await alert({
         title: "请选择模型",
         message:
@@ -276,7 +320,6 @@ export function LibtvImageInputDock() {
       Boolean(settingsData.dockStyleRef?.imageUrl) ||
       Boolean(linkedStyle);
     if (!prompt && !hasRefs) {
-      revertPending();
       await alert({
         title: "请输入提示词",
         message: "可直接文字生图，或上传/连接图片后输入编辑指令。",
@@ -285,7 +328,6 @@ export function LibtvImageInputDock() {
       return;
     }
     if (!base) {
-      revertPending();
       await alert({
         title: "画布未就绪",
         message: "请刷新页面后重试。",
@@ -293,7 +335,17 @@ export function LibtvImageInputDock() {
       });
       return;
     }
-    busEnqueueStoryRun({ nodeId: storeNode.id, forceFresh: true });
+
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+    const queued = busEnqueueStoryRun({ nodeId: storeNode.id, forceFresh: true });
+    if (!queued) {
+      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+      await alert({
+        title: "无法开始生成",
+        message: "该节点已有进行中的生成任务，请稍候完成后再试。",
+        variant: "warning",
+      });
+    }
   }, [
     storeNode,
     engine,
@@ -325,7 +377,7 @@ export function LibtvImageInputDock() {
         });
   if (usesEmbedded) return null;
 
-  const styleRef = settingsData.dockStyleRef ?? pro2Data.dockStyleRef;
+  const styleRef = dockStyleRef;
   const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
   const styleActive = Boolean(styleRef || linkedStyle);
   const styleLabel = styleRef?.name ?? linkedStyle?.name;
@@ -364,9 +416,9 @@ export function LibtvImageInputDock() {
         header={
           <Pro2DockHeader
             refRow={
-              upstreamLinks.length > 0 ? (
+              displayLinks.length > 0 ? (
                 <Pro2DockUpstreamChips
-                  links={upstreamLinks}
+                  links={displayLinks}
                   anchorNodeId={storeNode.id}
                   activeIds={activeRefIds}
                 />
@@ -374,12 +426,14 @@ export function LibtvImageInputDock() {
             }
             actionRow={
               <>
-                <Pro2DockStyleButton
-                  active={styleActive}
-                  label={styleLabel}
-                  disabled={isRunning}
-                  onClick={onOpenStyleLibrary}
-                />
+                {showStyleButton ? (
+                  <Pro2DockStyleButton
+                    active={styleActive}
+                    label={styleLabel}
+                    disabled={isRunning}
+                    onClick={onOpenStyleLibrary}
+                  />
+                ) : null}
                 <Pro2DockRefImages
                   refs={[]}
                   onChange={() => {}}
@@ -486,6 +540,7 @@ export function LibtvImageInputDock() {
         <Sbv1ImageGenerateSettingsModal
           open={settingsOpen}
           data={settingsData}
+          allowedModelKeys={imageModelKeys}
           onClose={() => setSettingsOpen(false)}
           onConfirm={(patch) => {
             if (!storeNode) return;

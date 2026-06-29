@@ -237,3 +237,44 @@ export function resolvePro2DockStyleFromUpstream(
   if (!style) return null;
   return { name: style.label };
 }
+
+export type Pro2DockStyleRef = {
+  name?: string;
+  imageUrl?: string;
+};
+
+function hasPro2DockStyleSlot(links: Pro2DockUpstreamLink[]): boolean {
+  return links.some((l) => l.id.startsWith("up-style-"));
+}
+
+/**
+ * 将风格库选中（dockStyleRef）合并进缩略图槽位行；
+ * 已连风格素材节点时不重复插入。
+ */
+export function enrichPro2DockUpstreamLinks(
+  links: Pro2DockUpstreamLink[],
+  dockStyleRef?: Pro2DockStyleRef | null,
+  anchorNodeId?: string,
+): Pro2DockUpstreamLink[] {
+  if (hasPro2DockStyleSlot(links)) return links;
+  const imageUrl = dockStyleRef?.imageUrl?.trim();
+  if (!imageUrl) return links;
+  return [
+    ...links,
+    {
+      id: "up-style-dock",
+      kind: "image",
+      label: dockStyleRef?.name?.trim() || "风格",
+      previewUrl: imageUrl,
+      sourceNodeId: anchorNodeId ?? "",
+    },
+  ];
+}
+
+/** 风格已占槽位时隐藏独立「风格」按钮，避免第二行重复展示 */
+export function pro2DockStyleShownAsChip(
+  links: Pro2DockUpstreamLink[],
+  dockStyleRef?: Pro2DockStyleRef | null,
+): boolean {
+  return hasPro2DockStyleSlot(enrichPro2DockUpstreamLinks(links, dockStyleRef));
+}

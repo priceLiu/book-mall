@@ -30,8 +30,12 @@ import type {
 } from "./story-workspace-types";
 import {
   isLibtvFreestandingImageNode,
-  libtvMediaRunIdlePatch,
 } from "./libtv-image-node-run";
+import { sbv1ImageFailurePatch } from "./sbv1-image-task-apply";
+import {
+  clearCanvasNodeRunSession,
+  shouldDeferLibtvOrphanReconcile,
+} from "./canvas-run-session";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { isStoryWorkspaceNodeType } from "./types";
 
@@ -384,7 +388,17 @@ export function reconcileStaleInflightRuntimes(
             !isStaleServerInflightTask(t, nodeTasks),
         );
         if (!hasServerInflight) {
-          updateNodeData(node.id, libtvMediaRunIdlePatch());
+          if (shouldDeferLibtvOrphanReconcile(node.id)) {
+            continue;
+          }
+          clearCanvasNodeRunSession(node.id);
+          updateNodeData(
+            node.id,
+            sbv1ImageFailurePatch(
+              "RUN_STALE",
+              "生成未完成（服务端无进行中的任务）。请重试；若仍失败请查看 Gateway 状态或联系管理员。",
+            ),
+          );
         }
       }
       continue;
