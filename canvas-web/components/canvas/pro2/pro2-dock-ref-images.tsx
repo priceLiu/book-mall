@@ -61,7 +61,7 @@ function DockRefImageChip({
     <>
       <div
         className={cn(
-          "group relative size-10 cursor-grab overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow active:cursor-grabbing",
+          "group relative size-12 cursor-grab overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow active:cursor-grabbing",
           active
             ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
             : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
@@ -103,7 +103,7 @@ function DockRefImageChip({
             className="size-full object-cover"
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-[9px] text-white/40">
+          <div className="flex size-full items-center justify-center text-[11px] text-white/40">
             图
           </div>
         )}
@@ -257,7 +257,7 @@ export function Pro2DockRefImages({
         <button
           type="button"
           className={cn(
-            "flex size-9 items-center justify-center rounded-lg border border-dashed border-white/[0.1] text-white/40 transition hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/70",
+            "flex size-12 items-center justify-center rounded-lg border border-dashed border-white/[0.1] text-white/40 transition hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/70",
             disabled && "cursor-not-allowed opacity-40",
           )}
           title={
@@ -268,7 +268,7 @@ export function Pro2DockRefImages({
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
         >
-          <ImagePlus className="size-4" />
+          <ImagePlus className="size-5" />
         </button>
       ) : null}
       <input

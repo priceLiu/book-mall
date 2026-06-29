@@ -143,18 +143,23 @@ async function createKieTaskWithApiKey(
   base: string,
   args: CreateKieTaskArgs,
 ): Promise<{ taskId: string }> {
+  const { gatewayFetch } = await import("@/lib/gateway/format-fetch-error");
   const url = `${base.replace(/\/$/, "")}/api/v1/jobs/createTask`;
   const body: Record<string, unknown> = { model: args.model, input: args.input };
   if (args.callBackUrl) body.callBackUrl = args.callBackUrl;
 
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  const r = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    { hop: "upstream", providerKind: "KIE" },
+  );
   const text = await r.text();
   let json: unknown = null;
   try {

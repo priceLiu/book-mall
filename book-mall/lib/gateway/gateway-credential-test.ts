@@ -7,6 +7,7 @@ import { decryptApiKey } from "@/lib/canvas/secret";
 import {
   defaultBaseUrl,
   resolveDeepSeekBaseUrl,
+  resolveKieApiRoot,
   resolveOpenAiCompatibleBaseUrl,
 } from "@/lib/gateway/model-router";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
@@ -45,7 +46,9 @@ function buildTestConfig(row: {
               /\/$/,
               "",
             )
-          : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(
+          : row.providerKind === "KIE"
+            ? resolveKieApiRoot(row.baseUrl)
+            : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(
             /\/$/,
             "",
           );

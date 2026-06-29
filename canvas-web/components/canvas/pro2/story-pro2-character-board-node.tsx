@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { Loader2, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -17,6 +17,7 @@ import {
   Pro2CharacterBoardCell,
   pro2CharacterCellStatus,
 } from "./pro2-character-board-cell";
+import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 
 export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
@@ -89,15 +90,12 @@ export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
       <div
         className={cn(
           PRO2_CARD_SHELL_CLASS,
-          "flex min-h-0 flex-1 flex-col overflow-hidden p-2",
+          "relative flex min-h-0 flex-1 flex-col overflow-hidden p-2",
         )}
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
       >
         {anyRunning && !hasAnyImage ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-[11px] text-violet-200/70">
-            <Loader2 className="size-5 animate-spin" />
-            生成三视图中…
-          </div>
+          <LibtvMediaGeneratingState variant="violet" />
         ) : sortedRows.length ? (
           <div className="nodrag min-h-0 flex-1 overflow-y-auto pr-0.5">
             <div className="grid grid-cols-2 gap-2">

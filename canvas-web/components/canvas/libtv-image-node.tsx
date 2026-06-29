@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
@@ -25,6 +25,10 @@ import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types
 import type { CanvasPortraitNodeFields } from "@/lib/canvas/portrait-node-data";
 import { isPortraitNodeActive } from "@/lib/canvas/portrait-node-data";
 import { useImportPortraitToLibrary } from "@/lib/canvas/use-import-portrait-to-library";
+import {
+  libtvMediaPreviewCanFallbackToBlob,
+  resolveLibtvMediaPreviewUrl,
+} from "@/lib/canvas/libtv-media-preview-url";
 import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
@@ -116,15 +120,34 @@ export function LibtvImageNode({
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [livenessOpen, setLivenessOpen] = useState(false);
+  const [preferBlobPreview, setPreferBlobPreview] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? undefined;
 
   const d = data as unknown as LibtvImageNodeData;
+  useEffect(() => {
+    setPreferBlobPreview(false);
+  }, [d.ossUrl, d.blobUrl, d.uploading]);
+
+  const previewUrl = useMemo(
+    () =>
+      resolveLibtvMediaPreviewUrl({
+        ossUrl: d.ossUrl,
+        blobUrl: d.blobUrl,
+        uploading: d.uploading,
+        preferBlob: preferBlobPreview,
+      }),
+    [d.ossUrl, d.blobUrl, d.uploading, preferBlobPreview],
+  );
+  const onPreviewLoadError = useCallback(() => {
+    if (libtvMediaPreviewCanFallbackToBlob(d)) {
+      setPreferBlobPreview(true);
+    }
+  }, [d]);
   const saveAsAsset = useSaveNodeAsAsset();
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
   const mediaRole = d.pro2MediaRole ?? "generic";
   const isCharacterThreeView = mediaRole === "character-three-view";
-  const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const portraitActive = isPortraitNodeActive(
     (self?.data ?? d) as CanvasPortraitNodeFields,
@@ -221,7 +244,7 @@ export function LibtvImageNode({
         return;
       }
       try {
-        const ossUrl = await uploadCanvasImage(base, file);
+        const ossUrl = await uploadCanvasImage(base, normalized);
         updateNodeData(id, { ossUrl, uploading: false });
       } catch (e) {
         updateNodeData(id, {
@@ -264,6 +287,7 @@ export function LibtvImageNode({
             alt={nodeLabel}
             fit="cover"
             hidePreviewOverlay
+            onImageError={onPreviewLoadError}
             className="absolute inset-0"
           />
         );
@@ -296,6 +320,7 @@ export function LibtvImageNode({
               alt=""
               className="absolute inset-0 size-full object-contain opacity-40"
               draggable={false}
+              onError={onPreviewLoadError}
             />
           ) : null}
         </LibtvMediaGeneratingState>
@@ -309,6 +334,7 @@ export function LibtvImageNode({
           alt={nodeLabel}
           fit="cover"
           hidePreviewOverlay
+          onImageError={onPreviewLoadError}
           className="absolute inset-0"
         />
       );

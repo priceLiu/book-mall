@@ -7,13 +7,24 @@ import {
 } from "./gateway-credential-match";
 import {
   defaultBaseUrl,
+  isKieCodexChatModel,
   resolveBailianChatModelKey,
   resolveDeepseekChatModelKey,
+  resolveKieApiRoot,
   resolveKieGeminiChatPath,
   resolveOpenAiCompatibleBaseUrl,
   resolveVolcengineModelKey,
   routeGatewayModel,
 } from "./model-router";
+import { KieGateway } from "@/lib/canvas/providers/kie";
+import {
+  CanvasGatewayError,
+  type CanvasChatMessage,
+} from "@/lib/canvas/providers/types";
+import {
+  buildKieCodexResponsesBody,
+  kieCodexResponseToChatCompletions,
+} from "./kie-codex-chat";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
 import { resolveVolcengineArkApiKey } from "./volcengine-gateway-credential";
 import {
@@ -442,6 +453,20 @@ export async function finalizeRequestLog(
       console.warn("[gateway] releaseTrafficSlot 失败（忽略）", logId, e);
     }
   }
+
+  if (patch.status === "FAILED") {
+    const { recordGatewayPlatformError } = await import("@/lib/platform-error-log");
+    recordGatewayPlatformError({
+      logId,
+      failCode: resolvedFailCode,
+      failMessage: patch.failMessage,
+      model: patch.model ?? log.model,
+      endpoint: log.endpoint,
+      clientPage: log.clientPage,
+      storyTaskId: log.storyTaskId,
+      userId: log.userId,
+    });
+  }
 }
 
 function resolveChatCompletionsBody(
@@ -462,6 +487,65 @@ function resolveChatCompletionsBody(
   return body;
 }
 
+async function forwardKieChatViaGateway(
+  opts: {
+    credentialId: string;
+    body: Record<string, unknown>;
+    baseUrlOverride?: string | null;
+  },
+  cred: { apiKey: string; baseUrl: string | null },
+): Promise<{ status: number; text: string; durationMs: number }> {
+  const started = Date.now();
+  const modelKey =
+    typeof opts.body.model === "string" ? opts.body.model : "gemini-3-flash";
+  const gateway = new KieGateway({
+    id: opts.credentialId,
+    alias: "",
+    kind: "KIE",
+    apiKey: cred.apiKey,
+    baseUrl: resolveKieApiRoot(opts.baseUrlOverride || cred.baseUrl),
+  });
+  const messages = Array.isArray(opts.body.messages)
+    ? (opts.body.messages as CanvasChatMessage[])
+    : [];
+  const {
+    model: _model,
+    messages: _messages,
+    stream: _stream,
+    ...params
+  } = opts.body;
+
+  try {
+    const resp = await gateway.chat({ modelKey, messages, params });
+    return {
+      status: 200,
+      text: JSON.stringify({
+        id: "chatcmpl-gateway-kie",
+        object: "chat.completion",
+        model: modelKey,
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: resp.text },
+            finish_reason: "stop",
+          },
+        ],
+        usage: {
+          prompt_tokens: resp.usage?.promptTokens,
+          completion_tokens: resp.usage?.completionTokens,
+          total_tokens: resp.usage?.totalTokens,
+        },
+      }),
+      durationMs: Date.now() - started,
+    };
+  } catch (e) {
+    if (e instanceof CanvasGatewayError) {
+      throw new Error(e.message);
+    }
+    throw e;
+  }
+}
+
 export async function forwardChatCompletions(opts: {
   credentialId: string;
   providerKind: GatewayProviderKind;
@@ -471,17 +555,15 @@ export async function forwardChatCompletions(opts: {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
 
+  if (cred.providerKind === "KIE") {
+    return forwardKieChatViaGateway(opts, cred);
+  }
+
   const base = resolveOpenAiCompatibleBaseUrl(
     cred.providerKind,
     opts.baseUrlOverride || cred.baseUrl,
   );
-  let url = `${base}/chat/completions`;
-
-  if (cred.providerKind === "KIE") {
-    const modelKey =
-      typeof opts.body.model === "string" ? opts.body.model : "gemini-3-flash";
-    url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
-  }
+  const url = `${base}/chat/completions`;
 
   const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
   const bearerKey =
@@ -524,10 +606,21 @@ export async function forwardChatCompletionsStream(opts: {
   if (cred.providerKind === "KIE") {
     const modelKey =
       typeof opts.body.model === "string" ? opts.body.model : "gemini-3-flash";
-    url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
+    if (isKieCodexChatModel(modelKey)) {
+      url = `${base}/codex/v1/responses`;
+    } else {
+      url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
+    }
   }
 
-  const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  let requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  if (
+    cred.providerKind === "KIE" &&
+    typeof opts.body.model === "string" &&
+    isKieCodexChatModel(opts.body.model)
+  ) {
+    requestBody = { ...buildKieCodexResponsesBody(requestBody), stream: false };
+  }
   const bearerKey =
     cred.providerKind === "VOLCENGINE"
       ? resolveVolcengineArkApiKey(cred.apiKey)

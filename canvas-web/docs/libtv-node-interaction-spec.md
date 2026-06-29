@@ -82,6 +82,30 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 **拖动登记**：`flow-canvas.tsx` · `canvasDraggingNodeId` 仅 position 拖动写入；resize 开始时 **清空** `canvasDraggingNodeId`。
 
+### 2.4 输入坞尺寸 / 比例 / 缩放（固定规范 · 唯一真源 `lib/canvas/libtv-dock-scale.ts`）
+
+> 所有 Pro2 / sbv1 浮动 Dock **共用**此规范；flow 布局尺寸固定，仅屏幕呈现随 zoom 线性变化。**禁止**在组件内另写宽高 / 缩放逻辑（旧 `nodeWidth × ratio` 已废弃）。
+
+| 项 | 常量 | 值 | 说明 |
+| --- | --- | --- | --- |
+| 比例 | `LIBTV_DOCK_ASPECT_W` : `LIBTV_DOCK_ASPECT_H` | **16 : 6** | 固定宽高比 |
+| 长宽尺度 | `LIBTV_DOCK_SIZE_FACTOR` | **0.9** | flow 长宽同比 −10% |
+| flow 宽 | `LIBTV_DOCK_FLOW_WIDTH` | **1296**（1440×0.9） | flow 坐标基准宽（固定） |
+| flow 高 | `LIBTV_DOCK_FLOW_HEIGHT` | **486** | = 宽 × 6/16 |
+| 基准放大 | `LIBTV_DOCK_BASE_SCALE` | **1.4** | 未展开时屏幕 +40% |
+| 展开放大 | `LIBTV_DOCK_EXPAND_FACTOR` | **1.2** | 点击展开在基准上再 +20%（不改 flow 尺寸） |
+| 100% 屏宽 | `LIBTV_DOCK_SCREEN_W_BASE` | **~1512px** | zoom=1 目标屏幕宽 |
+| 屏宽下限 | `LIBTV_DOCK_SCREEN_W_MIN` | **~756px** | = 基准一半 |
+| 屏宽上限 | `LIBTV_DOCK_SCREEN_W_MAX` | = `BASE` | 缩小画布时不再超过 100% 尺寸 |
+| 缩小斜率 | `LIBTV_DOCK_ZOOMOUT_SLOPE` | **5/6** | zoom=0.4 → 屏宽降至一半（下限） |
+
+**线性规则**（`computeLibtvDockScreenWidth(zoom)`）：
+
+- `zoom ≥ 1`（放大画布）：`screenW = BASE / zoom`，收缩到 `MIN` 为止。
+- `zoom < 1`（缩小画布）：`screenW = BASE × (1 − (1 − zoom) × 5/6)`，到 `MIN` 为止 → **zoom=0.4 即降为一半**。
+- 挂载：Dock 在 RF viewport 内，`transform: scale(invScale)`，`invScale = screenW /(flowW × zoom)`（`computeLibtvDockInverseScale`）。
+- 展开仅改 `expand` 乘子（屏宽 ×1.2），缩略图 / 文本 / 模型选择器整体同比放大。
+
 ## 5. 节点顶栏工具条（`Pro2ImageNodeToolbar`）
 
 > **唯一实现**：`components/canvas/pro2/pro2-image-node-toolbar.tsx`  
@@ -100,10 +124,10 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 | 项 | 规范 |
 | --- | --- |
-| 位置 | 卡片**上方**居中；`absolute left-1/2 -translate-x-1/2` · `style={{ top: -PRO2_IMAGE_NODE_TOOLBAR_OFFSET_TOP_PX }}`（默认 **60px**） |
-| 壳层 | `PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS`：`rounded-xl` · `border-white/10` · `bg-[#1c1c1e]/96` · `backdrop-blur-xl` · 阴影 |
-| 文案钮 | `PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS`：`text-[11px]` · icon + label · 可选 `ChevronDown` / `NEW` 角标 |
-| 图标钮 | `PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS`：`size-8` · 仅 icon（下载 / 放大预览等） |
+| 位置 | 卡片**上方**居中；`absolute left-1/2` · `style.transform = translateX(-50%) scale(toolbarScale)`（`transformOrigin: center bottom`）· `style={{ top: -PRO2_IMAGE_NODE_TOOLBAR_OFFSET_TOP_PX }}`（默认 **60px**） |
+| 壳层 | `PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS`：`rounded-full` · `border-white/[0.06]` · **实心 `bg-[#262626]`（无透明 / 无 blur）** · `shadow-[0_4px_20px_rgba(0,0,0,0.42)]` |
+| 文案钮 | `PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS`：`text-[15px]` · icon + label · 可选 `ChevronDown` / `NEW` 角标 |
+| 图标钮 | `PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS`：`size-10` · 仅 icon（下载 / 放大预览等） |
 | 分隔 | `PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS` · 分组之间插入 |
 | 拖动 | **必须** `passNodeDrag`：壳层 `pointer-events-none`，仅 `button` 可点；空白区仍可拖节点 |
 
@@ -114,6 +138,25 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 3. **操作**：智能编辑 · 下载 · 放大预览（`Maximize2`）
 
 其他 LibTV 节点若需顶栏，**复用同一壳层与按钮 class**，只替换业务项；不得改圆角/底色/字号。
+
+### 5.4 顶栏 zoom 缩放（固定规范 · 唯一真源 `lib/canvas/libtv-node-toolbar-scale.ts`）
+
+> 顶栏挂在节点 DOM（随画布 zoom 缩放）；额外施加 `scale = computeLibtvNodeToolbarTransformScale(zoom)` 做 **全量补偿**，使顶栏与字号在 **屏幕上恒定大小**（不随画布放大缩小）。`Pro2ImageNodeToolbar` 与 `Pro2ThinNodeToolbar` 共用。
+
+| 项 | 常量 | 值 |
+| --- | --- | --- |
+| 补偿强度 | `LIBTV_NODE_TOOLBAR_ZOOM_BLEND` | **1**（完全补偿） |
+| 整体尺度 | `LIBTV_NODE_TOOLBAR_SIZE_RATIO` | **1** |
+| scale 上限 | `LIBTV_NODE_TOOLBAR_MAX_SCALE` | **10** |
+| scale 下限 | `LIBTV_NODE_TOOLBAR_MIN_SCALE` | **0.4** |
+
+**规则**：`scale = clamp(1 / zoom, 0.4, 10)`。
+
+- `zoom = 1` → `scale 1`（基准）。
+- 画布缩小：`zoom = 0.1` → `scale 10`（10% 画布下顶栏与 100% 等大）；更小封顶 10。
+- 画布 100% 及以上：on-screen 维持 **1 倍**（`scale = 1/zoom`，到 `MIN` 为止）。
+- **字号固定**：`text-[15px]`；因全量补偿，字号在屏幕上不随画布缩放。
+- **Dock 内字号**（§2.4 联动）：textarea `PRO2_DOCK_TEXTAREA_CLASS` `text-[15px]`、模型选择器 `text-[15px]`、`EnginePicker` 触发 `text-[14px]`；头部风格 / 参考图按钮 `size-12`。
 
 **媒体组顶栏**（Pro2 三视图/分镜图组 · sbv1 参考图组）：须走 `Pro2MediaGroupToolbarPanel`（`edition` pro2/sbv1），壳层与 §5.2 完全一致；`passNodeDrag` 默认开启。
 

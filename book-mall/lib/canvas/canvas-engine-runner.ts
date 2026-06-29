@@ -28,6 +28,7 @@ import {
   getCanvasUserInflightMax,
 } from "./canvas-constants";
 import { CanvasProjectError } from "./canvas-project-service";
+import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
@@ -877,6 +878,17 @@ export async function runStoryLlmEngineNode(
   const imageUrls = (node.imageInputs ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
   );
+  if (imageUrls.length > 0) {
+    try {
+      assertStoryLlmVisionModel(modelKey, "多模态 LLM");
+    } catch (e) {
+      throw new CanvasProjectError(
+        "MODEL_CAPABILITY_MISMATCH",
+        e instanceof Error ? e.message : String(e),
+        400,
+      );
+    }
+  }
   const inputHash = computeInputHash({
     modelKey,
     prompt: userText,

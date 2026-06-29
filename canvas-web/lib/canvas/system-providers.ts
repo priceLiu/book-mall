@@ -12,6 +12,10 @@ import {
   STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
 } from "./types";
+import {
+  isStoryLlmVisionModel,
+  STORY_LLM_VISION_MODEL_KEYS,
+} from "./story-llm-vision-models";
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
@@ -29,6 +33,7 @@ export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 const DEEPSEEK_BASE_URL_MARK = "deepseek.com";
 
 const STORY_LLM_ALLOWED = new Set<string>(STORY_LLM_MODEL_KEYS);
+const STORY_LLM_VISION_ALLOWED = new Set<string>(STORY_LLM_VISION_MODEL_KEYS);
 
 export function isSystemProviderId(id: string): boolean {
   return id.startsWith("system:");
@@ -78,16 +83,46 @@ function findDeepSeekProvider(
 function findLlmOnProvider(
   provider: CanvasProviderDto,
   modelKey: string,
+  allowed: Set<string> = STORY_LLM_ALLOWED,
 ): { providerId: string; modelKey: string } | null {
   const m = provider.models.find(
     (x) =>
       x.role === "LLM" &&
       x.enabled &&
       x.modelKey === modelKey &&
-      STORY_LLM_ALLOWED.has(x.modelKey),
+      allowed.has(x.modelKey),
   );
   if (!m) return null;
   return { providerId: provider.id, modelKey: m.modelKey };
+}
+
+/** 图片/视频反推 · 仅多模态 LLM（Gemini / GPT-5.5） */
+export function pickDefaultStoryVisionLlmEngine(
+  providers: CanvasProviderDto[],
+): { providerId: string; modelKey: string } | null {
+  const active = activeCanvasProviders(providers);
+  const kie = findProviderByKind(providers, "KIE");
+  if (kie) {
+    for (const key of STORY_LLM_VISION_MODEL_KEYS) {
+      if (key === "gpt-5-5") continue;
+      const pick = findLlmOnProvider(kie, key, STORY_LLM_VISION_ALLOWED);
+      if (pick) return pick;
+    }
+    const gpt = findLlmOnProvider(kie, "gpt-5-5", STORY_LLM_VISION_ALLOWED);
+    if (gpt) return gpt;
+  }
+  for (const provider of active) {
+    for (const m of provider.models) {
+      if (
+        m.role === "LLM" &&
+        m.enabled &&
+        isStoryLlmVisionModel(m.modelKey)
+      ) {
+        return { providerId: provider.id, modelKey: m.modelKey };
+      }
+    }
+  }
+  return null;
 }
 
 /** 漫剧 Story LLM 默认：Gateway KIE · gemini-3-flash-preview，其次 Gateway / 用户 DeepSeek。 */

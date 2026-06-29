@@ -84,6 +84,7 @@ export async function runSbv1ImageNode(
   const providerId = String(engine.providerId ?? data.providerId ?? "");
   const modelKey = String(engine.modelKey ?? data.modelKey ?? "");
   const promptRaw = String(data.dockInput ?? "").trim();
+  const upstreamText = (args.node.textInputs ?? []).filter((s) => s && s.trim());
 
   const styleRef = data.dockStyleRef as
     | { prompt?: string; imageUrl?: string; name?: string }
@@ -115,7 +116,7 @@ export async function runSbv1ImageNode(
 
   const hasRefs = imageUrls.length > 0;
   const stylePrompt = styleRef?.prompt?.trim() ?? "";
-  const promptParts = [stylePrompt, promptRaw].filter(Boolean);
+  const promptParts = [stylePrompt, promptRaw, ...upstreamText].filter(Boolean);
   const prompt =
     promptParts.join("\n\n") ||
     (hasRefs ? "根据参考图生成或编辑画面" : "");

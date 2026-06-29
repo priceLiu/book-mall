@@ -25,8 +25,8 @@ import {
   submitDashscopeWan27ImageJobForLog,
   submitDashscopeWanxJobForLog,
   submitHunyuanJobForLog,
-  submitKieJobForLog,
 } from "@/lib/gateway/poll-service";
+import { runGatewayV1KieCreateTask } from "@/lib/gateway/gateway-v1-kie-task-service";
 import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
 import { buildSubmitFailureFinalizePayload } from "@/lib/gateway/gateway-submit-error-policy";
@@ -138,6 +138,37 @@ export async function POST(request: NextRequest) {
       { error: `No ${route.providerKind} credential bound to this API key` },
       { status: 400 },
     );
+  }
+
+  if (route.providerKind === "KIE") {
+    if (!body.input) {
+      return NextResponse.json(
+        { error: "KIE credential and input required for async jobs" },
+        { status: 400 },
+      );
+    }
+    try {
+      const created = await runGatewayV1KieCreateTask({
+        auth,
+        body: {
+          model,
+          input: body.input,
+          callBackUrl: body.callBackUrl ?? null,
+        },
+        logMeta,
+      });
+      return NextResponse.json({
+        code: 200,
+        data: {
+          taskId: created.taskId,
+          logId: created.logId,
+          providerKind: "KIE",
+        },
+      });
+    } catch (e) {
+      const msg = (e as Error).message || "createTask failed";
+      return NextResponse.json({ error: msg }, { status: 502 });
+    }
   }
 
   const clientSource = parseGatewayClientSource(
@@ -347,24 +378,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (route.providerKind !== "KIE" || !body.input) {
-      return NextResponse.json(
-        { error: "KIE credential and input required for async jobs" },
-        { status: 400 },
-      );
-    }
-
-    const taskId = await submitKieJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      input: body.input,
-      callBackUrl: body.callBackUrl ?? null,
-    });
-    return NextResponse.json({
-      code: 200,
-      data: { taskId, logId: log.id, providerKind: "KIE" },
-    });
+    return NextResponse.json(
+      { error: "Unsupported async job provider" },
+      { status: 400 },
+    );
   } catch (e) {
     const msg = (e as Error).message || "createTask failed";
     const row = await prisma.gatewayRequestLog.findUnique({

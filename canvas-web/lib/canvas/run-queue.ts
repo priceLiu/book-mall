@@ -194,7 +194,7 @@ function shouldReleaseStoryRunInflight(
       (node.type === "story-pro2-script-hub" &&
         (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
           true)) &&
-    job.mediaKind === "themeOutline"
+    (job.mediaKind === "themeOutline" || job.mediaKind === "generalText")
   ) {
     const st = (
       node.data as { themeOutlineRuntime?: { status?: string } }
@@ -240,9 +240,14 @@ function resolveImageInputsRaw(
     if (p.type === "image") {
       const d = p.data as unknown as ImageNodeData;
       if (d.ossUrl) out.push(d.ossUrl);
-    } else if (p.type === "sbv1-image") {
+    } else if (
+      p.type === "sbv1-image" ||
+      p.type === "story-pro2-image" ||
+      p.type === "story-pro2-three-view"
+    ) {
       const d = p.data as { ossUrl?: string; blobUrl?: string };
-      if (d.ossUrl) out.push(d.ossUrl);
+      const url = d.ossUrl ?? d.blobUrl;
+      if (url) out.push(url);
     } else if (p.type === "story-pro2-style-asset") {
       const d = p.data as { imageUrl?: string };
       if (d.imageUrl?.trim()) out.push(d.imageUrl.trim());
@@ -325,7 +330,10 @@ function mentionCatalogForNode(
       nodes,
       edges,
     );
-    return pro2DockMentionRefCatalog(links, []);
+    const dockRefImages = (
+      (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
+    ) as StoryRefImage[];
+    return pro2DockMentionRefCatalog(links, dockRefImages);
   }
 
   if (
@@ -385,15 +393,10 @@ function resolveImageInputs(
     opts?.prompt ??
     promptForDockMentionFilter(node, nodes, edges, opts?.rowKey);
   const catalog = mentionCatalogForNode(node, nodes, edges, opts?.rowKey);
-
-  if (prompt.trim() && catalog.length > 0) {
-    const mentioned = parseReferencedIds(prompt);
-    if (mentioned.length > 0) {
-      return dockMentionRefUrlsForPrompt(prompt, catalog);
-    }
-  }
-
-  return resolveImageInputsRaw(nodes, edges, nodeId);
+  const raw = resolveImageInputsRaw(nodes, edges, nodeId);
+  if (!catalog.length) return raw;
+  const fromCatalog = dockMentionRefUrlsForPrompt(prompt, catalog);
+  return Array.from(new Set([...fromCatalog, ...raw]));
 }
 
 function resolveSbv1ImageRunData(
@@ -656,8 +659,12 @@ export function useCanvasRunner(
 
   const releaseInflightKey = useCallback((key: string) => {
     if (!inflightRef.current.delete(key)) return;
-    // 生成中重复点击产生的 deferred 不再自动排队，避免同一节点连跑两轮（重复 Gateway 日志 / 扣费）
+    const deferred = deferredForceFreshRef.current.get(key);
     deferredForceFreshRef.current.delete(key);
+    if (deferred) {
+      queueRef.current.push(deferred);
+      setTimeout(() => drainRef.current(), 0);
+    }
   }, []);
 
   /** 顺序链单步完成：防止 subscribe 与 finally 重复推进 cursor */
@@ -1318,6 +1325,10 @@ export function useCanvasRunner(
           releaseStaleInflightLock(job);
         }
         if (inflightRef.current.has(key)) {
+          if (job.forceFresh) {
+            deferredForceFreshRef.current.set(key, job);
+            return true;
+          }
           return false;
         }
       }

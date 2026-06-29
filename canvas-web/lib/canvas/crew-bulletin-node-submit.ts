@@ -13,7 +13,55 @@ import type {
   CrewBulletinTask,
   CrewTaskForkSubmission,
 } from "./crew-bulletin-types";
-import type { CanvasFlowNode } from "./types";
+import {
+  appendScriptPackageSnapshot,
+  buildScriptPackageSnapshot,
+  persistScriptPackageSnapshotsToAsset,
+  resolveLinkedScriptPackageAssetId,
+} from "./script-package-snapshots";
+import type { CanvasFlowNode, CanvasGraph } from "./types";
+
+export type CrewBulletinSubmitContext = CrewBulletinPatchStore & {
+  nodes: CanvasFlowNode[];
+  graphMeta?: CanvasGraph["meta"] | null;
+  bookMallBase?: string;
+};
+
+function persistSnapshotAfterComplete(
+  anchor: CrewBulletinAnchor,
+  task: CrewBulletinTask,
+  node: CanvasFlowNode | undefined,
+  ctx: CrewBulletinSubmitContext,
+  assignee?: { userId?: string; displayName?: string },
+  completedAt?: string,
+): void {
+  if (task.kind === "script") return;
+  const snapshot = buildScriptPackageSnapshot({
+    task,
+    node,
+    assigneeDisplayName: assignee?.displayName ?? task.assigneeDisplayName,
+    completedAt,
+  });
+  const next = appendScriptPackageSnapshot(
+    anchor,
+    snapshot,
+    ctx,
+    ctx.graphMeta,
+    ctx.nodes,
+  );
+  const assetId = resolveLinkedScriptPackageAssetId(
+    anchor,
+    ctx.graphMeta,
+    ctx.nodes,
+  );
+  if (assetId && ctx.bookMallBase?.trim()) {
+    void persistScriptPackageSnapshotsToAsset(
+      ctx.bookMallBase,
+      assetId,
+      next,
+    );
+  }
+}
 
 /** 节点顶栏「完成制作」是否可用 */
 export function canCompleteCrewTaskFromNode(
@@ -38,7 +86,7 @@ export function submitCrewBulletinTaskFromNode(
   bulletin: CrewBulletinState,
   nodeId: string,
   nodes: CanvasFlowNode[],
-  store: CrewBulletinPatchStore,
+  store: CrewBulletinPatchStore | CrewBulletinSubmitContext,
   assignee?: { userId?: string; displayName?: string },
 ): boolean {
   const node = nodes.find((n) => n.id === nodeId);
@@ -81,6 +129,7 @@ export function submitCrewBulletinTaskFromNode(
       patchGraphMeta: store.patchGraphMeta,
     });
     store.updateNodeData(nodeId, { crewTaskLastSubmittedAt: now });
+    persistSnapshotAfterComplete(anchor, task, node, store as CrewBulletinSubmitContext, assignee, now);
     dispatchCrewBulletinChanged(anchor.nodeId);
     return true;
   }
@@ -104,6 +153,7 @@ export function submitCrewBulletinTaskFromNode(
     patchGraphMeta: store.patchGraphMeta,
   });
   store.updateNodeData(nodeId, { crewTaskLastSubmittedAt: now });
+  persistSnapshotAfterComplete(anchor, task, node, store as CrewBulletinSubmitContext, assignee, now);
   dispatchCrewBulletinChanged(anchor.nodeId);
   return true;
 }

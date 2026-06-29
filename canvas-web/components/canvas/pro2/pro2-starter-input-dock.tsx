@@ -19,6 +19,7 @@ import {
   isPro2StoryOutlineTextNode,
   resolvePro2TextPurpose,
 } from "@/lib/canvas/pro2-text-purpose";
+import { isPro2StarterTextGenerating } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import {
@@ -36,6 +37,13 @@ import {
 import { Pro2DockPasteZone } from "./pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "./pro2-dock-ref-images";
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
+import {
+  pro2StarterCanSendGeneralText,
+} from "@/lib/canvas/pro2-starter-dock-send";
+import {
+  pro2TextNodeLlmNeedsVision,
+} from "@/lib/canvas/pro2-text-node-engine-roles";
+import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
 
 /** 2.0 文本节点 · 底部输入坞 */
 export function Pro2StarterInputDock() {
@@ -77,10 +85,7 @@ export function Pro2StarterInputDock() {
   );
   const isStoryOutlineMode = textPurpose === "story-outline";
   const themeInput = d.themeInput ?? "";
-  const isGenerating =
-    isStoryOutlineMode &&
-    (d.themeOutlineRuntime?.status === "pending" ||
-      d.themeOutlineRuntime?.status === "running");
+  const isGenerating = isPro2StarterTextGenerating(d);
   const outlineErrorMessage =
     isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
@@ -107,15 +112,86 @@ export function Pro2StarterInputDock() {
     },
   });
 
-  const onSaveGeneralText = useCallback(() => {
+  const onSendGeneralText = useCallback(async () => {
     if (!storeNode) return;
     const text = themeInput.trim();
-    if (!text) return;
+    const canSend = pro2StarterCanSendGeneralText({
+      themeInput: text,
+      pro2PresetKind: d.pro2PresetKind,
+      nodeId: storeNode.id,
+      nodes,
+      edges,
+    });
+    if (!canSend) {
+      await alert({
+        title: "请先填写提示词",
+        message:
+          String(d.pro2PresetKind ?? "") === "image-to-prompt"
+            ? "在图片节点上传图片后再生成，或在输入框补充说明。"
+            : "在输入框写下提示词或指令后再生成。",
+        variant: "warning",
+      });
+      return;
+    }
+    const live = useCanvasStore
+      .getState()
+      .nodes.find((n) => n.id === storeNode.id);
+    const liveData = (live?.data ?? {}) as StoryProStarterNodeData;
+    if (!liveData.providerId?.trim() || !liveData.modelKey?.trim()) {
+      await alert({
+        title: "请选择模型",
+        message: "点击左下角模型选择器，选择 Text model 后再生成。",
+        variant: "warning",
+      });
+      return;
+    }
+    const needsVision = pro2TextNodeLlmNeedsVision(liveData, {
+      nodeId: storeNode.id,
+      nodes,
+      edges,
+    });
+    if (needsVision && !isStoryLlmVisionModel(liveData.modelKey)) {
+      await alert({
+        title: "请换用支持图片理解的模型",
+        message:
+          "图片/视频反推提示词须使用 Gemini 3 Flash 或 GPT-5.5 等多模态文本模型；DeepSeek / 通义等纯文本模型无法读取参考图。",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!base) {
+      await alert({
+        title: "画布未就绪",
+        message: "请刷新页面后重试。",
+        variant: "error",
+      });
+      return;
+    }
     updateNodeData(storeNode.id, {
       themeInput: text,
-      generatedOutlineMd: text,
+      generatedOutlineMd: undefined,
+      themeOutlineRuntime: {
+        status: "pending",
+        taskId: undefined,
+        failCode: undefined,
+        failMessage: undefined,
+      },
     });
-  }, [storeNode, themeInput, updateNodeData]);
+    const queued = busEnqueueStoryRun({
+      nodeId: storeNode.id,
+      mediaKind: "generalText",
+      forceFresh: true,
+    });
+    if (!queued) {
+      updateNodeData(storeNode.id, {
+        themeOutlineRuntime: {
+          status: "error",
+          failCode: "RUN_QUEUE_BUSY",
+          failMessage: "生成任务未能入队，请稍候再试。",
+        },
+      });
+    }
+  }, [storeNode, themeInput, d.pro2PresetKind, nodes, edges, base, alert, updateNodeData]);
 
   const onSendOutline = useCallback(async () => {
     if (!storeNode) return;
@@ -159,6 +235,7 @@ export function Pro2StarterInputDock() {
     }
     updateNodeData(storeNode.id, {
       themeInput: theme,
+      generatedOutlineMd: undefined,
       starterMode: "generate",
       themeOutlineSystemPrompt: STORY_PRO2_THEME_OUTLINE_SYSTEM,
       themeOutlineRuntime: {
@@ -168,15 +245,59 @@ export function Pro2StarterInputDock() {
         failMessage: undefined,
       },
     });
-    busEnqueueStoryRun({
+    const queued = busEnqueueStoryRun({
       nodeId: storeNode.id,
       mediaKind: "themeOutline",
       forceFresh: true,
     });
+    if (!queued) {
+      updateNodeData(storeNode.id, {
+        themeOutlineRuntime: {
+          status: "error",
+          failCode: "RUN_QUEUE_BUSY",
+          failMessage: "生成任务未能入队，请稍候再试。",
+        },
+      });
+    }
   }, [storeNode, themeInput, base, alert, updateNodeData, nodes, edges]);
 
-  const onSend = isStoryOutlineMode ? onSendOutline : onSaveGeneralText;
-  const sendTitle = isStoryOutlineMode ? "生成故事大纲" : "写入节点";
+  const onSend = isStoryOutlineMode ? onSendOutline : onSendGeneralText;
+  const sendTitle = isStoryOutlineMode ? "生成故事大纲" : "生成";
+  const canSendGeneral = pro2StarterCanSendGeneralText({
+    themeInput,
+    pro2PresetKind: d.pro2PresetKind,
+    nodeId: storeNode?.id ?? "",
+    nodes,
+    edges,
+  });
+  const generalErrorMessage =
+    !isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
+      ? formatCanvasTaskError(
+          d.themeOutlineRuntime.failCode,
+          d.themeOutlineRuntime.failMessage,
+          d.modelKey,
+        )
+      : null;
+
+  useLibtvRuntimeErrorAlert({
+    enabled:
+      !isStoryOutlineMode &&
+      Boolean(generalErrorMessage) &&
+      Boolean(storeNode),
+    nodeId: storeNode?.id ?? "",
+    status: d.themeOutlineRuntime?.status,
+    taskId: d.themeOutlineRuntime?.taskId,
+    failCode: d.themeOutlineRuntime?.failCode,
+    failMessage: generalErrorMessage ?? undefined,
+    dismissedFailTaskId: d.themeOutlineRuntime?.dismissedFailTaskId,
+    onAlert: ({ message }) => {
+      void alert({
+        title: "生成失败",
+        message,
+        variant: "error",
+      });
+    },
+  });
   const placeholder = isStoryOutlineMode
     ? "写下你想讲的故事、场景或角色设定。输入 @ 可引用已链接的图片。"
     : "输入提示词，供下游生图/生视频使用；输入 @ 可引用已链接的图片。";
@@ -277,7 +398,10 @@ export function Pro2StarterInputDock() {
               ) : null}
               <button
                 type="button"
-                disabled={isGenerating || !themeInput.trim()}
+                disabled={
+                  isGenerating ||
+                  (isStoryOutlineMode ? !themeInput.trim() : !canSendGeneral)
+                }
                 className="nodrag flex size-9 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
                 title={sendTitle}
                 onClick={() => void onSend()}

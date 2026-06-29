@@ -79,6 +79,25 @@ export function storyRunPendingPatch(
 ): Record<string, unknown> | null {
   if (
     (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    ctx?.mediaKind === "generalText"
+  ) {
+    if (
+      node.type === "story-pro2-starter" &&
+      isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
+    ) {
+      return null;
+    }
+    return {
+      themeOutlineRuntime: {
+        status: "pending",
+        taskId: undefined,
+        failCode: undefined,
+        failMessage: undefined,
+      } satisfies CanvasNodeRuntime,
+    };
+  }
+  if (
+    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
     ctx?.mediaKind === "themeOutline"
   ) {
     if (
@@ -291,6 +310,28 @@ export function storyApplyTaskResult(
         updateNodeData,
       );
     }
+    return;
+  }
+
+  if (
+    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    ctx?.mediaKind === "generalText"
+  ) {
+    if (
+      node.type === "story-pro2-starter" &&
+      isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
+    ) {
+      return;
+    }
+    const prevRt = (
+      node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
+    ).themeOutlineRuntime;
+    if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
+    const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
+    if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
+      patch.generatedOutlineMd = task.textOutput.trim();
+    }
+    updateNodeData(node.id, patch);
     return;
   }
 

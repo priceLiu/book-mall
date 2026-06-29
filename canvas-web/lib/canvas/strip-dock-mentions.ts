@@ -1,4 +1,4 @@
-import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
+import { parseReferencedIds } from "@/lib/canvas/dock-mention-parse";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -1,4 +1,8 @@
 import type { CrewBulletinState, CrewBulletinTask, CrewTaskKind } from "./crew-bulletin-types";
+import {
+  countScriptPackageSnapshots,
+  type ScriptPackageSnapshotsByKind,
+} from "./script-package-snapshots";
 
 /** 制作环节 · 公告条横向步骤（剧本发布后） */
 export type CrewProductionPhaseId =
@@ -11,7 +15,8 @@ export type CrewProductionPhaseId =
   | "frameVideo"
   | "audio"
   | "dialogue"
-  | "composite";
+  | "composite"
+  | "scriptPackage";
 
 export type CrewProductionPhaseStatus = "not_started" | "in_progress" | "done";
 
@@ -43,6 +48,7 @@ const PHASE_KINDS: Record<CrewProductionPhaseId, CrewTaskKind[]> = {
   audio: ["audio"],
   dialogue: ["dialogue"],
   composite: ["composite"],
+  scriptPackage: [],
 };
 
 export const CREW_PRODUCTION_PHASE_ORDER: CrewProductionPhaseId[] = [
@@ -56,6 +62,7 @@ export const CREW_PRODUCTION_PHASE_ORDER: CrewProductionPhaseId[] = [
   "audio",
   "dialogue",
   "composite",
+  "scriptPackage",
 ];
 
 export const CREW_PRODUCTION_PHASE_LABELS: Record<CrewProductionPhaseId, string> = {
@@ -69,6 +76,7 @@ export const CREW_PRODUCTION_PHASE_LABELS: Record<CrewProductionPhaseId, string>
   audio: "后期(音效)",
   dialogue: "后期(对白)",
   composite: "后期(合成)",
+  scriptPackage: "剧本包",
 };
 
 function isActiveTaskStatus(status: CrewBulletinTask["status"]): boolean {
@@ -164,6 +172,7 @@ function phaseSubtitle(
 /** 从公告条任务聚合制作环节状态（全员只读） */
 export function computeCrewProductionPhases(
   bulletin: CrewBulletinState | undefined,
+  scriptPackageSnapshots?: ScriptPackageSnapshotsByKind,
 ): CrewProductionPhase[] {
   const tasks = bulletin?.tasks ?? [];
   const byKind = new Map<CrewTaskKind, CrewBulletinTask[]>();
@@ -174,6 +183,23 @@ export function computeCrewProductionPhases(
   }
 
   return CREW_PRODUCTION_PHASE_ORDER.map((id) => {
+    if (id === "scriptPackage") {
+      const snapCount = countScriptPackageSnapshots(scriptPackageSnapshots);
+      return {
+        id,
+        label: CREW_PRODUCTION_PHASE_LABELS.scriptPackage,
+        status: snapCount > 0 ? ("in_progress" as const) : ("not_started" as const),
+        doneCount: snapCount,
+        totalCount: snapCount,
+        subtitle:
+          snapCount > 0 ? `${snapCount} 项完成快照` : "完成制作后自动归档",
+        phaseTasks: [],
+        pendingTasks: [],
+        activeTasks: [],
+        completedTasks: [],
+      };
+    }
+
     const kinds = PHASE_KINDS[id];
     const phaseTasks = kinds.flatMap((k) => byKind.get(k) ?? []);
     const forceDone = id === "script" && phaseTasks.length > 0;

@@ -243,6 +243,7 @@ export const STORY_VIDEO_ENGINE_PROMPT_DEFAULT =
 export const STORY_LLM_MODEL_KEYS = [
   "google/gemini-3-flash-preview",
   "gemini-3-flash",
+  "gpt-5-5",
   "deepseek-v4-flash",
   "deepseek-v4-pro",
   "deepseek-chat",

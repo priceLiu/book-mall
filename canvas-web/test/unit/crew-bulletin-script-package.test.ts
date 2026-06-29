@@ -5,6 +5,7 @@ import {
   patchStarterFromScriptPackage,
 } from "@/lib/canvas/crew-bulletin-script-package";
 import type { CrewBulletinState } from "@/lib/canvas/crew-bulletin-types";
+import { parseScriptPackageSnapshotsFromPayload } from "@/lib/canvas/script-package-snapshots";
 
 describe("freshLocalCrewBulletin", () => {
   it("resets claim state but keeps script task done", () => {
@@ -145,5 +146,22 @@ describe("crewBulletinFromScriptPackagePayload rebuild", () => {
     expect(bulletin.scriptTitle).toBe("小胖子吃西瓜");
     expect(bulletin.tasks.some((t) => t.kind === "character")).toBe(true);
     expect(bulletin.tasks.some((t) => t.kind === "scene")).toBe(true);
+  });
+
+  it("loads script package snapshots from payload", () => {
+    const snapshots = parseScriptPackageSnapshotsFromPayload({
+      scriptPackageSnapshots: {
+        character: [
+          {
+            id: "snap-1",
+            taskId: "character:a",
+            kind: "character",
+            label: "小明",
+            completedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    expect(snapshots.character?.length).toBe(1);
   });
 });

@@ -10,8 +10,15 @@ import type {
   CrewTaskStatus,
 } from "./crew-bulletin-types";
 import { CREW_TASK_STATUS_LABELS } from "./crew-bulletin-types";
+import {
+  appendScriptPackageSnapshot,
+  buildScriptPackageSnapshot,
+  persistScriptPackageSnapshotsToAsset,
+  removeScriptPackageSnapshotForTask,
+  resolveLinkedScriptPackageAssetId,
+} from "./script-package-snapshots";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasGraph } from "./types";
 
 export type { CrewBulletinPatchStore } from "./crew-bulletin-patch";
 export { patchCrewBulletinOnAnchor } from "./crew-bulletin-patch";
@@ -28,6 +35,8 @@ export type CrewBulletinClaimStore = CrewBulletinPatchStore & {
   setEdges: (
     fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[],
   ) => void;
+  graphMeta?: CanvasGraph["meta"] | null;
+  bookMallBase?: string;
 };
 
 export function crewTaskStatusLine(task: CrewBulletinTask): string {
@@ -181,21 +190,54 @@ export function submitCrewBulletinTaskDone(
 ): boolean {
   const now = new Date().toISOString();
   let hit = false;
+  let completedTask: CrewBulletinTask | undefined;
   const tasks = bulletin.tasks.map((task) => {
     if (task.id !== taskId) return task;
     if (!isCrewTaskSubmittable(task)) return task;
     hit = true;
-    return {
+    completedTask = {
       ...task,
       status: "done" as const,
       completedAt: now,
     };
+    return completedTask;
   });
-  if (!hit) return false;
+  if (!hit || !completedTask) return false;
   patchCrewBulletinOnAnchor(anchor, { ...bulletin, tasks }, {
     updateNodeData: store.updateNodeData,
     patchGraphMeta: store.patchGraphMeta,
   });
+
+  if (completedTask.kind !== "script") {
+    const workNode = completedTask.canvasNodeId
+      ? store.nodes.find((n) => n.id === completedTask!.canvasNodeId)
+      : undefined;
+    const snapshot = buildScriptPackageSnapshot({
+      task: completedTask,
+      node: workNode,
+      completedAt: now,
+    });
+    const next = appendScriptPackageSnapshot(
+      anchor,
+      snapshot,
+      store,
+      store.graphMeta,
+      store.nodes,
+    );
+    const assetId = resolveLinkedScriptPackageAssetId(
+      anchor,
+      store.graphMeta,
+      store.nodes,
+    );
+    if (assetId && store.bookMallBase?.trim()) {
+      void persistScriptPackageSnapshotsToAsset(
+        store.bookMallBase,
+        assetId,
+        next,
+      );
+    }
+  }
+
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
     window.dispatchEvent(
@@ -230,6 +272,27 @@ export function revertCrewBulletinTaskDone(
     updateNodeData: store.updateNodeData,
     patchGraphMeta: store.patchGraphMeta,
   });
+
+  const next = removeScriptPackageSnapshotForTask(
+    anchor,
+    taskId,
+    store,
+    store.graphMeta,
+    store.nodes,
+  );
+  const assetId = resolveLinkedScriptPackageAssetId(
+    anchor,
+    store.graphMeta,
+    store.nodes,
+  );
+  if (assetId && store.bookMallBase?.trim()) {
+    void persistScriptPackageSnapshotsToAsset(
+      store.bookMallBase,
+      assetId,
+      next,
+    );
+  }
+
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
     window.dispatchEvent(

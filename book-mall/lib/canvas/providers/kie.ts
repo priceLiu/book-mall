@@ -14,7 +14,13 @@ import {
   type KieImageInput,
 } from "@/lib/story/kie-client";
 
-import { resolveKieGeminiChatPath } from "@/lib/gateway/model-router";
+import { resolveKieApiRoot, resolveKieGeminiChatPath } from "@/lib/gateway/model-router";
+import { gatewayFetch } from "@/lib/gateway/format-fetch-error";
+import {
+  buildKieCodexResponsesBody,
+  isKieCodexChatModel,
+  kieCodexResponseToChatCompletions,
+} from "@/lib/gateway/kie-codex-chat";
 import { buildKieGrokTextToImageCreateArgs } from "@/lib/canvas/kie-grok-builders";
 
 import {
@@ -229,6 +235,35 @@ const GEMINI_3_FLASH_LLM_DEFAULTS = {
   temperature: 0.7,
 };
 
+const GPT_55_LLM_PARAMS = [
+  {
+    key: "reasoning_effort",
+    label: "推理深度",
+    type: "select",
+    options: [
+      { value: "low", label: "low（快）" },
+      { value: "medium", label: "medium" },
+      { value: "high", label: "high（深）" },
+      { value: "xhigh", label: "xhigh（最深）" },
+    ],
+    defaultValue: "low",
+  },
+  {
+    key: "temperature",
+    label: "temperature",
+    type: "number",
+    min: 0,
+    max: 2,
+    step: 0.1,
+    defaultValue: 0.7,
+  },
+] satisfies CanvasParamSchema;
+
+const GPT_55_LLM_DEFAULTS = {
+  reasoning_effort: "low",
+  temperature: 0.7,
+};
+
 export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   {
     modelKey: "google/gemini-3-flash-preview",
@@ -256,6 +291,15 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
       "Google Gemini 2.5 Flash · 快速多模态 · 提示词优化 / Story 文案推荐。",
     paramsSchema: GEMINI_3_FLASH_LLM_PARAMS,
     defaultParams: GEMINI_3_FLASH_LLM_DEFAULTS,
+  },
+  {
+    modelKey: "gpt-5-5",
+    displayName: "GPT-5.5 Chat (KIE)",
+    role: "LLM",
+    description:
+      "OpenAI GPT-5.5 · 复杂推理 / 工业化剧本与分镜脚本；经 KIE codex responses 端点。",
+    paramsSchema: GPT_55_LLM_PARAMS,
+    defaultParams: GPT_55_LLM_DEFAULTS,
   },
   {
     modelKey: "nano-banana-pro",
@@ -902,9 +946,9 @@ export class KieGateway implements CanvasProviderGateway {
       );
     }
     this.apiKey = config.apiKey;
-    this.baseUrl = (
-      config.baseUrl?.trim() || getDefaultProviderBaseUrl("KIE") || "https://api.kie.ai"
-    ).replace(/\/$/, "");
+    this.baseUrl = resolveKieApiRoot(
+      config.baseUrl?.trim() || getDefaultProviderBaseUrl("KIE") || null,
+    );
   }
 
   async testConnection(): Promise<{ ok: boolean; message?: string }> {
@@ -916,7 +960,7 @@ export class KieGateway implements CanvasProviderGateway {
         include_thoughts: false,
         max_tokens: 16,
       };
-      const r = await fetch(
+      const r = await gatewayFetch(
         `${this.baseUrl}/gemini-3-flash/v1/chat/completions`,
         {
           method: "POST",
@@ -926,6 +970,7 @@ export class KieGateway implements CanvasProviderGateway {
           },
           body: JSON.stringify(body),
         },
+        { hop: "upstream", providerKind: "KIE" },
       );
       if (r.status === 401 || r.status === 403) {
         return { ok: false, message: `auth failed (HTTP ${r.status})` };
@@ -945,6 +990,62 @@ export class KieGateway implements CanvasProviderGateway {
   }
 
   async chat(req: CanvasGatewayChatRequest): Promise<CanvasGatewayChatResponse> {
+    if (isKieCodexChatModel(req.modelKey)) {
+      const url = `${this.baseUrl}/codex/v1/responses`;
+      const body = buildKieCodexResponsesBody({
+        model: req.modelKey,
+        messages: req.messages,
+        reasoning_effort: req.params?.reasoning_effort,
+        temperature: req.params?.temperature,
+      });
+      const r = await gatewayFetch(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify(body),
+        },
+        { hop: "upstream", providerKind: "KIE" },
+      );
+      const text = await r.text();
+      if (!r.ok) {
+        throw new CanvasGatewayError(
+          "PROVIDER_HTTP_ERROR",
+          `KIE GPT-5.5 HTTP ${r.status}: ${text.slice(0, 400)}`,
+        );
+      }
+      let parsed: unknown = null;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        throw new CanvasGatewayError(
+          "PROVIDER_INVALID_RESPONSE",
+          `non-JSON KIE GPT-5.5 body: ${text.slice(0, 200)}`,
+        );
+      }
+      throwIfKieEnvelopeError(parsed);
+      const chatJson = kieCodexResponseToChatCompletions(parsed, req.modelKey);
+      const choice = (chatJson.choices as KieChatChoice[] | undefined)?.[0];
+      const out = extractKieChatText(choice?.message);
+      if (!out) kieChatEmptyError(choice, text);
+      const usage = chatJson.usage as {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      };
+      return {
+        text: out,
+        usage: {
+          promptTokens: usage.prompt_tokens,
+          completionTokens: usage.completion_tokens,
+          totalTokens: usage.total_tokens,
+        },
+      };
+    }
+
     const geminiPath = resolveKieGeminiChatPath(req.modelKey);
     const url = `${this.baseUrl}/${geminiPath}/v1/chat/completions`;
 
@@ -969,14 +1070,18 @@ export class KieGateway implements CanvasProviderGateway {
         if (max_tokens) body.max_tokens = max_tokens;
         if (temperature !== undefined) body.temperature = temperature;
       }
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
+      const r = await gatewayFetch(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        { hop: "upstream", providerKind: "KIE" },
+      );
       const text = await r.text();
       if (!r.ok) {
         if (r.status === 401 || r.status === 403) {

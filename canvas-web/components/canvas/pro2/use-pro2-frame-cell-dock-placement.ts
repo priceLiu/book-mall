@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
+import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import {
-  LIBTV_DOCK_HEIGHT_RATIO,
-  LIBTV_DOCK_WIDTH_RATIO,
-  type LibtvDockFlowPlacement,
-} from "@/lib/canvas/libtv-dock-flow-placement";
+  LIBTV_DOCK_FLOW_HEIGHT,
+  LIBTV_DOCK_FLOW_WIDTH,
+} from "@/lib/canvas/libtv-dock-scale";
 
 const GAP = 12;
 
@@ -57,14 +57,11 @@ export function usePro2FrameCellDockPlacement(
       y: rect.bottom + GAP,
     });
 
-    const flowCellW = rect.width / Math.max(viewport.zoom, 0.01);
-    const flowCellH = rect.height / Math.max(viewport.zoom, 0.01);
-
     return {
       flowX: anchor.x,
       flowY: anchor.y,
-      flowW: flowCellW * LIBTV_DOCK_WIDTH_RATIO,
-      flowH: flowCellH * LIBTV_DOCK_HEIGHT_RATIO,
+      flowW: LIBTV_DOCK_FLOW_WIDTH,
+      flowH: LIBTV_DOCK_FLOW_HEIGHT,
     };
   }, [
     nodeId,

@@ -20,6 +20,8 @@ import {
 } from "./batch-run-nodes";
 import { pickDefaultStoryImageEngine } from "./system-providers";
 import type { StoryRefImage } from "./story-ref-image";
+import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
+import { resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection } from "./story-workspace-types";
@@ -246,6 +248,20 @@ export function enqueuePro2ScriptGeneration(
   const nodes = options?.nodes ?? [];
   const edges = options?.edges ?? [];
   const hubData = options?.hubData;
+  const upstreamLinks =
+    nodes.length > 0
+      ? resolvePro2DockUpstreamLinks(
+          hubId,
+          "story-pro2-script-hub",
+          nodes,
+          edges,
+        )
+      : [];
+  const resolvedDockRefs = resolveDockRefsForRun(
+    dockInput,
+    upstreamLinks,
+    dockRefImages,
+  );
   const effectiveOutline =
     hubData && nodes.length
       ? resolvePro2HubEffectiveOutline(nodes, edges, hubId, hubData)
@@ -254,22 +270,22 @@ export function enqueuePro2ScriptGeneration(
   const dockMergedOutline = mergePro2DockIntoPrompt(
     STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
     dockInput,
-    dockRefImages,
+    resolvedDockRefs,
   );
   const dockMergedCharacter = mergePro2DockIntoPrompt(
     STORY_PRO2_CHARACTER_PROMPT,
     dockInput,
-    dockRefImages,
+    resolvedDockRefs,
   );
   const dockMergedScene = mergePro2DockIntoPrompt(
     STORY_PRO2_SCENE_PROMPT,
     dockInput,
-    dockRefImages,
+    resolvedDockRefs,
   );
   const dockMergedStoryboard = mergePro2DockIntoPrompt(
     STORY_PRO2_STORYBOARD_PROMPT,
     dockInput,
-    dockRefImages,
+    resolvedDockRefs,
   );
 
   const sections: StoryLlmSection[] =
@@ -471,6 +487,18 @@ export function kickoffPro2FrameBoardFromHub(
   store.updateNodeData(hubId, { dockInput, dockRefImages });
   store = getStore();
 
+  const upstreamLinks = resolvePro2DockUpstreamLinks(
+    hubId,
+    "story-pro2-script-hub",
+    store.nodes,
+    store.edges,
+  );
+  const resolvedDockRefs = resolveDockRefsForRun(
+    dockInput,
+    upstreamLinks,
+    dockRefImages,
+  );
+
   const ws =
     findStoryPro2WorkspaceForStarter(
       store.nodes,
@@ -512,9 +540,9 @@ export function kickoffPro2FrameBoardFromHub(
   store = getStore();
 
   const dockNote = dockInput.trim();
-  const refUrls = dockRefImages
-    .filter((r) => r.url && /^https?:\/\//.test(r.url))
-    .map((r) => ({ ...r }));
+  const refUrls = resolvedDockRefs.filter(
+    (r) => r.url && /^https?:\/\//.test(r.url),
+  );
 
   const frameRowsBase = synced.frameRows.map((row) => {
     const promptBase = row.prompt?.trim() || "";

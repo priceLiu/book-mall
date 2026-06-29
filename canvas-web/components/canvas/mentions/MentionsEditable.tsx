@@ -29,7 +29,10 @@ import {
   scanMentionTriggerBeforeCursor,
 } from "@/lib/canvas/mention-editable-trigger";
 import { getMentionDragId, hasMentionDrag } from "@/lib/canvas/mention-drag";
-import { PRO2_DOCK_TEXTAREA_SCROLL_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import {
+  PRO2_DOCK_TEXTAREA_INSET_CLASS,
+  PRO2_DOCK_TEXTAREA_SCROLL_CLASS,
+} from "@/lib/canvas/story-pro2-node-chrome";
 import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
 import { cn } from "@/lib/utils";
 import {
@@ -104,6 +107,15 @@ function caretRangeFromPoint(x: number, y: number): Range | null {
     }
   }
   return null;
+}
+
+function placeCaretAtStart(root: HTMLElement) {
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
 }
 
 export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps>(
@@ -585,7 +597,21 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
     const handleFocus = useCallback(() => {
       focusedRef.current = true;
       onFocus();
-    }, [onFocus]);
+      const root = editorRef.current;
+      if (root && libtvDock && !serializeEditable(root).length) {
+        requestAnimationFrame(() => {
+          const el = editorRef.current;
+          if (!el || serializeEditable(el).length) return;
+          placeCaretAtStart(el);
+        });
+      }
+    }, [onFocus, libtvDock]);
+
+    const handleClick = useCallback(() => {
+      const root = editorRef.current;
+      if (!root || !libtvDock || serializeEditable(root).length) return;
+      requestAnimationFrame(() => placeCaretAtStart(root));
+    }, [libtvDock]);
 
     const handleBlur = useCallback(() => {
       focusedRef.current = false;
@@ -675,6 +701,7 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
           onKeyDownCapture={onKeyDownCapture}
           onPaste={onPasteInternal}
           onFocus={handleFocus}
+          onClick={handleClick}
           onBlur={handleBlur}
           onMouseMove={onMouseMove}
           onMouseLeave={onMouseLeave}
@@ -694,7 +721,12 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
           />
         ) : null}
         {isEmpty && placeholder ? (
-          <div className="pointer-events-none absolute left-0 top-0 select-none p-2 text-[13px] leading-relaxed text-white/30">
+          <div
+            className={cn(
+              "pointer-events-none absolute left-0 top-0 right-0 select-none text-[13px] leading-relaxed text-white/30",
+              libtvDock ? PRO2_DOCK_TEXTAREA_INSET_CLASS : "p-2",
+            )}
+          >
             {placeholder}
           </div>
         ) : null}

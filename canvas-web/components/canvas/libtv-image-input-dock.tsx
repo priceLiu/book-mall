@@ -458,20 +458,20 @@ export function LibtvImageInputDock() {
                     type="button"
                     title="图片生成设置"
                     disabled={isRunning}
-                    className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="nodrag rounded-md p-2 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
                     onClick={() => setSettingsOpen(true)}
                   >
-                    <SlidersHorizontal className="size-4" />
+                    <SlidersHorizontal className="size-5" />
                   </button>
                 </div>
                 <button
                   type="button"
                   disabled={isRunning}
-                  className="nodrag flex h-8 min-w-0 flex-1 items-center gap-1 rounded-md px-2 text-left text-[13px] text-white/65 hover:bg-white/[0.06] hover:text-white/90"
+                  className="nodrag flex h-9 min-w-0 flex-1 items-center gap-1 rounded-md px-2 text-left text-[15px] text-white/65 hover:bg-white/[0.06] hover:text-white/90"
                   onClick={() => setSettingsOpen(true)}
                 >
                   <span className="truncate">{settingsLabel}</span>
-                  <ChevronDown className="size-3.5 shrink-0 opacity-45" />
+                  <ChevronDown className="size-4 shrink-0 opacity-45" />
                 </button>
               </>
             ) : (
@@ -480,10 +480,10 @@ export function LibtvImageInputDock() {
             <div className="flex shrink-0 items-center gap-1.5">
               {!isPipelineCell && estCredits?.credits != null ? (
                 <span
-                  className="flex shrink-0 items-center gap-1 text-[13px] tabular-nums text-amber-200/90"
+                  className="flex shrink-0 items-center gap-1 text-[15px] tabular-nums text-amber-200/90"
                   title={`${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`}
                 >
-                  <Zap className="size-3.5 fill-amber-300/90 text-amber-300/90" />
+                  <Zap className="size-4 fill-amber-300/90 text-amber-300/90" />
                   {estCredits.credits}
                 </span>
               ) : null}

@@ -33,12 +33,13 @@ export const PRO2_DOCK_DIVIDER = LIBTV_INPUT_DOCK_DIVIDER;
 export const PRO2_CONTROL_CARD_WIDTH = 360;
 export const PRO2_CONTROL_CARD_HEIGHT = 140;
 
-/** 2.0 文本节点（LibTV 卡片 · 默认尺寸，可拉伸） */
-export const PRO2_TEXT_NODE_WIDTH = 280;
-export const PRO2_TEXT_NODE_MIN_WIDTH = 240;
-export const PRO2_TEXT_NODE_MIN_HEIGHT = 220;
-/** 卡片主体默认高度（不含上方「文本节点 N」标签行） */
-export const PRO2_TEXT_NODE_CARD_HEIGHT = 260;
+/** 2.0 文本节点（LibTV 卡片 · 默认 4:3 · 可拉伸） */
+export const PRO2_TEXT_NODE_WIDTH = 440;
+export const PRO2_TEXT_NODE_MIN_WIDTH = 320;
+/** 卡片主体默认高度（宽:高 = 4:3，不含上方「文本节点 N」标签行） */
+export const PRO2_TEXT_NODE_CARD_HEIGHT = Math.round((PRO2_TEXT_NODE_WIDTH * 3) / 4);
+export const PRO2_TEXT_NODE_MIN_HEIGHT =
+  Math.round((PRO2_TEXT_NODE_MIN_WIDTH * 3) / 4) + 28;
 /** React Flow 节点登记默认高度 ≈ 标签行 + 卡片 */
 export const PRO2_TEXT_NODE_HEIGHT = PRO2_TEXT_NODE_CARD_HEIGHT + 28;
 
@@ -65,13 +66,27 @@ export const PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH = 320;
 export const PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT = 160;
 export const PRO2_CHARACTER_THREE_VIEW_CARD_HEIGHT = 252;
 
-/** 2.0 统一输入坞（固定横向长方形 · 内容区可滚动） */
-export const PRO2_DOCK_WIDTH = 560;
-export const PRO2_DOCK_HEIGHT = 288;
-/** 输入坞放大态宽度（点击放大时长边同时展开，且更明显） */
-export const PRO2_DOCK_WIDTH_EXPANDED = 820;
-/** 输入坞放大态高度 */
-export const PRO2_DOCK_HEIGHT_EXPANDED = 456;
+/** 2.0 统一输入坞（16:6 · flow 基准尺寸 · 屏幕缩放见 libtv-dock-scale.ts） */
+import {
+  LIBTV_DOCK_EXPAND_FACTOR,
+  libtvDockFlowSize,
+} from "@/lib/canvas/libtv-dock-scale";
+
+export {
+  LIBTV_DOCK_EXPAND_FACTOR as PRO2_DOCK_EXPAND_FACTOR,
+  LIBTV_DOCK_FLOW_HEIGHT as PRO2_DOCK_HEIGHT,
+  LIBTV_DOCK_FLOW_WIDTH as PRO2_DOCK_WIDTH,
+  libtvDockFlowSize,
+} from "@/lib/canvas/libtv-dock-scale";
+
+const _baseDock = libtvDockFlowSize();
+/** 输入坞放大态（屏幕同比 · 见 LIBTV_DOCK_EXPAND_FACTOR） */
+export const PRO2_DOCK_WIDTH_EXPANDED = Math.round(
+  _baseDock.w * LIBTV_DOCK_EXPAND_FACTOR,
+);
+export const PRO2_DOCK_HEIGHT_EXPANDED = Math.round(
+  _baseDock.h * LIBTV_DOCK_EXPAND_FACTOR,
+);
 
 /** 2.0 分镜图板节点（图 4 · 双列瀑布流） */
 export const PRO2_FRAME_BOARD_WIDTH = 520;
@@ -175,9 +190,9 @@ export const PRO2_DOCK_TEXTAREA_INSET_CLASS =
 export const PRO2_DOCK_TEXTAREA_SCROLL_CLASS =
   "min-h-0 h-full flex-1 overflow-y-auto overscroll-contain";
 
-/** 输入坞内 textarea · 无边框 */
+/** 输入坞内 textarea · 无边框（字号 +2 · 见 libtv-node-interaction-spec §2.4） */
 export const PRO2_DOCK_TEXTAREA_CLASS =
-  "nodrag w-full resize-none border-0 bg-transparent text-[13px] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";
+  "nodrag w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";
 
 export const PRO2_SAVE_TO_ASSETS_BTN_CLASS =
   "nodrag w-full rounded border border-violet-400/25 bg-violet-500/8 px-2 py-1.5 text-[11px] text-violet-100 hover:bg-violet-500/15 disabled:opacity-40";

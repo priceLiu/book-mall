@@ -5,19 +5,17 @@ import { createPortal } from "react-dom";
 import { useStore } from "@xyflow/react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { LibtvInputDockUiContext } from "@/lib/canvas/libtv-input-dock-ui-context";
+import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
+import {
+  computeLibtvDockInverseScale,
+  libtvDockFlowSize,
+} from "@/lib/canvas/libtv-dock-scale";
 import {
   LIBTV_INPUT_DOCK_BG,
   LIBTV_INPUT_DOCK_BORDER,
   LIBTV_INPUT_DOCK_DIVIDER,
   LIBTV_INPUT_DOCK_SHELL_CLASS,
 } from "@/lib/canvas/libtv-node-chrome";
-import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
-import {
-  PRO2_DOCK_HEIGHT,
-  PRO2_DOCK_HEIGHT_EXPANDED,
-  PRO2_DOCK_WIDTH,
-  PRO2_DOCK_WIDTH_EXPANDED,
-} from "@/lib/canvas/story-pro2-node-chrome";
 import { useLibtvDockWheelScroll } from "@/lib/canvas/use-libtv-dock-wheel-scroll";
 import { RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
@@ -32,22 +30,11 @@ export type Pro2InputDockShellProps = {
   className?: string;
   flowAnchor: LibtvDockFlowPlacement;
   dockClassName?: string;
-  /** 默认 flowAnchor.flowW */
+  /** @deprecated 坞宽统一 16:6 固定 flow 尺寸，忽略 */
   width?: number;
   /** 拖动所属节点时隐藏（仍挂载 · 保持锚点与输入状态） */
   hidden?: boolean;
 };
-
-/**
- * 反向缩放钳制：在常用缩放区间内坞保持恒定屏幕尺寸；超出区间（极端放大/缩小）
- * 时不再完全补偿，避免坞缩成过小或撑成铺满屏幕。
- */
-const DOCK_INVERSE_SCALE_MIN = 0.45;
-const DOCK_INVERSE_SCALE_MAX = 2.2;
-/** 画布缩小（zoom<1）时坞在恒定尺寸基础上最多额外放大 30% */
-const DOCK_ZOOM_OUT_MAX_BOOST = 1.3;
-/** 缩放到该值时达到满额 +30%（区间内线性渐入） */
-const DOCK_ZOOM_OUT_BOOST_FULL = 0.5;
 
 function useReactFlowViewportEl(): HTMLElement | null {
   const [el, setEl] = useState<HTMLElement | null>(null);
@@ -69,37 +56,15 @@ export function Pro2InputDockShell({
   className,
   flowAnchor,
   dockClassName,
-  width,
   hidden = false,
 }: Pro2InputDockShellProps) {
   const viewportEl = useReactFlowViewportEl();
   const [expanded, setExpanded] = useState(false);
   const [dockScrollEl, setDockScrollEl] = useState<HTMLElement | null>(null);
   useLibtvDockWheelScroll(dockScrollEl);
-  // 画布缩放：坞挂在 viewport 内会随之 scale(zoom)，这里反向 1/zoom 抵消，
-  // 让坞在屏幕上保持恒定尺寸（仅影响坞自身视觉，不碰画布缩放上下限）。
   const zoom = useStore((s) => s.transform[2]);
-  const baseInv = 1 / (zoom || 1);
-  // 画布缩小时按缩放程度线性放大，最多 +30%；放大画布时不加成（仍保持恒定）
-  const zoomOutBoost =
-    zoom >= 1
-      ? 1
-      : 1 +
-        (DOCK_ZOOM_OUT_MAX_BOOST - 1) *
-          Math.min(1, (1 - zoom) / (1 - DOCK_ZOOM_OUT_BOOST_FULL));
-  const invScale = Math.min(
-    DOCK_INVERSE_SCALE_MAX * DOCK_ZOOM_OUT_MAX_BOOST,
-    Math.max(DOCK_INVERSE_SCALE_MIN, baseInv * zoomOutBoost),
-  );
-  const baseDockW = width ?? flowAnchor.flowW;
-  // 放大态：长（宽）与高同时展开，宽边按更大比例放大，视觉更明显
-  const dockW = expanded
-    ? Math.round(baseDockW * (PRO2_DOCK_WIDTH_EXPANDED / PRO2_DOCK_WIDTH))
-    : Math.round(baseDockW);
-  const baseDockH = flowAnchor.flowH ?? PRO2_DOCK_HEIGHT;
-  const dockHeight = expanded
-    ? Math.round(baseDockH * (PRO2_DOCK_HEIGHT_EXPANDED / PRO2_DOCK_HEIGHT))
-    : Math.round(baseDockH);
+  const { w: dockW, h: dockHeight } = libtvDockFlowSize();
+  const invScale = computeLibtvDockInverseScale(zoom, dockW, expanded);
   const dockUi = useMemo(() => ({ expanded }), [expanded]);
 
   if (!viewportEl) return null;
@@ -116,10 +81,10 @@ export function Pro2InputDockShell({
           left: flowAnchor.flowX,
           top: flowAnchor.flowY,
           width: dockW,
-          transition: "width 180ms ease",
           // origin=顶部中点；先 scale 再 translateX(-50%)，使坞顶部中点恒定锚在 (flowX,flowY)
           transformOrigin: "50% 0",
           transform: `translateX(-50%) scale(${invScale}) translateZ(0)`,
+          transition: "transform 180ms ease",
           visibility: hidden ? "hidden" : "visible",
           pointerEvents: hidden ? "none" : "auto",
           backfaceVisibility: "hidden",
@@ -141,7 +106,6 @@ export function Pro2InputDockShell({
             background: LIBTV_INPUT_DOCK_BG,
             height: dockHeight,
             maxHeight: dockHeight,
-            transition: "height 180ms ease",
           }}
         >
           <button

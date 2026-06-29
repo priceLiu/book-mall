@@ -62,6 +62,7 @@ export function exportScriptPackageDraft(args: {
     scriptStudioFrameRows: hub?.scriptStudioFrameRows,
     scriptStudioMoodRows: hub?.scriptStudioMoodRows,
     scriptStudioAudioRows: hub?.scriptStudioAudioRows,
+    scriptPackageSnapshots: hub?.scriptPackageSnapshots,
   };
 
   const title =

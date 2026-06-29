@@ -3,6 +3,7 @@ import {
   mergeCrewBulletinPreservingClaims,
 } from "./crew-bulletin-build";
 import type { CrewBulletinState, CrewBulletinTask } from "./crew-bulletin-types";
+import { parseScriptPackageSnapshotsFromPayload } from "./script-package-snapshots";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
 /** 协作画布本地副本：任务清单保留，领取/完成状态重置（各画布独立） */
@@ -207,6 +208,9 @@ export function patchStarterFromScriptPackage(
     scriptStudioFrameRows: hubFields.scriptStudioFrameRows,
     scriptStudioMoodRows: hubFields.scriptStudioMoodRows,
     scriptStudioAudioRows: hubFields.scriptStudioAudioRows,
+    scriptPackageSnapshots: parseScriptPackageSnapshotsFromPayload(
+      asset.payload,
+    ),
   };
 }
 

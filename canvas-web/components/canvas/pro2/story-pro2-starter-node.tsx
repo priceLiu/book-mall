@@ -7,7 +7,6 @@ import {
   FileText,
   GripVertical,
   ImageIcon,
-  Loader2,
   Music,
   PenLine,
   Play,
@@ -35,6 +34,7 @@ import {
   pro2StarterLinkedMessage,
   pro2ThinNodeIsLinked,
   resolveLibtvThinNodeDisplayState,
+  isPro2StarterTextGenerating,
 } from "@/lib/canvas/pro2-thin-node-display-state";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import {
@@ -71,6 +71,7 @@ import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
+import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
   LibtvTryActionRow,
@@ -119,10 +120,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const hasCardContent = pro2StarterHasContent(d);
   const isStoryOutlineMode =
     resolvePro2TextPurpose(d, { nodeId: id, nodes, edges }) === "story-outline";
-  const isGenerating =
-    isStoryOutlineMode &&
-    (d.themeOutlineRuntime?.status === "pending" ||
-      d.themeOutlineRuntime?.status === "running");
+  const isGenerating = isPro2StarterTextGenerating(d);
   const outlineErrorMessage =
     isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
@@ -131,6 +129,15 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           d.modelKey,
         )
       : null;
+  const generalErrorMessage =
+    !isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
+      ? formatCanvasTaskError(
+          d.themeOutlineRuntime.failCode,
+          d.themeOutlineRuntime.failMessage,
+          d.modelKey,
+        )
+      : null;
+  const errorMessage = outlineErrorMessage ?? generalErrorMessage;
   const isLinked = pro2ThinNodeIsLinked(id, edges);
   const displayState = resolveLibtvThinNodeDisplayState({
     hasGeneratedContent: hasCardContent,
@@ -456,7 +463,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         className={cn(
           PRO2_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
-          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          "relative flex min-h-0 flex-1 flex-col overflow-hidden",
         )}
         style={
           libtvNodeBorderStyle({
@@ -466,16 +473,14 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           }) ?? { borderColor: pro2NodeBorderColor(!!selected) }
         }
       >
-        {outlineErrorMessage && !isGenerating ? (
+        {errorMessage && !isGenerating ? (
           <Pro2NodeErrorBanner
-            message={outlineErrorMessage}
+            message={errorMessage}
             onDismiss={dismissOutlineError}
           />
         ) : null}
         {isGenerating ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-3">
-            <Loader2 className="size-5 animate-spin text-violet-200/70" />
-          </div>
+          <LibtvMediaGeneratingState variant="violet" />
         ) : displayState === "generated" ? (
           <div
             className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "h-full min-h-0 p-2")}

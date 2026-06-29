@@ -24,9 +24,12 @@ import {
   runGatewayV1ChatCompletions,
 } from "@/lib/gateway/gateway-v1-chat-service";
 import {
+  GatewayV1KieTaskError,
+  runGatewayV1KieCreateTask,
+} from "@/lib/gateway/gateway-v1-kie-task-service";
+import {
   gatewayV1AudioSpeech,
   gatewayV1ChatCompletionsStream,
-  gatewayV1CreateTask,
   gatewayV1ImageParsing,
   gatewayV1RecordInfo,
 } from "@/lib/gateway/gateway-v1-http-client";
@@ -210,28 +213,42 @@ export async function canvasGwCreateKieJob(
     );
   }
 
-  const created = await gatewayV1CreateTask({
-    apiKeyId: auth.id,
-    body: {
-      model: opts.model,
-      input: {
-        ...opts.input,
-        ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
-      },
-      callBackUrl: opts.callBackUrl ?? null,
-    },
-    meta: await canvasGwMeta(userId, {
-      clientPage: opts.clientPage,
-      projectId: opts.projectId,
-      storyTaskId: opts.canvasTaskId,
-    }),
+  const meta = await canvasGwMeta(userId, {
+    clientPage: opts.clientPage,
+    projectId: opts.projectId,
+    storyTaskId: opts.canvasTaskId,
   });
 
-  return {
-    taskId: created.taskId,
-    logId: created.logId,
-    providerKind: "KIE",
+  const body = {
+    model: opts.model,
+    input: {
+      ...opts.input,
+      ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
+    },
+    callBackUrl: opts.callBackUrl ?? null,
   };
+
+  try {
+    const inProcess = await runGatewayV1KieCreateTask({
+      auth,
+      body,
+      logMeta: meta,
+    });
+    return {
+      taskId: inProcess.taskId,
+      logId: inProcess.logId,
+      providerKind: "KIE",
+    };
+  } catch (e) {
+    if (e instanceof GatewayV1KieTaskError) {
+      throw new CanvasProjectError(
+        "MODEL_NOT_AVAILABLE",
+        e.message,
+        e.status >= 400 && e.status < 600 ? e.status : 502,
+      );
+    }
+    throw e;
+  }
 }
 
 export async function canvasGwCreateVolcengineVideoJob(

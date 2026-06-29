@@ -13,7 +13,8 @@ export type StoryRunContext = {
     | "video"
     | "tts"
     | "sceneRef"
-    | "themeOutline";
+    | "themeOutline"
+    | "generalText";
 };
 
 export type StoryCharacterRow = {

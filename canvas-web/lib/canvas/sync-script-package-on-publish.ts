@@ -13,7 +13,7 @@ export async function syncScriptPackageAssetOnPublish(args: {
   hubData: StoryProScriptHubNodeData;
   starterId?: string;
   starterData?: StoryProStarterNodeData;
-}): Promise<void> {
+}): Promise<string | undefined> {
   const starterData = args.starterData ?? ({} as StoryProStarterNodeData);
   const draft = exportScriptPackageDraft({
     projectId: args.projectId,
@@ -35,7 +35,7 @@ export async function syncScriptPackageAssetOnPublish(args: {
   };
 
   try {
-    await createProjectAsset(args.base, {
+    const asset = await createProjectAsset(args.base, {
       kind: "SCRIPT_PACKAGE",
       displayName: draft.displayName,
       description: draft.description,
@@ -47,7 +47,9 @@ export async function syncScriptPackageAssetOnPublish(args: {
       refs: [],
       visibility: "private",
     });
+    return asset.id;
   } catch {
     /* 资产同步失败不阻断发布 */
+    return undefined;
   }
 }

@@ -156,25 +156,35 @@ export function reconcileStaleInflightRuntimes(
       ).themeOutlineRuntime;
       if (isInflightStatus(rt?.status)) {
         if (rt?.status === "pending" && !rt?.taskId) continue;
-        const scope = { mediaKind: "themeOutline" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
-        if (!hasServerInflightForScope(tasks, node.id, scope)) {
+        const scopes = [
+          { mediaKind: "themeOutline" as const },
+          { mediaKind: "generalText" as const },
+        ];
+        const serverInflight = scopes.some((scope) =>
+          hasServerInflightForScope(tasks, node.id, scope),
+        );
+        if (serverInflight) continue;
+        let applied = false;
+        for (const scope of scopes) {
           const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
-          if (pick) {
-            if (!shouldSkipStoryRowTaskApply(rt, pick, node.id)) {
-              storyApplyTaskResult(
-                node,
-                pick,
-                storyRunContextFromScope(node.id, scope),
-                updateNodeData,
-                nodes,
-              );
-            }
-          } else {
-            updateNodeData(node.id, {
-              themeOutlineRuntime: clearInflightRuntime(rt),
-            });
+          if (!pick) continue;
+          if (!shouldSkipStoryRowTaskApply(rt, pick, node.id)) {
+            storyApplyTaskResult(
+              node,
+              pick,
+              storyRunContextFromScope(node.id, scope),
+              updateNodeData,
+              nodes,
+            );
           }
+          applied = true;
+          break;
+        }
+        if (!applied) {
+          updateNodeData(node.id, {
+            themeOutlineRuntime: clearInflightRuntime(rt),
+          });
         }
       }
       continue;
