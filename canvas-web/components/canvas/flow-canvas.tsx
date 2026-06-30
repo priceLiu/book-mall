@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import {
   Background,
+  BackgroundVariant,
   PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
@@ -907,7 +908,7 @@ function FlowCanvasInner({
       if (focusEdgeIds.has(e.target)) {
         const className = `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim();
         if (
-          e.zIndex === 1000 &&
+          e.zIndex === 1 &&
           className === e.className &&
           e.style?.stroke === "#60a5fa"
         ) {
@@ -916,7 +917,7 @@ function FlowCanvasInner({
         changed = true;
         return {
           ...e,
-          zIndex: 1000,
+          zIndex: 1,
           className,
           style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 1.5 },
         };
@@ -925,7 +926,7 @@ function FlowCanvasInner({
         const className =
           `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim();
         if (
-          e.zIndex === 1000 &&
+          e.zIndex === 1 &&
           className === e.className &&
           e.style?.stroke === "#238636"
         ) {
@@ -934,7 +935,7 @@ function FlowCanvasInner({
         changed = true;
         return {
           ...e,
-          zIndex: 1000,
+          zIndex: 1,
           className,
           style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: 1.5 },
         };
@@ -1366,7 +1367,20 @@ function FlowCanvasInner({
         connectOnClick={false}
         connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}
       >
-        <Background gap={24} size={1} color="rgba(255,255,255,0.06)" />
+        {/* 淡淡的网格线（大格）+ 细点阵（小格），叠出层次但不抢眼 */}
+        <Background
+          id="canvas-grid-lines"
+          variant={BackgroundVariant.Lines}
+          gap={120}
+          lineWidth={1}
+          color="rgba(255,255,255,0.04)"
+        />
+        <Background
+          id="canvas-grid-dots"
+          gap={24}
+          size={1}
+          color="rgba(255,255,255,0.06)"
+        />
         {enableDragSnapGuides ? (
           <CanvasSnapGuidesOverlay guides={snapGuides} />
         ) : null}

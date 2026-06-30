@@ -7,9 +7,11 @@ import { useEffect, useRef, useState } from "react";
  */
 export function useLazyMediaActive<T extends HTMLElement = HTMLDivElement>(
   rootMargin = "240px",
+  /** 已知已加载过的 src：跳过 IO 等待，避免 onlyRenderVisibleElements 重挂载时灰底闪烁 */
+  eager = false,
 ) {
   const ref = useRef<T | null>(null);
-  const [active, setActive] = useState(false);
+  const [active, setActive] = useState(eager);
 
   useEffect(() => {
     if (active) return;

@@ -253,6 +253,8 @@ export const STORY_LLM_MODEL_KEYS = [
 
 export const STORY_VIDEO_MODEL_KEYS = [
   "kling-2.6/image-to-video",
+  "kling/v3-turbo-image-to-video",
+  "kling-3.0/video",
   "bytedance/seedance-2",
   "wan/2-7-image-to-video",
   "happyhorse/image-to-video",

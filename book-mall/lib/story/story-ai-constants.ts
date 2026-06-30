@@ -24,6 +24,8 @@ export const STORY_AI_KIE_MODELS = {
  */
 export const STORY_VIDEO_MODEL_IDS = [
   "kling-2.6/image-to-video",
+  "kling/v3-turbo-image-to-video",
+  "kling-3.0/video",
   "bytedance/seedance-2",
   "doubao-seedance-2.0",
   "doubao-seedance-1.5-pro",
@@ -44,8 +46,12 @@ export type StoryVideoOptions = {
   promptExtend?: boolean;
   /** 水印；仅 wan/2-7-text-to-video 支持 */
   watermark?: boolean;
-  /** Grok Imagine i2v · normal | fun | spicy */
+  /** Grok Imagine i2v · normal | fun | spicy；Kling 3.0 · std | pro */
   mode?: string;
+  /** Kling 3.0 · 多镜头（开启后仅首帧，不可首尾帧） */
+  multi_shots?: boolean;
+  /** Kling 3.0 · 生成音效 */
+  sound?: boolean;
 };
 
 export type StoryVideoModelDescriptor = {
@@ -85,6 +91,26 @@ export const STORY_VIDEO_MODELS: Record<
     durationRange: [5, 10] as const,
     supports: { generateAudio: true, promptExtend: false, watermark: false },
   },
+  "kling/v3-turbo-image-to-video": {
+    id: "kling/v3-turbo-image-to-video",
+    label: "Kling 3.0 Turbo",
+    description: "快手可灵 3.0 Turbo · 图生视频；全能参考 1 张首帧，首尾帧 image_urls[0]+[1]。",
+    requiresImage: true,
+    resolutions: ["720p", "1080p"] as const,
+    defaults: { resolution: "720p", duration: 5 },
+    durationRange: [3, 15] as const,
+    supports: { generateAudio: false, promptExtend: false, watermark: false },
+  },
+  "kling-3.0/video": {
+    id: "kling-3.0/video",
+    label: "Kling 3.0",
+    description: "快手可灵 3.0 · 图生视频；分镜首帧驱动，多镜头/元素引用，std/pro 画质。",
+    requiresImage: true,
+    resolutions: ["720p", "1080p"] as const,
+    defaults: { resolution: "1080p", duration: 5 },
+    durationRange: [3, 15] as const,
+    supports: { generateAudio: false, promptExtend: false, watermark: false },
+  },
   "bytedance/seedance-2": {
     id: "bytedance/seedance-2",
     label: "Seedance 2（KIE）",
@@ -119,7 +145,7 @@ export const STORY_VIDEO_MODELS: Record<
     id: "wan/2-7-image-to-video",
     label: "Wan 2.7",
     description:
-      "阿里通义万相 · 图生视频，把分镜图作为首帧动起来；画风/构图保留度高。",
+      "阿里通义万相 · 图生视频；全能参考=首帧，首尾帧=first_frame_url+last_frame_url。",
     requiresImage: true,
     resolutions: ["720p", "1080p"] as const,
     defaults: {

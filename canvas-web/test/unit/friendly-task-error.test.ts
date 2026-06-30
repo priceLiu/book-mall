@@ -36,6 +36,16 @@ describe("formatCanvasTaskError", () => {
     ).toBe("文本模型服务暂时不可用，请稍后重试。");
   });
 
+  it("short KIE video timeout message", () => {
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "KIE API 连接超时，请稍后重试。",
+        "kling-3.0/video",
+      ),
+    ).toBe("KIE 视频服务暂时不可用，请稍后重试。");
+  });
+
   it("strips long gateway technical messages", () => {
     expect(
       formatCanvasTaskError(

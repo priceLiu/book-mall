@@ -95,12 +95,14 @@ export const PRO2_FRAME_BOARD_MIN_WIDTH = 400;
 export const PRO2_FRAME_BOARD_MIN_HEIGHT = 320;
 
 /** 2.0 媒体组容器（分镜图 / 三视图 · 图 1） */
-export const PRO2_MEDIA_GROUP_BG = "#141418";
+export const PRO2_MEDIA_GROUP_BG = "#3C3C3C";
 export const PRO2_MEDIA_GROUP_DOT_GRID =
   "radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)";
 export const PRO2_MEDIA_GROUP_DOT_SIZE = "14px 14px";
-export const PRO2_MEDIA_GROUP_BORDER = "rgba(255, 255, 255, 0.08)";
-export const PRO2_MEDIA_GROUP_BORDER_SELECTED = "rgba(255, 255, 255, 0.2)";
+export const PRO2_MEDIA_GROUP_BORDER = "rgba(255, 255, 255, 0.14)";
+export const PRO2_MEDIA_GROUP_BORDER_SELECTED = "rgba(255, 255, 255, 0.32)";
+/** 组边框线宽（粗一些，便于在深色画布上区分组容器） */
+export const PRO2_MEDIA_GROUP_BORDER_WIDTH = 2;
 export const PRO2_MEDIA_GROUP_SHELL_CLASS =
   "pro2-media-group-node relative h-full w-full overflow-visible rounded-[20px]";
 
@@ -190,9 +192,9 @@ export const PRO2_DOCK_TEXTAREA_INSET_CLASS =
 export const PRO2_DOCK_TEXTAREA_SCROLL_CLASS =
   "min-h-0 h-full flex-1 overflow-y-auto overscroll-contain";
 
-/** 输入坞内 textarea · 无边框（字号 +2 · 见 libtv-node-interaction-spec §2.4） */
+/** 输入坞内 textarea · 无边框（字号随画布 zoom · 见 libtvDockPromptFontScreenMetrics） */
 export const PRO2_DOCK_TEXTAREA_CLASS =
-  "nodrag w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";
+  "nodrag w-full resize-none border-0 bg-transparent text-[length:var(--libtv-dock-prompt-font,15px)] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";
 
 export const PRO2_SAVE_TO_ASSETS_BTN_CLASS =
   "nodrag w-full rounded border border-violet-400/25 bg-violet-500/8 px-2 py-1.5 text-[11px] text-violet-100 hover:bg-violet-500/15 disabled:opacity-40";

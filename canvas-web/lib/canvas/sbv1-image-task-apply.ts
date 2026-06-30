@@ -6,6 +6,12 @@ import type { CanvasNodeRuntime } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 
+function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
+  const direct = task.posterUrl?.trim();
+  if (direct) return direct;
+  return undefined;
+}
+
 /** sbv1-image 任务结果写回节点 ossUrl + runtime */
 export function sbv1ImagePatchFromTask(
   prev: Sbv1ImageNodeData,
@@ -91,7 +97,7 @@ export function sbv1VideoPatchFromTask(
         taskId: task.id,
         ossUrl: mediaUrl,
         ephemeralUrl: task.ephemeralUrl ?? undefined,
-        posterUrl: task.posterUrl?.trim() || undefined,
+        posterUrl: posterUrlFromTask(task),
         failCode: undefined,
         failMessage: undefined,
       } satisfies CanvasNodeRuntime,

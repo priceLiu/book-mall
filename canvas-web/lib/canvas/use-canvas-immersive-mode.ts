@@ -6,7 +6,9 @@ const TOP_REVEAL_ZONE_PX = 56;
 const TOP_HIDE_DELAY_MS = 2200;
 
 /** 画布沉浸全屏：隐藏顶栏，鼠标移入顶部区域再显示 */
-export function useCanvasImmersiveMode(rootRef: React.RefObject<HTMLElement | null>) {
+export function useCanvasImmersiveMode(
+  _rootRef?: React.RefObject<HTMLElement | null>,
+) {
   const [immersive, setImmersive] = useState(false);
   const [topChromeVisible, setTopChromeVisible] = useState(true);
   const hideTimerRef = useRef<number | null>(null);
@@ -41,16 +43,20 @@ export function useCanvasImmersiveMode(rootRef: React.RefObject<HTMLElement | nu
   const enterImmersive = useCallback(async () => {
     setImmersive(true);
     setTopChromeVisible(false);
-    const el = rootRef.current;
-    if (el && document.fullscreenEnabled && !document.fullscreenElement) {
+    // 关键：对 documentElement（<html>）请求全屏，而非画布容器。
+    // 画布容器本身已是 fixed inset-0 占满视口；若把容器设为全屏元素，
+    // 所有 createPortal 到 document.body 的 UI（底部 Dock 的「+」菜单、节点浮动
+    // 工具条、双击画布的右键/上下文菜单等）都不在全屏子树内 → 全屏下不可见/失效。
+    // 改对 <html> 全屏后，body 及其下所有 portal 仍在全屏子树内，菜单恢复正常。
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
       try {
-        await el.requestFullscreen();
+        await document.documentElement.requestFullscreen();
       } catch {
         // 浏览器拒绝全屏时仍进入「隐藏顶栏」模式
       }
     }
     scheduleHideTopChrome();
-  }, [rootRef, scheduleHideTopChrome]);
+  }, [scheduleHideTopChrome]);
 
   const toggleImmersive = useCallback(async () => {
     if (immersive) {

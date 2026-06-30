@@ -11,11 +11,13 @@ import {
 } from "@xyflow/react";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import {
+  Columns3,
   Film,
   LayoutGrid,
   LayoutTemplate,
   MapPin,
   Palette,
+  Rows3,
   Trash2,
   GripVertical,
   Users,
@@ -28,6 +30,7 @@ import {
 } from "@/lib/canvas/pro2-media-group-meta";
 import {
   PRO2_MEDIA_GROUP_BG,
+  PRO2_MEDIA_GROUP_BORDER_WIDTH,
   PRO2_MEDIA_GROUP_DOT_GRID,
   PRO2_MEDIA_GROUP_DOT_SIZE,
   PRO2_MEDIA_GROUP_SHELL_CLASS,
@@ -354,11 +357,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
               backgroundColor: PRO2_MEDIA_GROUP_BG,
               backgroundImage: PRO2_MEDIA_GROUP_DOT_GRID,
               backgroundSize: PRO2_MEDIA_GROUP_DOT_SIZE,
-              border: `1px solid ${pro2MediaGroupBorderColor(color, selected)}`,
+              border: `${PRO2_MEDIA_GROUP_BORDER_WIDTH}px solid ${pro2MediaGroupBorderColor(color, selected)}`,
             }
           : {
               background: "transparent",
-              border: `2px ${selected ? "solid" : "dashed"} ${color}`,
+              border: `3px ${selected ? "solid" : "dashed"} ${color}`,
               boxShadow: selected ? `0 0 0 2px ${color}33` : "none",
             }
       }
@@ -485,10 +488,26 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                     <Palette className="size-[18px]" strokeWidth={1.75} />
                   </CanvasToolIcon>
                   <CanvasToolIcon
-                    label="整理"
-                    hint={`按拓扑顺序整理本组 ${childrenIds.length} 个子节点`}
+                    label="横排"
+                    hint={`把本组 ${childrenIds.length} 个子节点排成一行（横为主）`}
                     disabled={childrenIds.length < 2}
-                    onClick={() => autoLayoutNodes(childrenIds)}
+                    onClick={() => autoLayoutNodes(childrenIds, "row")}
+                  >
+                    <Columns3 className="size-[18px]" strokeWidth={1.75} />
+                  </CanvasToolIcon>
+                  <CanvasToolIcon
+                    label="竖排"
+                    hint={`把本组 ${childrenIds.length} 个子节点排成一列（竖为主）`}
+                    disabled={childrenIds.length < 2}
+                    onClick={() => autoLayoutNodes(childrenIds, "column")}
+                  >
+                    <Rows3 className="size-[18px]" strokeWidth={1.75} />
+                  </CanvasToolIcon>
+                  <CanvasToolIcon
+                    label="自动"
+                    hint={`按拓扑顺序自动整理本组 ${childrenIds.length} 个子节点`}
+                    disabled={childrenIds.length < 2}
+                    onClick={() => autoLayoutNodes(childrenIds, "auto")}
                   >
                     <LayoutGrid className="size-[18px]" strokeWidth={1.75} />
                   </CanvasToolIcon>

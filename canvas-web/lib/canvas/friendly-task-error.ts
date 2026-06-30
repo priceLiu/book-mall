@@ -1,5 +1,3 @@
-type LlmVendorHint = "kie" | "deepseek" | "bailian" | "volcengine" | "unknown";
-
 /** Gateway 生图 modelKey（非 LLM chat） */
 export function isGatewayImageModelKey(modelKey?: string | null): boolean {
   const m = (modelKey ?? "").trim().toLowerCase();
@@ -19,6 +17,22 @@ export function isGatewayImageModelKey(modelKey?: string | null): boolean {
   ) {
     return true;
   }
+  return false;
+}
+
+type LlmVendorHint = "kie" | "deepseek" | "bailian" | "volcengine" | "unknown";
+
+/** Gateway KIE 异步视频（Kling / Seedance / Grok video 等） */
+export function isKieVideoModelKey(modelKey?: string | null): boolean {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  if (!m) return false;
+  if (m.startsWith("kling") && (m.includes("video") || m.includes("motion-control"))) {
+    return true;
+  }
+  if (m.startsWith("bytedance/seedance")) return true;
+  if (m.startsWith("grok-imagine/") && m.includes("video")) return true;
+  if (m.startsWith("happyhorse/")) return true;
+  if (m === "wan/2-7-image-to-video") return true;
   return false;
 }
 
@@ -45,6 +59,9 @@ export function inferLlmVendorFromModelKey(
 function insufficientBalanceMessage(modelKey?: string | null): string {
   if (isGatewayImageModelKey(modelKey)) {
     return "生图账户余额不足，请检查 Gateway 绑定的厂商凭证余额后重试。";
+  }
+  if (isKieVideoModelKey(modelKey)) {
+    return "KIE 视频账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。";
   }
   const vendor = inferLlmVendorFromModelKey(modelKey);
   switch (vendor) {
@@ -121,6 +138,9 @@ const STALE_INSUFFICIENT_HINT =
 function networkFailureMessage(modelKey?: string | null): string {
   if (isGatewayImageModelKey(modelKey)) {
     return "生图服务暂时不可用，请稍后重试。";
+  }
+  if (isKieVideoModelKey(modelKey)) {
+    return "KIE 视频服务暂时不可用，请稍后重试。";
   }
   const vendor = inferLlmVendorFromModelKey(modelKey);
   if (vendor === "kie") {
@@ -222,6 +242,9 @@ export function formatCanvasTaskError(
     if (isGatewayImageModelKey(modelKey)) {
       return "KIE 生图账户余额不足，请充值后重试。";
     }
+    if (isKieVideoModelKey(modelKey)) {
+      return "KIE 视频账户余额不足，请充值后重试。";
+    }
     return "KIE 账户余额不足，请充值后重试。";
   }
 
@@ -239,6 +262,14 @@ export function formatCanvasTaskError(
     blob.includes("can't reach database server")
   ) {
     return "系统繁忙，任务已加入队列，请稍候勿重复点击。";
+  }
+
+  if (
+    blob.includes("dimensions must be at least") ||
+    blob.includes("300 pixels") ||
+    (blob.includes("422") && blob.includes("image"))
+  ) {
+    return "参考图尺寸过小（需至少 300×300 像素）。请换更大参考图或重新生成图片后再试。";
   }
 
   if (

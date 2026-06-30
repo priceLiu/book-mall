@@ -16,10 +16,16 @@ import {
   SBV1_DEFAULT_IMAGE_NODE_DATA,
   SBV1_DEFAULT_VIDEO_ENGINE_DATA,
 } from "./sbv1-workspace-types";
+import {
+  buildPro2GeneralTextNodeData,
+  selectPro2NodeAfterSpawn,
+} from "./pro2-spawn-nodes";
 import { cloneCanvasNodeData } from "./clone-node-data";
+import { PRO2_TEXT_NODE_MIN_WIDTH } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 
 const GAP = 48;
+const JIANYING_EXPORT_PRO2_WIDTH = 400;
 
 export function buildSbv1ImageNodeData(
   overrides?: Record<string, unknown>,
@@ -117,7 +123,12 @@ export function spawnSbv1NeighborFromNode(
   side: "left" | "right",
   nodeType: string,
   store: SpawnStore,
-  options?: { spawnMode?: "txt2img" | "img2img"; connectFromAnchor?: boolean },
+  options?: {
+    spawnMode?: "txt2img" | "img2img";
+    connectFromAnchor?: boolean;
+    /** 左侧 + · 动作视频：上游视频 out_video → 本节点 in_motion_video */
+    connectAsMotionVideo?: boolean;
+  },
 ): string {
   const { nodes, addNode, setNodes, setEdges } = store;
   const self = nodes.find((n) => n.id === anchorId);
@@ -143,9 +154,13 @@ export function spawnSbv1NeighborFromNode(
   }
 
   const newNodeW =
-    nodeType === "sbv1-video-engine"
-      ? SBV1_VIDEO_ENGINE_WIDTH
-      : SBV1_IMAGE_NODE_WIDTH;
+    nodeType === "jianying-export-pro2"
+      ? JIANYING_EXPORT_PRO2_WIDTH
+      : nodeType === "sbv1-video-engine"
+        ? SBV1_VIDEO_ENGINE_WIDTH
+        : nodeType === "story-pro2-starter"
+          ? PRO2_TEXT_NODE_MIN_WIDTH
+          : SBV1_IMAGE_NODE_WIDTH;
   const { x, y } = sbv1NeighborFlowPosition(
     self,
     nodes,
@@ -153,6 +168,29 @@ export function spawnSbv1NeighborFromNode(
     newNodeW,
     nodeType,
   );
+
+  if (nodeType === "story-pro2-starter") {
+    const newId = addNode(
+      "story-pro2-starter",
+      { x, y },
+      buildPro2GeneralTextNodeData(),
+    );
+    if (!newId) return "";
+    if (self.type === "sbv1-video-engine" && side === "left") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${newId}-${anchorId}-text`,
+          source: newId,
+          target: anchorId,
+          sourceHandle: "text",
+          targetHandle: "in_text",
+        },
+      ]);
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
 
   if (nodeType === "sbv1-image") {
     const label =
@@ -204,20 +242,67 @@ export function spawnSbv1NeighborFromNode(
     return newId;
   }
 
+  if (nodeType === "jianying-export-pro2") {
+    const newId = addNode(
+      "jianying-export-pro2",
+      { x, y },
+      { label: "导出剪辑" },
+    );
+    if (!newId) return "";
+    if (self.type === "sbv1-video-engine" && side === "right") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${anchorId}-${newId}`,
+          source: anchorId,
+          target: newId,
+          sourceHandle: "out_video",
+          targetHandle: "in_video",
+        },
+      ]);
+    }
+    selectSbv1NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
   if (nodeType === "sbv1-video-engine") {
     const newId = addNode("sbv1-video-engine", { x, y }, buildSbv1VideoEngineNodeData());
     if (!newId) return "";
-    const edge =
-      self.type === "sbv1-image"
-        ? {
-            id: `e-${anchorId}-${newId}`,
-            source: anchorId,
-            target: newId,
-            sourceHandle: "image",
-            targetHandle: "in_ref",
-          }
-        : null;
-    if (edge) setEdges((prev) => [...prev, edge]);
+    if (self.type === "sbv1-video-engine" && side === "left" && options?.connectAsMotionVideo) {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${newId}-${anchorId}-motion`,
+          source: newId,
+          target: anchorId,
+          sourceHandle: "out_video",
+          targetHandle: "in_motion_video",
+        },
+      ]);
+    } else if (self.type === "jianying-export-pro2" && side === "left") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${newId}-${anchorId}-video`,
+          source: newId,
+          target: anchorId,
+          sourceHandle: "out_video",
+          targetHandle: "in_video",
+        },
+      ]);
+    } else {
+      const edge =
+        self.type === "sbv1-image"
+          ? {
+              id: `e-${anchorId}-${newId}`,
+              source: anchorId,
+              target: newId,
+              sourceHandle: "image",
+              targetHandle: "in_ref",
+            }
+          : null;
+      if (edge) setEdges((prev) => [...prev, edge]);
+    }
     selectSbv1NodeAfterSpawn(setNodes, newId);
     return newId;
   }
@@ -343,8 +428,11 @@ export async function handleSbv1SideAddNodePick(
     itemId === "video" ||
     itemId === "video-engine" ||
     itemId === "video-compose" ||
+    itemId === "export" ||
     (itemId === "image" && nodeType === "sbv1-image") ||
-    nodeType === "sbv1-video-engine";
+    nodeType === "sbv1-video-engine" ||
+    nodeType === "jianying-export-pro2" ||
+    nodeType === "story-pro2-starter";
 
   if (enabled) {
     onSpawn();

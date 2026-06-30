@@ -88,6 +88,8 @@ export type Pro2NodeSidePlusProps = {
   visible?: boolean;
   /** 鼠标靠近时 + 沿边跟随（组 / 有连线时更易点） */
   magneticFollow?: boolean;
+  /** 侧 + 按钮尺寸：default · lg（视频节点左右 + 放大一倍） */
+  size?: "default" | "lg";
 };
 
 /**
@@ -102,6 +104,7 @@ export function Pro2NodeSidePlus({
   className,
   visible = true,
   magneticFollow = true,
+  size = "lg",
 }: Pro2NodeSidePlusProps) {
   const [open, setOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
@@ -207,6 +210,8 @@ export function Pro2NodeSidePlus({
 
   if (!visible) return null;
 
+  const lg = size === "lg";
+
   return (
     <>
       <div
@@ -214,12 +219,17 @@ export function Pro2NodeSidePlus({
         style={wrapStyle}
         className={cn(
           "pro2-node-side-plus-layer pointer-events-none absolute top-1/2",
-          side === "left" ? "-left-6" : "-right-6",
+          side === "left" ? (lg ? "-left-10" : "-left-6") : lg ? "-right-10" : "-right-6",
           className,
           "z-[20050]",
         )}
       >
-        <div className="pointer-events-auto relative grid size-[52px] place-items-center">
+        <div
+          className={cn(
+            "pointer-events-auto relative grid place-items-center",
+            lg ? "size-[104px]" : "size-[52px]",
+          )}
+        >
           <Handle
             id={handleId}
             type={handleType}
@@ -230,7 +240,9 @@ export function Pro2NodeSidePlus({
             className={cn(
               RF_NO_DRAG,
               "pro2-node-side-plus-handle",
-              "!flex !h-11 !w-11 !items-center !justify-center !rounded-full !p-0",
+              lg
+                ? "!flex !h-[88px] !w-[88px] !items-center !justify-center !rounded-full !p-0"
+                : "!flex !h-11 !w-11 !items-center !justify-center !rounded-full !p-0",
               "!border !border-white/25 !bg-[#2a2a2e] !opacity-100",
               "!shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
               "hover:!border-violet-400/60 hover:!bg-violet-500/25",
@@ -244,7 +256,10 @@ export function Pro2NodeSidePlus({
             }
           >
             <Plus
-              className="pointer-events-none size-6 shrink-0 text-white/90"
+              className={cn(
+                "pointer-events-none shrink-0 text-white/90",
+                lg ? "size-12" : "size-6",
+              )}
               strokeWidth={2.25}
               aria-hidden
             />

@@ -76,6 +76,14 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
 ];
 
 /** 2.0 · 工作环节（Rail / Dock 工作环节区） */
+const PRO2_EXPORT_ITEM: Pro2AddMenuItem = {
+  id: "export",
+  label: "导出剪辑",
+  icon: Download,
+  enabled: true,
+  nodeType: "jianying-export-pro2",
+};
+
 const PRO2_STAGE_ITEMS: Pro2AddMenuItem[] = [
   {
     id: "character-column",
@@ -91,6 +99,7 @@ const PRO2_STAGE_ITEMS: Pro2AddMenuItem[] = [
     enabled: true,
     nodeType: "sbv1-video-engine",
   },
+  PRO2_EXPORT_ITEM,
 ];
 
 /** 图片 / 三视图节点左侧 + · 添加上游输入（文生图：接文本） */
@@ -319,11 +328,4 @@ export const PRO2_STAGE_RAIL_ITEMS: Pro2AddMenuItem[] = [
     enabled: true,
   },
   ...PRO2_STAGE_ITEMS,
-  {
-    id: "export",
-    label: "剪映导出",
-    icon: Download,
-    enabled: true,
-    nodeType: "jianying-export-pro2",
-  },
 ];

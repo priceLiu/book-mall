@@ -33,7 +33,7 @@ import {
 } from "@/lib/canvas/sbv1-node-chrome";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
-import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { resolveLibtvVideoPosterUrl } from "@/lib/canvas/libtv-video-poster";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { sbv1VideoPatchFromTask, isSameSbv1MediaDataPatch } from "@/lib/canvas/sbv1-image-task-apply";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
-import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
+import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
@@ -71,7 +71,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     crewTaskId?: string;
     crewTaskLabel?: string;
   };
-  const saveAsAsset = useSaveNodeAsAsset();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const { succeeded, history } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -110,10 +109,17 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
     succeeded[succeeded.length - 1]?.ossUrl ??
     undefined;
-  const posterUrl =
-    d.runtime?.posterUrl ??
-    succeeded[succeeded.length - 1]?.posterUrl ??
-    undefined;
+  const posterUrl = useMemo(
+    () =>
+      resolveLibtvVideoPosterUrl({
+        nodeId: id,
+        runtime: d.runtime,
+        latestSucceededTask: succeeded[succeeded.length - 1],
+        nodes,
+        edges,
+      }),
+    [id, d.runtime, succeeded, nodes, edges],
+  );
 
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
@@ -225,6 +231,44 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             return;
           }
           if (
+            side === "left" &&
+            (itemId === "text" || nodeType === "story-pro2-starter")
+          ) {
+            spawnSbv1NeighborFromNode(
+              id,
+              "left",
+              "story-pro2-starter",
+              spawnStore,
+            );
+            return;
+          }
+          if (
+            side === "left" &&
+            itemId === "video" &&
+            nodeType === "sbv1-video-engine"
+          ) {
+            spawnSbv1NeighborFromNode(
+              id,
+              "left",
+              "sbv1-video-engine",
+              spawnStore,
+              { connectAsMotionVideo: true },
+            );
+            return;
+          }
+          if (
+            side === "right" &&
+            (itemId === "export" || nodeType === "jianying-export-pro2")
+          ) {
+            spawnSbv1NeighborFromNode(
+              id,
+              "right",
+              "jianying-export-pro2",
+              spawnStore,
+            );
+            return;
+          }
+          if (
             side === "right" &&
             (itemId === "video" ||
               itemId === "video-engine" ||
@@ -260,6 +304,19 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         onPointerLeave={onPointerLeave}
       >
         <Handle
+          id="in_text"
+          type="target"
+          position={Position.Left}
+          className={cn(
+            SBV1_NODE_HANDLE_CLASS,
+            showSidePlus
+              ? "pointer-events-none opacity-0"
+              : "opacity-100",
+          )}
+          style={{ top: "22%" }}
+          title="文本 / 提示词输入"
+        />
+        <Handle
           id="in_ref"
           type="target"
           position={Position.Left}
@@ -269,7 +326,21 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
+          style={{ top: "35%" }}
           title="参考图输入"
+        />
+        <Handle
+          id="in_motion_video"
+          type="target"
+          position={Position.Left}
+          className={cn(
+            SBV1_NODE_HANDLE_CLASS,
+            showSidePlus
+              ? "pointer-events-none opacity-0"
+              : "opacity-100",
+          )}
+          style={{ top: "68%" }}
+          title="动作视频输入（Motion Control）"
         />
         <Handle
           id="out_video"
@@ -293,7 +364,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               handleId="plus_left"
               handleType="source"
               visible
-              className="z-[60] -left-5"
+              size="lg"
+              className="z-[60]"
               sections={SBV1_VIDEO_ENGINE_LEFT_ADD_MENU}
               onPick={onSidePick("left")}
             />
@@ -301,7 +373,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               side="right"
               handleId="out_video"
               visible
-              className="z-[60] -right-5"
+              size="lg"
+              className="z-[60]"
               sections={SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU}
               onPick={onSidePick("right")}
             />
@@ -309,9 +382,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         ) : null}
 
         {showFloatingToolbar && !showToolbar ? (
-          <Pro2ImageNodeToolbar
+          <LibtvVideoNodeToolbar
             passNodeDrag
-            minimal
             className="absolute left-1/2 z-40 -translate-x-1/2"
             style={{ top: -60 }}
             onDuplicateNode={onDuplicateNode}
@@ -319,21 +391,12 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         ) : null}
 
         {showToolbar ? (
-          <Pro2ImageNodeToolbar
+          <LibtvVideoNodeToolbar
             passNodeDrag
-            minimal
             className="absolute left-1/2 z-40 -translate-x-1/2"
             style={{ top: -60 }}
             previewUrl={videoUrl}
             onExpandPreview={() => setPreviewOpen(true)}
-            onSaveAsAsset={() =>
-              saveAsAsset(
-                id,
-                "sbv1-video-engine",
-                { ...d, videoUrl } as unknown as Record<string, unknown>,
-                "STORYBOARD_VIDEO",
-              )
-            }
             onDuplicateNode={onDuplicateNode}
           />
         ) : null}
@@ -391,6 +454,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     <LazyViewportImage
                       src={posterUrl}
                       alt=""
+                      eager
                       className="absolute inset-0"
                       imgClassName="pointer-events-none object-contain opacity-60"
                       rootMargin="280px"
@@ -398,6 +462,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   ) : (
                     <LazyViewportVideo
                       src={videoUrl ?? undefined}
+                      poster={posterUrl}
+                      eager
                       className="absolute inset-0"
                       videoClassName="pointer-events-none object-contain opacity-60"
                       rootMargin="280px"
@@ -411,6 +477,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   <LazyViewportImage
                     src={posterUrl}
                     alt=""
+                    eager
                     className="absolute inset-0"
                     imgClassName="pointer-events-none object-contain"
                     rootMargin="280px"
@@ -418,6 +485,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 ) : (
                   <LazyViewportVideo
                     src={videoUrl ?? undefined}
+                    poster={posterUrl}
+                    eager
+                    preload="auto"
                     className="absolute inset-0"
                     videoClassName="pointer-events-none object-contain"
                     rootMargin="280px"

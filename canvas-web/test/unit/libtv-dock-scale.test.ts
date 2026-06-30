@@ -11,6 +11,13 @@ import {
   LIBTV_DOCK_SIZE_FACTOR,
   libtvDockFlowSize,
   libtvDockHeightForWidth,
+  libtvDockInnerContentZoom,
+  libtvDockPromptFontScreenMetrics,
+  libtvDockVideoHeaderScreenMetrics,
+  libtvDockZoomOutContentBoost,
+  DOCK_PROMPT_FONT_SCREEN_AT_100,
+  VIDEO_DOCK_HEADER_CHIP_FONT_AT_100,
+  VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
 
 describe("libtvDockHeightForWidth", () => {
@@ -63,11 +70,87 @@ describe("computeLibtvDockScreenWidth", () => {
   });
 });
 
+describe("libtvDockInnerContentZoom", () => {
+  it("is 1 at zoom 1", () => {
+    expect(libtvDockInnerContentZoom(1)).toBeCloseTo(1, 2);
+  });
+
+  it("compensates when canvas zooms in so content screen scale stays ~baseline", () => {
+    const { w } = libtvDockFlowSize();
+    const inv1 = computeLibtvDockInverseScale(1, w);
+    const z = 2;
+    const invZ = computeLibtvDockInverseScale(z, w);
+    const cz = libtvDockInnerContentZoom(z);
+    const contentAt1 = inv1 * 1 * 1;
+    const contentAtZ = invZ * z * cz;
+    expect(contentAtZ).toBeCloseTo(contentAt1, 0);
+  });
+
+  it("uses zoom-out boost below 100%", () => {
+    expect(libtvDockInnerContentZoom(0.2)).toBe(3);
+  });
+});
+
+describe("libtvDockPromptFontScreenMetrics", () => {
+  it("is 2px smaller than baseline at max canvas zoom", () => {
+    expect(libtvDockPromptFontScreenMetrics(2)).toBe(
+      DOCK_PROMPT_FONT_SCREEN_AT_100 - 2,
+    );
+  });
+
+  it("is 1px smaller than max at min canvas zoom anchor", () => {
+    expect(libtvDockPromptFontScreenMetrics(0.15)).toBe(
+      DOCK_PROMPT_FONT_SCREEN_AT_100 - 3,
+    );
+  });
+
+  it("is baseline at 100% zoom", () => {
+    expect(libtvDockPromptFontScreenMetrics(1)).toBe(
+      DOCK_PROMPT_FONT_SCREEN_AT_100,
+    );
+  });
+});
+
+describe("libtvDockVideoHeaderScreenMetrics", () => {
+  it("doubles thumb at 100% vs legacy baseline", () => {
+    const m = libtvDockVideoHeaderScreenMetrics(1);
+    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100);
+    expect(m.chipFontScreenPx).toBe(VIDEO_DOCK_HEADER_CHIP_FONT_AT_100);
+  });
+
+  it("doubles thumb and chip at max canvas zoom", () => {
+    const m = libtvDockVideoHeaderScreenMetrics(2);
+    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 * 2);
+    expect(m.chipFontScreenPx).toBe(VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 * 2);
+  });
+
+  it("keeps 2x thumb at 15% with smaller chip font", () => {
+    const m = libtvDockVideoHeaderScreenMetrics(0.15);
+    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 * 2);
+    expect(m.chipFontScreenPx).toBe(VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 - 2);
+  });
+});
+
+describe("libtvDockZoomOutContentBoost", () => {
+  it("is 1 at zoom 1 and 3 at zoom 0.2", () => {
+    expect(libtvDockZoomOutContentBoost(1)).toBe(1);
+    expect(libtvDockZoomOutContentBoost(0.2)).toBe(3);
+  });
+});
+
 describe("computeLibtvDockInverseScale", () => {
   it("yields base screen width at zoom 1", () => {
     const { w } = libtvDockFlowSize();
     const inv = computeLibtvDockInverseScale(1, w);
     expect(w * 1 * inv).toBeCloseTo(LIBTV_DOCK_SCREEN_W_BASE, 0);
+  });
+
+  it("does not apply content boost to shell invScale", () => {
+    const { w } = libtvDockFlowSize();
+    const z = 0.2;
+    const target = computeLibtvDockScreenWidth(z);
+    const inv = computeLibtvDockInverseScale(z, w);
+    expect(inv).toBeCloseTo(target / (w * z), 2);
   });
 
   it("yields ~20% larger than base when expanded", () => {

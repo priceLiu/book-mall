@@ -9,6 +9,8 @@ import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "./system-providers";
 
 export type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 
+export type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
+
 export type Sbv1AspectRatio =
   | "auto"
   | "21:9"
@@ -77,6 +79,8 @@ export type Sbv1VideoEngineNodeData = {
   durationSec: number;
   resolution: "720p" | "1080p";
   refSlots: Sbv1RefSlot[];
+  /** Dock 顶栏输入模式（文生视频 / 图生视频 / 首尾帧…） */
+  dockInputMode?: Sbv1DockInputMode;
   /** 火山私域人像库 asset://（LibTV 图片节点入库后写入） */
   portraitKind?: "virtual" | "real";
   portraitAssetId?: string;

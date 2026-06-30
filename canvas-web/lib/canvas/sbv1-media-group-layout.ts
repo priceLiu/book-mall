@@ -198,7 +198,7 @@ export function applySbv1MediaGroupRelayout(
     (n) => n.parentId === groupId && n.type === "sbv1-video-engine",
   );
 
-  if (engines.length > 1 && group) {
+  if (engines.length > 1 && images.length > 0 && group) {
     const keeper = pickPrimarySbv1GroupEngine(engines, edges, images);
     next = ejectExtraSbv1GroupEngines(next, groupId, keeper.id, group);
     engines = next.filter(
@@ -211,23 +211,25 @@ export function applySbv1MediaGroupRelayout(
   }
 
   if (images.length === 0 && engines.length > 0) {
+    const defaultCell = {
+      width: SBV1_VIDEO_ENGINE_WIDTH,
+      height: SBV1_VIDEO_ENGINE_HEIGHT,
+    };
+    const cols = pro2MediaGridCols(engines.length);
     const engineDimsList = engines.map((e) => sbv1VideoEngineDimensions(e));
+    const rowHeights: number[] = [];
+
     for (let i = 0; i < engines.length; i++) {
       const engine = engines[i]!;
       const dims = engineDimsList[i]!;
-      const prevHeight =
-        i > 0
-          ? engineDimsList
-              .slice(0, i)
-              .reduce((sum, d) => sum + d.height + PRO2_MEDIA_GRID_GAP, 0)
-          : 0;
-      const y =
-        PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER + prevHeight;
+      const row = Math.floor(i / cols);
+      rowHeights[row] = Math.max(rowHeights[row] ?? 0, dims.height);
+      const rel = pro2MediaGridLayout(i, defaultCell, cols);
       next = next.map((n) =>
         n.id === engine.id
           ? {
               ...n,
-              position: { x: PRO2_MEDIA_GROUP_PAD, y },
+              position: rel,
               width: dims.width,
               height: dims.height,
               style: {
@@ -240,21 +242,21 @@ export function applySbv1MediaGroupRelayout(
           : n,
       );
     }
-    const maxEngineWidth = Math.max(
-      ...engineDimsList.map((d) => d.width),
-      SBV1_VIDEO_ENGINE_WIDTH,
-    );
-    const enginesHeight = engineDimsList.reduce(
-      (sum, d, i) =>
-        sum + d.height + (i > 0 ? PRO2_MEDIA_GRID_GAP : 0),
-      0,
-    );
+
+    const gridContentWidth =
+      cols * defaultCell.width + Math.max(0, cols - 1) * PRO2_MEDIA_GRID_GAP;
+    const rows = Math.ceil(engines.length / cols);
+    let gridContentHeight = 0;
+    for (let r = 0; r < rows; r++) {
+      gridContentHeight += (rowHeights[r] ?? defaultCell.height) + (r > 0 ? PRO2_MEDIA_GRID_GAP : 0);
+    }
+
     const groupWidth =
-      PRO2_MEDIA_GROUP_PAD * 2 + maxEngineWidth + PRO2_MEDIA_GROUP_EXTRA;
+      PRO2_MEDIA_GROUP_PAD * 2 + gridContentWidth + PRO2_MEDIA_GROUP_EXTRA;
     const groupHeight =
       PRO2_MEDIA_GROUP_PAD * 2 +
       PRO2_MEDIA_GROUP_HEADER +
-      enginesHeight +
+      gridContentHeight +
       PRO2_MEDIA_GROUP_EXTRA;
     next = next.map((n) =>
       n.id === groupId

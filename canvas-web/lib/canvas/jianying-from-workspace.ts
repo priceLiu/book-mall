@@ -1,4 +1,4 @@
-import type { CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import type {
   StoryFrameColumnNodeData,
   StoryFrameRow,
@@ -6,6 +6,40 @@ import type {
   StoryVideoRow,
   StoryWorkspaceIds,
 } from "./story-workspace-types";
+
+const LIBTV_VIDEO_SOURCE_TYPES = new Set([
+  "sbv1-video-engine",
+  "video-engine",
+  "ai-video-engine",
+]);
+
+function nodeFlowSortX(node: CanvasFlowNode, nodes: CanvasFlowNode[]): number {
+  let x = node.position.x;
+  let parentId = node.parentId;
+  while (parentId) {
+    const parent = nodes.find((n) => n.id === parentId);
+    if (!parent) break;
+    x += parent.position.x;
+    parentId = parent.parentId;
+  }
+  return x;
+}
+
+function videoUrlFromConnectedNode(node: CanvasFlowNode): string | undefined {
+  const d = node.data as {
+    runtime?: { ossUrl?: string; ephemeralUrl?: string };
+  };
+  return (
+    d.runtime?.ossUrl?.trim() ||
+    d.runtime?.ephemeralUrl?.trim() ||
+    undefined
+  );
+}
+
+function dialogueFromConnectedVideoNode(node: CanvasFlowNode): string | undefined {
+  const p = (node.data as { prompt?: string }).prompt?.trim();
+  return p || undefined;
+}
 
 export type JianyingFrameExport = {
   frameIndex: number;
@@ -57,4 +91,57 @@ export function collectJianyingFramesFromWorkspace(
   const frameRows = (frameCol?.data as StoryFrameColumnNodeData)?.rows ?? [];
   const videoRows = (videoCol?.data as StoryVideoColumnNodeData)?.rows ?? [];
   return collectJianyingFramesFromColumns(frameRows, videoRows);
+}
+
+/** 从剪映导出节点 in_video 入边收集 LibTV / 画布视频节点（按 X 排序） */
+export function collectJianyingFramesFromLibtvVideos(
+  exportNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): JianyingFrameExport[] {
+  const incoming = edges.filter(
+    (e) =>
+      e.target === exportNodeId &&
+      (!e.targetHandle ||
+        e.targetHandle === "in_video" ||
+        e.targetHandle === "in_storyboard"),
+  );
+
+  const videoNodes = incoming
+    .map((e) => nodes.find((n) => n.id === e.source))
+    .filter(
+      (n): n is CanvasFlowNode =>
+        !!n && LIBTV_VIDEO_SOURCE_TYPES.has(n.type ?? ""),
+    )
+    .sort((a, b) => {
+      const ax = nodeFlowSortX(a, nodes);
+      const bx = nodeFlowSortX(b, nodes);
+      if (ax !== bx) return ax - bx;
+      return a.id.localeCompare(b.id);
+    });
+
+  return videoNodes
+    .map((node, i) => ({
+      frameIndex: i + 1,
+      videoUrl: videoUrlFromConnectedNode(node),
+      dialogue: dialogueFromConnectedVideoNode(node),
+    }))
+    .filter((f) => Boolean(f.videoUrl));
+}
+
+/** 优先 LibTV 连线视频；无连线时回退 Pro2 工作区视频列 */
+export function collectJianyingFramesForExportNode(
+  exportNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  ws?: Pick<StoryWorkspaceIds, "frameColumnId" | "videoColumnId"> | null,
+): JianyingFrameExport[] {
+  const libtv = collectJianyingFramesFromLibtvVideos(
+    exportNodeId,
+    nodes,
+    edges,
+  );
+  if (libtv.length) return libtv;
+  if (ws) return collectJianyingFramesFromWorkspace(nodes, ws);
+  return [];
 }

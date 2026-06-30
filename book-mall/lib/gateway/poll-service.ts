@@ -43,6 +43,16 @@ const STALE_RUNNING_NO_TASK_MS = 3 * 60 * 1000;
 /** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING（高负载下 submit 可能 >90s） */
 const STALE_VOLCENGINE_NO_TASK_MS = 5 * 60 * 1000;
 const STALE_RUNNING_WITH_TASK_MS = 6 * 60 * 60 * 1000;
+/**
+ * 非视频异步任务（KIE 生图 / chat-job 等，有 externalTaskId）的兜底超时：
+ * 图片/文本类 createTask 正常几十秒～数分钟完成；若超过此时长仍 RUNNING，多半是
+ * 回调漏发 + 无人轮询（本地收不到 KIE callback、poll-loop 未起），按超时收口，
+ * 而不是沿用给长媒体留余量的 6h，避免「日志一直卡在生成中」。
+ */
+const STALE_NONVIDEO_ASYNC_MS = (() => {
+  const v = Number(process.env.STALE_NONVIDEO_ASYNC_MS);
+  return Number.isFinite(v) && v > 0 ? v : 30 * 60 * 1000;
+})();
 /** 火山视频任务：过长仍 RUNNING 则先向厂商核对（彻底收口），核对不通过才失败 */
 const STALE_VOLCENGINE_VIDEO_MS = 90 * 60 * 1000;
 /**
@@ -115,6 +125,25 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
+  // 非视频异步任务（KIE 生图 / chat-job 等）的兜底超时：30min（默认）。
+  // 即便本地收不到 KIE 回调、且 poll-loop/常驻轮询未起，也不会像 6h 那样长时间挂着。
+  const nonVideoAsyncCutoff = new Date(now - STALE_NONVIDEO_ASYNC_MS);
+  const r2b = await prisma.gatewayRequestLog.updateMany({
+    where: {
+      status: "RUNNING",
+      externalTaskId: { not: null },
+      submittedAt: { lt: nonVideoAsyncCutoff },
+      OR: [{ requestKind: null }, { requestKind: { not: "VIDEO" } }],
+    },
+    data: {
+      status: "FAILED",
+      failCode: "STALE_TIMEOUT",
+      failMessage:
+        "异步任务长时间未完成（超过 30 分钟），已自动关闭，请重试",
+      completedAt: new Date(),
+    },
+  });
+
   const volcengineNoTaskCutoff = new Date(now - STALE_VOLCENGINE_NO_TASK_MS);
   const r3a = await prisma.gatewayRequestLog.updateMany({
     where: {
@@ -163,7 +192,9 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     );
   }
 
-  return r0.count + r1.count + r2.count + r3a.count + r3 + r3b.count + r4;
+  return (
+    r0.count + r1.count + r2.count + r2b.count + r3a.count + r3 + r3b.count + r4
+  );
 }
 
 /**

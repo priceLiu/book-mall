@@ -727,7 +727,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   "story-pro2-mood": { label: "氛围设计", dockInput: "" } as Record<string, unknown>,
   "story-pro2-audio": { label: "音效设计", dockInput: "" } as Record<string, unknown>,
   "jianying-export-pro2": {
-    label: "剪映导出 · 专业版 2.0",
+    label: "导出剪辑",
   } as Record<string, unknown>,
   "sbv1-image": {
     ...SBV1_DEFAULT_IMAGE_NODE_DATA,
@@ -966,7 +966,7 @@ export const NODE_DEFAULT_SIZE: Record<
   },
   "jianying-export-pro2": {
     width: 400,
-    height: PRO2_COLUMN_CARD_HEIGHT,
+    height: 180,
   },
   "sbv1-image": {
     width: SBV1_IMAGE_NODE_WIDTH,

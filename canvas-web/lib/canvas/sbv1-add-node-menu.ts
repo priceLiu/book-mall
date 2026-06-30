@@ -1,6 +1,7 @@
 import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "./sbv1-node-chrome";
 import {
+  Download,
   Image as ImageIcon,
   Sparkles,
   Type,
@@ -59,13 +60,35 @@ export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         enabled: true,
         nodeType: "sbv1-image",
       },
-      { id: "video", label: "视频", icon: Video, enabled: false },
-      { id: "text", label: "文本", icon: Type, enabled: false },
+      { id: "video", label: "动作视频", icon: Video, enabled: true, nodeType: "sbv1-video-engine" },
+      {
+        id: "text",
+        label: "文本",
+        icon: Type,
+        enabled: true,
+        nodeType: "story-pro2-starter",
+      },
     ],
   },
 ];
 
-/** 视频节点右侧 + · 串联下一节点 */
+/** 导出剪辑节点左侧 + · 接入视频 */
+export const JIANYING_EXPORT_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
+  {
+    title: "接入视频",
+    items: [
+      {
+        id: "video",
+        label: "视频",
+        icon: Video,
+        enabled: true,
+        nodeType: "sbv1-video-engine",
+      },
+    ],
+  },
+];
+
+/** 视频节点右侧 + · 串联下一节点 / 导出剪辑 */
 export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "串联生成",
@@ -76,6 +99,18 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",
+      },
+    ],
+  },
+  {
+    title: "导出成片",
+    items: [
+      {
+        id: "export",
+        label: "导出剪辑",
+        icon: Download,
+        enabled: true,
+        nodeType: "jianying-export-pro2",
       },
     ],
   },
