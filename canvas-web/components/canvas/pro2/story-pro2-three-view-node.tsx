@@ -43,6 +43,7 @@ import {
   Pro2MediaNodeErrorState,
 } from "./pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
+import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
@@ -214,33 +215,31 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           </>
         ) : null}
 
-        {showFloatingToolbar && !showImageTools ? (
-          <Pro2ImageNodeToolbar
-            passNodeDrag
-            minimal
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            onDuplicateNode={onDuplicateNode}
-          />
-        ) : null}
-
-        {showImageTools ? (
-          <Pro2ImageNodeToolbar
-            passNodeDrag
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            previewUrl={previewUrl}
-            onExpandPreview={() => setPreviewOpen(true)}
-            onSaveAsAsset={() =>
-              saveAsAsset(
-                id,
-                "story-pro2-three-view",
-                d as unknown as Record<string, unknown>,
-                "CHARACTER",
-              )
-            }
-            onDuplicateNode={onDuplicateNode}
-          />
+        {showFloatingToolbar ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
+            {showImageTools ? (
+              <Pro2ImageNodeToolbar
+                passNodeDrag
+                previewUrl={previewUrl}
+                onExpandPreview={() => setPreviewOpen(true)}
+                onSaveAsAsset={() =>
+                  saveAsAsset(
+                    id,
+                    "story-pro2-three-view",
+                    d as unknown as Record<string, unknown>,
+                    "CHARACTER",
+                  )
+                }
+                onDuplicateNode={onDuplicateNode}
+              />
+            ) : (
+              <Pro2ImageNodeToolbar
+                passNodeDrag
+                minimal
+                onDuplicateNode={onDuplicateNode}
+              />
+            )}
+          </LibtvNodeToolbarPortal>
         ) : null}
 
         <div

@@ -8,6 +8,7 @@ import type { JianyingMediaRenderResult } from "@/lib/canvas/types";
 import {
   type JianyingExportFrame,
   type MediaRenderJob,
+  type MediaRenderScaleMode,
   submitMediaRender,
   waitMediaRenderJob,
 } from "@/lib/canvas-api";
@@ -20,6 +21,19 @@ type Props = {
   persisted?: JianyingMediaRenderResult | null;
 };
 
+type TransitionKind = "xfade" | "none";
+
+const SCALE_OPTIONS: { value: MediaRenderScaleMode; label: string }[] = [
+  { value: "source", label: "原片（不缩放）" },
+  { value: "fit720p", label: "720P" },
+  { value: "fit1080p", label: "1080P" },
+];
+
+const TRANSITION_OPTIONS: { value: TransitionKind; label: string }[] = [
+  { value: "xfade", label: "交叉淡化" },
+  { value: "none", label: "无转场" },
+];
+
 function renderStatusLabel(job: MediaRenderJob | null): string {
   if (!job) return "提交任务…";
   if (job.status === "PENDING") {
@@ -30,6 +44,9 @@ function renderStatusLabel(job: MediaRenderJob | null): string {
   return "处理中…";
 }
 
+const fieldSelectClass =
+  "nodrag w-[118px] rounded border border-white/20 bg-black/30 px-2 py-1 text-[10px] text-white";
+
 export function JianyingMediaRenderActions({
   nodeId,
   base,
@@ -39,7 +56,9 @@ export function JianyingMediaRenderActions({
 }: Props) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [busy, setBusy] = useState(false);
+  const [transitionKind, setTransitionKind] = useState<TransitionKind>("xfade");
   const [transitionSec, setTransitionSec] = useState(0.6);
+  const [scaleMode, setScaleMode] = useState<MediaRenderScaleMode>("fit1080p");
   const [burnIn, setBurnIn] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [doneUrl, setDoneUrl] = useState<string | null>(
@@ -83,11 +102,16 @@ export function JianyingMediaRenderActions({
     setProgress(0);
     setStepLabel("提交任务…");
     try {
+      const transition =
+        transitionKind === "xfade"
+          ? ({ type: "xfade" as const, durationSec: transitionSec })
+          : ({ type: "none" as const });
       const job = await submitMediaRender(base!, projectId!, {
         frames: videoFrames,
         profile: {
-          transition: { type: "xfade", durationSec: transitionSec },
+          transition,
           subtitle: { mode: "script", burnIn },
+          video: { scaleMode },
         },
       });
       applyJobProgress(job);
@@ -118,10 +142,40 @@ export function JianyingMediaRenderActions({
           max={2}
           step={0.1}
           value={transitionSec}
-          disabled={busy}
-          className="nodrag w-16 rounded border border-white/20 bg-black/30 px-2 py-1 text-white"
+          disabled={busy || transitionKind === "none"}
+          className="nodrag w-16 rounded border border-white/20 bg-black/30 px-2 py-1 text-white disabled:opacity-40"
           onChange={(e) => setTransitionSec(Number(e.target.value) || 0.6)}
         />
+      </label>
+      <label className="flex items-center justify-between gap-2 text-[10px] text-white/60">
+        <span>转场效果</span>
+        <select
+          value={transitionKind}
+          disabled={busy}
+          className={fieldSelectClass}
+          onChange={(e) => setTransitionKind(e.target.value as TransitionKind)}
+        >
+          {TRANSITION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center justify-between gap-2 text-[10px] text-white/60">
+        <span>输出画质</span>
+        <select
+          value={scaleMode}
+          disabled={busy}
+          className={fieldSelectClass}
+          onChange={(e) => setScaleMode(e.target.value as MediaRenderScaleMode)}
+        >
+          {SCALE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="nodrag flex items-center gap-2 text-[10px] text-white/60">
         <input

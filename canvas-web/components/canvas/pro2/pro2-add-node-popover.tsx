@@ -23,16 +23,19 @@ function menuItemClass(enabled: boolean, highlighted: boolean): string {
   return cn(MENU_ITEM_BASE, "text-white/88");
 }
 
-export type Pro2AddNodePopoverPlacement = "top-left" | "above-center";
+export type Pro2AddNodePopoverPlacement = "top-left" | "above-center" | "beside-pointer";
 
 export type Pro2AddNodePopoverProps = {
   open: boolean;
-  anchor: { x: number; y: number };
+  anchor: { x: number; y: number } | null;
   sections: Pro2AddMenuSection[];
   onClose: () => void;
   onPick: (itemId: string, nodeType?: string) => void;
-  /** above-center：锚点取菜单底边中点，向上展开（Dock 顶栏用） */
+  /** above-center：锚点取菜单底边中点，向上展开（Dock 顶栏用）；beside-pointer：松手位置右侧垂直居中 */
   placement?: Pro2AddNodePopoverPlacement;
+  /** 菜单主面板左缘中点 · 供拖线预览吸附 */
+  onPanelRect?: (pt: { x: number; y: number }) => void;
+  menuZIndex?: number;
 };
 
 export function Pro2AddNodePopover({
@@ -42,6 +45,8 @@ export function Pro2AddNodePopover({
   onClose,
   onPick,
   placement = "top-left",
+  onPanelRect,
+  menuZIndex = 1400,
 }: Pro2AddNodePopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const mainPanelRef = useRef<HTMLDivElement>(null);
@@ -51,7 +56,7 @@ export function Pro2AddNodePopover({
   const [maxMainHeight, setMaxMainHeight] = useState<number | undefined>();
 
   useLayoutEffect(() => {
-    if (!open) {
+    if (!open || !anchor) {
       setMaxMainHeight(undefined);
       return;
     }
@@ -63,7 +68,20 @@ export function Pro2AddNodePopover({
         ? anchor.y - margin
         : window.innerHeight - anchor.y - margin;
     setMaxMainHeight(Math.max(180, Math.min(520, available)));
-  }, [open, anchor.x, anchor.y, placement, sections]);
+  }, [open, anchor?.x, anchor?.y, placement, sections]);
+
+  useEffect(() => {
+    const panel = mainPanelRef.current;
+    if (!open || !panel || !onPanelRect) return;
+    const report = () => {
+      const r = panel.getBoundingClientRect();
+      onPanelRect({ x: r.left, y: r.top + r.height / 2 });
+    };
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(panel);
+    return () => ro.disconnect();
+  }, [open, onPanelRect, anchor?.x, anchor?.y, sections, placement]);
 
   useEffect(() => {
     if (!open) {
@@ -87,7 +105,7 @@ export function Pro2AddNodePopover({
     };
   }, [open, onClose]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!open || !anchor || typeof document === "undefined") return null;
 
   const flyoutSections = sections
     .flatMap((s) => s.items)
@@ -96,12 +114,17 @@ export function Pro2AddNodePopover({
   return createPortal(
     <div
       ref={ref}
-      className="pro2-add-menu nodrag fixed z-[1400] flex items-end gap-0"
+      className="pro2-add-menu nodrag fixed flex items-end gap-0"
       style={{
         left: anchor.x,
         top: anchor.y,
+        zIndex: menuZIndex,
         transform:
-          placement === "above-center" ? "translate(-50%, -100%)" : undefined,
+          placement === "above-center"
+            ? "translate(-50%, -100%)"
+            : placement === "beside-pointer"
+              ? "translateY(-50%)"
+              : undefined,
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}

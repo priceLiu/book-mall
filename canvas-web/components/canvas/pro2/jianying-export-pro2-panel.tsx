@@ -8,19 +8,24 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingExportNodeData } from "@/lib/canvas/types";
 import type { JianyingFrameExport } from "@/lib/canvas/jianying-from-workspace";
 import { exportJianyingZip } from "@/lib/canvas-api";
-import {
-  PRO2_HINT_LABEL_CLASS,
-  PRO2_STAGE_BADGE_CLASS,
-} from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_HINT_LABEL_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 
 type Props = {
   nodeId: string;
   data: JianyingExportNodeData;
+  connectedCount: number;
+  renderedCount: number;
   frames: JianyingFrameExport[];
 };
 
-export function JianyingExportPro2Panel({ nodeId, data, frames }: Props) {
+export function JianyingExportPro2Panel({
+  nodeId,
+  data,
+  connectedCount,
+  renderedCount,
+  frames,
+}: Props) {
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
   const [loading, setLoading] = useState<"bundle" | "draft" | null>(null);
@@ -30,9 +35,8 @@ export function JianyingExportPro2Panel({ nodeId, data, frames }: Props) {
     ...f,
     dialogue: f.dialogue ?? "",
   }));
-  const videoCount = exportFrames.filter((f) => f.videoUrl).length;
   const audioCount = exportFrames.filter((f) => f.audioUrl).length;
-  const ready = videoCount > 0;
+  const ready = renderedCount > 0;
 
   const onExport = async (format: "bundle" | "draft") => {
     if (!base || !projectId || !exportFrames.length) {
@@ -51,20 +55,16 @@ export function JianyingExportPro2Panel({ nodeId, data, frames }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-3 px-3 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] text-white/75">
-          已识别 <strong className="text-white">{exportFrames.length}</strong> 镜；
-          含视频 {videoCount} · 配音 {audioCount}
-        </p>
-        <span className={PRO2_STAGE_BADGE_CLASS}>
-          {data.mediaRenderResult?.downloadUrl
-            ? "成片就绪"
-            : ready
-              ? "就绪"
-              : "待接入"}
+    <div className="flex flex-col gap-2.5 px-3 pb-1">
+      <p className="text-[11px] text-white/75">
+        已连接 <strong className="text-white">{connectedCount}</strong>
+        {" · "}
+        成片 <strong className="text-white">{renderedCount}</strong>
+        <span className="text-white/45">
+          {" "}
+          （已识别 {connectedCount} 镜；含视频 {renderedCount} · 配音 {audioCount}）
         </span>
-      </div>
+      </p>
 
       <div className="flex flex-col gap-2">
         <button
@@ -87,6 +87,15 @@ export function JianyingExportPro2Panel({ nodeId, data, frames }: Props) {
         </button>
       </div>
 
+      <div className="flex flex-col gap-1">
+        <p className={`${PRO2_HINT_LABEL_CLASS} leading-relaxed`}>
+          草稿包解压至剪映「草稿位置」对应文件夹。剪映 6+ 若无法打开，请用分镜包。
+        </p>
+        <p className={`${PRO2_HINT_LABEL_CLASS} leading-relaxed`}>
+          Mac：下载 ZIP → 本地导入剪映
+        </p>
+      </div>
+
       <JianyingMediaRenderActions
         nodeId={nodeId}
         base={base}
@@ -95,12 +104,6 @@ export function JianyingExportPro2Panel({ nodeId, data, frames }: Props) {
         persisted={data.mediaRenderResult}
       />
 
-      <p className={`${PRO2_HINT_LABEL_CLASS} leading-relaxed`}>
-        草稿包解压至剪映「草稿位置」对应文件夹。剪映 6+ 若无法打开，请用分镜包。
-      </p>
-      <p className="text-[10px] text-white/45">
-        Mac：下载 ZIP → 本地导入剪映
-      </p>
       {err ? <p className="text-[10px] text-red-300">{err}</p> : null}
     </div>
   );

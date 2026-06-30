@@ -51,6 +51,10 @@ import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import { mergeStoreNodesIntoRf } from "@/lib/canvas/canvas-rf-sync";
 import { resolveSnapConnectionOnNodeHit } from "@/lib/canvas/libtv-connection-snap";
 import {
+  isLibtvSidePlusConnectHandle,
+  resolveLibtvSideConnectMenu,
+} from "@/lib/canvas/libtv-side-connect-menu";
+import {
   applyDragSnapToNode,
   computeDragSnap,
   filterNearbySnapCandidates,
@@ -79,6 +83,8 @@ import { Pro2FloatingInspector } from "./pro2/pro2-floating-inspector";
 import { Pro2FrameCellInputDock } from "./pro2/pro2-frame-cell-input-dock";
 import { Pro2MediaGroupToolbar } from "./pro2/pro2-media-group-toolbar";
 import { Pro2SelectionToolbar } from "./pro2/pro2-selection-toolbar";
+import { Pro2SelectionBatchConnectLayer } from "./pro2/pro2-selection-batch-connect";
+import { LibtvSideConnectLayer } from "./pro2/libtv-side-connect-layer";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
 import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
 import { LibtvImageInputDock } from "./libtv-image-input-dock";
@@ -826,9 +832,6 @@ function FlowCanvasInner({
   );
   const onConnectEnd = useCallback<OnConnectEnd>(
     (event, connectionState) => {
-      setConnectingFrom(null);
-      if (connectionState.isValid) return;
-
       const clientX =
         "changedTouches" in event
           ? event.changedTouches[0]?.clientX
@@ -837,7 +840,16 @@ function FlowCanvasInner({
         "changedTouches" in event
           ? event.changedTouches[0]?.clientY
           : event.clientY;
-      if (clientX == null || clientY == null) return;
+
+      if (connectionState.isValid) {
+        setConnectingFrom(null);
+        return;
+      }
+
+      if (clientX == null || clientY == null) {
+        setConnectingFrom(null);
+        return;
+      }
 
       const flowPoint = screenToFlowPosition({ x: clientX, y: clientY });
       const nodes = getNodes() as CanvasFlowNode[];
@@ -853,7 +865,34 @@ function FlowCanvasInner({
         nodes,
         flowPoint,
       );
-      if (snapped) onConnect(snapped);
+      if (snapped) {
+        onConnect(snapped);
+        setConnectingFrom(null);
+        return;
+      }
+
+      const fromNodeId = connectionState.fromNode?.id;
+      const fromHandleId = connectionState.fromHandle?.id;
+      const fromNodeType = connectionState.fromNode?.type;
+      const fromHandleType = connectionState.fromHandle?.type;
+      if (
+        fromNodeId &&
+        fromHandleId &&
+        fromNodeType &&
+        fromHandleType &&
+        isLibtvSidePlusConnectHandle(String(fromNodeType), fromHandleId) &&
+        resolveLibtvSideConnectMenu(String(fromNodeType), fromHandleId)
+      ) {
+        useCanvasStore.getState().setPendingSideConnect({
+          anchor: { x: clientX, y: clientY },
+          fromNodeId,
+          fromHandleId,
+          fromHandleType,
+        });
+        return;
+      }
+
+      setConnectingFrom(null);
     },
     [setConnectingFrom, screenToFlowPosition, getNodes, onConnect],
   );
@@ -1394,6 +1433,10 @@ function FlowCanvasInner({
             <Pro2MediaGroupToolbar rfNodes={rfNodes} />
           </>
         ) : null}
+        {pro2FloatingInspector || sbv1Canvas ? (
+          <Pro2SelectionBatchConnectLayer rfNodes={rfNodes} />
+        ) : null}
+        <LibtvSideConnectLayer />
       </ReactFlow>
       {pro2FloatingInspector ? null : <SelectionToolbar />}
       {pro2FloatingInspector || sbv1Canvas ? (

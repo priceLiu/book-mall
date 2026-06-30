@@ -1,34 +1,33 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position } from "@xyflow/react";
-import { Clapperboard } from "lucide-react";
+import { Handle, NodeResizer, Position } from "@xyflow/react";
+import { GripVertical } from "lucide-react";
 
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
-import { collectJianyingFramesFromLibtvVideos } from "@/lib/canvas/jianying-from-workspace";
+import { collectJianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
+import {
+  libtvNodeBorderStyle,
+  libtvNodeInteractiveBorderClass,
+} from "@/lib/canvas/libtv-node-chrome";
 import { JIANYING_EXPORT_LEFT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
 import { spawnSbv1NeighborFromNode } from "@/lib/canvas/sbv1-spawn-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
-import {
-  PRO2_CARD_SUBTITLE_CLASS,
-  PRO2_CARD_TITLE_CLASS,
-  PRO2_NODE_HANDLE_CLASS,
-  PRO2_STAGE_BADGE_CLASS,
-  pro2NodeBorderColor,
-} from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_NODE_HANDLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { JianyingExportNodeData } from "@/lib/canvas/types";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
-import { JianyingExportPro2Modal } from "./jianying-export-pro2-modal";
+import { JianyingExportPro2Panel } from "./jianying-export-pro2-panel";
 
 const NODE_BG = "#212121";
+const MIN_W = 360;
+const MIN_H = 400;
 
-/** 2.0 · 导出剪辑节点（画布卡片 · 双击弹出导出面板） */
+/** 2.0 · 导出剪辑（内嵌完整导出 / 自动剪辑 · 无 Dock） */
 export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
   const d = data as unknown as JianyingExportNodeData;
-  const [modalOpen, setModalOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
 
   const nodes = useCanvasStore((s) => s.nodes);
@@ -37,17 +36,14 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
-
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
-  const frames = useMemo(
-    () => collectJianyingFramesFromLibtvVideos(id, nodes, edges),
+  const snapshot = useMemo(
+    () => collectJianyingLibtvConnectionSnapshot(id, nodes, edges),
     [id, nodes, edges],
   );
-  const videoCount = frames.filter((f) => f.videoUrl).length;
-  const showSidePlus = Boolean(
-    (hovered || selected || connectingFromNodeId) && !modalOpen,
-  );
+
+  const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
 
   const spawnStore = useMemo(
     () => ({ nodes, edges, addNode, addNodeInGroup, setNodes, setEdges }),
@@ -63,92 +59,78 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
   );
 
   const title = d.label?.trim() || "导出剪辑";
-  const subtitle =
-    videoCount > 0
-      ? `已接 ${videoCount} 个视频 · 双击导出`
-      : "连接各镜视频以导出";
-  const badgeLabel = d.mediaRenderResult?.downloadUrl
-    ? "成片就绪"
-    : videoCount > 0
-      ? "就绪"
-      : "待接入";
+  const borderStyle =
+    libtvNodeBorderStyle({
+      selected: !!selected,
+      hovered: hovered && !selected,
+      edition: "neutral",
+    }) ?? { borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" as const };
 
   return (
-    <>
-      <div
-        className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl"
-        style={{
-          backgroundColor: NODE_BG,
-          border: `1px solid ${pro2NodeBorderColor(!!selected)}`,
-        }}
-        onPointerEnter={onPointerEnter}
-        onPointerLeave={onPointerLeave}
-        onDoubleClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setModalOpen(true);
-        }}
-        title="双击打开导出面板"
-      >
-        <Handle
-          id="in_video"
-          type="target"
-          position={Position.Left}
-          className={cn(
-            PRO2_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title="各镜视频"
+    <div
+      className={cn(
+        RF_NODE_DRAG_HANDLE,
+        libtvNodeInteractiveBorderClass({
+          selected: !!selected,
+          hovered: hovered && !selected,
+          edition: "neutral",
+        }),
+        "relative flex h-full w-full min-h-0 flex-col overflow-visible rounded-2xl text-[12px] text-white",
+        "cursor-grab active:cursor-grabbing",
+      )}
+      style={{ backgroundColor: NODE_BG, ...borderStyle }}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <NodeResizer
+        isVisible={!!selected}
+        minWidth={MIN_W}
+        minHeight={MIN_H}
+        handleClassName="jianying-export-resizer-handle"
+      />
+
+      <Handle
+        id="in_video"
+        type="target"
+        position={Position.Left}
+        className={cn(
+          PRO2_NODE_HANDLE_CLASS,
+          showSidePlus
+            ? "pointer-events-none opacity-0"
+            : selected
+              ? "opacity-100"
+              : "pointer-events-none opacity-0",
+        )}
+        title="各镜视频"
+      />
+
+      {showSidePlus ? (
+        <Pro2NodeSidePlus
+          side="left"
+          handleId="plus_left"
+          visible
+          className="z-[20060]"
+          sections={JIANYING_EXPORT_LEFT_ADD_MENU}
+          onPick={onLeftPick}
         />
+      ) : null}
 
-        {showSidePlus ? (
-          <Pro2NodeSidePlus
-            side="left"
-            handleId="plus_left"
-            visible
-            sections={JIANYING_EXPORT_LEFT_ADD_MENU}
-            onPick={onLeftPick}
-          />
-        ) : null}
-
-        <div
-          className={cn(
-            RF_NODE_DRAG_HANDLE,
-            "flex shrink-0 cursor-grab items-start justify-between gap-3 px-4 py-3 active:cursor-grabbing",
-          )}
-        >
-          <div className="min-w-0">
-            <p className={cn(PRO2_CARD_TITLE_CLASS, "text-[14px]")}>{title}</p>
-            <p className={cn(PRO2_CARD_SUBTITLE_CLASS, "mt-1 truncate")}>
-              {subtitle}
-            </p>
-          </div>
-          <span className={cn(PRO2_STAGE_BADGE_CLASS, "shrink-0")}>
-            {badgeLabel}
-          </span>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col justify-end px-4 pb-4">
-          <div className="flex items-center gap-2 text-white/40">
-            <Clapperboard className="size-3.5 shrink-0" />
-            <p className="text-[11px] leading-relaxed">
-              Mac：下载 ZIP → 本地导入剪映
-            </p>
-          </div>
-        </div>
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2.5">
+        <GripVertical className="size-3.5 shrink-0 text-white/30" aria-hidden />
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/92">
+          {title}
+        </p>
       </div>
 
-      <JianyingExportPro2Modal
-        open={modalOpen}
-        nodeId={id}
-        data={d}
-        frames={frames}
-        onClose={() => setModalOpen(false)}
-      />
-    </>
+      <div className="shrink-0">
+        <JianyingExportPro2Panel
+          nodeId={id}
+          data={d}
+          connectedCount={snapshot.connectedCount}
+          renderedCount={snapshot.renderedCount}
+          frames={snapshot.frames}
+        />
+      </div>
+    </div>
   );
 }

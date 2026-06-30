@@ -24,6 +24,8 @@ export function Sbv1MediaGroupToolbar({
 }) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const edges = useCanvasStore((s) => s.edges);
+  const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
+  const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
 
@@ -33,20 +35,27 @@ export function Sbv1MediaGroupToolbar({
     );
     if (hasNonGroupSelected) return null;
     const selected = rfNodes.find((n) => n.selected && n.type === "group");
-    if (!selected) return null;
-    if (!isSbv1MediaGroup(selected, rfNodes)) return null;
-    return selected;
-  }, [rfNodes]);
+    const target =
+      selected ??
+      (hoveredMediaGroupId
+        ? rfNodes.find(
+            (n) => n.id === hoveredMediaGroupId && n.type === "group",
+          )
+        : undefined);
+    if (!target) return null;
+    if (!isSbv1MediaGroup(target, rfNodes)) return null;
+    return target;
+  }, [rfNodes, hoveredMediaGroupId]);
 
-  // 选中组时：若视频引擎在组外但已连线，纳入组内并排布
+  // 选中组时：若视频引擎在组外但已连线，纳入组内并排布（悬停预览顶栏时不重排）
   useEffect(() => {
-    if (!group) return;
+    if (!group?.selected) return;
     const nodes = useCanvasStore.getState().nodes;
     const linked = findSbv1GroupLinkedVideoEngine(group.id, nodes, edges);
     if (linked && linked.parentId !== group.id) {
       relayoutSbv1MediaGroup(setNodes, group.id, edges);
     }
-  }, [group?.id, edges, setNodes, group]);
+  }, [group?.id, group?.selected, edges, setNodes, group]);
 
   const viewport = useViewportTransformActive(Boolean(group) && !viewportMoving);
 
@@ -91,19 +100,34 @@ export function Sbv1MediaGroupToolbar({
 
   if (viewportMoving || !group || !placement) return null;
 
+  const keepHover = () => setHoveredMediaGroupId(group.id);
+  const releaseHover = () => {
+    if (
+      !group.selected &&
+      useCanvasStore.getState().hoveredMediaGroupId === group.id
+    ) {
+      setHoveredMediaGroupId(null);
+    }
+  };
+
   return (
-    <Pro2MediaGroupToolbarPanel
-      groupId={group.id}
-      kind={null}
-      edition="sbv1"
-      onRelayout={() => relayoutSbv1MediaGroup(setNodes, group.id, edges)}
+    <div
       className="fixed z-[1300]"
       style={{
         left: placement.x,
         top: placement.y,
         transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
       }}
-      onMouseDown={(e) => e.stopPropagation()}
-    />
+      onPointerEnter={keepHover}
+      onPointerLeave={releaseHover}
+    >
+      <Pro2MediaGroupToolbarPanel
+        groupId={group.id}
+        kind={null}
+        edition="sbv1"
+        onRelayout={() => relayoutSbv1MediaGroup(setNodes, group.id, edges)}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+    </div>
   );
 }

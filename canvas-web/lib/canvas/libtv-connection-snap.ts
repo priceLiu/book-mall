@@ -4,7 +4,7 @@ import { absoluteNodePosition, nodeMeasuredSize } from "./normalize-graph-nodes"
 import type { CanvasFlowNode } from "./types";
 
 /** 拖线松手时 · 节点 type → 默认 target / source handle */
-const DEFAULT_HANDLE_BY_TYPE: Record<
+export const DEFAULT_HANDLE_BY_TYPE: Record<
   string,
   { target?: string; source?: string }
 > = {
@@ -69,6 +69,52 @@ export type SnapConnectionEndArgs = {
 
 /** 松手点距节点外框的吸附容差（px · 画布坐标） */
 const CONNECT_SNAP_PADDING = 28;
+
+function distancePointToRect(
+  point: { x: number; y: number },
+  box: { left: number; top: number; right: number; bottom: number },
+): number {
+  const dx =
+    point.x < box.left
+      ? box.left - point.x
+      : point.x > box.right
+        ? point.x - box.right
+        : 0;
+  const dy =
+    point.y < box.top
+      ? box.top - point.y
+      : point.y > box.bottom
+        ? point.y - box.bottom
+        : 0;
+  return Math.hypot(dx, dy);
+}
+
+/** 框选批量连线 · 优先吸附到「导出剪辑」节点外框 */
+export function findBatchConnectSnapTarget(
+  nodes: CanvasFlowNode[],
+  flowPoint: { x: number; y: number },
+  excludeIds: string[],
+): CanvasFlowNode | null {
+  const exclude = new Set(excludeIds);
+  let nearestExport: { node: CanvasFlowNode; dist: number } | null = null;
+  for (const n of nodes) {
+    if (n.type !== "jianying-export-pro2" || exclude.has(n.id)) continue;
+    const box = nodeSnapBox(n, nodes);
+    const dist = distancePointToRect(flowPoint, box);
+    if (
+      dist <= CONNECT_SNAP_PADDING * 2 &&
+      (!nearestExport || dist < nearestExport.dist)
+    ) {
+      nearestExport = { node: n, dist };
+    }
+  }
+  if (nearestExport) return nearestExport.node;
+  return findTopmostNodeAtFlowPoint(
+    nodes,
+    flowPoint,
+    excludeIds[0],
+  );
+}
 
 /** 拖线未命中 Handle 但落在节点上时，补全连线 */
 export function resolveSnapConnectionOnNodeHit(

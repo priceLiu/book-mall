@@ -39,6 +39,7 @@ import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
 import { useLibtvNodeDuplicate, crewNodeShowsParticipatingBadge } from "./libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2/pro2-crew-task-status-badge";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
+import { LibtvNodeToolbarPortal } from "./libtv-node-toolbar-portal";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
@@ -450,33 +451,31 @@ export function LibtvImageNode({
           </>
         ) : null}
 
-        {showFloatingToolbar && !showImageTools && !isCharacterThreeView ? (
-          <Pro2ImageNodeToolbar
-            passNodeDrag
-            minimal
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            onDuplicateNode={onDuplicateNode}
-          />
-        ) : null}
-
-        {showImageTools ? (
-          <Pro2ImageNodeToolbar
-            passNodeDrag
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            previewUrl={previewUrl}
-            onExpandPreview={() => setPreviewOpen(true)}
-            onSaveAsAsset={() =>
-              saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
-            }
-            onImportPortrait={
-              d.ossUrl ? () => void importPortrait() : undefined
-            }
-            portraitImporting={portraitImporting}
-            portraitActive={portraitActive}
-            onDuplicateNode={onDuplicateNode}
-          />
+        {showFloatingToolbar && !isCharacterThreeView ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
+            {showImageTools ? (
+              <Pro2ImageNodeToolbar
+                passNodeDrag
+                previewUrl={previewUrl}
+                onExpandPreview={() => setPreviewOpen(true)}
+                onSaveAsAsset={() =>
+                  saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
+                }
+                onImportPortrait={
+                  d.ossUrl ? () => void importPortrait() : undefined
+                }
+                portraitImporting={portraitImporting}
+                portraitActive={portraitActive}
+                onDuplicateNode={onDuplicateNode}
+              />
+            ) : (
+              <Pro2ImageNodeToolbar
+                passNodeDrag
+                minimal
+                onDuplicateNode={onDuplicateNode}
+              />
+            )}
+          </LibtvNodeToolbarPortal>
         ) : null}
 
         <div

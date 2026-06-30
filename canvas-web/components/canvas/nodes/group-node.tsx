@@ -88,6 +88,8 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const reflowStoryTemplateGroups = useCanvasStore(
     (s) => s.reflowStoryTemplateGroups,
   );
+  const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
+  const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
   const hasMediaChildren = useCanvasStore((s) =>
     s.nodes.some(
       (n) =>
@@ -120,6 +122,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const isPro2MediaGroup = Boolean(d.pro2Kind);
   const isSbv1Group = Boolean(d.sbv1Styled);
   const isLibtvMediaGroup = isPro2MediaGroup || isSbv1Group;
+  const groupHovered = isLibtvMediaGroup && hoveredMediaGroupId === id;
   const isStoryTemplateGroup =
     id === "sc-group-characters" ||
     id === "sc-group-media" ||
@@ -351,13 +354,27 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           : "rounded-[20px]",
       )}
       data-pro2-media-group={isLibtvMediaGroup ? id : undefined}
+      onPointerEnter={
+        isLibtvMediaGroup
+          ? () => setHoveredMediaGroupId(id)
+          : undefined
+      }
+      onPointerLeave={
+        isLibtvMediaGroup
+          ? () => {
+              if (useCanvasStore.getState().hoveredMediaGroupId === id) {
+                setHoveredMediaGroupId(null);
+              }
+            }
+          : undefined
+      }
       style={
         isLibtvMediaGroup
           ? {
               backgroundColor: PRO2_MEDIA_GROUP_BG,
               backgroundImage: PRO2_MEDIA_GROUP_DOT_GRID,
               backgroundSize: PRO2_MEDIA_GROUP_DOT_SIZE,
-              border: `${PRO2_MEDIA_GROUP_BORDER_WIDTH}px solid ${pro2MediaGroupBorderColor(color, selected)}`,
+              border: `${PRO2_MEDIA_GROUP_BORDER_WIDTH}px solid ${pro2MediaGroupBorderColor(color, selected, groupHovered && !selected)}`,
             }
           : {
               background: "transparent",

@@ -966,7 +966,7 @@ export const NODE_DEFAULT_SIZE: Record<
   },
   "jianying-export-pro2": {
     width: 400,
-    height: 180,
+    height: 460,
   },
   "sbv1-image": {
     width: SBV1_IMAGE_NODE_WIDTH,

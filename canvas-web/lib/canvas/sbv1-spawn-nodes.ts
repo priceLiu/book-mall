@@ -23,6 +23,7 @@ import {
 import { cloneCanvasNodeData } from "./clone-node-data";
 import { PRO2_TEXT_NODE_MIN_WIDTH } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+import { flowPositionAtScreenPoint } from "./viewport-placement";
 
 const GAP = 48;
 const JIANYING_EXPORT_PRO2_WIDTH = 400;
@@ -128,6 +129,8 @@ export function spawnSbv1NeighborFromNode(
     connectFromAnchor?: boolean;
     /** 左侧 + · 动作视频：上游视频 out_video → 本节点 in_motion_video */
     connectAsMotionVideo?: boolean;
+    /** 松手位置（屏幕坐标）· 优先于邻居偏移 */
+    atScreen?: { x: number; y: number };
   },
 ): string {
   const { nodes, addNode, setNodes, setEdges } = store;
@@ -138,7 +141,8 @@ export function spawnSbv1NeighborFromNode(
     nodeType === "sbv1-video-engine" &&
     side === "right" &&
     self.type === "sbv1-image" &&
-    self.parentId
+    self.parentId &&
+    !options?.atScreen
   ) {
     const group = nodes.find((n) => n.id === self.parentId);
     if (group && isSbv1MediaGroup(group, nodes)) {
@@ -161,13 +165,18 @@ export function spawnSbv1NeighborFromNode(
         : nodeType === "story-pro2-starter"
           ? PRO2_TEXT_NODE_MIN_WIDTH
           : SBV1_IMAGE_NODE_WIDTH;
-  const { x, y } = sbv1NeighborFlowPosition(
+  const neighborPos = sbv1NeighborFlowPosition(
     self,
     nodes,
     side,
     newNodeW,
     nodeType,
   );
+  const spawnPos = options?.atScreen
+    ? flowPositionAtScreenPoint(nodeType as CanvasNodeType, options.atScreen)
+    : neighborPos;
+  const x = spawnPos.x;
+  const y = spawnPos.y;
 
   if (nodeType === "story-pro2-starter") {
     const newId = addNode(

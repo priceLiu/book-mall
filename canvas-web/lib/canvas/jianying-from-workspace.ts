@@ -93,12 +93,11 @@ export function collectJianyingFramesFromWorkspace(
   return collectJianyingFramesFromColumns(frameRows, videoRows);
 }
 
-/** 从剪映导出节点 in_video 入边收集 LibTV / 画布视频节点（按 X 排序） */
-export function collectJianyingFramesFromLibtvVideos(
+function incomingLibtvVideoNodes(
   exportNodeId: string,
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
-): JianyingFrameExport[] {
+): CanvasFlowNode[] {
   const incoming = edges.filter(
     (e) =>
       e.target === exportNodeId &&
@@ -107,7 +106,7 @@ export function collectJianyingFramesFromLibtvVideos(
         e.targetHandle === "in_storyboard"),
   );
 
-  const videoNodes = incoming
+  return incoming
     .map((e) => nodes.find((n) => n.id === e.source))
     .filter(
       (n): n is CanvasFlowNode =>
@@ -119,14 +118,45 @@ export function collectJianyingFramesFromLibtvVideos(
       if (ax !== bx) return ax - bx;
       return a.id.localeCompare(b.id);
     });
+}
 
-  return videoNodes
-    .map((node, i) => ({
-      frameIndex: i + 1,
-      videoUrl: videoUrlFromConnectedNode(node),
-      dialogue: dialogueFromConnectedVideoNode(node),
-    }))
-    .filter((f) => Boolean(f.videoUrl));
+export type JianyingLibtvConnectionSnapshot = {
+  /** in_video 入边 · 视频类源节点总数（含未生成） */
+  connectedCount: number;
+  /** 其中已有 oss / ephemeral 视频 URL 的数量 */
+  renderedCount: number;
+  /** 仅含成片的导出帧（ZIP / 自动剪辑用） */
+  frames: JianyingFrameExport[];
+};
+
+/** 导出剪辑 · LibTV 连线快照（连线数 + 成片数） */
+export function collectJianyingLibtvConnectionSnapshot(
+  exportNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): JianyingLibtvConnectionSnapshot {
+  const videoNodes = incomingLibtvVideoNodes(exportNodeId, nodes, edges);
+  const slots = videoNodes.map((node, i) => ({
+    frameIndex: i + 1,
+    videoUrl: videoUrlFromConnectedNode(node),
+    dialogue: dialogueFromConnectedVideoNode(node),
+  }));
+  const frames = slots.filter((f) => Boolean(f.videoUrl));
+  return {
+    connectedCount: slots.length,
+    renderedCount: frames.length,
+    frames,
+  };
+}
+
+/** 从剪映导出节点 in_video 入边收集 LibTV / 画布视频节点（按 X 排序 · 仅成片） */
+export function collectJianyingFramesFromLibtvVideos(
+  exportNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): JianyingFrameExport[] {
+  return collectJianyingLibtvConnectionSnapshot(exportNodeId, nodes, edges)
+    .frames;
 }
 
 /** 优先 LibTV 连线视频；无连线时回退 Pro2 工作区视频列 */

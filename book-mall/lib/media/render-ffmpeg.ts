@@ -59,9 +59,10 @@ function scaleFilter(scaleMode: RenderProfile["video"]["scaleMode"]): string {
   if (scaleMode === "source") {
     return "setsar=1";
   }
+  const [w, h] = scaleMode === "fit720p" ? [1280, 720] : [1920, 1080];
   return [
-    "scale=1920:1080:force_original_aspect_ratio=decrease",
-    "pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black",
+    `scale=${w}:${h}:force_original_aspect_ratio=decrease`,
+    `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black`,
     "setsar=1",
     "fps=30",
   ].join(",");
