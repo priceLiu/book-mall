@@ -18,8 +18,10 @@ export function buildCanvasVideoKieInput(args: {
   imageUrl: string | null;
   /** Seedance 等多图模型：三视图等附加参考（分镜图已在 imageUrl） */
   referenceImageUrls?: string[];
+  /** Kling 3.0 · multi_shots=false 时 image_urls[1] 为尾帧 */
+  lastFrameUrl?: string | null;
   options?: StoryVideoOptions;
-  aspectRatio?: "16:9" | "9:16";
+  aspectRatio?: "16:9" | "9:16" | "1:1";
 }): { model: string; input: Record<string, unknown> } {
   const requested = args.modelKey;
   if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(requested)) {
@@ -81,6 +83,62 @@ export function buildCanvasVideoKieInput(args: {
     };
   }
 
+  if (modelId === "kling/v3-turbo-image-to-video") {
+    const rawDur = Number(args.options?.duration ?? desc.defaults.duration);
+    const dur = Number.isFinite(rawDur) && rawDur >= 3 ? String(Math.round(rawDur)) : "5";
+    const res = resolution === "1080p" ? "1080p" : "720p";
+    const lastUrl = args.lastFrameUrl?.trim() || null;
+    let image_urls: string[] = [];
+    if (mainUrl && lastUrl) image_urls = [mainUrl, lastUrl];
+    else if (mainUrl) image_urls = [mainUrl];
+    return {
+      model: "kling/v3-turbo-image-to-video",
+      input: {
+        prompt: args.prompt,
+        image_urls,
+        duration: dur,
+        resolution: res,
+      },
+    };
+  }
+
+  if (modelId === "kling-3.0/video") {
+    const rawDur = Number(args.options?.duration ?? desc.defaults.duration);
+    const dur = Number.isFinite(rawDur) && rawDur >= 3 ? String(Math.round(rawDur)) : "5";
+    const mode =
+      typeof args.options?.mode === "string" &&
+      (args.options.mode === "std" || args.options.mode === "pro")
+        ? args.options.mode
+        : "pro";
+    const multiShots = args.options?.multi_shots === true;
+    const lastUrl = args.lastFrameUrl?.trim() || null;
+    const sound =
+      args.options?.sound ??
+      args.options?.generateAudio ??
+      desc.defaults.generateAudio ??
+      true;
+    let image_urls: string[] = [];
+    if (multiShots) {
+      if (mainUrl) image_urls = [mainUrl];
+    } else if (mainUrl && lastUrl) {
+      image_urls = [mainUrl, lastUrl];
+    } else if (mainUrl) {
+      image_urls = [mainUrl];
+    }
+    return {
+      model: "kling-3.0/video",
+      input: {
+        prompt: args.prompt,
+        image_urls,
+        duration: dur,
+        aspect_ratio: aspect,
+        mode,
+        sound: sound !== false,
+        multi_shots: multiShots,
+      },
+    };
+  }
+
   if (modelId === "grok-imagine/image-to-video") {
     return buildKieGrokImageToVideoCreateArgs({
       prompt: args.prompt,
@@ -107,7 +165,8 @@ export function buildCanvasVideoKieInput(args: {
     model: "wan/2-7-image-to-video",
     input: {
       prompt: args.prompt,
-      first_frame_url: args.imageUrl,
+      first_frame_url: mainUrl ?? undefined,
+      last_frame_url: args.lastFrameUrl?.trim() || undefined,
       resolution,
       duration,
       prompt_extend:

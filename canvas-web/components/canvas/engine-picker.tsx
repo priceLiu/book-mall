@@ -7,7 +7,7 @@ import {
   useModalBodyScrollLock,
   useModalEscapeClose,
 } from "@/lib/canvas/use-modal-portal-effects";
-import { ChevronDown, Cog, ExternalLink, Sparkles, X } from "lucide-react";
+import { ChevronDown, Cog, ExternalLink, Film, Sparkles, X } from "lucide-react";
 
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import type {
@@ -25,6 +25,10 @@ import {
 } from "@/lib/canvas/story-model-capabilities";
 import {
   gatewayModelRoleMeta,
+  hideKieVendorLabel,
+  ENGINE_PICKER_MODAL_BG,
+  ENGINE_PICKER_SELECTED_BORDER,
+  ENGINE_PICKER_UNSELECTED_BORDER,
   type GatewayModelRole,
 } from "@/lib/canvas/gateway-model-role";
 
@@ -56,6 +60,8 @@ export type EnginePickerProps = {
   embedded?: boolean;
   /** 仅展示这些 Provider（如 gateway:volcengine） */
   providerIds?: string[];
+  /** 模型列表布局：grid（默认 · 双列卡片）/ list（单列行）/ dropdown（折叠下拉 · 单列行） */
+  layout?: "grid" | "list" | "dropdown";
 };
 
 /* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
@@ -81,6 +87,7 @@ export function EnginePicker({
   embedded = false,
   modelsOnly = false,
   providerIds,
+  layout = "grid",
 }: EnginePickerProps) {
   const { providers, loading } = useUserProviders();
   const [open, setOpen] = useState(false);
@@ -164,6 +171,7 @@ export function EnginePicker({
         params={params}
         capabilityMismatch={capabilityMismatch}
         modelsOnly={modelsOnly}
+        layout={layout}
         onChange={onChange}
       />
     );
@@ -184,7 +192,9 @@ export function EnginePicker({
             <span className="text-[var(--canvas-muted)]">加载 Providers…</span>
           ) : current ? (
             <>
-              <span className="text-white/70">{current.provider.alias}</span>
+              <span className="text-white/70">
+                {hideKieVendorLabel(current.provider.alias)}
+              </span>
               <span className="mx-1 text-white/30">·</span>
               <span className="font-mono">{current.model.modelKey}</span>
             </>
@@ -229,6 +239,7 @@ function EnginePickerInlinePanel({
   params,
   capabilityMismatch,
   modelsOnly = false,
+  layout = "grid",
   onChange,
 }: {
   role: "LLM" | "IMAGE" | "VIDEO";
@@ -239,11 +250,13 @@ function EnginePickerInlinePanel({
   params: Record<string, unknown>;
   capabilityMismatch: string | null;
   modelsOnly?: boolean;
+  layout?: "grid" | "list" | "dropdown";
   onChange: EnginePickerProps["onChange"];
 }) {
   const [draft, setDraft] = useState<DraftSelection | null>(() =>
     resolveInitialDraft(groups, providerId, modelKey, params),
   );
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const paramsKey = useMemo(() => JSON.stringify(params), [params]);
   const groupsKey = useMemo(
     () =>
@@ -274,7 +287,7 @@ function EnginePickerInlinePanel({
     });
   };
 
-  if (loading) {
+  if (loading && groups.length === 0) {
     return (
       <p className="text-[12px] text-[var(--canvas-muted)]">加载 Providers…</p>
     );
@@ -289,6 +302,73 @@ function EnginePickerInlinePanel({
       ) : null}
       {groups.length === 0 ? (
         <EmptyState role={role} />
+      ) : layout === "dropdown" ? (
+        <>
+          <div>
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDropdownOpen((open) => !open);
+              }}
+              className="flex w-full items-center gap-2 rounded-xl border border-white/15 bg-white/[.02] px-3 py-2 text-left transition hover:border-white/25"
+            >
+              <span className="min-w-0 flex-1">
+                {draft ? (
+                  <ModelListRowContent model={draft.model} selected />
+                ) : (
+                  <span className="text-[13px] text-white/45">
+                    {gatewayModelRoleMeta(role as GatewayModelRole).pickerPlaceholder}
+                  </span>
+                )}
+              </span>
+              <ChevronDown
+                className={[
+                  "size-4 shrink-0 text-white/50 transition-transform",
+                  dropdownOpen ? "rotate-180" : "",
+                ].join(" ")}
+              />
+            </button>
+            {dropdownOpen ? (
+              <div className="mt-1.5 max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-1.5">
+                {groups.map(({ provider, models }) => (
+                  <ProviderGroup
+                    key={provider.id}
+                    provider={provider}
+                    models={models}
+                    draft={draft}
+                    layout="list"
+                    onSelectModel={(m) => {
+                      const same =
+                        draft?.provider.id === provider.id &&
+                        draft?.model.modelKey === m.modelKey;
+                      emitDraft({
+                        provider,
+                        model: m,
+                        params: same
+                          ? (draft?.params ?? buildModelParams(m))
+                          : buildModelParams(m),
+                      });
+                      setDropdownOpen(false);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {draft && hasParams && !modelsOnly ? (
+            <DynamicParamForm
+              variant="panel"
+              schema={draft.model.paramsSchema}
+              value={draft.params}
+              onChange={(next) => {
+                if (!draft) return;
+                emitDraft({ ...draft, params: next });
+              }}
+            />
+          ) : null}
+        </>
       ) : (
         <>
           {groups.map(({ provider, models }) => (
@@ -297,6 +377,7 @@ function EnginePickerInlinePanel({
               provider={provider}
               models={models}
               draft={draft}
+              layout={layout}
               onSelectModel={(m) => {
                 const same =
                   draft?.provider.id === provider.id &&
@@ -414,7 +495,8 @@ function EngineModelModal({
       aria-modal="true"
     >
       <div
-        className="nodrag nowheel flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
+        className="nodrag nowheel flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+        style={{ backgroundColor: ENGINE_PICKER_MODAL_BG }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
@@ -533,17 +615,25 @@ function ProviderGroup({
   provider,
   models,
   draft,
+  layout = "grid",
   onSelectModel,
 }: {
   provider: CanvasProviderDto;
   models: CanvasProviderModelDto[];
   draft: DraftSelection | null;
+  layout?: "grid" | "list";
   onSelectModel: (m: CanvasProviderModelDto) => void;
 }) {
   const isPlatformOffering = provider.id === "platform:offering";
   return (
     <section>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div
+        className={
+          layout === "list"
+            ? "flex flex-col gap-1.5"
+            : "grid grid-cols-1 gap-2 sm:grid-cols-2"
+        }
+      >
         {models.map((m) => {
           const selected =
             draft?.provider.id === provider.id &&
@@ -554,6 +644,7 @@ function ProviderGroup({
               model={m}
               providerKind={isPlatformOffering ? "" : provider.kind}
               selected={selected}
+              layout={layout}
               onClick={() => onSelectModel(m)}
             />
           );
@@ -563,17 +654,104 @@ function ProviderGroup({
   );
 }
 
+/** 从模型默认参数里取视频时长，作为列表行右侧徽标（如 5s） */
+function modelDurationBadge(model: CanvasProviderModelDto): string | null {
+  const d = model.defaultParams?.duration;
+  const n = typeof d === "number" ? d : Number(d);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${Math.round(n)}s`;
+}
+
+function ModelListRowContent({
+  model,
+  selected = false,
+}: {
+  model: CanvasProviderModelDto;
+  selected?: boolean;
+}) {
+  const name = hideKieVendorLabel(model.displayName) || model.modelKey;
+  const desc = hideKieVendorLabel(model.description ?? "");
+  const badge = modelDurationBadge(model);
+  return (
+    <span className="flex w-full items-center gap-3">
+      <span
+        className={[
+          "grid size-9 shrink-0 place-items-center rounded-lg border",
+          selected
+            ? "border-white/40 bg-white/10"
+            : "border-white/10 bg-white/[.04]",
+        ].join(" ")}
+      >
+        <Film className="size-[18px] text-white/70" strokeWidth={1.75} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-[14px] font-medium text-white">
+            {name}
+          </span>
+          {selected ? (
+            <span className="grid size-4 shrink-0 place-items-center rounded-full bg-white text-[9px] font-bold text-black">
+              ✓
+            </span>
+          ) : null}
+        </span>
+        {desc ? (
+          <span className="mt-0.5 line-clamp-1 text-[11.5px] text-white/45">
+            {desc}
+          </span>
+        ) : null}
+      </span>
+      {badge ? (
+        <span className="shrink-0 rounded-md bg-white/[.06] px-1.5 py-0.5 text-[11px] tabular-nums text-white/45">
+          {badge}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function ModelCard({
   model,
   providerKind: _providerKind,
   selected,
+  layout = "grid",
   onClick,
 }: {
   model: CanvasProviderModelDto;
   providerKind: string;
   selected: boolean;
+  layout?: "grid" | "list";
   onClick: () => void;
 }) {
+  const name = hideKieVendorLabel(model.displayName) || model.modelKey;
+  const desc = hideKieVendorLabel(model.description ?? "");
+
+  if (layout === "list") {
+    return (
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={[
+          "group flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
+          selected
+            ? "bg-white/[.04] text-white"
+            : "text-white/80 hover:border-white/20 hover:bg-white/[.03] hover:text-white",
+        ].join(" ")}
+        style={{
+          borderColor: selected
+            ? ENGINE_PICKER_SELECTED_BORDER
+            : ENGINE_PICKER_UNSELECTED_BORDER,
+        }}
+      >
+        <ModelListRowContent model={model} selected={selected} />
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -584,13 +762,16 @@ function ModelCard({
       }}
       className={[
         "relative rounded-xl border px-4 py-3 text-left transition",
-        selected
-          ? "border-white bg-white/[.06] text-white"
-          : "border-white/15 text-white/75 hover:border-white/30 hover:text-white",
+        selected ? "bg-white/[.04] text-white" : "text-white/75 hover:text-white",
       ].join(" ")}
+      style={{
+        borderColor: selected
+          ? ENGINE_PICKER_SELECTED_BORDER
+          : ENGINE_PICKER_UNSELECTED_BORDER,
+      }}
     >
       <p className="line-clamp-2 text-[13px] font-medium">
-        {model.displayName || model.modelKey}
+        {name}
       </p>
       {selected ? (
         <span className="absolute right-2 top-2 grid size-4 place-items-center rounded-full bg-white text-[9px] font-bold text-black">

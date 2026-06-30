@@ -6,6 +6,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import {
@@ -59,6 +60,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
 }) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
+  const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
@@ -73,13 +75,18 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   const nodeData = (data ?? {}) as Sbv1VideoEngineNodeData;
 
   const upstreamLinks = useMemo(
-    () => resolveSbv1UpstreamRefLinks(nodeId, useCanvasStore.getState().nodes, edges),
-    [nodeId, edges],
+    () => resolveSbv1UpstreamRefLinks(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
+  );
+
+  const upstreamTextLinks = useMemo(
+    () => resolveSbv1UpstreamTextLinks(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
   );
 
   const mentionables = useMemo(
-    () => buildSbv1DockMentionables(upstreamLinks, useCanvasStore.getState().nodes),
-    [upstreamLinks],
+    () => buildSbv1DockMentionables(upstreamLinks, nodes),
+    [upstreamLinks, nodes],
   );
 
   const isGenerating =
@@ -111,6 +118,8 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     const resolved = resolveSbv1VideoEngineInputs(latestNodes, latestEdges, nodeId, {
       prompt,
       referenceMode: latestData.referenceMode ?? "omni",
+      dockInputMode: latestData.dockInputMode,
+      modelKey: latestData.engine?.modelKey,
     });
     if (!resolved.ok) {
       revertPending();
@@ -161,6 +170,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       nodeId={nodeId}
       data={nodeData}
       upstreamLinks={upstreamLinks}
+      upstreamTextLinks={upstreamTextLinks}
       mentionables={mentionables}
       isGenerating={isGenerating}
       onPatch={onPatch}

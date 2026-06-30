@@ -37,6 +37,8 @@ export default defineConfig({
       "test/unit/friendly-task-error.test.ts",
       "test/unit/pro2-dock-ref-resolve.test.ts",
       "test/unit/libtv-dock-scale.test.ts",
+      "test/unit/sbv1-upstream-ref-links.test.ts",
+      "test/unit/jianying-from-workspace.test.ts",
       "test/unit/libtv-node-toolbar-scale.test.ts",
     ],
     environment: "node",

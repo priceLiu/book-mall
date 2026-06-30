@@ -32,7 +32,7 @@ const PRO2_NODE_LABELS: Record<string, string> = {
   "story-pro2-scene": "场景设计",
   "story-pro2-frame": "分镜脚本",
   "story-pro2-video": "分镜视频",
-  "jianying-export-pro2": "剪映导出",
+  "jianying-export-pro2": "导出剪辑",
 };
 
 function inspectorProps(node: CanvasFlowNode): NodeProps {
@@ -180,6 +180,7 @@ export function Pro2FloatingInspector() {
     storeNode.type === "story-pro2-image" ||
     storeNode.type === "story-pro2-three-view" ||
     storeNode.type === "story-pro2-style-asset" ||
+    storeNode.type === "jianying-export-pro2" ||
     storeNode.type === "group" ||
     visualGroupController
   ) {

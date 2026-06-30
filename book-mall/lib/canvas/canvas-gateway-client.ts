@@ -30,6 +30,7 @@ import {
 import {
   gatewayV1AudioSpeech,
   gatewayV1ChatCompletionsStream,
+  gatewayV1CreateTask,
   gatewayV1ImageParsing,
   gatewayV1RecordInfo,
 } from "@/lib/gateway/gateway-v1-http-client";

@@ -22,6 +22,7 @@ export type ResolveSbv1VideoEngineInputsResult =
       ok: true;
       imageInputs: string[];
       portraitAssetRefs: PortraitAssetRefPayload[];
+      videoInputs: string[];
     }
   | { ok: false; error: string };
 
@@ -90,6 +91,35 @@ function resolveUpstreamMediaSlot(
   return null;
 }
 
+function httpsVideoUrlFromNode(node: CanvasFlowNode): string | null {
+  if (node.type !== "sbv1-video-engine") return null;
+  const d = node.data as {
+    runtime?: { ossUrl?: string; ephemeralUrl?: string };
+  };
+  const url = String(
+    d.runtime?.ossUrl ?? d.runtime?.ephemeralUrl ?? "",
+  ).trim();
+  return /^https?:\/\//.test(url) ? url : null;
+}
+
+/** 动作控制 · 驱动视频（连到 in_motion_video 的上游视频节点 OSS） */
+function resolveMotionVideoInputs(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  engineNodeId: string,
+): string[] {
+  const out: string[] = [];
+  for (const e of edges) {
+    if (e.target !== engineNodeId) continue;
+    if (e.targetHandle !== "in_motion_video") continue;
+    const src = nodes.find((n) => n.id === e.source);
+    if (!src) continue;
+    const url = httpsVideoUrlFromNode(src);
+    if (url) out.push(url);
+  }
+  return [...new Set(out)];
+}
+
 /**
  * sbv1 视频合成 · Seedance 2.0 参考图：
  * - 已「私域人像入库」→ asset://（portraitAssetRefs）
@@ -103,10 +133,15 @@ export function resolveSbv1VideoEngineInputs(
   opts: {
     prompt?: string;
     referenceMode?: Sbv1ReferenceMode;
+    dockInputMode?: import("./sbv1-workspace-types").Sbv1DockInputMode;
+    modelKey?: string;
   },
 ): ResolveSbv1VideoEngineInputsResult {
   const prompt = String(opts.prompt ?? "").trim();
   const referenceMode = opts.referenceMode ?? "omni";
+  const allowKlingTextToVideo =
+    opts.modelKey?.trim() === "kling-3.0/video" &&
+    opts.dockInputMode === "t2v";
   const upstreamLinks = resolveSbv1UpstreamRefLinks(engineNodeId, nodes, edges);
   const mentionedIds = parseReferencedIds(prompt);
   const activeLinks =
@@ -143,9 +178,10 @@ export function resolveSbv1VideoEngineInputs(
   }
 
   const styleHttps = resolveNonSbv1ImageHttpsInputs(nodes, edges, engineNodeId);
+  const videoInputs = resolveMotionVideoInputs(nodes, edges, engineNodeId);
 
   if (referenceMode === "first_last") {
-    if (slots.length < 1) {
+    if (slots.length < 1 && !allowKlingTextToVideo) {
       return {
         ok: false,
         error: "首尾帧模式需要至少一张参考图（已入库 asset:// 或未入库 OSS 均可）。",
@@ -175,7 +211,8 @@ export function resolveSbv1VideoEngineInputs(
       !prompt &&
       portraitAssetRefs.length === 0 &&
       imageInputs.length === 0 &&
-      styleHttps.length === 0
+      styleHttps.length === 0 &&
+      !allowKlingTextToVideo
     ) {
       return {
         ok: false,
@@ -187,6 +224,7 @@ export function resolveSbv1VideoEngineInputs(
       ok: true,
       imageInputs: [...new Set([...imageInputs, ...styleHttps])],
       portraitAssetRefs: dedupePortraitAssetRefs(portraitAssetRefs),
+      videoInputs,
     };
   }
 
@@ -204,7 +242,7 @@ export function resolveSbv1VideoEngineInputs(
   const dedupedAssets = dedupePortraitAssetRefs(portraitAssetRefs);
   const dedupedImages = [...new Set([...imageInputs, ...styleHttps])];
 
-  if (!prompt && dedupedAssets.length === 0 && dedupedImages.length === 0) {
+  if (!prompt && dedupedAssets.length === 0 && dedupedImages.length === 0 && !allowKlingTextToVideo) {
     return {
       ok: false,
       error: "请填写 prompt 或连接至少一张参考图。",
@@ -215,5 +253,6 @@ export function resolveSbv1VideoEngineInputs(
     ok: true,
     imageInputs: dedupedImages,
     portraitAssetRefs: dedupedAssets,
+    videoInputs,
   };
 }

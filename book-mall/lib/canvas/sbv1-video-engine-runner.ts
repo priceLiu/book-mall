@@ -8,6 +8,10 @@ import {
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import {
+  clampSbv1ReferenceMode,
+  getSbv1VideoModelRefCaps,
+} from "./sbv1-video-model-reference";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 
@@ -19,7 +23,6 @@ export async function runSbv1VideoEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
-  const referenceMode = String(data.referenceMode ?? "omni") as Sbv1ReferenceMode;
   const engine = (data.engine as Record<string, unknown> | undefined) ?? {};
   const providerId = String(engine.providerId ?? data.providerId ?? "");
   const modelKey = String(engine.modelKey ?? data.modelKey ?? "");
@@ -27,6 +30,13 @@ export async function runSbv1VideoEngineNode(
     ...((engine.params as Record<string, unknown> | undefined) ?? {}),
     ...((data.params as Record<string, unknown> | undefined) ?? {}),
   };
+  const referenceMode = clampSbv1ReferenceMode(
+    String(data.referenceMode ?? "omni") as Sbv1ReferenceMode,
+    getSbv1VideoModelRefCaps(modelKey, {
+      multiShots: params.multi_shots === true,
+      providerId,
+    }),
+  );
 
   const aspectRatio = resolveVolcengineVideoRatio(
     String(data.aspectRatio ?? params.aspect_ratio ?? "16:9"),
@@ -45,11 +55,27 @@ export async function runSbv1VideoEngineNode(
   if (!providerId || !modelKey) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
-      "sbv1-video-engine 缺少 Volcengine 模型配置",
+      "sbv1-video-engine 缺少模型配置",
     );
   }
 
-  if (!promptRaw && imageInputs.length === 0 && !hasPortraitRefs) {
+  const isMotionControl =
+    modelKey === "kling-2.6/motion-control" ||
+    modelKey === "kling-3.0/motion-control";
+
+  const dockInputMode = data.dockInputMode as
+    | import("./sbv1-workspace-types").Sbv1DockInputMode
+    | undefined;
+  const isKlingTextToVideo =
+    modelKey === "kling-3.0/video" && dockInputMode === "t2v";
+
+  if (
+    !promptRaw &&
+    imageInputs.length === 0 &&
+    !hasPortraitRefs &&
+    !isMotionControl &&
+    !isKlingTextToVideo
+  ) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "请填写 prompt 或连接至少一张参考图",
@@ -62,7 +88,12 @@ export async function runSbv1VideoEngineNode(
   let lastFrameImageUrl = "";
   let forceReferenceMode = false;
 
-  if (referenceMode === "first_last") {
+  if (isKlingTextToVideo) {
+    mainFrameImageUrl = "";
+    referenceImageUrls = [];
+    lastFrameImageUrl = "";
+    forceReferenceMode = false;
+  } else if (referenceMode === "first_last") {
     const firstAsset = portraitRefs.find((r) => r.role === "first_frame");
     const lastAsset = portraitRefs.find((r) => r.role === "last_frame");
     if (firstAsset && lastAsset) {
@@ -119,8 +150,21 @@ export async function runSbv1VideoEngineNode(
   if (referenceMode !== "smart_multi") {
     params.duration = durationSec;
   }
+  if (modelKey === "kling-3.0/video" && referenceMode === "first_last") {
+    params.multi_shots = false;
+  }
   params.generate_audio =
     params.generate_audio !== false && params.generateAudio !== false;
+
+  if (isMotionControl) {
+    const videoUrls = Array.isArray(params.reference_video_urls)
+      ? (params.reference_video_urls as unknown[]).filter(
+          (u): u is string =>
+            typeof u === "string" && /^https?:\/\//.test(u.trim()),
+        )
+      : [];
+    params.reference_video_urls = videoUrls;
+  }
 
   const variantId = String(
     data.volcengineVariantId ?? data.jimengModelId ?? "",

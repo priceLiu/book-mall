@@ -158,6 +158,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   }, [nodes, id]);
 
   const leftAddMenuSections = PRO2_STARTER_LEFT_ADD_MENU;
+  const showSidePlus = (hovered || !!selected) && !isGenerating;
 
   const openEditor = useCallback(() => {
     if (!hasCardContent || isGenerating) return;
@@ -418,7 +419,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         )}
       />
 
-      {selected ? (
+      {showSidePlus ? (
         <>
           <Pro2NodeSidePlus
             side="left"

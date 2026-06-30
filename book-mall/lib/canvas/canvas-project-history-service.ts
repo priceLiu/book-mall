@@ -147,18 +147,18 @@ export async function getCanvasProjectHistoryForUser(
 }
 
 async function trimHistoryOverflow(
-  tx: Prisma.TransactionClient,
+  db: Prisma.TransactionClient | typeof prisma,
   projectId: string,
   source: CanvasHistorySource,
 ) {
-  const overflow = await tx.canvasProjectHistory.findMany({
+  const overflow = await db.canvasProjectHistory.findMany({
     where: { projectId, source },
     orderBy: { createdAt: "desc" },
     skip: maxForSource(source),
     select: { id: true },
   });
   if (overflow.length) {
-    await tx.canvasProjectHistory.deleteMany({
+    await db.canvasProjectHistory.deleteMany({
       where: { id: { in: overflow.map((r) => r.id) } },
     });
   }
@@ -188,26 +188,33 @@ export async function createCanvasProjectHistoryForUser(
         ? "生成快照"
         : "自动保存");
 
-  const row = await prisma.$transaction(async (tx) => {
-    const created = await tx.canvasProjectHistory.create({
-      data: {
-        userId,
-        projectId,
-        label,
-        source,
-        canvas: args.canvas as Prisma.InputJsonValue,
-        thumbnailUrl:
-          args.thumbnailUrl?.trim() ||
-          pickProjectThumbnailUrl(args.canvas) ||
-          "",
-      },
-    });
-
-    await trimHistoryOverflow(tx, projectId, source);
-    return created;
+  // 不放进交互事务：大画布快照 JSON 写入 + 溢出裁剪可能超过 Prisma 默认 5s 事务超时，
+  // 超时后事务关闭，内部后续查询会抛 "Transaction not found / closed transaction"。
+  // 创建是单条写入本身原子；溢出裁剪是尽力而为的清理，失败不影响本次保存。
+  const created = await prisma.canvasProjectHistory.create({
+    data: {
+      userId,
+      projectId,
+      label,
+      source,
+      canvas: args.canvas as Prisma.InputJsonValue,
+      thumbnailUrl:
+        args.thumbnailUrl?.trim() ||
+        pickProjectThumbnailUrl(args.canvas) ||
+        "",
+    },
   });
 
-  return toSummary(row);
+  try {
+    await trimHistoryOverflow(prisma, projectId, source);
+  } catch (e) {
+    console.warn(
+      "[canvas-history] trim overflow skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  return toSummary(created);
 }
 
 export async function deleteCanvasProjectHistoryForUser(

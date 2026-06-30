@@ -277,9 +277,22 @@ export async function handlePro2ToolbarAddNodePick(
     return;
   }
 
+  if (
+    itemId === "export" ||
+    nodeType === "jianying-export-pro2"
+  ) {
+    const pos = spawnPosition("jianying-export-pro2", options);
+    const id = addNode(
+      "jianying-export-pro2",
+      pos,
+      { ...(NODE_DEFAULT_DATA["jianying-export-pro2"] as Record<string, unknown>) },
+    );
+    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
   const stageColumnTypes = [
     "story-pro2-audio",
-    "jianying-export-pro2",
   ] as const;
   if (
     nodeType &&

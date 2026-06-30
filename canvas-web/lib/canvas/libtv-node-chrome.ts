@@ -93,11 +93,11 @@ export function libtvNodeBorderStyle(options: {
         : edition === "neutral"
           ? LIBTV_NODE_BORDER_SELECTED_NEUTRAL
           : LIBTV_NODE_BORDER_SELECTED_PRO2;
-    return { borderWidth: 2, borderColor, borderStyle: "solid" };
+    return { borderWidth: 1.5, borderColor, borderStyle: "solid" };
   }
   if (hovered) {
     return {
-      borderWidth: 2,
+      borderWidth: 1.5,
       borderColor: LIBTV_NODE_BORDER_HOVER_COLOR,
       borderStyle: "solid",
     };

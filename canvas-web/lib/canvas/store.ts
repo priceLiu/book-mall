@@ -299,8 +299,16 @@ type CanvasState = {
   ) => string | null;
   /** 解散指定 group：把它的子节点 parentNode 清空、坐标恢复到画布坐标。 */
   ungroup: (groupId: string) => void;
-  /** 对一组节点子图做 dagre LR 布局。 */
-  autoLayoutNodes: (nodeIds: string[]) => void;
+  /**
+   * 对一组节点排列：
+   *  - "auto"（默认）：dagre LR 拓扑布局（按现在的自动计算）。
+   *  - "row"：横排，按当前 x 顺序排成一行。
+   *  - "column"：竖排，按当前 y 顺序排成一列。
+   */
+  autoLayoutNodes: (
+    nodeIds: string[],
+    mode?: "auto" | "row" | "column",
+  ) => void;
 
   /**
    * 把指定节点重新挂到 newParentGroupId（或挂到画布根，传 null）。
@@ -711,8 +719,8 @@ export const useCanvasStore = create<CanvasState>()(
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
         const state = get();
-        const normalized = normalizeSbv1PlusLeftConnection(
-          normalizePro2PlusLeftConnection(connection, state.nodes),
+        const normalized = normalizePro2PlusLeftConnection(
+          normalizeSbv1PlusLeftConnection(connection, state.nodes),
           state.nodes,
         );
         const refValidation = validateRefVideoConnection(
@@ -1231,7 +1239,7 @@ export const useCanvasStore = create<CanvasState>()(
         );
       },
 
-      autoLayoutNodes: (nodeIds) => {
+      autoLayoutNodes: (nodeIds, mode = "auto") => {
         const all = get().nodes;
         const idSet = new Set(nodeIds);
         const targets = all.filter(
@@ -1258,23 +1266,50 @@ export const useCanvasStore = create<CanvasState>()(
           ...sizeOf(n),
         }));
 
-        // 跑 dagre LR
-        const allEdges = get().edges;
-        const subEdges = allEdges.filter(
-          (e) => idSet.has(e.source) && idSet.has(e.target),
-        );
-        const g = new dagre.graphlib.Graph();
-        g.setDefaultEdgeLabel(() => ({}));
-        g.setGraph({ rankdir: "LR", nodesep: 64, ranksep: 120 });
-        for (const m of measured) g.setNode(m.id, { width: m.w, height: m.h });
-        for (const e of subEdges) g.setEdge(e.source, e.target);
-        dagre.layout(g);
+        // 计算每个节点的目标左上角坐标（layout）；以"原选区左上角"为锚点平移整体
+        let layout: { id: string; x: number; y: number; w: number; h: number }[];
+        if (mode === "row" || mode === "column") {
+          // 横排 / 竖排：忽略拓扑，按当前坐标顺序排成一行 / 一列
+          const GAP = 64;
+          const horizontal = mode === "row";
+          const ordered = [...measured].sort((a, b) =>
+            horizontal
+              ? a.abs.x - b.abs.x || a.abs.y - b.abs.y
+              : a.abs.y - b.abs.y || a.abs.x - b.abs.x,
+          );
+          let cursor = 0;
+          layout = ordered.map((m) => {
+            const node = horizontal
+              ? { id: m.id, x: cursor, y: 0, w: m.w, h: m.h }
+              : { id: m.id, x: 0, y: cursor, w: m.w, h: m.h };
+            cursor += (horizontal ? m.w : m.h) + GAP;
+            return node;
+          });
+        } else {
+          // 自动：dagre LR 拓扑布局
+          const allEdges = get().edges;
+          const subEdges = allEdges.filter(
+            (e) => idSet.has(e.source) && idSet.has(e.target),
+          );
+          const g = new dagre.graphlib.Graph();
+          g.setDefaultEdgeLabel(() => ({}));
+          g.setGraph({ rankdir: "LR", nodesep: 64, ranksep: 120 });
+          for (const m of measured) g.setNode(m.id, { width: m.w, height: m.h });
+          for (const e of subEdges) g.setEdge(e.source, e.target);
+          dagre.layout(g);
 
-        // 把 dagre 输出（中心坐标）转成左上角，并以"原选区左上角"为锚点平移整体
-        const layout = measured.map((m) => {
-          const r = g.node(m.id);
-          return { id: m.id, x: r.x - m.w / 2, y: r.y - m.h / 2, w: m.w, h: m.h };
-        });
+          // 把 dagre 输出（中心坐标）转成左上角
+          layout = measured.map((m) => {
+            const r = g.node(m.id);
+            return {
+              id: m.id,
+              x: r.x - m.w / 2,
+              y: r.y - m.h / 2,
+              w: m.w,
+              h: m.h,
+            };
+          });
+        }
         const oldMinX = Math.min(...measured.map((m) => m.abs.x));
         const oldMinY = Math.min(...measured.map((m) => m.abs.y));
         const newMinX = Math.min(...layout.map((l) => l.x));

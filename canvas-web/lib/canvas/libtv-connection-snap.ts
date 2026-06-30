@@ -10,6 +10,7 @@ const DEFAULT_HANDLE_BY_TYPE: Record<
 > = {
   "sbv1-image": { target: "in_image", source: "image" },
   "sbv1-video-engine": { target: "in_ref", source: "out_video" },
+  "jianying-export-pro2": { target: "in_video" },
   "story-pro2-image": { target: "in_image", source: "image" },
   "story-pro2-three-view": { target: "in_image", source: "image" },
   "story-pro2-starter": { target: "in_text", source: "text" },
@@ -90,16 +91,37 @@ export function resolveSnapConnectionOnNodeHit(
   const needRole: "source" | "target" =
     state.fromHandleType === "source" ? "target" : "source";
 
-  const fromDefaults = DEFAULT_HANDLE_BY_TYPE[String(
-    nodes.find((n) => n.id === state.fromNodeId)?.type ?? "",
-  )];
   const toDefaults = DEFAULT_HANDLE_BY_TYPE[String(targetNode.type ?? "")];
 
+  const fromNode = nodes.find((n) => n.id === state.fromNodeId);
+
   if (state.fromHandleType === "source") {
-    const targetHandle =
+    let targetHandle =
       state.toHandleId ??
       pickHandleId(targetNode, "target") ??
       toDefaults?.target;
+    if (
+      targetNode.type === "sbv1-video-engine" &&
+      !state.toHandleId &&
+      (fromNode?.type === "story-pro2-starter" ||
+        fromNode?.type === "story-pro2-script-hub")
+    ) {
+      targetHandle = "in_text";
+    } else if (
+      targetNode.type === "sbv1-video-engine" &&
+      !state.toHandleId &&
+      fromNode?.type === "sbv1-video-engine" &&
+      state.fromHandleId === "out_video"
+    ) {
+      targetHandle = "in_motion_video";
+    } else if (
+      targetNode.type === "jianying-export-pro2" &&
+      !state.toHandleId &&
+      fromNode?.type === "sbv1-video-engine" &&
+      state.fromHandleId === "out_video"
+    ) {
+      targetHandle = "in_video";
+    }
     if (!targetHandle) return null;
     return {
       source: state.fromNodeId,

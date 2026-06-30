@@ -18,6 +18,8 @@ type LazyShellProps = {
   src?: string;
   className?: string;
   rootMargin?: string;
+  /** 节点内已生成媒体 · 跳过 IO 灰底，立即加载封面/首帧 */
+  eager?: boolean;
   /** 与外部 ref 合并（如 tooltip 锚点） */
   containerRef?: Ref<HTMLDivElement>;
   children: (active: boolean) => ReactNode;
@@ -27,10 +29,11 @@ function LazyMediaShell({
   src,
   className,
   rootMargin = "240px",
+  eager = false,
   containerRef,
   children,
 }: LazyShellProps) {
-  const { ref: lazyRef, active } = useLazyMediaActive(rootMargin);
+  const { ref: lazyRef, active } = useLazyMediaActive(rootMargin, eager);
 
   if (!src) return null;
 
@@ -55,6 +58,7 @@ export function LazyViewportImage({
   imgClassName,
   rootMargin,
   containerRef,
+  eager = false,
 }: {
   src?: string;
   alt?: string;
@@ -62,12 +66,14 @@ export function LazyViewportImage({
   imgClassName?: string;
   rootMargin?: string;
   containerRef?: Ref<HTMLDivElement>;
+  eager?: boolean;
 }) {
   return (
     <LazyMediaShell
       src={src}
       className={cn("relative", className)}
       rootMargin={rootMargin}
+      eager={eager}
       containerRef={containerRef}
     >
       {() => (
@@ -92,6 +98,8 @@ export function LazyViewportVideo({
   rootMargin,
   containerRef,
   preload = "metadata",
+  eager = false,
+  poster,
 }: {
   src?: string;
   className?: string;
@@ -99,17 +107,21 @@ export function LazyViewportVideo({
   rootMargin?: string;
   containerRef?: Ref<HTMLDivElement>;
   preload?: "none" | "metadata" | "auto";
+  eager?: boolean;
+  poster?: string;
 }) {
   return (
     <LazyMediaShell
       src={src}
       className={cn("relative", className)}
       rootMargin={rootMargin}
+      eager={eager}
       containerRef={containerRef}
     >
       {() => (
         <video
           src={src}
+          poster={poster}
           className={cn("size-full object-contain", videoClassName)}
           playsInline
           muted

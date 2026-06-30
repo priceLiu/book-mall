@@ -827,6 +827,9 @@ export function useCanvasRunner(
         let portraitAssetRefs: ReturnType<
           typeof resolvePortraitAssetRefsFromUpstream
         > = [];
+        let sbv1VideoResolved: ReturnType<
+          typeof resolveSbv1VideoEngineInputs
+        > | null = null;
         if (node.type === "sbv1-video-engine") {
           if (base && projectId) {
             await refreshSbv1UpstreamPortraitStatuses({
@@ -856,12 +859,20 @@ export function useCanvasRunner(
                 vd.referenceMode === "smart_multi"
                   ? vd.referenceMode
                   : "omni",
+              dockInputMode: (vd as { dockInputMode?: string }).dockInputMode as
+                | import("./sbv1-workspace-types").Sbv1DockInputMode
+                | undefined,
+              modelKey: (
+                (nodeAfterPortrait.data as { engine?: { modelKey?: string } })
+                  .engine?.modelKey ?? ""
+              ).trim() || undefined,
             },
           );
           if (!resolved.ok) {
             abortSequential(job, resolved.error);
             return;
           }
+          sbv1VideoResolved = resolved;
           imageInputs = resolved.imageInputs;
           portraitAssetRefs = resolved.portraitAssetRefs;
         } else {
@@ -878,9 +889,28 @@ export function useCanvasRunner(
         );
 
         const data = node.data as Record<string, unknown>;
-        const runData = isLibtvFreestandingImageNode(node)
+        let runData = isLibtvFreestandingImageNode(node)
           ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
           : data;
+        if (
+          sbv1VideoResolved?.ok &&
+          sbv1VideoResolved.videoInputs.length > 0
+        ) {
+          const eng = (runData.engine as Record<string, unknown> | undefined) ?? {};
+          const prevParams =
+            (eng.params as Record<string, unknown> | undefined) ??
+            (runData.params as Record<string, unknown> | undefined) ??
+            {};
+          const mergedParams = {
+            ...prevParams,
+            reference_video_urls: sbv1VideoResolved.videoInputs,
+          };
+          runData = {
+            ...runData,
+            params: mergedParams,
+            engine: { ...eng, params: mergedParams },
+          };
+        }
         if (isLibtvFreestandingImageNode(node)) {
           if (!resolveLibtvImageEngineFromNodeData(runData)) {
             abortSequential(

@@ -1,16 +1,22 @@
 /**
- * 生视频看门狗 · 常驻定时巡检（web 进程内）。
+ * Gateway 看门狗 · 常驻定时巡检（web 进程内）。
  *
  * 与「被触发巡检」（canvas-queue 读路径 / poll-loop 末尾）互补：
  * 这里是不依赖外部 poll-loop 是否存活、也不依赖是否有人打开 Logs 页的「定时巡检」，
- * 每 `GATEWAY_VIDEO_WATCHDOG_RESIDENT_INTERVAL_MS`（默认 30s）跑一次 runGatewayVideoWatchdog。
+ * 每 `GATEWAY_VIDEO_WATCHDOG_RESIDENT_INTERVAL_MS`（默认 30s）跑一次：
+ *  1. runGatewayVideoWatchdog —— 火山在途视频按检查点向厂商核对并收口；
+ *  2. runGatewayPollWorker —— 推进所有异步在途任务：轮询火山 / 其它厂商，并对
+ *     KIE（回调型）做 backstop 补捞，同时内部已包含 expireStaleGatewayLogs 卡死收口。
+ *     这样即便 `gateway:poll-loop` 进程没起（如 `dev:all --no-poll`）、或本地收不到
+ *     KIE 回调，KIE 生图/异步任务也会在进程内被轮询收口，而不会一直停留在 RUNNING。
+ *     （`GATEWAY_POLL_RESIDENT=0` 时退化为仅 expireStaleGatewayLogs 收口，
+ *      用于已单独部署 poll-loop、想避免 web 多副本重复轮询的生产环境。）
  *
- * 看门狗本身轻量：只查 RUNNING 火山视频日志，按检查点（默认 300/500/600/900s + 末档后定期）
- * 向厂商核对并收口，且内部已节流（MIN_INTERVAL_MS）+ 复核并发封顶 + DB 标记去重，
- * 因此多副本同跑也安全。
+ * 各步都轻量、内部已节流 / DB 标记去重 / updateMany 幂等、轮询本身幂等，多副本同跑安全。
  *
  * 开关：
- *  - GATEWAY_VIDEO_WATCHDOG_RESIDENT=0 关闭（默认开启）
+ *  - GATEWAY_VIDEO_WATCHDOG_RESIDENT=0 关闭整个常驻巡检（默认开启）
+ *  - GATEWAY_POLL_RESIDENT=0 仅关闭进程内轮询，保留 expire 收口（默认开启）
  *  - GATEWAY_VIDEO_WATCHDOG_RESIDENT_INTERVAL_MS 巡检间隔（默认 30000）
  */
 
@@ -22,6 +28,12 @@ function envInt(name: string, fallback: number): number {
 function residentEnabled(): boolean {
   const v = process.env.GATEWAY_VIDEO_WATCHDOG_RESIDENT?.trim().toLowerCase();
   // 默认开启；显式设为 0 / false 才关闭
+  return !(v === "0" || v === "false");
+}
+
+function residentPollEnabled(): boolean {
+  const v = process.env.GATEWAY_POLL_RESIDENT?.trim().toLowerCase();
+  // 默认开启；显式设为 0 / false 才退化为仅 expire 收口
   return !(v === "0" || v === "false");
 }
 
@@ -55,6 +67,33 @@ export function startResidentGatewayVideoWatchdog(): void {
       } catch (e) {
         console.warn(
           "[gateway-watchdog] resident tick failed",
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+      // 推进异步在途任务 + 卡死收口：不依赖 gateway:poll-loop 进程是否存活、
+      // 也不依赖本地能否收到 KIE 回调。runGatewayPollWorker 内部已含
+      // expireStaleGatewayLogs，因此默认走它即可同时收口 + 轮询（含 KIE backstop）。
+      try {
+        if (residentPollEnabled()) {
+          const { runGatewayPollWorker } = await import(
+            "@/lib/gateway/poll-service"
+          );
+          await runGatewayPollWorker();
+        } else {
+          const { expireStaleGatewayLogs } = await import(
+            "@/lib/gateway/poll-service"
+          );
+          const n = await expireStaleGatewayLogs();
+          if (n > 0) {
+            console.info(
+              "[gateway-watchdog] resident expireStaleGatewayLogs",
+              JSON.stringify({ expired: n }),
+            );
+          }
+        }
+      } catch (e) {
+        console.warn(
+          "[gateway-watchdog] resident poll/expire failed",
           e instanceof Error ? e.message : String(e),
         );
       }

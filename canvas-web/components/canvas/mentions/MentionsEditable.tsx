@@ -76,6 +76,8 @@ export type MentionsEditableProps = {
   mentionInlineThumb?: boolean;
   mentionInlineThumbHoverOnText?: boolean;
   mentionEdition?: "pro2" | "sbv1";
+  /** LibTV Dock 内 placeholder 与正文共用 inset（默认 Pro2 大左侧留白） */
+  dockInsetClassName?: string;
   commitHandleRef?: Ref<MentionsTextareaCommitHandle>;
 };
 
@@ -140,6 +142,7 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       mentionPickerEmptyHint = "暂无已生成的角色图，请先在角色列生成。",
       mentionHoverPreview = true,
       mentionEdition = "pro2",
+      dockInsetClassName,
       commitHandleRef,
     },
     ref,
@@ -724,7 +727,9 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
           <div
             className={cn(
               "pointer-events-none absolute left-0 top-0 right-0 select-none text-[13px] leading-relaxed text-white/30",
-              libtvDock ? PRO2_DOCK_TEXTAREA_INSET_CLASS : "p-2",
+              libtvDock
+                ? dockInsetClassName ?? PRO2_DOCK_TEXTAREA_INSET_CLASS
+                : "p-2",
             )}
           >
             {placeholder}

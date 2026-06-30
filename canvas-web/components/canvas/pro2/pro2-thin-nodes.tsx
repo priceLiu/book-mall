@@ -1,7 +1,6 @@
 "use client";
 
 import type { NodeProps } from "@xyflow/react";
-import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_STAGE_BADGE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { Pro2ThinCardShell } from "./thin-card-shell";
@@ -82,22 +81,6 @@ export function StoryPro2StyleThinNode({ data, selected }: NodeProps) {
       }
       inputs={[{ id: "in_text", label: "剧本" }]}
       outputs={[{ id: "text", label: "风格" }]}
-    />
-  );
-}
-
-export function JianyingExportPro2ThinNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; mediaRenderResult?: { downloadUrl?: string } };
-  return (
-    <Pro2ThinCardShell
-      title={d.label ?? "剪映导出 · 2.0"}
-      selected={selected}
-      badge={
-        <span className={PRO2_STAGE_BADGE_CLASS}>
-          {d.mediaRenderResult?.downloadUrl ? "成片就绪" : "待导出"}
-        </span>
-      }
-      inputs={[{ id: "in_storyboard", label: "视频列" }]}
     />
   );
 }

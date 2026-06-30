@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ImageIcon, Loader2, X } from "lucide-react";
+import { Check, ImageIcon, Loader2 } from "lucide-react";
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-hover-preview";
+import { DockRefCornerBadge } from "@/components/canvas/pro2/dock-ref-corner-badge";
 import {
   SBV1_DOCK_ACTIVE_REF_BORDER_CLASS,
   SBV1_DOCK_REF_IDLE_BORDER_CLASS,
@@ -22,22 +23,38 @@ export function DockUpstreamRefPreviewCard({
   previewUrl,
   active,
   importBadge,
+  cornerLabel,
+  badgeIndex,
   onDisconnect,
   className,
+  style,
+  badgeFontPx,
+  badgeMinPx,
 }: {
   id: string;
   label: string;
   previewUrl?: string;
   active: boolean;
   importBadge?: PortraitImportUiState | null;
+  /** 右上角角标：首尾帧等角色文案，或非首尾帧时的序号 */
+  cornerLabel?: string;
+  /** cornerLabel 未传时回退为 index+1 */
+  badgeIndex?: number;
   onDisconnect: () => void;
   className?: string;
+  style?: React.CSSProperties;
+  badgeFontPx?: number;
+  badgeMinPx?: number;
 }) {
   const [hover, setHover] = useState<{
     rect: DOMRect;
     clientX: number;
     clientY: number;
   } | null>(null);
+
+  const badgeText =
+    cornerLabel?.trim() ||
+    (badgeIndex != null ? String(badgeIndex + 1) : undefined);
 
   const mentionItem: MentionableItem = {
     id,
@@ -55,6 +72,7 @@ export function DockUpstreamRefPreviewCard({
           active ? SBV1_DOCK_ACTIVE_REF_BORDER_CLASS : SBV1_DOCK_REF_IDLE_BORDER_CLASS,
           className,
         )}
+        style={style}
         title={`${label} · 可拖入正文 @ 引用`}
         draggable
         onDragStart={(e) => {
@@ -92,9 +110,15 @@ export function DockUpstreamRefPreviewCard({
             <ImageIcon className="size-4" />
           </div>
         )}
-        <p className="pointer-events-none absolute bottom-0 left-0 right-0 truncate bg-black/65 px-1 py-0.5 text-[8px] text-white/80">
-          {label}
-        </p>
+        {badgeText ? (
+          <DockRefCornerBadge
+            label={badgeText}
+            title="断开连线"
+            onRemove={onDisconnect}
+            fontSizePx={badgeFontPx}
+            minSizePx={badgeMinPx}
+          />
+        ) : null}
         {importBadge === "pending" ? (
           <span
             className="pointer-events-none absolute left-0.5 top-0.5 flex size-4 items-center justify-center"
@@ -125,17 +149,6 @@ export function DockUpstreamRefPreviewCard({
             </span>
           ) : null
         ) : null}
-        <button
-          type="button"
-          className="nodrag absolute right-0.5 top-0.5 z-10 flex size-4 items-center justify-center text-white/90 opacity-0 transition hover:text-white group-hover:opacity-100"
-          title="断开连线"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDisconnect();
-          }}
-        >
-          <X className={cn("size-2.5", THUMB_ICON_SHADOW)} strokeWidth={2.5} />
-        </button>
       </div>
       <MentionHoverPreviewPortal
         item={hover ? mentionItem : null}

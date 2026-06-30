@@ -64,18 +64,9 @@ export function Sbv1UpstreamRefChips({
 
   const onDisconnect = useCallback(
     (link: Sbv1UpstreamRefLink) => {
-      setEdges((es) =>
-        es.filter(
-          (e) =>
-            !(
-              e.source === link.sourceNodeId &&
-              e.target === engineNodeId &&
-              (e.targetHandle === "in_ref" || !e.targetHandle)
-            ),
-        ),
-      );
+      setEdges((es) => es.filter((e) => e.id !== link.edgeId));
     },
-    [engineNodeId, setEdges],
+    [setEdges],
   );
 
   if (!links.length) return null;

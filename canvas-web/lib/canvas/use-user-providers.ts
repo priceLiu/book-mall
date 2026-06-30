@@ -17,7 +17,8 @@ const CACHE: {
   gatewayLink: null,
   ts: 0,
 };
-const TTL_MS = 30_000;
+/** 会话内缓存：打开模型选择器时不重复阻塞 UI；后台静默刷新 */
+const TTL_MS = 30 * 60 * 1000;
 let prefetchInflight: Promise<void> | null = null;
 
 async function fetchUserProvidersIntoCache(base: string): Promise<void> {
@@ -69,7 +70,15 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    // stale-while-revalidate：有缓存时立即展示，后台刷新，不阻塞弹层
+    const hasStale = Boolean(CACHE.value);
+    if (hasStale) {
+      setProviders(CACHE.value!);
+      setGatewayLink(CACHE.gatewayLink);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     void fetchUserProvidersIntoCache(base)
       .then(() => {
         if (cancelled) return;
@@ -79,7 +88,9 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "加载 Providers 失败");
+        if (!hasStale) {
+          setError(e instanceof Error ? e.message : "加载 Providers 失败");
+        }
       })
       .finally(() => {
         if (cancelled) return;

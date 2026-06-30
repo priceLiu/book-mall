@@ -6,8 +6,6 @@ import {
   ChevronDown,
   ImageIcon,
   Loader2,
-  Plus,
-  SlidersHorizontal,
   Zap,
 } from "lucide-react";
 import {
@@ -19,17 +17,18 @@ import { DockUpstreamRefPreviewCard } from "@/components/canvas/pro2/dock-upstre
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
-  Pro2DockRefRow,
+  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "@/components/canvas/pro2/pro2-input-dock-shell";
+import { Pro2DockUpstreamChips } from "@/components/canvas/pro2/pro2-dock-upstream-chips";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { spawnSbv1PastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   SBV1_CHAT_INPUT_TEXTAREA_CLASS,
+  SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
-import { PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import {
   getSbv1VolcengineModelById,
   migrateSbv1ModelVariantId,
@@ -37,9 +36,13 @@ import {
 } from "@/lib/canvas/sbv1-video-models";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
+import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
+import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
+import { libtvDockFixedFlowPx, libtvDockVideoHeaderScreenMetrics, VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100, VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 } from "@/lib/canvas/libtv-dock-scale";
+import { useLibtvInputDockUi } from "@/lib/canvas/libtv-input-dock-ui-context";
 import {
   portraitImportUiState,
   type CanvasPortraitNodeFields,
@@ -47,6 +50,13 @@ import {
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
+import {
+  dockInputModeToPatch,
+  getSbv1VideoDockModeChips,
+  resolveSbv1DockInputMode,
+  sbv1DockRefCornerLabelForModel,
+} from "@/lib/canvas/sbv1-video-model-reference";
+import { Sbv1VideoDockModeBar } from "./sbv1-video-dock-mode-bar";
 import {
   Sbv1VideoGenerateSettingsModal,
   sbv1VideoSettingsTriggerLabel,
@@ -56,6 +66,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   nodeId,
   data,
   upstreamLinks,
+  upstreamTextLinks,
   mentionables,
   isGenerating,
   onPatch,
@@ -66,6 +77,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   nodeId: string;
   data: Sbv1VideoEngineNodeData;
   upstreamLinks: Sbv1UpstreamRefLink[];
+  upstreamTextLinks: Sbv1UpstreamTextLink[];
   mentionables: MentionableItem[];
   isGenerating: boolean;
   onPatch: (patch: Partial<Sbv1VideoEngineNodeData>) => void;
@@ -76,9 +88,46 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
+  const { shellScreenScale, canvasZoom } = useLibtvInputDockUi();
+  const headerMetrics = useMemo(
+    () => libtvDockVideoHeaderScreenMetrics(canvasZoom),
+    [canvasZoom],
+  );
+  const thumbPx = libtvDockFixedFlowPx(
+    headerMetrics.thumbScreenPx,
+    shellScreenScale,
+  );
+  const chipFontPx = libtvDockFixedFlowPx(
+    headerMetrics.chipFontScreenPx,
+    shellScreenScale,
+  );
+  const chipMinHeightPx = libtvDockFixedFlowPx(
+    VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100,
+    shellScreenScale,
+  );
+  const badgeFontPx = libtvDockFixedFlowPx(
+    headerMetrics.badgeFontScreenPx,
+    shellScreenScale,
+  );
+  const badgeMinPx = libtvDockFixedFlowPx(
+    headerMetrics.badgeFontScreenPx + 6,
+    shellScreenScale,
+  );
+  const headerMinHeightPx = thumbPx + libtvDockFixedFlowPx(8, shellScreenScale);
+  const modelPickerFontPx = libtvDockFixedFlowPx(
+    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
+    shellScreenScale,
+  );
+  const modelPickerIconPx = libtvDockFixedFlowPx(11, shellScreenScale);
+  const creditsFontPx = libtvDockFixedFlowPx(
+    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
+    shellScreenScale,
+  );
+  const sendBtnPx = libtvDockFixedFlowPx(28, shellScreenScale);
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const canvasNodes = useCanvasStore((s) => s.nodes);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
@@ -101,6 +150,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   }, [storedPrompt, nodeId]);
 
   const smartMulti = data.referenceMode === "smart_multi";
+  const referenceMode = data.referenceMode ?? "omni";
   /** Dock 预估与财务后台一致：视频按 15s 封顶；智能多帧未设时长时也按 15s 展示 */
   const billableDurationSec = (() => {
     const cap = 15;
@@ -115,6 +165,35 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   );
   const selectedModel = getSbv1VolcengineModelById(variantId, providers);
   const modelKey = selectedModel.engine.modelKey;
+  const dockChips = useMemo(
+    () =>
+      getSbv1VideoDockModeChips(modelKey, {
+        multiShots: data.multiShots,
+        providerId: data.engine?.providerId,
+      }),
+    [modelKey, data.multiShots, data.engine?.providerId],
+  );
+  const activeDockMode = resolveSbv1DockInputMode(
+    referenceMode,
+    data.dockInputMode,
+    dockChips,
+  );
+  const showFirstLastSlots = activeDockMode === "first_last";
+  const allRefsHighlighted =
+    activeDockMode === "omni" || activeDockMode === "multi_ref";
+  const textDockLinks = useMemo(
+    () => sbv1TextLinksToDockUpstream(upstreamTextLinks),
+    [upstreamTextLinks],
+  );
+
+  useEffect(() => {
+    if (
+      data.dockInputMode &&
+      !dockChips.some((c) => c.id === data.dockInputMode)
+    ) {
+      onPatch(dockInputModeToPatch(activeDockMode));
+    }
+  }, [data.dockInputMode, dockChips, activeDockMode, onPatch]);
   const settingsLabel = sbv1VideoSettingsTriggerLabel(data, providers);
   const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
 
@@ -195,73 +274,188 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     [uploadFiles],
   );
 
-  const refBar =
-    upstreamLinks.length > 0 ? (
-      <Pro2DockRefRow>
-        <div className="hide-scroll-bar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-          {upstreamLinks.map((link) => {
-            const sourceNode = useCanvasStore
-              .getState()
-              .nodes.find((n) => n.id === link.sourceNodeId);
-            const importState = portraitImportUiState(
-              sourceNode?.data as CanvasPortraitNodeFields | undefined,
-            );
+  const refThumbStyle = useMemo(
+    () => ({ width: thumbPx, height: thumbPx, minWidth: thumbPx, minHeight: thumbPx }),
+    [thumbPx],
+  );
+  const refThumbClass =
+    "group relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";
+
+  const refThumbCorner = useCallback(
+    (index: number, total: number) =>
+      sbv1DockRefCornerLabelForModel(
+        modelKey,
+        referenceMode,
+        activeDockMode,
+        index,
+        total,
+        {
+          multiShots: data.multiShots,
+          providerId: data.engine?.providerId,
+        },
+      ),
+    [
+      modelKey,
+      referenceMode,
+      activeDockMode,
+      data.multiShots,
+      data.engine?.providerId,
+    ],
+  );
+
+  const refIsActive = useCallback(
+    (linkId: string) =>
+      allRefsHighlighted ||
+      showFirstLastSlots ||
+      activeRefIds.includes(linkId),
+    [allRefsHighlighted, showFirstLastSlots, activeRefIds],
+  );
+
+  const refThumbnails = (() => {
+    if (showFirstLastSlots) {
+      return (
+        <div className="flex min-w-0 items-center gap-1">
+          {[0, 1].map((slotIndex) => {
+            const link = upstreamLinks[slotIndex];
+            const corner = refThumbCorner(slotIndex, 2) ?? "参考";
+            if (link) {
+              const sourceNode = canvasNodes.find((n) => n.id === link.sourceNodeId);
+              const importState = portraitImportUiState(
+                sourceNode?.data as CanvasPortraitNodeFields | undefined,
+              );
+              return (
+                  <DockUpstreamRefPreviewCard
+                    key={link.id}
+                    id={link.id}
+                    label={link.label}
+                    previewUrl={link.previewUrl}
+                    cornerLabel={corner}
+                    badgeIndex={slotIndex}
+                    active={refIsActive(link.id)}
+                    importBadge={importState}
+                    className={refThumbClass}
+                    style={refThumbStyle}
+                    badgeFontPx={badgeFontPx}
+                    badgeMinPx={badgeMinPx}
+                    onDisconnect={() => onDisconnect(link)}
+                  />
+              );
+            }
             return (
-              <DockUpstreamRefPreviewCard
-                key={link.id}
-                id={link.id}
-                label={link.label}
-                previewUrl={link.previewUrl}
-                active={activeRefIds.includes(link.id)}
-                importBadge={importState}
-                onDisconnect={() => onDisconnect(link)}
+              <Sbv1DockEmptyRefSlot
+                key={`empty-${slotIndex}`}
+                label={corner}
+                style={refThumbStyle}
               />
             );
           })}
         </div>
-      </Pro2DockRefRow>
-    ) : null;
+      );
+    }
+
+    if (upstreamLinks.length === 0) return null;
+
+    return (
+      <div className="hide-scroll-bar flex min-w-0 items-center gap-1.5 overflow-x-auto">
+        {upstreamLinks.map((link, index) => {
+          const sourceNode = canvasNodes.find((n) => n.id === link.sourceNodeId);
+          const importState = portraitImportUiState(
+            sourceNode?.data as CanvasPortraitNodeFields | undefined,
+          );
+          const corner = refThumbCorner(index, upstreamLinks.length);
+          return (
+            <DockUpstreamRefPreviewCard
+              key={link.id}
+              id={link.id}
+              label={link.label}
+              previewUrl={link.previewUrl}
+              cornerLabel={corner}
+              badgeIndex={index}
+              active={refIsActive(link.id)}
+              importBadge={importState}
+              className={refThumbClass}
+              style={refThumbStyle}
+              badgeFontPx={badgeFontPx}
+              badgeMinPx={badgeMinPx}
+              onDisconnect={() => onDisconnect(link)}
+            />
+          );
+        })}
+      </div>
+    );
+  })();
+
+  const dockHeader = (() => {
+    const hasModeBar = dockChips.length > 0;
+    const hasRefRow = textDockLinks.length > 0 || refThumbnails;
+    if (!hasModeBar && !hasRefRow) return null;
+
+    return (
+      <>
+        {hasModeBar ? (
+          <Sbv1VideoDockModeBar
+            chips={dockChips}
+            activeMode={activeDockMode}
+            disabled={isGenerating}
+            chipFontPx={chipFontPx}
+            chipMinHeightPx={chipMinHeightPx}
+            onSelect={(mode) => onPatch(dockInputModeToPatch(mode))}
+          />
+        ) : null}
+        {hasRefRow ? (
+          <Pro2DockHeader
+            compact
+            minHeightPx={headerMinHeightPx}
+            refRow={
+              <>
+                {textDockLinks.length > 0 ? (
+                  <Pro2DockUpstreamChips
+                    links={textDockLinks}
+                    anchorNodeId={nodeId}
+                    activeIds={textDockLinks.map((l) => l.id)}
+                  />
+                ) : null}
+                {refThumbnails}
+              </>
+            }
+          />
+        ) : null}
+      </>
+    );
+  })();
 
   const toolbar = (
-    <Pro2DockToolbar className="gap-2">
-      <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          title="上传参考图"
-          disabled={isGenerating}
-          className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Plus className="size-4" />
-        </button>
-        <button
-          type="button"
-          title="视频生成设置"
-          disabled={isGenerating}
-          className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <SlidersHorizontal className="size-4" />
-        </button>
-      </div>
-
+    <Pro2DockToolbar compact className="gap-2">
       <button
         type="button"
         disabled={isGenerating}
-        className="nodrag flex h-8 min-w-0 flex-1 items-center gap-1 rounded-md px-2 text-left text-[13px] text-white/65 hover:bg-white/[0.06] hover:text-white/90"
+        className="nodrag flex w-auto max-w-full shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-white/65 hover:bg-white/[0.06] hover:text-white/90"
+        style={{ fontSize: modelPickerFontPx }}
         onClick={() => setSettingsOpen(true)}
       >
-        <span className="truncate">{settingsLabel}</span>
-        <ChevronDown className="size-3.5 shrink-0 opacity-45" />
+        <span className="whitespace-nowrap">{settingsLabel}</span>
+        <ChevronDown
+          className="shrink-0 opacity-45"
+          style={{ width: modelPickerIconPx, height: modelPickerIconPx }}
+        />
       </button>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="min-w-0 flex-1" />
+
+      <div className="flex shrink-0 items-center gap-1">
         {estCredits?.credits != null ? (
           <span
-            className="flex shrink-0 items-center gap-1 text-[13px] tabular-nums text-amber-200/90"
+            className="flex shrink-0 items-center gap-0.5 tabular-nums text-amber-200/90"
+            style={{ fontSize: creditsFontPx }}
             title={`${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`}
           >
-            <Zap className="size-3.5 fill-amber-300/90 text-amber-300/90" />
+            <Zap
+              className="fill-amber-300/90 text-amber-300/90"
+              style={{
+                width: libtvDockFixedFlowPx(12, shellScreenScale),
+                height: libtvDockFixedFlowPx(12, shellScreenScale),
+              }}
+            />
             {estCredits.credits}
           </span>
         ) : null}
@@ -269,13 +463,25 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
           type="button"
           disabled={!canSend}
           title={isGenerating ? "生成中" : "生成视频"}
-          className="nodrag flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="nodrag flex shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ width: sendBtnPx, height: sendBtnPx }}
           onClick={runWithCommittedPrompt}
         >
           {isGenerating ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2
+              className="animate-spin"
+              style={{
+                width: libtvDockFixedFlowPx(14, shellScreenScale),
+                height: libtvDockFixedFlowPx(14, shellScreenScale),
+              }}
+            />
           ) : (
-            <ArrowUp className="size-4" />
+            <ArrowUp
+              style={{
+                width: libtvDockFixedFlowPx(14, shellScreenScale),
+                height: libtvDockFixedFlowPx(14, shellScreenScale),
+              }}
+            />
           )}
         </button>
       </div>
@@ -286,9 +492,9 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     <>
       <Pro2InputDockShell
         flowAnchor={placement}
-        dockClassName="sbv1-video-engine-dock"
+        dockClassName="sbv1-image-dock"
         hidden={hidden}
-        header={refBar}
+        header={dockHeader}
         footer={toolbar}
       >
         <div
@@ -321,8 +527,9 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               SBV1_CHAT_INPUT_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
               RF_NO_WHEEL,
-              PRO2_DOCK_TEXTAREA_INSET_CLASS,
+              SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS,
             )}
+            dockInsetClassName={SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS}
             placeholder="描述你想生成的视频… 使用 @ 引用参考图，或粘贴/上传图片"
             value={storedPrompt}
             mentionables={mentionables}
@@ -367,3 +574,21 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     </>
   );
 });
+
+function Sbv1DockEmptyRefSlot({
+  label,
+  style,
+}: {
+  label: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      className="relative shrink-0 overflow-hidden rounded-md border border-dashed border-white/15 bg-white/[0.02] flex flex-col items-center justify-center"
+      style={style}
+      title={`${label} · 连接或上传参考图`}
+    >
+      <span className="text-[8px] font-medium text-white/45">{label}</span>
+    </div>
+  );
+}

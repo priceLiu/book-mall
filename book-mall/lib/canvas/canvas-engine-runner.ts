@@ -59,6 +59,7 @@ import {
   buildCanvasRefVideoKieInput,
   buildCanvasVideoKieInput,
 } from "./canvas-video-kie";
+import { normalizeKieVideoRefImageUrls } from "./canvas-video-ref-image-normalize";
 import {
   buildCanvasVideoVolcengineInput,
   isVolcengineStoryVideoModelKey,
@@ -66,6 +67,7 @@ import {
 } from "./canvas-video-volcengine";
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { buildKieImageCreateArgs } from "./providers/kie";
+import { buildKieToolVideoCreateArgs } from "./kie-video-tool-builders";
 import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
 import { modelHasStoryCapabilities } from "./story-model-capabilities";
@@ -792,6 +794,21 @@ async function executeStoryLlmEngineTask(
       projectId,
       canvasTaskId: taskId,
     });
+    // 模型返回空内容（推理预算耗尽 / 上游异常 / 解析失败）时，勿当作成功落库：
+    // 否则前端会从「生成中」直接翻到 done 且无正文，表现为「转圈一会就消失但没生成」。
+    if (!(resp.text ?? "").trim()) {
+      const failed = await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: "STORY_LLM_EMPTY",
+          failMessage:
+            "模型返回了空内容，请重试或更换文本模型（部分推理模型在预算不足时会无正文输出）。",
+          completedAt: new Date(),
+        },
+      });
+      return { reused: false, task: failed };
+    }
     const scriptStudioMirror =
       data.scriptStudioMode === true
         ? scriptStudioMirrorPayload(resp.text)
@@ -1010,8 +1027,20 @@ export async function runVideoEngineNode(
   );
   const effectiveForceReferenceMode =
     forceReferenceMode || portraitAssetRefs.length > 0;
+  const isMotionControl =
+    modelKey === "kling-2.6/motion-control" ||
+    modelKey === "kling-3.0/motion-control";
+  const motionVideoUrls = isMotionControl
+    ? (Array.isArray(params.reference_video_urls)
+        ? (params.reference_video_urls as unknown[])
+        : []
+      ).filter(
+        (u): u is string =>
+          typeof u === "string" && /^https?:\/\//.test(u.trim()),
+      )
+    : [];
   const expandedPrompt = expandVideoPrompt(promptBase, referenceImageUrls);
-  if (!expandedPrompt.trim()) {
+  if (!isMotionControl && !expandedPrompt.trim()) {
     throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
   }
 
@@ -1019,6 +1048,13 @@ export async function runVideoEngineNode(
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "video-engine 需要分镜图作为主图",
+    );
+  }
+
+  if (isMotionControl && !motionVideoUrls.length) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "动作控制需要连接驱动动作视频（视频节点左侧 + · 添加上游视频）",
     );
   }
 
@@ -1034,6 +1070,10 @@ export async function runVideoEngineNode(
   if (
     referenceImageUrls.length > 0 &&
     !isBailianR2v &&
+    !isMotionControl &&
+    modelKey !== "kling-3.0/video" &&
+    modelKey !== "kling/v3-turbo-image-to-video" &&
+    modelKey !== "wan/2-7-image-to-video" &&
     !modelHasStoryCapabilities(modelKey, ["video_multi_ref"])
   ) {
     effectiveModelKey =
@@ -1049,8 +1089,11 @@ export async function runVideoEngineNode(
   if (isBailianR2v) {
     const referenceImageUrlsForR2v = [
       mainFrameImageUrl,
+      ...(lastFrameImageUrl ? [lastFrameImageUrl] : []),
       ...referenceImageUrls,
-    ].filter((u, i, arr) => arr.indexOf(u) === i);
+    ].filter(
+      (u, i, arr) => Boolean(u?.trim()) && arr.indexOf(u) === i,
+    );
     return runRefVideoEngineNode({
       ...args,
       node: {
@@ -1069,7 +1112,7 @@ export async function runVideoEngineNode(
   }
 
   if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(effectiveModelKey)) {
-    if (!isVolcengineStoryVideoModelKey(effectiveModelKey)) {
+    if (!isVolcengineStoryVideoModelKey(effectiveModelKey) && !isMotionControl) {
       throw new CanvasProjectError(
         "INVALID_INPUT",
         `video-engine 不支持模型 ${effectiveModelKey}`,
@@ -1111,6 +1154,28 @@ export async function runVideoEngineNode(
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
+  let kieMainFrame = mainFrameImageUrl;
+  let kieReferenceImageUrls = referenceImageUrls;
+  let kieLastFrame = lastFrameImageUrl;
+  if (!isVolcengineVideo) {
+    const needsNorm =
+      isMotionControl ||
+      Boolean(kieMainFrame) ||
+      kieReferenceImageUrls.length > 0 ||
+      Boolean(kieLastFrame);
+    if (needsNorm) {
+      const normalized = await normalizeKieVideoRefImageUrls({
+        userId,
+        mainFrameImageUrl: kieMainFrame,
+        referenceImageUrls: kieReferenceImageUrls,
+        lastFrameImageUrl: kieLastFrame,
+      });
+      kieMainFrame = normalized.mainFrameImageUrl;
+      kieReferenceImageUrls = normalized.referenceImageUrls;
+      kieLastFrame = normalized.lastFrameImageUrl;
+    }
+  }
+
   const { model, input } = isVolcengineVideo
     ? (() => {
         const refVideos = Array.isArray(params.reference_video_urls)
@@ -1143,19 +1208,50 @@ export async function runVideoEngineNode(
         });
         return { model: built.model, input: built.body };
       })()
-    : buildCanvasVideoKieInput({
+    : isMotionControl
+      ? (() => {
+          try {
+            return buildKieToolVideoCreateArgs({
+              model: effectiveModelKey,
+              prompt: expandedPrompt.trim() || promptRaw.trim() || undefined,
+              imageUrls: kieMainFrame ? [kieMainFrame] : [],
+              videoUrls: motionVideoUrls,
+              mode: String(params.mode ?? ""),
+              characterOrientation: String(
+                params.character_orientation ?? "video",
+              ),
+            });
+          } catch (e) {
+            throw new CanvasProjectError(
+              "INVALID_INPUT",
+              e instanceof Error ? e.message : String(e),
+            );
+          }
+        })()
+      : buildCanvasVideoKieInput({
         modelKey: effectiveModelKey,
         prompt: expandedPrompt,
-        imageUrl: mainFrameImageUrl,
-        referenceImageUrls,
+        imageUrl: kieMainFrame,
+        referenceImageUrls: kieReferenceImageUrls,
+        lastFrameUrl: kieLastFrame || undefined,
         options: {
           resolution: String(params.resolution ?? "1080p"),
           duration: Number(params.duration ?? 5),
-          generateAudio: params.generateAudio === true,
+          generateAudio:
+            params.generate_audio === true || params.generateAudio === true,
           promptExtend: params.promptExtend !== false,
           watermark: params.watermark === true,
+          mode: typeof params.mode === "string" ? params.mode : undefined,
+          multi_shots: params.multi_shots === true,
+          sound:
+            params.sound !== false && params.generate_audio !== false,
         },
-        aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
+        aspectRatio:
+          params.aspect_ratio === "9:16"
+            ? "9:16"
+            : params.aspect_ratio === "1:1"
+              ? "1:1"
+              : "16:9",
       });
 
   await assertVideoCreditsBeforeTrafficQueue({

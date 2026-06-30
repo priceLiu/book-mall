@@ -1,5 +1,6 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
-import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
+import type { ImageEngineNodeData, ImageNodeData } from "./types";
+import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 
 export type Sbv1UpstreamRefLink = {
   id: string;
@@ -27,8 +28,56 @@ export function isSbv1VideoEngineRefImageNode(
 }
 
 function imageUrlFromRefNode(node: CanvasFlowNode): string | undefined {
-  const d = node.data as unknown as Sbv1ImageNodeData;
-  return d.ossUrl ?? d.blobUrl;
+  if (
+    node.type === "sbv1-image" ||
+    node.type === "story-pro2-image" ||
+    node.type === "story-pro2-three-view"
+  ) {
+    const d = node.data as unknown as ImageNodeData & {
+      runtime?: { ossUrl?: string; ephemeralUrl?: string };
+      modelKey?: string;
+    };
+    return (
+      pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
+      d.runtime?.ossUrl ??
+      d.ossUrl ??
+      d.blobUrl
+    );
+  }
+  if (node.type === "image-engine" || node.type === "three-view-engine") {
+    const d = node.data as unknown as ImageEngineNodeData & {
+      ossUrl?: string;
+      blobUrl?: string;
+    };
+    return (
+      pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
+      d.runtime?.ossUrl ??
+      d.ossUrl ??
+      d.blobUrl
+    );
+  }
+  return undefined;
+}
+
+/** 入边是否应计入视频引擎参考图（含历史误标 in_text 的图片连线） */
+export function edgeMatchesSbv1VideoRefInput(
+  edge: CanvasFlowEdge,
+  engineNodeId: string,
+  nodes: CanvasFlowNode[],
+): boolean {
+  if (edge.target !== engineNodeId) return false;
+  if (edge.targetHandle === "in_motion_video") return false;
+  if (edge.targetHandle === "in_ref" || !edge.targetHandle) return true;
+  const source = nodes.find((n) => n.id === edge.source);
+  if (
+    source &&
+    (isSbv1VideoEngineRefImageNode(source) || source.type === "group")
+  ) {
+    return (
+      edge.targetHandle === "in_text" || edge.targetHandle === "default"
+    );
+  }
+  return false;
 }
 
 /**
@@ -41,10 +90,8 @@ export function resolveSbv1UpstreamRefLinks(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): Sbv1UpstreamRefLink[] {
-  const incoming = edges.filter(
-    (e) =>
-      e.target === engineNodeId &&
-      (e.targetHandle === "in_ref" || !e.targetHandle),
+  const incoming = edges.filter((e) =>
+    edgeMatchesSbv1VideoRefInput(e, engineNodeId, nodes),
   );
   const links: Sbv1UpstreamRefLink[] = [];
   const seen = new Set<string>();

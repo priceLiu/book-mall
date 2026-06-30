@@ -263,7 +263,7 @@ const STORY_PRO2_PALETTE: PaletteItem[] = [
   },
   {
     type: "jianying-export-pro2",
-    label: "剪映 · 专业版 2.0",
+    label: "导出剪辑 · 2.0",
     icon: <Download className="size-[18px]" />,
     hint: "ZIP + 自动剪辑",
     dividerBefore: true,

@@ -279,6 +279,14 @@ html[data-canvas-modal-open] .pro2-input-dock {
   pointer-events: none !important;
 }
 
+/* 连线始终在节点/组内容之下，避免穿过图片遮挡画面 */
+.canvas-flow-wrap .react-flow__edges {
+  z-index: 0 !important;
+}
+.canvas-flow-wrap .react-flow__nodes {
+  z-index: 1 !important;
+}
+
 /* LibTV 侧 + · 置顶于连线交互层 */
 .pro2-node-side-plus-layer {
   isolation: isolate;

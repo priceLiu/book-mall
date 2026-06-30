@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus } from "lucide-react";
+import { DockRefCornerBadge } from "@/components/canvas/pro2/dock-ref-corner-badge";
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-hover-preview";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -35,11 +36,13 @@ export type Pro2DockRefImagesProps = {
 
 function DockRefImageChip({
   refItem,
+  index,
   active,
   disabled,
   onRemove,
 }: {
   refItem: StoryRefImage;
+  index: number;
   active: boolean;
   disabled?: boolean;
   onRemove: () => void;
@@ -107,17 +110,12 @@ function DockRefImageChip({
             图
           </div>
         )}
-        <button
-          type="button"
-          className="nodrag absolute right-0 top-0 z-10 flex size-4 items-center justify-center bg-black/80 text-white/85 transition hover:bg-black hover:text-white"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
+        <DockRefCornerBadge
+          label={String(index + 1)}
+          title="移除参考图"
           disabled={disabled}
-        >
-          <X className="size-2.5" />
-        </button>
+          onRemove={onRemove}
+        />
       </div>
       <MentionHoverPreviewPortal
         item={hover ? mentionItem : null}
@@ -234,10 +232,11 @@ export function Pro2DockRefImages({
       onFocusCapture={() => setPasteZoneActive(true)}
       onBlurCapture={() => setPasteZoneActive(false)}
     >
-      {refs.map((ref) => (
+      {refs.map((ref, index) => (
         <DockRefImageChip
           key={ref.id}
           refItem={ref}
+          index={index}
           active={activeIds.includes(ref.id)}
           disabled={disabled}
           onRemove={() => {

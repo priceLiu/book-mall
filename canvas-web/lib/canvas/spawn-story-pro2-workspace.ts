@@ -521,7 +521,7 @@ export function spawnStoryPro2MediaColumns(
   const jianyingExportId = args.addNode(
     "jianying-export-pro2",
     { x: exportX, y: storyMediaColumnY(originY, rowBottom, "jianying-export-pro2") },
-    { label: "剪映导出 · 专业版", hubNodeId: args.scriptHubId },
+    { label: "导出剪辑", hubNodeId: args.scriptHubId },
   );
 
   connect(args.setEdges, styleId, characterColumnId, "text", "in_text");

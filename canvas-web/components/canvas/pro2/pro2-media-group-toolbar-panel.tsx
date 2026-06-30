@@ -2,12 +2,14 @@
 
 import {
   BookmarkPlus,
+  Columns3,
   Copy,
   Download,
   LayoutGrid,
   Loader2,
   Palette,
   RotateCw,
+  Rows3,
   Unlink,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -98,10 +100,18 @@ export function Pro2MediaGroupToolbarPanel({
 }: Pro2MediaGroupToolbarPanelProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const ungroup = useCanvasStore((s) => s.ungroup);
+  const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const duplicateMediaGroup = useCanvasStore((s) => s.duplicateMediaGroup);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const group = nodes.find((n) => n.id === groupId);
+  const childrenIds = useMemo(
+    () =>
+      nodes
+        .filter((n) => n.parentId === groupId && n.type !== "group")
+        .map((n) => n.id),
+    [nodes, groupId],
+  );
   const saveGroupAsAsset = useSaveGroupAsAsset();
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState("");
@@ -351,6 +361,36 @@ export function Pro2MediaGroupToolbarPanel({
             重排
           </button>
         ) : null}
+        <button
+          type="button"
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+          title={`把本组 ${childrenIds.length} 个子节点排成一行（横为主）`}
+          disabled={childrenIds.length < 2}
+          onClick={() => autoLayoutNodes(childrenIds, "row")}
+        >
+          <Columns3 className="size-3.5" />
+          横排
+        </button>
+        <button
+          type="button"
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+          title={`把本组 ${childrenIds.length} 个子节点排成一列（竖为主）`}
+          disabled={childrenIds.length < 2}
+          onClick={() => autoLayoutNodes(childrenIds, "column")}
+        >
+          <Rows3 className="size-3.5" />
+          竖排
+        </button>
+        <button
+          type="button"
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+          title={`按拓扑顺序自动整理本组 ${childrenIds.length} 个子节点`}
+          disabled={childrenIds.length < 2}
+          onClick={() => autoLayoutNodes(childrenIds, "auto")}
+        >
+          <LayoutGrid className="size-3.5" />
+          自动
+        </button>
         <button
           type="button"
           className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}

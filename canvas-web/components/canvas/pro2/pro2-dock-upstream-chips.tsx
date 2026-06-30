@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { AlignLeft, FileText, ImageIcon, X } from "lucide-react";
+import { DockRefCornerBadge } from "@/components/canvas/pro2/dock-ref-corner-badge";
 import { createPortal } from "react-dom";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
@@ -112,28 +113,20 @@ function UpstreamChip({
             <Icon className="size-4" />
           )}
         </button>
-        <span
-          className="pointer-events-none absolute left-0 top-0 z-10 flex size-3 items-center justify-center rounded-br-md bg-black/75 text-[8px] font-medium text-white/90"
-          aria-hidden
-        >
-          {index + 1}
-        </span>
         {deletable ? (
-          <button
-            type="button"
-            className={cn(
-              "nodrag absolute right-0 top-0 z-10 flex size-4 items-center justify-center rounded-bl-md bg-black/75 text-white/80 transition hover:bg-red-950/90 hover:text-white",
-              "opacity-0 group-hover:opacity-100 focus:opacity-100",
-            )}
+          <DockRefCornerBadge
+            label={String(index + 1)}
             title={`删除「${link.label}」`}
-            onClick={(e) => {
-              e.stopPropagation();
-              void onDelete();
-            }}
+            onRemove={() => void onDelete()}
+          />
+        ) : (
+          <span
+            className="pointer-events-none absolute right-0.5 top-0.5 z-10 flex min-h-[14px] min-w-[14px] items-center justify-center rounded bg-black/75 px-1 py-px text-[8px] font-medium leading-none text-white/90"
+            aria-hidden
           >
-            <X className="size-2.5" />
-          </button>
-        ) : null}
+            {index + 1}
+          </span>
+        )}
       </div>
 
       {open && typeof document !== "undefined"

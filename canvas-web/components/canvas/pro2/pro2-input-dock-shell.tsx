@@ -9,6 +9,9 @@ import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placem
 import {
   computeLibtvDockInverseScale,
   libtvDockFlowSize,
+  libtvDockInnerContentZoom,
+  libtvDockPromptFlowFontPx,
+  libtvDockPromptFontScreenMetrics,
 } from "@/lib/canvas/libtv-dock-scale";
 import {
   LIBTV_INPUT_DOCK_BG,
@@ -65,7 +68,17 @@ export function Pro2InputDockShell({
   const zoom = useStore((s) => s.transform[2]);
   const { w: dockW, h: dockHeight } = libtvDockFlowSize();
   const invScale = computeLibtvDockInverseScale(zoom, dockW, expanded);
-  const dockUi = useMemo(() => ({ expanded }), [expanded]);
+  const contentZoom = libtvDockInnerContentZoom(zoom, expanded);
+  const shellScreenScale = invScale * zoom;
+  const promptFontFlowPx = libtvDockPromptFlowFontPx(
+    libtvDockPromptFontScreenMetrics(zoom),
+    shellScreenScale,
+    contentZoom,
+  );
+  const dockUi = useMemo(
+    () => ({ expanded, contentZoom, shellScreenScale, canvasZoom: zoom }),
+    [expanded, contentZoom, shellScreenScale, zoom],
+  );
 
   if (!viewportEl) return null;
 
@@ -106,6 +119,8 @@ export function Pro2InputDockShell({
             background: LIBTV_INPUT_DOCK_BG,
             height: dockHeight,
             maxHeight: dockHeight,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <button
@@ -122,12 +137,20 @@ export function Pro2InputDockShell({
           </button>
           {header}
           <div
-            ref={setDockScrollEl}
-            className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden overscroll-contain [overflow-anchor:none]"
-            data-canvas-wheel-scroll
+            className="libtv-dock-content-zoom flex min-h-0 flex-1 flex-col overflow-hidden"
+            style={{
+              ...(contentZoom === 1 ? {} : { zoom: contentZoom }),
+              ["--libtv-dock-prompt-font" as string]: `${promptFontFlowPx}px`,
+            }}
           >
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              {children}
+            <div
+              ref={setDockScrollEl}
+              className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden overscroll-contain [overflow-anchor:none]"
+              data-canvas-wheel-scroll
+            >
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {children}
+              </div>
             </div>
           </div>
           {footer ? <div className="shrink-0">{footer}</div> : null}
@@ -156,16 +179,35 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
 export function Pro2DockHeader({
   refRow,
   actionRow,
+  compact,
+  minHeightPx,
 }: {
   refRow?: ReactNode;
   actionRow?: ReactNode;
+  /** 视频 Dock 等 · 更矮顶栏 */
+  compact?: boolean;
+  minHeightPx?: number;
 }) {
   if (!refRow && !actionRow) return null;
   return (
     <div
       className={cn("nodrag shrink-0 border-b", LIBTV_INPUT_DOCK_DIVIDER)}
     >
-      <div className="hide-scroll-bar flex min-h-[44px] min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto px-3 py-1.5">
+      <div
+        className={cn(
+          "hide-scroll-bar flex min-w-0 flex-nowrap items-center overflow-x-auto",
+          compact
+            ? "gap-1 px-2 py-1"
+            : "min-h-[44px] gap-1.5 px-3 py-1.5",
+        )}
+        style={
+          minHeightPx != null
+            ? { minHeight: minHeightPx }
+            : compact
+              ? { minHeight: 30 }
+              : undefined
+        }
+      >
         {refRow}
         {actionRow}
       </div>
@@ -191,15 +233,18 @@ export function Pro2DockRefRow({ children }: { children: ReactNode }) {
 export function Pro2DockToolbar({
   children,
   className,
+  compact,
 }: {
   children: ReactNode;
   className?: string;
+  compact?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "nodrag flex shrink-0 items-center justify-between gap-2 border-t px-2 py-1.5",
+        "nodrag flex shrink-0 items-center justify-between gap-2 border-t",
         LIBTV_INPUT_DOCK_DIVIDER,
+        compact ? "px-2 py-1" : "px-2 py-1.5",
         className,
       )}
     >
