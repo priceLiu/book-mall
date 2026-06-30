@@ -171,7 +171,7 @@ export function resolveSnapConnectionOnNodeHit(
       targetNode.type === "jianying-export-pro2" &&
       !state.toHandleId &&
       fromNode?.type === "sbv1-video-engine" &&
-      state.fromHandleId === "out_video"
+      (state.fromHandleId === "out_video" || state.fromHandleId === "plus_left")
     ) {
       targetHandle = "in_video";
     }

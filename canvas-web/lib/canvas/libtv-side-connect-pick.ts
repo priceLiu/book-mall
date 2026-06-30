@@ -7,12 +7,18 @@ import {
   type LibtvSideSpawnStore,
 } from "./libtv-side-spawn";
 import { resolveLibtvSideSpawnNodeType } from "./libtv-side-spawn";
+import { handlePro2GroupSidePick } from "./pro2-group-side-spawn";
 import {
+  spawnJianyingRenderPreviewNode,
+} from "./spawn-jianying-render-preview";
+import {
+  handleSbv1GroupSidePick,
   handleSbv1SideAddNodePick,
   spawnSbv1NeighborFromNode,
 } from "./sbv1-spawn-nodes";
 import { sideConnectSideFromHandle } from "./libtv-side-connect-menu";
 import type { Pro2AddNodePickDialogs } from "./pro2-add-node-pick";
+import { useCanvasStore } from "./store";
 
 export type SideConnectPickContext = {
   fromNodeId: string;
@@ -41,13 +47,60 @@ export async function runLibtvSideConnectPick(
   }
 
   if (anchorNode.type === "jianying-export-pro2") {
-    if (itemId === "video" || nodeType === "sbv1-video-engine") {
+    if (
+      side === "left" &&
+      (itemId === "video" || nodeType === "sbv1-video-engine")
+    ) {
       spawnSbv1NeighborFromNode(
         ctx.fromNodeId,
         "left",
         "sbv1-video-engine",
         store,
         spawnOpts,
+      );
+    } else if (
+      side === "right" &&
+      (itemId === "preview" || nodeType === "video-preview")
+    ) {
+      const canvas = useCanvasStore.getState();
+      spawnJianyingRenderPreviewNode(
+        ctx.fromNodeId,
+        "",
+        {
+          nodes: canvas.nodes,
+          edges: canvas.edges,
+          addNode: store.addNode,
+          setNodes: store.setNodes,
+          setEdges: store.setEdges,
+          updateNodeData: canvas.updateNodeData,
+        },
+        spawnOpts,
+      );
+    }
+    return;
+  }
+
+  if (anchorNode.type === "group") {
+    const isSbv1 = Boolean(
+      (anchorNode.data as { sbv1Styled?: boolean }).sbv1Styled,
+    );
+    if (isSbv1) {
+      await handleSbv1GroupSidePick(
+        ctx.fromNodeId,
+        side,
+        itemId,
+        nodeType,
+        dialogs.alert,
+        store,
+      );
+    } else {
+      await handlePro2GroupSidePick(
+        ctx.fromNodeId,
+        side,
+        itemId,
+        nodeType,
+        dialogs.alert,
+        store,
       );
     }
     return;
@@ -145,6 +198,23 @@ export async function runLibtvSideConnectPick(
 
   if (anchorNode.type === "story-pro2-style-asset") {
     await handlePro2SideAddNodePick(itemId, nodeType, { alert }, () => {
+      if (side === "left") {
+        if (
+          itemId === "txt2img" ||
+          itemId === "img2img" ||
+          itemId === "image" ||
+          nodeType === "story-pro2-image"
+        ) {
+          spawnLibtvNeighborFromAnchor(
+            ctx.fromNodeId,
+            "left",
+            "story-pro2-image",
+            store,
+            spawnOpts,
+          );
+        }
+        return;
+      }
       if (itemId === "text" || nodeType === "story-pro2-starter") {
         spawnLibtvNeighborFromAnchor(
           ctx.fromNodeId,

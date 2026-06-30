@@ -3,15 +3,23 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
-import { Handle, Position, useStore } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useNodeId,
+  useUpdateNodeInternals,
+  useStore,
+} from "@xyflow/react";
 import type { HandleType } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
+import { LIBTV_NODE_SIDE_PLUS_LAYER_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 
@@ -106,6 +114,8 @@ export function Pro2NodeSidePlus({
   magneticFollow = true,
   size = "lg",
 }: Pro2NodeSidePlusProps) {
+  const nodeId = useNodeId();
+  const updateNodeInternals = useUpdateNodeInternals();
   const [open, setOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
     null,
@@ -138,6 +148,15 @@ export function Pro2NodeSidePlus({
     if (!rect) return null;
     return sideMenuAnchorFromRect(rect, side);
   }, [side]);
+
+  useLayoutEffect(() => {
+    if (!nodeId) return;
+    updateNodeInternals(nodeId);
+  }, [nodeId, visible, size, magnetOffsetY, updateNodeInternals]);
+
+  useEffect(() => {
+    if (!visible) setOpen(false);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !magneticFollow || open) {
@@ -175,7 +194,6 @@ export function Pro2NodeSidePlus({
   }, []);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
-    e.stopPropagation();
     gestureRef.current = {
       pointerId: e.pointerId,
       x: e.clientX,
@@ -192,23 +210,18 @@ export function Pro2NodeSidePlus({
     }
   }, []);
 
-  const onPointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      const g = gestureRef.current;
-      if (!g || g.pointerId !== e.pointerId) return;
-      gestureRef.current = null;
-      if (g.moved) return;
-      openMenu(e);
-    },
-    [openMenu],
-  );
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g || g.pointerId !== e.pointerId) return;
+    gestureRef.current = null;
+    if (g.moved) return;
+    openMenu(e);
+  }, [openMenu]);
 
   const wrapStyle: CSSProperties = {
     top: "50%",
     transform: `translateY(calc(-50% + ${magnetOffsetY}px))`,
   };
-
-  if (!visible) return null;
 
   const lg = size === "lg";
 
@@ -218,56 +231,49 @@ export function Pro2NodeSidePlus({
         ref={handleWrapRef}
         style={wrapStyle}
         className={cn(
-          "pro2-node-side-plus-layer pointer-events-none absolute top-1/2",
-          side === "left" ? (lg ? "-left-10" : "-left-6") : lg ? "-right-10" : "-right-6",
+          "pro2-node-side-plus-layer pointer-events-none absolute top-1/2 w-0",
+          side === "left" ? "left-0" : "right-0",
+          LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+          !visible && "pointer-events-none opacity-0",
           className,
-          "z-[20050]",
         )}
+        aria-hidden={!visible}
       >
-        <div
+        <Handle
+          id={handleId}
+          type={handleType}
+          position={position}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
           className={cn(
-            "pointer-events-auto relative grid place-items-center",
-            lg ? "size-[104px]" : "size-[52px]",
-          )}
-        >
-          <Handle
-            id={handleId}
-            type={handleType}
-            position={position}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            className={cn(
-              RF_NO_DRAG,
-              "pro2-node-side-plus-handle",
-              lg
-                ? "!flex !h-[88px] !w-[88px] !items-center !justify-center !rounded-full !p-0"
-                : "!flex !h-11 !w-11 !items-center !justify-center !rounded-full !p-0",
-              "!border !border-white/25 !bg-[#2a2a2e] !opacity-100",
-              "!shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
+            RF_NO_DRAG,
+            "pro2-node-side-plus-handle",
+            lg && "pro2-node-side-plus-handle--lg",
+            "!flex !items-center !justify-center !rounded-full !border !border-white/25 !bg-[#2a2a2e] !p-0 !opacity-100",
+            "!shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
+            visible &&
               "hover:!border-violet-400/60 hover:!bg-violet-500/25",
-              side === "left" ? "!-left-0" : "!-right-0",
-              "!top-1/2 !-translate-y-1/2",
+            !visible && "!pointer-events-none !opacity-0",
+          )}
+          title={
+            side === "left"
+              ? "添加上下文 · 单击菜单 / 拖拽连线"
+              : "引用生成 · 单击菜单 / 拖拽连线"
+          }
+        >
+          <Plus
+            className={cn(
+              "pointer-events-none shrink-0 text-white/90",
+              lg ? "size-12" : "size-6",
             )}
-            title={
-              side === "left"
-                ? "添加上下文 · 单击菜单 / 拖拽连线"
-                : "引用生成 · 单击菜单 / 拖拽连线"
-            }
-          >
-            <Plus
-              className={cn(
-                "pointer-events-none shrink-0 text-white/90",
-                lg ? "size-12" : "size-6",
-              )}
-              strokeWidth={2.25}
-              aria-hidden
-            />
-          </Handle>
-        </div>
+            strokeWidth={2.25}
+            aria-hidden
+          />
+        </Handle>
       </div>
       <Pro2AddNodePopover
-        open={open}
+        open={open && visible}
         anchor={menuAnchor ?? { x: 0, y: 0 }}
         sections={sections}
         onClose={closeMenu}

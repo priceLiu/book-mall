@@ -22,7 +22,11 @@ import {
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
-import { libtvNodeBorderStyle } from "@/lib/canvas/libtv-node-chrome";
+import {
+  libtvNodeBorderStyle,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
+} from "@/lib/canvas/libtv-node-chrome";
 import {
   SBV1_CARD_DRAG_CLASS,
   SBV1_CARD_SHELL_CLASS,
@@ -344,6 +348,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           title="动作视频输入（Motion Control）"
         />
         <Handle
+          id="plus_left"
+          type="source"
+          position={Position.Left}
+          className={cn(SBV1_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
+          style={{ top: "50%" }}
+        />
+        <Handle
           id="out_video"
           type="source"
           position={Position.Right}
@@ -358,29 +369,25 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           title={`串联下一${SBV1_VIDEO_COMPOSE_LABEL}`}
         />
 
-        {showSidePlus ? (
-          <>
-            <Pro2NodeSidePlus
-              side="left"
-              handleId="plus_left"
-              handleType="source"
-              visible
-              size="lg"
-              className="z-[60]"
-              sections={SBV1_VIDEO_ENGINE_LEFT_ADD_MENU}
-              onPick={onSidePick("left")}
-            />
-            <Pro2NodeSidePlus
-              side="right"
-              handleId="out_video"
-              visible
-              size="lg"
-              className="z-[60]"
-              sections={SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU}
-              onPick={onSidePick("right")}
-            />
-          </>
-        ) : null}
+        <Pro2NodeSidePlus
+          side="left"
+          handleId="plus_left"
+          handleType="source"
+          visible={showSidePlus}
+          size={LIBTV_NODE_SIDE_PLUS_SIZE}
+          className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+          sections={SBV1_VIDEO_ENGINE_LEFT_ADD_MENU}
+          onPick={onSidePick("left")}
+        />
+        <Pro2NodeSidePlus
+          side="right"
+          handleId="out_video"
+          visible={showSidePlus}
+          size={LIBTV_NODE_SIDE_PLUS_SIZE}
+          className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+          sections={SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU}
+          onPick={onSidePick("right")}
+        />
 
         {showFloatingToolbar ? (
           <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>

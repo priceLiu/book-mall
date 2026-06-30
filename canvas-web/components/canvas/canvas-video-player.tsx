@@ -12,11 +12,14 @@ export function CanvasVideoPlayer({
   className,
   autoPlay = false,
   poster,
+  fill = false,
 }: {
   src: string;
   className?: string;
   autoPlay?: boolean;
   poster?: string;
+  /** 填满父容器（不强制 16:9），由外层节点决定可用高度 */
+  fill?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -32,7 +35,8 @@ export function CanvasVideoPlayer({
   return (
     <div
       className={cn(
-        "relative aspect-video w-full max-w-full overflow-hidden bg-black/95",
+        "relative max-w-full overflow-hidden bg-black/95",
+        fill ? "h-full w-full" : "aspect-video w-full",
         className,
       )}
     >

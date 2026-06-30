@@ -165,6 +165,15 @@ export function computeLibtvDockInverseScale(
 /** 视频 Dock 顶栏 · 100% 画布时缩略图目标屏宽（相对旧版 size-10 ≈×2） */
 export const VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 = 64;
 
+/** 缩略图屏上最大尺寸（画布缩到 ≤20% 时取此值） */
+export const VIDEO_DOCK_HEADER_THUMB_W_MAX = 96;
+export const VIDEO_DOCK_HEADER_THUMB_H_MAX = 91;
+/** 画布放大时缩略图收到最大尺寸的 90% */
+export const VIDEO_DOCK_HEADER_THUMB_MIN_RATIO = 0.9;
+/** ≤ 此 zoom 取最大尺寸；≥ THUMB_MIN_ZOOM 取最小尺寸 */
+export const VIDEO_DOCK_HEADER_THUMB_MAX_ZOOM = 0.2;
+export const VIDEO_DOCK_HEADER_THUMB_MIN_ZOOM = 1;
+
 /** 100% 画布时模式 chip 字号（屏 px · 相对旧 10px ≈×2） */
 export const VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 = 19;
 
@@ -218,50 +227,62 @@ export function libtvDockPromptFlowFontPx(
 }
 
 /**
- * 视频 Dock 顶两栏（模式 chip + 缩略图）屏上尺寸 · 随画布 zoom。
- * - 100%：缩略图/标签为旧版约 2 倍
- * - 15%：顶栏整体 2×100% 基准，chip 字号小 2px
- * - 放大至 max：缩略图与第一行标签为 100% 的 2 倍
+ * 视频 / 图片 Dock 顶两栏（模式 chip + 缩略图）屏上尺寸 · 随画布 zoom。
+ * 缩略图：
+ * - 画布缩小（zoom ≤ 0.2）→ 最大 96×91（屏上 px，不再继续放大）
+ * - 画布放大（zoom ≥ 1）→ 最小 = 最大尺寸 × 90%
+ * - 之间线性插值
+ * chip / badge 字号沿用旧档位，保持视频模式条观感不变。
  */
 export function libtvDockVideoHeaderScreenMetrics(canvasZoom: number): {
+  /** = thumbWidthScreenPx，向后兼容 */
   thumbScreenPx: number;
+  thumbWidthScreenPx: number;
+  thumbHeightScreenPx: number;
   chipFontScreenPx: number;
   badgeFontScreenPx: number;
 } {
   const z = Math.max(0.08, Math.min(4, Number.isFinite(canvasZoom) ? canvasZoom : 1));
-  const T = VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100;
   const F = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
+
+  // 缩略图屏上尺寸：zoom≤0.2 取最大；zoom≥1 取 90%；线性插值
+  const wMax = VIDEO_DOCK_HEADER_THUMB_W_MAX;
+  const hMax = VIDEO_DOCK_HEADER_THUMB_H_MAX;
+  const r = VIDEO_DOCK_HEADER_THUMB_MIN_RATIO;
+  const zOut = VIDEO_DOCK_HEADER_THUMB_MAX_ZOOM;
+  const zIn = VIDEO_DOCK_HEADER_THUMB_MIN_ZOOM;
+  const tThumb =
+    z <= zOut ? 0 : z >= zIn ? 1 : (z - zOut) / (zIn - zOut);
+  const thumbWidthScreenPx = wMax - tThumb * (wMax * (1 - r));
+  const thumbHeightScreenPx = hMax - tThumb * (hMax * (1 - r));
+
+  // chip / badge 字号（旧档位）
   const zMin = VIDEO_DOCK_HEADER_ZOOMOUT_ANCHOR;
   const zMax = VIDEO_DOCK_HEADER_ZOOMIN_ANCHOR;
-  const thumb2x = T * 2;
   const font2x = F * 2;
-
+  let chipFontScreenPx: number;
+  let badgeFontScreenPx: number;
   if (z <= zMin) {
-    return {
-      thumbScreenPx: thumb2x,
-      chipFontScreenPx: F - 2,
-      badgeFontScreenPx: Math.max(9, F - 3),
-    };
-  }
-  if (z >= zMax) {
-    return {
-      thumbScreenPx: thumb2x,
-      chipFontScreenPx: font2x,
-      badgeFontScreenPx: Math.max(10, font2x * 0.55),
-    };
-  }
-  if (z >= 1) {
+    chipFontScreenPx = F - 2;
+    badgeFontScreenPx = Math.max(9, F - 3);
+  } else if (z >= zMax) {
+    chipFontScreenPx = font2x;
+    badgeFontScreenPx = Math.max(10, font2x * 0.55);
+  } else if (z >= 1) {
     const t = (z - 1) / (zMax - 1);
-    return {
-      thumbScreenPx: T + t * (thumb2x - T),
-      chipFontScreenPx: F + t * (font2x - F),
-      badgeFontScreenPx: Math.max(10, (F + t * (font2x - F)) * 0.55),
-    };
+    chipFontScreenPx = F + t * (font2x - F);
+    badgeFontScreenPx = Math.max(10, chipFontScreenPx * 0.55);
+  } else {
+    const t = (z - zMin) / (1 - zMin);
+    chipFontScreenPx = F - 2 + t * 2;
+    badgeFontScreenPx = Math.max(9, F - 3 + t * 2);
   }
-  const t = (z - zMin) / (1 - zMin);
+
   return {
-    thumbScreenPx: thumb2x - t * (thumb2x - T),
-    chipFontScreenPx: F - 2 + t * 2,
-    badgeFontScreenPx: Math.max(9, F - 3 + t * 2),
+    thumbScreenPx: thumbWidthScreenPx,
+    thumbWidthScreenPx,
+    thumbHeightScreenPx,
+    chipFontScreenPx,
+    badgeFontScreenPx,
   };
 }

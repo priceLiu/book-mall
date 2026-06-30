@@ -10,8 +10,11 @@ import { collectJianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-fr
 import {
   libtvNodeBorderStyle,
   libtvNodeInteractiveBorderClass,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
 } from "@/lib/canvas/libtv-node-chrome";
-import { JIANYING_EXPORT_LEFT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
+import { JIANYING_EXPORT_LEFT_ADD_MENU, JIANYING_EXPORT_RIGHT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
+import { spawnJianyingRenderPreviewNode } from "@/lib/canvas/spawn-jianying-render-preview";
 import { spawnSbv1NeighborFromNode } from "@/lib/canvas/sbv1-spawn-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_NODE_HANDLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
@@ -38,6 +41,8 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
   const setEdges = useCanvasStore((s) => s.setEdges);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+
   const snapshot = useMemo(
     () => collectJianyingLibtvConnectionSnapshot(id, nodes, edges),
     [id, nodes, edges],
@@ -56,6 +61,21 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
       spawnSbv1NeighborFromNode(id, "left", "sbv1-video-engine", spawnStore);
     },
     [id, spawnStore],
+  );
+
+  const onRightPick = useCallback(
+    (itemId: string, nodeType?: string) => {
+      if (itemId !== "preview" && nodeType !== "video-preview") return;
+      spawnJianyingRenderPreviewNode(id, "", {
+        nodes,
+        edges,
+        addNode,
+        setNodes,
+        setEdges,
+        updateNodeData,
+      });
+    },
+    [id, nodes, edges, addNode, setNodes, setEdges, updateNodeData],
   );
 
   const title = d.label?.trim() || "导出剪辑";
@@ -103,17 +123,47 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
         )}
         title="各镜视频"
       />
+      <Handle
+        id="plus_left"
+        type="source"
+        position={Position.Left}
+        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
+        title="添加上下文"
+      />
 
-      {showSidePlus ? (
-        <Pro2NodeSidePlus
-          side="left"
-          handleId="plus_left"
-          visible
-          className="z-[20060]"
-          sections={JIANYING_EXPORT_LEFT_ADD_MENU}
-          onPick={onLeftPick}
-        />
-      ) : null}
+      <Pro2NodeSidePlus
+        side="left"
+        handleId="plus_left"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={JIANYING_EXPORT_LEFT_ADD_MENU}
+        onPick={onLeftPick}
+      />
+      <Pro2NodeSidePlus
+        side="right"
+        handleId="out_render"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={JIANYING_EXPORT_RIGHT_ADD_MENU}
+        onPick={onRightPick}
+      />
+
+      <Handle
+        id="out_render"
+        type="source"
+        position={Position.Right}
+        className={cn(
+          PRO2_NODE_HANDLE_CLASS,
+          showSidePlus
+            ? "pointer-events-none opacity-0"
+            : selected
+              ? "opacity-100"
+              : "pointer-events-none opacity-0",
+        )}
+        title="剪辑成片"
+      />
 
       <div className="flex shrink-0 items-center gap-2 px-3 py-2.5">
         <GripVertical className="size-3.5 shrink-0 text-white/30" aria-hidden />

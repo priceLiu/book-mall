@@ -8,7 +8,10 @@ import { Handle, Position } from "@xyflow/react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
-import { PRO2_STYLE_ASSET_RIGHT_MENU } from "@/lib/canvas/pro2-add-node-menu";
+import {
+  PRO2_IMAGE_LEFT_ADD_MENU,
+  PRO2_STYLE_ASSET_RIGHT_MENU,
+} from "@/lib/canvas/pro2-add-node-menu";
 import {
   buildPro2GeneralTextNodeData,
   buildPro2ImageNodeData,
@@ -23,7 +26,11 @@ import {
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2StyleAssetNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
-import { libtvNodeBorderStyle } from "@/lib/canvas/libtv-node-chrome";
+import {
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
+  libtvNodeBorderStyle,
+} from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
@@ -38,19 +45,25 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const d = data as unknown as StoryPro2StyleAssetNodeData;
+  const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-style-asset");
   const previewUrl = d.imageUrl?.trim() ?? "";
   const headerLabel = d.label?.trim() || `素材-风格-${d.styleName || "未命名"}`;
 
   const spawnNeighbor = useCallback(
-    (nodeType: "story-pro2-starter" | "story-pro2-image") => {
+    (
+      side: "left" | "right",
+      nodeType: "story-pro2-starter" | "story-pro2-image",
+    ) => {
       const self = nodes.find((n) => n.id === id);
       if (!self) return;
       const gap = 48;
       const w = self.width ?? PRO2_IMAGE_NODE_WIDTH;
-      const x = self.position.x + w + gap;
+      const x =
+        side === "left" ? self.position.x - w - gap : self.position.x + w + gap;
       const y = self.position.y;
 
       if (nodeType === "story-pro2-starter") {
@@ -92,18 +105,29 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   );
 
   const onSidePick = useCallback(
-    (itemId: string, nodeType?: string) => {
+    (side: "left" | "right") => (itemId: string, nodeType?: string) => {
       void handlePro2SideAddNodePick(
         itemId,
         nodeType,
         { alert },
         () => {
+          if (side === "left") {
+            if (
+              itemId === "txt2img" ||
+              itemId === "img2img" ||
+              itemId === "image" ||
+              nodeType === "story-pro2-image"
+            ) {
+              spawnNeighbor("left", "story-pro2-image");
+            }
+            return;
+          }
           if (itemId === "text" || nodeType === "story-pro2-starter") {
-            spawnNeighbor("story-pro2-starter");
+            spawnNeighbor("right", "story-pro2-starter");
             return;
           }
           if (itemId === "image" || nodeType === "story-pro2-image") {
-            spawnNeighbor("story-pro2-image");
+            spawnNeighbor("right", "story-pro2-image");
           }
         },
       );
@@ -119,13 +143,40 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
       onPointerLeave={onPointerLeave}
     >
       <Handle
+        id="plus_left"
+        type="source"
+        position={Position.Left}
+        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
+      />
+      <Handle
         id="style"
         type="source"
         position={Position.Right}
         className={cn(
           PRO2_NODE_HANDLE_CLASS,
-          selected ? "pointer-events-none opacity-0" : "opacity-0 pointer-events-none",
+          showSidePlus
+            ? "pointer-events-none opacity-0"
+            : "opacity-0 pointer-events-none",
         )}
+      />
+
+      <Pro2NodeSidePlus
+        side="left"
+        handleId="plus_left"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={PRO2_IMAGE_LEFT_ADD_MENU}
+        onPick={onSidePick("left")}
+      />
+      <Pro2NodeSidePlus
+        side="right"
+        handleId="style"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={PRO2_STYLE_ASSET_RIGHT_MENU}
+        onPick={onSidePick("right")}
       />
 
       {selected ? (
@@ -145,16 +196,6 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
       </p>
 
       <div className="relative min-h-0 flex-1">
-        {selected ? (
-          <Pro2NodeSidePlus
-            side="right"
-            handleId="style"
-            visible
-            sections={PRO2_STYLE_ASSET_RIGHT_MENU}
-            onPick={onSidePick}
-          />
-        ) : null}
-
         <div
           className={cn(
             PRO2_STYLE_ASSET_CARD_SHELL_CLASS,

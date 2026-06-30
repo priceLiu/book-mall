@@ -1,6 +1,7 @@
 "use client";
 
 import { Box } from "lucide-react";
+import { useLibtvDockRefThumbMetrics } from "@/lib/canvas/use-libtv-dock-ref-thumb-metrics";
 import { cn } from "@/lib/utils";
 
 export type Pro2DockStyleButtonProps = {
@@ -17,13 +18,21 @@ export function Pro2DockStyleButton({
   disabled,
   onClick,
 }: Pro2DockStyleButtonProps) {
+  const { thumbPx } = useLibtvDockRefThumbMetrics();
+
   return (
     <button
       type="button"
       disabled={disabled}
       title={label ? `风格：${label}` : "风格库"}
+      style={{
+        width: thumbPx,
+        height: thumbPx,
+        minWidth: thumbPx,
+        minHeight: thumbPx,
+      }}
       className={cn(
-        "nodrag flex size-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[11px] transition",
+        "nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[11px] transition",
         active
           ? "border-violet-400/45 bg-violet-500/15 text-violet-100"
           : "border-white/12 bg-white/[0.04] text-white/55 hover:border-white/20 hover:bg-white/8 hover:text-white/80",

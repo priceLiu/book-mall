@@ -58,8 +58,9 @@ export const SBV1_CHAT_INPUT_TEXTAREA_CLASS = PRO2_DOCK_TEXTAREA_CLASS;
 /** 视频 Dock 正文 · 与顶栏 px-2 对齐，去掉 Pro2 左侧额外 1 字符留白 */
 export const SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS =
   "min-h-0 pl-2 pr-4 py-3";
-export const SBV1_REF_THUMB_CLASS =
-  "group relative size-10 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";
+export const SBV1_REF_THUMB_BASE_CLASS =
+  "group relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-[#262626]";
+export const SBV1_REF_THUMB_CLASS = `${SBV1_REF_THUMB_BASE_CLASS} size-10`;
 
 export const SBV1_DOCK_TEXTAREA_CLASS =
   "min-h-[88px] w-full resize-none border-0 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/35 focus:outline-none focus:ring-0";

@@ -94,7 +94,11 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     [canvasZoom],
   );
   const thumbPx = libtvDockFixedFlowPx(
-    headerMetrics.thumbScreenPx,
+    headerMetrics.thumbWidthScreenPx,
+    shellScreenScale,
+  );
+  const thumbHeightPx = libtvDockFixedFlowPx(
+    headerMetrics.thumbHeightScreenPx,
     shellScreenScale,
   );
   const chipFontPx = libtvDockFixedFlowPx(
@@ -113,7 +117,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     headerMetrics.badgeFontScreenPx + 6,
     shellScreenScale,
   );
-  const headerMinHeightPx = thumbPx + libtvDockFixedFlowPx(8, shellScreenScale);
+  const headerMinHeightPx = thumbHeightPx + libtvDockFixedFlowPx(8, shellScreenScale);
   const modelPickerFontPx = libtvDockFixedFlowPx(
     VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
     shellScreenScale,
@@ -275,8 +279,13 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   );
 
   const refThumbStyle = useMemo(
-    () => ({ width: thumbPx, height: thumbPx, minWidth: thumbPx, minHeight: thumbPx }),
-    [thumbPx],
+    () => ({
+      width: thumbPx,
+      height: thumbHeightPx,
+      minWidth: thumbPx,
+      minHeight: thumbHeightPx,
+    }),
+    [thumbPx, thumbHeightPx],
   );
   const refThumbClass =
     "group relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";

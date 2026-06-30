@@ -72,6 +72,22 @@ export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
+/** 导出剪辑节点右侧 + · 剪辑成片预览 */
+export const JIANYING_EXPORT_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
+  {
+    title: "导出成片",
+    items: [
+      {
+        id: "preview",
+        label: "剪辑成片",
+        icon: Video,
+        enabled: true,
+        nodeType: "video-preview",
+      },
+    ],
+  },
+];
+
 /** 导出剪辑节点左侧 + · 接入视频 */
 export const JIANYING_EXPORT_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   {

@@ -497,6 +497,8 @@ export type AudioPreviewNodeData = {
 export type VideoPreviewNodeData = {
   label?: string;
   frameIndex?: number;
+  /** 直接播放 URL（如云端剪辑成片）· 优先于上游 video-engine */
+  videoUrl?: string;
   runtime?: CanvasNodeRuntime;
 };
 

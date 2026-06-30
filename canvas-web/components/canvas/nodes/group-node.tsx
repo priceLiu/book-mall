@@ -25,6 +25,11 @@ import {
 import { useCanvasStore } from "@/lib/canvas/store";
 import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
+  cancelPro2MediaGroupToolbarHide,
+  pinPro2MediaGroupToolbarHover,
+  schedulePro2MediaGroupToolbarHide,
+} from "@/lib/canvas/pro2-media-group-toolbar-hover";
+import {
   isPro2MediaChildNode,
   isPro2StyledGroup,
   pro2MediaGroupBorderColor,
@@ -40,8 +45,24 @@ import {
   PRO2_NODE_RESIZER_HANDLE,
   PRO2_NODE_RESIZER_LINE,
 } from "@/lib/canvas/story-pro2-node-chrome";
-import { LIBTV_CARD_DRAG_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import {
+  LIBTV_CARD_DRAG_CLASS,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
+} from "@/lib/canvas/libtv-node-chrome";
 import { Pro2NodeResizeGrip } from "../pro2/pro2-node-resize-grip";
+import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { handlePro2GroupSidePick } from "@/lib/canvas/pro2-group-side-spawn";
+import {
+  PRO2_IMAGE_LEFT_ADD_MENU,
+  PRO2_RIGHT_ADD_MENU,
+} from "@/lib/canvas/pro2-add-node-menu";
+import {
+  SBV1_GROUP_RIGHT_ADD_MENU,
+  SBV1_IMAGE_LEFT_ADD_MENU,
+} from "@/lib/canvas/sbv1-add-node-menu";
+import { handleSbv1GroupSidePick } from "@/lib/canvas/sbv1-spawn-nodes";
 import { SBV1_NODE_HANDLE_CLASS, SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import {
   GROUP_COLOR_PRESETS,
@@ -84,6 +105,10 @@ function pointInRect(x: number, y: number, r: ScreenRect) {
 export function GroupNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  const { alert } = useDialogs();
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const reflowStoryTemplateGroups = useCanvasStore(
@@ -139,6 +164,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       Boolean(selfNode && isPro2StyledGroup(selfNode, storeNodes)));
   const groupHovered = isLibtvMediaGroup && hoveredMediaGroupId === id;
   const groupVisualHovered = groupHovered || pointerOverGroup;
+  const showSidePlus = Boolean(
+    isLibtvMediaGroup &&
+      (selected || groupVisualHovered || connectingFromNodeId),
+  );
   const groupBorderWidth =
     selected || groupVisualHovered
       ? PRO2_MEDIA_GROUP_BORDER_WIDTH + 1
@@ -321,6 +350,14 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   ]);
 
   useEffect(() => {
+    if (selected && isLibtvMediaGroup) {
+      pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
+    }
+  }, [selected, isLibtvMediaGroup, id, setHoveredMediaGroupId]);
+
+  useEffect(() => () => cancelPro2MediaGroupToolbarHide(), []);
+
+  useEffect(() => {
     if (selected || editOpen) {
       cancelHide();
       setPointerInside(true);
@@ -365,10 +402,45 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       : d.label?.trim() || "未命名分组";
 
   const selectMediaGroup = useCallback(() => {
+    pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
     rfSetNodes((prev) =>
       prev.map((n) => ({ ...n, selected: n.id === id })),
     );
-  }, [id, rfSetNodes]);
+  }, [id, rfSetNodes, setHoveredMediaGroupId]);
+
+  const groupSpawnStore = useMemo(
+    () => ({ nodes: storeNodes, addNode, setNodes, setEdges }),
+    [storeNodes, addNode, setNodes, setEdges],
+  );
+
+  const onGroupSidePick = useCallback(
+    (side: "left" | "right") => (itemId: string, nodeType?: string) => {
+      void (isSbv1Group && !isPro2MediaGroup
+        ? handleSbv1GroupSidePick(
+            id,
+            side,
+            itemId,
+            nodeType,
+            alert,
+            groupSpawnStore,
+          )
+        : handlePro2GroupSidePick(
+            id,
+            side,
+            itemId,
+            nodeType,
+            alert,
+            groupSpawnStore,
+          ));
+    },
+    [
+      id,
+      isSbv1Group,
+      isPro2MediaGroup,
+      alert,
+      groupSpawnStore,
+    ],
+  );
 
   return (
     <div
@@ -381,15 +453,23 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       data-pro2-media-group={isLibtvMediaGroup ? id : undefined}
       onPointerEnter={() => {
         setPointerOverGroup(true);
-        if (isLibtvMediaGroup) setHoveredMediaGroupId(id);
+        if (isLibtvMediaGroup) {
+          pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
+        }
       }}
       onPointerLeave={() => {
         setPointerOverGroup(false);
-        if (
-          isLibtvMediaGroup &&
-          useCanvasStore.getState().hoveredMediaGroupId === id
-        ) {
-          setHoveredMediaGroupId(null);
+        if (isLibtvMediaGroup) {
+          schedulePro2MediaGroupToolbarHide(id, () => {
+            if (useCanvasStore.getState().hoveredMediaGroupId === id) {
+              setHoveredMediaGroupId(null);
+            }
+          });
+        }
+      }}
+      onPointerDown={() => {
+        if (isLibtvMediaGroup) {
+          pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
         }
       }}
       style={
@@ -410,7 +490,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             position={Position.Left}
             className={cn(
               PRO2_NODE_HANDLE_CLASS,
-              selected ? "opacity-100" : "pointer-events-none opacity-0",
+              showSidePlus
+                ? "pointer-events-none opacity-0"
+                : selected
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0",
             )}
             style={{ top: "50%" }}
           />
@@ -420,7 +504,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             position={Position.Right}
             className={cn(
               PRO2_NODE_HANDLE_CLASS,
-              selected ? "opacity-100" : "pointer-events-none opacity-0",
+              showSidePlus
+                ? "pointer-events-none opacity-0"
+                : selected
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0",
             )}
             style={{ top: "50%" }}
           />
@@ -434,11 +522,59 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           position={Position.Right}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
-            selected ? "opacity-100" : "pointer-events-none opacity-0",
+            showSidePlus
+              ? "pointer-events-none opacity-0"
+              : selected
+                ? "opacity-100"
+                : "pointer-events-none opacity-0",
           )}
           style={{ top: "50%" }}
           title={`连线到${SBV1_VIDEO_COMPOSE_LABEL}`}
         />
+      ) : null}
+
+      {isLibtvMediaGroup ? (
+        <Handle
+          id="plus_left"
+          type="source"
+          position={Position.Left}
+          className={cn(
+            isPro2MediaGroup ? PRO2_NODE_HANDLE_CLASS : SBV1_NODE_HANDLE_CLASS,
+            "pointer-events-none opacity-0",
+          )}
+          style={{ top: "50%" }}
+        />
+      ) : null}
+
+      {isLibtvMediaGroup ? (
+        <>
+          <Pro2NodeSidePlus
+            side="left"
+            handleId="plus_left"
+            visible={showSidePlus}
+            size={LIBTV_NODE_SIDE_PLUS_SIZE}
+            className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+            sections={
+              isSbv1Group && !isPro2MediaGroup
+                ? SBV1_IMAGE_LEFT_ADD_MENU
+                : PRO2_IMAGE_LEFT_ADD_MENU
+            }
+            onPick={onGroupSidePick("left")}
+          />
+          <Pro2NodeSidePlus
+            side="right"
+            handleId="out_media"
+            visible={showSidePlus}
+            size={LIBTV_NODE_SIDE_PLUS_SIZE}
+            className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+            sections={
+              isSbv1Group && !isPro2MediaGroup
+                ? SBV1_GROUP_RIGHT_ADD_MENU
+                : PRO2_RIGHT_ADD_MENU
+            }
+            onPick={onGroupSidePick("right")}
+          />
+        </>
       ) : null}
 
       <NodeResizer

@@ -1,17 +1,19 @@
 import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
 import {
+  JIANYING_EXPORT_LEFT_ADD_MENU,
+  JIANYING_EXPORT_RIGHT_ADD_MENU,
+  SBV1_IMAGE_LEFT_ADD_MENU,
+  SBV1_IMAGE_RIGHT_ADD_MENU,
+  SBV1_GROUP_RIGHT_ADD_MENU,
+  SBV1_VIDEO_ENGINE_LEFT_ADD_MENU,
+  SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU,
+} from "./sbv1-add-node-menu";
+import {
   PRO2_IMAGE_LEFT_ADD_MENU,
   PRO2_RIGHT_ADD_MENU,
   PRO2_STARTER_LEFT_ADD_MENU,
   PRO2_STYLE_ASSET_RIGHT_MENU,
 } from "./pro2-add-node-menu";
-import {
-  JIANYING_EXPORT_LEFT_ADD_MENU,
-  SBV1_IMAGE_LEFT_ADD_MENU,
-  SBV1_IMAGE_RIGHT_ADD_MENU,
-  SBV1_VIDEO_ENGINE_LEFT_ADD_MENU,
-  SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU,
-} from "./sbv1-add-node-menu";
 
 const SIDE_PLUS_BY_TYPE: Record<
   string,
@@ -23,8 +25,9 @@ const SIDE_PLUS_BY_TYPE: Record<
   "story-pro2-three-view": { left: "plus_left", right: "image" },
   "sbv1-image": { left: "plus_left", right: "image" },
   "sbv1-video-engine": { left: "plus_left", right: "out_video" },
-  "jianying-export-pro2": { left: "plus_left" },
-  "story-pro2-style-asset": { right: "style" },
+  "jianying-export-pro2": { left: "plus_left", right: "out_render" },
+  group: { left: "plus_left", right: "out_media" },
+  "story-pro2-style-asset": { left: "plus_left", right: "style" },
 };
 
 export function sideConnectSideFromHandle(handleId: string): "left" | "right" {
@@ -45,8 +48,16 @@ export function isLibtvSidePlusConnectHandle(
 export function resolveLibtvSideConnectMenu(
   nodeType: string,
   handleId: string,
+  nodeData?: Record<string, unknown>,
 ): Pro2AddMenuSection[] | null {
   const side = sideConnectSideFromHandle(handleId);
+  if (nodeType === "group") {
+    const isSbv1 = Boolean(nodeData?.sbv1Styled);
+    if (side === "left") {
+      return isSbv1 ? SBV1_IMAGE_LEFT_ADD_MENU : PRO2_IMAGE_LEFT_ADD_MENU;
+    }
+    return isSbv1 ? SBV1_GROUP_RIGHT_ADD_MENU : PRO2_RIGHT_ADD_MENU;
+  }
   switch (nodeType) {
     case "story-pro2-starter":
     case "story-pro2-script-hub":
@@ -59,7 +70,9 @@ export function resolveLibtvSideConnectMenu(
         ? PRO2_IMAGE_LEFT_ADD_MENU
         : PRO2_RIGHT_ADD_MENU;
     case "story-pro2-style-asset":
-      return side === "right" ? PRO2_STYLE_ASSET_RIGHT_MENU : null;
+      return side === "left"
+        ? PRO2_IMAGE_LEFT_ADD_MENU
+        : PRO2_STYLE_ASSET_RIGHT_MENU;
     case "sbv1-image":
       return side === "left"
         ? SBV1_IMAGE_LEFT_ADD_MENU
@@ -69,7 +82,9 @@ export function resolveLibtvSideConnectMenu(
         ? SBV1_VIDEO_ENGINE_LEFT_ADD_MENU
         : SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU;
     case "jianying-export-pro2":
-      return side === "left" ? JIANYING_EXPORT_LEFT_ADD_MENU : null;
+      return side === "left"
+        ? JIANYING_EXPORT_LEFT_ADD_MENU
+        : JIANYING_EXPORT_RIGHT_ADD_MENU;
     default:
       return null;
   }

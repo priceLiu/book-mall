@@ -5,6 +5,7 @@ import { Clapperboard, Download } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingMediaRenderResult } from "@/lib/canvas/types";
+import { spawnJianyingRenderPreviewNode } from "@/lib/canvas/spawn-jianying-render-preview";
 import {
   type JianyingExportFrame,
   type MediaRenderJob,
@@ -55,6 +56,9 @@ export function JianyingMediaRenderActions({
   persisted,
 }: Props) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
   const [busy, setBusy] = useState(false);
   const [transitionKind, setTransitionKind] = useState<TransitionKind>("xfade");
   const [transitionSec, setTransitionSec] = useState(0.6);
@@ -82,6 +86,15 @@ export function JianyingMediaRenderActions({
         expiresAt: expires,
         completedAt: new Date().toISOString(),
       },
+    });
+    const state = useCanvasStore.getState();
+    spawnJianyingRenderPreviewNode(nodeId, downloadUrl, {
+      nodes: state.nodes,
+      edges: state.edges,
+      addNode,
+      setNodes,
+      setEdges,
+      updateNodeData,
     });
   };
 
@@ -231,7 +244,7 @@ export function JianyingMediaRenderActions({
           download
           target="_blank"
           rel="noreferrer"
-          className="nodrag flex items-center justify-center gap-2 rounded-md bg-[var(--canvas-accent)] px-3 py-2 text-[12px] text-white hover:opacity-90"
+          className="nodrag flex items-center justify-center gap-2 rounded-md border border-white/10 bg-[#2A2A2A] px-3 py-2 text-[12px] text-white transition hover:bg-[#333]"
         >
           <Download className="size-4" />
           下载成片 MP4

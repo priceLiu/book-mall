@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { AlignLeft, FileText, ImageIcon, X } from "lucide-react";
 import { DockRefCornerBadge } from "@/components/canvas/pro2/dock-ref-corner-badge";
+import { DockUpstreamRefPreviewCard } from "@/components/canvas/pro2/dock-upstream-ref-preview-card";
 import { createPortal } from "react-dom";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
@@ -10,19 +11,25 @@ import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import { PRO2_DOCK_BORDER, PRO2_DOCK_SHELL_BG } from "@/lib/canvas/story-pro2-node-chrome";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { PRO2_DOCK_ACTIVE_REF_BORDER_CLASS, PRO2_DOCK_REF_IDLE_BORDER_CLASS } from "@/lib/canvas/dock-active-ref-chrome";
+import {
+  PRO2_DOCK_ACTIVE_REF_BORDER_CLASS,
+  PRO2_DOCK_REF_IDLE_BORDER_CLASS,
+} from "@/lib/canvas/dock-active-ref-chrome";
+import { useLibtvDockRefThumbMetrics } from "@/lib/canvas/use-libtv-dock-ref-thumb-metrics";
 import { cn } from "@/lib/utils";
 
-function UpstreamChip({
+function TextUpstreamChip({
   link,
   index,
   anchorNodeId,
   active,
+  thumbPx,
 }: {
   link: Pro2DockUpstreamLink;
   index: number;
   anchorNodeId: string;
   active?: boolean;
+  thumbPx: number;
 }) {
   const [open, setOpen] = useState(false);
   const { doubleConfirm } = useDialogs();
@@ -90,11 +97,19 @@ function UpstreamChip({
 
   return (
     <>
-      <div className="group relative size-10 shrink-0">
+      <div
+        className="group relative shrink-0 overflow-hidden"
+        style={{
+          width: thumbPx,
+          height: thumbPx,
+          minWidth: thumbPx,
+          minHeight: thumbPx,
+        }}
+      >
         <button
           type="button"
           className={cn(
-            "nodrag flex size-full items-center justify-center overflow-hidden rounded-lg border bg-white/[0.04] text-white/70 transition hover:bg-white/[0.07] hover:text-white/90",
+            "nodrag block size-full min-h-0 min-w-0 overflow-hidden rounded-md border bg-white/[0.04] text-white/70 transition hover:bg-white/[0.07] hover:text-white/90",
             active
               ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
               : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
@@ -102,16 +117,9 @@ function UpstreamChip({
           title={`已链接：${link.label}`}
           onClick={() => setOpen(true)}
         >
-          {link.kind === "image" && link.previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={link.previewUrl}
-              alt={link.label}
-              className="size-full rounded-[7px] object-cover"
-            />
-          ) : (
-            <Icon className="size-4" />
-          )}
+          <span className="flex size-full items-center justify-center">
+            <Icon className="size-4 shrink-0" />
+          </span>
         </button>
         {deletable ? (
           <DockRefCornerBadge
@@ -181,6 +189,99 @@ function UpstreamChip({
   );
 }
 
+function ImageUpstreamChip({
+  link,
+  index,
+  anchorNodeId,
+  active,
+  thumbStyle,
+  thumbClass,
+  badgeFontPx,
+  badgeMinPx,
+}: {
+  link: Pro2DockUpstreamLink;
+  index: number;
+  anchorNodeId: string;
+  active?: boolean;
+  thumbStyle: React.CSSProperties;
+  thumbClass: string;
+  badgeFontPx: number;
+  badgeMinPx: number;
+}) {
+  const { doubleConfirm } = useDialogs();
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const removeNode = useCanvasStore((s) => s.removeNode);
+
+  const deletable = link.sourceNodeId !== anchorNodeId;
+
+  const onDelete = useCallback(async () => {
+    if (!deletable) return;
+    const validation = validateStoryPipelineDeletion(
+      [link.sourceNodeId],
+      nodes,
+      edges,
+    );
+    if (!validation.ok) {
+      canvasNotify({
+        title: "无法删除该节点",
+        message: validation.message,
+        variant: "error",
+      });
+      return;
+    }
+    const id = validation.allowedIds[0];
+    if (!id) return;
+
+    const hasOss = Boolean(link.previewUrl);
+    const ok = await doubleConfirm({
+      first: {
+        title: `断开并删除「${link.label}」？`,
+        message:
+          "将删除画布上该上游节点及其连线；当前脚本节点不会被删除。",
+        confirmLabel: "继续",
+        danger: true,
+      },
+      second: {
+        title: "再次确认 · 不可恢复",
+        message: hasOss
+          ? "节点删除后无法撤回；已上传的云端图片不会自动从存储中清除。"
+          : "节点删除后无法撤回，是否继续？",
+        confirmLabel: "永久删除",
+        danger: true,
+      },
+    });
+    if (!ok) return;
+    removeNode(id);
+  }, [
+    deletable,
+    link.sourceNodeId,
+    link.label,
+    link.previewUrl,
+    nodes,
+    edges,
+    doubleConfirm,
+    removeNode,
+  ]);
+
+  return (
+    <DockUpstreamRefPreviewCard
+      id={link.id}
+      label={link.label}
+      previewUrl={link.previewUrl}
+      active={Boolean(active)}
+      badgeIndex={index}
+      className={thumbClass}
+      style={thumbStyle}
+      badgeFontPx={badgeFontPx}
+      badgeMinPx={badgeMinPx}
+      onDisconnect={() => {
+        if (deletable) void onDelete();
+      }}
+    />
+  );
+}
+
 export function Pro2DockUpstreamChips({
   links,
   anchorNodeId,
@@ -190,18 +291,42 @@ export function Pro2DockUpstreamChips({
   anchorNodeId: string;
   activeIds?: string[];
 }) {
+  const {
+    thumbPx,
+    thumbStyle,
+    thumbClass,
+    badgeFontPx,
+    badgeMinPx,
+  } = useLibtvDockRefThumbMetrics();
+
   if (!links.length) return null;
+
   return (
     <>
-      {links.map((link, i) => (
-        <UpstreamChip
-          key={link.id}
-          link={link}
-          index={i}
-          anchorNodeId={anchorNodeId}
-          active={activeIds.includes(link.id)}
-        />
-      ))}
+      {links.map((link, i) =>
+        link.kind === "image" ? (
+          <ImageUpstreamChip
+            key={link.id}
+            link={link}
+            index={i}
+            anchorNodeId={anchorNodeId}
+            active={activeIds.includes(link.id)}
+            thumbStyle={thumbStyle}
+            thumbClass={thumbClass}
+            badgeFontPx={badgeFontPx}
+            badgeMinPx={badgeMinPx}
+          />
+        ) : (
+          <TextUpstreamChip
+            key={link.id}
+            link={link}
+            index={i}
+            anchorNodeId={anchorNodeId}
+            active={activeIds.includes(link.id)}
+            thumbPx={thumbPx}
+          />
+        ),
+      )}
     </>
   );
 }

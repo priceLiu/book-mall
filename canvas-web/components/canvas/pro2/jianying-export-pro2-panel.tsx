@@ -8,7 +8,6 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingExportNodeData } from "@/lib/canvas/types";
 import type { JianyingFrameExport } from "@/lib/canvas/jianying-from-workspace";
 import { exportJianyingZip } from "@/lib/canvas-api";
-import { PRO2_HINT_LABEL_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 
 type Props = {
@@ -55,7 +54,7 @@ export function JianyingExportPro2Panel({
   };
 
   return (
-    <div className="flex flex-col gap-2.5 px-3 pb-1">
+    <div className="flex flex-col gap-2.5 px-3 pb-3">
       <p className="text-[11px] text-white/75">
         已连接 <strong className="text-white">{connectedCount}</strong>
         {" · "}
@@ -70,7 +69,7 @@ export function JianyingExportPro2Panel({
         <button
           type="button"
           disabled={loading !== null || !ready}
-          className="nodrag flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2.5 text-[12px] font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
+          className="nodrag flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-2.5 text-[12px] font-medium text-white transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-45"
           onClick={() => void onExport("bundle")}
         >
           <Download className="size-4 shrink-0" />
@@ -85,15 +84,6 @@ export function JianyingExportPro2Panel({
           <Film className="size-4 shrink-0" />
           {loading === "draft" ? "生成中…" : "全包导入 · 剪映草稿 ZIP（Mac）"}
         </button>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <p className={`${PRO2_HINT_LABEL_CLASS} leading-relaxed`}>
-          草稿包解压至剪映「草稿位置」对应文件夹。剪映 6+ 若无法打开，请用分镜包。
-        </p>
-        <p className={`${PRO2_HINT_LABEL_CLASS} leading-relaxed`}>
-          Mac：下载 ZIP → 本地导入剪映
-        </p>
       </div>
 
       <JianyingMediaRenderActions

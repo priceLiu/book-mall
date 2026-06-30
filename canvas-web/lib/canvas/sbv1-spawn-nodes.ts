@@ -461,8 +461,71 @@ export async function handleSbv1SideAddNodePick(
   });
 }
 
+/** sbv1 媒体组左右 + · 在组框外侧生成邻居节点并连线 */
+export function spawnSbv1NeighborFromGroup(
+  groupId: string,
+  side: "left" | "right",
+  nodeType: "sbv1-image",
+  store: SpawnStore,
+  options?: { spawnMode?: "txt2img" | "img2img" },
+): string {
+  const { nodes, addNode, setNodes, setEdges } = store;
+  const group = nodes.find((n) => n.id === groupId);
+  if (!group) return "";
+
+  const children = nodes.filter(
+    (n) => n.parentId === groupId && n.type === "sbv1-image",
+  );
+  const refChild = side === "left" ? children[0] : children[children.length - 1];
+  const refId = refChild?.id ?? groupId;
+
+  const gap = 48;
+  const gw = group.width ?? 360;
+  const w = refChild?.width ?? SBV1_IMAGE_NODE_WIDTH;
+  const x =
+    side === "left" ? group.position.x - w - gap : group.position.x + gw + gap;
+  const y = group.position.y + 40;
+
+  const label =
+    options?.spawnMode === "txt2img"
+      ? "文生图"
+      : options?.spawnMode === "img2img"
+        ? "图生图"
+        : "图片";
+  const newId = addNode(
+    "sbv1-image",
+    { x, y },
+    buildSbv1ImageNodeData({
+      label,
+      imageMode: options?.spawnMode,
+    }),
+  );
+  if (!newId) return "";
+
+  const edge =
+    side === "left"
+      ? {
+          id: `e-${newId}-${refId}`,
+          source: newId,
+          target: refId,
+          sourceHandle: "image",
+          targetHandle: refChild ? "in_image" : "in_ref",
+        }
+      : {
+          id: `e-${refId}-${newId}`,
+          source: refId,
+          target: newId,
+          sourceHandle: refChild ? "image" : "out_media",
+          targetHandle: "in_image",
+        };
+  setEdges((prev) => [...prev, edge]);
+  selectSbv1NodeAfterSpawn(setNodes, newId);
+  return newId;
+}
+
 export async function handleSbv1GroupSidePick(
   groupId: string,
+  side: "left" | "right",
   itemId: string,
   nodeType: string | undefined,
   alert: (opts: {
@@ -474,12 +537,36 @@ export async function handleSbv1GroupSidePick(
 ): Promise<void> {
   await handleSbv1SideAddNodePick(itemId, nodeType, alert, () => {
     if (
-      itemId === "video" ||
-      itemId === "video-engine" ||
-      itemId === "video-compose" ||
-      nodeType === "sbv1-video-engine"
+      side === "right" &&
+      (itemId === "video" ||
+        itemId === "video-engine" ||
+        itemId === "video-compose" ||
+        nodeType === "sbv1-video-engine")
     ) {
       spawnSbv1VideoEngineFromGroup(groupId, store);
+      return;
+    }
+    if (
+      side === "left" &&
+      (itemId === "txt2img" ||
+        itemId === "img2img" ||
+        itemId === "image" ||
+        nodeType === "sbv1-image")
+    ) {
+      spawnSbv1NeighborFromGroup(
+        groupId,
+        "left",
+        "sbv1-image",
+        store,
+        {
+          spawnMode:
+            itemId === "txt2img"
+              ? "txt2img"
+              : itemId === "img2img"
+                ? "img2img"
+                : undefined,
+        },
+      );
     }
   });
 }

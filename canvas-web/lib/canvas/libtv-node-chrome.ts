@@ -148,6 +148,10 @@ export const LIBTV_DRAG_ANYWHERE_NODE_TYPES = [
 export const LIBTV_NODE_OUTER_CLASS =
   "relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-visible";
 
+/** 侧栏 + 统一尺寸 / 层级（左右对称 · 不被节点内容遮挡） */
+export const LIBTV_NODE_SIDE_PLUS_SIZE = "lg" as const;
+export const LIBTV_NODE_SIDE_PLUS_LAYER_CLASS = "z-[20060]";
+
 export const LIBTV_NODE_HANDLE_CLASS =
   "!h-2.5 !w-2.5 !border-2 !border-[#141418] !bg-cyan-400";
 

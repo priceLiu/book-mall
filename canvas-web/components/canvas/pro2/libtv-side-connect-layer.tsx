@@ -40,6 +40,7 @@ function LibtvSideConnectLayerInner() {
     return resolveLibtvSideConnectMenu(
       String(sourceNode.type),
       pending.fromHandleId,
+      sourceNode.data as Record<string, unknown> | undefined,
     );
   }, [pending, sourceNode?.type]);
 

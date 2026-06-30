@@ -18,6 +18,8 @@ import {
   LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_NODE_HANDLE_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
@@ -415,6 +417,18 @@ export function LibtvImageNode({
             title="上游参考图"
           />
         ) : null}
+        {!isCharacterThreeView ? (
+          <Handle
+            id="plus_left"
+            type="source"
+            position={Position.Left}
+            className={cn(
+              LIBTV_NODE_HANDLE_CLASS,
+              "pointer-events-none opacity-0",
+            )}
+            title="添加上下文"
+          />
+        ) : null}
         <Handle
           id="image"
           type="source"
@@ -430,26 +444,24 @@ export function LibtvImageNode({
           title="连线到下游"
         />
 
-        {showSidePlus ? (
-          <>
-            <Pro2NodeSidePlus
-              side="left"
-              handleId="plus_left"
-              visible
-              className="z-[60] -left-5"
-              sections={leftMenuSections}
-              onPick={onSidePickLeft}
-            />
-            <Pro2NodeSidePlus
-              side="right"
-              handleId="image"
-              visible
-              className="z-[60] -right-5"
-              sections={rightMenuSections}
-              onPick={onSidePickRight}
-            />
-          </>
-        ) : null}
+        <Pro2NodeSidePlus
+          side="left"
+          handleId="plus_left"
+          visible={showSidePlus}
+          size={LIBTV_NODE_SIDE_PLUS_SIZE}
+          className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+          sections={leftMenuSections}
+          onPick={onSidePickLeft}
+        />
+        <Pro2NodeSidePlus
+          side="right"
+          handleId="image"
+          visible={showSidePlus}
+          size={LIBTV_NODE_SIDE_PLUS_SIZE}
+          className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+          sections={rightMenuSections}
+          onPick={onSidePickRight}
+        />
 
         {showFloatingToolbar && !isCharacterThreeView ? (
           <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>

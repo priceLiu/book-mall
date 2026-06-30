@@ -7,6 +7,10 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { isPro2CharacterBoardGroup } from "@/lib/canvas/pro2-resolve-character-board-group";
 import { isPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import { isPro2StyledGroup } from "@/lib/canvas/pro2-media-group-meta";
+import {
+  pinPro2MediaGroupToolbarHover,
+  schedulePro2MediaGroupToolbarHide,
+} from "@/lib/canvas/pro2-media-group-toolbar-hover";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { Pro2MediaGroupToolbarPanel } from "./pro2-media-group-toolbar-panel";
 
@@ -99,14 +103,17 @@ export function Pro2MediaGroupToolbar({
 
   if (viewportMoving || !resolved || !placement) return null;
 
-  const keepHover = () => setHoveredMediaGroupId(resolved.group.id);
+  const keepHover = () =>
+    pinPro2MediaGroupToolbarHover(resolved.group.id, setHoveredMediaGroupId);
   const releaseHover = () => {
-    if (
-      !resolved.group.selected &&
-      useCanvasStore.getState().hoveredMediaGroupId === resolved.group.id
-    ) {
-      setHoveredMediaGroupId(null);
-    }
+    if (resolved.group.selected) return;
+    schedulePro2MediaGroupToolbarHide(resolved.group.id, () => {
+      if (
+        useCanvasStore.getState().hoveredMediaGroupId === resolved.group.id
+      ) {
+        setHoveredMediaGroupId(null);
+      }
+    });
   };
 
   return (
@@ -116,9 +123,12 @@ export function Pro2MediaGroupToolbar({
         left: placement.x,
         top: placement.y,
         transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
+        padding: "14px 20px",
+        margin: "-14px -20px",
       }}
       onPointerEnter={keepHover}
       onPointerLeave={releaseHover}
+      onPointerDown={keepHover}
     >
       <Pro2MediaGroupToolbarPanel
         groupId={resolved.group.id}

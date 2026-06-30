@@ -195,7 +195,7 @@ export function Pro2DockHeader({
     >
       <div
         className={cn(
-          "hide-scroll-bar flex min-w-0 flex-nowrap items-center overflow-x-auto",
+          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto",
           compact
             ? "gap-1 px-2 py-1"
             : "min-h-[44px] gap-1.5 px-3 py-1.5",
@@ -267,25 +267,38 @@ export function Pro2EmbeddedInputDock({
 }) {
   const [dockScrollEl, setDockScrollEl] = useState<HTMLElement | null>(null);
   useLibtvDockWheelScroll(dockScrollEl);
+  const canvasZoom = useStore((s) => s.transform[2]);
+  const dockUi = useMemo(
+    () => ({
+      expanded: true,
+      contentZoom: 1,
+      /** 内嵌 Dock 随节点缩放 · flow 缩略图尺寸≈屏上目标 / zoom */
+      shellScreenScale: Math.max(0.08, canvasZoom),
+      canvasZoom,
+    }),
+    [canvasZoom],
+  );
 
   return (
-    <div
-      className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden",
-        RF_NO_WHEEL,
-        className,
-      )}
-      data-libtv-input-dock=""
-    >
-      {header}
+    <LibtvInputDockUiContext.Provider value={dockUi}>
       <div
-        ref={setDockScrollEl}
-        className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden [overflow-anchor:none]"
-        data-canvas-wheel-scroll
+        className={cn(
+          "flex h-full min-h-0 flex-col overflow-hidden",
+          RF_NO_WHEEL,
+          className,
+        )}
+        data-libtv-input-dock=""
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        {header}
+        <div
+          ref={setDockScrollEl}
+          className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden [overflow-anchor:none]"
+          data-canvas-wheel-scroll
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        </div>
+        {footer ? <div className="shrink-0">{footer}</div> : null}
       </div>
-      {footer ? <div className="shrink-0">{footer}</div> : null}
-    </div>
+    </LibtvInputDockUiContext.Provider>
   );
 }
