@@ -14,6 +14,12 @@ export function useLazyMediaActive<T extends HTMLElement = HTMLDivElement>(
   const [active, setActive] = useState(eager);
 
   useEffect(() => {
+    if (eager && !active) {
+      setActive(true);
+    }
+  }, [eager, active]);
+
+  useEffect(() => {
     if (active) return;
     const el = ref.current;
     if (!el) return;

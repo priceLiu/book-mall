@@ -43,6 +43,7 @@ import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
+import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
@@ -381,24 +382,23 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           </>
         ) : null}
 
-        {showFloatingToolbar && !showToolbar ? (
-          <LibtvVideoNodeToolbar
-            passNodeDrag
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            onDuplicateNode={onDuplicateNode}
-          />
-        ) : null}
-
-        {showToolbar ? (
-          <LibtvVideoNodeToolbar
-            passNodeDrag
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            previewUrl={videoUrl}
-            onExpandPreview={() => setPreviewOpen(true)}
-            onDuplicateNode={onDuplicateNode}
-          />
+        {showFloatingToolbar ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
+            {showToolbar ? (
+              <LibtvVideoNodeToolbar
+                passNodeDrag
+                previewUrl={videoUrl}
+                onExpandPreview={() => setPreviewOpen(true)}
+                onDuplicateNode={onDuplicateNode}
+              />
+            ) : (
+              <LibtvVideoNodeToolbar
+                passNodeDrag
+                minimal
+                onDuplicateNode={onDuplicateNode}
+              />
+            )}
+          </LibtvNodeToolbarPortal>
         ) : null}
 
         <div

@@ -60,12 +60,17 @@ export function pro2MediaGroupDefaultLabel(
 export function pro2MediaGroupBorderColor(
   color: string | undefined,
   selected?: boolean,
+  hovered?: boolean,
 ): string {
   const c = color?.trim() || GROUP_COLOR_PRESETS[2];
   if (!c.startsWith("#") || c.length !== 7) {
-    return selected ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)";
+    if (selected) return "rgba(255,255,255,0.2)";
+    if (hovered) return "rgba(255,255,255,0.14)";
+    return "rgba(255,255,255,0.08)";
   }
-  return selected ? c : `${c}66`;
+  if (selected) return c;
+  if (hovered) return `${c}99`;
+  return `${c}66`;
 }
 
 /** 为缺少 pro2Kind 的 Pro2 媒体组补齐元数据 */

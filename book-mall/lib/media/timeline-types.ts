@@ -37,7 +37,9 @@ export const renderProfileSchema = z.object({
     .optional(),
   video: z
     .object({
-      scaleMode: z.enum(["source", "fit1080p"]).default("fit1080p"),
+      scaleMode: z
+        .enum(["source", "fit720p", "fit1080p"])
+        .default("fit1080p"),
     })
     .default({ scaleMode: "fit1080p" }),
 });

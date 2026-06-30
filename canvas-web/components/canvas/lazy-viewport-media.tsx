@@ -1,6 +1,10 @@
 "use client";
 
 import type { MutableRefObject, ReactNode, Ref } from "react";
+import {
+  isMediaSrcLoaded,
+  markMediaSrcLoaded,
+} from "@/lib/canvas/loaded-media-src-cache";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 import { cn } from "@/lib/utils";
 
@@ -33,13 +37,16 @@ function LazyMediaShell({
   containerRef,
   children,
 }: LazyShellProps) {
-  const { ref: lazyRef, active } = useLazyMediaActive(rootMargin, eager);
+  const cached = isMediaSrcLoaded(src);
+  const forceEager = eager || cached;
+  const { ref: lazyRef, active } = useLazyMediaActive(rootMargin, forceEager);
+  const ready = active || cached;
 
   if (!src) return null;
 
   return (
     <div ref={mergeRefs(lazyRef, containerRef)} className={className}>
-      {active ? (
+      {ready ? (
         children(true)
       ) : (
         <div
@@ -81,8 +88,9 @@ export function LazyViewportImage({
         <img
           src={src}
           alt={alt}
-          loading="lazy"
+          loading={eager || isMediaSrcLoaded(src) ? "eager" : "lazy"}
           decoding="async"
+          onLoad={() => markMediaSrcLoaded(src)}
           className={cn("size-full object-contain", imgClassName)}
           draggable={false}
         />
@@ -125,7 +133,11 @@ export function LazyViewportVideo({
           className={cn("size-full object-contain", videoClassName)}
           playsInline
           muted
-          preload={preload}
+          preload={eager || isMediaSrcLoaded(src) ? "auto" : preload}
+          onLoadedData={() => {
+            markMediaSrcLoaded(src);
+            if (poster?.trim()) markMediaSrcLoaded(poster);
+          }}
           draggable={false}
         />
       )}

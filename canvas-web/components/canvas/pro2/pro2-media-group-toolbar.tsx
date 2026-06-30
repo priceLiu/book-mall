@@ -25,6 +25,8 @@ export function Pro2MediaGroupToolbar({
 }) {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
+  const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
 
   const resolved = useMemo(() => {
     // 有非组节点被选中时（框选 / 多选）→ 让位给框选工具条，避免双条
@@ -35,16 +37,23 @@ export function Pro2MediaGroupToolbar({
     const selectedGroup = rfNodes.find(
       (n) => n.selected && n.type === "group",
     );
-    if (!selectedGroup) return null;
-    if (!isPro2StyledGroup(selectedGroup, rfNodes)) return null;
-    if (isPro2CharacterBoardGroup(selectedGroup, rfNodes)) {
-      return { group: selectedGroup, kind: "character-board" as const };
+    const targetGroup =
+      selectedGroup ??
+      (hoveredMediaGroupId
+        ? rfNodes.find(
+            (n) => n.id === hoveredMediaGroupId && n.type === "group",
+          )
+        : undefined);
+    if (!targetGroup) return null;
+    if (!isPro2StyledGroup(targetGroup, rfNodes)) return null;
+    if (isPro2CharacterBoardGroup(targetGroup, rfNodes)) {
+      return { group: targetGroup, kind: "character-board" as const };
     }
-    if (isPro2FrameBoardGroup(selectedGroup, rfNodes)) {
-      return { group: selectedGroup, kind: "frame-board" as const };
+    if (isPro2FrameBoardGroup(targetGroup, rfNodes)) {
+      return { group: targetGroup, kind: "frame-board" as const };
     }
-    return { group: selectedGroup, kind: null };
-  }, [rfNodes]);
+    return { group: targetGroup, kind: null };
+  }, [rfNodes, hoveredMediaGroupId]);
 
   const viewport = useViewportTransformActive(Boolean(resolved) && !viewportMoving);
 
@@ -90,17 +99,32 @@ export function Pro2MediaGroupToolbar({
 
   if (viewportMoving || !resolved || !placement) return null;
 
+  const keepHover = () => setHoveredMediaGroupId(resolved.group.id);
+  const releaseHover = () => {
+    if (
+      !resolved.group.selected &&
+      useCanvasStore.getState().hoveredMediaGroupId === resolved.group.id
+    ) {
+      setHoveredMediaGroupId(null);
+    }
+  };
+
   return (
-    <Pro2MediaGroupToolbarPanel
-      groupId={resolved.group.id}
-      kind={resolved.kind}
+    <div
       className="fixed z-[1300]"
       style={{
         left: placement.x,
         top: placement.y,
         transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
       }}
-      onMouseDown={(e) => e.stopPropagation()}
-    />
+      onPointerEnter={keepHover}
+      onPointerLeave={releaseHover}
+    >
+      <Pro2MediaGroupToolbarPanel
+        groupId={resolved.group.id}
+        kind={resolved.kind}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+    </div>
   );
 }

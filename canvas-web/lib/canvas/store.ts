@@ -53,6 +53,7 @@ import {
 } from "./story-column-display";
 import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
 import { canAddStoryNodeType } from "./story-edition-isolation";
+import { expandBatchSnapConnection } from "./pro2-batch-connect";
 import { normalizePro2PlusLeftConnection } from "./pro2-side-plus-connect";
 import {
   expandSbv1GroupOutMediaConnection,
@@ -161,6 +162,13 @@ import {
 import { validatePro2StyleAssetConnection } from "./pro2-style-asset-connect";
 import type { HubPreviewSection } from "./story-hub-runtime";
 
+export type PendingSideConnect = {
+  anchor: { x: number; y: number };
+  fromNodeId: string;
+  fromHandleId: string;
+  fromHandleType: "source" | "target";
+};
+
 type CanvasState = {
   projectId: string | null;
   nodes: CanvasFlowNode[];
@@ -184,6 +192,8 @@ type CanvasState = {
    * - `dragHoverGroupId`：拖动节点过程中，鼠标当前悬停在哪个 group 容器内
    */
   connectingFromNodeId: string | null;
+  /** 侧栏 + 拖线松手空白处 · 待选菜单（与 connectingFrom 并存） */
+  pendingSideConnect: PendingSideConnect | null;
   dragHoverGroupId: string | null;
   /** 节点拖动/缩放几何进行中：浮动 Dock 隐藏，松手后恢复 */
   canvasGeometryDragging: boolean;
@@ -194,8 +204,13 @@ type CanvasState = {
   /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
   libtvFloatingDockNodeId: string | null;
   libtvFloatingDockNodeType: string | null;
+  /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
+  hoveredMediaGroupId: string | null;
   setConnectingFrom: (id: string | null) => void;
+  setPendingSideConnect: (pending: PendingSideConnect | null) => void;
+  clearPendingSideConnect: () => void;
   setDragHoverGroup: (id: string | null) => void;
+  setHoveredMediaGroupId: (id: string | null) => void;
   setCanvasGeometryDragging: (dragging: boolean) => void;
   setCanvasDraggingNodeId: (nodeId: string | null) => void;
   setCanvasViewportMoving: (moving: boolean) => void;
@@ -362,14 +377,20 @@ export const useCanvasStore = create<CanvasState>()(
       canvasFocusNonce: 0,
       graphRevision: 0,
       connectingFromNodeId: null,
+      pendingSideConnect: null,
       dragHoverGroupId: null,
+      hoveredMediaGroupId: null,
       canvasGeometryDragging: false,
       canvasDraggingNodeId: null,
       canvasViewportMoving: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
+      setPendingSideConnect: (pending) => set({ pendingSideConnect: pending }),
+      clearPendingSideConnect: () =>
+        set({ pendingSideConnect: null, connectingFromNodeId: null }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
+      setHoveredMediaGroupId: (id) => set({ hoveredMediaGroupId: id }),
       setCanvasGeometryDragging: (dragging) =>
         set({ canvasGeometryDragging: dragging }),
       setCanvasDraggingNodeId: (nodeId) =>
@@ -739,6 +760,30 @@ export const useCanvasStore = create<CanvasState>()(
         if (!styleValidation.ok) {
           console.warn("[canvas] connection rejected:", styleValidation.reason);
           return;
+        }
+
+        const batchSourceIds = state.nodes
+          .filter((n) => n.selected && !isGroupNode(String(n.type ?? "")))
+          .map((n) => n.id);
+        if (
+          batchSourceIds.length >= 2 &&
+          normalized.source &&
+          batchSourceIds.includes(normalized.source)
+        ) {
+          const batchEdges = expandBatchSnapConnection(
+            normalized,
+            batchSourceIds,
+            state.nodes,
+            state.edges,
+          );
+          if (batchEdges?.length) {
+            set((state) =>
+              withGraphRevision(state, {
+                edges: [...state.edges, ...batchEdges],
+              }),
+            );
+            return;
+          }
         }
 
         const groupImageEdges = expandSbv1GroupOutMediaConnection(

@@ -1364,9 +1364,12 @@ export type MediaRenderJob = {
   errorMessage: string | null;
 };
 
+export type MediaRenderScaleMode = "source" | "fit720p" | "fit1080p";
+
 export type MediaRenderProfile = {
   transition?: { type: "xfade"; durationSec: number } | { type: "none" };
   subtitle?: { mode: "script" | "none"; burnIn?: boolean };
+  video?: { scaleMode?: MediaRenderScaleMode };
 };
 
 export async function submitMediaRender(

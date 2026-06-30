@@ -13,6 +13,7 @@ import {
   Unlink,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
@@ -87,6 +88,21 @@ async function downloadOne(url: string, filename: string) {
   }
 }
 
+function sanitizeDownloadFilename(name: string): string {
+  return name.replace(/[/\\?%*:|"<>]/g, "_").trim().slice(0, 80) || "media";
+}
+
+function downloadExt(url: string, fallback: string): string {
+  const path = url.split("?")[0] ?? "";
+  const ext = path.split(".").pop();
+  if (!ext || ext.length > 5) return fallback;
+  return ext;
+}
+
+const BATCH_DOWNLOAD_GAP_MS = 450;
+/** 浏览器连续自动下载上限 · 超出需用户再次确认以续传 */
+const BATCH_DOWNLOAD_CHUNK = 4;
+
 /** Pro2 媒体组 · 顶部浮动工具条（角色三视图 / 分镜图 / 手动组 统一） */
 export function Pro2MediaGroupToolbarPanel({
   groupId,
@@ -113,6 +129,7 @@ export function Pro2MediaGroupToolbarPanel({
     [nodes, groupId],
   );
   const saveGroupAsAsset = useSaveGroupAsAsset();
+  const { confirm } = useDialogs();
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
@@ -282,12 +299,30 @@ export function Pro2MediaGroupToolbarPanel({
   const onBatchDownload = async () => {
     if (!downloadable.length || downloading) return;
     setDownloading(true);
-    for (let i = 0; i < downloadable.length; i++) {
-      const item = downloadable[i]!;
-      const ext = item.url.split("?")[0]?.split(".").pop() || "png";
-      await downloadOne(item.url, `${item.label || `image-${i + 1}`}.${ext}`);
+    try {
+      for (let i = 0; i < downloadable.length; i++) {
+        if (i > 0 && i % BATCH_DOWNLOAD_CHUNK === 0) {
+          const remaining = downloadable.length - i;
+          const ok = await confirm({
+            title: "继续下载",
+            message: `已下载 ${i} 个文件。浏览器限制连续下载，是否继续下载剩余 ${remaining} 个？`,
+          });
+          if (!ok) break;
+        }
+        const item = downloadable[i]!;
+        const ext = downloadExt(
+          item.url,
+          /\.(mp4|webm|mov)/i.test(item.url) ? "mp4" : "png",
+        );
+        const base = sanitizeDownloadFilename(item.label || `media-${i + 1}`);
+        await downloadOne(item.url, `${base}-${i + 1}.${ext}`);
+        if (i < downloadable.length - 1) {
+          await new Promise((r) => setTimeout(r, BATCH_DOWNLOAD_GAP_MS));
+        }
+      }
+    } finally {
+      setDownloading(false);
     }
-    setDownloading(false);
   };
 
   const openEdit = () => {

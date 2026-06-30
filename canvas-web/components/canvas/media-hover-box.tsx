@@ -21,20 +21,16 @@ import {
 } from "./compare-utils";
 import { CompareSplitView, CompareToolbar, useCompareSides } from "./compare-view";
 import { CanvasVideoPlayer } from "./canvas-video-player";
+import {
+  isMediaSrcLoaded,
+  markMediaSrcLoaded,
+} from "@/lib/canvas/loaded-media-src-cache";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
   return /\.(mp4|webm|mov|m4v|avi)(\?|#|$)/i.test(url);
 }
-
-/**
- * 已成功加载过的媒体 src（模块级缓存）。
- * `onlyRenderVisibleElements` 在缩放/平移时会卸载离屏节点，重新挂载时 useLazyMediaActive
- * 会回到未激活态，导致图片闪一下灰底再「重新加载」。命中此缓存的 src 直接立即渲染
- * （浏览器缓存命中，无需再发请求），消除缩放时的灰底闪烁。
- */
-const LOADED_MEDIA_SRCS = new Set<string>();
 
 export type MediaHoverBoxProps = {
   src?: string;
@@ -98,7 +94,7 @@ export function MediaHoverBox({
     previewIconSize === "lg" ? OVERLAY_ICON_BTN_LG : OVERLAY_ICON_BTN;
   const overlayIconClass =
     previewIconSize === "lg" ? "size-8 pointer-events-none" : "size-4 pointer-events-none";
-  const alreadyLoaded = !!src && LOADED_MEDIA_SRCS.has(src);
+  const alreadyLoaded = isMediaSrcLoaded(src);
   /** 画布已生成图/视频：不 lazy，避免 onlyRenderVisibleElements 重挂载时灰底 */
   const eagerMedia = variant === "generated" || alreadyLoaded;
   const { ref: lazyRef, active: mediaActive } = useLazyMediaActive(
@@ -107,7 +103,7 @@ export function MediaHoverBox({
   );
   const mediaReady = mediaActive || alreadyLoaded;
   const markLoaded = useCallback(() => {
-    if (src) LOADED_MEDIA_SRCS.add(src);
+    markMediaSrcLoaded(src);
   }, [src]);
   const kind =
     mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
