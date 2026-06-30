@@ -21,14 +21,17 @@ import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { getKindDef } from "@/lib/quick-replica/qr-kinds";
 import {
   qrCreateMotionSyncJob,
+  qrMaterializeMotionSyncJobTemplate,
   qrPollMotionSyncJob,
   type QrMotionSyncPollResult,
 } from "@/lib/quick-replica/qr-motion-sync-service";
+import { isHappyHorseR2vModel, resolveMotionSyncReferenceImageUrls, validateHappyHorseMotionSyncDraft } from "@/lib/quick-replica/qr-motion-sync-models";
 import {
   createUserQrTemplate,
   findQrTemplateByLogId,
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrCategory, QrTemplateJson, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
+import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
 import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-client";
 import { prisma } from "@/lib/prisma";
 
@@ -71,13 +74,24 @@ function buildGenericCreateBody(draft: QrWorkspaceDraft): {
   ].filter((u) => u.trim());
 
   if (draft.kind === "motion-sync" || draft.toolKey === "motion-sync") {
+    const refs = isHappyHorseR2vModel(draft.modelKey)
+      ? resolveMotionSyncReferenceImageUrls({
+          sceneImageUrls: draft.sceneImageUrls,
+          targetImageUrl: draft.targetImageUrl,
+        })
+      : draft.targetImageUrl
+        ? [draft.targetImageUrl]
+        : undefined;
     return buildKieToolVideoCreateArgs({
       model: modelKey,
       prompt: draft.prompt,
-      imageUrls: draft.targetImageUrl ? [draft.targetImageUrl] : undefined,
+      imageUrls: refs,
       videoUrls: draft.referenceVideoUrl ? [draft.referenceVideoUrl] : undefined,
       mode: draft.mode,
       characterOrientation: draft.characterOrientation,
+      resolution: draft.resolution,
+      aspectRatio: draft.aspectRatio,
+      duration: draft.duration,
     });
   }
 
@@ -145,16 +159,27 @@ export async function qrCreateGenerateJob(
   draft: QrWorkspaceDraft,
 ): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind | string }> {
   if (draft.kind === "motion-sync" || draft.toolKey === "motion-sync") {
-    if (!draft.targetImageUrl.trim() || !draft.referenceVideoUrl.trim()) {
+    if (isHappyHorseR2vModel(draft.modelKey)) {
+      const validationError = validateHappyHorseMotionSyncDraft({
+        prompt: draft.prompt,
+        sceneImageUrls: draft.sceneImageUrls,
+        targetImageUrl: draft.targetImageUrl,
+      });
+      if (validationError) throw new Error(validationError);
+    } else if (!draft.targetImageUrl.trim() || !draft.referenceVideoUrl.trim()) {
       throw new Error("运动同步需要目标图与参考视频");
     }
     const job = await qrCreateMotionSyncJob(userId, {
       targetImageUrl: draft.targetImageUrl,
       referenceVideoUrl: draft.referenceVideoUrl,
+      referenceImageUrls: draft.sceneImageUrls,
       prompt: draft.prompt,
       modelKey: draft.modelKey,
       mode: draft.mode,
       characterOrientation: draft.characterOrientation,
+      resolution: draft.resolution,
+      aspectRatio: draft.aspectRatio,
+      duration: draft.duration,
     });
     return job;
   }
@@ -215,24 +240,15 @@ function extractOutputUrl(log: {
   resultSummary: unknown;
   requestKind: string;
 }): { url: string; mediaType: "image" | "video" | "audio" } | null {
-  const rs = log.resultSummary;
-  if (!rs || typeof rs !== "object") return null;
-  const root = rs as Record<string, unknown>;
-  if (typeof root.video_url === "string" && root.video_url.trim()) {
-    return { url: root.video_url.trim(), mediaType: "video" };
-  }
-  if (typeof root.url === "string" && root.url.trim()) {
-    const mediaType =
-      log.requestKind === "IMAGE" || log.requestKind === "TRYON" ? "image" : "video";
-    return { url: root.url.trim(), mediaType };
-  }
-  if (typeof root.image_url === "string" && root.image_url.trim()) {
-    return { url: root.image_url.trim(), mediaType: "image" };
+  const extracted = extractQrJobOutputUrl(log.resultSummary);
+  if (extracted) return extracted;
+  if (log.requestKind === "IMAGE" || log.requestKind === "TRYON") {
+    return null;
   }
   return null;
 }
 
-async function ensureUserTemplateFromLog(args: {
+async function createUserTemplateFromLog(args: {
   userId: string;
   logId: string;
   draft: QrWorkspaceDraft;
@@ -297,6 +313,35 @@ async function ensureUserTemplateFromLog(args: {
   });
 }
 
+/** 用户点击「保存为我的」后再写入作品库 */
+export async function qrMaterializeGenerateJobTemplate(
+  userId: string,
+  logId: string,
+): Promise<QrTemplateJson | null> {
+  const existing = await findQrTemplateByLogId(logId);
+  if (existing) return existing;
+
+  const motion = await qrMaterializeMotionSyncJobTemplate(userId, logId);
+  if (motion) return motion;
+
+  const log = await prisma.gatewayRequestLog.findFirst({
+    where: { id: logId, actorBookUserId: userId },
+  });
+  if (!log || log.status !== "SUCCEEDED") return null;
+
+  const draft = readGenerateDraftFromLog(log);
+  const out = extractOutputUrl(log);
+  if (!draft || !out?.url) return null;
+
+  return createUserTemplateFromLog({
+    userId,
+    logId,
+    draft,
+    outputUrl: out.url,
+    mediaType: out.mediaType,
+  });
+}
+
 export async function qrPollGenerateJob(
   userId: string,
   logId: string,
@@ -330,17 +375,9 @@ export async function qrPollGenerateJob(
 
   if (log.status === "SUCCEEDED") {
     const out = extractOutputUrl(log);
-    if (out && draft) {
-      const template = await ensureUserTemplateFromLog({
-        userId,
-        logId,
-        draft,
-        outputUrl: out.url,
-        mediaType: out.mediaType,
-      });
-      return { status: "SUCCEEDED", outputUrl: out.url, template };
+    if (out?.url) {
+      return { status: "SUCCEEDED", outputUrl: out.url };
     }
-    return { status: "SUCCEEDED", outputUrl: out?.url };
   }
 
   if (log.status === "FAILED") {
@@ -375,16 +412,6 @@ export async function qrPollGenerateJob(
             : { video_url: outputUrl },
         model: log.model,
       });
-      if (draft) {
-        const template = await ensureUserTemplateFromLog({
-          userId,
-          logId,
-          draft,
-          outputUrl,
-          mediaType,
-        });
-        return { status: "SUCCEEDED", outputUrl, template };
-      }
       return { status: "SUCCEEDED", outputUrl };
     }
     return { status: "RUNNING" };

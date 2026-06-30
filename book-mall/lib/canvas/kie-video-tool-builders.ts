@@ -32,6 +32,12 @@ export function buildKieWan26VideoToVideoCreateArgs(args: {
   };
 }
 
+function normalizeKieMotionControlMode(raw: unknown): "720p" | "1080p" {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (s === "pro" || s === "1080p" || s === "hd" || s === "high") return "1080p";
+  return "720p";
+}
+
 export function buildKieKlingMotionControlCreateArgs(args: {
   model: "kling-2.6/motion-control" | "kling-3.0/motion-control";
   prompt?: string;
@@ -47,12 +53,10 @@ export function buildKieKlingMotionControlCreateArgs(args: {
   };
   const prompt = args.prompt?.trim();
   if (prompt) input.prompt = prompt;
-  if (args.mode === "std" || args.mode === "pro" || args.mode === "720p" || args.mode === "1080p") {
-    input.mode = args.mode;
-  }
-  if (args.characterOrientation === "image" || args.characterOrientation === "video") {
-    input.character_orientation = args.characterOrientation;
-  }
+  // KIE motion-control 校验 mode 为 720p | 1080p（非 std/pro）
+  input.mode = normalizeKieMotionControlMode(args.mode);
+  input.character_orientation =
+    args.characterOrientation === "image" ? "image" : "video";
   if (args.backgroundSource === "input_video" || args.backgroundSource === "input_image") {
     input.background_source = args.backgroundSource;
   }
@@ -79,6 +83,40 @@ export function buildKieTopazVideoUpscaleCreateArgs(args: {
   };
 }
 
+export function buildKieHappyHorseR2vCreateArgs(args: {
+  prompt: string;
+  referenceImages: string[];
+  resolution?: string;
+  aspectRatio?: string;
+  duration?: number;
+}): { model: string; input: Record<string, unknown> } {
+  const refs = filterHttpUrls(args.referenceImages).slice(0, 9);
+  if (!refs.length) throw new Error("reference_image required");
+  const prompt = args.prompt.trim();
+  if (!prompt) throw new Error("prompt required for reference-to-video");
+
+  const resolutionRaw = typeof args.resolution === "string" ? args.resolution.trim().toLowerCase() : "";
+  const resolution = resolutionRaw === "720p" ? "720p" : "1080p";
+
+  const ratioRaw = typeof args.aspectRatio === "string" ? args.aspectRatio.trim() : "16:9";
+  const allowed = new Set(["16:9", "9:16", "4:3", "3:4", "1:1"]);
+  const aspect_ratio = allowed.has(ratioRaw) ? ratioRaw : "16:9";
+
+  const durRaw = typeof args.duration === "number" ? args.duration : 5;
+  const duration = Math.min(15, Math.max(3, Math.round(durRaw)));
+
+  return {
+    model: "happyhorse-1-1/reference-to-video",
+    input: {
+      prompt,
+      reference_image: refs,
+      resolution,
+      aspect_ratio,
+      duration,
+    },
+  };
+}
+
 export function buildKieToolVideoCreateArgs(args: {
   model: string;
   prompt?: string;
@@ -88,12 +126,24 @@ export function buildKieToolVideoCreateArgs(args: {
   resolution?: string;
   duration?: number;
   mode?: string;
+  aspectRatio?: string;
   characterOrientation?: string;
   backgroundSource?: string;
   upscaleFactor?: string | number;
   nsfwChecker?: boolean;
 }): { model: string; input: Record<string, unknown> } {
   const model = args.model.trim();
+
+  if (model === "happyhorse-1-1/reference-to-video") {
+    const refs = args.imageUrls ?? [];
+    return buildKieHappyHorseR2vCreateArgs({
+      prompt: args.prompt ?? "",
+      referenceImages: refs,
+      resolution: args.resolution ?? args.mode,
+      aspectRatio: typeof args.aspectRatio === "string" ? args.aspectRatio : undefined,
+      duration: args.duration,
+    });
+  }
 
   if (model === "wan/2-6-video-to-video") {
     const prompt = args.prompt?.trim() ?? "";

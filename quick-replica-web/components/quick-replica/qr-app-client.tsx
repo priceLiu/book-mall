@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2 } from "lucide-react";
 
-import { QrGeneratePreviewModal } from "@/components/quick-replica/qr-generate-preview-modal";
+import {
+  QrGeneratePreviewModal,
+  type QrGenerateModalPhase,
+} from "@/components/quick-replica/qr-generate-preview-modal";
+import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
 import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
@@ -27,7 +32,7 @@ import {
   type QrWorkspaceDraft,
   templateToWorkspaceDraft,
 } from "@/lib/qr-template-types";
-import { saveCopiedTemplate } from "@/lib/qr-template-save";
+import { runQrGenerateJob, deleteQrUserTemplate } from "@/lib/run-qr-generate-job";
 
 type SessionInfo = {
   name?: string | null;
@@ -66,7 +71,11 @@ export function QrAppClient({
   const [previewTemplate, setPreviewTemplate] = useState<QrTemplate | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [generateResult, setGenerateResult] = useState<QrGenerateJobResult | null>(null);
+  const [generatePhase, setGeneratePhase] = useState<QrGenerateModalPhase>("generating");
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [generateLogId, setGenerateLogId] = useState<string | null>(null);
+  const [generatePreviewImage, setGeneratePreviewImage] = useState<string | undefined>();
+  const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [kindsLoading, setKindsLoading] = useState(false);
@@ -76,7 +85,8 @@ export function QrAppClient({
     defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
   );
 
-  const templateScope = navMode === "my-works" ? "my" : "all";
+  const templateScope =
+    navMode === "my-works" || navMode === "generate-history" ? "my" : "all";
 
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
@@ -111,7 +121,7 @@ export function QrAppClient({
     if (selectedKind) qs.set("kind", selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") qs.set("toolKey", pinnedToolKey);
     try {
-      const res = await fetch(
+      const res = await fetchQrPlatform(
         `/api/book-mall/api/platform/v1/quick-replica/templates?${qs}`,
       );
       if (browseKeyRef.current !== requestKey) return;
@@ -131,7 +141,7 @@ export function QrAppClient({
   }, [navMode, category, selectedKind, pinnedToolKey, templateScope]);
 
   const loadKinds = useCallback(async () => {
-    if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool") {
+    if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool" || navMode === "generate-history") {
       setKindItems([]);
       setKindsLoading(false);
       return;
@@ -146,7 +156,7 @@ export function QrAppClient({
     }
     setKindsLoading(true);
     try {
-      const res = await fetch(
+      const res = await fetchQrPlatform(
         `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(requestCategory)}`,
       );
       if (res.ok && category === requestCategory) {
@@ -232,6 +242,7 @@ export function QrAppClient({
       return "推荐模板";
     }
     if (navMode === "my-works") return "我的作品";
+    if (navMode === "generate-history") return "我的作品";
     if (selectedKind) return getKindDef(selectedKind)?.label ?? selectedKind;
     if (pinnedToolKey) return QR_PINNED_LABEL(pinnedToolKey);
     return undefined;
@@ -263,6 +274,13 @@ export function QrAppClient({
 
   const onMyWorks = () => {
     setNavMode("my-works");
+    setMiddleMode("browse");
+    setSelectedKind(null);
+    setPinnedToolKey(null);
+  };
+
+  const onGenerateHistory = () => {
+    setNavMode("generate-history");
     setMiddleMode("browse");
     setSelectedKind(null);
     setPinnedToolKey(null);
@@ -341,46 +359,83 @@ export function QrAppClient({
 
   const onCopyTemplate = (t: QrTemplate) => {
     const nextDraft = templateToWorkspaceDraft(t);
-    setDraft(nextDraft);
+    const isMotionSync = t.kind === "motion-sync" || t.toolKey === "motion-sync";
+    setDraft((prev) => ({
+      ...nextDraft,
+      ...(isMotionSync
+        ? {
+            targetImageUrl: prev.targetImageUrl,
+            sceneImageUrls: prev.sceneImageUrls,
+          }
+        : {}),
+      savedTemplateId: t.source === "user" ? t.id : undefined,
+    }));
     setMiddleMode("workspace");
     if (t.category) setCategory(t.category);
     setSelectedKind(t.kind);
     if (navMode === "home" || navMode === "admin") {
       setNavMode("category");
     }
-    setCopyToast("复制成功");
-
-    void (async () => {
-      const result = await saveCopiedTemplate(t);
-      if ("error" in result) return;
-      const saved = result.template;
-      setDraft((prev) => ({
-        ...prev,
-        savedTemplateId: saved.id,
-        title: saved.title,
-        prompt: saved.reference.prompt.text,
-      }));
-      invalidateQrTemplateCacheForCategory(templatesCacheRef.current, saved.category);
-    })();
+    setCopyToast("已载入工作区，编辑后点「产生」生成");
   };
 
-  const onGenerateComplete = (result: QrGenerateJobResult) => {
-    setGenerateResult(result);
+  const handleGenerate = useCallback(async (draftToRun: QrWorkspaceDraft) => {
+    setGenerating(true);
     setGenerateModalOpen(true);
-  };
+    setGeneratePhase("generating");
+    setGenerateResult(null);
+    setGenerateLogId(null);
+    setGeneratePreviewImage(draftToRun.targetImageUrl.trim() || undefined);
 
-  const onGenerateSaved = () => {
-    if (generateResult?.template) {
-      setTemplates((prev) => [
-        generateResult.template!,
-        ...prev.filter((x) => x.id !== generateResult.template!.id),
-      ]);
-    }
+    const job = await runQrGenerateJob(draftToRun);
+    setGenerating(false);
+    setGenerateLogId(job.logId ?? null);
+    setGenerateResult(job);
+    setGeneratePhase(
+      job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed",
+    );
+  }, []);
+
+  const onGenerateSaved = (template: QrTemplate) => {
+    setTemplates((prev) => [template, ...prev.filter((x) => x.id !== template.id)]);
     kindsCacheRef.current.delete(category);
     invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
     void loadTemplates();
     void loadKinds();
   };
+
+  const handleDeleteTemplate = useCallback(
+    async (template: QrTemplate) => {
+      const result = await deleteQrUserTemplate(template.id);
+      if ("error" in result) {
+        setCopyToast(result.error);
+        return;
+      }
+      setTemplates((prev) => prev.filter((t) => t.id !== template.id));
+      templatesCacheRef.current.clear();
+      invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
+      setPreviewTemplate(null);
+      setCopyToast("已删除");
+      void loadTemplates();
+    },
+    [category, loadTemplates],
+  );
+
+  const handleOpenHistoryResult = useCallback(
+    (args: {
+      logId: string;
+      phase: QrGenerateModalPhase;
+      result: QrGenerateJobResult;
+      previewImageUrl?: string;
+    }) => {
+      setGenerateLogId(args.logId);
+      setGenerateResult(args.result);
+      setGeneratePhase(args.phase);
+      setGeneratePreviewImage(args.previewImageUrl);
+      setGenerateModalOpen(true);
+    },
+    [],
+  );
 
   const middlePanel = (() => {
     if (navMode === "admin") {
@@ -407,7 +462,8 @@ export function QrAppClient({
         <QrWorkspacePanel
           draft={draft}
           onDraftChange={setDraft}
-          onGenerateComplete={onGenerateComplete}
+          generating={generating}
+          onGenerate={(d) => void handleGenerate(d)}
           onBackToBrowse={
             navMode === "category" || navMode === "my-works"
               ? () => setMiddleMode("browse")
@@ -424,7 +480,7 @@ export function QrAppClient({
           </div>
           <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
             <p className="text-sm text-zinc-400">
-              右侧展示你产生的作品；点击卡片可预览并复制到工作区继续编辑
+              右侧展示你的作品与草稿；点击卡片可预览、删除或复制到工作区
             </p>
             <button
               type="button"
@@ -436,6 +492,9 @@ export function QrAppClient({
           </div>
         </div>
       );
+    }
+    if (navMode === "generate-history") {
+      return <QrGenerateHistoryPanel onOpenResult={handleOpenHistoryResult} />;
     }
     return (
       <QrKindBrowsePanel
@@ -499,6 +558,7 @@ export function QrAppClient({
           onHome={onHome}
           onCategory={onCategory}
           onMyWorks={onMyWorks}
+          onGenerateHistory={onGenerateHistory}
           onPinnedTool={onPinnedTool}
           onAdmin={canManageFeatured ? onAdmin : undefined}
         />
@@ -519,7 +579,7 @@ export function QrAppClient({
             ) : (
               <QrTemplateGallery
                 key={browseKey || category}
-                category={navMode === "my-works" ? null : category}
+                category={navMode === "my-works" || navMode === "generate-history" ? null : category}
                 titleSuffix={galleryTitleSuffix}
                 templates={templates}
                 loading={templatesLoading}
@@ -564,6 +624,12 @@ export function QrAppClient({
         canManageFeatured={canManageFeatured}
         onClose={() => setPreviewTemplate(null)}
         onCopy={onCopyTemplate}
+        allowDelete={navMode === "my-works" || navMode === "generate-history"}
+        onDelete={
+          navMode === "my-works" || navMode === "generate-history"
+            ? (t) => void handleDeleteTemplate(t)
+            : undefined
+        }
         onFeaturedUpdated={() => {
           kindsCacheRef.current.delete(category);
           invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
@@ -574,10 +640,15 @@ export function QrAppClient({
 
       <QrGeneratePreviewModal
         open={generateModalOpen}
+        phase={generatePhase}
         result={generateResult}
+        logId={generateLogId}
+        previewImageUrl={generatePreviewImage}
         onClose={() => {
+          if (generating) return;
           setGenerateModalOpen(false);
           setGenerateResult(null);
+          setGenerateLogId(null);
         }}
         onSaved={onGenerateSaved}
       />

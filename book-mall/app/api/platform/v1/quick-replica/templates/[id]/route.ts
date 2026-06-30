@@ -4,6 +4,7 @@ import { requireQuickReplicaSession } from "@/lib/quick-replica/qr-platform-auth
 import {
   getQrTemplateById,
   updateUserQrTemplate,
+  deleteUserQrTemplate,
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 
@@ -80,4 +81,16 @@ export async function PUT(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "作品不存在或无权编辑" }, { status: 404 });
   }
   return NextResponse.json({ template });
+}
+
+export async function DELETE(request: Request, ctx: Ctx) {
+  const auth = await requireQuickReplicaSession(request);
+  if (!auth.ok) return auth.response;
+
+  const { id } = await ctx.params;
+  const ok = await deleteUserQrTemplate(auth.userId, id);
+  if (!ok) {
+    return NextResponse.json({ error: "作品不存在或无权删除" }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
 }

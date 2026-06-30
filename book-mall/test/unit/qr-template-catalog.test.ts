@@ -12,7 +12,12 @@ import {
 } from "@/lib/quick-replica/qr-template-catalog";
 import type { QrTemplateJson } from "@/lib/quick-replica/qr-types";
 
-function tpl(id: string, kind: string, category: QrTemplateJson["category"] = "image"): QrTemplateJson {
+function tpl(
+  id: string,
+  kind: string,
+  category: QrTemplateJson["category"] = "image",
+  source: QrTemplateJson["source"] = "builtin",
+): QrTemplateJson {
   return {
     schemaVersion: 1,
     id,
@@ -20,7 +25,7 @@ function tpl(id: string, kind: string, category: QrTemplateJson["category"] = "i
     kind,
     title: id,
     thumbnailUrl: "https://example.com/x.webp",
-    source: "builtin",
+    source,
     visibility: "public",
     reference: {
       slots: {},
@@ -130,6 +135,36 @@ describe("qr-template-catalog", () => {
     });
     expect(out.every(isQrMotionSyncGalleryTemplate)).toBe(true);
     expect(out).toHaveLength(2);
+  });
+
+  it("motion-sync gallery includes platform catalog templates", () => {
+    const items = [
+      tpl("qr-motion-sync-gallery-01", "motion-sync", "video"),
+      tpl("clxyz-multi-person", "motion-sync", "video", "catalog"),
+      tpl("clxyz-other-kind", "text-to-video", "video", "catalog"),
+    ];
+    const out = filterTemplatesForGallery(items, {
+      category: "video",
+      kind: "motion-sync",
+      scope: "all",
+    });
+    expect(out.map((t) => t.id)).toEqual([
+      "qr-motion-sync-gallery-01",
+      "clxyz-multi-person",
+    ]);
+  });
+
+  it("motion-sync gallery includes catalog when filtered by toolKey", () => {
+    const items = [
+      tpl("clxyz-multi-person", "motion-sync", "video", "catalog"),
+      tpl("qr-motion-sync-gallery-01", "motion-sync", "video"),
+    ];
+    const out = filterTemplatesForGallery(items, {
+      category: "video",
+      toolKey: "motion-sync",
+      scope: "all",
+    });
+    expect(out.map((t) => t.id)).toContain("clxyz-multi-person");
   });
 
   it("kind browse excludes motion-sync gallery builtins", () => {
