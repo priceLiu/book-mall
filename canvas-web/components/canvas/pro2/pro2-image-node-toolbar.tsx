@@ -24,6 +24,7 @@ import {
   guessMediaDownloadFilename,
 } from "@/lib/canvas/download-media-url";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
+import { useLibtvToolbarPortaled } from "@/components/canvas/libtv-node-toolbar-portal";
 import { cn } from "@/lib/utils";
 
 /** LibTV 节点顶栏工具条 · 壳层（规范见 libtv-node-interaction-spec.md §5） */
@@ -302,7 +303,10 @@ function ToolbarShell({
   children: React.ReactNode;
 }) {
   const zoom = useStore((s) => s.transform[2]);
-  const toolbarScale = computeLibtvNodeToolbarTransformScale(zoom);
+  const portaled = useLibtvToolbarPortaled();
+  const toolbarScale = portaled
+    ? 1
+    : computeLibtvNodeToolbarTransformScale(zoom);
 
   return (
     <div
@@ -311,15 +315,19 @@ function ToolbarShell({
         passNodeDrag
           ? "pointer-events-none [&_button]:pointer-events-auto"
           : "nodrag pointer-events-auto",
-        !style && "absolute left-1/2 z-30",
+        !portaled && !style && "absolute left-1/2 z-30",
         className,
       )}
-      style={{
-        ...style,
-        transform: `translateX(-50%) scale(${toolbarScale})`,
-        transformOrigin: "center bottom",
-        transition: "transform 120ms ease",
-      }}
+      style={
+        portaled
+          ? style
+          : {
+              ...style,
+              transform: `translateX(-50%) scale(${toolbarScale})`,
+              transformOrigin: "center bottom",
+              transition: "transform 120ms ease",
+            }
+      }
       {...(passNodeDrag
         ? {}
         : {

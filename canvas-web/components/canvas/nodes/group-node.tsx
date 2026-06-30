@@ -26,6 +26,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
   isPro2MediaChildNode,
+  isPro2StyledGroup,
   pro2MediaGroupBorderColor,
 } from "@/lib/canvas/pro2-media-group-meta";
 import {
@@ -109,6 +110,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   const [editOpen, setEditOpen] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
+  const [pointerOverGroup, setPointerOverGroup] = useState(false);
   const [screenPos, setScreenPos] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -119,15 +121,40 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as GroupNodeData;
   const color = d.color || GROUP_COLOR_PRESETS[2];
+  const storeNodes = useCanvasStore((s) => s.nodes);
+  const selfNode = useMemo(
+    () => storeNodes.find((n) => n.id === id),
+    [storeNodes, id],
+  );
   const isPro2MediaGroup = Boolean(d.pro2Kind);
   const isSbv1Group = Boolean(d.sbv1Styled);
-  const isLibtvMediaGroup = isPro2MediaGroup || isSbv1Group;
-  const groupHovered = isLibtvMediaGroup && hoveredMediaGroupId === id;
   const isStoryTemplateGroup =
     id === "sc-group-characters" ||
     id === "sc-group-media" ||
     id === "sc-group-frames" ||
     id === "sc-group-videos";
+  const isLibtvMediaGroup =
+    !isStoryTemplateGroup &&
+    (isSbv1Group ||
+      Boolean(selfNode && isPro2StyledGroup(selfNode, storeNodes)));
+  const groupHovered = isLibtvMediaGroup && hoveredMediaGroupId === id;
+  const groupVisualHovered = groupHovered || pointerOverGroup;
+  const groupBorderWidth =
+    selected || groupVisualHovered
+      ? PRO2_MEDIA_GROUP_BORDER_WIDTH + 1
+      : PRO2_MEDIA_GROUP_BORDER_WIDTH;
+  const groupBorderColor = pro2MediaGroupBorderColor(
+    color,
+    selected,
+    groupVisualHovered && !selected,
+  );
+  const unifiedGroupShellStyle = {
+    backgroundColor: PRO2_MEDIA_GROUP_BG,
+    backgroundImage: PRO2_MEDIA_GROUP_DOT_GRID,
+    backgroundSize: PRO2_MEDIA_GROUP_DOT_SIZE,
+    border: `${groupBorderWidth}px solid ${groupBorderColor}`,
+    transition: "border-width 120ms ease, border-color 120ms ease",
+  } as const;
 
   const childrenIds = useMemo(
     () => (childrenIdsKey ? childrenIdsKey.split("\0") : []),
@@ -135,9 +162,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   );
 
   const showToolbar =
-    !isPro2MediaGroup &&
-    !isSbv1Group &&
-    (selected || editOpen || pointerInside);
+    !isLibtvMediaGroup && (selected || editOpen || pointerInside);
 
   const viewport = useViewportTransformActive(
     !isLibtvMediaGroup &&
@@ -337,7 +362,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const groupHeaderLabel =
     isSbv1Group && !isPro2MediaGroup
       ? d.label?.trim() || "参考图组"
-      : d.label?.trim() || "媒体组";
+      : d.label?.trim() || "未命名分组";
 
   const selectMediaGroup = useCallback(() => {
     rfSetNodes((prev) =>
@@ -349,38 +374,32 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     <div
       className={cn(
         "canvas-group-node group/gn relative h-full w-full overflow-visible",
-        isLibtvMediaGroup
+        isLibtvMediaGroup || !isStoryTemplateGroup
           ? cn(PRO2_MEDIA_GROUP_SHELL_CLASS, LIBTV_CARD_DRAG_CLASS)
           : "rounded-[20px]",
       )}
       data-pro2-media-group={isLibtvMediaGroup ? id : undefined}
-      onPointerEnter={
-        isLibtvMediaGroup
-          ? () => setHoveredMediaGroupId(id)
-          : undefined
-      }
-      onPointerLeave={
-        isLibtvMediaGroup
-          ? () => {
-              if (useCanvasStore.getState().hoveredMediaGroupId === id) {
-                setHoveredMediaGroupId(null);
-              }
-            }
-          : undefined
-      }
+      onPointerEnter={() => {
+        setPointerOverGroup(true);
+        if (isLibtvMediaGroup) setHoveredMediaGroupId(id);
+      }}
+      onPointerLeave={() => {
+        setPointerOverGroup(false);
+        if (
+          isLibtvMediaGroup &&
+          useCanvasStore.getState().hoveredMediaGroupId === id
+        ) {
+          setHoveredMediaGroupId(null);
+        }
+      }}
       style={
-        isLibtvMediaGroup
+        isStoryTemplateGroup
           ? {
-              backgroundColor: PRO2_MEDIA_GROUP_BG,
-              backgroundImage: PRO2_MEDIA_GROUP_DOT_GRID,
-              backgroundSize: PRO2_MEDIA_GROUP_DOT_SIZE,
-              border: `${PRO2_MEDIA_GROUP_BORDER_WIDTH}px solid ${pro2MediaGroupBorderColor(color, selected, groupHovered && !selected)}`,
-            }
-          : {
               background: "transparent",
               border: `3px ${selected ? "solid" : "dashed"} ${color}`,
               boxShadow: selected ? `0 0 0 2px ${color}33` : "none",
             }
+          : unifiedGroupShellStyle
       }
     >
       {isPro2MediaGroup ? (

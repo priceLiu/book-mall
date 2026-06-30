@@ -61,6 +61,7 @@ import {
 } from "./sbv1-side-plus-connect";
 import {
   inferPro2MediaGroupKind,
+  isPro2MediaChildNode,
   pro2MediaGroupDefaultLabel,
   syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
@@ -1142,8 +1143,17 @@ export const useCanvasStore = create<CanvasState>()(
             (c) => c.type === "sbv1-image" || c.type === "sbv1-video-engine",
           );
         const sbv1Styled = sbv1OnlyMedia;
+        const mediaGridChildrenOnly =
+          children.length > 0 &&
+          children.every(
+            (c) =>
+              isPro2MediaChildNode(c) ||
+              c.type === "sbv1-image" ||
+              c.type === "sbv1-video-engine",
+          );
         const usePro2MediaGrid = Boolean(
-          !pro2ShortcutPreset && (pro2Kind || pro2Styled || sbv1Styled),
+          !pro2ShortcutPreset &&
+            (pro2Kind || sbv1Styled || (pro2Styled && mediaGridChildrenOnly)),
         );
         const PADDING = usePro2MediaGrid ? PRO2_MEDIA_GROUP_PAD : 28;
         const HEADER = usePro2MediaGrid ? PRO2_MEDIA_GROUP_HEADER : 32;

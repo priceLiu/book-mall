@@ -5,8 +5,6 @@ import { useReactFlow } from "@xyflow/react";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
 
-const TOOLBAR_GAP_PX = 10;
-
 /** 节点顶栏 · 屏幕坐标（portal 固定定位，避免组内/相邻节点 z 轴夹住工具条） */
 export function useLibtvNodeToolbarScreenPlacement(
   nodeId: string,
@@ -35,7 +33,7 @@ export function useLibtvNodeToolbarScreenPlacement(
       (typeof internal.width === "number" ? internal.width : undefined) ??
       350;
     const top = flowToScreenPosition({ x: pos.x + w / 2, y: pos.y });
-    return { x: top.x, y: top.y - TOOLBAR_GAP_PX };
+    return { x: top.x, y: top.y };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId, visible, viewportMoving, viewport, getInternalNode, flowToScreenPosition]);
 }

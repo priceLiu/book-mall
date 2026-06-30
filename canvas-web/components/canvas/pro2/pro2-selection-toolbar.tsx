@@ -230,7 +230,7 @@ export function Pro2SelectionToolbar({
 
   return (
     <div
-      className="pointer-events-auto fixed z-[100]"
+      className="pointer-events-auto fixed z-[1600]"
       style={{
         left: placement.x,
         top: placement.y,

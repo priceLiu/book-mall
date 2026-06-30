@@ -11,7 +11,7 @@ import {
   PenLine,
   Play,
 } from "lucide-react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useNodes } from "@xyflow/react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
@@ -64,6 +64,7 @@ import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
 import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
+import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
@@ -101,6 +102,7 @@ const STARTER_TRY_ACTIONS: StarterTryAction[] = [
 
 export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const rfNodes = useNodes();
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -159,6 +161,10 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
 
   const leftAddMenuSections = PRO2_STARTER_LEFT_ADD_MENU;
   const showSidePlus = (hovered || !!selected) && !isGenerating;
+  const soleSelected = useMemo(
+    () => Boolean(selected && rfNodes.filter((n) => n.selected).length === 1),
+    [selected, rfNodes],
+  );
 
   const openEditor = useCallback(() => {
     if (!hasCardContent || isGenerating) return;
@@ -438,19 +444,20 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         </>
       ) : null}
 
-      {selected ? (
-        <Pro2ThinNodeToolbar
-          style={{ top: -60 }}
-          onSaveAsAsset={() =>
-            saveAsAsset(
-              id,
-              "story-pro2-starter",
-              d as unknown as Record<string, unknown>,
-              "OUTLINE",
-            )
-          }
-          onDuplicateNode={onDuplicateNode}
-        />
+      {soleSelected ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
+          <Pro2ThinNodeToolbar
+            onSaveAsAsset={() =>
+              saveAsAsset(
+                id,
+                "story-pro2-starter",
+                d as unknown as Record<string, unknown>,
+                "OUTLINE",
+              )
+            }
+            onDuplicateNode={onDuplicateNode}
+          />
+        </LibtvNodeToolbarPortal>
       ) : null}
 
       <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>

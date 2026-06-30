@@ -3,6 +3,7 @@
 import { BookmarkPlus, Copy } from "lucide-react";
 import { useStore } from "@xyflow/react";
 import { cn } from "@/lib/utils";
+import { useLibtvToolbarPortaled } from "@/components/canvas/libtv-node-toolbar-portal";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
 import {
   PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS,
@@ -23,22 +24,31 @@ export function Pro2ThinNodeToolbar({
   style?: React.CSSProperties;
 }) {
   const zoom = useStore((s) => s.transform[2]);
-  const toolbarScale = computeLibtvNodeToolbarTransformScale(zoom);
+  const portaled = useLibtvToolbarPortaled();
+  const toolbarScale = portaled
+    ? 1
+    : computeLibtvNodeToolbarTransformScale(zoom);
 
   if (!onSaveAsAsset && !onDuplicateNode) return null;
   return (
     <div
       className={cn(
         PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
-        "nodrag pointer-events-auto absolute left-1/2 z-40",
+        portaled
+          ? "pointer-events-auto"
+          : "nodrag pointer-events-auto absolute left-1/2 z-40",
         className,
       )}
-      style={{
-        ...style,
-        transform: `translateX(-50%) scale(${toolbarScale})`,
-        transformOrigin: "center bottom",
-        transition: "transform 120ms ease",
-      }}
+      style={
+        portaled
+          ? style
+          : {
+              ...style,
+              transform: `translateX(-50%) scale(${toolbarScale})`,
+              transformOrigin: "center bottom",
+              transition: "transform 120ms ease",
+            }
+      }
       onMouseDown={(e) => e.stopPropagation()}
     >
       {onSaveAsAsset ? (
