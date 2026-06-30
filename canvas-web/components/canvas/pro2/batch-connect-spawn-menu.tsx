@@ -16,21 +16,20 @@ export type BatchConnectSpawnMenuItem = {
 export function BatchConnectSpawnMenu({
   anchor,
   title,
-  item,
+  items,
   onPick,
   onClose,
   onMenuRect,
 }: {
   anchor: { x: number; y: number };
   title: string;
-  item: BatchConnectSpawnMenuItem;
+  items: BatchConnectSpawnMenuItem[];
   onPick: (itemId: string, nodeType?: string) => void;
   onClose: () => void;
   /** 菜单外框 · 供预览线吸附左侧中点 */
   onMenuRect?: (rect: { x: number; y: number }) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const Icon = item.icon;
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -59,7 +58,7 @@ export function BatchConnectSpawnMenu({
     const ro = new ResizeObserver(report);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [onMenuRect, title, item.label]);
+  }, [onMenuRect, title, items]);
 
   if (typeof document === "undefined") return null;
 
@@ -78,20 +77,26 @@ export function BatchConnectSpawnMenu({
       <p className="px-3 pb-1 pt-1.5 text-[10px] font-medium text-white/40">
         {title}
       </p>
-      <button
-        type="button"
-        className={cn(
-          "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-white/88 transition-colors",
-          "hover:bg-violet-500/22 hover:text-white",
-        )}
-        onClick={() => {
-          onPick(item.id, item.nodeType);
-          onClose();
-        }}
-      >
-        <Icon className="size-4 shrink-0 opacity-80" />
-        <span className="flex-1">{item.label}</span>
-      </button>
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className={cn(
+              "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-white/88 transition-colors",
+              "hover:bg-violet-500/22 hover:text-white",
+            )}
+            onClick={() => {
+              onPick(item.id, item.nodeType);
+              onClose();
+            }}
+          >
+            <Icon className="size-4 shrink-0 opacity-80" />
+            <span className="flex-1">{item.label}</span>
+          </button>
+        );
+      })}
     </div>,
     document.body,
   );
