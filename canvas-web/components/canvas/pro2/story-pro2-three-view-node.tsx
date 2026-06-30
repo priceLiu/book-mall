@@ -25,6 +25,8 @@ import {
   LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_NODE_HANDLE_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import {
@@ -181,6 +183,12 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           )}
         />
         <Handle
+          id="plus_left"
+          type="source"
+          position={Position.Left}
+          className={cn(LIBTV_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
+        />
+        <Handle
           id="image"
           type="source"
           position={Position.Right}
@@ -194,26 +202,24 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           )}
         />
 
-        {showSidePlus ? (
-          <>
-            <Pro2NodeSidePlus
-              side="left"
-              handleId="plus_left"
-              visible
-              className="z-[60] -left-5"
-              sections={PRO2_IMAGE_LEFT_ADD_MENU}
-              onPick={onSidePick("left")}
-            />
-            <Pro2NodeSidePlus
-              side="right"
-              handleId="image"
-              visible
-              className="z-[60] -right-5"
-              sections={PRO2_RIGHT_ADD_MENU}
-              onPick={onSidePick("right")}
-            />
-          </>
-        ) : null}
+        <Pro2NodeSidePlus
+          side="left"
+          handleId="plus_left"
+          visible={showSidePlus}
+          size={LIBTV_NODE_SIDE_PLUS_SIZE}
+          className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+          sections={PRO2_IMAGE_LEFT_ADD_MENU}
+          onPick={onSidePick("left")}
+        />
+        <Pro2NodeSidePlus
+          side="right"
+          handleId="image"
+          visible={showSidePlus}
+          size={LIBTV_NODE_SIDE_PLUS_SIZE}
+          className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+          sections={PRO2_RIGHT_ADD_MENU}
+          onPick={onSidePick("right")}
+        />
 
         {showFloatingToolbar ? (
           <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>

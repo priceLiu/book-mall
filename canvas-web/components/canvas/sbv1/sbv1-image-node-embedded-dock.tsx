@@ -21,8 +21,8 @@ import { Pro2DockPasteZone } from "../pro2/pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "../pro2/pro2-dock-ref-images";
 import { Pro2DockStyleButton } from "../pro2/pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "../pro2/pro2-dock-upstream-chips";
+import { Pro2DockUpstreamHeader } from "../pro2/pro2-dock-upstream-header";
 import {
-  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2EmbeddedInputDock,
 } from "../pro2/pro2-input-dock-shell";
@@ -123,7 +123,7 @@ export function Sbv1ImageNodeEmbeddedDock({
   return (
     <Pro2EmbeddedInputDock
       header={
-        <Pro2DockHeader
+        <Pro2DockUpstreamHeader
           refRow={
             displayLinks.length > 0 ? (
               <Pro2DockUpstreamChips

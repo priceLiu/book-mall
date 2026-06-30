@@ -27,6 +27,8 @@ import {
 import {
   LIBTV_CARD_DRAG_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import {
@@ -160,7 +162,10 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   }, [nodes, id]);
 
   const leftAddMenuSections = PRO2_STARTER_LEFT_ADD_MENU;
-  const showSidePlus = (hovered || !!selected) && !isGenerating;
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  const showSidePlus = Boolean(
+    (hovered || selected || connectingFromNodeId) && !isGenerating,
+  );
   const soleSelected = useMemo(
     () => Boolean(selected && rfNodes.filter((n) => n.selected).length === 1),
     [selected, rfNodes],
@@ -412,8 +417,18 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         position={Position.Left}
         className={cn(
           PRO2_NODE_HANDLE_CLASS,
-          selected ? "opacity-100" : "opacity-0 pointer-events-none",
+          showSidePlus
+            ? "pointer-events-none opacity-0"
+            : selected
+              ? "opacity-100"
+              : "opacity-0 pointer-events-none",
         )}
+      />
+      <Handle
+        id="plus_left"
+        type="source"
+        position={Position.Left}
+        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
       />
       <Handle
         id="text"
@@ -425,24 +440,24 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         )}
       />
 
-      {showSidePlus ? (
-        <>
-          <Pro2NodeSidePlus
-            side="left"
-            handleId="plus_left"
-            visible
-            sections={leftAddMenuSections}
-            onPick={onSidePick("left")}
-          />
-          <Pro2NodeSidePlus
-            side="right"
-            handleId="text"
-            visible
-            sections={PRO2_RIGHT_ADD_MENU}
-            onPick={onSidePick("right")}
-          />
-        </>
-      ) : null}
+      <Pro2NodeSidePlus
+        side="left"
+        handleId="plus_left"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={leftAddMenuSections}
+        onPick={onSidePick("left")}
+      />
+      <Pro2NodeSidePlus
+        side="right"
+        handleId="text"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={PRO2_RIGHT_ADD_MENU}
+        onPick={onSidePick("right")}
+      />
 
       {soleSelected ? (
         <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>

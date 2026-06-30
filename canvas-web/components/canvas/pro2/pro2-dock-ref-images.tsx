@@ -18,6 +18,7 @@ import {
   PRO2_DOCK_ACTIVE_REF_BORDER_CLASS,
   PRO2_DOCK_REF_IDLE_BORDER_CLASS,
 } from "@/lib/canvas/dock-active-ref-chrome";
+import { useLibtvDockRefThumbMetrics } from "@/lib/canvas/use-libtv-dock-ref-thumb-metrics";
 import { cn } from "@/lib/utils";
 
 export type Pro2DockRefImagesProps = {
@@ -40,12 +41,14 @@ function DockRefImageChip({
   active,
   disabled,
   onRemove,
+  thumbStyle,
 }: {
   refItem: StoryRefImage;
   index: number;
   active: boolean;
   disabled?: boolean;
   onRemove: () => void;
+  thumbStyle: React.CSSProperties;
 }) {
   const [hover, setHover] = useState<{
     rect: DOMRect;
@@ -64,11 +67,12 @@ function DockRefImageChip({
     <>
       <div
         className={cn(
-          "group relative size-12 cursor-grab overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow active:cursor-grabbing",
+          "group relative shrink-0 cursor-grab overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow active:cursor-grabbing",
           active
             ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
             : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
         )}
+        style={thumbStyle}
         title={`${refItem.label} · 可拖入正文 @ 引用`}
         draggable={!disabled}
         onDragStart={(e) => {
@@ -103,7 +107,7 @@ function DockRefImageChip({
             src={refItem.url}
             alt={refItem.label}
             draggable={false}
-            className="size-full object-cover"
+            className="size-full object-contain"
           />
         ) : (
           <div className="flex size-full items-center justify-center text-[11px] text-white/40">
@@ -147,6 +151,7 @@ export function Pro2DockRefImages({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { thumbPx, thumbStyle } = useLibtvDockRefThumbMetrics();
 
   const spawnFiles = useCallback(
     async (files: File[]) => {
@@ -239,6 +244,7 @@ export function Pro2DockRefImages({
           index={index}
           active={activeIds.includes(ref.id)}
           disabled={disabled}
+          thumbStyle={thumbStyle}
           onRemove={() => {
             const next = removeDockRefFromState(refs, ref.id, promptValue ?? "");
             onChange(next.refs);
@@ -255,8 +261,14 @@ export function Pro2DockRefImages({
       {spawnAnchor || refs.length < maxCount ? (
         <button
           type="button"
+          style={{
+            width: thumbPx,
+            height: thumbPx,
+            minWidth: thumbPx,
+            minHeight: thumbPx,
+          }}
           className={cn(
-            "flex size-12 items-center justify-center rounded-lg border border-dashed border-white/[0.1] text-white/40 transition hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/70",
+            "flex shrink-0 items-center justify-center rounded-lg border border-dashed border-white/[0.1] text-white/40 transition hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/70",
             disabled && "cursor-not-allowed opacity-40",
           )}
           title={

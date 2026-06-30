@@ -77,6 +77,7 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
           Mac：下载 ZIP → 本地导入剪映
         </span>
       }
+      outputs={[{ id: "out_render", label: "成片", kind: "image" }]}
     >
       <div className="flex flex-col gap-3 p-1">
         <p className="text-[11px] text-white/70">

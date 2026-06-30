@@ -11,6 +11,10 @@ import {
 } from "@/lib/canvas/sbv1-media-group-layout";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { Pro2MediaGroupToolbarPanel } from "../pro2/pro2-media-group-toolbar-panel";
+import {
+  pinPro2MediaGroupToolbarHover,
+  schedulePro2MediaGroupToolbarHide,
+} from "@/lib/canvas/pro2-media-group-toolbar-hover";
 
 const TOOLBAR_HEIGHT = 44;
 const HEADER_RESERVED = 56;
@@ -100,26 +104,30 @@ export function Sbv1MediaGroupToolbar({
 
   if (viewportMoving || !group || !placement) return null;
 
-  const keepHover = () => setHoveredMediaGroupId(group.id);
+  const keepHover = () =>
+    pinPro2MediaGroupToolbarHover(group.id, setHoveredMediaGroupId);
   const releaseHover = () => {
-    if (
-      !group.selected &&
-      useCanvasStore.getState().hoveredMediaGroupId === group.id
-    ) {
-      setHoveredMediaGroupId(null);
-    }
+    if (group.selected) return;
+    schedulePro2MediaGroupToolbarHide(group.id, () => {
+      if (useCanvasStore.getState().hoveredMediaGroupId === group.id) {
+        setHoveredMediaGroupId(null);
+      }
+    });
   };
 
   return (
     <div
-      className="fixed z-[1300]"
+      className="pointer-events-auto fixed z-[1600]"
       style={{
         left: placement.x,
         top: placement.y,
         transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
+        padding: "14px 20px",
+        margin: "-14px -20px",
       }}
       onPointerEnter={keepHover}
       onPointerLeave={releaseHover}
+      onPointerDown={keepHover}
     >
       <Pro2MediaGroupToolbarPanel
         groupId={group.id}

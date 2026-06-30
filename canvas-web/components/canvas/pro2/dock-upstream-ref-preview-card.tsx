@@ -9,7 +9,7 @@ import {
   SBV1_DOCK_ACTIVE_REF_BORDER_CLASS,
   SBV1_DOCK_REF_IDLE_BORDER_CLASS,
 } from "@/lib/canvas/dock-active-ref-chrome";
-import { SBV1_REF_THUMB_CLASS } from "@/lib/canvas/sbv1-node-chrome";
+import { SBV1_REF_THUMB_BASE_CLASS, SBV1_REF_THUMB_CLASS } from "@/lib/canvas/sbv1-node-chrome";
 import { setMentionDragData } from "@/lib/canvas/mention-drag";
 import type { PortraitImportUiState } from "@/lib/canvas/portrait-node-data";
 import { cn } from "@/lib/utils";
@@ -67,7 +67,7 @@ export function DockUpstreamRefPreviewCard({
     <>
       <div
         className={cn(
-          SBV1_REF_THUMB_CLASS,
+          style ? SBV1_REF_THUMB_BASE_CLASS : SBV1_REF_THUMB_CLASS,
           "group cursor-grab border transition-shadow active:cursor-grabbing",
           active ? SBV1_DOCK_ACTIVE_REF_BORDER_CLASS : SBV1_DOCK_REF_IDLE_BORDER_CLASS,
           className,
@@ -103,7 +103,7 @@ export function DockUpstreamRefPreviewCard({
             src={previewUrl}
             alt={label}
             draggable={false}
-            className="size-full object-cover"
+            className="size-full object-contain"
           />
         ) : (
           <div className="flex size-full items-center justify-center text-white/30">

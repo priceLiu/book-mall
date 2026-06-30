@@ -62,6 +62,8 @@ import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace
 import {
   LIBTV_CARD_DRAG_CLASS,
   LIBTV_NODE_OUTER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
@@ -347,6 +349,12 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         )}
       />
       <Handle
+        id="plus_left"
+        type="source"
+        position={Position.Left}
+        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
+      />
+      <Handle
         id="text"
         type="source"
         position={Position.Right}
@@ -356,24 +364,24 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         )}
       />
 
-      {showSidePlus ? (
-        <>
-          <Pro2NodeSidePlus
-            side="left"
-            handleId="plus_left"
-            visible
-            sections={PRO2_STARTER_LEFT_ADD_MENU}
-            onPick={onSidePick("left")}
-          />
-          <Pro2NodeSidePlus
-            side="right"
-            handleId="text"
-            visible
-            sections={PRO2_RIGHT_ADD_MENU}
-            onPick={onSidePick("right")}
-          />
-        </>
-      ) : null}
+      <Pro2NodeSidePlus
+        side="left"
+        handleId="plus_left"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={PRO2_STARTER_LEFT_ADD_MENU}
+        onPick={onSidePick("left")}
+      />
+      <Pro2NodeSidePlus
+        side="right"
+        handleId="text"
+        visible={showSidePlus}
+        size={LIBTV_NODE_SIDE_PLUS_SIZE}
+        className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
+        sections={PRO2_RIGHT_ADD_MENU}
+        onPick={onSidePick("right")}
+      />
 
       {selected && !showToolbar ? (
         <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />

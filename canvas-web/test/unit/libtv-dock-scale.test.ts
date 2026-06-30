@@ -17,7 +17,9 @@ import {
   libtvDockZoomOutContentBoost,
   DOCK_PROMPT_FONT_SCREEN_AT_100,
   VIDEO_DOCK_HEADER_CHIP_FONT_AT_100,
-  VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100,
+  VIDEO_DOCK_HEADER_THUMB_W_MAX,
+  VIDEO_DOCK_HEADER_THUMB_H_MAX,
+  VIDEO_DOCK_HEADER_THUMB_MIN_RATIO,
 } from "@/lib/canvas/libtv-dock-scale";
 
 describe("libtvDockHeightForWidth", () => {
@@ -112,21 +114,38 @@ describe("libtvDockPromptFontScreenMetrics", () => {
 });
 
 describe("libtvDockVideoHeaderScreenMetrics", () => {
-  it("doubles thumb at 100% vs legacy baseline", () => {
+  it("caps thumb at 96x91 when zoomed out (<=0.2)", () => {
+    const m = libtvDockVideoHeaderScreenMetrics(0.2);
+    expect(m.thumbWidthScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_W_MAX);
+    expect(m.thumbHeightScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_H_MAX);
+    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_W_MAX);
+  });
+
+  it("holds 96x91 cap even below 0.2", () => {
+    const m = libtvDockVideoHeaderScreenMetrics(0.08);
+    expect(m.thumbWidthScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_W_MAX);
+    expect(m.thumbHeightScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_H_MAX);
+  });
+
+  it("shrinks thumb to 90% of max when zoomed in (>=1)", () => {
     const m = libtvDockVideoHeaderScreenMetrics(1);
-    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100);
-    expect(m.chipFontScreenPx).toBe(VIDEO_DOCK_HEADER_CHIP_FONT_AT_100);
+    expect(m.thumbWidthScreenPx).toBeCloseTo(
+      VIDEO_DOCK_HEADER_THUMB_W_MAX * VIDEO_DOCK_HEADER_THUMB_MIN_RATIO,
+      5,
+    );
+    expect(m.thumbHeightScreenPx).toBeCloseTo(
+      VIDEO_DOCK_HEADER_THUMB_H_MAX * VIDEO_DOCK_HEADER_THUMB_MIN_RATIO,
+      5,
+    );
+    const m2 = libtvDockVideoHeaderScreenMetrics(2);
+    expect(m2.thumbWidthScreenPx).toBeCloseTo(
+      VIDEO_DOCK_HEADER_THUMB_W_MAX * VIDEO_DOCK_HEADER_THUMB_MIN_RATIO,
+      5,
+    );
   });
 
-  it("doubles thumb and chip at max canvas zoom", () => {
-    const m = libtvDockVideoHeaderScreenMetrics(2);
-    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 * 2);
-    expect(m.chipFontScreenPx).toBe(VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 * 2);
-  });
-
-  it("keeps 2x thumb at 15% with smaller chip font", () => {
+  it("keeps chip font smaller at 15%", () => {
     const m = libtvDockVideoHeaderScreenMetrics(0.15);
-    expect(m.thumbScreenPx).toBe(VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 * 2);
     expect(m.chipFontScreenPx).toBe(VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 - 2);
   });
 });

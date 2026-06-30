@@ -400,20 +400,39 @@ html[data-canvas-modal-open] .pro2-input-dock {
 .react-flow__handle.pro2-node-side-plus-handle {
   cursor: pointer !important;
   opacity: 1 !important;
-  width: 24px !important;
-  height: 24px !important;
-  min-width: 24px !important;
-  min-height: 24px !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
   border-radius: 9999px !important;
   pointer-events: auto !important;
 }
-.react-flow__handle.pro2-node-side-plus-handle.react-flow__handle-left {
-  left: -12px !important;
+/* default 尺寸（薄卡等） */
+.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-handle--lg) {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
 }
-.react-flow__handle.pro2-node-side-plus-handle.react-flow__handle-right {
-  right: -12px !important;
+.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-handle--lg).react-flow__handle-left {
+  left: -22px !important;
+  right: auto !important;
+}
+.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-handle--lg).react-flow__handle-right {
+  right: -22px !important;
+  left: auto !important;
+}
+/* lg 尺寸（媒体 / 视频节点 · 与组件 88px 对齐） */
+.react-flow__handle.pro2-node-side-plus-handle--lg {
+  width: 88px !important;
+  height: 88px !important;
+  min-width: 88px !important;
+  min-height: 88px !important;
+}
+.react-flow__handle.pro2-node-side-plus-handle--lg.react-flow__handle-left {
+  left: -44px !important;
+  right: auto !important;
+}
+.react-flow__handle.pro2-node-side-plus-handle--lg.react-flow__handle-right {
+  right: -44px !important;
   left: auto !important;
 }
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle {

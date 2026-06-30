@@ -881,7 +881,11 @@ function FlowCanvasInner({
         fromNodeType &&
         fromHandleType &&
         isLibtvSidePlusConnectHandle(String(fromNodeType), fromHandleId) &&
-        resolveLibtvSideConnectMenu(String(fromNodeType), fromHandleId)
+        resolveLibtvSideConnectMenu(
+          String(fromNodeType),
+          fromHandleId,
+          connectionState.fromNode?.data as Record<string, unknown> | undefined,
+        )
       ) {
         useCanvasStore.getState().setPendingSideConnect({
           anchor: { x: clientX, y: clientY },
