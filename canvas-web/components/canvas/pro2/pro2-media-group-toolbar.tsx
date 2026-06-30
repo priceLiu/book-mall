@@ -111,7 +111,7 @@ export function Pro2MediaGroupToolbar({
 
   return (
     <div
-      className="fixed z-[1300]"
+      className="pointer-events-auto fixed z-[1600]"
       style={{
         left: placement.x,
         top: placement.y,

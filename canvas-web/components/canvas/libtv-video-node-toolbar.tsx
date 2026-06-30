@@ -19,6 +19,7 @@ import {
   guessMediaDownloadFilename,
 } from "@/lib/canvas/download-media-url";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
+import { useLibtvToolbarPortaled } from "@/components/canvas/libtv-node-toolbar-portal";
 import {
   PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
   PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS,
@@ -49,7 +50,10 @@ export function LibtvVideoNodeToolbar({
   const { alert } = useDialogs();
   const [downloading, setDownloading] = useState(false);
   const zoom = useStore((s) => s.transform[2]);
-  const toolbarScale = computeLibtvNodeToolbarTransformScale(zoom);
+  const portaled = useLibtvToolbarPortaled();
+  const toolbarScale = portaled
+    ? 1
+    : computeLibtvNodeToolbarTransformScale(zoom);
 
   const soon = async (label: string) => {
     await alert({
@@ -79,18 +83,18 @@ export function LibtvVideoNodeToolbar({
         passNodeDrag
           ? "pointer-events-none [&_button]:pointer-events-auto"
           : "nodrag pointer-events-auto",
-        !style && "absolute left-1/2 z-30",
+        !portaled && !style && "absolute left-1/2 z-30",
         className,
       )}
-      style={{
-        ...style,
-        transform: style?.transform
-          ? style.transform
-          : style?.top != null
-            ? `translateX(-50%) scale(${toolbarScale})`
-            : `translateX(-50%) scale(${toolbarScale})`,
-        transformOrigin: "50% 100%",
-      }}
+      style={
+        portaled
+          ? style
+          : {
+              ...style,
+              transform: style?.transform ?? `translateX(-50%) scale(${toolbarScale})`,
+              transformOrigin: "50% 100%",
+            }
+      }
     >
       <button type="button" className={TOOL_BTN} onClick={() => void soon("裁剪")}>
         <Crop className="size-3.5" />
