@@ -7,6 +7,7 @@ import {
 } from "@/lib/canvas/jianying-from-workspace";
 import {
   buildBatchConnectEdges,
+  classifyBatchConnectMode,
   expandBatchSnapConnection,
 } from "@/lib/canvas/pro2-batch-connect";
 import type { CanvasFlowEdge, CanvasFlowNode } from "@/lib/canvas/types";
@@ -130,6 +131,57 @@ describe("pro2-batch-connect", () => {
     );
     expect(edges).toHaveLength(2);
     expect(edges.every((e) => e.targetHandle === "in_video")).toBe(true);
+  });
+
+  it("classifies image vs video batch modes", () => {
+    const imgs: CanvasFlowNode[] = [
+      { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
+      { id: "i2", type: "story-pro2-image", position: { x: 100, y: 0 }, data: {} },
+    ];
+    const vids: CanvasFlowNode[] = [
+      { id: "v1", type: "sbv1-video-engine", position: { x: 0, y: 0 }, data: {} },
+      { id: "v2", type: "sbv1-video-engine", position: { x: 100, y: 0 }, data: {} },
+    ];
+    expect(classifyBatchConnectMode(imgs)).toBe("image-pipeline");
+    expect(classifyBatchConnectMode(vids)).toBe("video-export");
+    expect(classifyBatchConnectMode([...imgs, ...vids])).toBeNull();
+  });
+
+  it("builds batch image edges to video engine in_ref", () => {
+    const vidId = "vid-1";
+    const nodes: CanvasFlowNode[] = [
+      { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
+      { id: "i2", type: "story-pro2-three-view", position: { x: 200, y: 0 }, data: {} },
+      { id: vidId, type: "sbv1-video-engine", position: { x: 500, y: 0 }, data: {} },
+    ];
+    const edges = buildBatchConnectEdges(
+      nodes.filter((n) => n.type !== "sbv1-video-engine"),
+      vidId,
+      nodes,
+      [],
+      "in_ref",
+    );
+    expect(edges).toHaveLength(2);
+    expect(edges.every((e) => e.targetHandle === "in_ref")).toBe(true);
+    expect(edges.every((e) => e.sourceHandle === "image")).toBe(true);
+  });
+
+  it("builds batch image edges to image node in_image", () => {
+    const targetId = "img-out";
+    const nodes: CanvasFlowNode[] = [
+      { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
+      { id: "i2", type: "story-pro2-image", position: { x: 200, y: 0 }, data: {} },
+      { id: targetId, type: "story-pro2-image", position: { x: 500, y: 0 }, data: {} },
+    ];
+    const edges = buildBatchConnectEdges(
+      nodes.filter((n) => n.id !== targetId),
+      targetId,
+      nodes,
+      [],
+      "in_image",
+    );
+    expect(edges).toHaveLength(2);
+    expect(edges.every((e) => e.targetHandle === "in_image")).toBe(true);
   });
 
   it("expandBatchSnapConnection fans out multi-select drag", () => {

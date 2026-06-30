@@ -89,31 +89,38 @@ function distancePointToRect(
   return Math.hypot(dx, dy);
 }
 
-/** 框选批量连线 · 优先吸附到「导出剪辑」节点外框 */
+/** 框选批量连线 · 按模式吸附目标节点外框 */
 export function findBatchConnectSnapTarget(
   nodes: CanvasFlowNode[],
   flowPoint: { x: number; y: number },
   excludeIds: string[],
+  mode: "video-export" | "image-pipeline" = "video-export",
 ): CanvasFlowNode | null {
   const exclude = new Set(excludeIds);
-  let nearestExport: { node: CanvasFlowNode; dist: number } | null = null;
+  let nearest: { node: CanvasFlowNode; dist: number } | null = null;
+
   for (const n of nodes) {
-    if (n.type !== "jianying-export-pro2" || exclude.has(n.id)) continue;
+    if (exclude.has(n.id)) continue;
+    const matches =
+      mode === "video-export"
+        ? n.type === "jianying-export-pro2"
+        : n.type === "sbv1-video-engine" ||
+          n.type === "sbv1-image" ||
+          n.type === "story-pro2-image" ||
+          n.type === "story-pro2-three-view";
+    if (!matches) continue;
     const box = nodeSnapBox(n, nodes);
     const dist = distancePointToRect(flowPoint, box);
     if (
       dist <= CONNECT_SNAP_PADDING * 2 &&
-      (!nearestExport || dist < nearestExport.dist)
+      (!nearest || dist < nearest.dist)
     ) {
-      nearestExport = { node: n, dist };
+      nearest = { node: n, dist };
     }
   }
-  if (nearestExport) return nearestExport.node;
-  return findTopmostNodeAtFlowPoint(
-    nodes,
-    flowPoint,
-    excludeIds[0],
-  );
+  if (nearest) return nearest.node;
+
+  return findTopmostNodeAtFlowPoint(nodes, flowPoint, excludeIds[0]);
 }
 
 /** 拖线未命中 Handle 但落在节点上时，补全连线 */

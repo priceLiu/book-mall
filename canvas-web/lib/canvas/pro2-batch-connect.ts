@@ -1,6 +1,19 @@
 import type { Connection } from "@xyflow/react";
 import { DEFAULT_HANDLE_BY_TYPE } from "./libtv-connection-snap";
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+
+/** 框选批量 · 图片上游（图生图 / 图生视频） */
+export const BATCH_IMAGE_SOURCE_TYPES = new Set([
+  "sbv1-image",
+  "story-pro2-image",
+  "story-pro2-three-view",
+]);
+
+export type BatchConnectMode = "video-export" | "image-pipeline";
+
+export function isBatchImageSource(node: CanvasFlowNode): boolean {
+  return BATCH_IMAGE_SOURCE_TYPES.has(node.type ?? "");
+}
 
 /** 框选批量出边 · 节点 type → source handle */
 export const BATCH_OUT_HANDLE_BY_TYPE: Record<string, string> = {
@@ -24,6 +37,60 @@ export function nodesEligibleForBatchOut(
   return ids
     .map((id) => nodes.find((n) => n.id === id))
     .filter((n): n is CanvasFlowNode => !!n && !!nodeBatchOutHandle(n));
+}
+
+/** 框选 ≥2 个同类型可批量节点时返回模式，否则 null（混合选区不出批量 +） */
+export function classifyBatchConnectMode(
+  sources: CanvasFlowNode[],
+): BatchConnectMode | null {
+  if (sources.length < 2) return null;
+  if (sources.every((s) => s.type === "sbv1-video-engine")) {
+    return "video-export";
+  }
+  if (sources.every((s) => isBatchImageSource(s))) {
+    return "image-pipeline";
+  }
+  return null;
+}
+
+export function batchImageSpawnNodeType(
+  sources: CanvasFlowNode[],
+): CanvasNodeType {
+  if (sources.length > 0 && sources.every((s) => s.type === "sbv1-image")) {
+    return "sbv1-image";
+  }
+  return "story-pro2-image";
+}
+
+export function isBatchConnectSnapTarget(
+  node: CanvasFlowNode,
+  mode: BatchConnectMode,
+): boolean {
+  if (mode === "video-export") {
+    return node.type === "jianying-export-pro2";
+  }
+  return (
+    node.type === "sbv1-video-engine" ||
+    isBatchImageSource(node) ||
+    node.type === "story-pro2-image" ||
+    node.type === "story-pro2-three-view"
+  );
+}
+
+export function batchConnectTargetHandleForSnap(
+  target: CanvasFlowNode,
+  source: CanvasFlowNode,
+  mode: BatchConnectMode,
+): string | null {
+  if (mode === "video-export" && target.type === "jianying-export-pro2") {
+    return "in_video";
+  }
+  if (mode === "image-pipeline" && target.type === "sbv1-video-engine") {
+    return "in_ref";
+  }
+  const sourceHandle = nodeBatchOutHandle(source);
+  if (!sourceHandle) return null;
+  return pickBatchTargetHandle(target, source, sourceHandle);
 }
 
 export function pickBatchTargetHandle(
