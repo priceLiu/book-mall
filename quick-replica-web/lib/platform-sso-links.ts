@@ -1,8 +1,9 @@
 import { getMainSiteOrigin } from "@/lib/site-origin";
+import { QUICK_REPLICA_SSO_APP } from "@/lib/qr-sso-app";
 
 export function bookMallReEnterHref(
   redirectPath: string,
-  app: "prompt-optimizer" = "prompt-optimizer",
+  app: typeof QUICK_REPLICA_SSO_APP = QUICK_REPLICA_SSO_APP,
 ): string | null {
   const origin = getMainSiteOrigin();
   if (!origin) return null;

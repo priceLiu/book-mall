@@ -4,6 +4,7 @@ import {
   Clapperboard,
   FolderOpen,
   Globe,
+  History,
   Home,
   ImageIcon,
   Settings2,
@@ -19,7 +20,13 @@ import {
   type QrCategory,
 } from "@/lib/qr-template-types";
 
-export type QrNavMode = "home" | "category" | "my-works" | "pinned-tool" | "admin";
+export type QrNavMode =
+  | "home"
+  | "category"
+  | "my-works"
+  | "generate-history"
+  | "pinned-tool"
+  | "admin";
 
 const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
   video: Video,
@@ -39,6 +46,7 @@ type Props = {
   onHome: () => void;
   onCategory: (category: QrCategory) => void;
   onMyWorks: () => void;
+  onGenerateHistory?: () => void;
   onPinnedTool: (toolKey: string, category: QrCategory, kind: string) => void;
   onAdmin?: () => void;
 };
@@ -53,6 +61,7 @@ export function QrSidebar({
   onHome,
   onCategory,
   onMyWorks,
+  onGenerateHistory,
   onPinnedTool,
   onAdmin,
 }: Props) {
@@ -173,6 +182,23 @@ export function QrSidebar({
             <FolderOpen className="h-4 w-4 shrink-0" />
             我的作品
           </button>
+          {onGenerateHistory ? (
+            <button
+              type="button"
+              onClick={() => {
+                onGenerateHistory();
+                onCloseSidebar();
+              }}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
+                navMode === "generate-history"
+                  ? "qr-nav-active"
+                  : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
+              }`}
+            >
+              <History className="h-4 w-4 shrink-0" />
+              生成记录
+            </button>
+          ) : null}
         </div>
       </aside>
 

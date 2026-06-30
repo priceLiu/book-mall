@@ -172,6 +172,14 @@ body {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
   }
 
+  .qr-textarea-resizable {
+    resize: both;
+    min-height: 88px;
+    max-height: 320px;
+    overflow: auto;
+    line-height: 1.55;
+  }
+
   .qr-modal-shell {
     @apply flex flex-col overflow-hidden shadow-2xl;
     border-radius: 20px;
@@ -239,6 +247,26 @@ body {
   }
 
   @keyframes qr-skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .qr-generate-sweep {
+    background: linear-gradient(
+      105deg,
+      transparent 38%,
+      rgba(255, 255, 255, 0.22) 50%,
+      transparent 62%
+    );
+    background-size: 200% 100%;
+    animation: qr-generate-sweep 1.8s ease-in-out infinite;
+  }
+
+  @keyframes qr-generate-sweep {
     0% {
       background-position: 200% 0;
     }

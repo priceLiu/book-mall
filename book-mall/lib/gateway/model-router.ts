@@ -119,6 +119,10 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }
 
+  if (m.startsWith("happyhorse-1-1/")) {
+    return { providerKind: "KIE", requestKind: "VIDEO" };
+  }
+
   if (
     DASHSCOPE_VIDEO_PREFIXES.some((p) => m.startsWith(p)) ||
     (m.includes("-i2v") && !m.includes("/")) ||

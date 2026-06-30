@@ -6,6 +6,7 @@ import {
   bookMallLoginHref,
   bookMallReEnterHref,
 } from "@/lib/platform-sso-links";
+import { QUICK_REPLICA_SSO_APP } from "@/lib/qr-sso-app";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
   buildSilentReEnterHref,
@@ -52,8 +53,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     const path =
       typeof window !== "undefined" ? window.location.pathname : "/";
     const reEnter =
-      buildSilentReEnterHref(mainOrigin, path, "prompt-optimizer") ||
-      bookMallReEnterHref(path, "prompt-optimizer");
+      buildSilentReEnterHref(mainOrigin, path, QUICK_REPLICA_SSO_APP) ||
+      bookMallReEnterHref(path, QUICK_REPLICA_SSO_APP);
     if (reEnter) {
       window.location.href = reEnter;
       return true;

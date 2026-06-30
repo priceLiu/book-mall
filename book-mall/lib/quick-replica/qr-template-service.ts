@@ -52,6 +52,7 @@ export function rowToJson(row: {
   badges: unknown;
   ownerUserId: string | null;
   visibility: string;
+  isPlatformCatalog?: boolean;
   reference: unknown;
   output: unknown;
   sortOrder: number;
@@ -70,7 +71,7 @@ export function rowToJson(row: {
     badges: Array.isArray(row.badges)
       ? (row.badges as QrTemplateJson["badges"])
       : undefined,
-    source: "user",
+    source: row.isPlatformCatalog ? "catalog" : "user",
     ownerUserId: row.ownerUserId ?? undefined,
     visibility: row.visibility === "public" ? "public" : "private",
     reference: row.reference as QrTemplateJson["reference"],
@@ -90,6 +91,29 @@ function dedupeTemplates(items: QrTemplateJson[]): QrTemplateJson[] {
     out.push(t);
   }
   return out;
+}
+
+/** 运营库公开模板（ownerUserId 为 null，不能走 NOT ownerUserId 的 public 查询） */
+export function buildPlatformCatalogWhere(
+  filters: QrTemplateListFilters,
+): Prisma.QrTemplateWhereInput {
+  const where: Prisma.QrTemplateWhereInput = {
+    deletedAt: null,
+    visibility: "public",
+    isPlatformCatalog: true,
+    catalogBuiltinId: null,
+  };
+  if (filters.category) where.category = filters.category;
+  if (filters.kind) where.kind = filters.kind;
+  if (filters.toolKey) {
+    where.OR = [
+      { toolKey: filters.toolKey },
+      ...(filters.toolKey === "motion-sync"
+        ? [{ kind: "motion-sync", toolKey: null }]
+        : []),
+    ];
+  }
+  return where;
 }
 
 export async function listQrTemplates(
@@ -129,13 +153,16 @@ export async function listQrTemplates(
     visibility: "public",
     deletedAt: null,
     catalogBuiltinId: null,
-    NOT: { ownerUserId: userId },
+    isPlatformCatalog: false,
+    ownerUserId: { not: userId },
   };
   if (filters.category) publicWhere.category = filters.category;
   if (filters.kind) publicWhere.kind = filters.kind;
   if (filters.toolKey) publicWhere.toolKey = filters.toolKey;
 
-  const [ownRows, publicRows] = await Promise.all([
+  const catalogWhere = buildPlatformCatalogWhere(filters);
+
+  const [ownRows, publicRows, catalogRows] = await Promise.all([
     prisma.qrTemplate.findMany({
       where: ownWhere,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
@@ -144,11 +171,16 @@ export async function listQrTemplates(
       where: publicWhere,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     }),
+    prisma.qrTemplate.findMany({
+      where: catalogWhere,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
   ]);
 
   const merged = dedupeTemplates([
     ...ownRows.map(rowToJson),
     ...publicRows.map(rowToJson),
+    ...catalogRows.map(rowToJson),
     ...builtin,
   ]);
   const filtered = filterTemplatesForGallery(merged, filters);
@@ -300,6 +332,58 @@ export async function updateUserQrTemplate(args: {
     },
   });
   return rowToJson(row);
+}
+
+export async function deleteUserQrTemplate(
+  userId: string,
+  id: string,
+): Promise<boolean> {
+  const existing = await prisma.qrTemplate.findFirst({
+    where: { id, ownerUserId: userId, deletedAt: null },
+  });
+  if (!existing) return false;
+  await prisma.qrTemplate.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  });
+  return true;
+}
+
+export async function deleteAdminUserQrTemplate(id: string): Promise<boolean> {
+  const existing = await prisma.qrTemplate.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+      catalogBuiltinId: null,
+      ownerUserId: { not: null },
+    },
+  });
+  if (!existing) return false;
+  await prisma.qrTemplate.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  });
+  return true;
+}
+
+export async function listAdminUserQrTemplates(filters: {
+  category?: QrCategory | null;
+  kind?: string | null;
+  limit?: number;
+}): Promise<QrTemplateJson[]> {
+  const where: Prisma.QrTemplateWhereInput = {
+    ownerUserId: { not: null },
+    catalogBuiltinId: null,
+    deletedAt: null,
+  };
+  if (filters.category) where.category = filters.category;
+  if (filters.kind) where.kind = filters.kind;
+  const rows = await prisma.qrTemplate.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: Math.min(200, Math.max(1, filters.limit ?? 100)),
+  });
+  return rows.map(rowToJson);
 }
 
 export function templateToWorkspaceDraft(

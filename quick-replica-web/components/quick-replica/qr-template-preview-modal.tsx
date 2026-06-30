@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Copy, X } from "lucide-react";
+import { Copy, Trash2, X } from "lucide-react";
 
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrToast } from "@/components/quick-replica/qr-toast";
@@ -13,6 +13,8 @@ type Props = {
   canManageFeatured: boolean;
   onClose: () => void;
   onCopy: (template: QrTemplate) => void;
+  allowDelete?: boolean;
+  onDelete?: (template: QrTemplate) => void;
   onFeaturedUpdated?: () => void;
 };
 
@@ -47,12 +49,15 @@ export function QrTemplatePreviewModal({
   canManageFeatured,
   onClose,
   onCopy,
+  allowDelete = false,
+  onDelete,
   onFeaturedUpdated,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [copyToast, setCopyToast] = useState<string | null>(null);
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const dismissCopyToast = useCallback(() => setCopyToast(null), []);
 
   if (!template) return null;
@@ -270,7 +275,66 @@ export function QrTemplatePreviewModal({
             ) : null}
           </div>
 
-          <div className="shrink-0 p-5" style={{ borderTop: "1px solid var(--qr-border)" }}>
+          <div className="shrink-0 space-y-2 p-5" style={{ borderTop: "1px solid var(--qr-border)" }}>
+            {allowDelete && template.source === "user" && onDelete ? (
+              deleteStep === 0 ? (
+                <button
+                  type="button"
+                  className="qr-btn-secondary flex w-full items-center justify-center gap-2 text-red-300"
+                  onClick={() => setDeleteStep(1)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  删除
+                </button>
+              ) : deleteStep === 1 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--qr-text-secondary)]">
+                    确定删除「{template.title}」？
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="qr-btn-secondary flex-1 text-xs"
+                      onClick={() => setDeleteStep(0)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="qr-btn-primary flex-1 text-xs"
+                      onClick={() => setDeleteStep(2)}
+                    >
+                      继续
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-200">
+                    此操作不可恢复，将永久删除该作品记录。
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="qr-btn-secondary flex-1 text-xs"
+                      onClick={() => setDeleteStep(0)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="qr-btn-primary flex-1 text-xs"
+                      onClick={() => {
+                        onDelete(template);
+                        setDeleteStep(0);
+                      }}
+                    >
+                      确认删除
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : null}
             <button
               type="button"
               className="qr-btn-primary w-full"

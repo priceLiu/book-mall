@@ -39,6 +39,13 @@ function parseDraft(body: Record<string, unknown>): QrWorkspaceDraft | null {
     prompt: typeof body.prompt === "string" ? body.prompt : "",
     modelKey,
     mode: typeof body.mode === "string" ? body.mode : undefined,
+    characterOrientation:
+      typeof body.characterOrientation === "string"
+        ? body.characterOrientation
+        : undefined,
+    resolution: typeof body.resolution === "string" ? body.resolution : undefined,
+    aspectRatio: typeof body.aspectRatio === "string" ? body.aspectRatio : undefined,
+    duration: typeof body.duration === "number" ? body.duration : undefined,
   };
 }
 

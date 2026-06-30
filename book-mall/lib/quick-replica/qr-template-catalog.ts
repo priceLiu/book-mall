@@ -25,6 +25,16 @@ export function isQrMotionSyncGalleryTemplate(t: Pick<QrTemplateJson, "id">): bo
   return t.id.startsWith("qr-motion-sync-gallery-");
 }
 
+/** 用户已产生作品（有 output）才混入分类模板瀑布流 */
+export function isQrUserProducedTemplate(t: Pick<QrTemplateJson, "source" | "output">): boolean {
+  return t.source === "user" && Boolean(t.output?.url?.trim());
+}
+
+/** 管理后台维护的公开运营模板（非内置 id 覆盖） */
+export function isQrPlatformCatalogTemplate(t: Pick<QrTemplateJson, "source">): boolean {
+  return t.source === "catalog";
+}
+
 export function isQrGalleryTemplate(t: Pick<QrTemplateJson, "id">): boolean {
   return (
     isQrImageGalleryTemplate(t) ||
@@ -57,28 +67,41 @@ export function filterTemplatesForGallery(
 ): QrTemplateJson[] {
   let items = templates.filter((t) => !isQrKindThumbBuiltin(t));
 
+  const isMotionSyncBrowse =
+    filters.kind === "motion-sync" || filters.toolKey === "motion-sync";
+
   if (filters.category === "image" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrImageGalleryTemplate(t) || t.source === "user");
+    items = items.filter((t) => isQrImageGalleryTemplate(t) || isQrUserProducedTemplate(t));
   }
 
   if (filters.category === "character" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrCharacterGalleryTemplate(t) || t.source === "user");
+    items = items.filter((t) => isQrCharacterGalleryTemplate(t) || isQrUserProducedTemplate(t));
   }
 
   if (filters.category === "world" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrWorldGalleryTemplate(t) || t.source === "user");
-  }
-
-  if (filters.category === "video" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrVideoGalleryTemplate(t) || t.source === "user");
+    items = items.filter((t) => isQrWorldGalleryTemplate(t) || isQrUserProducedTemplate(t));
   }
 
   if (
     filters.category === "video" &&
-    filters.kind === "motion-sync" &&
+    !filters.kind &&
+    !isMotionSyncBrowse &&
     (filters.scope ?? "all") === "all"
   ) {
-    items = items.filter((t) => isQrMotionSyncGalleryTemplate(t) || t.source === "user");
+    items = items.filter((t) => isQrVideoGalleryTemplate(t) || isQrUserProducedTemplate(t));
+  }
+
+  if (
+    filters.category === "video" &&
+    isMotionSyncBrowse &&
+    (filters.scope ?? "all") === "all"
+  ) {
+    items = items.filter(
+      (t) =>
+        isQrMotionSyncGalleryTemplate(t) ||
+        isQrUserProducedTemplate(t) ||
+        (isQrPlatformCatalogTemplate(t) && t.kind === "motion-sync"),
+    );
   }
 
   if (
@@ -89,7 +112,7 @@ export function filterTemplatesForGallery(
   ) {
     items = items.filter(
       (t) =>
-        t.source === "user" ||
+        isQrUserProducedTemplate(t) ||
         (isQrVideoGalleryTemplate(t) && t.kind === filters.kind),
     );
   }

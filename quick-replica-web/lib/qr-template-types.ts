@@ -13,7 +13,7 @@ export type QrTemplate = {
   title: string;
   thumbnailUrl: string;
   badges?: QrTemplateBadge[];
-  source: "builtin" | "user";
+  source: "builtin" | "user" | "catalog";
   ownerUserId?: string;
   visibility: "private" | "public";
   reference: {
@@ -60,6 +60,9 @@ export type QrWorkspaceDraft = {
   characterOrientation?: string;
   /** UI 预留：保留参考视频原声（暂未接入 KIE motion-control） */
   keepOriginalSound?: boolean;
+  resolution?: string;
+  aspectRatio?: string;
+  duration?: number;
 };
 
 export type QrKindDef = {
@@ -227,14 +230,96 @@ export const MOTION_SYNC_MODELS = [
     label: "Kling 2.6",
     subtitle: "运动模仿",
     defaultMode: "std" as const,
+    kind: "motion-control" as const,
   },
   {
     modelKey: "kling-3.0/motion-control",
     label: "Kling 3.0",
     subtitle: "运动模仿",
     defaultMode: "pro" as const,
+    kind: "motion-control" as const,
+  },
+  {
+    modelKey: "happyhorse-1-1/reference-to-video",
+    label: "HappyHorse 1.1",
+    subtitle: "参考图生视频",
+    defaultMode: "1080p" as const,
+    kind: "reference-to-video" as const,
   },
 ] as const;
+
+export const HAPPYHORSE_R2V_MODEL_KEY = "happyhorse-1-1/reference-to-video";
+
+export function isHappyHorseR2vModel(modelKey: string): boolean {
+  return modelKey.trim() === HAPPYHORSE_R2V_MODEL_KEY;
+}
+
+/** HappyHorse 参考图：优先 sceneImageUrls，否则回退 targetImageUrl（模板复制） */
+export function resolveMotionSyncReferenceImageUrls(draft: {
+  sceneImageUrls: string[];
+  targetImageUrl: string;
+}): string[] {
+  const fromScene = draft.sceneImageUrls.map((u) => u.trim()).filter(Boolean);
+  if (fromScene.length) return fromScene;
+  const target = draft.targetImageUrl.trim();
+  return target ? [target] : [];
+}
+
+export const HAPPYHORSE_IMAGE_REF_TOKEN_RE = /\[Image\s+(\d+)\]/gi;
+
+export function parseHappyHorsePromptImageIndices(prompt: string): number[] {
+  const indices: number[] = [];
+  const re = new RegExp(HAPPYHORSE_IMAGE_REF_TOKEN_RE.source, "gi");
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(prompt)) !== null) {
+    const n = Number.parseInt(match[1] ?? "", 10);
+    if (Number.isFinite(n) && n > 0) indices.push(n);
+  }
+  return indices;
+}
+
+export function maxHappyHorsePromptImageIndex(prompt: string): number {
+  const indices = parseHappyHorsePromptImageIndices(prompt);
+  return indices.length ? Math.max(...indices) : 0;
+}
+
+export function formatHappyHorseImageRefToken(index: number): string {
+  return `[Image ${index}]`;
+}
+
+export function validateHappyHorseMotionSyncDraft(args: {
+  prompt: string;
+  sceneImageUrls: string[];
+  targetImageUrl: string;
+}): string | null {
+  const refs = resolveMotionSyncReferenceImageUrls(args);
+  if (!refs.length) return "请先上传至少一张参考图";
+  const prompt = args.prompt.trim();
+  if (!prompt) return "请填写提示词";
+  const maxIdx = maxHappyHorsePromptImageIndex(prompt);
+  if (maxIdx > refs.length) {
+    return `提示词引用了 [Image ${maxIdx}]，但只有 ${refs.length} 张参考图`;
+  }
+  return null;
+}
+
+export const HAPPYHORSE_R2V_MAX_REFS = 9;
+
+export const HAPPYHORSE_R2V_RESOLUTIONS = [
+  { value: "720p", label: "720P" },
+  { value: "1080p", label: "1080P" },
+] as const;
+
+export const HAPPYHORSE_R2V_ASPECT_RATIOS = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "4:3", label: "4:3" },
+  { value: "3:4", label: "3:4" },
+  { value: "1:1", label: "1:1" },
+] as const;
+
+export const HAPPYHORSE_R2V_DURATION_MIN = 3;
+export const HAPPYHORSE_R2V_DURATION_MAX = 15;
 
 export const MOTION_SYNC_VIDEO_MODES = [
   { value: "std", label: "标准", hint: "720p" },
@@ -242,9 +327,12 @@ export const MOTION_SYNC_VIDEO_MODES = [
 ] as const;
 
 export const MOTION_SYNC_CHARACTER_ORIENTATIONS = [
-  { value: "video", label: "精确的", hint: "跟随参考视频朝向" },
-  { value: "image", label: "跟随图片", hint: "跟随角色图朝向" },
+  { value: "image", label: "图像", hint: "跟随角色图朝向" },
+  { value: "video", label: "视频", hint: "跟随参考视频朝向" },
 ] as const;
+
+/** 运动同步提示词最大长度（与 KIE motion-control 对齐） */
+export const MOTION_SYNC_PROMPT_MAX_LENGTH = 2500;
 
 function thumb(seed: string): string {
   return `https://picsum.photos/seed/${encodeURIComponent(seed)}/480/360`;
@@ -500,6 +588,7 @@ export function filterTemplates(
 }
 
 export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
+  const targetImageUrl = t.reference.slots.targetImage?.url ?? "";
   const sceneImageUrls =
     t.reference.slots.sceneImages?.map((s) => s.url).filter(Boolean) ?? [];
   return {
@@ -508,7 +597,7 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     toolKey: t.toolKey,
     title: t.title,
     savedTemplateId: t.source === "user" ? t.id : undefined,
-    targetImageUrl: t.reference.slots.targetImage?.url ?? "",
+    targetImageUrl,
     referenceVideoUrl: t.reference.slots.referenceVideo?.url ?? "",
     referenceAudioUrl: t.reference.slots.referenceAudio?.url ?? "",
     sceneImageUrls,

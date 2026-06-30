@@ -13,7 +13,7 @@ export type QrTemplateJson = {
   title: string;
   thumbnailUrl: string;
   badges?: QrTemplateBadge[];
-  source: "builtin" | "user";
+  source: "builtin" | "user" | "catalog";
   ownerUserId?: string;
   visibility: "private" | "public";
   reference: {
@@ -75,4 +75,10 @@ export type QrWorkspaceDraft = {
   mode?: string;
   characterOrientation?: string;
   keepOriginalSound?: boolean;
+  /** HappyHorse R2V：720p | 1080p */
+  resolution?: string;
+  /** HappyHorse R2V：16:9 等 */
+  aspectRatio?: string;
+  /** HappyHorse R2V：3–15 秒 */
+  duration?: number;
 };

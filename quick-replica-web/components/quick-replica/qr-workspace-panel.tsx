@@ -1,26 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { QrMotionSyncForm } from "@/components/quick-replica/qr-motion-sync-workspace";
-import { persistWorkspaceDraft } from "@/lib/qr-template-save";
 import {
   getKindDef,
-  type QrTemplate,
+  isHappyHorseR2vModel,
+  validateHappyHorseMotionSyncDraft,
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
-
-export type QrGenerateJobResult = {
-  status: string;
-  outputUrl?: string;
-  error?: string;
-  template?: QrTemplate;
-};
+import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 
 type Props = {
   draft: QrWorkspaceDraft;
   onDraftChange: (draft: QrWorkspaceDraft) => void;
-  onGenerateComplete: (result: QrGenerateJobResult) => void;
+  onGenerate: (draft: QrWorkspaceDraft) => void;
+  generating?: boolean;
   onBackToBrowse?: () => void;
 };
 
@@ -36,33 +31,19 @@ async function readFileAsDataUrl(file: File): Promise<string> {
 export function QrWorkspacePanel({
   draft,
   onDraftChange,
-  onGenerateComplete,
+  onGenerate,
+  generating = false,
   onBackToBrowse,
 }: Props) {
-  const [busy, setBusy] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saveHint, setSaveHint] = useState<string | null>(null);
   const kindDef = getKindDef(draft.kind);
   const isMotionSync = draft.kind === "motion-sync" || draft.toolKey === "motion-sync";
 
-  useEffect(() => {
-    if (!draft.savedTemplateId) return;
-    setSaveHint("保存中…");
-    const timer = window.setTimeout(() => {
-      void persistWorkspaceDraft(draft).then((result) => {
-        if (result.ok) {
-          setSaveHint("已自动保存");
-        } else {
-          setSaveHint(null);
-        }
-      });
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [draft]);
-
   const uploadAsset = async (file: File, kind: "image" | "video" | "audio") => {
     const dataUrl = await readFileAsDataUrl(file);
-    const res = await fetch("/api/book-mall/api/platform/v1/quick-replica/assets/upload", {
+    const res = await fetchQrPlatform("/api/book-mall/api/platform/v1/quick-replica/assets/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataUrl, kind }),
@@ -75,51 +56,28 @@ export function QrWorkspacePanel({
     return data.url;
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = () => {
     setError(null);
-    if (isMotionSync && (!draft.targetImageUrl.trim() || !draft.referenceVideoUrl.trim())) {
-      setError("请先上传目标图与参考视频");
-      return;
-    }
-    setBusy(true);
-    try {
-      const createRes = await fetch(
-        "/api/book-mall/api/platform/v1/quick-replica/jobs/generate",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draft),
-        },
-      );
-      if (!createRes.ok) {
-        const body = (await createRes.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `创建任务失败（${createRes.status}）`);
-      }
-      const created = (await createRes.json()) as { logId: string };
-
-      for (let i = 0; i < 120; i += 1) {
-        await new Promise((r) => setTimeout(r, 3000));
-        const pollRes = await fetch(
-          `/api/book-mall/api/platform/v1/quick-replica/jobs/${encodeURIComponent(created.logId)}`,
-        );
-        if (!pollRes.ok) continue;
-        const job = (await pollRes.json()) as QrGenerateJobResult;
-        if (job.status === "SUCCEEDED" && job.template) {
-          onGenerateComplete(job);
+    if (isMotionSync) {
+      if (isHappyHorseR2vModel(draft.modelKey)) {
+        const validationError = validateHappyHorseMotionSyncDraft({
+          prompt: draft.prompt,
+          sceneImageUrls: draft.sceneImageUrls,
+          targetImageUrl: draft.targetImageUrl,
+        });
+        if (validationError) {
+          setError(validationError);
           return;
         }
-        if (job.status === "FAILED") {
-          onGenerateComplete(job);
-          return;
-        }
+      } else if (!draft.targetImageUrl.trim() || !draft.referenceVideoUrl.trim()) {
+        setError("请先上传目标图与参考视频");
+        return;
       }
-      onGenerateComplete({ status: "FAILED", error: "轮询超时，请稍后在 Gateway 日志查看" });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "生成失败");
-    } finally {
-      setBusy(false);
     }
+    onGenerate(draft);
   };
+
+  const isHappyHorseMotion = isMotionSync && isHappyHorseR2vModel(draft.modelKey);
 
   const needsTargetImage =
     isMotionSync ||
@@ -128,19 +86,18 @@ export function QrWorkspacePanel({
     draft.kind.includes("upscale") ||
     draft.kind === "lip-sync";
 
-  const needsReferenceVideo = isMotionSync;
+  const needsReferenceVideo = isMotionSync && !isHappyHorseMotion;
   const needsReferenceAudio = draft.kind === "lip-sync" || draft.category === "audio";
   const needsSceneImages =
     draft.category === "world" || draft.kind.includes("scene");
+
+  const busy = generating || uploadingImage || uploadingVideo;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="qr-panel-header shrink-0">
         <span>{kindDef?.label ?? draft.kind}</span>
         <div className="flex items-center gap-3">
-          {saveHint ? (
-            <span className="text-[10px] text-[var(--qr-text-muted)]">{saveHint}</span>
-          ) : null}
           {onBackToBrowse ? (
           <button
             type="button"
@@ -158,28 +115,58 @@ export function QrWorkspacePanel({
           <QrMotionSyncForm
             draft={draft}
             onDraftChange={onDraftChange}
-            busy={busy}
+            busy={generating}
+            uploadingImage={uploadingImage}
+            uploadingVideo={uploadingVideo}
             onUploadImage={async (file) => {
               try {
-                setBusy(true);
+                setUploadingImage(true);
+                setError(null);
                 const url = await uploadAsset(file, "image");
                 onDraftChange({ ...draft, targetImageUrl: url });
               } catch (err) {
                 setError(err instanceof Error ? err.message : "上传失败");
               } finally {
-                setBusy(false);
+                setUploadingImage(false);
               }
             }}
             onUploadVideo={async (file) => {
               try {
-                setBusy(true);
+                setUploadingVideo(true);
+                setError(null);
                 const url = await uploadAsset(file, "video");
                 onDraftChange({ ...draft, referenceVideoUrl: url });
               } catch (err) {
                 setError(err instanceof Error ? err.message : "上传失败");
               } finally {
-                setBusy(false);
+                setUploadingVideo(false);
               }
+            }}
+            onUploadReferenceImages={async (files) => {
+              try {
+                setUploadingImage(true);
+                setError(null);
+                const slotsLeft = Math.max(0, 9 - draft.sceneImageUrls.length);
+                const batch = files.slice(0, slotsLeft);
+                const urls: string[] = [];
+                for (const file of batch) {
+                  urls.push(await uploadAsset(file, "image"));
+                }
+                onDraftChange({
+                  ...draft,
+                  sceneImageUrls: [...draft.sceneImageUrls, ...urls].slice(0, 9),
+                });
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "上传失败");
+              } finally {
+                setUploadingImage(false);
+              }
+            }}
+            onRemoveReferenceImage={(index) => {
+              onDraftChange({
+                ...draft,
+                sceneImageUrls: draft.sceneImageUrls.filter((_, i) => i !== index),
+              });
             }}
           />
         ) : (
@@ -187,6 +174,7 @@ export function QrWorkspacePanel({
             <div>
               <label className="mb-1 block text-xs text-[var(--qr-text-muted)]">模型</label>
               <input className="qr-input" value={draft.modelKey}
+                disabled={generating}
                 onChange={(e) => onDraftChange({ ...draft, modelKey: e.target.value })}
               />
             </div>
@@ -203,13 +191,13 @@ export function QrWorkspacePanel({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     try {
-                      setBusy(true);
+                      setUploadingImage(true);
                       const url = await uploadAsset(file, "image");
                       onDraftChange({ ...draft, targetImageUrl: url });
                     } catch (err) {
                       setError(err instanceof Error ? err.message : "上传失败");
                     } finally {
-                      setBusy(false);
+                      setUploadingImage(false);
                     }
                   }}
                 />
@@ -236,13 +224,13 @@ export function QrWorkspacePanel({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     try {
-                      setBusy(true);
+                      setUploadingVideo(true);
                       const url = await uploadAsset(file, "video");
                       onDraftChange({ ...draft, referenceVideoUrl: url });
                     } catch (err) {
                       setError(err instanceof Error ? err.message : "上传失败");
                     } finally {
-                      setBusy(false);
+                      setUploadingVideo(false);
                     }
                   }}
                 />
@@ -261,13 +249,13 @@ export function QrWorkspacePanel({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     try {
-                      setBusy(true);
+                      setUploadingVideo(true);
                       const url = await uploadAsset(file, "audio");
                       onDraftChange({ ...draft, referenceAudioUrl: url });
                     } catch (err) {
                       setError(err instanceof Error ? err.message : "上传失败");
                     } finally {
-                      setBusy(false);
+                      setUploadingVideo(false);
                     }
                   }}
                 />
@@ -286,7 +274,7 @@ export function QrWorkspacePanel({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     try {
-                      setBusy(true);
+                      setUploadingImage(true);
                       const url = await uploadAsset(file, "image");
                       onDraftChange({
                         ...draft,
@@ -295,7 +283,7 @@ export function QrWorkspacePanel({
                     } catch (err) {
                       setError(err instanceof Error ? err.message : "上传失败");
                     } finally {
-                      setBusy(false);
+                      setUploadingImage(false);
                     }
                   }}
                 />
@@ -320,6 +308,7 @@ export function QrWorkspacePanel({
               <textarea
                 className="qr-input min-h-[100px]"
                 value={draft.prompt}
+                disabled={generating}
                 onChange={(e) => onDraftChange({ ...draft, prompt: e.target.value })}
               />
             </div>
@@ -336,13 +325,21 @@ export function QrWorkspacePanel({
       <div className="shrink-0 p-4" style={{ borderTop: "1px solid var(--qr-border)" }}>
         <button
           type="button"
-          disabled={busy}
-          onClick={() => void handleGenerate()}
+          disabled={generating}
+          onClick={handleGenerate}
           className="w-full qr-btn-primary py-3 disabled:opacity-50"
         >
-          {busy ? "产生中…" : "产生"}
+          {generating ? "产生中…" : "产生"}
         </button>
       </div>
     </div>
   );
 }
+
+/** @deprecated 兼容旧引用 */
+export type QrGenerateJobResult = {
+  status: string;
+  outputUrl?: string;
+  error?: string;
+  template?: import("@/lib/qr-template-types").QrTemplate;
+};

@@ -7,6 +7,7 @@ import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QR_CATEGORIES, QR_KINDS_BY_CATEGORY, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
 import { extractAdminFormFieldsFromTemplate, isCharacterCatalogEdit, isMotionSyncKind } from "@/lib/qr-admin-form";
 import { QrAdminPreviewThumb } from "@/components/quick-replica/qr-admin-preview-thumb";
+import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 import { resolveQrTemplatePreviewMedia } from "@/lib/qr-template-preview-media";
 
 type AdminTemplateRow = {
@@ -106,6 +107,17 @@ function resolveAdminFormPreview(form: FormState) {
 }
 
 type AdminPrimaryTab = QrCategory | "motion-sync";
+type AdminView = "catalog" | "user-works";
+
+type UserWorkRow = {
+  id: string;
+  title: string;
+  kind: string;
+  category: QrCategory;
+  thumbnailUrl: string;
+  output?: QrTemplate["output"];
+  createdAt: string;
+};
 
 type Props = {
   bookMallAdminUrl: string | null;
@@ -119,8 +131,10 @@ export function QrAdminPanel({
   onScopeChange,
 }: Props) {
   const [primaryTab, setPrimaryTab] = useState<AdminPrimaryTab>("video");
+  const [adminView, setAdminView] = useState<AdminView>("catalog");
   const [kindFilter, setKindFilter] = useState("");
   const [templates, setTemplates] = useState<AdminTemplateRow[]>([]);
+  const [userWorks, setUserWorks] = useState<UserWorkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -129,6 +143,7 @@ export function QrAdminPanel({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserWorkRow | null>(null);
 
   const category: QrCategory = primaryTab === "motion-sync" ? "video" : primaryTab;
   const effectiveKind = primaryTab === "motion-sync" ? "motion-sync" : kindFilter;
@@ -143,16 +158,29 @@ export function QrAdminPanel({
   );
 
   const load = useCallback(async () => {
+    if (adminView === "user-works") {
+      const qs = new URLSearchParams();
+      if (category) qs.set("category", category);
+      if (effectiveKind) qs.set("kind", effectiveKind);
+      const res = await fetchQrPlatform(
+        `/api/book-mall/api/platform/v1/quick-replica/admin/user-templates?${qs}`,
+        { cache: "no-store" },
+      );
+      const data = (await res.json()) as { templates?: UserWorkRow[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "加载失败");
+      setUserWorks(Array.isArray(data.templates) ? data.templates : []);
+      return;
+    }
     const qs = new URLSearchParams({ category });
     if (effectiveKind) qs.set("kind", effectiveKind);
-    const res = await fetch(
+    const res = await fetchQrPlatform(
       `/api/book-mall/api/platform/v1/quick-replica/admin/templates?${qs}`,
       { cache: "no-store" },
     );
     const data = (await res.json()) as { templates?: AdminTemplateRow[]; error?: string };
     if (!res.ok) throw new Error(data.error ?? "加载失败");
     setTemplates(Array.isArray(data.templates) ? data.templates : []);
-  }, [category, effectiveKind]);
+  }, [category, effectiveKind, adminView]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,7 +200,26 @@ export function QrAdminPanel({
     };
   }, [load]);
 
-  const filteredCount = useMemo(() => templates.length, [templates]);
+  const filteredCount = useMemo(
+    () => (adminView === "user-works" ? userWorks.length : templates.length),
+    [adminView, templates.length, userWorks.length],
+  );
+
+  async function deleteUserWork(row: UserWorkRow) {
+    const res = await fetchQrPlatform(
+      `/api/book-mall/api/platform/v1/quick-replica/admin/user-templates?id=${encodeURIComponent(row.id)}`,
+      { method: "DELETE" },
+    );
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setMessage(data.error ?? "删除失败");
+      return;
+    }
+    setDeleteTarget(null);
+    setMessage("已删除用户作品");
+    await load();
+    onTemplatesChanged?.();
+  }
 
   function openCreate() {
     const defaultKind =
@@ -224,7 +271,7 @@ export function QrAdminPanel({
     try {
       const dataUrl = await readFileAsDataUrl(file);
       const kind = file.type.startsWith("video/") ? "video" : "image";
-      const res = await fetch("/api/book-mall/api/platform/v1/quick-replica/assets/upload", {
+      const res = await fetchQrPlatform("/api/book-mall/api/platform/v1/quick-replica/assets/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl, kind }),
@@ -298,7 +345,7 @@ export function QrAdminPanel({
       const url = isNew
         ? "/api/book-mall/api/platform/v1/quick-replica/admin/templates"
         : `/api/book-mall/api/platform/v1/quick-replica/admin/templates/${encodeURIComponent(form.id ?? form.dbId ?? "new")}`;
-      const res = await fetch(url, {
+      const res = await fetchQrPlatform(url, {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -346,6 +393,37 @@ export function QrAdminPanel({
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAdminView("catalog")}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              adminView === "catalog"
+                ? "bg-white/15 text-[var(--qr-text-primary)]"
+                : "border border-[var(--qr-border)] text-[var(--qr-text-secondary)]"
+            }`}
+          >
+            运营模板
+          </button>
+          <button
+            type="button"
+            onClick={() => setAdminView("user-works")}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              adminView === "user-works"
+                ? "bg-white/15 text-[var(--qr-text-primary)]"
+                : "border border-[var(--qr-border)] text-[var(--qr-text-secondary)]"
+            }`}
+          >
+            用户作品
+          </button>
+          {adminView === "catalog" ? (
+            <button type="button" className="qr-btn-primary ml-auto text-xs" onClick={openCreate}>
+              新增模板
+            </button>
+          ) : null}
+        </div>
+
+        {adminView === "catalog" ? (
+        <div className="flex flex-wrap items-center gap-2">
           {QR_CATEGORIES.map((c) => (
             <button
               key={c.id}
@@ -379,12 +457,10 @@ export function QrAdminPanel({
           >
             运动同步
           </button>
-          <button type="button" className="qr-btn-primary ml-auto text-xs" onClick={openCreate}>
-            新增模板
-          </button>
         </div>
+        ) : null}
 
-        {primaryTab !== "motion-sync" && QR_KINDS_BY_CATEGORY[category]?.length ? (
+        {adminView === "catalog" && primaryTab !== "motion-sync" && QR_KINDS_BY_CATEGORY[category]?.length ? (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -442,13 +518,20 @@ export function QrAdminPanel({
                 <tr className="border-b border-[var(--qr-border)]">
                   <th className="px-3 py-2 font-medium">预览</th>
                   <th className="px-3 py-2 font-medium">标题 / 子类</th>
-                  <th className="px-3 py-2 font-medium">提示词</th>
-                  <th className="px-3 py-2 font-medium">来源</th>
+                  {adminView === "catalog" ? (
+                    <>
+                      <th className="px-3 py-2 font-medium">提示词</th>
+                      <th className="px-3 py-2 font-medium">来源</th>
+                    </>
+                  ) : (
+                    <th className="px-3 py-2 font-medium">创建时间</th>
+                  )}
                   <th className="px-3 py-2 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {templates.map((row) => (
+                {adminView === "catalog"
+                  ? templates.map((row) => (
                   <tr key={row.id} className="border-t border-[var(--qr-border)] align-top">
                     <td className="px-3 py-2">
                       <QrAdminPreviewThumb
@@ -486,18 +569,53 @@ export function QrAdminPanel({
                       </button>
                     </td>
                   </tr>
-                ))}
+                ))
+                  : userWorks.map((row) => (
+                      <tr key={row.id} className="border-t border-[var(--qr-border)] align-top">
+                        <td className="px-3 py-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={row.thumbnailUrl}
+                            alt=""
+                            className="h-14 w-10 rounded object-cover"
+                          />
+                        </td>
+                        <td className="max-w-[10rem] px-3 py-2">
+                          <div className="font-medium">{row.title}</div>
+                          <div className="text-xs text-[var(--qr-text-muted)]">{row.kind}</div>
+                          {!row.output?.url ? (
+                            <div className="text-[10px] text-amber-300">草稿 · 无输出</div>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-[var(--qr-text-muted)]">
+                          {new Date(row.createdAt).toLocaleString("zh-CN")}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            className="qr-btn-secondary px-2 py-1 text-xs text-red-300"
+                            onClick={() => setDeleteTarget(row)}
+                          >
+                            删除
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
               </tbody>
             </table>
             <div className="border-t border-[var(--qr-border)] px-3 py-2 text-xs text-[var(--qr-text-muted)]">
-              共 {filteredCount} 项 · 当前：
-              {primaryTab === "motion-sync"
-                ? "运动同步"
-                : `${QR_CATEGORIES.find((c) => c.id === primaryTab)?.label ?? primaryTab}${
-                    kindFilter
-                      ? ` · ${QR_KINDS_BY_CATEGORY[category].find((k) => k.id === kindFilter)?.label ?? kindFilter}`
-                      : ""
-                  }`}
+              共 {filteredCount} 项
+              {adminView === "catalog"
+                ? ` · 当前：${
+                    primaryTab === "motion-sync"
+                      ? "运动同步"
+                      : `${QR_CATEGORIES.find((c) => c.id === primaryTab)?.label ?? primaryTab}${
+                          kindFilter
+                            ? ` · ${QR_KINDS_BY_CATEGORY[category].find((k) => k.id === kindFilter)?.label ?? kindFilter}`
+                            : ""
+                        }`
+                  }`
+                : " · 用户作品（含草稿与已产生）"}
             </div>
           </div>
         )}
@@ -761,6 +879,35 @@ export function QrAdminPanel({
                 {saving ? "保存中…" : "保存"}
               </button>
             </div>
+          </div>
+        </div>
+      </QrModal>
+
+      <QrModal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="删除用户作品"
+        variant="square"
+      >
+        <div className="space-y-4 p-4">
+          <p className="text-sm text-[var(--qr-text-secondary)]">
+            确定删除「{deleteTarget?.title}」？此操作不可恢复。
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="qr-btn-secondary"
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="qr-btn-primary"
+              onClick={() => deleteTarget && void deleteUserWork(deleteTarget)}
+            >
+              确认删除
+            </button>
           </div>
         </div>
       </QrModal>

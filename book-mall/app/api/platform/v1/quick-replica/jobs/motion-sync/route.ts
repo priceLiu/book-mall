@@ -26,6 +26,10 @@ export async function POST(request: Request) {
       ? body.modelKey.trim()
       : "kling-2.6/motion-control";
   const mode = typeof body.mode === "string" ? body.mode : undefined;
+  const characterOrientation =
+    typeof body.characterOrientation === "string"
+      ? body.characterOrientation
+      : undefined;
 
   if (!targetImageUrl || !referenceVideoUrl) {
     return NextResponse.json({ error: "targetImageUrl 与 referenceVideoUrl 必填" }, { status: 400 });
@@ -38,6 +42,7 @@ export async function POST(request: Request) {
       prompt,
       modelKey,
       mode,
+      characterOrientation,
     });
     return NextResponse.json(result);
   } catch (e) {

@@ -23,6 +23,8 @@ import {
   findQrTemplateByLogId,
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrTemplateJson } from "@/lib/quick-replica/qr-types";
+import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
+import { isHappyHorseR2vModel, resolveMotionSyncReferenceImageUrls } from "@/lib/quick-replica/qr-motion-sync-models";
 import {
   extractKieResultUrl,
   type KieRecordResponse,
@@ -48,10 +50,14 @@ export async function qrCreateMotionSyncJob(
   opts: {
     targetImageUrl: string;
     referenceVideoUrl: string;
+    referenceImageUrls?: string[];
     prompt?: string;
     modelKey: string;
     mode?: string;
     characterOrientation?: string;
+    resolution?: string;
+    aspectRatio?: string;
+    duration?: number;
   },
 ): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind }> {
   const auth = await requireGatewayAuth(userId);
@@ -62,13 +68,30 @@ export async function qrCreateMotionSyncJob(
     throw new GatewayRequiredError("Gateway Key 未绑定 KIE 凭证");
   }
 
+  const happyHorse = isHappyHorseR2vModel(model);
+  const imageUrls = happyHorse
+    ? resolveMotionSyncReferenceImageUrls({
+        sceneImageUrls: opts.referenceImageUrls ?? [],
+        targetImageUrl: opts.targetImageUrl,
+      })
+    : opts.targetImageUrl.trim()
+      ? [opts.targetImageUrl.trim()]
+      : [];
+  const videoUrls =
+    !happyHorse && opts.referenceVideoUrl.trim()
+      ? [opts.referenceVideoUrl.trim()]
+      : undefined;
+
   const { model: routedModel, input } = buildKieToolVideoCreateArgs({
     model,
     prompt: opts.prompt,
-    imageUrls: [opts.targetImageUrl.trim()],
-    videoUrls: [opts.referenceVideoUrl.trim()],
+    imageUrls,
+    videoUrls,
     mode: opts.mode,
     characterOrientation: opts.characterOrientation,
+    resolution: opts.resolution,
+    aspectRatio: opts.aspectRatio,
+    duration: opts.duration,
   });
 
   const created = await gatewayV1CreateTask({
@@ -96,10 +119,14 @@ export async function qrCreateMotionSyncJob(
         qrMotionSync: {
           targetImageUrl: opts.targetImageUrl.trim(),
           referenceVideoUrl: opts.referenceVideoUrl.trim(),
+          referenceImageUrls: happyHorse ? imageUrls : undefined,
           prompt: opts.prompt ?? "",
           modelKey: opts.modelKey,
           mode: opts.mode ?? null,
           characterOrientation: opts.characterOrientation ?? null,
+          resolution: opts.resolution ?? null,
+          aspectRatio: opts.aspectRatio ?? null,
+          duration: opts.duration ?? null,
         },
       },
     },
@@ -141,19 +168,45 @@ function readMotionSyncSnapshotFromLog(log: {
 function extractVideoUrlFromLog(log: {
   resultSummary: unknown;
 }): string | null {
-  const rs = log.resultSummary;
-  if (!rs || typeof rs !== "object") return null;
-  const root = rs as Record<string, unknown>;
-  if (typeof root.video_url === "string" && root.video_url.trim()) {
-    return root.video_url.trim();
-  }
-  if (typeof root.url === "string" && root.url.trim()) {
-    return root.url.trim();
-  }
-  return null;
+  return extractQrJobOutputUrl(log.resultSummary)?.url ?? null;
 }
 
-async function ensureUserTemplateFromLog(args: {
+/** 用户确认「保存为我的」后再落库；轮询成功仅返回 outputUrl */
+export async function qrMaterializeMotionSyncJobTemplate(
+  userId: string,
+  logId: string,
+): Promise<QrTemplateJson | null> {
+  const existing = await findQrTemplateByLogId(logId);
+  if (existing) return existing;
+
+  const log = await prisma.gatewayRequestLog.findFirst({
+    where: { id: logId, actorBookUserId: userId },
+  });
+  if (!log || log.status !== "SUCCEEDED") return null;
+
+  const inputSnapshot = readMotionSyncSnapshotFromLog(log);
+  const outputUrl = extractVideoUrlFromLog(log);
+  if (
+    !outputUrl ||
+    !inputSnapshot?.targetImageUrl ||
+    !inputSnapshot.referenceVideoUrl
+  ) {
+    return null;
+  }
+
+  return createUserTemplateFromLog({
+    userId,
+    logId,
+    targetImageUrl: inputSnapshot.targetImageUrl,
+    referenceVideoUrl: inputSnapshot.referenceVideoUrl,
+    prompt: inputSnapshot.prompt ?? "",
+    modelKey: inputSnapshot.modelKey ?? log.model,
+    mode: inputSnapshot.mode,
+    outputUrl,
+  });
+}
+
+async function createUserTemplateFromLog(args: {
   userId: string;
   logId: string;
   targetImageUrl: string;
@@ -228,23 +281,14 @@ export async function qrPollMotionSyncJob(
 
   if (log.status === "SUCCEEDED") {
     const outputUrl = extractVideoUrlFromLog(log);
-    if (outputUrl && inputSnapshot?.targetImageUrl && inputSnapshot.referenceVideoUrl) {
-      const template = await ensureUserTemplateFromLog({
-        userId,
-        logId,
-        targetImageUrl: inputSnapshot.targetImageUrl,
-        referenceVideoUrl: inputSnapshot.referenceVideoUrl,
-        prompt: inputSnapshot.prompt ?? "",
-        modelKey: inputSnapshot.modelKey ?? log.model,
-        mode: inputSnapshot.mode,
-        outputUrl,
-      });
-      return { status: "SUCCEEDED", outputUrl, template };
+    if (outputUrl) {
+      return { status: "SUCCEEDED", outputUrl };
     }
-    return {
-      status: "SUCCEEDED",
-      outputUrl: outputUrl ?? undefined,
-    };
+    if (log.externalTaskId) {
+      // 日志已终态但 resultSummary 结构异常：再向厂商拉一次
+    } else {
+      return { status: "FAILED", error: "任务已成功但未找到输出地址" };
+    }
   }
 
   if (log.status === "FAILED") {
@@ -275,19 +319,6 @@ export async function qrPollMotionSyncJob(
         resultSummary: { video_url: outputUrl },
         model: log.model,
       });
-      if (inputSnapshot?.targetImageUrl && inputSnapshot.referenceVideoUrl) {
-        const template = await ensureUserTemplateFromLog({
-          userId,
-          logId,
-          targetImageUrl: inputSnapshot.targetImageUrl,
-          referenceVideoUrl: inputSnapshot.referenceVideoUrl,
-          prompt: inputSnapshot.prompt ?? "",
-          modelKey: inputSnapshot.modelKey ?? log.model,
-          mode: inputSnapshot.mode,
-          outputUrl,
-        });
-        return { status: "SUCCEEDED", outputUrl, template };
-      }
       return { status: "SUCCEEDED", outputUrl };
     }
     return { status: "RUNNING" };
