@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, Settings2, X } from "lucide-react";
 
+import { QrAdminAudioFields, extractAudioFieldsFromTemplate } from "@/components/quick-replica/qr-admin-audio-fields";
+import { QrCoverImagePicker } from "@/components/quick-replica/qr-cover-image-picker";
+import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
+import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QR_CATEGORIES, QR_KINDS_BY_CATEGORY, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
-import { extractAdminFormFieldsFromTemplate, isCharacterCatalogEdit, isMotionSyncKind } from "@/lib/qr-admin-form";
+import { extractAdminFormFieldsFromTemplate, isCharacterCatalogEdit, isMotionSyncKind, supportsAdminSceneImages, ADMIN_SCENE_IMAGE_MAX } from "@/lib/qr-admin-form";
 import { QrAdminPreviewThumb } from "@/components/quick-replica/qr-admin-preview-thumb";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 import { resolveQrTemplatePreviewMedia } from "@/lib/qr-template-preview-media";
+import { captureVideoFirstFrameDataUrl } from "@/lib/qr-video-first-frame";
 
 type AdminTemplateRow = {
   id: string;
@@ -44,7 +49,14 @@ type FormState = {
   outputUrl: string;
   modelKey: string;
   promptText: string;
+  sceneImageUrls: string[];
   sortOrder: number;
+  voiceId: string;
+  audioStyleTag: string;
+  voiceSpeed: number;
+  voiceStability: number;
+  voiceSimilarityBoost: number;
+  voiceStyleExaggeration: number;
 };
 
 const EMPTY_FORM: FormState = {
@@ -62,7 +74,14 @@ const EMPTY_FORM: FormState = {
   outputUrl: "",
   modelKey: "",
   promptText: "",
+  sceneImageUrls: [],
   sortOrder: 0,
+  voiceId: "khanh-tu",
+  audioStyleTag: "ad-teaser",
+  voiceSpeed: 1,
+  voiceStability: 0.5,
+  voiceSimilarityBoost: 0.75,
+  voiceStyleExaggeration: 0,
 };
 
 async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
@@ -76,6 +95,20 @@ async function readJsonResponse(res: Response): Promise<Record<string, unknown>>
   } catch {
     throw new Error(`服务器响应异常 (${res.status})`);
   }
+}
+
+async function uploadQuickReplicaAssetDataUrl(
+  dataUrl: string,
+  kind: "image" | "video" | "audio",
+): Promise<string> {
+  const res = await fetchQrPlatform("/api/book-mall/api/platform/v1/quick-replica/assets/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataUrl, kind }),
+  });
+  const data = (await res.json()) as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? "上传失败");
+  return data.url;
 }
 
 async function readFileAsDataUrl(file: File): Promise<string> {
@@ -225,13 +258,25 @@ export function QrAdminPanel({
     const defaultKind =
       primaryTab === "motion-sync"
         ? "motion-sync"
-        : kindFilter || (category === "video" ? "text-to-video" : "create-image");
+        : kindFilter ||
+          (category === "video"
+            ? "text-to-video"
+            : category === "character"
+              ? "create-character"
+              : category === "audio"
+                ? "create-voiceover"
+                : "create-image");
     setForm({
       ...EMPTY_FORM,
       category,
       kind: defaultKind,
       toolKey: defaultKind === "motion-sync" ? "motion-sync" : undefined,
-      modelKey: defaultKind === "motion-sync" ? "kling-2.6/motion-control" : "",
+      modelKey:
+        defaultKind === "motion-sync"
+          ? "kling-2.6/motion-control"
+          : category === "audio"
+            ? "eleven_multilingual_v2"
+            : "",
     });
     setFormOpen(true);
     setMessage(null);
@@ -240,6 +285,8 @@ export function QrAdminPanel({
 
   function openEdit(row: AdminTemplateRow) {
     const extracted = extractAdminFormFieldsFromTemplate(row);
+    const audioFields =
+      row.category === "audio" ? extractAudioFieldsFromTemplate(row.reference) : null;
     setForm({
       id: row.id,
       dbId: row.dbId,
@@ -254,9 +301,16 @@ export function QrAdminPanel({
       targetImageUrl: extracted.targetImageUrl,
       referenceVideoUrl: extracted.referenceVideoUrl,
       outputUrl: extracted.outputUrl,
-      modelKey: extracted.modelKey,
+      modelKey: audioFields?.modelKey ?? extracted.modelKey,
       promptText: extracted.promptText,
+      sceneImageUrls: extracted.sceneImageUrls,
       sortOrder: row.sortOrder,
+      voiceId: audioFields?.voiceId ?? "khanh-tu",
+      audioStyleTag: audioFields?.audioStyleTag ?? "ad-teaser",
+      voiceSpeed: audioFields?.voiceSpeed ?? 1,
+      voiceStability: audioFields?.voiceStability ?? 0.5,
+      voiceSimilarityBoost: audioFields?.voiceSimilarityBoost ?? 0.75,
+      voiceStyleExaggeration: audioFields?.voiceStyleExaggeration ?? 0,
     });
     setFormOpen(true);
     setMessage(null);
@@ -265,41 +319,78 @@ export function QrAdminPanel({
 
   async function uploadMedia(
     file: File,
-    target: "thumbnail" | "media" | "targetImage" | "referenceVideo",
+    target: "thumbnail" | "media" | "targetImage" | "referenceVideo" | "referenceImage",
   ) {
     setUploading(true);
     try {
       const dataUrl = await readFileAsDataUrl(file);
-      const kind = file.type.startsWith("video/") ? "video" : "image";
-      const res = await fetchQrPlatform("/api/book-mall/api/platform/v1/quick-replica/assets/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, kind }),
+      const isVideo = file.type.startsWith("video/");
+      const url = await uploadQuickReplicaAssetDataUrl(dataUrl, isVideo ? "video" : "image");
+
+      let autoCoverUrl: string | undefined;
+      if (isVideo && (target === "media" || target === "referenceVideo")) {
+        try {
+          const frameDataUrl = await captureVideoFirstFrameDataUrl(file);
+          autoCoverUrl = await uploadQuickReplicaAssetDataUrl(frameDataUrl, "image");
+        } catch {
+          /* 首帧失败时不阻断视频上传 */
+        }
+      }
+
+      setForm((prev) => {
+        if (target === "referenceImage") {
+          const slotsLeft = Math.max(0, ADMIN_SCENE_IMAGE_MAX - prev.sceneImageUrls.length);
+          if (slotsLeft <= 0) return prev;
+          return {
+            ...prev,
+            sceneImageUrls: [...prev.sceneImageUrls, url].slice(0, ADMIN_SCENE_IMAGE_MAX),
+          };
+        }
+
+        const next = { ...prev };
+        if (target === "thumbnail" || (target === "media" && !isVideo)) {
+          next.thumbnailUrl = url;
+        }
+        if (autoCoverUrl) {
+          next.thumbnailUrl = autoCoverUrl;
+        }
+        if (target === "media" || isVideo) {
+          next.mediaUrl = url;
+        }
+        if (target === "targetImage" || (target === "media" && !isVideo)) {
+          next.targetImageUrl = url;
+        }
+        if (target === "referenceVideo" || (target === "media" && isVideo)) {
+          next.referenceVideoUrl = url;
+          next.outputUrl = url;
+        }
+        if (target === "referenceVideo") {
+          next.outputUrl = url;
+        }
+        return next;
       });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) throw new Error(data.error ?? "上传失败");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "上传失败");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function uploadReferenceImages(files: File[]) {
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        if (urls.length >= ADMIN_SCENE_IMAGE_MAX) break;
+        const dataUrl = await readFileAsDataUrl(file);
+        const url = await uploadQuickReplicaAssetDataUrl(dataUrl, "image");
+        urls.push(url);
+      }
+      if (!urls.length) return;
       setForm((prev) => ({
         ...prev,
-        thumbnailUrl:
-          target === "thumbnail" || (target === "media" && kind === "image")
-            ? data.url!
-            : prev.thumbnailUrl,
-        mediaUrl: target === "media" || kind === "video" ? data.url! : prev.mediaUrl,
-        targetImageUrl:
-          target === "targetImage" || (target === "media" && kind === "image")
-            ? data.url!
-            : prev.targetImageUrl,
-        referenceVideoUrl:
-          target === "referenceVideo" || (target === "media" && kind === "video")
-            ? data.url!
-            : prev.referenceVideoUrl,
-        outputUrl:
-          target === "referenceVideo" || (target === "media" && kind === "video")
-            ? data.url!
-            : prev.outputUrl,
-        ...(kind === "video" && target === "media" && !prev.thumbnailUrl
-          ? { thumbnailUrl: prev.thumbnailUrl }
-          : {}),
+        sceneImageUrls: [...prev.sceneImageUrls, ...urls].slice(0, ADMIN_SCENE_IMAGE_MAX),
       }));
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "上传失败");
@@ -314,11 +405,14 @@ export function QrAdminPanel({
     setFormMessage(null);
     try {
       const characterEdit = isCharacterCatalogEdit(form);
-      const thumbnailUrl =
+      let thumbnailUrl =
         form.thumbnailUrl.trim() ||
         form.mediaUrl.trim() ||
         form.targetImageUrl.trim() ||
         form.outputUrl.trim();
+      if (!thumbnailUrl && form.category === "audio") {
+        thumbnailUrl = "https://picsum.photos/seed/qr-audio-cover/480/360";
+      }
       if (!thumbnailUrl) {
         throw new Error(
           characterEdit ? "缺少封面数据，请关闭后重新打开该条目" : "请先上传封面或媒体，再保存",
@@ -338,8 +432,15 @@ export function QrAdminPanel({
         outputUrl: form.outputUrl || form.referenceVideoUrl || form.mediaUrl,
         modelKey: form.modelKey,
         promptText: form.promptText.trim(),
+        sceneImageUrls: form.sceneImageUrls,
         sortOrder: form.sortOrder,
         source: form.source,
+        voiceId: form.voiceId,
+        audioStyleTag: form.audioStyleTag,
+        voiceSpeed: form.voiceSpeed,
+        voiceStability: form.voiceStability,
+        voiceSimilarityBoost: form.voiceSimilarityBoost,
+        voiceStyleExaggeration: form.voiceStyleExaggeration,
       };
       const isNew = form.source === "new" && !form.dbId;
       const url = isNew
@@ -690,6 +791,7 @@ export function QrAdminPanel({
               {(() => {
                 const motionSync = isMotionSyncKind(form.kind, form.toolKey);
                 const characterEdit = isCharacterCatalogEdit(form);
+                const sceneImagesEnabled = supportsAdminSceneImages(form);
                 return (
                   <>
                     <label className="block space-y-1">
@@ -734,6 +836,57 @@ export function QrAdminPanel({
                         onChange={(e) => setForm((p) => ({ ...p, promptText: e.target.value }))}
                       />
                     </label>
+                    {form.category === "audio" ? (
+                      <>
+                        <QrAdminAudioFields
+                          disabled={saving || uploading}
+                          value={{
+                            modelKey: form.modelKey,
+                            voiceId: form.voiceId,
+                            audioStyleTag: form.audioStyleTag,
+                            voiceSpeed: form.voiceSpeed,
+                            voiceStability: form.voiceStability,
+                            voiceSimilarityBoost: form.voiceSimilarityBoost,
+                            voiceStyleExaggeration: form.voiceStyleExaggeration,
+                          }}
+                          onChange={(audio) =>
+                            setForm((p) => ({
+                              ...p,
+                              modelKey: audio.modelKey,
+                              voiceId: audio.voiceId,
+                              audioStyleTag: audio.audioStyleTag,
+                              voiceSpeed: audio.voiceSpeed,
+                              voiceStability: audio.voiceStability,
+                              voiceSimilarityBoost: audio.voiceSimilarityBoost,
+                              voiceStyleExaggeration: audio.voiceStyleExaggeration,
+                            }))
+                          }
+                        />
+                        <QrCoverImagePicker
+                          coverUrl={form.thumbnailUrl}
+                          disabled={uploading}
+                          uploading={uploading}
+                          onUploadFile={(file) => uploadMedia(file, "thumbnail")}
+                          onClear={() => setForm((p) => ({ ...p, thumbnailUrl: "" }))}
+                          hint="列表封面（可选，默认使用占位图）"
+                        />
+                        <label className="block space-y-1">
+                          <span className="text-xs text-[var(--qr-text-muted)]">示例音频 URL（可选）</span>
+                          <input
+                            className="qr-input w-full font-mono text-xs"
+                            value={form.outputUrl}
+                            onChange={(e) =>
+                              setForm((p) => ({
+                                ...p,
+                                outputUrl: e.target.value,
+                                mediaUrl: e.target.value,
+                              }))
+                            }
+                            placeholder="https://…/demo.mp3"
+                          />
+                        </label>
+                      </>
+                    ) : null}
                     {motionSync ? (
                       <>
                         <label className="block space-y-1">
@@ -771,47 +924,52 @@ export function QrAdminPanel({
                         </label>
                       </>
                     ) : null}
-                    {!characterEdit ? (
+                    {!characterEdit && form.category !== "audio" ? (
                       <>
-                        <label className="block space-y-1">
-                          <span className="text-xs text-[var(--qr-text-muted)]">
-                            {motionSync ? "列表封面 URL" : "封面 / 媒体 URL"}
-                          </span>
-                          <input
-                            className="qr-input w-full font-mono text-xs"
-                            value={form.thumbnailUrl}
-                            onChange={(e) =>
-                              setForm((p) => ({ ...p, thumbnailUrl: e.target.value }))
-                            }
-                          />
-                        </label>
+                        <QrCoverImagePicker
+                          coverUrl={form.thumbnailUrl}
+                          disabled={uploading}
+                          uploading={uploading}
+                          onUploadFile={(file) => uploadMedia(file, "thumbnail")}
+                          onClear={() => setForm((p) => ({ ...p, thumbnailUrl: "" }))}
+                          hint={
+                            motionSync
+                              ? "上传参考视频后也会自动截取首帧；可手动更换列表封面"
+                              : "上传媒体视频后自动截取首帧；可手动上传或粘贴替换"
+                          }
+                        />
                         {!motionSync ? (
                           <label className="block space-y-1">
                             <span className="text-xs text-[var(--qr-text-muted)]">
-                              媒体 URL（视频/参考图）
+                              媒体视频 URL
                             </span>
                             <input
                               className="qr-input w-full font-mono text-xs"
                               value={form.mediaUrl}
-                              onChange={(e) => setForm((p) => ({ ...p, mediaUrl: e.target.value }))}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  mediaUrl: e.target.value,
+                                  outputUrl: e.target.value,
+                                  referenceVideoUrl: e.target.value,
+                                }))
+                              }
                             />
                           </label>
                         ) : null}
                         <div className="flex flex-wrap gap-2">
-                          <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
-                            {uploading ? "上传中…" : "上传封面"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) void uploadMedia(file, "thumbnail");
-                              }}
-                            />
-                          </label>
                           {motionSync ? (
                             <>
+                              <QrImageUploadZone
+                                className="outline-none"
+                                disabled={uploading}
+                                multiple={false}
+                                showHint={false}
+                                onFiles={(files) => {
+                                  const file = files[0];
+                                  if (file) void uploadMedia(file, "targetImage");
+                                }}
+                              >
                               <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
                                 上传目标图
                                 <input
@@ -824,6 +982,7 @@ export function QrAdminPanel({
                                   }}
                                 />
                               </label>
+                              </QrImageUploadZone>
                               <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
                                 上传参考视频
                                 <input
@@ -838,11 +997,21 @@ export function QrAdminPanel({
                               </label>
                             </>
                           ) : (
+                            <QrImageUploadZone
+                              className="outline-none"
+                              disabled={uploading}
+                              multiple={false}
+                              showHint={false}
+                              onFiles={(files) => {
+                                const file = files[0];
+                                if (file) void uploadMedia(file, "media");
+                              }}
+                            >
                             <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
-                              上传媒体
+                              {uploading ? "上传中…" : "上传媒体视频"}
                               <input
                                 type="file"
-                                accept="image/*,video/*"
+                                accept="video/*"
                                 className="hidden"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
@@ -850,8 +1019,60 @@ export function QrAdminPanel({
                                 }}
                               />
                             </label>
+                            </QrImageUploadZone>
                           )}
                         </div>
+                        {sceneImagesEnabled ? (
+                          <QrImageUploadZone
+                            className="space-y-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-xl"
+                            disabled={uploading}
+                            onFiles={(files) => void uploadReferenceImages(files)}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-[var(--qr-text-muted)]">
+                                引用图片（可选，最多 {ADMIN_SCENE_IMAGE_MAX} 张）
+                              </span>
+                              <span className="text-[10px] text-[var(--qr-text-muted)]">
+                                {form.sceneImageUrls.length}/{ADMIN_SCENE_IMAGE_MAX}
+                              </span>
+                            </div>
+                            <p className="text-[10px] leading-relaxed text-[var(--qr-text-muted)]">
+                              复制模板时带入工作区「选择科目」；不上传则保持纯提示词初始状态。
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              {form.sceneImageUrls.map((url, index) => (
+                                <QrRefImageThumb
+                                  key={`${url}-${index}`}
+                                  url={url}
+                                  index={index}
+                                  size="md"
+                                  onRemove={() =>
+                                    setForm((p) => ({
+                                      ...p,
+                                      sceneImageUrls: p.sceneImageUrls.filter((_, i) => i !== index),
+                                    }))
+                                  }
+                                />
+                              ))}
+                              {form.sceneImageUrls.length < ADMIN_SCENE_IMAGE_MAX ? (
+                                <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[var(--qr-border)] text-xs text-[var(--qr-text-muted)] hover:border-[var(--qr-brand)] hover:text-[var(--qr-brand)]">
+                                  添加
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const files = Array.from(e.target.files ?? []);
+                                      e.target.value = "";
+                                      if (files.length) void uploadReferenceImages(files);
+                                    }}
+                                  />
+                                </label>
+                              ) : null}
+                            </div>
+                          </QrImageUploadZone>
+                        ) : null}
                       </>
                     ) : (
                       <p className="text-xs text-[var(--qr-text-muted)]">

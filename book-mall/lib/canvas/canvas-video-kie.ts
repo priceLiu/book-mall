@@ -125,17 +125,21 @@ export function buildCanvasVideoKieInput(args: {
     } else if (mainUrl) {
       image_urls = [mainUrl];
     }
+    const input: Record<string, unknown> = {
+      prompt: args.prompt,
+      duration: dur,
+      aspect_ratio: aspect,
+      mode,
+      sound: sound !== false,
+      multi_shots: multiShots,
+    };
+    // KIE 纯文生视频：空 image_urls 会触发 "This field is required"，须省略该字段
+    if (image_urls.length > 0) {
+      input.image_urls = image_urls;
+    }
     return {
       model: "kling-3.0/video",
-      input: {
-        prompt: args.prompt,
-        image_urls,
-        duration: dur,
-        aspect_ratio: aspect,
-        mode,
-        sound: sound !== false,
-        multi_shots: multiShots,
-      },
+      input,
     };
   }
 

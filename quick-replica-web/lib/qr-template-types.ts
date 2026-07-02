@@ -63,6 +63,13 @@ export type QrWorkspaceDraft = {
   resolution?: string;
   aspectRatio?: string;
   duration?: number;
+  outputFormat?: string;
+  voiceId?: string;
+  audioStyleTag?: string;
+  voiceSpeed?: number;
+  voiceStability?: number;
+  voiceSimilarityBoost?: number;
+  voiceStyleExaggeration?: number;
 };
 
 export type QrKindDef = {
@@ -153,7 +160,25 @@ export const QR_KIND_GALLERY_PREFETCH: ReadonlyArray<{
   { category: "video", kind: "motion-sync" },
   /** 视频顶层 gallery 条目 kind 均为 text-to-video，选中该子类时须单独 cache key */
   { category: "video", kind: "text-to-video" },
+  { category: "image", kind: "create-image" },
+  { category: "character", kind: "create-character" },
+  { category: "audio", kind: "create-voiceover" },
 ];
+
+export function isQrTextToImageKind(kind: string): boolean {
+  return kind === "create-image" || kind === "create-character" || kind === "character-image";
+}
+
+export function isQrTextToAudioKind(input: { category: QrCategory; kind: string }): boolean {
+  return (
+    input.category === "audio" &&
+    (input.kind === "create-voiceover" ||
+      input.kind === "create-music" ||
+      input.kind === "create-sfx" ||
+      input.kind === "voice-clone" ||
+      input.kind === "voice-changer")
+  );
+}
 
 export function invalidateQrTemplateCacheForCategory(
   cache: Map<string, QrTemplate[]>,
@@ -193,8 +218,33 @@ export function defaultWorkspaceDraft(input: {
     sceneImageUrls: [],
     prompt: "",
     modelKey:
-      input.kind === "motion-sync" ? "kling-2.6/motion-control" : "lib-nano-pro",
-    mode: input.kind === "motion-sync" ? "std" : undefined,
+      input.kind === "motion-sync"
+        ? "kling-2.6/motion-control"
+        : input.kind === "text-to-video"
+          ? TEXT_TO_VIDEO_DEFAULT_MODEL_KEY
+          : input.kind === "create-image" || input.kind === "create-character" || input.kind === "character-image"
+            ? TEXT_TO_IMAGE_DEFAULT_MODEL_KEY
+            : input.category === "audio"
+              ? "eleven_multilingual_v2"
+              : "lib-nano-pro",
+    mode:
+      input.kind === "motion-sync"
+        ? "std"
+        : input.kind === "text-to-video"
+          ? "normal"
+          : undefined,
+    aspectRatio:
+      input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "1:1" : undefined,
+    resolution:
+      input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "2K" : undefined,
+    outputFormat:
+      input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "png" : undefined,
+    voiceId: input.category === "audio" ? "khanh-tu" : undefined,
+    audioStyleTag: input.category === "audio" ? "ad-teaser" : undefined,
+    voiceSpeed: input.category === "audio" ? 1 : undefined,
+    voiceStability: input.category === "audio" ? 0.5 : undefined,
+    voiceSimilarityBoost: input.category === "audio" ? 0.75 : undefined,
+    voiceStyleExaggeration: input.category === "audio" ? 0 : undefined,
     characterOrientation: input.kind === "motion-sync" ? "video" : undefined,
     keepOriginalSound: input.kind === "motion-sync" ? true : undefined,
   };
@@ -333,6 +383,328 @@ export const MOTION_SYNC_CHARACTER_ORIENTATIONS = [
 
 /** 运动同步提示词最大长度（与 KIE motion-control 对齐） */
 export const MOTION_SYNC_PROMPT_MAX_LENGTH = 2500;
+
+/** 文字转视频 · 模型清单（与 book-mall qr-text-to-video-models 对齐） */
+export const TEXT_TO_VIDEO_MODELS = [
+  {
+    modelKey: "doubao-seedance-2.0",
+    label: "Seedance 2.0",
+    subtitle: "火山方舟 · 文/图生视频",
+    maxRefImages: 8,
+    paramProfile: "seedance20" as const,
+    supportsSound: true as const,
+  },
+  {
+    modelKey: "grok-imagine/image-to-video",
+    label: "Grok Imagine",
+    subtitle: "图/文生视频",
+    maxRefImages: 7,
+    paramProfile: "grok_i2v" as const,
+    defaultMode: "normal" as const,
+  },
+  {
+    modelKey: "kling/v3-turbo-text-to-video",
+    label: "Kling 3.0 Turbo",
+    subtitle: "文生视频",
+    maxRefImages: 0,
+    paramProfile: "kling_turbo" as const,
+  },
+  {
+    modelKey: "kling-3.0/video",
+    label: "Kling 3.0",
+    subtitle: "图/文生视频",
+    maxRefImages: 4,
+    paramProfile: "kling30" as const,
+    defaultMode: "pro" as const,
+    supportsSound: true as const,
+  },
+  {
+    modelKey: "happyhorse-1-1/reference-to-video",
+    label: "HappyHorse 1.1",
+    subtitle: "参考图生视频",
+    maxRefImages: 9,
+    paramProfile: "happyhorse_r2v" as const,
+    usesImageTokens: true as const,
+  },
+  {
+    modelKey: "wan/2-7-text-to-video",
+    label: "Wan 2.7",
+    subtitle: "文生视频",
+    maxRefImages: 0,
+    paramProfile: "wan_t2v" as const,
+  },
+] as const;
+
+export const TEXT_TO_VIDEO_DEFAULT_MODEL_KEY = "grok-imagine/image-to-video";
+
+export type QrTextToVideoParamProfile =
+  (typeof TEXT_TO_VIDEO_MODELS)[number]["paramProfile"];
+
+export function getTextToVideoModelDef(modelKey: string) {
+  return (
+    TEXT_TO_VIDEO_MODELS.find((m) => m.modelKey === modelKey.trim()) ??
+    TEXT_TO_VIDEO_MODELS[0]
+  );
+}
+
+export function resolveTextToVideoReferenceImageUrls(draft: {
+  sceneImageUrls: string[];
+  targetImageUrl: string;
+}): string[] {
+  return resolveMotionSyncReferenceImageUrls(draft);
+}
+
+/** 文生图 · 模型清单（与 book-mall qr-text-to-image-models 对齐） */
+export const TEXT_TO_IMAGE_MODELS = [
+  {
+    modelKey: "lib-nano-pro",
+    label: "Nano Banana Pro",
+    subtitle: "高质量文/图生图",
+    maxRefImages: 8,
+    paramProfile: "nano_pro" as const,
+  },
+  {
+    modelKey: "grok-imagine/text-to-image",
+    label: "Grok Imagine",
+    subtitle: "文生图",
+    maxRefImages: 0,
+    paramProfile: "grok_t2i" as const,
+  },
+  {
+    modelKey: "flux-2-pro",
+    label: "Flux 2 Pro",
+    subtitle: "文/图生图",
+    maxRefImages: 4,
+    paramProfile: "flux2" as const,
+  },
+  {
+    modelKey: "seedream-5-lite",
+    label: "Seedream 5 Lite",
+    subtitle: "文/图生图",
+    maxRefImages: 4,
+    paramProfile: "seedream" as const,
+    defaultMode: "basic" as const,
+  },
+  {
+    modelKey: "seedream-4.5",
+    label: "Seedream 4.5",
+    subtitle: "文/图生图",
+    maxRefImages: 4,
+    paramProfile: "seedream" as const,
+    defaultMode: "basic" as const,
+  },
+  {
+    modelKey: "gpt-image-2",
+    label: "GPT Image 2",
+    subtitle: "文/图生图",
+    maxRefImages: 4,
+    paramProfile: "gpt_image_2" as const,
+  },
+  {
+    modelKey: "gpt-image-1",
+    label: "GPT Image 1.5",
+    subtitle: "文/图生图",
+    maxRefImages: 4,
+    paramProfile: "gpt_image_1" as const,
+    defaultMode: "medium" as const,
+  },
+  {
+    modelKey: "qwen-text-to-image",
+    label: "Qwen 文生图",
+    subtitle: "文/图生图",
+    maxRefImages: 1,
+    paramProfile: "qwen_t2i" as const,
+  },
+] as const;
+
+export const TEXT_TO_IMAGE_DEFAULT_MODEL_KEY = "lib-nano-pro";
+
+export const TEXT_TO_IMAGE_PROMPT_MAX_LENGTH = 4000;
+
+export type QrTextToImageParamProfile =
+  (typeof TEXT_TO_IMAGE_MODELS)[number]["paramProfile"];
+
+export function getTextToImageModelDef(modelKey: string) {
+  return (
+    TEXT_TO_IMAGE_MODELS.find((m) => m.modelKey === modelKey.trim()) ??
+    TEXT_TO_IMAGE_MODELS[0]
+  );
+}
+
+export function resolveTextToImageReferenceImageUrls(draft: {
+  sceneImageUrls: string[];
+  targetImageUrl: string;
+}): string[] {
+  return resolveMotionSyncReferenceImageUrls(draft);
+}
+
+export function validateTextToImageDraft(args: {
+  modelKey: string;
+  prompt: string;
+  sceneImageUrls: string[];
+  targetImageUrl: string;
+}): string | null {
+  const meta = getTextToImageModelDef(args.modelKey);
+  const prompt = args.prompt.trim();
+  if (!prompt) return "请填写提示词";
+  const refs = resolveTextToImageReferenceImageUrls(args);
+  if (meta.maxRefImages === 0 && refs.length > 0) {
+    return "当前模型不支持参考图，请移除参考图";
+  }
+  if (refs.length > meta.maxRefImages) {
+    return `参考图最多 ${meta.maxRefImages} 张`;
+  }
+  return null;
+}
+
+export const IMAGE_T2I_ASPECT_RATIOS = [
+  { value: "1:1", label: "1:1" },
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "4:3", label: "4:3" },
+  { value: "3:4", label: "3:4" },
+  { value: "3:2", label: "3:2" },
+  { value: "2:3", label: "2:3" },
+] as const;
+
+export const NANO_PRO_RESOLUTIONS = [
+  { value: "1K", label: "1K" },
+  { value: "2K", label: "2K" },
+] as const;
+
+export const FLUX2_RESOLUTIONS = [
+  { value: "1K", label: "1K" },
+  { value: "2K", label: "2K" },
+] as const;
+
+export const GPT_IMAGE_2_RESOLUTIONS = [
+  { value: "1K", label: "1K" },
+  { value: "2K", label: "2K" },
+  { value: "4K", label: "4K" },
+] as const;
+
+export const SEEDREAM_QUALITIES = [
+  { value: "basic", label: "标准" },
+  { value: "high", label: "高品质" },
+] as const;
+
+export const GPT_IMAGE_1_QUALITIES = [
+  { value: "medium", label: "标准" },
+  { value: "high", label: "高品质" },
+] as const;
+
+export const QWEN_OUTPUT_FORMATS = [
+  { value: "png", label: "PNG" },
+  { value: "jpeg", label: "JPEG" },
+] as const;
+
+export const NANO_PRO_OUTPUT_FORMATS = [
+  { value: "png", label: "PNG" },
+  { value: "jpeg", label: "JPEG" },
+  { value: "webp", label: "WebP" },
+] as const;
+
+export function validateTextToVideoDraft(args: {
+  modelKey: string;
+  prompt: string;
+  sceneImageUrls: string[];
+  targetImageUrl: string;
+}): string | null {
+  const meta = getTextToVideoModelDef(args.modelKey);
+  const prompt = args.prompt.trim();
+  if (!prompt) return "请填写提示词";
+
+  const refs = resolveTextToVideoReferenceImageUrls(args);
+
+  if ("usesImageTokens" in meta && meta.usesImageTokens) {
+    if (!refs.length) return "请先上传至少一张参考图";
+    const maxIdx = maxHappyHorsePromptImageIndex(prompt);
+    if (maxIdx > refs.length) {
+      return `提示词引用了 [Image ${maxIdx}]，但只有 ${refs.length} 张参考图`;
+    }
+  }
+
+  return null;
+}
+
+export const GROK_I2V_MODES = [
+  { value: "normal", label: "标准" },
+  { value: "fun", label: "趣味" },
+  { value: "spicy", label: "Spicy" },
+] as const;
+
+export const GROK_I2V_ASPECT_RATIOS = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+  { value: "3:2", label: "3:2" },
+  { value: "2:3", label: "2:3" },
+  { value: "auto", label: "自动" },
+] as const;
+
+export const GROK_I2V_RESOLUTIONS = [
+  { value: "480p", label: "480P" },
+  { value: "720p", label: "720P" },
+] as const;
+
+export const KLING_TURBO_RESOLUTIONS = [
+  { value: "720p", label: "720P" },
+  { value: "1080p", label: "1080P" },
+] as const;
+
+export const KLING_TURBO_ASPECT_RATIOS = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+] as const;
+
+export const WAN_T2V_ASPECT_RATIOS = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+  { value: "4:3", label: "4:3" },
+  { value: "3:4", label: "3:4" },
+] as const;
+
+export const WAN_T2V_RESOLUTIONS = [
+  { value: "720p", label: "720P" },
+  { value: "1080p", label: "1080P" },
+] as const;
+
+export const WAN_T2V_DURATION_MIN = 5;
+export const WAN_T2V_DURATION_MAX = 10;
+
+export const SEEDANCE20_RESOLUTIONS = [
+  { value: "720p", label: "720P" },
+  { value: "1080p", label: "1080P" },
+] as const;
+
+export const SEEDANCE20_ASPECT_RATIOS = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+  { value: "adaptive", label: "自适应" },
+] as const;
+
+export const SEEDANCE20_DURATION_MIN = 4;
+export const SEEDANCE20_DURATION_MAX = 15;
+
+export function textToVideoModelSupportsSound(modelKey: string): boolean {
+  const meta = getTextToVideoModelDef(modelKey);
+  return "supportsSound" in meta && meta.supportsSound === true;
+}
+
+export const GROK_I2V_DURATION_MIN = 6;
+export const GROK_I2V_DURATION_MAX = 30;
+
+export const KLING30_ASPECT_RATIOS = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+] as const;
+
+/** 文字转视频提示词最大长度 */
+export const TEXT_TO_VIDEO_PROMPT_MAX_LENGTH = 2500;
 
 function thumb(seed: string): string {
   return `https://picsum.photos/seed/${encodeURIComponent(seed)}/480/360`;
@@ -565,12 +937,26 @@ export const BUILTIN_TEMPLATES: QrTemplate[] = [
   baseTemplate({
     id: "builtin-audio-placeholder",
     category: "audio",
-    kind: "add-sound",
-    title: "添加音效",
+    kind: "create-voiceover",
+    title: "制作旁白",
     reference: {
-      slots: { referenceAudio: { url: "https://storage.example.com/demo/sfx.mp3" } },
-      prompt: { text: "Festive piñata party ambience.", locale: "en" },
-      model: { role: "AUDIO", modelKey: "audio-placeholder", params: {} },
+      slots: {},
+      prompt: {
+        text: "The new Lynq X3 is built for people who move fast. Meet the phone that keeps up with your day.",
+        locale: "en",
+      },
+      model: {
+        role: "AUDIO",
+        modelKey: "eleven_multilingual_v2",
+        params: {
+          voice_id: "khanh-tu",
+          style_tag: "ad-teaser",
+          speed: 1,
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style_exaggeration: 0,
+        },
+      },
     },
   }),
 ];
@@ -589,8 +975,11 @@ export function filterTemplates(
 
 export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
   const targetImageUrl = t.reference.slots.targetImage?.url ?? "";
-  const sceneImageUrls =
+  const sceneFromSlots =
     t.reference.slots.sceneImages?.map((s) => s.url).filter(Boolean) ?? [];
+  const sceneFromCharacterRefs =
+    t.reference.slots.characterRefs?.map((s) => s.url).filter(Boolean) ?? [];
+  const sceneImageUrls = sceneFromSlots.length ? sceneFromSlots : sceneFromCharacterRefs;
   return {
     category: t.category,
     kind: t.kind,
@@ -606,6 +995,44 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     mode:
       typeof t.reference.model.params.mode === "string"
         ? t.reference.model.params.mode
+        : typeof t.reference.model.params.quality === "string"
+          ? String(t.reference.model.params.quality)
+          : undefined,
+    aspectRatio:
+      typeof t.reference.model.params.aspect_ratio === "string"
+        ? t.reference.model.params.aspect_ratio
+        : undefined,
+    resolution:
+      typeof t.reference.model.params.resolution === "string"
+        ? t.reference.model.params.resolution
+        : undefined,
+    outputFormat:
+      typeof t.reference.model.params.output_format === "string"
+        ? t.reference.model.params.output_format
+        : undefined,
+    voiceId:
+      typeof t.reference.model.params.voice_id === "string"
+        ? t.reference.model.params.voice_id
+        : undefined,
+    audioStyleTag:
+      typeof t.reference.model.params.style_tag === "string"
+        ? t.reference.model.params.style_tag
+        : undefined,
+    voiceSpeed:
+      typeof t.reference.model.params.speed === "number"
+        ? t.reference.model.params.speed
+        : undefined,
+    voiceStability:
+      typeof t.reference.model.params.stability === "number"
+        ? t.reference.model.params.stability
+        : undefined,
+    voiceSimilarityBoost:
+      typeof t.reference.model.params.similarity_boost === "number"
+        ? t.reference.model.params.similarity_boost
+        : undefined,
+    voiceStyleExaggeration:
+      typeof t.reference.model.params.style_exaggeration === "number"
+        ? t.reference.model.params.style_exaggeration
         : undefined,
     characterOrientation:
       typeof t.reference.model.params.character_orientation === "string"

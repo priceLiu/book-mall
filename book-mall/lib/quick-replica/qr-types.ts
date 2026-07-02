@@ -81,4 +81,14 @@ export type QrWorkspaceDraft = {
   aspectRatio?: string;
   /** HappyHorse R2V：3–15 秒 */
   duration?: number;
+  /** 文生图：png | jpeg | webp */
+  outputFormat?: string;
+  /** 旁白音色 id（audio catalog） */
+  voiceId?: string;
+  /** 旁白风格标签 id */
+  audioStyleTag?: string;
+  voiceSpeed?: number;
+  voiceStability?: number;
+  voiceSimilarityBoost?: number;
+  voiceStyleExaggeration?: number;
 };

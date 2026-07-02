@@ -1,0 +1,53 @@
+---
+description: QuickReplica 图片上传须支持粘贴（含多图）与统一缩略图交互
+globs:
+  - quick-replica-web/**/*.tsx
+---
+
+# QuickReplica · 图片上传规范
+
+## 适用范围
+
+`quick-replica-web` 内 **所有** 用户可见的图片上传入口，包括但不限于：
+
+- 中栏工作区「选择科目 / 参考图」
+- 管理后台「编辑模板」引用图、封面上传
+- 未来新增的图片 pick / drop 区域
+
+## 粘贴上传（必做）
+
+1. 用 **`QrImageUploadZone`**（`components/quick-replica/qr-image-upload-zone.tsx`）包裹上传热区。
+2. 用户在热区 **悬停** 或 **焦点在区内** 时，`Ctrl+V` / `⌘V` 可粘贴剪贴板图片。
+3. **多图区**（参考图列表）：`multiple={true}`，一次粘贴可追加多张（受业务上限约束）。
+4. **单图区**（封面、目标人物图）：`multiple={false}`。
+5. 展示提示文案：「支持 Ctrl+V / ⌘V 粘贴图片（可多图）」——由 `QrImageUploadZone` 的 `showHint` 控制。
+
+剪贴板解析统一走 **`extractImageFilesFromClipboard`**（`lib/qr-image-upload-paste.ts`），禁止各页面自写 `clipboardData` 解析。
+
+## 缩略图（必做）
+
+参考图 / 模板引用图缩略图统一用 **`QrRefImageThumb`**：
+
+| 场景 | `size` |
+|------|--------|
+| 中栏工作区 | `sm`（68px） |
+| 编辑模板 / 模板详情 | `md`（96px） |
+
+交互：
+
+- **悬停**：半透明遮罩 + **眼睛**（弹层放大预览）+ **下载**
+- 可编辑区保留右上角 **移除**
+- 只读（模板预览）传 `readonly`，无移除按钮
+
+下载走 **`downloadImageUrl`**，禁止 `window.alert`。
+
+## 封面（视频模板）
+
+- 编辑模板使用 **`QrCoverImagePicker`**：大图预览 + 上传 + 粘贴替换封面。
+- 上传 **媒体视频** 或 **参考视频** 成功后，客户端自动 **截取首帧** 上传 OSS 并写入 `thumbnailUrl`；用户仍可通过封面区手动更换。
+
+## Code Review
+
+- 新 `<input type="file" accept="image/*">` 未包 `QrImageUploadZone` → 驳回
+- 自写缩略图且无预览/下载 → 改为 `QrRefImageThumb`
+- 粘贴逻辑复制粘贴到业务文件 → 改为共用 util / Zone

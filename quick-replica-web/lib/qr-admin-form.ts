@@ -4,6 +4,19 @@ export function isMotionSyncKind(kind: string, toolKey?: string): boolean {
   return kind === "motion-sync" || toolKey === "motion-sync";
 }
 
+/** 管理后台模板可配置多张引用图（复制到工作区「选择科目」） */
+export function supportsAdminSceneImages(form: {
+  category: string;
+  kind: string;
+  toolKey?: string;
+}): boolean {
+  if (isMotionSyncKind(form.kind, form.toolKey)) return false;
+  if (form.category === "character") return false;
+  return form.category === "video" || form.category === "world";
+}
+
+export const ADMIN_SCENE_IMAGE_MAX = 9;
+
 /** 角色库编辑已有条目：只改标题/提示词，不展示封面 URL 与上传 */
 export function isCharacterCatalogEdit(form: {
   category: string;
@@ -29,6 +42,8 @@ export function extractAdminFormFieldsFromTemplate(t: {
   const referenceVideoUrl =
     ref?.slots.referenceVideo?.url?.trim() || outputUrl || "";
   const targetImageUrl = ref?.slots.targetImage?.url?.trim() ?? "";
+  const sceneImageUrls =
+    ref?.slots.sceneImages?.map((s) => s.url.trim()).filter(Boolean) ?? [];
   return {
     promptText: ref?.prompt.text ?? "",
     mediaUrl: outputUrl || referenceVideoUrl || t.thumbnailUrl,
@@ -37,5 +52,6 @@ export function extractAdminFormFieldsFromTemplate(t: {
     outputUrl,
     modelKey: ref?.model.modelKey ?? "",
     toolKey: t.toolKey ?? (t.kind === "motion-sync" ? "motion-sync" : undefined),
+    sceneImageUrls,
   };
 }

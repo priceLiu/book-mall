@@ -51,16 +51,20 @@ export function buildKieGrokImageToVideoCreateArgs(args: {
   const dur = args.duration ?? 6;
   const mode =
     args.mode === "fun" || args.mode === "spicy" ? args.mode : "normal";
+  const image_urls = filterHttpUrls(args.imageUrls).slice(0, 7);
+  const input: Record<string, unknown> = {
+    prompt: args.prompt,
+    mode,
+    duration: String(Math.min(30, Math.max(6, Math.floor(dur)))),
+    resolution: pickGrokResolution(args.resolution),
+    aspect_ratio: pickGrokAspect(args.aspectRatio, "16:9"),
+  };
+  if (image_urls.length > 0) {
+    input.image_urls = image_urls;
+  }
   return {
     model: "grok-imagine/image-to-video",
-    input: {
-      prompt: args.prompt,
-      image_urls: filterHttpUrls(args.imageUrls).slice(0, 7),
-      mode,
-      duration: String(Math.min(30, Math.max(6, Math.floor(dur)))),
-      resolution: pickGrokResolution(args.resolution),
-      aspect_ratio: pickGrokAspect(args.aspectRatio, "16:9"),
-    },
+    input,
   };
 }
 

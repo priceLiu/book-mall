@@ -101,15 +101,34 @@ describe("qr-template-catalog", () => {
     expect(filterBuiltinsForKindBrowse(items).map((t) => t.id)).toEqual(["builtin-world-create"]);
   });
 
-  it("video gallery lists only qr-video-gallery when no kind filter", () => {
+  it("video gallery lists gallery seeds and platform catalog when no kind filter", () => {
     const items = [
       tpl("qr-video-gallery-01", "text-to-video", "video"),
-      tpl("qr-video-gallery-02", "text-to-video", "video"),
+      tpl("qr-video-gallery-02", "frame-to-video", "video"),
+      tpl("qr-motion-sync-gallery-01", "motion-sync", "video"),
+      tpl("clxyz-abyss-fight", "text-to-video", "video", "catalog"),
+      tpl("clxyz-tide-juggernaut", "text-to-video", "video", "catalog"),
+      tpl("clxyz-image-only", "create-image", "image", "catalog"),
       tpl("builtin-video-text-to-video", "text-to-video", "video"),
     ];
     const out = filterTemplatesForGallery(items, { category: "video", scope: "all" });
-    expect(out.every(isQrVideoGalleryTemplate)).toBe(true);
-    expect(out).toHaveLength(2);
+    expect(out.map((t) => t.id)).toEqual([
+      "qr-video-gallery-01",
+      "qr-video-gallery-02",
+      "qr-motion-sync-gallery-01",
+      "clxyz-abyss-fight",
+      "clxyz-tide-juggernaut",
+    ]);
+  });
+
+  it("image category browse includes platform catalog templates", () => {
+    const items = [
+      tpl("qr-image-gallery-01", "create-image"),
+      tpl("clxyz-admin-image", "create-image", "image", "catalog"),
+      tpl("builtin-image-create", "create-image"),
+    ];
+    const out = filterTemplatesForGallery(items, { category: "image", scope: "all" });
+    expect(out.map((t) => t.id)).toEqual(["qr-image-gallery-01", "clxyz-admin-image"]);
   });
 
   it("kind browse excludes video gallery builtins", () => {
@@ -177,18 +196,41 @@ describe("qr-template-catalog", () => {
     ]);
   });
 
-  it("video text-to-video kind lists only qr-video-gallery", () => {
+  it("image create-image kind lists gallery and platform catalog", () => {
+    const items = [
+      tpl("qr-image-gallery-01", "create-image"),
+      tpl("clxyz-admin-image", "create-image", "image", "catalog"),
+      tpl("clxyz-other-kind", "edit-image", "image", "catalog"),
+    ];
+    const out = filterTemplatesForGallery(items, {
+      category: "image",
+      kind: "create-image",
+      scope: "all",
+    });
+    expect(out.map((t) => t.id)).toEqual([
+      "qr-image-gallery-01",
+      "clxyz-admin-image",
+    ]);
+  });
+
+  it("video text-to-video kind lists gallery and platform catalog", () => {
     const items = [
       tpl("qr-video-gallery-01", "text-to-video", "video"),
       tpl("qr-motion-sync-gallery-01", "motion-sync", "video"),
+      tpl("clxyz-abyss-fight", "text-to-video", "video", "catalog"),
+      tpl("clxyz-tide-juggernaut", "text-to-video", "video", "catalog"),
+      tpl("clxyz-motion-only", "motion-sync", "video", "catalog"),
     ];
     const out = filterTemplatesForGallery(items, {
       category: "video",
       kind: "text-to-video",
       scope: "all",
     });
-    expect(out.every(isQrVideoGalleryTemplate)).toBe(true);
-    expect(out).toHaveLength(1);
+    expect(out.map((t) => t.id)).toEqual([
+      "qr-video-gallery-01",
+      "clxyz-abyss-fight",
+      "clxyz-tide-juggernaut",
+    ]);
   });
 
   it("video lip-sync kind excludes gallery builtins", () => {

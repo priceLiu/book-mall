@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
 import {
   HAPPYHORSE_R2V_ASPECT_RATIOS,
@@ -28,85 +27,11 @@ import {
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
 import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
+import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
+import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 
 /** HappyHorse 参考图缩略边长（较 h-14 高约 20%） */
 const HH_REF_THUMB_CLASS = "h-[68px] w-[68px]";
-
-function HappyHorseRefImageThumb({
-  url,
-  index,
-  onRemove,
-}: {
-  url: string;
-  index: number;
-  onRemove?: () => void;
-}) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [preview, setPreview] = useState<{ left: number; top: number } | null>(null);
-
-  const showPreview = () => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setPreview({
-      left: rect.left + rect.width / 2,
-      top: rect.top - 10,
-    });
-  };
-
-  return (
-    <>
-      <div
-        ref={wrapRef}
-        className={`group relative ${HH_REF_THUMB_CLASS} shrink-0 overflow-visible rounded-lg bg-zinc-900`}
-        onMouseEnter={showPreview}
-        onMouseLeave={() => setPreview(null)}
-      >
-        <div className="h-full w-full overflow-hidden rounded-lg">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className="h-full w-full object-cover" />
-        </div>
-        <span className="pointer-events-none absolute left-0.5 top-0.5 z-[1] rounded bg-black/60 px-1 py-px text-[9px] text-white">
-          {index + 1}
-        </span>
-        {onRemove ? (
-          <button
-            type="button"
-            className="absolute right-0.5 top-0.5 z-[2] rounded bg-black/60 p-px text-white hover:bg-red-600/80"
-            onClick={onRemove}
-            aria-label="移除参考图"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        ) : null}
-      </div>
-      {preview && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className="pointer-events-none fixed z-[4500] -translate-x-1/2 -translate-y-full"
-              style={{ left: preview.left, top: preview.top }}
-            >
-              <div
-                className="overflow-hidden rounded-xl border shadow-2xl"
-                style={{
-                  borderColor: "var(--qr-border)",
-                  background: "var(--qr-bg-surface)",
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt=""
-                  className="block max-h-52 max-w-52 object-contain"
-                />
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
-  );
-}
 
 type Props = {
   draft: QrWorkspaceDraft;
@@ -425,7 +350,14 @@ export function QrMotionSyncForm({
         </p>
         ) : null}
         {isHappyHorse ? (
-          <>
+          <QrImageUploadZone
+            className="mt-3 outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-xl"
+            disabled={busy || uploadingImage}
+            onFiles={async (files) => {
+              if (!files.length || !onUploadReferenceImages) return;
+              await onUploadReferenceImages(files);
+            }}
+          >
             <input
               ref={multiImageInputRef}
               type="file"
@@ -440,9 +372,9 @@ export function QrMotionSyncForm({
                 await onUploadReferenceImages(files);
               }}
             />
-            <div className="mt-3 flex min-h-[76px] flex-wrap items-center gap-2.5 py-0.5">
+            <div className="flex min-h-[76px] flex-wrap items-center gap-2.5 py-0.5">
               {refImages.map((url, index) => (
-                <HappyHorseRefImageThumb
+                <QrRefImageThumb
                   key={`${url}-${index}`}
                   url={url}
                   index={index}
@@ -475,7 +407,7 @@ export function QrMotionSyncForm({
                 {refImages.length}/{HAPPYHORSE_R2V_MAX_REFS}
               </span>
             </div>
-          </>
+          </QrImageUploadZone>
         ) : (
           <>
         <input
@@ -491,11 +423,21 @@ export function QrMotionSyncForm({
             await onUploadImage(file);
           }}
         />
+        <QrImageUploadZone
+          className="mt-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-2xl"
+          disabled={busy || uploadingImage}
+          multiple={false}
+          onFiles={async (files) => {
+            const file = files[0];
+            if (!file || !onUploadImage) return;
+            await onUploadImage(file);
+          }}
+        >
         <button
           type="button"
           disabled={busy || uploadingImage}
           onClick={() => imageInputRef.current?.click()}
-          className="relative mt-4 flex w-full min-h-[148px] flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-6 transition hover:border-white/25 hover:bg-white/[0.02] disabled:opacity-50"
+          className="relative flex w-full min-h-[148px] flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-6 transition hover:border-white/25 hover:bg-white/[0.02] disabled:opacity-50"
           style={{ borderColor: "rgba(255,255,255,0.14)" }}
         >
           {uploadingImage ? (
@@ -537,6 +479,7 @@ export function QrMotionSyncForm({
             </>
           )}
         </button>
+        </QrImageUploadZone>
           </>
         )}
       </section>

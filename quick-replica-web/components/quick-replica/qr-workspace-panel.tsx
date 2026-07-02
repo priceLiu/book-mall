@@ -2,11 +2,21 @@
 
 import { useState } from "react";
 
+import { QrCreateImageForm } from "@/components/quick-replica/qr-create-image-workspace";
+import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrMotionSyncForm } from "@/components/quick-replica/qr-motion-sync-workspace";
+import { QrTextToVideoForm } from "@/components/quick-replica/qr-text-to-video-workspace";
+import { validateTextToAudioDraft } from "@/lib/qr-audio-catalog-client";
 import {
   getKindDef,
+  getTextToImageModelDef,
+  getTextToVideoModelDef,
   isHappyHorseR2vModel,
+  isQrTextToAudioKind,
+  isQrTextToImageKind,
   validateHappyHorseMotionSyncDraft,
+  validateTextToImageDraft,
+  validateTextToVideoDraft,
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
@@ -40,6 +50,9 @@ export function QrWorkspacePanel({
   const [error, setError] = useState<string | null>(null);
   const kindDef = getKindDef(draft.kind);
   const isMotionSync = draft.kind === "motion-sync" || draft.toolKey === "motion-sync";
+  const isTextToVideo = draft.kind === "text-to-video";
+  const isCreateImage = isQrTextToImageKind(draft.kind);
+  const isTextToAudio = isQrTextToAudioKind(draft);
 
   const uploadAsset = async (file: File, kind: "image" | "video" | "audio") => {
     const dataUrl = await readFileAsDataUrl(file);
@@ -71,6 +84,38 @@ export function QrWorkspacePanel({
         }
       } else if (!draft.targetImageUrl.trim() || !draft.referenceVideoUrl.trim()) {
         setError("请先上传目标图与参考视频");
+        return;
+      }
+    } else if (isTextToVideo) {
+      const validationError = validateTextToVideoDraft({
+        modelKey: draft.modelKey,
+        prompt: draft.prompt,
+        sceneImageUrls: draft.sceneImageUrls,
+        targetImageUrl: draft.targetImageUrl,
+      });
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    } else if (isCreateImage) {
+      const validationError = validateTextToImageDraft({
+        modelKey: draft.modelKey,
+        prompt: draft.prompt,
+        sceneImageUrls: draft.sceneImageUrls,
+        targetImageUrl: draft.targetImageUrl,
+      });
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    } else if (isTextToAudio) {
+      const validationError = validateTextToAudioDraft({
+        modelKey: draft.modelKey,
+        voiceId: draft.voiceId,
+        prompt: draft.prompt,
+      });
+      if (validationError) {
+        setError(validationError);
         return;
       }
     }
@@ -168,6 +213,80 @@ export function QrWorkspacePanel({
                 sceneImageUrls: draft.sceneImageUrls.filter((_, i) => i !== index),
               });
             }}
+          />
+        ) : isTextToVideo ? (
+          <QrTextToVideoForm
+            draft={draft}
+            onDraftChange={onDraftChange}
+            busy={generating}
+            uploadingImage={uploadingImage}
+            onUploadReferenceImages={async (files) => {
+              try {
+                setUploadingImage(true);
+                setError(null);
+                const maxRefs = getTextToVideoModelDef(draft.modelKey).maxRefImages;
+                const slotsLeft = Math.max(0, maxRefs - draft.sceneImageUrls.length);
+                const batch = files.slice(0, slotsLeft);
+                const urls: string[] = [];
+                for (const file of batch) {
+                  urls.push(await uploadAsset(file, "image"));
+                }
+                onDraftChange({
+                  ...draft,
+                  sceneImageUrls: [...draft.sceneImageUrls, ...urls].slice(0, maxRefs),
+                });
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "上传失败");
+              } finally {
+                setUploadingImage(false);
+              }
+            }}
+            onRemoveReferenceImage={(index) => {
+              onDraftChange({
+                ...draft,
+                sceneImageUrls: draft.sceneImageUrls.filter((_, i) => i !== index),
+              });
+            }}
+          />
+        ) : isCreateImage ? (
+          <QrCreateImageForm
+            draft={draft}
+            onDraftChange={onDraftChange}
+            busy={generating}
+            uploadingImage={uploadingImage}
+            onUploadReferenceImages={async (files) => {
+              try {
+                setUploadingImage(true);
+                setError(null);
+                const maxRefs = getTextToImageModelDef(draft.modelKey).maxRefImages;
+                const slotsLeft = Math.max(0, maxRefs - draft.sceneImageUrls.length);
+                const batch = files.slice(0, slotsLeft);
+                const urls: string[] = [];
+                for (const file of batch) {
+                  urls.push(await uploadAsset(file, "image"));
+                }
+                onDraftChange({
+                  ...draft,
+                  sceneImageUrls: [...draft.sceneImageUrls, ...urls].slice(0, maxRefs),
+                });
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "上传失败");
+              } finally {
+                setUploadingImage(false);
+              }
+            }}
+            onRemoveReferenceImage={(index) => {
+              onDraftChange({
+                ...draft,
+                sceneImageUrls: draft.sceneImageUrls.filter((_, i) => i !== index),
+              });
+            }}
+          />
+        ) : isTextToAudio ? (
+          <QrCreateVoiceoverForm
+            draft={draft}
+            onDraftChange={onDraftChange}
+            busy={generating}
           />
         ) : (
           <div className="space-y-4">

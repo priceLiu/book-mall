@@ -351,6 +351,27 @@ export function QrAppClient({
     ) {
       cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
     }
+    if (
+      !cachedTemplates &&
+      category === "image" &&
+      kind === "create-image"
+    ) {
+      cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
+    }
+    if (
+      !cachedTemplates &&
+      category === "character" &&
+      kind === "create-character"
+    ) {
+      cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
+    }
+    if (
+      !cachedTemplates &&
+      category === "audio" &&
+      kind === "create-voiceover"
+    ) {
+      cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
+    }
     setTemplates(cachedTemplates ?? []);
     setTemplatesLoading(true);
   };
@@ -385,7 +406,11 @@ export function QrAppClient({
     setGeneratePhase("generating");
     setGenerateResult(null);
     setGenerateLogId(null);
-    setGeneratePreviewImage(draftToRun.targetImageUrl.trim() || undefined);
+    setGeneratePreviewImage(
+      draftToRun.targetImageUrl.trim() ||
+        draftToRun.sceneImageUrls.find((u) => u.trim()) ||
+        undefined,
+    );
 
     const job = await runQrGenerateJob(draftToRun);
     setGenerating(false);

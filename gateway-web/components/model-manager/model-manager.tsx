@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { CredentialEditModal } from "./credential-edit-modal";
+import { CredentialKeyReveal } from "./credential-key-reveal";
 import { ConfirmModal } from "./confirm-modal";
 import type { CatalogGroup, CredentialRow, ModelTab } from "./types";
 import { formatProviderKindLabel } from "@/lib/gateway-model-display";
@@ -273,7 +274,7 @@ export function ModelManager({
                     <p className="text-xs text-[var(--gw-muted)]">
                       默认凭证：{primary.alias}
                       {primary.channel ? `（${primary.channel}）` : ""} ·{" "}
-                      {primary.apiKeyMasked}
+                      <CredentialKeyReveal credentialId={primary.id} masked={primary.apiKeyMasked} />
                       {primary.lastTestStatus
                         ? ` · 最近测试 ${primary.lastTestStatus}`
                         : ""}
@@ -376,7 +377,7 @@ export function ModelManager({
                             停用
                           </span>
                         ) : null}
-                        <span className="text-[var(--gw-muted)]">{c.apiKeyMasked}</span>
+                        <CredentialKeyReveal credentialId={c.id} masked={c.apiKeyMasked} />
                       </div>
                       <div className="flex items-center gap-3">
                         {!c.isDefaultForProvider && c.active ? (
