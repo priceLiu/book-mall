@@ -161,6 +161,13 @@ export function routeGatewayModel(model: string): RoutedModel {
   }
 
   if (
+    m === "lib-nano-pro" ||
+    m.startsWith("nano-banana")
+  ) {
+    return { providerKind: "KIE", requestKind: "IMAGE" };
+  }
+
+  if (
     m.startsWith("seedream-") ||
     m.startsWith("gpt-image-") ||
     m.startsWith("flux-") ||

@@ -14,5 +14,6 @@ globs:
 - 表单用 `qr-input`；弹层用 `qr-modal-shell`
 - 装饰粉 `#ea5ec1` 仅 badge/pin，勿用于主按钮文字
 - 禁止 `window.alert/confirm/prompt` → `QrModal`
+- **图片上传**：须 `QrImageUploadZone` + `QrRefImageThumb`（见 `.cursor/rules/quick-replica-image-upload.mdc`）
 
 详细规范见 skill：`.cursor/skills/quick-replica-minimax/SKILL.md`

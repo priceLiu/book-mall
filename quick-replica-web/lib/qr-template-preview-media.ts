@@ -57,3 +57,18 @@ export function resolveQrTemplatePreviewMedia(input: {
   }
   return null;
 }
+
+/** 模板详情 / 复制：reference.slots.sceneImages 中的引用图 URL */
+export function resolveTemplateSceneImageUrls(input: {
+  reference?: {
+    slots?: {
+      sceneImages?: Array<{ url?: string }>;
+    };
+  };
+}): string[] {
+  return (
+    input.reference?.slots?.sceneImages
+      ?.map((s) => s.url?.trim() ?? "")
+      .filter(Boolean) ?? []
+  );
+}

@@ -4,8 +4,10 @@ import { useCallback, useState } from "react";
 import { Copy, Trash2, X } from "lucide-react";
 
 import { QrModal } from "@/components/quick-replica/qr-modal";
+import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrToast } from "@/components/quick-replica/qr-toast";
 import { getKindDef, type QrTemplate } from "@/lib/qr-template-types";
+import { resolveTemplateSceneImageUrls } from "@/lib/qr-template-preview-media";
 
 type Props = {
   template: QrTemplate | null;
@@ -66,6 +68,7 @@ export function QrTemplatePreviewModal({
   const aspectLabel = resolveAspectRatioLabel(template);
   const { url: previewUrl, isVideo } = resolvePreviewMedia(template);
   const promptText = template.reference.prompt.text;
+  const sceneImageUrls = resolveTemplateSceneImageUrls(template);
   const promptPreview =
     promptExpanded || promptText.length <= 280
       ? promptText
@@ -247,6 +250,25 @@ export function QrTemplatePreviewModal({
               </div>
               <span className="qr-aspect-pill">{aspectLabel}</span>
             </div>
+
+            {sceneImageUrls.length > 0 ? (
+              <div>
+                <div className="mb-2 text-xs font-medium text-[var(--qr-text-secondary)]">
+                  引用图片
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {sceneImageUrls.map((url, index) => (
+                    <QrRefImageThumb
+                      key={`${url}-${index}`}
+                      url={url}
+                      index={index}
+                      size="md"
+                      readonly
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {message ? <p className="text-xs text-[var(--qr-text-muted)]">{message}</p> : null}
 

@@ -504,22 +504,25 @@
     "updatedAt": "2026-06-20T00:00:00.000Z",
     "id": "builtin-audio-placeholder",
     "category": "audio",
-    "kind": "add-sound",
-    "title": "添加音效",
+    "kind": "create-voiceover",
+    "title": "制作旁白",
     "reference": {
-      "slots": {
-        "referenceAudio": {
-          "url": "https://storage.example.com/demo/sfx.mp3"
-        }
-      },
+      "slots": {},
       "prompt": {
-        "text": "Festive piñata party ambience.",
+        "text": "The new Lynq X3 is built for people who move fast. Meet the phone that keeps up with your day.",
         "locale": "en"
       },
       "model": {
         "role": "AUDIO",
-        "modelKey": "audio-placeholder",
-        "params": {}
+        "modelKey": "eleven_multilingual_v2",
+        "params": {
+          "voice_id": "khanh-tu",
+          "style_tag": "ad-teaser",
+          "speed": 1,
+          "stability": 0.5,
+          "similarity_boost": 0.75,
+          "style_exaggeration": 0
+        }
       }
     },
     "thumbnailUrl": "https://picsum.photos/seed/builtin-audio-placeholder/480/360"

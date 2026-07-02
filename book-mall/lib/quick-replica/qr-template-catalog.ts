@@ -60,35 +60,102 @@ export function filterBuiltinsForKindBrowse(templates: QrTemplateJson[]): QrTemp
   return templates.filter((t) => !isQrGalleryTemplate(t));
 }
 
-/** 右栏模板列表：排除 kind 占位；图像分类未选子类时只展示 gallery */
+/** 右栏模板列表：排除 kind 占位；大类未选子类时展示该分类全部 gallery + 运营模板 */
 export function filterTemplatesForGallery(
   templates: QrTemplateJson[],
   filters: QrTemplateListFilters,
 ): QrTemplateJson[] {
   let items = templates.filter((t) => !isQrKindThumbBuiltin(t));
 
+  const scopeAll = (filters.scope ?? "all") === "all";
   const isMotionSyncBrowse =
     filters.kind === "motion-sync" || filters.toolKey === "motion-sync";
 
-  if (filters.category === "image" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrImageGalleryTemplate(t) || isQrUserProducedTemplate(t));
+  function isCategoryGallerySeed(t: QrTemplateJson, category: QrTemplateJson["category"]): boolean {
+    switch (category) {
+      case "image":
+        return isQrImageGalleryTemplate(t);
+      case "character":
+        return isQrCharacterGalleryTemplate(t);
+      case "world":
+        return isQrWorldGalleryTemplate(t);
+      case "video":
+        return isQrVideoGalleryTemplate(t) || isQrMotionSyncGalleryTemplate(t);
+      default:
+        return false;
+    }
   }
 
-  if (filters.category === "character" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrCharacterGalleryTemplate(t) || isQrUserProducedTemplate(t));
+  function matchesCategoryBrowse(t: QrTemplateJson, category: QrTemplateJson["category"]): boolean {
+    return (
+      isCategoryGallerySeed(t, category) ||
+      isQrUserProducedTemplate(t) ||
+      (isQrPlatformCatalogTemplate(t) && t.category === category)
+    );
   }
 
-  if (filters.category === "world" && !filters.kind && (filters.scope ?? "all") === "all") {
-    items = items.filter((t) => isQrWorldGalleryTemplate(t) || isQrUserProducedTemplate(t));
+  if (filters.category === "image" && !filters.kind && scopeAll) {
+    items = items.filter((t) => matchesCategoryBrowse(t, "image"));
+  }
+
+  if (
+    filters.category === "image" &&
+    filters.kind &&
+    scopeAll
+  ) {
+    items = items.filter(
+      (t) =>
+        isQrUserProducedTemplate(t) ||
+        (isQrImageGalleryTemplate(t) && t.kind === filters.kind) ||
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
+    );
+  }
+
+  if (
+    filters.category === "character" &&
+    filters.kind &&
+    scopeAll
+  ) {
+    items = items.filter(
+      (t) =>
+        isQrUserProducedTemplate(t) ||
+        (isQrCharacterGalleryTemplate(t) && t.kind === filters.kind) ||
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
+    );
+  }
+
+  if (filters.category === "audio" && !filters.kind && scopeAll) {
+    items = items.filter((t) => matchesCategoryBrowse(t, "audio"));
+  }
+
+  if (
+    filters.category === "audio" &&
+    filters.kind &&
+    scopeAll
+  ) {
+    items = items.filter(
+      (t) =>
+        isQrUserProducedTemplate(t) ||
+        (t.category === "audio" && t.kind === filters.kind) ||
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
+    );
+  }
+
+  if (filters.category === "character" && !filters.kind && scopeAll) {
+    items = items.filter((t) => matchesCategoryBrowse(t, "character"));
+  }
+
+  if (filters.category === "world" && !filters.kind && scopeAll) {
+    items = items.filter((t) => matchesCategoryBrowse(t, "world"));
   }
 
   if (
     filters.category === "video" &&
     !filters.kind &&
     !isMotionSyncBrowse &&
-    (filters.scope ?? "all") === "all"
+    scopeAll
   ) {
-    items = items.filter((t) => isQrVideoGalleryTemplate(t) || isQrUserProducedTemplate(t));
+    items = items.filter((t) => matchesCategoryBrowse(t, "video"));
   }
 
   if (
@@ -113,7 +180,8 @@ export function filterTemplatesForGallery(
     items = items.filter(
       (t) =>
         isQrUserProducedTemplate(t) ||
-        (isQrVideoGalleryTemplate(t) && t.kind === filters.kind),
+        (isQrVideoGalleryTemplate(t) && t.kind === filters.kind) ||
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
     );
   }
 

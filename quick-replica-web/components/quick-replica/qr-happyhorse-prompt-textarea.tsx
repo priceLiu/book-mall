@@ -95,6 +95,8 @@ type Props = {
   disabled?: boolean;
   referenceImages: QrHappyHorseImageRef[];
   onChange: (value: string) => void;
+  /** 默认 min-h-[180px]；文字转视频中栏可传 min-h-[360px] */
+  minHeightClass?: string;
 };
 
 export function QrHappyHorsePromptTextarea({
@@ -104,6 +106,7 @@ export function QrHappyHorsePromptTextarea({
   disabled,
   referenceImages,
   onChange,
+  minHeightClass = "min-h-[180px]",
 }: Props) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -319,7 +322,7 @@ export function QrHappyHorsePromptTextarea({
       <textarea
         ref={textareaRef}
         id={id}
-        className="qr-input qr-textarea-resizable min-h-[180px] w-full"
+        className={`qr-input qr-textarea-resizable ${minHeightClass} w-full`}
         value={value}
         maxLength={maxLength}
         disabled={disabled}

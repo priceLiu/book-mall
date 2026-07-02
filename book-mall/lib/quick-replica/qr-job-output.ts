@@ -8,6 +8,9 @@ export function extractQrJobOutputUrl(resultSummary: unknown): {
   if (!resultSummary || typeof resultSummary !== "object") return null;
   const root = resultSummary as Record<string, unknown>;
 
+  if (typeof root.audio_url === "string" && root.audio_url.trim()) {
+    return { url: root.audio_url.trim(), mediaType: "audio" };
+  }
   if (typeof root.video_url === "string" && root.video_url.trim()) {
     return { url: root.video_url.trim(), mediaType: "video" };
   }
@@ -16,8 +19,9 @@ export function extractQrJobOutputUrl(resultSummary: unknown): {
   }
   if (typeof root.url === "string" && root.url.trim()) {
     const url = root.url.trim();
-    const mediaType =
-      url.includes(".mp4") || url.includes(".webm") || url.includes("video")
+    const mediaType = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url)
+      ? "audio"
+      : url.includes(".mp4") || url.includes(".webm") || url.includes("video")
         ? "video"
         : "image";
     return { url, mediaType };

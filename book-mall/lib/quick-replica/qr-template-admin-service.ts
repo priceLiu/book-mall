@@ -176,7 +176,14 @@ export async function upsertAdminQrTemplate(args: {
   referenceVideoUrl?: string;
   outputUrl?: string;
   modelKey?: string;
+  sceneImageUrls?: string[];
   sortOrder?: number;
+  voiceId?: string;
+  audioStyleTag?: string;
+  voiceSpeed?: number;
+  voiceStability?: number;
+  voiceSimilarityBoost?: number;
+  voiceStyleExaggeration?: number;
 }): Promise<AdminQrTemplateRow> {
   if (!getKindDef(args.kind)) {
     throw new Error(`未知 kind: ${args.kind}`);
@@ -218,7 +225,14 @@ export async function upsertAdminQrTemplate(args: {
     referenceVideoUrl: args.referenceVideoUrl,
     outputUrl: args.outputUrl,
     modelKey: args.modelKey,
+    sceneImageUrls: args.sceneImageUrls,
     sortOrder: args.sortOrder,
+    voiceId: args.voiceId,
+    audioStyleTag: args.audioStyleTag,
+    voiceSpeed: args.voiceSpeed,
+    voiceStability: args.voiceStability,
+    voiceSimilarityBoost: args.voiceSimilarityBoost,
+    voiceStyleExaggeration: args.voiceStyleExaggeration,
     existingReference: existingBuiltin?.reference,
     existingOutput: existingBuiltin?.output,
   };

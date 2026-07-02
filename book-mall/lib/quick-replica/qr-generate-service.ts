@@ -26,12 +26,30 @@ import {
   type QrMotionSyncPollResult,
 } from "@/lib/quick-replica/qr-motion-sync-service";
 import { isHappyHorseR2vModel, resolveMotionSyncReferenceImageUrls, validateHappyHorseMotionSyncDraft } from "@/lib/quick-replica/qr-motion-sync-models";
+import { qrCreateTextToVideoJob } from "@/lib/quick-replica/qr-text-to-video-service";
+import { qrCreateTextToImageJob } from "@/lib/quick-replica/qr-text-to-image-service";
+import { qrCreateTextToAudioJob } from "@/lib/quick-replica/qr-text-to-audio-service";
 import {
   createUserQrTemplate,
   findQrTemplateByLogId,
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrCategory, QrTemplateJson, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
+
+function isQrTextToImageCharacterKind(kind: string): boolean {
+  return kind === "create-character" || kind === "character-image";
+}
+
+function isQrTextToAudioKind(draft: QrWorkspaceDraft): boolean {
+  return (
+    draft.category === "audio" &&
+    (draft.kind === "create-voiceover" ||
+      draft.kind === "create-music" ||
+      draft.kind === "create-sfx" ||
+      draft.kind === "voice-clone" ||
+      draft.kind === "voice-changer")
+  );
+}
 import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-client";
 import { prisma } from "@/lib/prisma";
 
@@ -184,6 +202,18 @@ export async function qrCreateGenerateJob(
     return job;
   }
 
+  if (draft.kind === "text-to-video") {
+    return qrCreateTextToVideoJob(userId, draft);
+  }
+
+  if (draft.kind === "create-image" || isQrTextToImageCharacterKind(draft.kind)) {
+    return qrCreateTextToImageJob(userId, draft);
+  }
+
+  if (isQrTextToAudioKind(draft)) {
+    return qrCreateTextToAudioJob(userId, draft);
+  }
+
   const auth = await requireGatewayAuth(userId);
   const { model, input } = buildGenericCreateBody(draft);
   const providerKind: GatewayProviderKind =
@@ -213,7 +243,7 @@ function readGenerateDraftFromLog(log: {
 }): QrWorkspaceDraft | null {
   if (!log.inputSummary || typeof log.inputSummary !== "object") return null;
   const root = log.inputSummary as Record<string, unknown>;
-  const snap = root.qrGenerate ?? root.qrMotionSync;
+  const snap = root.qrGenerate ?? root.qrMotionSync ?? root.qrTextToVideo ?? root.qrTextToAudio;
   if (!snap || typeof snap !== "object") return null;
   const s = snap as Record<string, unknown>;
   if (s.draft && typeof s.draft === "object") {
@@ -246,6 +276,21 @@ function extractOutputUrl(log: {
     return null;
   }
   return null;
+}
+
+function buildTemplateModelParamsFromDraft(draft: QrWorkspaceDraft): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+  if (draft.mode) params.mode = draft.mode;
+  if (draft.aspectRatio) params.aspect_ratio = draft.aspectRatio;
+  if (draft.resolution) params.resolution = draft.resolution;
+  if (draft.outputFormat) params.output_format = draft.outputFormat;
+  if (draft.voiceId) params.voice_id = draft.voiceId;
+  if (draft.audioStyleTag) params.style_tag = draft.audioStyleTag;
+  if (draft.voiceSpeed != null) params.speed = draft.voiceSpeed;
+  if (draft.voiceStability != null) params.stability = draft.voiceStability;
+  if (draft.voiceSimilarityBoost != null) params.similarity_boost = draft.voiceSimilarityBoost;
+  if (draft.voiceStyleExaggeration != null) params.style_exaggeration = draft.voiceStyleExaggeration;
+  return params;
 }
 
 async function createUserTemplateFromLog(args: {
@@ -301,7 +346,7 @@ async function createUserTemplateFromLog(args: {
               ? "AUDIO"
               : "VIDEO",
         modelKey: args.draft.modelKey,
-        params: args.draft.mode ? { mode: args.draft.mode } : {},
+        params: buildTemplateModelParamsFromDraft(args.draft),
       },
     },
     output: {

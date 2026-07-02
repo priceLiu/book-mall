@@ -5,6 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { QrCategory, QrTemplate } from "@/lib/qr-template-types";
 import { QR_CATEGORIES } from "@/lib/qr-template-types";
 import {
+  isQrMasonryPosterCached,
+  markQrMasonryPosterCached,
+} from "@/lib/qr-masonry-poster-cache";
+import { isImageMediaUrl, isVideoMediaUrl } from "@/lib/qr-template-preview-media";
+import { useIntersectionVisible } from "@/lib/use-intersection-visible";
+import {
   QrGridGallerySkeleton,
   QrMasonryGallerySkeleton,
 } from "@/components/quick-replica/qr-panel-skeletons";
@@ -38,41 +44,66 @@ function distributeToColumns<T>(items: T[], columnCount: number): T[][] {
 
 const VIDEO_POSTER_SEEK_SEC = 0.01;
 
-/** 预加载封面；失败时由组件切到 video 首帧 */
+function resolveGalleryThumbnailUrl(thumbnailUrl: string | undefined): string | undefined {
+  const thumb = thumbnailUrl?.trim() ?? "";
+  if (!thumb || isVideoMediaUrl(thumb)) return undefined;
+  if (isImageMediaUrl(thumb)) return thumb;
+  return thumb;
+}
+
+/** 预加载封面；失败时由组件在 hover 时切到 video 首帧 */
 function useQrMasonryPoster(
   templateId: string,
   thumbnailUrl: string | undefined,
   videoUrl: string | null,
+  enabled: boolean,
 ) {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => isQrMasonryPosterCached(templateId));
   const [posterMode, setPosterMode] = useState<"thumbnail" | "video-frame">(
     "thumbnail",
   );
 
   useEffect(() => {
+    if (!enabled) return;
+
+    if (isQrMasonryPosterCached(templateId)) {
+      setReady(true);
+      return;
+    }
+
     setReady(false);
     setPosterMode("thumbnail");
 
-    if (!thumbnailUrl) {
+    const imageThumb = resolveGalleryThumbnailUrl(thumbnailUrl);
+    if (!imageThumb) {
       if (videoUrl) setPosterMode("video-frame");
-      else setReady(true);
+      else {
+        markQrMasonryPosterCached(templateId);
+        setReady(true);
+      }
       return;
     }
 
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => setReady(true);
+    img.onload = () => {
+      markQrMasonryPosterCached(templateId);
+      setReady(true);
+    };
     img.onerror = () => {
       if (videoUrl) setPosterMode("video-frame");
-      else setReady(true);
+      else {
+        markQrMasonryPosterCached(templateId);
+        setReady(true);
+      }
     };
-    img.src = thumbnailUrl;
+    img.src = imageThumb;
 
     return () => {
       img.onload = null;
       img.onerror = null;
     };
-  }, [templateId, thumbnailUrl, videoUrl]);
+  }, [templateId, thumbnailUrl, videoUrl, enabled]);
 
   return { ready, setReady, posterMode, setPosterMode };
 }
@@ -84,29 +115,43 @@ function MasonryTemplateCard({
   template: QrTemplate;
   onSelect: () => void;
 }) {
+  const { ref: visibilityRef, visible } = useIntersectionVisible();
+  const [hovering, setHovering] = useState(false);
   const showTitle = template.title && !/^图像灵感 \d+$/.test(template.title);
   const previewVideoUrl =
     template.output?.mediaType === "video" ? template.output.url : null;
+  const imageThumbUrl = resolveGalleryThumbnailUrl(template.thumbnailUrl);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { ready, setReady, posterMode, setPosterMode } = useQrMasonryPoster(
     template.id,
     template.thumbnailUrl,
     previewVideoUrl,
+    visible,
   );
   const useVideoFramePoster = Boolean(
-    previewVideoUrl && posterMode === "video-frame",
+    previewVideoUrl && posterMode === "video-frame" && visible,
   );
+  const mountVideo =
+    Boolean(previewVideoUrl) &&
+    visible &&
+    (hovering || useVideoFramePoster);
 
   useEffect(() => {
-    if (!useVideoFramePoster || !previewVideoUrl) return;
+    if (!mountVideo || !useVideoFramePoster || !previewVideoUrl) return;
     const video = videoRef.current;
     if (!video) return;
 
     const armSeek = () => {
       video.currentTime = VIDEO_POSTER_SEEK_SEC;
     };
-    const onSeeked = () => setReady(true);
-    const onError = () => setReady(true);
+    const onSeeked = () => {
+      markQrMasonryPosterCached(template.id);
+      setReady(true);
+    };
+    const onError = () => {
+      markQrMasonryPosterCached(template.id);
+      setReady(true);
+    };
 
     video.addEventListener("loadeddata", armSeek);
     video.addEventListener("seeked", onSeeked);
@@ -117,29 +162,30 @@ function MasonryTemplateCard({
       video.removeEventListener("seeked", onSeeked);
       video.removeEventListener("error", onError);
     };
-  }, [useVideoFramePoster, previewVideoUrl, template.id, setReady]);
+  }, [mountVideo, useVideoFramePoster, previewVideoUrl, template.id, setReady]);
 
   const onHoverStart = () => {
+    setHovering(true);
     const video = videoRef.current;
     if (!video) return;
     void video.play().catch(() => undefined);
   };
 
   const onHoverEnd = () => {
+    setHovering(false);
     const video = videoRef.current;
     if (!video) return;
     video.pause();
     video.currentTime = useVideoFramePoster ? VIDEO_POSTER_SEEK_SEC : 0;
   };
 
-  const showSkeleton = !ready;
-  const showThumbImg = Boolean(
-    template.thumbnailUrl && posterMode === "thumbnail",
-  );
+  const showSkeleton = visible && !ready;
+  const showThumbImg = Boolean(imageThumbUrl && posterMode === "thumbnail" && visible);
 
   return (
     <button
       type="button"
+      ref={visibilityRef}
       onClick={onSelect}
       onMouseEnter={previewVideoUrl ? onHoverStart : undefined}
       onMouseLeave={previewVideoUrl ? onHoverEnd : undefined}
@@ -175,29 +221,34 @@ function MasonryTemplateCard({
         {showThumbImg ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={template.thumbnailUrl}
+            src={imageThumbUrl}
             alt={template.title}
-            loading={previewVideoUrl ? "eager" : "lazy"}
+            loading="lazy"
             decoding="async"
-            fetchPriority={previewVideoUrl ? "high" : "auto"}
-            onLoad={() => setReady(true)}
+            onLoad={() => {
+              markQrMasonryPosterCached(template.id);
+              setReady(true);
+            }}
             onError={() => {
               if (previewVideoUrl) setPosterMode("video-frame");
-              else setReady(true);
+              else {
+                markQrMasonryPosterCached(template.id);
+                setReady(true);
+              }
             }}
             className={`block h-auto w-full object-cover transition-all duration-300 group-hover:scale-[1.03]${previewVideoUrl ? " group-hover:opacity-0" : ""}${ready ? " opacity-100" : " opacity-0"}`}
           />
         ) : null}
 
-        {previewVideoUrl ? (
+        {mountVideo ? (
           <video
             ref={videoRef}
-            src={previewVideoUrl}
-            poster={showThumbImg ? template.thumbnailUrl : undefined}
+            src={previewVideoUrl ?? undefined}
+            poster={imageThumbUrl}
             loop
             muted
             playsInline
-            preload="metadata"
+            preload={useVideoFramePoster ? "metadata" : "none"}
             className={`pointer-events-none object-cover transition-opacity duration-150${
               useVideoFramePoster
                 ? ready
@@ -260,17 +311,29 @@ function GridTemplateCard({
   template: QrTemplate;
   onSelect: () => void;
 }) {
+  const { ref, visible } = useIntersectionVisible();
+  const imageThumbUrl = resolveGalleryThumbnailUrl(template.thumbnailUrl);
+
   return (
-    <button type="button" onClick={onSelect} className="qr-card group relative">
+    <button
+      type="button"
+      ref={ref}
+      onClick={onSelect}
+      className="qr-card group relative"
+    >
       <div className="aspect-[4/3] w-full overflow-hidden bg-zinc-900">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={template.thumbnailUrl}
-          alt={template.title}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-        />
+        {!visible || !imageThumbUrl ? (
+          <div className="qr-skeleton h-full w-full" aria-hidden />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={imageThumbUrl}
+            alt={template.title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+          />
+        )}
       </div>
       <div className="absolute left-2 top-2 flex flex-wrap gap-1">
         {template.badges?.includes("pinned") ? (

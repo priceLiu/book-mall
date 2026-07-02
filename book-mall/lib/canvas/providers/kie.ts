@@ -708,6 +708,17 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     description: "快手可灵 3.0 Turbo · 文生视频；纯提示词成片，速度优先。",
     paramsSchema: [
       {
+        key: "aspect_ratio",
+        label: "画幅比例",
+        type: "select",
+        options: [
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+          { value: "1:1", label: "1:1" },
+        ],
+        defaultValue: "16:9",
+      },
+      {
         key: "resolution",
         label: "分辨率",
         type: "select",
@@ -727,7 +738,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
         defaultValue: 5,
       },
     ] satisfies CanvasParamSchema,
-    defaultParams: { resolution: "720p", duration: 5 },
+    defaultParams: { aspect_ratio: "16:9", resolution: "720p", duration: 5 },
   },
   {
     modelKey: "kling-3.0/video",
