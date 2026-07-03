@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, Settings2, X } from "lucide-react";
 
-import { QrAdminAudioFields, extractAudioFieldsFromTemplate } from "@/components/quick-replica/qr-admin-audio-fields";
+import {
+  QrAdminPromptTemplatesEditor,
+  invalidateQrAudioCatalogCache,
+} from "@/components/quick-replica/qr-admin-prompt-templates-editor";
+import {
+  QrAdminAudioFields,
+  audioFieldsToModelParams,
+  extractAudioFieldsFromTemplate,
+} from "@/components/quick-replica/qr-admin-audio-fields";
 import { QrCoverImagePicker } from "@/components/quick-replica/qr-cover-image-picker";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
@@ -836,6 +844,14 @@ export function QrAdminPanel({
                         onChange={(e) => setForm((p) => ({ ...p, promptText: e.target.value }))}
                       />
                     </label>
+                    {form.category === "audio" &&
+                    (form.kind === "create-voiceover" || form.kind === "voice-changer") ? (
+                      <QrAdminPromptTemplatesEditor
+                        kind={form.kind}
+                        disabled={saving || uploading}
+                        onSaved={() => invalidateQrAudioCatalogCache()}
+                      />
+                    ) : null}
                     {form.category === "audio" ? (
                       <>
                         <QrAdminAudioFields

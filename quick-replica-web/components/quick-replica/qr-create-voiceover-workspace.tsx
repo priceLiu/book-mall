@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -10,6 +10,10 @@ import {
   QrAudioVoiceControlSlider,
   QrAudioVoicePickerButton,
 } from "@/components/quick-replica/qr-audio-form-parts";
+import {
+  QrAudioPromptTemplatePills,
+  resolveActivePromptTemplateId,
+} from "@/components/quick-replica/qr-audio-prompt-template-pills";
 import { useQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 
@@ -52,7 +56,12 @@ export function QrCreateVoiceoverForm({
   const tone = draft.voiceTone ?? catalog.defaults.voiceTone;
   const intensity = draft.voiceIntensity ?? catalog.defaults.voiceIntensity;
   const timbre = draft.voiceTimbre ?? catalog.defaults.voiceTimbre;
-  const styleTag = draft.audioStyleTag ?? catalog.defaults.styleTag;
+  const activeTemplateId = resolveActivePromptTemplateId(
+    catalog,
+    "create-voiceover",
+    draft.prompt,
+    draft.audioStyleTag,
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -88,37 +97,19 @@ export function QrCreateVoiceoverForm({
           onChange={(e) => onDraftChange({ ...draft, prompt: e.target.value })}
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {catalog.styleTags.map((tag) => {
-              const active = styleTag === tag.id;
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onDraftChange({ ...draft, audioStyleTag: tag.id })}
-                  className={`rounded-full border px-3 py-1 text-[11px] transition ${
-                    active
-                      ? "border-[var(--qr-brand)] bg-[rgba(59,130,246,0.12)] text-[var(--qr-text-primary)]"
-                      : "border-white/10 text-[var(--qr-text-muted)] hover:border-white/20"
-                  }`}
-                >
-                  {tag.label}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              disabled={busy}
-              className="rounded-full border border-white/10 p-1.5 text-[var(--qr-text-muted)] hover:border-white/20"
-              aria-label="刷新风格"
-              onClick={() =>
-                onDraftChange({ ...draft, audioStyleTag: catalog.defaults.styleTag })
-              }
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <QrAudioPromptTemplatePills
+            catalog={catalog}
+            kind="create-voiceover"
+            activeTemplateId={activeTemplateId}
+            busy={busy}
+            onApply={(tpl) =>
+              onDraftChange({
+                ...draft,
+                prompt: tpl.content,
+                audioStyleTag: tpl.id,
+              })
+            }
+          />
           <span className="shrink-0 text-[11px] tabular-nums text-[var(--qr-text-muted)]">
             {promptLength}/{PROMPT_MAX.toLocaleString()}
           </span>

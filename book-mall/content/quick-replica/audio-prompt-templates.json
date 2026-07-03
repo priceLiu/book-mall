@@ -1,0 +1,41 @@
+{
+  "create-voiceover": [
+    {
+      "id": "podcast-intro",
+      "name": "Podcast Intro",
+      "content": "欢迎回到《创意前沿》播客节目，在这里我们一同探寻想象力与科技交融碰撞的领域。我是主持人，今天我们将深入探讨人工智能正在如何改变叙事创作的方式。从图像生成到语音合成，创意创作流程正经历前所未有的重塑。泡上一杯咖啡，让我们一同探寻叙事创作的未来，从每一个像素开始细细探索。"
+    },
+    {
+      "id": "product-explainer",
+      "name": "Product Explainer",
+      "content": "Meet VisionX — your AI-powered assistant for image editing. Whether you're a beginner or a pro, VisionX helps you enhance photos, remove backgrounds, and create stunning visuals in seconds. With smart suggestions, drag-and-drop simplicity, and real-time feedback, you don't need to be a designer to look like one. Start with a template or upload your own—either way, the results are magical. Try VisionX today, and make your visuals unforgettable."
+    },
+    {
+      "id": "ad-teaser",
+      "name": "Ad Teaser",
+      "content": "这绝非一款普通手机。\n它是你的相机、创作画布、专属工作室——全部收纳于口袋之中。\n全新Lynq X3本周五正式发布。\n没错，它完全配得上所有期待。"
+    },
+    {
+      "id": "brand-story",
+      "name": "Brand Story",
+      "content": "Once upon a time, in a garage with just one laptop and a big dream, our story began. Our founder believed creativity should be accessible to everyone, not just professionals. So they built tools for storytellers, dreamers, and everyday creators. What started as a side project turned into a platform used by millions. Today, that same spirit lives on in everything we make. This isn't just a brand. It's a movement."
+    }
+  ],
+  "voice-changer": [
+    {
+      "id": "vc-narration",
+      "name": "旁白变声",
+      "content": "将源音频转换为目标音色，保持语速与情感，适用于播客片头、产品介绍等旁白场景。"
+    },
+    {
+      "id": "vc-character",
+      "name": "角色配音",
+      "content": "保留原始表演节奏，替换为角色音色，适合动画对白、游戏台词与短视频角色演绎。"
+    },
+    {
+      "id": "vc-dubbing",
+      "name": "译制风格",
+      "content": "在清晰可懂的前提下调整音色质感，用于多语言版本或本地化配音预览。"
+    }
+  ]
+}

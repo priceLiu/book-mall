@@ -37,12 +37,23 @@ export type QrAudioCatalogStyleTag = {
   id: string;
   label: string;
   labelEn?: string;
+  content?: string;
+};
+
+export type QrAudioPromptTemplateDef = {
+  id: string;
+  name: string;
+  content: string;
 };
 
 export type QrAudioCatalog = {
   models: QrAudioCatalogModel[];
   voices: QrAudioCatalogVoice[];
   styleTags: QrAudioCatalogStyleTag[];
+  promptTemplates?: {
+    "create-voiceover": QrAudioPromptTemplateDef[];
+    "voice-changer": QrAudioPromptTemplateDef[];
+  };
   voicesPaged?: boolean;
   defaults: {
     modelKey: string;
@@ -63,9 +74,14 @@ export type QrAudioCatalog = {
 let cachedCatalog: QrAudioCatalog | null = null;
 let inflight: Promise<QrAudioCatalog> | null = null;
 
-export async function fetchQrAudioCatalog(): Promise<QrAudioCatalog> {
-  if (cachedCatalog) return cachedCatalog;
-  if (inflight) return inflight;
+export function invalidateQrAudioCatalogClientCache(): void {
+  cachedCatalog = null;
+  inflight = null;
+}
+
+export async function fetchQrAudioCatalog(force = false): Promise<QrAudioCatalog> {
+  if (!force && cachedCatalog) return cachedCatalog;
+  if (!force && inflight) return inflight;
   inflight = fetchQrPlatform("/api/book-mall/api/platform/v1/quick-replica/audio-catalog")
     .then(async (res) => {
       if (!res.ok) throw new Error(`加载声音目录失败（${res.status}）`);
@@ -101,22 +117,35 @@ export function useQrAudioCatalog() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (cachedCatalog) return;
+    const reload = () => {
+      invalidateQrAudioCatalogClientCache();
+      void fetchQrAudioCatalog(true)
+        .then((data) => {
+          if (!cancelled) setCatalog(data);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err.message : "加载失败");
+        });
+    };
     let cancelled = false;
-    void fetchQrAudioCatalog()
-      .then((data) => {
-        if (!cancelled) setCatalog(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "加载失败");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    if (!cachedCatalog) {
+      void fetchQrAudioCatalog()
+        .then((data) => {
+          if (!cancelled) setCatalog(data);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : "加载失败");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }
+    window.addEventListener("qr-audio-catalog-invalidate", reload);
     return () => {
       cancelled = true;
+      window.removeEventListener("qr-audio-catalog-invalidate", reload);
     };
   }, []);
 

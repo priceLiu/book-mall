@@ -6,9 +6,13 @@ export function isVideoMediaUrl(url: string): boolean {
   return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url.trim());
 }
 
+export function isAudioMediaUrl(url: string): boolean {
+  return /\.(mp3|wav|m4a|aac|ogg|flac)(\?|$)/i.test(url.trim());
+}
+
 export type QrPreviewMedia = {
   url: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
   poster?: string;
 };
 
@@ -40,13 +44,13 @@ export function resolveQrTemplatePreviewMedia(input: {
   if (thumb && isVideoMediaUrl(thumb)) {
     return { url: thumb, kind: "video" };
   }
+  if (outputUrl && isAudioMediaUrl(outputUrl)) {
+    return { url: outputUrl, kind: "audio" };
+  }
+  if (input.mediaType === "audio" && outputUrl) {
+    return { url: outputUrl, kind: "audio" };
+  }
   if (outputUrl && isVideoMediaUrl(outputUrl)) {
-    return { url: outputUrl, kind: "video", poster: thumb || undefined };
-  }
-  if (refVideo && isVideoMediaUrl(refVideo)) {
-    return { url: refVideo, kind: "video", poster: thumb || undefined };
-  }
-  if (outputUrl && isImageMediaUrl(outputUrl)) {
     return { url: outputUrl, kind: "image" };
   }
   if (thumb) {

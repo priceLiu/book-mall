@@ -10,6 +10,10 @@ import {
   QrAudioVoiceControlSlider,
   QrAudioVoicePickerButton,
 } from "@/components/quick-replica/qr-audio-form-parts";
+import {
+  QrAudioPromptTemplatePills,
+  resolveActivePromptTemplateId,
+} from "@/components/quick-replica/qr-audio-prompt-template-pills";
 import { useQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
@@ -144,6 +148,30 @@ export function QrVoiceChangerForm({
         pickerActive={voicePickerActive}
         onOpenGallery={onOpenVoiceGallery ?? (() => undefined)}
       />
+
+      {(catalog.promptTemplates?.["voice-changer"]?.length ?? 0) > 0 ? (
+        <section className="qr-card p-4">
+          <p className="mb-2 text-sm font-medium text-[var(--qr-text-primary)]">变声说明</p>
+          <textarea
+            className="qr-input qr-textarea-resizable mb-2 min-h-[96px] w-full"
+            value={draft.prompt}
+            disabled={busy}
+            placeholder="可选：记录变声用途或场景说明…"
+            onChange={(e) => onDraftChange({ ...draft, prompt: e.target.value })}
+          />
+          <QrAudioPromptTemplatePills
+            catalog={catalog}
+            kind="voice-changer"
+            activeTemplateId={resolveActivePromptTemplateId(
+              catalog,
+              "voice-changer",
+              draft.prompt,
+            )}
+            busy={busy}
+            onApply={(tpl) => onDraftChange({ ...draft, prompt: tpl.content })}
+          />
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <QrAudioVoiceControlHeading />

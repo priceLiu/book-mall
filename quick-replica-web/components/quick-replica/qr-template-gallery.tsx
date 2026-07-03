@@ -3,17 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { QrCategory, QrTemplate } from "@/lib/qr-template-types";
-import { QR_CATEGORIES } from "@/lib/qr-template-types";
+import { QR_CATEGORIES, getKindDef } from "@/lib/qr-template-types";
 import {
   isQrMasonryPosterCached,
   markQrMasonryPosterCached,
 } from "@/lib/qr-masonry-poster-cache";
-import { isImageMediaUrl, isVideoMediaUrl } from "@/lib/qr-template-preview-media";
+import {
+  isAudioMediaUrl,
+  isImageMediaUrl,
+  isVideoMediaUrl,
+} from "@/lib/qr-template-preview-media";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
 import {
   QrGridGallerySkeleton,
   QrMasonryGallerySkeleton,
 } from "@/components/quick-replica/qr-panel-skeletons";
+import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
 
 function useMasonryColumnCount(): number {
   const [count, setCount] = useState(2);
@@ -304,6 +309,110 @@ function MasonryTemplateCard({
   );
 }
 
+function isAudioTemplate(template: QrTemplate): boolean {
+  return (
+    template.category === "audio" ||
+    template.output?.mediaType === "audio" ||
+    template.reference.model.role === "AUDIO" ||
+    Boolean(template.output?.url && isAudioMediaUrl(template.output.url))
+  );
+}
+
+function resolveAudioCardMeta(template: QrTemplate) {
+  const params = template.reference.model.params;
+  const voiceLabel =
+    typeof params.voice_label === "string"
+      ? params.voice_label
+      : typeof params.voice_id === "string"
+        ? params.voice_id
+        : "音色";
+  const voiceLetter =
+    typeof voiceLabel === "string" && voiceLabel.length
+      ? voiceLabel.slice(0, 1)
+      : "♪";
+  const kindLabel = getKindDef(template.kind)?.label ?? template.kind;
+  const audioUrl = template.output?.url?.trim() ?? "";
+  return { voiceLabel, voiceLetter, kindLabel, audioUrl };
+}
+
+function AudioTemplateCard({
+  template,
+  onSelect,
+}: {
+  template: QrTemplate;
+  onSelect: () => void;
+}) {
+  const { ref, visible } = useIntersectionVisible();
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const { voiceLabel, voiceLetter, kindLabel, audioUrl } = resolveAudioCardMeta(template);
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = audioRef.current;
+    if (!el || !audioUrl) return;
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      void el.play();
+      setPlaying(true);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      ref={ref}
+      onClick={onSelect}
+      className="qr-card group relative overflow-hidden text-left"
+    >
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-[#0a0f18] via-[#0d1117] to-[#0a1210]">
+        <div className="pointer-events-none absolute inset-x-2 inset-y-3">
+          <HorizontalOscilloscopeWaveform active={playing} barCount={56} className="h-full opacity-90" />
+        </div>
+        <div className="relative flex h-full items-center gap-3 px-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-500 text-lg font-semibold text-white">
+            {voiceLetter}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-white">{voiceLabel}</p>
+            <p className="truncate text-[11px] text-white/55">{kindLabel}</p>
+          </div>
+          {audioUrl && visible ? (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={togglePlay}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") togglePlay(e as unknown as React.MouseEvent);
+              }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/40 text-xs text-white hover:bg-black/55"
+            >
+              {playing ? "❚❚" : "▶"}
+            </span>
+          ) : null}
+        </div>
+        {audioUrl ? (
+          <audio
+            ref={audioRef}
+            src={audioUrl}
+            preload="none"
+            className="hidden"
+            onEnded={() => setPlaying(false)}
+          />
+        ) : null}
+      </div>
+      <div className="absolute left-2 top-2">
+        <span className="rounded-full bg-[rgba(59,130,246,0.35)] px-2 py-0.5 text-[10px] text-white">
+          {kindLabel}
+        </span>
+      </div>
+      <div className="px-2 py-2 text-sm font-medium">{template.title}</div>
+    </button>
+  );
+}
+
 function GridTemplateCard({
   template,
   onSelect,
@@ -377,6 +486,7 @@ export function QrTemplateGallery({
     category === "character" ||
     category === "world" ||
     category === "video";
+  const useAudioCards = category === "audio";
   const columns = useMemo(
     () => (useMasonry ? distributeToColumns(templates, columnCount) : []),
     [templates, columnCount, useMasonry],
@@ -385,6 +495,8 @@ export function QrTemplateGallery({
   const categoryLabel = category
     ? QR_CATEGORIES.find((c) => c.id === category)?.label
     : null;
+  const headerLabel =
+    categoryLabel === "声音" || category === "audio" ? "作品" : "模板";
 
   const showSkeleton = loading && templates.length === 0;
   const showRefreshing = loading && templates.length > 0;
@@ -393,7 +505,7 @@ export function QrTemplateGallery({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="qr-panel-header">
         <span>
-          模板
+          {headerLabel}
           {categoryLabel ? ` · ${categoryLabel}` : ""}
           {titleSuffix ? ` · ${titleSuffix}` : ""}
         </span>
@@ -432,14 +544,22 @@ export function QrTemplateGallery({
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 p-2 md:grid-cols-3 xl:grid-cols-4">
-                {templates.map((t) => (
-                  <GridTemplateCard
-                    key={t.id}
-                    template={t}
-                    onSelect={() => onSelectTemplate(t)}
-                  />
-                ))}
+              <div className="grid grid-cols-1 gap-3 p-2 sm:grid-cols-2 xl:grid-cols-3">
+                {templates.map((t) =>
+                  useAudioCards || isAudioTemplate(t) ? (
+                    <AudioTemplateCard
+                      key={t.id}
+                      template={t}
+                      onSelect={() => onSelectTemplate(t)}
+                    />
+                  ) : (
+                    <GridTemplateCard
+                      key={t.id}
+                      template={t}
+                      onSelect={() => onSelectTemplate(t)}
+                    />
+                  ),
+                )}
               </div>
             )}
             {!loading && templates.length === 0 ? (

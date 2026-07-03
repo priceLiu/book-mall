@@ -6,8 +6,9 @@ import { Copy, Trash2, X } from "lucide-react";
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrToast } from "@/components/quick-replica/qr-toast";
-import { getKindDef, type QrTemplate } from "@/lib/qr-template-types";
-import { resolveTemplateSceneImageUrls } from "@/lib/qr-template-preview-media";
+import { getKindDef, templateToWorkspaceDraft, type QrTemplate } from "@/lib/qr-template-types";
+import { isAudioMediaUrl, isVideoMediaUrl } from "@/lib/qr-template-preview-media";
+import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-generate-preview";
 
 type Props = {
   template: QrTemplate | null;
@@ -34,15 +35,23 @@ function resolveAspectRatioLabel(template: QrTemplate): string {
 function resolvePreviewMedia(template: QrTemplate): {
   url: string;
   isVideo: boolean;
+  isAudio: boolean;
 } {
+  const outputUrl = template.output?.url?.trim() ?? "";
+  const isAudio =
+    template.output?.mediaType === "audio" ||
+    template.reference.model.role === "AUDIO" ||
+    template.category === "audio" ||
+    isAudioMediaUrl(outputUrl);
   const isVideo =
-    template.output?.mediaType === "video" ||
-    template.reference.model.role === "VIDEO";
+    !isAudio &&
+    (template.output?.mediaType === "video" ||
+      template.reference.model.role === "VIDEO");
   const url =
-    template.output?.url ||
+    outputUrl ||
     (isVideo ? template.reference.slots.referenceVideo?.url : undefined) ||
     template.thumbnailUrl;
-  return { url, isVideo: Boolean(isVideo && template.output?.url) || isVideo };
+  return { url: url ?? "", isVideo: Boolean(isVideo && outputUrl) || isVideo, isAudio };
 }
 
 export function QrTemplatePreviewModal({
@@ -66,7 +75,7 @@ export function QrTemplatePreviewModal({
 
   const kindDef = getKindDef(template.kind);
   const aspectLabel = resolveAspectRatioLabel(template);
-  const { url: previewUrl, isVideo } = resolvePreviewMedia(template);
+  const { url: previewUrl, isVideo, isAudio } = resolvePreviewMedia(template);
   const promptText = template.reference.prompt.text;
   const sceneImageUrls = resolveTemplateSceneImageUrls(template);
   const promptPreview =
@@ -169,7 +178,14 @@ export function QrTemplatePreviewModal({
           style={{ background: "var(--qr-bg-page)" }}
         >
           {previewUrl ? (
-            isVideo ? (
+            isAudio ? (
+              <div className="h-full w-full max-w-3xl p-4">
+                <QrAudioGenerateSuccess
+                  draft={templateToWorkspaceDraft(template)}
+                  outputUrl={previewUrl}
+                />
+              </div>
+            ) : isVideo ? (
               <video
                 src={previewUrl}
                 controls
