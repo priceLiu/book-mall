@@ -407,37 +407,88 @@ body {
     }
   }
 
-  .qr-audio-wave-band-scroll {
-    display: flex;
-    width: 200%;
-    height: 100%;
-    animation: qr-audio-wave-band-scroll 2.8s linear infinite;
+  .qr-audio-oscilloscope-track {
+    min-height: 3.5rem;
   }
 
-  @keyframes qr-audio-wave-band-scroll {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(-50%);
-    }
+  .qr-audio-oscilloscope-grid {
+    background-image:
+      linear-gradient(rgba(45, 212, 191, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(45, 212, 191, 0.06) 1px, transparent 1px);
+    background-size: 10px 10px;
+    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
   }
 
-  .qr-audio-wave-band-path {
-    animation: qr-audio-wave-band-pulse 1.6s ease-in-out infinite;
+  .qr-audio-wave-strip-leading {
+    background: #0a0f18;
+    box-shadow: 12px 0 24px rgba(10, 15, 24, 0.95);
   }
 
-  .qr-audio-wave-band-path-alt {
-    animation: qr-audio-wave-band-pulse 1.6s ease-in-out infinite 0.4s;
+  .qr-audio-wave-control-fill {
+    background: #0b1018;
+    border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
-  @keyframes qr-audio-wave-band-pulse {
+  .qr-audio-wave-meta-fill {
+    background: rgba(10, 15, 24, 0.92);
+  }
+
+  .qr-audio-oscilloscope-bare {
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .qr-audio-oscilloscope-bare .qr-audio-oscilloscope-grid {
+    opacity: 0.55;
+    mask-image: none;
+  }
+
+  .qr-audio-oscilloscope-line {
+    min-height: 3px;
+    border-radius: 1px;
+    transform-origin: center center;
+    box-shadow:
+      0 0 6px rgba(34, 211, 238, 0.3),
+      0 0 10px rgba(168, 85, 247, 0.18);
+  }
+
+  .qr-audio-oscilloscope-line-active {
+    animation: qr-audio-oscilloscope-line 0.78s ease-in-out infinite;
+  }
+
+  .qr-audio-oscilloscope-line-generating {
+    animation: qr-audio-oscilloscope-line-generating 0.68s ease-in-out infinite;
+  }
+
+  @keyframes qr-audio-oscilloscope-line {
     0%,
     100% {
-      opacity: 0.45;
+      transform: scaleY(0.62);
+      opacity: 0.55;
     }
     50% {
+      transform: scaleY(1.08);
       opacity: 1;
+    }
+  }
+
+  @keyframes qr-audio-oscilloscope-line-generating {
+    0%,
+    100% {
+      transform: scaleY(0.55);
+      opacity: 0.65;
+    }
+    25% {
+      transform: scaleY(0.92);
+      opacity: 0.9;
+    }
+    50% {
+      transform: scaleY(1.18);
+      opacity: 1;
+    }
+    75% {
+      transform: scaleY(0.78);
+      opacity: 0.82;
     }
   }
 }

@@ -10,7 +10,7 @@ import {
 } from "@/components/quick-replica/qr-generate-preview-modal";
 import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
 import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
-import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
+import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
 import { QrAudioRightPanel, type QrAudioRightTab } from "@/components/quick-replica/qr-audio-right-panel";
@@ -90,6 +90,8 @@ export function QrAppClient({
   );
   const [audioRightTab, setAudioRightTab] = useState<QrAudioRightTab>("templates");
   const [voiceGalleryFocus, setVoiceGalleryFocus] = useState(false);
+  const [myWorksCategory, setMyWorksCategory] = useState<QrCategory>("audio");
+  const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
   const voiceGalleryFocusTimerRef = useRef<number | null>(null);
 
@@ -99,11 +101,15 @@ export function QrAppClient({
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
     const parts = [templateScope];
-    if (navMode !== "my-works" && category) parts.push(category);
+    if (navMode === "my-works") {
+      parts.push(myWorksCategory);
+    } else if (category) {
+      parts.push(category);
+    }
     if (selectedKind) parts.push(selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") parts.push(pinnedToolKey);
     return parts.join("|");
-  }, [navMode, category, selectedKind, pinnedToolKey, templateScope]);
+  }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory]);
 
   const browseKeyRef = useRef(browseKey);
   browseKeyRef.current = browseKey;
@@ -125,7 +131,11 @@ export function QrAppClient({
     setTemplatesLoading(true);
 
     const qs = new URLSearchParams({ scope: templateScope });
-    if (navMode !== "my-works" && category) qs.set("category", category);
+    if (navMode === "my-works") {
+      qs.set("category", myWorksCategory);
+    } else if (category) {
+      qs.set("category", category);
+    }
     if (selectedKind) qs.set("kind", selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") qs.set("toolKey", pinnedToolKey);
     try {
@@ -146,7 +156,7 @@ export function QrAppClient({
         setTemplatesLoading(false);
       }
     }
-  }, [navMode, category, selectedKind, pinnedToolKey, templateScope]);
+  }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory]);
 
   const loadKinds = useCallback(async () => {
     if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool" || navMode === "generate-history") {
@@ -291,6 +301,8 @@ export function QrAppClient({
     setMiddleMode("browse");
     setSelectedKind(null);
     setPinnedToolKey(null);
+    setMyWorksCategory("audio");
+    setMyWorksPreview(null);
   };
 
   const onGenerateHistory = () => {
@@ -455,6 +467,7 @@ export function QrAppClient({
       templatesCacheRef.current.clear();
       invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
       setPreviewTemplate(null);
+      setMyWorksPreview((prev) => (prev?.id === template.id ? null : prev));
       setCopyToast("已删除");
       void loadTemplates();
     },
@@ -540,21 +553,40 @@ export function QrAppClient({
     if (navMode === "my-works") {
       return (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="border-b border-white/10 px-4 py-2 text-sm font-medium">
-            我的作品
+          <div className="shrink-0 border-b border-white/10 px-4 py-2">
+            <p className="mb-2 text-sm font-medium">我的作品</p>
+            <div className="flex flex-wrap gap-1.5">
+              {QR_CATEGORIES.map((c) => {
+                const Icon = CATEGORY_ICONS[c.id];
+                const active = myWorksCategory === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setMyWorksCategory(c.id);
+                      setMyWorksPreview(null);
+                    }}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition ${
+                      active
+                        ? "bg-[rgba(59,130,246,0.22)] text-[var(--qr-text-primary)]"
+                        : "bg-white/5 text-[var(--qr-text-muted)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-            <p className="text-sm text-zinc-400">
-              右侧展示你的作品与草稿；点击卡片可预览、删除或复制到工作区
-            </p>
-            <button
-              type="button"
-              className="qr-btn-secondary mt-4"
-              onClick={() => onCategory("video")}
-            >
-              去创作
-            </button>
-          </div>
+          <QrMyWorksPreviewPanel
+            category={myWorksCategory}
+            template={myWorksPreview}
+            onSelectTemplate={setMyWorksPreview}
+            onCopy={onCopyTemplate}
+            onDelete={(t) => void handleDeleteTemplate(t)}
+          />
         </div>
       );
     }
@@ -662,11 +694,23 @@ export function QrAppClient({
             ) : (
               <QrTemplateGallery
                 key={browseKey || category}
-                category={navMode === "my-works" || navMode === "generate-history" ? null : category}
-                titleSuffix={galleryTitleSuffix}
+                category={
+                  navMode === "my-works"
+                    ? myWorksCategory
+                    : navMode === "generate-history"
+                      ? null
+                      : category
+                }
+                titleSuffix={navMode === "my-works" ? "我的作品" : galleryTitleSuffix}
                 templates={templates}
                 loading={templatesLoading}
-                onSelectTemplate={setPreviewTemplate}
+                onSelectTemplate={(t) => {
+                  if (navMode === "my-works") {
+                    setMyWorksPreview(t);
+                    return;
+                  }
+                  setPreviewTemplate(t);
+                }}
               />
             )}
           </section>

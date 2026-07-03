@@ -6,6 +6,12 @@ import {
   MINIMAX_MUSIC_MODELS,
   MINIMAX_DEFAULT_MUSIC_MODEL_KEY,
 } from "@/lib/gateway/minimax-speech-models";
+import {
+  readQrAudioPromptTemplates,
+  type QrAudioPromptTemplateDef,
+} from "@/lib/quick-replica/qr-audio-prompt-templates";
+
+export type { QrAudioPromptTemplateDef };
 
 export type QrAudioModelDef = {
   modelKey: string;
@@ -117,14 +123,27 @@ export function getQrAudioVoiceDef(voiceId: string): QrAudioVoiceDef {
 }
 
 export function getQrAudioCatalog() {
+  const promptTemplates = readQrAudioPromptTemplates();
+  const voiceoverTemplates = promptTemplates["create-voiceover"];
+  const styleTags =
+    voiceoverTemplates.length > 0
+      ? voiceoverTemplates.map((t) => ({
+          id: t.id,
+          label: t.name,
+          labelEn: t.name,
+          content: t.content,
+        }))
+      : QR_AUDIO_STYLE_TAGS.map((t) => ({ ...t, content: "" }));
+
   return {
     models: QR_AUDIO_MODELS,
     voices: QR_AUDIO_VOICES,
-    styleTags: QR_AUDIO_STYLE_TAGS,
+    styleTags,
+    promptTemplates,
     defaults: {
       modelKey: QR_DEFAULT_AUDIO_MODEL_KEY,
       voiceId: QR_DEFAULT_AUDIO_VOICE_ID,
-      styleTag: QR_DEFAULT_AUDIO_STYLE_TAG,
+      styleTag: styleTags[0]?.id ?? QR_DEFAULT_AUDIO_STYLE_TAG,
       ...QR_AUDIO_VOICE_CONTROL_DEFAULTS,
     },
     voicesPaged: true,
