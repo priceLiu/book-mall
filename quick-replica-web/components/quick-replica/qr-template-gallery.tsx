@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Download } from "lucide-react";
 
 import type { QrCategory, QrTemplate } from "@/lib/qr-template-types";
 import { QR_CATEGORIES, getKindDef } from "@/lib/qr-template-types";
@@ -19,6 +20,7 @@ import {
   QrMasonryGallerySkeleton,
 } from "@/components/quick-replica/qr-panel-skeletons";
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
+import { downloadQrTemplateOutput } from "@/lib/qr-download-output";
 
 function useMasonryColumnCount(): number {
   const [count, setCount] = useState(2);
@@ -113,12 +115,40 @@ function useQrMasonryPoster(
   return { ready, setReady, posterMode, setPosterMode };
 }
 
+function TemplateDownloadButton({
+  template,
+  className = "",
+}: {
+  template: QrTemplate;
+  className?: string;
+}) {
+  const url = template.output?.url?.trim();
+  if (!url) return null;
+
+  return (
+    <button
+      type="button"
+      aria-label="下载"
+      className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-[#0a0f18]/90 text-white/85 shadow-md transition hover:bg-[#121826] hover:text-white ${className}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        void downloadQrTemplateOutput(template);
+      }}
+    >
+      <Download className="h-4 w-4" />
+    </button>
+  );
+}
+
 function MasonryTemplateCard({
   template,
   onSelect,
+  allowDownload = false,
 }: {
   template: QrTemplate;
   onSelect: () => void;
+  allowDownload?: boolean;
 }) {
   const { ref: visibilityRef, visible } = useIntersectionVisible();
   const [hovering, setHovering] = useState(false);
@@ -188,6 +218,7 @@ function MasonryTemplateCard({
   const showThumbImg = Boolean(imageThumbUrl && posterMode === "thumbnail" && visible);
 
   return (
+    <div className="group relative w-full">
     <button
       type="button"
       ref={visibilityRef}
@@ -306,6 +337,10 @@ function MasonryTemplateCard({
         </div>
       ) : null}
     </button>
+    {allowDownload ? (
+      <TemplateDownloadButton template={template} className="absolute bottom-2 right-2 z-20" />
+    ) : null}
+  </div>
   );
 }
 
@@ -338,9 +373,11 @@ function resolveAudioCardMeta(template: QrTemplate) {
 function AudioTemplateCard({
   template,
   onSelect,
+  allowDownload = false,
 }: {
   template: QrTemplate;
   onSelect: () => void;
+  allowDownload?: boolean;
 }) {
   const { ref, visible } = useIntersectionVisible();
   const [playing, setPlaying] = useState(false);
@@ -361,12 +398,8 @@ function AudioTemplateCard({
   };
 
   return (
-    <button
-      type="button"
-      ref={ref}
-      onClick={onSelect}
-      className="qr-card group relative overflow-hidden text-left"
-    >
+    <div className="qr-card group relative overflow-hidden text-left">
+      <button type="button" ref={ref} onClick={onSelect} className="block w-full text-left">
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-[#0a0f18] via-[#0d1117] to-[#0a1210]">
         <div className="pointer-events-none absolute inset-x-2 inset-y-3">
           <HorizontalOscilloscopeWaveform active={playing} barCount={56} className="h-full opacity-90" />
@@ -408,28 +441,30 @@ function AudioTemplateCard({
           {kindLabel}
         </span>
       </div>
-      <div className="px-2 py-2 text-sm font-medium">{template.title}</div>
-    </button>
+      <div className="px-2 py-2 pr-10 text-sm font-medium">{template.title}</div>
+      </button>
+      {allowDownload ? (
+        <TemplateDownloadButton template={template} className="absolute bottom-2 right-2 z-20" />
+      ) : null}
+    </div>
   );
 }
 
 function GridTemplateCard({
   template,
   onSelect,
+  allowDownload = false,
 }: {
   template: QrTemplate;
   onSelect: () => void;
+  allowDownload?: boolean;
 }) {
   const { ref, visible } = useIntersectionVisible();
   const imageThumbUrl = resolveGalleryThumbnailUrl(template.thumbnailUrl);
 
   return (
-    <button
-      type="button"
-      ref={ref}
-      onClick={onSelect}
-      className="qr-card group relative"
-    >
+    <div className="qr-card group relative overflow-hidden text-left">
+      <button type="button" ref={ref} onClick={onSelect} className="block w-full text-left">
       <div className="aspect-[4/3] w-full overflow-hidden bg-zinc-900">
         {!visible || !imageThumbUrl ? (
           <div className="qr-skeleton h-full w-full" aria-hidden />
@@ -460,8 +495,12 @@ function GridTemplateCard({
           </span>
         ) : null}
       </div>
-      <div className="px-2 py-2 text-sm font-medium">{template.title}</div>
-    </button>
+      <div className="px-2 py-2 pr-10 text-sm font-medium">{template.title}</div>
+      </button>
+      {allowDownload ? (
+        <TemplateDownloadButton template={template} className="absolute bottom-2 right-2 z-20" />
+      ) : null}
+    </div>
   );
 }
 
@@ -471,6 +510,7 @@ type Props = {
   templates: QrTemplate[];
   loading: boolean;
   onSelectTemplate: (template: QrTemplate) => void;
+  allowDownload?: boolean;
 };
 
 export function QrTemplateGallery({
@@ -479,6 +519,7 @@ export function QrTemplateGallery({
   templates,
   loading,
   onSelectTemplate,
+  allowDownload = false,
 }: Props) {
   const columnCount = useMasonryColumnCount();
   const useMasonry =
@@ -537,6 +578,7 @@ export function QrTemplateGallery({
                         <MasonryTemplateCard
                           template={t}
                           onSelect={() => onSelectTemplate(t)}
+                          allowDownload={allowDownload}
                         />
                       </div>
                     ))}
@@ -551,12 +593,14 @@ export function QrTemplateGallery({
                       key={t.id}
                       template={t}
                       onSelect={() => onSelectTemplate(t)}
+                      allowDownload={allowDownload}
                     />
                   ) : (
                     <GridTemplateCard
                       key={t.id}
                       template={t}
                       onSelect={() => onSelectTemplate(t)}
+                      allowDownload={allowDownload}
                     />
                   ),
                 )}

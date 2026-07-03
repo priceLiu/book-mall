@@ -77,18 +77,6 @@ export function QrMyWorksPreviewPanel({
             <p className="text-xs text-[var(--qr-text-muted)]">暂无产出预览</p>
           </div>
         )}
-
-        {template.reference.prompt.text.trim() ? (
-          <section
-            className="mt-4 rounded-xl border px-3 py-2.5"
-            style={{ borderColor: "var(--qr-border)", background: "var(--qr-bg-elevated)" }}
-          >
-            <p className="mb-1 text-[10px] uppercase tracking-wide text-[var(--qr-text-muted)]">Prompt</p>
-            <p className="max-h-40 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-[var(--qr-text-secondary)]">
-              {template.reference.prompt.text}
-            </p>
-          </section>
-        ) : null}
       </div>
 
       <div className="flex shrink-0 gap-2 border-t border-white/10 p-4">
