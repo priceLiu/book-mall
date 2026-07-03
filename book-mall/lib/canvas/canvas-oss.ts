@@ -11,6 +11,7 @@ import {
 import {
   buildCanvasOssKey,
   buildQuickReplicaBuiltinOssKey,
+  buildMinimaxVoicePreviewOssKey,
   buildStyleLibraryOssKey,
   type CanvasOssKind,
 } from "./canvas-constants";
@@ -325,6 +326,24 @@ export async function uploadQuickReplicaBuiltinPreview(args: {
     key,
     buf: args.buf,
     contentType: args.contentType,
+  });
+}
+
+/** MiniMax 音色试听 MP3（固定 OSS key） */
+export async function uploadMinimaxVoicePreview(args: {
+  voiceId: string;
+  buf: Buffer;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildMinimaxVoicePreviewOssKey(args.voiceId);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: "audio/mpeg",
   });
 }
 

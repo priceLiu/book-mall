@@ -1,0 +1,3258 @@
+{
+  "schemaVersion": 1,
+  "total": 325,
+  "pageSize": 40,
+  "updatedAt": "2026-07-03T09:22:56.040Z",
+  "voices": [
+    {
+      "voiceId": "male-qn-qingse",
+      "label": "青涩青年音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "青",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-qingse.mp3"
+    },
+    {
+      "voiceId": "male-qn-jingying",
+      "label": "精英青年音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "精",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-jingying.mp3"
+    },
+    {
+      "voiceId": "male-qn-badao",
+      "label": "霸道青年音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "霸",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-badao.mp3"
+    },
+    {
+      "voiceId": "male-qn-daxuesheng",
+      "label": "青年大学生音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "青",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-daxuesheng.mp3"
+    },
+    {
+      "voiceId": "female-shaonv",
+      "label": "少女音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "少",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-shaonv.mp3"
+    },
+    {
+      "voiceId": "female-yujie",
+      "label": "御姐音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "御",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-yujie.mp3"
+    },
+    {
+      "voiceId": "female-chengshu",
+      "label": "成熟女性音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "成",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-chengshu.mp3"
+    },
+    {
+      "voiceId": "female-tianmei",
+      "label": "甜美女性音色",
+      "language": "中文 (普通话)",
+      "avatarLetter": "甜",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-tianmei.mp3"
+    },
+    {
+      "voiceId": "male-qn-qingse-jingpin",
+      "label": "青涩青年音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "青",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-qingse-jingpin.mp3"
+    },
+    {
+      "voiceId": "male-qn-jingying-jingpin",
+      "label": "精英青年音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "精",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-jingying-jingpin.mp3"
+    },
+    {
+      "voiceId": "male-qn-badao-jingpin",
+      "label": "霸道青年音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "霸",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-badao-jingpin.mp3"
+    },
+    {
+      "voiceId": "male-qn-daxuesheng-jingpin",
+      "label": "青年大学生音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "青",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/male-qn-daxuesheng-jingpin.mp3"
+    },
+    {
+      "voiceId": "female-shaonv-jingpin",
+      "label": "少女音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "少",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-shaonv-jingpin.mp3"
+    },
+    {
+      "voiceId": "female-yujie-jingpin",
+      "label": "御姐音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "御",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-yujie-jingpin.mp3"
+    },
+    {
+      "voiceId": "female-chengshu-jingpin",
+      "label": "成熟女性音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "成",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-chengshu-jingpin.mp3"
+    },
+    {
+      "voiceId": "female-tianmei-jingpin",
+      "label": "甜美女性音色-beta",
+      "language": "中文 (普通话)",
+      "avatarLetter": "甜",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/female-tianmei-jingpin.mp3"
+    },
+    {
+      "voiceId": "clever_boy",
+      "label": "聪明男童",
+      "language": "中文 (普通话)",
+      "avatarLetter": "聪",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/clever_boy.mp3"
+    },
+    {
+      "voiceId": "cute_boy",
+      "label": "可爱男童",
+      "language": "中文 (普通话)",
+      "avatarLetter": "可",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/cute_boy.mp3"
+    },
+    {
+      "voiceId": "lovely_girl",
+      "label": "萌萌女童",
+      "language": "中文 (普通话)",
+      "avatarLetter": "萌",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/lovely_girl.mp3"
+    },
+    {
+      "voiceId": "cartoon_pig",
+      "label": "卡通猪小琪",
+      "language": "中文 (普通话)",
+      "avatarLetter": "卡",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/cartoon_pig.mp3"
+    },
+    {
+      "voiceId": "bingjiao_didi",
+      "label": "病娇弟弟",
+      "language": "中文 (普通话)",
+      "avatarLetter": "病",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/bingjiao_didi.mp3"
+    },
+    {
+      "voiceId": "junlang_nanyou",
+      "label": "俊朗男友",
+      "language": "中文 (普通话)",
+      "avatarLetter": "俊",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/junlang_nanyou.mp3"
+    },
+    {
+      "voiceId": "chunzhen_xuedi",
+      "label": "纯真学弟",
+      "language": "中文 (普通话)",
+      "avatarLetter": "纯",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/chunzhen_xuedi.mp3"
+    },
+    {
+      "voiceId": "lengdan_xiongzhang",
+      "label": "冷淡学长",
+      "language": "中文 (普通话)",
+      "avatarLetter": "冷",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/lengdan_xiongzhang.mp3"
+    },
+    {
+      "voiceId": "badao_shaoye",
+      "label": "霸道少爷",
+      "language": "中文 (普通话)",
+      "avatarLetter": "霸",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/badao_shaoye.mp3"
+    },
+    {
+      "voiceId": "tianxin_xiaoling",
+      "label": "甜心小玲",
+      "language": "中文 (普通话)",
+      "avatarLetter": "甜",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/tianxin_xiaoling.mp3"
+    },
+    {
+      "voiceId": "qiaopi_mengmei",
+      "label": "俏皮萌妹",
+      "language": "中文 (普通话)",
+      "avatarLetter": "俏",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/qiaopi_mengmei.mp3"
+    },
+    {
+      "voiceId": "wumei_yujie",
+      "label": "妩媚御姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "妩",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/wumei_yujie.mp3"
+    },
+    {
+      "voiceId": "diadia_xuemei",
+      "label": "嗲嗲学妹",
+      "language": "中文 (普通话)",
+      "avatarLetter": "嗲",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/diadia_xuemei.mp3"
+    },
+    {
+      "voiceId": "danya_xuejie",
+      "label": "淡雅学姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "淡",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/danya_xuejie.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Reliable_Executive",
+      "label": "沉稳高管",
+      "language": "中文 (普通话)",
+      "avatarLetter": "沉",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Reliable_Executive.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_News_Anchor",
+      "label": "新闻女声",
+      "language": "中文 (普通话)",
+      "avatarLetter": "新",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_News_Anchor.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Mature_Woman",
+      "label": "傲娇御姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "傲",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Mature_Woman.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Unrestrained_Young_Man",
+      "label": "不羁青年",
+      "language": "中文 (普通话)",
+      "avatarLetter": "不",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Unrestrained_Young_Man.mp3"
+    },
+    {
+      "voiceId": "Arrogant_Miss",
+      "label": "嚣张小姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "嚣",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Arrogant_Miss.mp3"
+    },
+    {
+      "voiceId": "Robot_Armor",
+      "label": "机械战甲",
+      "language": "中文 (普通话)",
+      "avatarLetter": "机",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Robot_Armor.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Kind-hearted_Antie",
+      "label": "热心大婶",
+      "language": "中文 (普通话)",
+      "avatarLetter": "热",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Kind-hearted_Antie.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_HK_Flight_Attendant",
+      "label": "港普空姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "港",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_HK_Flight_Attendant.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Humorous_Elder",
+      "label": "搞笑大爷",
+      "language": "中文 (普通话)",
+      "avatarLetter": "搞",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Humorous_Elder.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Gentleman",
+      "label": "温润男声",
+      "language": "中文 (普通话)",
+      "avatarLetter": "温",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Gentleman.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Warm_Bestie",
+      "label": "温暖闺蜜",
+      "language": "中文 (普通话)",
+      "avatarLetter": "温",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Warm_Bestie.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Male_Announcer",
+      "label": "播报男声",
+      "language": "中文 (普通话)",
+      "avatarLetter": "播",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Male_Announcer.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Sweet_Lady",
+      "label": "甜美女声",
+      "language": "中文 (普通话)",
+      "avatarLetter": "甜",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Sweet_Lady.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Southern_Young_Man",
+      "label": "南方小哥",
+      "language": "中文 (普通话)",
+      "avatarLetter": "南",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Southern_Young_Man.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Wise_Women",
+      "label": "阅历姐姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "阅",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Wise_Women.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Gentle_Youth",
+      "label": "温润青年",
+      "language": "中文 (普通话)",
+      "avatarLetter": "温",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Gentle_Youth.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Warm_Girl",
+      "label": "温暖少女",
+      "language": "中文 (普通话)",
+      "avatarLetter": "温",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Warm_Girl.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Kind-hearted_Elder",
+      "label": "花甲奶奶",
+      "language": "中文 (普通话)",
+      "avatarLetter": "花",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Kind-hearted_Elder.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Cute_Spirit",
+      "label": "憨憨萌兽",
+      "language": "中文 (普通话)",
+      "avatarLetter": "憨",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Cute_Spirit.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Radio_Host",
+      "label": "电台男主播",
+      "language": "中文 (普通话)",
+      "avatarLetter": "电",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Radio_Host.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Lyrical_Voice",
+      "label": "抒情男声",
+      "language": "中文 (普通话)",
+      "avatarLetter": "抒",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Lyrical_Voice.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Straightforward_Boy",
+      "label": "率真弟弟",
+      "language": "中文 (普通话)",
+      "avatarLetter": "率",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Straightforward_Boy.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Sincere_Adult",
+      "label": "真诚青年",
+      "language": "中文 (普通话)",
+      "avatarLetter": "真",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Sincere_Adult.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Gentle_Senior",
+      "label": "温柔学姐",
+      "language": "中文 (普通话)",
+      "avatarLetter": "温",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Gentle_Senior.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Stubborn_Friend",
+      "label": "嘴硬竹马",
+      "language": "中文 (普通话)",
+      "avatarLetter": "嘴",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Stubborn_Friend.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Crisp_Girl",
+      "label": "清脆少女",
+      "language": "中文 (普通话)",
+      "avatarLetter": "清",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Crisp_Girl.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Pure-hearted_Boy",
+      "label": "清澈邻家弟弟",
+      "language": "中文 (普通话)",
+      "avatarLetter": "清",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Pure-hearted_Boy.mp3"
+    },
+    {
+      "voiceId": "Chinese (Mandarin)_Soft_Girl",
+      "label": "柔和少女",
+      "language": "中文 (普通话)",
+      "avatarLetter": "柔",
+      "tags": [
+        "中文 (普通话)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Chinese_(Mandarin)_Soft_Girl.mp3"
+    },
+    {
+      "voiceId": "Cantonese_GentleLady",
+      "label": "温柔女声",
+      "language": "中文 (粤语)",
+      "avatarLetter": "温",
+      "tags": [
+        "中文 (粤语)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Cantonese_GentleLady.mp3"
+    },
+    {
+      "voiceId": "Cantonese_PlayfulMan",
+      "label": "活泼男声",
+      "language": "中文 (粤语)",
+      "avatarLetter": "活",
+      "tags": [
+        "中文 (粤语)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Cantonese_PlayfulMan.mp3"
+    },
+    {
+      "voiceId": "Cantonese_CuteGirl",
+      "label": "可爱女孩",
+      "language": "中文 (粤语)",
+      "avatarLetter": "可",
+      "tags": [
+        "中文 (粤语)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Cantonese_CuteGirl.mp3"
+    },
+    {
+      "voiceId": "Cantonese_KindWoman",
+      "label": "善良女声",
+      "language": "中文 (粤语)",
+      "avatarLetter": "善",
+      "tags": [
+        "中文 (粤语)"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Cantonese_KindWoman.mp3"
+    },
+    {
+      "voiceId": "Santa_Claus",
+      "label": "Santa Claus",
+      "language": "英文",
+      "avatarLetter": "S",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Santa_Claus.mp3"
+    },
+    {
+      "voiceId": "Grinch",
+      "label": "Grinch",
+      "language": "英文",
+      "avatarLetter": "G",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Grinch.mp3"
+    },
+    {
+      "voiceId": "Rudolph",
+      "label": "Rudolph",
+      "language": "英文",
+      "avatarLetter": "R",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Rudolph.mp3"
+    },
+    {
+      "voiceId": "Arnold",
+      "label": "Arnold",
+      "language": "英文",
+      "avatarLetter": "A",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Arnold.mp3"
+    },
+    {
+      "voiceId": "Charming_Santa",
+      "label": "Charming Santa",
+      "language": "英文",
+      "avatarLetter": "C",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Charming_Santa.mp3"
+    },
+    {
+      "voiceId": "Charming_Lady",
+      "label": "Charming Lady",
+      "language": "英文",
+      "avatarLetter": "C",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Charming_Lady.mp3"
+    },
+    {
+      "voiceId": "Sweet_Girl",
+      "label": "Sweet Girl",
+      "language": "英文",
+      "avatarLetter": "S",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Sweet_Girl.mp3"
+    },
+    {
+      "voiceId": "Cute_Elf",
+      "label": "Cute Elf",
+      "language": "英文",
+      "avatarLetter": "C",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Cute_Elf.mp3"
+    },
+    {
+      "voiceId": "Attractive_Girl",
+      "label": "Attractive Girl",
+      "language": "英文",
+      "avatarLetter": "A",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Attractive_Girl.mp3"
+    },
+    {
+      "voiceId": "Serene_Woman",
+      "label": "Serene Woman",
+      "language": "英文",
+      "avatarLetter": "S",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Serene_Woman.mp3"
+    },
+    {
+      "voiceId": "English_Trustworthy_Man",
+      "label": "Trustworthy Man",
+      "language": "英文",
+      "avatarLetter": "T",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/English_Trustworthy_Man.mp3"
+    },
+    {
+      "voiceId": "English_Graceful_Lady",
+      "label": "Graceful Lady",
+      "language": "英文",
+      "avatarLetter": "G",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/English_Graceful_Lady.mp3"
+    },
+    {
+      "voiceId": "English_Aussie_Bloke",
+      "label": "Aussie Bloke",
+      "language": "英文",
+      "avatarLetter": "A",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/English_Aussie_Bloke.mp3"
+    },
+    {
+      "voiceId": "English_Whispering_girl",
+      "label": "Whispering girl",
+      "language": "英文",
+      "avatarLetter": "W",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/English_Whispering_girl.mp3"
+    },
+    {
+      "voiceId": "English_Diligent_Man",
+      "label": "Diligent Man",
+      "language": "英文",
+      "avatarLetter": "D",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/English_Diligent_Man.mp3"
+    },
+    {
+      "voiceId": "English_Gentle-voiced_man",
+      "label": "Gentle-voiced man",
+      "language": "英文",
+      "avatarLetter": "G",
+      "tags": [
+        "英文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/English_Gentle-voiced_man.mp3"
+    },
+    {
+      "voiceId": "Japanese_IntellectualSenior",
+      "label": "Intellectual Senior",
+      "language": "日文",
+      "avatarLetter": "I",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_IntellectualSenior.mp3"
+    },
+    {
+      "voiceId": "Japanese_DecisivePrincess",
+      "label": "Decisive Princess",
+      "language": "日文",
+      "avatarLetter": "D",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_DecisivePrincess.mp3"
+    },
+    {
+      "voiceId": "Japanese_LoyalKnight",
+      "label": "Loyal Knight",
+      "language": "日文",
+      "avatarLetter": "L",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_LoyalKnight.mp3"
+    },
+    {
+      "voiceId": "Japanese_DominantMan",
+      "label": "Dominant Man",
+      "language": "日文",
+      "avatarLetter": "D",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_DominantMan.mp3"
+    },
+    {
+      "voiceId": "Japanese_SeriousCommander",
+      "label": "Serious Commander",
+      "language": "日文",
+      "avatarLetter": "S",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_SeriousCommander.mp3"
+    },
+    {
+      "voiceId": "Japanese_ColdQueen",
+      "label": "Cold Queen",
+      "language": "日文",
+      "avatarLetter": "C",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_ColdQueen.mp3"
+    },
+    {
+      "voiceId": "Japanese_DependableWoman",
+      "label": "Dependable Woman",
+      "language": "日文",
+      "avatarLetter": "D",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_DependableWoman.mp3"
+    },
+    {
+      "voiceId": "Japanese_GentleButler",
+      "label": "Gentle Butler",
+      "language": "日文",
+      "avatarLetter": "G",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_GentleButler.mp3"
+    },
+    {
+      "voiceId": "Japanese_KindLady",
+      "label": "Kind Lady",
+      "language": "日文",
+      "avatarLetter": "K",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_KindLady.mp3"
+    },
+    {
+      "voiceId": "Japanese_CalmLady",
+      "label": "Calm Lady",
+      "language": "日文",
+      "avatarLetter": "C",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_CalmLady.mp3"
+    },
+    {
+      "voiceId": "Japanese_OptimisticYouth",
+      "label": "Optimistic Youth",
+      "language": "日文",
+      "avatarLetter": "O",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_OptimisticYouth.mp3"
+    },
+    {
+      "voiceId": "Japanese_GenerousIzakayaOwner",
+      "label": "Generous Izakaya Owner",
+      "language": "日文",
+      "avatarLetter": "G",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_GenerousIzakayaOwner.mp3"
+    },
+    {
+      "voiceId": "Japanese_SportyStudent",
+      "label": "Sporty Student",
+      "language": "日文",
+      "avatarLetter": "S",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_SportyStudent.mp3"
+    },
+    {
+      "voiceId": "Japanese_InnocentBoy",
+      "label": "Innocent Boy",
+      "language": "日文",
+      "avatarLetter": "I",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_InnocentBoy.mp3"
+    },
+    {
+      "voiceId": "Japanese_GracefulMaiden",
+      "label": "Graceful Maiden",
+      "language": "日文",
+      "avatarLetter": "G",
+      "tags": [
+        "日文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Japanese_GracefulMaiden.mp3"
+    },
+    {
+      "voiceId": "Korean_SweetGirl",
+      "label": "Sweet Girl",
+      "language": "韩文",
+      "avatarLetter": "S",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_SweetGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_CheerfulBoyfriend",
+      "label": "Cheerful Boyfriend",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CheerfulBoyfriend.mp3"
+    },
+    {
+      "voiceId": "Korean_EnchantingSister",
+      "label": "Enchanting Sister",
+      "language": "韩文",
+      "avatarLetter": "E",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_EnchantingSister.mp3"
+    },
+    {
+      "voiceId": "Korean_ShyGirl",
+      "label": "Shy Girl",
+      "language": "韩文",
+      "avatarLetter": "S",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ShyGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_ReliableSister",
+      "label": "Reliable Sister",
+      "language": "韩文",
+      "avatarLetter": "R",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ReliableSister.mp3"
+    },
+    {
+      "voiceId": "Korean_StrictBoss",
+      "label": "Strict Boss",
+      "language": "韩文",
+      "avatarLetter": "S",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_StrictBoss.mp3"
+    },
+    {
+      "voiceId": "Korean_SassyGirl",
+      "label": "Sassy Girl",
+      "language": "韩文",
+      "avatarLetter": "S",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_SassyGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_ChildhoodFriendGirl",
+      "label": "Childhood Friend Girl",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ChildhoodFriendGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_PlayboyCharmer",
+      "label": "Playboy Charmer",
+      "language": "韩文",
+      "avatarLetter": "P",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_PlayboyCharmer.mp3"
+    },
+    {
+      "voiceId": "Korean_ElegantPrincess",
+      "label": "Elegant Princess",
+      "language": "韩文",
+      "avatarLetter": "E",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ElegantPrincess.mp3"
+    },
+    {
+      "voiceId": "Korean_BraveFemaleWarrior",
+      "label": "Brave Female Warrior",
+      "language": "韩文",
+      "avatarLetter": "B",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_BraveFemaleWarrior.mp3"
+    },
+    {
+      "voiceId": "Korean_BraveYouth",
+      "label": "Brave Youth",
+      "language": "韩文",
+      "avatarLetter": "B",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_BraveYouth.mp3"
+    },
+    {
+      "voiceId": "Korean_CalmLady",
+      "label": "Calm Lady",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CalmLady.mp3"
+    },
+    {
+      "voiceId": "Korean_EnthusiasticTeen",
+      "label": "Enthusiastic Teen",
+      "language": "韩文",
+      "avatarLetter": "E",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_EnthusiasticTeen.mp3"
+    },
+    {
+      "voiceId": "Korean_SoothingLady",
+      "label": "Soothing Lady",
+      "language": "韩文",
+      "avatarLetter": "S",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_SoothingLady.mp3"
+    },
+    {
+      "voiceId": "Korean_IntellectualSenior",
+      "label": "Intellectual Senior",
+      "language": "韩文",
+      "avatarLetter": "I",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_IntellectualSenior.mp3"
+    },
+    {
+      "voiceId": "Korean_LonelyWarrior",
+      "label": "Lonely Warrior",
+      "language": "韩文",
+      "avatarLetter": "L",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_LonelyWarrior.mp3"
+    },
+    {
+      "voiceId": "Korean_MatureLady",
+      "label": "Mature Lady",
+      "language": "韩文",
+      "avatarLetter": "M",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_MatureLady.mp3"
+    },
+    {
+      "voiceId": "Korean_InnocentBoy",
+      "label": "Innocent Boy",
+      "language": "韩文",
+      "avatarLetter": "I",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_InnocentBoy.mp3"
+    },
+    {
+      "voiceId": "Korean_CharmingSister",
+      "label": "Charming Sister",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CharmingSister.mp3"
+    },
+    {
+      "voiceId": "Korean_AthleticStudent",
+      "label": "Athletic Student",
+      "language": "韩文",
+      "avatarLetter": "A",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_AthleticStudent.mp3"
+    },
+    {
+      "voiceId": "Korean_BraveAdventurer",
+      "label": "Brave Adventurer",
+      "language": "韩文",
+      "avatarLetter": "B",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_BraveAdventurer.mp3"
+    },
+    {
+      "voiceId": "Korean_CalmGentleman",
+      "label": "Calm Gentleman",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CalmGentleman.mp3"
+    },
+    {
+      "voiceId": "Korean_WiseElf",
+      "label": "Wise Elf",
+      "language": "韩文",
+      "avatarLetter": "W",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_WiseElf.mp3"
+    },
+    {
+      "voiceId": "Korean_CheerfulCoolJunior",
+      "label": "Cheerful Cool Junior",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CheerfulCoolJunior.mp3"
+    },
+    {
+      "voiceId": "Korean_DecisiveQueen",
+      "label": "Decisive Queen",
+      "language": "韩文",
+      "avatarLetter": "D",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_DecisiveQueen.mp3"
+    },
+    {
+      "voiceId": "Korean_ColdYoungMan",
+      "label": "Cold Young Man",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ColdYoungMan.mp3"
+    },
+    {
+      "voiceId": "Korean_MysteriousGirl",
+      "label": "Mysterious Girl",
+      "language": "韩文",
+      "avatarLetter": "M",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_MysteriousGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_QuirkyGirl",
+      "label": "Quirky Girl",
+      "language": "韩文",
+      "avatarLetter": "Q",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_QuirkyGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_ConsiderateSenior",
+      "label": "Considerate Senior",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ConsiderateSenior.mp3"
+    },
+    {
+      "voiceId": "Korean_CheerfulLittleSister",
+      "label": "Cheerful Little Sister",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CheerfulLittleSister.mp3"
+    },
+    {
+      "voiceId": "Korean_DominantMan",
+      "label": "Dominant Man",
+      "language": "韩文",
+      "avatarLetter": "D",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_DominantMan.mp3"
+    },
+    {
+      "voiceId": "Korean_AirheadedGirl",
+      "label": "Airheaded Girl",
+      "language": "韩文",
+      "avatarLetter": "A",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_AirheadedGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_ReliableYouth",
+      "label": "Reliable Youth",
+      "language": "韩文",
+      "avatarLetter": "R",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ReliableYouth.mp3"
+    },
+    {
+      "voiceId": "Korean_FriendlyBigSister",
+      "label": "Friendly Big Sister",
+      "language": "韩文",
+      "avatarLetter": "F",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_FriendlyBigSister.mp3"
+    },
+    {
+      "voiceId": "Korean_GentleBoss",
+      "label": "Gentle Boss",
+      "language": "韩文",
+      "avatarLetter": "G",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_GentleBoss.mp3"
+    },
+    {
+      "voiceId": "Korean_ColdGirl",
+      "label": "Cold Girl",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ColdGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_HaughtyLady",
+      "label": "Haughty Lady",
+      "language": "韩文",
+      "avatarLetter": "H",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_HaughtyLady.mp3"
+    },
+    {
+      "voiceId": "Korean_CharmingElderSister",
+      "label": "Charming Elder Sister",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CharmingElderSister.mp3"
+    },
+    {
+      "voiceId": "Korean_IntellectualMan",
+      "label": "Intellectual Man",
+      "language": "韩文",
+      "avatarLetter": "I",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_IntellectualMan.mp3"
+    },
+    {
+      "voiceId": "Korean_CaringWoman",
+      "label": "Caring Woman",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CaringWoman.mp3"
+    },
+    {
+      "voiceId": "Korean_WiseTeacher",
+      "label": "Wise Teacher",
+      "language": "韩文",
+      "avatarLetter": "W",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_WiseTeacher.mp3"
+    },
+    {
+      "voiceId": "Korean_ConfidentBoss",
+      "label": "Confident Boss",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ConfidentBoss.mp3"
+    },
+    {
+      "voiceId": "Korean_AthleticGirl",
+      "label": "Athletic Girl",
+      "language": "韩文",
+      "avatarLetter": "A",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_AthleticGirl.mp3"
+    },
+    {
+      "voiceId": "Korean_PossessiveMan",
+      "label": "Possessive Man",
+      "language": "韩文",
+      "avatarLetter": "P",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_PossessiveMan.mp3"
+    },
+    {
+      "voiceId": "Korean_GentleWoman",
+      "label": "Gentle Woman",
+      "language": "韩文",
+      "avatarLetter": "G",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_GentleWoman.mp3"
+    },
+    {
+      "voiceId": "Korean_CockyGuy",
+      "label": "Cocky Guy",
+      "language": "韩文",
+      "avatarLetter": "C",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_CockyGuy.mp3"
+    },
+    {
+      "voiceId": "Korean_ThoughtfulWoman",
+      "label": "Thoughtful Woman",
+      "language": "韩文",
+      "avatarLetter": "T",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_ThoughtfulWoman.mp3"
+    },
+    {
+      "voiceId": "Korean_OptimisticYouth",
+      "label": "Optimistic Youth",
+      "language": "韩文",
+      "avatarLetter": "O",
+      "tags": [
+        "韩文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Korean_OptimisticYouth.mp3"
+    },
+    {
+      "voiceId": "Spanish_SereneWoman",
+      "label": "Serene Woman",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_SereneWoman.mp3"
+    },
+    {
+      "voiceId": "Spanish_MaturePartner",
+      "label": "Mature Partner",
+      "language": "西班牙文",
+      "avatarLetter": "M",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_MaturePartner.mp3"
+    },
+    {
+      "voiceId": "Spanish_CaptivatingStoryteller",
+      "label": "Captivating Storyteller",
+      "language": "西班牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_CaptivatingStoryteller.mp3"
+    },
+    {
+      "voiceId": "Spanish_Narrator",
+      "label": "Narrator",
+      "language": "西班牙文",
+      "avatarLetter": "N",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Narrator.mp3"
+    },
+    {
+      "voiceId": "Spanish_WiseScholar",
+      "label": "Wise Scholar",
+      "language": "西班牙文",
+      "avatarLetter": "W",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_WiseScholar.mp3"
+    },
+    {
+      "voiceId": "Spanish_Kind-heartedGirl",
+      "label": "Kind-hearted Girl",
+      "language": "西班牙文",
+      "avatarLetter": "K",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Kind-heartedGirl.mp3"
+    },
+    {
+      "voiceId": "Spanish_DeterminedManager",
+      "label": "Determined Manager",
+      "language": "西班牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_DeterminedManager.mp3"
+    },
+    {
+      "voiceId": "Spanish_BossyLeader",
+      "label": "Bossy Leader",
+      "language": "西班牙文",
+      "avatarLetter": "B",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_BossyLeader.mp3"
+    },
+    {
+      "voiceId": "Spanish_ReservedYoungMan",
+      "label": "Reserved Young Man",
+      "language": "西班牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ReservedYoungMan.mp3"
+    },
+    {
+      "voiceId": "Spanish_ConfidentWoman",
+      "label": "Confident Woman",
+      "language": "西班牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ConfidentWoman.mp3"
+    },
+    {
+      "voiceId": "Spanish_ThoughtfulMan",
+      "label": "Thoughtful Man",
+      "language": "西班牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ThoughtfulMan.mp3"
+    },
+    {
+      "voiceId": "Spanish_Strong-WilledBoy",
+      "label": "Strong-willed Boy",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Strong-WilledBoy.mp3"
+    },
+    {
+      "voiceId": "Spanish_SophisticatedLady",
+      "label": "Sophisticated Lady",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_SophisticatedLady.mp3"
+    },
+    {
+      "voiceId": "Spanish_RationalMan",
+      "label": "Rational Man",
+      "language": "西班牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_RationalMan.mp3"
+    },
+    {
+      "voiceId": "Spanish_AnimeCharacter",
+      "label": "Anime Character",
+      "language": "西班牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_AnimeCharacter.mp3"
+    },
+    {
+      "voiceId": "Spanish_Deep-tonedMan",
+      "label": "Deep-toned Man",
+      "language": "西班牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Deep-tonedMan.mp3"
+    },
+    {
+      "voiceId": "Spanish_Fussyhostess",
+      "label": "Fussy hostess",
+      "language": "西班牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Fussyhostess.mp3"
+    },
+    {
+      "voiceId": "Spanish_SincereTeen",
+      "label": "Sincere Teen",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_SincereTeen.mp3"
+    },
+    {
+      "voiceId": "Spanish_FrankLady",
+      "label": "Frank Lady",
+      "language": "西班牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_FrankLady.mp3"
+    },
+    {
+      "voiceId": "Spanish_Comedian",
+      "label": "Comedian",
+      "language": "西班牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Comedian.mp3"
+    },
+    {
+      "voiceId": "Spanish_Debator",
+      "label": "Debator",
+      "language": "西班牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Debator.mp3"
+    },
+    {
+      "voiceId": "Spanish_ToughBoss",
+      "label": "Tough Boss",
+      "language": "西班牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ToughBoss.mp3"
+    },
+    {
+      "voiceId": "Spanish_Wiselady",
+      "label": "Wise Lady",
+      "language": "西班牙文",
+      "avatarLetter": "W",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Wiselady.mp3"
+    },
+    {
+      "voiceId": "Spanish_Steadymentor",
+      "label": "Steady Mentor",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Steadymentor.mp3"
+    },
+    {
+      "voiceId": "Spanish_Jovialman",
+      "label": "Jovial Man",
+      "language": "西班牙文",
+      "avatarLetter": "J",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Jovialman.mp3"
+    },
+    {
+      "voiceId": "Spanish_SantaClaus",
+      "label": "Santa Claus",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_SantaClaus.mp3"
+    },
+    {
+      "voiceId": "Spanish_Rudolph",
+      "label": "Rudolph",
+      "language": "西班牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Rudolph.mp3"
+    },
+    {
+      "voiceId": "Spanish_Intonategirl",
+      "label": "Intonate Girl",
+      "language": "西班牙文",
+      "avatarLetter": "I",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Intonategirl.mp3"
+    },
+    {
+      "voiceId": "Spanish_Arnold",
+      "label": "Arnold",
+      "language": "西班牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Arnold.mp3"
+    },
+    {
+      "voiceId": "Spanish_Ghost",
+      "label": "Ghost",
+      "language": "西班牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_Ghost.mp3"
+    },
+    {
+      "voiceId": "Spanish_HumorousElder",
+      "label": "Humorous Elder",
+      "language": "西班牙文",
+      "avatarLetter": "H",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_HumorousElder.mp3"
+    },
+    {
+      "voiceId": "Spanish_EnergeticBoy",
+      "label": "Energetic Boy",
+      "language": "西班牙文",
+      "avatarLetter": "E",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_EnergeticBoy.mp3"
+    },
+    {
+      "voiceId": "Spanish_WhimsicalGirl",
+      "label": "Whimsical Girl",
+      "language": "西班牙文",
+      "avatarLetter": "W",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_WhimsicalGirl.mp3"
+    },
+    {
+      "voiceId": "Spanish_StrictBoss",
+      "label": "Strict Boss",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_StrictBoss.mp3"
+    },
+    {
+      "voiceId": "Spanish_ReliableMan",
+      "label": "Reliable Man",
+      "language": "西班牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ReliableMan.mp3"
+    },
+    {
+      "voiceId": "Spanish_SereneElder",
+      "label": "Serene Elder",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_SereneElder.mp3"
+    },
+    {
+      "voiceId": "Spanish_AngryMan",
+      "label": "Angry Man",
+      "language": "西班牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_AngryMan.mp3"
+    },
+    {
+      "voiceId": "Spanish_AssertiveQueen",
+      "label": "Assertive Queen",
+      "language": "西班牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_AssertiveQueen.mp3"
+    },
+    {
+      "voiceId": "Spanish_CaringGirlfriend",
+      "label": "Caring Girlfriend",
+      "language": "西班牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_CaringGirlfriend.mp3"
+    },
+    {
+      "voiceId": "Spanish_PowerfulSoldier",
+      "label": "Powerful Soldier",
+      "language": "西班牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_PowerfulSoldier.mp3"
+    },
+    {
+      "voiceId": "Spanish_PassionateWarrior",
+      "label": "Passionate Warrior",
+      "language": "西班牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_PassionateWarrior.mp3"
+    },
+    {
+      "voiceId": "Spanish_ChattyGirl",
+      "label": "Chatty Girl",
+      "language": "西班牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ChattyGirl.mp3"
+    },
+    {
+      "voiceId": "Spanish_RomanticHusband",
+      "label": "Romantic Husband",
+      "language": "西班牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_RomanticHusband.mp3"
+    },
+    {
+      "voiceId": "Spanish_CompellingGirl",
+      "label": "Compelling Girl",
+      "language": "西班牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_CompellingGirl.mp3"
+    },
+    {
+      "voiceId": "Spanish_PowerfulVeteran",
+      "label": "Powerful Veteran",
+      "language": "西班牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_PowerfulVeteran.mp3"
+    },
+    {
+      "voiceId": "Spanish_SensibleManager",
+      "label": "Sensible Manager",
+      "language": "西班牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_SensibleManager.mp3"
+    },
+    {
+      "voiceId": "Spanish_ThoughtfulLady",
+      "label": "Thoughtful Lady",
+      "language": "西班牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "西班牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Spanish_ThoughtfulLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SentimentalLady",
+      "label": "Sentimental Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SentimentalLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_BossyLeader",
+      "label": "Bossy Leader",
+      "language": "葡萄牙文",
+      "avatarLetter": "B",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_BossyLeader.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Wiselady",
+      "label": "Wise lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "W",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Wiselady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Strong-WilledBoy",
+      "label": "Strong-willed Boy",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Strong-WilledBoy.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Deep-VoicedGentleman",
+      "label": "Deep-voiced Gentleman",
+      "language": "葡萄牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Deep-VoicedGentleman.mp3"
+    },
+    {
+      "voiceId": "Portuguese_UpsetGirl",
+      "label": "Upset Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "U",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_UpsetGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_PassionateWarrior",
+      "label": "Passionate Warrior",
+      "language": "葡萄牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_PassionateWarrior.mp3"
+    },
+    {
+      "voiceId": "Portuguese_AnimeCharacter",
+      "label": "Anime Character",
+      "language": "葡萄牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_AnimeCharacter.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ConfidentWoman",
+      "label": "Confident Woman",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ConfidentWoman.mp3"
+    },
+    {
+      "voiceId": "Portuguese_AngryMan",
+      "label": "Angry Man",
+      "language": "葡萄牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_AngryMan.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CaptivatingStoryteller",
+      "label": "Captivating Storyteller",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CaptivatingStoryteller.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Godfather",
+      "label": "Godfather",
+      "language": "葡萄牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Godfather.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ReservedYoungMan",
+      "label": "Reserved Young Man",
+      "language": "葡萄牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ReservedYoungMan.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SmartYoungGirl",
+      "label": "Smart Young Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SmartYoungGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Kind-heartedGirl",
+      "label": "Kind-hearted Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "K",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Kind-heartedGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Pompouslady",
+      "label": "Pompous lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Pompouslady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Grinch",
+      "label": "Grinch",
+      "language": "葡萄牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Grinch.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Debator",
+      "label": "Debator",
+      "language": "葡萄牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Debator.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SweetGirl",
+      "label": "Sweet Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SweetGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_AttractiveGirl",
+      "label": "Attractive Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_AttractiveGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ThoughtfulMan",
+      "label": "Thoughtful Man",
+      "language": "葡萄牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ThoughtfulMan.mp3"
+    },
+    {
+      "voiceId": "Portuguese_PlayfulGirl",
+      "label": "Playful Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_PlayfulGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_GorgeousLady",
+      "label": "Gorgeous Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_GorgeousLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_LovelyLady",
+      "label": "Lovely Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "L",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_LovelyLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SereneWoman",
+      "label": "Serene Woman",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SereneWoman.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SadTeen",
+      "label": "Sad Teen",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SadTeen.mp3"
+    },
+    {
+      "voiceId": "Portuguese_MaturePartner",
+      "label": "Mature Partner",
+      "language": "葡萄牙文",
+      "avatarLetter": "M",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_MaturePartner.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Comedian",
+      "label": "Comedian",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Comedian.mp3"
+    },
+    {
+      "voiceId": "Portuguese_NaughtySchoolgirl",
+      "label": "Naughty Schoolgirl",
+      "language": "葡萄牙文",
+      "avatarLetter": "N",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_NaughtySchoolgirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Narrator",
+      "label": "Narrator",
+      "language": "葡萄牙文",
+      "avatarLetter": "N",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Narrator.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ToughBoss",
+      "label": "Tough Boss",
+      "language": "葡萄牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ToughBoss.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Fussyhostess",
+      "label": "Fussy hostess",
+      "language": "葡萄牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Fussyhostess.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Dramatist",
+      "label": "Dramatist",
+      "language": "葡萄牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Dramatist.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Steadymentor",
+      "label": "Steady Mentor",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Steadymentor.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Jovialman",
+      "label": "Jovial Man",
+      "language": "葡萄牙文",
+      "avatarLetter": "J",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Jovialman.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CharmingQueen",
+      "label": "Charming Queen",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CharmingQueen.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SantaClaus",
+      "label": "Santa Claus",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SantaClaus.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Rudolph",
+      "label": "Rudolph",
+      "language": "葡萄牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Rudolph.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Arnold",
+      "label": "Arnold",
+      "language": "葡萄牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Arnold.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CharmingSanta",
+      "label": "Charming Santa",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CharmingSanta.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CharmingLady",
+      "label": "Charming Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CharmingLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Ghost",
+      "label": "Ghost",
+      "language": "葡萄牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Ghost.mp3"
+    },
+    {
+      "voiceId": "Portuguese_HumorousElder",
+      "label": "Humorous Elder",
+      "language": "葡萄牙文",
+      "avatarLetter": "H",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_HumorousElder.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CalmLeader",
+      "label": "Calm Leader",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CalmLeader.mp3"
+    },
+    {
+      "voiceId": "Portuguese_GentleTeacher",
+      "label": "Gentle Teacher",
+      "language": "葡萄牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_GentleTeacher.mp3"
+    },
+    {
+      "voiceId": "Portuguese_EnergeticBoy",
+      "label": "Energetic Boy",
+      "language": "葡萄牙文",
+      "avatarLetter": "E",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_EnergeticBoy.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ReliableMan",
+      "label": "Reliable Man",
+      "language": "葡萄牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ReliableMan.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SereneElder",
+      "label": "Serene Elder",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SereneElder.mp3"
+    },
+    {
+      "voiceId": "Portuguese_GrimReaper",
+      "label": "Grim Reaper",
+      "language": "葡萄牙文",
+      "avatarLetter": "G",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_GrimReaper.mp3"
+    },
+    {
+      "voiceId": "Portuguese_AssertiveQueen",
+      "label": "Assertive Queen",
+      "language": "葡萄牙文",
+      "avatarLetter": "A",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_AssertiveQueen.mp3"
+    },
+    {
+      "voiceId": "Portuguese_WhimsicalGirl",
+      "label": "Whimsical Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "W",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_WhimsicalGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_StressedLady",
+      "label": "Stressed Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_StressedLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_FriendlyNeighbor",
+      "label": "Friendly Neighbor",
+      "language": "葡萄牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_FriendlyNeighbor.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CaringGirlfriend",
+      "label": "Caring Girlfriend",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CaringGirlfriend.mp3"
+    },
+    {
+      "voiceId": "Portuguese_PowerfulSoldier",
+      "label": "Powerful Soldier",
+      "language": "葡萄牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_PowerfulSoldier.mp3"
+    },
+    {
+      "voiceId": "Portuguese_FascinatingBoy",
+      "label": "Fascinating Boy",
+      "language": "葡萄牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_FascinatingBoy.mp3"
+    },
+    {
+      "voiceId": "Portuguese_RomanticHusband",
+      "label": "Romantic Husband",
+      "language": "葡萄牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_RomanticHusband.mp3"
+    },
+    {
+      "voiceId": "Portuguese_StrictBoss",
+      "label": "Strict Boss",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_StrictBoss.mp3"
+    },
+    {
+      "voiceId": "Portuguese_InspiringLady",
+      "label": "Inspiring Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "I",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_InspiringLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_PlayfulSpirit",
+      "label": "Playful Spirit",
+      "language": "葡萄牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_PlayfulSpirit.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ElegantGirl",
+      "label": "Elegant Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "E",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ElegantGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_CompellingGirl",
+      "label": "Compelling Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_CompellingGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_PowerfulVeteran",
+      "label": "Powerful Veteran",
+      "language": "葡萄牙文",
+      "avatarLetter": "P",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_PowerfulVeteran.mp3"
+    },
+    {
+      "voiceId": "Portuguese_SensibleManager",
+      "label": "Sensible Manager",
+      "language": "葡萄牙文",
+      "avatarLetter": "S",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_SensibleManager.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ThoughtfulLady",
+      "label": "Thoughtful Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ThoughtfulLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_TheatricalActor",
+      "label": "Theatrical Actor",
+      "language": "葡萄牙文",
+      "avatarLetter": "T",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_TheatricalActor.mp3"
+    },
+    {
+      "voiceId": "Portuguese_FragileBoy",
+      "label": "Fragile Boy",
+      "language": "葡萄牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_FragileBoy.mp3"
+    },
+    {
+      "voiceId": "Portuguese_ChattyGirl",
+      "label": "Chatty Girl",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_ChattyGirl.mp3"
+    },
+    {
+      "voiceId": "Portuguese_Conscientiousinstructor",
+      "label": "Conscientious Instructor",
+      "language": "葡萄牙文",
+      "avatarLetter": "C",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_Conscientiousinstructor.mp3"
+    },
+    {
+      "voiceId": "Portuguese_RationalMan",
+      "label": "Rational Man",
+      "language": "葡萄牙文",
+      "avatarLetter": "R",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_RationalMan.mp3"
+    },
+    {
+      "voiceId": "Portuguese_WiseScholar",
+      "label": "Wise Scholar",
+      "language": "葡萄牙文",
+      "avatarLetter": "W",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_WiseScholar.mp3"
+    },
+    {
+      "voiceId": "Portuguese_FrankLady",
+      "label": "Frank Lady",
+      "language": "葡萄牙文",
+      "avatarLetter": "F",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_FrankLady.mp3"
+    },
+    {
+      "voiceId": "Portuguese_DeterminedManager",
+      "label": "Determined Manager",
+      "language": "葡萄牙文",
+      "avatarLetter": "D",
+      "tags": [
+        "葡萄牙文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Portuguese_DeterminedManager.mp3"
+    },
+    {
+      "voiceId": "French_Male_Speech_New",
+      "label": "Level-Headed Man",
+      "language": "法文",
+      "avatarLetter": "L",
+      "tags": [
+        "法文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/French_Male_Speech_New.mp3"
+    },
+    {
+      "voiceId": "French_Female_News Anchor",
+      "label": "Patient Female Presenter",
+      "language": "法文",
+      "avatarLetter": "P",
+      "tags": [
+        "法文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/French_Female_News_Anchor.mp3"
+    },
+    {
+      "voiceId": "French_CasualMan",
+      "label": "Casual Man",
+      "language": "法文",
+      "avatarLetter": "C",
+      "tags": [
+        "法文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/French_CasualMan.mp3"
+    },
+    {
+      "voiceId": "French_MovieLeadFemale",
+      "label": "Movie Lead Female",
+      "language": "法文",
+      "avatarLetter": "M",
+      "tags": [
+        "法文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/French_MovieLeadFemale.mp3"
+    },
+    {
+      "voiceId": "French_FemaleAnchor",
+      "label": "Female Anchor",
+      "language": "法文",
+      "avatarLetter": "F",
+      "tags": [
+        "法文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/French_FemaleAnchor.mp3"
+    },
+    {
+      "voiceId": "French_MaleNarrator",
+      "label": "Male Narrator",
+      "language": "法文",
+      "avatarLetter": "M",
+      "tags": [
+        "法文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/French_MaleNarrator.mp3"
+    },
+    {
+      "voiceId": "Indonesian_SweetGirl",
+      "label": "Sweet Girl",
+      "language": "印尼文",
+      "avatarLetter": "S",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_SweetGirl.mp3"
+    },
+    {
+      "voiceId": "Indonesian_ReservedYoungMan",
+      "label": "Reserved Young Man",
+      "language": "印尼文",
+      "avatarLetter": "R",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_ReservedYoungMan.mp3"
+    },
+    {
+      "voiceId": "Indonesian_CharmingGirl",
+      "label": "Charming Girl",
+      "language": "印尼文",
+      "avatarLetter": "C",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_CharmingGirl.mp3"
+    },
+    {
+      "voiceId": "Indonesian_CalmWoman",
+      "label": "Calm Woman",
+      "language": "印尼文",
+      "avatarLetter": "C",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_CalmWoman.mp3"
+    },
+    {
+      "voiceId": "Indonesian_ConfidentWoman",
+      "label": "Confident Woman",
+      "language": "印尼文",
+      "avatarLetter": "C",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_ConfidentWoman.mp3"
+    },
+    {
+      "voiceId": "Indonesian_CaringMan",
+      "label": "Caring Man",
+      "language": "印尼文",
+      "avatarLetter": "C",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_CaringMan.mp3"
+    },
+    {
+      "voiceId": "Indonesian_BossyLeader",
+      "label": "Bossy Leader",
+      "language": "印尼文",
+      "avatarLetter": "B",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_BossyLeader.mp3"
+    },
+    {
+      "voiceId": "Indonesian_DeterminedBoy",
+      "label": "Determined Boy",
+      "language": "印尼文",
+      "avatarLetter": "D",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_DeterminedBoy.mp3"
+    },
+    {
+      "voiceId": "Indonesian_GentleGirl",
+      "label": "Gentle Girl",
+      "language": "印尼文",
+      "avatarLetter": "G",
+      "tags": [
+        "印尼文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Indonesian_GentleGirl.mp3"
+    },
+    {
+      "voiceId": "German_FriendlyMan",
+      "label": "Friendly Man",
+      "language": "德文",
+      "avatarLetter": "F",
+      "tags": [
+        "德文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/German_FriendlyMan.mp3"
+    },
+    {
+      "voiceId": "German_SweetLady",
+      "label": "Sweet Lady",
+      "language": "德文",
+      "avatarLetter": "S",
+      "tags": [
+        "德文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/German_SweetLady.mp3"
+    },
+    {
+      "voiceId": "German_PlayfulMan",
+      "label": "Playful Man",
+      "language": "德文",
+      "avatarLetter": "P",
+      "tags": [
+        "德文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/German_PlayfulMan.mp3"
+    },
+    {
+      "voiceId": "Russian_HandsomeChildhoodFriend",
+      "label": "Handsome Childhood Friend",
+      "language": "俄文",
+      "avatarLetter": "H",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_HandsomeChildhoodFriend.mp3"
+    },
+    {
+      "voiceId": "Russian_BrightHeroine",
+      "label": "Bright Queen",
+      "language": "俄文",
+      "avatarLetter": "B",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_BrightHeroine.mp3"
+    },
+    {
+      "voiceId": "Russian_AmbitiousWoman",
+      "label": "Ambitious Woman",
+      "language": "俄文",
+      "avatarLetter": "A",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_AmbitiousWoman.mp3"
+    },
+    {
+      "voiceId": "Russian_ReliableMan",
+      "label": "Reliable Man",
+      "language": "俄文",
+      "avatarLetter": "R",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_ReliableMan.mp3"
+    },
+    {
+      "voiceId": "Russian_CrazyQueen",
+      "label": "Crazy Girl",
+      "language": "俄文",
+      "avatarLetter": "C",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_CrazyQueen.mp3"
+    },
+    {
+      "voiceId": "Russian_PessimisticGirl",
+      "label": "Pessimistic Girl",
+      "language": "俄文",
+      "avatarLetter": "P",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_PessimisticGirl.mp3"
+    },
+    {
+      "voiceId": "Russian_AttractiveGuy",
+      "label": "Attractive Guy",
+      "language": "俄文",
+      "avatarLetter": "A",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_AttractiveGuy.mp3"
+    },
+    {
+      "voiceId": "Russian_Bad-temperedBoy",
+      "label": "Bad-tempered Boy",
+      "language": "俄文",
+      "avatarLetter": "B",
+      "tags": [
+        "俄文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Russian_Bad-temperedBoy.mp3"
+    },
+    {
+      "voiceId": "Italian_BraveHeroine",
+      "label": "Brave Heroine",
+      "language": "意大利文",
+      "avatarLetter": "B",
+      "tags": [
+        "意大利文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Italian_BraveHeroine.mp3"
+    },
+    {
+      "voiceId": "Italian_Narrator",
+      "label": "Narrator",
+      "language": "意大利文",
+      "avatarLetter": "N",
+      "tags": [
+        "意大利文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Italian_Narrator.mp3"
+    },
+    {
+      "voiceId": "Italian_WanderingSorcerer",
+      "label": "Wandering Sorcerer",
+      "language": "意大利文",
+      "avatarLetter": "W",
+      "tags": [
+        "意大利文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Italian_WanderingSorcerer.mp3"
+    },
+    {
+      "voiceId": "Italian_DiligentLeader",
+      "label": "Diligent Leader",
+      "language": "意大利文",
+      "avatarLetter": "D",
+      "tags": [
+        "意大利文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Italian_DiligentLeader.mp3"
+    },
+    {
+      "voiceId": "Arabic_CalmWoman",
+      "label": "Calm Woman",
+      "language": "阿拉伯文",
+      "avatarLetter": "C",
+      "tags": [
+        "阿拉伯文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Arabic_CalmWoman.mp3"
+    },
+    {
+      "voiceId": "Arabic_FriendlyGuy",
+      "label": "Friendly Guy",
+      "language": "阿拉伯文",
+      "avatarLetter": "F",
+      "tags": [
+        "阿拉伯文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Arabic_FriendlyGuy.mp3"
+    },
+    {
+      "voiceId": "Turkish_CalmWoman",
+      "label": "Calm Woman",
+      "language": "土耳其文",
+      "avatarLetter": "C",
+      "tags": [
+        "土耳其文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Turkish_CalmWoman.mp3"
+    },
+    {
+      "voiceId": "Turkish_Trustworthyman",
+      "label": "Trustworthy man",
+      "language": "土耳其文",
+      "avatarLetter": "T",
+      "tags": [
+        "土耳其文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Turkish_Trustworthyman.mp3"
+    },
+    {
+      "voiceId": "Ukrainian_CalmWoman",
+      "label": "Calm Woman",
+      "language": "乌克兰文",
+      "avatarLetter": "C",
+      "tags": [
+        "乌克兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Ukrainian_CalmWoman.mp3"
+    },
+    {
+      "voiceId": "Ukrainian_WiseScholar",
+      "label": "Wise Scholar",
+      "language": "乌克兰文",
+      "avatarLetter": "W",
+      "tags": [
+        "乌克兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Ukrainian_WiseScholar.mp3"
+    },
+    {
+      "voiceId": "Dutch_kindhearted_girl",
+      "label": "Kind-hearted girl",
+      "language": "荷兰文",
+      "avatarLetter": "K",
+      "tags": [
+        "荷兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Dutch_kindhearted_girl.mp3"
+    },
+    {
+      "voiceId": "Dutch_bossy_leader",
+      "label": "Bossy leader",
+      "language": "荷兰文",
+      "avatarLetter": "B",
+      "tags": [
+        "荷兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Dutch_bossy_leader.mp3"
+    },
+    {
+      "voiceId": "Vietnamese_kindhearted_girl",
+      "label": "Kind-hearted girl",
+      "language": "越南文",
+      "avatarLetter": "K",
+      "tags": [
+        "越南文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Vietnamese_kindhearted_girl.mp3"
+    },
+    {
+      "voiceId": "Thai_male_1_sample8",
+      "label": "Serene Man",
+      "language": "泰文",
+      "avatarLetter": "S",
+      "tags": [
+        "泰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Thai_male_1_sample8.mp3"
+    },
+    {
+      "voiceId": "Thai_male_2_sample2",
+      "label": "Friendly Man",
+      "language": "泰文",
+      "avatarLetter": "F",
+      "tags": [
+        "泰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Thai_male_2_sample2.mp3"
+    },
+    {
+      "voiceId": "Thai_female_1_sample1",
+      "label": "Confident Woman",
+      "language": "泰文",
+      "avatarLetter": "C",
+      "tags": [
+        "泰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Thai_female_1_sample1.mp3"
+    },
+    {
+      "voiceId": "Thai_female_2_sample2",
+      "label": "Energetic Woman",
+      "language": "泰文",
+      "avatarLetter": "E",
+      "tags": [
+        "泰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Thai_female_2_sample2.mp3"
+    },
+    {
+      "voiceId": "Polish_male_1_sample4",
+      "label": "Male Narrator",
+      "language": "波兰文",
+      "avatarLetter": "M",
+      "tags": [
+        "波兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Polish_male_1_sample4.mp3"
+    },
+    {
+      "voiceId": "Polish_male_2_sample3",
+      "label": "Male Anchor",
+      "language": "波兰文",
+      "avatarLetter": "M",
+      "tags": [
+        "波兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Polish_male_2_sample3.mp3"
+    },
+    {
+      "voiceId": "Polish_female_1_sample1",
+      "label": "Calm Woman",
+      "language": "波兰文",
+      "avatarLetter": "C",
+      "tags": [
+        "波兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Polish_female_1_sample1.mp3"
+    },
+    {
+      "voiceId": "Polish_female_2_sample3",
+      "label": "Casual Woman",
+      "language": "波兰文",
+      "avatarLetter": "C",
+      "tags": [
+        "波兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Polish_female_2_sample3.mp3"
+    },
+    {
+      "voiceId": "Romanian_male_1_sample2",
+      "label": "Reliable Man",
+      "language": "罗马尼亚文",
+      "avatarLetter": "R",
+      "tags": [
+        "罗马尼亚文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Romanian_male_1_sample2.mp3"
+    },
+    {
+      "voiceId": "Romanian_male_2_sample1",
+      "label": "Energetic Youth",
+      "language": "罗马尼亚文",
+      "avatarLetter": "E",
+      "tags": [
+        "罗马尼亚文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Romanian_male_2_sample1.mp3"
+    },
+    {
+      "voiceId": "Romanian_female_1_sample4",
+      "label": "Optimistic Youth",
+      "language": "罗马尼亚文",
+      "avatarLetter": "O",
+      "tags": [
+        "罗马尼亚文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Romanian_female_1_sample4.mp3"
+    },
+    {
+      "voiceId": "Romanian_female_2_sample1",
+      "label": "Gentle Woman",
+      "language": "罗马尼亚文",
+      "avatarLetter": "G",
+      "tags": [
+        "罗马尼亚文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Romanian_female_2_sample1.mp3"
+    },
+    {
+      "voiceId": "greek_male_1a_v1",
+      "label": "Thoughtful Mentor",
+      "language": "希腊文",
+      "avatarLetter": "T",
+      "tags": [
+        "希腊文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/greek_male_1a_v1.mp3"
+    },
+    {
+      "voiceId": "Greek_female_1_sample1",
+      "label": "Gentle Lady",
+      "language": "希腊文",
+      "avatarLetter": "G",
+      "tags": [
+        "希腊文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Greek_female_1_sample1.mp3"
+    },
+    {
+      "voiceId": "Greek_female_2_sample3",
+      "label": "Girl Next Door",
+      "language": "希腊文",
+      "avatarLetter": "G",
+      "tags": [
+        "希腊文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/Greek_female_2_sample3.mp3"
+    },
+    {
+      "voiceId": "czech_male_1_v1",
+      "label": "Assured Presenter",
+      "language": "捷克文",
+      "avatarLetter": "A",
+      "tags": [
+        "捷克文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/czech_male_1_v1.mp3"
+    },
+    {
+      "voiceId": "czech_female_5_v7",
+      "label": "Steadfast Narrator",
+      "language": "捷克文",
+      "avatarLetter": "S",
+      "tags": [
+        "捷克文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/czech_female_5_v7.mp3"
+    },
+    {
+      "voiceId": "czech_female_2_v2",
+      "label": "Elegant Lady",
+      "language": "捷克文",
+      "avatarLetter": "E",
+      "tags": [
+        "捷克文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/czech_female_2_v2.mp3"
+    },
+    {
+      "voiceId": "finnish_male_3_v1",
+      "label": "Upbeat Man",
+      "language": "芬兰文",
+      "avatarLetter": "U",
+      "tags": [
+        "芬兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/finnish_male_3_v1.mp3"
+    },
+    {
+      "voiceId": "finnish_male_1_v2",
+      "label": "Friendly Boy",
+      "language": "芬兰文",
+      "avatarLetter": "F",
+      "tags": [
+        "芬兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/finnish_male_1_v2.mp3"
+    },
+    {
+      "voiceId": "finnish_female_4_v1",
+      "label": "Assetive Woman",
+      "language": "芬兰文",
+      "avatarLetter": "A",
+      "tags": [
+        "芬兰文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/finnish_female_4_v1.mp3"
+    },
+    {
+      "voiceId": "hindi_male_1_v2",
+      "label": "Trustworthy Advisor",
+      "language": "印地文",
+      "avatarLetter": "T",
+      "tags": [
+        "印地文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/hindi_male_1_v2.mp3"
+    },
+    {
+      "voiceId": "hindi_female_2_v1",
+      "label": "Tranquil Woman",
+      "language": "印地文",
+      "avatarLetter": "T",
+      "tags": [
+        "印地文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/hindi_female_2_v1.mp3"
+    },
+    {
+      "voiceId": "hindi_female_1_v2",
+      "label": "News Anchor",
+      "language": "印地文",
+      "avatarLetter": "N",
+      "tags": [
+        "印地文"
+      ],
+      "previewUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/voices/hindi_female_1_v2.mp3"
+    }
+  ]
+}

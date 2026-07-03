@@ -2184,14 +2184,7 @@ enum GatewayProviderKind {
   HUNYUAN
   DASHSCOPE
   VOLCENGINE
-}
-
-enum GatewayRequestStatus {
-  PENDING
-  RUNNING
-  SUCCEEDED
-  FAILED
-  CANCELLED
+  MINIMAX
 }
 
 enum GatewayRequestKind {
@@ -2201,6 +2194,15 @@ enum GatewayRequestKind {
   OTHER
   TTS
   TRYON
+  MUSIC
+}
+
+enum GatewayRequestStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
 }
 
 enum GatewayMetricsSource {

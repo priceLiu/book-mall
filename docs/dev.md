@@ -133,3 +133,18 @@ pnpm build:prompt-vendor:copy  # 仅拷贝已有 packages/web/dist（跳过 buil
 详细说明：[docs/prompt-optimizer.md](./prompt-optimizer.md)、[deploy/tencent/README.md](../deploy/tencent/README.md)。
 
 Agent 约束见 `.cursor/rules/prompt-optimizer-platform-build.mdc`。
+
+## QuickReplica · MiniMax 音色同步
+
+MiniMax 系统音色与试听 MP3 经离线脚本写入 OSS，并生成 `book-mall/content/quick-replica/minimax-voice-catalog.json` 供 Platform API 分页读取。
+
+**运行时无需** `.env.local` 的 `MINIMAX_API_KEY`：Book / QuickReplica **不直连** MiniMax，只经 Gateway；凭证在 `docs/minimax.md` 首行 `api-key:`，执行一次：
+
+```bash
+cd book-mall
+pnpm qr:bind-minimax-gateway   # 读 minimax.md → 写入所有 ADMIN 的 Gateway 凭证池并绑定 sk-gw
+pnpm gateway:seed-registry     # 模型注册表（已含 5 个 MiniMax modelKey）
+```
+
+Gateway 路由：`POST /api/gw/v1/minimax/tts`、`/voices/query`、`/voice-convert`、`/music/generate` 等。接口说明见 [docs/minimax.md](./minimax.md)（**不含** API Key）。
+

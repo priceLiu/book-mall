@@ -9,8 +9,8 @@ type Props = {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  /** default: 窄条；square: 80% 正方形；preview: 居中盒 min(90vw,1400)×min(calc(100vh-80px),90dvh) */
-  variant?: "default" | "square" | "preview";
+  /** default: 窄条；square: 80% 正方形；preview: 居中盒；audio / audio-track: 音轨弹层（同宽） */
+  variant?: "default" | "square" | "preview" | "audio" | "audio-track";
   hideHeader?: boolean;
 };
 
@@ -38,12 +38,18 @@ export function QrModal({
 
   if (!open || typeof document === "undefined") return null;
 
+  const audioTrackWidth = "w-[min(92vw,1200px)]";
+
   const shellClass =
     variant === "preview"
       ? "qr-modal-shell relative z-10 flex h-[min(calc(100vh-80px),90dvh)] w-[min(90vw,1400px)] max-h-[calc(100vh-80px)] max-w-[min(90vw,1400px)] min-h-[33vh]"
-      : variant === "square"
-        ? "qr-modal-shell relative z-10 flex h-[80vmin] w-[80vmin] max-h-[80dvh] max-w-[80vw]"
-        : "qr-modal-shell relative z-10 flex max-h-[90dvh] w-full max-w-lg";
+      : variant === "audio-track"
+        ? `relative z-10 flex ${audioTrackWidth} pointer-events-auto`
+        : variant === "audio"
+          ? `qr-modal-shell relative z-10 flex ${audioTrackWidth} max-h-[85dvh]`
+          : variant === "square"
+            ? "qr-modal-shell relative z-10 flex h-[80vmin] w-[80vmin] max-h-[80dvh] max-w-[80vw]"
+            : "qr-modal-shell relative z-10 flex max-h-[90dvh] w-full max-w-lg";
 
   const showHeader = Boolean(title) && !hideHeader;
 

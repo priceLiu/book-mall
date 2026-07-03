@@ -365,6 +365,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     DASHSCOPE: "DashScope",
     HUNYUAN: "腾讯混元",
     VOLCENGINE: "火山方舟",
+    MINIMAX: "MiniMax",
   };
 
   type CatalogModel = Omit<GroupModel, "canonicalModelKey">;
@@ -387,7 +388,10 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
   const isImage = (m: CatalogModel) => m.requestKind === "IMAGE" || m.role === "IMAGE";
   const isVideo = (m: CatalogModel) => m.requestKind === "VIDEO" || m.role === "VIDEO";
   const isFunc = (m: CatalogModel) =>
-    m.requestKind === "TTS" || m.requestKind === "TRYON" || m.requestKind === "OTHER";
+    m.requestKind === "TTS" ||
+    m.requestKind === "MUSIC" ||
+    m.requestKind === "TRYON" ||
+    m.requestKind === "OTHER";
 
   const filterTabs = (pred: (m: CatalogModel) => boolean) =>
     groups

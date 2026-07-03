@@ -15,6 +15,10 @@ import { listHunyuanKnownModels } from "@/lib/canvas/providers/hunyuan-3d";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
 import type { CanvasGatewayListedModel } from "@/lib/canvas/providers/types";
 import { WANX_TEXT2IMAGE_PLUS_MODEL } from "@/lib/gateway/dashscope-client";
+import {
+  MINIMAX_MUSIC_MODELS,
+  MINIMAX_SPEECH_MODELS,
+} from "@/lib/gateway/minimax-speech-models";
 import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
@@ -24,7 +28,8 @@ export type GatewayCatalogRequestKind =
   | "VIDEO"
   | "TTS"
   | "TRYON"
-  | "OTHER";
+  | "OTHER"
+  | "MUSIC";
 
 export type GatewayCatalogModel = {
   modelKey: string;
@@ -84,6 +89,7 @@ const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   DASHSCOPE: "DashScope 原生",
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山方舟 / 豆包",
+  MINIMAX: "MiniMax",
 };
 
 /** 与 tool-web/config/lab-video-models.json 保持同步 */
@@ -428,6 +434,29 @@ export function buildGatewayModelCatalog(
     ]),
   );
 
+  const minimaxModels = sortModels(
+    dedupeByKey([
+      ...MINIMAX_SPEECH_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.label,
+        requestKind: "TTS" as const,
+        role: "TTS" as const,
+        description: m.subtitle,
+        products: ["QuickReplica"],
+        capabilities: [] as string[],
+      })),
+      ...MINIMAX_MUSIC_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.label,
+        requestKind: "MUSIC" as const,
+        role: "TTS" as const,
+        description: m.subtitle,
+        products: ["QuickReplica"],
+        capabilities: [] as string[],
+      })),
+    ]),
+  );
+
   const groups: GatewayCatalogGroup[] = (
     [
       ["KIE", kieModels],
@@ -436,6 +465,7 @@ export function buildGatewayModelCatalog(
       ["DASHSCOPE", dashscopeModels],
       ["HUNYUAN", hunyuanModels],
       ["VOLCENGINE", volcengineModels],
+      ["MINIMAX", minimaxModels],
     ] as const
   ).map(([providerKind, models]) => ({
     providerKind,

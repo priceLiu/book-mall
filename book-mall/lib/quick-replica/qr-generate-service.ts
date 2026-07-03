@@ -35,6 +35,8 @@ import {
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrCategory, QrTemplateJson, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
+import { getQrAudioVoiceDef } from "@/lib/quick-replica/qr-audio-catalog";
+import { findMinimaxVoiceById } from "@/lib/quick-replica/minimax-voice-catalog";
 
 function isQrTextToImageCharacterKind(kind: string): boolean {
   return kind === "create-character" || kind === "character-image";
@@ -243,7 +245,13 @@ function readGenerateDraftFromLog(log: {
 }): QrWorkspaceDraft | null {
   if (!log.inputSummary || typeof log.inputSummary !== "object") return null;
   const root = log.inputSummary as Record<string, unknown>;
-  const snap = root.qrGenerate ?? root.qrMotionSync ?? root.qrTextToVideo ?? root.qrTextToAudio;
+  const snap =
+    root.qrGenerate ??
+    root.qrMotionSync ??
+    root.qrTextToVideo ??
+    root.qrTextToAudio ??
+    root.qrVoiceChanger ??
+    root.qrCreateMusic;
   if (!snap || typeof snap !== "object") return null;
   const s = snap as Record<string, unknown>;
   if (s.draft && typeof s.draft === "object") {
@@ -284,9 +292,27 @@ function buildTemplateModelParamsFromDraft(draft: QrWorkspaceDraft): Record<stri
   if (draft.aspectRatio) params.aspect_ratio = draft.aspectRatio;
   if (draft.resolution) params.resolution = draft.resolution;
   if (draft.outputFormat) params.output_format = draft.outputFormat;
-  if (draft.voiceId) params.voice_id = draft.voiceId;
+  if (draft.voiceId) {
+    params.voice_id = draft.voiceId;
+    const fromManifest = findMinimaxVoiceById(draft.voiceId);
+    if (fromManifest) {
+      params.voice_label = fromManifest.label;
+      params.voice_subtitle = fromManifest.language ?? fromManifest.subtitle;
+    } else {
+      const inline = getQrAudioVoiceDef(draft.voiceId);
+      if (inline.voiceId === draft.voiceId.trim()) {
+        params.voice_label = inline.label;
+        params.voice_subtitle = inline.subtitle;
+      }
+    }
+  }
   if (draft.audioStyleTag) params.style_tag = draft.audioStyleTag;
   if (draft.voiceSpeed != null) params.speed = draft.voiceSpeed;
+  if (draft.voiceVolume != null) params.vol = draft.voiceVolume;
+  if (draft.voicePitch != null) params.pitch = draft.voicePitch;
+  if (draft.voiceTone != null) params.tone = draft.voiceTone;
+  if (draft.voiceIntensity != null) params.intensity = draft.voiceIntensity;
+  if (draft.voiceTimbre != null) params.timbre = draft.voiceTimbre;
   if (draft.voiceStability != null) params.stability = draft.voiceStability;
   if (draft.voiceSimilarityBoost != null) params.similarity_boost = draft.voiceSimilarityBoost;
   if (draft.voiceStyleExaggeration != null) params.style_exaggeration = draft.voiceStyleExaggeration;
@@ -317,7 +343,9 @@ async function createUserTemplateFromLog(args: {
     thumbnailUrl:
       args.mediaType === "image"
         ? args.outputUrl
-        : args.draft.targetImageUrl || args.outputUrl,
+        : args.mediaType === "audio"
+          ? args.draft.targetImageUrl || ""
+          : args.draft.targetImageUrl || args.outputUrl,
     sortOrder: 0,
     gatewayRequestLogId: args.logId,
     reference: {

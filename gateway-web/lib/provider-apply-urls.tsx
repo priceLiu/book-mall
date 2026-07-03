@@ -1,7 +1,13 @@
 /** 各厂商 API Key 申请入口（Gateway 控制台展示） */
 export const PROVIDER_APPLY_URLS: Partial<
   Record<
-    "KIE" | "BAILIAN" | "DEEPSEEK" | "DASHSCOPE" | "HUNYUAN" | "VOLCENGINE",
+    | "KIE"
+    | "BAILIAN"
+    | "DEEPSEEK"
+    | "DASHSCOPE"
+    | "HUNYUAN"
+    | "VOLCENGINE"
+    | "MINIMAX",
     string
   >
 > = {
@@ -10,6 +16,7 @@ export const PROVIDER_APPLY_URLS: Partial<
     "https://bailian.console.aliyun.com/cn-beijing?spm=5176.42028462.overview_recent.5.2124154amlfGdb&tab=model#/api-key",
   VOLCENGINE:
     "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
+  MINIMAX: "https://platform.minimaxi.com/user-center/basic-information/interface-key",
 };
 
 export function providerApplyUrl(

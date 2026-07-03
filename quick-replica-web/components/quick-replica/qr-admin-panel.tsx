@@ -76,7 +76,7 @@ const EMPTY_FORM: FormState = {
   promptText: "",
   sceneImageUrls: [],
   sortOrder: 0,
-  voiceId: "khanh-tu",
+  voiceId: "male-qn-qingse",
   audioStyleTag: "ad-teaser",
   voiceSpeed: 1,
   voiceStability: 0.5,
@@ -275,7 +275,7 @@ export function QrAdminPanel({
         defaultKind === "motion-sync"
           ? "kling-2.6/motion-control"
           : category === "audio"
-            ? "eleven_multilingual_v2"
+            ? "MiniMax/speech-2.8-hd"
             : "",
     });
     setFormOpen(true);
@@ -305,7 +305,7 @@ export function QrAdminPanel({
       promptText: extracted.promptText,
       sceneImageUrls: extracted.sceneImageUrls,
       sortOrder: row.sortOrder,
-      voiceId: audioFields?.voiceId ?? "khanh-tu",
+      voiceId: audioFields?.voiceId ?? "male-qn-qingse",
       audioStyleTag: audioFields?.audioStyleTag ?? "ad-teaser",
       voiceSpeed: audioFields?.voiceSpeed ?? 1,
       voiceStability: audioFields?.voiceStability ?? 0.5,
@@ -845,6 +845,11 @@ export function QrAdminPanel({
                             voiceId: form.voiceId,
                             audioStyleTag: form.audioStyleTag,
                             voiceSpeed: form.voiceSpeed,
+                            voiceVolume: 1,
+                            voicePitch: 0,
+                            voiceTone: 0.5,
+                            voiceIntensity: 0.5,
+                            voiceTimbre: 0.5,
                             voiceStability: form.voiceStability,
                             voiceSimilarityBoost: form.voiceSimilarityBoost,
                             voiceStyleExaggeration: form.voiceStyleExaggeration,

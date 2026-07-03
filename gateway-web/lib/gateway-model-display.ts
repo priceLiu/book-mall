@@ -5,6 +5,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山方舟",
+  MINIMAX: "MiniMax",
 };
 
 const REQUEST_KIND_LABEL: Record<string, string> = {
@@ -12,6 +13,7 @@ const REQUEST_KIND_LABEL: Record<string, string> = {
   IMAGE: "图像",
   VIDEO: "视频",
   TTS: "语音合成",
+  MUSIC: "音乐生成",
   TRYON: "AI 试衣",
   OTHER: "其他",
 };

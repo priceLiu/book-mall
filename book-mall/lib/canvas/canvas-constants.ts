@@ -119,6 +119,12 @@ export function buildQuickReplicaBuiltinOssKey(id: string, ext: string): string 
   return `quick-replica/builtin/${safeId}.${safeExt}`;
 }
 
+/** MiniMax 系统音色试听 MP3（固定 key） */
+export function buildMinimaxVoicePreviewOssKey(voiceId: string): string {
+  const safeId = voiceId.replace(/[^a-zA-Z0-9_().-]/g, "_");
+  return `quick-replica/voices/${safeId}.mp3`;
+}
+
 export function buildCanvasOssKey(
   kind: CanvasOssKind,
   args: { projectId?: string; userId?: string; ext: string },

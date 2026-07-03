@@ -66,6 +66,12 @@ const CREDENTIALS: Array<{
     env: "VOLCENGINE_API_KEY",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
   },
+  {
+    kind: "MINIMAX",
+    alias: "MiniMax",
+    env: "MINIMAX_API_KEY",
+    baseUrl: "https://api.minimaxi.com",
+  },
 ];
 
 async function ensureCredential(
@@ -96,6 +102,14 @@ async function ensureCredential(
       } catch {
         /* env 未配齐时保留已有凭证 */
       }
+    }
+    const envKey = process.env[spec.env]?.trim();
+    if (envKey && spec.kind === "MINIMAX") {
+      await updateGatewayCredential(gatewayUserId, existing.id, {
+        apiKey: envKey,
+        active: true,
+        ...(targetBase ? { baseUrl: targetBase } : {}),
+      });
     }
     return existing.id;
   }

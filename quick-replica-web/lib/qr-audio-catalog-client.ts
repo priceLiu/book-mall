@@ -17,6 +17,18 @@ export type QrAudioCatalogVoice = {
   subtitle: string;
   gender: "female" | "male" | "neutral";
   accent?: string;
+  language?: string;
+  previewUrl?: string;
+  tags?: string[];
+  avatarLetter: string;
+};
+
+export type QrVoiceCatalogItem = {
+  voiceId: string;
+  label: string;
+  subtitle: string;
+  language?: string;
+  previewUrl?: string;
   tags?: string[];
   avatarLetter: string;
 };
@@ -31,11 +43,17 @@ export type QrAudioCatalog = {
   models: QrAudioCatalogModel[];
   voices: QrAudioCatalogVoice[];
   styleTags: QrAudioCatalogStyleTag[];
+  voicesPaged?: boolean;
   defaults: {
     modelKey: string;
     voiceId: string;
     styleTag: string;
     voiceSpeed: number;
+    voiceVolume: number;
+    voicePitch: number;
+    voiceTone: number;
+    voiceIntensity: number;
+    voiceTimbre: number;
     voiceStability: number;
     voiceSimilarityBoost: number;
     voiceStyleExaggeration: number;
@@ -59,6 +77,22 @@ export async function fetchQrAudioCatalog(): Promise<QrAudioCatalog> {
       inflight = null;
     });
   return inflight;
+}
+
+export async function fetchQrVoicePage(page: number, pageSize = 40): Promise<{
+  items: QrVoiceCatalogItem[];
+  total: number;
+  hasMore: boolean;
+}> {
+  const res = await fetchQrPlatform(
+    `/api/book-mall/api/platform/v1/quick-replica/voices?page=${page}&pageSize=${pageSize}`,
+  );
+  if (!res.ok) throw new Error(`加载音色失败（${res.status}）`);
+  return (await res.json()) as {
+    items: QrVoiceCatalogItem[];
+    total: number;
+    hasMore: boolean;
+  };
 }
 
 export function useQrAudioCatalog() {

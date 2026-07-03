@@ -1,6 +1,11 @@
 import type { GatewayProviderKind } from "@prisma/client";
 
 import {
+  isMinimaxMusicModelKey,
+  isMinimaxSpeechModelKey,
+} from "@/lib/gateway/minimax-speech-models";
+
+import {
   VOLCENGINE_CHAT_MODEL_KEYS,
   VOLCENGINE_VIDEO_MODEL_KEYS,
   resolveVolcengineModelKey,
@@ -63,7 +68,7 @@ const DASHSCOPE_VIDEO_PREFIXES = [
 
 export type RoutedModel = {
   providerKind: GatewayProviderKind;
-  requestKind: "CHAT" | "IMAGE" | "VIDEO" | "OTHER" | "TTS" | "TRYON";
+  requestKind: "CHAT" | "IMAGE" | "VIDEO" | "OTHER" | "TTS" | "TRYON" | "MUSIC";
 };
 
 /** 未在模型目录登记的 modelKey；禁止默认落 KIE。 */
@@ -226,7 +231,15 @@ export function routeGatewayModel(model: string): RoutedModel {
     };
   }
 
-  if (m.includes("qwen") || m.includes("bailian") || m.includes("minimax")) {
+  if (isMinimaxSpeechModelKey(raw) || isMinimaxSpeechModelKey(m)) {
+    return { providerKind: "MINIMAX", requestKind: "TTS" };
+  }
+
+  if (isMinimaxMusicModelKey(raw) || isMinimaxMusicModelKey(m)) {
+    return { providerKind: "MINIMAX", requestKind: "MUSIC" };
+  }
+
+  if (m.includes("qwen") || m.includes("bailian") || (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
@@ -245,6 +258,8 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       return "https://api.ai3d.cloud.tencent.com";
     case "VOLCENGINE":
       return "https://ark.cn-beijing.volces.com/api/v3";
+    case "MINIMAX":
+      return "https://api.minimaxi.com";
     default:
       return (
         process.env.KIE_API_BASE?.trim()?.replace(/\/$/, "") ||

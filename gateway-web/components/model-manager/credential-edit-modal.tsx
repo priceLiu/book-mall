@@ -13,6 +13,7 @@ const PROVIDERS = [
   "DASHSCOPE",
   "HUNYUAN",
   "VOLCENGINE",
+  "MINIMAX",
 ] as const;
 
 export function CredentialEditModal({
