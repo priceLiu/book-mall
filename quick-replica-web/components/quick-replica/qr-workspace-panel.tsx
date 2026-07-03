@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { QrCreateImageForm } from "@/components/quick-replica/qr-create-image-workspace";
+import { QrAudioMiddlePanel } from "@/components/quick-replica/qr-audio-middle-panel";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrMotionSyncForm } from "@/components/quick-replica/qr-motion-sync-workspace";
 import { QrTextToVideoForm } from "@/components/quick-replica/qr-text-to-video-workspace";
@@ -27,6 +28,8 @@ type Props = {
   onGenerate: (draft: QrWorkspaceDraft) => void;
   generating?: boolean;
   onBackToBrowse?: () => void;
+  voicePickerActive?: boolean;
+  onOpenVoiceGallery?: () => void;
 };
 
 async function readFileAsDataUrl(file: File): Promise<string> {
@@ -44,6 +47,8 @@ export function QrWorkspacePanel({
   onGenerate,
   generating = false,
   onBackToBrowse,
+  voicePickerActive,
+  onOpenVoiceGallery,
 }: Props) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -137,6 +142,20 @@ export function QrWorkspacePanel({
     draft.category === "world" || draft.kind.includes("scene");
 
   const busy = generating || uploadingImage || uploadingVideo;
+
+  if (draft.category === "audio") {
+    return (
+      <QrAudioMiddlePanel
+        draft={draft}
+        onDraftChange={onDraftChange}
+        generating={generating}
+        onGenerate={onGenerate}
+        onBackToBrowse={onBackToBrowse}
+        voicePickerActive={voicePickerActive}
+        onOpenVoiceGallery={onOpenVoiceGallery ?? (() => undefined)}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -287,6 +306,7 @@ export function QrWorkspacePanel({
             draft={draft}
             onDraftChange={onDraftChange}
             busy={generating}
+            onOpenVoiceGallery={onOpenVoiceGallery}
           />
         ) : (
           <div className="space-y-4">

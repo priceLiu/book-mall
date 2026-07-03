@@ -13,6 +13,7 @@ import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
+import { QrAudioRightPanel, type QrAudioRightTab } from "@/components/quick-replica/qr-audio-right-panel";
 import { QrTemplatePreviewModal } from "@/components/quick-replica/qr-template-preview-modal";
 import { QrToast } from "@/components/quick-replica/qr-toast";
 import {
@@ -75,6 +76,9 @@ export function QrAppClient({
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [generateLogId, setGenerateLogId] = useState<string | null>(null);
   const [generatePreviewImage, setGeneratePreviewImage] = useState<string | undefined>();
+  const [generateDraftSnapshot, setGenerateDraftSnapshot] = useState<QrWorkspaceDraft | null>(
+    null,
+  );
   const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -84,6 +88,10 @@ export function QrAppClient({
   const [draft, setDraft] = useState<QrWorkspaceDraft>(
     defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
   );
+  const [audioRightTab, setAudioRightTab] = useState<QrAudioRightTab>("templates");
+  const [voiceGalleryFocus, setVoiceGalleryFocus] = useState(false);
+  const audioRightPanelRef = useRef<HTMLElement>(null);
+  const voiceGalleryFocusTimerRef = useRef<number | null>(null);
 
   const templateScope =
     navMode === "my-works" || navMode === "generate-history" ? "my" : "all";
@@ -259,9 +267,15 @@ export function QrAppClient({
   const onCategory = (cat: QrCategory) => {
     setNavMode("category");
     setCategory(cat);
-    setMiddleMode("browse");
-    setSelectedKind(null);
     setPinnedToolKey(null);
+    if (cat === "audio") {
+      setSelectedKind("create-voiceover");
+      setMiddleMode("workspace");
+      setDraft(defaultWorkspaceDraft({ category: "audio", kind: "create-voiceover" }));
+    } else {
+      setMiddleMode("browse");
+      setSelectedKind(null);
+    }
     const cachedKinds = kindsCacheRef.current.get(cat);
     setKindItems(cachedKinds ?? []);
     setKindsLoading(true);
@@ -406,6 +420,7 @@ export function QrAppClient({
     setGeneratePhase("generating");
     setGenerateResult(null);
     setGenerateLogId(null);
+    setGenerateDraftSnapshot(draftToRun);
     setGeneratePreviewImage(
       draftToRun.targetImageUrl.trim() ||
         draftToRun.sceneImageUrls.find((u) => u.trim()) ||
@@ -462,6 +477,29 @@ export function QrAppClient({
     [],
   );
 
+  const openVoiceGallery = useCallback(() => {
+    setAudioRightTab("voices");
+    setVoiceGalleryFocus(true);
+    if (voiceGalleryFocusTimerRef.current != null) {
+      window.clearTimeout(voiceGalleryFocusTimerRef.current);
+    }
+    voiceGalleryFocusTimerRef.current = window.setTimeout(() => {
+      setVoiceGalleryFocus(false);
+      voiceGalleryFocusTimerRef.current = null;
+    }, 2800);
+    window.requestAnimationFrame(() => {
+      audioRightPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, []);
+
+  const handleVoiceSelectedFromGallery = useCallback(() => {
+    setVoiceGalleryFocus(false);
+    if (voiceGalleryFocusTimerRef.current != null) {
+      window.clearTimeout(voiceGalleryFocusTimerRef.current);
+      voiceGalleryFocusTimerRef.current = null;
+    }
+  }, []);
+
   const middlePanel = (() => {
     if (navMode === "admin") {
       return (
@@ -494,6 +532,8 @@ export function QrAppClient({
               ? () => setMiddleMode("browse")
               : undefined
           }
+          voicePickerActive={voiceGalleryFocus}
+          onOpenVoiceGallery={openVoiceGallery}
         />
       );
     }
@@ -596,11 +636,29 @@ export function QrAppClient({
             {middlePanel}
           </section>
 
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[400px]">
+          <section
+            ref={audioRightPanelRef}
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[400px]"
+          >
             {navMode === "home" ? (
               <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
                 选择分类后在此浏览模板
               </div>
+            ) : category === "audio" && navMode === "category" ? (
+              <QrAudioRightPanel
+                key={browseKey || category}
+                category={category}
+                titleSuffix={galleryTitleSuffix}
+                templates={templates}
+                templatesLoading={templatesLoading}
+                draft={draft}
+                onDraftChange={setDraft}
+                onSelectTemplate={setPreviewTemplate}
+                activeTab={audioRightTab}
+                onTabChange={setAudioRightTab}
+                voiceGalleryFocus={voiceGalleryFocus}
+                onVoiceSelected={handleVoiceSelectedFromGallery}
+              />
             ) : (
               <QrTemplateGallery
                 key={browseKey || category}
@@ -669,11 +727,13 @@ export function QrAppClient({
         result={generateResult}
         logId={generateLogId}
         previewImageUrl={generatePreviewImage}
+        generateDraft={generateDraftSnapshot}
         onClose={() => {
           if (generating) return;
           setGenerateModalOpen(false);
           setGenerateResult(null);
           setGenerateLogId(null);
+          setGenerateDraftSnapshot(null);
         }}
         onSaved={onGenerateSaved}
       />

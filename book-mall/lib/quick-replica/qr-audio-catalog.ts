@@ -1,4 +1,11 @@
-/** QuickReplica 声音 · 模拟目录（前台 / 管理后台共用） */
+/** QuickReplica 声音 · MiniMax Gateway 模型目录 */
+
+import {
+  MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
+  MINIMAX_SPEECH_MODELS,
+  MINIMAX_MUSIC_MODELS,
+  MINIMAX_DEFAULT_MUSIC_MODEL_KEY,
+} from "@/lib/gateway/minimax-speech-models";
 
 export type QrAudioModelDef = {
   modelKey: string;
@@ -13,8 +20,9 @@ export type QrAudioVoiceDef = {
   subtitle: string;
   gender: "female" | "male" | "neutral";
   accent?: string;
+  language?: string;
+  previewUrl?: string;
   tags?: string[];
-  /** 列表卡片首字母 / 渐变色标识 */
   avatarLetter: string;
 };
 
@@ -25,68 +33,55 @@ export type QrAudioStyleTagDef = {
 };
 
 export const QR_AUDIO_MODELS: QrAudioModelDef[] = [
-  {
-    modelKey: "eleven_multilingual_v2",
-    label: "Eleven Multilingual v2",
-    subtitle: "多语言旁白 · 高自然度",
-    provider: "elevenlabs",
-  },
-  {
-    modelKey: "eleven_turbo_v2_5",
-    label: "Eleven Turbo v2.5",
-    subtitle: "低延迟 · 适合预览",
-    provider: "elevenlabs",
-  },
-  {
-    modelKey: "minimax_speech_02",
-    label: "MiniMax Speech 02",
-    subtitle: "中文旁白 · 情感丰富",
+  ...MINIMAX_SPEECH_MODELS.map((m) => ({
+    modelKey: m.modelKey,
+    label: m.label,
+    subtitle: m.subtitle,
     provider: "minimax",
-  },
+  })),
+  ...MINIMAX_MUSIC_MODELS.map((m) => ({
+    modelKey: m.modelKey,
+    label: m.label,
+    subtitle: m.subtitle,
+    provider: "minimax",
+  })),
 ];
 
-export const QR_DEFAULT_AUDIO_MODEL_KEY = "eleven_multilingual_v2";
+export const QR_DEFAULT_AUDIO_MODEL_KEY = MINIMAX_DEFAULT_SPEECH_MODEL_KEY;
+export const QR_DEFAULT_MUSIC_MODEL_KEY = MINIMAX_DEFAULT_MUSIC_MODEL_KEY;
 
+/** 内联 fallback（完整列表走 GET /quick-replica/voices 分页） */
 export const QR_AUDIO_VOICES: QrAudioVoiceDef[] = [
   {
-    voiceId: "khanh-tu",
-    label: "Khánh Tư",
-    subtitle: "Giọng kể chuyện và nhân vật",
-    gender: "female",
-    accent: "southern",
-    tags: ["characters_animation", "female", "southern"],
-    avatarLetter: "K",
-  },
-  {
-    voiceId: "mei-ling",
-    label: "Mei Ling",
-    subtitle: "温暖女声 · 品牌故事",
-    gender: "female",
-    accent: "mandarin",
-    tags: ["narration", "female", "mandarin"],
-    avatarLetter: "M",
-  },
-  {
-    voiceId: "alex-chen",
-    label: "Alex Chen",
-    subtitle: "清晰男声 · 产品解说",
+    voiceId: "male-qn-qingse",
+    label: "青涩青年音色",
+    subtitle: "中文 (普通话)",
     gender: "male",
-    accent: "neutral",
-    tags: ["product", "male"],
-    avatarLetter: "A",
+    language: "中文 (普通话)",
+    avatarLetter: "青",
+    tags: ["中文", "male"],
   },
   {
-    voiceId: "sarah-uk",
-    label: "Sarah",
-    subtitle: "英式英语 · 播客片头",
+    voiceId: "female-shaonv",
+    label: "少女音色",
+    subtitle: "中文 (普通话)",
     gender: "female",
-    accent: "british",
-    tags: ["podcast", "female", "english"],
-    avatarLetter: "S",
+    language: "中文 (普通话)",
+    avatarLetter: "少",
+    tags: ["中文", "female"],
+  },
+  {
+    voiceId: "English_expressive_narrator",
+    label: "Expressive Narrator",
+    subtitle: "English",
+    gender: "neutral",
+    language: "English",
+    avatarLetter: "E",
+    tags: ["english"],
   },
 ];
 
-export const QR_DEFAULT_AUDIO_VOICE_ID = "khanh-tu";
+export const QR_DEFAULT_AUDIO_VOICE_ID = "male-qn-qingse";
 
 export const QR_AUDIO_STYLE_TAGS: QrAudioStyleTagDef[] = [
   { id: "podcast-intro", label: "Podcast Intro", labelEn: "Podcast Intro" },
@@ -99,6 +94,11 @@ export const QR_DEFAULT_AUDIO_STYLE_TAG = "ad-teaser";
 
 export const QR_AUDIO_VOICE_CONTROL_DEFAULTS = {
   voiceSpeed: 1,
+  voiceVolume: 1,
+  voicePitch: 0,
+  voiceTone: 0.5,
+  voiceIntensity: 0.5,
+  voiceTimbre: 0.5,
   voiceStability: 0.5,
   voiceSimilarityBoost: 0.75,
   voiceStyleExaggeration: 0,
@@ -127,5 +127,6 @@ export function getQrAudioCatalog() {
       styleTag: QR_DEFAULT_AUDIO_STYLE_TAG,
       ...QR_AUDIO_VOICE_CONTROL_DEFAULTS,
     },
+    voicesPaged: true,
   };
 }

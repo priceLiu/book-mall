@@ -5,6 +5,11 @@ import type {
   ModelMediaKind,
 } from "@prisma/client";
 
+import {
+  MINIMAX_MUSIC_MODELS,
+  MINIMAX_SPEECH_MODELS,
+} from "@/lib/gateway/minimax-speech-models";
+
 type CanonicalModelDef = {
   canonicalModelKey: string;
   displayName: string;
@@ -313,4 +318,32 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
     primaryVendor: "tencent",
     routes: [{ vendor: "tencent", modelKey: "hy-3d-express", providerKind: "HUNYUAN" }],
   },
+  ...MINIMAX_SPEECH_MODELS.map((m, i) => ({
+    canonicalModelKey: m.modelKey,
+    displayName: m.label,
+    description: m.subtitle,
+    mediaKind: "TEXT_LLM" as const,
+    role: "LLM" as const,
+    requestKind: "TTS" as const,
+    appTags: ["tool", "canvas", "story"],
+    sortOrder: 100 + i,
+    primaryVendor: "minimax",
+    billingKind: "PER_CALL" as const,
+    unitLabel: "元/次",
+    routes: [{ vendor: "minimax", modelKey: m.modelKey, providerKind: "MINIMAX" as const }],
+  })),
+  ...MINIMAX_MUSIC_MODELS.map((m, i) => ({
+    canonicalModelKey: m.modelKey,
+    displayName: m.label,
+    description: m.subtitle,
+    mediaKind: "TEXT_LLM" as const,
+    role: "LLM" as const,
+    requestKind: "MUSIC" as const,
+    appTags: ["tool"],
+    sortOrder: 110 + i,
+    primaryVendor: "minimax",
+    billingKind: "PER_CALL" as const,
+    unitLabel: "元/次",
+    routes: [{ vendor: "minimax", modelKey: m.modelKey, providerKind: "MINIMAX" as const }],
+  })),
 ];

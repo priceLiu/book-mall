@@ -15,9 +15,16 @@ export type QrAdminAudioFormSlice = {
   voiceId: string;
   audioStyleTag: string;
   voiceSpeed: number;
+  voiceVolume: number;
+  voicePitch: number;
+  voiceTone: number;
+  voiceIntensity: number;
+  voiceTimbre: number;
   voiceStability: number;
   voiceSimilarityBoost: number;
   voiceStyleExaggeration: number;
+  sourceAudioUrl?: string;
+  musicMode?: "generate" | "cover" | "lyrics";
 };
 
 type Props = {
@@ -217,10 +224,15 @@ export function QrAdminAudioFields({ value, onChange, disabled }: Props) {
 export function extractAudioFieldsFromTemplate(reference?: QrTemplate["reference"]): QrAdminAudioFormSlice {
   const params = reference?.model.params ?? {};
   return {
-    modelKey: reference?.model.modelKey ?? "eleven_multilingual_v2",
-    voiceId: typeof params.voice_id === "string" ? params.voice_id : "khanh-tu",
+    modelKey: reference?.model.modelKey ?? "MiniMax/speech-2.8-hd",
+    voiceId: typeof params.voice_id === "string" ? params.voice_id : "male-qn-qingse",
     audioStyleTag: typeof params.style_tag === "string" ? params.style_tag : "ad-teaser",
     voiceSpeed: typeof params.speed === "number" ? params.speed : 1,
+    voiceVolume: typeof params.vol === "number" ? params.vol : 1,
+    voicePitch: typeof params.pitch === "number" ? params.pitch : 0,
+    voiceTone: typeof params.tone === "number" ? params.tone : 0.5,
+    voiceIntensity: typeof params.intensity === "number" ? params.intensity : 0.5,
+    voiceTimbre: typeof params.timbre === "number" ? params.timbre : 0.5,
     voiceStability: typeof params.stability === "number" ? params.stability : 0.5,
     voiceSimilarityBoost: typeof params.similarity_boost === "number" ? params.similarity_boost : 0.75,
     voiceStyleExaggeration:
@@ -233,6 +245,11 @@ export function audioFieldsToModelParams(slice: QrAdminAudioFormSlice): Record<s
     voice_id: slice.voiceId,
     style_tag: slice.audioStyleTag,
     speed: slice.voiceSpeed,
+    vol: slice.voiceVolume,
+    pitch: slice.voicePitch,
+    tone: slice.voiceTone,
+    intensity: slice.voiceIntensity,
+    timbre: slice.voiceTimbre,
     stability: slice.voiceStability,
     similarity_boost: slice.voiceSimilarityBoost,
     style_exaggeration: slice.voiceStyleExaggeration,

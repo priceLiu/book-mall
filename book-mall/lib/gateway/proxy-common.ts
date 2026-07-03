@@ -26,6 +26,10 @@ import {
   kieCodexResponseToChatCompletions,
 } from "./kie-codex-chat";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
+import {
+  forwardMinimaxT2a,
+  isMinimaxSpeechRouteModel,
+} from "./minimax-speech-proxy";
 import { resolveVolcengineArkApiKey } from "./volcengine-gateway-credential";
 import {
   parseUsageFromUnknown,
@@ -662,6 +666,29 @@ export async function forwardAudioSpeech(opts: {
   const model = String(opts.body.model ?? "").trim();
   if (isQwenTtsModel(model)) {
     return forwardQwenTtsSpeech(opts);
+  }
+
+  if (isMinimaxSpeechRouteModel(model) || opts.providerKind === "MINIMAX") {
+    const text = String(opts.body.input ?? opts.body.text ?? "").trim();
+    const voiceId = String(opts.body.voice ?? opts.body.voice_id ?? "English_expressive_narrator");
+    return forwardMinimaxT2a({
+      credentialId: opts.credentialId,
+      baseUrlOverride: opts.baseUrlOverride,
+      input: {
+        modelKey: model,
+        text,
+        voice_id: voiceId,
+        speed: typeof opts.body.speed === "number" ? opts.body.speed : undefined,
+        vol: typeof opts.body.vol === "number" ? opts.body.vol : undefined,
+        pitch: typeof opts.body.pitch === "number" ? opts.body.pitch : undefined,
+        output_format:
+          opts.body.response_format === "wav"
+            ? "wav"
+            : opts.body.response_format === "pcm"
+              ? "pcm"
+              : "mp3",
+      },
+    });
   }
 
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);

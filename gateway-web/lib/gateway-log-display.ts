@@ -64,6 +64,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山",
+  MINIMAX: "MiniMax",
 };
 
 /** 日志页厂商筛选 · 展示顺序 */
@@ -74,6 +75,7 @@ export const LOG_PROVIDER_KIND_ORDER = [
   "DASHSCOPE",
   "HUNYUAN",
   "VOLCENGINE",
+  "MINIMAX",
 ] as const;
 
 export function sortLogProviderKinds(kinds: Iterable<string>): string[] {

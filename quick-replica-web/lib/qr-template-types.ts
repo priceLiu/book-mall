@@ -67,9 +67,16 @@ export type QrWorkspaceDraft = {
   voiceId?: string;
   audioStyleTag?: string;
   voiceSpeed?: number;
+  voiceVolume?: number;
+  voicePitch?: number;
+  voiceTone?: number;
+  voiceIntensity?: number;
+  voiceTimbre?: number;
   voiceStability?: number;
   voiceSimilarityBoost?: number;
   voiceStyleExaggeration?: number;
+  sourceAudioUrl?: string;
+  musicMode?: "generate" | "cover" | "lyrics";
 };
 
 export type QrKindDef = {
@@ -225,7 +232,7 @@ export function defaultWorkspaceDraft(input: {
           : input.kind === "create-image" || input.kind === "create-character" || input.kind === "character-image"
             ? TEXT_TO_IMAGE_DEFAULT_MODEL_KEY
             : input.category === "audio"
-              ? "eleven_multilingual_v2"
+              ? "MiniMax/speech-2.8-hd"
               : "lib-nano-pro",
     mode:
       input.kind === "motion-sync"
@@ -239,12 +246,18 @@ export function defaultWorkspaceDraft(input: {
       input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "2K" : undefined,
     outputFormat:
       input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "png" : undefined,
-    voiceId: input.category === "audio" ? "khanh-tu" : undefined,
+    voiceId: input.category === "audio" ? "male-qn-qingse" : undefined,
     audioStyleTag: input.category === "audio" ? "ad-teaser" : undefined,
     voiceSpeed: input.category === "audio" ? 1 : undefined,
+    voiceVolume: input.category === "audio" ? 1 : undefined,
+    voicePitch: input.category === "audio" ? 0 : undefined,
+    voiceTone: input.category === "audio" ? 0.5 : undefined,
+    voiceIntensity: input.category === "audio" ? 0.5 : undefined,
+    voiceTimbre: input.category === "audio" ? 0.5 : undefined,
     voiceStability: input.category === "audio" ? 0.5 : undefined,
     voiceSimilarityBoost: input.category === "audio" ? 0.75 : undefined,
     voiceStyleExaggeration: input.category === "audio" ? 0 : undefined,
+    musicMode: input.kind === "create-music" ? "generate" : undefined,
     characterOrientation: input.kind === "motion-sync" ? "video" : undefined,
     keepOriginalSound: input.kind === "motion-sync" ? true : undefined,
   };

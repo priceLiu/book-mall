@@ -88,7 +88,16 @@ export type QrWorkspaceDraft = {
   /** 旁白风格标签 id */
   audioStyleTag?: string;
   voiceSpeed?: number;
+  voiceVolume?: number;
+  voicePitch?: number;
+  voiceTone?: number;
+  voiceIntensity?: number;
+  voiceTimbre?: number;
   voiceStability?: number;
   voiceSimilarityBoost?: number;
   voiceStyleExaggeration?: number;
+  /** 变声器源音频 URL */
+  sourceAudioUrl?: string;
+  /** 音乐生成模式 */
+  musicMode?: "generate" | "cover" | "lyrics";
 };
