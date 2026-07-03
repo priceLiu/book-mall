@@ -711,6 +711,7 @@ export function QrAppClient({
                   }
                   setPreviewTemplate(t);
                 }}
+                allowDownload={navMode === "my-works"}
               />
             )}
           </section>
