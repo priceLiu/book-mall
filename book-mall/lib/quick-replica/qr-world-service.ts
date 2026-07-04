@@ -28,6 +28,7 @@ import {
   type WorldlabsWorldPrompt,
 } from "@/lib/gateway/worldlabs-proxy";
 import { findBuiltinWorldAssetEntry } from "@/lib/quick-replica/builtin-world-gallery-assets";
+import { rememberWorldImageUrls } from "@/lib/quick-replica/qr-world-image-proxy";
 import { rememberWorldSplatUrls } from "@/lib/quick-replica/qr-world-splat-proxy";
 import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { prisma } from "@/lib/prisma";
@@ -363,6 +364,13 @@ export async function qrGetWorldViewerPayload(
     const best = highRes ?? lowRes ?? preview100k ?? fullRes ?? local.splatUrls[0] ?? null;
 
     rememberWorldSplatUrls(userId, id, local.splatUrls);
+    rememberWorldImageUrls(
+      userId,
+      id,
+      [local.panoUrl, local.thumbnailUrl, ...local.sceneImageUrls].filter((u): u is string =>
+        Boolean(u?.trim()),
+      ),
+    );
     return {
       worldId: id,
       displayName: local.title || "Marble World",
@@ -383,6 +391,10 @@ export async function qrGetWorldViewerPayload(
   const { world } = await forwardWorldlabsGetWorld({ credentialId, worldId: id });
 
   rememberWorldSplatUrls(userId, id, listWorldSplatUrls(world));
+  rememberWorldImageUrls(userId, id, [
+    world.assets?.imagery?.pano_url?.trim(),
+    extractWorldThumbnailUrl(world),
+  ].filter((u): u is string => Boolean(u?.trim())));
 
   const tiers = extractWorldSplatTiers(world);
 

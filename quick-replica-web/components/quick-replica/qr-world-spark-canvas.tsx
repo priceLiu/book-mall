@@ -10,6 +10,7 @@ export type QrWorldSparkStage = "preview" | "loading-full" | "ready" | "error";
 
 export type QrWorldSparkHandle = {
   resetView: () => void;
+  captureScreenshot: () => string | null;
 };
 
 type Props = {
@@ -57,9 +58,28 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
   const onFirstVisualRef = useRef(onFirstVisual);
   const onErrorRef = useRef(onError);
   const resetFnRef = useRef<(() => void) | null>(null);
+  const captureSnapshotRef = useRef<(() => string | null) | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<spark.SparkControls | null>(null);
 
-  useImperativeHandle(ref, () => ({ resetView: () => resetFnRef.current?.() }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      resetView: () => resetFnRef.current?.(),
+      captureScreenshot: () => {
+        const snap = captureSnapshotRef.current;
+        if (snap) return snap();
+        const canvas = rendererRef.current?.domElement;
+        if (!canvas) return null;
+        try {
+          return canvas.toDataURL("image/png");
+        } catch {
+          return null;
+        }
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     onProgressRef.current = onProgress;
@@ -143,6 +163,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           powerPreference: "high-performance",
           preserveDrawingBuffer: true,
         });
+        rendererRef.current = renderer;
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -220,16 +241,22 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           reportProgress: boolean,
           onRatio?: (ratio: number) => void,
         ): Promise<PackedSplats | null> => {
-          const packed = await loader.loadAsync(url, (event) => {
-            if (!event.lengthComputable || disposed) return;
-            const ratio = Math.max(0, Math.min(1, event.loaded / event.total));
-            if (reportProgress) onProgressRef.current?.(ratio);
-            onRatio?.(ratio);
-          });
-          if (disposed) return null;
-          await packed.initialized;
-          if (disposed) return null;
-          return packed;
+          try {
+            const packed = await loader.loadAsync(url, (event) => {
+              if (!event.lengthComputable || disposed) return;
+              const ratio = Math.max(0, Math.min(1, event.loaded / event.total));
+              if (reportProgress) onProgressRef.current?.(ratio);
+              onRatio?.(ratio);
+            });
+            if (disposed) return null;
+            await packed.initialized;
+            if (disposed) return null;
+            return packed;
+          } catch (err) {
+            if (disposed) return null;
+            console.warn("[QrWorldSparkCanvas] splat load failed:", url, err);
+            return null;
+          }
         };
 
         const makeMeshFromPacked = async (
@@ -263,6 +290,16 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
 
         const startRenderLoop = () => {
           if (!renderer) return;
+          captureSnapshotRef.current = () => {
+            if (disposed || !renderer) return null;
+            controls?.update(camera);
+            renderer.render(scene, camera);
+            try {
+              return renderer.domElement.toDataURL("image/png");
+            } catch {
+              return null;
+            }
+          };
           renderer.setAnimationLoop(() => {
             if (disposed || !renderer) return;
             const now = performance.now();
@@ -327,10 +364,16 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
 
           if (disposed) return;
 
-          if (!lowPacked) {
+          if (!lowPacked && !disposed) {
             setStage("loading-full", "Loading full quality...");
             const highPacked = await highLoadPromise;
-            if (disposed || !highPacked) return;
+            if (disposed || !highPacked) {
+              if (!disposed) {
+                onErrorRef.current?.("Splat 资源加载失败，请稍后重试");
+                setStage("error", "Splat 资源加载失败");
+              }
+              return;
+            }
             singleMesh = await makeMeshFromPacked(highPacked);
             if (disposed || !singleMesh) return;
             singleMesh.opacity = 1;
@@ -344,6 +387,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           const particle = buildParticleModifier(spark);
           particleTimeUniform = particle.timeUniform;
 
+          if (!lowPacked) return;
           lowMesh = await makeMeshFromPacked(lowPacked, particle.modifier);
           if (disposed || !lowMesh) return;
           scene.add(lowMesh);
@@ -375,7 +419,13 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           onProgressRef.current?.(0);
           startRenderLoop();
           const packed = await loadPacked(primary, true);
-          if (disposed || !packed) return;
+          if (disposed || !packed) {
+            if (!disposed) {
+              onErrorRef.current?.("Splat 资源加载失败，请稍后重试");
+              setStage("error", "Splat 资源加载失败");
+            }
+            return;
+          }
           singleMesh = await makeMeshFromPacked(packed);
           if (disposed || !singleMesh) return;
           singleMesh.opacity = 1;
@@ -399,10 +449,12 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
     return () => {
       disposed = true;
       resetFnRef.current = null;
+      captureSnapshotRef.current = null;
       removeResize?.();
       removeKeys?.();
       renderer?.setAnimationLoop(null);
       controlsRef.current = null;
+      rendererRef.current = null;
       lowMesh?.dispose();
       highMesh?.dispose();
       singleMesh?.dispose();
@@ -412,6 +464,6 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
   }, [low, high]);
 
   return (
-    <div ref={hostRef} className={`h-full w-full ${className}`.trim()} style={{ background: "#060910" }} />
+    <div ref={hostRef} data-qr-world-spark-host className={`h-full w-full ${className}`.trim()} style={{ background: "#060910" }} />
   );
 });

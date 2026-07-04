@@ -1,10 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  Camera,
   Clapperboard,
   Download,
   Heart,
@@ -18,18 +16,28 @@ import {
   X,
 } from "lucide-react";
 
-import type { QrWorldSparkHandle, QrWorldSparkStage } from "@/components/quick-replica/qr-world-spark-canvas";
+import {
+  QrWorldSparkCanvas,
+  type QrWorldSparkHandle,
+  type QrWorldSparkStage,
+} from "@/components/quick-replica/qr-world-spark-canvas";
+import { QrWorldLoadProgress } from "@/components/quick-replica/qr-world-load-progress";
 import { QrWorldLoadingBackdrop } from "@/components/quick-replica/qr-world-loading-backdrop";
+import { QrWorldScreenshotMenu } from "@/components/quick-replica/qr-world-screenshot-menu";
+import { QrWorldShutterFlash } from "@/components/quick-replica/qr-world-shutter-flash";
+import { downloadDataUrl, triggerSameOriginDownload } from "@/lib/qr-world-download";
 import { resolveWorldId, resolveWorldMarbleUrl } from "@/lib/qr-world-marble-url";
+import {
+  resolveTemplatePanoUrl,
+  resolveTemplateSplatUrls,
+} from "@/lib/qr-world-template-splat";
 import type { QrTemplate } from "@/lib/qr-template-types";
-import { fetchQrWorldViewerPayload, type QrWorldViewerPayload } from "@/lib/qr-world-viewer-api";
+import {
+  fetchQrWorldViewerPayload,
+  proxifyWorldImageUrl,
+  type QrWorldViewerPayload,
+} from "@/lib/qr-world-viewer-api";
 import { useLockBodyScroll } from "@/lib/use-lock-body-scroll";
-
-const QrWorldSparkCanvas = dynamic(
-  () =>
-    import("@/components/quick-replica/qr-world-spark-canvas").then((m) => m.QrWorldSparkCanvas),
-  { ssr: false },
-);
 
 type Props = {
   template: QrTemplate;
@@ -201,22 +209,6 @@ function ToolbarButton({
   );
 }
 
-function QrWorldLoadBadge({ stage, message }: { stage: QrWorldSparkStage; message?: string }) {
-  if (stage === "ready" || stage === "error") return null;
-  const label =
-    message ??
-    (stage === "preview" ? "Loading preview…" : stage === "loading-full" ? "Loading full quality…" : "Loading…");
-  return (
-    <div
-      className="pointer-events-none absolute bottom-3 right-3 z-[105] flex items-center gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-xs text-white/70 backdrop-blur-md"
-      aria-live="polite"
-    >
-      <span className="inline-block h-3 w-3 animate-spin rounded-full border border-white/25 border-t-white/80" />
-      <span>{label}</span>
-    </div>
-  );
-}
-
 export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Props) {
   const [mounted, setMounted] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
@@ -226,12 +218,18 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
   const [sparkStage, setSparkStage] = useState<QrWorldSparkStage>("preview");
   const [sparkStageMessage, setSparkStageMessage] = useState<string | undefined>();
   const [hasFirstVisual, setHasFirstVisual] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [naturalMouse, setNaturalMouse] = useState(false);
   const [invertTrackpadDrag, setInvertTrackpadDrag] = useState(false);
+  const [shutterFlash, setShutterFlash] = useState(0);
   const sparkRef = useRef<QrWorldSparkHandle>(null);
 
   const worldId = resolveWorldId(template);
   const marbleUrl = resolveWorldMarbleUrl(template);
+  const templateSplats = useMemo(
+    () => (worldId ? resolveTemplateSplatUrls(template, worldId) : null),
+    [template, worldId],
+  );
   const promptPreview = template.reference.prompt.text.trim();
   const previewThumb =
     template.reference.slots.sceneImages?.[0]?.url?.trim() ||
@@ -258,6 +256,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     setSparkStage("preview");
     setSparkStageMessage(undefined);
     setHasFirstVisual(false);
+    setLoadProgress(0);
 
     void fetchQrWorldViewerPayload(worldId)
       .then((data) => {
@@ -299,37 +298,128 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     }
   }, [payload?.worldMarbleUrl, marbleUrl, onToast]);
 
-  const openExternal = useCallback(() => {
-    const url = payload?.worldMarbleUrl ?? marbleUrl;
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [payload?.worldMarbleUrl, marbleUrl]);
-
   const resetView = useCallback(() => {
     sparkRef.current?.resetView();
   }, []);
 
+  const captureFrame = useCallback((): string | null => {
+    const fromRef = sparkRef.current?.captureScreenshot();
+    if (fromRef) return fromRef;
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      "[data-qr-world-spark-host] canvas",
+    );
+    if (!canvas) return null;
+    try {
+      return canvas.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const downloadSpz = useCallback(() => {
+    const url =
+      payload?.fullResSpzUrl ??
+      payload?.highResSpzUrl ??
+      payload?.spzUrl ??
+      templateSplats?.highResUrl ??
+      null;
+    if (!worldId || !url) {
+      onToast?.("暂无可下载的 3D 资产");
+      return;
+    }
+    const ext = url.split("?")[0]?.split(".").pop()?.toLowerCase() || "spz";
+    const slug =
+      template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
+    const filename = `${slug}-${worldId.slice(0, 8)}.${ext}`;
+    onToast?.("正在下载 3D 资产…");
+    triggerSameOriginDownload(url, filename);
+  }, [payload, template.title, templateSplats?.highResUrl, worldId, onToast]);
+
+  const takeScreenshot = useCallback(() => {
+    const dataUrl = captureFrame();
+    if (!dataUrl) {
+      onToast?.("场景尚未就绪，请稍后再试");
+      return;
+    }
+    setShutterFlash((n) => n + 1);
+    const slug = template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
+    downloadDataUrl(dataUrl, `${slug}-screenshot.png`);
+    onToast?.("截图已保存");
+  }, [captureFrame, template.title, onToast]);
+
+  const takePanoramaScreenshot = useCallback(() => {
+    if (!worldId) {
+      onToast?.("缺少场景 ID");
+      return;
+    }
+    const rawPano =
+      payload?.panoUrl?.trim() ||
+      resolveTemplatePanoUrl(template) ||
+      previewThumb ||
+      null;
+    if (!rawPano) {
+      onToast?.("该场景暂无全景图，已保存当前视角截图");
+      takeScreenshot();
+      return;
+    }
+    const proxied = proxifyWorldImageUrl(worldId, rawPano);
+    if (!proxied) {
+      onToast?.("全景图地址无效");
+      return;
+    }
+    setShutterFlash((n) => n + 1);
+    const slug =
+      template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
+    const ext = rawPano.split("?")[0]?.split(".").pop()?.toLowerCase() || "jpg";
+    const filename = `${slug}-panorama.${ext}`;
+    onToast?.("正在下载全景图…");
+    triggerSameOriginDownload(proxied, filename);
+    onToast?.("全景图已保存");
+  }, [payload?.panoUrl, previewThumb, takeScreenshot, template, worldId, onToast]);
+
   if (!mounted) return null;
 
-  const hasProgressiveTiers = Boolean(
+  const payloadProgressive = Boolean(
     payload?.preview100kSpzUrl && payload?.fullResSpzUrl,
   );
-  const lowResUrl = hasProgressiveTiers
+  const templateProgressive = Boolean(
+    templateSplats?.lowResUrl &&
+      templateSplats?.highResUrl &&
+      templateSplats.lowResUrl !== templateSplats.highResUrl,
+  );
+
+  const lowResUrl = payloadProgressive
     ? payload!.preview100kSpzUrl!
-    : null;
+    : templateProgressive
+      ? templateSplats!.lowResUrl
+      : null;
   const highResUrl =
     payload?.fullResSpzUrl ??
     payload?.highResSpzUrl ??
     payload?.spzUrl ??
+    templateSplats?.highResUrl ??
     null;
   const spzUrl = highResUrl ?? lowResUrl;
   const showSpark = Boolean(spzUrl && !loadError);
+  const sceneReady = hasFirstVisual || sparkStage === "ready";
 
   const showLoadingBackdrop = !loadError && !hasFirstVisual;
 
+  const loadProgressLabel =
+    loading && !showSpark
+      ? "加载场景…"
+      : sparkStageMessage ??
+        (sparkStage === "loading-full" ? "加载高清画质…" : undefined);
+
   return createPortal(
     <div className="fixed inset-0 z-[100]" style={{ background: "#060910" }}>
-      <QrWorldLoadingBackdrop active={showLoadingBackdrop} />
+      <QrWorldLoadingBackdrop active={showLoadingBackdrop} thumbUrl={previewThumb} />
+      <QrWorldLoadProgress
+        active={showLoadingBackdrop}
+        ratio={loadProgress}
+        label={loadProgressLabel}
+      />
+      <QrWorldShutterFlash trigger={shutterFlash} />
 
       {showSpark ? (
         <QrWorldSparkCanvas
@@ -339,6 +429,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
           highResUrl={highResUrl}
           naturalMouse={naturalMouse}
           invertTrackpadDrag={invertTrackpadDrag}
+          onProgress={setLoadProgress}
           onFirstVisual={() => setHasFirstVisual(true)}
           onStageChange={(stage, message) => {
             setSparkStage(stage);
@@ -349,12 +440,6 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
             setSparkStage("error");
           }}
         />
-      ) : null}
-
-      {loading && !loadError && !showSpark ? (
-        <QrWorldLoadBadge stage="preview" message="Loading scene…" />
-      ) : showSpark && !loadError ? (
-        <QrWorldLoadBadge stage={sparkStage} message={sparkStageMessage} />
       ) : null}
 
       {loadError ? (
@@ -407,12 +492,14 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
               <Clapperboard className="h-[18px] w-[18px]" />
             </ToolbarButton>
             <span className="mx-1 h-5 w-px bg-white/15" aria-hidden />
-            <ToolbarButton label="在 Marble 打开" onClick={openExternal}>
+            <ToolbarButton label="下载 3D 资产" onClick={downloadSpz}>
               <Download className="h-[18px] w-[18px]" />
             </ToolbarButton>
-            <ToolbarButton label="截图" onClick={() => onToast?.("请使用系统截图")}>
-              <Camera className="h-[18px] w-[18px]" />
-            </ToolbarButton>
+            <QrWorldScreenshotMenu
+              disabled={!sceneReady}
+              onScreenshot={takeScreenshot}
+              onPanoramaScreenshot={takePanoramaScreenshot}
+            />
             <ToolbarButton label="复制链接" onClick={() => void copyLink()}>
               <Link2 className="h-[18px] w-[18px]" />
             </ToolbarButton>

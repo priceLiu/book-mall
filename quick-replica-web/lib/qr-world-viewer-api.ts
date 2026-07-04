@@ -21,7 +21,7 @@ export type QrWorldViewerPayload = {
   colliderMeshUrl: string | null;
 };
 
-/** World Labs CDN 无 CORS；经 book-mall 同域代理给 Spark SplatLoader。 */
+/** World Labs / OSS CDN 无 CORS；经 book-mall 同域代理给下载与 Spark。 */
 export function proxifyWorldSplatUrl(
   worldId: string,
   upstream: string | null | undefined,
@@ -31,6 +31,18 @@ export function proxifyWorldSplatUrl(
   if (url.startsWith("/api/book-mall/")) return url;
   const q = new URLSearchParams({ url });
   return `/api/book-mall/api/platform/v1/quick-replica/worlds/${encodeURIComponent(worldId)}/splat?${q}`;
+}
+
+/** 全景图 / 缩略图等同域代理（下载全景图、避免 CORS）。 */
+export function proxifyWorldImageUrl(
+  worldId: string,
+  upstream: string | null | undefined,
+): string | null {
+  const url = upstream?.trim();
+  if (!url) return null;
+  if (url.startsWith("/api/book-mall/")) return url;
+  const q = new URLSearchParams({ url });
+  return `/api/book-mall/api/platform/v1/quick-replica/worlds/${encodeURIComponent(worldId)}/image?${q}`;
 }
 
 function proxifyWorldViewerPayload(payload: QrWorldViewerPayload): QrWorldViewerPayload {
@@ -43,6 +55,8 @@ function proxifyWorldViewerPayload(payload: QrWorldViewerPayload): QrWorldViewer
     lowResSpzUrl: proxifyWorldSplatUrl(id, payload.lowResSpzUrl),
     highResSpzUrl: proxifyWorldSplatUrl(id, payload.highResSpzUrl),
     radUrl: proxifyWorldSplatUrl(id, payload.radUrl),
+    panoUrl: proxifyWorldImageUrl(id, payload.panoUrl),
+    thumbnailUrl: proxifyWorldImageUrl(id, payload.thumbnailUrl),
   };
 }
 

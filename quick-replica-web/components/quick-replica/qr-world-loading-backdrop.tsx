@@ -1,7 +1,13 @@
 "use client";
 
 /** 加载阶段占位：避免纯黑屏，对齐 Marble 粒子氛围 */
-export function QrWorldLoadingBackdrop({ active }: { active: boolean }) {
+export function QrWorldLoadingBackdrop({
+  active,
+  thumbUrl,
+}: {
+  active: boolean;
+  thumbUrl?: string;
+}) {
   if (!active) return null;
 
   return (
@@ -10,6 +16,14 @@ export function QrWorldLoadingBackdrop({ active }: { active: boolean }) {
       aria-hidden
       style={{ background: "radial-gradient(ellipse at 50% 40%, #0d1524 0%, #060910 70%)" }}
     >
+      {thumbUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={thumbUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-[0.06] blur-3xl"
+        />
+      ) : null}
       <div className="qr-world-loading-stars absolute inset-0 opacity-80" />
       <div className="qr-world-loading-glow absolute left-1/2 top-[42%] h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(120,160,255,0.12)] blur-3xl" />
     </div>
