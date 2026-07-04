@@ -10,7 +10,9 @@ export type QrWorldSparkStage = "preview" | "loading-full" | "ready" | "error";
 
 export type QrWorldSparkHandle = {
   resetView: () => void;
+  /** @deprecated 同步 PNG toDataURL 会阻塞 UI；请用 captureScreenshotBlob */
   captureScreenshot: () => string | null;
+  captureScreenshotBlob: () => Promise<Blob | null>;
 };
 
 type Props = {
@@ -59,6 +61,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
   const onErrorRef = useRef(onError);
   const resetFnRef = useRef<(() => void) | null>(null);
   const captureSnapshotRef = useRef<(() => string | null) | null>(null);
+  const captureSnapshotBlobRef = useRef<(() => Promise<Blob | null>) | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<spark.SparkControls | null>(null);
 
@@ -76,6 +79,19 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
         } catch {
           return null;
         }
+      },
+      captureScreenshotBlob: () => {
+        const snap = captureSnapshotBlobRef.current;
+        if (snap) return snap();
+        const canvas = rendererRef.current?.domElement;
+        if (!canvas) return Promise.resolve(null);
+        return new Promise((resolve) => {
+          try {
+            canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+          } catch {
+            resolve(null);
+          }
+        });
       },
     }),
     [],
@@ -295,11 +311,29 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
             controls?.update(camera);
             renderer.render(scene, camera);
             try {
-              return renderer.domElement.toDataURL("image/png");
+              return renderer.domElement.toDataURL("image/jpeg", 0.9);
             } catch {
               return null;
             }
           };
+          captureSnapshotBlobRef.current = () =>
+            new Promise((resolve) => {
+              if (disposed || !renderer) {
+                resolve(null);
+                return;
+              }
+              controls?.update(camera);
+              renderer.render(scene, camera);
+              try {
+                renderer.domElement.toBlob(
+                  (blob) => resolve(blob),
+                  "image/jpeg",
+                  0.9,
+                );
+              } catch {
+                resolve(null);
+              }
+            });
           renderer.setAnimationLoop(() => {
             if (disposed || !renderer) return;
             const now = performance.now();
@@ -450,6 +484,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
       disposed = true;
       resetFnRef.current = null;
       captureSnapshotRef.current = null;
+      captureSnapshotBlobRef.current = null;
       removeResize?.();
       removeKeys?.();
       renderer?.setAnimationLoop(null);

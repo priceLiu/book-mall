@@ -25,7 +25,8 @@ import { QrWorldLoadProgress } from "@/components/quick-replica/qr-world-load-pr
 import { QrWorldLoadingBackdrop } from "@/components/quick-replica/qr-world-loading-backdrop";
 import { QrWorldScreenshotMenu } from "@/components/quick-replica/qr-world-screenshot-menu";
 import { QrWorldShutterFlash } from "@/components/quick-replica/qr-world-shutter-flash";
-import { downloadDataUrl, triggerSameOriginDownload } from "@/lib/qr-world-download";
+import { QrToast } from "@/components/quick-replica/qr-toast";
+import { downloadBlob, scheduleSameOriginDownload } from "@/lib/qr-world-download";
 import { resolveWorldId, resolveWorldMarbleUrl } from "@/lib/qr-world-marble-url";
 import {
   resolveTemplatePanoUrl,
@@ -222,7 +223,12 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
   const [naturalMouse, setNaturalMouse] = useState(false);
   const [invertTrackpadDrag, setInvertTrackpadDrag] = useState(false);
   const [shutterFlash, setShutterFlash] = useState(0);
+  const [viewerToast, setViewerToast] = useState<string | null>(null);
   const sparkRef = useRef<QrWorldSparkHandle>(null);
+
+  const showToast = useCallback((message: string) => {
+    setViewerToast(message);
+  }, []);
 
   const worldId = resolveWorldId(template);
   const marbleUrl = resolveWorldMarbleUrl(template);
@@ -292,28 +298,33 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      onToast?.("已复制场景链接");
+      showToast("已复制场景链接");
     } catch {
-      onToast?.("复制失败");
+      showToast("复制失败");
     }
-  }, [payload?.worldMarbleUrl, marbleUrl, onToast]);
+  }, [payload?.worldMarbleUrl, marbleUrl, showToast]);
 
   const resetView = useCallback(() => {
     sparkRef.current?.resetView();
   }, []);
 
-  const captureFrame = useCallback((): string | null => {
-    const fromRef = sparkRef.current?.captureScreenshot();
+  const captureFrameBlob = useCallback(async (): Promise<Blob | null> => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    const fromRef = await sparkRef.current?.captureScreenshotBlob();
     if (fromRef) return fromRef;
     const canvas = document.querySelector<HTMLCanvasElement>(
       "[data-qr-world-spark-host] canvas",
     );
     if (!canvas) return null;
-    try {
-      return canvas.toDataURL("image/png");
-    } catch {
-      return null;
-    }
+    return new Promise((resolve) => {
+      try {
+        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+      } catch {
+        resolve(null);
+      }
+    });
   }, []);
 
   const downloadSpz = useCallback(() => {
@@ -324,32 +335,35 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
       templateSplats?.highResUrl ??
       null;
     if (!worldId || !url) {
-      onToast?.("暂无可下载的 3D 资产");
+      showToast("暂无可下载的 3D 资产");
       return;
     }
     const ext = url.split("?")[0]?.split(".").pop()?.toLowerCase() || "spz";
     const slug =
       template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
     const filename = `${slug}-${worldId.slice(0, 8)}.${ext}`;
-    onToast?.("正在下载 3D 资产…");
-    triggerSameOriginDownload(url, filename);
-  }, [payload, template.title, templateSplats?.highResUrl, worldId, onToast]);
+    showToast("正在下载 3D 资产…");
+    scheduleSameOriginDownload(url, filename);
+  }, [payload, template.title, templateSplats?.highResUrl, worldId, showToast]);
 
   const takeScreenshot = useCallback(() => {
-    const dataUrl = captureFrame();
-    if (!dataUrl) {
-      onToast?.("场景尚未就绪，请稍后再试");
-      return;
-    }
     setShutterFlash((n) => n + 1);
-    const slug = template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
-    downloadDataUrl(dataUrl, `${slug}-screenshot.png`);
-    onToast?.("截图已保存");
-  }, [captureFrame, template.title, onToast]);
+    void (async () => {
+      const blob = await captureFrameBlob();
+      if (!blob) {
+        showToast("场景尚未就绪，请稍后再试");
+        return;
+      }
+      const slug =
+        template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
+      downloadBlob(blob, `${slug}-screenshot.jpg`);
+      showToast("截图已保存");
+    })();
+  }, [captureFrameBlob, template.title, showToast]);
 
   const takePanoramaScreenshot = useCallback(() => {
     if (!worldId) {
-      onToast?.("缺少场景 ID");
+      showToast("缺少场景 ID");
       return;
     }
     const rawPano =
@@ -358,13 +372,13 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
       previewThumb ||
       null;
     if (!rawPano) {
-      onToast?.("该场景暂无全景图，已保存当前视角截图");
+      showToast("该场景暂无全景图，已保存当前视角截图");
       takeScreenshot();
       return;
     }
     const proxied = proxifyWorldImageUrl(worldId, rawPano);
     if (!proxied) {
-      onToast?.("全景图地址无效");
+      showToast("全景图地址无效");
       return;
     }
     setShutterFlash((n) => n + 1);
@@ -372,10 +386,10 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
       template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
     const ext = rawPano.split("?")[0]?.split(".").pop()?.toLowerCase() || "jpg";
     const filename = `${slug}-panorama.${ext}`;
-    onToast?.("正在下载全景图…");
-    triggerSameOriginDownload(proxied, filename);
-    onToast?.("全景图已保存");
-  }, [payload?.panoUrl, previewThumb, takeScreenshot, template, worldId, onToast]);
+    showToast("正在下载全景图…");
+    scheduleSameOriginDownload(proxied, filename);
+    window.setTimeout(() => showToast("全景图已保存"), 400);
+  }, [payload?.panoUrl, previewThumb, takeScreenshot, template, worldId, showToast]);
 
   if (!mounted) return null;
 
@@ -420,6 +434,11 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
         label={loadProgressLabel}
       />
       <QrWorldShutterFlash trigger={shutterFlash} />
+      <QrToast
+        message={viewerToast}
+        onDismiss={() => setViewerToast(null)}
+        placement="above-toolbar"
+      />
 
       {showSpark ? (
         <QrWorldSparkCanvas
@@ -485,10 +504,10 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
             <ToolbarButton label="重置视角" onClick={resetView}>
               <RotateCcw className="h-[18px] w-[18px]" />
             </ToolbarButton>
-            <ToolbarButton label="风格" onClick={() => onToast?.("风格调整即将推出")}>
+            <ToolbarButton label="风格" onClick={() => showToast("风格调整即将推出")}>
               <Palette className="h-[18px] w-[18px]" />
             </ToolbarButton>
-            <ToolbarButton label="视频" onClick={() => onToast?.("视频导出即将推出")}>
+            <ToolbarButton label="视频" onClick={() => showToast("视频导出即将推出")}>
               <Clapperboard className="h-[18px] w-[18px]" />
             </ToolbarButton>
             <span className="mx-1 h-5 w-px bg-white/15" aria-hidden />
@@ -503,13 +522,13 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
             <ToolbarButton label="复制链接" onClick={() => void copyLink()}>
               <Link2 className="h-[18px] w-[18px]" />
             </ToolbarButton>
-            <ToolbarButton label="收藏" onClick={() => onToast?.("收藏即将推出")}>
+            <ToolbarButton label="收藏" onClick={() => showToast("收藏即将推出")}>
               <Heart className="h-[18px] w-[18px]" />
             </ToolbarButton>
-            <ToolbarButton label="喜欢" onClick={() => onToast?.("反馈即将推出")}>
+            <ToolbarButton label="喜欢" onClick={() => showToast("反馈即将推出")}>
               <ThumbsUp className="h-[18px] w-[18px]" />
             </ToolbarButton>
-            <ToolbarButton label="不喜欢" onClick={() => onToast?.("反馈即将推出")}>
+            <ToolbarButton label="不喜欢" onClick={() => showToast("反馈即将推出")}>
               <ThumbsDown className="h-[18px] w-[18px]" />
             </ToolbarButton>
           </div>

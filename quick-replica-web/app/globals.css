@@ -297,6 +297,11 @@ body {
     animation: qr-toast-in 0.2s ease-out;
   }
 
+  .qr-toast--above-toolbar {
+    bottom: 5.75rem;
+    z-index: 106;
+  }
+
   @keyframes qr-toast-in {
     from {
       opacity: 0;
