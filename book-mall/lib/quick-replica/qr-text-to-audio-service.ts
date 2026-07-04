@@ -7,15 +7,17 @@ import {
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
 import {
-  forwardMinimaxT2a,
-  forwardMinimaxVoiceConvert,
-} from "@/lib/gateway/minimax-speech-proxy";
-import { forwardMinimaxMusicGenerate } from "@/lib/gateway/minimax-music-proxy";
-import {
   MINIMAX_DEFAULT_MUSIC_MODEL_KEY,
   MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
   isMinimaxMusicModelKey,
+  resolveMinimaxUpstreamSpeechModel,
 } from "@/lib/gateway/minimax-speech-models";
+import {
+  forwardMinimaxFileUpload,
+  forwardMinimaxT2a,
+  forwardMinimaxVoiceClone,
+  forwardMinimaxVoiceConvert,
+} from "@/lib/gateway/minimax-speech-proxy";
 import {
   createRequestLog,
   finalizeRequestLog,
@@ -31,7 +33,14 @@ import {
   validateTextToAudioDraft,
   validateVoiceChangerDraft,
 } from "@/lib/quick-replica/qr-text-to-audio-models";
+import {
+  generateQrCloneVoiceId,
+  normalizeVoiceEmotionWeights,
+  resolveDominantVoiceEmotion,
+  validateVoiceCloneDraft,
+} from "@/lib/quick-replica/qr-voice-clone-models";
 import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
+import { forwardMinimaxMusicGenerate } from "@/lib/gateway/minimax-music-proxy";
 
 const CLIENT_SOURCE = "QUICK_REPLICA" as const;
 
@@ -270,10 +279,180 @@ export async function qrCreateMinimaxMusicJob(
   return { logId: log.id, taskId: result.taskId ?? log.id, providerKind: "MINIMAX" };
 }
 
+async function downloadRemoteBuffer(url: string): Promise<Buffer> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("无法下载音频文件");
+  return Buffer.from(await r.arrayBuffer());
+}
+
+function guessAudioFilename(url: string, fallbackExt = "mp3"): string {
+  const path = url.split("?")[0] ?? url;
+  const name = path.split("/").pop();
+  if (name && /\.(mp3|m4a|wav)$/i.test(name)) return name;
+  return `audio.${fallbackExt}`;
+}
+
+export async function qrCreateMinimaxVoiceCloneJob(
+  userId: string,
+  draft: QrWorkspaceDraft,
+): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind | string }> {
+  const validationError = validateVoiceCloneDraft({
+    modelKey: draft.modelKey,
+    referenceAudioUrl: draft.referenceAudioUrl,
+    sourceAudioUrl: draft.sourceAudioUrl,
+    prompt: draft.prompt,
+  });
+  if (validationError) throw new Error(validationError);
+
+  const { auth, credentialId } = await requireMinimaxAuth(userId);
+  const modelKey = draft.modelKey.trim() || MINIMAX_DEFAULT_SPEECH_MODEL_KEY;
+  const refUrl = (draft.referenceAudioUrl ?? draft.sourceAudioUrl ?? "").trim();
+  const refBuffer = await downloadRemoteBuffer(refUrl);
+  const refUpload = await forwardMinimaxFileUpload({
+    credentialId,
+    buffer: refBuffer,
+    filename: guessAudioFilename(refUrl),
+    purpose: "voice_clone",
+  });
+  if (!refUpload.fileId) {
+    throw new Error("参考音频上传 MiniMax 失败");
+  }
+
+  let clonePrompt: { prompt_audio: number; prompt_text: string } | undefined;
+  const promptAudioUrl = draft.clonePromptAudioUrl?.trim();
+  const promptText = draft.clonePromptText?.trim();
+  if (promptAudioUrl && promptText) {
+    const promptBuffer = await downloadRemoteBuffer(promptAudioUrl);
+    const promptUpload = await forwardMinimaxFileUpload({
+      credentialId,
+      buffer: promptBuffer,
+      filename: guessAudioFilename(promptAudioUrl),
+      purpose: "prompt_audio",
+    });
+    if (!promptUpload.fileId) throw new Error("示例音频上传 MiniMax 失败");
+    clonePrompt = { prompt_audio: promptUpload.fileId, prompt_text: promptText };
+  }
+
+  const cloneVoiceId = draft.cloneVoiceId?.trim() || generateQrCloneVoiceId();
+  const emotions = normalizeVoiceEmotionWeights(draft.voiceEmotions);
+  const dominantEmotion = resolveDominantVoiceEmotion(emotions);
+  const controls = normalizeVoiceControls(draft);
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model: modelKey,
+    endpoint: "/v1/voice_clone",
+    providerKind: "MINIMAX",
+    requestKind: "TTS",
+    clientSource: CLIENT_SOURCE,
+    clientPage: "quick-replica/voice-clone",
+    actorBookUserId: userId,
+    inputSummary: {
+      qrVoiceClone: {
+        draft: { ...draft, cloneVoiceId },
+        referenceFileId: refUpload.fileId,
+      },
+    },
+  });
+
+  const result = await forwardMinimaxVoiceClone({
+    credentialId,
+    input: {
+      file_id: refUpload.fileId,
+      voice_id: cloneVoiceId,
+      text: draft.prompt.trim(),
+      model: resolveMinimaxUpstreamSpeechModel(modelKey),
+      language_boost: draft.languageBoost?.trim() || "auto",
+      clone_prompt: clonePrompt,
+      text_validation: draft.textValidation?.trim(),
+      accuracy: draft.accuracy,
+      need_noise_reduction: draft.needNoiseReduction ?? false,
+      need_volume_normalization: draft.needVolumeNormalization ?? false,
+      aigc_watermark: draft.aigcWatermark ?? false,
+      voice_setting: {
+        voice_id: cloneVoiceId,
+        emotion: dominantEmotion,
+        speed: controls.voiceSpeed,
+        vol: controls.voiceVolume,
+        pitch: controls.voicePitch,
+      },
+    },
+  });
+
+  const baseResp = (result.vendorJson as { base_resp?: { status_msg?: string } })?.base_resp;
+  if (result.status < 200 || result.status >= 300) {
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: result.durationMs,
+      failMessage: baseResp?.status_msg ?? "MiniMax 音色复刻失败",
+      model: modelKey,
+    });
+    throw new Error(baseResp?.status_msg ?? "MiniMax 音色复刻失败");
+  }
+
+  let audioUrl = result.demoAudioUrl?.trim() ?? "";
+  if (!audioUrl) {
+    const t2a = await forwardMinimaxT2a({
+      credentialId,
+      input: {
+        modelKey,
+        text: draft.prompt.trim(),
+        voice_id: cloneVoiceId,
+        speed: controls.voiceSpeed,
+        vol: controls.voiceVolume,
+        pitch: controls.voicePitch,
+      },
+    });
+    if (t2a.status >= 200 && t2a.status < 300 && t2a.buffer.length) {
+      audioUrl = await uploadAudioOutput({
+        userId,
+        buffer: t2a.buffer,
+        ext: t2a.ext,
+      });
+    }
+  } else {
+    const demoBuf = await downloadRemoteBuffer(audioUrl);
+    audioUrl = await uploadAudioOutput({
+      userId,
+      buffer: demoBuf,
+      ext: "mp3",
+    });
+  }
+
+  if (!audioUrl) {
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: result.durationMs,
+      failMessage: "复刻成功但未返回试听音频",
+      model: modelKey,
+    });
+    throw new Error("复刻成功但未返回试听音频");
+  }
+
+  await finalizeRequestLog(log.id, {
+    status: "SUCCEEDED",
+    durationMs: result.durationMs,
+    resultSummary: {
+      audio_url: audioUrl,
+      url: audioUrl,
+      voice_id: cloneVoiceId,
+      demo_audio: audioUrl,
+    },
+    model: modelKey,
+  });
+
+  return { logId: log.id, taskId: log.id, providerKind: "MINIMAX" };
+}
+
 export async function qrCreateTextToAudioJob(
   userId: string,
   draft: QrWorkspaceDraft,
 ): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind | string }> {
+  if (draft.kind === "voice-clone") {
+    return qrCreateMinimaxVoiceCloneJob(userId, draft);
+  }
   if (draft.kind === "voice-changer") {
     return qrCreateMinimaxVoiceConvertJob(userId, draft);
   }

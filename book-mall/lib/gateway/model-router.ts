@@ -4,6 +4,7 @@ import {
   isMinimaxMusicModelKey,
   isMinimaxSpeechModelKey,
 } from "@/lib/gateway/minimax-speech-models";
+import { isWorldlabsMarbleModelKey } from "@/lib/gateway/worldlabs-marble-models";
 
 import {
   VOLCENGINE_CHAT_MODEL_KEYS,
@@ -239,6 +240,10 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "MINIMAX", requestKind: "MUSIC" };
   }
 
+  if (isWorldlabsMarbleModelKey(raw) || isWorldlabsMarbleModelKey(m)) {
+    return { providerKind: "WORLDLABS", requestKind: "OTHER" };
+  }
+
   if (m.includes("qwen") || m.includes("bailian") || (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
@@ -260,6 +265,8 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       return "https://ark.cn-beijing.volces.com/api/v3";
     case "MINIMAX":
       return "https://api.minimaxi.com";
+    case "WORLDLABS":
+      return "https://api.worldlabs.ai";
     default:
       return (
         process.env.KIE_API_BASE?.trim()?.replace(/\/$/, "") ||

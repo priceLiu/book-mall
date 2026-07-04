@@ -22,7 +22,7 @@ import {
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
 import { downloadQrTemplateOutput } from "@/lib/qr-download-output";
 
-function useMasonryColumnCount(): number {
+export function useMasonryColumnCount(): number {
   const [count, setCount] = useState(2);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ function useMasonryColumnCount(): number {
   return count;
 }
 
-function distributeToColumns<T>(items: T[], columnCount: number): T[][] {
+export function distributeToColumns<T>(items: T[], columnCount: number): T[][] {
   const cols: T[][] = Array.from({ length: columnCount }, () => []);
   items.forEach((item, index) => {
     cols[index % columnCount]?.push(item);
@@ -141,16 +141,19 @@ function TemplateDownloadButton({
   );
 }
 
-function MasonryTemplateCard({
+export function MasonryTemplateCard({
   template,
   onSelect,
   allowDownload = false,
+  hideRecreateOnHover = false,
 }: {
   template: QrTemplate;
   onSelect: () => void;
   allowDownload?: boolean;
+  /** 场景墙：点击整卡进入全屏预览，不显示悬停「重现」 */
+  hideRecreateOnHover?: boolean;
 }) {
-  const { ref: visibilityRef, visible } = useIntersectionVisible();
+  const { ref: visibilityRef, visible } = useIntersectionVisible<HTMLButtonElement>();
   const [hovering, setHovering] = useState(false);
   const showTitle = template.title && !/^图像灵感 \d+$/.test(template.title);
   const previewVideoUrl =
@@ -295,19 +298,23 @@ function MasonryTemplateCard({
           />
         ) : null}
 
-        <div
-          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          style={{
-            background:
-              "linear-gradient(to top, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0) 34%), rgba(0, 0, 0, 0.42)",
-          }}
-        />
+        {!hideRecreateOnHover ? (
+          <>
+            <div
+              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+              style={{
+                background:
+                  "linear-gradient(to top, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0) 34%), rgba(0, 0, 0, 0.42)",
+              }}
+            />
 
-        <div className="pointer-events-none absolute inset-0 z-[2] flex items-end justify-center px-[6px] py-3">
-          <span className="qr-masonry-recreate pointer-events-auto min-w-[72px] rounded-[8px] bg-[var(--qr-brand)] px-4 py-2 text-[12px] font-medium leading-4 tracking-[0.05px] text-white opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0">
-            重现
-          </span>
-        </div>
+            <div className="pointer-events-none absolute inset-0 z-[2] flex items-end justify-center px-[6px] py-3">
+              <span className="qr-masonry-recreate pointer-events-auto min-w-[72px] rounded-[8px] bg-[var(--qr-brand)] px-4 py-2 text-[12px] font-medium leading-4 tracking-[0.05px] text-white opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0">
+                重现
+              </span>
+            </div>
+          </>
+        ) : null}
 
         {(template.badges?.length ?? 0) > 0 || template.source === "user" ? (
           <div className="absolute left-2 top-2 z-[1] flex flex-wrap gap-1">
@@ -379,7 +386,7 @@ function AudioTemplateCard({
   onSelect: () => void;
   allowDownload?: boolean;
 }) {
-  const { ref, visible } = useIntersectionVisible();
+  const { ref, visible } = useIntersectionVisible<HTMLButtonElement>();
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const { voiceLabel, voiceLetter, kindLabel, audioUrl } = resolveAudioCardMeta(template);
@@ -459,7 +466,7 @@ function GridTemplateCard({
   onSelect: () => void;
   allowDownload?: boolean;
 }) {
-  const { ref, visible } = useIntersectionVisible();
+  const { ref, visible } = useIntersectionVisible<HTMLButtonElement>();
   const imageThumbUrl = resolveGalleryThumbnailUrl(template.thumbnailUrl);
 
   return (

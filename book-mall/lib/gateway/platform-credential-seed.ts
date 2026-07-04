@@ -72,6 +72,12 @@ const CREDENTIALS: Array<{
     env: "MINIMAX_API_KEY",
     baseUrl: "https://api.minimaxi.com",
   },
+  {
+    kind: "WORLDLABS",
+    alias: "World Labs",
+    env: "WORLDLABS_API_KEY",
+    baseUrl: "https://api.worldlabs.ai",
+  },
 ];
 
 async function ensureCredential(
@@ -105,6 +111,13 @@ async function ensureCredential(
     }
     const envKey = process.env[spec.env]?.trim();
     if (envKey && spec.kind === "MINIMAX") {
+      await updateGatewayCredential(gatewayUserId, existing.id, {
+        apiKey: envKey,
+        active: true,
+        ...(targetBase ? { baseUrl: targetBase } : {}),
+      });
+    }
+    if (envKey && spec.kind === "WORLDLABS") {
       await updateGatewayCredential(gatewayUserId, existing.id, {
         apiKey: envKey,
         active: true,

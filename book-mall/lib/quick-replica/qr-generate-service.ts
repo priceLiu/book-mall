@@ -30,6 +30,12 @@ import { qrCreateTextToVideoJob } from "@/lib/quick-replica/qr-text-to-video-ser
 import { qrCreateTextToImageJob } from "@/lib/quick-replica/qr-text-to-image-service";
 import { qrCreateTextToAudioJob } from "@/lib/quick-replica/qr-text-to-audio-service";
 import {
+  extractWorldOutputFromLog,
+  qrCreateWorldJob,
+  qrPollWorldJob,
+  readWorldDraftFromLog,
+} from "@/lib/quick-replica/qr-world-service";
+import {
   createUserQrTemplate,
   findQrTemplateByLogId,
 } from "@/lib/quick-replica/qr-template-service";
@@ -216,6 +222,10 @@ export async function qrCreateGenerateJob(
     return qrCreateTextToAudioJob(userId, draft);
   }
 
+  if (draft.category === "world" && draft.kind === "create-world") {
+    return qrCreateWorldJob(userId, draft);
+  }
+
   const auth = await requireGatewayAuth(userId);
   const { model, input } = buildGenericCreateBody(draft);
   const providerKind: GatewayProviderKind =
@@ -251,7 +261,9 @@ function readGenerateDraftFromLog(log: {
     root.qrTextToVideo ??
     root.qrTextToAudio ??
     root.qrVoiceChanger ??
-    root.qrCreateMusic;
+    root.qrVoiceClone ??
+    root.qrCreateMusic ??
+    root.qrWorld;
   if (!snap || typeof snap !== "object") return null;
   const s = snap as Record<string, unknown>;
   if (s.draft && typeof s.draft === "object") {
@@ -277,7 +289,14 @@ function readGenerateDraftFromLog(log: {
 function extractOutputUrl(log: {
   resultSummary: unknown;
   requestKind: string;
+  providerKind?: string | null;
 }): { url: string; mediaType: "image" | "video" | "audio" } | null {
+  if (log.providerKind === "WORLDLABS") {
+    const worldOut = extractWorldOutputFromLog(log.resultSummary);
+    if (worldOut.outputUrl) {
+      return { url: worldOut.outputUrl, mediaType: "image" };
+    }
+  }
   const extracted = extractQrJobOutputUrl(log.resultSummary);
   if (extracted) return extracted;
   if (log.requestKind === "IMAGE" || log.requestKind === "TRYON") {
@@ -316,6 +335,16 @@ function buildTemplateModelParamsFromDraft(draft: QrWorkspaceDraft): Record<stri
   if (draft.voiceStability != null) params.stability = draft.voiceStability;
   if (draft.voiceSimilarityBoost != null) params.similarity_boost = draft.voiceSimilarityBoost;
   if (draft.voiceStyleExaggeration != null) params.style_exaggeration = draft.voiceStyleExaggeration;
+  if (draft.cloneVoiceId) params.clone_voice_id = draft.cloneVoiceId;
+  if (draft.languageBoost) params.language_boost = draft.languageBoost;
+  if (draft.textValidation) params.text_validation = draft.textValidation;
+  if (draft.accuracy != null) params.accuracy = draft.accuracy;
+  if (draft.needNoiseReduction != null) params.need_noise_reduction = draft.needNoiseReduction;
+  if (draft.needVolumeNormalization != null) {
+    params.need_volume_normalization = draft.needVolumeNormalization;
+  }
+  if (draft.aigcWatermark != null) params.aigc_watermark = draft.aigcWatermark;
+  if (draft.voiceEmotions) params.voice_emotions = draft.voiceEmotions;
   return params;
 }
 
@@ -435,6 +464,15 @@ export async function qrPollGenerateJob(
     );
   if (isMotionSync) {
     return qrPollMotionSyncJob(userId, logId);
+  }
+
+  const worldDraft = readWorldDraftFromLog(log) ?? draft;
+  const isWorldJob =
+    worldDraft?.category === "world" &&
+    worldDraft.kind === "create-world" &&
+    log.providerKind === "WORLDLABS";
+  if (isWorldJob) {
+    return qrPollWorldJob(userId, logId);
   }
 
   const existingTemplate = await findQrTemplateByLogId(logId);

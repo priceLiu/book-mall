@@ -98,6 +98,28 @@ export type QrWorkspaceDraft = {
   voiceStyleExaggeration?: number;
   /** 变声器源音频 URL */
   sourceAudioUrl?: string;
+  /** 音色快速复刻 · 自定义 voice_id（留空则自动生成） */
+  cloneVoiceId?: string;
+  /** 音色快速复刻 · language_boost，默认 auto */
+  languageBoost?: string;
+  /** 参考音频 ASR 校验文本 */
+  textValidation?: string;
+  /** ASR 相似度阈值 0–1 */
+  accuracy?: number;
+  needNoiseReduction?: boolean;
+  needVolumeNormalization?: boolean;
+  aigcWatermark?: boolean;
+  /** 可选示例音频 URL + 文本（clone_prompt） */
+  clonePromptAudioUrl?: string;
+  clonePromptText?: string;
+  /** 情感权重（UI 八维，总和 ≤ 1.5） */
+  voiceEmotions?: Record<string, number>;
   /** 音乐生成模式 */
   musicMode?: "generate" | "cover" | "lyrics";
+  /** Marble 世界：参考图方位角（与 sceneImageUrls 对齐） */
+  worldRefAzimuths?: number[];
+  /** Marble 多图：Auto Layout / reconstruct_images */
+  worldAutoLayout?: boolean;
+  /** Marble 单图：全景检测 auto | true | false */
+  worldIsPano?: boolean | "auto";
 };

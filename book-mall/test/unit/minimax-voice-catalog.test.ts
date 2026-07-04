@@ -19,6 +19,7 @@ describe("minimax-speech-models", () => {
 
   it("resolves upstream speech model", () => {
     expect(resolveMinimaxUpstreamSpeechModel("MiniMax/speech-02-hd")).toBe("speech-02-hd");
+    expect(resolveMinimaxUpstreamSpeechModel("MiniMax/speech-2.6-hd")).toBe("speech-2.6-hd");
     expect(resolveMinimaxUpstreamSpeechModel("minimax_speech_02")).toBe("speech-02-hd");
   });
 });

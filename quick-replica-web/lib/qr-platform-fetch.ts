@@ -70,6 +70,15 @@ export function formatQrPlatformError(error: string | undefined): string {
   if (e === "未登录" || e === "no_session" || e === "Unauthorized") {
     return "会话已过期，请点击「重新连接」后继续操作";
   }
+  if (e === "book_mall_proxy_failed") {
+    return "无法连接主站 API，请确认 dev:all 已启动 book-mall（:3000）";
+  }
+  if (e === "GATEWAY_KEY_REQUIRED") {
+    return "请先在 Book 个人中心关联 Gateway API Key（须含 World Labs 凭证）";
+  }
+  if (e.includes("Gateway") || e.includes("sk-gw") || e.includes("World Labs")) {
+    return e;
+  }
   return e || "操作失败";
 }
 

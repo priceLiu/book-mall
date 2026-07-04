@@ -76,7 +76,20 @@ export type QrWorkspaceDraft = {
   voiceSimilarityBoost?: number;
   voiceStyleExaggeration?: number;
   sourceAudioUrl?: string;
+  cloneVoiceId?: string;
+  languageBoost?: string;
+  textValidation?: string;
+  accuracy?: number;
+  needNoiseReduction?: boolean;
+  needVolumeNormalization?: boolean;
+  aigcWatermark?: boolean;
+  clonePromptAudioUrl?: string;
+  clonePromptText?: string;
+  voiceEmotions?: Record<string, number>;
   musicMode?: "generate" | "cover" | "lyrics";
+  worldRefAzimuths?: number[];
+  worldAutoLayout?: boolean;
+  worldIsPano?: boolean | "auto";
 };
 
 export type QrKindDef = {
@@ -233,7 +246,9 @@ export function defaultWorkspaceDraft(input: {
             ? TEXT_TO_IMAGE_DEFAULT_MODEL_KEY
             : input.category === "audio"
               ? "MiniMax/speech-2.8-hd"
-              : "lib-nano-pro",
+              : input.kind === "create-world"
+                ? "marble-1.1"
+                : "lib-nano-pro",
     mode:
       input.kind === "motion-sync"
         ? "std"
@@ -257,6 +272,23 @@ export function defaultWorkspaceDraft(input: {
     voiceStability: input.category === "audio" ? 0.5 : undefined,
     voiceSimilarityBoost: input.category === "audio" ? 0.75 : undefined,
     voiceStyleExaggeration: input.category === "audio" ? 0 : undefined,
+    languageBoost: input.kind === "voice-clone" ? "auto" : undefined,
+    needNoiseReduction: input.kind === "voice-clone" ? false : undefined,
+    needVolumeNormalization: input.kind === "voice-clone" ? false : undefined,
+    aigcWatermark: input.kind === "voice-clone" ? false : undefined,
+    voiceEmotions:
+      input.kind === "voice-clone"
+        ? {
+            happy: 0,
+            angry: 0,
+            sad: 0,
+            fearful: 0,
+            disgusted: 0,
+            calm: 0,
+            surprised: 0,
+            neutral: 0,
+          }
+        : undefined,
     musicMode: input.kind === "create-music" ? "generate" : undefined,
     characterOrientation: input.kind === "motion-sync" ? "video" : undefined,
     keepOriginalSound: input.kind === "motion-sync" ? true : undefined,
@@ -1001,7 +1033,15 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     savedTemplateId: t.source === "user" ? t.id : undefined,
     targetImageUrl,
     referenceVideoUrl: t.reference.slots.referenceVideo?.url ?? "",
-    referenceAudioUrl: t.reference.slots.referenceAudio?.url ?? "",
+    referenceAudioUrl:
+      t.reference.slots.referenceAudio?.url ??
+      (typeof t.reference.model.params.reference_audio_url === "string"
+        ? t.reference.model.params.reference_audio_url
+        : ""),
+    sourceAudioUrl:
+      typeof t.reference.model.params.source_audio_url === "string"
+        ? t.reference.model.params.source_audio_url
+        : t.reference.slots.referenceAudio?.url,
     sceneImageUrls,
     prompt: t.reference.prompt.text,
     modelKey: t.reference.model.modelKey,
@@ -1046,6 +1086,41 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     voiceStyleExaggeration:
       typeof t.reference.model.params.style_exaggeration === "number"
         ? t.reference.model.params.style_exaggeration
+        : undefined,
+    cloneVoiceId:
+      typeof t.reference.model.params.clone_voice_id === "string"
+        ? t.reference.model.params.clone_voice_id
+        : typeof t.reference.model.params.voice_id === "string" && t.kind === "voice-clone"
+          ? t.reference.model.params.voice_id
+          : undefined,
+    languageBoost:
+      typeof t.reference.model.params.language_boost === "string"
+        ? t.reference.model.params.language_boost
+        : undefined,
+    textValidation:
+      typeof t.reference.model.params.text_validation === "string"
+        ? t.reference.model.params.text_validation
+        : undefined,
+    accuracy:
+      typeof t.reference.model.params.accuracy === "number"
+        ? t.reference.model.params.accuracy
+        : undefined,
+    needNoiseReduction:
+      typeof t.reference.model.params.need_noise_reduction === "boolean"
+        ? t.reference.model.params.need_noise_reduction
+        : undefined,
+    needVolumeNormalization:
+      typeof t.reference.model.params.need_volume_normalization === "boolean"
+        ? t.reference.model.params.need_volume_normalization
+        : undefined,
+    aigcWatermark:
+      typeof t.reference.model.params.aigc_watermark === "boolean"
+        ? t.reference.model.params.aigc_watermark
+        : undefined,
+    voiceEmotions:
+      t.reference.model.params.voice_emotions &&
+      typeof t.reference.model.params.voice_emotions === "object"
+        ? (t.reference.model.params.voice_emotions as Record<string, number>)
         : undefined,
     characterOrientation:
       typeof t.reference.model.params.character_orientation === "string"

@@ -366,6 +366,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     HUNYUAN: "腾讯混元",
     VOLCENGINE: "火山方舟",
     MINIMAX: "MiniMax",
+    WORLDLABS: "World Labs",
   };
 
   type CatalogModel = Omit<GroupModel, "canonicalModelKey">;

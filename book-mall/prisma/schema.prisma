@@ -2185,6 +2185,7 @@ enum GatewayProviderKind {
   DASHSCOPE
   VOLCENGINE
   MINIMAX
+  WORLDLABS
 }
 
 enum GatewayRequestKind {

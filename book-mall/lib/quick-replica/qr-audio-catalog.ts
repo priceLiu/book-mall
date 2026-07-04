@@ -5,6 +5,8 @@ import {
   MINIMAX_SPEECH_MODELS,
   MINIMAX_MUSIC_MODELS,
   MINIMAX_DEFAULT_MUSIC_MODEL_KEY,
+  MINIMAX_LANGUAGE_BOOST_OPTIONS,
+  MINIMAX_VOICE_CLONE_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
 import {
   readQrAudioPromptTemplates,
@@ -137,6 +139,13 @@ export function getQrAudioCatalog() {
 
   return {
     models: QR_AUDIO_MODELS,
+    voiceCloneModels: MINIMAX_VOICE_CLONE_SPEECH_MODELS.map((m) => ({
+      modelKey: m.modelKey,
+      label: m.label,
+      subtitle: m.subtitle,
+      provider: "minimax",
+    })),
+    languageBoostOptions: [...MINIMAX_LANGUAGE_BOOST_OPTIONS],
     voices: QR_AUDIO_VOICES,
     styleTags,
     promptTemplates,
@@ -144,6 +153,7 @@ export function getQrAudioCatalog() {
       modelKey: QR_DEFAULT_AUDIO_MODEL_KEY,
       voiceId: QR_DEFAULT_AUDIO_VOICE_ID,
       styleTag: styleTags[0]?.id ?? QR_DEFAULT_AUDIO_STYLE_TAG,
+      languageBoost: "auto",
       ...QR_AUDIO_VOICE_CONTROL_DEFAULTS,
     },
     voicesPaged: true,

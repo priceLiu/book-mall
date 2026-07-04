@@ -7,7 +7,7 @@ import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrToast } from "@/components/quick-replica/qr-toast";
 import { getKindDef, templateToWorkspaceDraft, type QrTemplate } from "@/lib/qr-template-types";
-import { isAudioMediaUrl, isVideoMediaUrl } from "@/lib/qr-template-preview-media";
+import { isAudioMediaUrl, isVideoMediaUrl, resolveTemplateSceneImageUrls } from "@/lib/qr-template-preview-media";
 import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-generate-preview";
 
 type Props = {

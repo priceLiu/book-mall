@@ -41,6 +41,7 @@ type Props = {
   category: QrCategory;
   pinnedToolKey: string | null;
   sidebarOpen: boolean;
+  compact?: boolean;
   canManageFeatured?: boolean;
   onCloseSidebar: () => void;
   onHome: () => void;
@@ -56,6 +57,7 @@ export function QrSidebar({
   category,
   pinnedToolKey,
   sidebarOpen,
+  compact = false,
   canManageFeatured = false,
   onCloseSidebar,
   onHome,
@@ -70,7 +72,9 @@ export function QrSidebar({
       <aside
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r p-3 transition lg:static lg:translate-x-0`}
+        } fixed inset-y-0 left-0 z-40 flex flex-col border-r p-3 transition lg:static lg:translate-x-0 ${
+          compact ? "w-14 px-2" : "w-56"
+        }`}
         style={{
           borderColor: "var(--qr-border)",
           background: "var(--qr-bg-surface)",
@@ -85,7 +89,10 @@ export function QrSidebar({
 
         <button
           type="button"
+          title="首页"
           className={`mb-4 flex w-full items-center gap-2 px-2 py-2 text-sm transition ${
+            compact ? "justify-center" : ""
+          } ${
             navMode === "home" ? "qr-nav-active" : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
           }`}
           onClick={() => {
@@ -93,11 +100,14 @@ export function QrSidebar({
             onCloseSidebar();
           }}
         >
-          <Home className="h-4 w-4" /> 首页
+          <Home className="h-4 w-4 shrink-0" />
+          {compact ? null : "首页"}
         </button>
 
-        <div className="mb-2 text-xs uppercase tracking-wide qr-panel-muted">创造</div>
-        <div className="grid grid-cols-2 gap-2">
+        {compact ? null : (
+          <div className="mb-2 text-xs uppercase tracking-wide qr-panel-muted">创造</div>
+        )}
+        <div className={compact ? "grid grid-cols-1 gap-1.5" : "grid grid-cols-2 gap-2"}>
           {QR_CATEGORIES.map((c) => {
             const Icon = CATEGORY_ICONS[c.id];
             const active = navMode === "category" && category === c.id;
@@ -105,43 +115,51 @@ export function QrSidebar({
               <button
                 key={c.id}
                 type="button"
+                title={c.label}
                 onClick={() => {
                   onCategory(c.id);
                   onCloseSidebar();
                 }}
                 className={`flex items-center gap-2 rounded-lg border px-2 py-2 text-xs transition ${
+                  compact ? "justify-center px-1.5" : ""
+                } ${
                   active
                     ? "qr-nav-category-active"
                     : "border-[var(--qr-border)] text-[var(--qr-text-secondary)] hover:border-white/20"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
-                {c.label}
+                {compact ? null : c.label}
               </button>
             );
           })}
         </div>
 
-        <div className="mt-6 mb-2 text-xs uppercase tracking-wide qr-panel-muted">
-          已置顶工具
-        </div>
-        <div className="space-y-1">
+        {compact ? null : (
+          <div className="mt-6 mb-2 text-xs uppercase tracking-wide qr-panel-muted">
+            已置顶工具
+          </div>
+        )}
+        <div className={`space-y-1 ${compact ? "mt-4" : ""}`}>
           {QR_PINNED_TOOLS.map((t) => (
             <button
               key={t.toolKey}
               type="button"
+              title={t.label}
               onClick={() => {
                 onPinnedTool(t.toolKey, t.category, t.kind);
                 onCloseSidebar();
               }}
               className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition ${
+                compact ? "justify-center px-1.5" : ""
+              } ${
                 navMode === "pinned-tool" && pinnedToolKey === t.toolKey
                   ? "qr-nav-active"
                   : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
               }`}
             >
               <Clapperboard className="h-4 w-4 shrink-0" />
-              {t.label}
+              {compact ? null : t.label}
             </button>
           ))}
         </div>
@@ -149,54 +167,65 @@ export function QrSidebar({
         <div className="mt-auto space-y-1 pt-4">
           {canManageFeatured && onAdmin ? (
             <>
-              <div className="mb-2 text-xs uppercase tracking-wide qr-panel-muted">管理</div>
+              {compact ? null : (
+                <div className="mb-2 text-xs uppercase tracking-wide qr-panel-muted">管理</div>
+              )}
               <button
                 type="button"
+                title="管理后台"
                 onClick={() => {
                   onAdmin();
                   onCloseSidebar();
                 }}
                 className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
+                  compact ? "justify-center px-1.5" : ""
+                } ${
                   navMode === "admin"
                     ? "qr-nav-active"
                     : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
                 }`}
               >
                 <Settings2 className="h-4 w-4 shrink-0" />
-                管理后台
+                {compact ? null : "管理后台"}
               </button>
             </>
           ) : null}
           <button
             type="button"
+            title="我的作品"
             onClick={() => {
               onMyWorks();
               onCloseSidebar();
             }}
             className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
+              compact ? "justify-center px-1.5" : ""
+            } ${
               navMode === "my-works"
                 ? "qr-nav-active"
                 : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
             }`}
           >
             <FolderOpen className="h-4 w-4 shrink-0" />
-            我的作品
+            {compact ? null : "我的作品"}
           </button>
           {onGenerateHistory ? (
             <button
               type="button"
+              title="生成记录"
               onClick={() => {
                 onGenerateHistory();
                 onCloseSidebar();
               }}
               className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
+                compact ? "justify-center px-1.5" : ""
+              } ${
                 navMode === "generate-history"
                   ? "qr-nav-active"
                   : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
               }`}
             >
               <History className="h-4 w-4 shrink-0" />
-              生成记录
+              {compact ? null : "生成记录"}
             </button>
           ) : null}
         </div>

@@ -3,7 +3,11 @@
 import { ChevronRight, Mic2, Volume2, X } from "lucide-react";
 
 import type { QrAudioCatalog } from "@/lib/qr-audio-catalog-client";
-import { getQrAudioModelFromCatalog } from "@/lib/qr-audio-catalog-client";
+import {
+  getQrAudioModelFromCatalog,
+  QR_VOICE_EMOTION_DEFS,
+  QR_VOICE_EMOTION_MAX_TOTAL,
+} from "@/lib/qr-audio-catalog-client";
 import { resolveQrSelectedVoiceDisplay } from "@/lib/qr-audio-voice-selection";
 
 export function QrAudioOptionSheet({
@@ -201,5 +205,71 @@ export function QrAudioVoiceControlSlider({
         <span>{rightLabel}</span>
       </div>
     </div>
+  );
+}
+
+export function QrAudioEmotionControlGrid({
+  values,
+  disabled,
+  onChange,
+}: {
+  values: Record<string, number>;
+  disabled?: boolean;
+  onChange: (values: Record<string, number>) => void;
+}) {
+  const total = QR_VOICE_EMOTION_DEFS.reduce((sum, d) => sum + (values[d.id] ?? 0), 0);
+  const totalOk = total <= QR_VOICE_EMOTION_MAX_TOTAL + 0.001;
+
+  const setEmotion = (id: string, nextRaw: number) => {
+    const nextVal = Math.max(0, Math.min(1.5, nextRaw));
+    const others = QR_VOICE_EMOTION_DEFS.filter((d) => d.id !== id).reduce(
+      (sum, d) => sum + (values[d.id] ?? 0),
+      0,
+    );
+    const capped = Math.min(nextVal, Math.max(0, QR_VOICE_EMOTION_MAX_TOTAL - others));
+    onChange({ ...values, [id]: Math.round(capped * 100) / 100 });
+  };
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-[var(--qr-text-primary)]">
+          3. Set Emotion Control{" "}
+          <span className="text-[11px] font-normal text-[var(--qr-text-muted)]">(Optional)</span>
+        </h3>
+        <span
+          className={`text-[11px] tabular-nums ${totalOk ? "text-emerald-400" : "text-amber-400"}`}
+        >
+          Total Emotion Values {total.toFixed(2)} / {QR_VOICE_EMOTION_MAX_TOTAL.toFixed(1)}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {QR_VOICE_EMOTION_DEFS.map((def) => {
+          const val = values[def.id] ?? 0;
+          return (
+            <div
+              key={def.id}
+              className="rounded-2xl border px-4 py-3"
+              style={{ borderColor: "var(--qr-border)", background: "var(--qr-bg-elevated)" }}
+            >
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-[var(--qr-text-primary)]">{def.label}</span>
+                <span className="tabular-nums text-[var(--qr-text-muted)]">{val.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1.5}
+                step={0.01}
+                value={val}
+                disabled={disabled}
+                className="w-full accent-[var(--qr-accent-pink)]"
+                onChange={(e) => setEmotion(def.id, Number.parseFloat(e.target.value))}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

@@ -48,6 +48,8 @@ export type QrAudioPromptTemplateDef = {
 
 export type QrAudioCatalog = {
   models: QrAudioCatalogModel[];
+  voiceCloneModels?: QrAudioCatalogModel[];
+  languageBoostOptions?: string[];
   voices: QrAudioCatalogVoice[];
   styleTags: QrAudioCatalogStyleTag[];
   promptTemplates?: {
@@ -68,6 +70,7 @@ export type QrAudioCatalog = {
     voiceStability: number;
     voiceSimilarityBoost: number;
     voiceStyleExaggeration: number;
+    languageBoost?: string;
   };
 };
 
@@ -156,6 +159,37 @@ export function getQrAudioModelFromCatalog(catalog: QrAudioCatalog, modelKey: st
   return (
     catalog.models.find((m) => m.modelKey === modelKey.trim()) ?? catalog.models[0]!
   );
+}
+
+export const QR_VOICE_EMOTION_DEFS = [
+  { id: "happy", label: "Happy" },
+  { id: "angry", label: "Angry" },
+  { id: "sad", label: "Sad" },
+  { id: "fearful", label: "Fear" },
+  { id: "disgusted", label: "Hate" },
+  { id: "calm", label: "Low" },
+  { id: "surprised", label: "Surprise" },
+  { id: "neutral", label: "Neutral" },
+] as const;
+
+export const QR_VOICE_EMOTION_MAX_TOTAL = 1.5;
+export const QR_VOICE_CLONE_PROMPT_MAX = 1000;
+
+export function getQrVoiceCloneModelsFromCatalog(catalog: QrAudioCatalog): QrAudioCatalogModel[] {
+  if (catalog.voiceCloneModels?.length) return catalog.voiceCloneModels;
+  return catalog.models.filter((m) =>
+    [
+      "MiniMax/speech-2.8-hd",
+      "MiniMax/speech-2.8-turbo",
+      "MiniMax/speech-2.6-hd",
+      "MiniMax/speech-2.6-turbo",
+    ].includes(m.modelKey),
+  );
+}
+
+export function getQrVoiceCloneModelFromCatalog(catalog: QrAudioCatalog, modelKey: string) {
+  const models = getQrVoiceCloneModelsFromCatalog(catalog);
+  return models.find((m) => m.modelKey === modelKey.trim()) ?? models[0]!;
 }
 
 export function getQrAudioVoiceFromCatalog(catalog: QrAudioCatalog, voiceId: string) {
