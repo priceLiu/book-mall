@@ -10,17 +10,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@sparkjsdev/spark": "^2.1.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "14.2.3",
     "react": "^18",
     "react-dom": "^18",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/three": "^0.185.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",

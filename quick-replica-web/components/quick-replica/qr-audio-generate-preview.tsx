@@ -320,9 +320,11 @@ export function QrAudioGenerateSuccess({
   const promptLabel =
     draft.kind === "voice-changer"
       ? "变声说明"
-      : draft.kind === "create-music"
-        ? "音乐描述 / 歌词"
-        : "Prompt";
+      : draft.kind === "voice-clone"
+        ? "复刻的文字"
+        : draft.kind === "create-music"
+          ? "音乐描述 / 歌词"
+          : "Prompt";
 
   const promptText = draft.prompt.trim();
 

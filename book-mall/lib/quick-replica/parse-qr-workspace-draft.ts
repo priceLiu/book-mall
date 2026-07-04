@@ -67,6 +67,33 @@ export function parseQrWorkspaceDraft(body: Record<string, unknown>): QrWorkspac
     voiceSimilarityBoost: parseOptionalNumber(body.voiceSimilarityBoost),
     voiceStyleExaggeration: parseOptionalNumber(body.voiceStyleExaggeration),
     sourceAudioUrl: typeof body.sourceAudioUrl === "string" ? body.sourceAudioUrl : undefined,
+    cloneVoiceId: typeof body.cloneVoiceId === "string" ? body.cloneVoiceId : undefined,
+    languageBoost: typeof body.languageBoost === "string" ? body.languageBoost : undefined,
+    textValidation: typeof body.textValidation === "string" ? body.textValidation : undefined,
+    accuracy: parseOptionalNumber(body.accuracy),
+    needNoiseReduction:
+      typeof body.needNoiseReduction === "boolean" ? body.needNoiseReduction : undefined,
+    needVolumeNormalization:
+      typeof body.needVolumeNormalization === "boolean"
+        ? body.needVolumeNormalization
+        : undefined,
+    aigcWatermark: typeof body.aigcWatermark === "boolean" ? body.aigcWatermark : undefined,
+    clonePromptAudioUrl:
+      typeof body.clonePromptAudioUrl === "string" ? body.clonePromptAudioUrl : undefined,
+    clonePromptText: typeof body.clonePromptText === "string" ? body.clonePromptText : undefined,
+    voiceEmotions:
+      body.voiceEmotions && typeof body.voiceEmotions === "object"
+        ? (body.voiceEmotions as Record<string, number>)
+        : undefined,
     musicMode: parseMusicMode(body.musicMode),
+    worldRefAzimuths: Array.isArray(body.worldRefAzimuths)
+      ? body.worldRefAzimuths.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+      : undefined,
+    worldAutoLayout:
+      typeof body.worldAutoLayout === "boolean" ? body.worldAutoLayout : undefined,
+    worldIsPano:
+      body.worldIsPano === "auto" || body.worldIsPano === true || body.worldIsPano === false
+        ? body.worldIsPano
+        : undefined,
   };
 }

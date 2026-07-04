@@ -10,9 +10,9 @@ export function isQrCharacterGalleryTemplate(t: Pick<QrTemplateJson, "id">): boo
   return t.id.startsWith("qr-character-gallery-");
 }
 
-/** 右栏瀑布流模板（OpenArt 场景库） */
+/** 右栏瀑布流模板（OpenArt / World Labs API 场景库） */
 export function isQrWorldGalleryTemplate(t: Pick<QrTemplateJson, "id">): boolean {
-  return t.id.startsWith("qr-world-gallery-");
+  return t.id.startsWith("qr-world-gallery-") || t.id.startsWith("qr-world-api-");
 }
 
 /** 右栏瀑布流模板（OpenArt 视频库） */

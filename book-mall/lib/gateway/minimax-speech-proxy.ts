@@ -29,6 +29,29 @@ export type MinimaxT2aInput = {
   output_format?: "mp3" | "wav" | "pcm";
 };
 
+export type MinimaxVoiceCloneInput = {
+  file_id: number;
+  voice_id: string;
+  text?: string;
+  model?: string;
+  language_boost?: string;
+  clone_prompt?: { prompt_audio: number; prompt_text: string };
+  text_validation?: string;
+  accuracy?: number;
+  need_noise_reduction?: boolean;
+  need_volume_normalization?: boolean;
+  aigc_watermark?: boolean;
+  voice_setting?: {
+    voice_id: string;
+    emotion?: string;
+    speed?: number;
+    vol?: number;
+    pitch?: number;
+  };
+};
+
+export type MinimaxFileUploadPurpose = "voice_clone" | "prompt_audio";
+
 export type MinimaxSystemVoice = {
   voice_id: string;
   voice_name?: string;
@@ -178,6 +201,127 @@ export async function forwardMinimaxT2a(args: {
     ext,
     vendorJson: json,
     audioUrl,
+  };
+}
+
+export async function forwardMinimaxFileUpload(args: {
+  credentialId: string;
+  buffer: Buffer;
+  filename: string;
+  purpose: MinimaxFileUploadPurpose;
+  baseUrlOverride?: string | null;
+}): Promise<{
+  status: number;
+  fileId: number;
+  vendorJson: unknown;
+  durationMs: number;
+}> {
+  const cred = await getDecryptedCredentialApiKey(args.credentialId);
+  if (!cred) throw new Error("MiniMax 凭证不可用");
+
+  const root = resolveMinimaxApiRoot(args.baseUrlOverride || cred.baseUrl);
+  const url = `${root}/v1/files/upload`;
+  const started = Date.now();
+
+  const form = new FormData();
+  form.append("purpose", args.purpose);
+  form.append("file", new Blob([new Uint8Array(args.buffer)]), args.filename);
+
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${cred.apiKey}`,
+    },
+    body: form,
+  });
+
+  const json = (await r.json()) as Record<string, unknown>;
+  const baseResp = json.base_resp as { status_code?: number; status_msg?: string } | undefined;
+  const file = json.file as { file_id?: number } | undefined;
+  const fileId = typeof file?.file_id === "number" ? file.file_id : 0;
+
+  if (!fileId || (baseResp && baseResp.status_code !== 0 && baseResp.status_code !== undefined)) {
+    return {
+      status: r.status >= 400 ? r.status : 502,
+      fileId: 0,
+      vendorJson: json,
+      durationMs: Date.now() - started,
+    };
+  }
+
+  return {
+    status: r.status,
+    fileId,
+    vendorJson: json,
+    durationMs: Date.now() - started,
+  };
+}
+
+export async function forwardMinimaxVoiceClone(args: {
+  credentialId: string;
+  input: MinimaxVoiceCloneInput;
+  baseUrlOverride?: string | null;
+}): Promise<{
+  status: number;
+  demoAudioUrl?: string;
+  clonedVoiceId: string;
+  vendorJson: unknown;
+  durationMs: number;
+}> {
+  const cred = await getDecryptedCredentialApiKey(args.credentialId);
+  if (!cred) throw new Error("MiniMax 凭证不可用");
+
+  const root = resolveMinimaxApiRoot(args.baseUrlOverride || cred.baseUrl);
+  const url = `${root}/v1/voice_clone`;
+  const started = Date.now();
+
+  const body: Record<string, unknown> = {
+    file_id: args.input.file_id,
+    voice_id: args.input.voice_id,
+  };
+  if (args.input.text?.trim()) body.text = args.input.text.trim().slice(0, 1000);
+  if (args.input.model) body.model = args.input.model;
+  if (args.input.language_boost) body.language_boost = args.input.language_boost;
+  if (args.input.clone_prompt) body.clone_prompt = args.input.clone_prompt;
+  if (args.input.text_validation?.trim()) body.text_validation = args.input.text_validation.trim();
+  if (args.input.accuracy != null && args.input.accuracy > 0) body.accuracy = args.input.accuracy;
+  if (args.input.need_noise_reduction != null) {
+    body.need_noise_reduction = args.input.need_noise_reduction;
+  }
+  if (args.input.need_volume_normalization != null) {
+    body.need_volume_normalization = args.input.need_volume_normalization;
+  }
+  if (args.input.aigc_watermark != null) body.aigc_watermark = args.input.aigc_watermark;
+  if (args.input.voice_setting) body.voice_setting = args.input.voice_setting;
+
+  const r = await fetch(url, {
+    method: "POST",
+    headers: minimaxAuthHeaders(cred.apiKey),
+    body: JSON.stringify(body),
+  });
+
+  const json = (await r.json()) as Record<string, unknown>;
+  const baseResp = json.base_resp as { status_code?: number; status_msg?: string } | undefined;
+  const demoAudio =
+    typeof json.demo_audio === "string" && json.demo_audio.startsWith("http")
+      ? json.demo_audio
+      : undefined;
+
+  if (baseResp && baseResp.status_code !== 0 && baseResp.status_code !== undefined) {
+    return {
+      status: 502,
+      clonedVoiceId: args.input.voice_id,
+      vendorJson: json,
+      durationMs: Date.now() - started,
+    };
+  }
+
+  return {
+    status: r.status,
+    demoAudioUrl: demoAudio,
+    clonedVoiceId: args.input.voice_id,
+    vendorJson: json,
+    durationMs: Date.now() - started,
   };
 }
 

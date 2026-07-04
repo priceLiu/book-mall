@@ -6,6 +6,7 @@ import { Sparkles } from "lucide-react";
 import { QrCreateMusicForm } from "@/components/quick-replica/qr-create-music-workspace";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrVoiceChangerForm } from "@/components/quick-replica/qr-voice-changer-workspace";
+import { QrVoiceCloneForm } from "@/components/quick-replica/qr-voice-clone-workspace";
 import {
   QR_KINDS_BY_CATEGORY,
   defaultWorkspaceDraft,
@@ -48,6 +49,19 @@ export function QrAudioMiddlePanel({
 
   const handleGenerate = () => {
     setError(null);
+    if (draft.kind === "voice-clone") {
+      const ref = draft.referenceAudioUrl ?? draft.sourceAudioUrl;
+      if (!ref?.trim()) {
+        setError("请上传参考音频");
+        return;
+      }
+      if (!draft.prompt.trim()) {
+        setError("请填写复刻的文字");
+        return;
+      }
+      onGenerate(draft);
+      return;
+    }
     if (!draft.prompt.trim() && draft.kind !== "voice-changer") {
       setError("请填写内容");
       return;
@@ -112,6 +126,8 @@ export function QrAudioMiddlePanel({
             voicePickerActive={voicePickerActive}
             onOpenVoiceGallery={onOpenVoiceGallery}
           />
+        ) : draft.kind === "voice-clone" ? (
+          <QrVoiceCloneForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
         ) : draft.kind === "create-music" ? (
           <QrCreateMusicForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
         ) : (

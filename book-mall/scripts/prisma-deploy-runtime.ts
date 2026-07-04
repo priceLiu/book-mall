@@ -16,6 +16,25 @@ function migrationChecksum(sql: string): string {
   return createHash("sha256").update(sql).digest("hex");
 }
 
+/** PgBouncer 不支持单条 prepared statement 多命令；按语句拆分执行。 */
+function splitMigrationStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let buf = "";
+  for (const line of sql.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("--")) continue;
+    buf += `${line}\n`;
+    if (trimmed.endsWith(";")) {
+      const stmt = buf.trim().replace(/;\s*$/, "");
+      if (stmt) statements.push(stmt);
+      buf = "";
+    }
+  }
+  const tail = buf.trim().replace(/;\s*$/, "");
+  if (tail) statements.push(tail);
+  return statements;
+}
+
 async function appliedNames(): Promise<Set<string>> {
   const rows = await prisma.$queryRaw<Array<{ migration_name: string }>>`
     SELECT migration_name FROM "_prisma_migrations"
@@ -42,7 +61,10 @@ async function main() {
     const sqlPath = join(MIGRATIONS_DIR, name, "migration.sql");
     const sql = readFileSync(sqlPath, "utf8");
     console.log(`  → ${name}`);
-    await prisma.$executeRawUnsafe(sql);
+    const statements = splitMigrationStatements(sql);
+    for (const stmt of statements) {
+      await prisma.$executeRawUnsafe(stmt);
+    }
     const checksum = migrationChecksum(sql);
     await prisma.$executeRaw`
       INSERT INTO "_prisma_migrations" (

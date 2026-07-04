@@ -1,1052 +1,321 @@
 [
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-01",
+    "id": "qr-world-api-1d267f7e-2361-457f-8fb9-c559ce3cc4b1",
     "category": "world",
     "kind": "create-world",
-    "title": "山湖日落",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-01.webp",
+    "title": "QR Seed 13",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-1d267f7e-2361-457f-8fb9-c559ce3cc4b1.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "山湖日落",
-        "locale": "zh"
+        "text": "The scene is a cozy and rustic Scandinavian-designed mountain lodge interior, captured in a realistic style, exuding warmth and comfort amidst a snowy alpine environment. The overall tone is inviting and serene, perfect for relaxation after a day in the mountains. A grand, roaring fireplace, constructed from natural stone, serves as the central focal point, casting a warm, flickering glow across the room. Heavy wooden beams span the ceiling, providing structural elegance and enhancing the rustic aesthetic. Panoramic windows dominate one wall, offering breathtaking, unobstructed views of snow-covered alpine peaks and a vast, clear sky. Plush, comfortable seating arrangements, including sofas and armchairs upholstered in natural fabrics, are strategically placed around the fireplace, inviting guests to unwind. Sheepskin rugs are scattered across the polished wooden floor, adding layers of texture and warmth. Small, intricately carved wooden tables are positioned beside the seating, holding ceramic mugs and perhaps a book. The walls are paneled with light-colored wood, complementing the natural materials used throughout the space. Decorative elements such as woven blankets with geometric patterns and minimalist artwork adorn the walls, reflecting the Scandinavian design influence. The fireplace is centrally located, with seating arranged in a semi-circle around it. The panoramic windows stretch across the wall opposite the fireplace, framing the majestic mountain vista. The wooden beams are uniformly spaced across the ceiling, and the wooden tables are placed adjacent to the sofas and armchairs. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "1d267f7e-2361-457f-8fb9-c559ce3cc4b1",
+          "world_marble_url": "https://marble.worldlabs.ai/world/1d267f7e-2361-457f-8fb9-c559ce3cc4b1",
+          "tags": []
+        }
       }
     },
     "sortOrder": 100,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:00.436Z",
+    "updatedAt": "2026-07-04T02:26:00.436Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-02",
+    "id": "qr-world-api-d25a644a-48ed-4f24-931a-7f77ce52c2cf",
     "category": "world",
     "kind": "create-world",
-    "title": "魔法森林树屋图书馆",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-02.webp",
+    "title": "QR Seed 12",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-d25a644a-48ed-4f24-931a-7f77ce52c2cf.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "魔法森林树屋图书馆",
-        "locale": "zh"
+        "text": "The scene is an abandoned industrial warehouse, meticulously converted into an artist's loft, rendered in a realistic style that evokes a warm, creative, and inspiring mood. Exposed brick walls, rich with texture and varying shades of red and brown, define the perimeter of the expansive space. Large, multi-paned windows, stretching from floor to ceiling, dominate one side of the loft, allowing golden hour light to flood the interior, casting long, dramatic shadows and illuminating dust motes dancing in the air. Scattered canvases, some leaning against walls, others propped on easels, display various stages of artistic creation, from preliminary sketches to vibrant, finished paintings. Sculptures of diverse materials and forms are strategically placed throughout the loft, adding three-dimensional interest and reflecting the artist's eclectic taste. Industrial elements, such as exposed metal beams and ventilation ducts, remain as architectural features, seamlessly integrated into the artistic environment. A worn wooden floor, bearing the marks of countless footsteps and creative endeavors, stretches across the entire space. Various art supplies, including paint tubes, brushes, and tools, are arranged on workbenches and tables, suggesting ongoing projects. The golden light bathes the brick walls, enhancing their texture and creating a cozy, inviting atmosphere. The large windows are positioned along the main wall, allowing the golden hour light to penetrate deeply into the loft. Canvases are distributed throughout the space, some near the windows to catch the light, others in more secluded corners. Sculptures are placed on pedestals and directly on the floor, creating visual anchors within the open plan. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "d25a644a-48ed-4f24-931a-7f77ce52c2cf",
+          "world_marble_url": "https://marble.worldlabs.ai/world/d25a644a-48ed-4f24-931a-7f77ce52c2cf",
+          "tags": []
+        }
       }
     },
     "sortOrder": 101,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:00.876Z",
+    "updatedAt": "2026-07-04T02:26:00.876Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-03",
+    "id": "qr-world-api-bd92e16e-fd27-4819-a983-19cabfff7709",
     "category": "world",
     "kind": "create-world",
-    "title": "传统日式室内设计，可欣赏花园景色",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-03.webp",
+    "title": "QR Seed 11",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-bd92e16e-fd27-4819-a983-19cabfff7709.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "传统日式室内设计，可欣赏花园景色",
-        "locale": "zh"
+        "text": "The scene is a serene and meditative bamboo forest path at dawn, rendered in a realistic style with a soft, ethereal quality. The overall tone is tranquil and contemplative, inviting a sense of peace and introspection. Tall bamboo stalks, their vibrant green hues softened by the early morning light, rise majestically on both sides of a winding path, forming a natural canopy overhead. A gentle mist hangs in the air, diffusing the light and creating a dreamlike atmosphere. Stone lanterns, weathered and moss-kissed, are strategically placed along the path, their subtle glow hinting at an ancient presence. The path itself is made of smooth, dark stones, worn by countless footsteps, and it curves gently out of sight, inviting exploration. The ground beneath the bamboo is covered with a delicate carpet of fallen leaves and sparse undergrowth, adding to the natural texture of the forest floor. The light filtering through the dense bamboo creates a play of shadows and highlights, illuminating patches of the path and the intricate patterns of the bamboo stalks. The bamboo stalks are densely packed, creating a sense of enclosure and intimacy along the path. The stone lanterns are positioned at regular intervals, guiding the viewer's gaze along the winding trail. The path itself is centrally located, drawing the eye deeper into the forest. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "bd92e16e-fd27-4819-a983-19cabfff7709",
+          "world_marble_url": "https://marble.worldlabs.ai/world/bd92e16e-fd27-4819-a983-19cabfff7709",
+          "tags": []
+        }
       }
     },
     "sortOrder": 102,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:01.193Z",
+    "updatedAt": "2026-07-04T02:26:01.193Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-04",
+    "id": "qr-world-api-f8dc8b76-f2e2-476b-b65e-9b01214953c0",
     "category": "world",
     "kind": "create-world",
-    "title": "日落时分的威尼斯漂浮城市景观",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-04.webp",
+    "title": "QR Seed 11",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-f8dc8b76-f2e2-476b-b65e-9b01214953c0.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "日落时分的威尼斯漂浮城市景观",
-        "locale": "zh"
+        "text": "The scene is a serene and meditative bamboo forest path at dawn, rendered in a realistic style with a soft, ethereal quality. The overall tone is tranquil and contemplative, inviting a sense of peace and introspection. Tall bamboo stalks, their vibrant green hues softened by the early morning light, rise majestically on both sides of a winding path, forming a natural canopy overhead. A gentle mist hangs in the air, diffusing the light and creating a dreamlike atmosphere. Stone lanterns, weathered and moss-kissed, are strategically placed along the path, their subtle glow hinting at an ancient presence. The path itself is made of smooth, dark stones, worn by countless footsteps, and it curves gently out of sight, inviting exploration. The ground beneath the bamboo is covered with a delicate carpet of fallen leaves and sparse undergrowth, adding to the natural texture of the forest floor. The light filtering through the dense bamboo creates a play of shadows and highlights, illuminating patches of the path and the intricate patterns of the bamboo stalks. The bamboo stalks are densely packed, creating a sense of enclosure and intimacy along the path. The stone lanterns are positioned at regular intervals, guiding the viewer's gaze along the winding trail. The path itself is centrally located, drawing the eye deeper into the forest. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "f8dc8b76-f2e2-476b-b65e-9b01214953c0",
+          "world_marble_url": "https://marble.worldlabs.ai/world/f8dc8b76-f2e2-476b-b65e-9b01214953c0",
+          "tags": []
+        }
       }
     },
     "sortOrder": 103,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:01.933Z",
+    "updatedAt": "2026-07-04T02:26:01.933Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-05",
+    "id": "qr-world-api-014f4ca7-04b7-4242-bc5b-d2cd33722654",
     "category": "world",
     "kind": "create-world",
-    "title": "蒸汽朋克火车车厢温室",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-05.webp",
+    "title": "QR Seed 10",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-014f4ca7-04b7-4242-bc5b-d2cd33722654.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "蒸汽朋克火车车厢温室",
-        "locale": "zh"
+        "text": "The scene is an underwater coral reef, rendered in a vibrant and realistic style, capturing the dynamic beauty of marine life. The overall tone is lively and awe-inspiring, showcasing a thriving ecosystem beneath the ocean's surface. The reef is a kaleidoscope of colors, with various coral formations in shades of red, orange, yellow, and purple, creating intricate structures that provide shelter and sustenance for numerous marine species. Schools of colorful fish, including iridescent blues, bright yellows, and striped patterns, swim gracefully among the corals, adding movement and life to the scene. Some fish are small and darting, while others are larger and glide with serene elegance. Anemones with waving tentacles are interspersed among the coral, providing homes for clownfish. The sandy seabed is visible in patches, dotted with smaller rocks and marine debris, indicating the natural ebb and flow of the ocean. Sunlight filters down from the surface, creating shimmering patterns on the coral and illuminating the water with a soft, ethereal glow. The coral formations rise from the seabed, creating a complex topography of peaks and valleys. The fish navigate these structures, some congregating in dense schools, others solitary. The anemones are nestled within the coral, their vibrant colors contrasting with the surrounding rock. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "014f4ca7-04b7-4242-bc5b-d2cd33722654",
+          "world_marble_url": "https://marble.worldlabs.ai/world/014f4ca7-04b7-4242-bc5b-d2cd33722654",
+          "tags": []
+        }
       }
     },
     "sortOrder": 104,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:02.224Z",
+    "updatedAt": "2026-07-04T02:26:02.224Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-06",
+    "id": "qr-world-api-86bc6627-99f5-441e-8f96-63004ac5b3fd",
     "category": "world",
     "kind": "create-world",
-    "title": "梦幻冰酒店 北极光",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-06.webp",
+    "title": "QR Seed 9",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-86bc6627-99f5-441e-8f96-63004ac5b3fd.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "梦幻冰酒店 北极光",
-        "locale": "zh"
+        "text": "The scene is a vibrant desert oasis, rendered in a realistic style, evoking a sense of tranquility and natural beauty amidst an arid landscape. The overall tone is serene and inviting, highlighting the stark contrast between the lush greenery and the surrounding desert. A crystal-clear pool of water, reflecting the sky above, forms the central feature of the oasis. Numerous tall palm trees with verdant fronds encircle the pool, providing ample shade and a striking visual element. The ground immediately surrounding the pool is covered with fine, golden sand, transitioning into more rugged, rocky terrain further out. Various desert plants and shrubs, adapted to the harsh environment, dot the sandy areas, adding texture and subtle color variations. The water in the pool appears pristine, with visible ripples on its surface, suggesting a gentle breeze. The palm trees stand majestically, their trunks varying in thickness and height, some leaning slightly over the water. The sandy ground extends outward from the pool, gradually giving way to larger rock formations and sparse desert vegetation. The clear pool is positioned centrally, with the palm trees forming a natural perimeter around it. The sandy ground directly borders the pool, and the desert plants are scattered across this sandy expanse. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "86bc6627-99f5-441e-8f96-63004ac5b3fd",
+          "world_marble_url": "https://marble.worldlabs.ai/world/86bc6627-99f5-441e-8f96-63004ac5b3fd",
+          "tags": []
+        }
       }
     },
     "sortOrder": 105,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:02.478Z",
+    "updatedAt": "2026-07-04T02:26:02.478Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-07",
+    "id": "qr-world-api-35cb9c9a-22d9-41fc-b686-7f0ac7bd8b26",
     "category": "world",
     "kind": "create-world",
-    "title": "绿植环绕的温馨咖啡馆内部",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-07.webp",
+    "title": "QR Seed 8",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-35cb9c9a-22d9-41fc-b686-7f0ac7bd8b26.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "绿植环绕的温馨咖啡馆内部",
-        "locale": "zh"
+        "text": "The scene is a realistic depiction of a rainy Tokyo street, imbued with a melancholic yet vibrant atmosphere. The wet asphalt reflects the neon glow of city lights, creating a mesmerizing visual tapestry. The street is lined with various buildings, their facades adorned with intricate signage in Japanese characters, some illuminated brightly, others subtly. Numerous pedestrians navigate the slick pavement, many holding colorful umbrellas that add splashes of vivid hues against the muted tones of the wet urban landscape. The ground is a dark, reflective surface, mirroring the overhead lights and the undersides of the umbrellas. Utility poles with a dense network of overhead wires crisscross the sky, a characteristic feature of Tokyo's urban infrastructure. The buildings vary in height and architectural style, ranging from modern glass structures to older, more traditional establishments, all contributing to the dense, vertical feel of the city. The reflections on the wet street are particularly prominent, distorting and elongating the light sources into shimmering streaks. The street itself appears to be a main thoroughfare, with visible lane markings and possibly some parked vehicles along the sides. The umbrellas, in shades of red, blue, and yellow, stand out against the darker backdrop of the street and buildings. The buildings rise steeply on both sides of the street, creating a canyon-like effect. The utility poles are positioned along the edges of the street, with wires extending across the entire width of the scene. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "35cb9c9a-22d9-41fc-b686-7f0ac7bd8b26",
+          "world_marble_url": "https://marble.worldlabs.ai/world/35cb9c9a-22d9-41fc-b686-7f0ac7bd8b26",
+          "tags": []
+        }
       }
     },
     "sortOrder": 106,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:02.742Z",
+    "updatedAt": "2026-07-04T02:26:02.742Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-08",
+    "id": "qr-world-api-bff56dae-1de3-44fc-924c-d7df5d14f68c",
     "category": "world",
     "kind": "create-world",
-    "title": "乡村风格浴室静谧之所",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-08.webp",
+    "title": "QR Seed 4",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-bff56dae-1de3-44fc-924c-d7df5d14f68c.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "乡村风格浴室静谧之所",
-        "locale": "zh"
+        "text": "The scene is a cozy and rustic snowy mountain cabin interior, rendered in a realistic style that evokes warmth and comfort. The overall tone is inviting and serene, perfect for a winter retreat. A large, stone fireplace dominates one wall, its hearth glowing with a crackling fire, casting a soft, flickering light across the room. Above the mantelpiece, a rustic wooden beam supports a collection of framed artwork depicting mountain landscapes and wildlife. Plush, oversized armchairs upholstered in warm, earthy tones are positioned strategically around the fireplace, inviting relaxation. A thick, woven rug with geometric patterns covers the wooden floor, adding texture and insulation. Large windows, framed with heavy, insulated curtains, offer glimpses of snow-covered pine trees and distant peaks, creating a picturesque backdrop. A sturdy wooden coffee table, laden with books and mugs, sits between the armchairs. Exposed wooden beams crisscross the ceiling, enhancing the cabin's rustic charm. On an adjacent wall, a built-in bookshelf filled with various titles suggests a love for reading. The fireplace is centrally located on the main wall, with the armchairs arranged in a semi-circle facing it. The coffee table is placed directly in front of the fireplace, between the armchairs. The windows are positioned on the wall opposite the fireplace, offering views of the snowy landscape. The bookshelf is integrated into the wall to the right of the fireplace. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "bff56dae-1de3-44fc-924c-d7df5d14f68c",
+          "world_marble_url": "https://marble.worldlabs.ai/world/bff56dae-1de3-44fc-924c-d7df5d14f68c",
+          "tags": []
+        }
       }
     },
     "sortOrder": 107,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:03.017Z",
+    "updatedAt": "2026-07-04T02:26:03.017Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-09",
+    "id": "qr-world-api-84e8c4c9-7c31-4fac-abed-88c13143a736",
     "category": "world",
     "kind": "create-world",
-    "title": "神秘水晶洞穴内部",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-09.webp",
+    "title": "QR Seed 3",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-84e8c4c9-7c31-4fac-abed-88c13143a736.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "神秘水晶洞穴内部",
-        "locale": "zh"
+        "text": "The scene is a futuristic cyberpunk alley at night, rendered in a highly detailed, realistic style with a dark, gritty, and atmospheric tone. The alley is narrow, enclosed by towering, dilapidated buildings that stretch upwards into the perpetually dark sky. Neon signs in vibrant blues, purples, and reds illuminate the wet, grimy surfaces, casting long, distorted reflections on the slick ground. Intricate holographic advertisements flicker and shift, displaying cryptic symbols and stylized characters. Exposed pipes and conduits crisscross the building facades, some emitting steam or sparking with errant electricity. Grimy ventilation shafts protrude from the walls, adding to the industrial decay. Various cables and wires hang haphazardly between structures, creating a dense, tangled canopy overhead. The ground is littered with discarded refuse and puddles of unknown liquids, reflecting the harsh glow of the neon. A large, glowing sign for a noodle bar is prominently displayed on one building, its light spilling onto the alley floor. Another sign, advertising \"Synth-Drinks,\" pulses with an electric blue hue. The buildings are constructed from a mix of corroded metal, stained concrete, and reinforced glass, showing signs of extensive wear and tear. The alley curves slightly to the right, disappearing into further shadows and more distant, pulsating lights. The noodle bar sign is positioned high on the left wall, while the \"Synth-Drinks\" sign is lower down on the right, closer to the ground. The exposed pipes and conduits run horizontally and vertically across the building surfaces, creating a complex network. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "84e8c4c9-7c31-4fac-abed-88c13143a736",
+          "world_marble_url": "https://marble.worldlabs.ai/world/84e8c4c9-7c31-4fac-abed-88c13143a736",
+          "tags": []
+        }
       }
     },
     "sortOrder": 108,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:03.270Z",
+    "updatedAt": "2026-07-04T02:26:03.270Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-10",
+    "id": "qr-world-api-4ccf585c-0465-42c3-9ae9-02bfc87436ec",
     "category": "world",
     "kind": "create-world",
-    "title": "格兰德粉彩酒店大堂",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-10.webp",
+    "title": "QR Seed 2",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-4ccf585c-0465-42c3-9ae9-02bfc87436ec.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "格兰德粉彩酒店大堂",
-        "locale": "zh"
+        "text": "The scene is a serene and inviting Japanese tatami room, rendered in a realistic style, bathed in the gentle glow of soft morning light. The overall tone is peaceful and contemplative, evoking a sense of calm and traditional elegance. The room features traditional tatami mats covering the entire floor, their woven texture visible and inviting. A low, dark wooden table, polished to a subtle sheen, occupies the center of the room, suggesting a space for tea ceremonies or quiet reflection. Cushions, upholstered in a muted, natural fabric, are neatly arranged around the table, providing comfortable seating. Shoji screens, with their delicate paper and wooden lattice, form the walls, allowing diffused light to filter into the space, creating soft shadows and a warm ambiance. A tokonoma, a traditional alcove, is visible along one wall, likely adorned with a simple floral arrangement or a scroll, though specific details are not discernible. The ceiling is constructed with exposed wooden beams, adding to the rustic yet refined aesthetic. The light entering through the shoji screens casts a soft, even illumination across the room, highlighting the natural materials and minimalist design. The tatami mats are meticulously laid, forming a seamless floor. The low wooden table is centrally placed on the tatami, with the cushions symmetrically arranged around it. The shoji screens extend along the perimeter of the room, forming the primary wall structure. The tokonoma is recessed into one of these walls. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "4ccf585c-0465-42c3-9ae9-02bfc87436ec",
+          "world_marble_url": "https://marble.worldlabs.ai/world/4ccf585c-0465-42c3-9ae9-02bfc87436ec",
+          "tags": []
+        }
       }
     },
     "sortOrder": 109,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:03.523Z",
+    "updatedAt": "2026-07-04T02:26:03.523Z"
   },
   {
     "schemaVersion": 1,
-    "id": "qr-world-gallery-11",
+    "id": "qr-world-api-8efdf9d5-68a0-4738-9bd8-887ee6569220",
     "category": "world",
     "kind": "create-world",
-    "title": "无限阶梯和拱形结构",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-11.webp",
+    "title": "QR Seed Atrium",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-8efdf9d5-68a0-4738-9bd8-887ee6569220.webp",
     "source": "builtin",
     "visibility": "public",
     "reference": {
       "slots": {},
       "prompt": {
-        "text": "无限阶梯和拱形结构",
-        "locale": "zh"
+        "text": "The scene is a sunlit indoor atrium, rendered in a realistic style, exuding an atmosphere of spaciousness and natural light. The overall tone is bright and serene, creating a welcoming and uplifting environment. The atrium features a polished marble floor, reflecting the abundant light that streams in from tall glass windows. Lush green plants, including various potted trees and flowering shrubs, are strategically placed throughout the space, adding vibrant touches of nature. The glass windows extend from floor to ceiling, offering expansive views of the outside and allowing natural light to flood the interior. Architectural elements include sleek, modern columns that support the high ceiling, enhancing the grandeur of the space. Seating areas with comfortable benches and small tables are arranged among the plants, inviting visitors to relax. Decorative elements such as large, ornate planters house the diverse flora. The marble floor is laid in a geometric pattern, contributing to the atrium's sophisticated aesthetic. The tall glass windows are positioned along the perimeter of the atrium, allowing light to illuminate the entire space. The plants are arranged in clusters and along the walls, creating natural divisions and focal points. The seating areas are interspersed among the plant arrangements, providing comfortable spots for repose. The 360 scene is faultless.",
+        "locale": "en"
       },
       "model": {
         "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
+        "modelKey": "marble-1.0-draft",
+        "params": {
+          "world_id": "8efdf9d5-68a0-4738-9bd8-887ee6569220",
+          "world_marble_url": "https://marble.worldlabs.ai/world/8efdf9d5-68a0-4738-9bd8-887ee6569220",
+          "tags": []
+        }
       }
     },
     "sortOrder": 110,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-12",
-    "category": "world",
-    "kind": "create-world",
-    "title": "极简主义卧室和步入式衣帽间",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-12.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "极简主义卧室和步入式衣帽间",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 111,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-13",
-    "category": "world",
-    "kind": "create-world",
-    "title": "蒸汽朋克云中大都会",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-13.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "蒸汽朋克云中大都会",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 112,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-14",
-    "category": "world",
-    "kind": "create-world",
-    "title": "闪耀海景悬崖小屋",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-14.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "闪耀海景悬崖小屋",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 113,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-15",
-    "category": "world",
-    "kind": "create-world",
-    "title": "宁静的海滨日落豪华度假胜地",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-15.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "宁静的海滨日落豪华度假胜地",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 114,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-16",
-    "category": "world",
-    "kind": "create-world",
-    "title": "宏伟的城堡入口",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-16.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "宏伟的城堡入口",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 115,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-17",
-    "category": "world",
-    "kind": "create-world",
-    "title": "充满活力的走廊和楼梯",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-17.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "充满活力的走廊和楼梯",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 116,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-18",
-    "category": "world",
-    "kind": "create-world",
-    "title": "宏伟的拱形图书馆走廊",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-18.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "宏伟的拱形图书馆走廊",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 117,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-19",
-    "category": "world",
-    "kind": "create-world",
-    "title": "奇幻糖果乐园梦境",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-19.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "奇幻糖果乐园梦境",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 118,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-20",
-    "category": "world",
-    "kind": "create-world",
-    "title": "秋季日本花园保护区",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-20.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "秋季日本花园保护区",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 119,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-21",
-    "category": "world",
-    "kind": "create-world",
-    "title": "未来太空飞船内部指挥中心",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-21.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "未来太空飞船内部指挥中心",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 120,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-22",
-    "category": "world",
-    "kind": "create-world",
-    "title": "北极村，宁静倒影",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-22.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "北极村，宁静倒影",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 121,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-23",
-    "category": "world",
-    "kind": "create-world",
-    "title": "未来主义太空飞船卧室星球景观",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-23.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "未来主义太空飞船卧室星球景观",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 122,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-24",
-    "category": "world",
-    "kind": "create-world",
-    "title": "质朴的洞穴式海滨度假胜地",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-24.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "质朴的洞穴式海滨度假胜地",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 123,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-25",
-    "category": "world",
-    "kind": "create-world",
-    "title": "粉红海岸街天堂",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-25.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "粉红海岸街天堂",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 124,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-26",
-    "category": "world",
-    "kind": "create-world",
-    "title": "温馨的客厅内饰",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-26.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "温馨的客厅内饰",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 125,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-27",
-    "category": "world",
-    "kind": "create-world",
-    "title": "宏伟的大教堂和正式花园",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-27.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "宏伟的大教堂和正式花园",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 126,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-28",
-    "category": "world",
-    "kind": "create-world",
-    "title": "有葡萄园的山村",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-28.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "有葡萄园的山村",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 127,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-29",
-    "category": "world",
-    "kind": "create-world",
-    "title": "废弃火车站，杂草丛生",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-29.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "废弃火车站，杂草丛生",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 128,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-30",
-    "category": "world",
-    "kind": "create-world",
-    "title": "山顶上的棋盘",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-30.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "山顶上的棋盘",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 129,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-31",
-    "category": "world",
-    "kind": "create-world",
-    "title": "古朴的山地火车站",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-31.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "古朴的山地火车站",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 130,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-32",
-    "category": "world",
-    "kind": "create-world",
-    "title": "日式房间与静谧花园",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-32.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "日式房间与静谧花园",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 131,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-33",
-    "category": "world",
-    "kind": "create-world",
-    "title": "宁静的日式池塘小屋",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-33.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "宁静的日式池塘小屋",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 132,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-34",
-    "category": "world",
-    "kind": "create-world",
-    "title": "复古迷你美式餐馆",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-34.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "复古迷你美式餐馆",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 133,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-35",
-    "category": "world",
-    "kind": "create-world",
-    "title": "圣托里尼岛沿海村庄",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-35.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "圣托里尼岛沿海村庄",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 134,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-36",
-    "category": "world",
-    "kind": "create-world",
-    "title": "翠绿山脉中的古老寺庙",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-36.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "翠绿山脉中的古老寺庙",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 135,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-37",
-    "category": "world",
-    "kind": "create-world",
-    "title": "迷人的花园小径小屋",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-37.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "迷人的花园小径小屋",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 136,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-38",
-    "category": "world",
-    "kind": "create-world",
-    "title": "迷人的乡村鹅卵石小路",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-38.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "迷人的乡村鹅卵石小路",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 137,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-39",
-    "category": "world",
-    "kind": "create-world",
-    "title": "温馨的乡村住宅内饰",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-39.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "温馨的乡村住宅内饰",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 138,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-40",
-    "category": "world",
-    "kind": "create-world",
-    "title": "魔法城堡彩虹景观",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-40.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "魔法城堡彩虹景观",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 139,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-41",
-    "category": "world",
-    "kind": "create-world",
-    "title": "华丽、宏伟、神圣的小教堂内部",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-41.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "华丽、宏伟、神圣的小教堂内部",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 140,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
-  },
-  {
-    "schemaVersion": 1,
-    "id": "qr-world-gallery-42",
-    "category": "world",
-    "kind": "create-world",
-    "title": "历史悠久的欧洲小巷，内设洗衣房",
-    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-42.webp",
-    "source": "builtin",
-    "visibility": "public",
-    "reference": {
-      "slots": {},
-      "prompt": {
-        "text": "历史悠久的欧洲小巷，内设洗衣房",
-        "locale": "zh"
-      },
-      "model": {
-        "role": "IMAGE",
-        "modelKey": "lib-nano-pro",
-        "params": {}
-      }
-    },
-    "sortOrder": 141,
-    "createdAt": "2026-06-20T00:00:00.000Z",
-    "updatedAt": "2026-06-20T00:00:00.000Z"
+    "createdAt": "2026-07-04T02:26:03.796Z",
+    "updatedAt": "2026-07-04T02:26:03.796Z"
   }
 ]

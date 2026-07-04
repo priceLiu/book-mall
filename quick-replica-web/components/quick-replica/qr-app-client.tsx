@@ -12,8 +12,10 @@ import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-h
 import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
+import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
 import { QrAudioRightPanel, type QrAudioRightTab } from "@/components/quick-replica/qr-audio-right-panel";
+import { QrWorldBrowsePanel } from "@/components/quick-replica/qr-world-browse-panel";
 import { QrTemplatePreviewModal } from "@/components/quick-replica/qr-template-preview-modal";
 import { QrToast } from "@/components/quick-replica/qr-toast";
 import {
@@ -89,6 +91,7 @@ export function QrAppClient({
     defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
   );
   const [audioRightTab, setAudioRightTab] = useState<QrAudioRightTab>("templates");
+  const [worldOmniboxExpanded, setWorldOmniboxExpanded] = useState(false);
   const [voiceGalleryFocus, setVoiceGalleryFocus] = useState(false);
   const [myWorksCategory, setMyWorksCategory] = useState<QrCategory>("audio");
   const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
@@ -97,6 +100,9 @@ export function QrAppClient({
 
   const templateScope =
     navMode === "my-works" || navMode === "generate-history" ? "my" : "all";
+
+  const isWorldBrowse =
+    navMode === "category" && category === "world" && middleMode === "browse";
 
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
@@ -271,6 +277,7 @@ export function QrAppClient({
     setMiddleMode("welcome");
     setSelectedKind(null);
     setPinnedToolKey(null);
+    setWorldOmniboxExpanded(false);
     setTemplates([]);
   };
 
@@ -282,6 +289,11 @@ export function QrAppClient({
       setSelectedKind("create-voiceover");
       setMiddleMode("workspace");
       setDraft(defaultWorkspaceDraft({ category: "audio", kind: "create-voiceover" }));
+    } else if (cat === "world") {
+      setMiddleMode("browse");
+      setSelectedKind(null);
+      setWorldOmniboxExpanded(false);
+      setDraft(defaultWorkspaceDraft({ category: "world", kind: "create-world" }));
     } else {
       setMiddleMode("browse");
       setSelectedKind(null);
@@ -404,7 +416,22 @@ export function QrAppClient({
 
   const dismissCopyToast = useCallback(() => setCopyToast(null), []);
 
+  const applyWorldTemplate = useCallback((t: QrTemplate) => {
+    const nextDraft = templateToWorkspaceDraft(t);
+    setDraft((prev) => ({
+      ...nextDraft,
+      savedTemplateId: t.source === "user" ? t.id : undefined,
+    }));
+    setWorldOmniboxExpanded(true);
+    setCopyToast("已载入提示词");
+  }, []);
+
   const onCopyTemplate = (t: QrTemplate) => {
+    if (isWorldBrowse && t.category === "world") {
+      applyWorldTemplate(t);
+      setPreviewTemplate(null);
+      return;
+    }
     const nextDraft = templateToWorkspaceDraft(t);
     const isMotionSync = t.kind === "motion-sync" || t.toolKey === "motion-sync";
     setDraft((prev) => ({
@@ -646,6 +673,7 @@ export function QrAppClient({
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <QrSidebar
+          compact={isWorldBrowse}
           navMode={navMode}
           category={category}
           pinnedToolKey={pinnedToolKey}
@@ -660,6 +688,22 @@ export function QrAppClient({
           onAdmin={canManageFeatured ? onAdmin : undefined}
         />
 
+        {isWorldBrowse ? (
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <QrWorldBrowsePanel
+              templates={templates}
+              loading={templatesLoading}
+              draft={draft}
+              onDraftChange={setDraft}
+              omniboxExpanded={worldOmniboxExpanded}
+              onOmniboxExpandedChange={setWorldOmniboxExpanded}
+              onApplyTemplate={applyWorldTemplate}
+              onGenerate={(d) => void handleGenerate(d)}
+              generating={generating}
+              onToast={setCopyToast}
+            />
+          </main>
+        ) : (
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
           <section
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[480px] lg:max-w-2xl lg:flex-[1.15] lg:border-b-0 lg:border-r"
@@ -716,6 +760,7 @@ export function QrAppClient({
             )}
           </section>
         </main>
+        )}
       </div>
 
       <nav
