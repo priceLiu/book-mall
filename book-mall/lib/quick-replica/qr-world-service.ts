@@ -27,6 +27,7 @@ import {
   type WorldlabsContentRef,
   type WorldlabsWorldPrompt,
 } from "@/lib/gateway/worldlabs-proxy";
+import { findBuiltinWorldAssetEntry } from "@/lib/quick-replica/builtin-world-gallery-assets";
 import { rememberWorldSplatUrls } from "@/lib/quick-replica/qr-world-splat-proxy";
 import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { prisma } from "@/lib/prisma";
@@ -342,6 +343,41 @@ export async function qrGetWorldViewerPayload(
 ): Promise<QrWorldViewerPayload> {
   const id = worldId.trim();
   if (!id) throw new Error("缺少 world_id");
+
+  // 优先走本地内置世界库（右栏场景墙），不依赖实时官方 get world。
+  const local = findBuiltinWorldAssetEntry(id);
+  if (local) {
+    const urls = local.spzUrlMap;
+    const pick = (...keys: string[]): string | null => {
+      for (const key of keys) {
+        const u = urls[key];
+        if (u?.trim()) return u.trim();
+      }
+      return null;
+    };
+    const preview100k = pick("100k");
+    const fullRes = pick("full_res");
+    const lowRes = pick("100k", "150k");
+    const highRes = pick("full_res", "3m", "500k");
+    const radUrl = pick("rad");
+    const best = highRes ?? lowRes ?? preview100k ?? fullRes ?? local.splatUrls[0] ?? null;
+
+    rememberWorldSplatUrls(userId, id, local.splatUrls);
+    return {
+      worldId: id,
+      displayName: local.title || "Marble World",
+      worldMarbleUrl: local.worldMarbleUrl ?? `https://marble.worldlabs.ai/world/${id}`,
+      spzUrl: best,
+      preview100kSpzUrl: preview100k,
+      fullResSpzUrl: fullRes,
+      lowResSpzUrl: lowRes,
+      highResSpzUrl: highRes ?? best,
+      radUrl,
+      panoUrl: local.panoUrl,
+      thumbnailUrl: local.thumbnailUrl,
+      colliderMeshUrl: local.colliderMeshUrl,
+    };
+  }
 
   const { credentialId } = await requireWorldlabsAuth(userId);
   const { world } = await forwardWorldlabsGetWorld({ credentialId, worldId: id });

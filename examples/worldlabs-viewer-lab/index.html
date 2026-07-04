@@ -16,8 +16,16 @@
           <button id="list-worlds">List Worlds</button>
         </div>
         <div class="row">
+          <label for="list-source">List Source</label>
+          <select id="list-source">
+            <option value="official">Official (public)</option>
+            <option value="owned">API Key (owned)</option>
+          </select>
+          <span class="muted">official uses api.worldlabs.ai/api/v1</span>
+        </div>
+        <div class="row">
           <label for="world-id">World ID</label>
-          <input id="world-id" type="text" value="7391f97b-8290-4f71-9f17-ffbdcd3a00e5" />
+          <input id="world-id" type="text" value="889a5974-c395-4a6a-a401-e2d6aec4f12b" />
           <button id="open-world">Open World</button>
         </div>
         <div class="row">
@@ -28,6 +36,27 @@
             <option value="100k">100k</option>
           </select>
           <span id="status"></span>
+        </div>
+        <div class="row">
+          <label for="list-status">List Status</label>
+          <select id="list-status">
+            <option value="">ALL</option>
+            <option value="SUCCEEDED">SUCCEEDED</option>
+            <option value="RUNNING">RUNNING</option>
+            <option value="PENDING">PENDING</option>
+            <option value="FAILED">FAILED</option>
+          </select>
+          <label for="list-model">Model</label>
+          <input id="list-model" type="text" placeholder="e.g. marble-1.1 / marble-1.0-draft" />
+        </div>
+        <div class="row">
+          <label for="list-public">Public</label>
+          <select id="list-public">
+            <option value="">ALL</option>
+            <option value="true">Public only</option>
+            <option value="false">Private only</option>
+          </select>
+          <span id="list-debug"></span>
         </div>
       </section>
 
@@ -79,10 +108,15 @@
       const apiKeyEl = document.getElementById("api-key");
       const worldIdEl = document.getElementById("world-id");
       const qualityEl = document.getElementById("quality");
+      const listSourceEl = document.getElementById("list-source");
       const listBtn = document.getElementById("list-worlds");
       const openBtn = document.getElementById("open-world");
       const worldsBody = document.getElementById("worlds-body");
       const statusEl = document.getElementById("status");
+      const listStatusEl = document.getElementById("list-status");
+      const listModelEl = document.getElementById("list-model");
+      const listPublicEl = document.getElementById("list-public");
+      const listDebugEl = document.getElementById("list-debug");
       const viewer = document.getElementById("viewer");
       const viewerStatus = document.getElementById("viewer-status");
       const progressFill = document.getElementById("progress-fill");
@@ -162,6 +196,58 @@
         return body;
       }
 
+      async function officialFetch(path, options = {}) {
+        const response = await fetch(`https://api.worldlabs.ai/api/v1/${path}`, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+          },
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(`${path}: HTTP ${response.status} ${JSON.stringify(body)}`);
+        }
+        return body;
+      }
+
+      function normalizeWorld(raw) {
+        if (!raw || typeof raw !== "object") return null;
+        const world = unwrapWorld(raw);
+        const worldId = (world.world_id || world.id || "").trim();
+        if (!worldId) return null;
+
+        const spzUrls =
+          world?.assets?.splats?.spz_urls ||
+          world?.generation_output?.spz_urls ||
+          {};
+        const thumbnail =
+          world?.assets?.thumbnail_url ||
+          (world?.generation_output?.mpi_url
+            ? `${world.generation_output.mpi_url}/thumbnail.webp`
+            : "");
+
+        return {
+          world_id: worldId,
+          display_name: world.display_name || "-",
+          world_marble_url:
+            world.world_marble_url || `https://marble.worldlabs.ai/world/${worldId}`,
+          assets: {
+            thumbnail_url: thumbnail || null,
+            splats: { spz_urls: spzUrls || {} },
+          },
+          model: world.model || world?.generation_input?.model || "",
+          status: world.status || "",
+          source: world.source || "",
+        };
+      }
+
+      function unwrapWorld(payload) {
+        if (!payload || typeof payload !== "object") return null;
+        if (payload.world && typeof payload.world === "object") return payload.world;
+        return payload;
+      }
+
       function pickSplatUrl(world, quality) {
         const urls = world?.assets?.splats?.spz_urls || {};
         return urls[quality] || urls.full_res || urls["500k"] || urls["100k"] || null;
@@ -209,9 +295,14 @@
         `;
         const btn = document.createElement("button");
         btn.textContent = "View";
-        btn.onclick = () => {
+        btn.onclick = async () => {
           worldIdEl.value = world.world_id;
-          void openWorld(world);
+          try {
+            await loadById(world.world_id);
+          } catch (e) {
+            setStatus(String(e?.message || e));
+            setViewerStatus(String(e?.message || e));
+          }
         };
         tr.children[3].appendChild(btn);
         return tr;
@@ -219,22 +310,119 @@
 
       async function listWorlds() {
         setStatus("Listing worlds...");
-        const body = await apiFetch("worlds:list", { method: "POST", body: JSON.stringify({}) });
-        worldsBody.innerHTML = "";
-        const worlds = body.worlds || [];
-        if (!worlds.length) {
-          worldsBody.innerHTML = `<tr><td colspan="4">No worlds returned.</td></tr>`;
+        listDebugEl.textContent = "";
+
+        const sourceMode = listSourceEl.value;
+        const pageSize = 100;
+        let pageToken = null;
+        const all = [];
+        const seen = new Set();
+        let pageCount = 0;
+
+        const statusFilter = listStatusEl.value.trim();
+        const modelFilter = listModelEl.value.trim();
+        const publicRaw = listPublicEl.value.trim();
+
+        if (sourceMode === "official") {
+          // 官方 Marble Explore 入口：curated 标签池（公开）
+          do {
+            const body = await officialFetch("worlds:by-tag", {
+              method: "POST",
+              body: JSON.stringify({
+                tag: "curated",
+                page_size: Math.min(pageSize, 50),
+                ...(pageToken ? { page_token: pageToken } : {}),
+              }),
+            });
+            pageCount += 1;
+
+            const worlds = Array.isArray(body.worlds) ? body.worlds : [];
+            for (const raw of worlds) {
+              const world = normalizeWorld(raw);
+              const id = world?.world_id;
+              if (!id || seen.has(id)) continue;
+              seen.add(id);
+              all.push(world);
+            }
+
+            pageToken =
+              typeof body.next_page_token === "string" && body.next_page_token.trim()
+                ? body.next_page_token.trim()
+                : null;
+            // 先取前两页用于快速对比
+            if (pageCount >= 2) break;
+          } while (pageToken);
         } else {
-          for (const world of worlds) worldsBody.appendChild(makeRow(world));
+          // docs.worldlabs.ai /marble/v1/worlds:list：当前 WLT key 的 worlds
+          const listRequestBase = {
+            page_size: pageSize,
+            sort_by: "updated_at",
+            ...(statusFilter ? { status: statusFilter } : {}),
+            ...(modelFilter ? { model: modelFilter } : {}),
+            ...(publicRaw ? { is_public: publicRaw === "true" } : {}),
+          };
+          do {
+            const body = await apiFetch("worlds:list", {
+              method: "POST",
+              body: JSON.stringify({
+                ...listRequestBase,
+                ...(pageToken ? { page_token: pageToken } : {}),
+              }),
+            });
+            pageCount += 1;
+
+            const worlds = Array.isArray(body.worlds) ? body.worlds : [];
+            for (const raw of worlds) {
+              const world = normalizeWorld(raw);
+              const id = world?.world_id;
+              if (!id || seen.has(id)) continue;
+              seen.add(id);
+              all.push(world);
+            }
+
+            pageToken =
+              typeof body.next_page_token === "string" && body.next_page_token.trim()
+                ? body.next_page_token.trim()
+                : null;
+          } while (pageToken);
         }
-        setStatus(`Loaded ${worlds.length} worlds.`);
+
+        worldsBody.innerHTML = "";
+        if (!all.length) {
+          worldsBody.innerHTML = `<tr><td colspan="4">No worlds returned for this API key.</td></tr>`;
+        } else {
+          for (const world of all) {
+            if (world?.assets) worldsBody.appendChild(makeRow(world));
+          }
+        }
+
+        const byModel = new Map();
+        for (const w of all) {
+          const m = (w?.model || "unknown").trim();
+          byModel.set(m, (byModel.get(m) || 0) + 1);
+        }
+        const modelSummary = [...byModel.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `${k}:${v}`)
+          .join(" | ");
+
+        listDebugEl.textContent = `pages=${pageCount} · unique=${all.length}${modelSummary ? ` · ${modelSummary}` : ""}`;
+        setStatus(`Loaded ${all.length} worlds.`);
       }
 
-      async function loadById() {
-        const id = worldIdEl.value.trim();
+      async function loadById(worldIdOverride) {
+        const id = (worldIdOverride || worldIdEl.value).trim();
         if (!id) throw new Error("world_id is empty");
-        setStatus(`Loading world ${id}...`);
-        const world = await apiFetch(`worlds/${encodeURIComponent(id)}`, { method: "GET" });
+        const sourceMode = listSourceEl.value;
+        setStatus(`Fetching world ${id} from World Labs API...`);
+        const worldPayload =
+          sourceMode === "official"
+            ? await officialFetch(`worlds/${encodeURIComponent(id)}`, { method: "GET" })
+            : await apiFetch(`worlds/${encodeURIComponent(id)}`, { method: "GET" });
+        const world = normalizeWorld(worldPayload);
+        if (!world?.assets?.splats?.spz_urls) {
+          throw new Error("world payload missing assets.splats.spz_urls");
+        }
         await openWorld(world);
         setStatus(`Opened world ${id}.`);
       }

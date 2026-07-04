@@ -247,8 +247,8 @@ function PhaseChip({
 function PhaseActionPanel({
   phase,
   published,
-  hubId,
-  hubData,
+          hubId,
+          hubData,
   nodes,
   onViewScript,
   onCopyScriptNode,
@@ -415,24 +415,24 @@ function PhaseActionPanel({
         </p>
         <div className="flex shrink-0 items-center gap-1.5">
           {emptyPhase ? (
-            <button
-              type="button"
+                  <button
+                    type="button"
               disabled={refreshing}
               className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/70 transition hover:bg-[#262626] disabled:opacity-40"
               onClick={onRefreshTasks}
-            >
+                  >
               {refreshing ? "刷新中…" : "刷新任务"}
-            </button>
-          ) : null}
+                  </button>
+              ) : null}
           {claimableTaskIds.size > 0 ? (
-            <button
-              type="button"
+                <button
+                  type="button"
               disabled={claiming || selectedTaskIds.size === 0}
               className="shrink-0 rounded-md border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-[10px] text-cyan-50 transition hover:bg-cyan-500/25 disabled:opacity-40"
               onClick={onClaim}
             >
               {claiming ? "参与制作中…" : `参与制作 (${selectedTaskIds.size})`}
-            </button>
+                </button>
           ) : null}
         </div>
       </div>
@@ -442,7 +442,7 @@ function PhaseActionPanel({
         </p>
       ) : (
         <div
-          className={cn(
+                  className={cn(
             fullscreen && "flex min-h-0 flex-1 flex-col",
           )}
         >
@@ -468,7 +468,7 @@ function PhaseActionPanel({
             contentScale={contentScale}
             fullscreen={fullscreen}
           />
-        </div>
+              </div>
       )}
     </div>
   );
@@ -508,17 +508,17 @@ function AuthoringPanel({
         创作
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+                  <button
+                    type="button"
           className="inline-flex items-center gap-1 rounded-lg border border-black/40 bg-black/20 px-2.5 py-1 text-[11px] text-white/75 transition hover:bg-black/30"
           onClick={() =>
             updateNodeData(hubId, { scriptStudioInputMode: "generate" })
           }
         >
           一句话生成
-        </button>
-        <button
-          type="button"
+                  </button>
+                <button
+                  type="button"
           disabled={uploadBusy}
           className="inline-flex items-center gap-1 rounded-lg border border-black/40 bg-black/20 px-2.5 py-1 text-[11px] text-white/75 transition hover:bg-black/30 disabled:opacity-50"
           onClick={onUpload}
@@ -529,13 +529,13 @@ function AuthoringPanel({
             <Upload className="size-3" />
           )}
           上传剧本
-        </button>
+                </button>
         <span className="text-[10px] text-white/35">|</span>
         {SCRIPT_STUDIO_TOTAL_EPISODE_PRESETS.map((n) => (
-          <button
+                <button
             key={n}
-            type="button"
-            className={cn(
+                  type="button"
+                  className={cn(
               "rounded-md px-2 py-0.5 text-[10px] transition",
               total === n
                 ? "bg-cyan-500/25 text-cyan-50"
@@ -544,37 +544,37 @@ function AuthoringPanel({
             onClick={() => updateNodeData(hubId, { scriptStudioTotalEpisodes: n })}
           >
             {n}集
-          </button>
+                </button>
         ))}
-      </div>
+              </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <span className="text-[10px] text-white/50">
           进度 {generatedEpisodes}/{total} 集 · 第 {batchIndex}/{batchTotal} 批
         </span>
-        {hasMore ? (
-          <button
-            type="button"
-            disabled={running}
+              {hasMore ? (
+                <button
+                  type="button"
+                  disabled={running}
             className="inline-flex items-center gap-1 rounded-lg bg-cyan-600/90 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50"
-            onClick={onNextBatch}
-          >
-            {running ? (
+                  onClick={onNextBatch}
+                >
+                  {running ? (
               <Loader2 className="size-3 animate-spin" />
-            ) : (
+                  ) : (
               <Play className="size-3" />
-            )}
-            {batchIndex === 0
-              ? `生成第 ${range.start}–${range.end} 集`
-              : `下一批 ${range.start}–${range.end} 集`}
-          </button>
-        ) : (
+                  )}
+                  {batchIndex === 0
+                    ? `生成第 ${range.start}–${range.end} 集`
+                    : `下一批 ${range.start}–${range.end} 集`}
+                </button>
+              ) : (
           <span className="text-[10px] text-emerald-300/80">全部批次已生成</span>
         )}
-      </div>
+            </div>
       <p className="mt-2 text-[10px] text-white/35">
         发布：请在脚本生成器节点顶栏点击「发布剧本」；发布后可在此参与制作任务。
       </p>
-    </div>
+              </div>
   );
 }
 
@@ -633,8 +633,8 @@ function CrewBulletinPhaseFullscreen({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-black/25 p-0.5">
-            <button
-              type="button"
+                    <button
+                      type="button"
               disabled={!canZoomOut}
               className="rounded-md p-1.5 text-white/55 hover:bg-white/8 disabled:opacity-30"
               title="缩小字号"
@@ -644,11 +644,11 @@ function CrewBulletinPhaseFullscreen({
               }}
             >
               <ZoomOut className="size-4" />
-            </button>
+                    </button>
             {CREW_CONTENT_SCALES.map((s) => (
-              <button
+                          <button
                 key={s.label}
-                type="button"
+                            type="button"
                 className={cn(
                   "rounded-md px-2 py-1 text-[10px] transition",
                   contentScale === s.value
@@ -658,10 +658,10 @@ function CrewBulletinPhaseFullscreen({
                 onClick={() => onContentScaleChange(s.value)}
               >
                 {s.label}
-              </button>
+                          </button>
             ))}
-            <button
-              type="button"
+                              <button
+                                type="button"
               disabled={!canZoomIn}
               className="rounded-md p-1.5 text-white/55 hover:bg-white/8 disabled:opacity-30"
               title="放大字号"
@@ -674,16 +674,16 @@ function CrewBulletinPhaseFullscreen({
               }}
             >
               <ZoomIn className="size-4" />
-            </button>
-          </div>
-          <button
-            type="button"
+                              </button>
+                      </div>
+                <button
+                  type="button"
             className="rounded-lg p-2 text-white/50 hover:bg-white/8"
             onClick={onClose}
-          >
+                >
             <X className="size-5" />
-          </button>
-        </div>
+                </button>
+            </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </div>,
@@ -1074,8 +1074,8 @@ export function Pro2CrewBulletin() {
       />
 
       {/* 收起后保留 · 公告 logo */}
-      <button
-        type="button"
+                    <button
+                      type="button"
         className={cn(
           "pointer-events-auto relative z-[2] flex size-9 shrink-0 items-center justify-center rounded-r-lg border border-black/40 bg-[var(--canvas-surface)]/98 text-cyan-300/90 shadow-md backdrop-blur-sm transition hover:bg-black/25",
           !collapsed && "rounded-r-none border-r-0",
@@ -1090,7 +1090,7 @@ export function Pro2CrewBulletin() {
         }}
       >
         <Megaphone className="size-4" />
-      </button>
+                    </button>
 
       {/* 向右滑开 · 环节 tab + 任务面板 */}
       <div
@@ -1145,7 +1145,7 @@ export function Pro2CrewBulletin() {
                       onClick={() => onPhaseClick(phase.id)}
                     />
                   ))}
-            </div>
+          </div>
             {published && scriptPackagePhase ? (
               <div className="flex shrink-0 items-center border-l border-black/35 px-2 py-1.5">
                 <PhaseChip
@@ -1156,8 +1156,8 @@ export function Pro2CrewBulletin() {
                   active={expandedPhaseId === "scriptPackage"}
                   onClick={() => onPhaseClick("scriptPackage")}
                 />
-              </div>
-            ) : null}
+        </div>
+      ) : null}
           </div>
 
           {isAuthoring && expandedPhaseId === "authoring" ? (

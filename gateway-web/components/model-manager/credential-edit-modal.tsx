@@ -14,6 +14,7 @@ const PROVIDERS = [
   "HUNYUAN",
   "VOLCENGINE",
   "MINIMAX",
+  "WORLDLABS",
 ] as const;
 
 export function CredentialEditModal({

@@ -15,6 +15,7 @@ import {
   GATEWAY_CANONICAL_REGISTRY,
 } from "@/lib/platform-model/canonical-registry";
 import { prisma } from "@/lib/prisma";
+import { WORLDLABS_MARBLE_MODELS } from "@/lib/gateway/worldlabs-marble-models";
 
 export class UnregisteredGatewayModelError extends Error {
   readonly modelKey: string;
@@ -356,6 +357,23 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
       credentialBound: isGatewayProviderBound(boundKinds, route.providerKind),
     });
     byProvider.set(route.providerKind, list);
+  }
+
+  // World Labs 目前常见为平台侧已登记能力，不一定先在 DB route 出现；
+  // 这里补一份 Function Models 分组，确保 Gateway 模型管理里可见并可绑定凭证。
+  if (!byProvider.has("WORLDLABS")) {
+    byProvider.set(
+      "WORLDLABS",
+      WORLDLABS_MARBLE_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        requestKind: "OTHER",
+        role: "OTHER",
+        description: m.description,
+        canonicalModelKey: m.modelKey,
+        credentialBound: isGatewayProviderBound(boundKinds, "WORLDLABS"),
+      })),
+    );
   }
 
   const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {

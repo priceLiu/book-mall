@@ -1,11 +1,10 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import * as THREE from "three";
+import * as spark from "@sparkjsdev/spark";
 
-import {
-  buildParticleModifier,
-  frameCameraToSplatMesh,
-} from "@/lib/qr-world-splat-fx";
+import { buildParticleModifier } from "@/lib/qr-world-splat-fx";
 
 export type QrWorldSparkStage = "preview" | "loading-full" | "ready" | "error";
 
@@ -16,10 +15,13 @@ export type QrWorldSparkHandle = {
 type Props = {
   lowResUrl?: string | null;
   highResUrl?: string | null;
+  naturalMouse?: boolean;
+  invertTrackpadDrag?: boolean;
   className?: string;
   onProgress?: (ratio: number) => void;
   onStageChange?: (stage: QrWorldSparkStage, message?: string) => void;
   onReady?: () => void;
+  onFirstVisual?: () => void;
   onError?: (message: string) => void;
 };
 
@@ -31,16 +33,31 @@ const MIN_FOV = 30;
 const MAX_FOV = 120;
 const CROSSFADE_MS = 650;
 
+type PackedSplats = spark.PackedSplats | spark.ExtSplats;
+
 export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function QrWorldSparkCanvas(
-  { lowResUrl, highResUrl, className = "", onProgress, onStageChange, onReady, onError },
+  {
+    lowResUrl,
+    highResUrl,
+    naturalMouse = false,
+    invertTrackpadDrag = false,
+    className = "",
+    onProgress,
+    onStageChange,
+    onReady,
+    onFirstVisual,
+    onError,
+  },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
   const onProgressRef = useRef(onProgress);
   const onStageChangeRef = useRef(onStageChange);
   const onReadyRef = useRef(onReady);
+  const onFirstVisualRef = useRef(onFirstVisual);
   const onErrorRef = useRef(onError);
   const resetFnRef = useRef<(() => void) | null>(null);
+  const controlsRef = useRef<spark.SparkControls | null>(null);
 
   useImperativeHandle(ref, () => ({ resetView: () => resetFnRef.current?.() }), []);
 
@@ -48,11 +65,31 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
     onProgressRef.current = onProgress;
     onStageChangeRef.current = onStageChange;
     onReadyRef.current = onReady;
+    onFirstVisualRef.current = onFirstVisual;
     onErrorRef.current = onError;
   });
 
   const low = lowResUrl?.trim() || null;
   const high = highResUrl?.trim() || null;
+
+  useEffect(() => {
+    const c = controlsRef.current as
+      | (spark.SparkControls & {
+          pointerControls?: {
+            reverseRotate?: boolean;
+            reverseSlide?: boolean;
+            reverseSwipe?: boolean;
+          };
+        })
+      | null;
+    if (!c?.pointerControls) return;
+
+    // "Natural Mouse": content follows drag direction (reverse camera-style rotate).
+    c.pointerControls.reverseRotate = Boolean(naturalMouse);
+    // "Invert Trackpad Drag": invert two-finger drag/swipe panning direction.
+    c.pointerControls.reverseSlide = Boolean(invertTrackpadDrag);
+    c.pointerControls.reverseSwipe = Boolean(invertTrackpadDrag);
+  }, [naturalMouse, invertTrackpadDrag]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -64,12 +101,12 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
     let disposed = false;
     let removeResize: (() => void) | undefined;
     let removeKeys: (() => void) | undefined;
-    let renderer: import("three").WebGLRenderer | null = null;
-    let controls: import("@sparkjsdev/spark").SparkControls | null = null;
+    let renderer: THREE.WebGLRenderer | null = null;
+    let controls: spark.SparkControls | null = null;
 
-    let lowMesh: import("@sparkjsdev/spark").SplatMesh | null = null;
-    let highMesh: import("@sparkjsdev/spark").SplatMesh | null = null;
-    let singleMesh: import("@sparkjsdev/spark").SplatMesh | null = null;
+    let lowMesh: spark.SplatMesh | null = null;
+    let highMesh: spark.SplatMesh | null = null;
+    let singleMesh: spark.SplatMesh | null = null;
 
     let particleTimeUniform: { value: number } | null = null;
     let crossFading = false;
@@ -86,13 +123,12 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
 
     const canvas = document.createElement("canvas");
     canvas.className = "h-full w-full touch-none outline-none";
+    canvas.tabIndex = 0;
     host.replaceChildren(canvas);
+    canvas.addEventListener("pointerdown", () => canvas.focus());
 
     void (async () => {
       try {
-        const THREE = await import("three");
-        const spark = await import("@sparkjsdev/spark");
-
         if (disposed) return;
 
         const scene = new THREE.Scene();
@@ -124,12 +160,17 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
         const sparkRenderer = new spark.SparkRenderer({ renderer });
         scene.add(sparkRenderer);
 
-        let initialPos = new THREE.Vector3(0, 1, 0);
+        let initialPos = new THREE.Vector3(0, 0, 0.01);
         let initialQuat = new THREE.Quaternion();
 
-        const saveCameraPose = () => {
+        const setInitialView = () => {
+          camera.position.set(0, 0, 0.01);
+          camera.quaternion.set(0, 0, 0, 1);
           initialPos = camera.position.clone();
           initialQuat = camera.quaternion.clone();
+        };
+
+        const saveCameraPose = () => {
           resetFnRef.current = () => {
             camera.position.copy(initialPos);
             camera.quaternion.copy(initialQuat);
@@ -138,8 +179,24 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           };
         };
 
+        setInitialView();
+        saveCameraPose();
+
         controls = new spark.SparkControls({ canvas });
+        controlsRef.current = controls;
         controls.fpsMovement.keycodeMoveMapping.Space = new THREE.Vector3(0, 1, 0);
+        const pointer = (controls as spark.SparkControls & {
+          pointerControls?: {
+            reverseRotate?: boolean;
+            reverseSlide?: boolean;
+            reverseSwipe?: boolean;
+          };
+        }).pointerControls;
+        if (pointer) {
+          pointer.reverseRotate = Boolean(naturalMouse);
+          pointer.reverseSlide = Boolean(invertTrackpadDrag);
+          pointer.reverseSwipe = Boolean(invertTrackpadDrag);
+        }
 
         const onKeyDown = (event: KeyboardEvent) => {
           if (event.code === "Digit0" || event.code === "Numpad0") {
@@ -162,30 +219,31 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           url: string,
           reportProgress: boolean,
           onRatio?: (ratio: number) => void,
-        ) => {
+        ): Promise<PackedSplats | null> => {
           const packed = await loader.loadAsync(url, (event) => {
-            if (!event.lengthComputable) return;
+            if (!event.lengthComputable || disposed) return;
             const ratio = Math.max(0, Math.min(1, event.loaded / event.total));
             if (reportProgress) onProgressRef.current?.(ratio);
             onRatio?.(ratio);
           });
-          if (disposed) throw new Error("disposed");
+          if (disposed) return null;
           await packed.initialized;
+          if (disposed) return null;
           return packed;
         };
 
         const makeMeshFromPacked = async (
-          packed: import("@sparkjsdev/spark").PackedSplats | import("@sparkjsdev/spark").ExtSplats,
-          worldModifier?: import("@sparkjsdev/spark").GsplatModifier,
-        ) => {
+          packed: PackedSplats,
+          worldModifier?: spark.GsplatModifier,
+        ): Promise<spark.SplatMesh | null> => {
           const mesh = new spark.SplatMesh({
-            packedSplats: packed as import("@sparkjsdev/spark").PackedSplats,
+            packedSplats: packed as spark.PackedSplats,
             worldModifier,
           });
           await mesh.initialized;
           if (disposed) {
             mesh.dispose();
-            throw new Error("disposed");
+            return null;
           }
           mesh.quaternion.set(1, 0, 0, 0);
           mesh.updateGenerator();
@@ -258,44 +316,56 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
         if (progressive) {
           setStage("preview", "Loading preview...");
           onProgressRef.current?.(0);
+          startRenderLoop();
 
-          // 100k 与 full_res 并行下载，缩短「粒子 → 成片」空窗
           const highLoadPromise = loadPacked(high!, false, (ratio) => {
             setStage("loading-full", `${Math.round(ratio * 100)}%`);
           });
 
-          const lowPacked = await loadPacked(low!, true);
+          let lowPacked: PackedSplats | null = null;
+          lowPacked = await loadPacked(low!, true);
+
+          if (disposed) return;
+
+          if (!lowPacked) {
+            setStage("loading-full", "Loading full quality...");
+            const highPacked = await highLoadPromise;
+            if (disposed || !highPacked) return;
+            singleMesh = await makeMeshFromPacked(highPacked);
+            if (disposed || !singleMesh) return;
+            singleMesh.opacity = 1;
+            scene.add(singleMesh);
+            onFirstVisualRef.current?.();
+            setStage("ready");
+            onReadyRef.current?.();
+            return;
+          }
+
           const particle = buildParticleModifier(spark);
           particleTimeUniform = particle.timeUniform;
 
           lowMesh = await makeMeshFromPacked(lowPacked, particle.modifier);
+          if (disposed || !lowMesh) return;
           scene.add(lowMesh);
-          frameCameraToSplatMesh(THREE, camera, lowMesh);
-          saveCameraPose();
-          startRenderLoop();
+          onFirstVisualRef.current?.();
           setStage("preview", "Particle preview");
 
           setStage("loading-full", "Loading full quality...");
           onProgressRef.current?.(0);
 
-          let highPacked: import("@sparkjsdev/spark").PackedSplats | import("@sparkjsdev/spark").ExtSplats;
-          try {
-            highPacked = await highLoadPromise;
-          } catch {
-            if (disposed) return;
+          const highPacked = await highLoadPromise;
+          if (disposed) return;
+          if (!highPacked) {
             finishLowOnlyPreview();
+            onFirstVisualRef.current?.();
             return;
           }
 
-          if (disposed) return;
-
           highMesh = await makeMeshFromPacked(highPacked);
+          if (disposed || !highMesh) return;
           highMesh.opacity = 0;
           highMesh.visible = true;
           scene.add(highMesh);
-
-          frameCameraToSplatMesh(THREE, camera, highMesh);
-          saveCameraPose();
 
           setStage("loading-full", "Compositing…");
           crossFading = true;
@@ -303,25 +373,26 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
         } else {
           setStage("loading-full", "Loading...");
           onProgressRef.current?.(0);
-          const packed = await loadPacked(primary, true);
-          singleMesh = await makeMeshFromPacked(packed);
-          singleMesh.opacity = 0;
-          scene.add(singleMesh);
-          frameCameraToSplatMesh(THREE, camera, singleMesh);
-          saveCameraPose();
-          singleRevealStart = performance.now();
           startRenderLoop();
+          const packed = await loadPacked(primary, true);
+          if (disposed || !packed) return;
+          singleMesh = await makeMeshFromPacked(packed);
+          if (disposed || !singleMesh) return;
+          singleMesh.opacity = 1;
+          scene.add(singleMesh);
+          onFirstVisualRef.current?.();
+          setStage("ready");
+          onReadyRef.current?.();
         }
       } catch (err) {
-        if (!disposed) {
-          const raw = err instanceof Error ? err.message : "3D 场景加载失败";
-          const msg =
-            raw === "fetch failed"
-              ? "Splat 资源下载失败，请确认已登录且 book-mall 可访问"
-              : raw;
-          setStage("error", msg);
-          onErrorRef.current?.(msg);
-        }
+        if (disposed) return;
+        const raw = err instanceof Error ? err.message : "3D 场景加载失败";
+        const msg =
+          raw === "fetch failed"
+            ? "Splat 资源下载失败，请确认已登录且 book-mall 可访问"
+            : raw;
+        setStage("error", msg);
+        onErrorRef.current?.(msg);
       }
     })();
 
@@ -331,6 +402,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
       removeResize?.();
       removeKeys?.();
       renderer?.setAnimationLoop(null);
+      controlsRef.current = null;
       lowMesh?.dispose();
       highMesh?.dispose();
       singleMesh?.dispose();
