@@ -38,6 +38,26 @@ export function validateVoiceChangerDraft(args: {
   return null;
 }
 
+export function validateSfxDraft(args: {
+  prompt: string;
+}): string | null {
+  const prompt = args.prompt.trim();
+  if (!prompt) return "请填写音效描述";
+  if (prompt.length > QR_TEXT_TO_AUDIO_PROMPT_MAX_LENGTH) {
+    return `描述最多 ${QR_TEXT_TO_AUDIO_PROMPT_MAX_LENGTH} 字`;
+  }
+  return null;
+}
+
+export function validateMusicDraft(args: { prompt: string }): string | null {
+  const prompt = args.prompt.trim();
+  if (!prompt) return "请填写音乐描述";
+  if (prompt.length > QR_TEXT_TO_AUDIO_PROMPT_MAX_LENGTH) {
+    return `描述最多 ${QR_TEXT_TO_AUDIO_PROMPT_MAX_LENGTH} 字`;
+  }
+  return null;
+}
+
 export function clampVoiceControl(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

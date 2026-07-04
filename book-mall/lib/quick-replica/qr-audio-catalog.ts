@@ -1,10 +1,18 @@
-/** QuickReplica 声音 · MiniMax Gateway 模型目录 */
+/** QuickReplica 声音 · Gateway 模型目录（MiniMax + ElevenLabs） */
 
 import {
+  ELEVENLABS_DEFAULT_MUSIC_MODEL_KEY,
+  ELEVENLABS_DEFAULT_SFX_MODEL_KEY,
+  ELEVENLABS_DEFAULT_STS_MODEL_KEY,
+  ELEVENLABS_DEFAULT_VOICE_ID,
+  ELEVENLABS_MUSIC_MODELS,
+  ELEVENLABS_SFX_MODELS,
+  ELEVENLABS_STS_MODELS,
+} from "@/lib/gateway/elevenlabs-models";
+import {
   MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
-  MINIMAX_SPEECH_MODELS,
   MINIMAX_MUSIC_MODELS,
-  MINIMAX_DEFAULT_MUSIC_MODEL_KEY,
+  MINIMAX_SPEECH_MODELS,
   MINIMAX_LANGUAGE_BOOST_OPTIONS,
   MINIMAX_VOICE_CLONE_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
@@ -38,6 +46,7 @@ export type QrAudioStyleTagDef = {
   id: string;
   label: string;
   labelEn?: string;
+  content?: string;
 };
 
 export const QR_AUDIO_MODELS: QrAudioModelDef[] = [
@@ -53,10 +62,44 @@ export const QR_AUDIO_MODELS: QrAudioModelDef[] = [
     subtitle: m.subtitle,
     provider: "minimax",
   })),
+  ...ELEVENLABS_STS_MODELS.map((m) => ({
+    modelKey: m.modelKey,
+    label: m.label,
+    subtitle: m.subtitle,
+    provider: "elevenlabs",
+  })),
+  ...ELEVENLABS_SFX_MODELS.map((m) => ({
+    modelKey: m.modelKey,
+    label: m.label,
+    subtitle: m.subtitle,
+    provider: "elevenlabs",
+  })),
+  ...ELEVENLABS_MUSIC_MODELS.map((m) => ({
+    modelKey: m.modelKey,
+    label: m.label,
+    subtitle: m.subtitle,
+    provider: "elevenlabs",
+  })),
 ];
 
+export const QR_VOICE_CHANGER_MODELS: QrAudioModelDef[] = ELEVENLABS_STS_MODELS.map((m) => ({
+  modelKey: m.modelKey,
+  label: m.label,
+  subtitle: m.subtitle,
+  provider: "elevenlabs",
+}));
+
+export const QR_SFX_MODELS: QrAudioModelDef[] = ELEVENLABS_SFX_MODELS.map((m) => ({
+  modelKey: m.modelKey,
+  label: m.label,
+  subtitle: m.subtitle,
+  provider: "elevenlabs",
+}));
+
 export const QR_DEFAULT_AUDIO_MODEL_KEY = MINIMAX_DEFAULT_SPEECH_MODEL_KEY;
-export const QR_DEFAULT_MUSIC_MODEL_KEY = MINIMAX_DEFAULT_MUSIC_MODEL_KEY;
+export const QR_DEFAULT_VOICE_CHANGER_MODEL_KEY = ELEVENLABS_DEFAULT_STS_MODEL_KEY;
+export const QR_DEFAULT_SFX_MODEL_KEY = ELEVENLABS_DEFAULT_SFX_MODEL_KEY;
+export const QR_DEFAULT_MUSIC_MODEL_KEY = ELEVENLABS_DEFAULT_MUSIC_MODEL_KEY;
 
 /** 内联 fallback（完整列表走 GET /quick-replica/voices 分页） */
 export const QR_AUDIO_VOICES: QrAudioVoiceDef[] = [
@@ -79,17 +122,18 @@ export const QR_AUDIO_VOICES: QrAudioVoiceDef[] = [
     tags: ["中文", "female"],
   },
   {
-    voiceId: "English_expressive_narrator",
-    label: "Expressive Narrator",
-    subtitle: "English",
-    gender: "neutral",
+    voiceId: ELEVENLABS_DEFAULT_VOICE_ID,
+    label: "George",
+    subtitle: "English · ElevenLabs",
+    gender: "male",
     language: "English",
-    avatarLetter: "E",
-    tags: ["english"],
+    avatarLetter: "G",
+    tags: ["english", "elevenlabs"],
   },
 ];
 
 export const QR_DEFAULT_AUDIO_VOICE_ID = "male-qn-qingse";
+export const QR_DEFAULT_ELEVEN_VOICE_ID = ELEVENLABS_DEFAULT_VOICE_ID;
 
 export const QR_AUDIO_STYLE_TAGS: QrAudioStyleTagDef[] = [
   { id: "podcast-intro", label: "Podcast Intro", labelEn: "Podcast Intro" },
@@ -112,6 +156,26 @@ export const QR_AUDIO_VOICE_CONTROL_DEFAULTS = {
   voiceStyleExaggeration: 0,
 } as const;
 
+export const QR_SFX_CONTROL_DEFAULTS = {
+  sfxLoop: false,
+  sfxDurationAuto: true,
+  sfxDurationSeconds: 5,
+  sfxPromptInfluence: 0.3,
+} as const;
+
+export const QR_MUSIC_CONTROL_DEFAULTS = {
+  musicClipMode: "quick" as const,
+  musicInstrumental: false,
+  musicDurationAuto: true,
+  musicDurationSeconds: 180,
+  musicBpmAuto: true,
+  musicBpm: 120,
+  musicIntensityAuto: true,
+  musicIntensity: "medium",
+  musicKeyAuto: true,
+  musicKey: "C major",
+} as const;
+
 export function getQrAudioModelDef(modelKey: string): QrAudioModelDef {
   return (
     QR_AUDIO_MODELS.find((m) => m.modelKey === modelKey.trim()) ?? QR_AUDIO_MODELS[0]!
@@ -127,6 +191,9 @@ export function getQrAudioVoiceDef(voiceId: string): QrAudioVoiceDef {
 export function getQrAudioCatalog() {
   const promptTemplates = readQrAudioPromptTemplates();
   const voiceoverTemplates = promptTemplates["create-voiceover"];
+  const sfxTemplates = promptTemplates["create-sfx"];
+  const musicTemplates = promptTemplates["create-music"];
+
   const styleTags =
     voiceoverTemplates.length > 0
       ? voiceoverTemplates.map((t) => ({
@@ -137,8 +204,30 @@ export function getQrAudioCatalog() {
         }))
       : QR_AUDIO_STYLE_TAGS.map((t) => ({ ...t, content: "" }));
 
+  const sfxStyleTags =
+    sfxTemplates.length > 0
+      ? sfxTemplates.map((t) => ({
+          id: t.id,
+          label: t.name,
+          labelEn: t.name,
+          content: t.content,
+        }))
+      : [];
+
+  const musicStyleTags =
+    musicTemplates.length > 0
+      ? musicTemplates.map((t) => ({
+          id: t.id,
+          label: t.name,
+          labelEn: t.name,
+          content: t.content,
+        }))
+      : [];
+
   return {
     models: QR_AUDIO_MODELS,
+    voiceChangerModels: QR_VOICE_CHANGER_MODELS,
+    sfxModels: QR_SFX_MODELS,
     voiceCloneModels: MINIMAX_VOICE_CLONE_SPEECH_MODELS.map((m) => ({
       modelKey: m.modelKey,
       label: m.label,
@@ -148,14 +237,23 @@ export function getQrAudioCatalog() {
     languageBoostOptions: [...MINIMAX_LANGUAGE_BOOST_OPTIONS],
     voices: QR_AUDIO_VOICES,
     styleTags,
+    sfxStyleTags,
+    musicStyleTags,
     promptTemplates,
     defaults: {
       modelKey: QR_DEFAULT_AUDIO_MODEL_KEY,
+      voiceChangerModelKey: QR_DEFAULT_VOICE_CHANGER_MODEL_KEY,
+      sfxModelKey: QR_DEFAULT_SFX_MODEL_KEY,
+      musicModelKey: QR_DEFAULT_MUSIC_MODEL_KEY,
       voiceId: QR_DEFAULT_AUDIO_VOICE_ID,
+      elevenVoiceId: QR_DEFAULT_ELEVEN_VOICE_ID,
       styleTag: styleTags[0]?.id ?? QR_DEFAULT_AUDIO_STYLE_TAG,
       languageBoost: "auto",
       ...QR_AUDIO_VOICE_CONTROL_DEFAULTS,
+      ...QR_SFX_CONTROL_DEFAULTS,
+      ...QR_MUSIC_CONTROL_DEFAULTS,
     },
     voicesPaged: true,
+    elevenVoicesLive: true,
   };
 }

@@ -96,6 +96,14 @@ export type QrWorkspaceDraft = {
   voiceStability?: number;
   voiceSimilarityBoost?: number;
   voiceStyleExaggeration?: number;
+  /** 音效 · 无缝循环（Eleven Sound Effects v2） */
+  sfxLoop?: boolean;
+  /** 音效 · 自动时长（否则用 sfxDurationSeconds） */
+  sfxDurationAuto?: boolean;
+  /** 音效 · 固定时长 0.5–30s */
+  sfxDurationSeconds?: number;
+  /** 音效 · Prompt Influence 0–1 */
+  sfxPromptInfluence?: number;
   /** 变声器源音频 URL */
   sourceAudioUrl?: string;
   /** 音色快速复刻 · 自定义 voice_id（留空则自动生成） */
@@ -114,7 +122,18 @@ export type QrWorkspaceDraft = {
   clonePromptText?: string;
   /** 情感权重（UI 八维，总和 ≤ 1.5） */
   voiceEmotions?: Record<string, number>;
-  /** 音乐生成模式 */
+  /** 创作音乐 · Quick Clip / Full Song */
+  musicClipMode?: "quick" | "full";
+  musicInstrumental?: boolean;
+  musicDurationAuto?: boolean;
+  musicDurationSeconds?: number;
+  musicBpmAuto?: boolean;
+  musicBpm?: number;
+  musicIntensityAuto?: boolean;
+  musicIntensity?: string;
+  musicKeyAuto?: boolean;
+  musicKey?: string;
+  /** @deprecated 旧 MiniMax 音乐模式 */
   musicMode?: "generate" | "cover" | "lyrics";
   /** Marble 世界：参考图方位角（与 sceneImageUrls 对齐） */
   worldRefAzimuths?: number[];

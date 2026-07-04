@@ -48,18 +48,29 @@ export type QrAudioPromptTemplateDef = {
 
 export type QrAudioCatalog = {
   models: QrAudioCatalogModel[];
+  voiceChangerModels?: QrAudioCatalogModel[];
+  sfxModels?: QrAudioCatalogModel[];
   voiceCloneModels?: QrAudioCatalogModel[];
   languageBoostOptions?: string[];
   voices: QrAudioCatalogVoice[];
   styleTags: QrAudioCatalogStyleTag[];
+  sfxStyleTags?: QrAudioCatalogStyleTag[];
+  musicStyleTags?: QrAudioCatalogStyleTag[];
   promptTemplates?: {
     "create-voiceover": QrAudioPromptTemplateDef[];
     "voice-changer": QrAudioPromptTemplateDef[];
+    "create-sfx"?: QrAudioPromptTemplateDef[];
+    "create-music"?: QrAudioPromptTemplateDef[];
   };
   voicesPaged?: boolean;
+  elevenVoicesLive?: boolean;
   defaults: {
     modelKey: string;
+    voiceChangerModelKey?: string;
+    sfxModelKey?: string;
+    musicModelKey?: string;
     voiceId: string;
+    elevenVoiceId?: string;
     styleTag: string;
     voiceSpeed: number;
     voiceVolume: number;
@@ -70,6 +81,20 @@ export type QrAudioCatalog = {
     voiceStability: number;
     voiceSimilarityBoost: number;
     voiceStyleExaggeration: number;
+    sfxLoop?: boolean;
+    sfxDurationAuto?: boolean;
+    sfxDurationSeconds?: number;
+    sfxPromptInfluence?: number;
+    musicClipMode?: "quick" | "full";
+    musicInstrumental?: boolean;
+    musicDurationAuto?: boolean;
+    musicDurationSeconds?: number;
+    musicBpmAuto?: boolean;
+    musicBpm?: number;
+    musicIntensityAuto?: boolean;
+    musicIntensity?: string;
+    musicKeyAuto?: boolean;
+    musicKey?: string;
     languageBoost?: string;
   };
 };
@@ -156,9 +181,18 @@ export function useQrAudioCatalog() {
 }
 
 export function getQrAudioModelFromCatalog(catalog: QrAudioCatalog, modelKey: string) {
-  return (
-    catalog.models.find((m) => m.modelKey === modelKey.trim()) ?? catalog.models[0]!
-  );
+  const all = [
+    ...catalog.models,
+    ...(catalog.voiceChangerModels ?? []),
+    ...(catalog.sfxModels ?? []),
+    ...(catalog.voiceCloneModels ?? []),
+  ];
+  return all.find((m) => m.modelKey === modelKey.trim()) ?? catalog.models[0]!;
+}
+
+export function isElevenLabsStsModelKey(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "eleven/english-sts-v2" || k === "eleven/multilingual-sts-v2";
 }
 
 export const QR_VOICE_EMOTION_DEFS = [

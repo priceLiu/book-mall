@@ -8,6 +8,7 @@ export const PROVIDER_APPLY_URLS: Partial<
     | "HUNYUAN"
     | "VOLCENGINE"
     | "MINIMAX"
+    | "ELEVENLABS"
     | "WORLDLABS",
     string
   >
@@ -18,6 +19,7 @@ export const PROVIDER_APPLY_URLS: Partial<
   VOLCENGINE:
     "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
   MINIMAX: "https://platform.minimaxi.com/user-center/basic-information/interface-key",
+  ELEVENLABS: "https://elevenlabs.io/app/settings/api-keys",
   WORLDLABS: "https://platform.worldlabs.ai/api-keys",
 };
 

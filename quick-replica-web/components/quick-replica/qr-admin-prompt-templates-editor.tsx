@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 
-type PromptTemplateKind = "create-voiceover" | "voice-changer";
+type PromptTemplateKind = "create-voiceover" | "voice-changer" | "create-sfx" | "create-music";
 
 type TemplateDef = {
   id: string;
@@ -15,7 +15,7 @@ type TemplateDef = {
 
 type Library = Record<PromptTemplateKind, TemplateDef[]>;
 
-const EMPTY: Library = { "create-voiceover": [], "voice-changer": [] };
+const EMPTY: Library = { "create-voiceover": [], "voice-changer": [], "create-sfx": [], "create-music": [] };
 
 type Props = {
   kind: PromptTemplateKind;

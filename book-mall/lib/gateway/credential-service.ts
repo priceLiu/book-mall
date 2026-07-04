@@ -14,6 +14,7 @@ export const GATEWAY_PROVIDER_KINDS = [
   "VOLCENGINE",
   "MINIMAX",
   "WORLDLABS",
+  "ELEVENLABS",
 ] as const satisfies readonly GatewayProviderKind[];
 
 async function afterCredentialMutation(gatewayUserId: string): Promise<void> {

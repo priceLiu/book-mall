@@ -10,6 +10,7 @@ import type { QrVoiceCatalogItem } from "@/lib/qr-audio-catalog-client";
 type Props = {
   selectedVoiceId?: string;
   focusSelected?: boolean;
+  voiceProvider?: "minimax" | "elevenlabs";
   onSelectVoice: (voice: QrVoiceCatalogItem) => void;
 };
 
@@ -87,7 +88,12 @@ function VoiceCard({
   );
 }
 
-export function QrVoiceGallery({ selectedVoiceId, focusSelected = false, onSelectVoice }: Props) {
+export function QrVoiceGallery({
+  selectedVoiceId,
+  focusSelected = false,
+  voiceProvider = "minimax",
+  onSelectVoice,
+}: Props) {
   const [items, setItems] = useState<QrVoiceCatalogItem[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -102,8 +108,10 @@ export function QrVoiceGallery({ selectedVoiceId, focusSelected = false, onSelec
     setLoading(true);
     setError(null);
     try {
+      const providerQs =
+        voiceProvider === "elevenlabs" ? "&provider=elevenlabs" : "";
       const res = await fetchQrPlatform(
-        `/api/book-mall/api/platform/v1/quick-replica/voices?page=${nextPage}&pageSize=40`,
+        `/api/book-mall/api/platform/v1/quick-replica/voices?page=${nextPage}&pageSize=40${providerQs}`,
       );
       if (!res.ok) throw new Error(`加载音色失败（${res.status}）`);
       const data = (await res.json()) as {
@@ -119,7 +127,7 @@ export function QrVoiceGallery({ selectedVoiceId, focusSelected = false, onSelec
       loadingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [voiceProvider]);
 
   useEffect(() => {
     void loadPage(1);

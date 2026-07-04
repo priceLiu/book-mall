@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 
 import { QrCreateMusicForm } from "@/components/quick-replica/qr-create-music-workspace";
+import { QrCreateSfxForm } from "@/components/quick-replica/qr-create-sfx-workspace";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrVoiceChangerForm } from "@/components/quick-replica/qr-voice-changer-workspace";
 import { QrVoiceCloneForm } from "@/components/quick-replica/qr-voice-clone-workspace";
@@ -130,6 +131,8 @@ export function QrAudioMiddlePanel({
           <QrVoiceCloneForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
         ) : draft.kind === "create-music" ? (
           <QrCreateMusicForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
+        ) : draft.kind === "create-sfx" ? (
+          <QrCreateSfxForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
         ) : (
           <QrCreateVoiceoverForm
             draft={draft}
