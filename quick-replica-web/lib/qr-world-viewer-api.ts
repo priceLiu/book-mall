@@ -6,7 +6,11 @@ export type QrWorldViewerPayload = {
   worldMarbleUrl: string;
   /** 最佳单档（向后兼容）：等同 highResSpzUrl */
   spzUrl: string | null;
-  /** 低模档（150k/100k），先渲染出粒子的那份 */
+  /** OpenArt 预览档（100k），与 fullResSpzUrl 配对做两档渐进 */
+  preview100kSpzUrl?: string | null;
+  /** OpenArt 高模档（full_res） */
+  fullResSpzUrl?: string | null;
+  /** 低模档（100k/150k），先渲染出粒子的那份 */
   lowResSpzUrl?: string | null;
   /** 高模档（full_res/3m/500k），揭示后的清晰画质 */
   highResSpzUrl?: string | null;
@@ -16,6 +20,31 @@ export type QrWorldViewerPayload = {
   thumbnailUrl: string | null;
   colliderMeshUrl: string | null;
 };
+
+/** World Labs CDN 无 CORS；经 book-mall 同域代理给 Spark SplatLoader。 */
+export function proxifyWorldSplatUrl(
+  worldId: string,
+  upstream: string | null | undefined,
+): string | null {
+  const url = upstream?.trim();
+  if (!url) return null;
+  if (url.startsWith("/api/book-mall/")) return url;
+  const q = new URLSearchParams({ url });
+  return `/api/book-mall/api/platform/v1/quick-replica/worlds/${encodeURIComponent(worldId)}/splat?${q}`;
+}
+
+function proxifyWorldViewerPayload(payload: QrWorldViewerPayload): QrWorldViewerPayload {
+  const id = payload.worldId;
+  return {
+    ...payload,
+    spzUrl: proxifyWorldSplatUrl(id, payload.spzUrl),
+    preview100kSpzUrl: proxifyWorldSplatUrl(id, payload.preview100kSpzUrl),
+    fullResSpzUrl: proxifyWorldSplatUrl(id, payload.fullResSpzUrl),
+    lowResSpzUrl: proxifyWorldSplatUrl(id, payload.lowResSpzUrl),
+    highResSpzUrl: proxifyWorldSplatUrl(id, payload.highResSpzUrl),
+    radUrl: proxifyWorldSplatUrl(id, payload.radUrl),
+  };
+}
 
 export async function fetchQrWorldViewerPayload(worldId: string): Promise<QrWorldViewerPayload> {
   const id = worldId.trim();
@@ -47,5 +76,5 @@ export async function fetchQrWorldViewerPayload(worldId: string): Promise<QrWorl
   if (!data || !("worldId" in data)) {
     throw new Error("场景数据无效");
   }
-  return data;
+  return proxifyWorldViewerPayload(data);
 }

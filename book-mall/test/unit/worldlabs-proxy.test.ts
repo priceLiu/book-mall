@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractWorldSplatTiers,
   extractWorldSplatUrl,
+  isAllowedWorldSplatUpstreamUrl,
   type WorldlabsWorld,
 } from "@/lib/gateway/worldlabs-proxy";
 
@@ -50,7 +51,7 @@ describe("extractWorldSplatUrl", () => {
 });
 
 describe("extractWorldSplatTiers", () => {
-  it("picks 150k low, full_res high, rad when present", () => {
+  it("picks 100k low (OpenArt), full_res high, rad when present", () => {
     const tiers = extractWorldSplatTiers({
       world_id: "w2",
       display_name: "Full",
@@ -68,7 +69,9 @@ describe("extractWorldSplatTiers", () => {
       },
     });
     expect(tiers).toEqual({
-      lowRes: "https://cdn.example/150k.spz",
+      preview100k: "https://cdn.example/100k.spz",
+      fullRes: "https://cdn.example/full.spz",
+      lowRes: "https://cdn.example/100k.spz",
       highRes: "https://cdn.example/full.spz",
       radUrl: "https://cdn.example/world.rad",
     });
@@ -89,6 +92,8 @@ describe("extractWorldSplatTiers", () => {
       },
     });
     expect(tiers).toEqual({
+      preview100k: "https://cdn.example/100k.spz",
+      fullRes: null,
       lowRes: "https://cdn.example/100k.spz",
       highRes: "https://cdn.example/500k.spz",
       radUrl: null,
@@ -102,6 +107,21 @@ describe("extractWorldSplatTiers", () => {
       world_marble_url: "https://marble.worldlabs.ai/world/w4",
       assets: {},
     });
-    expect(tiers).toEqual({ lowRes: null, highRes: null, radUrl: null });
+    expect(tiers).toEqual({
+      preview100k: null,
+      fullRes: null,
+      lowRes: null,
+      highRes: null,
+      radUrl: null,
+    });
+  });
+});
+
+describe("isAllowedWorldSplatUpstreamUrl", () => {
+  it("allows worldlabs and gcs hosts over https", () => {
+    expect(isAllowedWorldSplatUpstreamUrl("https://storage.googleapis.com/bucket/x.spz")).toBe(true);
+    expect(isAllowedWorldSplatUpstreamUrl("https://cdn.worldlabs.ai/x.spz")).toBe(true);
+    expect(isAllowedWorldSplatUpstreamUrl("http://storage.googleapis.com/x.spz")).toBe(false);
+    expect(isAllowedWorldSplatUpstreamUrl("https://evil.example/x.spz")).toBe(false);
   });
 });

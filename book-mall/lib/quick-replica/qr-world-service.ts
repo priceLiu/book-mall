@@ -22,10 +22,12 @@ import {
   forwardWorldlabsGenerateWorld,
   forwardWorldlabsGetOperation,
   forwardWorldlabsGetWorld,
+  listWorldSplatUrls,
   operationErrorMessage,
   type WorldlabsContentRef,
   type WorldlabsWorldPrompt,
 } from "@/lib/gateway/worldlabs-proxy";
+import { rememberWorldSplatUrls } from "@/lib/quick-replica/qr-world-splat-proxy";
 import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { prisma } from "@/lib/prisma";
 
@@ -38,7 +40,7 @@ const WORLD_REF_VIEW_AZIMUTHS: Record<string, number> = {
   left: 270,
 };
 
-async function requireWorldlabsAuth(userId: string) {
+export async function requireWorldlabsAuth(userId: string) {
   await assertGatewayApiKeyLinkedForUser(userId);
   const auth = await resolveGatewayAuthForBookUser(userId);
   if (!auth) {
@@ -319,7 +321,11 @@ export type QrWorldViewerPayload = {
   worldMarbleUrl: string;
   /** 最佳单档（向后兼容）：等同 highResSpzUrl */
   spzUrl: string | null;
-  /** 低模档（150k/100k），先渲染出粒子的那份 */
+  /** OpenArt 预览档（100k），与 fullResSpzUrl 配对做两档渐进 */
+  preview100kSpzUrl: string | null;
+  /** OpenArt 高模档（full_res） */
+  fullResSpzUrl: string | null;
+  /** 低模档（100k/150k），先渲染出粒子的那份 */
   lowResSpzUrl: string | null;
   /** 高模档（full_res/3m/500k），揭示后的清晰画质 */
   highResSpzUrl: string | null;
@@ -340,6 +346,8 @@ export async function qrGetWorldViewerPayload(
   const { credentialId } = await requireWorldlabsAuth(userId);
   const { world } = await forwardWorldlabsGetWorld({ credentialId, worldId: id });
 
+  rememberWorldSplatUrls(userId, id, listWorldSplatUrls(world));
+
   const tiers = extractWorldSplatTiers(world);
 
   return {
@@ -347,6 +355,8 @@ export async function qrGetWorldViewerPayload(
     displayName: world.display_name?.trim() || "Marble World",
     worldMarbleUrl: world.world_marble_url,
     spzUrl: tiers.highRes ?? extractWorldSplatUrl(world),
+    preview100kSpzUrl: tiers.preview100k,
+    fullResSpzUrl: tiers.fullRes,
     lowResSpzUrl: tiers.lowRes,
     highResSpzUrl: tiers.highRes ?? extractWorldSplatUrl(world),
     radUrl: tiers.radUrl,
