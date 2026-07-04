@@ -14,6 +14,7 @@ const PROVIDERS = [
   "HUNYUAN",
   "VOLCENGINE",
   "MINIMAX",
+  "ELEVENLABS",
   "WORLDLABS",
 ] as const;
 

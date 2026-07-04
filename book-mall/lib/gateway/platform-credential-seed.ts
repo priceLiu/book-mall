@@ -145,6 +145,19 @@ async function ensureCredential(
   return created.id;
 }
 
+/** 平台凭证池中已在 DB 登记、经 Gateway UI 绑定的凭证（含非 env bootstrap 厂商如 ElevenLabs） */
+async function listPlatformPoolCredentialIds(gatewayUserId: string): Promise<string[]> {
+  const rows = await prisma.gatewayVendorCredential.findMany({
+    where: {
+      userId: gatewayUserId,
+      active: true,
+      channel: "platform-pool",
+    },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
 async function ensurePlatformAdminKey(
   gatewayUserId: string,
   credentialIds: string[],
@@ -231,11 +244,13 @@ export async function syncPlatformCredentialPoolForBookUser(
     const id = await ensureCredential(gwUser.id, spec);
     if (id) credentialIds.push(id);
   }
-  if (credentialIds.length === 0) {
-    throw new Error("未导入任何凭证：请在 .env.local 配置 KIE_API_KEY、DASHSCOPE_API_KEY 等");
+  const poolCredentialIds = await listPlatformPoolCredentialIds(gwUser.id);
+  const mergedCredentialIds = [...new Set([...credentialIds, ...poolCredentialIds])];
+  if (mergedCredentialIds.length === 0) {
+    throw new Error("未导入任何凭证：请在 .env.local 配置 KIE_API_KEY、DASHSCOPE_API_KEY 等，或在 Gateway 模型管理页绑定平台凭证");
   }
 
-  const platform = await ensurePlatformAdminKey(gwUser.id, credentialIds);
+  const platform = await ensurePlatformAdminKey(gwUser.id, mergedCredentialIds);
   const { updated: managedKeysUpdated } = await rebindManagedKeysToPlatformPool();
 
   let linkedPersonal = false;
@@ -247,7 +262,7 @@ export async function syncPlatformCredentialPoolForBookUser(
     if (personal) {
       await prisma.gatewayApiKeyCredential.deleteMany({ where: { apiKeyId: personal.id } });
       await prisma.gatewayApiKeyCredential.createMany({
-        data: credentialIds.map((credentialId) => ({ apiKeyId: personal.id, credentialId })),
+        data: mergedCredentialIds.map((credentialId) => ({ apiKeyId: personal.id, credentialId })),
         skipDuplicates: true,
       });
       const status = await getGatewayLinkStatusForUser(user.id);
@@ -262,7 +277,7 @@ export async function syncPlatformCredentialPoolForBookUser(
   return {
     bookUserId: user.id,
     email: user.email,
-    credentialCount: credentialIds.length,
+    credentialCount: mergedCredentialIds.length,
     platformAdminKeyId: platform.apiKeyId,
     managedKeysUpdated,
     linkedPersonal,

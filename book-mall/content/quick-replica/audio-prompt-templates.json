@@ -37,5 +37,49 @@
       "name": "译制风格",
       "content": "在清晰可懂的前提下调整音色质感，用于多语言版本或本地化配音预览。"
     }
+  ],
+  "create-sfx": [
+    {
+      "id": "whoosh",
+      "name": "Whoosh",
+      "content": "Fast cinematic whoosh transition with deep low-end sweep"
+    },
+    {
+      "id": "magic",
+      "name": "Magic",
+      "content": "Magical sparkle shimmer rising into a soft chime burst"
+    },
+    {
+      "id": "game",
+      "name": "Game",
+      "content": "Retro 8-bit coin pickup chime, short and bright"
+    },
+    {
+      "id": "booms",
+      "name": "Booms",
+      "content": "Deep cinematic boom impact with sub-bass rumble"
+    }
+  ],
+  "create-music": [
+    {
+      "id": "pop",
+      "name": "Pop",
+      "content": "Catchy pop song with bright acoustic guitar, handclaps, and an uplifting chorus melody."
+    },
+    {
+      "id": "lo-fi",
+      "name": "Lo-fi",
+      "content": "Mellow lo-fi hip hop beat with dusty vinyl crackle, soft Rhodes piano chords, and a lazy boom-bap drum pattern."
+    },
+    {
+      "id": "cinematic",
+      "name": "Cinematic",
+      "content": "Tense cinematic underscore with low strings, dark brass stabs, and an ominous percussion build."
+    },
+    {
+      "id": "electronic",
+      "name": "Electronic",
+      "content": "Upbeat electronic dance track with pulsing synth bass, shimmering arpeggios, and a driving four-on-the-floor beat."
+    }
   ]
 }

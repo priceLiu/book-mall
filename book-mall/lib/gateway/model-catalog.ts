@@ -19,6 +19,11 @@ import {
   MINIMAX_MUSIC_MODELS,
   MINIMAX_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
+import {
+  ELEVENLABS_SFX_MODELS,
+  ELEVENLABS_STS_MODELS,
+  ELEVENLABS_MUSIC_MODELS,
+} from "@/lib/gateway/elevenlabs-models";
 import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
@@ -91,6 +96,7 @@ const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   VOLCENGINE: "火山方舟 / 豆包",
   MINIMAX: "MiniMax",
   WORLDLABS: "World Labs",
+  ELEVENLABS: "ElevenLabs",
 };
 
 /** 与 tool-web/config/lab-video-models.json 保持同步 */
@@ -458,6 +464,38 @@ export function buildGatewayModelCatalog(
     ]),
   );
 
+  const elevenlabsModels = sortModels(
+    dedupeByKey([
+      ...ELEVENLABS_STS_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.label,
+        requestKind: "TTS" as const,
+        role: "TTS" as const,
+        description: m.subtitle,
+        products: ["QuickReplica"],
+        capabilities: [] as string[],
+      })),
+      ...ELEVENLABS_SFX_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.label,
+        requestKind: "OTHER" as const,
+        role: "TTS" as const,
+        description: m.subtitle,
+        products: ["QuickReplica"],
+        capabilities: [] as string[],
+      })),
+      ...ELEVENLABS_MUSIC_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.label,
+        requestKind: "MUSIC" as const,
+        role: "TTS" as const,
+        description: m.subtitle,
+        products: ["QuickReplica"],
+        capabilities: [] as string[],
+      })),
+    ]),
+  );
+
   const groups: GatewayCatalogGroup[] = (
     [
       ["KIE", kieModels],
@@ -467,6 +505,7 @@ export function buildGatewayModelCatalog(
       ["HUNYUAN", hunyuanModels],
       ["VOLCENGINE", volcengineModels],
       ["MINIMAX", minimaxModels],
+      ["ELEVENLABS", elevenlabsModels],
     ] as const
   ).map(([providerKind, models]) => ({
     providerKind,

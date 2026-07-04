@@ -75,6 +75,20 @@ export type QrWorkspaceDraft = {
   voiceStability?: number;
   voiceSimilarityBoost?: number;
   voiceStyleExaggeration?: number;
+  sfxLoop?: boolean;
+  sfxDurationAuto?: boolean;
+  sfxDurationSeconds?: number;
+  sfxPromptInfluence?: number;
+  musicClipMode?: "quick" | "full";
+  musicInstrumental?: boolean;
+  musicDurationAuto?: boolean;
+  musicDurationSeconds?: number;
+  musicBpmAuto?: boolean;
+  musicBpm?: number;
+  musicIntensityAuto?: boolean;
+  musicIntensity?: string;
+  musicKeyAuto?: boolean;
+  musicKey?: string;
   sourceAudioUrl?: string;
   cloneVoiceId?: string;
   languageBoost?: string;
@@ -245,7 +259,13 @@ export function defaultWorkspaceDraft(input: {
           : input.kind === "create-image" || input.kind === "create-character" || input.kind === "character-image"
             ? TEXT_TO_IMAGE_DEFAULT_MODEL_KEY
             : input.category === "audio"
-              ? "MiniMax/speech-2.8-hd"
+              ? input.kind === "voice-changer"
+                ? "Eleven/multilingual-sts-v2"
+                : input.kind === "create-sfx"
+                  ? "Eleven/sound-effects-v2"
+                  : input.kind === "create-music"
+                    ? "Eleven/music-v2"
+                    : "MiniMax/speech-2.8-hd"
               : input.kind === "create-world"
                 ? "marble-1.1"
                 : "lib-nano-pro",
@@ -261,7 +281,12 @@ export function defaultWorkspaceDraft(input: {
       input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "2K" : undefined,
     outputFormat:
       input.kind === "create-image" || isQrTextToImageKind(input.kind) ? "png" : undefined,
-    voiceId: input.category === "audio" ? "male-qn-qingse" : undefined,
+    voiceId:
+      input.category === "audio"
+        ? input.kind === "voice-changer"
+          ? "JBFqnCBsd6RMkjVDRZzb"
+          : "male-qn-qingse"
+        : undefined,
     audioStyleTag: input.category === "audio" ? "ad-teaser" : undefined,
     voiceSpeed: input.category === "audio" ? 1 : undefined,
     voiceVolume: input.category === "audio" ? 1 : undefined,
@@ -272,6 +297,20 @@ export function defaultWorkspaceDraft(input: {
     voiceStability: input.category === "audio" ? 0.5 : undefined,
     voiceSimilarityBoost: input.category === "audio" ? 0.75 : undefined,
     voiceStyleExaggeration: input.category === "audio" ? 0 : undefined,
+    sfxLoop: input.kind === "create-sfx" ? false : undefined,
+    sfxDurationAuto: input.kind === "create-sfx" ? true : undefined,
+    sfxDurationSeconds: input.kind === "create-sfx" ? 5 : undefined,
+    sfxPromptInfluence: input.kind === "create-sfx" ? 0.3 : undefined,
+    musicClipMode: input.kind === "create-music" ? "quick" : undefined,
+    musicInstrumental: input.kind === "create-music" ? false : undefined,
+    musicDurationAuto: input.kind === "create-music" ? true : undefined,
+    musicDurationSeconds: input.kind === "create-music" ? 180 : undefined,
+    musicBpmAuto: input.kind === "create-music" ? true : undefined,
+    musicBpm: input.kind === "create-music" ? 120 : undefined,
+    musicIntensityAuto: input.kind === "create-music" ? true : undefined,
+    musicIntensity: input.kind === "create-music" ? "medium" : undefined,
+    musicKeyAuto: input.kind === "create-music" ? true : undefined,
+    musicKey: input.kind === "create-music" ? "C major" : undefined,
     languageBoost: input.kind === "voice-clone" ? "auto" : undefined,
     needNoiseReduction: input.kind === "voice-clone" ? false : undefined,
     needVolumeNormalization: input.kind === "voice-clone" ? false : undefined,
@@ -289,7 +328,6 @@ export function defaultWorkspaceDraft(input: {
             neutral: 0,
           }
         : undefined,
-    musicMode: input.kind === "create-music" ? "generate" : undefined,
     characterOrientation: input.kind === "motion-sync" ? "video" : undefined,
     keepOriginalSound: input.kind === "motion-sync" ? true : undefined,
   };

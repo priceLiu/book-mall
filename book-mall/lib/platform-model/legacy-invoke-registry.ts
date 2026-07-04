@@ -9,6 +9,11 @@ import {
   MINIMAX_MUSIC_MODELS,
   MINIMAX_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
+import {
+  ELEVENLABS_SFX_MODELS,
+  ELEVENLABS_STS_MODELS,
+  ELEVENLABS_MUSIC_MODELS,
+} from "@/lib/gateway/elevenlabs-models";
 
 type CanonicalModelDef = {
   canonicalModelKey: string;
@@ -345,5 +350,47 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_CALL" as const,
     unitLabel: "元/次",
     routes: [{ vendor: "minimax", modelKey: m.modelKey, providerKind: "MINIMAX" as const }],
+  })),
+  ...ELEVENLABS_STS_MODELS.map((m, i) => ({
+    canonicalModelKey: m.modelKey,
+    displayName: m.label,
+    description: m.subtitle,
+    mediaKind: "TEXT_LLM" as const,
+    role: "LLM" as const,
+    requestKind: "TTS" as const,
+    appTags: ["tool"],
+    sortOrder: 120 + i,
+    primaryVendor: "elevenlabs",
+    billingKind: "PER_CALL" as const,
+    unitLabel: "元/次",
+    routes: [{ vendor: "elevenlabs", modelKey: m.modelKey, providerKind: "ELEVENLABS" as const }],
+  })),
+  ...ELEVENLABS_SFX_MODELS.map((m, i) => ({
+    canonicalModelKey: m.modelKey,
+    displayName: m.label,
+    description: m.subtitle,
+    mediaKind: "TEXT_LLM" as const,
+    role: "LLM" as const,
+    requestKind: "OTHER" as const,
+    appTags: ["tool"],
+    sortOrder: 125 + i,
+    primaryVendor: "elevenlabs",
+    billingKind: "PER_CALL" as const,
+    unitLabel: "元/次",
+    routes: [{ vendor: "elevenlabs", modelKey: m.modelKey, providerKind: "ELEVENLABS" as const }],
+  })),
+  ...ELEVENLABS_MUSIC_MODELS.map((m, i) => ({
+    canonicalModelKey: m.modelKey,
+    displayName: m.label,
+    description: m.subtitle,
+    mediaKind: "TEXT_LLM" as const,
+    role: "LLM" as const,
+    requestKind: "MUSIC" as const,
+    appTags: ["tool"],
+    sortOrder: 128 + i,
+    primaryVendor: "elevenlabs",
+    billingKind: "PER_CALL" as const,
+    unitLabel: "元/次",
+    routes: [{ vendor: "elevenlabs", modelKey: m.modelKey, providerKind: "ELEVENLABS" as const }],
   })),
 ];

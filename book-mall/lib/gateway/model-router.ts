@@ -4,6 +4,11 @@ import {
   isMinimaxMusicModelKey,
   isMinimaxSpeechModelKey,
 } from "@/lib/gateway/minimax-speech-models";
+import {
+  isElevenLabsSfxModelKey,
+  isElevenLabsStsModelKey,
+  isElevenLabsMusicModelKey,
+} from "@/lib/gateway/elevenlabs-models";
 import { isWorldlabsMarbleModelKey } from "@/lib/gateway/worldlabs-marble-models";
 
 import {
@@ -240,6 +245,22 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "MINIMAX", requestKind: "MUSIC" };
   }
 
+  if (isElevenLabsStsModelKey(raw) || isElevenLabsStsModelKey(m)) {
+    return { providerKind: "ELEVENLABS", requestKind: "TTS" };
+  }
+
+  if (isElevenLabsSfxModelKey(raw) || isElevenLabsSfxModelKey(m)) {
+    return { providerKind: "ELEVENLABS", requestKind: "OTHER" };
+  }
+
+  if (isElevenLabsMusicModelKey(raw) || isElevenLabsMusicModelKey(m)) {
+    return { providerKind: "ELEVENLABS", requestKind: "MUSIC" };
+  }
+
+  if (m.startsWith("eleven/")) {
+    return { providerKind: "ELEVENLABS", requestKind: "TTS" };
+  }
+
   if (isWorldlabsMarbleModelKey(raw) || isWorldlabsMarbleModelKey(m)) {
     return { providerKind: "WORLDLABS", requestKind: "OTHER" };
   }
@@ -267,6 +288,8 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       return "https://api.minimaxi.com";
     case "WORLDLABS":
       return "https://api.worldlabs.ai";
+    case "ELEVENLABS":
+      return "https://api.elevenlabs.io";
     default:
       return (
         process.env.KIE_API_BASE?.trim()?.replace(/\/$/, "") ||

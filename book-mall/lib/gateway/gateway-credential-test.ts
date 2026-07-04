@@ -72,6 +72,18 @@ export async function testGatewayCredentialConnection(row: {
   baseUrl: string | null;
 }): Promise<{ ok: boolean; message?: string }> {
   try {
+    if (row.providerKind === "ELEVENLABS") {
+      const apiKey = decryptApiKey(row.apiKeyEncrypted);
+      const base = (row.baseUrl?.trim() || defaultBaseUrl("ELEVENLABS")).replace(/\/$/, "");
+      const r = await fetch(`${base}/v1/user`, {
+        headers: { "xi-api-key": apiKey },
+        cache: "no-store",
+      });
+      if (r.ok) return { ok: true };
+      const text = await r.text().catch(() => "");
+      return { ok: false, message: text.slice(0, 200) || `HTTP ${r.status}` };
+    }
+
     const config = buildTestConfig(row);
     const gateway = getGatewayForKind(config.kind, config);
     return await gateway.testConnection();

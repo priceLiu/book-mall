@@ -845,7 +845,10 @@ export function QrAdminPanel({
                       />
                     </label>
                     {form.category === "audio" &&
-                    (form.kind === "create-voiceover" || form.kind === "voice-changer") ? (
+                    (form.kind === "create-voiceover" ||
+                      form.kind === "voice-changer" ||
+                      form.kind === "create-sfx" ||
+                      form.kind === "create-music") ? (
                       <QrAdminPromptTemplatesEditor
                         kind={form.kind}
                         disabled={saving || uploading}

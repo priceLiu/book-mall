@@ -65,6 +65,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山",
   MINIMAX: "MiniMax",
+  ELEVENLABS: "ElevenLabs",
 };
 
 /** 日志页厂商筛选 · 展示顺序 */
@@ -76,6 +77,8 @@ export const LOG_PROVIDER_KIND_ORDER = [
   "HUNYUAN",
   "VOLCENGINE",
   "MINIMAX",
+  "ELEVENLABS",
+  "WORLDLABS",
 ] as const;
 
 export function sortLogProviderKinds(kinds: Iterable<string>): string[] {

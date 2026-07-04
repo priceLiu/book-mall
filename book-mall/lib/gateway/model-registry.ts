@@ -16,6 +16,11 @@ import {
 } from "@/lib/platform-model/canonical-registry";
 import { prisma } from "@/lib/prisma";
 import { WORLDLABS_MARBLE_MODELS } from "@/lib/gateway/worldlabs-marble-models";
+import {
+  ELEVENLABS_SFX_MODELS,
+  ELEVENLABS_STS_MODELS,
+  ELEVENLABS_MUSIC_MODELS,
+} from "@/lib/gateway/elevenlabs-models";
 
 export class UnregisteredGatewayModelError extends Error {
   readonly modelKey: string;
@@ -376,6 +381,41 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     );
   }
 
+  if (!byProvider.has("ELEVENLABS")) {
+    byProvider.set(
+      "ELEVENLABS",
+      [
+        ...ELEVENLABS_STS_MODELS.map((m) => ({
+          modelKey: m.modelKey,
+          displayName: m.label,
+          requestKind: "TTS" as const,
+          role: "LLM" as const,
+          description: m.subtitle,
+          canonicalModelKey: m.modelKey,
+          credentialBound: isGatewayProviderBound(boundKinds, "ELEVENLABS"),
+        })),
+        ...ELEVENLABS_SFX_MODELS.map((m) => ({
+          modelKey: m.modelKey,
+          displayName: m.label,
+          requestKind: "OTHER" as const,
+          role: "LLM" as const,
+          description: m.subtitle,
+          canonicalModelKey: m.modelKey,
+          credentialBound: isGatewayProviderBound(boundKinds, "ELEVENLABS"),
+        })),
+        ...ELEVENLABS_MUSIC_MODELS.map((m) => ({
+          modelKey: m.modelKey,
+          displayName: m.label,
+          requestKind: "MUSIC" as const,
+          role: "LLM" as const,
+          description: m.subtitle,
+          canonicalModelKey: m.modelKey,
+          credentialBound: isGatewayProviderBound(boundKinds, "ELEVENLABS"),
+        })),
+      ],
+    );
+  }
+
   const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
     KIE: "KIE",
     DEEPSEEK: "DeepSeek",
@@ -385,6 +425,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     VOLCENGINE: "火山方舟",
     MINIMAX: "MiniMax",
     WORLDLABS: "World Labs",
+    ELEVENLABS: "ElevenLabs",
   };
 
   type CatalogModel = Omit<GroupModel, "canonicalModelKey">;

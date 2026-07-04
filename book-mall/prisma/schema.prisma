@@ -2186,6 +2186,7 @@ enum GatewayProviderKind {
   VOLCENGINE
   MINIMAX
   WORLDLABS
+  ELEVENLABS
 }
 
 enum GatewayRequestKind {

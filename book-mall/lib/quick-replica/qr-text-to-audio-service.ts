@@ -7,10 +7,20 @@ import {
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
 import {
-  MINIMAX_DEFAULT_MUSIC_MODEL_KEY,
+  ELEVENLABS_DEFAULT_MUSIC_MODEL_KEY,
+  ELEVENLABS_DEFAULT_SFX_MODEL_KEY,
+  ELEVENLABS_DEFAULT_STS_MODEL_KEY,
+  ELEVENLABS_DEFAULT_VOICE_ID,
+  isElevenLabsStsModelKey,
+} from "@/lib/gateway/elevenlabs-models";
+import {
+  forwardElevenLabsListVoices,
+  forwardElevenLabsMusicCompose,
+  forwardElevenLabsSoundEffects,
+  forwardElevenLabsStsConvert,
+} from "@/lib/gateway/elevenlabs-proxy";
+import {
   MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
-  isMinimaxMusicModelKey,
-  resolveMinimaxUpstreamSpeechModel,
 } from "@/lib/gateway/minimax-speech-models";
 import {
   forwardMinimaxFileUpload,
@@ -30,8 +40,10 @@ import {
 } from "@/lib/quick-replica/qr-audio-catalog";
 import {
   normalizeVoiceControls,
+  validateSfxDraft,
   validateTextToAudioDraft,
   validateVoiceChangerDraft,
+  validateMusicDraft,
 } from "@/lib/quick-replica/qr-text-to-audio-models";
 import {
   generateQrCloneVoiceId,
@@ -40,9 +52,21 @@ import {
   validateVoiceCloneDraft,
 } from "@/lib/quick-replica/qr-voice-clone-models";
 import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
-import { forwardMinimaxMusicGenerate } from "@/lib/gateway/minimax-music-proxy";
 
 const CLIENT_SOURCE = "QUICK_REPLICA" as const;
+
+async function requireElevenLabsAuth(userId: string) {
+  await assertGatewayApiKeyLinkedForUser(userId);
+  const auth = await resolveGatewayAuthForBookUser(userId);
+  if (!auth) {
+    throw new GatewayRequiredError("请先在 Book 个人中心关联 Gateway API Key");
+  }
+  const credentialId = pickCredentialForKind(auth.credentials, "ELEVENLABS");
+  if (!credentialId) {
+    throw new GatewayRequiredError("Gateway Key 未绑定 ElevenLabs 凭证");
+  }
+  return { auth, credentialId };
+}
 
 async function requireMinimaxAuth(userId: string) {
   await assertGatewayApiKeyLinkedForUser(userId);
@@ -210,27 +234,201 @@ export async function qrCreateMinimaxVoiceConvertJob(
   return { logId: log.id, taskId: log.id, providerKind: "MINIMAX" };
 }
 
-export async function qrCreateMinimaxMusicJob(
+export async function qrListElevenLabsVoices(userId: string) {
+  const { credentialId } = await requireElevenLabsAuth(userId);
+  const result = await forwardElevenLabsListVoices({ credentialId });
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error("ElevenLabs 音色列表加载失败");
+  }
+  return result.voices.map((v) => ({
+    voiceId: v.voice_id,
+    label: v.name,
+    subtitle: v.labels?.language ?? v.labels?.accent ?? "ElevenLabs",
+    language: v.labels?.language,
+    previewUrl: v.preview_url ?? undefined,
+    avatarLetter: v.name.charAt(0).toUpperCase() || "V",
+    tags: ["elevenlabs"],
+  }));
+}
+
+export async function qrCreateElevenLabsStsJob(
   userId: string,
   draft: QrWorkspaceDraft,
 ): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind | string }> {
-  const prompt = draft.prompt.trim();
-  if (!prompt) throw new Error("请填写音乐描述或歌词");
+  const validationError = validateVoiceChangerDraft({
+    modelKey: draft.modelKey,
+    voiceId: draft.voiceId,
+    sourceAudioUrl: draft.sourceAudioUrl ?? draft.referenceAudioUrl,
+  });
+  if (validationError) throw new Error(validationError);
 
-  const { auth, credentialId } = await requireMinimaxAuth(userId);
-  const modelKey =
-    draft.modelKey.trim() ||
-    (isMinimaxMusicModelKey(draft.modelKey) ? draft.modelKey : MINIMAX_DEFAULT_MUSIC_MODEL_KEY);
-
-  routeGatewayModel(modelKey);
+  const { auth, credentialId } = await requireElevenLabsAuth(userId);
+  const modelKey = draft.modelKey.trim() || ELEVENLABS_DEFAULT_STS_MODEL_KEY;
+  const controls = normalizeVoiceControls(draft);
+  const sourceAudioUrl = (draft.sourceAudioUrl ?? draft.referenceAudioUrl ?? "").trim();
+  const voiceId = draft.voiceId?.trim() || ELEVENLABS_DEFAULT_VOICE_ID;
 
   const log = await createRequestLog({
     userId: auth.userId,
     apiKeyId: auth.id,
     credentialId,
     model: modelKey,
-    endpoint: "/v1/music_generation",
-    providerKind: "MINIMAX",
+    endpoint: "/v1/speech-to-speech",
+    providerKind: "ELEVENLABS",
+    requestKind: "TTS",
+    clientSource: CLIENT_SOURCE,
+    clientPage: "quick-replica/voice-changer",
+    actorBookUserId: userId,
+    inputSummary: { qrVoiceChanger: { draft } },
+  });
+
+  const result = await forwardElevenLabsStsConvert({
+    credentialId,
+    modelKey,
+    voiceId,
+    sourceAudioUrl,
+    voiceSettings: {
+      stability: controls.voiceStability,
+      similarity_boost: controls.voiceSimilarityBoost,
+      style: controls.voiceStyleExaggeration,
+      use_speaker_boost: true,
+    },
+  });
+
+  const ok = result.status >= 200 && result.status < 300;
+  if (!ok) {
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: result.durationMs,
+      failMessage: result.buffer.toString("utf8").slice(0, 500),
+      model: modelKey,
+    });
+    throw new Error("ElevenLabs 变声失败");
+  }
+
+  const audioUrl = await uploadAudioOutput({
+    userId,
+    buffer: result.buffer,
+    ext: result.ext,
+  });
+
+  await finalizeRequestLog(log.id, {
+    status: "SUCCEEDED",
+    durationMs: result.durationMs,
+    resultSummary: { audio_url: audioUrl, url: audioUrl },
+    model: modelKey,
+  });
+
+  return { logId: log.id, taskId: log.id, providerKind: "ELEVENLABS" };
+}
+
+export async function qrCreateElevenLabsSfxJob(
+  userId: string,
+  draft: QrWorkspaceDraft,
+): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind | string }> {
+  const validationError = validateSfxDraft({ prompt: draft.prompt });
+  if (validationError) throw new Error(validationError);
+
+  const { auth, credentialId } = await requireElevenLabsAuth(userId);
+  const modelKey = ELEVENLABS_DEFAULT_SFX_MODEL_KEY;
+  const durationAuto = draft.sfxDurationAuto ?? true;
+  const durationSeconds = durationAuto
+    ? null
+    : Math.min(30, Math.max(0.5, draft.sfxDurationSeconds ?? 5));
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model: modelKey,
+    endpoint: "/v1/sound-generation",
+    providerKind: "ELEVENLABS",
+    requestKind: "OTHER",
+    clientSource: CLIENT_SOURCE,
+    clientPage: "quick-replica/create-sfx",
+    actorBookUserId: userId,
+    inputSummary: { qrSfx: { draft } },
+  });
+
+  const result = await forwardElevenLabsSoundEffects({
+    credentialId,
+    text: draft.prompt.trim(),
+    durationSeconds,
+    promptInfluence: draft.sfxPromptInfluence ?? 0.3,
+    loop: Boolean(draft.sfxLoop),
+  });
+
+  const ok = result.status >= 200 && result.status < 300;
+  if (!ok) {
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: result.durationMs,
+      failMessage: result.buffer.toString("utf8").slice(0, 500),
+      model: modelKey,
+    });
+    throw new Error("ElevenLabs 音效生成失败");
+  }
+
+  const audioUrl = await uploadAudioOutput({
+    userId,
+    buffer: result.buffer,
+    ext: result.ext,
+  });
+
+  await finalizeRequestLog(log.id, {
+    status: "SUCCEEDED",
+    durationMs: result.durationMs,
+    resultSummary: { audio_url: audioUrl, url: audioUrl },
+    model: modelKey,
+  });
+
+  return { logId: log.id, taskId: log.id, providerKind: "ELEVENLABS" };
+}
+
+function buildElevenMusicPrompt(draft: QrWorkspaceDraft): string {
+  let prompt = draft.prompt.trim();
+  const extras: string[] = [];
+  if (!draft.musicBpmAuto && draft.musicBpm != null) {
+    extras.push(`BPM: ${Math.round(draft.musicBpm)}`);
+  }
+  if (!draft.musicKeyAuto && draft.musicKey?.trim()) {
+    extras.push(`Key: ${draft.musicKey.trim()}`);
+  }
+  if (!draft.musicIntensityAuto && draft.musicIntensity?.trim()) {
+    extras.push(`Intensity: ${draft.musicIntensity.trim()}`);
+  }
+  if (extras.length > 0) {
+    prompt = `${prompt}\n${extras.join(". ")}.`;
+  }
+  return prompt;
+}
+
+function resolveElevenMusicLengthMs(draft: QrWorkspaceDraft): number | null {
+  if ((draft.musicClipMode ?? "quick") === "quick") return 30_000;
+  if (draft.musicDurationAuto ?? true) return null;
+  const sec = draft.musicDurationSeconds ?? draft.duration ?? 180;
+  return Math.min(600, Math.max(3, sec)) * 1000;
+}
+
+export async function qrCreateElevenLabsMusicJob(
+  userId: string,
+  draft: QrWorkspaceDraft,
+): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind | string }> {
+  const validationError = validateMusicDraft({ prompt: draft.prompt });
+  if (validationError) throw new Error(validationError);
+
+  const { auth, credentialId } = await requireElevenLabsAuth(userId);
+  const modelKey = ELEVENLABS_DEFAULT_MUSIC_MODEL_KEY;
+  const prompt = buildElevenMusicPrompt(draft);
+  const musicLengthMs = resolveElevenMusicLengthMs(draft);
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model: modelKey,
+    endpoint: "/v1/music",
+    providerKind: "ELEVENLABS",
     requestKind: "MUSIC",
     clientSource: CLIENT_SOURCE,
     clientPage: "quick-replica/create-music",
@@ -238,45 +436,39 @@ export async function qrCreateMinimaxMusicJob(
     inputSummary: { qrCreateMusic: { draft } },
   });
 
-  const result = await forwardMinimaxMusicGenerate({
+  const result = await forwardElevenLabsMusicCompose({
     credentialId,
-    input: {
-      modelKey,
-      prompt,
-      lyrics: draft.musicMode === "cover" ? draft.prompt : undefined,
-      durationSeconds: draft.duration,
-    },
+    modelKey,
+    prompt,
+    musicLengthMs,
+    forceInstrumental: Boolean(draft.musicInstrumental),
   });
 
-  if (!result.buffer?.length) {
+  const ok = result.status >= 200 && result.status < 300;
+  if (!ok) {
     await finalizeRequestLog(log.id, {
-      status: result.taskId ? "RUNNING" : "FAILED",
+      status: "FAILED",
       durationMs: result.durationMs,
-      externalTaskId: result.taskId,
-      failMessage: result.taskId ? undefined : "MiniMax 音乐生成失败",
+      failMessage: result.buffer.toString("utf8").slice(0, 500),
       model: modelKey,
     });
-    if (result.taskId) {
-      return { logId: log.id, taskId: result.taskId, providerKind: "MINIMAX" };
-    }
-    throw new Error("MiniMax 音乐生成失败");
+    throw new Error("ElevenLabs 音乐生成失败");
   }
 
   const audioUrl = await uploadAudioOutput({
     userId,
     buffer: result.buffer,
-    ext: "mp3",
+    ext: result.ext,
   });
 
   await finalizeRequestLog(log.id, {
     status: "SUCCEEDED",
     durationMs: result.durationMs,
-    externalTaskId: result.taskId,
     resultSummary: { audio_url: audioUrl, url: audioUrl },
     model: modelKey,
   });
 
-  return { logId: log.id, taskId: result.taskId ?? log.id, providerKind: "MINIMAX" };
+  return { logId: log.id, taskId: log.id, providerKind: "ELEVENLABS" };
 }
 
 async function downloadRemoteBuffer(url: string): Promise<Buffer> {
@@ -454,10 +646,16 @@ export async function qrCreateTextToAudioJob(
     return qrCreateMinimaxVoiceCloneJob(userId, draft);
   }
   if (draft.kind === "voice-changer") {
+    if (isElevenLabsStsModelKey(draft.modelKey)) {
+      return qrCreateElevenLabsStsJob(userId, draft);
+    }
     return qrCreateMinimaxVoiceConvertJob(userId, draft);
   }
+  if (draft.kind === "create-sfx") {
+    return qrCreateElevenLabsSfxJob(userId, draft);
+  }
   if (draft.kind === "create-music") {
-    return qrCreateMinimaxMusicJob(userId, draft);
+    return qrCreateElevenLabsMusicJob(userId, draft);
   }
   return qrCreateMinimaxTtsJob(userId, draft);
 }

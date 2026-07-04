@@ -9,14 +9,23 @@ export type QrAudioPromptTemplateDef = {
   content: string;
 };
 
-export type QrAudioPromptTemplateKind = "create-voiceover" | "voice-changer";
+export type QrAudioPromptTemplateKind =
+  | "create-voiceover"
+  | "voice-changer"
+  | "create-sfx"
+  | "create-music";
 
 export type QrAudioPromptTemplateLibrary = Record<
   QrAudioPromptTemplateKind,
   QrAudioPromptTemplateDef[]
 >;
 
-const TEMPLATE_KINDS: QrAudioPromptTemplateKind[] = ["create-voiceover", "voice-changer"];
+const TEMPLATE_KINDS: QrAudioPromptTemplateKind[] = [
+  "create-voiceover",
+  "voice-changer",
+  "create-sfx",
+  "create-music",
+];
 
 function templatesFilePath(): string {
   return path.join(process.cwd(), "content/quick-replica/audio-prompt-templates.json");
@@ -36,6 +45,8 @@ function normalizeLibrary(raw: unknown): QrAudioPromptTemplateLibrary {
   const empty: QrAudioPromptTemplateLibrary = {
     "create-voiceover": [],
     "voice-changer": [],
+    "create-sfx": [],
+    "create-music": [],
   };
   if (!raw || typeof raw !== "object") return empty;
   const root = raw as Record<string, unknown>;
@@ -52,11 +63,23 @@ function normalizeLibrary(raw: unknown): QrAudioPromptTemplateLibrary {
 export function readQrAudioPromptTemplates(): QrAudioPromptTemplateLibrary {
   try {
     const file = templatesFilePath();
-    if (!fs.existsSync(file)) return { "create-voiceover": [], "voice-changer": [] };
+    if (!fs.existsSync(file)) {
+      return {
+        "create-voiceover": [],
+        "voice-changer": [],
+        "create-sfx": [],
+        "create-music": [],
+      };
+    }
     const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
     return normalizeLibrary(parsed);
   } catch {
-    return { "create-voiceover": [], "voice-changer": [] };
+    return {
+      "create-voiceover": [],
+      "voice-changer": [],
+      "create-sfx": [],
+      "create-music": [],
+    };
   }
 }
 
@@ -71,7 +94,12 @@ export function getQrAudioPromptTemplatesForKind(
   kind: string,
 ): QrAudioPromptTemplateDef[] {
   const lib = readQrAudioPromptTemplates();
-  if (kind === "create-voiceover" || kind === "voice-changer") {
+  if (
+    kind === "create-voiceover" ||
+    kind === "voice-changer" ||
+    kind === "create-sfx" ||
+    kind === "create-music"
+  ) {
     return lib[kind];
   }
   return [];

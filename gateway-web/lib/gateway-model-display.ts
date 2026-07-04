@@ -6,6 +6,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山方舟",
   MINIMAX: "MiniMax",
+  ELEVENLABS: "ElevenLabs",
   WORLDLABS: "World Labs",
 };
 

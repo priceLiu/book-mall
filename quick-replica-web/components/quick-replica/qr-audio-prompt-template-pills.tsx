@@ -7,7 +7,7 @@ import { findPromptTemplate, pickNextPromptTemplate } from "@/lib/qr-audio-promp
 
 type Props = {
   catalog: QrAudioCatalog;
-  kind: "create-voiceover" | "voice-changer";
+  kind: "create-voiceover" | "voice-changer" | "create-sfx" | "create-music";
   activeTemplateId?: string;
   busy?: boolean;
   onApply: (template: QrAudioPromptTemplateDef) => void;
@@ -21,6 +21,20 @@ function templatesForKind(
   if (fromLib?.length) return fromLib;
   if (kind === "create-voiceover") {
     return catalog.styleTags.map((tag) => ({
+      id: tag.id,
+      name: tag.label,
+      content: tag.content ?? "",
+    }));
+  }
+  if (kind === "create-sfx") {
+    return (catalog.sfxStyleTags ?? []).map((tag) => ({
+      id: tag.id,
+      name: tag.label,
+      content: tag.content ?? "",
+    }));
+  }
+  if (kind === "create-music") {
+    return (catalog.musicStyleTags ?? []).map((tag) => ({
       id: tag.id,
       name: tag.label,
       content: tag.content ?? "",
@@ -87,7 +101,7 @@ export function QrAudioPromptTemplatePills({
 
 export function resolveActivePromptTemplateId(
   catalog: QrAudioCatalog,
-  kind: "create-voiceover" | "voice-changer",
+  kind: "create-voiceover" | "voice-changer" | "create-sfx" | "create-music",
   prompt: string,
   styleTag?: string,
 ): string | undefined {

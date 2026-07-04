@@ -10,11 +10,7 @@ import {
   QrAudioVoiceControlSlider,
   QrAudioVoicePickerButton,
 } from "@/components/quick-replica/qr-audio-form-parts";
-import {
-  QrAudioPromptTemplatePills,
-  resolveActivePromptTemplateId,
-} from "@/components/quick-replica/qr-audio-prompt-template-pills";
-import { useQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
+import { useQrAudioCatalog, isElevenLabsStsModelKey } from "@/lib/qr-audio-catalog-client";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 
@@ -43,7 +39,7 @@ async function uploadAudio(file: File): Promise<string> {
   return data.url;
 }
 
-/** 变声器工作区（布局对齐制作旁白） */
+/** 变声器 · ElevenLabs STS */
 export function QrVoiceChangerForm({
   draft,
   onDraftChange,
@@ -69,11 +65,15 @@ export function QrVoiceChangerForm({
   const similarity = draft.voiceSimilarityBoost ?? catalog.defaults.voiceSimilarityBoost;
   const exaggeration = draft.voiceStyleExaggeration ?? catalog.defaults.voiceStyleExaggeration;
   const sourceUrl = draft.sourceAudioUrl ?? draft.referenceAudioUrl ?? "";
+  const vcModels = catalog.voiceChangerModels?.length
+    ? catalog.voiceChangerModels
+    : catalog.models.filter((m) => m.provider === "elevenlabs");
+  const showElevenControls = isElevenLabsStsModelKey(draft.modelKey);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <QrAudioModelPickerButton
-        catalog={catalog}
+        catalog={{ ...catalog, models: vcModels }}
         modelKey={draft.modelKey}
         busy={busy}
         onOpen={() => setModelSheetOpen(true)}
@@ -149,79 +149,65 @@ export function QrVoiceChangerForm({
         onOpenGallery={onOpenVoiceGallery ?? (() => undefined)}
       />
 
-      {(catalog.promptTemplates?.["voice-changer"]?.length ?? 0) > 0 ? (
-        <section className="qr-card p-4">
-          <p className="mb-2 text-sm font-medium text-[var(--qr-text-primary)]">变声说明</p>
-          <textarea
-            className="qr-input qr-textarea-resizable mb-2 min-h-[96px] w-full"
-            value={draft.prompt}
+      {showElevenControls ? (
+        <section className="qr-card space-y-3 p-4">
+          <QrAudioVoiceControlHeading />
+          <QrAudioVoiceControlSlider
+            label="Stability"
+            value={stability}
+            min={0}
+            max={1}
+            step={0.01}
+            leftLabel="More variable"
+            rightLabel="More stable"
             disabled={busy}
-            placeholder="可选：记录变声用途或场景说明…"
-            onChange={(e) => onDraftChange({ ...draft, prompt: e.target.value })}
+            onChange={(voiceStability) => onDraftChange({ ...draft, voiceStability })}
           />
-          <QrAudioPromptTemplatePills
-            catalog={catalog}
-            kind="voice-changer"
-            activeTemplateId={resolveActivePromptTemplateId(
-              catalog,
-              "voice-changer",
-              draft.prompt,
-            )}
-            busy={busy}
-            onApply={(tpl) => onDraftChange({ ...draft, prompt: tpl.content })}
+          <QrAudioVoiceControlSlider
+            label="Similarity Boost"
+            value={similarity}
+            min={0}
+            max={1}
+            step={0.01}
+            leftLabel="Low"
+            rightLabel="High"
+            disabled={busy}
+            onChange={(voiceSimilarityBoost) => onDraftChange({ ...draft, voiceSimilarityBoost })}
+          />
+          <QrAudioVoiceControlSlider
+            label="Style Exaggeration"
+            value={exaggeration}
+            min={0}
+            max={1}
+            step={0.01}
+            leftLabel="None"
+            rightLabel="Exaggerated"
+            disabled={busy}
+            onChange={(voiceStyleExaggeration) =>
+              onDraftChange({ ...draft, voiceStyleExaggeration })
+            }
           />
         </section>
       ) : null}
 
-      <section className="space-y-3">
-        <QrAudioVoiceControlHeading />
-        <QrAudioVoiceControlSlider
-          label="Stability"
-          value={stability}
-          min={0}
-          max={1}
-          step={0.01}
-          leftLabel="Variable"
-          rightLabel="Stable"
-          disabled={busy}
-          onChange={(voiceStability) => onDraftChange({ ...draft, voiceStability })}
-        />
-        <QrAudioVoiceControlSlider
-          label="Similarity Boost"
-          value={similarity}
-          min={0}
-          max={1}
-          step={0.01}
-          leftLabel="Low"
-          rightLabel="High"
-          disabled={busy}
-          onChange={(voiceSimilarityBoost) => onDraftChange({ ...draft, voiceSimilarityBoost })}
-        />
-        <QrAudioVoiceControlSlider
-          label="Style Exaggeration"
-          value={exaggeration}
-          min={0}
-          max={1}
-          step={0.01}
-          leftLabel="None"
-          rightLabel="Exaggerated"
-          disabled={busy}
-          onChange={(voiceStyleExaggeration) =>
-            onDraftChange({ ...draft, voiceStyleExaggeration })
-          }
-        />
-      </section>
-
       {modelSheetOpen ? (
         <QrAudioOptionSheet
           title="Audio model"
-          options={catalog.models.map((m) => ({
+          options={vcModels.map((m) => ({
             value: m.modelKey,
             label: m.label,
             hint: m.subtitle,
           }))}
           value={draft.modelKey}
-          onSelect={(modelKey) => onDraftChange({ ...draft, modelKey })}
+          onSelect={(modelKey) =>
+            onDraftChange({
+              ...draft,
+              modelKey,
+              voiceId: isElevenLabsStsModelKey(modelKey)
+                ? catalog.defaults.elevenVoiceId ?? draft.voiceId
+                : draft.voiceId,
+            })
+          }
           onClose={() => setModelSheetOpen(false)}
         />
       ) : null}

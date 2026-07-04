@@ -90,6 +90,11 @@ export function QrAudioRightPanel({
         <QrVoiceGallery
           selectedVoiceId={draft.voiceId}
           focusSelected={voiceGalleryFocus}
+          voiceProvider={
+            draft.kind === "voice-changer" && draft.modelKey.startsWith("Eleven/")
+              ? "elevenlabs"
+              : "minimax"
+          }
           onSelectVoice={handleSelectVoice}
         />
       )}
