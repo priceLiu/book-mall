@@ -2,11 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  distributeToColumns,
-  MasonryTemplateCard,
-  useMasonryColumnCount,
-} from "@/components/quick-replica/qr-template-gallery";
+import { useMasonryColumnCount } from "@/components/quick-replica/qr-template-gallery";
+import { QrWorldGalleryCard } from "@/components/quick-replica/qr-world-gallery-card";
 import { QrWorldPromptOmnibox } from "@/components/quick-replica/qr-world-prompt-omnibox";
 import { QrWorldViewer } from "@/components/quick-replica/qr-world-viewer";
 import { QrMasonryGallerySkeleton } from "@/components/quick-replica/qr-panel-skeletons";
@@ -61,10 +58,15 @@ export function QrWorldBrowsePanel({
   }, [activeTab, templates, initialCount]);
 
   const visibleTemplates = filtered.slice(0, visibleCount);
-  const columns = useMemo(
-    () => distributeToColumns(visibleTemplates, columnCount),
-    [visibleTemplates, columnCount],
-  );
+
+  const columnClass =
+    columnCount >= 5
+      ? "columns-2 sm:columns-3 lg:columns-4 xl:columns-5"
+      : columnCount >= 4
+        ? "columns-2 sm:columns-3 lg:columns-4"
+        : columnCount >= 3
+          ? "columns-2 md:columns-3"
+          : "columns-2";
 
   const { ref: loadMoreRef, visible: loadMoreVisible } =
     useIntersectionVisible<HTMLDivElement>("480px 0px");
@@ -80,8 +82,7 @@ export function QrWorldBrowsePanel({
         <QrWorldViewer
           template={viewingTemplate}
           onClose={() => setViewingTemplate(null)}
-          onLoadPrompt={(t) => {
-            setViewingTemplate(null);
+          onEditPrompt={(t) => {
             onApplyTemplate(t);
           }}
           onToast={onToast}
@@ -96,6 +97,7 @@ export function QrWorldBrowsePanel({
           generating={generating}
           presetTemplates={templates}
           onToast={onToast}
+          overlayZIndex={viewingTemplate ? 112 : 60}
           onGenerate={() => onGenerate({ ...draft, kind: "create-world", category: "world" })}
         />
 
@@ -135,25 +137,15 @@ export function QrWorldBrowsePanel({
         ) : (
           <>
             <div
-              className="grid items-start gap-4"
-              style={{
-                gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-              }}
+              className={`${columnClass}`}
+              style={{ columnGap: "1rem" }}
             >
-              {columns.map((col, colIndex) => (
-                <div
-                  key={`col-${colIndex}`}
-                  className="grid gap-4"
-                  style={{ gridTemplateColumns: "minmax(0, 1fr)" }}
-                >
-                  {col.map((template) => (
-                    <MasonryTemplateCard
-                      key={template.id}
-                      template={template}
-                      hideRecreateOnHover
-                      onSelect={() => setViewingTemplate(template)}
-                    />
-                  ))}
+              {visibleTemplates.map((template) => (
+                <div key={template.id} className="mb-4 break-inside-avoid">
+                  <QrWorldGalleryCard
+                    template={template}
+                    onSelect={() => setViewingTemplate(template)}
+                  />
                 </div>
               ))}
             </div>

@@ -90,6 +90,7 @@ const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山方舟 / 豆包",
   MINIMAX: "MiniMax",
+  WORLDLABS: "World Labs",
 };
 
 /** 与 tool-web/config/lab-video-models.json 保持同步 */

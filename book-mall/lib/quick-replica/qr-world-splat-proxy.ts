@@ -5,6 +5,7 @@ import {
   isAllowedWorldSplatUpstreamUrl,
   listWorldSplatUrls,
 } from "@/lib/gateway/worldlabs-proxy";
+import { findBuiltinWorldAssetEntry } from "@/lib/quick-replica/builtin-world-gallery-assets";
 import { requireWorldlabsAuth } from "@/lib/quick-replica/qr-world-service";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -25,7 +26,29 @@ export function rememberWorldSplatUrls(userId: string, worldId: string, urls: st
   });
 }
 
+function normalizeSplatUrl(url: string): string {
+  return url.trim();
+}
+
+function isUrlAllowed(allowed: Set<string>, upstream: string): boolean {
+  const target = normalizeSplatUrl(upstream);
+  if (allowed.has(target)) return true;
+  for (const item of allowed) {
+    if (normalizeSplatUrl(item) === target) return true;
+  }
+  return false;
+}
+
 async function getAllowedWorldSplatUrls(userId: string, worldId: string): Promise<Set<string>> {
+  try {
+    const local = findBuiltinWorldAssetEntry(worldId);
+    if (local && local.splatUrls.length) {
+      return new Set(local.splatUrls.map(normalizeSplatUrl));
+    }
+  } catch (err) {
+    console.warn("[qr-world-splat-proxy] local asset read failed", err);
+  }
+
   const key = cacheKey(userId, worldId);
   const hit = splatUrlCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.urls;
@@ -45,17 +68,30 @@ export async function proxyWorldSplatAsset(args: {
   worldId: string;
   upstreamUrl: string;
 }): Promise<Response> {
-  const upstream = args.upstreamUrl.trim();
+  const upstream = normalizeSplatUrl(args.upstreamUrl);
   if (!upstream || !isAllowedWorldSplatUpstreamUrl(upstream)) {
     return NextResponse.json({ error: "invalid_splat_url" }, { status: 400 });
   }
 
-  const allowed = await getAllowedWorldSplatUrls(args.userId, args.worldId);
-  if (!allowed.has(upstream)) {
+  let allowed: Set<string>;
+  try {
+    allowed = await getAllowedWorldSplatUrls(args.userId, args.worldId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "splat_allowlist_failed";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
+
+  if (!isUrlAllowed(allowed, upstream)) {
     return NextResponse.json({ error: "splat_url_not_in_world" }, { status: 403 });
   }
 
-  const upstreamRes = await fetch(upstream, { redirect: "follow", cache: "no-store" });
+  let upstreamRes: Response;
+  try {
+    upstreamRes = await fetch(upstream, { redirect: "follow", cache: "no-store" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "upstream_fetch_failed";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
   if (!upstreamRes.ok) {
     return NextResponse.json(
       { error: `upstream_http_${upstreamRes.status}` },

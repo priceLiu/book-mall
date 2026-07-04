@@ -69,6 +69,7 @@ function useQrMasonryPoster(
   const [posterMode, setPosterMode] = useState<"thumbnail" | "video-frame">(
     "thumbnail",
   );
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -94,6 +95,9 @@ function useQrMasonryPoster(
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setAspectRatio(img.naturalWidth / img.naturalHeight);
+      }
       markQrMasonryPosterCached(templateId);
       setReady(true);
     };
@@ -112,7 +116,7 @@ function useQrMasonryPoster(
     };
   }, [templateId, thumbnailUrl, videoUrl, enabled]);
 
-  return { ready, setReady, posterMode, setPosterMode };
+  return { ready, setReady, posterMode, setPosterMode, aspectRatio };
 }
 
 function TemplateDownloadButton({
@@ -146,12 +150,15 @@ export function MasonryTemplateCard({
   onSelect,
   allowDownload = false,
   hideRecreateOnHover = false,
+  naturalAspect = false,
 }: {
   template: QrTemplate;
   onSelect: () => void;
   allowDownload?: boolean;
   /** 场景墙：点击整卡进入全屏预览，不显示悬停「重现」 */
   hideRecreateOnHover?: boolean;
+  /** 保留原图宽高比（瀑布流），不裁切为统一 4:3 */
+  naturalAspect?: boolean;
 }) {
   const { ref: visibilityRef, visible } = useIntersectionVisible<HTMLButtonElement>();
   const [hovering, setHovering] = useState(false);
@@ -160,7 +167,7 @@ export function MasonryTemplateCard({
     template.output?.mediaType === "video" ? template.output.url : null;
   const imageThumbUrl = resolveGalleryThumbnailUrl(template.thumbnailUrl);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { ready, setReady, posterMode, setPosterMode } = useQrMasonryPoster(
+  const { ready, setReady, posterMode, setPosterMode, aspectRatio } = useQrMasonryPoster(
     template.id,
     template.thumbnailUrl,
     previewVideoUrl,
@@ -253,9 +260,22 @@ export function MasonryTemplateCard({
         style={{ borderRadius: "calc(14.5px)", inset: "1.5px" }}
       />
 
-      <div className="relative w-full overflow-hidden rounded-[10px] bg-zinc-900">
+      <div
+        className={`relative w-full overflow-hidden rounded-[10px] bg-zinc-900${naturalAspect ? "" : ""}`}
+        style={
+          naturalAspect
+            ? undefined
+            : {
+                aspectRatio:
+                  aspectRatio && Number.isFinite(aspectRatio) ? `${aspectRatio}` : "4 / 3",
+              }
+        }
+      >
         {showSkeleton ? (
-          <div className="qr-skeleton aspect-[4/3] w-full" aria-hidden />
+          <div
+            className={`qr-skeleton w-full${naturalAspect ? " min-h-[140px]" : " h-full"}`}
+            aria-hidden
+          />
         ) : null}
         {showThumbImg ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -275,7 +295,7 @@ export function MasonryTemplateCard({
                 setReady(true);
               }
             }}
-            className={`block h-auto w-full object-cover transition-all duration-300 group-hover:scale-[1.03]${previewVideoUrl ? " group-hover:opacity-0" : ""}${ready ? " opacity-100" : " opacity-0"}`}
+            className={`block w-full transition-all duration-300 group-hover:scale-[1.03]${naturalAspect ? " h-auto" : " h-full object-cover"}${previewVideoUrl ? " group-hover:opacity-0" : ""}${ready ? " opacity-100" : " opacity-0"}`}
           />
         ) : null}
 
@@ -586,6 +606,8 @@ export function QrTemplateGallery({
                           template={t}
                           onSelect={() => onSelectTemplate(t)}
                           allowDownload={allowDownload}
+                          naturalAspect={category === "world"}
+                          hideRecreateOnHover={category === "world"}
                         />
                       </div>
                     ))}

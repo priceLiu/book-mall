@@ -7,7 +7,8 @@ export const PROVIDER_APPLY_URLS: Partial<
     | "DASHSCOPE"
     | "HUNYUAN"
     | "VOLCENGINE"
-    | "MINIMAX",
+    | "MINIMAX"
+    | "WORLDLABS",
     string
   >
 > = {
@@ -17,6 +18,7 @@ export const PROVIDER_APPLY_URLS: Partial<
   VOLCENGINE:
     "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
   MINIMAX: "https://platform.minimaxi.com/user-center/basic-information/interface-key",
+  WORLDLABS: "https://platform.worldlabs.ai/api-keys",
 };
 
 export function providerApplyUrl(

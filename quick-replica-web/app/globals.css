@@ -511,6 +511,32 @@ body {
     animation: qr-world-load-bar-shimmer 1.8s ease-in-out infinite;
   }
 
+  @keyframes qr-world-loading-drift {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 0.35;
+    }
+    50% {
+      transform: translate3d(12px, -18px, 0) scale(1.05);
+      opacity: 0.85;
+    }
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 0.35;
+    }
+  }
+
+  .qr-world-loading-stars {
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255, 255, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 30% 70%, rgba(180, 210, 255, 0.85) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 55% 35%, rgba(255, 255, 255, 0.75) 50%, transparent 51%),
+      radial-gradient(1px 1px at 72% 62%, rgba(200, 220, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 28%, rgba(255, 255, 255, 0.7) 50%, transparent 51%),
+      radial-gradient(1px 1px at 45% 85%, rgba(170, 200, 255, 0.75) 50%, transparent 51%);
+    animation: qr-world-loading-drift 4.5s ease-in-out infinite;
+  }
+
   @keyframes qr-audio-oscilloscope-line-generating {
     0%,
     100% {

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -17,43 +18,112 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  QrWorldSparkCanvas,
-  type QrWorldSparkHandle,
-  type QrWorldSparkStage,
-} from "@/components/quick-replica/qr-world-spark-canvas";
+import type { QrWorldSparkHandle, QrWorldSparkStage } from "@/components/quick-replica/qr-world-spark-canvas";
+import { QrWorldLoadingBackdrop } from "@/components/quick-replica/qr-world-loading-backdrop";
 import { resolveWorldId, resolveWorldMarbleUrl } from "@/lib/qr-world-marble-url";
 import type { QrTemplate } from "@/lib/qr-template-types";
 import { fetchQrWorldViewerPayload, type QrWorldViewerPayload } from "@/lib/qr-world-viewer-api";
 import { useLockBodyScroll } from "@/lib/use-lock-body-scroll";
 
+const QrWorldSparkCanvas = dynamic(
+  () =>
+    import("@/components/quick-replica/qr-world-spark-canvas").then((m) => m.QrWorldSparkCanvas),
+  { ssr: false },
+);
+
 type Props = {
   template: QrTemplate;
   onClose: () => void;
-  onLoadPrompt?: (template: QrTemplate) => void;
+  /** 点击顶部提示条：带入提示词与参考图到创作框（不关闭 viewer） */
+  onEditPrompt?: (template: QrTemplate) => void;
   onToast?: (message: string) => void;
 };
 
-function QrWorldControlsPanel({ onClose }: { onClose: () => void }) {
-  const rows: Array<{ label: string; keys: string[] }> = [
-    { label: "前进", keys: ["W", "↑"] },
-    { label: "后退", keys: ["S", "↓"] },
-    { label: "左移", keys: ["A", "←"] },
-    { label: "右移", keys: ["D", "→"] },
-    { label: "上升", keys: ["E", "Space"] },
-    { label: "下降", keys: ["Q"] },
-    { label: "加速", keys: ["Shift"] },
-    { label: "调整视野", keys: ["[", "]"] },
-    { label: "回到原点", keys: ["0"] },
+function QrSwitch({
+  checked,
+  onChange,
+  label,
+  subtitle,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  subtitle?: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-[var(--qr-text-primary)]">{label}</span>
+        {subtitle ? (
+          <span className="block text-xs leading-snug text-[var(--qr-text-muted)]">{subtitle}</span>
+        ) : null}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-10 rounded-full border transition ${
+          checked
+            ? "border-[rgba(59,130,246,0.6)] bg-[rgba(59,130,246,0.35)]"
+            : "border-white/15 bg-white/10"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+            checked ? "left-[1.05rem]" : "left-0.5"
+          }`}
+        />
+      </button>
+    </label>
+  );
+}
+
+function QrWorldControlsPanel({
+  naturalMouse,
+  invertTrackpadDrag,
+  onNaturalMouseChange,
+  onInvertTrackpadDragChange,
+  onClose,
+}: {
+  naturalMouse: boolean;
+  invertTrackpadDrag: boolean;
+  onNaturalMouseChange: (next: boolean) => void;
+  onInvertTrackpadDragChange: (next: boolean) => void;
+  onClose: () => void;
+}) {
+  const col1: Array<{ label: string; keys: string[] }> = [
+    { label: "Move forward", keys: ["W"] },
+    { label: "Move left", keys: ["A"] },
+    { label: "Move backward", keys: ["S"] },
+    { label: "Move right", keys: ["D"] },
+  ];
+  const col2: Array<{ label: string; keys: string[] }> = [
+    { label: "Move up", keys: ["E", "Space"] },
+    { label: "Move down", keys: ["Q"] },
+    { label: "Move faster", keys: ["Shift"] },
+  ];
+  const col3: Array<{ label: string; keys: string[] }> = [
+    { label: "Change FOV", keys: ["[", "]"] },
+    { label: "Return to origin", keys: ["0"] },
+  ];
+  const col4: Array<{ label: string; keys: string[] }> = [
+    { label: "Drag", keys: ["Mouse"] },
+    { label: "360° Look", keys: ["Orbit"] },
+    { label: "Pan", keys: ["Shift", "+", "Drag"] },
   ];
 
   return (
     <div
-      className="absolute bottom-24 right-4 z-[110] w-[min(420px,calc(100vw-2rem))] rounded-xl border p-4 shadow-2xl"
-      style={{ borderColor: "var(--qr-border)", background: "var(--qr-bg-surface)" }}
+      className="absolute inset-x-4 bottom-6 z-[110] mx-auto w-[min(920px,calc(100vw-2rem))] rounded-2xl border p-5 shadow-2xl backdrop-blur-xl"
+      style={{
+        borderColor: "var(--qr-border)",
+        background:
+          "linear-gradient(120deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02) 45%, rgba(234,94,193,0.07) 100%)",
+      }}
     >
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--qr-text-primary)]">Controls</h3>
+        <h3 className="text-lg font-semibold text-[var(--qr-text-primary)]">Controls</h3>
         <button
           type="button"
           aria-label="关闭"
@@ -63,25 +133,47 @@ function QrWorldControlsPanel({ onClose }: { onClose: () => void }) {
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-2">
-            <span className="text-[var(--qr-text-muted)]">{row.label}</span>
-            <span className="flex gap-1">
-              {row.keys.map((k) => (
-                <kbd
-                  key={k}
-                  className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[var(--qr-text-primary)]"
-                >
-                  {k}
-                </kbd>
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-4">
+        {[col1, col2, col3, col4].map((col, idx) => (
+          <div key={`col-${idx}`} className={idx < 3 ? "border-r border-white/10 pr-4 md:pr-6" : ""}>
+            <div className="space-y-3">
+              {col.map((row) => (
+                <div key={row.label} className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-[var(--qr-text-primary)]">{row.label}</span>
+                  <span className="flex items-center gap-1.5">
+                    {row.keys.map((k) => (
+                      <kbd
+                        key={k}
+                        className="min-w-8 rounded-md border border-white/15 bg-black/25 px-2 py-1 text-center font-mono text-xs text-white/90"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </span>
+                </div>
               ))}
-            </span>
+            </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[10px] leading-relaxed text-[var(--qr-text-muted)]">
-        点击场景区域后使用 WASD 漫游；拖拽鼠标可环视。
+
+      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <QrSwitch
+          checked={naturalMouse}
+          onChange={onNaturalMouseChange}
+          label="Natural Mouse"
+          subtitle="Content tracks mouse movement"
+        />
+        <QrSwitch
+          checked={invertTrackpadDrag}
+          onChange={onInvertTrackpadDragChange}
+          label="Invert Trackpad Drag"
+        />
+      </div>
+
+      <p className="mt-3 text-[11px] leading-relaxed text-[var(--qr-text-muted)]">
+        Click the scene, then drag with mouse for 360° look; use keyboard for movement.
       </p>
     </div>
   );
@@ -125,7 +217,7 @@ function QrWorldLoadBadge({ stage, message }: { stage: QrWorldSparkStage; messag
   );
 }
 
-export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Props) {
+export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Props) {
   const [mounted, setMounted] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [payload, setPayload] = useState<QrWorldViewerPayload | null>(null);
@@ -133,12 +225,18 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
   const [loading, setLoading] = useState(true);
   const [sparkStage, setSparkStage] = useState<QrWorldSparkStage>("preview");
   const [sparkStageMessage, setSparkStageMessage] = useState<string | undefined>();
+  const [hasFirstVisual, setHasFirstVisual] = useState(false);
+  const [naturalMouse, setNaturalMouse] = useState(false);
+  const [invertTrackpadDrag, setInvertTrackpadDrag] = useState(false);
   const sparkRef = useRef<QrWorldSparkHandle>(null);
 
   const worldId = resolveWorldId(template);
   const marbleUrl = resolveWorldMarbleUrl(template);
   const promptPreview = template.reference.prompt.text.trim();
-  const previewThumb = template.thumbnailUrl?.trim() || undefined;
+  const previewThumb =
+    template.reference.slots.sceneImages?.[0]?.url?.trim() ||
+    template.thumbnailUrl?.trim() ||
+    undefined;
 
   useLockBodyScroll(true);
 
@@ -159,6 +257,7 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
     setPayload(null);
     setSparkStage("preview");
     setSparkStageMessage(undefined);
+    setHasFirstVisual(false);
 
     void fetchQrWorldViewerPayload(worldId)
       .then((data) => {
@@ -212,24 +311,35 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
 
   if (!mounted) return null;
 
-  const hasOpenArtTiers = Boolean(payload?.preview100kSpzUrl && payload?.fullResSpzUrl);
-  const lowResUrl = hasOpenArtTiers
+  const hasProgressiveTiers = Boolean(
+    payload?.preview100kSpzUrl && payload?.fullResSpzUrl,
+  );
+  const lowResUrl = hasProgressiveTiers
     ? payload!.preview100kSpzUrl!
-    : payload?.lowResSpzUrl ?? null;
-  const highResUrl = hasOpenArtTiers
-    ? payload!.fullResSpzUrl!
-    : payload?.highResSpzUrl ?? payload?.spzUrl ?? null;
+    : null;
+  const highResUrl =
+    payload?.fullResSpzUrl ??
+    payload?.highResSpzUrl ??
+    payload?.spzUrl ??
+    null;
   const spzUrl = highResUrl ?? lowResUrl;
   const showSpark = Boolean(spzUrl && !loadError);
 
+  const showLoadingBackdrop = !loadError && !hasFirstVisual;
+
   return createPortal(
     <div className="fixed inset-0 z-[100]" style={{ background: "#060910" }}>
+      <QrWorldLoadingBackdrop active={showLoadingBackdrop} />
+
       {showSpark ? (
         <QrWorldSparkCanvas
           ref={sparkRef}
-          key={`${lowResUrl ?? ""}|${highResUrl ?? ""}`}
+          key={worldId ?? template.id}
           lowResUrl={lowResUrl}
           highResUrl={highResUrl}
+          naturalMouse={naturalMouse}
+          invertTrackpadDrag={invertTrackpadDrag}
+          onFirstVisual={() => setHasFirstVisual(true)}
           onStageChange={(stage, message) => {
             setSparkStage(stage);
             setSparkStageMessage(message);
@@ -265,11 +375,23 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
       </button>
 
       {promptPreview ? (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-[105] w-[min(640px,calc(100vw-6rem))] -translate-x-1/2">
-          <div className="rounded-xl border border-white/10 bg-black/55 px-4 py-2.5 text-center text-xs leading-relaxed text-white/90 backdrop-blur-md">
-            <span className="line-clamp-2">{promptPreview}</span>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => onEditPrompt?.(template)}
+          className="absolute left-1/2 top-4 z-[105] w-[min(640px,calc(100vw-6rem))] -translate-x-1/2 rounded-xl border border-white/10 bg-black/55 px-4 py-2.5 text-left backdrop-blur-md transition hover:border-white/25 hover:bg-black/65"
+        >
+          <span className="flex items-start gap-3">
+            {previewThumb ? (
+              <span className="mt-0.5 block h-10 w-10 shrink-0 overflow-hidden rounded-md border border-white/10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewThumb} alt="" className="h-full w-full object-cover" />
+              </span>
+            ) : null}
+            <span className="line-clamp-2 min-w-0 flex-1 text-xs leading-relaxed text-white/90">
+              {promptPreview}
+            </span>
+          </span>
+        </button>
       ) : null}
 
       {worldId && !loadError ? (
@@ -319,12 +441,12 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
             >
               <Keyboard className="h-[18px] w-[18px]" />
             </button>
-            {onLoadPrompt ? (
+            {onEditPrompt ? (
               <button
                 type="button"
-                title="载入提示词到创作框"
-                aria-label="载入提示词"
-                onClick={() => onLoadPrompt(template)}
+                title="编辑提示词与参考图"
+                aria-label="编辑提示词"
+                onClick={() => onEditPrompt(template)}
                 className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition hover:text-white"
               >
                 <Info className="h-[18px] w-[18px]" />
@@ -332,7 +454,15 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
             ) : null}
           </div>
 
-          {controlsOpen ? <QrWorldControlsPanel onClose={() => setControlsOpen(false)} /> : null}
+          {controlsOpen ? (
+            <QrWorldControlsPanel
+              naturalMouse={naturalMouse}
+              invertTrackpadDrag={invertTrackpadDrag}
+              onNaturalMouseChange={setNaturalMouse}
+              onInvertTrackpadDragChange={setInvertTrackpadDrag}
+              onClose={() => setControlsOpen(false)}
+            />
+          ) : null}
         </>
       ) : null}
     </div>,

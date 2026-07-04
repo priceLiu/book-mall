@@ -42,8 +42,14 @@ export function extractAdminFormFieldsFromTemplate(t: {
   const referenceVideoUrl =
     ref?.slots.referenceVideo?.url?.trim() || outputUrl || "";
   const targetImageUrl = ref?.slots.targetImage?.url?.trim() ?? "";
-  const sceneImageUrls =
+  const sceneImageUrlsRaw =
     ref?.slots.sceneImages?.map((s) => s.url.trim()).filter(Boolean) ?? [];
+  const sceneImageUrls =
+    sceneImageUrlsRaw.length > 0
+      ? sceneImageUrlsRaw
+      : t.kind === "create-world" && t.thumbnailUrl?.trim()
+        ? [t.thumbnailUrl.trim()]
+        : [];
   return {
     promptText: ref?.prompt.text ?? "",
     mediaUrl: outputUrl || referenceVideoUrl || t.thumbnailUrl,

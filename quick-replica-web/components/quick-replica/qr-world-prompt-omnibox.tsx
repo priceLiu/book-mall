@@ -48,6 +48,8 @@ type Props = {
   presetTemplates?: QrTemplate[];
   onToast?: (message: string) => void;
   onGenerate: () => void;
+  /** 场景 viewer 打开时需高于 z-[100] */
+  overlayZIndex?: number;
 };
 
 export function QrWorldPromptOmnibox({
@@ -59,6 +61,7 @@ export function QrWorldPromptOmnibox({
   presetTemplates = [],
   onToast,
   onGenerate,
+  overlayZIndex = 60,
 }: Props) {
   const collapsedRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -572,7 +575,8 @@ export function QrWorldPromptOmnibox({
     mounted && expanded
       ? createPortal(
           <div
-            className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden bg-black/45 px-3 pb-6 pt-[72px] backdrop-blur-sm"
+            className="fixed inset-0 flex items-start justify-center overflow-hidden bg-black/45 px-3 pb-6 pt-[72px] backdrop-blur-sm"
+            style={{ zIndex: overlayZIndex }}
             role="presentation"
           >
             <div
@@ -589,7 +593,10 @@ export function QrWorldPromptOmnibox({
                 {expandedPanel}
               </div>
             </div>
-            <div className="pointer-events-none fixed bottom-6 left-1/2 z-[61] -translate-x-1/2">
+            <div
+              className="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2"
+              style={{ zIndex: overlayZIndex + 1 }}
+            >
               <div className="pointer-events-auto">{actionPills}</div>
             </div>
           </div>,

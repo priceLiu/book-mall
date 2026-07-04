@@ -1024,7 +1024,11 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     t.reference.slots.sceneImages?.map((s) => s.url).filter(Boolean) ?? [];
   const sceneFromCharacterRefs =
     t.reference.slots.characterRefs?.map((s) => s.url).filter(Boolean) ?? [];
-  const sceneImageUrls = sceneFromSlots.length ? sceneFromSlots : sceneFromCharacterRefs;
+  let sceneImageUrls = sceneFromSlots.length ? sceneFromSlots : sceneFromCharacterRefs;
+  if (t.category === "world" && sceneImageUrls.length === 0) {
+    const thumb = t.thumbnailUrl?.trim();
+    if (thumb) sceneImageUrls = [thumb];
+  }
   return {
     category: t.category,
     kind: t.kind,
