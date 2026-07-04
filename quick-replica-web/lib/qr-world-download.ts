@@ -12,42 +12,52 @@ function extFromUrl(url: string, fallback: string): string {
   return fallback;
 }
 
-/** 同域链接：在用户点击同步触发，避免 await fetch 后浏览器拦截 download */
-export function triggerSameOriginDownload(url: string, filename: string): void {
+function clickDownloadLink(href: string, filename: string): void {
   const a = document.createElement("a");
-  a.href = url;
+  a.href = href;
   a.download = filename;
   a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
 
-  // 大文件时部分浏览器会忽略 download 属性；hidden iframe 可触发 Content-Disposition 下载
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.title = "download";
-  iframe.src = url;
-  document.body.appendChild(iframe);
-  window.setTimeout(() => iframe.remove(), 120_000);
+/** 同域链接：在用户点击同步触发 <a download>，避免 await fetch 后浏览器拦截 */
+export function triggerSameOriginDownload(url: string, filename: string): void {
+  clickDownloadLink(url, filename);
+  // 大文件兜底：延迟 iframe，避免与 <a> 同时拉流导致主线程长时间阻塞
+  window.setTimeout(() => {
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.title = "download";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    window.setTimeout(() => iframe.remove(), 120_000);
+  }, 900);
+}
+
+/** 异步触发同域下载，先让 UI（快门 / Toast）完成一帧渲染 */
+export function scheduleSameOriginDownload(url: string, filename: string): void {
+  window.requestAnimationFrame(() => {
+    triggerSameOriginDownload(url, filename);
+  });
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  const blobUrl = URL.createObjectURL(blob);
+  clickDownloadLink(blobUrl, filename);
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
 }
 
 export async function downloadUrlAsFile(url: string, filename: string): Promise<void> {
   if (url.startsWith("/")) {
-    triggerSameOriginDownload(url, filename);
+    scheduleSameOriginDownload(url, filename);
     return;
   }
   const res = await fetch(url, { credentials: "include" });
   if (!res.ok) throw new Error(`下载失败 (${res.status})`);
   const blob = await res.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
+  downloadBlob(blob, filename);
 }
 
 export async function downloadWorldSpz(args: {
@@ -60,12 +70,13 @@ export async function downloadWorldSpz(args: {
   const ext = extFromUrl(url, "spz");
   const filename = `${safeFilename(args.title)}-${args.worldId.slice(0, 8)}.${ext}`;
   if (url.startsWith("/")) {
-    triggerSameOriginDownload(url, filename);
+    scheduleSameOriginDownload(url, filename);
     return;
   }
   await downloadUrlAsFile(url, filename);
 }
 
+/** @deprecated 大 data URL 会阻塞主线程；请改用 downloadBlob */
 export function downloadDataUrl(dataUrl: string, filename: string): void {
-  triggerSameOriginDownload(dataUrl, filename);
+  clickDownloadLink(dataUrl, filename);
 }
