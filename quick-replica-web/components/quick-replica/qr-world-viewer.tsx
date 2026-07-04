@@ -17,10 +17,10 @@ import {
   X,
 } from "lucide-react";
 
-import { QrWorldLoadingScreen } from "@/components/quick-replica/qr-world-loading-screen";
 import {
   QrWorldSparkCanvas,
   type QrWorldSparkHandle,
+  type QrWorldSparkStage,
 } from "@/components/quick-replica/qr-world-spark-canvas";
 import { resolveWorldId, resolveWorldMarbleUrl } from "@/lib/qr-world-marble-url";
 import type { QrTemplate } from "@/lib/qr-template-types";
@@ -109,17 +109,30 @@ function ToolbarButton({
   );
 }
 
+function QrWorldLoadBadge({ stage, message }: { stage: QrWorldSparkStage; message?: string }) {
+  if (stage === "ready" || stage === "error") return null;
+  const label =
+    message ??
+    (stage === "preview" ? "Loading preview…" : stage === "loading-full" ? "Loading full quality…" : "Loading…");
+  return (
+    <div
+      className="pointer-events-none absolute bottom-3 right-3 z-[105] flex items-center gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-xs text-white/70 backdrop-blur-md"
+      aria-live="polite"
+    >
+      <span className="inline-block h-3 w-3 animate-spin rounded-full border border-white/25 border-t-white/80" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Props) {
   const [mounted, setMounted] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [payload, setPayload] = useState<QrWorldViewerPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadProgress, setLoadProgress] = useState(0);
-  const [sparkReady, setSparkReady] = useState(false);
-  const [loadingOverlayVisible, setLoadingOverlayVisible] = useState(true);
-  const [loadingFadeOut, setLoadingFadeOut] = useState(false);
-  const [fetchProgress, setFetchProgress] = useState(0);
+  const [sparkStage, setSparkStage] = useState<QrWorldSparkStage>("preview");
+  const [sparkStageMessage, setSparkStageMessage] = useState<string | undefined>();
   const sparkRef = useRef<QrWorldSparkHandle>(null);
 
   const worldId = resolveWorldId(template);
@@ -134,29 +147,9 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
   }, []);
 
   useEffect(() => {
-    if (!loading) return;
-    setFetchProgress(0);
-    const start = performance.now();
-    const tick = () => {
-      const elapsed = performance.now() - start;
-      setFetchProgress(Math.min(0.35, (elapsed / 2400) * 0.35));
-    };
-    const id = window.setInterval(tick, 80);
-    return () => window.clearInterval(id);
-  }, [loading]);
-
-  useEffect(() => {
-    if (!sparkReady) return;
-    setLoadingFadeOut(true);
-    const id = window.setTimeout(() => setLoadingOverlayVisible(false), 520);
-    return () => window.clearTimeout(id);
-  }, [sparkReady]);
-
-  useEffect(() => {
     if (!worldId) {
       setLoading(false);
       setLoadError("该条目缺少 world_id");
-      setLoadingOverlayVisible(false);
       return;
     }
 
@@ -164,11 +157,8 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
     setLoading(true);
     setLoadError(null);
     setPayload(null);
-    setSparkReady(false);
-    setLoadProgress(0);
-    setLoadingOverlayVisible(true);
-    setLoadingFadeOut(false);
-    setFetchProgress(0);
+    setSparkStage("preview");
+    setSparkStageMessage(undefined);
 
     void fetchQrWorldViewerPayload(worldId)
       .then((data) => {
@@ -176,13 +166,11 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
         setPayload(data);
         if (!data.spzUrl) {
           setLoadError("该场景暂无 3D splat 资产，可在 Marble 官网查看");
-          setLoadingOverlayVisible(false);
         }
       })
       .catch((err) => {
         if (cancelled) return;
         setLoadError(err instanceof Error ? err.message : "加载场景失败");
-        setLoadingOverlayVisible(false);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -224,39 +212,39 @@ export function QrWorldViewer({ template, onClose, onLoadPrompt, onToast }: Prop
 
   if (!mounted) return null;
 
-  const highResUrl = payload?.highResSpzUrl ?? payload?.spzUrl ?? null;
-  const lowResUrl = payload?.lowResSpzUrl ?? null;
+  const hasOpenArtTiers = Boolean(payload?.preview100kSpzUrl && payload?.fullResSpzUrl);
+  const lowResUrl = hasOpenArtTiers
+    ? payload!.preview100kSpzUrl!
+    : payload?.lowResSpzUrl ?? null;
+  const highResUrl = hasOpenArtTiers
+    ? payload!.fullResSpzUrl!
+    : payload?.highResSpzUrl ?? payload?.spzUrl ?? null;
   const spzUrl = highResUrl ?? lowResUrl;
   const showSpark = Boolean(spzUrl && !loadError);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-black">
+    <div className="fixed inset-0 z-[100]" style={{ background: "#060910" }}>
       {showSpark ? (
         <QrWorldSparkCanvas
           ref={sparkRef}
           key={`${lowResUrl ?? ""}|${highResUrl ?? ""}`}
           lowResUrl={lowResUrl}
           highResUrl={highResUrl}
-          onProgress={setLoadProgress}
-          onReady={() => setSparkReady(true)}
+          onStageChange={(stage, message) => {
+            setSparkStage(stage);
+            setSparkStageMessage(message);
+          }}
           onError={(msg) => {
             setLoadError(msg);
-            setLoadingOverlayVisible(false);
+            setSparkStage("error");
           }}
         />
-      ) : previewThumb ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={previewThumb} alt="" className="h-full w-full object-cover opacity-40" />
       ) : null}
 
-      {loadingOverlayVisible && !loadError ? (
-        <QrWorldLoadingScreen
-          title={payload?.displayName?.trim() || template.title?.trim() || promptPreview || undefined}
-          previewUrl={previewThumb ?? payload?.thumbnailUrl ?? undefined}
-          phase={loading || !spzUrl ? "fetch" : "splat"}
-          progress={loading || !spzUrl ? fetchProgress : loadProgress}
-          fadingOut={loadingFadeOut}
-        />
+      {loading && !loadError && !showSpark ? (
+        <QrWorldLoadBadge stage="preview" message="Loading scene…" />
+      ) : showSpark && !loadError ? (
+        <QrWorldLoadBadge stage={sparkStage} message={sparkStageMessage} />
       ) : null}
 
       {loadError ? (

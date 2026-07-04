@@ -233,7 +233,11 @@ export function extractWorldSplatUrl(
 }
 
 export type WorldlabsSplatTiers = {
-  /** 低模：优先 150k，其次 100k（先渲染出发光粒子的那份） */
+  /** OpenArt 预览档：仅 100k（与 full_res 配对做两档渐进） */
+  preview100k: string | null;
+  /** OpenArt 高模档：仅 full_res */
+  fullRes: string | null;
+  /** 低模：优先 100k，其次 150k（先渲染出发光粒子的那份） */
   lowRes: string | null;
   /** 目标高模（桌面）：full_res → 3m → 500k */
   highRes: string | null;
@@ -248,10 +252,12 @@ export type WorldlabsSplatTiers = {
 export function extractWorldSplatTiers(world: WorldlabsWorld): WorldlabsSplatTiers {
   const urls = world.assets?.splats?.spz_urls;
   if (!urls || typeof urls !== "object") {
-    return { lowRes: null, highRes: null, radUrl: null };
+    return { preview100k: null, fullRes: null, lowRes: null, highRes: null, radUrl: null };
   }
   return {
-    lowRes: pickSpzUrl(urls, ["150k", "100k"]),
+    preview100k: pickSpzUrl(urls, ["100k"]),
+    fullRes: pickSpzUrl(urls, ["full_res"]),
+    lowRes: pickSpzUrl(urls, ["100k", "150k"]),
     highRes: pickSpzUrl(urls, ["full_res", "3m", "500k"]),
     radUrl: pickSpzUrl(urls, ["rad"]),
   };
@@ -317,6 +323,35 @@ export function extractWorldThumbnailUrl(world: WorldlabsWorld): string | null {
   if (thumb) return thumb;
   const pano = world.assets?.imagery?.pano_url?.trim();
   return pano || null;
+}
+
+/** 某 world 登记的全部 splat 上游 URL（用于代理白名单校验） */
+export function listWorldSplatUrls(world: WorldlabsWorld): string[] {
+  const tiers = extractWorldSplatTiers(world);
+  const best = extractWorldSplatUrl(world);
+  const urls = [
+    tiers.preview100k,
+    tiers.fullRes,
+    tiers.lowRes,
+    tiers.highRes,
+    tiers.radUrl,
+    best,
+  ];
+  return [...new Set(urls.map((u) => u?.trim()).filter((u): u is string => Boolean(u)))];
+}
+
+const WORLD_SPLAT_HOST_SUFFIXES = ["worldlabs.ai", "googleapis.com", "googleusercontent.com"];
+
+/** 浏览器直连可能因 CORS 失败；仅允许 World Labs / GCS 上游。 */
+export function isAllowedWorldSplatUpstreamUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim());
+    if (u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    return WORLD_SPLAT_HOST_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`));
+  } catch {
+    return false;
+  }
 }
 
 export { operationErrorMessage };

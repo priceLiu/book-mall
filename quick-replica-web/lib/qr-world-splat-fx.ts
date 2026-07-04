@@ -1,24 +1,26 @@
 /**
- * QuickReplica 世界加载特效：忠实移植自 marble.worldlabs.ai 的
- * `_id-*.js`（世界查看器 chunk）中的 `Hs`（粒子 worldModifier）、
- * `Us`（扩散球揭示 worldModifier）与 `Qs`（低→高两档渐进时序）。
+ * QuickReplica 世界加载特效：对齐 openart.ai/suite/world 的 SplatViewer
+ * （chunk ffb1a6f2d4f97a80.js）粒子 worldModifier + 扩散球揭示时序。
  *
- * 由于 QuickReplica 与 Marble 使用同一套 @sparkjsdev/spark，故此处直接
- * 复刻其 GLSL dyno 图，实现「低模发光粒子 → 高模扩散球揭示」的一致观感。
+ * 与 Marble 同源 @sparkjsdev/spark dyno 图；OpenArt 使用 sparsity=0.6、
+ * 按场景 bounds 动态 reveal 半径，以及 radius/133×1000ms 揭示时长。
  */
 
 type SparkModule = typeof import("@sparkjsdev/spark");
 type ThreeModule = typeof import("three");
+type ThreePerspectiveCamera = InstanceType<ThreeModule["PerspectiveCamera"]>;
+type ThreeVector3 = InstanceType<ThreeModule["Vector3"]>;
 type GsplatModifier = import("@sparkjsdev/spark").GsplatModifier;
+type PackedSplats = import("@sparkjsdev/spark").PackedSplats;
 
-/** Marble 默认粒子参数（Ws） */
+/** OpenArt 粒子参数（sparsity=0.6，比 Marble 0.15 更稀疏） */
 export const PARTICLE_PARAMS = {
   pointSize: 0.005,
   pointSizeVariation: 0.01,
   pulseSpeed: 2.2,
   pulseAmount: 0.4,
   pulsePhaseVariation: 0.8,
-  sparsity: 0.15,
+  sparsity: 0.6,
   jitterAmount: 0.01,
   jitterSpeed: 1.1,
   colorShift: 0,
@@ -28,19 +30,94 @@ export const PARTICLE_PARAMS = {
   enabled: 1,
 } as const;
 
-/** 揭示时序常量（Marble: Ks/Js/Ys/Xs/qs/Zs） */
-export const TRANSITION_MS = 3000; // Ks
-export const MAX_RADIUS = 2000; // Js（半径 = progress^1.5 × MAX_RADIUS）
-export const RING_WIDTH = 2; // Xs
-export const RING_COLOR: [number, number, number] = [0.627, 0.682, 0.961]; // Ys 淡紫光环
-export const TRANSITION_CENTER: [number, number, number] = [0, 0, 0]; // qs
+/** OpenArt TRANSITION_SPEED：durationMs = radius / TRANSITION_SPEED × 1000 */
+export const TRANSITION_SPEED = 133;
+export const MIN_TRANSITION_MS = 1500;
+export const MAX_TRANSITION_MS = 8000;
+export const RING_WIDTH = 2;
+export const RING_COLOR: [number, number, number] = [0.627, 0.682, 0.961];
 
-/** easeInOutCubic（Marble: Zs） */
+/** easeInOutCubic（OpenArt / Marble 共用） */
 export const easeInOutCubic = (t: number): number =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
+export type RevealBounds = {
+  center: ThreeVector3;
+  radius: number;
+};
+
+/**
+ * 从 PackedSplats 采样包围盒，计算扩散球心与半径。
+ * 球心必须用场景中心（不能写死原点），否则揭示永远对不上几何体。
+ */
+export function computeRevealBounds(packed: PackedSplats, THREE: ThreeModule): RevealBounds {
+  const total = packed.numSplats;
+  const center = new THREE.Vector3();
+  if (total <= 0) return { center, radius: 1 };
+
+  const samples = Math.min(total, 2000);
+  const step = Math.max(1, Math.floor(total / samples));
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+
+  for (let i = 0; i < total; i += step) {
+    const c = packed.getSplat(i).center;
+    minX = Math.min(minX, c.x);
+    minY = Math.min(minY, c.y);
+    minZ = Math.min(minZ, c.z);
+    maxX = Math.max(maxX, c.x);
+    maxY = Math.max(maxY, c.y);
+    maxZ = Math.max(maxZ, c.z);
+  }
+
+  center.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+
+  let maxDistSq = 0;
+  for (let i = 0; i < total; i += step) {
+    const c = packed.getSplat(i).center;
+    const dx = c.x - center.x;
+    const dy = c.y - center.y;
+    const dz = c.z - center.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq > maxDistSq) maxDistSq = distSq;
+  }
+
+  return { center, radius: Math.max(Math.sqrt(maxDistSq) || 1, 0.5) };
+}
+
+export function computeTransitionDurationMs(radius: number): number {
+  const raw = (radius / TRANSITION_SPEED) * 1000;
+  return Math.min(MAX_TRANSITION_MS, Math.max(MIN_TRANSITION_MS, raw));
+}
+
+/** Marble ec() 风格：按 splat 包围盒把相机放到眼高位置 */
+export function frameCameraToSplatMesh(
+  THREE: ThreeModule,
+  camera: ThreePerspectiveCamera,
+  mesh: import("@sparkjsdev/spark").SplatMesh,
+): void {
+  const box = mesh.getBoundingBox(true);
+  if (box.isEmpty()) {
+    camera.position.set(0, 1, 0);
+    camera.lookAt(0, 1, -10);
+    camera.updateProjectionMatrix();
+    return;
+  }
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 1);
+  const eyeLift = Math.min(size.y * 0.12, 1.2) + 0.35;
+  camera.position.set(center.x, center.y + eyeLift, center.z + 0.01);
+  camera.lookAt(center.x, center.y, center.z - maxDim * 0.38);
+  camera.updateProjectionMatrix();
+}
+
 const PARTICLE_GLOBALS = `
-// Hash functions for pseudo-random values
 float hash(float n) {
   return fract(sin(n) * 43758.5453123);
 }
@@ -49,7 +126,6 @@ vec3 hash3v(float n) {
   return fract(sin(vec3(n, n + 1.0, n + 2.0)) * vec3(43758.5453123, 22578.1459123, 19642.3490423));
 }
 
-// Smooth spatial jitter for organic movement
 vec3 smoothJitter(vec3 pos, float time, float amount, float speed, float seed) {
   float t = time * speed;
   vec3 offset = vec3(
@@ -65,18 +141,15 @@ vec3 smoothJitter(vec3 pos, float time, float amount, float speed, float seed) {
   return offset * amount;
 }
 
-// Pulsing function with phase variation
 float pulseValue(float time, float speed, float phase, float amount) {
   return 1.0 + sin(time * speed + phase) * amount;
 }
 
-// Convert splats to clean points
 vec3 makePointScale(float baseSize, float sizeVar, float pulse) {
   float finalSize = baseSize * (1.0 + sizeVar) * pulse;
   return vec3(finalSize);
 }
 
-// Clean monochrome with subtle color
 vec3 pointColor(vec3 originalColor, float mono, float shift, float glow) {
   float luma = dot(originalColor, vec3(0.299, 0.587, 0.114));
   vec3 gray = vec3(luma);
@@ -84,16 +157,8 @@ vec3 pointColor(vec3 originalColor, float mono, float shift, float glow) {
   vec3 color = mix(originalColor, tinted, mono);
   return color * glow;
 }
-
-// Sparsity mask - randomly hide points
-float sparsityMask(float hash, float sparsity) {
-  return hash > sparsity ? 1.0 : 0.0;
-}
 `;
 
-/**
- * 粒子 worldModifier（Hs）。返回可复用的 modifier 与随帧更新的 timeUniform。
- */
 export function buildParticleModifier(spark: SparkModule): {
   modifier: GsplatModifier;
   timeUniform: { value: number };
@@ -145,29 +210,29 @@ export function buildParticleModifier(spark: SparkModule): {
             ${outputs.gsplat} = ${inputs.gsplat};
 
             float indexF = float(${inputs.gsplat}.index);
-            float hash1 = hash(indexF);
-            float hash2 = hash(indexF * 2.0);
-            float hash3 = hash(indexF * 3.0);
-            vec3 hash3vec = hash3v(indexF);
+            float h1 = hash(indexF);
+            float h2 = hash(indexF * 2.0);
+            float h3 = hash(indexF * 3.0);
+            vec3 hv = hash3v(indexF);
 
-            float sparse = sparsityMask(hash1, ${inputs.sparsity});
-            float effectStrength = ${inputs.enabled} * sparse;
+            float sparse = h1 > ${inputs.sparsity} ? 1.0 : 0.0;
+            float fx = ${inputs.enabled} * sparse;
 
-            vec3 jitter = smoothJitter(
+            vec3 jit = smoothJitter(
               ${inputs.gsplat}.center,
               ${inputs.time},
               ${inputs.jitterAmount},
               ${inputs.jitterSpeed},
-              hash1
+              h1
             );
 
             ${outputs.gsplat}.center = mix(
               ${inputs.gsplat}.center,
-              ${inputs.gsplat}.center + jitter,
-              effectStrength
+              ${inputs.gsplat}.center + jit,
+              fx
             );
 
-            float phase = hash2 * 6.28318 * ${inputs.pulsePhaseVariation};
+            float phase = h2 * 6.28318 * ${inputs.pulsePhaseVariation};
             float pulse = pulseValue(
               ${inputs.time},
               ${inputs.pulseSpeed},
@@ -175,37 +240,35 @@ export function buildParticleModifier(spark: SparkModule): {
               ${inputs.pulseAmount}
             );
 
-            vec3 pointScale = makePointScale(
+            vec3 ps = makePointScale(
               ${inputs.pointSize},
-              hash3 * ${inputs.pointSizeVariation},
+              h3 * ${inputs.pointSizeVariation},
               pulse
             );
 
             ${outputs.gsplat}.scales = mix(
               ${inputs.gsplat}.scales,
-              pointScale,
-              effectStrength
+              ps,
+              fx
             );
 
-            vec3 newColor = pointColor(
+            vec3 nc = pointColor(
               ${inputs.gsplat}.rgba.rgb,
               ${inputs.monochromeAmount},
-              ${inputs.colorShift} * hash3vec.x,
+              ${inputs.colorShift} * hv.x,
               ${inputs.glowIntensity}
             );
 
             ${outputs.gsplat}.rgba.rgb = mix(
               ${inputs.gsplat}.rgba.rgb,
-              newColor,
-              effectStrength
+              nc,
+              fx
             );
 
-            float targetOpacity = ${inputs.gsplat}.rgba.a * ${inputs.opacity};
-            targetOpacity *= sparse;
-
+            float tgt = ${inputs.gsplat}.rgba.a * ${inputs.opacity} * sparse;
             ${outputs.gsplat}.rgba.a = mix(
               ${inputs.gsplat}.rgba.a,
-              targetOpacity,
+              tgt,
               ${inputs.enabled}
             );
           `),
@@ -235,20 +298,15 @@ export function buildParticleModifier(spark: SparkModule): {
   return { modifier: modifier as unknown as GsplatModifier, timeUniform: time };
 }
 
-/**
- * 扩散球揭示 worldModifier（Us）。返回可复用 modifier 与随帧更新的
- * radiusUniform。isHighRes=true：球内可见；false：球外可见。
- */
 export function buildRevealModifier(
   spark: SparkModule,
   THREE: ThreeModule,
   isHighRes: boolean,
+  center: ThreeVector3,
 ): { modifier: GsplatModifier; radiusUniform: { value: number } } {
   const K = spark.dyno;
 
-  const transitionCenter = K.dynoVec3(
-    new THREE.Vector3(TRANSITION_CENTER[0], TRANSITION_CENTER[1], TRANSITION_CENTER[2]),
-  );
+  const transitionCenter = K.dynoVec3(center);
   const transitionRadius = K.dynoFloat(0);
   const ringColor = K.dynoVec3(
     new THREE.Vector3(RING_COLOR[0], RING_COLOR[1], RING_COLOR[2]),
@@ -309,9 +367,7 @@ export function buildRevealModifier(
   return { modifier: modifier as unknown as GsplatModifier, radiusUniform: transitionRadius };
 }
 
-/**
- * 组合两个 modifier：先 first 再 second（Marble Qs 中的低模链：粒子 → 揭示）。
- */
+/** 低模链：先粒子再揭示（OpenArt 在 full_res 就绪后挂载） */
 export function composeModifiers(
   spark: SparkModule,
   first: GsplatModifier,
