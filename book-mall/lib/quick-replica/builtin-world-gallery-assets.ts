@@ -8,6 +8,7 @@ type BuiltinWorldAssetEntry = {
   spzUrlMap: Record<string, string>;
   splatUrls: string[];
   thumbnailUrl: string | null;
+  sceneImageUrls: string[];
   panoUrl: string | null;
   colliderMeshUrl: string | null;
 };
@@ -61,6 +62,18 @@ function readBuiltinWorldAssetMap(): BuiltinWorldAssetMap {
     const colliderMeshUrl = normalizeUrl(params?.collider_mesh_url);
     const spzUrlMap = parseSplatUrlMap(params?.splat_urls);
     const splatUrls = parseSplatUrls(spzUrlMap);
+    const sceneImageUrls: string[] = [];
+    const slots = reference?.slots as Record<string, unknown> | undefined;
+    const sceneImages = slots?.sceneImages;
+    if (Array.isArray(sceneImages)) {
+      for (const item of sceneImages) {
+        if (!item || typeof item !== "object") continue;
+        const u = normalizeUrl((item as Record<string, unknown>).url);
+        if (u) sceneImageUrls.push(u);
+      }
+    }
+    const thumbSource = normalizeUrl(params?.thumbnail_source_url);
+    if (thumbSource) sceneImageUrls.push(thumbSource);
 
     map.set(worldId, {
       worldId,
@@ -69,6 +82,7 @@ function readBuiltinWorldAssetMap(): BuiltinWorldAssetMap {
       spzUrlMap,
       splatUrls,
       thumbnailUrl,
+      sceneImageUrls: [...new Set(sceneImageUrls)],
       panoUrl,
       colliderMeshUrl,
     });

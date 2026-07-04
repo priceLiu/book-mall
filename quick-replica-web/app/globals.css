@@ -537,6 +537,25 @@ body {
     animation: qr-world-loading-drift 4.5s ease-in-out infinite;
   }
 
+  @keyframes qr-world-shutter-flash {
+    0% {
+      opacity: 0;
+      background: rgba(255, 255, 255, 0);
+    }
+    12% {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.92);
+    }
+    100% {
+      opacity: 0;
+      background: rgba(255, 255, 255, 0);
+    }
+  }
+
+  .qr-world-shutter-flash {
+    animation: qr-world-shutter-flash 0.36s ease-out forwards;
+  }
+
   @keyframes qr-audio-oscilloscope-line-generating {
     0%,
     100% {
