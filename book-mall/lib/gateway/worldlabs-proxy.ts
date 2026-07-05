@@ -340,9 +340,14 @@ export function listWorldSplatUrls(world: WorldlabsWorld): string[] {
   return [...new Set(urls.map((u) => u?.trim()).filter((u): u is string => Boolean(u)))];
 }
 
-const WORLD_SPLAT_HOST_SUFFIXES = ["worldlabs.ai", "googleapis.com", "googleusercontent.com"];
+const WORLD_SPLAT_HOST_SUFFIXES = [
+  "worldlabs.ai",
+  "googleapis.com",
+  "googleusercontent.com",
+  "aliyuncs.com",
+];
 
-/** 浏览器直连可能因 CORS 失败；仅允许 World Labs / GCS 上游。 */
+/** 浏览器直连可能因 CORS 失败；允许 World Labs / GCS / 平台 OSS 上游。 */
 export function isAllowedWorldSplatUpstreamUrl(raw: string): boolean {
   try {
     const u = new URL(raw.trim());

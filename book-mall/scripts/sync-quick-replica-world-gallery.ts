@@ -8,8 +8,10 @@
  * 使用：
  *   cd book-mall && pnpm qr:sync-world-gallery
  *   pnpm qr:sync-world-gallery --dry-run
+ *
+ * splat 高清档须另跑：pnpm qr:sync-world-splats（见 sync-quick-replica-world-splats-to-oss.ts）
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import sharp from "sharp";
@@ -60,12 +62,51 @@ function extractThumbnailUrl(world: OfficialWorld): string | null {
   return `${base}/thumbnail.webp`;
 }
 
+function isOssQuickReplicaUrl(url: string): boolean {
+  return url.trim().toLowerCase().includes("aliyuncs.com/quick-replica/");
+}
+
+function mergeSplatUrlsFromExisting(
+  worldId: string,
+  incoming: Record<string, string>,
+  existingByWorldId: Map<string, QrTemplateJson>,
+): Record<string, string> {
+  const existing = existingByWorldId.get(worldId);
+  const params = existing?.reference?.model?.params as Record<string, unknown> | undefined;
+  const prev = params?.splat_urls;
+  if (!prev || typeof prev !== "object") return incoming;
+
+  const merged = { ...incoming };
+  for (const [tier, url] of Object.entries(prev as Record<string, unknown>)) {
+    if (typeof url !== "string" || !url.trim()) continue;
+    if (isOssQuickReplicaUrl(url)) merged[tier] = url.trim();
+  }
+  return merged;
+}
+
+function loadExistingTemplatesByWorldId(): Map<string, QrTemplateJson> {
+  try {
+    const arr = JSON.parse(readFileSync(OUT_JSON, "utf8")) as QrTemplateJson[];
+    const map = new Map<string, QrTemplateJson>();
+    for (const row of arr) {
+      const params = row.reference?.model?.params as Record<string, unknown> | undefined;
+      const worldId = typeof params?.world_id === "string" ? params.world_id.trim() : "";
+      if (worldId) map.set(worldId, row);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 function buildTemplate(
   world: OfficialWorld,
   thumbnailUrl: string,
   sourceThumbnailUrl: string,
   sortOrder: number,
   thumbMeta?: { width: number; height: number },
+  splatUrlsOverride?: Record<string, string>,
+  splatSourceUrls?: Record<string, string>,
 ): QrTemplateJson {
   const now = new Date().toISOString();
   const promptText = extractPromptText(world);
@@ -100,7 +141,8 @@ function buildTemplate(
           tags: world.tags ?? [],
           source: world.source ?? "web_ui",
           status: world.status ?? null,
-          splat_urls: world.generation_output?.spz_urls ?? {},
+          splat_urls: splatUrlsOverride ?? world.generation_output?.spz_urls ?? {},
+          splat_source_urls: splatSourceUrls ?? undefined,
           thumbnail_source_url: sourceThumbnailUrl,
           thumb_width: thumbMeta?.width ?? null,
           thumb_height: thumbMeta?.height ?? null,
@@ -190,6 +232,7 @@ async function main() {
   const urlMap: Record<string, string> = {};
   const templates: QrTemplateJson[] = [];
   let ok = 0;
+  const existingByWorldId = loadExistingTemplatesByWorldId();
 
   for (let i = 0; i < worlds.length; i += 1) {
     const listed = worlds[i]!;
@@ -218,6 +261,16 @@ async function main() {
       console.warn(`[warn] ${id} missing full_res · keys=${spzKeys.join(",") || "none"}`);
     }
 
+    const incomingSplats = world.generation_output?.spz_urls ?? {};
+    const mergedSplats = mergeSplatUrlsFromExisting(world.id, incomingSplats, existingByWorldId);
+    const existingParams = existingByWorldId.get(world.id)?.reference?.model?.params as
+      | Record<string, unknown>
+      | undefined;
+    const existingSourceUrls =
+      existingParams?.splat_source_urls && typeof existingParams.splat_source_urls === "object"
+        ? (existingParams.splat_source_urls as Record<string, string>)
+        : undefined;
+
     if (!sourceThumb) {
       console.warn(`[skip] ${id} no thumbnail`);
       continue;
@@ -225,7 +278,17 @@ async function main() {
 
     if (dryRun) {
       console.log(`[dry-run] ${id} ← ${sourceThumb}`);
-      templates.push(buildTemplate(world, sourceThumb, sourceThumb, sortOrder));
+      templates.push(
+        buildTemplate(
+          world,
+          sourceThumb,
+          sourceThumb,
+          sortOrder,
+          undefined,
+          mergedSplats,
+          existingSourceUrls,
+        ),
+      );
       ok += 1;
       continue;
     }
@@ -244,7 +307,9 @@ async function main() {
         ext,
       });
       urlMap[id] = ossUrl;
-      templates.push(buildTemplate(world, ossUrl, sourceThumb, sortOrder, thumbMeta));
+      templates.push(
+        buildTemplate(world, ossUrl, sourceThumb, sortOrder, thumbMeta, mergedSplats, existingSourceUrls),
+      );
       ok += 1;
       console.log(`[ok] ${id} → ${ossUrl}`);
     } catch (e) {
