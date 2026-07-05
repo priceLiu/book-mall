@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo } from "react";
 import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
-import { useNodes } from "@xyflow/react";
 import {
   VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
@@ -10,7 +9,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -53,24 +52,16 @@ export function Pro2StarterInputDock() {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
-  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const selectedStarter = useMemo(() => {
-    const picked = rfNodes.filter(
-      (n) => n.selected && n.type === "story-pro2-starter",
-    );
-    return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
-
+  const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-starter");
   const storeNode = useMemo(() => {
-    if (!selectedStarter) return null;
-    return nodes.find((n) => n.id === selectedStarter.id) ?? null;
-  }, [selectedStarter, nodes]);
+    if (!dockNodeId) return null;
+    return nodes.find((n) => n.id === dockNodeId) ?? null;
+  }, [dockNodeId, nodes]);
 
-  const dockNodeId = selectedStarter?.id ?? storeNode?.id ?? null;
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 

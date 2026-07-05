@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 import { useNodes } from "@xyflow/react";
 import { resolveLibtvFloatingDockSelection } from "./libtv-floating-dock-selection";
+import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 import { useCanvasStore } from "./store";
 import {
   useLibtvDockFlowPlacement,
@@ -21,11 +22,14 @@ type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]
  */
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
+  const marqueeSelecting = useCanvasMarqueeSelecting();
 
   const rfGlobal = useMemo(
     () => resolveLibtvFloatingDockSelection(rfNodes),
     [rfNodes],
   );
+
+  if (marqueeSelecting) return null;
 
   // RF 已无选中时 Dock 必须收起；勿回退 pin（否则点空白常需两次才关）
   if (!rfGlobal) return null;
@@ -53,6 +57,7 @@ export function useLibtvFloatingDock(
   const hidden = useCanvasStore((s) =>
     libtvFloatingDockHidden(s.canvasDraggingNodeId, dockNodeId),
   );
+  const marqueeSelecting = useCanvasMarqueeSelecting();
 
   const rawPlacement = useLibtvDockFlowPlacement(dockNodeId, placementOpts);
   const stablePlacement = useStableLibtvDockFlowPlacement(rawPlacement);
@@ -74,7 +79,7 @@ export function useLibtvFloatingDock(
       ? pinRef.current.placement
       : null);
 
-  const active = Boolean(dockNodeId && placement);
+  const active = Boolean(dockNodeId && placement && !marqueeSelecting);
 
   return {
     placement,

@@ -15,6 +15,7 @@ import {
   computePro2MultiSelectionBbox,
   pro2SelectedNonGroupIds,
 } from "@/lib/canvas/pro2-selection-bbox";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function Pro2SelectionToolbar({
   const { flowToScreenPosition, getInternalNode, setNodes: rfSetNodes } =
     useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
   const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const projectId = useCanvasStore((s) => s.projectId);
@@ -126,7 +128,9 @@ export function Pro2SelectionToolbar({
     return { x: top.x, y: top.y - GAP, place: "above" as const };
   }, [bbox, flowToScreenPosition, viewport]);
 
-  if (viewportMoving || !placement || selectedIds.length < 2) return null;
+  if (marqueeSelecting || viewportMoving || !placement || selectedIds.length < 2) {
+    return null;
+  }
 
   const onSaveToAssets = async () => {
     if (!saveableThreeViews.length) {

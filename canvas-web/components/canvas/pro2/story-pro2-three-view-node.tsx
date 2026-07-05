@@ -46,10 +46,11 @@ import {
 } from "./pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
-import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
+import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import {
   Pro2ThreeViewNodeEmbeddedDock,
   pro2ThreeViewNodeUsesEmbeddedDock,
@@ -82,10 +83,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const hasError = Boolean(d.uploadError?.trim());
   const label = d.label?.trim() || "角色";
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
-  const soleSelected = useMemo(
-    () => selected && rfNodes.filter((n) => n.selected).length === 1,
-    [selected, rfNodes],
-  );
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
   const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
   const showImageTools = Boolean(showFloatingToolbar && hasImage);
   const showEmbeddedDock = pro2ThreeViewNodeUsesEmbeddedDock(d, {

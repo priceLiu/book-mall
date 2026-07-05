@@ -9,7 +9,7 @@ import {
   useReactFlow,
   type NodeProps,
 } from "@xyflow/react";
-import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import {
   Columns3,
   Film,
@@ -192,8 +192,12 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     [childrenIdsKey],
   );
 
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+
   const showToolbar =
-    !isLibtvMediaGroup && (selected || editOpen || pointerInside);
+    !marqueeSelecting &&
+    !isLibtvMediaGroup &&
+    (selected || editOpen || pointerInside);
 
   const viewport = useViewportTransformActive(
     !isLibtvMediaGroup &&

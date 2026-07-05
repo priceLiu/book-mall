@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useReactFlow } from "@xyflow/react";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isPro2CharacterBoardGroup } from "@/lib/canvas/pro2-resolve-character-board-group";
@@ -29,6 +30,7 @@ export function Pro2MediaGroupToolbar({
 }) {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
   const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
   const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
 
@@ -101,7 +103,7 @@ export function Pro2MediaGroupToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved, getInternalNode, flowToScreenPosition, rfNodes, viewport]);
 
-  if (viewportMoving || !resolved || !placement) return null;
+  if (marqueeSelecting || viewportMoving || !resolved || !placement) return null;
 
   const keepHover = () =>
     pinPro2MediaGroupToolbarHover(resolved.group.id, setHoveredMediaGroupId);

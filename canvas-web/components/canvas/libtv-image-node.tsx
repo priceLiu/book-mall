@@ -34,6 +34,7 @@ import {
 import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
+import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
@@ -173,10 +174,7 @@ export function LibtvImageNode({
   const showSidePlus = Boolean(
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
-  const soleSelected = useMemo(
-    () => selected && rfNodes.filter((n) => n.selected).length === 1,
-    [selected, rfNodes],
-  );
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
   const showTryMenu =
     !isCharacterThreeView && !hasImage && !isGenerating && !hasError;
   const showFloatingToolbar = Boolean(soleSelected && !isGenerating);

@@ -82,6 +82,8 @@ import {
 import { generatePro2CharacterThreeViewFromHub } from "@/lib/canvas/pro2-script-hub-toolbar-actions";
 import { resolvePro2ThreeViewBatchImageForHub } from "@/lib/canvas/pro2-three-view-batch-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 
 type HubTryActionId = "upload-script" | "video-ref" | "character";
 
@@ -210,12 +212,15 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   }, [nodes, edges, id, d.outlineMd]);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
-  const showToolbar = Boolean(selected && hasPreviewContent && !isGenerating);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
+  const showToolbar = Boolean(soleSelected && hasPreviewContent && !isGenerating);
   const showThinTitle = displayState !== "generated" || isGenerating;
   const previewTitle =
     displayState === "generated" && !isGenerating ? tableTitle : undefined;
   const showSidePlus = Boolean(
-    (hovered || selected || connectingFromNodeId) &&
+    !marqueeSelecting &&
+      (hovered || soleSelected || connectingFromNodeId) &&
       (hasPreviewContent || isLinked) &&
       !isGenerating,
   );
@@ -387,7 +392,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {selected && !showToolbar ? (
+      {soleSelected && !showToolbar ? (
         <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
       ) : null}
 
