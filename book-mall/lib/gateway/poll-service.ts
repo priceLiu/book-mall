@@ -133,7 +133,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
       status: "RUNNING",
       externalTaskId: { not: null },
       submittedAt: { lt: nonVideoAsyncCutoff },
-      OR: [{ requestKind: null }, { requestKind: { not: "VIDEO" } }],
+      requestKind: { not: "VIDEO" },
     },
     data: {
       status: "FAILED",
