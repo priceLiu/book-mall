@@ -7,7 +7,7 @@ function hintForReason(reason: string): string {
     return "子站未配置 TOOLS_SSO_SERVER_SECRET（≥16 字符）。本地开发请确保 book-mall/.env.local 已配置，并用 pnpm dev（会自动从主站继承）；或复制到 e-commerce-toolkit/.env.local。";
   }
   if (reason === "missing_main_origin") {
-    return "未配置 MAIN_SITE_ORIGIN 或 NEXT_PUBLIC_BOOK_MALL_URL。";
+    return "子站运行时未读到主站地址。本地请用 pnpm dev（scripts/dev.mjs）启动，或在 e-commerce-toolkit/.env.local 配置 MAIN_SITE_ORIGIN=http://localhost:3000；线上请在 e-commerce-toolkit 云托管（非 book-mall）配置 MAIN_SITE_ORIGIN=https://book.ai-code8.com。可访问 /api/sso-config-health 自检。";
   }
   if (reason === "exchange_403") {
     return "当前账号不满足电商工具箱准入（须有效月费、代付模式或管理员）。";

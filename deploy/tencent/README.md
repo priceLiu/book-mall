@@ -63,7 +63,7 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 - **财务服务**与工具站一样，容器内 Next 监听 **3002**（与本地 `pnpm dev` 端口一致）。
 - **story-web** 容器内 Next 监听 **3003**。
 - **canvas-web** 监听 **3004**；**gateway-web** **3005**；**prompt-optimizer-platform** **3006**（镜像内多阶段构建上游 Vue + Next 壳）。
-- **e-commerce-toolkit** 监听 **3007**；环境变量见 **`deploy/tencent/e-commerce-toolkit.env.example`**；主站须配置 `NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN`，6a 代付时 `ECOM_PLATFORM_GATEWAY_API_KEY_ID`。
+- **e-commerce-toolkit** 监听 **3007**；环境变量见 **`deploy/tencent/e-commerce-toolkit.env.example`**（**`MAIN_SITE_ORIGIN`**、**`TOOLS_SSO_*`** 须配在 **e-commerce-toolkit 服务本身**，不是只配 book-mall）；主站须配置 `NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN`，6a 代付时 `ECOM_PLATFORM_GATEWAY_API_KEY_ID`。
 - 每个服务绑定各自域名；TLS 在「访问设置」里绑定。
 
 ### 新建 story-web 服务（逐步）
