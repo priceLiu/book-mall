@@ -18,8 +18,8 @@ import {
 } from "./sbv1-workspace-types";
 import {
   buildPro2GeneralTextNodeData,
-  selectPro2NodeAfterSpawn,
 } from "./pro2-spawn-nodes";
+import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { cloneCanvasNodeData } from "./clone-node-data";
 import { PRO2_TEXT_NODE_MIN_WIDTH } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";

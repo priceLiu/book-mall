@@ -26,7 +26,7 @@ export type Pro2AddNodePickDialogs = {
     message: string;
     variant?: "info" | "warning" | "error";
   }) => Promise<void>;
-  confirm: (opts: {
+  confirm?: (opts: {
     title: string;
     message: string;
     confirmLabel?: string;
@@ -134,7 +134,7 @@ export async function handlePro2ToolbarAddNodePick(
     itemId === "mood-column" ||
     itemId === "audio-column";
   if (stagePick && !pro2ProductionGateAllowsStageSpawn(gate)) {
-    const ok = await dialogs.confirm({
+    const ok = await (dialogs.confirm ?? (async () => true))({
       title: "建议先关联剧本",
       message: `${gate.message}\n\n仍要继续添加节点吗？`,
       confirmLabel: "继续添加",

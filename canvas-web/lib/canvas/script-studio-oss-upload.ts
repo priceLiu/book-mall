@@ -14,8 +14,8 @@ export async function uploadScriptStudioTextToOss(
         : "";
     const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
     const file = new File([blob], filename, { type: "text/markdown" });
-    const { ossUrl } = await uploadCanvasFile(base, file);
-    return ossUrl ?? null;
+    const ossUrl = await uploadCanvasFile(base, file);
+    return ossUrl || null;
   } catch {
     return null;
   }

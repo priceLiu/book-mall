@@ -54,6 +54,8 @@ export function dialogueFromVideoNode(node: CanvasFlowNode): string | undefined 
   return p || undefined;
 }
 
-export function videoUrlFromTask(task: Pick<CanvasTaskRecord, "ossUrl" | "ephemeralUrl">): string | undefined {
+export function videoUrlFromTask(
+  task: Pick<CanvasTaskRecord, "ossUrl" | "ephemeralUrl" | "model" | "textOutput">,
+): string | undefined {
   return pickTaskResultMediaUrl(task) ?? task.ossUrl?.trim() ?? task.ephemeralUrl?.trim() ?? undefined;
 }

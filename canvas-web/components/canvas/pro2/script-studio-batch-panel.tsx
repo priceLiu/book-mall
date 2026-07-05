@@ -43,7 +43,7 @@ export function ScriptStudioBatchPanel() {
   const generatedEpisodes = Math.min(batchIndex * 10, total);
   const rt = d.themeOutlineRuntime;
   const running =
-    rt?.status === "pending" || rt?.status === "running" || rt?.status === "submitted";
+    rt?.status === "pending" || rt?.status === "running";
   const hasMore = batchIndex < batchTotal;
   const range =
     batchIndex < batchTotal

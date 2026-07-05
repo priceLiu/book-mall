@@ -20,13 +20,15 @@ import { LibtvImageNode } from "../libtv-image-node";
 export function StoryPro2ImageNode(props: NodeProps) {
   const { alert } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
 
   const spawnStore = useMemo(
-    () => ({ nodes, addNode, setNodes, setEdges }),
-    [nodes, addNode, setNodes, setEdges],
+    () => ({ nodes, edges, addNode, addNodeInGroup, setNodes, setEdges }),
+    [nodes, edges, addNode, addNodeInGroup, setNodes, setEdges],
   );
 
   const onSidePick = useCallback(

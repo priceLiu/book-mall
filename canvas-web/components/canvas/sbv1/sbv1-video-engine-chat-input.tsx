@@ -169,13 +169,14 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   );
   const selectedModel = getSbv1VolcengineModelById(variantId, providers);
   const modelKey = selectedModel.engine.modelKey;
+  const multiShots = data.engine?.params?.multi_shots === true;
   const dockChips = useMemo(
     () =>
       getSbv1VideoDockModeChips(modelKey, {
-        multiShots: data.multiShots,
+        multiShots,
         providerId: data.engine?.providerId,
       }),
-    [modelKey, data.multiShots, data.engine?.providerId],
+    [modelKey, multiShots, data.engine?.providerId],
   );
   const activeDockMode = resolveSbv1DockInputMode(
     referenceMode,
@@ -299,7 +300,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         index,
         total,
         {
-          multiShots: data.multiShots,
+          multiShots,
           providerId: data.engine?.providerId,
         },
       ),
@@ -307,7 +308,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       modelKey,
       referenceMode,
       activeDockMode,
-      data.multiShots,
+      multiShots,
       data.engine?.providerId,
     ],
   );

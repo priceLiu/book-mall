@@ -108,6 +108,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -374,7 +375,9 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           ) {
             spawnLibtvNeighborFromAnchor(id, side, spawnType, {
               nodes,
+              edges,
               addNode,
+              addNodeInGroup,
               setNodes,
               setEdges,
             });

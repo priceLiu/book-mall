@@ -45,7 +45,7 @@ export async function syncScriptPackageAssetOnPublish(args: {
       sourceEdition: "pro2",
       payload,
       refs: [],
-      visibility: "private",
+      visibility: "PRIVATE",
     });
     return asset.id;
   } catch {

@@ -401,7 +401,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             ) : (
               <LibtvVideoNodeToolbar
                 passNodeDrag
-                minimal
                 onDuplicateNode={onDuplicateNode}
               />
             )}

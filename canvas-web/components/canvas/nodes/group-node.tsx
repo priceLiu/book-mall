@@ -107,6 +107,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const { alert } = useDialogs();
   const ungroup = useCanvasStore((s) => s.ungroup);
@@ -147,6 +148,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as GroupNodeData;
   const color = d.color || GROUP_COLOR_PRESETS[2];
   const storeNodes = useCanvasStore((s) => s.nodes);
+  const storeEdges = useCanvasStore((s) => s.edges);
   const selfNode = useMemo(
     () => storeNodes.find((n) => n.id === id),
     [storeNodes, id],
@@ -409,8 +411,15 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   }, [id, rfSetNodes, setHoveredMediaGroupId]);
 
   const groupSpawnStore = useMemo(
-    () => ({ nodes: storeNodes, addNode, setNodes, setEdges }),
-    [storeNodes, addNode, setNodes, setEdges],
+    () => ({
+      nodes: storeNodes,
+      edges: storeEdges,
+      addNode,
+      addNodeInGroup,
+      setNodes,
+      setEdges,
+    }),
+    [storeNodes, storeEdges, addNode, addNodeInGroup, setNodes, setEdges],
   );
 
   const onGroupSidePick = useCallback(

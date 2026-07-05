@@ -7,7 +7,7 @@ import type { CrewBulletinTask, CrewTaskKind } from "./crew-bulletin-types";
 import { CREW_BULLETIN_KIND_LABELS } from "./crew-bulletin-types";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
-import type { CanvasFlowNode, CanvasGraph } from "./types";
+import type { CanvasFlowNode, CanvasGraph, CanvasNodeType } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 
@@ -314,7 +314,7 @@ export function spawnScriptPackageSnapshotOnCanvas(
     }
   }
 
-  const nodeType = snapshot.nodeType;
+  const nodeType = snapshot.nodeType as CanvasNodeType | undefined;
   if (!nodeType || !snapshot.nodeDataSnapshot) return null;
 
   const position = flowPositionAtViewportCenter(nodeType);
