@@ -203,6 +203,10 @@ type CanvasState = {
   canvasDraggingNodeId: string | null;
   /** 画布 pan/zoom 进行中：浮动 Dock / 内联 @ 缩略图暂停更新 */
   canvasViewportMoving: boolean;
+  /** 用户拖空白框选中（尚未松手）：隐藏节点顶栏 / 浮动 Dock */
+  canvasMarqueeSelecting: boolean;
+  /** 多选选区整体拖动中：隐藏单节点 Dock / 顶栏 */
+  canvasSelectionDragging: boolean;
   /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
   libtvFloatingDockNodeId: string | null;
   libtvFloatingDockNodeType: string | null;
@@ -216,6 +220,8 @@ type CanvasState = {
   setCanvasGeometryDragging: (dragging: boolean) => void;
   setCanvasDraggingNodeId: (nodeId: string | null) => void;
   setCanvasViewportMoving: (moving: boolean) => void;
+  setCanvasMarqueeSelecting: (selecting: boolean) => void;
+  setCanvasSelectionDragging: (dragging: boolean) => void;
   setLibtvFloatingDockSelection: (
     nodeId: string | null,
     nodeType: string | null,
@@ -385,6 +391,8 @@ export const useCanvasStore = create<CanvasState>()(
       canvasGeometryDragging: false,
       canvasDraggingNodeId: null,
       canvasViewportMoving: false,
+      canvasMarqueeSelecting: false,
+      canvasSelectionDragging: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
@@ -399,6 +407,10 @@ export const useCanvasStore = create<CanvasState>()(
         set({ canvasDraggingNodeId: nodeId }),
       setCanvasViewportMoving: (moving) =>
         set({ canvasViewportMoving: moving }),
+      setCanvasMarqueeSelecting: (selecting) =>
+        set({ canvasMarqueeSelecting: selecting }),
+      setCanvasSelectionDragging: (dragging) =>
+        set({ canvasSelectionDragging: dragging }),
       setLibtvFloatingDockSelection: (nodeId, nodeType) =>
         set({
           libtvFloatingDockNodeId: nodeId,

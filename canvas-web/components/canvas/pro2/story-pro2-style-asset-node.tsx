@@ -35,6 +35,8 @@ import { cn } from "@/lib/utils";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
+import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 
 /** 2.0 风格素材节点（LibTV 薄卡 · 无底部 Dock / 检视面板） */
@@ -48,7 +50,12 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const d = data as unknown as StoryPro2StyleAssetNodeData;
-  const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
+  const showSidePlus = Boolean(
+    !marqueeSelecting &&
+      (hovered || soleSelected || connectingFromNodeId),
+  );
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-style-asset");
   const previewUrl = d.imageUrl?.trim() ?? "";
   const headerLabel = d.label?.trim() || `素材-风格-${d.styleName || "未命名"}`;
@@ -179,7 +186,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {selected ? (
+      {soleSelected ? (
         <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
       ) : null}
 

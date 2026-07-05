@@ -8,6 +8,7 @@ import {
   useLibtvNodeToolbarHidden,
   useLibtvNodeToolbarScreenPlacement,
 } from "@/lib/canvas/use-libtv-node-toolbar-placement";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import {
   computeLibtvPortaledToolbarScale,
   LIBTV_TOOLBAR_PORTAL_GAP_PX,
@@ -31,12 +32,14 @@ export function LibtvNodeToolbarPortal({
   children: React.ReactNode;
 }) {
   const mounted = useClientPortalMounted();
-  const placement = useLibtvNodeToolbarScreenPlacement(nodeId, visible);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const effectiveVisible = visible && !marqueeSelecting;
+  const placement = useLibtvNodeToolbarScreenPlacement(nodeId, effectiveVisible);
   const hidden = useLibtvNodeToolbarHidden(nodeId);
   const zoom = useStore((s) => s.transform[2]);
   const toolbarScale = computeLibtvPortaledToolbarScale(zoom);
 
-  if (!mounted || !visible || !placement) return null;
+  if (!mounted || !effectiveVisible || !placement) return null;
 
   return createPortal(
     <LibtvToolbarPortaledContext.Provider value={true}>

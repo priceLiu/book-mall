@@ -70,7 +70,7 @@ import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
-import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
@@ -167,10 +167,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const showSidePlus = Boolean(
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
-  const soleSelected = useMemo(
-    () => Boolean(selected && rfNodes.filter((n) => n.selected).length === 1),
-    [selected, rfNodes],
-  );
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
 
   const openEditor = useCallback(() => {
     if (!hasCardContent || isGenerating) return;

@@ -5,6 +5,7 @@ import { useNodes, useReactFlow } from "@xyflow/react";
 import { LayoutGrid, FolderPlus, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { computePro2MultiSelectionBbox } from "@/lib/canvas/pro2-selection-bbox";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { GROUP_COLOR_PRESETS, isGroupNode } from "@/lib/canvas/types";
@@ -32,6 +33,7 @@ export function SelectionToolbar() {
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const removeNode = useCanvasStore((s) => s.removeNode);
   const allNodes = useCanvasStore((s) => s.nodes);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
   const { doubleConfirm, alert } = useDialogs();
 
   const allRfNodes = useNodes();
@@ -79,7 +81,7 @@ export function SelectionToolbar() {
     }
   }, [groupOpen, groupName]);
 
-  if (!placement || selectedIds.length < 2) return null;
+  if (marqueeSelecting || !placement || selectedIds.length < 2) return null;
 
   return (
     <div

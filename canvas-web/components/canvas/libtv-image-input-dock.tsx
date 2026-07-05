@@ -37,6 +37,7 @@ import {
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
 import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { isLibtvPro2ImageDockNodeType } from "@/lib/canvas/libtv-pro2-image-dock-types";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
@@ -111,7 +112,9 @@ export function LibtvImageInputDock() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
+  const marqueeSelecting = useCanvasMarqueeSelecting();
   const pro2DockNodeId = useMemo(() => {
+    if (marqueeSelecting) return null;
     const sel = resolveLibtvFloatingDockSelection(rfNodes);
     if (!sel || !isLibtvPro2ImageDockNodeType(sel.nodeType)) return null;
     const rf = rfNodes.find((n) => n.id === sel.nodeId);
@@ -123,7 +126,7 @@ export function LibtvImageInputDock() {
       return null;
     }
     return sel.nodeId;
-  }, [rfNodes]);
+  }, [rfNodes, marqueeSelecting]);
 
   const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
 

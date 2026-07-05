@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Languages, Zap } from "lucide-react";
-import { useNodes } from "@xyflow/react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { LibtvDockSettingsTrigger } from "@/components/canvas/libtv-dock-settings-trigger";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
@@ -48,24 +47,16 @@ const SCRIPT_PLACEHOLDER =
 export function Pro2ScriptInputDock() {
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
-  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const selectedHub = useMemo(() => {
-    const picked = rfNodes.filter(
-      (n) => n.selected && n.type === "story-pro2-script-hub",
-    );
-    return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
-
+  const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-script-hub");
   const storeNode = useMemo(() => {
-    if (!selectedHub) return null;
-    return nodes.find((n) => n.id === selectedHub.id) ?? null;
-  }, [selectedHub, nodes]);
+    if (!dockNodeId) return null;
+    return nodes.find((n) => n.id === dockNodeId) ?? null;
+  }, [dockNodeId, nodes]);
 
-  const dockNodeId = selectedHub?.id ?? storeNode?.id ?? null;
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 

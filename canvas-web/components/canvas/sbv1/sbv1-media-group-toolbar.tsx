@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { useReactFlow } from "@xyflow/react";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
@@ -32,6 +33,7 @@ export function Sbv1MediaGroupToolbar({
   const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
 
   const group = useMemo(() => {
     const hasNonGroupSelected = rfNodes.some(
@@ -102,7 +104,7 @@ export function Sbv1MediaGroupToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group, getInternalNode, flowToScreenPosition, rfNodes, viewport]);
 
-  if (viewportMoving || !group || !placement) return null;
+  if (marqueeSelecting || viewportMoving || !group || !placement) return null;
 
   const keepHover = () =>
     pinPro2MediaGroupToolbarHover(group.id, setHoveredMediaGroupId);

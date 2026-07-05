@@ -24,7 +24,10 @@ import {
   isCanvasPositionCommitOnly,
   isCanvasSelectionOnlyChange,
 } from "@/lib/canvas/canvas-node-changes";
-import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
+import {
+  countLibtvSelectedNonGroupNodes,
+  resolveLibtvFloatingDockSelection,
+} from "@/lib/canvas/libtv-floating-dock-selection";
 import { cloneCanvasNodeData } from "@/lib/canvas/clone-node-data";
 import {
   isPro2StyledGroup,
@@ -167,6 +170,8 @@ function FlowCanvasInner({
   const [isNodeDragging, setIsNodeDragging] = useState(false);
   const isNodeDraggingRef = useRef(false);
   const [snapGuides, setSnapGuides] = useState<SnapGuideLine[]>([]);
+  /** 框选松手后 onPaneClick 与多选拖松手竞态 · 勿收成单选 */
+  const libtvMultiNodeDragRef = useRef(false);
   const deferStoreGraphSyncRef = useRef(false);
 
   const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -684,6 +689,16 @@ function FlowCanvasInner({
       setIsNodeDragging(true);
       setCanvasGeometryDragging(true);
       setCanvasDraggingNodeId(node.id);
+      if (libtvCanvas) {
+        const multi =
+          countLibtvSelectedNonGroupNodes(getNodes() as CanvasFlowNode[]) > 1;
+        libtvMultiNodeDragRef.current = multi;
+        if (multi) {
+          useCanvasStore.getState().setCanvasSelectionDragging(true);
+        }
+      } else {
+        libtvMultiNodeDragRef.current = false;
+      }
       setSnapGuides([]);
       lastSnapGuideKeyRef.current = "";
       if (enableDragSnapGuides && node.type !== "group") {
@@ -698,7 +713,7 @@ function FlowCanvasInner({
       useCanvasStore.temporal.getState().pause();
       dragUndoPausedRef.current = true;
     },
-    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging, setCanvasDraggingNodeId],
+    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging, setCanvasDraggingNodeId, libtvCanvas],
   );
 
   const onNodeDrag = useCallback(
@@ -805,13 +820,20 @@ function FlowCanvasInner({
       }
       setDragHoverGroup(null);
       if (libtvCanvas && node.type && node.type !== "group") {
-        setRfNodes((prev) =>
-          prev.map((n) => ({ ...n, selected: n.id === node.id })),
-        );
-        useCanvasStore.getState().setLibtvFloatingDockSelection(
-          node.id,
-          node.type,
-        );
+        if (libtvMultiNodeDragRef.current) {
+          // 框选后拖整组松手：保留多选，交给 Pro2SelectionToolbar；勿收成单节点 Dock
+          useCanvasStore.getState().setLibtvFloatingDockSelection(null, null);
+          useCanvasStore.getState().setCanvasSelectionDragging(false);
+        } else {
+          setRfNodes((prev) =>
+            prev.map((n) => ({ ...n, selected: n.id === node.id })),
+          );
+          useCanvasStore.getState().setLibtvFloatingDockSelection(
+            node.id,
+            node.type,
+          );
+        }
+        libtvMultiNodeDragRef.current = false;
       }
       deferStoreGraphSyncRef.current = false;
       if (didCommitPositions || willReparent) {
@@ -1341,13 +1363,25 @@ function FlowCanvasInner({
         onMoveStart={onMoveStart}
         onMoveEnd={onMoveEnd}
         onInit={onInit}
+        onSelectionStart={() => {
+          useCanvasStore.getState().setCanvasMarqueeSelecting(true);
+        }}
+        onSelectionDragStart={() => {
+          useCanvasStore.getState().setCanvasSelectionDragging(true);
+        }}
+        onSelectionDragStop={() => {
+          useCanvasStore.getState().setCanvasSelectionDragging(false);
+        }}
         onSelectionEnd={
           pro2FloatingInspector
             ? () => {
+                useCanvasStore.getState().setCanvasMarqueeSelecting(false);
                 // 框选松手后会紧跟一次 onPaneClick；忽略以免清空刚选中的节点
                 ignoreNextPaneClickRef.current = true;
               }
-            : undefined
+            : () => {
+                useCanvasStore.getState().setCanvasMarqueeSelecting(false);
+              }
         }
         onPaneClick={
           pro2FloatingInspector || sbv1Canvas

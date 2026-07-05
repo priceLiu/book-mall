@@ -44,6 +44,7 @@ import { sbv1VideoPatchFromTask, isSameSbv1MediaDataPatch } from "@/lib/canvas/s
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
+import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
@@ -203,10 +204,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       d.runtime?.ossUrl ||
       d.runtime?.ephemeralUrl,
   );
-  const soleSelected = useMemo(
-    () => selected && rfNodes.filter((n) => n.selected).length === 1,
-    [selected, rfNodes],
-  );
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
   const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
   const showToolbar = Boolean(showFloatingToolbar && hasToolbarContent);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
