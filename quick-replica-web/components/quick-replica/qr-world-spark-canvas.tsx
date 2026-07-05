@@ -35,6 +35,31 @@ const CAMERA_FAR = 2000;
 const MIN_FOV = 30;
 const MAX_FOV = 120;
 const CROSSFADE_MS = 650;
+/** 低模预览档；超时后仍尝试高清或降级 */
+const LOW_SPLAT_LOAD_TIMEOUT_MS = 90_000;
+/** 高清档体积大，经 BFF 流式传输仍可能较慢 */
+const HIGH_SPLAT_LOAD_TIMEOUT_MS = 240_000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof window.setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = window.setTimeout(
+          () => reject(new Error(`${label}_timeout`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer != null) window.clearTimeout(timer);
+  }
+}
 
 type PackedSplats = spark.PackedSplats | spark.ExtSplats;
 
@@ -256,16 +281,21 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           url: string,
           reportProgress: boolean,
           onRatio?: (ratio: number) => void,
+          timeoutMs = LOW_SPLAT_LOAD_TIMEOUT_MS,
         ): Promise<PackedSplats | null> => {
           try {
-            const packed = await loader.loadAsync(url, (event) => {
-              if (!event.lengthComputable || disposed) return;
-              const ratio = Math.max(0, Math.min(1, event.loaded / event.total));
-              if (reportProgress) onProgressRef.current?.(ratio);
-              onRatio?.(ratio);
-            });
+            const packed = await withTimeout(
+              loader.loadAsync(url, (event) => {
+                if (!event.lengthComputable || disposed) return;
+                const ratio = Math.max(0, Math.min(1, event.loaded / event.total));
+                if (reportProgress) onProgressRef.current?.(ratio);
+                onRatio?.(ratio);
+              }),
+              timeoutMs,
+              "splat_load",
+            );
             if (disposed) return null;
-            await packed.initialized;
+            await withTimeout(packed.initialized, timeoutMs, "splat_init");
             if (disposed) return null;
             return packed;
           } catch (err) {
@@ -389,9 +419,14 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           onProgressRef.current?.(0);
           startRenderLoop();
 
-          const highLoadPromise = loadPacked(high!, false, (ratio) => {
-            setStage("loading-full", `${Math.round(ratio * 100)}%`);
-          });
+          const highLoadPromise = loadPacked(
+            high!,
+            false,
+            (ratio) => {
+              setStage("loading-full", `${Math.round(ratio * 100)}%`);
+            },
+            HIGH_SPLAT_LOAD_TIMEOUT_MS,
+          );
 
           let lowPacked: PackedSplats | null = null;
           lowPacked = await loadPacked(low!, true);

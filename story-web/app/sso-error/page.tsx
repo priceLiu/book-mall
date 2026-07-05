@@ -8,7 +8,11 @@ function hintForReason(reason: string): string {
     return "未配置 MAIN_SITE_ORIGIN 或 NEXT_PUBLIC_BOOK_MALL_URL。";
   }
   if (reason === "missing_exchange_secret") {
-    return "未配置 TOOLS_SSO_SERVER_SECRET（长度 ≥16）。";
+    return (
+      "story-web 运行时未读到有效的 TOOLS_SSO_SERVER_SECRET（长度须 ≥16）。" +
+      "请在 CloudBase 的 story-web 服务（不是 book-mall）配置该变量，与主站完全一致，保存后重新部署/重启。" +
+      "可用 GET /api/sso-config-health 查看当前容器内 exchangeSecretLength。"
+    );
   }
   return "请从主站「打开漫剧」重新发起 SSO，并确认主站与子站 TOOLS_SSO_* 密钥一致。";
 }

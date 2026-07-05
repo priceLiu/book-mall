@@ -1,10 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { exchangeSecret } from "@/lib/sso-exchange-env";
 import { getMainSiteOrigin, getAppPublicOrigin } from "@/lib/site-origin";
-
-function exchangeSecret(): string | null {
-  const s = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
-  return s && s.length >= 16 ? s : null;
-}
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim();
