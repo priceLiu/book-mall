@@ -23,6 +23,11 @@ import {
   isSsoExchangeFreshClient,
 } from "@/lib/sso-exchange-fresh";
 import {
+  parseToolsSessionInactiveReason,
+  toolsSessionInactiveUserMessage,
+  type ToolsSessionInactiveReason,
+} from "@/lib/tools-session-inactive-reason";
+import {
   bumpSsoReenterAttempts,
   clearSsoReenterAttempts,
   MAX_SSO_REENTER_ATTEMPTS,
@@ -100,6 +105,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [hasTokenCookie, setHasTokenCookie] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+  const [inactiveReason, setInactiveReason] =
+    useState<ToolsSessionInactiveReason | null>(null);
   const [exhausted, setExhausted] = useState(false);
   const silentAttemptedRef = useRef(false);
   const loadGenRef = useRef(0);
@@ -154,6 +161,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       if (gen !== loadGenRef.current) return;
       setHasTokenCookie(Boolean(data.hasCookie));
       setSessionActive(Boolean(data.active));
+      setInactiveReason(parseToolsSessionInactiveReason(data));
       if (data.active) {
         clearSsoExchangeFreshClient();
         setReady(true);
@@ -172,6 +180,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           if (gen !== loadGenRef.current) return;
           setHasTokenCookie(Boolean(retryData.hasCookie));
           setSessionActive(Boolean(retryData.active));
+          setInactiveReason(parseToolsSessionInactiveReason(retryData));
           if (retryData.active) {
             setReady(true);
             return;
@@ -184,6 +193,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       if (gen !== loadGenRef.current) return;
       setHasTokenCookie(false);
       setSessionActive(false);
+      setInactiveReason("introspect_timeout");
       setReady(false);
       const aborted =
         e instanceof Error &&
@@ -219,6 +229,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
    */
   useEffect(() => {
     if (silentAttemptedRef.current) return;
+    if (inactiveReason === "tools_access_denied") return;
+    if (inactiveReason === "introspect_timeout") return;
     if (
       !shouldAttemptSilentSso({
         hasTokenCookie,
@@ -238,7 +250,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     bumpSsoReenterAttempts();
     silentAttemptedRef.current = true;
     window.location.href = href;
-  }, [loading, hasTokenCookie, sessionActive, reEnterHref, error]);
+  }, [loading, hasTokenCookie, sessionActive, reEnterHref, error, inactiveReason]);
 
   /**
    * 是否正处于「静默自动换票」过程中：此时不展示手动屏，只显示连接 loader，避免闪烁。
@@ -249,6 +261,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     !loading &&
     !error &&
     !exhausted &&
+    inactiveReason !== "tools_access_denied" &&
+    inactiveReason !== "introspect_timeout" &&
     shouldAttemptSilentSso({ hasTokenCookie, sessionActive, loading: false }) &&
     Boolean(reEnterHref());
 
@@ -275,19 +289,33 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const toolServiceFeeHref =
+    mainOrigin != null && mainOrigin.length > 0
+      ? `${mainOrigin.replace(/\/$/, "")}/account/tool-service-fee`
+      : null;
+
+  const inactiveMessage = toolsSessionInactiveUserMessage(inactiveReason, {
+    freshExchange: isSsoExchangeFreshClient(),
+    hasCookie: hasTokenCookie,
+  });
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--canvas-bg)] px-6 text-center text-[var(--canvas-muted)]">
       <p className="max-w-md text-sm text-zinc-300">
         {error ??
           (exhausted
             ? "多次自动连接 Book 账号均未成功，请重新登录后继续使用。"
-            : isSsoExchangeFreshClient() && hasTokenCookie
-              ? "刚完成 SSO 换票，主站校验较慢。请点「重新连接」或稍候再试。"
-              : hasTokenCookie
-                ? "工具站令牌已失效，请重新连接主站账号。"
-                : "尚未建立画布会话，请连接 Book 账号后继续使用。")}
+            : inactiveMessage)}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
+        {inactiveReason === "tools_access_denied" && toolServiceFeeHref ? (
+          <a
+            href={toolServiceFeeHref}
+            className="rounded-lg border border-[var(--canvas-accent)]/40 bg-[var(--canvas-accent)]/15 px-4 py-2 text-sm text-[var(--canvas-accent)] transition hover:bg-[var(--canvas-accent)]/25"
+          >
+            去开通工具月费
+          </a>
+        ) : null}
         <button
           type="button"
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/15"

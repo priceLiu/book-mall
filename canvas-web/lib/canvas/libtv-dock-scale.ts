@@ -1,13 +1,19 @@
 /**
- * LibTV 浮动输入坞 · 固定 flow 尺寸 + 屏幕线性缩放。
+ * LibTV 浮动输入坞 · 固定 flow 尺寸 + 固定屏幕尺寸（跨 zoom 恒定）。
  *
- * 比例 16:6 · SIZE_FACTOR 0.9（长宽同比 -10%）。
- * 未展开：屏幕基准 +40%（LIBTV_DOCK_BASE_SCALE）。
- * 展开态：在基准上再 +20%（LIBTV_DOCK_EXPAND_FACTOR）。
+ * 目标（未展开 · 在原 656×212 基础上整体 +20%）：
+ * - Dock 屏幕宽高：787 × 254
+ * - 顶栏缩略图：72 × 72
+ * - Dock 关键文字：17px
+ *
+ * 通过 viewport 内 inverse-scale 抵消画布 zoom，实现 10%~800% 基本恒定。
  */
 
-export const LIBTV_DOCK_ASPECT_W = 16;
-export const LIBTV_DOCK_ASPECT_H = 6;
+/** 全局统一放大系数：所有 Dock 在原基准上 +20% */
+export const LIBTV_DOCK_UI_SCALE = 1.2;
+
+export const LIBTV_DOCK_ASPECT_W = 656;
+export const LIBTV_DOCK_ASPECT_H = 212;
 
 /** flow 长宽同比 -10%（相对设计宽 1440） */
 export const LIBTV_DOCK_SIZE_FACTOR = 0.9;
@@ -27,8 +33,8 @@ export const LIBTV_DOCK_FLOW_HEIGHT = libtvDockHeightForWidth(
   LIBTV_DOCK_FLOW_WIDTH,
 );
 
-/** 未展开时屏幕显示同比 +40%（flow 布局不变 · 内容随 invScale 放大） */
-export const LIBTV_DOCK_BASE_SCALE = 1.4;
+/** 未展开时屏幕倍率（固定尺寸模式下保持 1） */
+export const LIBTV_DOCK_BASE_SCALE = 1;
 
 /** 点击展开：在基准上再 +20% */
 export const LIBTV_DOCK_EXPAND_FACTOR = 1.2;
@@ -44,29 +50,12 @@ export function libtvDockScreenExpandMultiplier(expanded: boolean): number {
   return expanded ? LIBTV_DOCK_EXPAND_FACTOR : 1;
 }
 
-/** 设计参考宽（× BASE_SCALE × SIZE_FACTOR 后为 zoom=1 目标屏宽） */
-const LIBTV_DOCK_SCREEN_W_DESIGN = 1200;
-
-function dockScreenScaleFactor(): number {
-  return LIBTV_DOCK_BASE_SCALE * LIBTV_DOCK_SIZE_FACTOR;
-}
-
-/** zoom=1（画布 100%）时目标屏幕宽度（css px） */
-export const LIBTV_DOCK_SCREEN_W_BASE = Math.round(
-  LIBTV_DOCK_SCREEN_W_DESIGN * dockScreenScaleFactor(),
-);
-/** 画布缩 / 放到极限时坞屏宽下限（约 756px · zoom≈0.4 时即到达） */
-export const LIBTV_DOCK_SCREEN_W_MIN = Math.round(
-  600 * dockScreenScaleFactor(),
-);
-/** 画布缩小时坞不再继续放大，封顶 = 100% zoom 屏宽 */
+/** Dock 未展开时固定屏幕宽度（css px · 656×1.2） */
+export const LIBTV_DOCK_SCREEN_W_BASE = Math.round(656 * LIBTV_DOCK_UI_SCALE);
+/** 保留同名常量用于兼容旧调用 */
+export const LIBTV_DOCK_SCREEN_W_MIN = LIBTV_DOCK_SCREEN_W_BASE;
+/** 保留同名常量用于兼容旧调用 */
 export const LIBTV_DOCK_SCREEN_W_MAX = LIBTV_DOCK_SCREEN_W_BASE;
-
-/**
- * 画布缩小（zoom<1）时坞屏宽线性收缩斜率。
- * factor = 1 − (1 − zoom) × SLOPE；取 5/6 使 zoom=0.4 → factor 0.5（约为 100% 的一半）。
- */
-export const LIBTV_DOCK_ZOOMOUT_SLOPE = 5 / 6;
 
 /** 画布缩小到 20% 时，Dock 内文字/缩略图相对现网再放大 3 倍（仅内容 · 外壳尺寸不变） */
 export const LIBTV_DOCK_ZOOMOUT_CONTENT_BOOST_AT_MIN = 3;
@@ -77,13 +66,8 @@ export const LIBTV_DOCK_ZOOMOUT_BOOST_ANCHOR = 0.2;
  * 使画布缩到 20% 时 Dock 内文字与缩略图仍可读。
  */
 export function libtvDockZoomOutContentBoost(zoom: number): number {
-  const z = Math.max(0.08, Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
-  if (z >= 1) return 1;
-  if (z <= LIBTV_DOCK_ZOOMOUT_BOOST_ANCHOR) {
-    return LIBTV_DOCK_ZOOMOUT_CONTENT_BOOST_AT_MIN;
-  }
-  const t = (1 - z) / (1 - LIBTV_DOCK_ZOOMOUT_BOOST_ANCHOR);
-  return 1 + t * (LIBTV_DOCK_ZOOMOUT_CONTENT_BOOST_AT_MIN - 1);
+  void zoom;
+  return 1;
 }
 
 /**
@@ -95,15 +79,9 @@ export function libtvDockInnerContentZoom(
   zoom: number,
   expanded = false,
 ): number {
-  const z = Math.max(0.08, Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
-  if (z < 1) {
-    return libtvDockZoomOutContentBoost(z);
-  }
-  const { w: fw } = libtvDockFlowSize();
-  const invAtZ = computeLibtvDockInverseScale(z, fw, expanded);
-  const invAt1 = computeLibtvDockInverseScale(1, fw, expanded);
-  const compensate = invAt1 / (invAtZ * z);
-  return Math.min(8, Math.max(1, compensate));
+  void zoom;
+  void expanded;
+  return 1;
 }
 
 /** 抵消外壳缩放，使 Dock 内元素屏上 px 恒定（flow 坐标用） */
@@ -125,25 +103,14 @@ export function libtvDockFixedScreenPx(
 }
 
 /**
- * 目标屏宽：
- * - zoom ≥ 1（放大画布）：BASE / zoom，缩到 MIN 为止。
- * - zoom < 1（缩小画布）：BASE × (1 − (1−zoom) × SLOPE)，到 MIN 为止（不再保持 100% 尺寸）。
+ * 目标屏宽（固定）：默认 656px（展开态按 expand 系数放大）。
  */
 export function computeLibtvDockScreenWidth(
-  zoom: number,
+  _zoom: number,
   expanded = false,
 ): number {
-  const z = Math.max(0.08, Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
   const expand = libtvDockScreenExpandMultiplier(expanded);
-  const factor =
-    z >= 1
-      ? 1 / z
-      : Math.max(0, 1 - (1 - z) * LIBTV_DOCK_ZOOMOUT_SLOPE);
-  const raw = LIBTV_DOCK_SCREEN_W_BASE * expand * factor;
-  return Math.min(
-    LIBTV_DOCK_SCREEN_W_MAX * expand,
-    Math.max(LIBTV_DOCK_SCREEN_W_MIN * expand, raw),
-  );
+  return LIBTV_DOCK_SCREEN_W_BASE * expand;
 }
 
 /**
@@ -159,29 +126,31 @@ export function computeLibtvDockInverseScale(
   const fw = Math.max(1, flowWidth);
   const target = computeLibtvDockScreenWidth(zoom, expanded);
   const inv = target / (fw * z);
-  return Math.min(4.5, Math.max(0.1, inv));
+  // 覆盖 10%~800%：zoom=0.1 时允许 >5；zoom=8 时允许 <0.1。
+  return Math.min(12, Math.max(0.03, inv));
 }
 
-/** 视频 Dock 顶栏 · 100% 画布时缩略图目标屏宽（相对旧版 size-10 ≈×2） */
-export const VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 = 64;
+/** 视频 Dock 顶栏 · 缩略图固定屏幕尺寸（60×1.2=72） */
+export const VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 = Math.round(
+  60 * LIBTV_DOCK_UI_SCALE,
+);
 
-/** 缩略图屏上最大尺寸（画布缩到 ≤20% 时取此值） */
-export const VIDEO_DOCK_HEADER_THUMB_W_MAX = 96;
-export const VIDEO_DOCK_HEADER_THUMB_H_MAX = 91;
-/** 画布放大时缩略图收到最大尺寸的 90% */
-export const VIDEO_DOCK_HEADER_THUMB_MIN_RATIO = 0.9;
-/** ≤ 此 zoom 取最大尺寸；≥ THUMB_MIN_ZOOM 取最小尺寸 */
-export const VIDEO_DOCK_HEADER_THUMB_MAX_ZOOM = 0.2;
-export const VIDEO_DOCK_HEADER_THUMB_MIN_ZOOM = 1;
+/** 固定 1:1 缩略图（屏 px） */
+export const VIDEO_DOCK_HEADER_THUMB_W_MAX = Math.round(60 * LIBTV_DOCK_UI_SCALE);
+export const VIDEO_DOCK_HEADER_THUMB_H_MAX = Math.round(60 * LIBTV_DOCK_UI_SCALE);
 
-/** 100% 画布时模式 chip 字号（屏 px · 相对旧 10px ≈×2） */
-export const VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 = 19;
+/** 模式 chip 固定字号（屏 px · 14×1.2≈17） */
+export const VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 = Math.round(14 * LIBTV_DOCK_UI_SCALE);
 
-/** 模式 chip 最小屏高（字号缩小后仍保持原 pill 高度） */
-export const VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100 = 28;
+/** 模式 chip 最小屏高（字号缩小后仍保持原 pill 高度 · 34×1.2≈41） */
+export const VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100 = Math.round(
+  34 * LIBTV_DOCK_UI_SCALE,
+);
 
-/** 视频 Dock 底栏 · 模型/积分字号（屏 px） */
-export const VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 = 13;
+/** 视频 Dock 底栏 · 模型/积分字号（屏 px · 14×1.2≈17） */
+export const VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 = Math.round(
+  14 * LIBTV_DOCK_UI_SCALE,
+);
 
 /** 画布缩小锚点 · 顶栏缩略图仍保持 2×100% 基准 */
 export const VIDEO_DOCK_HEADER_ZOOMOUT_ANCHOR = 0.15;
@@ -189,8 +158,8 @@ export const VIDEO_DOCK_HEADER_ZOOMOUT_ANCHOR = 0.15;
 /** 画布放大锚点 · 顶栏相对 100% 再 ×2 */
 export const VIDEO_DOCK_HEADER_ZOOMIN_ANCHOR = 2;
 
-/** Dock 正文 prompt · 100% 画布基准屏字号（与 PRO2_DOCK_TEXTAREA_CLASS 一致） */
-export const DOCK_PROMPT_FONT_SCREEN_AT_100 = 15;
+/** Dock 正文 prompt · 固定屏字号（14×1.2≈17） */
+export const DOCK_PROMPT_FONT_SCREEN_AT_100 = Math.round(14 * LIBTV_DOCK_UI_SCALE);
 
 /**
  * Dock 正文 prompt 屏上字号 · 随画布 zoom。
@@ -198,21 +167,8 @@ export const DOCK_PROMPT_FONT_SCREEN_AT_100 = 15;
  * - 缩小至 min：比 max 再小 1px（max 与 min 仅差 1 个字号）
  */
 export function libtvDockPromptFontScreenMetrics(canvasZoom: number): number {
-  const z = Math.max(0.08, Math.min(4, Number.isFinite(canvasZoom) ? canvasZoom : 1));
-  const F = DOCK_PROMPT_FONT_SCREEN_AT_100;
-  const zMin = VIDEO_DOCK_HEADER_ZOOMOUT_ANCHOR;
-  const zMax = VIDEO_DOCK_HEADER_ZOOMIN_ANCHOR;
-  const fontAtMax = F - 2;
-  const fontAtMin = fontAtMax - 1;
-
-  if (z <= zMin) return fontAtMin;
-  if (z >= zMax) return fontAtMax;
-  if (z >= 1) {
-    const t = (z - 1) / (zMax - 1);
-    return F + t * (fontAtMax - F);
-  }
-  const t = (z - zMin) / (1 - zMin);
-  return fontAtMin + t * (F - fontAtMin);
+  void canvasZoom;
+  return DOCK_PROMPT_FONT_SCREEN_AT_100;
 }
 
 /** 正文在 contentZoom 包裹内 · flow 字号使屏上尺寸 = targetScreenPx */
@@ -227,12 +183,7 @@ export function libtvDockPromptFlowFontPx(
 }
 
 /**
- * 视频 / 图片 Dock 顶两栏（模式 chip + 缩略图）屏上尺寸 · 随画布 zoom。
- * 缩略图：
- * - 画布缩小（zoom ≤ 0.2）→ 最大 96×91（屏上 px，不再继续放大）
- * - 画布放大（zoom ≥ 1）→ 最小 = 最大尺寸 × 90%
- * - 之间线性插值
- * chip / badge 字号沿用旧档位，保持视频模式条观感不变。
+ * 视频 / 图片 Dock 顶两栏（模式 chip + 缩略图）屏上尺寸固定。
  */
 export function libtvDockVideoHeaderScreenMetrics(canvasZoom: number): {
   /** = thumbWidthScreenPx，向后兼容 */
@@ -242,41 +193,11 @@ export function libtvDockVideoHeaderScreenMetrics(canvasZoom: number): {
   chipFontScreenPx: number;
   badgeFontScreenPx: number;
 } {
-  const z = Math.max(0.08, Math.min(4, Number.isFinite(canvasZoom) ? canvasZoom : 1));
-  const F = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
-
-  // 缩略图屏上尺寸：zoom≤0.2 取最大；zoom≥1 取 90%；线性插值
-  const wMax = VIDEO_DOCK_HEADER_THUMB_W_MAX;
-  const hMax = VIDEO_DOCK_HEADER_THUMB_H_MAX;
-  const r = VIDEO_DOCK_HEADER_THUMB_MIN_RATIO;
-  const zOut = VIDEO_DOCK_HEADER_THUMB_MAX_ZOOM;
-  const zIn = VIDEO_DOCK_HEADER_THUMB_MIN_ZOOM;
-  const tThumb =
-    z <= zOut ? 0 : z >= zIn ? 1 : (z - zOut) / (zIn - zOut);
-  const thumbWidthScreenPx = wMax - tThumb * (wMax * (1 - r));
-  const thumbHeightScreenPx = hMax - tThumb * (hMax * (1 - r));
-
-  // chip / badge 字号（旧档位）
-  const zMin = VIDEO_DOCK_HEADER_ZOOMOUT_ANCHOR;
-  const zMax = VIDEO_DOCK_HEADER_ZOOMIN_ANCHOR;
-  const font2x = F * 2;
-  let chipFontScreenPx: number;
-  let badgeFontScreenPx: number;
-  if (z <= zMin) {
-    chipFontScreenPx = F - 2;
-    badgeFontScreenPx = Math.max(9, F - 3);
-  } else if (z >= zMax) {
-    chipFontScreenPx = font2x;
-    badgeFontScreenPx = Math.max(10, font2x * 0.55);
-  } else if (z >= 1) {
-    const t = (z - 1) / (zMax - 1);
-    chipFontScreenPx = F + t * (font2x - F);
-    badgeFontScreenPx = Math.max(10, chipFontScreenPx * 0.55);
-  } else {
-    const t = (z - zMin) / (1 - zMin);
-    chipFontScreenPx = F - 2 + t * 2;
-    badgeFontScreenPx = Math.max(9, F - 3 + t * 2);
-  }
+  void canvasZoom;
+  const thumbWidthScreenPx = VIDEO_DOCK_HEADER_THUMB_W_MAX;
+  const thumbHeightScreenPx = VIDEO_DOCK_HEADER_THUMB_H_MAX;
+  const chipFontScreenPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
+  const badgeFontScreenPx = Math.max(10, VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 - 2);
 
   return {
     thumbScreenPx: thumbWidthScreenPx,

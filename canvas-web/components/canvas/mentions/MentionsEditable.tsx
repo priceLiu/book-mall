@@ -726,7 +726,7 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
         {isEmpty && placeholder ? (
           <div
             className={cn(
-              "pointer-events-none absolute left-0 top-0 right-0 select-none text-[13px] leading-relaxed text-white/30",
+              "pointer-events-none absolute left-0 top-0 right-0 select-none text-[length:var(--libtv-dock-prompt-font,14px)] leading-relaxed text-white/30",
               libtvDock
                 ? dockInsetClassName ?? PRO2_DOCK_TEXTAREA_INSET_CLASS
                 : "p-2",

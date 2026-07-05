@@ -103,7 +103,7 @@ export function DockUpstreamRefPreviewCard({
             src={previewUrl}
             alt={label}
             draggable={false}
-            className="size-full object-contain"
+            className="h-full w-full object-cover"
           />
         ) : (
           <div className="flex size-full items-center justify-center text-white/30">

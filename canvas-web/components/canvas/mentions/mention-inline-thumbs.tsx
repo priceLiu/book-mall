@@ -163,7 +163,7 @@ function syncBadgeDom(
       badge.dataset.mentionInlineBadge = "";
       badge.dataset.mentionId = p.item.id;
       badge.className = cn(
-        "relative inline-flex h-6 max-w-[200px] shrink-0 items-center rounded-lg border border-white/10 px-1 text-[13px] leading-none text-white/90",
+        "relative inline-flex min-h-[1.15em] max-w-[200px] shrink-0 items-center rounded-lg border border-white/10 px-1 py-[1px] text-[1em] leading-none text-white/90",
         borderClass,
       );
       badge.style.backgroundColor = LIBTV_INPUT_DOCK_BG;

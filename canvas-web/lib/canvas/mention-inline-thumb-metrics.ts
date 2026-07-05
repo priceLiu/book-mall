@@ -1,5 +1,5 @@
-/** LibTV 内联 mention badge · 16px 缩略图 + gap（与竞品 Dock 一致） */
-export const INLINE_MENTION_THUMB_PX = 16;
+/** LibTV 内联 mention badge · 缩略图放大（约原 2 倍） */
+export const INLINE_MENTION_THUMB_PX = 40;
 export const INLINE_MENTION_BADGE_GAP_PX = 4;
 /** badge 比纯 @文案多占的横向宽度（thumb + gap + 左右 padding） */
 export const INLINE_MENTION_BADGE_EXTRA_PAD_PX = 8;

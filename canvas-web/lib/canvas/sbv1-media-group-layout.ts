@@ -2,21 +2,20 @@
 
 import { sbv1ImageChildren } from "./sbv1-media-group-meta";
 import {
-  SBV1_IMAGE_NODE_WIDTH,
   SBV1_VIDEO_ENGINE_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
-import { absoluteNodePosition, nodeMeasuredSize, sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { absoluteNodePosition, sortNodesForReactFlow } from "./normalize-graph-nodes";
 import {
   PRO2_MEDIA_GRID_GAP,
   PRO2_MEDIA_GROUP_EXTRA,
   PRO2_MEDIA_GROUP_HEADER,
   PRO2_MEDIA_GROUP_PAD,
   applyPro2MediaGroupRelayout,
-  pro2MediaChildSize,
   pro2MediaGridCols,
   pro2MediaGridLayout,
-  pro2MediaGroupDimensions,
+  pro2MediaGridLayoutForChildren,
+  pro2MediaGroupDimensionsFromLayouts,
 } from "./pro2-media-group-layout";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
@@ -26,7 +25,14 @@ function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
   width: number;
   height: number;
 } {
-  const { w, h } = nodeMeasuredSize(n);
+  const w =
+    n.measured?.width ??
+    (typeof n.width === "number" ? n.width : undefined) ??
+    SBV1_VIDEO_ENGINE_WIDTH;
+  const h =
+    n.measured?.height ??
+    (typeof n.height === "number" ? n.height : undefined) ??
+    SBV1_VIDEO_ENGINE_HEIGHT;
   if (Boolean((n.data as { manualSize?: boolean }).manualSize)) {
     return { width: w, height: h };
   }
@@ -42,6 +48,14 @@ function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
 function isSbv1MediaGroup(group: CanvasFlowNode | undefined): boolean {
   if (!group || group.type !== "group") return false;
   return Boolean((group.data as { sbv1Styled?: boolean }).sbv1Styled);
+}
+
+function sortSbv1GroupChildren(children: CanvasFlowNode[]): CanvasFlowNode[] {
+  return [...children].sort((a, b) => {
+    const al = (a.data as { label?: string }).label ?? a.id;
+    const bl = (b.data as { label?: string }).label ?? b.id;
+    return al.localeCompare(bl, "zh");
+  });
 }
 
 /** 组内参考图已全部连到的视频引擎（可尚未 parent 进组） */
@@ -76,90 +90,119 @@ export function findSbv1GroupLinkedVideoEngine(
   return undefined;
 }
 
-function releaseNodeFromGroup(
-  node: CanvasFlowNode,
-  absPosition: { x: number; y: number },
-): CanvasFlowNode {
-  const nextData = { ...(node.data as Record<string, unknown>) };
-  delete nextData.pro2GroupId;
-  return {
-    ...node,
-    parentId: undefined,
-    extent: undefined,
-    position: absPosition,
-    data: nextData,
-  } as CanvasFlowNode;
-}
-
-function pickPrimarySbv1GroupEngine(
-  engines: CanvasFlowNode[],
-  edges: CanvasFlowEdge[],
-  images: CanvasFlowNode[],
-): CanvasFlowNode {
-  if (engines.length <= 1) return engines[0]!;
-  const imageIds = new Set(images.map((i) => i.id));
-  const refCount = (eng: CanvasFlowNode) =>
-    edges.filter(
-      (e) =>
-        e.target === eng.id &&
-        imageIds.has(e.source) &&
-        (!e.targetHandle || e.targetHandle === "in_ref"),
-    ).length;
-  return [...engines].sort((a, b) => refCount(b) - refCount(a))[0]!;
-}
-
-/** 组内只保留一个视频槽；其余移到组框右侧外，避免叠在同一格 */
-function ejectExtraSbv1GroupEngines(
-  nodes: CanvasFlowNode[],
-  groupId: string,
-  keeperId: string,
-  group: CanvasFlowNode,
-): CanvasFlowNode[] {
-  const gw =
-    group.width ??
-    SBV1_VIDEO_ENGINE_WIDTH + SBV1_IMAGE_NODE_WIDTH + PRO2_MEDIA_GROUP_PAD * 2;
-  let outIdx = 0;
-  return nodes.map((n) => {
-    if (
-      n.parentId !== groupId ||
-      n.type !== "sbv1-video-engine" ||
-      n.id === keeperId
-    ) {
-      return n;
-    }
-    const abs = absoluteNodePosition(n, nodes);
-    const released = releaseNodeFromGroup(n, {
-      x: group.position.x + gw + SBV1_VIDEO_GAP,
-      y: abs.y + outIdx * (SBV1_VIDEO_ENGINE_HEIGHT + PRO2_MEDIA_GRID_GAP),
-    });
-    outIdx += 1;
-    return released;
-  });
-}
-
 function reparentToGroup(
   node: CanvasFlowNode,
   group: CanvasFlowNode,
   allNodes: CanvasFlowNode[],
 ): CanvasFlowNode {
-  const absOf = (n: CanvasFlowNode): { x: number; y: number } => {
-    if (!n.parentId) return n.position;
-    const p = allNodes.find((x) => x.id === n.parentId);
-    if (!p) return n.position;
-    const pa = absOf(p);
-    return { x: pa.x + n.position.x, y: pa.y + n.position.y };
-  };
-  const a = absOf(node);
+  const abs = absoluteNodePosition(node, allNodes);
   return {
     ...node,
     parentId: group.id,
     extent: "parent",
-    position: { x: a.x - group.position.x, y: a.y - group.position.y },
+    position: { x: abs.x - group.position.x, y: abs.y - group.position.y },
     data: { ...node.data, pro2GroupId: group.id },
   };
 }
 
-/** sbv1 媒体组：参考图宫格 + 右侧视频引擎，组框贴合 */
+function applySbv1GroupImageGrid(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+  images: CanvasFlowNode[],
+): { nodes: CanvasFlowNode[]; gridContentWidth: number; imageBox: { width: number; height: number } } {
+  if (images.length === 0) {
+    return {
+      nodes,
+      gridContentWidth: 0,
+      imageBox: { width: 320, height: 240 },
+    };
+  }
+
+  const cols = pro2MediaGridCols(images.length);
+  const layouts = pro2MediaGridLayoutForChildren(images, cols);
+  let next = nodes;
+
+  for (let i = 0; i < images.length; i++) {
+    const child = images[i]!;
+    const lay = layouts[i]!;
+    next = next.map((n) =>
+      n.id === child.id
+        ? {
+            ...n,
+            position: { x: lay.x, y: lay.y },
+            width: lay.width,
+            height: lay.height,
+            style: {
+              ...(typeof n.style === "object" && n.style ? n.style : {}),
+              width: lay.width,
+              height: lay.height,
+            },
+            data: { ...n.data, pro2GroupId: groupId },
+          }
+        : n,
+    );
+  }
+
+  const imageBox = pro2MediaGroupDimensionsFromLayouts(layouts, cols);
+  const gridContentWidth = Math.max(
+    0,
+    ...layouts.map((lay) => lay.x + lay.width - PRO2_MEDIA_GROUP_PAD),
+  );
+
+  return { nodes: next, gridContentWidth, imageBox };
+}
+
+function applySbv1GroupVideoColumn(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+  engines: CanvasFlowNode[],
+  gridContentWidth: number,
+): {
+  nodes: CanvasFlowNode[];
+  maxVideoWidth: number;
+  videoColumnHeight: number;
+} {
+  if (engines.length === 0) {
+    return { nodes, maxVideoWidth: 0, videoColumnHeight: 0 };
+  }
+
+  const videoX = PRO2_MEDIA_GROUP_PAD + gridContentWidth + SBV1_VIDEO_GAP;
+  let videoY = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
+  let maxVideoWidth = 0;
+  let videoBottom = videoY;
+  let next = nodes;
+
+  for (const engine of engines) {
+    const dims = sbv1VideoEngineDimensions(engine);
+    next = next.map((n) =>
+      n.id === engine.id
+        ? {
+            ...n,
+            position: { x: videoX, y: videoY },
+            width: dims.width,
+            height: dims.height,
+            style: {
+              ...(typeof n.style === "object" && n.style ? n.style : {}),
+              width: dims.width,
+              height: dims.height,
+            },
+            data: { ...n.data, pro2GroupId: groupId },
+          }
+        : n,
+    );
+    maxVideoWidth = Math.max(maxVideoWidth, dims.width);
+    videoBottom = videoY + dims.height;
+    videoY = videoBottom + PRO2_MEDIA_GRID_GAP;
+  }
+
+  return {
+    nodes: next,
+    maxVideoWidth,
+    videoColumnHeight: videoBottom - (PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER),
+  };
+}
+
+/** sbv1 媒体组：参考图宫格 + 右侧视频引擎（可多槽竖排），组框贴合 */
 export function applySbv1MediaGroupRelayout(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
@@ -173,38 +216,16 @@ export function applySbv1MediaGroupRelayout(
   let next = [...nodes];
   const linkedEngine = findSbv1GroupLinkedVideoEngine(groupId, next, edges);
   if (linkedEngine && linkedEngine.parentId !== groupId && group) {
-    const existingInside = next.find(
-      (n) =>
-        n.parentId === groupId &&
-        n.type === "sbv1-video-engine" &&
-        n.id !== linkedEngine.id,
-    );
-    if (existingInside) {
-      next = ejectExtraSbv1GroupEngines(
-        next,
-        groupId,
-        linkedEngine.id,
-        group,
-      );
-    }
     const reparented = reparentToGroup(linkedEngine, group, next);
     next = next.map((n) => (n.id === reparented.id ? reparented : n));
   }
 
-  let images = next.filter(
-    (n) => n.parentId === groupId && n.type === "sbv1-image",
+  const images = sortSbv1GroupChildren(
+    next.filter((n) => n.parentId === groupId && n.type === "sbv1-image"),
   );
-  let engines = next.filter(
-    (n) => n.parentId === groupId && n.type === "sbv1-video-engine",
+  const engines = sortSbv1GroupChildren(
+    next.filter((n) => n.parentId === groupId && n.type === "sbv1-video-engine"),
   );
-
-  if (engines.length > 1 && images.length > 0 && group) {
-    const keeper = pickPrimarySbv1GroupEngine(engines, edges, images);
-    next = ejectExtraSbv1GroupEngines(next, groupId, keeper.id, group);
-    engines = next.filter(
-      (n) => n.parentId === groupId && n.type === "sbv1-video-engine",
-    );
-  }
 
   if (images.length === 0 && engines.length === 0) {
     return sortNodesForReactFlow(next);
@@ -248,7 +269,8 @@ export function applySbv1MediaGroupRelayout(
     const rows = Math.ceil(engines.length / cols);
     let gridContentHeight = 0;
     for (let r = 0; r < rows; r++) {
-      gridContentHeight += (rowHeights[r] ?? defaultCell.height) + (r > 0 ? PRO2_MEDIA_GRID_GAP : 0);
+      gridContentHeight +=
+        (rowHeights[r] ?? defaultCell.height) + (r > 0 ? PRO2_MEDIA_GRID_GAP : 0);
     }
 
     const groupWidth =
@@ -275,79 +297,37 @@ export function applySbv1MediaGroupRelayout(
     return sortNodesForReactFlow(next);
   }
 
-  const cols = pro2MediaGridCols(images.length);
-  const cell = pro2MediaChildSize({ type: "sbv1-image" });
+  const { nodes: withImages, gridContentWidth, imageBox } = applySbv1GroupImageGrid(
+    next,
+    groupId,
+    images,
+  );
+  next = withImages;
 
-  for (let i = 0; i < images.length; i++) {
-    const child = images[i]!;
-    const rel = pro2MediaGridLayout(i, cell, cols);
-    next = next.map((n) =>
-      n.id === child.id
-        ? {
-            ...n,
-            position: rel,
-            width: cell.width,
-            height: cell.height,
-            style: {
-              ...(typeof n.style === "object" && n.style ? n.style : {}),
-              width: cell.width,
-              height: cell.height,
-            },
-            data: { ...n.data, pro2GroupId: groupId },
-          }
-        : n,
-    );
-  }
+  const { nodes: withVideos, maxVideoWidth, videoColumnHeight } =
+    applySbv1GroupVideoColumn(next, groupId, engines, gridContentWidth);
+  next = withVideos;
 
-  const imageBox = pro2MediaGroupDimensions(images.length, cell, cols);
-  const gridContentWidth =
-    cols * cell.width + Math.max(0, cols - 1) * PRO2_MEDIA_GRID_GAP;
-
-  const engine =
-    engines[0] ??
-    next.find(
-      (n) => n.parentId === groupId && n.type === "sbv1-video-engine",
-    );
-
-  let groupWidth = imageBox.width;
-  let groupHeight = imageBox.height;
-
-  if (engine) {
-    const engineDims = sbv1VideoEngineDimensions(engine);
-    const videoX = PRO2_MEDIA_GROUP_PAD + gridContentWidth + SBV1_VIDEO_GAP;
-    const videoY = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
-    next = next.map((n) =>
-      n.id === engine.id
-        ? {
-            ...n,
-            position: { x: videoX, y: videoY },
-            width: engineDims.width,
-            height: engineDims.height,
-            style: {
-              ...(typeof n.style === "object" && n.style ? n.style : {}),
-              width: engineDims.width,
-              height: engineDims.height,
-            },
-            data: { ...n.data, pro2GroupId: groupId },
-          }
-        : n,
-    );
-    groupWidth =
-      PRO2_MEDIA_GROUP_PAD +
-      gridContentWidth +
-      SBV1_VIDEO_GAP +
-      engineDims.width +
-      PRO2_MEDIA_GROUP_PAD +
-      PRO2_MEDIA_GROUP_EXTRA;
-    groupHeight = Math.max(
-      imageBox.height,
-      PRO2_MEDIA_GROUP_PAD +
-        PRO2_MEDIA_GROUP_HEADER +
-        engineDims.height +
+  const groupWidth =
+    engines.length > 0
+      ? PRO2_MEDIA_GROUP_PAD +
+        gridContentWidth +
+        SBV1_VIDEO_GAP +
+        maxVideoWidth +
         PRO2_MEDIA_GROUP_PAD +
-        PRO2_MEDIA_GROUP_EXTRA,
-    );
-  }
+        PRO2_MEDIA_GROUP_EXTRA
+      : imageBox.width;
+  const groupHeight =
+    engines.length > 0
+      ? Math.max(
+          imageBox.height,
+          PRO2_MEDIA_GROUP_PAD +
+            PRO2_MEDIA_GROUP_HEADER +
+            videoColumnHeight +
+            PRO2_MEDIA_GROUP_PAD +
+            PRO2_MEDIA_GROUP_EXTRA,
+        )
+      : imageBox.height;
 
   next = next.map((n) =>
     n.id === groupId

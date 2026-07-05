@@ -25,7 +25,7 @@ export function Sbv1VideoDockModeBar({
   if (!chips.length) return null;
 
   return (
-    <div className="nodrag flex shrink-0 flex-wrap items-center gap-1 border-b border-white/[0.06] px-2 py-1">
+    <div className="nodrag flex shrink-0 flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-2 py-1.5">
       {chips.map((c) => {
         const active = c.id === activeMode;
         return (
@@ -40,11 +40,11 @@ export function Sbv1VideoDockModeBar({
                 : {}),
             }}
             className={cn(
-              "rounded-full border px-2.5 py-0.5 font-medium leading-tight transition",
+              "rounded-full border px-2.5 py-1 font-medium leading-tight transition",
               chipFontPx == null && "text-[12px]",
               active
                 ? "border-white/35 bg-white/[0.08] text-white"
-                : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/70",
+                : "border-white/10 text-white/70 hover:border-white/20 hover:text-white/90",
               disabled && "cursor-not-allowed opacity-50",
             )}
             onClick={() => onSelect(c.id)}

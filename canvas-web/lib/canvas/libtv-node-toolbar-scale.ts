@@ -10,8 +10,6 @@
  * - 图 2 · 极限缩小画布：1583 × 85（上限）
  */
 
-import { LIBTV_DOCK_ZOOMOUT_SLOPE } from "./libtv-dock-scale";
-
 /** 0 = 随画布 1:1；1 = 完全补偿（仅节点内联顶栏） */
 export const LIBTV_NODE_TOOLBAR_ZOOM_BLEND = 1;
 
@@ -61,48 +59,19 @@ export function computeLibtvNodeToolbarTransformScale(zoom: number): number {
  * - zoom < 1：随画布缩小线性放大，至图 2 上限（与 Dock 缩小时不低于 MIN 对称）
  */
 export function computeLibtvToolbarScreenWidth(zoom: number): number {
-  const z = clampZoom(zoom);
-  const minW = LIBTV_TOOLBAR_DESIGN_WIDTH;
-  const maxW = LIBTV_TOOLBAR_MAX_SCREEN_WIDTH;
-
-  if (z >= 1) {
-    return Math.max(minW, minW / z);
-  }
-
-  // 与 Dock `LIBTV_DOCK_ZOOMOUT_SLOPE` 同系：zoom 越小，补偿越强
-  const t = Math.min(
-    1,
-    Math.max(0, (1 - z) / (1 - LIBTV_TOOLBAR_ZOOMOUT_ANCHOR)),
-  );
-  const boosted = minW + t * (maxW - minW) * (1 + (1 - z) * LIBTV_DOCK_ZOOMOUT_SLOPE * 0.15);
-  return Math.min(maxW, Math.max(minW, boosted));
+  void zoom;
+  return LIBTV_TOOLBAR_DESIGN_WIDTH;
 }
 
 export function computeLibtvToolbarScreenHeight(zoom: number): number {
-  const z = clampZoom(zoom);
-  const minH = LIBTV_TOOLBAR_DESIGN_HEIGHT;
-  const maxH = LIBTV_TOOLBAR_MAX_SCREEN_HEIGHT;
-
-  if (z >= 1) {
-    return Math.max(minH, minH / z);
-  }
-
-  const t = Math.min(
-    1,
-    Math.max(0, (1 - z) / (1 - LIBTV_TOOLBAR_ZOOMOUT_ANCHOR)),
-  );
-  const boosted = minH + t * (maxH - minH) * (1 + (1 - z) * LIBTV_DOCK_ZOOMOUT_SLOPE * 0.15);
-  return Math.min(maxH, Math.max(minH, boosted));
+  void zoom;
+  return LIBTV_TOOLBAR_DESIGN_HEIGHT;
 }
 
 /** Portal 顶栏 transform scale（相对 CSS 自然尺寸） */
 export function computeLibtvPortaledToolbarScale(zoom: number): number {
-  const targetW = computeLibtvToolbarScreenWidth(zoom);
-  const targetH = computeLibtvToolbarScreenHeight(zoom);
-  return Math.min(
-    targetW / LIBTV_TOOLBAR_DESIGN_WIDTH,
-    targetH / LIBTV_TOOLBAR_DESIGN_HEIGHT,
-  );
+  void zoom;
+  return 1;
 }
 
 export function libtvPortaledToolbarScreenSize(zoom: number): {

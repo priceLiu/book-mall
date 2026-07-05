@@ -62,6 +62,8 @@ export type EnginePickerProps = {
   providerIds?: string[];
   /** 模型列表布局：grid（默认 · 双列卡片）/ list（单列行）/ dropdown（折叠下拉 · 单列行） */
   layout?: "grid" | "list" | "dropdown";
+  /** 触发按钮字号（flow px · 供 Dock 抵消缩放，与正文字号统一） */
+  triggerFontPx?: number;
 };
 
 /* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
@@ -88,6 +90,7 @@ export function EnginePicker({
   modelsOnly = false,
   providerIds,
   layout = "grid",
+  triggerFontPx,
 }: EnginePickerProps) {
   const { providers, loading } = useUserProviders();
   const [open, setOpen] = useState(false);
@@ -185,7 +188,12 @@ export function EnginePicker({
           e.stopPropagation();
           setOpen(true);
         }}
-        className="nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[14px] text-white hover:border-white/30"
+        style={triggerFontPx != null ? { fontSize: triggerFontPx } : undefined}
+        className={
+          triggerFontPx != null
+            ? "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-white hover:border-white/30"
+            : "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[14px] text-white hover:border-white/30"
+        }
       >
         <span className="truncate">
           {loading ? (
@@ -204,7 +212,15 @@ export function EnginePicker({
             </span>
           )}
         </span>
-        <ChevronDown className="size-4 shrink-0 text-white/50" />
+        <ChevronDown
+          className="shrink-0 text-white/50"
+          style={
+            triggerFontPx != null
+              ? { width: triggerFontPx, height: triggerFontPx }
+              : undefined
+          }
+          {...(triggerFontPx == null ? { size: 16 } : {})}
+        />
       </button>
       {capabilityMismatch ? (
         <p className="nodrag mt-1 rounded border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-100/90">
