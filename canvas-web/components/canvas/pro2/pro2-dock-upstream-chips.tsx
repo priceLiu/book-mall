@@ -24,12 +24,14 @@ function TextUpstreamChip({
   anchorNodeId,
   active,
   thumbPx,
+  logoIconPx,
 }: {
   link: Pro2DockUpstreamLink;
   index: number;
   anchorNodeId: string;
   active?: boolean;
   thumbPx: number;
+  logoIconPx: number;
 }) {
   const [open, setOpen] = useState(false);
   const { doubleConfirm } = useDialogs();
@@ -118,7 +120,10 @@ function TextUpstreamChip({
           onClick={() => setOpen(true)}
         >
           <span className="flex size-full items-center justify-center">
-            <Icon className="size-4 shrink-0" />
+            <Icon
+              className="shrink-0"
+              style={{ width: logoIconPx, height: logoIconPx }}
+            />
           </span>
         </button>
         {deletable ? (
@@ -297,6 +302,7 @@ export function Pro2DockUpstreamChips({
     thumbClass,
     badgeFontPx,
     badgeMinPx,
+    logoIconPx,
   } = useLibtvDockRefThumbMetrics();
 
   if (!links.length) return null;
@@ -324,6 +330,7 @@ export function Pro2DockUpstreamChips({
             anchorNodeId={anchorNodeId}
             active={activeIds.includes(link.id)}
             thumbPx={thumbPx}
+            logoIconPx={logoIconPx}
           />
         ),
       )}

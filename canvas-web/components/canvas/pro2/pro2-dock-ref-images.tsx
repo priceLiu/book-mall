@@ -151,7 +151,7 @@ export function Pro2DockRefImages({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const { thumbPx, thumbStyle } = useLibtvDockRefThumbMetrics();
+  const { thumbPx, thumbStyle, logoIconPx } = useLibtvDockRefThumbMetrics();
 
   const spawnFiles = useCallback(
     async (files: File[]) => {
@@ -279,7 +279,7 @@ export function Pro2DockRefImages({
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
         >
-          <ImagePlus className="size-5" />
+          <ImagePlus style={{ width: logoIconPx, height: logoIconPx }} />
         </button>
       ) : null}
       <input

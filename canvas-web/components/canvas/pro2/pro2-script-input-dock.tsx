@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
-import { useNodes } from "@xyflow/react";
+import { useNodes, useStore } from "@xyflow/react";
+import {
+  computeLibtvDockInverseScale,
+  libtvDockFixedFlowPx,
+  libtvDockFlowSize,
+  VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
+} from "@/lib/canvas/libtv-dock-scale";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
@@ -63,6 +69,17 @@ export function Pro2ScriptInputDock() {
   const dockNodeId = selectedHub?.id ?? storeNode?.id ?? null;
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
+
+  const zoom = useStore((s) => s.transform[2]);
+  const { w: dockW } = libtvDockFlowSize();
+  const invScale = computeLibtvDockInverseScale(zoom, dockW, false);
+  const shellScreenScale = invScale * Math.max(0.08, zoom);
+  const dockTextFontPx = libtvDockFixedFlowPx(
+    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
+    shellScreenScale,
+  );
+  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
+  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
 
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
   const dockInput = d.dockInput ?? "";
@@ -239,38 +256,47 @@ export function Pro2ScriptInputDock() {
                 providerId={d.providerId ?? ""}
                 modelKey={d.modelKey ?? ""}
                 params={d.params ?? {}}
+                triggerFontPx={dockTextFontPx}
                 onChange={onPickEngine}
               />
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div
+              className="flex shrink-0 items-center gap-1 text-white/35"
+              style={{ fontSize: dockTextFontPx }}
+            >
               <button
                 type="button"
                 className="nodrag rounded-md p-1.5 text-white/35"
                 title="翻译（预留）"
                 disabled
               >
-                <Languages className="size-4" />
+                <Languages style={{ width: sendIconPx, height: sendIconPx }} />
               </button>
               <button
                 type="button"
-                className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] text-white/35"
+                className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
+                style={{ fontSize: dockTextFontPx }}
                 title="消耗（预留）"
                 disabled
               >
-                <Zap className="size-3.5" />
+                <Zap style={{ width: sendIconPx, height: sendIconPx }} />
                 <span>1</span>
               </button>
               <button
                 type="button"
                 disabled={isGenerating || !canSend}
-                className="nodrag flex size-9 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                className="nodrag flex items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ width: sendBtnPx, height: sendBtnPx }}
                 title={phase === "frame" ? "重新生成脚本" : "生成分镜脚本"}
                 onClick={() => void onSend()}
               >
                 {isGenerating ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2
+                    className="animate-spin"
+                    style={{ width: sendIconPx, height: sendIconPx }}
+                  />
                 ) : (
-                  <ArrowUp className="size-4" />
+                  <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
                 )}
               </button>
             </div>

@@ -42,6 +42,12 @@ import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import {
+  PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
+} from "./pro2-image-node-toolbar";
+import {
   resolvePro2FrameBatchImageForHub,
 } from "@/lib/canvas/pro2-frame-batch-image";
 import {
@@ -57,11 +63,10 @@ import {
   type Pro2SceneImageResult,
 } from "./pro2-scene-image-picker";
 
-const TOOL_BTN =
-  "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
+/** 与图片节点顶部工具条统一样式（字号 / 尺寸 / 外壳） */
+const TOOL_BTN = PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS;
 
-const ICON_BTN =
-  "nodrag flex size-8 shrink-0 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/8 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-40";
+const ICON_BTN = PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS;
 
 export type Pro2ScriptHubToolbarProps = {
   hubId: string;
@@ -343,7 +348,8 @@ export function Pro2ScriptHubToolbar({
     <>
       <div
         className={cn(
-          "nodrag pointer-events-auto absolute left-1/2 z-30 flex min-w-max -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-xl border border-white/10 bg-[#1c1c1e]/98 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]",
+          "nodrag pointer-events-auto absolute left-1/2 z-30 min-w-max -translate-x-1/2 whitespace-nowrap",
+          PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
           className,
         )}
         onMouseDown={(e) => e.stopPropagation()}
@@ -397,7 +403,7 @@ export function Pro2ScriptHubToolbar({
           <LayoutGrid className="size-3.5" />
           <span>生成分镜</span>
         </button>
-        <div className="mx-0.5 h-5 w-px bg-white/10" />
+        <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
         <button
           type="button"
           className={TOOL_BTN}
@@ -440,7 +446,7 @@ export function Pro2ScriptHubToolbar({
           disabled={!hasTable}
           onClick={onDownload}
         >
-          <Download className="size-4" />
+          <Download className="size-5" />
         </button>
         {onDuplicateNode ? (
           <button
@@ -449,7 +455,7 @@ export function Pro2ScriptHubToolbar({
             title="复制节点"
             onClick={onDuplicateNode}
           >
-            <Copy className="size-4" />
+            <Copy className="size-5" />
           </button>
         ) : null}
       </div>

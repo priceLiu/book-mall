@@ -16,7 +16,7 @@ export function mentionBadgeBorderClass(edition: "pro2" | "sbv1"): string {
 
 /**
  * 创建一个内联 mention 徽标（contenteditable=false 原子节点）：
- * `[16px 缩略图] @label`。图在左、标签在右，与 LibTV 一致。
+ * `[缩略图] @label`。图在左、标签在右，与 LibTV 一致。
  */
 export function createMentionBadge(
   id: string,
@@ -29,7 +29,7 @@ export function createMentionBadge(
   badge.setAttribute("draggable", "false");
   badge.dataset.mentionLabel = item?.label ?? "";
   badge.className = [
-    "mention-inline-badge align-middle inline-flex h-6 max-w-[220px] shrink-0 select-none items-center rounded-lg border border-white/10 px-1 text-[13px] leading-none text-white/90",
+    "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 select-none items-center rounded-lg border border-white/10 px-1 py-[1px] text-[1em] leading-none text-white/90",
     mentionBadgeBorderClass(edition),
   ].join(" ");
   badge.style.backgroundColor = LIBTV_INPUT_DOCK_BG;

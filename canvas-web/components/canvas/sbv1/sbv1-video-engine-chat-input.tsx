@@ -101,6 +101,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     headerMetrics.thumbHeightScreenPx,
     shellScreenScale,
   );
+  const thumbSquarePx = Math.min(thumbPx, thumbHeightPx);
   const chipFontPx = libtvDockFixedFlowPx(
     headerMetrics.chipFontScreenPx,
     shellScreenScale,
@@ -117,17 +118,23 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     headerMetrics.badgeFontScreenPx + 6,
     shellScreenScale,
   );
-  const headerMinHeightPx = thumbHeightPx + libtvDockFixedFlowPx(8, shellScreenScale);
+  const headerMinHeightPx = thumbSquarePx + libtvDockFixedFlowPx(10, shellScreenScale);
+  const dockTextFontPx = libtvDockFixedFlowPx(
+    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
+    shellScreenScale,
+  );
   const modelPickerFontPx = libtvDockFixedFlowPx(
     VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
     shellScreenScale,
   );
-  const modelPickerIconPx = libtvDockFixedFlowPx(11, shellScreenScale);
+  const modelPickerIconPx = libtvDockFixedFlowPx(13, shellScreenScale);
   const creditsFontPx = libtvDockFixedFlowPx(
     VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
     shellScreenScale,
   );
-  const sendBtnPx = libtvDockFixedFlowPx(28, shellScreenScale);
+  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
+  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
+  const toolbarMinHeightPx = libtvDockFixedFlowPx(48, shellScreenScale);
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -281,12 +288,12 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   const refThumbStyle = useMemo(
     () => ({
-      width: thumbPx,
-      height: thumbHeightPx,
-      minWidth: thumbPx,
-      minHeight: thumbHeightPx,
+      width: thumbSquarePx,
+      height: thumbSquarePx,
+      minWidth: thumbSquarePx,
+      minHeight: thumbSquarePx,
     }),
-    [thumbPx, thumbHeightPx],
+    [thumbSquarePx],
   );
   const refThumbClass =
     "group relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";
@@ -356,6 +363,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
                 key={`empty-${slotIndex}`}
                 label={corner}
                 style={refThumbStyle}
+                iconPx={thumbSquarePx}
+                textFontPx={dockTextFontPx}
               />
             );
           })}
@@ -435,12 +444,15 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   })();
 
   const toolbar = (
-    <Pro2DockToolbar compact className="gap-2">
+    <Pro2DockToolbar compact className="gap-2 py-2.5">
       <button
         type="button"
         disabled={isGenerating}
-        className="nodrag flex w-auto max-w-full shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-white/65 hover:bg-white/[0.06] hover:text-white/90"
-        style={{ fontSize: modelPickerFontPx }}
+        className="nodrag flex w-auto max-w-full shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-white hover:bg-white/[0.06]"
+        style={{
+          fontSize: modelPickerFontPx,
+          minHeight: toolbarMinHeightPx,
+        }}
         onClick={() => setSettingsOpen(true)}
       >
         <span className="whitespace-nowrap">{settingsLabel}</span>
@@ -452,18 +464,21 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
       <div className="min-w-0 flex-1" />
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div
+        className="flex shrink-0 items-center gap-1.5 text-white/80"
+        style={{ fontSize: dockTextFontPx }}
+      >
         {estCredits?.credits != null ? (
           <span
-            className="flex shrink-0 items-center gap-0.5 tabular-nums text-amber-200/90"
+            className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
             style={{ fontSize: creditsFontPx }}
             title={`${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`}
           >
             <Zap
               className="fill-amber-300/90 text-amber-300/90"
               style={{
-                width: libtvDockFixedFlowPx(12, shellScreenScale),
-                height: libtvDockFixedFlowPx(12, shellScreenScale),
+                width: libtvDockFixedFlowPx(14, shellScreenScale),
+                height: libtvDockFixedFlowPx(14, shellScreenScale),
               }}
             />
             {estCredits.credits}
@@ -480,18 +495,10 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
           {isGenerating ? (
             <Loader2
               className="animate-spin"
-              style={{
-                width: libtvDockFixedFlowPx(14, shellScreenScale),
-                height: libtvDockFixedFlowPx(14, shellScreenScale),
-              }}
+              style={{ width: sendIconPx, height: sendIconPx }}
             />
           ) : (
-            <ArrowUp
-              style={{
-                width: libtvDockFixedFlowPx(14, shellScreenScale),
-                height: libtvDockFixedFlowPx(14, shellScreenScale),
-              }}
-            />
+            <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
           )}
         </button>
       </div>
@@ -588,9 +595,13 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 function Sbv1DockEmptyRefSlot({
   label,
   style,
+  iconPx,
+  textFontPx,
 }: {
   label: string;
   style?: React.CSSProperties;
+  iconPx?: number;
+  textFontPx?: number;
 }) {
   return (
     <div
@@ -598,7 +609,19 @@ function Sbv1DockEmptyRefSlot({
       style={style}
       title={`${label} · 连接或上传参考图`}
     >
-      <span className="text-[8px] font-medium text-white/45">{label}</span>
+      <ArrowUp
+        className="text-white/35"
+        style={{
+          width: iconPx ? Math.max(14, iconPx) : 14,
+          height: iconPx ? Math.max(14, iconPx) : 14,
+        }}
+      />
+      <span
+        className="absolute bottom-0.5 font-medium text-white/45"
+        style={{ fontSize: textFontPx ?? 14 }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

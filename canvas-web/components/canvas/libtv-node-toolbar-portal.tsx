@@ -4,7 +4,10 @@ import { createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "@xyflow/react";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
-import { useLibtvNodeToolbarScreenPlacement } from "@/lib/canvas/use-libtv-node-toolbar-placement";
+import {
+  useLibtvNodeToolbarHidden,
+  useLibtvNodeToolbarScreenPlacement,
+} from "@/lib/canvas/use-libtv-node-toolbar-placement";
 import {
   computeLibtvPortaledToolbarScale,
   LIBTV_TOOLBAR_PORTAL_GAP_PX,
@@ -29,6 +32,7 @@ export function LibtvNodeToolbarPortal({
 }) {
   const mounted = useClientPortalMounted();
   const placement = useLibtvNodeToolbarScreenPlacement(nodeId, visible);
+  const hidden = useLibtvNodeToolbarHidden(nodeId);
   const zoom = useStore((s) => s.transform[2]);
   const toolbarScale = computeLibtvPortaledToolbarScale(zoom);
 
@@ -43,6 +47,8 @@ export function LibtvNodeToolbarPortal({
           top: placement.y,
           transform: `translate(-50%, calc(-100% - ${LIBTV_TOOLBAR_PORTAL_GAP_PX}px)) scale(${toolbarScale})`,
           transformOrigin: "center bottom",
+          visibility: hidden ? "hidden" : "visible",
+          pointerEvents: hidden ? "none" : "auto",
         }}
       >
         {children}

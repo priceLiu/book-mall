@@ -95,6 +95,10 @@ export type Pro2TextNodeEnginePickersProps = {
   providers: CanvasProviderDto[];
   disabled?: boolean;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  /** 触发按钮字号（flow px · 与 Dock 正文统一） */
+  triggerFontPx?: number;
+  /** role 分组小标题字号（flow px） */
+  sectionFontPx?: number;
 };
 
 /** 文本节点 · 按 Gateway role 分类的模型 + 参数选择（Text / Image / Video model） */
@@ -106,6 +110,8 @@ export function Pro2TextNodeEnginePickers({
   providers,
   disabled,
   updateNodeData,
+  triggerFontPx,
+  sectionFontPx,
 }: Pro2TextNodeEnginePickersProps) {
   const roles = useMemo(
     () =>
@@ -177,7 +183,18 @@ export function Pro2TextNodeEnginePickers({
         const cur = readPro2TextNodeEngine(data, role);
         return (
           <div key={role} className="min-w-0 shrink-0">
-            <p className="mb-0.5 truncate text-[10px] font-medium tracking-wide text-white/45">
+            <p
+              className={
+                sectionFontPx != null
+                  ? "mb-0.5 truncate font-medium tracking-wide text-white/45"
+                  : "mb-0.5 truncate text-[10px] font-medium tracking-wide text-white/45"
+              }
+              style={
+                sectionFontPx != null
+                  ? { fontSize: sectionFontPx }
+                  : undefined
+              }
+            >
               {gatewayModelRoleSectionTitle(role)}
             </p>
             <EnginePicker
@@ -187,6 +204,7 @@ export function Pro2TextNodeEnginePickers({
               providerId={cur.providerId}
               modelKey={cur.modelKey}
               params={cur.params ?? {}}
+              triggerFontPx={triggerFontPx}
               onChange={(next) => {
                 const pick = {
                   providerId: next.providerId,

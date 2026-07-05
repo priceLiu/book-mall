@@ -21,6 +21,7 @@ import type {
   StoryProFrameRow,
 } from "@/lib/canvas/story-pro2-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { useLibtvDockRefThumbMetrics } from "@/lib/canvas/use-libtv-dock-ref-thumb-metrics";
 import { cn } from "@/lib/utils";
 import {
   Pro2DockToolbar,
@@ -66,6 +67,8 @@ export function Pro2ImageNodeEmbeddedDock({
     () => nodes.find((n) => n.id === nodeId) ?? null,
     [nodes, nodeId],
   );
+  const { thumbPx, logoIconPx, logoLabelFontPx } =
+    useLibtvDockRefThumbMetrics();
   const d = (storeNode?.data ?? {}) as StoryPro2ImageNodeData;
   const dockInput = d.dockInput ?? "";
   const mediaRole = d.pro2MediaRole ?? "generic";
@@ -193,19 +196,39 @@ export function Pro2ImageNodeEmbeddedDock({
                 type="button"
                 disabled
                 title="标记（即将推出）"
-                className="nodrag flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+                className="nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-white/35"
+                style={{
+                  width: thumbPx,
+                  height: thumbPx,
+                  minWidth: thumbPx,
+                  minHeight: thumbPx,
+                  fontSize: logoLabelFontPx,
+                }}
               >
-                <MapPin className="size-4" strokeWidth={1.75} />
+                <MapPin
+                  style={{ width: logoIconPx, height: logoIconPx }}
+                  strokeWidth={1.75}
+                />
                 <span>标记</span>
               </button>
               {onUpload ? (
                 <button
                   type="button"
                   title="上传图片"
-                  className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/70 transition hover:bg-white/[0.07]"
+                  className="nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.07]"
+                  style={{
+                    width: thumbPx,
+                    height: thumbPx,
+                    minWidth: thumbPx,
+                    minHeight: thumbPx,
+                    fontSize: logoLabelFontPx,
+                  }}
                   onClick={onUpload}
                 >
-                  <Upload className="size-4" strokeWidth={1.75} />
+                  <Upload
+                    style={{ width: logoIconPx, height: logoIconPx }}
+                    strokeWidth={1.75}
+                  />
                   <span>上传</span>
                 </button>
               ) : null}

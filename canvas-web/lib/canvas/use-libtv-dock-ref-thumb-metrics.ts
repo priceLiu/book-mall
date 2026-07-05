@@ -37,6 +37,10 @@ export function useLibtvDockRefThumbMetrics() {
     );
     const headerMinHeightPx =
       thumbHeightPx + libtvDockFixedFlowPx(8, shellScreenScale);
+    /** 顶栏内 logo（文本/上传/标记）图标屏上尺寸 · 与缩略图协调（约 40%） */
+    const logoIconPx = libtvDockFixedFlowPx(30, shellScreenScale);
+    /** logo 按钮下方小标签字号（如「标记」「上传」） */
+    const logoLabelFontPx = libtvDockFixedFlowPx(11, shellScreenScale);
     const thumbStyle = {
       width: thumbWidthPx,
       height: thumbHeightPx,
@@ -55,6 +59,8 @@ export function useLibtvDockRefThumbMetrics() {
       chipMinHeightPx,
       badgeFontPx,
       badgeMinPx,
+      logoIconPx,
+      logoLabelFontPx,
     };
   }, [canvasZoom, shellScreenScale]);
 }
