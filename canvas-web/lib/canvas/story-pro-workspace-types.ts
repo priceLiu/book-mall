@@ -362,6 +362,10 @@ export type StoryProStarterNodeData = {
   themeOutlineSystemPrompt?: string;
   /** 剧本创作画布 · 工业化标准化分批生成 */
   scriptStudioMode?: boolean;
+  /** 小白生剧 / 上传剧本 */
+  scriptStudioInputMode?: StoryProStarterMode;
+  /** 剧本创作 · 主题或描述（迁移前 starter 入口） */
+  scriptStudioThemeInput?: string;
   scriptStudioSystem?: "original" | "adaptation";
   scriptStudioTotalEpisodes?: number;
   /** 当前批次 index（0 = 第 1–10 集） */
@@ -389,6 +393,8 @@ export type StoryProStarterNodeData = {
   videoEngine?: import("./types").CanvasEnginePick;
   /** 协作画布 · 关联已发布剧本包后的本地公告条 */
   crewBulletin?: import("./crew-bulletin-types").CrewBulletinState;
+  /** 迁移前 starter 上的发布标记（迁入 hub 后清除） */
+  scriptPublished?: boolean;
   linkedScriptPackageTitle?: string;
   /** 协作画布 · 关联剧本包正文（仅公告条/任务上下文，不在 starter 卡片展示） */
   linkedScriptPackageMarkdown?: string;

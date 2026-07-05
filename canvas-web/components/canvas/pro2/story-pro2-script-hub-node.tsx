@@ -132,6 +132,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -262,14 +263,16 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
           if (!spawnType) return;
           spawnLibtvNeighborFromAnchor(id, side, spawnType, {
             nodes,
+            edges,
             addNode,
+            addNodeInGroup,
             setNodes,
             setEdges,
           });
         },
       );
     },
-    [id, nodes, addNode, setNodes, setEdges, alert, onGenerateThreeView],
+    [id, nodes, edges, addNode, addNodeInGroup, setNodes, setEdges, alert, onGenerateThreeView],
   );
 
   const openEditor = useCallback(() => {

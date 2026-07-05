@@ -38,7 +38,8 @@ export function normalizePro2PlusLeftConnection(
   return {
     source: connection.target,
     target: connection.source,
-    sourceHandle: pro2PlusLeftOutboundHandle(outboundNode, connection.targetHandle),
+    sourceHandle:
+      pro2PlusLeftOutboundHandle(outboundNode, connection.targetHandle) ?? null,
     targetHandle: pro2InboundTargetHandle(inboundNode?.type),
   };
 }

@@ -187,7 +187,7 @@ export function useCopyScriptPackageSnapshot(args: {
       void canvasNotify({
         title: "无法复制",
         message: "源节点已删除且缺少可还原的数据快照",
-        variant: "warning",
+        variant: "error",
       });
     }
   };

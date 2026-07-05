@@ -19,12 +19,13 @@ function LibtvSideConnectLayerInner() {
   const pending = useCanvasStore((s) => s.pendingSideConnect);
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const clearPendingSideConnect = useCanvasStore(
     (s) => s.clearPendingSideConnect,
   );
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
 
   const [lineTarget, setLineTarget] = useState<{ x: number; y: number } | null>(
     null,
@@ -72,7 +73,9 @@ function LibtvSideConnectLayerInner() {
       if (!pending) return;
       const store = {
         nodes: useCanvasStore.getState().nodes,
+        edges: useCanvasStore.getState().edges,
         addNode,
+        addNodeInGroup,
         setNodes,
         setEdges,
       };
@@ -85,12 +88,12 @@ function LibtvSideConnectLayerInner() {
         itemId,
         nodeType,
         store,
-        { alert },
+        { alert, confirm },
       ).finally(() => {
         closeMenu();
       });
     },
-    [pending, addNode, setNodes, setEdges, alert, closeMenu],
+    [pending, addNode, addNodeInGroup, setNodes, setEdges, alert, confirm, closeMenu],
   );
 
   if (!pending || !sourceNode || !sections?.length || !menuAnchor || !lineTarget) {

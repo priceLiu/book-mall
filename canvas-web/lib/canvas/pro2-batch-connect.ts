@@ -55,7 +55,7 @@ export function classifyBatchConnectMode(
 
 export function batchImageSpawnNodeType(
   sources: CanvasFlowNode[],
-): CanvasNodeType {
+): "story-pro2-image" | "sbv1-image" {
   if (sources.length > 0 && sources.every((s) => s.type === "sbv1-image")) {
     return "sbv1-image";
   }

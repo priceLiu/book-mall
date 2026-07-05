@@ -197,7 +197,7 @@ export async function runLibtvSideConnectPick(
   }
 
   if (anchorNode.type === "story-pro2-style-asset") {
-    await handlePro2SideAddNodePick(itemId, nodeType, { alert }, () => {
+    await handlePro2SideAddNodePick(itemId, nodeType, dialogs, () => {
       if (side === "left") {
         if (
           itemId === "txt2img" ||

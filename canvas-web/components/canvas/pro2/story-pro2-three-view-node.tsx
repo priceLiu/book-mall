@@ -61,7 +61,9 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
   const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -149,14 +151,16 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           if (!spawnType) return;
           spawnLibtvNeighborFromAnchor(id, side, spawnType, {
             nodes,
+            edges,
             addNode,
+            addNodeInGroup,
             setNodes,
             setEdges,
           });
         },
       );
     },
-    [id, nodes, addNode, setNodes, setEdges, alert],
+    [id, nodes, edges, addNode, addNodeInGroup, setNodes, setEdges, alert],
   );
 
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-three-view");

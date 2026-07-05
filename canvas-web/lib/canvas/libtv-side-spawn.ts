@@ -29,9 +29,16 @@ export type LibtvSideSpawnOptions = {
 
 export type LibtvSideSpawnStore = {
   nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
   addNode: (
     type: CanvasNodeType,
     position: { x: number; y: number },
+    data?: Record<string, unknown>,
+  ) => string;
+  addNodeInGroup: (
+    type: CanvasNodeType,
+    groupId: string,
+    relativePosition: { x: number; y: number },
     data?: Record<string, unknown>,
   ) => string;
   setNodes: (

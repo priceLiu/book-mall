@@ -19,7 +19,7 @@ export function JianyingExportPro2Inspector({ id, data }: NodeProps) {
     : undefined;
   const stored = (
     starter?.data as {
-      workspaceIds?: import("@/lib/canvas/story-pro-workspace-types").StoryPro2WorkspaceIds;
+      workspaceIds?: import("@/lib/canvas/story-pro-workspace-types").StoryProWorkspaceIds;
     }
   )?.workspaceIds;
   const ws =

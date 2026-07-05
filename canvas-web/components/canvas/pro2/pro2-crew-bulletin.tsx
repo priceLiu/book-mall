@@ -453,7 +453,7 @@ function PhaseActionPanel({
           />
           <CrewBulletinVirtualTaskList
             tasks={listTasks}
-            taskKind={phase.id === "script" ? undefined : phase.id}
+            taskKind={phase.id}
             episodeFilter={episodeFilter}
             selectedTaskIds={selectedTaskIds}
             claimableTaskIds={claimableTaskIds}

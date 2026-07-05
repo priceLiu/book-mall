@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, LayoutDashboard } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import type { CanvasFlowNode } from "@/lib/canvas/types";
 import type {
   StoryProFrameRow,
   StoryProStarterNodeData,
@@ -215,7 +216,7 @@ export function Pro2DirectorOverview() {
                         >
                           <span className="truncate text-white/70">
                             镜 {row.frameIndex}
-                            {row.shotLabel ? ` · ${row.shotLabel}` : ""}
+                            {row.shotNo ? ` · ${row.shotNo}` : ""}
                           </span>
                           <button
                             type="button"

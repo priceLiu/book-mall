@@ -420,10 +420,7 @@ function Pro2SelectionBatchConnectLayerInner({
 
   const boxLeft = screenBox.left;
   const boxTop = screenBox.top;
-  const boxWidth =
-    "right" in screenBox
-      ? screenBox.right - screenBox.left
-      : screenBox.width;
+  const boxWidth = screenBox.right - screenBox.left;
   const boxHeight =
     "bottom" in screenBox
       ? screenBox.bottom - screenBox.top

@@ -97,7 +97,7 @@ export function ensureScriptStudioWorkspace(
 
   const d = starter.data as StoryProStarterNodeData;
   let nodes = args.nodes;
-  let ws = d.workspaceIds ?? {};
+  let ws: Partial<StoryPro2WorkspaceIds> = d.workspaceIds ?? {};
 
   const sharedLlm = {
     providerId: d.providerId ?? "",
@@ -200,5 +200,5 @@ export function ensureScriptStudioWorkspace(
   });
   args.updateNodeData(scriptHubId, { scriptStudioMode: true });
 
-  return ws;
+  return ws as StoryPro2WorkspaceIds;
 }
