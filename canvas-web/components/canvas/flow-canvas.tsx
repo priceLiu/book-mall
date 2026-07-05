@@ -49,7 +49,7 @@ import {
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import { mergeStoreNodesIntoRf } from "@/lib/canvas/canvas-rf-sync";
-import { resolveSnapConnectionOnNodeHit } from "@/lib/canvas/libtv-connection-snap";
+import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
 import {
   isLibtvSidePlusConnectHandle,
   resolveLibtvSideConnectMenu,
@@ -841,11 +841,6 @@ function FlowCanvasInner({
           ? event.changedTouches[0]?.clientY
           : event.clientY;
 
-      if (connectionState.isValid) {
-        setConnectingFrom(null);
-        return;
-      }
-
       if (clientX == null || clientY == null) {
         setConnectingFrom(null);
         return;
@@ -853,6 +848,37 @@ function FlowCanvasInner({
 
       const flowPoint = screenToFlowPosition({ x: clientX, y: clientY });
       const nodes = getNodes() as CanvasFlowNode[];
+
+      const sidePlusHit = findNearestSidePlusHandle(
+        nodes,
+        flowPoint,
+        connectionState.fromNode?.id ?? undefined,
+      );
+
+      if (connectionState.isValid && sidePlusHit) {
+        const fromId = connectionState.fromNode?.id;
+        const toId = connectionState.toNode?.id;
+        const toHandle = connectionState.toHandle?.id;
+        const prefersSidePlus =
+          toId === sidePlusHit.node.id &&
+          toHandle !== sidePlusHit.handleId;
+        if (prefersSidePlus && fromId) {
+          onConnect({
+            source: fromId,
+            target: sidePlusHit.node.id,
+            sourceHandle: connectionState.fromHandle?.id ?? null,
+            targetHandle: sidePlusHit.handleId,
+          });
+          setConnectingFrom(null);
+          return;
+        }
+      }
+
+      if (connectionState.isValid) {
+        setConnectingFrom(null);
+        return;
+      }
+
       const snapped = resolveSnapConnectionOnNodeHit(
         {
           isValid: connectionState.isValid ?? undefined,
@@ -1406,7 +1432,7 @@ function FlowCanvasInner({
         noDragClassName="nodrag"
         minZoom={0.02}
         maxZoom={32}
-        connectionRadius={100}
+        connectionRadius={160}
         connectOnClick={false}
         connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}
       >

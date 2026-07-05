@@ -19,8 +19,8 @@ import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
-  enrichPro2DockUpstreamLinks,
   pro2DockStyleShownAsChip,
+  pro2DockUpstreamLinksForChips,
 } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
@@ -151,14 +151,9 @@ export function Pro2ThreeViewInputDock() {
     );
   }, [storeNode, nodes, edges]);
 
-  const displayLinks = useMemo(
-    () =>
-      enrichPro2DockUpstreamLinks(
-        upstreamLinks,
-        d.dockStyleRef,
-        storeNode?.id,
-      ),
-    [upstreamLinks, d.dockStyleRef, storeNode?.id],
+  const chipLinks = useMemo(
+    () => pro2DockUpstreamLinksForChips(upstreamLinks),
+    [upstreamLinks],
   );
   const showStyleButton = !pro2DockStyleShownAsChip(
     upstreamLinks,
@@ -347,9 +342,9 @@ export function Pro2ThreeViewInputDock() {
         header={
           <Pro2DockHeader
             refRow={
-              displayLinks.length > 0 ? (
+              chipLinks.length > 0 ? (
                 <Pro2DockUpstreamChips
-                  links={displayLinks}
+                  links={chipLinks}
                   anchorNodeId={storeNode.id}
                   activeIds={activeRefIds}
                 />

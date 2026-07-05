@@ -264,8 +264,8 @@ html[data-canvas-modal-open] .pro2-input-dock {
   transition: opacity 0.12s ease-out;
 }
 .canvas-edge-delete.is-selected,
-.canvas-edge-delete:hover,
-.react-flow__edge:hover .canvas-edge-delete {
+.canvas-edge-delete.is-hover-cut,
+.canvas-edge-delete:hover {
   opacity: 1;
 }
 
@@ -277,6 +277,12 @@ html[data-canvas-modal-open] .pro2-input-dock {
 /* 未 hover 的连线不挡节点侧 +；hover 时仍可点选/删除连线 */
 .react-flow__edge:not(:hover):not(.selected) .react-flow__edge-interaction {
   pointer-events: none !important;
+}
+
+/* DeletableEdge · 宽命中带（任意位置悬停 1s 出剪刀） */
+.deletable-edge-hit {
+  pointer-events: stroke !important;
+  cursor: crosshair;
 }
 
 /* 连线始终在节点/组内容之下，避免穿过图片遮挡画面 */
@@ -443,6 +449,58 @@ html[data-canvas-modal-open] .pro2-input-dock {
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle.connectingfrom,
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle.react-flow__handle-connecting {
   cursor: crosshair !important;
+}
+
+/* 侧栏 + 叠层 target · 拖线时吸附；平时不挡单击菜单 */
+.react-flow__handle.pro2-node-side-plus-in-handle {
+  cursor: crosshair !important;
+  opacity: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  z-index: 20048 !important;
+}
+.canvas-connecting .react-flow__handle.pro2-node-side-plus-in-handle {
+  pointer-events: all !important;
+  z-index: 20055 !important;
+}
+/* 叠层 target 与可见 + 同尺寸，拖线时扩大命中区 */
+.canvas-connecting
+  .react-flow__handle.pro2-node-side-plus-in-handle.pro2-node-side-plus-handle--lg {
+  width: 88px !important;
+  height: 88px !important;
+  min-width: 88px !important;
+  min-height: 88px !important;
+}
+.canvas-connecting
+  .react-flow__handle.pro2-node-side-plus-in-handle.pro2-node-side-plus-handle--lg.react-flow__handle-left {
+  left: -44px !important;
+  right: auto !important;
+}
+.canvas-connecting
+  .react-flow__handle.pro2-node-side-plus-in-handle.pro2-node-side-plus-handle--lg.react-flow__handle-right {
+  right: -44px !important;
+  left: auto !important;
+}
+.canvas-connecting
+  .react-flow__handle.pro2-node-side-plus-in-handle:not(.pro2-node-side-plus-handle--lg) {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+/* 拖线时让可见 +（source）不挡住叠层 target 的吸附 */
+.canvas-connecting
+  .react-flow__handle.pro2-node-side-plus-handle:not(.connectingfrom):not(
+    .react-flow__handle-connecting
+  ) {
+  pointer-events: none !important;
+}
+.canvas-connecting .react-flow__handle.pro2-node-side-plus-in-handle.connectingto,
+.canvas-connecting .react-flow__handle.pro2-node-side-plus-in-handle.react-flow__handle-valid {
+  opacity: 0 !important;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.55) !important;
 }
 
 /* ----------------------------------------

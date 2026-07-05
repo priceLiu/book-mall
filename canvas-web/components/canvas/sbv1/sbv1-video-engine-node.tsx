@@ -353,13 +353,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           title="动作视频输入（Motion Control）"
         />
         <Handle
-          id="plus_left"
-          type="source"
-          position={Position.Left}
-          className={cn(SBV1_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-          style={{ top: "50%" }}
-        />
-        <Handle
           id="out_video"
           type="source"
           position={Position.Right}

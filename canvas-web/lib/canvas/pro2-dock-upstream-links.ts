@@ -271,6 +271,29 @@ export function enrichPro2DockUpstreamLinks(
   ];
 }
 
+/** 缩略图 chip 仅展示真实入边（不含 dockStyleRef 虚拟槽） */
+export function pro2DockUpstreamLinksForChips(
+  links: Pro2DockUpstreamLink[],
+): Pro2DockUpstreamLink[] {
+  return links.filter(
+    (l) =>
+      l.sourceNodeId &&
+      !l.id.startsWith("up-style-dock") &&
+      l.id !== "up-style-dock",
+  );
+}
+
+/** 该上游 chip 是否来自画布连线（可显示角标 / 断开） */
+export function isPro2DockUpstreamEdgeLink(
+  link: Pro2DockUpstreamLink,
+  anchorNodeId: string,
+): boolean {
+  return Boolean(
+    link.sourceNodeId &&
+      link.sourceNodeId !== anchorNodeId &&
+      !link.id.startsWith("up-style-dock"),
+  );
+}
 /** 风格已占槽位时隐藏独立「风格」按钮，避免第二行重复展示 */
 export function pro2DockStyleShownAsChip(
   links: Pro2DockUpstreamLink[],

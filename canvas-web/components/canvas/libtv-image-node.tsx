@@ -417,18 +417,6 @@ export function LibtvImageNode({
             title="上游参考图"
           />
         ) : null}
-        {!isCharacterThreeView ? (
-          <Handle
-            id="plus_left"
-            type="source"
-            position={Position.Left}
-            className={cn(
-              LIBTV_NODE_HANDLE_CLASS,
-              "pointer-events-none opacity-0",
-            )}
-            title="添加上下文"
-          />
-        ) : null}
         <Handle
           id="image"
           type="source"

@@ -18,7 +18,7 @@ export function Pro2DockStyleButton({
   disabled,
   onClick,
 }: Pro2DockStyleButtonProps) {
-  const { actionBtnPx } = useLibtvDockRefThumbMetrics();
+  const { actionBtnPx, logoIconPx } = useLibtvDockRefThumbMetrics();
 
   return (
     <button
@@ -40,7 +40,11 @@ export function Pro2DockStyleButton({
       )}
       onClick={onClick}
     >
-      <Box className="size-5 shrink-0" strokeWidth={1.75} />
+      <Box
+        className="shrink-0"
+        style={{ width: logoIconPx, height: logoIconPx }}
+        strokeWidth={1.75}
+      />
       <span className="max-w-[60px] truncate leading-none">
         {active && label ? label : "风格"}
       </span>
