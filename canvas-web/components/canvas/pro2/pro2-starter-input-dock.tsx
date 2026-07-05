@@ -2,11 +2,8 @@
 
 import { useCallback, useMemo } from "react";
 import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
-import { useNodes, useStore } from "@xyflow/react";
+import { useNodes } from "@xyflow/react";
 import {
-  computeLibtvDockInverseScale,
-  libtvDockFixedFlowPx,
-  libtvDockFlowSize,
   VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -77,16 +74,9 @@ export function Pro2StarterInputDock() {
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 
-  const zoom = useStore((s) => s.transform[2]);
-  const { w: dockW } = libtvDockFlowSize();
-  const invScale = computeLibtvDockInverseScale(zoom, dockW, false);
-  const shellScreenScale = invScale * Math.max(0.08, zoom);
-  const dockTextFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
-  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
+  const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
+  const sendBtnPx = 44;
+  const sendIconPx = 18;
 
   const d = (storeNode?.data ?? {}) as StoryProStarterNodeData;
   const textPurpose = useMemo(

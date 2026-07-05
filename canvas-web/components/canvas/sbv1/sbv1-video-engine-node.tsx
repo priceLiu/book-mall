@@ -21,6 +21,7 @@ import {
   handleSbv1SideAddNodePick,
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
+import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-library";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
 import {
   libtvNodeBorderStyle,
@@ -231,6 +232,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         nodeType,
         alert,
         () => {
+          if (side === "left" && itemId === "style-asset") {
+            openPro2StyleLibraryForMediaNode(id);
+            return;
+          }
           if (side === "left" && (itemId === "image" || nodeType === "sbv1-image")) {
             spawnSbv1NeighborFromNode(id, "left", "sbv1-image", spawnStore);
             return;

@@ -2,65 +2,48 @@
 
 import { useMemo } from "react";
 import {
-  libtvDockFixedFlowPx,
-  libtvDockVideoHeaderScreenMetrics,
+  DOCK_HEADER_MARK_BTN_SCREEN_H,
+  DOCK_HEADER_MARK_BTN_SCREEN_W,
+  DOCK_REF_CORNER_BADGE_FONT_SCREEN,
+  DOCK_REF_CORNER_BADGE_MIN_SCREEN,
+  DOCK_REF_THUMB_SCREEN_SIZE,
   VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
-import { useLibtvInputDockUi } from "@/lib/canvas/libtv-input-dock-ui-context";
 
-/** 视频 / 图片 Dock 顶栏 · 上游参考缩略图屏上尺寸（与 sbv1-video-engine-chat-input 一致） */
+/**
+ * Dock 顶栏缩略图 / 标记 · 与底栏字号同一策略：
+ * flow 内直接用目标屏 px（Pro2InputDockShell 外层 invScale 负责缩到屏上恒定尺寸）。
+ */
 export function useLibtvDockRefThumbMetrics() {
-  const { shellScreenScale, canvasZoom } = useLibtvInputDockUi();
   return useMemo(() => {
-    const headerMetrics = libtvDockVideoHeaderScreenMetrics(canvasZoom);
-    const thumbWidthPx = libtvDockFixedFlowPx(
-      headerMetrics.thumbWidthScreenPx,
-      shellScreenScale,
-    );
-    const thumbHeightPx = libtvDockFixedFlowPx(
-      headerMetrics.thumbHeightScreenPx,
-      shellScreenScale,
-    );
-    /** 方形按钮（风格 / 上传）用高度对齐缩略图行 */
-    const thumbPx = thumbHeightPx;
-    const chipMinHeightPx = libtvDockFixedFlowPx(
-      VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100,
-      shellScreenScale,
-    );
-    const badgeFontPx = libtvDockFixedFlowPx(
-      headerMetrics.badgeFontScreenPx,
-      shellScreenScale,
-    );
-    const badgeMinPx = libtvDockFixedFlowPx(
-      headerMetrics.badgeFontScreenPx + 6,
-      shellScreenScale,
-    );
-    const headerMinHeightPx =
-      thumbHeightPx + libtvDockFixedFlowPx(8, shellScreenScale);
-    /** 顶栏内 logo（文本/上传/标记）图标屏上尺寸 · 与缩略图协调（约 40%） */
-    const logoIconPx = libtvDockFixedFlowPx(30, shellScreenScale);
-    /** logo 按钮下方小标签字号（如「标记」「上传」） */
-    const logoLabelFontPx = libtvDockFixedFlowPx(11, shellScreenScale);
+    const thumbSize = DOCK_REF_THUMB_SCREEN_SIZE;
+    const markBtnWidthPx = DOCK_HEADER_MARK_BTN_SCREEN_W;
+    const markBtnHeightPx = DOCK_HEADER_MARK_BTN_SCREEN_H;
+    /** 顶栏行高以缩略图为准；标记可略高但不撑大行高 */
+    const headerMinHeightPx = thumbSize + 10;
     const thumbStyle = {
-      width: thumbWidthPx,
-      height: thumbHeightPx,
-      minWidth: thumbWidthPx,
-      minHeight: thumbHeightPx,
+      width: thumbSize,
+      height: thumbSize,
+      minWidth: thumbSize,
+      minHeight: thumbSize,
     } as const;
     const thumbClass =
       "group relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-[#262626]";
     return {
-      thumbPx,
-      thumbWidthPx,
-      thumbHeightPx,
+      actionBtnPx: markBtnWidthPx,
+      markBtnWidthPx,
+      markBtnHeightPx,
+      thumbPx: thumbSize,
+      thumbWidthPx: thumbSize,
+      thumbHeightPx: thumbSize,
       thumbStyle,
       thumbClass,
       headerMinHeightPx,
-      chipMinHeightPx,
-      badgeFontPx,
-      badgeMinPx,
-      logoIconPx,
-      logoLabelFontPx,
+      chipMinHeightPx: VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100,
+      badgeFontPx: DOCK_REF_CORNER_BADGE_FONT_SCREEN,
+      badgeMinPx: DOCK_REF_CORNER_BADGE_MIN_SCREEN,
+      logoIconPx: 30,
+      logoLabelFontPx: 11,
     };
-  }, [canvasZoom, shellScreenScale]);
+  }, []);
 }

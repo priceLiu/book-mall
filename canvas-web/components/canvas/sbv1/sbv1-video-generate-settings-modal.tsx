@@ -38,7 +38,9 @@ import {
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { cn } from "@/lib/utils";
 
-const MODAL_Z = 1200;
+import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
+
+const MODAL_Z = LIBTV_GENERATE_SETTINGS_MODAL_Z;
 
 const RESOLUTION_OPTIONS = [
   { id: "720p", label: "720p" },

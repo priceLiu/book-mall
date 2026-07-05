@@ -9,6 +9,7 @@ import {
 import {
   buildPro2StyleAssetToHubEdge,
   buildPro2StyleAssetToImageEdge,
+  buildPro2StyleAssetToVideoEdge,
   findPro2StyleAssetSnapScriptHub,
   findStyleAssetLinkedToImage,
 } from "./pro2-style-asset-connect";
@@ -114,6 +115,7 @@ const DOCK_STYLE_MEDIA_TYPES = new Set([
   "story-pro2-image",
   "story-pro2-three-view",
   "sbv1-image",
+  "sbv1-video-engine",
 ]);
 
 /** Dock / + 菜单风格库 · 在目标媒体节点左侧生成/更新风格素材并连线 */
@@ -165,6 +167,12 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
   const nodeId = args.addNode("story-pro2-style-asset", position, patch);
   if (!nodeId) return "";
 
+  const mediaType = mediaNode.type ?? "";
+  const styleEdge =
+    mediaType === "sbv1-video-engine"
+      ? buildPro2StyleAssetToVideoEdge(nodeId, args.imageNodeId)
+      : buildPro2StyleAssetToImageEdge(nodeId, args.imageNodeId);
+
   args.setEdges((prev) => {
     if (
       prev.some(
@@ -173,10 +181,7 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
     ) {
       return prev;
     }
-    return [
-      ...prev,
-      buildPro2StyleAssetToImageEdge(nodeId, args.imageNodeId),
-    ];
+    return [...prev, styleEdge];
   });
 
   selectPro2NodeAfterSpawn(args.setNodes, nodeId);

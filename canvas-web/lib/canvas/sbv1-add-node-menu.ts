@@ -7,6 +7,7 @@ import {
   Type,
   Video,
   Wand2,
+  Box,
 } from "lucide-react";
 
 /** 图片节点左侧 + · 文生图 / 图生图 */
@@ -67,6 +68,13 @@ export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: Type,
         enabled: true,
         nodeType: "story-pro2-starter",
+      },
+      {
+        id: "style-asset",
+        label: "素材",
+        icon: Box,
+        enabled: true,
+        nodeType: "story-pro2-style-asset",
       },
     ],
   },

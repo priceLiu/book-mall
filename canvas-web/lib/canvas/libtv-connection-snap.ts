@@ -1,6 +1,11 @@
 import type { Connection } from "@xyflow/react";
 import { nodeSnapBox } from "./canvas-drag-snap";
 import { absoluteNodePosition, nodeMeasuredSize } from "./normalize-graph-nodes";
+import { SIDE_PLUS_BY_TYPE } from "./libtv-side-connect-menu";
+import {
+  LIBTV_SIDE_PLUS_LG_RADIUS_FLOW,
+  LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW,
+} from "./libtv-node-chrome";
 import type { CanvasFlowNode } from "./types";
 
 /** 拖线松手时 · 节点 type → 默认 target / source handle */
@@ -30,12 +35,13 @@ export function findTopmostNodeAtFlowPoint(
     if (n.id === excludeId) continue;
     if (n.type === "group") continue;
     const box = nodeSnapBox(n, nodes);
-    if (
-      point.x < box.left - CONNECT_SNAP_PADDING ||
-      point.x > box.right + CONNECT_SNAP_PADDING ||
-      point.y < box.top - CONNECT_SNAP_PADDING ||
-      point.y > box.bottom + CONNECT_SNAP_PADDING
-    ) {
+    const inBox =
+      point.x >= box.left - CONNECT_SNAP_PADDING &&
+      point.x <= box.right + CONNECT_SNAP_PADDING &&
+      point.y >= box.top - CONNECT_SNAP_PADDING &&
+      point.y <= box.bottom + CONNECT_SNAP_PADDING;
+    const onSidePlus = nodeHitsSidePlusZone(n, nodes, point);
+    if (!inBox && !onSidePlus) {
       continue;
     }
     const { w, h } = nodeMeasuredSize(n);
@@ -69,6 +75,81 @@ export type SnapConnectionEndArgs = {
 
 /** 松手点距节点外框的吸附容差（px · 画布坐标） */
 const CONNECT_SNAP_PADDING = 28;
+
+type SidePlusSnapHit = {
+  node: CanvasFlowNode;
+  handleId: string;
+  dist: number;
+};
+
+function sidePlusHandleCenter(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  side: "left" | "right",
+): { x: number; y: number } | null {
+  const map = SIDE_PLUS_BY_TYPE[String(node.type ?? "")];
+  if (!map) return null;
+  const handleId = side === "left" ? map.left : map.right;
+  if (!handleId) return null;
+  const box = nodeSnapBox(node, nodes);
+  const cy = (box.top + box.bottom) / 2;
+  const cx =
+    side === "left"
+      ? box.left - LIBTV_SIDE_PLUS_LG_RADIUS_FLOW
+      : box.right + LIBTV_SIDE_PLUS_LG_RADIUS_FLOW;
+  return { x: cx, y: cy };
+}
+
+/** 拖线松手 · 优先吸附到节点侧栏 + 圆形热区（+ 在节点外框之外） */
+function findNearestSidePlusHandle(
+  nodes: CanvasFlowNode[],
+  point: { x: number; y: number },
+  excludeId?: string,
+): SidePlusSnapHit | null {
+  let best: SidePlusSnapHit | null = null;
+  const maxDist =
+    LIBTV_SIDE_PLUS_LG_RADIUS_FLOW + LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW;
+
+  for (const n of nodes) {
+    if (n.id === excludeId || n.type === "group") continue;
+    const map = SIDE_PLUS_BY_TYPE[String(n.type ?? "")];
+    if (!map) continue;
+
+    for (const side of ["left", "right"] as const) {
+      const handleId = side === "left" ? map.left : map.right;
+      if (!handleId) continue;
+      const center = sidePlusHandleCenter(n, nodes, side);
+      if (!center) continue;
+      const dist = Math.hypot(point.x - center.x, point.y - center.y);
+      if (dist > maxDist) continue;
+      if (!best || dist < best.dist) {
+        best = { node: n, handleId, dist };
+      }
+    }
+  }
+  return best;
+}
+
+function nodeHitsSidePlusZone(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  point: { x: number; y: number },
+): boolean {
+  const map = SIDE_PLUS_BY_TYPE[String(node.type ?? "")];
+  if (!map) return false;
+  const maxDist =
+    LIBTV_SIDE_PLUS_LG_RADIUS_FLOW + LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW;
+  for (const side of ["left", "right"] as const) {
+    const handleId = side === "left" ? map.left : map.right;
+    if (!handleId) continue;
+    const center = sidePlusHandleCenter(node, nodes, side);
+    if (!center) continue;
+    if (Math.hypot(point.x - center.x, point.y - center.y) <= maxDist) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function distancePointToRect(
   point: { x: number; y: number },
@@ -134,15 +215,19 @@ export function resolveSnapConnectionOnNodeHit(
     return null;
   }
 
+  const sidePlusHit = findNearestSidePlusHandle(
+    nodes,
+    flowPoint,
+    state.fromNodeId,
+  );
+
   const targetNode =
+    sidePlusHit?.node ??
     (state.toNodeId
       ? nodes.find((n) => n.id === state.toNodeId)
       : null) ??
     findTopmostNodeAtFlowPoint(nodes, flowPoint, state.fromNodeId);
   if (!targetNode || targetNode.id === state.fromNodeId) return null;
-
-  const needRole: "source" | "target" =
-    state.fromHandleType === "source" ? "target" : "source";
 
   const toDefaults = DEFAULT_HANDLE_BY_TYPE[String(targetNode.type ?? "")];
 
@@ -151,6 +236,9 @@ export function resolveSnapConnectionOnNodeHit(
   if (state.fromHandleType === "source") {
     let targetHandle =
       state.toHandleId ??
+      (sidePlusHit?.node.id === targetNode.id
+        ? sidePlusHit.handleId
+        : undefined) ??
       pickHandleId(targetNode, "target") ??
       toDefaults?.target;
     if (
@@ -186,6 +274,7 @@ export function resolveSnapConnectionOnNodeHit(
 
   const sourceHandle =
     state.toHandleId ??
+    (sidePlusHit?.node.id === targetNode.id ? sidePlusHit.handleId : undefined) ??
     pickHandleId(targetNode, "source") ??
     toDefaults?.source;
   if (!sourceHandle) return null;

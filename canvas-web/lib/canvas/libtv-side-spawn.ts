@@ -8,6 +8,11 @@ import {
   buildPro2ThreeViewNodeData,
   spawnPro2ScriptHubFromSource,
 } from "./pro2-spawn-nodes";
+import { buildPro2EmptyStyleAssetNodeData } from "./pro2-spawn-style-asset";
+import {
+  buildPro2StyleAssetToImageEdge,
+  buildPro2StyleAssetToVideoEdge,
+} from "./pro2-style-asset-connect";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { selectSbv1NodeAfterSpawn, buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
 import { SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
@@ -222,6 +227,26 @@ export function spawnLibtvNeighborFromAnchor(
       setNodes,
     });
     return "";
+  }
+
+  if (nodeType === "story-pro2-style-asset" && side === "left") {
+    const newId = addNode(
+      "story-pro2-style-asset",
+      { x: position.x, y: position.y },
+      buildPro2EmptyStyleAssetNodeData() as unknown as Record<string, unknown>,
+    );
+    if (!newId) return "";
+    if (anchor.type === "sbv1-video-engine") {
+      pushEdge(setEdges, buildPro2StyleAssetToVideoEdge(newId, anchorId));
+    } else if (
+      anchor.type === "story-pro2-image" ||
+      anchor.type === "story-pro2-three-view" ||
+      anchor.type === "sbv1-image"
+    ) {
+      pushEdge(setEdges, buildPro2StyleAssetToImageEdge(newId, anchorId));
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
+    return newId;
   }
 
   return "";

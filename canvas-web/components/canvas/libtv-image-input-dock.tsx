@@ -1,14 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ArrowUp,
-  ChevronDown,
-  Loader2,
-  SlidersHorizontal,
-  Zap,
-} from "lucide-react";
-import { useNodes, useStore } from "@xyflow/react";
+import { Zap } from "lucide-react";
+import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -48,15 +42,12 @@ import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { isLibtvMediaGenerating } from "@/components/canvas/libtv-media-generating-state";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
-import {
-  computeLibtvDockInverseScale,
-  libtvDockFixedFlowPx,
-  libtvDockFlowSize,
-  VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-} from "@/lib/canvas/libtv-dock-scale";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
+import { LibtvDockSendButton } from "./libtv-dock-send-button";
+import { LibtvDockSettingsTrigger } from "./libtv-dock-settings-trigger";
+import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { pro2ImageNodeUsesEmbeddedDock } from "./pro2/pro2-image-node-embedded-dock";
 import { Pro2DockPasteZone } from "./pro2/pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "./pro2/pro2-dock-ref-images";
@@ -118,17 +109,6 @@ export function LibtvImageInputDock() {
   );
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const zoom = useStore((s) => s.transform[2]);
-  const { w: dockW } = libtvDockFlowSize();
-  const invScale = computeLibtvDockInverseScale(zoom, dockW, false);
-  const shellScreenScale = invScale * Math.max(0.08, zoom);
-  const dockTextFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const toolbarMinHeightPx = libtvDockFixedFlowPx(48, shellScreenScale);
-  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
-  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
 
   const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
   const pro2DockNodeId = useMemo(() => {
@@ -467,73 +447,15 @@ export function LibtvImageInputDock() {
           />
         }
         footer={
-          <Pro2DockToolbar className="gap-2">
-            {!isPipelineCell ? (
-              <>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <button
-                    type="button"
-                    title="图片生成设置"
-                    disabled={isRunning}
-                    className="nodrag rounded-md p-2 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    <SlidersHorizontal className="size-5" />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  disabled={isRunning}
-                  className="nodrag flex min-w-0 flex-1 items-center gap-1 rounded-md px-2.5 py-2 text-left text-white hover:bg-white/[0.06]"
-                  style={{ fontSize: dockTextFontPx, minHeight: toolbarMinHeightPx }}
-                  onClick={() => setSettingsOpen(true)}
-                >
-                  <span className="truncate">{settingsLabel}</span>
-                  <ChevronDown className="size-4 shrink-0 opacity-45" />
-                </button>
-              </>
-            ) : (
-              <div className="min-w-0 flex-1" />
-            )}
-            <div className="flex shrink-0 items-center gap-1.5">
-              {!isPipelineCell && estCredits?.credits != null ? (
-                <span
-                  className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
-                  style={{ fontSize: dockTextFontPx }}
-                  title={`${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`}
-                >
-                  <Zap
-                    className="fill-amber-300/90 text-amber-300/90"
-                    style={{ width: sendIconPx, height: sendIconPx }}
-                  />
-                  {estCredits.credits}
-                </span>
-              ) : null}
-              <button
-                type="button"
-                disabled={!canSend}
-                title={
-                  isRunning
-                    ? "生成中"
-                    : isPipelineCell
-                      ? "重新生成"
-                      : "生成图片"
-                }
-                className="nodrag flex shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-                style={{ width: sendBtnPx, height: sendBtnPx }}
-                onClick={onRun}
-              >
-                {isRunning ? (
-                  <Loader2
-                    className="animate-spin"
-                    style={{ width: sendIconPx, height: sendIconPx }}
-                  />
-                ) : (
-                  <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-                )}
-              </button>
-            </div>
-          </Pro2DockToolbar>
+          <LibtvImageDockFooter
+            isPipelineCell={isPipelineCell}
+            isRunning={isRunning}
+            settingsLabel={settingsLabel}
+            estCredits={estCredits}
+            canSend={canSend}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onRun={onRun}
+          />
         }
       >
         <Pro2DockPasteZone
@@ -575,6 +497,67 @@ export function LibtvImageInputDock() {
         />
       ) : null}
     </>
+  );
+}
+
+function LibtvImageDockFooter({
+  isPipelineCell,
+  isRunning,
+  settingsLabel,
+  estCredits,
+  canSend,
+  onOpenSettings,
+  onRun,
+}: {
+  isPipelineCell: boolean;
+  isRunning: boolean;
+  settingsLabel: string;
+  estCredits: ReturnType<typeof useModelCreditsPreview>;
+  canSend: boolean;
+  onOpenSettings: () => void;
+  onRun: () => void;
+}) {
+  const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
+
+  return (
+    <Pro2DockToolbar className="gap-2">
+      {!isPipelineCell ? (
+        <LibtvDockSettingsTrigger
+          label={settingsLabel}
+          disabled={isRunning}
+          onClick={onOpenSettings}
+        />
+      ) : (
+        <div className="min-w-0 flex-1" />
+      )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {!isPipelineCell && estCredits?.credits != null ? (
+          <span
+            className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
+            style={{ fontSize: fontPx }}
+            title={`${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`}
+          >
+            <Zap
+              className="fill-amber-300/90 text-amber-300/90"
+              style={{ width: sendIconPx, height: sendIconPx }}
+            />
+            {estCredits.credits}
+          </span>
+        ) : null}
+        <LibtvDockSendButton
+          disabled={!canSend}
+          loading={isRunning}
+          title={
+            isRunning
+              ? "生成中"
+              : isPipelineCell
+                ? "重新生成"
+                : "生成图片"
+          }
+          onClick={onRun}
+        />
+      </div>
+    </Pro2DockToolbar>
   );
 }
 

@@ -1,18 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
-import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
-import { useNodes, useStore } from "@xyflow/react";
-import {
-  computeLibtvDockInverseScale,
-  libtvDockFixedFlowPx,
-  libtvDockFlowSize,
-  VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-} from "@/lib/canvas/libtv-dock-scale";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Languages, Zap } from "lucide-react";
+import { useNodes } from "@xyflow/react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { LibtvDockSettingsTrigger } from "@/components/canvas/libtv-dock-settings-trigger";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
-import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
+import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
@@ -28,11 +24,14 @@ import {
   pro2HubIsGenerating,
   pro2HubScriptPhaseLabel,
 } from "@/lib/canvas/pro2-script-hub-helpers";
-import { EnginePicker } from "../engine-picker";
-import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
+import {
+  Pro2ScriptLlmSettingsModal,
+  pro2ScriptLlmSettingsTriggerLabel,
+} from "./pro2-script-llm-settings-modal";
 import {
   Pro2DockHeader,
   Pro2DockToolbar,
@@ -70,16 +69,7 @@ export function Pro2ScriptInputDock() {
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 
-  const zoom = useStore((s) => s.transform[2]);
-  const { w: dockW } = libtvDockFlowSize();
-  const invScale = computeLibtvDockInverseScale(zoom, dockW, false);
-  const shellScreenScale = invScale * Math.max(0.08, zoom);
-  const dockTextFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
-  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
   const dockInput = d.dockInput ?? "";
@@ -207,8 +197,14 @@ export function Pro2ScriptInputDock() {
   if (!storeNode || !dockActive || !placement) return null;
 
   const placeholder = SCRIPT_PLACEHOLDER;
+  const settingsLabel = pro2ScriptLlmSettingsTriggerLabel(
+    d.providerId ?? "",
+    d.modelKey ?? "",
+    providers,
+  );
 
   return (
+    <>
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-script-dock"
@@ -247,61 +243,14 @@ export function Pro2ScriptInputDock() {
         />
       }
       footer={
-        <>
-          <Pro2DockToolbar>
-            <div className="min-w-0 flex-1">
-              <EnginePicker
-                role="LLM"
-                allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
-                providerId={d.providerId ?? ""}
-                modelKey={d.modelKey ?? ""}
-                params={d.params ?? {}}
-                triggerFontPx={dockTextFontPx}
-                onChange={onPickEngine}
-              />
-            </div>
-            <div
-              className="flex shrink-0 items-center gap-1 text-white/35"
-              style={{ fontSize: dockTextFontPx }}
-            >
-              <button
-                type="button"
-                className="nodrag rounded-md p-1.5 text-white/35"
-                title="翻译（预留）"
-                disabled
-              >
-                <Languages style={{ width: sendIconPx, height: sendIconPx }} />
-              </button>
-              <button
-                type="button"
-                className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
-                style={{ fontSize: dockTextFontPx }}
-                title="消耗（预留）"
-                disabled
-              >
-                <Zap style={{ width: sendIconPx, height: sendIconPx }} />
-                <span>1</span>
-              </button>
-              <button
-                type="button"
-                disabled={isGenerating || !canSend}
-                className="nodrag flex items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-                style={{ width: sendBtnPx, height: sendBtnPx }}
-                title={phase === "frame" ? "重新生成脚本" : "生成分镜脚本"}
-                onClick={() => void onSend()}
-              >
-                {isGenerating ? (
-                  <Loader2
-                    className="animate-spin"
-                    style={{ width: sendIconPx, height: sendIconPx }}
-                  />
-                ) : (
-                  <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-                )}
-              </button>
-            </div>
-          </Pro2DockToolbar>
-        </>
+        <Pro2ScriptDockFooter
+          settingsLabel={settingsLabel}
+          isGenerating={isGenerating}
+          canSend={canSend}
+          phase={phase}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onSend={() => void onSend()}
+        />
       }
     >
       <Pro2DockPasteZone
@@ -332,5 +281,72 @@ export function Pro2ScriptInputDock() {
         />
       </Pro2DockPasteZone>
     </Pro2InputDockShell>
+
+    <Pro2ScriptLlmSettingsModal
+      open={settingsOpen}
+      providerId={d.providerId ?? ""}
+      modelKey={d.modelKey ?? ""}
+      params={d.params ?? {}}
+      onClose={() => setSettingsOpen(false)}
+      onConfirm={onPickEngine}
+    />
+    </>
+  );
+}
+
+function Pro2ScriptDockFooter({
+  settingsLabel,
+  isGenerating,
+  canSend,
+  phase,
+  onOpenSettings,
+  onSend,
+}: {
+  settingsLabel: string;
+  isGenerating: boolean;
+  canSend: boolean;
+  phase: string;
+  onOpenSettings: () => void;
+  onSend: () => void;
+}) {
+  const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
+
+  return (
+    <Pro2DockToolbar className="gap-2">
+      <LibtvDockSettingsTrigger
+        label={settingsLabel}
+        disabled={isGenerating}
+        onClick={onOpenSettings}
+      />
+      <div
+        className="flex shrink-0 items-center gap-1.5 text-white/35"
+        style={{ fontSize: fontPx }}
+      >
+        <button
+          type="button"
+          className="nodrag rounded-md p-1.5 text-white/35"
+          title="翻译（预留）"
+          disabled
+        >
+          <Languages style={{ width: sendIconPx, height: sendIconPx }} />
+        </button>
+        <button
+          type="button"
+          className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
+          style={{ fontSize: fontPx }}
+          title="消耗（预留）"
+          disabled
+        >
+          <Zap style={{ width: sendIconPx, height: sendIconPx }} />
+          <span>1</span>
+        </button>
+        <LibtvDockSendButton
+          disabled={!canSend}
+          loading={isGenerating}
+          title={phase === "frame" ? "重新生成脚本" : "生成分镜脚本"}
+          onClick={onSend}
+        />
+      </div>
+    </Pro2DockToolbar>
   );
 }

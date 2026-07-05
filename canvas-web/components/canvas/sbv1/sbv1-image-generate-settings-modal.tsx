@@ -24,7 +24,9 @@ import {
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { cn } from "@/lib/utils";
 
-const MODAL_Z = 1200;
+import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
+
+const MODAL_Z = LIBTV_GENERATE_SETTINGS_MODAL_Z;
 
 const QUALITY_OPTIONS: { id: Sbv1ImageQuality; label: string }[] = [
   { id: "low", label: "低" },

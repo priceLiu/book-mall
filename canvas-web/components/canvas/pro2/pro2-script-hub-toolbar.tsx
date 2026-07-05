@@ -348,7 +348,7 @@ export function Pro2ScriptHubToolbar({
     <>
       <div
         className={cn(
-          "nodrag pointer-events-auto absolute left-1/2 z-30 min-w-max -translate-x-1/2 whitespace-nowrap",
+          "nodrag pointer-events-auto min-w-max whitespace-nowrap",
           PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
           className,
         )}
