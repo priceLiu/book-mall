@@ -25,6 +25,7 @@ export function DockUpstreamRefPreviewCard({
   importBadge,
   cornerLabel,
   badgeIndex,
+  showCornerBadge = true,
   onDisconnect,
   className,
   style,
@@ -40,6 +41,8 @@ export function DockUpstreamRefPreviewCard({
   cornerLabel?: string;
   /** cornerLabel 未传时回退为 index+1 */
   badgeIndex?: number;
+  /** 无画布连线时不显示右上角角标 */
+  showCornerBadge?: boolean;
   onDisconnect: () => void;
   className?: string;
   style?: React.CSSProperties;
@@ -110,7 +113,7 @@ export function DockUpstreamRefPreviewCard({
             <ImageIcon className="size-4" />
           </div>
         )}
-        {badgeText ? (
+        {badgeText && showCornerBadge ? (
           <DockRefCornerBadge
             label={badgeText}
             title="断开连线"

@@ -1,20 +1,20 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
   type EdgeProps,
 } from "@xyflow/react";
-import { X } from "lucide-react";
+import { Scissors } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 
+const HOVER_REVEAL_MS = 1000;
+const HIT_STROKE_WIDTH = 36;
+
 /**
- * 可删除的连线：hover / 选中 时在中点显示 ✕。
- *
- * - 默认走 React Flow 内置的 select+Delete/Backspace 删除（无障碍 + 键盘党）。
- * - 这个 ✕ 是给鼠标用户的"显式入口"，hover 才出，避免画面过乱。
+ * 可删除连线：在连线上任意位置悬停 1s，于鼠标处显示剪刀；点击剪断。
  */
 export function DeletableEdge(props: EdgeProps) {
   const {
@@ -27,7 +27,6 @@ export function DeletableEdge(props: EdgeProps) {
     targetPosition,
     style,
     markerEnd,
-    selected,
   } = props;
 
   const setEdges = useCanvasStore((s) => s.setEdges);
@@ -35,7 +34,34 @@ export function DeletableEdge(props: EdgeProps) {
     setEdges((edges) => edges.filter((e) => e.id !== id));
   }, [id, setEdges]);
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [cutAnchor, setCutAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current != null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const scheduleCutAnchor = useCallback(
+    (clientX: number, clientY: number) => {
+      clearTimer();
+      timerRef.current = setTimeout(() => {
+        setCutAnchor({ x: clientX, y: clientY });
+      }, HOVER_REVEAL_MS);
+    },
+    [clearTimer],
+  );
+
+  const onEdgePointerLeave = useCallback(() => {
+    clearTimer();
+    setCutAnchor(null);
+  }, [clearTimer]);
+
+  const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
@@ -51,32 +77,54 @@ export function DeletableEdge(props: EdgeProps) {
         path={edgePath}
         markerEnd={markerEnd}
         style={style}
-        // 让 group/.deletable-edge:hover 能命中整条 path
         className="deletable-edge"
       />
-      <EdgeLabelRenderer>
-        <div
-          style={{
-            position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            pointerEvents: "all",
-          }}
-          className={`canvas-edge-delete ${selected ? "is-selected" : ""}`}
-        >
-          <button
-            type="button"
-            aria-label="删除连线"
-            title="删除连线（也可选中后按 Delete）"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={HIT_STROKE_WIDTH}
+        pointerEvents="stroke"
+        className="deletable-edge-hit nodrag nopan"
+        onPointerEnter={(e) => scheduleCutAnchor(e.clientX, e.clientY)}
+        onPointerMove={(e) => {
+          if (cutAnchor) {
+            setCutAnchor({ x: e.clientX, y: e.clientY });
+            return;
+          }
+          scheduleCutAnchor(e.clientX, e.clientY);
+        }}
+        onPointerLeave={onEdgePointerLeave}
+      />
+      {cutAnchor ? (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: "fixed",
+              left: cutAnchor.x,
+              top: cutAnchor.y,
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "all",
+              zIndex: 1000,
             }}
-            className="nodrag flex size-7 items-center justify-center rounded-full border border-white/20 bg-black/85 text-white/80 shadow-md hover:border-red-400/60 hover:bg-red-500/30 hover:text-red-200"
+            className="canvas-edge-delete is-hover-cut"
+            onPointerLeave={onEdgePointerLeave}
           >
-            <X className="size-4" />
-          </button>
-        </div>
-      </EdgeLabelRenderer>
+            <button
+              type="button"
+              aria-label="剪断连线"
+              title="剪断连线（也可选中后按 Delete）"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="nodrag flex size-7 items-center justify-center rounded-full border border-white/20 bg-black/85 text-white/80 shadow-md hover:border-red-400/60 hover:bg-red-500/30 hover:text-red-200"
+            >
+              <Scissors className="size-3.5" />
+            </button>
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
     </>
   );
 }

@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
+import { isPro2DockUpstreamEdgeLink } from "@/lib/canvas/pro2-dock-upstream-links";
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import { PRO2_DOCK_BORDER, PRO2_DOCK_SHELL_BG } from "@/lib/canvas/story-pro2-node-chrome";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -25,6 +26,8 @@ function TextUpstreamChip({
   active,
   thumbPx,
   logoIconPx,
+  badgeFontPx,
+  badgeMinPx,
 }: {
   link: Pro2DockUpstreamLink;
   index: number;
@@ -32,6 +35,8 @@ function TextUpstreamChip({
   active?: boolean;
   thumbPx: number;
   logoIconPx: number;
+  badgeFontPx: number;
+  badgeMinPx: number;
 }) {
   const [open, setOpen] = useState(false);
   const { doubleConfirm } = useDialogs();
@@ -126,13 +131,16 @@ function TextUpstreamChip({
             />
           </span>
         </button>
-        {deletable ? (
+        {deletable &&
+        isPro2DockUpstreamEdgeLink(link, anchorNodeId) ? (
           <DockRefCornerBadge
             label={String(index + 1)}
             title={`删除「${link.label}」`}
             onRemove={() => void onDelete()}
+            fontSizePx={badgeFontPx}
+            minSizePx={badgeMinPx}
           />
-        ) : (
+        ) : deletable ? null : (
           <span
             className="pointer-events-none absolute right-0.5 top-0.5 z-10 flex min-h-[14px] min-w-[14px] items-center justify-center rounded bg-black/75 px-1 py-px text-[8px] font-medium leading-none text-white/90"
             aria-hidden
@@ -276,6 +284,7 @@ function ImageUpstreamChip({
       previewUrl={link.previewUrl}
       active={Boolean(active)}
       badgeIndex={index}
+      showCornerBadge={isPro2DockUpstreamEdgeLink(link, anchorNodeId)}
       className={thumbClass}
       style={thumbStyle}
       badgeFontPx={badgeFontPx}
@@ -331,6 +340,8 @@ export function Pro2DockUpstreamChips({
             active={activeIds.includes(link.id)}
             thumbPx={thumbPx}
             logoIconPx={logoIconPx}
+            badgeFontPx={badgeFontPx}
+            badgeMinPx={badgeMinPx}
           />
         ),
       )}

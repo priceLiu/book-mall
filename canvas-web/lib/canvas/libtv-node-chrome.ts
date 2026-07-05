@@ -153,8 +153,8 @@ export const LIBTV_NODE_SIDE_PLUS_SIZE = "lg" as const;
 export const LIBTV_NODE_SIDE_PLUS_LAYER_CLASS = "z-[20060]";
 /** lg 侧 + 半径（flow · 与 globals.css 88px 对齐） */
 export const LIBTV_SIDE_PLUS_LG_RADIUS_FLOW = 44;
-/** 拖线松手 · 侧 + 额外吸附容差（flow） */
-export const LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW = 24;
+/** 拖线松手 · 侧 + 额外吸附容差（flow · 含磁吸沿边偏移） */
+export const LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW = 56;
 
 export const LIBTV_NODE_HANDLE_CLASS =
   "!h-2.5 !w-2.5 !border-2 !border-[#141418] !bg-cyan-400";

@@ -145,9 +145,9 @@ export const VIDEO_DOCK_HEADER_THUMB_H_MAX = DOCK_REF_THUMB_SCREEN_SIZE;
 export const DOCK_HEADER_MARK_BTN_SCREEN_W = 118;
 export const DOCK_HEADER_MARK_BTN_SCREEN_H = 118;
 
-/** 参考缩略图右上角序号角标（屏 px） */
-export const DOCK_REF_CORNER_BADGE_FONT_SCREEN = 12;
-export const DOCK_REF_CORNER_BADGE_MIN_SCREEN = 16;
+/** 参考缩略图右上角序号角标（屏 px · 2× 基准） */
+export const DOCK_REF_CORNER_BADGE_FONT_SCREEN = 24;
+export const DOCK_REF_CORNER_BADGE_MIN_SCREEN = 32;
 
 /** 模式 chip 固定字号（屏 px） */
 export const VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 = 27;

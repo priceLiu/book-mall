@@ -42,7 +42,7 @@ export function useLibtvDockRefThumbMetrics() {
       chipMinHeightPx: VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100,
       badgeFontPx: DOCK_REF_CORNER_BADGE_FONT_SCREEN,
       badgeMinPx: DOCK_REF_CORNER_BADGE_MIN_SCREEN,
-      logoIconPx: 30,
+      logoIconPx: 60,
       logoLabelFontPx: 11,
     };
   }, []);

@@ -18,8 +18,8 @@ import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
-  enrichPro2DockUpstreamLinks,
   pro2DockStyleShownAsChip,
+  pro2DockUpstreamLinksForChips,
 } from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -196,14 +196,9 @@ export function LibtvImageInputDock() {
   }, [storeNode, nodeType, nodes, edges]);
 
   const dockStyleRef = settingsData.dockStyleRef ?? pro2Data.dockStyleRef;
-  const displayLinks = useMemo(
-    () =>
-      enrichPro2DockUpstreamLinks(
-        upstreamLinks,
-        dockStyleRef,
-        storeNode?.id,
-      ),
-    [upstreamLinks, dockStyleRef, storeNode?.id],
+  const chipLinks = useMemo(
+    () => pro2DockUpstreamLinksForChips(upstreamLinks),
+    [upstreamLinks],
   );
   const showStyleButton = !pro2DockStyleShownAsChip(
     upstreamLinks,
@@ -413,9 +408,9 @@ export function LibtvImageInputDock() {
         header={
           <Pro2DockUpstreamHeader
             refRow={
-              displayLinks.length > 0 ? (
+              chipLinks.length > 0 ? (
                 <Pro2DockUpstreamChips
-                  links={displayLinks}
+                  links={chipLinks}
                   anchorNodeId={storeNode.id}
                   activeIds={activeRefIds}
                 />

@@ -8,7 +8,7 @@ import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
-import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream, enrichPro2DockUpstreamLinks, pro2DockStyleShownAsChip } from "@/lib/canvas/pro2-dock-upstream-links";
+import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream, pro2DockStyleShownAsChip, pro2DockUpstreamLinksForChips } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultPro2ThreeViewImageEngine } from "@/lib/canvas/pro2-three-view-batch-image";
@@ -118,14 +118,9 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     );
   }, [storeNode, nodes, edges]);
 
-  const displayLinks = useMemo(
-    () =>
-      enrichPro2DockUpstreamLinks(
-        upstreamLinks,
-        d.dockStyleRef,
-        storeNode?.id,
-      ),
-    [upstreamLinks, d.dockStyleRef, storeNode?.id],
+  const chipLinks = useMemo(
+    () => pro2DockUpstreamLinksForChips(upstreamLinks),
+    [upstreamLinks],
   );
 
   const mentionables = useMemo(
@@ -220,9 +215,9 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
         header={
           <Pro2DockHeader
             refRow={
-              displayLinks.length > 0 ? (
+              chipLinks.length > 0 ? (
                 <Pro2DockUpstreamChips
-                  links={displayLinks}
+                  links={chipLinks}
                   anchorNodeId={storeNode.id}
                   activeIds={activeRefIds}
                 />

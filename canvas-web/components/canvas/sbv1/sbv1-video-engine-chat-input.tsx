@@ -95,6 +95,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     badgeMinPx,
     headerMinHeightPx,
     chipMinHeightPx,
+    logoIconPx,
   } = useLibtvDockRefThumbMetrics();
   const chipFontPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
   const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
@@ -323,7 +324,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
                 key={`empty-${slotIndex}`}
                 label={corner}
                 style={refThumbStyle}
-                iconPx={thumbWidthPx}
+                iconPx={logoIconPx}
                 textFontPx={dockTextFontPx}
               />
             );
@@ -560,18 +561,16 @@ function Sbv1DockEmptyRefSlot({
   iconPx?: number;
   textFontPx?: number;
 }) {
+  const iconSize = iconPx ?? 14;
   return (
     <div
       className="relative shrink-0 overflow-hidden rounded-md border border-dashed border-white/15 bg-white/[0.02] flex flex-col items-center justify-center"
       style={style}
       title={`${label} · 连接或上传参考图`}
     >
-      <ArrowUp
+      <ImageIcon
         className="text-white/35"
-        style={{
-          width: iconPx ? Math.max(14, iconPx) : 14,
-          height: iconPx ? Math.max(14, iconPx) : 14,
-        }}
+        style={{ width: iconSize, height: iconSize }}
       />
       <span
         className="absolute bottom-0.5 font-medium text-white/45"

@@ -2,6 +2,7 @@ import type { Connection } from "@xyflow/react";
 import { nodeSnapBox } from "./canvas-drag-snap";
 import { absoluteNodePosition, nodeMeasuredSize } from "./normalize-graph-nodes";
 import { SIDE_PLUS_BY_TYPE } from "./libtv-side-connect-menu";
+import { libtvSidePlusInHandleId } from "./libtv-side-plus-in-handle";
 import {
   LIBTV_SIDE_PLUS_LG_RADIUS_FLOW,
   LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW,
@@ -82,26 +83,33 @@ type SidePlusSnapHit = {
   dist: number;
 };
 
-function sidePlusHandleCenter(
+/** 与 pro2-node-side-plus · MAGNET_VERTICAL_INSET_PX 对齐 */
+const SIDE_PLUS_VERTICAL_INSET_FLOW = 24;
+
+/** 点到侧 + 吸附带的最短距离（+ 可沿节点竖边磁吸移动） */
+function distancePointToSidePlusZone(
+  point: { x: number; y: number },
   node: CanvasFlowNode,
   nodes: CanvasFlowNode[],
   side: "left" | "right",
-): { x: number; y: number } | null {
+): number | null {
   const map = SIDE_PLUS_BY_TYPE[String(node.type ?? "")];
   if (!map) return null;
   const handleId = side === "left" ? map.left : map.right;
   if (!handleId) return null;
   const box = nodeSnapBox(node, nodes);
-  const cy = (box.top + box.bottom) / 2;
   const cx =
     side === "left"
       ? box.left - LIBTV_SIDE_PLUS_LG_RADIUS_FLOW
       : box.right + LIBTV_SIDE_PLUS_LG_RADIUS_FLOW;
-  return { x: cx, y: cy };
+  const minY = box.top + SIDE_PLUS_VERTICAL_INSET_FLOW;
+  const maxY = box.bottom - SIDE_PLUS_VERTICAL_INSET_FLOW;
+  if (maxY <= minY) return null;
+  const clampedY = Math.max(minY, Math.min(maxY, point.y));
+  return Math.hypot(point.x - cx, point.y - clampedY);
 }
 
-/** 拖线松手 · 优先吸附到节点侧栏 + 圆形热区（+ 在节点外框之外） */
-function findNearestSidePlusHandle(
+export function findNearestSidePlusHandle(
   nodes: CanvasFlowNode[],
   point: { x: number; y: number },
   excludeId?: string,
@@ -118,12 +126,14 @@ function findNearestSidePlusHandle(
     for (const side of ["left", "right"] as const) {
       const handleId = side === "left" ? map.left : map.right;
       if (!handleId) continue;
-      const center = sidePlusHandleCenter(n, nodes, side);
-      if (!center) continue;
-      const dist = Math.hypot(point.x - center.x, point.y - center.y);
-      if (dist > maxDist) continue;
+      const dist = distancePointToSidePlusZone(point, n, nodes, side);
+      if (dist == null || dist > maxDist) continue;
+      const snapHandleId =
+        side === "left" || side === "right"
+          ? libtvSidePlusInHandleId(handleId)
+          : handleId;
       if (!best || dist < best.dist) {
-        best = { node: n, handleId, dist };
+        best = { node: n, handleId: snapHandleId, dist };
       }
     }
   }
@@ -142,9 +152,8 @@ function nodeHitsSidePlusZone(
   for (const side of ["left", "right"] as const) {
     const handleId = side === "left" ? map.left : map.right;
     if (!handleId) continue;
-    const center = sidePlusHandleCenter(node, nodes, side);
-    if (!center) continue;
-    if (Math.hypot(point.x - center.x, point.y - center.y) <= maxDist) {
+    const dist = distancePointToSidePlusZone(point, node, nodes, side);
+    if (dist != null && dist <= maxDist) {
       return true;
     }
   }

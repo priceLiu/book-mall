@@ -19,6 +19,7 @@ import type { HandleType } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
+import { libtvSidePlusInHandleId } from "@/lib/canvas/libtv-side-plus-in-handle";
 import { LIBTV_NODE_SIDE_PLUS_LAYER_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
@@ -239,6 +240,20 @@ export function Pro2NodeSidePlus({
         )}
         aria-hidden={!visible}
       >
+        {side === "left" || side === "right" ? (
+          <Handle
+            id={libtvSidePlusInHandleId(handleId)}
+            type="target"
+            position={position}
+            className={cn(
+              RF_NO_DRAG,
+              "pro2-node-side-plus-handle",
+              "pro2-node-side-plus-in-handle",
+              lg && "pro2-node-side-plus-handle--lg",
+            )}
+            title="连接到此节点"
+          />
+        ) : null}
         <Handle
           id={handleId}
           type={handleType}
