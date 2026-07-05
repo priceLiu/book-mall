@@ -16,6 +16,7 @@ import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import { forwardMinimaxMusicGenerate } from "@/lib/gateway/minimax-music-proxy";
 import { MINIMAX_DEFAULT_MUSIC_MODEL_KEY } from "@/lib/gateway/minimax-speech-models";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -90,8 +91,18 @@ export async function POST(request: NextRequest) {
       },
     });
     const ok = result.status >= 200 && result.status < 300 && !!result.buffer?.length;
+    if (result.taskId && !ok) {
+      await prisma.gatewayRequestLog.update({
+        where: { id: log.id },
+        data: {
+          externalTaskId: result.taskId,
+          durationMs: result.durationMs > 0 ? result.durationMs : undefined,
+        },
+      });
+      return NextResponse.json({ taskId: result.taskId, logId: log.id, status: "RUNNING" });
+    }
     await finalizeRequestLog(log.id, {
-      status: ok ? "SUCCEEDED" : result.taskId ? "RUNNING" : "FAILED",
+      status: ok ? "SUCCEEDED" : "FAILED",
       durationMs: result.durationMs,
       externalTaskId: result.taskId,
       resultSummary: ok
@@ -103,9 +114,6 @@ export async function POST(request: NextRequest) {
       failMessage: ok ? undefined : `HTTP ${result.status}`,
       model,
     });
-    if (result.taskId && !ok) {
-      return NextResponse.json({ taskId: result.taskId, logId: log.id, status: "RUNNING" });
-    }
     if (!ok || !result.buffer) {
       return NextResponse.json(
         { error: `MiniMax music HTTP ${result.status}`, logId: log.id },

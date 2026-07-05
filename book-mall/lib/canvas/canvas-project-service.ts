@@ -32,6 +32,7 @@ export class CanvasProjectError extends Error {
       | "TASK_ALREADY_INFLIGHT"
       | "EMPTY_PROMPT"
       | "MODEL_NOT_AVAILABLE"
+      | "MODEL_CAPABILITY_MISMATCH"
       | "PROVIDER_KEYS_REQUIRED"
       | "GATEWAY_KEY_REQUIRED"
       | "INSUFFICIENT_CREDITS"

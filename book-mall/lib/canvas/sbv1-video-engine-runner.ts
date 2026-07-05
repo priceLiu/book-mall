@@ -14,6 +14,7 @@ import {
 } from "./sbv1-video-model-reference";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
+type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
 
 function httpsImageUrls(urls: string[]): string[] {
   return urls.filter((u) => typeof u === "string" && /^https?:\/\//.test(u.trim()));
@@ -63,9 +64,7 @@ export async function runSbv1VideoEngineNode(
     modelKey === "kling-2.6/motion-control" ||
     modelKey === "kling-3.0/motion-control";
 
-  const dockInputMode = data.dockInputMode as
-    | import("./sbv1-workspace-types").Sbv1DockInputMode
-    | undefined;
+  const dockInputMode = data.dockInputMode as Sbv1DockInputMode | undefined;
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
 

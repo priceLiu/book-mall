@@ -1,4 +1,9 @@
-import type { GatewayClientSource, GatewayProviderKind, BillingPersona } from "@prisma/client";
+import type {
+  BillingPersona,
+  GatewayClientSource,
+  GatewayProviderKind,
+  GatewayRequestKind,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 import {
@@ -124,7 +129,7 @@ export async function createRequestLog(opts: {
   model: string;
   endpoint: string;
   providerKind?: GatewayProviderKind;
-  requestKind?: "CHAT" | "IMAGE" | "VIDEO" | "OTHER" | "TTS" | "TRYON";
+  requestKind?: GatewayRequestKind;
   clientSource?: GatewayClientSource;
   clientPage?: string | null;
   inputSummary?: unknown;

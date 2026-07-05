@@ -316,7 +316,7 @@ function buildTemplateModelParamsFromDraft(draft: QrWorkspaceDraft): Record<stri
     const fromManifest = findMinimaxVoiceById(draft.voiceId);
     if (fromManifest) {
       params.voice_label = fromManifest.label;
-      params.voice_subtitle = fromManifest.language ?? fromManifest.subtitle;
+      params.voice_subtitle = fromManifest.language;
     } else {
       const inline = getQrAudioVoiceDef(draft.voiceId);
       if (inline.voiceId === draft.voiceId.trim()) {

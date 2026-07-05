@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type {
   PlatformErrorSeverity,
   PlatformErrorSource,
+  Prisma,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -61,9 +62,9 @@ export function recordPlatformError(input: RecordPlatformErrorInput): void {
 
   const fingerprint = buildFingerprint({ ...input, message });
   const detail = clip(input.detail, 8000);
-  const context =
+  const context: Prisma.InputJsonValue | undefined =
     input.context && Object.keys(input.context).length > 0
-      ? (input.context as Record<string, unknown>)
+      ? (input.context as Prisma.InputJsonValue)
       : undefined;
 
   void (async () => {
