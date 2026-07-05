@@ -14,7 +14,7 @@ export function fingerprintBulletinFromCanvasJson(
     )
     .join(";");
   const rows =
-    (anchor.scriptStudioCharacterRows?.length ?? 0) +
-    (anchor.scriptStudioFrameRows?.length ?? 0);
+    (anchor?.scriptStudioCharacterRows?.length ?? 0) +
+    (anchor?.scriptStudioFrameRows?.length ?? 0);
   return `${taskSig}|rows:${rows}`;
 }

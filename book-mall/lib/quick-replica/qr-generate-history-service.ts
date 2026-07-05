@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { getKindDef } from "@/lib/quick-replica/qr-kinds";
 import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
@@ -63,7 +65,7 @@ export async function listQrGenerateJobRecords(
     where: {
       actorBookUserId: userId,
       clientSource: "QUICK_REPLICA",
-      inputSummary: { not: null },
+      inputSummary: { not: Prisma.DbNull },
     },
     orderBy: { submittedAt: "desc" },
     take: capped,

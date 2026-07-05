@@ -21,6 +21,7 @@ import {
 } from "@/lib/gateway/elevenlabs-proxy";
 import {
   MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
+  resolveMinimaxUpstreamSpeechModel,
 } from "@/lib/gateway/minimax-speech-models";
 import {
   forwardMinimaxFileUpload,
