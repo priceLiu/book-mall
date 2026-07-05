@@ -45,20 +45,19 @@ function withTimeout<T>(
   timeoutMs: number,
   label: string,
 ): Promise<T> {
-  let timer: ReturnType<typeof window.setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = window.setTimeout(
-          () => reject(new Error(`${label}_timeout`)),
-          timeoutMs,
-        );
-      }),
-    ]);
-  } finally {
-    if (timer != null) window.clearTimeout(timer);
-  }
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label}_timeout`)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 type PackedSplats = spark.PackedSplats | spark.ExtSplats;
@@ -295,7 +294,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
               "splat_load",
             );
             if (disposed) return null;
-            await withTimeout(packed.initialized, timeoutMs, "splat_init");
+            await packed.initialized;
             if (disposed) return null;
             return packed;
           } catch (err) {
