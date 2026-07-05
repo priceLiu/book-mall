@@ -49,13 +49,18 @@ export function QrWorldBrowsePanel({
     [templates, activeTab],
   );
 
-  const initialCount = columnCount * 6;
+  /** 内置场景库约 48 条；超过阈值再懒加载，避免首屏只出 30 张 */
+  const lazyLoadThreshold = 80;
+  const shouldLazyLoad = filtered.length > lazyLoadThreshold;
+  const pageSize = columnCount * 6;
   const batchSize = columnCount * 5;
-  const [visibleCount, setVisibleCount] = useState(initialCount);
+  const [visibleCount, setVisibleCount] = useState(() =>
+    shouldLazyLoad ? pageSize : filtered.length,
+  );
 
   useEffect(() => {
-    setVisibleCount(initialCount);
-  }, [activeTab, templates, initialCount]);
+    setVisibleCount(shouldLazyLoad ? pageSize : filtered.length);
+  }, [activeTab, templates, filtered.length, shouldLazyLoad, pageSize]);
 
   const visibleTemplates = filtered.slice(0, visibleCount);
 
@@ -72,9 +77,9 @@ export function QrWorldBrowsePanel({
     useIntersectionVisible<HTMLDivElement>("480px 0px");
 
   useEffect(() => {
-    if (!loadMoreVisible || visibleCount >= filtered.length) return;
+    if (!shouldLazyLoad || !loadMoreVisible || visibleCount >= filtered.length) return;
     setVisibleCount((c) => Math.min(c + batchSize, filtered.length));
-  }, [loadMoreVisible, visibleCount, filtered.length, batchSize]);
+  }, [shouldLazyLoad, loadMoreVisible, visibleCount, filtered.length, batchSize]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -150,7 +155,7 @@ export function QrWorldBrowsePanel({
               ))}
             </div>
 
-            {visibleCount < filtered.length ? (
+            {shouldLazyLoad && visibleCount < filtered.length ? (
               <div ref={loadMoreRef} className="flex justify-center py-8">
                 <span className="text-xs text-[var(--qr-text-muted)]">加载更多…</span>
               </div>

@@ -119,6 +119,13 @@ export function buildQuickReplicaBuiltinOssKey(id: string, ext: string): string 
   return `quick-replica/builtin/${safeId}.${safeExt}`;
 }
 
+/** QuickReplica 内置场景 splat（固定 key，便于增量覆盖） */
+export function buildQuickReplicaBuiltinSplatOssKey(templateId: string, tier: string): string {
+  const safeId = templateId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeTier = tier.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `quick-replica/builtin/splats/${safeId}-${safeTier}.spz`;
+}
+
 /** MiniMax 系统音色试听 MP3（固定 key） */
 export function buildMinimaxVoicePreviewOssKey(voiceId: string): string {
   const safeId = voiceId.replace(/[^a-zA-Z0-9_().-]/g, "_");

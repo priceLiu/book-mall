@@ -34,16 +34,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/881ea259-0bb3-4dcd-883a-e4c3d39205e6_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/9b5f70c7-36d4-4161-9ceb-030c71c3def2_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/ac6f5cb4-ec7b-4b64-bdfb-dec328537214_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/5acfd60c-e167-4862-a481-279b2abc570e_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6425f0fd-fed4-4569-9d92-1ea90f5627d0-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6425f0fd-fed4-4569-9d92-1ea90f5627d0-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6425f0fd-fed4-4569-9d92-1ea90f5627d0-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6425f0fd-fed4-4569-9d92-1ea90f5627d0-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/ff44304c-1da9-4fff-b11c-632b3b376ee2_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-6425f0fd-fed4-4569-9d92-1ea90f5627d0.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/5acfd60c-e167-4862-a481-279b2abc570e_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/881ea259-0bb3-4dcd-883a-e4c3d39205e6_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/9b5f70c7-36d4-4161-9ceb-030c71c3def2_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/6425f0fd-fed4-4569-9d92-1ea90f5627d0/ac6f5cb4-ec7b-4b64-bdfb-dec328537214_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -87,16 +93,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/92a80bc6-6e71-45a8-a2be-366c4b3bb8a7_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/a53735e4-fa06-4a80-95e0-a20c6b28c843_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/90568445-0f25-456a-a645-49727874d837_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/926e8ac9-6dfb-4025-8834-27c155a68e33_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-d113b1c8-728b-49a2-a88c-d4ad13a4bffb-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-d113b1c8-728b-49a2-a88c-d4ad13a4bffb-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-d113b1c8-728b-49a2-a88c-d4ad13a4bffb-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-d113b1c8-728b-49a2-a88c-d4ad13a4bffb-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/c81cbcb5-78dc-4cb2-ab5e-4051050c6adf_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-d113b1c8-728b-49a2-a88c-d4ad13a4bffb.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/926e8ac9-6dfb-4025-8834-27c155a68e33_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/92a80bc6-6e71-45a8-a2be-366c4b3bb8a7_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/a53735e4-fa06-4a80-95e0-a20c6b28c843_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/d113b1c8-728b-49a2-a88c-d4ad13a4bffb/90568445-0f25-456a-a645-49727874d837_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -140,16 +152,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/0ffbf3ff-518f-44cb-be0b-524dca2fa3a0_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/bbf24f4e-9c22-43e5-8b95-a30a22a61c35_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/0ca0fdb4-6b35-4746-bdf4-17d3adcc5c01_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/9ba4dab7-547d-435f-a831-4caeed5d59e5_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9e2ad9b2-69d1-4f7c-be57-d387f9ce34de-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9e2ad9b2-69d1-4f7c-be57-d387f9ce34de-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9e2ad9b2-69d1-4f7c-be57-d387f9ce34de-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9e2ad9b2-69d1-4f7c-be57-d387f9ce34de-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/9e3d7826-29c7-4456-9676-4e53d045fe5d_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-9e2ad9b2-69d1-4f7c-be57-d387f9ce34de.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/9ba4dab7-547d-435f-a831-4caeed5d59e5_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/0ffbf3ff-518f-44cb-be0b-524dca2fa3a0_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/bbf24f4e-9c22-43e5-8b95-a30a22a61c35_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/9e2ad9b2-69d1-4f7c-be57-d387f9ce34de/0ca0fdb4-6b35-4746-bdf4-17d3adcc5c01_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -193,16 +211,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/bfed40bb-d2fa-4b5b-8d19-6a0676a23610_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/ae4e053e-7734-47e6-a4d7-26209d5a65a1_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/0cf84ce9-1a3f-41cb-83a6-dde2c3961280_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/614b3837-b149-4477-8a4e-b214303b59cc_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-889a5974-c395-4a6a-a401-e2d6aec4f12b-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-889a5974-c395-4a6a-a401-e2d6aec4f12b-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-889a5974-c395-4a6a-a401-e2d6aec4f12b-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-889a5974-c395-4a6a-a401-e2d6aec4f12b-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/ca4bc05a-64fd-45ce-b15e-789759fe6a71_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-889a5974-c395-4a6a-a401-e2d6aec4f12b.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/614b3837-b149-4477-8a4e-b214303b59cc_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/bfed40bb-d2fa-4b5b-8d19-6a0676a23610_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/ae4e053e-7734-47e6-a4d7-26209d5a65a1_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/889a5974-c395-4a6a-a401-e2d6aec4f12b/0cf84ce9-1a3f-41cb-83a6-dde2c3961280_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -246,16 +270,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/e1ec3ec5-9a08-48fc-ab51-8a1133d787f7_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/d49d54db-099e-42d2-8a0b-3ca04190be13_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/b61a0c0f-d2df-4a43-ad49-f3896c1eaf3d_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/bbffb87f-9b45-4f84-b67a-b9255c9cdbe7_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-110e1b47-2f76-40e9-b256-3e1b3464584c-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-110e1b47-2f76-40e9-b256-3e1b3464584c-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-110e1b47-2f76-40e9-b256-3e1b3464584c-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-110e1b47-2f76-40e9-b256-3e1b3464584c-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/660f3ecb-07e8-49af-87a9-339a38569744_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-110e1b47-2f76-40e9-b256-3e1b3464584c.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/bbffb87f-9b45-4f84-b67a-b9255c9cdbe7_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/e1ec3ec5-9a08-48fc-ab51-8a1133d787f7_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/d49d54db-099e-42d2-8a0b-3ca04190be13_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/110e1b47-2f76-40e9-b256-3e1b3464584c/b61a0c0f-d2df-4a43-ad49-f3896c1eaf3d_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -299,16 +329,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/5472dabb-b6a2-4951-9e49-93411fc695a8_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/de1fa974-99b9-4da2-95a8-a97e94f28755_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/2005671a-f881-4446-8acc-4ef6667cbdd0_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/2605dfed-1263-42f7-b3bb-f0e58d6d8d55_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7391f97b-8290-4f71-9f17-ffbdcd3a00e5-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7391f97b-8290-4f71-9f17-ffbdcd3a00e5-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7391f97b-8290-4f71-9f17-ffbdcd3a00e5-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7391f97b-8290-4f71-9f17-ffbdcd3a00e5-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/4acd2261-3d5f-4128-9107-42a929897a35_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-7391f97b-8290-4f71-9f17-ffbdcd3a00e5.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/2605dfed-1263-42f7-b3bb-f0e58d6d8d55_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/5472dabb-b6a2-4951-9e49-93411fc695a8_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/de1fa974-99b9-4da2-95a8-a97e94f28755_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/7391f97b-8290-4f71-9f17-ffbdcd3a00e5/2005671a-f881-4446-8acc-4ef6667cbdd0_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -352,16 +388,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/221ec399-5a4b-4144-b8e4-e542a9ce95ad_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/32d6dfbd-2009-43ad-9b73-0300fbd4b53f_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/1e072be7-585f-4a33-8e07-3c5d00b67c42_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/861a47d9-51cb-4eec-a59e-433cc6617198_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a9e59010-c720-4099-957a-66380c1d9c9a-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a9e59010-c720-4099-957a-66380c1d9c9a-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a9e59010-c720-4099-957a-66380c1d9c9a-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a9e59010-c720-4099-957a-66380c1d9c9a-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/699d2bcc-3dfb-4611-933c-89edb2f7ea6a_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-a9e59010-c720-4099-957a-66380c1d9c9a.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/861a47d9-51cb-4eec-a59e-433cc6617198_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/221ec399-5a4b-4144-b8e4-e542a9ce95ad_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/32d6dfbd-2009-43ad-9b73-0300fbd4b53f_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/a9e59010-c720-4099-957a-66380c1d9c9a/1e072be7-585f-4a33-8e07-3c5d00b67c42_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -405,16 +447,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/5c19bf11-20e2-4070-b855-6be429a9f4be_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/c215a718-3bc1-4c09-a01f-187f6379ea3d_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/5c387198-628c-4ae9-bdc1-25b1d9a33cf9_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/a7877117-c1fa-40ff-b7d0-be3cc93f6a52_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-26bc6939-b6ae-407a-b59a-51c073219325-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-26bc6939-b6ae-407a-b59a-51c073219325-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-26bc6939-b6ae-407a-b59a-51c073219325-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-26bc6939-b6ae-407a-b59a-51c073219325-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/be922d66-31e8-4833-aac8-62a355da002c_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-26bc6939-b6ae-407a-b59a-51c073219325.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/a7877117-c1fa-40ff-b7d0-be3cc93f6a52_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/5c19bf11-20e2-4070-b855-6be429a9f4be_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/c215a718-3bc1-4c09-a01f-187f6379ea3d_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/26bc6939-b6ae-407a-b59a-51c073219325/5c387198-628c-4ae9-bdc1-25b1d9a33cf9_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -457,16 +505,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/79439ccf-5029-4aed-8812-fe5d11229e88_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/537caa2b-87d1-4c32-9f05-e5c46c262120_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/8d77730b-29ae-4fa9-9824-239a5d25f52e_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/d8a7f871-dbcb-4f30-ac42-8b7d10bdf34d_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2becf31b-dbc1-40c2-9f45-68709acc009d-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2becf31b-dbc1-40c2-9f45-68709acc009d-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2becf31b-dbc1-40c2-9f45-68709acc009d-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2becf31b-dbc1-40c2-9f45-68709acc009d-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/f454cf19-6748-4d88-bf77-48c27295b68c_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-2becf31b-dbc1-40c2-9f45-68709acc009d.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/d8a7f871-dbcb-4f30-ac42-8b7d10bdf34d_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/79439ccf-5029-4aed-8812-fe5d11229e88_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/537caa2b-87d1-4c32-9f05-e5c46c262120_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/2becf31b-dbc1-40c2-9f45-68709acc009d/8d77730b-29ae-4fa9-9824-239a5d25f52e_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -509,16 +563,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/62078df7-ac59-4ff3-b565-7959470c0e74_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/6168f6d0-f61f-4427-a72e-e12a3e9735a4_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/452561ff-d29d-4b1d-a055-b3ea88574de3_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/d98f29d6-74d6-4595-a6ed-f89dc6d4063d_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fa470183-85e7-4a0a-8775-1c1676082f96-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fa470183-85e7-4a0a-8775-1c1676082f96-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fa470183-85e7-4a0a-8775-1c1676082f96-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fa470183-85e7-4a0a-8775-1c1676082f96-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/1b0a367c-a73e-4621-8555-636d87d89f02_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-fa470183-85e7-4a0a-8775-1c1676082f96.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/d98f29d6-74d6-4595-a6ed-f89dc6d4063d_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/62078df7-ac59-4ff3-b565-7959470c0e74_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/6168f6d0-f61f-4427-a72e-e12a3e9735a4_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/fa470183-85e7-4a0a-8775-1c1676082f96/452561ff-d29d-4b1d-a055-b3ea88574de3_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -562,16 +622,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/e61317cf-e8c6-43b7-b1c7-c2f076254fb5_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/d297d788-7342-4627-b870-def7dc2c6803_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/baabd54c-9cfa-4b8c-a594-f90a756bae6d_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/ed775b99-cf0e-40bc-af28-acb69029a3a1_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7f964e6d-dbdd-4cf7-a8fb-9292001f69ba-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7f964e6d-dbdd-4cf7-a8fb-9292001f69ba-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7f964e6d-dbdd-4cf7-a8fb-9292001f69ba-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-7f964e6d-dbdd-4cf7-a8fb-9292001f69ba-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/5408055a-dfe3-4e69-8a04-e893332ca1ea_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-7f964e6d-dbdd-4cf7-a8fb-9292001f69ba.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/ed775b99-cf0e-40bc-af28-acb69029a3a1_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/e61317cf-e8c6-43b7-b1c7-c2f076254fb5_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/d297d788-7342-4627-b870-def7dc2c6803_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/7f964e6d-dbdd-4cf7-a8fb-9292001f69ba/baabd54c-9cfa-4b8c-a594-f90a756bae6d_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -615,16 +681,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/3684f2ca-161d-47b9-949d-ade7209cb261_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/f2798360-ba24-41a9-bc0b-bb729c7b78f2_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/6e4ca249-039a-4e66-acc2-48698b64d3ae_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/98162010-85c6-486a-a4a0-c90ad481a190_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c053617-6d94-419f-81cc-c2a917510608-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c053617-6d94-419f-81cc-c2a917510608-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c053617-6d94-419f-81cc-c2a917510608-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c053617-6d94-419f-81cc-c2a917510608-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/0035e071-8ad2-467c-bb06-ddfaa782f407_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-6c053617-6d94-419f-81cc-c2a917510608.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/98162010-85c6-486a-a4a0-c90ad481a190_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/3684f2ca-161d-47b9-949d-ade7209cb261_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/f2798360-ba24-41a9-bc0b-bb729c7b78f2_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/6c053617-6d94-419f-81cc-c2a917510608/6e4ca249-039a-4e66-acc2-48698b64d3ae_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -668,16 +740,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/efdf4a5c-e382-42dd-a811-74449a9e193f_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/65f5f130-ce34-4744-b309-0ea0f6af55bf_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/983b5bef-71c6-4cc5-8c9f-71bb60f796ac_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/cf1ea5a3-5378-4923-9b68-45567e7440bc_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-62440386-5bfc-4d6d-849c-a8f2e784a015-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-62440386-5bfc-4d6d-849c-a8f2e784a015-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-62440386-5bfc-4d6d-849c-a8f2e784a015-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-62440386-5bfc-4d6d-849c-a8f2e784a015-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/2695e798-d630-4c4e-9f8d-3ed96af6f51a_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-62440386-5bfc-4d6d-849c-a8f2e784a015.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/cf1ea5a3-5378-4923-9b68-45567e7440bc_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/efdf4a5c-e382-42dd-a811-74449a9e193f_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/65f5f130-ce34-4744-b309-0ea0f6af55bf_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/62440386-5bfc-4d6d-849c-a8f2e784a015/983b5bef-71c6-4cc5-8c9f-71bb60f796ac_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -721,16 +799,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/cf2cacbb-44f3-4d67-b77b-bff688506d15_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/287ee67b-bbfc-4f03-85b5-a0f36b48033a_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/d2b6beb9-207a-4711-a5e4-a30d56277c72_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/f5b2390a-b46c-4d2c-923c-9ec51cedfd96_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-22e0c335-ff6d-4f3f-809b-a615e257dd9a-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-22e0c335-ff6d-4f3f-809b-a615e257dd9a-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-22e0c335-ff6d-4f3f-809b-a615e257dd9a-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-22e0c335-ff6d-4f3f-809b-a615e257dd9a-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/ce4b4e9c-533f-4c5c-be61-f1638d43a489_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-22e0c335-ff6d-4f3f-809b-a615e257dd9a.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/f5b2390a-b46c-4d2c-923c-9ec51cedfd96_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/cf2cacbb-44f3-4d67-b77b-bff688506d15_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/287ee67b-bbfc-4f03-85b5-a0f36b48033a_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/22e0c335-ff6d-4f3f-809b-a615e257dd9a/d2b6beb9-207a-4711-a5e4-a30d56277c72_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -774,16 +858,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/505a3884-eed8-4edc-86b1-3817a79bf17a_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/21d4a46e-6a68-493b-8096-ccb0b6aa6e38_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/d30da2a5-83c9-4048-a487-3640e12b91ca_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/7a22b81d-cd8b-49ec-b024-d3ff91b10e63_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a150489a-533e-4c21-918d-43d44c144eed-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a150489a-533e-4c21-918d-43d44c144eed-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a150489a-533e-4c21-918d-43d44c144eed-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a150489a-533e-4c21-918d-43d44c144eed-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/39e28179-572b-4396-929c-4c3f6f6dcaa3_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-a150489a-533e-4c21-918d-43d44c144eed.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/7a22b81d-cd8b-49ec-b024-d3ff91b10e63_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/505a3884-eed8-4edc-86b1-3817a79bf17a_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/21d4a46e-6a68-493b-8096-ccb0b6aa6e38_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/a150489a-533e-4c21-918d-43d44c144eed/d30da2a5-83c9-4048-a487-3640e12b91ca_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -826,16 +916,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/999e0b55-d4e2-46ac-859d-7f878b373891_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/b37fd8e0-8e5d-46c4-b69f-cd8a069f4e38_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/d3f684a5-40c2-4d3a-9a6b-26e68727ceab_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/a135e605-2bba-4414-b170-1f62cfd3c46e_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-19de39fb-0f3d-4899-9620-19ec3ce3e763-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-19de39fb-0f3d-4899-9620-19ec3ce3e763-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-19de39fb-0f3d-4899-9620-19ec3ce3e763-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-19de39fb-0f3d-4899-9620-19ec3ce3e763-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/1f5dd89f-076e-46f4-bab0-5451ea457964_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-19de39fb-0f3d-4899-9620-19ec3ce3e763.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/a135e605-2bba-4414-b170-1f62cfd3c46e_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/999e0b55-d4e2-46ac-859d-7f878b373891_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/b37fd8e0-8e5d-46c4-b69f-cd8a069f4e38_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/19de39fb-0f3d-4899-9620-19ec3ce3e763/d3f684a5-40c2-4d3a-9a6b-26e68727ceab_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -879,16 +975,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/b425d960-95b3-437e-88c2-a604ebbbf8be_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/508e1fbd-751d-4eaa-a7bc-308567f37d8e_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/c005b094-1f9d-4da2-a3d5-70b1ae670467_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/0fb6dbe9-203f-4d14-83f5-15fd7841087a_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-537e91e3-ec96-4332-a935-b941b9df900c-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-537e91e3-ec96-4332-a935-b941b9df900c-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-537e91e3-ec96-4332-a935-b941b9df900c-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-537e91e3-ec96-4332-a935-b941b9df900c-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/901b515a-6bfd-4114-a6f3-50d842736c17_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-537e91e3-ec96-4332-a935-b941b9df900c.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/0fb6dbe9-203f-4d14-83f5-15fd7841087a_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/b425d960-95b3-437e-88c2-a604ebbbf8be_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/508e1fbd-751d-4eaa-a7bc-308567f37d8e_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/537e91e3-ec96-4332-a935-b941b9df900c/c005b094-1f9d-4da2-a3d5-70b1ae670467_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -931,16 +1033,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/560ec051-a4da-4007-9af0-e2906522c93c_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/47d4eb0e-150a-48bc-9b25-f1ac35d70d44_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/b689a6d1-565c-4a87-94a7-7975079e61ed_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/b091ab1f-4870-4632-bd4c-0e1a2a5793b1_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a342be72-fb42-4289-b335-71462f8445df-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a342be72-fb42-4289-b335-71462f8445df-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a342be72-fb42-4289-b335-71462f8445df-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a342be72-fb42-4289-b335-71462f8445df-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/9de426df-4a5e-4c6e-9f3e-50186be382c7_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-a342be72-fb42-4289-b335-71462f8445df.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/b091ab1f-4870-4632-bd4c-0e1a2a5793b1_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/560ec051-a4da-4007-9af0-e2906522c93c_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/47d4eb0e-150a-48bc-9b25-f1ac35d70d44_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/a342be72-fb42-4289-b335-71462f8445df/b689a6d1-565c-4a87-94a7-7975079e61ed_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -983,16 +1091,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/737c142d-fdc2-40d6-863a-9c1b6a49a6b5_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/bc134b72-6c99-45f7-9afa-1869cb7736ba_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/71361cfd-95d5-4b71-942d-c49d14080d2d_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/bcaeaa57-4479-42be-b507-48e560c643ef_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-845d390d-4d86-4779-8a35-c3657a5bc8ab-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-845d390d-4d86-4779-8a35-c3657a5bc8ab-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-845d390d-4d86-4779-8a35-c3657a5bc8ab-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-845d390d-4d86-4779-8a35-c3657a5bc8ab-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/48abbe63-c545-4857-b59f-ea4bb7e7b7d9_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-845d390d-4d86-4779-8a35-c3657a5bc8ab.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/bcaeaa57-4479-42be-b507-48e560c643ef_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/737c142d-fdc2-40d6-863a-9c1b6a49a6b5_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/bc134b72-6c99-45f7-9afa-1869cb7736ba_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/845d390d-4d86-4779-8a35-c3657a5bc8ab/71361cfd-95d5-4b71-942d-c49d14080d2d_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1036,16 +1150,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/8d4a350a-3978-412f-918b-23c7e1969222_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/8859e247-ff38-43a0-8e8b-5a7e3efd8402_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/fb1f84df-81a0-44c6-b37a-f305531f04a3_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/d03a8cfe-29b8-4b5c-ab27-4b6db35132e8_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9feacfce-37fd-4c02-b154-044d78bd629c-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9feacfce-37fd-4c02-b154-044d78bd629c-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9feacfce-37fd-4c02-b154-044d78bd629c-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9feacfce-37fd-4c02-b154-044d78bd629c-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/58105991-312b-465b-8121-61c620980eda_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-9feacfce-37fd-4c02-b154-044d78bd629c.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/d03a8cfe-29b8-4b5c-ab27-4b6db35132e8_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/8d4a350a-3978-412f-918b-23c7e1969222_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/8859e247-ff38-43a0-8e8b-5a7e3efd8402_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/9feacfce-37fd-4c02-b154-044d78bd629c/fb1f84df-81a0-44c6-b37a-f305531f04a3_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1088,16 +1208,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/bd302112-51c5-40ae-ac87-86c4ad61d4e7_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/bb60b36b-17d9-470c-adca-6ef93c53a1e2_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/c38b63d9-e03f-478c-b32b-4c3eb1e7d245_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/755dc83f-8753-43a3-97c5-26fa32c3920f_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2c91ce31-9712-4be5-adad-05487eab2c7f-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2c91ce31-9712-4be5-adad-05487eab2c7f-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2c91ce31-9712-4be5-adad-05487eab2c7f-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-2c91ce31-9712-4be5-adad-05487eab2c7f-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/08d1a89e-d3ee-4b8a-af23-f25dfbe8ae40_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-2c91ce31-9712-4be5-adad-05487eab2c7f.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/755dc83f-8753-43a3-97c5-26fa32c3920f_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/bd302112-51c5-40ae-ac87-86c4ad61d4e7_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/bb60b36b-17d9-470c-adca-6ef93c53a1e2_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/2c91ce31-9712-4be5-adad-05487eab2c7f/c38b63d9-e03f-478c-b32b-4c3eb1e7d245_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1141,16 +1267,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/803aabde-aff2-4f80-9d4c-8ab04a9bdc8a_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/fd866a60-3a0f-4deb-b3ba-c4aa69737980_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/1b4dad84-2dc7-4da4-a11f-84e2d9e0581f_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/efa9827c-e48d-43e7-b54d-aee9d369f785_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-0158d14e-a6ba-4010-a6f9-42801fee7989-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-0158d14e-a6ba-4010-a6f9-42801fee7989-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-0158d14e-a6ba-4010-a6f9-42801fee7989-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-0158d14e-a6ba-4010-a6f9-42801fee7989-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/63db4eb7-eb6c-4047-b369-357456e5b4cd_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-0158d14e-a6ba-4010-a6f9-42801fee7989.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/efa9827c-e48d-43e7-b54d-aee9d369f785_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/803aabde-aff2-4f80-9d4c-8ab04a9bdc8a_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/fd866a60-3a0f-4deb-b3ba-c4aa69737980_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/0158d14e-a6ba-4010-a6f9-42801fee7989/1b4dad84-2dc7-4da4-a11f-84e2d9e0581f_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1193,16 +1325,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/99a3003b-4030-4b01-9ac5-f359a5bb48f7_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/5ebb05f0-4110-457b-b008-2c58f561c39c_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/00df9612-feed-424d-9a02-5c9955f8ae1e_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/5359123d-0979-450b-873d-edc583961b3b_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a4fc7526-fc73-439f-a5a7-344e443ada21-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a4fc7526-fc73-439f-a5a7-344e443ada21-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a4fc7526-fc73-439f-a5a7-344e443ada21-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-a4fc7526-fc73-439f-a5a7-344e443ada21-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/96ad66bb-62e5-461e-8867-d18753f6ebaf_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-a4fc7526-fc73-439f-a5a7-344e443ada21.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/5359123d-0979-450b-873d-edc583961b3b_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/99a3003b-4030-4b01-9ac5-f359a5bb48f7_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/5ebb05f0-4110-457b-b008-2c58f561c39c_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/a4fc7526-fc73-439f-a5a7-344e443ada21/00df9612-feed-424d-9a02-5c9955f8ae1e_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1246,16 +1384,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/cb758100-59b2-4f71-962e-41642aa3eb84_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/0589632e-9e90-4365-9f86-2354cd47b530_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/6e5bcbca-1b6a-4f67-be98-1e1219005f82_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/abe0765c-32e4-4076-ad07-a5b00de24dec_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-07e4a49d-ce02-469b-887e-2eef1cd39e5a-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-07e4a49d-ce02-469b-887e-2eef1cd39e5a-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-07e4a49d-ce02-469b-887e-2eef1cd39e5a-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-07e4a49d-ce02-469b-887e-2eef1cd39e5a-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/03872c14-23ee-4a78-b846-8bff3d5501e8_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-07e4a49d-ce02-469b-887e-2eef1cd39e5a.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/abe0765c-32e4-4076-ad07-a5b00de24dec_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/cb758100-59b2-4f71-962e-41642aa3eb84_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/0589632e-9e90-4365-9f86-2354cd47b530_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/07e4a49d-ce02-469b-887e-2eef1cd39e5a/6e5bcbca-1b6a-4f67-be98-1e1219005f82_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1298,16 +1442,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/1df444e0-0922-4ef6-a123-eeddf9bbfaec_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/eb6280c3-b0ca-4503-b081-5ce16cd60faf_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/0588693d-192b-4b49-b8d9-b55632c853de_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/97a92662-2daa-49c7-aac6-2d12a46840ab_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-ace20696-e1b9-4382-b00a-327a9132e2bc-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-ace20696-e1b9-4382-b00a-327a9132e2bc-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-ace20696-e1b9-4382-b00a-327a9132e2bc-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-ace20696-e1b9-4382-b00a-327a9132e2bc-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/05c41bfa-0bd6-4666-a587-286a6e569f3f_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-ace20696-e1b9-4382-b00a-327a9132e2bc.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/97a92662-2daa-49c7-aac6-2d12a46840ab_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/1df444e0-0922-4ef6-a123-eeddf9bbfaec_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/eb6280c3-b0ca-4503-b081-5ce16cd60faf_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/ace20696-e1b9-4382-b00a-327a9132e2bc/0588693d-192b-4b49-b8d9-b55632c853de_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1351,16 +1501,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/17a0c8b2-9a35-4b36-b99a-b3a6038de536_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/a549188b-55be-416f-b07c-bcb58da7a46d_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/c44c28db-7084-43f8-a193-a99bc720bbc7_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/7a1e0079-117a-4461-985c-6b2cd59e4c12_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f1091969-d580-4264-a022-ccc714dac6c4-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f1091969-d580-4264-a022-ccc714dac6c4-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f1091969-d580-4264-a022-ccc714dac6c4-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f1091969-d580-4264-a022-ccc714dac6c4-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/c7d52a97-032f-49c8-841e-f3859b211b65_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-f1091969-d580-4264-a022-ccc714dac6c4.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/7a1e0079-117a-4461-985c-6b2cd59e4c12_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/17a0c8b2-9a35-4b36-b99a-b3a6038de536_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/a549188b-55be-416f-b07c-bcb58da7a46d_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/f1091969-d580-4264-a022-ccc714dac6c4/c44c28db-7084-43f8-a193-a99bc720bbc7_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1404,16 +1560,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/25c380cd-ccc4-4d2b-aa5c-9e8d0b339f49_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/7ee74a9d-ba51-4ee2-ba5a-8ae710adf5a0_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/b3c4ce5d-eac0-468f-9016-0ff7459c4542_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/7a7c784b-c7fd-4075-bee5-93d4ac045992_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfd556e9-a222-4817-a61f-6f96429c3d4d-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfd556e9-a222-4817-a61f-6f96429c3d4d-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfd556e9-a222-4817-a61f-6f96429c3d4d-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfd556e9-a222-4817-a61f-6f96429c3d4d-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/06fbc963-7065-4467-907f-67ff0c4ae194_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-cfd556e9-a222-4817-a61f-6f96429c3d4d.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/7a7c784b-c7fd-4075-bee5-93d4ac045992_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/25c380cd-ccc4-4d2b-aa5c-9e8d0b339f49_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/7ee74a9d-ba51-4ee2-ba5a-8ae710adf5a0_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/cfd556e9-a222-4817-a61f-6f96429c3d4d/b3c4ce5d-eac0-468f-9016-0ff7459c4542_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1457,16 +1619,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/ea80b69a-3d19-437c-b5b0-ed865542d3e2_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/558f88f9-623a-4e23-af00-278ae4c91e31_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/22d7ecf1-607d-4c68-8feb-9c42519785dd_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/5a6122a6-4b68-4cb4-8a43-09b9c88ab876_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6961898a-3e3f-480b-86c9-09060b6ecbab-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6961898a-3e3f-480b-86c9-09060b6ecbab-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6961898a-3e3f-480b-86c9-09060b6ecbab-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6961898a-3e3f-480b-86c9-09060b6ecbab-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/6faf7e21-9a83-472e-bf3e-48adfbbe454b_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-6961898a-3e3f-480b-86c9-09060b6ecbab.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/5a6122a6-4b68-4cb4-8a43-09b9c88ab876_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/ea80b69a-3d19-437c-b5b0-ed865542d3e2_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/558f88f9-623a-4e23-af00-278ae4c91e31_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/6961898a-3e3f-480b-86c9-09060b6ecbab/22d7ecf1-607d-4c68-8feb-9c42519785dd_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1510,16 +1678,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/1cd38285-c29f-4352-bb12-0c1a333ba403_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/b731bb3d-6cb8-4f76-ab62-2c95429023b5_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/21ff50d2-81ca-4691-a28f-0ecdd99cacc2_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/5e50813a-8272-41ea-80af-b8d6d7643340_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-efe97f16-e206-4dad-b5d3-93936371726b-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-efe97f16-e206-4dad-b5d3-93936371726b-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-efe97f16-e206-4dad-b5d3-93936371726b-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-efe97f16-e206-4dad-b5d3-93936371726b-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/da1a8bf5-e2e2-438d-afd6-90ae8e16f964_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-efe97f16-e206-4dad-b5d3-93936371726b.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/5e50813a-8272-41ea-80af-b8d6d7643340_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/1cd38285-c29f-4352-bb12-0c1a333ba403_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/b731bb3d-6cb8-4f76-ab62-2c95429023b5_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/efe97f16-e206-4dad-b5d3-93936371726b/21ff50d2-81ca-4691-a28f-0ecdd99cacc2_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1563,16 +1737,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/512a00eb-289b-4033-9725-fcba9537a2d9_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/75dd2588-e3ec-4944-8670-980333003436_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/0933a1f3-a173-4846-b30e-5f4e787cccd6_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/d8a34f0b-d9d7-4a58-bbbd-2f7a4a705f4c_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-813200d1-1c25-4b8c-a107-7f22fdc30377-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-813200d1-1c25-4b8c-a107-7f22fdc30377-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-813200d1-1c25-4b8c-a107-7f22fdc30377-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-813200d1-1c25-4b8c-a107-7f22fdc30377-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/2e51d226-e47d-4090-a5bb-094df0ec99c7_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-813200d1-1c25-4b8c-a107-7f22fdc30377.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/d8a34f0b-d9d7-4a58-bbbd-2f7a4a705f4c_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/512a00eb-289b-4033-9725-fcba9537a2d9_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/75dd2588-e3ec-4944-8670-980333003436_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/813200d1-1c25-4b8c-a107-7f22fdc30377/0933a1f3-a173-4846-b30e-5f4e787cccd6_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1615,16 +1795,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/046241ed-2077-4ea9-a9c1-b5c6aeeb6929_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/2be41dd5-d332-4125-afb8-fccc91322635_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/6a4c3b84-5eb2-4ddb-a371-3b3a5eebda5f_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/13c27795-2a39-4dbf-89ca-70a04ae64cea_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fc5fedfc-4eee-4e27-bd84-d6db4e66507f-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fc5fedfc-4eee-4e27-bd84-d6db4e66507f-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fc5fedfc-4eee-4e27-bd84-d6db4e66507f-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-fc5fedfc-4eee-4e27-bd84-d6db4e66507f-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/ce727446-566c-4453-9db4-d37425e01b33_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-fc5fedfc-4eee-4e27-bd84-d6db4e66507f.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/13c27795-2a39-4dbf-89ca-70a04ae64cea_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/046241ed-2077-4ea9-a9c1-b5c6aeeb6929_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/2be41dd5-d332-4125-afb8-fccc91322635_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/fc5fedfc-4eee-4e27-bd84-d6db4e66507f/6a4c3b84-5eb2-4ddb-a371-3b3a5eebda5f_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1667,16 +1853,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/04da324b-97e6-477b-8986-6e8822a42074_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/f0d23ae6-4004-4d10-aa79-b42abf1f3905_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/8bb8c8b4-25a3-4657-8d51-17be6a0d17df_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/a9656535-b0bd-47aa-a798-ab565bccade5_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-594319e3-2f14-4434-9edd-f7698ca8b4b8-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-594319e3-2f14-4434-9edd-f7698ca8b4b8-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-594319e3-2f14-4434-9edd-f7698ca8b4b8-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-594319e3-2f14-4434-9edd-f7698ca8b4b8-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/db0b12c8-b4a0-43c0-80e9-e6edb131a1f9_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-594319e3-2f14-4434-9edd-f7698ca8b4b8.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/a9656535-b0bd-47aa-a798-ab565bccade5_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/04da324b-97e6-477b-8986-6e8822a42074_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/f0d23ae6-4004-4d10-aa79-b42abf1f3905_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/594319e3-2f14-4434-9edd-f7698ca8b4b8/8bb8c8b4-25a3-4657-8d51-17be6a0d17df_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1720,16 +1912,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/1292f720-afd5-41df-b63e-f31d4ee83acb_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/a6e3027c-6128-4585-8444-3b7a5428787e_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/66d6e488-ec89-4fcb-9676-fabf96f8fb01_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/da34b583-5182-4838-aab6-c91a40e96915_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8516d7c8-763d-4b8d-b8ee-52f767d51c83-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8516d7c8-763d-4b8d-b8ee-52f767d51c83-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8516d7c8-763d-4b8d-b8ee-52f767d51c83-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8516d7c8-763d-4b8d-b8ee-52f767d51c83-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/247a49a7-fa6c-4c00-a150-ede272cb4303_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-8516d7c8-763d-4b8d-b8ee-52f767d51c83.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/da34b583-5182-4838-aab6-c91a40e96915_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/1292f720-afd5-41df-b63e-f31d4ee83acb_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/a6e3027c-6128-4585-8444-3b7a5428787e_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/8516d7c8-763d-4b8d-b8ee-52f767d51c83/66d6e488-ec89-4fcb-9676-fabf96f8fb01_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1774,16 +1972,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/815764b6-9b59-4df3-a820-34dce50edbab_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/50dc6387-f9b1-4e53-9962-973da7925f46_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/f73049b5-62ad-4f50-a98a-5f6a41241166_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/e20e45b9-3bed-4ea0-b0f9-b9845d413cc3_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfe762ff-fb0e-401e-b610-452286969f6c-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfe762ff-fb0e-401e-b610-452286969f6c-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfe762ff-fb0e-401e-b610-452286969f6c-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cfe762ff-fb0e-401e-b610-452286969f6c-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/aab1a56a-1145-4623-9264-e26e1ca02926_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-cfe762ff-fb0e-401e-b610-452286969f6c.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/e20e45b9-3bed-4ea0-b0f9-b9845d413cc3_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/815764b6-9b59-4df3-a820-34dce50edbab_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/50dc6387-f9b1-4e53-9962-973da7925f46_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/cfe762ff-fb0e-401e-b610-452286969f6c/f73049b5-62ad-4f50-a98a-5f6a41241166_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1828,16 +2032,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/95340b46-089a-4a60-916d-964c44a05e95_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/58079f27-40db-4a08-8513-6a342fba336d_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/60df76c0-e431-4cd5-b4d7-d680d0482c71_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/df4f11e0-b90f-4515-91c1-24fe647e317b_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f85c5b58-927e-4fe2-8418-3b46c8c599fe-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f85c5b58-927e-4fe2-8418-3b46c8c599fe-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f85c5b58-927e-4fe2-8418-3b46c8c599fe-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f85c5b58-927e-4fe2-8418-3b46c8c599fe-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/d6be7b9b-e3d6-41ba-a8cf-58d3da778698_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-f85c5b58-927e-4fe2-8418-3b46c8c599fe.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/df4f11e0-b90f-4515-91c1-24fe647e317b_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/95340b46-089a-4a60-916d-964c44a05e95_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/58079f27-40db-4a08-8513-6a342fba336d_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/f85c5b58-927e-4fe2-8418-3b46c8c599fe/60df76c0-e431-4cd5-b4d7-d680d0482c71_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1881,16 +2091,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/3a326cf9-8d12-4a67-a61f-25b24135da80_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/239c6a8d-ad42-49ac-9f85-d891c5777d62_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/fbd0f672-b898-48eb-8436-139a5bd57cc1_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/beed3bf6-2417-41ed-8946-a16278883bc1_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9197af71-ce25-4e92-8698-219de940b137-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9197af71-ce25-4e92-8698-219de940b137-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9197af71-ce25-4e92-8698-219de940b137-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-9197af71-ce25-4e92-8698-219de940b137-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/f86fcb20-8373-4502-8271-99bacb2c821b_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-9197af71-ce25-4e92-8698-219de940b137.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/beed3bf6-2417-41ed-8946-a16278883bc1_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/3a326cf9-8d12-4a67-a61f-25b24135da80_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/239c6a8d-ad42-49ac-9f85-d891c5777d62_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/9197af71-ce25-4e92-8698-219de940b137/fbd0f672-b898-48eb-8436-139a5bd57cc1_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1934,16 +2150,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/5ced25c5-971c-4058-a5aa-e79ce78733d5_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/63699802-2ee0-4839-8706-0727edac5e14_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/40410ff5-8634-4b79-9ec6-0a84132e500c_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/e609cc87-ef0e-4808-a156-77f53ac20aee_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b4a1ef02-8161-427d-a2b3-efb6fd121e49-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b4a1ef02-8161-427d-a2b3-efb6fd121e49-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b4a1ef02-8161-427d-a2b3-efb6fd121e49-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b4a1ef02-8161-427d-a2b3-efb6fd121e49-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/039945f7-8ce0-41e0-b676-6af9f9b59d38_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-b4a1ef02-8161-427d-a2b3-efb6fd121e49.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/e609cc87-ef0e-4808-a156-77f53ac20aee_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/5ced25c5-971c-4058-a5aa-e79ce78733d5_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/63699802-2ee0-4839-8706-0727edac5e14_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/b4a1ef02-8161-427d-a2b3-efb6fd121e49/40410ff5-8634-4b79-9ec6-0a84132e500c_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -1986,16 +2208,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/3551a27c-2870-4203-b767-858b8e8ad989_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/08e5c0d9-d8f7-413d-a731-9cefb59384cf_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/9014d4b4-2d49-401c-a328-597c879500db_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/99deaacb-0446-4ee7-ba11-e06abbc6620f_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-34b7b181-3c95-4cea-a744-fe094c0665da-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-34b7b181-3c95-4cea-a744-fe094c0665da-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-34b7b181-3c95-4cea-a744-fe094c0665da-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-34b7b181-3c95-4cea-a744-fe094c0665da-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/c6ba8d54-6470-42ac-b25e-edb209245567_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-34b7b181-3c95-4cea-a744-fe094c0665da.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/99deaacb-0446-4ee7-ba11-e06abbc6620f_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/3551a27c-2870-4203-b767-858b8e8ad989_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/08e5c0d9-d8f7-413d-a731-9cefb59384cf_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/34b7b181-3c95-4cea-a744-fe094c0665da/9014d4b4-2d49-401c-a328-597c879500db_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2039,16 +2267,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/b7a153e2-b4bf-4776-962f-279d9ef82eca_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/6f08e19f-c1f8-4535-b664-e0541949fe5a_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/581beac5-1be0-4b9f-b1a8-103cd343371f_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/c6899c91-fcf9-48ec-bad9-46f4913caa23_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b709ca41-8bdf-4b40-ad07-14d064e818a9-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b709ca41-8bdf-4b40-ad07-14d064e818a9-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b709ca41-8bdf-4b40-ad07-14d064e818a9-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-b709ca41-8bdf-4b40-ad07-14d064e818a9-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/aacb59b8-cdd8-4571-b669-4925bb2fe6cb_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-b709ca41-8bdf-4b40-ad07-14d064e818a9.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/c6899c91-fcf9-48ec-bad9-46f4913caa23_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/b7a153e2-b4bf-4776-962f-279d9ef82eca_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/6f08e19f-c1f8-4535-b664-e0541949fe5a_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/b709ca41-8bdf-4b40-ad07-14d064e818a9/581beac5-1be0-4b9f-b1a8-103cd343371f_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2092,16 +2326,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/efe93c56-9d20-4a48-8a31-738f324ea591_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/ed1ecd82-a7d2-471c-9c7d-e7b0ce569738_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/a046cafb-f869-4f7e-83c4-e76047c2bb59_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/28039993-06b3-4a6e-b250-cdf04c8a34c7_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-edb3912e-9d91-4da7-b0f6-dba8bb37ce23-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-edb3912e-9d91-4da7-b0f6-dba8bb37ce23-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-edb3912e-9d91-4da7-b0f6-dba8bb37ce23-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-edb3912e-9d91-4da7-b0f6-dba8bb37ce23-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/3ce1d426-2712-44c1-a5bd-6e225f012e7d_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-edb3912e-9d91-4da7-b0f6-dba8bb37ce23.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/28039993-06b3-4a6e-b250-cdf04c8a34c7_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/efe93c56-9d20-4a48-8a31-738f324ea591_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/ed1ecd82-a7d2-471c-9c7d-e7b0ce569738_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/edb3912e-9d91-4da7-b0f6-dba8bb37ce23/a046cafb-f869-4f7e-83c4-e76047c2bb59_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2146,16 +2386,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/447225dc-c05f-4f52-a089-e936d5edd0a5_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/3199131c-9389-4cb6-8cdd-63715277f762_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/c457b3b5-d4db-4749-92bd-991e8f64d823_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/cbe66d86-91ca-43f1-a15c-6b8cb9c421a1_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/2e57ab9d-9561-44c1-b5d3-43820258c196_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/cbe66d86-91ca-43f1-a15c-6b8cb9c421a1_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/447225dc-c05f-4f52-a089-e936d5edd0a5_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/3199131c-9389-4cb6-8cdd-63715277f762_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/f32f01ae-ac64-44c6-8a0a-8ca502ebfe9d/c457b3b5-d4db-4749-92bd-991e8f64d823_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2199,16 +2445,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/9e958b0d-0bef-487c-b905-3ccb658b38d9_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/9739022d-95c4-42f2-9e7f-1ee2238570d1_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/6a5a0d0e-7346-470f-b7a3-372ade30ba14_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/a9e3b243-b4f6-4a2c-8aae-2394abe15250_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4590e44e-07cc-45b8-b0d0-276ef65310de-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4590e44e-07cc-45b8-b0d0-276ef65310de-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4590e44e-07cc-45b8-b0d0-276ef65310de-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4590e44e-07cc-45b8-b0d0-276ef65310de-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/41f4ccdb-32ab-4926-aa0f-c7781d655789_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-4590e44e-07cc-45b8-b0d0-276ef65310de.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/a9e3b243-b4f6-4a2c-8aae-2394abe15250_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/9e958b0d-0bef-487c-b905-3ccb658b38d9_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/9739022d-95c4-42f2-9e7f-1ee2238570d1_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/4590e44e-07cc-45b8-b0d0-276ef65310de/6a5a0d0e-7346-470f-b7a3-372ade30ba14_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2253,16 +2505,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/493221df-5331-4394-85c9-835830db0591_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/b535c0ee-bea1-47e0-bcf9-99ef0826c600_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/70653df9-b33d-4cb5-abf5-0a73f98b964c_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/012fa9de-230b-44cb-a959-16d359c3f602_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-bf233167-e707-4006-9806-e1b069aa91cd-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-bf233167-e707-4006-9806-e1b069aa91cd-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-bf233167-e707-4006-9806-e1b069aa91cd-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-bf233167-e707-4006-9806-e1b069aa91cd-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/7d8ff13f-c44e-4505-9e12-7a2b9ff632eb_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-bf233167-e707-4006-9806-e1b069aa91cd.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/012fa9de-230b-44cb-a959-16d359c3f602_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/493221df-5331-4394-85c9-835830db0591_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/b535c0ee-bea1-47e0-bcf9-99ef0826c600_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/bf233167-e707-4006-9806-e1b069aa91cd/70653df9-b33d-4cb5-abf5-0a73f98b964c_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2306,16 +2564,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/c3a8b70f-988a-46dc-889f-46fd9b3bccea_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/7a44f1e4-6ed8-4da9-9cd1-36369cb29df6_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/a4f8c9e7-1031-4945-be22-3ce714e09aa0_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/20a5c96c-6e57-4a87-bb17-c2959894edbc_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8e691e67-0dd5-4823-8130-2d0ab73579d2-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8e691e67-0dd5-4823-8130-2d0ab73579d2-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8e691e67-0dd5-4823-8130-2d0ab73579d2-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-8e691e67-0dd5-4823-8130-2d0ab73579d2-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/31e8e480-0ed3-43fe-a4b3-188f250d7ead_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-8e691e67-0dd5-4823-8130-2d0ab73579d2.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/20a5c96c-6e57-4a87-bb17-c2959894edbc_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/c3a8b70f-988a-46dc-889f-46fd9b3bccea_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/7a44f1e4-6ed8-4da9-9cd1-36369cb29df6_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/8e691e67-0dd5-4823-8130-2d0ab73579d2/a4f8c9e7-1031-4945-be22-3ce714e09aa0_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2359,16 +2623,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/e6cca937-55c4-4150-bdf2-a86cf1179391_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/f7c97f72-69fc-4a8e-bd58-8214c225c93b_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/bc01cbb5-027e-45c8-a261-e15607eb5233_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/2efebe0f-b06b-48d9-884b-3cc2dd23a538_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cbc48ff1-1e8e-4921-9812-31a8be825aae-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cbc48ff1-1e8e-4921-9812-31a8be825aae-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cbc48ff1-1e8e-4921-9812-31a8be825aae-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-cbc48ff1-1e8e-4921-9812-31a8be825aae-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/fa447fc2-5265-42f4-89b8-f1d5ae427889_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-cbc48ff1-1e8e-4921-9812-31a8be825aae.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/2efebe0f-b06b-48d9-884b-3cc2dd23a538_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/e6cca937-55c4-4150-bdf2-a86cf1179391_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/f7c97f72-69fc-4a8e-bd58-8214c225c93b_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/cbc48ff1-1e8e-4921-9812-31a8be825aae/bc01cbb5-027e-45c8-a261-e15607eb5233_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2412,16 +2682,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/31303df6-617e-4e3f-be3c-f9b082323e1d_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/9d609479-0d1b-4a81-a8fc-090cd43e90bb_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/42377498-7a83-4cfc-9e58-a627d9caf762_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/a9f6a818-f16d-4a30-8eb2-e23e4119436c_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-69a321c2-a7fc-4f07-b70d-7bedc0757e65-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-69a321c2-a7fc-4f07-b70d-7bedc0757e65-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-69a321c2-a7fc-4f07-b70d-7bedc0757e65-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-69a321c2-a7fc-4f07-b70d-7bedc0757e65-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/062a85c4-1090-4a4e-aa13-940bb36ae893_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-69a321c2-a7fc-4f07-b70d-7bedc0757e65.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/a9f6a818-f16d-4a30-8eb2-e23e4119436c_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/31303df6-617e-4e3f-be3c-f9b082323e1d_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/9d609479-0d1b-4a81-a8fc-090cd43e90bb_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/69a321c2-a7fc-4f07-b70d-7bedc0757e65/42377498-7a83-4cfc-9e58-a627d9caf762_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2466,16 +2742,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/a20eaddd-668e-40f6-a7db-84c20b35413a_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/619a56af-852b-4b3d-99c1-7d33f7497fc4_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/3971733e-0592-42be-9128-fa978e5712ff_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/20525922-3e8f-43b7-9731-143813120ea3_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c33b2cd-8d92-4dfa-8e23-740b8c03f029-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c33b2cd-8d92-4dfa-8e23-740b8c03f029-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c33b2cd-8d92-4dfa-8e23-740b8c03f029-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-6c33b2cd-8d92-4dfa-8e23-740b8c03f029-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/c1cfbf6d-764f-4b14-922e-5a5ffd9248cd_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-6c33b2cd-8d92-4dfa-8e23-740b8c03f029.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/20525922-3e8f-43b7-9731-143813120ea3_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/a20eaddd-668e-40f6-a7db-84c20b35413a_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/619a56af-852b-4b3d-99c1-7d33f7497fc4_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/6c33b2cd-8d92-4dfa-8e23-740b8c03f029/3971733e-0592-42be-9128-fa978e5712ff_ceramic_500k.spz"
+          }
         }
       }
     },
@@ -2519,16 +2801,22 @@
           "source": "web_ui",
           "status": "SUCCEEDED",
           "splat_urls": {
-            "100k": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/92a870af-83eb-4c6b-9dab-825887d21814_dust_100k.spz",
-            "150k": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/0e4a7401-4f1b-4822-a408-5208dc4bfe99_ceramic_150k.spz",
-            "500k": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/1b84afbd-7ac1-44a8-b666-0be2d602935f_ceramic_500k.spz",
-            "full_res": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/62f780a5-b4aa-49e6-8218-6f3f340a7be6_ceramic.spz"
+            "100k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4b2080e0-9be6-4f3b-820d-9a7dcf8c0577-100k.spz",
+            "150k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4b2080e0-9be6-4f3b-820d-9a7dcf8c0577-150k.spz",
+            "500k": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4b2080e0-9be6-4f3b-820d-9a7dcf8c0577-500k.spz",
+            "full_res": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/qr-world-api-4b2080e0-9be6-4f3b-820d-9a7dcf8c0577-full_res.spz"
           },
-          "thumbnail_source_url": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/1dab5a62-5923-4b64-8ec3-a38172036fce_sand_mpi/thumbnail.webp",
+          "thumbnail_source_url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-api-4b2080e0-9be6-4f3b-820d-9a7dcf8c0577.webp",
           "thumb_width": 720,
           "thumb_height": 480,
           "pano_url": null,
-          "collider_mesh_url": null
+          "collider_mesh_url": null,
+          "splat_source_urls": {
+            "full_res": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/62f780a5-b4aa-49e6-8218-6f3f340a7be6_ceramic.spz",
+            "100k": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/92a870af-83eb-4c6b-9dab-825887d21814_dust_100k.spz",
+            "150k": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/0e4a7401-4f1b-4822-a408-5208dc4bfe99_ceramic_150k.spz",
+            "500k": "https://cdn.marble.worldlabs.ai/4b2080e0-9be6-4f3b-820d-9a7dcf8c0577/1b84afbd-7ac1-44a8-b666-0be2d602935f_ceramic_500k.spz"
+          }
         }
       }
     },

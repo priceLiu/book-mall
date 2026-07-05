@@ -11,6 +11,7 @@ import {
 import {
   buildCanvasOssKey,
   buildQuickReplicaBuiltinOssKey,
+  buildQuickReplicaBuiltinSplatOssKey,
   buildMinimaxVoicePreviewOssKey,
   buildStyleLibraryOssKey,
   type CanvasOssKind,
@@ -326,6 +327,25 @@ export async function uploadQuickReplicaBuiltinPreview(args: {
     key,
     buf: args.buf,
     contentType: args.contentType,
+  });
+}
+
+/** QuickReplica 内置场景 splat（100k / full_res 等，固定 OSS key）。 */
+export async function uploadQuickReplicaBuiltinSplat(args: {
+  templateId: string;
+  tier: string;
+  buf: Buffer;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildQuickReplicaBuiltinSplatOssKey(args.templateId, args.tier);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: "application/octet-stream",
   });
 }
 

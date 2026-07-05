@@ -118,9 +118,14 @@ describe("extractWorldSplatTiers", () => {
 });
 
 describe("isAllowedWorldSplatUpstreamUrl", () => {
-  it("allows worldlabs and gcs hosts over https", () => {
+  it("allows worldlabs, gcs, and platform oss hosts over https", () => {
     expect(isAllowedWorldSplatUpstreamUrl("https://storage.googleapis.com/bucket/x.spz")).toBe(true);
     expect(isAllowedWorldSplatUpstreamUrl("https://cdn.worldlabs.ai/x.spz")).toBe(true);
+    expect(
+      isAllowedWorldSplatUpstreamUrl(
+        "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/splats/x-full_res.spz",
+      ),
+    ).toBe(true);
     expect(isAllowedWorldSplatUpstreamUrl("http://storage.googleapis.com/x.spz")).toBe(false);
     expect(isAllowedWorldSplatUpstreamUrl("https://evil.example/x.spz")).toBe(false);
   });

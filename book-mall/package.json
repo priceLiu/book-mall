@@ -77,6 +77,8 @@
     "qr:sync-character-gallery:dry-run": "tsx scripts/sync-quick-replica-character-gallery.ts --dry-run",
     "qr:sync-world-gallery": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-world-gallery.ts",
     "qr:sync-world-gallery:dry-run": "tsx scripts/sync-quick-replica-world-gallery.ts --dry-run",
+    "qr:sync-world-splats": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-world-splats-to-oss.ts",
+    "qr:sync-world-splats:dry-run": "tsx scripts/sync-quick-replica-world-splats-to-oss.ts --dry-run",
     "qr:sync-video-gallery": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-video-gallery.ts",
     "qr:sync-video-gallery:dry-run": "tsx scripts/sync-quick-replica-video-gallery.ts --dry-run",
     "qr:sync-motion-sync-gallery": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-motion-sync-gallery.ts",
