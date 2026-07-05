@@ -438,10 +438,12 @@ export async function handleSbv1SideAddNodePick(
     itemId === "video-engine" ||
     itemId === "video-compose" ||
     itemId === "export" ||
+    itemId === "style-asset" ||
     (itemId === "image" && nodeType === "sbv1-image") ||
     nodeType === "sbv1-video-engine" ||
     nodeType === "jianying-export-pro2" ||
-    nodeType === "story-pro2-starter";
+    nodeType === "story-pro2-starter" ||
+    nodeType === "story-pro2-style-asset";
 
   if (enabled) {
     onSpawn();

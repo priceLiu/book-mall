@@ -41,8 +41,8 @@ import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-lin
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
-import { libtvDockFixedFlowPx, libtvDockVideoHeaderScreenMetrics, VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100, VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 } from "@/lib/canvas/libtv-dock-scale";
-import { useLibtvInputDockUi } from "@/lib/canvas/libtv-input-dock-ui-context";
+import { VIDEO_DOCK_HEADER_CHIP_FONT_AT_100, VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 } from "@/lib/canvas/libtv-dock-scale";
+import { useLibtvDockRefThumbMetrics } from "@/lib/canvas/use-libtv-dock-ref-thumb-metrics";
 import {
   portraitImportUiState,
   type CanvasPortraitNodeFields,
@@ -88,53 +88,22 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
-  const { shellScreenScale, canvasZoom } = useLibtvInputDockUi();
-  const headerMetrics = useMemo(
-    () => libtvDockVideoHeaderScreenMetrics(canvasZoom),
-    [canvasZoom],
-  );
-  const thumbPx = libtvDockFixedFlowPx(
-    headerMetrics.thumbWidthScreenPx,
-    shellScreenScale,
-  );
-  const thumbHeightPx = libtvDockFixedFlowPx(
-    headerMetrics.thumbHeightScreenPx,
-    shellScreenScale,
-  );
-  const thumbSquarePx = Math.min(thumbPx, thumbHeightPx);
-  const chipFontPx = libtvDockFixedFlowPx(
-    headerMetrics.chipFontScreenPx,
-    shellScreenScale,
-  );
-  const chipMinHeightPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100,
-    shellScreenScale,
-  );
-  const badgeFontPx = libtvDockFixedFlowPx(
-    headerMetrics.badgeFontScreenPx,
-    shellScreenScale,
-  );
-  const badgeMinPx = libtvDockFixedFlowPx(
-    headerMetrics.badgeFontScreenPx + 6,
-    shellScreenScale,
-  );
-  const headerMinHeightPx = thumbSquarePx + libtvDockFixedFlowPx(10, shellScreenScale);
-  const dockTextFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const modelPickerFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const modelPickerIconPx = libtvDockFixedFlowPx(13, shellScreenScale);
-  const creditsFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
-  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
-  const toolbarMinHeightPx = libtvDockFixedFlowPx(48, shellScreenScale);
+  const {
+    thumbStyle: refThumbStyle,
+    thumbWidthPx,
+    badgeFontPx,
+    badgeMinPx,
+    headerMinHeightPx,
+    chipMinHeightPx,
+  } = useLibtvDockRefThumbMetrics();
+  const chipFontPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
+  const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
+  const modelPickerFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
+  const modelPickerIconPx = 13;
+  const creditsFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
+  const sendBtnPx = 44;
+  const sendIconPx = 18;
+  const toolbarMinHeightPx = 48;
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -286,15 +255,6 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     [uploadFiles],
   );
 
-  const refThumbStyle = useMemo(
-    () => ({
-      width: thumbSquarePx,
-      height: thumbSquarePx,
-      minWidth: thumbSquarePx,
-      minHeight: thumbSquarePx,
-    }),
-    [thumbSquarePx],
-  );
   const refThumbClass =
     "group relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";
 
@@ -363,7 +323,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
                 key={`empty-${slotIndex}`}
                 label={corner}
                 style={refThumbStyle}
-                iconPx={thumbSquarePx}
+                iconPx={thumbWidthPx}
                 textFontPx={dockTextFontPx}
               />
             );
@@ -476,10 +436,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
           >
             <Zap
               className="fill-amber-300/90 text-amber-300/90"
-              style={{
-                width: libtvDockFixedFlowPx(14, shellScreenScale),
-                height: libtvDockFixedFlowPx(14, shellScreenScale),
-              }}
+              style={{ width: 14, height: 14 }}
             />
             {estCredits.credits}
           </span>

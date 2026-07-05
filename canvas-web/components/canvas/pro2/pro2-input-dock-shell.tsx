@@ -195,14 +195,16 @@ export function Pro2DockHeader({
     >
       <div
         className={cn(
-          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto",
+          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto overflow-y-hidden",
           compact
             ? "gap-1 px-2 py-1"
             : "min-h-[44px] gap-1.5 px-3 py-1.5",
         )}
         style={
           minHeightPx != null
-            ? { minHeight: minHeightPx }
+            ? compact
+              ? { minHeight: minHeightPx, maxHeight: minHeightPx }
+              : { minHeight: minHeightPx }
             : compact
               ? { minHeight: 30 }
               : undefined

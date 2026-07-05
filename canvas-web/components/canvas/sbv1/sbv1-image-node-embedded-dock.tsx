@@ -55,7 +55,7 @@ export function Sbv1ImageNodeEmbeddedDock({
     () => nodes.find((n) => n.id === nodeId) ?? null,
     [nodes, nodeId],
   );
-  const { thumbPx, logoIconPx, logoLabelFontPx } =
+  const { actionBtnPx, logoIconPx, logoLabelFontPx } =
     useLibtvDockRefThumbMetrics();
   const d = (storeNode?.data ?? {}) as Sbv1ImageNodeData;
   const dockInput = d.dockInput ?? "";
@@ -152,10 +152,10 @@ export function Sbv1ImageNodeEmbeddedDock({
                 title="标记（即将推出）"
                 className="nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-white/35"
                 style={{
-                  width: thumbPx,
-                  height: thumbPx,
-                  minWidth: thumbPx,
-                  minHeight: thumbPx,
+                  width: actionBtnPx,
+                  height: actionBtnPx,
+                  minWidth: actionBtnPx,
+                  minHeight: actionBtnPx,
                   fontSize: logoLabelFontPx,
                 }}
               >
@@ -171,10 +171,10 @@ export function Sbv1ImageNodeEmbeddedDock({
                   title="上传图片"
                   className="nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.07]"
                   style={{
-                    width: thumbPx,
-                    height: thumbPx,
-                    minWidth: thumbPx,
-                    minHeight: thumbPx,
+                    width: actionBtnPx,
+                    height: actionBtnPx,
+                    minWidth: actionBtnPx,
+                    minHeight: actionBtnPx,
                     fontSize: logoLabelFontPx,
                   }}
                   onClick={onUpload}

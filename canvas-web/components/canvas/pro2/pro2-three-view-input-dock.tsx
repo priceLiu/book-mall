@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUp, ChevronDown, Loader2, MapPin, SlidersHorizontal } from "lucide-react";
-import { useNodes, useStore } from "@xyflow/react";
+import { SlidersHorizontal } from "lucide-react";
+import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -36,15 +36,11 @@ import type {
 } from "@/lib/canvas/story-pro2-workspace-types";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
-import {
-  computeLibtvDockInverseScale,
-  libtvDockFixedFlowPx,
-  libtvDockFlowSize,
-  VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-} from "@/lib/canvas/libtv-dock-scale";
-import { useLibtvDockRefThumbMetrics } from "@/lib/canvas/use-libtv-dock-ref-thumb-metrics";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
+import { LibtvDockSendButton } from "../libtv-dock-send-button";
+import { LibtvDockSettingsTrigger } from "../libtv-dock-settings-trigger";
+import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
   Sbv1ImageGenerateSettingsModal,
   sbv1ImageSettingsTriggerLabel,
@@ -54,6 +50,7 @@ import {
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "./pro2-input-dock-shell";
+import { Pro2DockMarkButton } from "./pro2-dock-mark-button";
 import { Pro2DockStyleButton } from "./pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 import { pro2ThreeViewNodeUsesEmbeddedDock } from "./pro2-three-view-node-embedded-dock";
@@ -73,18 +70,6 @@ export function Pro2ThreeViewInputDock() {
   );
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const zoom = useStore((s) => s.transform[2]);
-  const { w: dockW } = libtvDockFlowSize();
-  const invScale = computeLibtvDockInverseScale(zoom, dockW, false);
-  const shellScreenScale = invScale * Math.max(0.08, zoom);
-  const dockTextFontPx = libtvDockFixedFlowPx(
-    VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
-    shellScreenScale,
-  );
-  const toolbarMinHeightPx = libtvDockFixedFlowPx(48, shellScreenScale);
-  const sendBtnPx = libtvDockFixedFlowPx(44, shellScreenScale);
-  const sendIconPx = libtvDockFixedFlowPx(18, shellScreenScale);
-  const { thumbPx, logoIconPx, logoLabelFontPx } = useLibtvDockRefThumbMetrics();
 
   const selected = useMemo(() => {
     const picked = rfNodes.filter(
@@ -380,73 +365,19 @@ export function Pro2ThreeViewInputDock() {
                     onClick={onOpenStyleLibrary}
                   />
                 ) : null}
-                <button
-                  type="button"
-                  disabled
-                  title="标记（即将推出）"
-                  className="nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-white/35"
-                  style={{
-                    width: thumbPx,
-                    height: thumbPx,
-                    minWidth: thumbPx,
-                    minHeight: thumbPx,
-                    fontSize: logoLabelFontPx,
-                  }}
-                >
-                  <MapPin
-                    style={{ width: logoIconPx, height: logoIconPx }}
-                    strokeWidth={1.5}
-                  />
-                  <span>标记</span>
-                </button>
+                <Pro2DockMarkButton />
               </>
             }
           />
         }
         footer={
-          <Pro2DockToolbar className="gap-2">
-            <div className="flex shrink-0 items-center gap-0.5">
-              <button
-                type="button"
-                title="图片生成设置"
-                disabled={isRunning}
-                className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <SlidersHorizontal className="size-4" />
-              </button>
-            </div>
-            <button
-              type="button"
-              disabled={isRunning}
-              className="nodrag flex min-w-0 flex-1 items-center gap-1 rounded-md px-2.5 py-2 text-left text-white hover:bg-white/[0.06]"
-              style={{ fontSize: dockTextFontPx, minHeight: toolbarMinHeightPx }}
-              onClick={() => setSettingsOpen(true)}
-            >
-              <span className="truncate">{settingsLabel}</span>
-              <ChevronDown
-                className="shrink-0 opacity-45"
-                style={{ width: sendIconPx, height: sendIconPx }}
-              />
-            </button>
-            <button
-              type="button"
-              disabled={!canRegenerate || isRunning}
-              className="nodrag flex shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ width: sendBtnPx, height: sendBtnPx }}
-              title={canRegenerate ? "重新生成三视图" : "请先选择生图模型并填写提示词"}
-              onClick={onRegenerate}
-            >
-              {isRunning ? (
-                <Loader2
-                  className="animate-spin"
-                  style={{ width: sendIconPx, height: sendIconPx }}
-                />
-              ) : (
-                <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-              )}
-            </button>
-          </Pro2DockToolbar>
+          <Pro2ThreeViewDockFooter
+            settingsLabel={settingsLabel}
+            isRunning={isRunning}
+            canRegenerate={canRegenerate}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onRegenerate={onRegenerate}
+          />
         }
       >
         <MentionsEditable
@@ -474,5 +405,50 @@ export function Pro2ThreeViewInputDock() {
         onConfirm={onConfirmSettings}
       />
     </>
+  );
+}
+
+function Pro2ThreeViewDockFooter({
+  settingsLabel,
+  isRunning,
+  canRegenerate,
+  onOpenSettings,
+  onRegenerate,
+}: {
+  settingsLabel: string;
+  isRunning: boolean;
+  canRegenerate: boolean;
+  onOpenSettings: () => void;
+  onRegenerate: () => void;
+}) {
+  const { sendIconPx } = useLibtvDockToolbarMetrics();
+
+  return (
+    <Pro2DockToolbar className="gap-2">
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          title="图片生成设置"
+          disabled={isRunning}
+          className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={onOpenSettings}
+        >
+          <SlidersHorizontal style={{ width: sendIconPx, height: sendIconPx }} />
+        </button>
+      </div>
+      <LibtvDockSettingsTrigger
+        label={settingsLabel}
+        disabled={isRunning}
+        onClick={onOpenSettings}
+      />
+      <LibtvDockSendButton
+        disabled={!canRegenerate}
+        loading={isRunning}
+        title={
+          canRegenerate ? "重新生成三视图" : "请先选择生图模型并填写提示词"
+        }
+        onClick={onRegenerate}
+      />
+    </Pro2DockToolbar>
   );
 }

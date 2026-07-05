@@ -22,6 +22,7 @@ import { Handle, Position } from "@xyflow/react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
@@ -399,17 +400,18 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         </div>
       ) : null}
 
-      <div className="relative min-h-0 flex-1 overflow-visible">
-        {showToolbar ? (
+      {showToolbar ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={showToolbar}>
           <Pro2ScriptHubToolbar
-            className="-top-[4.25rem]"
             hubId={id}
             hubData={d}
             tableTitle={tableTitle}
             onDuplicateNode={onDuplicateNode}
           />
-        ) : null}
+        </LibtvNodeToolbarPortal>
+      ) : null}
 
+      <div className="relative min-h-0 flex-1 overflow-visible">
       <div
         className={cn(
           PRO2_CARD_SHELL_CLASS,

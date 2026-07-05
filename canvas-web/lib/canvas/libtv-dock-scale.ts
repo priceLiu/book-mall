@@ -3,8 +3,9 @@
  *
  * 目标（未展开 · 在原 656×212 基础上整体 +20%）：
  * - Dock 屏幕宽高：787 × 254
- * - 顶栏缩略图：72 × 72
- * - Dock 关键文字：17px
+ * - 顶栏缩略图：118 × 118
+ * - Dock 底栏 / 模式 chip 文字：27px
+ * - 顶栏风格/标记按钮：70 × 70
  *
  * 通过 viewport 内 inverse-scale 抵消画布 zoom，实现 10%~800% 基本恒定。
  */
@@ -130,27 +131,35 @@ export function computeLibtvDockInverseScale(
   return Math.min(12, Math.max(0.03, inv));
 }
 
-/** 视频 Dock 顶栏 · 缩略图固定屏幕尺寸（60×1.2=72） */
-export const VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 = Math.round(
-  60 * LIBTV_DOCK_UI_SCALE,
-);
+/** Dock 顶栏 · 上游参考缩略图（屏 px · 统一 118×118） */
+export const DOCK_REF_THUMB_SCREEN_SIZE = 118;
+
+/** @deprecated 用 DOCK_REF_THUMB_SCREEN_SIZE */
+export const VIDEO_DOCK_HEADER_THUMB_SCREEN_AT_100 = DOCK_REF_THUMB_SCREEN_SIZE;
 
 /** 固定 1:1 缩略图（屏 px） */
-export const VIDEO_DOCK_HEADER_THUMB_W_MAX = Math.round(60 * LIBTV_DOCK_UI_SCALE);
-export const VIDEO_DOCK_HEADER_THUMB_H_MAX = Math.round(60 * LIBTV_DOCK_UI_SCALE);
+export const VIDEO_DOCK_HEADER_THUMB_W_MAX = DOCK_REF_THUMB_SCREEN_SIZE;
+export const VIDEO_DOCK_HEADER_THUMB_H_MAX = DOCK_REF_THUMB_SCREEN_SIZE;
 
-/** 模式 chip 固定字号（屏 px · 14×1.2≈17） */
-export const VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 = Math.round(14 * LIBTV_DOCK_UI_SCALE);
+/** Dock 顶栏 · 标记按钮（屏 px · 宽 118；高与缩略图同行 118，避免顶栏吃光 prompt 区） */
+export const DOCK_HEADER_MARK_BTN_SCREEN_W = 118;
+export const DOCK_HEADER_MARK_BTN_SCREEN_H = 118;
 
-/** 模式 chip 最小屏高（字号缩小后仍保持原 pill 高度 · 34×1.2≈41） */
-export const VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100 = Math.round(
-  34 * LIBTV_DOCK_UI_SCALE,
-);
+/** 参考缩略图右上角序号角标（屏 px） */
+export const DOCK_REF_CORNER_BADGE_FONT_SCREEN = 12;
+export const DOCK_REF_CORNER_BADGE_MIN_SCREEN = 16;
 
-/** 视频 Dock 底栏 · 模型/积分字号（屏 px · 14×1.2≈17） */
-export const VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 = Math.round(
-  14 * LIBTV_DOCK_UI_SCALE,
-);
+/** 模式 chip 固定字号（屏 px） */
+export const VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 = 27;
+
+/** 模式 chip 最小屏高（配合 27px 字号） */
+export const VIDEO_DOCK_HEADER_CHIP_MIN_HEIGHT_AT_100 = 52;
+
+/** 视频 / 图片 Dock 底栏 · 模型名 / 积分字号（屏 px） */
+export const VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100 = 27;
+
+/** Dock 顶栏 · 风格 / 标记 / 上传方形按钮（屏 px） */
+export const DOCK_HEADER_ACTION_BTN_SCREEN_AT_100 = 70;
 
 /** 画布缩小锚点 · 顶栏缩略图仍保持 2×100% 基准 */
 export const VIDEO_DOCK_HEADER_ZOOMOUT_ANCHOR = 0.15;
@@ -197,7 +206,7 @@ export function libtvDockVideoHeaderScreenMetrics(canvasZoom: number): {
   const thumbWidthScreenPx = VIDEO_DOCK_HEADER_THUMB_W_MAX;
   const thumbHeightScreenPx = VIDEO_DOCK_HEADER_THUMB_H_MAX;
   const chipFontScreenPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
-  const badgeFontScreenPx = Math.max(10, VIDEO_DOCK_HEADER_CHIP_FONT_AT_100 - 2);
+  const badgeFontScreenPx = DOCK_REF_CORNER_BADGE_FONT_SCREEN;
 
   return {
     thumbScreenPx: thumbWidthScreenPx,

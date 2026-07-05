@@ -11,12 +11,14 @@ const STYLE_ASSET_CONNECT_TARGETS = new Set([
   "story-pro2-three-view",
   "story-pro2-starter",
   "sbv1-image",
+  "sbv1-video-engine",
 ]);
 
-const IMAGE_STYLE_LINK_TARGETS = new Set([
+const MEDIA_STYLE_LINK_TARGETS = new Set([
   "story-pro2-image",
   "story-pro2-three-view",
   "sbv1-image",
+  "sbv1-video-engine",
 ]);
 
 /** 风格素材节点可连出的目标类型 */
@@ -41,7 +43,7 @@ export function validatePro2StyleAssetConnection(
     if (!isPro2StyleAssetConnectTarget(tt)) {
       return {
         ok: false,
-        reason: "风格节点仅可连接脚本、文本、图片或三视图节点",
+        reason: "风格节点仅可连接脚本、文本、图片、三视图或视频节点",
       };
     }
     return { ok: true };
@@ -110,22 +112,39 @@ export function buildPro2StyleAssetToImageEdge(
   };
 }
 
-/** 图片节点左侧已连的风格素材（Dock 风格库选中后复用更新） */
+export function buildPro2StyleAssetToVideoEdge(
+  styleNodeId: string,
+  videoNodeId: string,
+): CanvasFlowEdge {
+  return {
+    id: `e-style-${styleNodeId}-${videoNodeId}`,
+    source: styleNodeId,
+    target: videoNodeId,
+    sourceHandle: "style",
+    targetHandle: "in_ref",
+  };
+}
+
+function styleLinkTargetHandle(mediaType: string): string {
+  return mediaType === "sbv1-video-engine" ? "in_ref" : "in_image";
+}
+
+/** 媒体节点左侧已连的风格素材（Dock 风格库选中后复用更新） */
 export function findStyleAssetLinkedToImage(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
-  imageNodeId: string,
+  mediaNodeId: string,
 ): CanvasFlowNode | undefined {
+  const mediaType =
+    nodes.find((n) => n.id === mediaNodeId)?.type ?? "";
+  if (!MEDIA_STYLE_LINK_TARGETS.has(mediaType)) return undefined;
+  const expectedTargetHandle = styleLinkTargetHandle(mediaType);
+
   for (const e of edges) {
-    if (e.target !== imageNodeId) continue;
-    if (e.targetHandle && e.targetHandle !== "in_image") continue;
+    if (e.target !== mediaNodeId) continue;
+    if (e.targetHandle && e.targetHandle !== expectedTargetHandle) continue;
     const source = nodes.find((n) => n.id === e.source);
-    if (
-      source?.type === STYLE_ASSET_TYPE &&
-      IMAGE_STYLE_LINK_TARGETS.has(
-        nodes.find((n) => n.id === imageNodeId)?.type ?? "",
-      )
-    ) {
+    if (source?.type === STYLE_ASSET_TYPE) {
       return source;
     }
   }

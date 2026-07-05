@@ -33,7 +33,7 @@ export function DockRefCornerBadge({
       className={cn(
         "nodrag absolute right-0.5 top-0.5 z-10 flex items-center justify-center rounded bg-black/70 px-1 py-px font-medium leading-none text-white/90 transition",
         !fontSizePx && "min-h-[14px] min-w-[14px] text-[8px]",
-        "group-hover:min-h-[18px] group-hover:min-w-[18px] group-hover:rounded-full group-hover:bg-red-950/90 group-hover:text-white",
+        "group-hover:min-h-[14px] group-hover:min-w-[14px] group-hover:rounded group-hover:bg-red-950/90 group-hover:text-white",
         "disabled:pointer-events-none disabled:opacity-40",
         className,
       )}
@@ -45,7 +45,7 @@ export function DockRefCornerBadge({
     >
       <span className="group-hover:hidden">{label}</span>
       <X
-        className="hidden size-3 group-hover:block"
+        className="hidden size-2.5 group-hover:block"
         strokeWidth={2.5}
         aria-hidden
       />

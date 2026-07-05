@@ -64,10 +64,18 @@ export type EnginePickerProps = {
   layout?: "grid" | "list" | "dropdown";
   /** 触发按钮字号（flow px · 供 Dock 抵消缩放，与正文字号统一） */
   triggerFontPx?: number;
+  /** Dock 底栏触发按钮最小高度（flow px） */
+  triggerMinHeightPx?: number;
+  /** Dock 底栏触发按钮 chevron 尺寸（flow px） */
+  triggerIconPx?: number;
+  /** Dock 底栏样式（无边框 · 与图片节点 Dock 底栏一致） */
+  triggerVariant?: "default" | "dock";
 };
 
 /* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
-const ENGINE_PICKER_MODAL_Z = 1200;
+import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
+
+const ENGINE_PICKER_MODAL_Z = LIBTV_GENERATE_SETTINGS_MODAL_Z;
 
 /** 稳定的空参数引用：避免默认 `params = {}` 每次 render 产生新对象，触发弹层 effect 反复 setDraft */
 const EMPTY_PARAMS: Record<string, unknown> = Object.freeze({});
@@ -91,6 +99,9 @@ export function EnginePicker({
   providerIds,
   layout = "grid",
   triggerFontPx,
+  triggerMinHeightPx,
+  triggerIconPx,
+  triggerVariant = "default",
 }: EnginePickerProps) {
   const { providers, loading } = useUserProviders();
   const [open, setOpen] = useState(false);
@@ -180,6 +191,8 @@ export function EnginePicker({
     );
   }
 
+  const dockTrigger = triggerVariant === "dock" && triggerFontPx != null;
+
   return (
     <>
       <button
@@ -188,11 +201,18 @@ export function EnginePicker({
           e.stopPropagation();
           setOpen(true);
         }}
-        style={triggerFontPx != null ? { fontSize: triggerFontPx } : undefined}
+        style={{
+          ...(triggerFontPx != null ? { fontSize: triggerFontPx } : {}),
+          ...(triggerMinHeightPx != null
+            ? { minHeight: triggerMinHeightPx }
+            : {}),
+        }}
         className={
-          triggerFontPx != null
-            ? "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-white hover:border-white/30"
-            : "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[14px] text-white hover:border-white/30"
+          dockTrigger
+            ? "nodrag flex min-w-0 w-full flex-1 items-center gap-1 rounded-md px-2.5 py-2 text-left text-white hover:bg-white/[0.06]"
+            : triggerFontPx != null
+              ? "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-white hover:border-white/30"
+              : "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[14px] text-white hover:border-white/30"
         }
       >
         <span className="truncate">
@@ -213,13 +233,19 @@ export function EnginePicker({
           )}
         </span>
         <ChevronDown
-          className="shrink-0 text-white/50"
-          style={
-            triggerFontPx != null
-              ? { width: triggerFontPx, height: triggerFontPx }
-              : undefined
+          className={
+            dockTrigger
+              ? "shrink-0 opacity-45"
+              : "shrink-0 text-white/50"
           }
-          {...(triggerFontPx == null ? { size: 16 } : {})}
+          style={
+            triggerIconPx != null
+              ? { width: triggerIconPx, height: triggerIconPx }
+              : triggerFontPx != null && !dockTrigger
+                ? { width: triggerFontPx, height: triggerFontPx }
+                : undefined
+          }
+          {...(triggerFontPx == null && triggerIconPx == null ? { size: 16 } : {})}
         />
       </button>
       {capabilityMismatch ? (
@@ -511,7 +537,7 @@ function EngineModelModal({
       aria-modal="true"
     >
       <div
-        className="nodrag nowheel flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+        className="nodrag nowheel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
         style={{ backgroundColor: ENGINE_PICKER_MODAL_BG }}
         onMouseDown={(e) => e.stopPropagation()}
       >

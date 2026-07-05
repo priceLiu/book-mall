@@ -15,7 +15,7 @@ import {
   PRO2_STYLE_ASSET_RIGHT_MENU,
 } from "./pro2-add-node-menu";
 
-const SIDE_PLUS_BY_TYPE: Record<
+export const SIDE_PLUS_BY_TYPE: Record<
   string,
   { left?: string; right?: string }
 > = {

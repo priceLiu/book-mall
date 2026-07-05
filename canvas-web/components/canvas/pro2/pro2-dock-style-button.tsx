@@ -18,7 +18,7 @@ export function Pro2DockStyleButton({
   disabled,
   onClick,
 }: Pro2DockStyleButtonProps) {
-  const { thumbPx } = useLibtvDockRefThumbMetrics();
+  const { actionBtnPx } = useLibtvDockRefThumbMetrics();
 
   return (
     <button
@@ -26,10 +26,10 @@ export function Pro2DockStyleButton({
       disabled={disabled}
       title={label ? `风格：${label}` : "风格库"}
       style={{
-        width: thumbPx,
-        height: thumbPx,
-        minWidth: thumbPx,
-        minHeight: thumbPx,
+        width: actionBtnPx,
+        height: actionBtnPx,
+        minWidth: actionBtnPx,
+        minHeight: actionBtnPx,
       }}
       className={cn(
         "nodrag flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[11px] transition",
