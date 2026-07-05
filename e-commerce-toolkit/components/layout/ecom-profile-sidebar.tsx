@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { ChevronRight, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { buildEcomLoginUrl } from "@/lib/ecom-auth";
+import type { EcomShellUser } from "@/lib/ecom-session.server";
 import {
   buildEcomSidebarNavItems,
   type EcomSidebarNavItem,
@@ -102,7 +103,7 @@ export function EcomProfileSidebar({
   onCollapsedChange,
   className,
 }: {
-  user: { name: string; email: string; avatarUrl: string | null } | null;
+  user: EcomShellUser | null;
   bookOrigin: string;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
