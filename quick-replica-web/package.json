@@ -7,6 +7,7 @@
     "build": "next build",
     "build:docker": "next build",
     "start": "next start -p 3008",
+    "bench:world-splat": "node scripts/bench-world-splat.mjs",
     "lint": "next lint"
   },
   "dependencies": {

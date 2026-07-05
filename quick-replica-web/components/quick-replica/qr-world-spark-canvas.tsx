@@ -422,7 +422,9 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
             high!,
             false,
             (ratio) => {
-              setStage("loading-full", `${Math.round(ratio * 100)}%`);
+              const pct = Math.round(ratio * 100);
+              setStage("loading-full", `加载高清画质 · ${pct}%`);
+              onProgressRef.current?.(ratio);
             },
             HIGH_SPLAT_LOAD_TIMEOUT_MS,
           );
@@ -462,8 +464,7 @@ export const QrWorldSparkCanvas = forwardRef<QrWorldSparkHandle, Props>(function
           onFirstVisualRef.current?.();
           setStage("preview", "Particle preview");
 
-          setStage("loading-full", "Loading full quality...");
-          onProgressRef.current?.(0);
+          setStage("loading-full", "加载高清画质…");
 
           const highPacked = await highLoadPromise;
           if (disposed) return;
