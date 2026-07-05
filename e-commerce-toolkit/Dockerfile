@@ -24,8 +24,10 @@ RUN groupadd --gid 1001 nodejs && useradd --uid 1001 --gid nodejs nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh && chown nextjs:nodejs docker-entrypoint.sh
 USER nextjs
 EXPOSE 3007
 ENV PORT=3007
 ENV HOSTNAME=0.0.0.0
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

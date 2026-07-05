@@ -42,6 +42,8 @@ for (const key of [
   "TOOLS_SSO_SERVER_SECRET",
   "TOOLS_SSO_JWT_SECRET",
   "MAIN_SITE_ORIGIN",
+  "BOOK_MALL_URL",
+  "NEXT_PUBLIC_BOOK_MALL_URL",
 ]) {
   if (book[key]) merged[key] = book[key];
 }
