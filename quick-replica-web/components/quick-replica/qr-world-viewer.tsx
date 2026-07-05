@@ -426,7 +426,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     loading && !showSpark
       ? "加载场景…"
       : sparkStageMessage ??
-        (sparkStage === "loading-full" ? "加载高清画质…" : undefined);
+        (sparkStage === "loading-full" ? "加载高清画质…" : sparkStage === "preview" ? "加载预览…" : undefined);
 
   return createPortal(
     <div className="fixed inset-0 z-[100]" style={{ background: "#060910" }}>
