@@ -6,6 +6,7 @@ import { EcomAuthBanner } from "@/components/auth/ecom-auth-banner";
 import { EcomMobileBar } from "@/components/layout/ecom-mobile-bar";
 import { EcomProfileSidebar } from "@/components/layout/ecom-profile-sidebar";
 import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
+import type { EcomShellUser } from "@/lib/ecom-session.server";
 
 const NAV_COLLAPSED_KEY = "ecom-nav-collapsed";
 /** 心跳间隔：令牌默认 10 分钟，60s 检查可在过期前静默续期 */
@@ -18,7 +19,7 @@ export function EcomAppShell({
   bookOrigin,
   children,
 }: {
-  user: { name: string; email: string; avatarUrl: string | null } | null;
+  user: EcomShellUser | null;
   bookOrigin: string;
   children: React.ReactNode;
 }) {
