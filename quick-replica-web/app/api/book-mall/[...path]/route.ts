@@ -10,10 +10,31 @@ export const dynamic = "force-dynamic";
 
 function shouldStreamProxyResponse(contentType: string, path: string): boolean {
   const ct = contentType.toLowerCase();
+  const p = path.toLowerCase();
   if (ct.includes("text/event-stream")) return true;
   if (ct.startsWith("text/plain")) return true;
-  if (path.includes("gateway/chat")) return true;
+  if (p.includes("gateway/chat")) return true;
+  // World splat / image 可达数百 MB，禁止 arrayBuffer 整包缓冲（否则高清档永远下不完）
+  if (
+    p.includes("quick-replica/worlds/") &&
+    (p.includes("/splat") || p.includes("/image"))
+  ) {
+    return true;
+  }
+  if (ct.includes("application/octet-stream")) return true;
   return false;
+}
+
+function passthroughUpstreamHeaders(upstream: Response, out: Headers): void {
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) out.set("Content-Type", contentType);
+  out.set("Cache-Control", upstream.headers.get("cache-control") ?? "no-store");
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) out.set("Content-Length", contentLength);
+  const disposition = upstream.headers.get("content-disposition");
+  if (disposition) out.set("Content-Disposition", disposition);
+  const encoding = upstream.headers.get("content-encoding");
+  if (encoding) out.set("Content-Encoding", encoding);
 }
 
 function attachRefreshedToolsCookie(
@@ -87,11 +108,8 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
     const contentType = r.headers.get("content-type") ?? "application/json";
     if (shouldStreamProxyResponse(contentType, path) && r.body) {
       const outHeaders = new Headers();
-      outHeaders.set("Content-Type", contentType);
-      outHeaders.set("Cache-Control", "no-store");
+      passthroughUpstreamHeaders(r, outHeaders);
       outHeaders.set("X-Accel-Buffering", "no");
-      const encoding = r.headers.get("content-encoding");
-      if (encoding) outHeaders.set("Content-Encoding", encoding);
       const streamRes = new NextResponse(r.body, {
         status: r.status,
         headers: outHeaders,

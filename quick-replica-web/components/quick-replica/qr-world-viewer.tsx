@@ -418,6 +418,9 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
   const sceneReady = hasFirstVisual || sparkStage === "ready";
 
   const showLoadingBackdrop = !loadError && !hasFirstVisual;
+  const showLoadProgress =
+    !loadError &&
+    (showLoadingBackdrop || sparkStage === "preview" || sparkStage === "loading-full");
 
   const loadProgressLabel =
     loading && !showSpark
@@ -429,7 +432,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     <div className="fixed inset-0 z-[100]" style={{ background: "#060910" }}>
       <QrWorldLoadingBackdrop active={showLoadingBackdrop} thumbUrl={previewThumb} />
       <QrWorldLoadProgress
-        active={showLoadingBackdrop}
+        active={showLoadProgress}
         ratio={loadProgress}
         label={loadProgressLabel}
       />

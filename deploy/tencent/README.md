@@ -136,8 +136,10 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 
 **漫剧空间 `story-web`**（至少）：
 
+- `MAIN_SITE_ORIGIN=https://book.ai-code8.com`（或与 `NEXT_PUBLIC_BOOK_MALL_URL` 相同）
+- `NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com`
+- **`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（与主站完全一致；缺则 SSO `missing_exchange_secret`）**
 - `NEXT_PUBLIC_STORY_WEB_ORIGIN=https://story.ai-code8.com`
-- `NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com`（未来 SSO / 发布互通）
 
 **提示词优化器 `prompt-optimizer-platform`**（至少）：
 
