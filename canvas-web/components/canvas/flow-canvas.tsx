@@ -103,6 +103,7 @@ import {
   pro2HubHasScriptTable,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { DeletableEdge } from "./edges/deletable-edge";
+import { useCanvasEdgeCutHover } from "./edges/canvas-edge-cut-portal";
 import {
   CanvasPaneContextMenu,
   type CanvasPaneContextMenuItem,
@@ -207,6 +208,13 @@ function FlowCanvasInner({
   const setCanvasViewportMoving = useCanvasStore(
     (s) => s.setCanvasViewportMoving,
   );
+
+  const {
+    onEdgeMouseEnter,
+    onEdgeMouseMove,
+    onEdgeMouseLeave,
+    cutPortal,
+  } = useCanvasEdgeCutHover();
 
   const applyInitialViewport = useCallback(() => {
     if (initialFitDoneRef.current) return;
@@ -1322,6 +1330,10 @@ function FlowCanvasInner({
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
+        onEdgeMouseEnter={onEdgeMouseEnter}
+        onEdgeMouseMove={onEdgeMouseMove}
+        onEdgeMouseLeave={onEdgeMouseLeave}
+        edgesReconnectable={false}
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
@@ -1468,6 +1480,7 @@ function FlowCanvasInner({
         ) : null}
         <LibtvSideConnectLayer />
       </ReactFlow>
+      {cutPortal}
       {pro2FloatingInspector ? null : <SelectionToolbar />}
       {pro2FloatingInspector || sbv1Canvas ? (
         <Sbv1MediaGroupToolbar rfNodes={rfNodes} />

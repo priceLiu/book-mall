@@ -255,34 +255,12 @@ html[data-canvas-modal-open] .pro2-input-dock {
 }
 
 /* ----------------------------------------
- * 可删除的连线 ✕ 按钮：
- *   - hover 整条 edge 时 也显示
- *   - selected 时一直显示
+ * 连线 · 宽命中带 + 悬停 1s 剪断（剪刀 portal 在 body）
  * ---------------------------------------- */
-.canvas-edge-delete {
-  opacity: 0;
-  transition: opacity 0.12s ease-out;
-}
-.canvas-edge-delete.is-selected,
-.canvas-edge-delete.is-hover-cut,
-.canvas-edge-delete:hover {
-  opacity: 1;
-}
-
-/* 让 edge 的可点击区域宽一点（默认很难命中） */
-.react-flow__edge-interaction {
-  stroke-width: 32 !important;
-}
-
-/* 未 hover 的连线不挡节点侧 +；hover 时仍可点选/删除连线 */
-.react-flow__edge:not(:hover):not(.selected) .react-flow__edge-interaction {
-  pointer-events: none !important;
-}
-
-/* DeletableEdge · 宽命中带（任意位置悬停 1s 出剪刀） */
-.deletable-edge-hit {
+.react-flow__edge .react-flow__edge-interaction {
+  stroke-width: 40 !important;
   pointer-events: stroke !important;
-  cursor: crosshair;
+  cursor: default;
 }
 
 /* 连线始终在节点/组内容之下，避免穿过图片遮挡画面 */
