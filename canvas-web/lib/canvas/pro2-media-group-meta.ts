@@ -125,10 +125,13 @@ export function isPro2StyledGroup(
   return groupHasPro2MediaChildren(node.id, allNodes);
 }
 
-const PRO2_MEDIA_GROUP_Z_BASE = 10;
-const PRO2_MEDIA_GROUP_Z_SELECTED = 1200;
+const PRO2_MEDIA_GROUP_Z_BASE = 5;
+const PRO2_MEDIA_GROUP_Z_SELECTED = 5;
+/** 高于 `.react-flow__edges`（globals.css · 10），连线可见但不压住图片 */
+const PRO2_MEDIA_GROUP_CHILD_Z_BASE = 15;
+const PRO2_MEDIA_GROUP_CHILD_Z_SELECTED = 1201;
 
-/** 选中媒体组时整组叠在连线与其它节点之上；组框 z 低于子图以便交互（Pro2 + sbv1） */
+/** 选中媒体组时子图叠在其它节点之上；组框底色保持低于连线层 */
 export function syncPro2MediaGroupZIndex(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
@@ -157,8 +160,8 @@ export function syncPro2MediaGroupZIndex(
     if (n.parentId && styledGroupIds.has(n.parentId)) {
       const z =
         n.parentId === selectedId
-          ? PRO2_MEDIA_GROUP_Z_SELECTED + 1
-          : PRO2_MEDIA_GROUP_Z_BASE + 1;
+          ? PRO2_MEDIA_GROUP_CHILD_Z_SELECTED
+          : PRO2_MEDIA_GROUP_CHILD_Z_BASE;
       if (n.zIndex === z) return n;
       changed = true;
       return { ...n, zIndex: z };

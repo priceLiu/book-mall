@@ -263,12 +263,17 @@ html[data-canvas-modal-open] .pro2-input-dock {
   cursor: default;
 }
 
-/* 连线始终在节点/组内容之下，避免穿过图片遮挡画面 */
+/* 组内连线：高于组底色 (z≈5)、低于媒体子节点 (z≥15) · 见 pro2-media-group-meta.ts */
 .canvas-flow-wrap .react-flow__edges {
-  z-index: 0 !important;
+  z-index: 10 !important;
 }
+/* 勿整层 nodes 盖住 edges；各节点用 zIndex / 下方规则分层 */
 .canvas-flow-wrap .react-flow__nodes {
-  z-index: 1 !important;
+  z-index: auto !important;
+}
+/* 非 group 节点默认在连线之上（组内子图 zIndex 由 syncPro2MediaGroupZIndex 写入） */
+.canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {
+  z-index: 15;
 }
 
 /* LibTV 侧 + · 置顶于连线交互层 */
