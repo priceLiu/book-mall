@@ -10,6 +10,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import {
   Columns3,
   Film,
