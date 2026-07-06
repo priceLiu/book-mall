@@ -93,6 +93,7 @@ import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
 import { LibtvImageInputDock } from "./libtv-image-input-dock";
 import { Sbv1MediaGroupToolbar } from "./sbv1/sbv1-media-group-toolbar";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
+import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floating-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
 import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
@@ -1532,7 +1533,10 @@ function FlowCanvasInner({
       ) : null}
       {pro2FloatingInspector || sbv1Canvas ? <LibtvImageInputDock /> : null}
       {pro2FloatingInspector || sbv1Canvas ? (
-        <Sbv1VideoEngineFloatingDock />
+        <>
+          <Sbv1VideoEngineFloatingDock />
+          <JianyingAutoRenderFloatingDock />
+        </>
       ) : null}
       <CanvasPaneContextMenu
         open={Boolean(paneMenu)}

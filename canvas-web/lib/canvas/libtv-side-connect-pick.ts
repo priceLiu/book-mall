@@ -9,7 +9,7 @@ import {
 import { resolveLibtvSideSpawnNodeType } from "./libtv-side-spawn";
 import { handlePro2GroupSidePick } from "./pro2-group-side-spawn";
 import {
-  spawnJianyingRenderPreviewNode,
+  spawnJianyingAutoRenderNode,
 } from "./spawn-jianying-render-preview";
 import {
   handleSbv1GroupSidePick,
@@ -60,12 +60,11 @@ export async function runLibtvSideConnectPick(
       );
     } else if (
       side === "right" &&
-      (itemId === "preview" || nodeType === "video-preview")
+      (itemId === "auto-render" || nodeType === "jianying-auto-render-pro2")
     ) {
       const canvas = useCanvasStore.getState();
-      spawnJianyingRenderPreviewNode(
+      spawnJianyingAutoRenderNode(
         ctx.fromNodeId,
-        "",
         {
           nodes: canvas.nodes,
           edges: canvas.edges,
@@ -74,6 +73,22 @@ export async function runLibtvSideConnectPick(
           setEdges: store.setEdges,
           updateNodeData: canvas.updateNodeData,
         },
+        { ...spawnOpts, replicateVideoEdgesFrom: ctx.fromNodeId },
+      );
+    }
+    return;
+  }
+
+  if (anchorNode.type === "jianying-auto-render-pro2") {
+    if (
+      side === "left" &&
+      (itemId === "video" || nodeType === "sbv1-video-engine")
+    ) {
+      spawnSbv1NeighborFromNode(
+        ctx.fromNodeId,
+        "left",
+        "sbv1-video-engine",
+        store,
         spawnOpts,
       );
     }
@@ -171,6 +186,19 @@ export async function runLibtvSideConnectPick(
             ctx.fromNodeId,
             "right",
             "jianying-export-pro2",
+            store,
+            spawnOpts,
+          );
+          return;
+        }
+        if (
+          side === "right" &&
+          (itemId === "auto-render" || nodeType === "jianying-auto-render-pro2")
+        ) {
+          spawnSbv1NeighborFromNode(
+            ctx.fromNodeId,
+            "right",
+            "jianying-auto-render-pro2",
             store,
             spawnOpts,
           );

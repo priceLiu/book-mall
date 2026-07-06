@@ -181,6 +181,7 @@ export function Pro2FloatingInspector() {
     storeNode.type === "story-pro2-three-view" ||
     storeNode.type === "story-pro2-style-asset" ||
     storeNode.type === "jianying-export-pro2" ||
+    storeNode.type === "jianying-auto-render-pro2" ||
     storeNode.type === "group" ||
     visualGroupController
   ) {

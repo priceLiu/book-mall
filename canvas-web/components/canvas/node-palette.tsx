@@ -265,8 +265,14 @@ const STORY_PRO2_PALETTE: PaletteItem[] = [
     type: "jianying-export-pro2",
     label: "导出剪辑 · 2.0",
     icon: <Download className="size-[18px]" />,
-    hint: "ZIP + 自动剪辑",
+    hint: "剪映 ZIP 导出",
     dividerBefore: true,
+  },
+  {
+    type: "jianying-auto-render-pro2",
+    label: "自动成片 · 2.0",
+    icon: <Clapperboard className="size-[18px]" />,
+    hint: "云端剪辑 MP4",
   },
 ];
 

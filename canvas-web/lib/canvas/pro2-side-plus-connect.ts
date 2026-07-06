@@ -3,6 +3,7 @@ import type { CanvasFlowNode } from "./types";
 
 function pro2InboundTargetHandle(nodeType: string | undefined): string {
   if (nodeType === "jianying-export-pro2") return "in_video";
+  if (nodeType === "jianying-auto-render-pro2") return "in_video";
   if (
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-three-view"

@@ -27,6 +27,7 @@ import { flowPositionAtScreenPoint } from "./viewport-placement";
 
 const GAP = 48;
 const JIANYING_EXPORT_PRO2_WIDTH = 400;
+const JIANYING_AUTO_RENDER_PRO2_WIDTH = 720;
 
 export function buildSbv1ImageNodeData(
   overrides?: Record<string, unknown>,
@@ -160,11 +161,13 @@ export function spawnSbv1NeighborFromNode(
   const newNodeW =
     nodeType === "jianying-export-pro2"
       ? JIANYING_EXPORT_PRO2_WIDTH
-      : nodeType === "sbv1-video-engine"
-        ? SBV1_VIDEO_ENGINE_WIDTH
-        : nodeType === "story-pro2-starter"
-          ? PRO2_TEXT_NODE_MIN_WIDTH
-          : SBV1_IMAGE_NODE_WIDTH;
+      : nodeType === "jianying-auto-render-pro2"
+        ? JIANYING_AUTO_RENDER_PRO2_WIDTH
+        : nodeType === "sbv1-video-engine"
+          ? SBV1_VIDEO_ENGINE_WIDTH
+          : nodeType === "story-pro2-starter"
+            ? PRO2_TEXT_NODE_MIN_WIDTH
+            : SBV1_IMAGE_NODE_WIDTH;
   const neighborPos = sbv1NeighborFlowPosition(
     self,
     nodes,
@@ -256,6 +259,29 @@ export function spawnSbv1NeighborFromNode(
       "jianying-export-pro2",
       { x, y },
       { label: "导出剪辑" },
+    );
+    if (!newId) return "";
+    if (self.type === "sbv1-video-engine" && side === "right") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${anchorId}-${newId}`,
+          source: anchorId,
+          target: newId,
+          sourceHandle: "out_video",
+          targetHandle: "in_video",
+        },
+      ]);
+    }
+    selectSbv1NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "jianying-auto-render-pro2") {
+    const newId = addNode(
+      "jianying-auto-render-pro2",
+      { x, y },
+      { label: "自动成片" },
     );
     if (!newId) return "";
     if (self.type === "sbv1-video-engine" && side === "right") {

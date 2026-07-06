@@ -22,7 +22,11 @@ export const STORY_PRO2_ACCENT = PRO2_NODE_ACCENT;
 export const STORY_PRO2_ACCENT_SOFT = PRO2_NODE_ACCENT_SOFT;
 
 export function storyEditionFromNodeType(type: string | undefined): StoryEdition {
-  if (type?.startsWith("story-pro2-") || type === "jianying-export-pro2") {
+  if (
+    type?.startsWith("story-pro2-") ||
+    type === "jianying-export-pro2" ||
+    type === "jianying-auto-render-pro2"
+  ) {
     return "pro2";
   }
   return type?.startsWith("story-pro-") ? "pro" : "comic";

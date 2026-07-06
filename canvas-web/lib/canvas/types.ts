@@ -123,6 +123,7 @@ export type CanvasNodeType =
   | "story-pro2-mood"
   | "story-pro2-audio"
   | "jianying-export-pro2"
+  | "jianying-auto-render-pro2"
   | "sbv1-image"
   | "sbv1-video-engine"
   | "story-pro-starter"
@@ -177,6 +178,7 @@ export type CanvasContentNodeType =
   | "story-pro2-mood"
   | "story-pro2-audio"
   | "jianying-export-pro2"
+  | "jianying-auto-render-pro2"
   | "sbv1-image"
   | "sbv1-video-engine"
   | "story-pro-starter"
@@ -230,6 +232,7 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "story-pro2-mood",
   "story-pro2-audio",
   "jianying-export-pro2",
+  "jianying-auto-render-pro2",
   "sbv1-image",
   "sbv1-video-engine",
   "story-pro-starter",
@@ -525,6 +528,16 @@ export type JianyingExportNodeData = {
   mediaRenderResult?: JianyingMediaRenderResult | null;
 };
 
+/** 2.0 · 自动成片（播放器 + 云端剪辑 Dock） */
+export type JianyingAutoRenderNodeData = {
+  label?: string;
+  /** 持久化播放 URL（与 mediaRenderResult.downloadUrl 同步） */
+  videoUrl?: string;
+  mediaRenderResult?: JianyingMediaRenderResult | null;
+  mediaFit?: boolean;
+  mediaFitKey?: string;
+};
+
 export type OutputNodeData = {
   title: string;
   saveToGallery: boolean;
@@ -589,6 +602,7 @@ export type CanvasNodeData =
   | (AudioPreviewNodeData & { __t: "audio-preview" })
   | (VideoPreviewNodeData & { __t: "video-preview" })
   | (ImagePreviewNodeData & { __t: "image-preview" })
+  | (JianyingAutoRenderNodeData & { __t: "jianying-auto-render-pro2" })
   | (JianyingExportNodeData & { __t: "jianying-export" })
   | (OutputNodeData & { __t: "output" })
   | (GroupNodeData & { __t: "group" });
@@ -730,6 +744,9 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   "story-pro2-audio": { label: "音效设计", dockInput: "" } as Record<string, unknown>,
   "jianying-export-pro2": {
     label: "导出剪辑",
+  } as Record<string, unknown>,
+  "jianying-auto-render-pro2": {
+    label: "自动成片",
   } as Record<string, unknown>,
   "sbv1-image": {
     ...SBV1_DEFAULT_IMAGE_NODE_DATA,
@@ -970,6 +987,10 @@ export const NODE_DEFAULT_SIZE: Record<
     width: 400,
     height: 460,
   },
+  "jianying-auto-render-pro2": {
+    width: 720,
+    height: 840,
+  },
   "sbv1-image": {
     width: SBV1_IMAGE_NODE_WIDTH,
     height: SBV1_IMAGE_NODE_HEIGHT,
@@ -1058,6 +1079,7 @@ export const NODE_OUTPUT_KIND: Record<
   "story-pro2-mood": "image",
   "story-pro2-audio": "audio",
   "jianying-export-pro2": "none",
+  "jianying-auto-render-pro2": "none",
   "sbv1-image": "image",
   "sbv1-video-engine": "video",
   "story-pro-starter": "text",

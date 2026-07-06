@@ -17,6 +17,7 @@ export const DEFAULT_HANDLE_BY_TYPE: Record<
   "sbv1-image": { target: "in_image", source: "image" },
   "sbv1-video-engine": { target: "in_ref", source: "out_video" },
   "jianying-export-pro2": { target: "in_video" },
+  "jianying-auto-render-pro2": { target: "in_video" },
   "story-pro2-image": { target: "in_image", source: "image" },
   "story-pro2-three-view": { target: "in_image", source: "image" },
   "story-pro2-starter": { target: "in_text", source: "text" },
@@ -193,7 +194,8 @@ export function findBatchConnectSnapTarget(
     if (exclude.has(n.id)) continue;
     const matches =
       mode === "video-export"
-        ? n.type === "jianying-export-pro2"
+        ? n.type === "jianying-export-pro2" ||
+          n.type === "jianying-auto-render-pro2"
         : n.type === "sbv1-video-engine" ||
           n.type === "sbv1-image" ||
           n.type === "story-pro2-image" ||
@@ -265,7 +267,8 @@ export function resolveSnapConnectionOnNodeHit(
     ) {
       targetHandle = "in_motion_video";
     } else if (
-      targetNode.type === "jianying-export-pro2" &&
+      (targetNode.type === "jianying-export-pro2" ||
+        targetNode.type === "jianying-auto-render-pro2") &&
       !state.toHandleId &&
       fromNode?.type === "sbv1-video-engine" &&
       (state.fromHandleId === "out_video" || state.fromHandleId === "plus_left")

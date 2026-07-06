@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Boxes,
   Box,
+  Clapperboard,
   Download,
   FileText,
   Film,
@@ -84,6 +85,14 @@ const PRO2_EXPORT_ITEM: Pro2AddMenuItem = {
   nodeType: "jianying-export-pro2",
 };
 
+const PRO2_AUTO_RENDER_ITEM: Pro2AddMenuItem = {
+  id: "auto-render",
+  label: "自动成片",
+  icon: Clapperboard,
+  enabled: true,
+  nodeType: "jianying-auto-render-pro2",
+};
+
 const PRO2_STAGE_ITEMS: Pro2AddMenuItem[] = [
   {
     id: "character-column",
@@ -100,6 +109,7 @@ const PRO2_STAGE_ITEMS: Pro2AddMenuItem[] = [
     nodeType: "sbv1-video-engine",
   },
   PRO2_EXPORT_ITEM,
+  PRO2_AUTO_RENDER_ITEM,
 ];
 
 /** 图片 / 三视图节点左侧 + · 添加上游输入（文生图：接文本） */

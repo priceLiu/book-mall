@@ -14,7 +14,7 @@ import {
   LIBTV_NODE_SIDE_PLUS_SIZE,
 } from "@/lib/canvas/libtv-node-chrome";
 import { JIANYING_EXPORT_LEFT_ADD_MENU, JIANYING_EXPORT_RIGHT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
-import { spawnJianyingRenderPreviewNode } from "@/lib/canvas/spawn-jianying-render-preview";
+import { spawnJianyingAutoRenderNode } from "@/lib/canvas/spawn-jianying-render-preview";
 import { spawnSbv1NeighborFromNode } from "@/lib/canvas/sbv1-spawn-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_NODE_HANDLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
@@ -28,7 +28,7 @@ const NODE_BG = "#212121";
 const MIN_W = 360;
 const MIN_H = 400;
 
-/** 2.0 · 导出剪辑（内嵌完整导出 / 自动剪辑 · 无 Dock） */
+/** 2.0 · 导出剪辑（剪映 ZIP · 无云端自动剪辑） */
 export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
   const d = data as unknown as JianyingExportNodeData;
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
@@ -65,15 +65,21 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
 
   const onRightPick = useCallback(
     (itemId: string, nodeType?: string) => {
-      if (itemId !== "preview" && nodeType !== "video-preview") return;
-      spawnJianyingRenderPreviewNode(id, "", {
-        nodes,
-        edges,
-        addNode,
-        setNodes,
-        setEdges,
-        updateNodeData,
-      });
+      if (itemId !== "auto-render" && nodeType !== "jianying-auto-render-pro2") {
+        return;
+      }
+      spawnJianyingAutoRenderNode(
+        id,
+        {
+          nodes,
+          edges,
+          addNode,
+          setNodes,
+          setEdges,
+          updateNodeData,
+        },
+        { replicateVideoEdgesFrom: id },
+      );
     },
     [id, nodes, edges, addNode, setNodes, setEdges, updateNodeData],
   );
