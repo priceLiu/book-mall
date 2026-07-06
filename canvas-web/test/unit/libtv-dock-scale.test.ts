@@ -9,6 +9,7 @@ import {
   LIBTV_DOCK_SCREEN_W_MAX,
   LIBTV_DOCK_SCREEN_W_MIN,
   LIBTV_DOCK_SIZE_FACTOR,
+  libtvDockExpandedFlowHeight,
   libtvDockFlowSize,
   libtvDockHeightForWidth,
   libtvDockInnerContentZoom,
@@ -64,11 +65,16 @@ describe("computeLibtvDockScreenWidth", () => {
     );
   });
 
-  it("expands screen width by 20% when expanded", () => {
-    expect(computeLibtvDockScreenWidth(1, true)).toBeCloseTo(
-      LIBTV_DOCK_SCREEN_W_BASE * LIBTV_DOCK_EXPAND_FACTOR,
-      0,
+  it("expands flow height by 50% when expanded", () => {
+    const base = libtvDockFlowSize().h;
+    expect(libtvDockExpandedFlowHeight(base, true)).toBe(
+      Math.round(base * LIBTV_DOCK_EXPAND_FACTOR),
     );
+    expect(libtvDockExpandedFlowHeight(base, false)).toBe(base);
+  });
+
+  it("keeps screen width unchanged when expanded", () => {
+    expect(computeLibtvDockScreenWidth(1, true)).toBe(LIBTV_DOCK_SCREEN_W_BASE);
   });
 });
 
@@ -172,12 +178,9 @@ describe("computeLibtvDockInverseScale", () => {
     expect(inv).toBeCloseTo(target / (w * z), 2);
   });
 
-  it("yields ~20% larger than base when expanded", () => {
+  it("yields same screen width when expanded", () => {
     const { w } = libtvDockFlowSize();
     const inv = computeLibtvDockInverseScale(1, w, true);
-    expect(w * 1 * inv).toBeCloseTo(
-      LIBTV_DOCK_SCREEN_W_BASE * LIBTV_DOCK_EXPAND_FACTOR,
-      0,
-    );
+    expect(w * 1 * inv).toBeCloseTo(LIBTV_DOCK_SCREEN_W_BASE, 0);
   });
 });

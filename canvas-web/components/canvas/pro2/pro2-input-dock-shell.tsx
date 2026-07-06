@@ -8,6 +8,7 @@ import { LibtvInputDockUiContext } from "@/lib/canvas/libtv-input-dock-ui-contex
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import {
   computeLibtvDockInverseScale,
+  libtvDockExpandedFlowHeight,
   libtvDockFlowSize,
   libtvDockInnerContentZoom,
   libtvDockPromptFlowFontPx,
@@ -77,14 +78,15 @@ export function Pro2InputDockShell({
   const zoom = useStore((s) => s.transform[2]);
   const defaultSize = libtvDockFlowSize();
   const dockW = flowSize?.w ?? defaultSize.w;
-  const dockHeight = flowSize?.h ?? defaultSize.h;
+  const baseDockHeight = flowSize?.h ?? defaultSize.h;
+  const dockHeight = libtvDockExpandedFlowHeight(baseDockHeight, expanded);
   const targetScreenW = screenWidth ?? undefined;
   const z = Math.max(0.08, Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
   const invScale =
     targetScreenW != null
       ? Math.min(12, Math.max(0.03, targetScreenW / (Math.max(1, dockW) * z)))
-      : computeLibtvDockInverseScale(zoom, dockW, expanded);
-  const contentZoom = libtvDockInnerContentZoom(zoom, expanded);
+      : computeLibtvDockInverseScale(zoom, dockW);
+  const contentZoom = libtvDockInnerContentZoom(zoom);
   const shellScreenScale = invScale * zoom;
   const promptFontFlowPx = libtvDockPromptFlowFontPx(
     libtvDockPromptFontScreenMetrics(zoom),
@@ -137,19 +139,20 @@ export function Pro2InputDockShell({
             maxHeight: dockHeight,
             display: "flex",
             flexDirection: "column",
+            transition: "height 180ms ease",
           }}
         >
           {hideExpand ? null : (
             <button
               type="button"
-              title={expanded ? "收起输入坞" : "放大输入坞"}
-              className="nodrag absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
+              title={expanded ? "收起输入区" : "放大输入区"}
+              className="nodrag absolute right-2 top-2 z-20 grid size-11 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
               onClick={() => setExpanded((v) => !v)}
             >
               {expanded ? (
-                <Minimize2 className="size-3.5" />
+                <Minimize2 className="size-6" />
               ) : (
-                <Maximize2 className="size-3.5" />
+                <Maximize2 className="size-6" />
               )}
             </button>
           )}

@@ -131,6 +131,14 @@ const INITIAL_TICK_DELAY_MS = 800;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
 const FULL_SCAN_EVERY_N_TICKS = 3;
 
+function canvasStoryRunJobKey(job: CanvasStoryRunJob): string {
+  const parts = [job.nodeId];
+  if (job.llmSection) parts.push(job.llmSection);
+  if (job.rowKey) parts.push(job.rowKey);
+  if (job.mediaKind) parts.push(job.mediaKind);
+  return parts.join(":");
+}
+
 function nodeRuntimeStatus(node: CanvasFlowNode): string | undefined {
   return (node.data as { runtime?: { status?: string } }).runtime?.status;
 }
@@ -604,13 +612,7 @@ export function useCanvasRunner(
     activeKey: string | null;
   } | null>(null);
 
-  const runKey = (job: QueueItem) => {
-    const parts = [job.nodeId];
-    if (job.llmSection) parts.push(job.llmSection);
-    if (job.rowKey) parts.push(job.rowKey);
-    if (job.mediaKind) parts.push(job.mediaKind);
-    return parts.join(":");
-  };
+  const runKey = canvasStoryRunJobKey;
 
   const emitTaskPanelSync = useCallback(
     (
@@ -1565,7 +1567,7 @@ export function useCanvasRunner(
           nodeRuntimeStatus(node) === "error";
       }
       if (!done) return;
-      const key = runKey(job);
+      const key = canvasStoryRunJobKey(job);
       const rowErr =
         job.rowKey && storyRowRuntimeStatus(node, job) === "error";
       if (rowErr && job.mediaKind === "sceneRef") {
@@ -2039,7 +2041,7 @@ export function useCanvasRunner(
       window.clearTimeout(initialTickTimer);
       window.clearTimeout(fullScanTimer);
     };
-  }, [base, projectId, releaseInflightKey, setNodeRuntime, updateNodeData]);
+  }, [base, projectId, releaseInflightKey, setNodeRuntime, updateNodeData, emitTaskPanelSync]);
 
   return { enqueueNode };
 }

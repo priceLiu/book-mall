@@ -13,7 +13,7 @@ import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
-import { hideKieVendorLabel } from "@/lib/canvas/gateway-model-role";
+import { hideKieVendorLabel, ENGINE_PICKER_MODAL_BG } from "@/lib/canvas/gateway-model-role";
 
 export type Pro2ScriptLlmSettingsModalProps = {
   open: boolean;
@@ -83,7 +83,8 @@ export function Pro2ScriptLlmSettingsModal({
       }}
     >
       <div
-        className="nodrag nowheel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
+        className="nodrag nowheel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+        style={{ backgroundColor: ENGINE_PICKER_MODAL_BG }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-4 py-3">

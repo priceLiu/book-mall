@@ -80,10 +80,8 @@ export {
 } from "@/lib/canvas/libtv-dock-scale";
 
 const _baseDock = libtvDockFlowSize();
-/** 输入坞放大态（屏幕同比 · 见 LIBTV_DOCK_EXPAND_FACTOR） */
-export const PRO2_DOCK_WIDTH_EXPANDED = Math.round(
-  _baseDock.w * LIBTV_DOCK_EXPAND_FACTOR,
-);
+/** 输入坞放大态：宽度不变，仅增高 prompt 区 */
+export const PRO2_DOCK_WIDTH_EXPANDED = _baseDock.w;
 export const PRO2_DOCK_HEIGHT_EXPANDED = Math.round(
   _baseDock.h * LIBTV_DOCK_EXPAND_FACTOR,
 );

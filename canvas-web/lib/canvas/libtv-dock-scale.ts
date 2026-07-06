@@ -37,8 +37,8 @@ export const LIBTV_DOCK_FLOW_HEIGHT = libtvDockHeightForWidth(
 /** 未展开时屏幕倍率（固定尺寸模式下保持 1） */
 export const LIBTV_DOCK_BASE_SCALE = 1;
 
-/** 点击展开：在基准上再 +20% */
-export const LIBTV_DOCK_EXPAND_FACTOR = 1.2;
+/** 点击展开：仅增高 prompt 输入区（顶栏缩略图 / 字号不变） */
+export const LIBTV_DOCK_EXPAND_FACTOR = 1.5;
 
 export function libtvDockFlowSize(_expanded?: boolean): {
   w: number;
@@ -47,8 +47,18 @@ export function libtvDockFlowSize(_expanded?: boolean): {
   return { w: LIBTV_DOCK_FLOW_WIDTH, h: LIBTV_DOCK_FLOW_HEIGHT };
 }
 
-export function libtvDockScreenExpandMultiplier(expanded: boolean): number {
-  return expanded ? LIBTV_DOCK_EXPAND_FACTOR : 1;
+/** @deprecated 展开不再放大屏宽；保留恒为 1 */
+export function libtvDockScreenExpandMultiplier(_expanded?: boolean): number {
+  return 1;
+}
+
+/** 展开态 flow 高度（仅增高中间输入区 · 顶/底栏 flow 尺寸不变） */
+export function libtvDockExpandedFlowHeight(
+  baseFlowHeight: number,
+  expanded = false,
+): number {
+  const h = Math.max(1, baseFlowHeight);
+  return expanded ? Math.round(h * LIBTV_DOCK_EXPAND_FACTOR) : h;
 }
 
 /** Dock 未展开时固定屏幕宽度（css px · 656×1.2） */
@@ -104,14 +114,10 @@ export function libtvDockFixedScreenPx(
 }
 
 /**
- * 目标屏宽（固定）：默认 656px（展开态按 expand 系数放大）。
+ * 目标屏宽（固定）：默认 656px（展开不改变宽度）。
  */
-export function computeLibtvDockScreenWidth(
-  _zoom: number,
-  expanded = false,
-): number {
-  const expand = libtvDockScreenExpandMultiplier(expanded);
-  return LIBTV_DOCK_SCREEN_W_BASE * expand;
+export function computeLibtvDockScreenWidth(_zoom: number, _expanded = false): number {
+  return LIBTV_DOCK_SCREEN_W_BASE;
 }
 
 /**
@@ -121,11 +127,11 @@ export function computeLibtvDockScreenWidth(
 export function computeLibtvDockInverseScale(
   zoom: number,
   flowWidth: number,
-  expanded = false,
+  _expanded = false,
 ): number {
   const z = Math.max(0.08, Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
   const fw = Math.max(1, flowWidth);
-  const target = computeLibtvDockScreenWidth(zoom, expanded);
+  const target = computeLibtvDockScreenWidth(zoom);
   const inv = target / (fw * z);
   // 覆盖 10%~800%：zoom=0.1 时允许 >5；zoom=8 时允许 <0.1。
   return Math.min(12, Math.max(0.03, inv));
