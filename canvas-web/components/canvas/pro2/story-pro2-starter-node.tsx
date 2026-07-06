@@ -70,6 +70,7 @@ import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
+import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";

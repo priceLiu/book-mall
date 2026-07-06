@@ -13,6 +13,7 @@ export function CanvasVideoPlayer({
   autoPlay = false,
   poster,
   fill = false,
+  objectFit = "contain",
 }: {
   src: string;
   className?: string;
@@ -20,6 +21,7 @@ export function CanvasVideoPlayer({
   poster?: string;
   /** 填满父容器（不强制 16:9），由外层节点决定可用高度 */
   fill?: boolean;
+  objectFit?: "contain" | "cover";
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -48,7 +50,10 @@ export function CanvasVideoPlayer({
         controls
         playsInline
         preload="metadata"
-        className="h-full w-full object-contain"
+        className={cn(
+          "h-full w-full",
+          objectFit === "cover" ? "object-cover" : "object-contain",
+        )}
       />
     </div>
   );
