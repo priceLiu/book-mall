@@ -144,6 +144,7 @@ export const LIBTV_DRAG_ANYWHERE_NODE_TYPES = [
   "story-pro2-style-asset",
   "story-pro2-frame",
   "video-preview",
+  "jianying-auto-render-pro2",
 ] as const;
 
 export const LIBTV_NODE_OUTER_CLASS =

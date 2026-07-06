@@ -35,6 +35,12 @@ export type Pro2InputDockShellProps = {
   dockClassName?: string;
   /** @deprecated 坞宽统一 16:6 固定 flow 尺寸，忽略 */
   width?: number;
+  /** 自定义 flow 尺寸（默认走 libtvDockFlowSize） */
+  flowSize?: { w: number; h: number };
+  /** 自定义屏上目标宽（px · 配合 inverse-scale 恒定） */
+  screenWidth?: number;
+  /** 隐藏右上角展开/收起 */
+  hideExpand?: boolean;
   /** 拖动所属节点时隐藏（仍挂载 · 保持锚点与输入状态） */
   hidden?: boolean;
 };
@@ -59,6 +65,9 @@ export function Pro2InputDockShell({
   className,
   flowAnchor,
   dockClassName,
+  flowSize,
+  screenWidth,
+  hideExpand = false,
   hidden = false,
 }: Pro2InputDockShellProps) {
   const viewportEl = useReactFlowViewportEl();
@@ -66,8 +75,15 @@ export function Pro2InputDockShell({
   const [dockScrollEl, setDockScrollEl] = useState<HTMLElement | null>(null);
   useLibtvDockWheelScroll(dockScrollEl);
   const zoom = useStore((s) => s.transform[2]);
-  const { w: dockW, h: dockHeight } = libtvDockFlowSize();
-  const invScale = computeLibtvDockInverseScale(zoom, dockW, expanded);
+  const defaultSize = libtvDockFlowSize();
+  const dockW = flowSize?.w ?? defaultSize.w;
+  const dockHeight = flowSize?.h ?? defaultSize.h;
+  const targetScreenW = screenWidth ?? undefined;
+  const z = Math.max(0.08, Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
+  const invScale =
+    targetScreenW != null
+      ? Math.min(12, Math.max(0.03, targetScreenW / (Math.max(1, dockW) * z)))
+      : computeLibtvDockInverseScale(zoom, dockW, expanded);
   const contentZoom = libtvDockInnerContentZoom(zoom, expanded);
   const shellScreenScale = invScale * zoom;
   const promptFontFlowPx = libtvDockPromptFlowFontPx(
@@ -123,18 +139,20 @@ export function Pro2InputDockShell({
             flexDirection: "column",
           }}
         >
-          <button
-            type="button"
-            title={expanded ? "收起输入坞" : "放大输入坞"}
-            className="nodrag absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
-            onClick={() => setExpanded((v) => !v)}
-          >
-            {expanded ? (
-              <Minimize2 className="size-3.5" />
-            ) : (
-              <Maximize2 className="size-3.5" />
-            )}
-          </button>
+          {hideExpand ? null : (
+            <button
+              type="button"
+              title={expanded ? "收起输入坞" : "放大输入坞"}
+              className="nodrag absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? (
+                <Minimize2 className="size-3.5" />
+              ) : (
+                <Maximize2 className="size-3.5" />
+              )}
+            </button>
+          )}
           {header}
           <div
             className="libtv-dock-content-zoom flex min-h-0 flex-1 flex-col overflow-hidden"

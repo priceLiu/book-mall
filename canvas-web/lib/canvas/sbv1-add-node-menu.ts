@@ -1,6 +1,7 @@
 import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "./sbv1-node-chrome";
 import {
+  Clapperboard,
   Download,
   Image as ImageIcon,
   Sparkles,
@@ -80,17 +81,33 @@ export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 导出剪辑节点右侧 + · 剪辑成片预览 */
+/** 导出剪辑节点右侧 + · 自动成片 */
 export const JIANYING_EXPORT_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "导出成片",
     items: [
       {
-        id: "preview",
-        label: "剪辑成片",
+        id: "auto-render",
+        label: "自动成片",
+        icon: Clapperboard,
+        enabled: true,
+        nodeType: "jianying-auto-render-pro2",
+      },
+    ],
+  },
+];
+
+/** 自动成片节点左侧 + · 接入视频 */
+export const JIANYING_AUTO_RENDER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
+  {
+    title: "接入视频",
+    items: [
+      {
+        id: "video",
+        label: "视频",
         icon: Video,
         enabled: true,
-        nodeType: "video-preview",
+        nodeType: "sbv1-video-engine",
       },
     ],
   },
@@ -129,6 +146,13 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "导出成片",
     items: [
+      {
+        id: "auto-render",
+        label: "自动成片",
+        icon: Clapperboard,
+        enabled: true,
+        nodeType: "jianying-auto-render-pro2",
+      },
       {
         id: "export",
         label: "导出剪辑",

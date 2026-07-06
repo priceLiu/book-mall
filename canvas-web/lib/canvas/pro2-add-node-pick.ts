@@ -51,6 +51,7 @@ export type Pro2AddNodePickStore = {
       | "story-pro2-mood"
       | "story-pro2-audio"
       | "jianying-export-pro2"
+      | "jianying-auto-render-pro2"
       | "sbv1-image"
       | "sbv1-video-engine",
     position: { x: number; y: number },
@@ -288,6 +289,20 @@ export async function handlePro2ToolbarAddNodePick(
       { ...(NODE_DEFAULT_DATA["jianying-export-pro2"] as Record<string, unknown>) },
     );
     if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
+  if (
+    itemId === "auto-render" ||
+    nodeType === "jianying-auto-render-pro2"
+  ) {
+    const pos = spawnPosition("jianying-auto-render-pro2", options);
+    const id = addNode(
+      "jianying-auto-render-pro2",
+      pos,
+      { ...(NODE_DEFAULT_DATA["jianying-auto-render-pro2"] as Record<string, unknown>) },
+    );
+    if (id) selectSbv1NodeAfterSpawn(setNodes, id);
     return;
   }
 

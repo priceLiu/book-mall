@@ -25,6 +25,7 @@ function inboundTargetForNodeType(
     return "in_ref";
   }
   if (targetType === "jianying-export-pro2") return "in_video";
+  if (targetType === "jianying-auto-render-pro2") return "in_video";
   if (
     targetType === "story-pro2-image" ||
     targetType === "story-pro2-three-view" ||

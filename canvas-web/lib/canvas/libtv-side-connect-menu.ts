@@ -1,5 +1,6 @@
 import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
 import {
+  JIANYING_AUTO_RENDER_LEFT_ADD_MENU,
   JIANYING_EXPORT_LEFT_ADD_MENU,
   JIANYING_EXPORT_RIGHT_ADD_MENU,
   SBV1_IMAGE_LEFT_ADD_MENU,
@@ -26,6 +27,7 @@ export const SIDE_PLUS_BY_TYPE: Record<
   "sbv1-image": { left: "plus_left", right: "image" },
   "sbv1-video-engine": { left: "plus_left", right: "out_video" },
   "jianying-export-pro2": { left: "plus_left", right: "out_render" },
+  "jianying-auto-render-pro2": { left: "plus_left" },
   group: { left: "plus_left", right: "out_media" },
   "story-pro2-style-asset": { left: "plus_left", right: "style" },
 };
@@ -85,6 +87,8 @@ export function resolveLibtvSideConnectMenu(
       return side === "left"
         ? JIANYING_EXPORT_LEFT_ADD_MENU
         : JIANYING_EXPORT_RIGHT_ADD_MENU;
+    case "jianying-auto-render-pro2":
+      return side === "left" ? JIANYING_AUTO_RENDER_LEFT_ADD_MENU : null;
     default:
       return null;
   }

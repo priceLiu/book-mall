@@ -31,6 +31,7 @@ import { StoryPro2ScriptHubNode } from "./pro2/story-pro2-script-hub-node";
 import { StoryPro2CharacterBoardNode } from "./pro2/story-pro2-character-board-node";
 import { StoryPro2FrameBoardNode } from "./pro2/story-pro2-frame-board-node";
 import { JianyingExportPro2Node } from "./pro2/jianying-export-pro2-node";
+import { JianyingAutoRenderPro2Node } from "./pro2/jianying-auto-render-pro2-node";
 import {
   Pro2ColumnThinNode,
   StoryPro2ScriptHubThinNode,
@@ -86,6 +87,7 @@ export const memoizedNodeTypes = {
   "story-pro2-mood": memoFlowNode(StoryPro2PlaceholderMediaNode),
   "story-pro2-audio": memoFlowNode(StoryPro2PlaceholderMediaNode),
   "jianying-export-pro2": memoFlowNode(JianyingExportPro2Node),
+  "jianying-auto-render-pro2": memoFlowNode(JianyingAutoRenderPro2Node),
   "story-pro-starter": memoFlowNode(StoryProStarterNode),
   "story-pro-script-hub": memoFlowNode(StoryProScriptHubNode),
   "story-pro-style": memoFlowNode(StoryProStyleNode),

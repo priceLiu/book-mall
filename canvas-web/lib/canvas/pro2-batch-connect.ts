@@ -67,7 +67,10 @@ export function isBatchConnectSnapTarget(
   mode: BatchConnectMode,
 ): boolean {
   if (mode === "video-export") {
-    return node.type === "jianying-export-pro2";
+    return (
+      node.type === "jianying-export-pro2" ||
+      node.type === "jianying-auto-render-pro2"
+    );
   }
   return (
     node.type === "sbv1-video-engine" ||
@@ -82,7 +85,11 @@ export function batchConnectTargetHandleForSnap(
   source: CanvasFlowNode,
   mode: BatchConnectMode,
 ): string | null {
-  if (mode === "video-export" && target.type === "jianying-export-pro2") {
+  if (
+    mode === "video-export" &&
+    (target.type === "jianying-export-pro2" ||
+      target.type === "jianying-auto-render-pro2")
+  ) {
     return "in_video";
   }
   if (mode === "image-pipeline" && target.type === "sbv1-video-engine") {
@@ -100,7 +107,8 @@ export function pickBatchTargetHandle(
 ): string | null {
   const defaults = DEFAULT_HANDLE_BY_TYPE[String(targetNode.type ?? "")];
   if (
-    targetNode.type === "jianying-export-pro2" &&
+    (targetNode.type === "jianying-export-pro2" ||
+      targetNode.type === "jianying-auto-render-pro2") &&
     sourceNode.type === "sbv1-video-engine" &&
     sourceHandle === "out_video"
   ) {

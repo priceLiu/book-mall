@@ -27,6 +27,7 @@ const PRO2_WORKSPACE_TYPES = new Set([
   "story-pro2-frame",
   "story-pro2-video",
   "jianying-export-pro2",
+  "jianying-auto-render-pro2",
 ]);
 
 /** 工作区 + Pro2 媒体组 + 非工作区顶层节点 */

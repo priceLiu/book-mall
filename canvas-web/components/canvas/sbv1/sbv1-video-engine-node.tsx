@@ -278,6 +278,18 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           }
           if (
             side === "right" &&
+            (itemId === "auto-render" || nodeType === "jianying-auto-render-pro2")
+          ) {
+            spawnSbv1NeighborFromNode(
+              id,
+              "right",
+              "jianying-auto-render-pro2",
+              spawnStore,
+            );
+            return;
+          }
+          if (
+            side === "right" &&
             (itemId === "video" ||
               itemId === "video-engine" ||
               itemId === "video-compose" ||

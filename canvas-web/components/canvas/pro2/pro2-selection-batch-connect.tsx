@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
-import { Download, Plus, Sparkles, Video } from "lucide-react";
+import { Clapperboard, Download, Plus, Sparkles, Video } from "lucide-react";
 
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
@@ -42,6 +42,12 @@ const DRAG_THRESHOLD = 3;
 const SPAWN_MENU_OFFSET_X = 12;
 
 const VIDEO_EXPORT_MENU_ITEMS: BatchConnectSpawnMenuItem[] = [
+  {
+    id: "auto-render",
+    label: "自动成片",
+    icon: Clapperboard,
+    nodeType: "jianying-auto-render-pro2",
+  },
   {
     id: "export",
     label: "导出剪辑",
@@ -181,6 +187,7 @@ function Pro2SelectionBatchConnectLayerInner({
       anchor: { x: number; y: number },
       nodeType:
         | "jianying-export-pro2"
+        | "jianying-auto-render-pro2"
         | "story-pro2-image"
         | "sbv1-image"
         | "sbv1-video-engine",
@@ -221,6 +228,15 @@ function Pro2SelectionBatchConnectLayerInner({
     (anchor: { x: number; y: number }) => {
       spawnAtAnchor(anchor, "jianying-export-pro2", "in_video", {
         label: "导出剪辑",
+      });
+    },
+    [spawnAtAnchor],
+  );
+
+  const spawnAutoRenderAndConnect = useCallback(
+    (anchor: { x: number; y: number }) => {
+      spawnAtAnchor(anchor, "jianying-auto-render-pro2", "in_video", {
+        label: "自动成片",
       });
     },
     [spawnAtAnchor],
@@ -394,6 +410,10 @@ function Pro2SelectionBatchConnectLayerInner({
         spawnExportAndConnect(menuAnchor);
         return;
       }
+      if (batchMode === "video-export" && itemId === "auto-render") {
+        spawnAutoRenderAndConnect(menuAnchor);
+        return;
+      }
       if (batchMode === "image-pipeline") {
         if (itemId === "img2img") spawnImg2ImgAndConnect(menuAnchor);
         if (itemId === "img2video") spawnImg2VideoAndConnect(menuAnchor);
@@ -403,6 +423,7 @@ function Pro2SelectionBatchConnectLayerInner({
       menuAnchor,
       batchMode,
       spawnExportAndConnect,
+      spawnAutoRenderAndConnect,
       spawnImg2ImgAndConnect,
       spawnImg2VideoAndConnect,
     ],

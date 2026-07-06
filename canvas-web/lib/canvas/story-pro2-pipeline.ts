@@ -16,6 +16,7 @@ export const STORY_PRO2_NODE_TYPES = [
   "story-pro2-mood",
   "story-pro2-audio",
   "jianying-export-pro2",
+  "jianying-auto-render-pro2",
 ] as const;
 
 export type StoryPro2NodeType = (typeof STORY_PRO2_NODE_TYPES)[number];

@@ -8,7 +8,6 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingExportNodeData } from "@/lib/canvas/types";
 import type { JianyingFrameExport } from "@/lib/canvas/jianying-from-workspace";
 import { exportJianyingZip } from "@/lib/canvas-api";
-import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 
 type Props = {
   nodeId: string;
@@ -19,8 +18,8 @@ type Props = {
 };
 
 export function JianyingExportPro2Panel({
-  nodeId,
-  data,
+  nodeId: _nodeId,
+  data: _data,
   connectedCount,
   renderedCount,
   frames,
@@ -85,14 +84,6 @@ export function JianyingExportPro2Panel({
           {loading === "draft" ? "生成中…" : "全包导入 · 剪映草稿 ZIP（Mac）"}
         </button>
       </div>
-
-      <JianyingMediaRenderActions
-        nodeId={nodeId}
-        base={base}
-        projectId={projectId}
-        frames={exportFrames}
-        persisted={data.mediaRenderResult}
-      />
 
       {err ? <p className="text-[10px] text-red-300">{err}</p> : null}
     </div>

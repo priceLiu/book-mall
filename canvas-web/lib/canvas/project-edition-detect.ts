@@ -28,6 +28,7 @@ const STORY_PRO2_NODE_TYPES = new Set([
   "story-pro2-mood",
   "story-pro2-audio",
   "jianying-export-pro2",
+  "jianying-auto-render-pro2",
 ]);
 
 const SBV1_NODE_TYPES = new Set(["sbv1-image", "sbv1-video-engine"]);
