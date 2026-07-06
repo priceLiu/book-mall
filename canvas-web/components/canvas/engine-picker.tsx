@@ -191,7 +191,9 @@ export function EnginePicker({
     );
   }
 
-  const dockTrigger = triggerVariant === "dock" && triggerFontPx != null;
+  const dockTrigger =
+    triggerVariant === "dock" ||
+    (triggerFontPx != null && triggerVariant !== "default");
 
   return (
     <>
@@ -210,9 +212,7 @@ export function EnginePicker({
         className={
           dockTrigger
             ? "nodrag flex min-w-0 w-full flex-1 items-center gap-1 rounded-md px-2.5 py-2 text-left text-white hover:bg-white/[0.06]"
-            : triggerFontPx != null
-              ? "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-white hover:border-white/30"
-              : "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[14px] text-white hover:border-white/30"
+            : "nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[14px] text-white hover:border-white/30"
         }
       >
         <span className="truncate">

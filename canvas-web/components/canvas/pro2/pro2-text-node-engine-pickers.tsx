@@ -36,6 +36,7 @@ import {
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "@/lib/canvas/types";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
+import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 
 type RolePickerConfig = {
   allowedModelKeys?: string[];
@@ -113,6 +114,7 @@ export function Pro2TextNodeEnginePickers({
   triggerFontPx,
   sectionFontPx,
 }: Pro2TextNodeEnginePickersProps) {
+  const { minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
   const roles = useMemo(
     () =>
       resolvePro2TextNodeEngineRoles(data, {
@@ -204,7 +206,10 @@ export function Pro2TextNodeEnginePickers({
               providerId={cur.providerId}
               modelKey={cur.modelKey}
               params={cur.params ?? {}}
+              triggerVariant="dock"
               triggerFontPx={triggerFontPx}
+              triggerMinHeightPx={minHeightPx}
+              triggerIconPx={chevronPx}
               onChange={(next) => {
                 const pick = {
                   providerId: next.providerId,

@@ -42,6 +42,8 @@ function DockRefImageChip({
   disabled,
   onRemove,
   thumbStyle,
+  badgeFontPx,
+  badgeMinPx,
 }: {
   refItem: StoryRefImage;
   index: number;
@@ -49,6 +51,8 @@ function DockRefImageChip({
   disabled?: boolean;
   onRemove: () => void;
   thumbStyle: React.CSSProperties;
+  badgeFontPx: number;
+  badgeMinPx: number;
 }) {
   const [hover, setHover] = useState<{
     rect: DOMRect;
@@ -119,6 +123,8 @@ function DockRefImageChip({
           title="移除参考图"
           disabled={disabled}
           onRemove={onRemove}
+          fontSizePx={badgeFontPx}
+          minSizePx={badgeMinPx}
         />
       </div>
       <MentionHoverPreviewPortal
@@ -151,7 +157,8 @@ export function Pro2DockRefImages({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const { thumbPx, thumbStyle, logoIconPx } = useLibtvDockRefThumbMetrics();
+  const { thumbPx, thumbStyle, logoIconPx, badgeFontPx, badgeMinPx } =
+    useLibtvDockRefThumbMetrics();
 
   const spawnFiles = useCallback(
     async (files: File[]) => {
@@ -245,6 +252,8 @@ export function Pro2DockRefImages({
           active={activeIds.includes(ref.id)}
           disabled={disabled}
           thumbStyle={thumbStyle}
+          badgeFontPx={badgeFontPx}
+          badgeMinPx={badgeMinPx}
           onRemove={() => {
             const next = removeDockRefFromState(refs, ref.id, promptValue ?? "");
             onChange(next.refs);

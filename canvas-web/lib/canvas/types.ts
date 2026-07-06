@@ -503,6 +503,9 @@ export type VideoPreviewNodeData = {
   /** 直接播放 URL（如云端剪辑成片）· 优先于上游 video-engine */
   videoUrl?: string;
   runtime?: CanvasNodeRuntime;
+  /** 成片比例自适应后标记，避免重复 probe */
+  mediaFit?: boolean;
+  mediaFitKey?: string;
 };
 
 export type ImagePreviewNodeData = {

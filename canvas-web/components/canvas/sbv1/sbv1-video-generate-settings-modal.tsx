@@ -259,7 +259,7 @@ export function Sbv1VideoGenerateSettingsModal({
               role="VIDEO"
               embedded
               modelsOnly
-              layout="dropdown"
+              layout="grid"
               providerIds={SBV1_DOCK_VIDEO_PROVIDER_IDS}
               allowedModelKeys={[
                 ...SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS,

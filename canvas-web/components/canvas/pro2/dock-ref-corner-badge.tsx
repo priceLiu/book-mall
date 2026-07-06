@@ -1,9 +1,8 @@
 "use client";
 
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Dock 参考缩略图 · 右上角角标（默认序号；悬停变 X 可删） */
+/** Dock 参考缩略图 · 右上角角标（默认序号；悬停变 × 可删） */
 export function DockRefCornerBadge({
   label,
   onRemove,
@@ -21,6 +20,8 @@ export function DockRefCornerBadge({
   fontSizePx?: number;
   minSizePx?: number;
 }) {
+  const glyphPx = fontSizePx ?? 8;
+
   return (
     <button
       type="button"
@@ -47,11 +48,13 @@ export function DockRefCornerBadge({
       }}
     >
       <span className="group-hover:hidden">{label}</span>
-      <X
-        className="hidden size-2.5 group-hover:block"
-        strokeWidth={2.5}
+      <span
+        className="hidden group-hover:block leading-none"
+        style={{ fontSize: glyphPx }}
         aria-hidden
-      />
+      >
+        ×
+      </span>
     </button>
   );
 }

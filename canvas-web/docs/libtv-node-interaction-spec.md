@@ -93,7 +93,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | flow 宽 | `LIBTV_DOCK_FLOW_WIDTH` | **1296**（1440×0.9） | flow 坐标基准宽（固定） |
 | flow 高 | `LIBTV_DOCK_FLOW_HEIGHT` | **486** | = 宽 × 6/16 |
 | 基准放大 | `LIBTV_DOCK_BASE_SCALE` | **1.4** | 未展开时屏幕 +40% |
-| 展开放大 | `LIBTV_DOCK_EXPAND_FACTOR` | **1.2** | 点击展开在基准上再 +20%（不改 flow 尺寸） |
+| 展开放大 | `LIBTV_DOCK_EXPAND_FACTOR` | **1.5** | 点击展开仅 **增高 prompt 输入区** +50%（顶栏缩略图 / 字号 / 屏宽不变） |
 | 100% 屏宽 | `LIBTV_DOCK_SCREEN_W_BASE` | **~1512px** | zoom=1 目标屏幕宽 |
 | 屏宽下限 | `LIBTV_DOCK_SCREEN_W_MIN` | **~756px** | = 基准一半 |
 | 屏宽上限 | `LIBTV_DOCK_SCREEN_W_MAX` | = `BASE` | 缩小画布时不再超过 100% 尺寸 |
@@ -104,7 +104,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 - `zoom ≥ 1`（放大画布）：`screenW = BASE / zoom`，收缩到 `MIN` 为止。
 - `zoom < 1`（缩小画布）：`screenW = BASE × (1 − (1 − zoom) × 5/6)`，到 `MIN` 为止 → **zoom=0.4 即降为一半**。
 - 挂载：Dock 在 RF viewport 内，`transform: scale(invScale)`，`invScale = screenW /(flowW × zoom)`（`computeLibtvDockInverseScale`）。
-- 展开仅改 `expand` 乘子（屏宽 ×1.2），缩略图 / 文本 / 模型选择器整体同比放大。
+- 展开仅增高 Dock shell 的 flow 高度（`libtvDockExpandedFlowHeight`）；顶栏 / 底栏 / 缩略图 / 文字屏上尺寸保持不变，中间 textarea 可视区变大。
 
 ## 5. 节点顶栏工具条（`Pro2ImageNodeToolbar`）
 
