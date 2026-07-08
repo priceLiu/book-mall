@@ -62,6 +62,8 @@ import {
   Sbv1VideoDockModelPicker,
   Sbv1VideoDockParamsPicker,
 } from "./sbv1-video-dock-pickers";
+import { Sbv1HdVideoDockToolbar } from "./sbv1-hd-video-dock-pickers";
+import { isSbv1HdVideoNode } from "@/lib/canvas/sbv1-hd-video-params";
 
 export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   nodeId,
@@ -111,6 +113,26 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const canvasNodes = useCanvasStore((s) => s.nodes);
+  const canvasEdges = useCanvasStore((s) => s.edges);
+
+  const isHdVideo = isSbv1HdVideoNode(data);
+  const hasMotionVideo = useMemo(() => {
+    if (!isHdVideo) return false;
+    for (const e of canvasEdges) {
+      if (e.target !== nodeId || e.targetHandle !== "in_motion_video") continue;
+      const src = canvasNodes.find((n) => n.id === e.source);
+      if (!src || src.type !== "sbv1-video-engine") continue;
+      const url = String(
+        (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
+          .runtime?.ossUrl ??
+          (src.data as { runtime?: { ephemeralUrl?: string } }).runtime
+            ?.ephemeralUrl ??
+          "",
+      ).trim();
+      if (/^https?:\/\//.test(url)) return true;
+    }
+    return false;
+  }, [isHdVideo, nodeId, canvasEdges, canvasNodes]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
@@ -167,11 +189,13 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const multiShots = data.engine?.params?.multi_shots === true;
   const dockChips = useMemo(
     () =>
-      getSbv1VideoDockModeChips(modelKey, {
-        multiShots,
-        providerId: data.engine?.providerId,
-      }),
-    [modelKey, multiShots, data.engine?.providerId],
+      isHdVideo
+        ? []
+        : getSbv1VideoDockModeChips(modelKey, {
+            multiShots,
+            providerId: data.engine?.providerId,
+          }),
+    [isHdVideo, modelKey, multiShots, data.engine?.providerId],
   );
   const activeDockMode = resolveSbv1DockInputMode(
     referenceMode,
@@ -218,10 +242,13 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     updateNodeData,
   });
 
-  const canSend =
-    (hasPrompt || hasRefs) &&
-    !isGenerating &&
-    Boolean(data.engine?.providerId && data.engine?.modelKey);
+  const canSend = isHdVideo
+    ? hasMotionVideo &&
+      !isGenerating &&
+      Boolean(data.engine?.providerId && data.engine?.modelKey)
+    : (hasPrompt || hasRefs) &&
+      !isGenerating &&
+      Boolean(data.engine?.providerId && data.engine?.modelKey);
 
   const runWithCommittedPrompt = useCallback(() => {
     promptCommitRef.current?.flushDraft();
@@ -390,6 +417,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   })();
 
   const dockHeader = (() => {
+    if (isHdVideo) return null;
     const hasModeBar = dockChips.length > 0;
     const hasRefRow = textDockLinks.length > 0 || refThumbnails;
     if (!hasModeBar && !hasRefRow) return null;
@@ -431,20 +459,30 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const toolbar = (
     <Pro2DockToolbar compact className="gap-2 py-2.5">
       <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
-        <Sbv1VideoDockModelPicker
-          data={data}
-          disabled={isGenerating}
-          onPatch={onPatch}
-          open={dockMenu === "model"}
-          onOpenChange={(next) => setDockMenu(next ? "model" : null)}
-        />
-        <Sbv1VideoDockParamsPicker
-          data={data}
-          disabled={isGenerating}
-          onPatch={onPatch}
-          open={dockMenu === "params"}
-          onOpenChange={(next) => setDockMenu(next ? "params" : null)}
-        />
+        {isHdVideo ? (
+          <Sbv1HdVideoDockToolbar
+            data={data}
+            disabled={isGenerating}
+            onPatch={onPatch}
+          />
+        ) : (
+          <>
+            <Sbv1VideoDockModelPicker
+              data={data}
+              disabled={isGenerating}
+              onPatch={onPatch}
+              open={dockMenu === "model"}
+              onOpenChange={(next) => setDockMenu(next ? "model" : null)}
+            />
+            <Sbv1VideoDockParamsPicker
+              data={data}
+              disabled={isGenerating}
+              onPatch={onPatch}
+              open={dockMenu === "params"}
+              onOpenChange={(next) => setDockMenu(next ? "params" : null)}
+            />
+          </>
+        )}
       </div>
 
       <div className="min-w-0 flex-1" />
@@ -469,7 +507,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         <button
           type="button"
           disabled={!canSend}
-          title={isGenerating ? "生成中" : sendTitle ?? "生成视频"}
+          title={isGenerating ? "生成中" : sendTitle ?? (isHdVideo ? "生成高清视频" : "生成视频")}
           className="nodrag flex shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ width: sendBtnPx, height: sendBtnPx }}
           onClick={runWithCommittedPrompt}
@@ -512,7 +550,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             void uploadFiles(e.dataTransfer.files);
           }}
         >
-          {isDragging ? (
+          {isDragging && !isHdVideo ? (
             <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-cyan-950/55 backdrop-blur-[1px]">
               <p className="flex items-center gap-2 text-sm text-cyan-100/90">
                 <ImageIcon className="size-4 opacity-70" />
@@ -520,35 +558,50 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               </p>
             </div>
           ) : null}
-          <MentionsEditable
-            key={nodeId}
-            className={cn(
-              SBV1_CHAT_INPUT_TEXTAREA_CLASS,
-              RF_FORM_CONTROL,
-              RF_NO_WHEEL,
-              SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS,
-            )}
-            dockInsetClassName={SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS}
-            placeholder="描述你想生成的视频… 使用 @ 引用参考图，或粘贴/上传图片"
-            value={storedPrompt}
-            mentionables={mentionables}
-            disabled={isGenerating}
-            rows={3}
-            commitHandleRef={promptCommitRef}
-            onChange={(prompt, _refs, meta) => {
-              setLivePrompt(prompt);
-              updateNodeData(
-                nodeId,
-                { prompt, dockInput: prompt },
-                { commit: meta?.commit ?? true },
-              );
-            }}
-            onPaste={onPaste}
-            mentionPickerTitle="参考图 · ←→ Enter 插入"
-            mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
-            mentionInlineThumb
-            mentionEdition="sbv1"
-          />
+          {isHdVideo ? (
+            <div
+              className={cn(
+                SBV1_CHAT_INPUT_TEXTAREA_CLASS,
+                SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS,
+                "flex min-h-0 flex-1 items-center justify-center px-4 text-center text-white/45",
+              )}
+              style={{ fontSize: dockTextFontPx }}
+            >
+              {hasMotionVideo
+                ? "已连接上游视频，选择参数后点击生成"
+                : "请从左侧连接上游视频节点，或在视频节点右侧 + 选择「高清视频」"}
+            </div>
+          ) : (
+            <MentionsEditable
+              key={nodeId}
+              className={cn(
+                SBV1_CHAT_INPUT_TEXTAREA_CLASS,
+                RF_FORM_CONTROL,
+                RF_NO_WHEEL,
+                SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS,
+              )}
+              dockInsetClassName={SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS}
+              placeholder="描述你想生成的视频… 使用 @ 引用参考图，或粘贴/上传图片"
+              value={storedPrompt}
+              mentionables={mentionables}
+              disabled={isGenerating}
+              rows={3}
+              commitHandleRef={promptCommitRef}
+              onChange={(prompt, _refs, meta) => {
+                setLivePrompt(prompt);
+                updateNodeData(
+                  nodeId,
+                  { prompt, dockInput: prompt },
+                  { commit: meta?.commit ?? true },
+                );
+              }}
+              onPaste={onPaste}
+              mentionPickerTitle="参考图 · ←→ Enter 插入"
+              mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
+              mentionInlineThumb
+              mentionEdition="sbv1"
+            />
+          )}
         </div>
       </Pro2InputDockShell>
 
@@ -564,7 +617,6 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         }}
       />
 
-      />
     </>
   );
 });

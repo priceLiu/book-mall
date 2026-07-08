@@ -14,6 +14,7 @@ import {
   isElevenLabsMusicModelKey,
 } from "@/lib/gateway/elevenlabs-models";
 import { isWorldlabsMarbleModelKey } from "@/lib/gateway/worldlabs-marble-models";
+import { isTopazLabsVideoModelKey } from "@/lib/gateway/topaz-models";
 
 import {
   VOLCENGINE_CHAT_MODEL_KEYS,
@@ -325,6 +326,14 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "WORLDLABS", requestKind: "OTHER" };
   }
 
+  if (
+    isTopazLabsVideoModelKey(raw) ||
+    isTopazLabsVideoModelKey(m) ||
+    m.startsWith("topaz-labs/")
+  ) {
+    return { providerKind: "TOPAZ", requestKind: "VIDEO" };
+  }
+
   if (m.includes("qwen") || m.includes("bailian") || (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
@@ -350,6 +359,8 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       return "https://api.worldlabs.ai";
     case "ELEVENLABS":
       return "https://api.elevenlabs.io";
+    case "TOPAZ":
+      return "https://api.topazlabs.com";
     default:
       return (
         process.env.KIE_API_BASE?.trim()?.replace(/\/$/, "") ||

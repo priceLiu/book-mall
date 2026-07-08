@@ -1,0 +1,30 @@
+---
+description: Gateway 预设模型不得在节点 Dock/设置中暴露 EnginePicker 或模型切换
+globs:
+  - canvas-web/**/*
+  - book-mall/lib/canvas/**/*
+alwaysApply: false
+---
+
+# Gateway 预设模型 · 禁止节点内配置
+
+## 适用范围
+
+经菜单/spawn **固定绑定** Gateway 模型与凭证的节点能力（如「高清视频」→ `topaz-labs/video-enhance` + `gateway:topaz`），以及未来同类 **一键成片 / 固定管线** 节点。
+
+## 必须
+
+1. **模型与 Provider** 在 spawn 预设中写死（如 `buildSbv1HdVideoEngineNodeData()`），用户从菜单添加即可用。
+2. **凭证** 仅在 Gateway 模型管理页 / 平台凭证池绑定（`gateway-platform-vendor-credentials.mdc`）；禁止写入 `.env` 提交或节点 UI。
+3. **禁止** 在节点 Dock、`EnginePicker`、视频/图片「生成设置」弹层、Inspector 中提供该预设模型的切换或参数入口。
+4. **允许** 业务必要参数（如 Topaz 分辨率 / 补帧 / 慢放）在 Dock 参数区暴露；**禁止** 切换模型或 Provider。
+
+## 禁止
+
+- 将预设模型 key 加入 `SBV1_DOCK_*` / `EnginePicker` 白名单供用户自选
+- 在节点 data 中留空的 `providerId` / `modelKey` 让用户补选
+- 复制第二套模型选择 UI 替代 Gateway 登记
+
+## Code Review
+
+PR 若对预设管线模型暴露 `EnginePicker` 或 Dock 模型切换 → **驳回**。

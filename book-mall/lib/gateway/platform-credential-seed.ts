@@ -78,6 +78,12 @@ const CREDENTIALS: Array<{
     env: "WORLDLABS_API_KEY",
     baseUrl: "https://api.worldlabs.ai",
   },
+  {
+    kind: "TOPAZ",
+    alias: "Topaz Labs",
+    env: "TOPAZ_LABS_API_KEY",
+    baseUrl: "https://api.topazlabs.com",
+  },
 ];
 
 async function ensureCredential(
@@ -118,6 +124,13 @@ async function ensureCredential(
       });
     }
     if (envKey && spec.kind === "WORLDLABS") {
+      await updateGatewayCredential(gatewayUserId, existing.id, {
+        apiKey: envKey,
+        active: true,
+        ...(targetBase ? { baseUrl: targetBase } : {}),
+      });
+    }
+    if (envKey && spec.kind === "TOPAZ") {
       await updateGatewayCredential(gatewayUserId, existing.id, {
         apiKey: envKey,
         active: true,

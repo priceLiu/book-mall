@@ -12,6 +12,7 @@ import {
 import {
   pickPreferredCanvasTask,
   pickPreferredCanvasTaskForScope,
+  pickStoryRowApplyTask,
   runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
   storyRunContextFromScope,
@@ -23,6 +24,7 @@ import {
 } from "./task-pick";
 import { storyApplyTaskResult } from "./story-run-apply";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
+import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryLlmSection,
@@ -343,7 +345,7 @@ export function reconcileStaleInflightRuntimes(
 
           if (!isInflightStatus(rt?.status)) continue;
           if (hasServerInflightForScope(tasks, node.id, scope)) continue;
-          const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+          const pick = pickStoryRowApplyTask(nodeTasks, scope, rt);
           if (pick) {
             if (!shouldSkipStoryRowTaskApply(rt, pick, node.id)) {
               storyApplyTaskResult(
@@ -364,7 +366,19 @@ export function reconcileStaleInflightRuntimes(
         }
         return next;
       });
-      if (changed) updateNodeData(node.id, { rows: nextRows });
+      if (changed) {
+        updateNodeData(node.id, { rows: nextRows });
+        syncPro2VideoBoardFromRows(
+          nodes.map((n) =>
+            n.id === node.id
+              ? { ...n, data: { ...n.data, rows: nextRows } }
+              : n,
+          ),
+          node.id,
+          nextRows as never,
+          updateNodeData,
+        );
+      }
       continue;
     }
 

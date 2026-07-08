@@ -129,6 +129,12 @@ import {
 import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { type BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
+import {
+  dashscopeExtractTaskImageUrl,
+  isDashscopeTaskFailed,
+  isDashscopeTaskSuccess,
+  type DashscopeTaskOutput,
+} from "@/lib/gateway/dashscope-client";
 import { CanvasProjectError } from "./canvas-project-service";
 import { recordCanvasPlatformError } from "@/lib/platform-error-log";
 
@@ -228,8 +234,10 @@ function gatewayProviderKindFromPayload(
 ): GatewayProviderKind {
   const pk = payload.providerKind;
   if (pk === "VOLCENGINE") return "VOLCENGINE";
+  if (pk === "DASHSCOPE") return "DASHSCOPE";
   if (pk === "BAILIAN_R2V" || pk === "BAILIAN") return "BAILIAN";
   if (pk === "HUNYUAN" || pk === "HUNYUAN_3D") return "HUNYUAN";
+  if (pk === "TOPAZ") return "TOPAZ";
   return "KIE";
 }
 
@@ -648,6 +656,118 @@ export async function applyCanvasBailianR2vPollResult(
     },
   });
   if (bailianUpdated) await patchCanvasProjectNodeRuntimeFromTask(bailianUpdated);
+}
+
+export async function applyCanvasDashscopeImagePollResult(
+  taskId: string,
+  output: DashscopeTaskOutput,
+): Promise<void> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    include: { project: true },
+  });
+  if (!task) return;
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (!(await claimCanvasTaskForResultApply(taskId))) return;
+
+  const status = output.task_status ?? "";
+  if (isDashscopeTaskFailed(status) || output.code) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: output.code ?? "DASHSCOPE_IMAGE_FAILED",
+        failMessage: (output.message ?? "DashScope 图像任务失败").slice(0, 500),
+        resultPayload: output as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (!isDashscopeTaskSuccess(status)) return;
+
+  const ephemeralUrl = dashscopeExtractTaskImageUrl(
+    output as Record<string, unknown>,
+  );
+  if (!ephemeralUrl) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "DASHSCOPE_NO_IMAGE_URL",
+        failMessage: "任务成功但未返回图片 URL",
+        resultPayload: output as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  let ossUrl: string | null = null;
+  let ossError: string | null = null;
+  try {
+    ossUrl = await persistCanvasKieResultToOss({
+      ephemeralUrl,
+      kind: "node-image",
+      projectId: task.projectId,
+    });
+  } catch (e) {
+    ossError = e instanceof Error ? e.message : String(e);
+  }
+
+  if (!ossUrl) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "OSS_UPLOAD_FAILED",
+        failMessage: ossError ?? "OSS upload failed",
+        ephemeralUrl,
+        resultPayload: output as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  await prisma.canvasGenerationTask.updateMany({
+    where: {
+      id: taskId,
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
+    },
+    data: {
+      status: "SUCCEEDED",
+      ossUrl,
+      ephemeralUrl,
+      resultPayload: output as unknown as Prisma.InputJsonValue,
+      completedAt: new Date(),
+    },
+  });
+  const updated = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      nodeId: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      completedAt: true,
+      resultPayload: true,
+    },
+  });
+  if (updated) {
+    await patchCanvasProjectNodeRuntimeFromTask(updated);
+    await patchCanvasProjectNodeMediaFromTask({
+      id: task.id,
+      projectId: task.projectId,
+      nodeId: task.nodeId,
+      ossUrl,
+      ephemeralUrl,
+      completedAt: updated.completedAt,
+      resultPayload: updated.resultPayload,
+    });
+  }
 }
 
 export async function applyCanvasVolcengineVideoResult(
@@ -1426,6 +1546,23 @@ async function pollOneSubmittedCanvasTask(
           status: "FAILED",
           failCode: polled.errorCode ?? "HUNYUAN_FAILED",
           failMessage: polled.errorMessage?.slice(0, 500),
+          completedAt: new Date(),
+        },
+      });
+    }
+  } else if (gw.providerKind === "DASHSCOPE") {
+    await applyCanvasDashscopeImagePollResult(task.id, gw.output);
+  } else if (gw.providerKind === "TOPAZ") {
+    const polled = gw.polled;
+    if (polled.state === "succeeded" && polled.downloadUrl) {
+      await applyCanvasVolcengineVideoResult(task.id, polled.downloadUrl);
+    } else if (polled.state === "failed") {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "FAILED",
+          failCode: "TOPAZ_VIDEO_FAILED",
+          failMessage: polled.errorMessage?.slice(0, 500) ?? "Topaz video failed",
           completedAt: new Date(),
         },
       });

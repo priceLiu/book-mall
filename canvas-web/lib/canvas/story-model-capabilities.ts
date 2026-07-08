@@ -13,6 +13,11 @@ export type StoryModelCapability =
 
 const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "nano-banana-pro": ["image_t2i", "image_multi_ref"],
+  "kling-3.0-image": ["image_t2i", "image_multi_ref"],
+  "4o-image": ["image_t2i", "image_multi_ref"],
+  "nano-banana-2": ["image_t2i", "image_multi_ref"],
+  "google/nano-banana": ["image_t2i", "image_multi_ref"],
+  "google/nano-banana-edit": ["image_t2i", "image_multi_ref"],
   "hunyuan-3d-pro": ["image_t2i", "image_multi_ref"],
   "hunyuan-3d-express": ["image_t2i", "image_multi_ref"],
   "google/nano-banana-pro": ["image_t2i", "image_multi_ref"],
@@ -28,6 +33,7 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "kling-2.6/motion-control": ["video_v2v"],
   "kling-3.0/motion-control": ["video_v2v"],
   "topaz/video-upscale": ["video_v2v"],
+  "topaz-labs/video-enhance": ["video_v2v"],
   "bytedance/seedream-v4-text-to-image": ["image_t2i", "image_multi_ref"],
   "flux-kontext-pro": ["image_t2i", "image_multi_ref"],
   "flux-kontext-max": ["image_t2i", "image_multi_ref"],

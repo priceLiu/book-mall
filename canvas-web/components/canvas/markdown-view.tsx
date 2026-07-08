@@ -22,6 +22,7 @@ function MarkdownProse({
   isNodePreview,
   isDarkPreview,
   isLightDoc,
+  inheritFontSize = false,
 }: {
   content: string;
   className: string;
@@ -31,8 +32,10 @@ function MarkdownProse({
   isNodePreview: boolean;
   isDarkPreview: boolean;
   isLightDoc: boolean;
+  inheritFontSize?: boolean;
 }) {
   const tablePad = isLightDoc ? "px-4 py-2.5" : "px-2 py-1";
+  const darkInherit = isDarkPreview && inheritFontSize;
 
   return (
     <div className={`w-full min-w-0 ${className}`}>
@@ -58,7 +61,9 @@ function MarkdownProse({
                   : isNodePreview
                     ? "mb-2 mt-5 border-b border-neutral-200 pb-1 text-[15px] font-semibold leading-snug text-neutral-800 first:mt-0"
                     : isDarkPreview
-                      ? "mb-2 mt-5 border-b border-white/15 pb-1 text-[14px] font-semibold leading-snug text-white first:mt-0"
+                      ? darkInherit
+                        ? "mb-2 mt-5 border-b border-white/15 pb-1 font-semibold leading-snug text-white first:mt-0"
+                        : "mb-2 mt-5 border-b border-white/15 pb-1 text-[14px] font-semibold leading-snug text-white first:mt-0"
                       : undefined
               }
             >
@@ -73,7 +78,9 @@ function MarkdownProse({
                   : isNodePreview
                     ? "mb-2 mt-4 text-[14px] font-semibold leading-snug text-neutral-800"
                     : isDarkPreview
-                      ? "mb-2 mt-4 text-[13px] font-semibold leading-snug text-white/95"
+                      ? darkInherit
+                        ? "mb-2 mt-4 font-semibold leading-snug text-white/95"
+                        : "mb-2 mt-4 text-[13px] font-semibold leading-snug text-white/95"
                       : undefined
               }
             >
@@ -88,7 +95,9 @@ function MarkdownProse({
                   : isNodePreview
                     ? "mb-3 text-[13px] leading-[1.75] text-neutral-700"
                     : isDarkPreview
-                      ? "mb-3 text-[13px] leading-[1.75] text-white/90"
+                      ? darkInherit
+                        ? "mb-3 leading-[1.75] text-white/90"
+                        : "mb-3 text-[13px] leading-[1.75] text-white/90"
                       : undefined
               }
             >
@@ -103,7 +112,9 @@ function MarkdownProse({
                   : isNodePreview
                     ? "text-[13px] leading-[1.7]"
                     : isDarkPreview
-                      ? "text-[13px] leading-[1.7] text-white/90"
+                      ? darkInherit
+                        ? "leading-[1.7] text-white/90"
+                        : "text-[13px] leading-[1.7] text-white/90"
                       : undefined
               }
             >
@@ -159,6 +170,8 @@ export function MarkdownView({
   content,
   className = "",
   variant = "inline",
+  /** 为 true 时不写死 text-[13px]，继承父级字号（标签节点等） */
+  inheritFontSize = false,
   /** 已由调用方 prepare 过时设为 true，避免重复处理 */
   prepared = false,
 }: {
@@ -166,6 +179,7 @@ export function MarkdownView({
   className?: string;
   /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读；darkPreview=黑底白字节点预览 */
   variant?: "inline" | "document" | "nodePreview" | "darkPreview";
+  inheritFontSize?: boolean;
   prepared?: boolean;
 }) {
   if (!content.trim()) {
@@ -185,7 +199,11 @@ export function MarkdownView({
     : isNodePreview
       ? `max-w-none text-[13px] leading-[1.7] text-neutral-800 ${className}`
       : isDarkPreview
-        ? `max-w-none text-[13px] leading-[1.75] text-white ${className}`
+        ? `max-w-none leading-[1.75] text-white ${
+            inheritFontSize
+              ? "text-inherit [&_*]:text-[length:inherit]"
+              : "text-[13px]"
+          } ${className}`
         : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`;
 
   const useRichPreview =
@@ -203,6 +221,7 @@ export function MarkdownView({
       isNodePreview={isNodePreview}
       isDarkPreview={isDarkPreview}
       isLightDoc={isLightDoc}
+      inheritFontSize={inheritFontSize}
     />
   );
 }

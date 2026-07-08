@@ -24,6 +24,7 @@ import {
   pollHunyuanTaskForLog,
   pollKieTaskForLog,
 } from "@/lib/gateway/poll-service";
+import { pollTopazVideoTaskForLog } from "@/lib/gateway/topaz-jobs";
 import {
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
@@ -108,6 +109,47 @@ export async function GET(request: NextRequest) {
         }
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "DASHSCOPE" });
+    }
+
+    if (providerKind === "TOPAZ") {
+      const polled = await pollTopazVideoTaskForLog({ credentialId, taskId });
+      if (log) {
+        if (polled.state === "succeeded") {
+          await finalizeRequestLog(log.id, {
+            status: "SUCCEEDED",
+            durationMs: log.submittedAt
+              ? Date.now() - log.submittedAt.getTime()
+              : 0,
+            resultSummary: polled,
+            externalTaskId: taskId,
+            model: log.model,
+          });
+        } else if (polled.state === "failed") {
+          await finalizeRequestLog(log.id, {
+            status: "FAILED",
+            durationMs: log.submittedAt
+              ? Date.now() - log.submittedAt.getTime()
+              : 0,
+            failMessage: polled.errorMessage ?? "failed",
+            externalTaskId: taskId,
+            model: log.model,
+          });
+        } else {
+          await touchGatewayLogProgress(
+            log.id,
+            buildGatewayLogProgressSummary({
+              providerKind: "TOPAZ",
+              status: polled.state,
+              progress: polled.progress,
+            }),
+          );
+        }
+      }
+      return NextResponse.json({
+        code: 200,
+        data: polled,
+        providerKind: "TOPAZ",
+      });
     }
 
     if (providerKind === "HUNYUAN") {

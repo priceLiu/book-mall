@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import {
-  EnginePicker,
-  ENGINE_PICKER_EMPTY_PARAMS,
-} from "@/components/canvas/engine-picker";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ENGINE_PICKER_EMPTY_PARAMS } from "@/components/canvas/engine-picker";
+import { buildModelParams } from "@/components/canvas/dynamic-param-form";
 import {
   gatewayModelRoleSectionTitle,
   type GatewayModelRole,
@@ -46,7 +44,11 @@ import {
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "@/lib/canvas/types";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
-import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
+import { LibtvDockEngineModelPicker } from "../libtv-dock-engine-model-picker";
+import {
+  LibtvDockGatewayParamsPicker,
+  libtvLlmParamsSummaryLabel,
+} from "../libtv-dock-gateway-params-picker";
 
 type RolePickerConfig = {
   allowedModelKeys?: string[];
@@ -57,7 +59,6 @@ function rolePickerConfig(
   role: GatewayModelRole,
   needsVision: boolean,
   data: Pro2TextNodeEngineData,
-  _ctx: { nodeId: string; nodes: CanvasFlowNode[]; edges: CanvasFlowEdge[] },
 ): RolePickerConfig {
   const preset = String(data.pro2PresetKind ?? "").trim();
   if (role === "LLM") {
@@ -68,9 +69,7 @@ function rolePickerConfig(
       ? [...STORY_LLM_VISION_MODEL_KEYS]
       : [...STORY_LLM_MODEL_KEYS];
     return {
-      allowedModelKeys: [
-        ...new Set([...llmKeys, ...PRO2_SUNO_MODEL_KEYS]),
-      ],
+      allowedModelKeys: [...llmKeys],
     };
   }
   if (role === "IMAGE") {
@@ -130,6 +129,37 @@ function defaultPickForRole(
   return { ...pick, params: pick.params ?? {} };
 }
 
+function buildLlmDockParams(
+  model: Parameters<typeof buildModelParams>[0],
+  curParams: Record<string, unknown>,
+): Record<string, unknown> {
+  const built = buildModelParams(model, curParams);
+  delete built.model;
+  return { ...STORY_PRO_LLM_PARAMS_DEFAULT, ...built };
+}
+
+function paramsSummaryForRole(
+  role: GatewayModelRole,
+  modelKey: string,
+  params: Record<string, unknown>,
+): string {
+  if (role === "LLM" && isPro2SunoModelKey(modelKey)) {
+    const parts: string[] = [];
+    if (params.instrumental === true) parts.push("纯音乐");
+    const ver = String(params.model ?? "").trim();
+    if (ver) parts.push(ver);
+    return parts.length > 0 ? parts.join(" · ") : "参数";
+  }
+  if (role === "LLM" || role === "MUSIC") {
+    return libtvLlmParamsSummaryLabel(params);
+  }
+  const keys = Object.keys(params).filter(
+    (k) => params[k] != null && String(params[k]).trim() !== "",
+  );
+  if (keys.length === 0) return "参数";
+  return keys.slice(0, 3).join(" · ");
+}
+
 export type Pro2TextNodeEnginePickersProps = {
   nodeId: string;
   data: Pro2TextNodeEngineData;
@@ -138,13 +168,11 @@ export type Pro2TextNodeEnginePickersProps = {
   providers: CanvasProviderDto[];
   disabled?: boolean;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-  /** 触发按钮字号（flow px · 与 Dock 正文统一） */
   triggerFontPx?: number;
-  /** role 分组小标题字号（flow px） */
   sectionFontPx?: number;
 };
 
-/** 文本节点 · 按 Gateway role 分类的模型 + 参数选择（Text / Image / Video model） */
+/** 文本节点 · 按 Gateway role 分类的模型 + 参数（Dock 双钮 · 与视频节点一致） */
 export function Pro2TextNodeEnginePickers({
   nodeId,
   data,
@@ -153,10 +181,8 @@ export function Pro2TextNodeEnginePickers({
   providers,
   disabled,
   updateNodeData,
-  triggerFontPx,
   sectionFontPx,
 }: Pro2TextNodeEnginePickersProps) {
-  const { minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
   const roles = useMemo(
     () =>
       resolvePro2TextNodeEngineRoles(data, {
@@ -171,7 +197,11 @@ export function Pro2TextNodeEnginePickers({
     [data, nodeId, nodes, edges],
   );
 
-  /** 自动补默认引擎仅执行一次（避免反复写 store · 冲掉撤销栈） */
+  const [dockMenu, setDockMenu] = useState<{
+    role: GatewayModelRole;
+    kind: "model" | "params";
+  } | null>(null);
+
   const seededRolesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -206,8 +236,32 @@ export function Pro2TextNodeEnginePickers({
         }
       }
       if (cur.providerId.trim() && cur.modelKey.trim()) {
-        if (role === "LLM" && isPro2SunoModelKey(cur.modelKey)) {
+        if (
+          role === "LLM" &&
+          !isPro2SunoModelKey(cur.modelKey) &&
+          cur.params?.model != null &&
+          String(cur.params.model).trim() !== ""
+        ) {
+          const cleaned = { ...(cur.params ?? {}) };
+          delete cleaned.model;
           seededRolesRef.current.add(seedKey);
+          updateNodeData(
+            nodeId,
+            patchPro2TextNodeEngine(role, { ...cur, params: cleaned }),
+          );
+          continue;
+        }
+        if (role === "LLM" && isPro2SunoModelKey(cur.modelKey)) {
+          const preset = String(data.pro2PresetKind ?? "").trim();
+          if (preset === "text-to-music") {
+            seededRolesRef.current.add(seedKey);
+            continue;
+          }
+          const pick = defaultPickForRole(role, providers, llmNeedsVision, data);
+          if (pick) {
+            seededRolesRef.current.add(seedKey);
+            updateNodeData(nodeId, patchPro2TextNodeEngine(role, pick));
+          }
           continue;
         }
         if (
@@ -230,12 +284,38 @@ export function Pro2TextNodeEnginePickers({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
       {roles.map((role) => {
-        const cfg = rolePickerConfig(role, llmNeedsVision, data, {
-          nodeId,
-          nodes,
-          edges,
-        });
+        const cfg = rolePickerConfig(role, llmNeedsVision, data);
         const cur = readPro2TextNodeEngine(data, role);
+        const params = cur.params ?? ENGINE_PICKER_EMPTY_PARAMS;
+
+        const applyPick = (pick: CanvasEnginePick) => {
+          const patch = patchPro2TextNodeEngine(role, pick);
+          if (role === "LLM" && !isPro2SunoModelKey(pick.modelKey)) {
+            const params = {
+              ...((patch.params as Record<string, unknown> | undefined) ?? {}),
+            };
+            delete params.model;
+            patch.params = params;
+          }
+          if (data.themeOutlineRuntime?.status === "error") {
+            patch.themeOutlineRuntime = {
+              ...data.themeOutlineRuntime,
+              status: "idle",
+              failCode: undefined,
+              failMessage: undefined,
+            };
+          }
+          updateNodeData(nodeId, patch);
+          syncPro2TextNodeEngineToDownstream(
+            nodeId,
+            role,
+            pick,
+            nodes,
+            edges,
+            updateNodeData,
+          );
+        };
+
         return (
           <div key={role} className="min-w-0 shrink-0">
             <p
@@ -252,35 +332,61 @@ export function Pro2TextNodeEnginePickers({
             >
               {gatewayModelRoleSectionTitle(role)}
             </p>
-            <EnginePicker
-              role={role}
-              allowedModelKeys={cfg.allowedModelKeys}
-              providerIds={cfg.providerIds}
-              externalProviders={providers}
-              providerId={cur.providerId}
-              modelKey={cur.modelKey}
-              params={cur.params ?? ENGINE_PICKER_EMPTY_PARAMS}
-              triggerVariant="dock"
-              triggerFontPx={triggerFontPx}
-              triggerMinHeightPx={minHeightPx}
-              triggerIconPx={chevronPx}
-              onChange={(next) => {
-                const pick = {
-                  providerId: next.providerId,
-                  modelKey: next.modelKey,
-                  params: next.params,
-                };
-                updateNodeData(nodeId, patchPro2TextNodeEngine(role, pick));
-                syncPro2TextNodeEngineToDownstream(
-                  nodeId,
-                  role,
-                  pick,
-                  nodes,
-                  edges,
-                  updateNodeData,
-                );
-              }}
-            />
+            <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+              <LibtvDockEngineModelPicker
+                role={role}
+                providerId={cur.providerId}
+                modelKey={cur.modelKey}
+                allowedModelKeys={cfg.allowedModelKeys}
+                providerIds={cfg.providerIds}
+                externalProviders={providers}
+                disabled={disabled}
+                open={
+                  dockMenu?.role === role && dockMenu.kind === "model"
+                }
+                onOpenChange={(next) =>
+                  setDockMenu(
+                    next ? { role, kind: "model" } : null,
+                  )
+                }
+                onSelect={({ providerId, modelKey, model }) => {
+                  const isSuno = isPro2SunoModelKey(modelKey);
+                  const nextParams = isSuno
+                    ? buildModelParams(model)
+                    : role === "LLM"
+                      ? buildLlmDockParams(model, cur.params ?? {})
+                      : buildModelParams(model, cur.params);
+                  applyPick({
+                    providerId,
+                    modelKey,
+                    params: nextParams,
+                  });
+                }}
+              />
+              <LibtvDockGatewayParamsPicker
+                providerId={cur.providerId}
+                modelKey={cur.modelKey}
+                params={params}
+                externalProviders={providers}
+                disabled={disabled}
+                open={
+                  dockMenu?.role === role && dockMenu.kind === "params"
+                }
+                onOpenChange={(next) =>
+                  setDockMenu(
+                    next ? { role, kind: "params" } : null,
+                  )
+                }
+                summaryLabel={paramsSummaryForRole(role, cur.modelKey, params)}
+                onChange={(nextParams) => {
+                  applyPick({
+                    providerId: cur.providerId,
+                    modelKey: cur.modelKey,
+                    params: nextParams,
+                  });
+                }}
+              />
+            </div>
           </div>
         );
       })}

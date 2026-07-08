@@ -114,6 +114,7 @@ import {
   backfillFrameVideoRuntimesFromTasks,
   pickPreferredCanvasTask,
   pickPreferredCanvasTaskForScope,
+  pickStoryRowApplyTask,
   preferredTasksByNode,
   runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
@@ -1844,7 +1845,11 @@ export function useCanvasRunner(
           for (const row of rows) {
             for (const mediaKind of ["video", "tts"] as const) {
               const scope = { rowKey: row.key, mediaKind };
-              const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+              const pick = pickStoryRowApplyTask(
+                nodeTasks,
+                scope,
+                mediaKind === "tts" ? row.ttsRuntime : row.videoRuntime,
+              );
               if (!pick) continue;
               const job: CanvasStoryRunJob =
                 jobByTaskRef.current.get(pick.id) ??

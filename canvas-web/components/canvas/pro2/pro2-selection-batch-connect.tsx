@@ -339,6 +339,15 @@ function Pro2SelectionBatchConnectLayerInner({
 
   useEffect(() => () => pointerCleanupRef.current?.(), []);
 
+  useEffect(() => {
+    const onPaneClick = () => {
+      clearPreview();
+      closeMenu();
+    };
+    window.addEventListener("canvas:pro2-pane-click", onPaneClick);
+    return () => window.removeEventListener("canvas:pro2-pane-click", onPaneClick);
+  }, [clearPreview, closeMenu]);
+
   const onPlusPointerDown = (e: React.PointerEvent) => {
     if (eligibleSources.length < 2 || !batchMode) return;
     e.preventDefault();
@@ -450,7 +459,7 @@ function Pro2SelectionBatchConnectLayerInner({
   const plusTop = screenBox.midY;
 
   const showPreviewLines =
-    lineTarget && (dragging || menuAnchor) && eligibleSources.length >= 2;
+    lineTarget && dragging && eligibleSources.length >= 2;
 
   const menuTitle =
     batchMode === "image-pipeline"

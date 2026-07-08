@@ -95,11 +95,10 @@ const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 function Inner({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
   const {
-    linked: gatewayLinked,
+    confirmedUnlinked: gatewayLinkBlocked,
     accountUrl: gatewayAccountUrl,
     loading: gatewayLinkLoading,
   } = useGatewayLinkStatus();
-  const gatewayLinkBlocked = !gatewayLinkLoading && !gatewayLinked;
   const dialogs = useDialogs();
 
   useEffect(() => {

@@ -4,13 +4,14 @@ import { flowPositionAtScreenPoint, flowPositionAtViewportCenter } from "./viewp
 import {
   buildPro2ImageNodeData,
   buildPro2StarterNodeData,
+  buildPro2TagNodeData,
   buildPro2ThreeViewNodeData,
   spawnPro2ScriptHubAt,
 } from "./pro2-spawn-nodes";
 import { NODE_DEFAULT_DATA } from "./types";
 import { PRO2_CHARACTER_THREE_VIEW_HEIGHT, PRO2_CHARACTER_THREE_VIEW_WIDTH } from "./story-pro2-node-chrome";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
-import { buildSbv1ImageNodeData, buildSbv1VideoEngineNodeData, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
+import { buildSbv1ImageNodeData, buildSbv1VideoEngineNodeDataForMenuItem, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   resolveLibtvSideSpawnNodeType,
 } from "./libtv-side-spawn";
@@ -38,6 +39,7 @@ export type Pro2AddNodePickStore = {
   addNode: (
     type:
       | "story-pro2-starter"
+      | "story-pro2-tag"
       | "story-pro2-image"
       | "story-pro2-script-hub"
       | "story-pro2-style-asset"
@@ -92,10 +94,15 @@ function spawnPosition(
 function spawnVideoEngine(
   store: Pro2AddNodePickStore,
   options?: Pro2ToolbarAddNodePickOptions,
+  itemId = "video",
 ) {
   const { addNode, setNodes } = store;
   const pos = spawnPosition("sbv1-video-engine", options);
-  const id = addNode("sbv1-video-engine", pos, buildSbv1VideoEngineNodeData());
+  const id = addNode(
+    "sbv1-video-engine",
+    pos,
+    buildSbv1VideoEngineNodeDataForMenuItem(itemId),
+  );
   if (id) selectSbv1NodeAfterSpawn(setNodes, id);
 }
 
@@ -161,11 +168,12 @@ export async function handlePro2ToolbarAddNodePick(
 
   if (
     itemId === "video" ||
+    itemId === "hd-video" ||
     itemId === "video-compose" ||
     itemId === "video-engine" ||
     nodeType === "sbv1-video-engine"
   ) {
-    spawnVideoEngine(store, options);
+    spawnVideoEngine(store, options, itemId);
     return;
   }
 
@@ -181,6 +189,13 @@ export async function handlePro2ToolbarAddNodePick(
   if (itemId === "text" && nodeType === "story-pro2-starter") {
     const pos = spawnPosition("story-pro2-starter", options);
     const id = addNode("story-pro2-starter", pos, buildPro2StarterNodeData());
+    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
+  if (itemId === "tag" && nodeType === "story-pro2-tag") {
+    const pos = spawnPosition("story-pro2-tag", options);
+    const id = addNode("story-pro2-tag", pos, buildPro2TagNodeData());
     if (id) selectPro2NodeAfterSpawn(setNodes, id);
     return;
   }

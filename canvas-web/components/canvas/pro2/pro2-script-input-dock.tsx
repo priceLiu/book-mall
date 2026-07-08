@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Languages, Zap } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
-import { LibtvDockSettingsTrigger } from "@/components/canvas/libtv-dock-settings-trigger";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
@@ -28,9 +27,9 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import {
-  Pro2ScriptLlmSettingsModal,
-  pro2ScriptLlmSettingsTriggerLabel,
-} from "./pro2-script-llm-settings-modal";
+  Pro2LlmDockModelPicker,
+  Pro2LlmDockParamsPicker,
+} from "./pro2-llm-dock-pickers";
 import {
   Pro2DockHeader,
   Pro2DockToolbar,
@@ -60,7 +59,7 @@ export function Pro2ScriptInputDock() {
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
   const dockInput = d.dockInput ?? "";
@@ -188,11 +187,7 @@ export function Pro2ScriptInputDock() {
   if (!storeNode || !dockActive || !placement) return null;
 
   const placeholder = SCRIPT_PLACEHOLDER;
-  const settingsLabel = pro2ScriptLlmSettingsTriggerLabel(
-    d.providerId ?? "",
-    d.modelKey ?? "",
-    providers,
-  );
+  const llmParams = d.params ?? { ...STORY_PRO_LLM_PARAMS_DEFAULT };
 
   return (
     <>
@@ -235,11 +230,16 @@ export function Pro2ScriptInputDock() {
       }
       footer={
         <Pro2ScriptDockFooter
-          settingsLabel={settingsLabel}
+          providerId={d.providerId ?? ""}
+          modelKey={d.modelKey ?? ""}
+          params={llmParams}
+          providers={providers}
+          dockMenu={dockMenu}
+          onDockMenuChange={setDockMenu}
           isGenerating={isGenerating}
           canSend={canSend}
           phase={phase}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onPickEngine={onPickEngine}
           onSend={() => void onSend()}
         />
       }
@@ -272,43 +272,67 @@ export function Pro2ScriptInputDock() {
         />
       </Pro2DockPasteZone>
     </Pro2InputDockShell>
-
-    <Pro2ScriptLlmSettingsModal
-      open={settingsOpen}
-      providerId={d.providerId ?? ""}
-      modelKey={d.modelKey ?? ""}
-      params={d.params ?? {}}
-      onClose={() => setSettingsOpen(false)}
-      onConfirm={onPickEngine}
-    />
     </>
   );
 }
 
 function Pro2ScriptDockFooter({
-  settingsLabel,
+  providerId,
+  modelKey,
+  params,
+  providers,
+  dockMenu,
+  onDockMenuChange,
   isGenerating,
   canSend,
   phase,
-  onOpenSettings,
+  onPickEngine,
   onSend,
 }: {
-  settingsLabel: string;
+  providerId: string;
+  modelKey: string;
+  params: Record<string, unknown>;
+  providers: ReturnType<typeof useUserProviders>["providers"];
+  dockMenu: "model" | "params" | null;
+  onDockMenuChange: (menu: "model" | "params" | null) => void;
   isGenerating: boolean;
   canSend: boolean;
   phase: string;
-  onOpenSettings: () => void;
+  onPickEngine: (next: {
+    providerId: string;
+    modelKey: string;
+    params: Record<string, unknown>;
+  }) => void;
   onSend: () => void;
 }) {
   const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
 
   return (
     <Pro2DockToolbar className="gap-2">
-      <LibtvDockSettingsTrigger
-        label={settingsLabel}
-        disabled={isGenerating}
-        onClick={onOpenSettings}
-      />
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
+        <Pro2LlmDockModelPicker
+          providerId={providerId}
+          modelKey={modelKey}
+          params={params}
+          externalProviders={providers}
+          disabled={isGenerating}
+          open={dockMenu === "model"}
+          onOpenChange={(next) => onDockMenuChange(next ? "model" : null)}
+          onConfirm={onPickEngine}
+        />
+        <Pro2LlmDockParamsPicker
+          providerId={providerId}
+          modelKey={modelKey}
+          params={params}
+          externalProviders={providers}
+          disabled={isGenerating}
+          open={dockMenu === "params"}
+          onOpenChange={(next) => onDockMenuChange(next ? "params" : null)}
+          onConfirm={(nextParams) =>
+            onPickEngine({ providerId, modelKey, params: nextParams })
+          }
+        />
+      </div>
       <div
         className="flex shrink-0 items-center gap-1.5 text-white/35"
         style={{ fontSize: fontPx }}

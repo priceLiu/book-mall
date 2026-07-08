@@ -26,6 +26,7 @@ import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
+import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
   LibtvTryActionRow,
@@ -405,7 +406,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
           <GripVertical className="size-3.5 shrink-0 text-white/30" />
           <FileText className="size-3.5 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{PRO2_SCRIPT_HUB_NODE_LABEL}</span>
+          <LibtvEditableNodeTitle
+            nodeId={id}
+            defaultLabel={PRO2_SCRIPT_HUB_NODE_LABEL}
+            textClassName="text-[11px] text-white"
+          />
           <Pro2CrewTaskStatusBadge nodeId={id} />
         </div>
       ) : null}

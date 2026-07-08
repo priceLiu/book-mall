@@ -288,6 +288,10 @@ export const STORY_PRO_VIDEO_MODEL_KEYS = [
  */
 export const STORY_PRO_FRAME_IMAGE_MODEL_KEYS = [
   "nano-banana-pro",
+  "kling-3.0-image",
+  "4o-image",
+  "nano-banana-2",
+  "google/nano-banana",
   "flux-2-pro",
   "seedream-5-lite",
   "seedream-4.5",

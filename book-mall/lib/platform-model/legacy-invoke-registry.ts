@@ -374,6 +374,25 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   kieV2v("kling-2.6/motion-control", 91),
   kieV2v("kling-3.0/motion-control", 92),
   {
+    canonicalModelKey: "topaz-labs/video-enhance",
+    displayName: "Topaz Labs · 高清视频增强",
+    mediaKind: "VIDEO_TO_VIDEO",
+    role: "VIDEO",
+    requestKind: "VIDEO",
+    appTags: [...VISUAL],
+    sortOrder: 92.5,
+    primaryVendor: "topaz",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/次",
+    routes: [
+      {
+        vendor: "topaz",
+        modelKey: "topaz-labs/video-enhance",
+        providerKind: "TOPAZ" as const,
+      },
+    ],
+  },
+  {
     canonicalModelKey: "topaz/video-upscale",
     displayName: "Topaz Video Upscale (KIE)",
     mediaKind: "VIDEO_TO_VIDEO",

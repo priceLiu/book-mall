@@ -97,6 +97,7 @@ const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   MINIMAX: "MiniMax",
   WORLDLABS: "World Labs",
   ELEVENLABS: "ElevenLabs",
+  TOPAZ: "Topaz Labs",
 };
 
 /** 与 tool-web/config/lab-video-models.json 保持同步 */

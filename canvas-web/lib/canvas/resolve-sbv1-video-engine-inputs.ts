@@ -158,6 +158,9 @@ export function resolveSbv1VideoEngineInputs(
   const allowKlingTextToVideo =
     opts.modelKey?.trim() === "kling-3.0/video" &&
     opts.dockInputMode === "t2v";
+  const isTopazHdVideo =
+    opts.modelKey?.trim() === "topaz-labs/video-enhance" ||
+    opts.modelKey?.trim() === "topaz/video-upscale";
   const upstreamLinks = resolveSbv1UpstreamRefLinks(engineNodeId, nodes, edges);
   const mentionedIds = parseReferencedIds(prompt);
   const activeLinks =
@@ -258,10 +261,18 @@ export function resolveSbv1VideoEngineInputs(
   const dedupedAssets = dedupePortraitAssetRefs(portraitAssetRefs);
   const dedupedImages = [...new Set([...imageInputs, ...styleHttps])];
 
-  if (!prompt && dedupedAssets.length === 0 && dedupedImages.length === 0 && !allowKlingTextToVideo) {
+  if (
+    !prompt &&
+    dedupedAssets.length === 0 &&
+    dedupedImages.length === 0 &&
+    !allowKlingTextToVideo &&
+    !(isTopazHdVideo && videoInputs.length > 0)
+  ) {
     return {
       ok: false,
-      error: "请填写 prompt 或连接至少一张参考图。",
+      error: isTopazHdVideo
+        ? "请连接上游视频节点后再生成高清视频。"
+        : "请填写 prompt 或连接至少一张参考图。",
     };
   }
 

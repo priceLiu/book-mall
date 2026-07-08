@@ -16,6 +16,7 @@ const PROVIDERS = [
   "MINIMAX",
   "ELEVENLABS",
   "WORLDLABS",
+  "TOPAZ",
 ] as const;
 
 export function CredentialEditModal({

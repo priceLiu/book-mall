@@ -30,6 +30,23 @@ export function BatchConnectPreviewLines({
       getInternalNode,
     );
     if (!start) continue;
+    if (
+      !Number.isFinite(start.x) ||
+      !Number.isFinite(start.y) ||
+      start.x < -64 ||
+      start.y < -64 ||
+      start.x > window.innerWidth + 64 ||
+      start.y > window.innerHeight + 64
+    ) {
+      continue;
+    }
+    if (
+      !Number.isFinite(cursor.x) ||
+      !Number.isFinite(cursor.y) ||
+      Math.hypot(cursor.x - start.x, cursor.y - start.y) > 720
+    ) {
+      continue;
+    }
     const [path] = getBezierPath({
       sourceX: start.x,
       sourceY: start.y,

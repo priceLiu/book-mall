@@ -19,6 +19,8 @@ import {
 } from "./pro2-video-board-dock-links";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
+import type { CanvasNodeRuntime } from "./types";
+import { isMislabeledVendorSuccessError } from "./friendly-task-error";
 
 function videoRowPreview(row: StoryProVideoRow): {
   runtime?: StoryProVideoRow["videoRuntime"];
@@ -442,6 +444,37 @@ export function repairPro2VideoBoardGroupEdges(
   }
 }
 
+function mergePro2VideoBoardCellRuntime(
+  existing: CanvasNodeRuntime | undefined,
+  incoming: CanvasNodeRuntime | undefined,
+): CanvasNodeRuntime | undefined {
+  if (!incoming) return existing;
+  const existingUrl =
+    existing?.ossUrl?.trim() || existing?.ephemeralUrl?.trim() || "";
+  const incomingUrl =
+    incoming.ossUrl?.trim() || incoming.ephemeralUrl?.trim() || "";
+  if (
+    existingUrl &&
+    incoming.status === "error" &&
+    !incomingUrl &&
+    isMislabeledVendorSuccessError(incoming.failCode, incoming.failMessage)
+  ) {
+    return {
+      ...existing,
+      ...incoming,
+      status: "done",
+      ossUrl: existing.ossUrl ?? existingUrl,
+      ephemeralUrl: existing.ephemeralUrl,
+      failCode: undefined,
+      failMessage: undefined,
+    };
+  }
+  if (existingUrl && incoming.status === "error" && !incomingUrl) {
+    return existing;
+  }
+  return incoming;
+}
+
 /** 视频列 rows 变更后同步到组内 sbv1-video-engine 子节点 */
 export function syncPro2VideoBoardFromRows(
   nodes: CanvasFlowNode[],
@@ -472,11 +505,16 @@ export function syncPro2VideoBoardFromRows(
     const prompt =
       row.videoPrompt?.trim() ||
       resolvePro2VideoBoardCellDefaultPrompt(cell.id, nodes, edges);
+    const existingRt = (cell.data as { runtime?: CanvasNodeRuntime }).runtime;
+    const runtime = mergePro2VideoBoardCellRuntime(existingRt, preview.runtime);
     updateNodeData(cell.id, {
       label: `镜 ${row.frameIndex}`,
       dockInput: prompt,
       prompt,
-      runtime: preview.runtime,
+      ...(runtime ? { runtime } : {}),
+      ...(runtime?.status === "done"
+        ? { uploading: false, uploadError: undefined }
+        : {}),
     });
   }
 }

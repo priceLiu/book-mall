@@ -139,6 +139,7 @@ export const LIBTV_DRAG_ANYWHERE_NODE_TYPES = [
   "sbv1-video-engine",
   "story-pro2-image",
   "story-pro2-starter",
+  "story-pro2-tag",
   "story-pro2-script-hub",
   "story-pro2-three-view",
   "story-pro2-style-asset",

@@ -50,7 +50,6 @@ import {
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "./libtv-dock-send-button";
-import { LibtvDockSettingsTrigger } from "./libtv-dock-settings-trigger";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { pro2ImageNodeUsesEmbeddedDock } from "./pro2/pro2-image-node-embedded-dock";
 import { Pro2DockPasteZone } from "./pro2/pro2-dock-paste-zone";
@@ -64,9 +63,9 @@ import {
 } from "./pro2/pro2-input-dock-shell";
 import { sbv1ImageNodeUsesEmbeddedDock } from "./sbv1/sbv1-image-node-embedded-dock";
 import {
-  Sbv1ImageGenerateSettingsModal,
-  sbv1ImageSettingsTriggerLabel,
-} from "./sbv1/sbv1-image-generate-settings-modal";
+  Sbv1ImageDockModelPicker,
+  Sbv1ImageDockParamsPicker,
+} from "./sbv1/sbv1-image-dock-pickers";
 
 type DockImageNodeType =
   | "sbv1-image"
@@ -110,7 +109,7 @@ export function LibtvImageInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
   const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
   const marqueeSelecting = useCanvasMarqueeSelecting();
@@ -182,11 +181,19 @@ export function LibtvImageInputDock() {
     : settingsData.engine;
   const modelKey = normalizeModelKey(engine?.modelKey);
   const outputCount = settingsData.outputCount ?? 1;
-  const settingsLabel = isFramePipelineCell
-    ? modelKey
-      ? modelKey
-      : "选择生图模型"
-    : sbv1ImageSettingsTriggerLabel(settingsData, providers);
+  const pickerData = useMemo((): Sbv1ImageNodeData => {
+    if (!isFramePipelineCell || !frameBatchImage?.providerId) {
+      return settingsData;
+    }
+    return {
+      ...settingsData,
+      engine: {
+        providerId: frameBatchImage.providerId,
+        modelKey: frameBatchImage.modelKey ?? "",
+        params: frameBatchImage.params ?? {},
+      },
+    };
+  }, [isFramePipelineCell, frameBatchImage, settingsData]);
   const estCredits = useModelCreditsPreview(
     modelKey,
     0,
@@ -396,6 +403,34 @@ export function LibtvImageInputDock() {
 
   const onRun = isPipelineCell ? onRunPipeline : () => void onRunFreestanding();
 
+  const onImagePatch = useCallback(
+    (patch: Partial<Sbv1ImageNodeData>) => {
+      if (!storeNode) return;
+      if (isFramePipelineCell && framePipelineController) {
+        const merged = { ...pickerData, ...patch };
+        const nextEngine = merged.engine;
+        if (nextEngine?.providerId && nextEngine.modelKey) {
+          updateNodeData(framePipelineController.id, {
+            batchImage: {
+              providerId: nextEngine.providerId,
+              modelKey: nextEngine.modelKey,
+              params: nextEngine.params ?? {},
+            },
+          });
+        }
+        return;
+      }
+      updateNodeData(storeNode.id, patch);
+    },
+    [
+      storeNode,
+      isFramePipelineCell,
+      framePipelineController,
+      pickerData,
+      updateNodeData,
+    ],
+  );
+
   if (!storeNode || !dockActive || !placement) return null;
 
   const usesEmbedded =
@@ -487,10 +522,14 @@ export function LibtvImageInputDock() {
           <LibtvImageDockFooter
             isPipelineCell={isPipelineCell && !isFramePipelineCell}
             isRunning={isRunning}
-            settingsLabel={settingsLabel}
+            showModelPicker={showModelPicker || isFramePipelineCell}
+            pickerData={pickerData}
+            imageModelKeys={imageModelKeys}
+            dockMenu={dockMenu}
+            onDockMenuChange={setDockMenu}
+            onImagePatch={onImagePatch}
             estCredits={estCredits}
             canSend={canSend}
-            onOpenSettings={() => setSettingsOpen(true)}
             onRun={onRun}
           />
         }
@@ -520,45 +559,6 @@ export function LibtvImageInputDock() {
           />
         </Pro2DockPasteZone>
       </Pro2InputDockShell>
-
-      {(showModelPicker || isFramePipelineCell) ? (
-        <Sbv1ImageGenerateSettingsModal
-          open={settingsOpen}
-          data={
-            isFramePipelineCell
-              ? ({
-                  ...settingsData,
-                  engine: engine ?? settingsData.engine,
-                } as Sbv1ImageNodeData)
-              : settingsData
-          }
-          allowedModelKeys={imageModelKeys}
-          onClose={() => setSettingsOpen(false)}
-          onConfirm={(patch) => {
-            if (!storeNode) return;
-            if (isFramePipelineCell && framePipelineController) {
-              const nextEngine = (
-                patch as { engine?: typeof engine }
-              ).engine;
-              if (nextEngine?.providerId && nextEngine.modelKey) {
-                updateNodeData(framePipelineController.id, {
-                  batchImage: {
-                    providerId: nextEngine.providerId,
-                    modelKey: nextEngine.modelKey,
-                    params: nextEngine.params ?? {
-                      aspect_ratio: "16:9",
-                      resolution: "2K",
-                      output_format: "png",
-                    },
-                  },
-                });
-              }
-              return;
-            }
-            updateNodeData(storeNode.id, patch);
-          }}
-        />
-      ) : null}
     </>
   );
 }
@@ -566,33 +566,53 @@ export function LibtvImageInputDock() {
 function LibtvImageDockFooter({
   isPipelineCell,
   isRunning,
-  settingsLabel,
+  showModelPicker,
+  pickerData,
+  imageModelKeys,
+  dockMenu,
+  onDockMenuChange,
+  onImagePatch,
   estCredits,
   canSend,
-  onOpenSettings,
   onRun,
 }: {
   isPipelineCell: boolean;
   isRunning: boolean;
-  settingsLabel: string;
+  showModelPicker: boolean;
+  pickerData: Sbv1ImageNodeData;
+  imageModelKeys?: readonly string[];
+  dockMenu: "model" | "params" | null;
+  onDockMenuChange: (menu: "model" | "params" | null) => void;
+  onImagePatch: (patch: Partial<Sbv1ImageNodeData>) => void;
   estCredits: ReturnType<typeof useModelCreditsPreview>;
   canSend: boolean;
-  onOpenSettings: () => void;
   onRun: () => void;
 }) {
   const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
 
   return (
     <Pro2DockToolbar className="gap-2">
-      {!isPipelineCell ? (
-        <LibtvDockSettingsTrigger
-          label={settingsLabel}
-          disabled={isRunning}
-          onClick={onOpenSettings}
-        />
-      ) : (
+      {showModelPicker && !isPipelineCell ? (
+        <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
+          <Sbv1ImageDockModelPicker
+            data={pickerData}
+            allowedModelKeys={imageModelKeys}
+            disabled={isRunning}
+            open={dockMenu === "model"}
+            onOpenChange={(next) => onDockMenuChange(next ? "model" : null)}
+            onPatch={onImagePatch}
+          />
+          <Sbv1ImageDockParamsPicker
+            data={pickerData}
+            disabled={isRunning}
+            open={dockMenu === "params"}
+            onOpenChange={(next) => onDockMenuChange(next ? "params" : null)}
+            onPatch={onImagePatch}
+          />
+        </div>
+      ) : isPipelineCell ? (
         <div className="min-w-0 flex-1" />
-      )}
+      ) : null}
       <div className="flex shrink-0 items-center gap-1.5">
         {!isPipelineCell && estCredits?.credits != null ? (
           <span

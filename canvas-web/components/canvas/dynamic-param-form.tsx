@@ -287,7 +287,7 @@ function CompactField({
                   className={[
                     "min-h-[28px] flex-1 rounded px-2 py-1 text-[11px] font-semibold transition",
                     active
-                      ? "bg-[var(--canvas-accent)] text-white"
+                      ? "bg-white/[0.12] text-white"
                       : "text-white/75 hover:bg-white/10",
                   ].join(" ")}
                 >
@@ -308,7 +308,7 @@ function CompactField({
           value={val}
           onChange={(e) => onPatch(e.target.value)}
           onWheel={onCanvasFormWheel}
-          className={`${RF_FORM_CONTROL} mt-0.5 w-full rounded-md border border-white/15 bg-black/50 px-2 py-1.5 text-[11px] font-medium text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+          className={`${RF_FORM_CONTROL} mt-0.5 w-full rounded-md border border-white/15 bg-black/50 px-2 py-1.5 text-[11px] font-medium text-white focus:border-white/35 focus:outline-none`}
         >
           {item.options.map((o) => (
             <option key={o.value} value={o.value} className="bg-[#1a1a24] text-white">
@@ -335,7 +335,7 @@ function CompactField({
             const v = e.target.value === "" ? undefined : Number(e.target.value);
             onPatch(v);
           }}
-          className={`${RF_NODE_SCROLL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+          className={`${RF_NODE_SCROLL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-white/35 focus:outline-none`}
         />
       </label>
     );
@@ -366,7 +366,7 @@ function CompactField({
           placeholder={item.placeholder}
           onChange={(e) => onPatch(e.target.value)}
           onWheel={onCanvasFormWheel}
-          className={`${RF_FORM_CONTROL} mt-0.5 max-h-32 w-full resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+          className={`${RF_FORM_CONTROL} mt-0.5 max-h-32 w-full resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-white/35 focus:outline-none`}
         />
       </label>
     );
@@ -381,7 +381,7 @@ function CompactField({
         value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
         placeholder={item.placeholder}
         onChange={(e) => onPatch(e.target.value)}
-        className={`${RF_NODE_SCROLL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+        className={`${RF_NODE_SCROLL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-white/35 focus:outline-none`}
       />
     </label>
   );

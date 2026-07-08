@@ -9,11 +9,10 @@ import {
   useModalEscapeClose,
 } from "@/lib/canvas/use-modal-portal-effects";
 import { EnginePicker } from "@/components/canvas/engine-picker";
-import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
-import { hideKieVendorLabel, ENGINE_PICKER_MODAL_BG } from "@/lib/canvas/gateway-model-role";
+import { ENGINE_PICKER_MODAL_BG } from "@/lib/canvas/gateway-model-role";
 
 export type Pro2ScriptLlmSettingsModalProps = {
   open: boolean;
@@ -145,28 +144,9 @@ export function Pro2ScriptLlmSettingsModal({
   );
 }
 
-/** Dock 底栏触发文案 */
-export function pro2ScriptLlmSettingsTriggerLabel(
-  providerId: string,
-  modelKey: string,
-  providers: CanvasProviderDto[],
-): string {
-  const key = modelKey.trim();
-  if (key) {
-    for (const provider of providers) {
-      const model = provider.models.find(
-        (m) => m.modelKey.toLowerCase() === key.toLowerCase(),
-      );
-      const name = model?.displayName?.trim();
-      if (name) return name;
-    }
-    if (providerId.trim()) {
-      const provider = providers.find((p) => p.id === providerId);
-      if (provider) {
-        return `${hideKieVendorLabel(provider.alias)} · ${key}`;
-      }
-    }
-    return key;
-  }
-  return "选择文本模型";
-}
+/** Dock 底栏触发文案（兼容旧引用） */
+export {
+  pro2LlmModelTriggerLabel as pro2ScriptLlmSettingsTriggerLabel,
+  pro2LlmModelTriggerLabel,
+  pro2LlmParamsTriggerLabel,
+} from "./pro2-llm-dock-pickers";

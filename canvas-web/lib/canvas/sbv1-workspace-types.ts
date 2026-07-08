@@ -20,7 +20,7 @@ export type Sbv1AspectRatio =
   | "3:4"
   | "9:16";
 
-export type Sbv1CreationType = "video";
+export type Sbv1CreationType = "video" | "hd-video";
 
 export type Sbv1RefSlot = {
   slotId: string;
@@ -77,7 +77,7 @@ export type Sbv1VideoEngineNodeData = {
   engine: CanvasEnginePick;
   aspectRatio: Sbv1AspectRatio;
   durationSec: number;
-  resolution: "720p" | "1080p";
+  resolution: "720p" | "1080p" | "2k" | "4k";
   refSlots: Sbv1RefSlot[];
   /** Dock 顶栏输入模式（文生视频 / 图生视频 / 首尾帧…） */
   dockInputMode?: Sbv1DockInputMode;

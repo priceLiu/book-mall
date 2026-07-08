@@ -44,12 +44,15 @@ export function useGatewayLinkStatus() {
   const gatewayConsoleUrl = `${GATEWAY_ORIGIN.replace(/\/$/, "")}/dashboard/credentials`;
   const gatewayGuideUrl = `${GATEWAY_ORIGIN.replace(/\/$/, "")}/guide`;
   const linked = Boolean(status?.linked && !status?.revoked);
+  /** 仅在成功拉取状态后确认未关联（避免上游 503 等误拦生成） */
+  const confirmedUnlinked = !loading && status !== null && !linked;
 
   return {
     status,
     loading,
     error,
     linked,
+    confirmedUnlinked,
     boundKinds: status?.boundKinds ?? [],
     accountUrl,
     gatewayConsoleUrl,

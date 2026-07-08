@@ -75,6 +75,7 @@ import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-sel
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
+import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
@@ -473,7 +474,11 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
       <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
         <GripVertical className="size-3.5 shrink-0 text-white/30" />
         <FileText className="size-3.5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{nodeLabel}</span>
+        <LibtvEditableNodeTitle
+          nodeId={id}
+          defaultLabel={nodeLabel}
+          textClassName="text-[11px] text-white"
+        />
         <Pro2CrewTaskStatusBadge nodeId={id} />
       </div>
 

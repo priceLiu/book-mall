@@ -87,6 +87,8 @@
     "qr:sync-minimax-voices:dry-run": "tsx scripts/sync-minimax-voice-catalog.ts --dry-run",
     "qr:bind-minimax-gateway": "dotenv -e .env.local -- tsx scripts/bind-minimax-gateway-credential.ts",
     "qr:bind-worldlabs-gateway": "dotenv -e .env.local -- tsx scripts/bind-worldlabs-gateway-credential.ts",
+    "qr:bind-topaz-gateway": "dotenv -e .env.local -- tsx scripts/bind-topaz-gateway-credential.ts",
+    "gateway:apply-topaz-enum": "dotenv -e .env.local -- tsx scripts/apply-topaz-enum.ts",
     "gateway:repair-insufficient-mislabel": "dotenv -e .env.local -- tsx scripts/repair-gateway-log-insufficient-mislabel.ts",
     "gateway:poll-loop": "GENERATION_POLL_WORKER=1 PRISMA_CONNECTION_LIMIT=3 dotenv -e .env.local -- tsx scripts/gateway-poll-loop.ts",
     "gateway:stats-reconcile": "dotenv -e .env.local -- tsx scripts/gateway-stats-counter-reconcile.ts",

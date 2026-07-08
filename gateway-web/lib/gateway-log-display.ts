@@ -66,6 +66,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   VOLCENGINE: "火山",
   MINIMAX: "MiniMax",
   ELEVENLABS: "ElevenLabs",
+  TOPAZ: "Topaz Labs",
 };
 
 /** 日志页厂商筛选 · 展示顺序 */
@@ -79,6 +80,7 @@ export const LOG_PROVIDER_KIND_ORDER = [
   "MINIMAX",
   "ELEVENLABS",
   "WORLDLABS",
+  "TOPAZ",
 ] as const;
 
 export function sortLogProviderKinds(kinds: Iterable<string>): string[] {
