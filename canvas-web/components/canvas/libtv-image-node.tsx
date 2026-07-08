@@ -45,6 +45,7 @@ import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
 import { Pro2ImageGridSplitToolbar } from "./pro2/pro2-image-grid-split-toolbar";
 import { LibtvImageGridSplitStage } from "./libtv-image-grid-split-stage";
 import { LibtvNodeToolbarPortal } from "./libtv-node-toolbar-portal";
+import { LibtvEditableNodeTitle } from "./libtv-editable-node-title";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
@@ -246,13 +247,17 @@ export function LibtvImageNode({
       (isGenerating && !d.uploading),
   });
 
-  const nodeLabel = useMemo(() => {
-    if (isCharacterThreeView) return d.label?.trim() || "角色";
-    if (d.label?.trim()) return d.label.trim();
+  const defaultNodeLabel = useMemo(() => {
+    if (isCharacterThreeView) return "角色";
     const imgs = nodes.filter((n) => n.type === rfNodeType);
     const idx = imgs.findIndex((n) => n.id === id);
     return `图片 ${idx >= 0 ? idx + 1 : ""}`.trim();
-  }, [nodes, id, d.label, isCharacterThreeView, rfNodeType]);
+  }, [nodes, id, isCharacterThreeView, rfNodeType]);
+
+  const nodeLabel = useMemo(() => {
+    if (d.label?.trim()) return d.label.trim();
+    return defaultNodeLabel;
+  }, [d.label, defaultNodeLabel]);
 
   const onPick = useCallback(() => inputRef.current?.click(), []);
 
@@ -708,7 +713,7 @@ export function LibtvImageNode({
               <button
                 type="button"
                 className={cn(
-                  "nodrag flex min-w-0 items-center gap-2 rounded-md transition",
+                  "nodrag flex shrink-0 items-center rounded-md transition",
                   !hasImage &&
                     !isGenerating &&
                     !isCharacterThreeView &&
@@ -727,10 +732,12 @@ export function LibtvImageNode({
                 }}
               >
                 <ImageIcon className={cn("size-3.5 shrink-0", chrome.icon)} />
-                <p className="truncate text-xs font-medium text-white">
-                  {nodeLabel}
-                </p>
               </button>
+              <LibtvEditableNodeTitle
+                nodeId={id}
+                defaultLabel={defaultNodeLabel}
+                textClassName="text-xs font-medium text-white"
+              />
             </div>
             {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
               <Pro2CrewTaskStatusBadge nodeId={id} />

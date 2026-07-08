@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -39,12 +38,10 @@ import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "../libtv-dock-send-button";
-import { LibtvDockSettingsTrigger } from "../libtv-dock-settings-trigger";
-import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
-  Sbv1ImageGenerateSettingsModal,
-  sbv1ImageSettingsTriggerLabel,
-} from "../sbv1/sbv1-image-generate-settings-modal";
+  Sbv1ImageDockModelPicker,
+  Sbv1ImageDockParamsPicker,
+} from "../sbv1/sbv1-image-dock-pickers";
 import {
   Pro2DockHeader,
   Pro2DockToolbar,
@@ -69,7 +66,7 @@ export function Pro2ThreeViewInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
   const selected = useMemo(() => {
     const picked = rfNodes.filter(
@@ -110,7 +107,6 @@ export function Pro2ThreeViewInputDock() {
     [d, batchImage],
   );
 
-  const settingsLabel = sbv1ImageSettingsTriggerLabel(settingsData, providers);
   const hasImageModel = Boolean(
     settingsData.engine?.providerId?.trim() && settingsData.engine?.modelKey?.trim(),
   );
@@ -367,10 +363,12 @@ export function Pro2ThreeViewInputDock() {
         }
         footer={
           <Pro2ThreeViewDockFooter
-            settingsLabel={settingsLabel}
+            settingsData={settingsData}
             isRunning={isRunning}
             canRegenerate={canRegenerate}
-            onOpenSettings={() => setSettingsOpen(true)}
+            dockMenu={dockMenu}
+            onDockMenuChange={setDockMenu}
+            onConfirmSettings={onConfirmSettings}
             onRegenerate={onRegenerate}
           />
         }
@@ -392,50 +390,45 @@ export function Pro2ThreeViewInputDock() {
           mentionEdition="pro2"
         />
       </Pro2InputDockShell>
-
-      <Sbv1ImageGenerateSettingsModal
-        open={settingsOpen}
-        data={settingsData}
-        onClose={() => setSettingsOpen(false)}
-        onConfirm={onConfirmSettings}
-      />
     </>
   );
 }
 
 function Pro2ThreeViewDockFooter({
-  settingsLabel,
+  settingsData,
   isRunning,
   canRegenerate,
-  onOpenSettings,
+  dockMenu,
+  onDockMenuChange,
+  onConfirmSettings,
   onRegenerate,
 }: {
-  settingsLabel: string;
+  settingsData: Sbv1ImageNodeData;
   isRunning: boolean;
   canRegenerate: boolean;
-  onOpenSettings: () => void;
+  dockMenu: "model" | "params" | null;
+  onDockMenuChange: (menu: "model" | "params" | null) => void;
+  onConfirmSettings: (patch: Partial<Sbv1ImageNodeData>) => void;
   onRegenerate: () => void;
 }) {
-  const { sendIconPx } = useLibtvDockToolbarMetrics();
-
   return (
     <Pro2DockToolbar className="gap-2">
-      <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          title="图片生成设置"
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
+        <Sbv1ImageDockModelPicker
+          data={settingsData}
           disabled={isRunning}
-          className="nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={onOpenSettings}
-        >
-          <SlidersHorizontal style={{ width: sendIconPx, height: sendIconPx }} />
-        </button>
+          open={dockMenu === "model"}
+          onOpenChange={(next) => onDockMenuChange(next ? "model" : null)}
+          onPatch={onConfirmSettings}
+        />
+        <Sbv1ImageDockParamsPicker
+          data={settingsData}
+          disabled={isRunning}
+          open={dockMenu === "params"}
+          onOpenChange={(next) => onDockMenuChange(next ? "params" : null)}
+          onPatch={onConfirmSettings}
+        />
       </div>
-      <LibtvDockSettingsTrigger
-        label={settingsLabel}
-        disabled={isRunning}
-        onClick={onOpenSettings}
-      />
       <LibtvDockSendButton
         disabled={!canRegenerate}
         loading={isRunning}

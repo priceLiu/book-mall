@@ -7,6 +7,7 @@ import type { GatewayProviderKind } from "@prisma/client";
 import type { CanvasProviderDto } from "./canvas-provider-service";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/deepseek-system";
+import { BAILIAN_IMAGE_KNOWN_MODELS } from "./providers/bailian-image";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
@@ -16,6 +17,7 @@ import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { listPlatformOfferingProvidersForUser } from "@/lib/canvas/platform-offering-providers";
 import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
+import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
 
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
@@ -24,6 +26,8 @@ export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
 export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
 /** 分镜视频 1.0 画布专用 · 仅 VOLCENGINE VIDEO（走「火山方舟 · 分镜视频1.0」凭证） */
 export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
+/** Topaz Labs · 高清视频增强 */
+export const GATEWAY_TOPAZ_PROVIDER_ID = "gateway:topaz";
 
 export function isGatewayVirtualProviderId(id: string | null | undefined): boolean {
   return !!id && id.startsWith("gateway:");
@@ -68,7 +72,7 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       enabled: true,
       sortOrder: idx,
     }));
-    const tts = STORY_TTS_GATEWAY_MODELS.map((m, idx) => ({
+    const image = BAILIAN_IMAGE_KNOWN_MODELS.map((m, idx) => ({
       id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
       modelKey: m.modelKey,
       displayName: m.displayName,
@@ -79,7 +83,18 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       enabled: true,
       sortOrder: r2v.length + idx,
     }));
-    return [...r2v, ...tts];
+    const tts = STORY_TTS_GATEWAY_MODELS.map((m, idx) => ({
+      id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
+      modelKey: m.modelKey,
+      displayName: m.displayName,
+      role: m.role,
+      description: m.description ?? null,
+      paramsSchema: m.paramsSchema ?? null,
+      defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+      enabled: true,
+      sortOrder: r2v.length + image.length + idx,
+    }));
+    return [...r2v, ...image, ...tts];
   }
   if (kind === "VOLCENGINE") {
     return VOLCENGINE_ALL_KNOWN_MODELS.map((m, idx) => ({
@@ -236,6 +251,32 @@ export async function listGatewayVirtualProvidersForUser(
       lastTestStatus: "gateway",
       models: listHunyuanKnownModels().map((m, idx) => ({
         id: `${GATEWAY_HUNYUAN_PROVIDER_ID}::${m.modelKey}`,
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        role: m.role,
+        description: m.description ?? null,
+        paramsSchema: m.paramsSchema ?? null,
+        defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+        enabled: true,
+        sortOrder: idx,
+      })),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  if (link.boundKinds.includes("TOPAZ")) {
+    out.push({
+      id: GATEWAY_TOPAZ_PROVIDER_ID,
+      alias: "Gateway · Topaz Labs",
+      kind: "TOPAZ",
+      baseUrl: "https://api.topazlabs.com",
+      apiKeyMasked: "gateway",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "gateway",
+      models: TOPAZ_KNOWN_MODELS.map((m, idx) => ({
+        id: `${GATEWAY_TOPAZ_PROVIDER_ID}::${m.modelKey}`,
         modelKey: m.modelKey,
         displayName: m.displayName,
         role: m.role,

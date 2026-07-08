@@ -8,6 +8,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   MINIMAX: "MiniMax",
   ELEVENLABS: "ElevenLabs",
   WORLDLABS: "World Labs",
+  TOPAZ: "Topaz Labs",
 };
 
 const REQUEST_KIND_LABEL: Record<string, string> = {

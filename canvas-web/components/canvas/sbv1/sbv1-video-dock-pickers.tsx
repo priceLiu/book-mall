@@ -24,6 +24,12 @@ import {
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
 import {
+  LIBTV_DOCK_POPOVER_CLASS,
+  LibtvDockParamGrid,
+  LIBTV_DOCK_PICKER_CHECK_CLASS,
+  libtvDockModelItemClassName,
+} from "../libtv-dock-picker-chrome";
+import {
   Sbv1ToolbarDropdown,
   useSbv1ToolbarAnchor,
 } from "./sbv1-toolbar-anchor-popover";
@@ -39,9 +45,6 @@ const RESOLUTION_OPTIONS = [
   { id: "720p", label: "720p" },
   { id: "1080p", label: "1080p" },
 ] as const;
-
-const DOCK_POPOVER_CLASS =
-  "nodrag nowheel max-h-[min(420px,70vh)] w-[min(22rem,calc(100vw-24px))] overflow-y-auto rounded-xl border border-white/12 bg-[#1a1a1c] py-2 shadow-2xl";
 
 function resolveVideoModelDisplayName(
   modelKey: string,
@@ -284,7 +287,7 @@ export function Sbv1VideoDockModelPicker({
         rect={rect}
         placement="auto"
         estimatedHeight={280}
-        className={DOCK_POPOVER_CLASS}
+        className={LIBTV_DOCK_POPOVER_CLASS}
       >
         <p className="px-3 pb-1.5 pt-0.5 text-[13px] font-medium text-white/75">
           选择模型
@@ -301,11 +304,7 @@ export function Sbv1VideoDockModelPicker({
               <button
                 key={`${providerId}:${model.modelKey}`}
                 type="button"
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2.5 text-left transition",
-                  "hover:border-cyan-400/35 hover:bg-white/[0.05]",
-                  selected && "border-cyan-400/50 bg-cyan-500/10",
-                )}
+                className={libtvDockModelItemClassName(selected)}
                 onClick={() => onSelect(providerId, model)}
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.06] text-[10px] font-semibold text-white/70">
@@ -320,7 +319,7 @@ export function Sbv1VideoDockModelPicker({
                   </span>
                 </span>
                 {selected ? (
-                  <Check className="size-4 shrink-0 text-cyan-300" />
+                  <Check className={LIBTV_DOCK_PICKER_CHECK_CLASS} />
                 ) : null}
               </button>
             );
@@ -328,44 +327,6 @@ export function Sbv1VideoDockModelPicker({
         </div>
       </Sbv1ToolbarDropdown>
     </>
-  );
-}
-
-function ParamGrid({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { id: string; label: string }[];
-  value: string;
-  onChange: (id: string) => void;
-}) {
-  return (
-    <div>
-      <p className="mb-2 px-3 text-[12px] text-white/50">{label}</p>
-      <div className="grid grid-cols-3 gap-1.5 px-2">
-        {options.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            className={cn(
-              "relative rounded-lg border px-2 py-2 text-[12px] font-medium transition",
-              opt.id === value
-                ? "border-cyan-400/55 bg-cyan-500/10 text-cyan-50"
-                : "border-white/10 text-white/70 hover:border-cyan-400/30 hover:bg-white/[0.04]",
-            )}
-            onClick={() => onChange(opt.id)}
-          >
-            {opt.label}
-            {opt.id === value ? (
-              <Check className="absolute right-1 top-1 size-3 text-cyan-300" />
-            ) : null}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -431,12 +392,12 @@ export function Sbv1VideoDockParamsPicker({
         rect={rect}
         placement="auto"
         estimatedHeight={360}
-        className={DOCK_POPOVER_CLASS}
+        className={LIBTV_DOCK_POPOVER_CLASS}
       >
         <div className="space-y-3 pb-1">
           {derived.isVolcDockModel ? (
             <>
-              <ParamGrid
+              <LibtvDockParamGrid
                 label="比例"
                 options={SBV1_ASPECT_RATIOS.map((r) => ({
                   id: r,
@@ -449,7 +410,7 @@ export function Sbv1VideoDockParamsPicker({
                   })
                 }
               />
-              <ParamGrid
+              <LibtvDockParamGrid
                 label="分辨率"
                 options={RESOLUTION_OPTIONS.map((r) => ({
                   id: r.id,
@@ -466,7 +427,7 @@ export function Sbv1VideoDockParamsPicker({
                   })
                 }
               />
-              <ParamGrid
+              <LibtvDockParamGrid
                 label="参考模式"
                 options={SBV1_REFERENCE_MODES.map((m) => ({
                   id: m.id,
@@ -501,7 +462,7 @@ export function Sbv1VideoDockParamsPicker({
                     max={15}
                     step={1}
                     value={derived.effectiveDurationSec}
-                    className="nodrag h-1.5 w-full cursor-pointer accent-cyan-400"
+                    className="nodrag h-1.5 w-full cursor-pointer accent-white"
                     onChange={(e) => {
                       const next = Number(e.target.value);
                       patchVideoSettings(data, onPatch, {
@@ -519,7 +480,7 @@ export function Sbv1VideoDockParamsPicker({
           ) : (
             <>
               {showGatewayReferenceMode ? (
-                <ParamGrid
+                <LibtvDockParamGrid
                   label="参考模式"
                   options={referenceModeOptions.map((m) => ({
                     id: m.id,

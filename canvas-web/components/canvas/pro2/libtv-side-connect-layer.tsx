@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useReactFlow } from "@xyflow/react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
@@ -10,12 +9,10 @@ import { resolveLibtvSideConnectMenu } from "@/lib/canvas/libtv-side-connect-men
 import { runLibtvSideConnectPick } from "@/lib/canvas/libtv-side-connect-pick";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
-import { BatchConnectPreviewLines } from "./batch-connect-preview-lines";
 
 const MENU_OFFSET_X = 12;
 
 function LibtvSideConnectLayerInner() {
-  const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const pending = useCanvasStore((s) => s.pendingSideConnect);
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -68,6 +65,15 @@ function LibtvSideConnectLayerInner() {
     clearPendingSideConnect();
   }, [clearPendingSideConnect]);
 
+  useEffect(() => {
+    if (!pending) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pending, closeMenu]);
+
   const onPick = useCallback(
     (itemId: string, nodeType?: string) => {
       if (!pending) return;
@@ -102,13 +108,6 @@ function LibtvSideConnectLayerInner() {
 
   return (
     <>
-      <BatchConnectPreviewLines
-        sources={[sourceNode]}
-        allNodes={nodes}
-        cursor={lineTarget}
-        flowToScreenPosition={flowToScreenPosition}
-        getInternalNode={getInternalNode}
-      />
       <Pro2AddNodePopover
         open
         anchor={menuAnchor}

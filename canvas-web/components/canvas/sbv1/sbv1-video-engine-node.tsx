@@ -50,6 +50,7 @@ import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-v
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
+import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
@@ -61,6 +62,14 @@ import {
   useLibtvRuntimeErrorAlert,
   libtvRuntimeErrorAlertTitle,
 } from "@/lib/canvas/libtv-runtime-error-alert";
+import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
+import {
+  pro2VideoBoardRowMediaUrl,
+  pickPro2VideoBoardRowApplyTask,
+  pickPro2VideoBoardRowSucceededTask,
+  pro2VideoBoardRowRuntime,
+} from "@/lib/canvas/pro2-video-board-cell-task";
+import type { StoryProVideoRow } from "@/lib/canvas/story-pro-workspace-types";
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
@@ -82,10 +91,103 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     label?: string;
   };
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const isPro2VideoBoardCell =
+    d.pro2MediaRole === "video" && Boolean(d.pro2ControllerNodeId?.trim());
+  const pro2ControllerNodeId = d.pro2ControllerNodeId?.trim() ?? "";
+  const pro2RowKey = (d as { pro2RowKey?: string }).pro2RowKey?.trim() ?? "";
+
   const { succeeded, history } = useNodeTaskHistory(id);
+  const { succeeded: columnSucceeded, history: columnHistory } =
+    useNodeTaskHistory(
+      isPro2VideoBoardCell && pro2ControllerNodeId
+        ? pro2ControllerNodeId
+        : null,
+    );
+
+  const rowRuntime = useMemo(() => {
+    if (!isPro2VideoBoardCell || !pro2ControllerNodeId || !pro2RowKey) {
+      return undefined;
+    }
+    const col = nodes.find((n) => n.id === pro2ControllerNodeId);
+    const rows = (col?.data as { rows?: StoryProVideoRow[] } | undefined)?.rows;
+    return pro2VideoBoardRowRuntime(rows, pro2RowKey);
+  }, [isPro2VideoBoardCell, pro2ControllerNodeId, pro2RowKey, nodes]);
+
+  const rowApplyTask = useMemo(() => {
+    if (!isPro2VideoBoardCell || !pro2ControllerNodeId || !pro2RowKey) {
+      return undefined;
+    }
+    return pickPro2VideoBoardRowApplyTask(
+      columnHistory,
+      pro2ControllerNodeId,
+      pro2RowKey,
+      d.runtime ?? rowRuntime,
+    );
+  }, [
+    isPro2VideoBoardCell,
+    pro2ControllerNodeId,
+    pro2RowKey,
+    columnHistory,
+    d.runtime,
+    rowRuntime,
+  ]);
+
+  const rowDisplayTask = useMemo(() => {
+    if (!isPro2VideoBoardCell || !pro2ControllerNodeId || !pro2RowKey) {
+      return undefined;
+    }
+    return (
+      pickPro2VideoBoardRowSucceededTask(
+        columnHistory,
+        pro2ControllerNodeId,
+        pro2RowKey,
+      ) ??
+      (rowApplyTask?.status !== "FAILED" && rowApplyTask?.status !== "CANCELLED"
+        ? rowApplyTask
+        : undefined)
+    );
+  }, [
+    isPro2VideoBoardCell,
+    pro2ControllerNodeId,
+    pro2RowKey,
+    columnHistory,
+    rowApplyTask,
+  ]);
+
+  const rowSucceeded = useMemo(() => {
+    if (!isPro2VideoBoardCell) return columnSucceeded;
+    return columnSucceeded.filter(
+      (t) =>
+        t.nodeId === pro2ControllerNodeId &&
+        t.storyScope?.rowKey === pro2RowKey &&
+        t.storyScope?.mediaKind === "video",
+    );
+  }, [
+    isPro2VideoBoardCell,
+    columnSucceeded,
+    pro2ControllerNodeId,
+    pro2RowKey,
+  ]);
+
+  const taskHistory = isPro2VideoBoardCell ? columnHistory : history;
+  const taskSucceeded = isPro2VideoBoardCell ? rowSucceeded : succeeded;
+
   const [previewOpen, setPreviewOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+
+  const videoUrl =
+    pro2VideoBoardRowMediaUrl({ runtime: d.runtime, task: rowDisplayTask }) ??
+    pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??
+    pickTaskResultMediaUrl(taskSucceeded[taskSucceeded.length - 1] ?? {}) ??
+    taskSucceeded[taskSucceeded.length - 1]?.ossUrl ??
+    undefined;
+  const hasVideo = Boolean(videoUrl);
+  const stageVideoFit: "cover" | "contain" = isPro2VideoBoardCell
+    ? "cover"
+    : "contain";
+  const stageVideoFitClass =
+    stageVideoFit === "cover" ? "object-cover" : "object-contain";
 
   const errorBanner = useLibtvRuntimeErrorBanner({
     nodeId: id,
@@ -94,6 +196,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    hasMedia: hasVideo,
   });
 
   useLibtvRuntimeErrorAlert({
@@ -103,6 +206,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    enabled: !hasVideo && !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
     onAlert: ({ message, failCode }) => {
       void alert({
         title: libtvRuntimeErrorAlertTitle(failCode, message),
@@ -113,42 +217,42 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     },
   });
 
-  const videoUrl =
-    d.runtime?.ossUrl ??
-    d.runtime?.ephemeralUrl ??
-    pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
-    succeeded[succeeded.length - 1]?.ossUrl ??
-    undefined;
   const posterUrl = useMemo(
     () =>
       resolveLibtvVideoPosterUrl({
         nodeId: id,
-        runtime: d.runtime,
-        latestSucceededTask: succeeded[succeeded.length - 1],
+        runtime: d.runtime ?? rowRuntime,
+        latestSucceededTask:
+          rowDisplayTask ??
+          taskSucceeded[taskSucceeded.length - 1],
         nodes,
         edges,
       }),
-    [id, d.runtime, succeeded, nodes, edges],
+    [id, d.runtime, rowRuntime, rowDisplayTask, taskSucceeded, nodes, edges],
   );
 
-  const isPro2VideoBoardCell =
-    d.pro2MediaRole === "video" && Boolean(d.pro2ControllerNodeId?.trim());
   const nodeEdition = isPro2VideoBoardCell ? "pro2" : "sbv1";
+  const defaultVideoTitle = isPro2VideoBoardCell
+    ? "分镜视频"
+    : SBV1_VIDEO_COMPOSE_LABEL;
   const nodeTitle =
     d.label?.trim() ||
     d.crewTaskLabel?.trim() ||
-    (isPro2VideoBoardCell ? "分镜视频" : SBV1_VIDEO_COMPOSE_LABEL);
-  const isGenerating = isLibtvMediaGenerating(d);
-  const hasVideo = Boolean(videoUrl);
+    defaultVideoTitle;
+  const isGenerating = isLibtvMediaGenerating(d) && !hasVideo;
 
   const inflightTask = useMemo(
-    () => pickActiveServerInflightTask(history, d.runtime?.taskId, d.runtime),
+    () =>
+      pickActiveServerInflightTask(
+        taskHistory,
+        rowApplyTask?.id ?? d.runtime?.taskId,
+        d.runtime ?? rowRuntime,
+      ),
     [
-      history,
-      d.runtime?.taskId,
-      d.runtime?.status,
-      d.runtime?.ossUrl,
-      d.runtime?.ephemeralUrl,
+      taskHistory,
+      rowApplyTask?.id,
+      d.runtime,
+      rowRuntime,
     ],
   );
 
@@ -171,7 +275,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     const localSt = localRt?.status;
     if (localSt !== "pending" && localSt !== "running") return;
 
-    const terminal = history.find(
+    const terminal = taskHistory.find(
       (t) =>
         t.id === boundId &&
         (t.status === "SUCCEEDED" ||
@@ -192,7 +296,56 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       return;
     }
     updateNodeData(id, nodePatch);
-  }, [history, id, updateNodeData, inflightTask]);
+  }, [taskHistory, id, updateNodeData, inflightTask]);
+
+  /** 分镜视频组格 · 任务在 video 列上，从列级任务写回子节点 runtime */
+  useEffect(() => {
+    if (!isPro2VideoBoardCell || !rowApplyTask) return;
+    if (
+      rowApplyTask.status !== "SUCCEEDED" &&
+      rowApplyTask.status !== "FAILED" &&
+      rowApplyTask.status !== "CANCELLED"
+    ) {
+      return;
+    }
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    const localRt = (node?.data as Sbv1VideoEngineNodeData | undefined)?.runtime;
+    if (
+      (rowApplyTask.status === "FAILED" ||
+        rowApplyTask.status === "CANCELLED") &&
+      (pickPro2VideoBoardRowSucceededTask(
+        columnHistory,
+        pro2ControllerNodeId,
+        pro2RowKey,
+      ) ||
+        localRt?.ossUrl?.trim() ||
+        localRt?.ephemeralUrl?.trim())
+    ) {
+      return;
+    }
+    if (shouldSkipStoryRowTaskApply(localRt, rowApplyTask, id)) return;
+    const nodePatch = sbv1VideoPatchFromTask(rowApplyTask);
+    if (!nodePatch) return;
+    const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
+    if (!rtPatch) return;
+    if (
+      !shouldApplyCanvasTaskRuntimePatch(localRt, rowApplyTask, rtPatch, id)
+    ) {
+      return;
+    }
+    if (isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)) {
+      return;
+    }
+    updateNodeData(id, nodePatch);
+  }, [
+    isPro2VideoBoardCell,
+    rowApplyTask,
+    id,
+    updateNodeData,
+    columnHistory,
+    pro2ControllerNodeId,
+    pro2RowKey,
+  ]);
 
   /** 乐观 UI 遗留 uploading=true · 任务已终态时清掉并落盘 */
   useEffect(() => {
@@ -206,6 +359,39 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     }
     updateNodeData(id, patch);
   }, [d.uploading, d.runtime?.status, id, updateNodeData]);
+
+  /** 已有成片但 runtime 仍标 error / pending / running · 自动恢复为 done */
+  useEffect(() => {
+    const st = d.runtime?.status;
+    if (
+      !hasVideo ||
+      (st !== "error" && st !== "pending" && st !== "running")
+    ) {
+      return;
+    }
+    const url =
+      videoUrl ??
+      pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask });
+    if (!url?.trim()) return;
+    updateNodeData(id, {
+      runtime: {
+        ...d.runtime,
+        status: "done",
+        ossUrl: d.runtime?.ossUrl ?? url,
+        ephemeralUrl: d.runtime?.ephemeralUrl,
+        failCode: undefined,
+        failMessage: undefined,
+      },
+    });
+  }, [
+    hasVideo,
+    d.runtime,
+    id,
+    updateNodeData,
+    rowDisplayTask,
+    rowRuntime,
+    videoUrl,
+  ]);
 
   const hasToolbarContent = Boolean(
     hasVideo ||
@@ -440,9 +626,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Video className="size-3.5 shrink-0 text-white/70" />
-              <p className="truncate text-xs font-medium text-white">
-                {nodeTitle}
-              </p>
+              <LibtvEditableNodeTitle
+                nodeId={id}
+                defaultLabel={defaultVideoTitle}
+                textClassName="text-xs font-medium text-white"
+              />
             </div>
             {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
               <Pro2CrewTaskStatusBadge nodeId={id} />
@@ -480,7 +668,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                       alt=""
                       eager
                       className="absolute inset-0"
-                      imgClassName="pointer-events-none object-contain opacity-60"
+                      imgClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
                       rootMargin="280px"
                     />
                   ) : (
@@ -489,7 +677,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                       poster={posterUrl}
                       eager
                       className="absolute inset-0"
-                      videoClassName="pointer-events-none object-contain opacity-60"
+                      videoClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
                       rootMargin="280px"
                     />
                   )
@@ -503,7 +691,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     alt=""
                     eager
                     className="absolute inset-0"
-                    imgClassName="pointer-events-none object-contain"
+                    imgClassName={cn("pointer-events-none", stageVideoFitClass)}
                     rootMargin="280px"
                   />
                 ) : (
@@ -513,7 +701,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     eager
                     preload="auto"
                     className="absolute inset-0"
-                    videoClassName="pointer-events-none object-contain"
+                    videoClassName={cn("pointer-events-none", stageVideoFitClass)}
                     rootMargin="280px"
                   />
                 )}

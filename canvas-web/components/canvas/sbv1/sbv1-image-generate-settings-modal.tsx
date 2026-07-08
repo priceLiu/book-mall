@@ -9,13 +9,14 @@ import {
   useModalEscapeClose,
 } from "@/lib/canvas/use-modal-portal-effects";
 import { EnginePicker } from "@/components/canvas/engine-picker";
-import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
+import {
+  buildSbv1ImageEngineSettingsPatch,
+} from "./sbv1-image-dock-pickers";
 import {
   SBV1_IMAGE_ASPECT_RATIOS,
   SBV1_IMAGE_MODEL_KEYS,
   SBV1_IMAGE_OUTPUT_COUNTS,
   SBV1_IMAGE_RESOLUTIONS,
-  buildSbv1ImageEngineParams,
   sbv1ImageAspectRatioLabel,
   type Sbv1ImageAspectRatio,
   type Sbv1ImageQuality,
@@ -102,24 +103,18 @@ export function Sbv1ImageGenerateSettingsModal({
 
   const handleConfirm = () => {
     if (!providerId.trim() || !modelKey.trim()) return;
-    const params = buildSbv1ImageEngineParams({
-      aspectRatio,
-      imageQuality,
-      resolution,
-      outputCount,
-    });
-    params.output_format = outputFormat;
-    onConfirm({
-      imageQuality,
-      resolution,
-      aspectRatio,
-      outputCount,
-      engine: {
+    onConfirm(
+      buildSbv1ImageEngineSettingsPatch({
+        imageQuality,
+        resolution,
+        aspectRatio,
+        outputCount,
+        outputFormat,
         providerId,
         modelKey,
-        params: { ...engineParams, ...params },
-      },
-    });
+        engineParams,
+      }),
+    );
     onClose();
   };
 
@@ -302,21 +297,10 @@ function SegmentRow({
   );
 }
 
-/** 工具条触发按钮文案（与视频 sbv1VideoSettingsTriggerLabel 一致） */
-export function sbv1ImageSettingsTriggerLabel(
-  data: Sbv1ImageNodeData,
-  providers: CanvasProviderDto[],
-): string {
-  const engineKey = data.engine?.modelKey?.trim();
-  if (engineKey) {
-    for (const provider of providers) {
-      const model = provider.models.find(
-        (m) => m.modelKey.toLowerCase() === engineKey.toLowerCase(),
-      );
-      const name = model?.displayName?.trim();
-      if (name) return name;
-    }
-    return engineKey;
-  }
-  return "选择模型与参数";
-}
+/** Dock 底栏触发文案（兼容旧引用） */
+export {
+  sbv1ImageModelTriggerLabel,
+  sbv1ImageParamsTriggerLabel,
+  sbv1ImageSettingsTriggerLabel,
+  buildSbv1ImageEngineSettingsPatch,
+} from "./sbv1-image-dock-pickers";

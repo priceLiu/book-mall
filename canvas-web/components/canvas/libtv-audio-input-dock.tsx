@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Zap } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
-import { EnginePicker, ENGINE_PICKER_EMPTY_PARAMS } from "@/components/canvas/engine-picker";
+import { ENGINE_PICKER_EMPTY_PARAMS } from "@/components/canvas/engine-picker";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
@@ -28,13 +28,16 @@ import { LibtvDockSendButton } from "./libtv-dock-send-button";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
   pickDefaultPro2TtsEngine,
-  PRO2_TTS_MODEL_KEYS,
 } from "@/lib/canvas/kie-audio-models";
 import type { LibtvAudioNodeData } from "@/lib/canvas/libtv-audio-task-apply";
 import {
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "./pro2/pro2-input-dock-shell";
+import {
+  LibtvTtsDockModelPicker,
+  LibtvTtsDockParamsPicker,
+} from "./libtv-audio-dock-pickers";
 
 /** Pro2 音频节点 · 底部浮动输入坞（ElevenLabs TTS） */
 export function LibtvAudioInputDock() {
@@ -45,6 +48,8 @@ export function LibtvAudioInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
+
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-audio");
   const storeNode = useMemo(() => {
@@ -76,8 +81,7 @@ export function LibtvAudioInputDock() {
 
   const estCredits = useModelCreditsPreview(engine?.modelKey, 0);
 
-  const { fontPx, minHeightPx, chevronPx, sendIconPx } =
-    useLibtvDockToolbarMetrics();
+  const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
 
   const onPromptChange = useCallback(
     (value: string) => {
@@ -166,29 +170,39 @@ export function LibtvAudioInputDock() {
       dockClassName="pro2-audio-dock"
       hidden={dockHidden}
       footer={
-        <Pro2DockToolbar>
-          <EnginePicker
-            role="TTS"
-            allowedModelKeys={[...PRO2_TTS_MODEL_KEYS]}
-            externalProviders={providers}
-            providerId={engine.providerId ?? ""}
-            modelKey={engine.modelKey ?? ""}
-            params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
-            triggerVariant="dock"
-            triggerFontPx={fontPx}
-            triggerMinHeightPx={minHeightPx}
-            triggerIconPx={chevronPx}
-            disabled={isRunning}
-            onChange={(next) => {
-              updateNodeData(storeNode.id, {
-                engine: {
-                  providerId: next.providerId,
-                  modelKey: next.modelKey,
-                  params: next.params,
-                },
-              });
-            }}
-          />
+        <Pro2DockToolbar className="gap-2">
+          <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
+            <LibtvTtsDockModelPicker
+              providerId={engine.providerId ?? ""}
+              modelKey={engine.modelKey ?? ""}
+              params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
+              externalProviders={providers}
+              disabled={isRunning}
+              open={dockMenu === "model"}
+              onOpenChange={(next) => setDockMenu(next ? "model" : null)}
+              onChange={(next) => {
+                updateNodeData(storeNode.id, { engine: next });
+              }}
+            />
+            <LibtvTtsDockParamsPicker
+              providerId={engine.providerId ?? ""}
+              modelKey={engine.modelKey ?? ""}
+              params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
+              externalProviders={providers}
+              disabled={isRunning}
+              open={dockMenu === "params"}
+              onOpenChange={(next) => setDockMenu(next ? "params" : null)}
+              onChange={(nextParams) => {
+                updateNodeData(storeNode.id, {
+                  engine: {
+                    providerId: engine.providerId ?? "",
+                    modelKey: engine.modelKey ?? "",
+                    params: nextParams,
+                  },
+                });
+              }}
+            />
+          </div>
           <span className="ml-auto flex items-center gap-2 text-white/40">
             <Zap className="size-3.5" />
             <span style={{ fontSize: fontPx }}>{estCredits ?? "—"}</span>

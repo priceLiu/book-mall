@@ -28,6 +28,32 @@ describe("computeDragSnap", () => {
     expect(dx).toBe(-2);
     expect(guides.some((g) => g.orientation === "vertical")).toBe(true);
   });
+
+  it("snaps top edges within threshold", () => {
+    const dragging = {
+      id: "a",
+      left: 50,
+      right: 150,
+      top: 102,
+      bottom: 202,
+      centerX: 100,
+      centerY: 152,
+    };
+    const others = [
+      {
+        id: "b",
+        left: 400,
+        right: 500,
+        top: 100,
+        bottom: 200,
+        centerX: 450,
+        centerY: 150,
+      },
+    ];
+    const { dy, guides } = computeDragSnap(dragging, others, 6);
+    expect(dy).toBe(-2);
+    expect(guides.some((g) => g.orientation === "horizontal")).toBe(true);
+  });
 });
 
 describe("nodeSnapBox", () => {

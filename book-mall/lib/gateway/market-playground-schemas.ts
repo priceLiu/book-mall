@@ -204,6 +204,27 @@ const EXPLICIT: Record<string, PlaygroundSchema> = {
       ], defaultValue: "2" },
     ],
   },
+  "topaz-labs/video-enhance": {
+    mode: "kie-async",
+    fields: [
+      { key: "video_url", label: "Source video", type: "video-url", required: true },
+      { key: "resolution", label: "Resolution", type: "select", options: [
+        { value: "1080p", label: "1080P" },
+        { value: "2k", label: "2K" },
+        { value: "4k", label: "4K" },
+      ], defaultValue: "1080p" },
+      { key: "frame_interpolation", label: "Frame interpolation", type: "select", options: [
+        { value: "none", label: "不补帧" },
+        { value: "high", label: "高质量补帧" },
+      ], defaultValue: "none" },
+      { key: "slowmo", label: "Slow motion", type: "select", options: [
+        { value: "1", label: "1×" },
+        { value: "2", label: "2×" },
+        { value: "3", label: "3×" },
+        { value: "5", label: "5×" },
+      ], defaultValue: "1" },
+    ],
+  },
 };
 
 export function getPlaygroundSchema(canonicalKey: string, requestKind: string): PlaygroundSchema {

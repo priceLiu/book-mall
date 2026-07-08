@@ -12,6 +12,7 @@ import {
   Handle,
   Position,
   useNodeId,
+  useStoreApi,
   useUpdateNodeInternals,
   useStore,
 } from "@xyflow/react";
@@ -22,6 +23,7 @@ import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import { libtvSidePlusInHandleId } from "@/lib/canvas/libtv-side-plus-in-handle";
 import { LIBTV_NODE_SIDE_PLUS_LAYER_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 
 const DRAG_THRESHOLD_PX = 6;
@@ -117,6 +119,7 @@ export function Pro2NodeSidePlus({
 }: Pro2NodeSidePlusProps) {
   const nodeId = useNodeId();
   const updateNodeInternals = useUpdateNodeInternals();
+  const rfStore = useStoreApi();
   const [open, setOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
     null,
@@ -181,12 +184,17 @@ export function Pro2NodeSidePlus({
   const openMenu = useCallback(
     (e: { stopPropagation: () => void }) => {
       e.stopPropagation();
+      rfStore.setState({
+        userSelectionActive: false,
+        userSelectionRect: null,
+      });
+      useCanvasStore.getState().setCanvasMarqueeSelecting(false);
       const anchor = captureMenuAnchor();
       if (anchor) setMenuAnchor(anchor);
       setMagnetOffsetY(0);
       setOpen(true);
     },
-    [captureMenuAnchor],
+    [captureMenuAnchor, rfStore],
   );
 
   const closeMenu = useCallback(() => {
@@ -195,6 +203,7 @@ export function Pro2NodeSidePlus({
   }, []);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
     gestureRef.current = {
       pointerId: e.pointerId,
       x: e.clientX,
@@ -204,6 +213,7 @@ export function Pro2NodeSidePlus({
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
     const g = gestureRef.current;
     if (!g || g.pointerId !== e.pointerId || g.moved) return;
     if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > DRAG_THRESHOLD_PX) {
@@ -212,6 +222,7 @@ export function Pro2NodeSidePlus({
   }, []);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
     const g = gestureRef.current;
     if (!g || g.pointerId !== e.pointerId) return;
     gestureRef.current = null;
@@ -263,7 +274,7 @@ export function Pro2NodeSidePlus({
           onPointerUp={onPointerUp}
           className={cn(
             RF_NO_DRAG,
-            "pro2-node-side-plus-handle",
+            "nopan nokey pro2-node-side-plus-handle",
             lg && "pro2-node-side-plus-handle--lg",
             "!flex !items-center !justify-center !rounded-full !border !border-white/25 !bg-[#2a2a2e] !p-0 !opacity-100",
             "!shadow-[0_4px_16px_rgba(0,0,0,0.45)]",

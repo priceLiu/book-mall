@@ -1,8 +1,17 @@
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import type { CanvasEnginePick } from "./types";
 
-/** sbv1 图片节点 · 首期固定 KIE nano-banana-pro（Lib Image） */
-export const SBV1_IMAGE_MODEL_KEYS = ["nano-banana-pro"] as const;
+/** sbv1 / Pro2 图片节点 · IMAGE 白名单（Gateway 登记模型） */
+export const SBV1_IMAGE_MODEL_KEYS = [
+  "nano-banana-pro",
+  "kling-3.0-image",
+  "4o-image",
+  "nano-banana-2",
+  "gpt-image-2",
+  "google/nano-banana",
+  "seedream-4.5",
+  "seedream-5-lite",
+] as const;
 
 export type Sbv1ImageQuality = "low" | "standard" | "high";
 

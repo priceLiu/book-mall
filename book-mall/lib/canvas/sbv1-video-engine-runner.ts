@@ -12,6 +12,7 @@ import {
   clampSbv1ReferenceMode,
   getSbv1VideoModelRefCaps,
 } from "./sbv1-video-model-reference";
+import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
@@ -58,6 +59,44 @@ export async function runSbv1VideoEngineNode(
       "INVALID_INPUT",
       "sbv1-video-engine 缺少模型配置",
     );
+  }
+
+  const isTopazHd =
+    data.creationType === "hd-video" || isTopazCanvasVideoModelKey(modelKey);
+
+  if (isTopazHd) {
+    const videoUrls = Array.isArray(params.reference_video_urls)
+      ? (params.reference_video_urls as unknown[]).filter(
+          (u): u is string =>
+            typeof u === "string" && /^https?:\/\//.test(u.trim()),
+        )
+      : [];
+    if (!videoUrls.length) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "请连接上游视频后再生成高清视频",
+      );
+    }
+    params.reference_video_urls = videoUrls;
+    params.resolution = resolution;
+    return runVideoEngineNode({
+      ...args,
+      clientPage: args.clientPage ?? `canvas/${args.projectId}/sbv1`,
+      node: {
+        ...args.node,
+        type: "video-engine",
+        modelKey,
+        data: {
+          providerId,
+          modelKey,
+          prompt: promptRaw || "Topaz video enhance",
+          params,
+          resolution,
+        },
+        imageInputs: [],
+        textInputs: [],
+      },
+    });
   }
 
   const isMotionControl =

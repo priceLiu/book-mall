@@ -5,6 +5,12 @@ import { absoluteNodePosition, nodeMeasuredSize } from "./normalize-graph-nodes"
 import type { CanvasFlowNode } from "./types";
 
 export const CANVAS_DRAG_SNAP_THRESHOLD = 6;
+/** 屏幕像素吸附半径 · 换算为 flow 坐标后随 zoom 变化 */
+export const CANVAS_DRAG_SNAP_SCREEN_PX = 10;
+
+export function canvasDragSnapThreshold(zoom: number): number {
+  return CANVAS_DRAG_SNAP_SCREEN_PX / Math.max(zoom, 0.08);
+}
 
 export type SnapGuideLine = {
   orientation: "horizontal" | "vertical";
@@ -118,44 +124,41 @@ export function computeDragSnap(
   const dx = snapX?.delta ?? 0;
   const dy = snapY?.delta ?? 0;
   const guides: SnapGuideLine[] = [];
+  const extend = 280;
 
   if (snapX) {
-    const allX = [
-      dragging.left + dx,
-      dragging.centerX + dx,
-      dragging.right + dx,
-      ...others.flatMap((o) => [o.left, o.centerX, o.right]),
-    ];
-    const allY = [
-      dragging.top + dy,
-      dragging.bottom + dy,
-      ...others.flatMap((o) => [o.top, o.bottom]),
-    ];
-    guides.push({
-      orientation: "vertical",
-      position: snapX.value,
-      from: Math.min(...allY) - 40,
-      to: Math.max(...allY) + 40,
-    });
-  }
-
-  if (snapY) {
     const allY = [
       dragging.top + dy,
       dragging.centerY + dy,
       dragging.bottom + dy,
       ...others.flatMap((o) => [o.top, o.centerY, o.bottom]),
     ];
+    const span = Math.max(...allY) - Math.min(...allY);
+    const mid = (Math.min(...allY) + Math.max(...allY)) / 2;
+    const half = span / 2 + extend;
+    guides.push({
+      orientation: "vertical",
+      position: snapX.value,
+      from: mid - half,
+      to: mid + half,
+    });
+  }
+
+  if (snapY) {
     const allX = [
       dragging.left + dx,
+      dragging.centerX + dx,
       dragging.right + dx,
-      ...others.flatMap((o) => [o.left, o.right]),
+      ...others.flatMap((o) => [o.left, o.centerX, o.right]),
     ];
+    const span = Math.max(...allX) - Math.min(...allX);
+    const mid = (Math.min(...allX) + Math.max(...allX)) / 2;
+    const half = span / 2 + extend;
     guides.push({
       orientation: "horizontal",
       position: snapY.value,
-      from: Math.min(...allX) - 40,
-      to: Math.max(...allX) + 40,
+      from: mid - half,
+      to: mid + half,
     });
   }
 

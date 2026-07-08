@@ -16,6 +16,7 @@ import {
   SBV1_DEFAULT_IMAGE_NODE_DATA,
   SBV1_DEFAULT_VIDEO_ENGINE_DATA,
 } from "./sbv1-workspace-types";
+import { buildSbv1HdVideoEngineNodeData } from "./sbv1-hd-video-models";
 import {
   buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
@@ -45,6 +46,16 @@ export function buildSbv1VideoEngineNodeData(
     ...cloneCanvasNodeData(SBV1_DEFAULT_VIDEO_ENGINE_DATA),
     ...cloneCanvasNodeData(overrides),
   };
+}
+
+export function buildSbv1VideoEngineNodeDataForMenuItem(
+  itemId: string,
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (itemId === "hd-video") {
+    return buildSbv1HdVideoEngineNodeData(overrides);
+  }
+  return buildSbv1VideoEngineNodeData(overrides);
 }
 
 export function selectSbv1NodeAfterSpawn(
@@ -130,6 +141,8 @@ export function spawnSbv1NeighborFromNode(
     connectFromAnchor?: boolean;
     /** 左侧 + · 动作视频：上游视频 out_video → 本节点 in_motion_video */
     connectAsMotionVideo?: boolean;
+    /** 菜单项 id（如 hd-video）· 决定预设引擎 */
+    menuItemId?: string;
     /** 松手位置（屏幕坐标）· 优先于邻居偏移 */
     atScreen?: { x: number; y: number };
   },
@@ -301,7 +314,10 @@ export function spawnSbv1NeighborFromNode(
   }
 
   if (nodeType === "sbv1-video-engine") {
-    const newId = addNode("sbv1-video-engine", { x, y }, buildSbv1VideoEngineNodeData());
+    const nodeData = buildSbv1VideoEngineNodeDataForMenuItem(
+      options?.menuItemId ?? "",
+    );
+    const newId = addNode("sbv1-video-engine", { x, y }, nodeData);
     if (!newId) return "";
     if (self.type === "sbv1-video-engine" && side === "left" && options?.connectAsMotionVideo) {
       setEdges((prev) => [
@@ -310,6 +326,21 @@ export function spawnSbv1NeighborFromNode(
           id: `e-${newId}-${anchorId}-motion`,
           source: newId,
           target: anchorId,
+          sourceHandle: "out_video",
+          targetHandle: "in_motion_video",
+        },
+      ]);
+    } else if (
+      self.type === "sbv1-video-engine" &&
+      side === "right" &&
+      (options?.connectAsMotionVideo || options?.menuItemId === "hd-video")
+    ) {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${anchorId}-${newId}-hd`,
+          source: anchorId,
+          target: newId,
           sourceHandle: "out_video",
           targetHandle: "in_motion_video",
         },
@@ -566,10 +597,11 @@ export async function handleSbv1GroupSidePick(
   await handleSbv1SideAddNodePick(itemId, nodeType, alert, () => {
     if (
       side === "right" &&
-      (itemId === "video" ||
-        itemId === "video-engine" ||
-        itemId === "video-compose" ||
-        nodeType === "sbv1-video-engine")
+      (    itemId === "video" ||
+    itemId === "hd-video" ||
+    itemId === "video-engine" ||
+    itemId === "video-compose" ||
+    nodeType === "sbv1-video-engine")
     ) {
       spawnSbv1VideoEngineFromGroup(groupId, store);
       return;

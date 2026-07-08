@@ -1669,6 +1669,7 @@ enum CanvasProviderKind {
   OPENAI_COMPAT
   GEMINI_NATIVE
   HUNYUAN_3D
+  TOPAZ
 }
 
 /// 画布可选 AI 引擎模型目录（user/admin 可在 canvas-web /models 配置；首批种子三条）
@@ -2187,6 +2188,7 @@ enum GatewayProviderKind {
   MINIMAX
   WORLDLABS
   ELEVENLABS
+  TOPAZ
 }
 
 enum GatewayRequestKind {

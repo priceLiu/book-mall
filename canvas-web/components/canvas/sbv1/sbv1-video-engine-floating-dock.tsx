@@ -11,6 +11,7 @@ import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-link
 import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
+import { isSbv1HdVideoNode } from "@/lib/canvas/sbv1-hd-video-params";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import {
   optimisticLibtvMediaRunStart,
@@ -175,6 +176,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       return;
     }
     if (
+      !isSbv1HdVideoNode(latestData) &&
       latestData.referenceMode === "first_last" &&
       resolved.portraitAssetRefs.length < 1 &&
       resolved.imageInputs.length < 1
@@ -191,7 +193,9 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       revertPending();
       await alert({
         title: "请选择模型",
-        message: "请选择火山 Seedance 模型后再生成。",
+        message: isSbv1HdVideoNode(latestData)
+          ? "高清视频模型未就绪，请刷新页面后重试。"
+          : "请选择火山 Seedance 模型后再生成。",
         variant: "warning",
       });
       return;

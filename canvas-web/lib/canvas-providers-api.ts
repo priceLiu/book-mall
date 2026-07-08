@@ -82,7 +82,18 @@ export type GatewayLinkStatusDto = {
   keyPrefix: string | null;
   keyName: string | null;
   linkedAt: string | null;
-  boundKinds: Array<"KIE" | "BAILIAN" | "DEEPSEEK" | "DASHSCOPE" | "HUNYUAN">;
+  boundKinds: Array<
+    | "KIE"
+    | "BAILIAN"
+    | "DEEPSEEK"
+    | "DASHSCOPE"
+    | "HUNYUAN"
+    | "VOLCENGINE"
+    | "TOPAZ"
+    | "MINIMAX"
+    | "WORLDLABS"
+    | "ELEVENLABS"
+  >;
   revoked: boolean;
 };
 

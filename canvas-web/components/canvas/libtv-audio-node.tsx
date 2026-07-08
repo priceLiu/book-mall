@@ -27,6 +27,7 @@ import { useLibtvNodeDuplicate } from "./libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2/pro2-crew-task-status-badge";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
 import { LibtvNodeToolbarPortal } from "./libtv-node-toolbar-portal";
+import { LibtvEditableNodeTitle } from "./libtv-editable-node-title";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
@@ -185,7 +186,6 @@ export function LibtvAudioNode({
     }
   }, [d]);
 
-  const nodeLabel = d.label?.trim() || "音频";
   const hasAudio = Boolean(previewUrl);
   const isGenerating = isLibtvMediaGenerating(d);
   const hasRuntimeError = d.runtime?.status === "error";
@@ -318,9 +318,11 @@ export function LibtvAudioNode({
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <Music className={cn("size-3.5 shrink-0", "text-white/70")} />
-            <span className="truncate text-[12px] font-medium text-white/90">
-              {nodeLabel}
-            </span>
+            <LibtvEditableNodeTitle
+              nodeId={id}
+              defaultLabel="音频"
+              textClassName="text-[12px] font-medium text-white/90"
+            />
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Pro2CrewTaskStatusBadge nodeId={id} />

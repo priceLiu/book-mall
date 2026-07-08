@@ -114,7 +114,7 @@ export function Pro2AddNodePopover({
   return createPortal(
     <div
       ref={ref}
-      className="pro2-add-menu nodrag fixed flex items-end gap-0"
+      className="pro2-add-menu nodrag nopan nokey fixed flex items-end gap-0"
       style={{
         left: anchor.x,
         top: anchor.y,

@@ -97,6 +97,12 @@ export type StoryPro2StyleAssetNodeData = {
   renderQuality?: import("./story-pro-workspace-types").StoryProRenderQuality;
 };
 
+/** 2.0 标签节点 · 画布注释（Markdown · 无 Dock · 无 Gateway） */
+export type StoryPro2TagNodeData = {
+  body: string;
+  label?: string;
+};
+
 /** 检视面板内编辑用（与 pro 字段同构） */
 export type StoryPro2StarterInspectorData = StoryPro2StarterNodeData;
 export type StoryPro2StyleInspectorData = StoryPro2StyleNodeData;

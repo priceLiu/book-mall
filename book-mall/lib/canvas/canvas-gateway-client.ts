@@ -122,11 +122,15 @@ export async function canvasGwChat(
     );
   }
 
+  const chatParams = { ...(opts.params ?? {}) };
+  // Suno 等音频模型的版本号也会写在 params.model，勿让其覆盖 Gateway modelKey
+  delete chatParams.model;
+
   const body: Record<string, unknown> = {
+    ...chatParams,
     model,
     messages: opts.messages,
     stream: false,
-    ...(opts.params ?? {}),
   };
 
   const meta = await canvasGwMeta(userId, {
@@ -374,6 +378,124 @@ export async function canvasGwCreateBailianR2vJob(
   };
 }
 
+function pickDashscopeCredentialForCanvas(
+  credentials: Parameters<typeof pickCredentialForKind>[0],
+): string | null {
+  return (
+    pickCredentialForKind(credentials, "DASHSCOPE") ??
+    pickCredentialForKind(credentials, "BAILIAN")
+  );
+}
+
+/** Canvas · 百炼可灵 3.0 图像（DashScope 异步；展示在 Gateway · 百炼 Provider） */
+export async function canvasGwCreateDashscopeKlingImageJob(
+  userId: string,
+  opts: {
+    model: string;
+    content: Array<{ text: string } | { image: string }>;
+    aspectRatio?: "16:9" | "9:16" | "1:1";
+    resolution?: "1k" | "2k" | "4k";
+    n?: number;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  if (!pickDashscopeCredentialForCanvas(auth.credentials)) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope / 百炼凭证（可灵生图需要阿里云 DashScope Key）",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      dashscope: {
+        jobKind: "kling-v3-image" as const,
+        content: opts.content,
+        aspectRatio: opts.aspectRatio,
+        resolution: opts.resolution,
+        n: opts.n,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
+}
+
+export async function canvasGwCreateTopazVideoJob(
+  userId: string,
+  opts: {
+    model: string;
+    videoUrl: string;
+    filterModel?: string;
+    upscaleFactor?: number | string;
+    slowmo?: number | string;
+    frameInterpolation?: string;
+    resolution?: string;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  const credentialId = pickCredentialForKind(auth.credentials, "TOPAZ");
+  if (!credentialId) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 Topaz Labs 凭证",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      topaz: {
+        videoUrl: opts.videoUrl,
+        filterModel: opts.filterModel,
+        upscaleFactor: opts.upscaleFactor,
+        slowmo: opts.slowmo,
+        frameInterpolation: opts.frameInterpolation,
+        resolution: opts.resolution,
+      },
+      input: {
+        video_url: opts.videoUrl,
+        filter_model: opts.filterModel,
+        upscale_factor: opts.upscaleFactor,
+        slowmo: opts.slowmo,
+        frame_interpolation: opts.frameInterpolation,
+        resolution: opts.resolution,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "TOPAZ",
+  };
+}
+
 export async function canvasGwCreateHunyuanJob(
   userId: string,
   opts: {
@@ -475,7 +597,16 @@ export type CanvasGwPollResult =
   | { providerKind: "BAILIAN"; output: BailianR2vTaskOutput }
   | { providerKind: "HUNYUAN"; polled: CanvasGatewayPollResult }
   | { providerKind: "DASHSCOPE"; output: DashscopeTaskOutput }
-  | { providerKind: "VOLCENGINE"; task: VolcengineVideoTaskResult };
+  | { providerKind: "VOLCENGINE"; task: VolcengineVideoTaskResult }
+  | {
+      providerKind: "TOPAZ";
+      polled: {
+        state: string;
+        downloadUrl?: string;
+        progress?: number;
+        errorMessage?: string;
+      };
+    };
 
 export async function canvasGwRecordInfo(
   userId: string,
@@ -523,6 +654,15 @@ export async function canvasGwRecordInfo(
       providerKind: "VOLCENGINE",
       task: polled.data as VolcengineVideoTaskResult,
     };
+  }
+  if (polled.providerKind === "TOPAZ") {
+    const data = polled.data as {
+      state?: string;
+      downloadUrl?: string;
+      progress?: number;
+      errorMessage?: string;
+    };
+    return { providerKind: "TOPAZ", polled: data };
   }
 
   return {
@@ -685,12 +825,15 @@ export async function canvasGwChatStream(
     );
   }
 
+  const streamParams = { ...(opts.params ?? {}) };
+  delete streamParams.model;
+
   const body: Record<string, unknown> = {
+    ...streamParams,
     model,
     messages: opts.messages,
     stream: true,
     stream_options: { include_usage: true },
-    ...(opts.params ?? {}),
   };
 
   const result = await gatewayV1ChatCompletionsStream({

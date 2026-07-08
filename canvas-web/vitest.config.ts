@@ -32,6 +32,7 @@ export default defineConfig({
       "test/unit/canvas-run-session.test.ts",
       "test/unit/pro2-script-studio-migrate.test.ts",
       "test/unit/pro2-text-node-engine-roles.test.ts",
+      "test/unit/pro2-video-board-cell-task.test.ts",
       "test/unit/pro2-starter-dock-send.test.ts",
       "test/unit/project-edition-detect.test.ts",
       "test/unit/friendly-task-error.test.ts",

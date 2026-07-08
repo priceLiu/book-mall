@@ -26,6 +26,7 @@ import {
   submitDashscopeWanxJobForLog,
   submitHunyuanJobForLog,
 } from "@/lib/gateway/poll-service";
+import { submitTopazVideoJobForLog } from "@/lib/gateway/topaz-jobs";
 import { runGatewayV1KieCreateTask } from "@/lib/gateway/gateway-v1-kie-task-service";
 import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
@@ -102,6 +103,14 @@ export async function POST(request: NextRequest) {
       prompt?: string;
       imageUrls?: string[];
       params?: Record<string, unknown>;
+    };
+    topaz?: {
+      videoUrl?: string;
+      filterModel?: string;
+      upscaleFactor?: number | string;
+      slowmo?: number | string;
+      frameInterpolation?: string;
+      resolution?: string;
     };
   };
   try {
@@ -212,6 +221,51 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (route.providerKind === "TOPAZ") {
+      const tz = body.topaz ?? {};
+      const videoUrl = String(
+        tz.videoUrl ?? body.input?.video_url ?? body.input?.videoUrl ?? "",
+      ).trim();
+      if (!videoUrl) {
+        return NextResponse.json({ error: "videoUrl required" }, { status: 400 });
+      }
+      const taskId = await submitTopazVideoJobForLog({
+        logId: log.id,
+        credentialId,
+        model,
+        input: {
+          videoUrl,
+          filterModel:
+            typeof tz.filterModel === "string"
+              ? tz.filterModel
+              : typeof body.input?.filter_model === "string"
+                ? body.input.filter_model
+                : undefined,
+          upscaleFactor:
+            tz.upscaleFactor ??
+            body.input?.upscale_factor ??
+            body.input?.upscaleFactor,
+          slowmo: tz.slowmo ?? body.input?.slowmo,
+          frameInterpolation:
+            typeof tz.frameInterpolation === "string"
+              ? tz.frameInterpolation
+              : typeof body.input?.frame_interpolation === "string"
+                ? body.input.frame_interpolation
+                : undefined,
+          resolution:
+            typeof tz.resolution === "string"
+              ? tz.resolution
+              : typeof body.input?.resolution === "string"
+                ? body.input.resolution
+                : undefined,
+        },
+      });
+      return NextResponse.json({
+        code: 200,
+        data: { taskId, logId: log.id, providerKind: "TOPAZ" },
+      });
+    }
+
     if (route.providerKind === "HUNYUAN") {
       const h = body.hunyuan ?? {};
       const taskId = await submitHunyuanJobForLog({

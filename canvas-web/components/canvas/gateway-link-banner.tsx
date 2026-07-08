@@ -7,7 +7,8 @@ export function GatewayLinkBanner() {
   const { loading, linked, status, accountUrl, gatewayConsoleUrl, gatewayGuideUrl } =
     useGatewayLinkStatus();
 
-  if (loading || linked || !accountUrl) return null;
+  // 仅在成功拿到状态且确认未关联时展示，避免上游 503（如 Prisma enum 未同步）误报
+  if (loading || linked || !accountUrl || !status) return null;
 
   const revoked = status?.revoked === true;
 

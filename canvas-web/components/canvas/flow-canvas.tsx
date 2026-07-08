@@ -12,6 +12,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStoreApi,
   type NodeChange,
   type OnConnectEnd,
   type Viewport,
@@ -60,6 +61,7 @@ import {
 } from "@/lib/canvas/libtv-side-connect-menu";
 import {
   applyDragSnapToNode,
+  canvasDragSnapThreshold,
   computeDragSnap,
   filterNearbySnapCandidates,
   nodeSnapBox,
@@ -123,6 +125,26 @@ import {
 } from "@/lib/canvas/pro2-add-node-pick";
 import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
 
+const PANE_ADD_DBL_CLICK_MS = 420;
+const PANE_ADD_DBL_CLICK_PX = 10;
+
+/** 空白画布点击目标（排除节点/连线/控件，兼容 pane / background / viewport） */
+function isBlankCanvasPointerTarget(target: Element): boolean {
+  if (target.closest(".react-flow__node")) return false;
+  if (target.closest(".react-flow__edge")) return false;
+  if (target.closest(".react-flow__handle")) return false;
+  if (target.closest(".react-flow__minimap")) return false;
+  if (target.closest(".react-flow__controls")) return false;
+  if (target.closest(".react-flow__panel")) return false;
+  if (target.closest("[data-libtv-side-connect]")) return false;
+  return Boolean(
+    target.closest(".react-flow__pane") ||
+      target.closest(".react-flow__background") ||
+      target.closest(".react-flow__viewport") ||
+      target.closest(".react-flow__renderer"),
+  );
+}
+
 const edgeTypes = {
   default: DeletableEdge,
 } as const;
@@ -161,7 +183,9 @@ function FlowCanvasInner({
     fitView,
     setViewport: rfSetViewport,
     getNodes,
+    getZoom,
   } = useReactFlow();
+  const rfStore = useStoreApi();
   const initialFitDoneRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
   const dragHoverRafRef = useRef<number | null>(null);
@@ -251,8 +275,19 @@ function FlowCanvasInner({
     null,
   );
   const paneAddAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const paneAddClickRef = useRef<{ t: number; x: number; y: number } | null>(
+    null,
+  );
   const closePaneMenu = useCallback(() => setPaneMenu(null), []);
   const closePaneAddMenu = useCallback(() => setPaneAddMenu(null), []);
+
+  const clearCanvasPaneSelection = useCallback(() => {
+    rfStore.setState({
+      userSelectionActive: false,
+      userSelectionRect: null,
+    });
+    useCanvasStore.getState().setCanvasMarqueeSelecting(false);
+  }, [rfStore]);
 
   const onPaneContextMenu = useCallback(
     (e: React.MouseEvent | MouseEvent) => {
@@ -285,12 +320,13 @@ function FlowCanvasInner({
   const openPaneAddMenuAt = useCallback(
     (clientX: number, clientY: number) => {
       closePaneMenu();
+      clearCanvasPaneSelection();
       ignoreNextPaneClickRef.current = true;
       const anchor = { x: clientX, y: clientY };
       paneAddAnchorRef.current = anchor;
       setPaneAddMenu(anchor);
     },
-    [closePaneMenu],
+    [closePaneMenu, clearCanvasPaneSelection],
   );
 
   /** RF 无 onPaneDoubleClick；空白 pane 双击弹出添加节点菜单（同底部 Dock +） */
@@ -298,18 +334,32 @@ function FlowCanvasInner({
     if (!enablePaneContextMenu) return;
     const wrap = wrapRef.current;
     if (!wrap) return;
-    const onNativeDoubleClick = (e: MouseEvent) => {
+    const onNativePointerUp = (e: PointerEvent) => {
+      if (e.button !== 0) return;
       const target = e.target;
       if (!(target instanceof Element)) return;
-      if (!target.closest(".react-flow__pane")) return;
-      if (target.closest(".react-flow__node")) return;
-      if (target.closest(".react-flow__edge")) return;
-      e.preventDefault();
-      e.stopPropagation();
-      openPaneAddMenuAt(e.clientX, e.clientY);
+      if (!isBlankCanvasPointerTarget(target)) {
+        paneAddClickRef.current = null;
+        return;
+      }
+      const now = Date.now();
+      const prev = paneAddClickRef.current;
+      if (
+        prev &&
+        now - prev.t <= PANE_ADD_DBL_CLICK_MS &&
+        Math.hypot(e.clientX - prev.x, e.clientY - prev.y) <=
+          PANE_ADD_DBL_CLICK_PX
+      ) {
+        paneAddClickRef.current = null;
+        e.preventDefault();
+        e.stopPropagation();
+        openPaneAddMenuAt(e.clientX, e.clientY);
+        return;
+      }
+      paneAddClickRef.current = { t: now, x: e.clientX, y: e.clientY };
     };
-    wrap.addEventListener("dblclick", onNativeDoubleClick, true);
-    return () => wrap.removeEventListener("dblclick", onNativeDoubleClick, true);
+    wrap.addEventListener("pointerup", onNativePointerUp, true);
+    return () => wrap.removeEventListener("pointerup", onNativePointerUp, true);
   }, [enablePaneContextMenu, openPaneAddMenuAt]);
 
   const paneMenuItems = useMemo<CanvasPaneContextMenuItem[]>(() => {
@@ -763,14 +813,18 @@ function FlowCanvasInner({
           dragBox,
           snapOthersRef.current,
         );
-        const { guides } = computeDragSnap(dragBox, nearby);
+        const { guides } = computeDragSnap(
+          dragBox,
+          nearby,
+          canvasDragSnapThreshold(getZoom()),
+        );
         const key = snapGuideKey(guides);
         if (key === lastSnapGuideKeyRef.current) return;
         lastSnapGuideKeyRef.current = key;
         setSnapGuides(guides);
       });
     },
-    [enableDragSnapGuides, findGroupAtPoint, getNodes, setDragHoverGroup],
+    [enableDragSnapGuides, findGroupAtPoint, getNodes, getZoom, setDragHoverGroup],
   );
 
   const flushAutosaveAfterDrag = useCallback(() => {
@@ -820,7 +874,11 @@ function FlowCanvasInner({
             dragBox,
             snapOthersRef.current,
           );
-          const { dx, dy } = computeDragSnap(dragBox, nearby);
+          const { dx, dy } = computeDragSnap(
+            dragBox,
+            nearby,
+            canvasDragSnapThreshold(getZoom()),
+          );
           if (dx !== 0 || dy !== 0) {
             const snapped = applyDragSnapToNode(dragging, all, dx, dy);
             setRfNodes((prev) =>
@@ -866,6 +924,7 @@ function FlowCanvasInner({
       findGroupAtPoint,
       flushAutosaveAfterDrag,
       getNodes,
+      getZoom,
       libtvCanvas,
       reparentNode,
       setDragHoverGroup,
@@ -963,6 +1022,8 @@ function FlowCanvasInner({
           connectionState.fromNode?.data as Record<string, unknown> | undefined,
         )
       ) {
+        clearCanvasPaneSelection();
+        setConnectingFrom(null);
         useCanvasStore.getState().setPendingSideConnect({
           anchor: { x: clientX, y: clientY },
           fromNodeId,
@@ -974,7 +1035,7 @@ function FlowCanvasInner({
 
       setConnectingFrom(null);
     },
-    [setConnectingFrom, screenToFlowPosition, getNodes, onConnect],
+    [setConnectingFrom, screenToFlowPosition, getNodes, onConnect, clearCanvasPaneSelection],
   );
 
   // 媒体组 zIndex 随选中变化；在 RF 本地完成，不触发 zustand
@@ -1419,6 +1480,8 @@ function FlowCanvasInner({
                 useCanvasStore
                   .getState()
                   .setLibtvFloatingDockSelection(null, null);
+                useCanvasStore.getState().clearPendingSideConnect();
+                useCanvasStore.getState().setConnectingFrom(null);
                 if (pro2FloatingInspector) {
                   useCanvasStore.getState().setPro2FrameDockFocus(null);
                 }
@@ -1494,6 +1557,7 @@ function FlowCanvasInner({
             : undefined
         }
         elevateNodesOnSelect={false}
+        elevateEdgesOnSelect={false}
         autoPanOnNodeDrag={false}
         proOptions={{ hideAttribution: true }}
         className="bg-[var(--canvas-bg)]"

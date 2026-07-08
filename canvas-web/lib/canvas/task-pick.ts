@@ -7,7 +7,10 @@ import {
   isCanvasNodeRunSessionActive,
   shouldSkipStaleTerminalWhileLocalInflight,
 } from "./canvas-run-session";
-import { pickTaskResultMediaUrl } from "./task-media-url";
+import {
+  pickTaskResultMediaUrl,
+  taskHasDisplayableResult,
+} from "./task-media-url";
 
 export type CanvasTaskStoryScope = {
   rowKey?: string;
@@ -255,9 +258,87 @@ export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
 ): CanvasTaskRecord | undefined {
   if (!tasks.length) return undefined;
-  const inflight = tasks.filter((t) => isServerInflightTaskStatus(t.status));
+  const inflight = tasks.filter(
+    (t) =>
+      isServerInflightTaskStatus(t.status) &&
+      !isStaleServerInflightTask(t, tasks),
+  );
   if (inflight.length) return newestTaskByUpdatedAt(inflight);
   return newestTaskByUpdatedAt(tasks);
+}
+
+function isInflightRuntimeStatus(status?: string): boolean {
+  return status === "pending" || status === "running";
+}
+
+/** 行级 scope · 最新成功成片（展示 URL，不受后续失败重试覆盖） */
+export function pickStoryRowSucceededTask(
+  tasks: CanvasTaskRecord[],
+  scope: CanvasTaskStoryScope,
+): CanvasTaskRecord | undefined {
+  const scoped = tasks.filter((t) => tasksMatchStoryScope(t, scope));
+  const succeeded = scoped.filter(
+    (t) => t.status === "SUCCEEDED" && taskHasDisplayableResult(t),
+  );
+  return newestTaskByUpdatedAt(succeeded);
+}
+
+/**
+ * 行级 scope 写回 runtime：非 stale 进行中 > 最新成功成片 > 最新失败（仅无成片时）。
+ */
+export function pickStoryRowApplyTask(
+  tasks: CanvasTaskRecord[],
+  scope: CanvasTaskStoryScope,
+  localRuntime?: CanvasNodeRuntime | null,
+): CanvasTaskRecord | undefined {
+  const scoped = tasks.filter((t) => tasksMatchStoryScope(t, scope));
+  if (!scoped.length) return undefined;
+
+  const localTaskId = localRuntime?.taskId?.trim();
+  const localInflight =
+    localTaskId && isInflightRuntimeStatus(localRuntime?.status)
+      ? scoped.find(
+          (t) =>
+            t.id === localTaskId && isServerInflightTaskStatus(t.status),
+        )
+      : undefined;
+
+  const inflight = scoped.filter(
+    (t) =>
+      isServerInflightTaskStatus(t.status) &&
+      !isStaleServerInflightTask(t, scoped),
+  );
+
+  if (
+    localInflight &&
+    !isStaleServerInflightTask(localInflight, scoped)
+  ) {
+    return localInflight;
+  }
+
+  if (inflight.length) {
+    const pick = newestTaskByUpdatedAt(inflight)!;
+    const succeeded = pickStoryRowSucceededTask(tasks, scope);
+    if (
+      succeeded &&
+      pick.status === "SUBMITTED" &&
+      pick.id !== succeeded.id &&
+      !localInflight
+    ) {
+      return succeeded;
+    }
+    return pick;
+  }
+
+  const succeeded = pickStoryRowSucceededTask(tasks, scope);
+  if (succeeded) return succeeded;
+
+  const failed = scoped.filter(
+    (t) => t.status === "FAILED" || t.status === "CANCELLED",
+  );
+  if (failed.length) return newestTaskByUpdatedAt(failed);
+
+  return newestTaskByUpdatedAt(scoped);
 }
 
 export function preferredTasksByNode(

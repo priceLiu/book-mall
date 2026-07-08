@@ -39,6 +39,7 @@ import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-l
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "../media-hover-box";
 import { LibtvNodeHeaderPreviewButton } from "../libtv-node-header-preview-button";
+import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import {
   Pro2MediaNodeEmptyState,
@@ -265,7 +266,11 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <ImageIcon className="size-3.5 shrink-0 text-violet-300" />
-              <p className="truncate text-xs font-medium text-white">{label}</p>
+              <LibtvEditableNodeTitle
+                nodeId={id}
+                defaultLabel="角色"
+                textClassName="text-xs font-medium text-white"
+              />
             </div>
             <Pro2CrewTaskStatusBadge nodeId={id} />
             <div className="relative z-[1] flex shrink-0 items-center gap-2">

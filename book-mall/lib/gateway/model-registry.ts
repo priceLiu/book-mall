@@ -23,6 +23,7 @@ import {
   taskTagsToCapabilities,
 } from "@/lib/gateway/gateway-model-capabilities";
 import { WORLDLABS_MARBLE_MODELS } from "@/lib/gateway/worldlabs-marble-models";
+import { TOPAZ_VIDEO_MODELS } from "@/lib/gateway/topaz-models";
 import {
   ELEVENLABS_SFX_MODELS,
   ELEVENLABS_STS_MODELS,
@@ -451,6 +452,22 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     );
   }
 
+  if (!byProvider.has("TOPAZ")) {
+    byProvider.set(
+      "TOPAZ",
+      TOPAZ_VIDEO_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        requestKind: "VIDEO" as const,
+        role: "VIDEO" as const,
+        description: m.description,
+        canonicalModelKey: m.modelKey,
+        credentialBound: isGatewayProviderBound(boundKinds, "TOPAZ"),
+        capabilities: ["video-upscale"],
+      })),
+    );
+  }
+
   const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
     KIE: "KIE",
     DEEPSEEK: "DeepSeek",
@@ -461,6 +478,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     MINIMAX: "MiniMax",
     WORLDLABS: "World Labs",
     ELEVENLABS: "ElevenLabs",
+    TOPAZ: "Topaz Labs",
   };
 
   type CatalogModel = Omit<GroupModel, "canonicalModelKey">;

@@ -540,7 +540,7 @@ function EngineModelModal({
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
           <p className="flex items-center gap-2 text-[15px] font-medium text-white">
-            <Sparkles className="size-4 text-[var(--canvas-accent)]" />
+            <Sparkles className="size-4 text-white/55" />
             {title}
           </p>
           <button
@@ -617,7 +617,7 @@ function EngineModelModal({
                 provider: draft.provider,
               });
             }}
-            className="rounded-md bg-[var(--canvas-accent)] px-4 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:opacity-50"
+            className="rounded-md bg-white/[0.12] px-4 py-1.5 text-[12px] font-medium text-white hover:bg-white/20 disabled:opacity-50"
           >
             确认
           </button>

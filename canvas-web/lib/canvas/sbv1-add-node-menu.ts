@@ -4,6 +4,7 @@ import {
   Clapperboard,
   Download,
   Image as ImageIcon,
+  ScanLine,
   Sparkles,
   Type,
   Video,
@@ -134,6 +135,13 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "串联生成",
     items: [
+      {
+        id: "hd-video",
+        label: "高清视频",
+        icon: ScanLine,
+        enabled: true,
+        nodeType: "sbv1-video-engine",
+      },
       {
         id: "video",
         label: SBV1_VIDEO_COMPOSE_LABEL,

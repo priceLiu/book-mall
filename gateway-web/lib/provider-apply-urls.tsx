@@ -9,7 +9,8 @@ export const PROVIDER_APPLY_URLS: Partial<
     | "VOLCENGINE"
     | "MINIMAX"
     | "ELEVENLABS"
-    | "WORLDLABS",
+    | "WORLDLABS"
+    | "TOPAZ",
     string
   >
 > = {
@@ -21,6 +22,7 @@ export const PROVIDER_APPLY_URLS: Partial<
   MINIMAX: "https://platform.minimaxi.com/user-center/basic-information/interface-key",
   ELEVENLABS: "https://elevenlabs.io/app/settings/api-keys",
   WORLDLABS: "https://platform.worldlabs.ai/api-keys",
+  TOPAZ: "https://account.topazlabs.com/manage-api",
 };
 
 export function providerApplyUrl(

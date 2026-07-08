@@ -8,10 +8,18 @@ alwaysApply: true
 
 ## 唯一实现（canvas-web）
 
-Pro2 画布及 `canvas-web` 内所有「点击后弹出选择 AI 模型 + 可调参数」的交互，**必须**复用：
+Pro2 画布及 `canvas-web` 内所有「点击后弹出选择 AI 模型 + 可调参数」的交互：
+
+### 浮动 Dock（强制 · 双钮 Popover）
+
+- **模型**：`LibtvDockEngineModelPicker` 或 role 专用 picker（见 `libtv-generate-settings-spec.md` §0）
+- **参数**：`LibtvDockGatewayParamsPicker` 或 `Sbv1ImageDockParamsPicker` / `Sbv1VideoDockParamsPicker` 等
+- **锚点 Popover**：`Sbv1ToolbarDropdown` · `useSbv1ToolbarAnchor` · 禁止 Dock 底栏单一合并设置钮
+
+### 全屏 / 嵌套弹层（批量选择等）
 
 - **组件**：`canvas-web/components/canvas/engine-picker.tsx`（`EnginePicker`）
-- **弹层**：同文件内 `EngineModelModal`（禁止另写第二套 Dialog / Drawer）
+- **弹层**：同文件内 `EngineModelModal`
 - **数据**：`useUserProviders()` → Gateway 登记模型；**禁止**前端硬编码模型卡片列表
 
 ## 按 role 分流
@@ -58,8 +66,9 @@ Pro2 画布及 `canvas-web` 内所有「点击后弹出选择 AI 模型 + 可调
 
 ## 禁止
 
-- 裸 `<select>` 或自写模型卡片网格替代 `EnginePicker`
-- 复制 `EngineModelModal` 布局另起弹层
+- 裸 `<select>` 模型列表 — Dock 用 `LibtvDockEngineModelPicker`；全屏弹层用 `EnginePicker`
+- Dock 单一「模型与参数」合并钮 — 须拆为 **模型 + 参数** 双 Popover（见 `libtv-generate-settings-spec.md` §0）
+- 复制 `EngineModelModal` 布局另起 Dock Popover — 全屏场景仍走 `EnginePicker`
 - 在 Dock / 工具条 / 弹层里写死 `modelKey` 列表而不走 Gateway providers
 - 电商工具箱内改走 `EnginePicker`（电商仍用 `StoryboardModelPickerDialog`，见 `ecom-model-picker.mdc`）
 

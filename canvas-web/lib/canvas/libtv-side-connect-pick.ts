@@ -207,6 +207,7 @@ export async function runLibtvSideConnectPick(
         if (
           side === "right" &&
           (itemId === "video" ||
+            itemId === "hd-video" ||
             itemId === "video-engine" ||
             itemId === "video-compose" ||
             nodeType === "sbv1-video-engine")
@@ -216,7 +217,11 @@ export async function runLibtvSideConnectPick(
             "right",
             "sbv1-video-engine",
             store,
-            spawnOpts,
+            {
+              ...spawnOpts,
+              menuItemId: itemId,
+              connectAsMotionVideo: itemId === "hd-video",
+            },
           );
         }
       },

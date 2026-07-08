@@ -1,3 +1,23 @@
+/** 厂商 state 误写入 failCode/failMessage（如 success）· 非真实用户错误 */
+export function isMislabeledVendorSuccessError(
+  failCode?: string | null,
+  failMessage?: string | null,
+): boolean {
+  const c = (failCode ?? "").trim().toLowerCase();
+  const m = (failMessage ?? "").trim().toLowerCase();
+  return (
+    c === "success" ||
+    c === "succeeded" ||
+    c === "completed" ||
+    m === "success" ||
+    m === "succeeded" ||
+    m === "completed" ||
+    m === "status=success" ||
+    m === "status=succeeded" ||
+    m === "status=completed"
+  );
+}
+
 /** Gateway 生图 modelKey（非 LLM chat） */
 export function isGatewayImageModelKey(modelKey?: string | null): boolean {
   const m = (modelKey ?? "").trim().toLowerCase();
@@ -176,6 +196,10 @@ export function formatCanvasTaskError(
   const msg = extractVendorErrorMessage(failMessage ?? "");
   const code = (failCode ?? "").trim();
   const blob = `${code} ${msg} ${failMessage ?? ""}`.toLowerCase();
+
+  if (isMislabeledVendorSuccessError(code, msg)) {
+    return "视频已生成但未写入节点，请刷新画布或重新打开项目后重试。";
+  }
 
   if (
     code === "SUBMIT_DISPATCH_TIMEOUT" ||

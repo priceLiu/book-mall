@@ -159,6 +159,15 @@ export function Pro2StarterInputDock() {
       return;
     }
     if (!isMusicPreset) {
+      if (isPro2SunoModelKey(modelKey)) {
+        await alert({
+          title: "请选择文本模型",
+          message:
+            "Suno API 用于生成音乐，不能用于文本对话。若要写 Suno 风格提示词，请选择 Gemini / DeepSeek 等文本模型；若要直接生音乐，请使用「文字生音乐」预设节点。",
+          variant: "warning",
+        });
+        return;
+      }
       const needsVision = pro2TextNodeLlmNeedsVision(liveData, {
         nodeId: storeNode.id,
         nodes,

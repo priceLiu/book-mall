@@ -43,8 +43,10 @@ import {
 import {
   canvasGwChat,
   canvasGwCreateBailianR2vJob,
+  canvasGwCreateDashscopeKlingImageJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
+  canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
   canvasGwTts,
 } from "./canvas-gateway-client";
@@ -66,6 +68,12 @@ import {
   VOLCENGINE_VIDEO_MULTI_REF_MODEL,
 } from "./canvas-video-volcengine";
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
+import { isTopazCanvasVideoModelKey } from "./providers/topaz";
+import {
+  parseTopazFrameInterpolation,
+  parseTopazSlowmoFactor,
+  topazUpscaleFromHdResolution,
+} from "@/lib/gateway/topaz-client";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { buildKieToolVideoCreateArgs } from "./kie-video-tool-builders";
 import {
@@ -85,6 +93,11 @@ import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-contro
 import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
 import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
+import {
+  isStoryboardKlingImageModel,
+  resolveStoryboardKlingModel,
+} from "@/lib/ecom/ecom-storyboard-image-models";
+import { resolveKlingV3Resolution } from "@/lib/ecom/ecom-storyboard-gen-params";
 
 const MAX_PROMPT_LEN = 16000;
 /** Story LLM（故事大纲等）允许更长上游参考包，避免截断创意描述 */
@@ -434,6 +447,18 @@ export async function runAiEngineNode(
   }
 }
 
+/** 可灵 3.0 图像 · aspect_ratio 仅支持 16:9 / 9:16 / 1:1 */
+function resolveKlingImageAspectFromParams(
+  params: Record<string, unknown>,
+): "16:9" | "9:16" | "1:1" {
+  const raw = String(params.aspect_ratio ?? "16:9").trim();
+  if (raw === "1:1" || raw === "9:16" || raw === "16:9") return raw;
+  if (raw.includes("9:16") || raw === "3:4" || raw === "2:3" || raw === "4:5") {
+    return "9:16";
+  }
+  return "16:9";
+}
+
 /** 生图引擎 —— 按 provider.kind 分同步 / 异步两条路径。 */
 export async function runImageEngineNode(
   args: RunEngineNodeArgs,
@@ -484,6 +509,7 @@ export async function runImageEngineNode(
 
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
+  const isKlingImage = isStoryboardKlingImageModel(modelKey);
   await shouldCanvasUseGateway(userId, providerId, modelKey);
 
   const inputHash = computeInputHash({
@@ -572,6 +598,51 @@ export async function runImageEngineNode(
               clientPage: gwClientPage,
               gatewayLogId: job.logId,
               providerKind: "HUNYUAN",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return { reused: false, task: updated };
+      }
+
+      if (isKlingImage) {
+        const apiModel = resolveStoryboardKlingModel(modelKey);
+        const promptText = clipPrompt(expandedPrompt);
+        const content: Array<{ text: string } | { image: string }> =
+          imageUrls.length > 0
+            ? [
+                ...imageUrls.map((url) => ({ image: url })),
+                { text: promptText },
+              ]
+            : [{ text: promptText }];
+        const job = await canvasGwCreateDashscopeKlingImageJob(userId, {
+          model: apiModel,
+          content,
+          aspectRatio: resolveKlingImageAspectFromParams(params),
+          resolution: resolveKlingV3Resolution(),
+          n: Math.min(4, Math.max(1, Number(params.n ?? 1) || 1)),
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: created.id,
+        });
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: job.logId,
+              providerKind: "DASHSCOPE",
+              dashscopeJobKind: "kling-v3-image",
               ...(args.storyScope ? { storyScope: args.storyScope } : {}),
             } as Prisma.InputJsonValue,
           },
@@ -1074,7 +1145,11 @@ export async function runVideoEngineNode(
   const isMotionControl =
     modelKey === "kling-2.6/motion-control" ||
     modelKey === "kling-3.0/motion-control";
-  const motionVideoUrls = isMotionControl
+  const isTopazDirectV2v = isTopazCanvasVideoModelKey(modelKey);
+  const isKieTopazUpscale = modelKey === "topaz/video-upscale";
+  const isVideoOnlyV2v =
+    isTopazDirectV2v || isKieTopazUpscale || modelKey === "wan/2-6-video-to-video";
+  const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)
         ? (params.reference_video_urls as unknown[])
         : []
@@ -1084,14 +1159,21 @@ export async function runVideoEngineNode(
       )
     : [];
   const expandedPrompt = expandVideoPrompt(promptBase, referenceImageUrls);
-  if (!isMotionControl && !expandedPrompt.trim()) {
+  if (!isMotionControl && !isVideoOnlyV2v && !expandedPrompt.trim()) {
     throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
   }
 
-  if (!mainFrameImageUrl && portraitAssetRefs.length === 0) {
+  if (!isVideoOnlyV2v && !mainFrameImageUrl && portraitAssetRefs.length === 0) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "video-engine 需要分镜图作为主图",
+    );
+  }
+
+  if (isVideoOnlyV2v && !motionVideoUrls.length) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "高清视频需要连接上游视频（视频节点右侧 + · 高清视频，或左侧接入驱动视频）",
     );
   }
 
@@ -1156,7 +1238,11 @@ export async function runVideoEngineNode(
   }
 
   if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(effectiveModelKey)) {
-    if (!isVolcengineStoryVideoModelKey(effectiveModelKey) && !isMotionControl) {
+    if (
+      !isVolcengineStoryVideoModelKey(effectiveModelKey) &&
+      !isMotionControl &&
+      !isVideoOnlyV2v
+    ) {
       throw new CanvasProjectError(
         "INVALID_INPUT",
         `video-engine 不支持模型 ${effectiveModelKey}`,
@@ -1171,7 +1257,7 @@ export async function runVideoEngineNode(
   const inputHash = computeInputHash({
     modelKey: effectiveModelKey,
     prompt: expandedPrompt,
-    imageUrls: allSubmittedImageUrls,
+    imageUrls: isVideoOnlyV2v ? motionVideoUrls : allSubmittedImageUrls,
     params: {
       ...params,
       portraitAssetRefs,
@@ -1220,83 +1306,126 @@ export async function runVideoEngineNode(
     }
   }
 
-  const { model, input } = isVolcengineVideo
-    ? (() => {
-        const refVideos = Array.isArray(params.reference_video_urls)
-          ? params.reference_video_urls.filter(
-              (u): u is string => typeof u === "string",
-            )
-          : undefined;
-        const refAudios = Array.isArray(params.reference_audio_urls)
-          ? params.reference_audio_urls.filter(
-              (u): u is string => typeof u === "string",
-            )
-          : undefined;
-        const built = buildCanvasVideoVolcengineInput({
-          modelKey: effectiveModelKey,
-          prompt: expandedPrompt,
-          imageUrl: mainFrameImageUrl,
-          referenceImageUrls,
-          referenceVideoUrls: refVideos,
-          referenceAudioUrls: refAudios,
-          assetRefs: portraitAssetRefs,
-          lastFrameUrl: lastFrameImageUrl,
-          forceReferenceMode: effectiveForceReferenceMode,
-          options: {
-            resolution: String(params.resolution ?? "1080p"),
-            duration: Number(params.duration ?? 5),
-            generateAudio: params.generate_audio === true || params.generateAudio === true,
-            watermark: params.watermark === true,
-          },
-          aspectRatio: String(params.aspect_ratio ?? "16:9"),
-        });
-        return { model: built.model, input: built.body };
-      })()
-    : isMotionControl
-      ? (() => {
-          try {
-            return buildKieToolVideoCreateArgs({
-              model: effectiveModelKey,
-              prompt: expandedPrompt.trim() || promptRaw.trim() || undefined,
-              imageUrls: kieMainFrame ? [kieMainFrame] : [],
-              videoUrls: motionVideoUrls,
-              mode: String(params.mode ?? ""),
-              characterOrientation: String(
-                params.character_orientation ?? "video",
-              ),
-            });
-          } catch (e) {
-            throw new CanvasProjectError(
-              "INVALID_INPUT",
-              e instanceof Error ? e.message : String(e),
-            );
-          }
-        })()
-      : buildCanvasVideoKieInput({
-        modelKey: effectiveModelKey,
-        prompt: expandedPrompt,
-        imageUrl: kieMainFrame,
-        referenceImageUrls: kieReferenceImageUrls,
-        lastFrameUrl: kieLastFrame || undefined,
-        options: {
-          resolution: String(params.resolution ?? "1080p"),
-          duration: Number(params.duration ?? 5),
-          generateAudio:
-            params.generate_audio === true || params.generateAudio === true,
-          promptExtend: params.promptExtend !== false,
-          watermark: params.watermark === true,
-          mode: typeof params.mode === "string" ? params.mode : undefined,
-          multi_shots: params.multi_shots === true,
-          sound:
-            params.sound !== false && params.generate_audio !== false,
-        },
-        aspectRatio:
-          params.aspect_ratio === "9:16"
-            ? "9:16"
-            : params.aspect_ratio === "1:1"
-              ? "1:1"
-              : "16:9",
+  let model: string;
+  let input: Record<string, unknown>;
+  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" = isVolcengineVideo
+    ? "VOLCENGINE"
+    : "KIE";
+
+  if (isTopazDirectV2v) {
+    model = effectiveModelKey;
+    const hdResolution = String(
+      data.resolution ?? params.resolution ?? "1080p",
+    );
+    input = {
+      video_url: motionVideoUrls[0],
+      filter_model: String(params.filter_model ?? "proteus"),
+      upscale_factor: topazUpscaleFromHdResolution(hdResolution),
+      resolution: hdResolution,
+      slowmo: parseTopazSlowmoFactor(params.slowmo),
+      frame_interpolation: parseTopazFrameInterpolation(
+        params.frame_interpolation ?? params.frameInterpolation,
+      ),
+    };
+    videoProviderKind = "TOPAZ";
+  } else if (isKieTopazUpscale) {
+    try {
+      const built = buildKieToolVideoCreateArgs({
+        model: effectiveModelKey,
+        videoUrl: motionVideoUrls[0],
+        upscaleFactor:
+          params.upscale_factor != null || params.upscaleFactor != null
+            ? Number(params.upscale_factor ?? params.upscaleFactor)
+            : undefined,
       });
+      model = built.model;
+      input = built.input;
+    } catch (e) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  } else if (isVolcengineVideo) {
+    const refVideos = Array.isArray(params.reference_video_urls)
+      ? params.reference_video_urls.filter(
+          (u): u is string => typeof u === "string",
+        )
+      : undefined;
+    const refAudios = Array.isArray(params.reference_audio_urls)
+      ? params.reference_audio_urls.filter(
+          (u): u is string => typeof u === "string",
+        )
+      : undefined;
+    const built = buildCanvasVideoVolcengineInput({
+      modelKey: effectiveModelKey,
+      prompt: expandedPrompt,
+      imageUrl: mainFrameImageUrl,
+      referenceImageUrls,
+      referenceVideoUrls: refVideos,
+      referenceAudioUrls: refAudios,
+      assetRefs: portraitAssetRefs,
+      lastFrameUrl: lastFrameImageUrl,
+      forceReferenceMode: effectiveForceReferenceMode,
+      options: {
+        resolution: String(params.resolution ?? "1080p"),
+        duration: Number(params.duration ?? 5),
+        generateAudio: params.generate_audio === true || params.generateAudio === true,
+        watermark: params.watermark === true,
+      },
+      aspectRatio: String(params.aspect_ratio ?? "16:9"),
+    });
+    model = built.model;
+    input = built.body as Record<string, unknown>;
+  } else if (isMotionControl) {
+    try {
+      const built = buildKieToolVideoCreateArgs({
+        model: effectiveModelKey,
+        prompt: expandedPrompt.trim() || promptRaw.trim() || undefined,
+        imageUrls: kieMainFrame ? [kieMainFrame] : [],
+        videoUrls: motionVideoUrls,
+        mode: String(params.mode ?? ""),
+        characterOrientation: String(
+          params.character_orientation ?? "video",
+        ),
+      });
+      model = built.model;
+      input = built.input;
+    } catch (e) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  } else {
+    const built = buildCanvasVideoKieInput({
+      modelKey: effectiveModelKey,
+      prompt: expandedPrompt,
+      imageUrl: kieMainFrame,
+      referenceImageUrls: kieReferenceImageUrls,
+      lastFrameUrl: kieLastFrame || undefined,
+      options: {
+        resolution: String(params.resolution ?? "1080p"),
+        duration: Number(params.duration ?? 5),
+        generateAudio:
+          params.generate_audio === true || params.generateAudio === true,
+        promptExtend: params.promptExtend !== false,
+        watermark: params.watermark === true,
+        mode: typeof params.mode === "string" ? params.mode : undefined,
+        multi_shots: params.multi_shots === true,
+        sound:
+          params.sound !== false && params.generate_audio !== false,
+      },
+      aspectRatio:
+        params.aspect_ratio === "9:16"
+          ? "9:16"
+          : params.aspect_ratio === "1:1"
+            ? "1:1"
+            : "16:9",
+    });
+    model = built.model;
+    input = built.input as Record<string, unknown>;
+  }
 
   await assertVideoCreditsBeforeTrafficQueue({
     userId,
@@ -1327,10 +1456,12 @@ export async function runVideoEngineNode(
         imageUrls: allSubmittedImageUrls,
         mainFrameImageUrl,
         referenceImageUrls,
-        providerKind: isVolcengineVideo ? "VOLCENGINE" : "KIE",
-        ...(isVolcengineVideo
+        providerKind: videoProviderKind,
+        ...(videoProviderKind === "VOLCENGINE"
           ? { volcengineModel: model, volcengineBody: input }
-          : { kieModel: model, kieInput: input }),
+          : videoProviderKind === "TOPAZ"
+            ? { topazModel: model, topazInput: input }
+            : { kieModel: model, kieInput: input }),
         ...(data.sbv1Billing && typeof data.sbv1Billing === "object"
           ? { sbv1Billing: data.sbv1Billing }
           : {}),
@@ -1391,7 +1522,24 @@ export async function runVideoEngineNode(
       );
     }
 
-    const job = isVolcengineVideo
+    const job = isTopazDirectV2v
+      ? await canvasGwCreateTopazVideoJob(userId, {
+          model,
+          videoUrl: String(motionVideoUrls[0] ?? ""),
+          filterModel: String(params.filter_model ?? "proteus"),
+          upscaleFactor: topazUpscaleFromHdResolution(
+            String(data.resolution ?? params.resolution ?? "1080p"),
+          ),
+          slowmo: parseTopazSlowmoFactor(params.slowmo),
+          frameInterpolation: parseTopazFrameInterpolation(
+            params.frame_interpolation ?? params.frameInterpolation,
+          ),
+          resolution: String(data.resolution ?? params.resolution ?? "1080p"),
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: claimedTask.id,
+        })
+      : isVolcengineVideo
       ? await canvasGwCreateVolcengineVideoJob(userId, {
           model,
           body: input as Record<string, unknown>,
@@ -1441,7 +1589,7 @@ export async function runVideoEngineNode(
         failMessage: formatVideoEngineFailMessage(
           "VIDEO_ENGINE_FAILED",
           msg,
-          { providerKind: isVolcengineVideo ? "VOLCENGINE" : "KIE" },
+          { providerKind: videoProviderKind },
         ).slice(0, 500),
         completedAt: new Date(),
         inputPayload: {

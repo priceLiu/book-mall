@@ -33,6 +33,11 @@ export const PRO2_DOCK_DIVIDER = LIBTV_INPUT_DOCK_DIVIDER;
 export const PRO2_CONTROL_CARD_WIDTH = 360;
 export const PRO2_CONTROL_CARD_HEIGHT = 140;
 
+/** 2.0 标签节点 · 可压成单行便签 */
+export const PRO2_TAG_NODE_MIN_WIDTH = 120;
+export const PRO2_TAG_NODE_MIN_HEIGHT = 54;
+export const PRO2_TAG_NODE_WIDTH = 440;
+export const PRO2_TAG_NODE_HEIGHT = 88;
 /** 2.0 文本节点（LibTV 卡片 · 默认 4:3 · 可拉伸） */
 export const PRO2_TEXT_NODE_WIDTH = 440;
 export const PRO2_TEXT_NODE_MIN_WIDTH = 320;

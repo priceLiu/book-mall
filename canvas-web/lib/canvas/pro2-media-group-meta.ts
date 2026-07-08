@@ -145,8 +145,8 @@ export function isPro2StyledGroup(
 
 const PRO2_MEDIA_GROUP_Z_BASE = 5;
 const PRO2_MEDIA_GROUP_Z_SELECTED = 5;
-/** 高于 `.react-flow__edges`（globals.css · 10），连线可见但不压住图片 */
-const PRO2_MEDIA_GROUP_CHILD_Z_BASE = 15;
+/** 高于 `.react-flow__edges`（globals.css · 4），连线可见但不压住图片 */
+const PRO2_MEDIA_GROUP_CHILD_Z_BASE = 22;
 const PRO2_MEDIA_GROUP_CHILD_Z_SELECTED = 1201;
 
 /** 选中媒体组时子图叠在其它节点之上；组框底色保持低于连线层 */

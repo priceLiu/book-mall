@@ -33,6 +33,15 @@ export function buildPro2StarterNodeData(
   };
 }
 
+export function buildPro2TagNodeData(
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    body: "",
+    ...overrides,
+  };
+}
+
 /** 文生图/生视频/反推等 · 不走故事大纲 LLM */
 export function buildPro2GeneralTextNodeData(
   overrides?: Record<string, unknown>,
