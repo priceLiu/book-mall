@@ -11,6 +11,10 @@ import {
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
+import {
+  canvasGraphRedo,
+  canvasGraphUndo,
+} from "@/lib/canvas/canvas-graph-undo-redo";
 import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
@@ -463,9 +467,9 @@ function Inner({ projectId }: { projectId: string }) {
     ) => {
       let writeHistory = opts.writeHistory ?? false;
       const autosaveIntervalMs = getCanvasAutosaveIntervalMs();
-      // debounce / flush 落盘：间隔未关闭时同步写「自动保存」历史
-      if (!writeHistory && autosaveIntervalMs > 0) {
-        writeHistory = true;
+      // 仅定时器（用户设置的间隔）写入「自动保存」历史；1.5s debounce 只落盘项目不增历史条
+      if (autosaveIntervalMs <= 0) {
+        writeHistory = false;
       }
       if (autosaveInFlightRef.current) {
         autosavePendingRef.current = true;
@@ -580,7 +584,7 @@ function Inner({ projectId }: { projectId: string }) {
 
     const flushAutosaveNow = () => {
       clearAutosaveTimer();
-      void runAutosave(true, { writeHistory: getCanvasAutosaveIntervalMs() > 0 });
+      void runAutosave(true);
     };
 
     const onFlushAutosave = () => flushAutosaveNow();
@@ -613,13 +617,11 @@ function Inner({ projectId }: { projectId: string }) {
   }, [project, base, projectId, loading]);
 
   const undo = useCallback(() => {
-    const tStore = useCanvasStore.temporal.getState();
-    tStore.undo();
+    canvasGraphUndo();
   }, []);
 
   const redo = useCallback(() => {
-    const tStore = useCanvasStore.temporal.getState();
-    tStore.redo();
+    canvasGraphRedo();
   }, []);
 
   const manualSave = useCallback(async () => {

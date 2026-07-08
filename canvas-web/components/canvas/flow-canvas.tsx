@@ -52,6 +52,7 @@ import {
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import { mergeStoreNodesIntoRf } from "@/lib/canvas/canvas-rf-sync";
+import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
 import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
 import {
   isLibtvSidePlusConnectHandle,
@@ -385,6 +386,23 @@ function FlowCanvasInner({
       }
     });
     return unsub;
+  }, [setRfNodes, setRfEdges, libtvCanvas]);
+
+  /** 撤销/重做后强制 RF 与 store 对齐（拖动中 defer 同步时 undo 可能不生效） */
+  useEffect(() => {
+    const onUndoRedo = () => {
+      deferStoreGraphSyncRef.current = false;
+      const s = useCanvasStore.getState();
+      setRfNodes((rf) =>
+        mergeStoreNodesIntoRf(rf, s.nodes, {
+          preserveRfSelection: libtvCanvas,
+        }),
+      );
+      setRfEdges(s.edges);
+    };
+    window.addEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
+    return () =>
+      window.removeEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
   }, [setRfNodes, setRfEdges, libtvCanvas]);
 
   const onMoveStart = useCallback(() => {
@@ -1419,12 +1437,21 @@ function FlowCanvasInner({
         onNodeClick={
           pro2FloatingInspector
             ? (_e, node) => {
-                if (node.type !== "group") return;
-                const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
-                const hit = all.find((n) => n.id === node.id);
-                if (!hit || !isPro2StyledGroup(hit, all)) return;
+                if (node.type === "group") {
+                  const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
+                  const hit = all.find((n) => n.id === node.id);
+                  if (!hit || !isPro2StyledGroup(hit, all)) return;
+                  setRfNodes((prev) =>
+                    prev.map((n) => ({ ...n, selected: n.id === node.id })),
+                  );
+                  return;
+                }
                 setRfNodes((prev) =>
                   prev.map((n) => ({ ...n, selected: n.id === node.id })),
+                );
+                useCanvasStore.getState().setLibtvFloatingDockSelection(
+                  node.id,
+                  node.type ?? null,
                 );
               }
             : undefined

@@ -31,30 +31,34 @@ export function EcomWorkspaceLayout({
   const hasAssistant = Boolean(assistant) && !fullWidth;
 
   return (
-    <div className="flex h-full min-h-0 w-full">
+    <div className="flex h-full min-h-0 w-full flex-col md:flex-row">
       {hasAssistant ? (
-        <aside className="flex w-[30%] min-w-[260px] max-w-[400px] shrink-0 flex-col border-r border-[#e8e8ed] bg-[#fafafa]">
+        <aside className="flex w-full shrink-0 flex-col border-b border-[#e8e8ed] bg-[#fafafa] md:h-full md:w-[30%] md:min-w-[260px] md:max-w-[400px] md:border-b-0 md:border-r">
           {assistantHeader ? (
             <div className="shrink-0 border-b border-[#e8e8ed] px-4 py-3">
               {assistantHeader}
             </div>
           ) : null}
-          <div className="min-h-0 flex-1">{assistant}</div>
+          <div className="max-h-[min(42vh,360px)] min-h-0 flex-1 overflow-y-auto md:max-h-none">
+            {assistant}
+          </div>
         </aside>
       ) : null}
 
-      {hasAssistant && progress ? (
-        <div className="flex shrink-0 flex-col">{progress}</div>
-      ) : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
+        {hasAssistant && progress ? (
+          <div className="flex shrink-0 flex-col">{progress}</div>
+        ) : null}
 
-      <main
-        className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f5f5f7]",
-          contentClassName,
-        )}
-      >
-        {children}
-      </main>
+        <main
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f5f5f7]",
+            contentClassName,
+          )}
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

@@ -88,9 +88,14 @@ export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
   width: number;
   height: number;
 } {
+  const data = node.data as {
+    pro2MediaRole?: string;
+    gridSplitFrameCrop?: boolean;
+    mediaFit?: boolean;
+  };
   const cell = pro2MediaChildSize({
     type: node.type,
-    pro2MediaRole: (node.data as { pro2MediaRole?: string }).pro2MediaRole,
+    pro2MediaRole: data.pro2MediaRole,
   });
   const style = node.style as { width?: number; height?: number } | undefined;
   const w =
@@ -103,6 +108,12 @@ export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
     (typeof node.height === "number" ? node.height : undefined) ??
     style?.height ??
     cell.height;
+  if (data.gridSplitFrameCrop && data.mediaFit) {
+    return {
+      width: Math.max(1, Math.round(w)),
+      height: Math.max(1, Math.round(h)),
+    };
+  }
   return {
     width: Math.max(cell.width, Math.round(w)),
     height: Math.max(cell.height, Math.round(h)),

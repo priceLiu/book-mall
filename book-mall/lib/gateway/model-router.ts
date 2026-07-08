@@ -179,6 +179,30 @@ export function routeGatewayModel(model: string): RoutedModel {
   }
 
   if (
+    m === "qwen-image-edit" ||
+    m === "qwen-image-edit-max" ||
+    m.startsWith("qwen-image-edit")
+  ) {
+    return { providerKind: "BAILIAN", requestKind: "IMAGE" };
+  }
+
+  if (
+    m === "image-out-painting" ||
+    m === "wanx-x-painting" ||
+    m === "wan2.5-i2i-preview"
+  ) {
+    return { providerKind: "BAILIAN", requestKind: "IMAGE" };
+  }
+
+  if (
+    m === "doubao-seedream-5-0-lite" ||
+    m === "doubao-seedream-5-0-260128" ||
+    (m.includes("doubao-seedream-5") && m.includes("lite"))
+  ) {
+    return { providerKind: "VOLCENGINE", requestKind: "IMAGE" };
+  }
+
+  if (
     m.startsWith("seedream-") ||
     m.startsWith("gpt-image-") ||
     m.startsWith("flux-") ||

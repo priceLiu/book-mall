@@ -7,6 +7,10 @@ import {
   useViewportTransformActive,
 } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  pro2NodeAbsolutePosition,
+  pro2NodeBoxSize,
+} from "@/lib/canvas/pro2-selection-bbox";
 
 /** 拖动所属节点时隐藏顶栏（与浮动 Dock 同一规则） */
 export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
@@ -22,11 +26,12 @@ export function useLibtvNodeToolbarScreenPlacement(
 ): { x: number; y: number } | null {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const flowNode = useCanvasStore((s) => s.nodes.find((n) => n.id === nodeId));
+  const allNodes = useCanvasStore((s) => s.nodes);
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
   const viewport = useViewportTransformActive(visible && !viewportMoving);
 
   return useMemo(() => {
-    if (!visible || viewportMoving) return null;
+    if (!visible || viewportMoving || !flowNode) return null;
     const internal = getInternalNode(nodeId) as
       | {
           measured?: { width?: number; height?: number };
@@ -36,15 +41,23 @@ export function useLibtvNodeToolbarScreenPlacement(
           height?: number;
         }
       | undefined;
-    if (!internal) return null;
-    const pos =
-      internal.internals?.positionAbsolute ?? internal.position;
-    const w =
-      internal.measured?.width ??
-      (typeof internal.width === "number" ? internal.width : undefined) ??
-      (typeof flowNode?.width === "number" ? flowNode.width : undefined) ??
-      (((flowNode?.style as { width?: number } | undefined)?.width) ?? undefined) ??
-      350;
+
+    let pos: { x: number; y: number };
+    let w: number;
+
+    if (internal) {
+      pos =
+        internal.internals?.positionAbsolute ?? internal.position;
+      const { w: boxW } = pro2NodeBoxSize(flowNode);
+      w =
+        internal.measured?.width ??
+        (typeof internal.width === "number" ? internal.width : undefined) ??
+        boxW;
+    } else {
+      pos = pro2NodeAbsolutePosition(flowNode, allNodes);
+      w = pro2NodeBoxSize(flowNode).w;
+    }
+
     const top = flowToScreenPosition({ x: pos.x + w / 2, y: pos.y });
     return { x: top.x, y: top.y };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,5 +69,6 @@ export function useLibtvNodeToolbarScreenPlacement(
     getInternalNode,
     flowToScreenPosition,
     flowNode,
+    allNodes,
   ]);
 }

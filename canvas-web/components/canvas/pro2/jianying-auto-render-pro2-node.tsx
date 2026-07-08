@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { Clapperboard, Maximize2 } from "lucide-react";
+import { Clapperboard, Maximize2, Play } from "lucide-react";
 
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { computeAutoRenderNodeSize } from "@/lib/canvas/clip-preview-node-size";
@@ -106,7 +106,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   return (
     <>
       <div
-        className={SBV1_NODE_OUTER_CLASS}
+        className={cn(SBV1_NODE_OUTER_CLASS, SBV1_CARD_DRAG_CLASS)}
         data-sbv1-dock-anchor={id}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
@@ -156,10 +156,23 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             <p className="min-w-0 flex-1 truncate text-xs font-medium text-white">
               {title}
             </p>
+            {videoUrl ? (
+              <button
+                type="button"
+                className={cn(
+                  RF_NO_DRAG,
+                  "flex size-7 shrink-0 items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
+                )}
+                onClick={() => setFullscreen(true)}
+                title="全屏预览"
+              >
+                <Maximize2 className="size-3.5" />
+              </button>
+            ) : null}
           </div>
 
           <div
-            className={cn(SBV1_MEDIA_STAGE_CLASS, "group relative")}
+            className={cn(SBV1_MEDIA_STAGE_CLASS, "group/stage relative")}
             style={{ backgroundColor: LIBTV_INPUT_DOCK_BG }}
           >
             {videoUrl ? (
@@ -168,23 +181,26 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                   key={videoUrl}
                   src={videoUrl}
                   fill
-                  objectFit="cover"
-                  className={cn(
-                    RF_NO_DRAG,
-                    "absolute inset-0 h-full w-full border-0 !bg-[#262626]",
-                  )}
+                  objectFit="contain"
+                  className="pointer-events-none absolute inset-0 h-full w-full border-0 !bg-[#262626]"
                 />
-                <button
-                  type="button"
-                  className={cn(
-                    RF_NO_DRAG,
-                    "absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-md bg-black/55 text-white/80 opacity-0 backdrop-blur-sm transition hover:bg-black/75 hover:text-white group-hover:opacity-100",
-                  )}
-                  onClick={() => setFullscreen(true)}
-                  title="全屏预览"
-                >
-                  <Maximize2 className="size-4" />
-                </button>
+                <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
+                  <button
+                    type="button"
+                    aria-label="播放成片"
+                    title="播放成片"
+                    className={cn(
+                      RF_NO_DRAG,
+                      "pointer-events-auto flex size-16 items-center justify-center rounded-full border border-white/25 bg-black/60 opacity-0 shadow-lg transition group-hover/stage:opacity-100",
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFullscreen(true);
+                    }}
+                  >
+                    <Play className="ml-1 size-8 fill-white text-white" />
+                  </button>
+                </div>
               </>
             ) : (
               <div className="flex h-full min-h-[400px] items-center justify-center px-4 text-center text-[12px] text-white/40">

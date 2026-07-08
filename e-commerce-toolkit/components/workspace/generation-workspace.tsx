@@ -169,7 +169,7 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
           </div>
         }
       >
-        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
           <h2 className="text-xl font-semibold text-[#1d1d1f]">本模块资产</h2>
           {assets.length === 0 ? (
             <p className="mt-4 text-sm text-[#6e6e73]">

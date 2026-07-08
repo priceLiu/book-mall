@@ -71,7 +71,7 @@ export default function LibraryPage() {
         }
         assistant={<EcomHomeAssistant variant="library" />}
       >
-        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
           {loading ? (
             <p className="text-sm text-[#6e6e73]">加载中…</p>
           ) : assets.length === 0 ? (
