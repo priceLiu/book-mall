@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
     const result = await volcengineImageGenerations({
       apiKey: cred.apiKey,
-      baseUrl: cred.baseUrl,
+      baseUrl: cred.baseUrl ?? undefined,
       model,
       prompt,
       image: body.image,
