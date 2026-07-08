@@ -1037,18 +1037,20 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       resizeNode: (id, { width, height }) => {
-        set({
-          nodes: get().nodes.map((n) =>
-            n.id === id
-              ? {
-                  ...n,
-                  width,
-                  height,
-                  style: { ...n.style, width, height },
-                }
-              : n,
-          ),
-        });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: state.nodes.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    width,
+                    height,
+                    style: { ...n.style, width, height },
+                  }
+                : n,
+            ),
+          }),
+        );
       },
 
       removeNode: (id) => {

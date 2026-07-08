@@ -19,7 +19,11 @@ import {
   gatewayV1ChatCompletionsStream,
   gatewayV1ClientMeta,
   gatewayV1CreateTask,
+  gatewayV1Image2ImageAsync,
+  gatewayV1ImageOutPainting,
+  gatewayV1QwenImageEdit,
   gatewayV1RecordInfo,
+  gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
 import {
   isBailianR2vFailed,
@@ -507,4 +511,119 @@ export async function ecomGwPollBailianR2v(
   }
 
   return { status: output.task_status ?? "PENDING" };
+}
+
+export async function ecomGwQwenImageEdit(
+  bookUserId: string,
+  opts: {
+    model: string;
+    content: Array<{ image?: string; text?: string }>;
+    parameters?: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  const model = opts.model.trim();
+  routeGatewayModel(model);
+  if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
+  }
+  return gatewayV1QwenImageEdit({
+    apiKeyId: auth.id,
+    body: {
+      model,
+      content: opts.content,
+      parameters: opts.parameters,
+    },
+    meta: gatewayV1ClientMeta("E_COMMERCE", {
+      clientPage: opts.clientPage,
+      bookUserId,
+    }),
+  });
+}
+
+export async function ecomGwVolcengineImageEdit(
+  bookUserId: string,
+  opts: {
+    model: string;
+    prompt: string;
+    image?: string;
+    parameters?: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<{ images: Array<{ url?: string; b64?: string }>; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  const model = opts.model.trim();
+  routeGatewayModel(model);
+  if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
+    throw new GatewayRequiredError("Gateway Key 未绑定火山方舟凭证");
+  }
+  return gatewayV1VolcengineImageGenerations({
+    apiKeyId: auth.id,
+    body: {
+      model,
+      prompt: opts.prompt,
+      image: opts.image,
+      parameters: opts.parameters,
+    },
+    meta: gatewayV1ClientMeta("E_COMMERCE", {
+      clientPage: opts.clientPage,
+      bookUserId,
+    }),
+  });
+}
+
+export async function ecomGwImageOutPainting(
+  bookUserId: string,
+  opts: {
+    imageUrl: string;
+    parameters?: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  routeGatewayModel("image-out-painting");
+  if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
+  }
+  return gatewayV1ImageOutPainting({
+    apiKeyId: auth.id,
+    body: {
+      imageUrl: opts.imageUrl,
+      parameters: opts.parameters,
+    },
+    meta: gatewayV1ClientMeta("E_COMMERCE", {
+      clientPage: opts.clientPage,
+      bookUserId,
+    }),
+  });
+}
+
+export async function ecomGwImage2ImageAsync(
+  bookUserId: string,
+  opts: {
+    model: string;
+    input: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  const model = opts.model.trim();
+  routeGatewayModel(model);
+  if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
+  }
+  return gatewayV1Image2ImageAsync({
+    apiKeyId: auth.id,
+    body: {
+      model,
+      input: opts.input,
+      parameters: opts.parameters,
+    },
+    meta: gatewayV1ClientMeta("E_COMMERCE", {
+      clientPage: opts.clientPage,
+      bookUserId,
+    }),
+  });
 }

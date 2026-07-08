@@ -281,8 +281,8 @@ export function MyCanvasHistoryPanel({
         </select>
         <p className="mt-2 text-[10px] leading-relaxed text-white/40">
           {intervalMs === 0
-            ? "当前：仅手动保存会写入「手动保存」历史。"
-            : `当前：编辑停顿约 ${CANVAS_AUTOSAVE_DEBOUNCE_MS / 1000} 秒后写入「自动保存」；另约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 补一条备份。`}
+            ? "当前：仅手动保存会写入「手动保存」历史；编辑仍会自动落盘到项目。"
+            : `当前：编辑停顿约 ${CANVAS_AUTOSAVE_DEBOUNCE_MS / 1000} 秒后自动落盘项目；每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 写入一条「自动保存」历史。`}
         </p>
       </div>
 
@@ -298,7 +298,7 @@ export function MyCanvasHistoryPanel({
               ? "还没有手动保存。点击工具栏「手动保存」后，版本会出现在这里。"
               : intervalMs <= 0
                 ? "已关闭自动保存历史。可在上方改间隔。"
-                : "还没有自动保存记录。编辑停顿约 1.5 秒后会写入一条快照。"}
+                : `还没有自动保存记录。编辑后约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 会写入一条。`}
           </p>
         ) : (
           <ul className="space-y-2">

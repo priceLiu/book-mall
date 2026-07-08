@@ -97,6 +97,8 @@
     "gateway:audit-gaps": "dotenv -e .env.local -- tsx scripts/audit-gateway-registry-gaps.ts",
     "seed:sbv1-video-credits": "dotenv -e .env.local -- tsx scripts/seed-sbv1-video-credit-prices.ts",
     "seed:lib-nano-pro-credits": "dotenv -e .env.local -- tsx scripts/seed-lib-nano-pro-credit-prices.ts",
+    "seed:ecom-image-processing-credits": "dotenv -e .env.local -- tsx scripts/seed-ecom-image-processing-credit-prices.ts",
+    "setup:seedream-5-volcengine": "dotenv -e .env.local -- tsx scripts/setup-seedream-5-volcengine-gateway.ts",
     "gateway:auto-publish": "dotenv -e .env.local -- tsx scripts/auto-publish-platform-offerings.ts",
     "media-render:expire": "dotenv -e .env.local -- tsx scripts/media-render-expire.ts",
     "media-render:check-ffmpeg": "tsx scripts/check-ffmpeg.ts",

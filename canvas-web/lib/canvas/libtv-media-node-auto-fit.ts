@@ -208,12 +208,23 @@ export function useLibtvMediaNodeAutoFit({
     const parentGroup = s.nodes.find((n) => n.id === parentId);
     return Boolean(parentGroup && isSbv1MediaGroup(parentGroup, s.nodes));
   });
+  /** 分镜图组等 Pro2 媒体组 · 尺寸由组 relayout 决定，禁止 auto-fit 撑破宫格 */
+  const skipForPro2GroupImage = useCanvasStore((s) => {
+    if (kind !== "image" || !parentId) return false;
+    const self = s.nodes.find((n) => n.id === nodeId);
+    const isGridSplitCrop = Boolean(
+      (self?.data as { gridSplitCrop?: unknown } | undefined)?.gridSplitCrop,
+    );
+    if (isGridSplitCrop) return false;
+    const parentGroup = s.nodes.find((n) => n.id === parentId);
+    return Boolean(parentGroup && isPro2StyledGroup(parentGroup, s.nodes));
+  });
 
   const lastFitKey = useRef("");
 
   useEffect(() => {
     const url = mediaUrl?.trim();
-    if (!url || disabled || skipForSbv1GroupImage) return;
+    if (!url || disabled || skipForSbv1GroupImage || skipForPro2GroupImage) return;
 
     const poster = posterUrl?.trim();
     const probeUrl = kind === "video" && poster ? poster : url;
@@ -284,6 +295,7 @@ export function useLibtvMediaNodeAutoFit({
     profile,
     disabled,
     skipForSbv1GroupImage,
+    skipForPro2GroupImage,
     parentId,
     mediaFit,
     mediaFitKey,

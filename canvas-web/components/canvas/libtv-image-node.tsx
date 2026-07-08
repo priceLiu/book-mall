@@ -42,6 +42,8 @@ import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
 import { useLibtvNodeDuplicate, crewNodeShowsParticipatingBadge } from "./libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2/pro2-crew-task-status-badge";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
+import { Pro2ImageGridSplitToolbar } from "./pro2/pro2-image-grid-split-toolbar";
+import { LibtvImageGridSplitStage } from "./libtv-image-grid-split-stage";
 import { LibtvNodeToolbarPortal } from "./libtv-node-toolbar-portal";
 import {
   Pro2MediaNodeEmptyState,
@@ -53,6 +55,26 @@ import {
   LibtvMediaGeneratingState,
   isLibtvMediaGenerating,
 } from "./libtv-media-generating-state";
+import {
+  gridSplitCropBackgroundStyle,
+  type GridSplitCrop,
+} from "@/lib/canvas/libtv-grid-split-crop";
+import {
+  libtvGridSplitFromPreset,
+  spawnExpandImageFromGridSplit,
+  spawnFrameGroupFromGridSplit,
+  toggleGridSplitCell,
+  type LibtvGridSplitPresetId,
+  type LibtvImageGridSplitState,
+} from "@/lib/canvas/libtv-image-grid-split";
+import {
+  spawnLibtvImageEditTarget,
+  type LibtvImageEditMenuId,
+} from "@/lib/canvas/libtv-image-toolbar-edit";
+import {
+  spawnLibtvImageMagicTarget,
+  type LibtvImageMagicMenuId,
+} from "@/lib/canvas/libtv-image-toolbar-magic";
 
 export type LibtvImageNodeEdition = "pro2" | "sbv1";
 
@@ -67,6 +89,8 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   engine?: CanvasEnginePick;
   imageMode?: string;
   pro2MediaRole?: Pro2ImageMediaRole | string;
+  gridSplit?: LibtvImageGridSplitState;
+  gridSplitCrop?: GridSplitCrop;
 };
 
 export type LibtvImageNodeProps = NodeProps & {
@@ -116,9 +140,15 @@ export function LibtvImageNode({
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const graphMeta = useCanvasStore((s) => s.graphMeta);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
+  const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const inputRef = useRef<HTMLInputElement>(null);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
@@ -178,13 +208,29 @@ export function LibtvImageNode({
   const showTryMenu =
     !isCharacterThreeView && !hasImage && !isGenerating && !hasError;
   const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
+  const gridSplit = d.gridSplit;
+  const gridSplitActive = Boolean(gridSplit && edition === "pro2");
   const showImageTools = Boolean(
     showFloatingToolbar &&
       !isCharacterThreeView &&
+      !gridSplitActive &&
       (hasImage ||
         Boolean(d.dockInput?.trim()) ||
         Boolean(d.engine?.modelKey?.trim())),
   );
+  const showNormalToolbar = Boolean(
+    showFloatingToolbar && !isCharacterThreeView && !gridSplitActive,
+  );
+  const showGridSplitToolbar = Boolean(
+    soleSelected && gridSplitActive && !isGenerating,
+  );
+  const pro2ImageToolbarExtras = Boolean(
+    edition === "pro2" && hasImage && !isCharacterThreeView,
+  );
+
+  const stageImageFit: "cover" | "contain" = gridSplitActive ? "contain" : "cover";
+
+  const gridSplitCropCss = d.gridSplitCrop;
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,
@@ -273,6 +319,136 @@ export function LibtvImageNode({
     }
   }, [duplicateNode, id, rfSetNodes, rfNodeType, onSelectAfterDuplicate]);
 
+  const clearGridSplit = useCallback(() => {
+    updateNodeData(id, { gridSplit: undefined });
+  }, [id, updateNodeData]);
+
+  const onEditPick = useCallback(
+    (menuId: LibtvImageEditMenuId) => {
+      if (edition !== "pro2") return;
+      spawnLibtvImageEditTarget(id, menuId, {
+        nodes,
+        addNode,
+        setNodes,
+        setEdges,
+      });
+    },
+    [edition, id, nodes, addNode, setNodes, setEdges],
+  );
+
+  const onMagicPick = useCallback(
+    (menuId: LibtvImageMagicMenuId) => {
+      if (edition !== "pro2") return;
+      spawnLibtvImageMagicTarget(id, menuId, {
+        nodes,
+        addNode,
+        setNodes,
+        setEdges,
+      });
+    },
+    [edition, id, nodes, addNode, setNodes, setEdges],
+  );
+
+  const onGridSplitPick = useCallback(
+    (presetId: LibtvGridSplitPresetId) => {
+      if (edition !== "pro2" || !hasImage) return;
+      updateNodeData(id, { gridSplit: libtvGridSplitFromPreset(presetId) });
+    },
+    [edition, hasImage, id, updateNodeData],
+  );
+
+  const onToggleGridCell = useCallback(
+    (cellIndex: number) => {
+      if (!gridSplit) return;
+      updateNodeData(id, {
+        gridSplit: toggleGridSplitCell(gridSplit, cellIndex),
+      });
+    },
+    [gridSplit, id, updateNodeData],
+  );
+
+  const onCreateFrameGroupFromSplit = useCallback(() => {
+    if (!gridSplit?.selected.length) return;
+    void (async () => {
+      const groupId = await spawnFrameGroupFromGridSplit(id, gridSplit, {
+        nodes,
+        addNode,
+        addNodeInGroup,
+        createGroupContaining,
+        updateNodeData,
+        setNodes,
+        setEdges,
+      });
+      if (!groupId) {
+        await alert({
+          title: "创建失败",
+          message: "无法创建分镜组，请重试。",
+          variant: "error",
+        });
+        return;
+      }
+      clearGridSplit();
+    })();
+  }, [
+    gridSplit,
+    id,
+    nodes,
+    addNode,
+    addNodeInGroup,
+    createGroupContaining,
+    updateNodeData,
+    setNodes,
+    setEdges,
+    clearGridSplit,
+    alert,
+  ]);
+
+  const onExpandFromGridSplit = useCallback(() => {
+    if (!gridSplit?.selected.length) return;
+    void (async () => {
+      const newIds = await spawnExpandImageFromGridSplit(id, gridSplit, {
+        nodes,
+        addNode,
+        setNodes,
+        setEdges,
+      });
+      if (!newIds.length) {
+        await alert({
+          title: "扩图失败",
+          message: "无法创建图片节点，请重试。",
+          variant: "error",
+        });
+        return;
+      }
+      clearGridSplit();
+    })();
+  }, [gridSplit, id, nodes, addNode, setNodes, setEdges, clearGridSplit, alert]);
+
+  useEffect(() => {
+    if (!gridSplitActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      clearGridSplit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [gridSplitActive, clearGridSplit]);
+
+  useEffect(() => {
+    if (!gridSplitActive) return;
+    const onPaneClick = () => clearGridSplit();
+    window.addEventListener("canvas:pro2-pane-click", onPaneClick);
+    return () =>
+      window.removeEventListener("canvas:pro2-pane-click", onPaneClick);
+  }, [gridSplitActive, clearGridSplit]);
+
+  useEffect(() => {
+    if (gridSplit && !soleSelected) {
+      clearGridSplit();
+    }
+  }, [gridSplit, soleSelected, clearGridSplit]);
+
   const renderStage = () => {
     if (isCharacterThreeView) {
       if (isGenerating) {
@@ -328,12 +504,33 @@ export function LibtvImageNode({
       );
     }
     if (hasImage) {
+      if (gridSplit && previewUrl) {
+        return (
+          <LibtvImageGridSplitStage
+            src={previewUrl}
+            alt={nodeLabel}
+            split={gridSplit}
+            onToggleCell={onToggleGridCell}
+            onImageError={onPreviewLoadError}
+          />
+        );
+      }
+      if (gridSplitCropCss && previewUrl) {
+        return (
+          <div
+            className="absolute inset-0"
+            style={gridSplitCropBackgroundStyle(previewUrl, gridSplitCropCss)}
+            aria-label={nodeLabel}
+            role="img"
+          />
+        );
+      }
       return (
         <MediaHoverBox
           src={previewUrl}
           variant="generated"
           alt={nodeLabel}
-          fit="cover"
+          fit={stageImageFit}
           hidePreviewOverlay
           onImageError={onPreviewLoadError}
           className="absolute inset-0"
@@ -449,12 +646,18 @@ export function LibtvImageNode({
           onPick={onSidePickRight}
         />
 
-        {showFloatingToolbar && !isCharacterThreeView ? (
-          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
+        {showNormalToolbar ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showNormalToolbar}>
             {showImageTools ? (
               <Pro2ImageNodeToolbar
                 passNodeDrag
                 previewUrl={previewUrl}
+                pro2ImageTools={pro2ImageToolbarExtras}
+                onEditPick={pro2ImageToolbarExtras ? onEditPick : undefined}
+                onMagicPick={pro2ImageToolbarExtras ? onMagicPick : undefined}
+                onGridSplitPick={
+                  pro2ImageToolbarExtras ? onGridSplitPick : undefined
+                }
                 onExpandPreview={() => setPreviewOpen(true)}
                 onSaveAsAsset={() =>
                   saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
@@ -473,6 +676,18 @@ export function LibtvImageNode({
                 onDuplicateNode={onDuplicateNode}
               />
             )}
+          </LibtvNodeToolbarPortal>
+        ) : null}
+
+        {showGridSplitToolbar && gridSplit ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showGridSplitToolbar}>
+            <Pro2ImageGridSplitToolbar
+              passNodeDrag
+              selectedCount={gridSplit.selected.length}
+              onCancel={clearGridSplit}
+              onExpandImage={onExpandFromGridSplit}
+              onCreateFrameGroup={onCreateFrameGroupFromSplit}
+            />
           </LibtvNodeToolbarPortal>
         ) : null}
 

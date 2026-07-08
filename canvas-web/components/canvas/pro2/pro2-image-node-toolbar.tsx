@@ -5,15 +5,13 @@ import {
   ChevronDown,
   Copy,
   Download,
-  Grid3x3,
-  Lamp,
   LayoutGrid,
   Loader2,
   Maximize2,
+  Pencil,
   RotateCw,
   Scan,
   ScanFace,
-  Sparkles,
   Wand2,
 } from "lucide-react";
 import { useState } from "react";
@@ -24,7 +22,24 @@ import {
   guessMediaDownloadFilename,
 } from "@/lib/canvas/download-media-url";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
+import {
+  LIBTV_IMAGE_EDIT_MENU,
+  type LibtvImageEditMenuId,
+} from "@/lib/canvas/libtv-image-toolbar-edit";
+import {
+  LIBTV_IMAGE_MAGIC_MENU,
+  type LibtvImageMagicMenuId,
+} from "@/lib/canvas/libtv-image-toolbar-magic";
+import {
+  LIBTV_GRID_SPLIT_PRESETS,
+  type LibtvGridSplitPresetId,
+} from "@/lib/canvas/libtv-image-grid-split";
 import { useLibtvToolbarPortaled } from "@/components/canvas/libtv-node-toolbar-portal";
+import {
+  Pro2ToolbarDropdownItem,
+  Pro2ToolbarDropdownMenu,
+  usePro2ToolbarExclusiveDropdowns,
+} from "./pro2-toolbar-dropdown-menu";
 import { cn } from "@/lib/utils";
 
 /** LibTV 节点顶栏工具条 · 壳层（规范见 libtv-node-interaction-spec.md §5） */
@@ -64,6 +79,14 @@ export type Pro2ImageNodeToolbarProps = {
   passNodeDrag?: boolean;
   /** 精简模式：仅预览 / 下载 / 复制（视频合成节点） */
   minimal?: boolean;
+  /** Pro2 图片节点 ·「编辑」菜单 */
+  onEditPick?: (menuId: LibtvImageEditMenuId) => void;
+  /** Pro2 图片节点 · 宫格切分预设 */
+  onGridSplitPick?: (presetId: LibtvGridSplitPresetId) => void;
+  /** Pro2 图片节点 ·「魔术」菜单 */
+  onMagicPick?: (menuId: LibtvImageMagicMenuId) => void;
+  /** 是否展示编辑 / 宫格切分（Pro2 有图节点） */
+  pro2ImageTools?: boolean;
 };
 
 /** 有图图片节点 · 顶部浮动工具条（LibTV 图 2） */
@@ -79,9 +102,18 @@ export function Pro2ImageNodeToolbar({
   style,
   passNodeDrag = false,
   minimal = false,
+  onEditPick,
+  onGridSplitPick,
+  onMagicPick,
+  pro2ImageTools = false,
 }: Pro2ImageNodeToolbarProps) {
   const { alert } = useDialogs();
   const [downloading, setDownloading] = useState(false);
+  const dropdowns = usePro2ToolbarExclusiveDropdowns([
+    "edit",
+    "magic",
+    "grid",
+  ] as const);
 
   const soon = async (label: string) => {
     await alert({
@@ -158,66 +190,66 @@ export function Pro2ImageNodeToolbar({
   }
 
   return (
-    <ToolbarShell passNodeDrag={passNodeDrag} className={className} style={style}>
-      <button
-        type="button"
-        className={TOOL_BTN}
-        onClick={() => void soon("全景")}
-      >
-        <Scan className="size-3.5" />
-        <span>全景</span>
-        <span className="rounded bg-sky-500/90 px-1 py-px text-[12px] font-semibold text-white">
-          NEW
-        </span>
-      </button>
-      <button
-        type="button"
-        className={TOOL_BTN}
-        onClick={() => void soon("多角度")}
-      >
-        <RotateCw className="size-3.5" />
-        <span>多角度</span>
-      </button>
-      <button
-        type="button"
-        className={TOOL_BTN}
-        onClick={() => void soon("打光")}
-      >
-        <Lamp className="size-3.5" />
-        <span>打光</span>
-      </button>
+    <>
+      <ToolbarShell passNodeDrag={passNodeDrag} className={className} style={style}>
+        <button
+          type="button"
+          className={TOOL_BTN}
+          onClick={() => void soon("全景")}
+        >
+          <Scan className="size-3.5" />
+          <span>全景</span>
+        </button>
+        <button
+          type="button"
+          className={TOOL_BTN}
+          onClick={() => void soon("多角度")}
+        >
+          <RotateCw className="size-3.5" />
+          <span>多角度</span>
+        </button>
 
-      <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+        {pro2ImageTools ? (
+          <>
+            <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
-      <button
-        type="button"
-        className={TOOL_BTN}
-        onClick={() => void soon("九宫格")}
-      >
-        <Grid3x3 className="size-3.5" />
-        <span>九宫格</span>
-        <ChevronDown className="size-3 opacity-50" />
-      </button>
-      <button
-        type="button"
-        className={TOOL_BTN}
-        onClick={() => void soon("高清")}
-      >
-        <Sparkles className="size-3.5" />
-        <span>高清</span>
-        <ChevronDown className="size-3 opacity-50" />
-      </button>
-      <button
-        type="button"
-        className={TOOL_BTN}
-        onClick={() => void soon("宫格切分")}
-      >
-        <LayoutGrid className="size-3.5" />
-        <span>宫格切分</span>
-        <ChevronDown className="size-3 opacity-50" />
-      </button>
+            <button
+              type="button"
+              ref={dropdowns.bindAnchor("edit")}
+              className={TOOL_BTN}
+              disabled={!onEditPick}
+              onClick={() => dropdowns.toggle("edit")}
+            >
+              <Pencil className="size-3.5" />
+              <span>编辑</span>
+              <ChevronDown className="size-3 opacity-50" />
+            </button>
+            <button
+              type="button"
+              ref={dropdowns.bindAnchor("magic")}
+              className={TOOL_BTN}
+              disabled={!onMagicPick}
+              onClick={() => dropdowns.toggle("magic")}
+            >
+              <Wand2 className="size-3.5" />
+              <span>魔术</span>
+              <ChevronDown className="size-3 opacity-50" />
+            </button>
+            <button
+              type="button"
+              ref={dropdowns.bindAnchor("grid")}
+              className={TOOL_BTN}
+              disabled={!onGridSplitPick}
+              onClick={() => dropdowns.toggle("grid")}
+            >
+              <LayoutGrid className="size-3.5" />
+              <span>宫格切分</span>
+              <ChevronDown className="size-3 opacity-50" />
+            </button>
+          </>
+        ) : null}
 
-      <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+        <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
       {onImportPortrait ? (
         <button
@@ -287,7 +319,71 @@ export function Pro2ImageNodeToolbar({
           <Copy className="size-5" />
         </button>
       ) : null}
-    </ToolbarShell>
+      </ToolbarShell>
+
+      {pro2ImageTools ? (
+        <>
+          <Pro2ToolbarDropdownMenu
+            open={dropdowns.isOpen("edit")}
+            setOpen={(v) => (v ? dropdowns.toggle("edit") : dropdowns.close())}
+            rect={dropdowns.isOpen("edit") ? dropdowns.rect : null}
+            minWidth={240}
+          >
+            <div className="max-h-[min(420px,60vh)] overflow-y-auto">
+              {LIBTV_IMAGE_EDIT_MENU.map((item) => (
+                <Pro2ToolbarDropdownItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => {
+                    dropdowns.close();
+                    onEditPick?.(item.id);
+                  }}
+                />
+              ))}
+            </div>
+          </Pro2ToolbarDropdownMenu>
+
+          <Pro2ToolbarDropdownMenu
+            open={dropdowns.isOpen("magic")}
+            setOpen={(v) => (v ? dropdowns.toggle("magic") : dropdowns.close())}
+            rect={dropdowns.isOpen("magic") ? dropdowns.rect : null}
+            minWidth={180}
+          >
+            {LIBTV_IMAGE_MAGIC_MENU.map((item) => (
+              <Pro2ToolbarDropdownItem
+                key={item.id}
+                icon={item.icon}
+                label={item.label}
+                onClick={() => {
+                  dropdowns.close();
+                  onMagicPick?.(item.id);
+                }}
+              />
+            ))}
+          </Pro2ToolbarDropdownMenu>
+
+          <Pro2ToolbarDropdownMenu
+            open={dropdowns.isOpen("grid")}
+            setOpen={(v) => (v ? dropdowns.toggle("grid") : dropdowns.close())}
+            rect={dropdowns.isOpen("grid") ? dropdowns.rect : null}
+            minWidth={180}
+          >
+            {LIBTV_GRID_SPLIT_PRESETS.map((preset) => (
+              <Pro2ToolbarDropdownItem
+                key={preset.id}
+                icon={LayoutGrid}
+                label={preset.label}
+                onClick={() => {
+                  dropdowns.close();
+                  onGridSplitPick?.(preset.id);
+                }}
+              />
+            ))}
+          </Pro2ToolbarDropdownMenu>
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -307,12 +403,13 @@ function ToolbarShell({
   const toolbarScale = portaled
     ? 1
     : computeLibtvNodeToolbarTransformScale(zoom);
+  const effectivePassNodeDrag = portaled ? false : passNodeDrag;
 
   return (
     <div
       className={cn(
         PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
-        passNodeDrag
+        effectivePassNodeDrag
           ? "pointer-events-none [&_button]:pointer-events-auto"
           : "nodrag pointer-events-auto",
         !portaled && !style && "absolute left-1/2 z-30",
@@ -328,7 +425,7 @@ function ToolbarShell({
               transition: "transform 120ms ease",
             }
       }
-      {...(passNodeDrag
+      {...(effectivePassNodeDrag
         ? {}
         : {
             onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),

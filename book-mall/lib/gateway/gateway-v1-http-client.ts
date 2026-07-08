@@ -198,6 +198,148 @@ export async function gatewayV1ImageParsing(
   };
 }
 
+export async function gatewayV1QwenImageEdit(
+  opts: GatewayV1RequestOpts & {
+    body: {
+      model: string;
+      content: Array<{ image?: string; text?: string }>;
+      parameters?: Record<string, unknown>;
+    };
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "bailian/qwen-image-edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(
+      summarizeUpstreamFailMessage(text, r.status) ||
+        `Gateway qwen-image-edit HTTP ${r.status}`,
+    );
+  }
+  let json: {
+    code?: number;
+    data?: { imageUrls?: string[] };
+    logId?: string;
+    error?: string;
+  };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error("Gateway qwen-image-edit 响应非 JSON");
+  }
+  const imageUrls = json.data?.imageUrls ?? [];
+  if (imageUrls.length === 0) {
+    throw new Error(json.error ?? "Gateway qwen-image-edit 未返回图像");
+  }
+  return { imageUrls, logId: json.logId ?? "" };
+}
+
+export async function gatewayV1VolcengineImageGenerations(
+  opts: GatewayV1RequestOpts & {
+    body: {
+      model: string;
+      prompt: string;
+      image?: string;
+      parameters?: Record<string, unknown>;
+    };
+  },
+): Promise<{ images: Array<{ url?: string; b64?: string }>; logId: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "volcengine/images/generations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(
+      summarizeUpstreamFailMessage(text, r.status) ||
+        `Gateway volcengine images HTTP ${r.status}`,
+    );
+  }
+  let json: {
+    code?: number;
+    data?: { images?: Array<{ url?: string; b64?: string }> };
+    logId?: string;
+    error?: string;
+  };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error("Gateway volcengine images 响应非 JSON");
+  }
+  const images = json.data?.images ?? [];
+  if (images.length === 0) {
+    throw new Error(json.error ?? "Gateway volcengine images 未返回图像");
+  }
+  return { images, logId: json.logId ?? "" };
+}
+
+async function parseGatewayImageUrlsResponse(
+  r: Response,
+  label: string,
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(
+      summarizeUpstreamFailMessage(text, r.status) ||
+        `Gateway ${label} HTTP ${r.status}`,
+    );
+  }
+  let json: {
+    code?: number;
+    data?: { imageUrls?: string[] };
+    logId?: string;
+    error?: string;
+  };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error(`Gateway ${label} 响应非 JSON`);
+  }
+  const imageUrls = json.data?.imageUrls ?? [];
+  if (imageUrls.length === 0) {
+    throw new Error(json.error ?? `Gateway ${label} 未返回图像`);
+  }
+  return { imageUrls, logId: json.logId ?? "" };
+}
+
+export async function gatewayV1ImageOutPainting(
+  opts: GatewayV1RequestOpts & {
+    body: { imageUrl: string; parameters?: Record<string, unknown> };
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "bailian/image-out-painting", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  return parseGatewayImageUrlsResponse(r, "image-out-painting");
+}
+
+export async function gatewayV1Image2ImageAsync(
+  opts: GatewayV1RequestOpts & {
+    body: {
+      model: string;
+      input: Record<string, unknown>;
+      parameters?: Record<string, unknown>;
+    };
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "bailian/image2image-async", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  return parseGatewayImageUrlsResponse(r, "image2image-async");
+}
+
 export function gatewayV1ClientMeta(
   clientSource: GatewayClientSource,
   extra?: Omit<GatewayV1LogMeta, "clientSource"> & { bookUserId?: string },

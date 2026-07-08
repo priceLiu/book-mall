@@ -13,6 +13,10 @@ export const KLING_V3_OMNI_IMAGE_MODEL = "kling/kling-v3-omni-image-generation";
 
 const TRYON_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis/";
+const IMAGE2IMAGE_SYNTHESIS_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis";
+const OUT_PAINTING_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/out-painting";
 const WANX_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis";
 const WAN27_IMAGE_CREATE_URL =
@@ -584,4 +588,96 @@ export function countWanxSucceededImages(output: DashscopeTaskOutput): number {
   const t = output.task_metrics?.SUCCEEDED;
   if (typeof t === "number" && t > 0) return Math.min(4, t);
   return 1;
+}
+
+export function dashscopeExtractAllTaskImageUrls(
+  output: Record<string, unknown>,
+): string[] {
+  const urls: string[] = [];
+  const single = dashscopeExtractTaskImageUrl(output);
+  if (single) urls.push(single);
+  const results = output.results;
+  if (Array.isArray(results)) {
+    for (const item of results) {
+      if (!item || typeof item !== "object") continue;
+      const r = item as Record<string, unknown>;
+      const u =
+        typeof r.url === "string"
+          ? r.url.trim()
+          : typeof r.image_url === "string"
+            ? r.image_url.trim()
+            : "";
+      if (u) urls.push(upgradeAliyunHttpToHttps(u));
+    }
+  }
+  return [...new Set(urls)];
+}
+
+async function dashscopeCreateAsyncTask(opts: {
+  apiKey: string;
+  url: string;
+  body: Record<string, unknown>;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const res = await fetch(opts.url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify(opts.body),
+  });
+
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      typeof json.message === "string"
+        ? json.message
+        : typeof json.code === "string"
+          ? json.code
+          : `HTTP ${res.status}`;
+    return { ok: false, error: msg };
+  }
+  const output = json.output as Record<string, unknown> | undefined;
+  const taskId =
+    typeof output?.task_id === "string" ? output.task_id : undefined;
+  if (!taskId) return { ok: false, error: "未返回 task_id" };
+  return { ok: true, taskId };
+}
+
+export async function dashscopeCreateOutPaintingTask(opts: {
+  apiKey: string;
+  imageUrl: string;
+  parameters?: Record<string, unknown>;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const imageUrl = opts.imageUrl.trim();
+  if (!imageUrl) return { ok: false, error: "image_url 不能为空" };
+  return dashscopeCreateAsyncTask({
+    apiKey: opts.apiKey,
+    url: OUT_PAINTING_URL,
+    body: {
+      model: "image-out-painting",
+      input: { image_url: imageUrl },
+      parameters: opts.parameters ?? {},
+    },
+  });
+}
+
+export async function dashscopeCreateImage2ImageTask(opts: {
+  apiKey: string;
+  model: string;
+  input: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const model = opts.model.trim();
+  if (!model) return { ok: false, error: "model 不能为空" };
+  return dashscopeCreateAsyncTask({
+    apiKey: opts.apiKey,
+    url: IMAGE2IMAGE_SYNTHESIS_URL,
+    body: {
+      model,
+      input: opts.input,
+      parameters: opts.parameters ?? {},
+    },
+  });
 }

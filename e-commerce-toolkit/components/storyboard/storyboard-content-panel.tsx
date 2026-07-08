@@ -804,7 +804,7 @@ export function StoryboardContentPanel({
         detail="云端合成各镜头视频（含转场），通常需 1–5 分钟…"
       />
 
-      <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-6">
+      <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
         {streaming ? (
           <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#0071e3]/10 px-4 py-3 text-sm text-[#0071e3]">
             <Loader2 className="h-4 w-4 animate-spin" />
