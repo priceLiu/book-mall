@@ -69,6 +69,98 @@ const SBV1_DOCK_VIDEO_PROVIDER_IDS = [
   GATEWAY_BAILIAN_PROVIDER_ID,
 ];
 
+export const SBV1_DOCK_VIDEO_MODEL_KEYS = [
+  ...SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS,
+  ...SBV1_DOCK_EXTRA_VIDEO_MODEL_KEYS,
+] as const;
+
+export type Sbv1VideoEngineSettingsPatchInput = {
+  referenceMode: Sbv1ReferenceMode;
+  aspectRatio: Sbv1AspectRatio;
+  durationSec: number;
+  resolution: "720p" | "1080p";
+  providerId: string;
+  modelKey: string;
+  engineParams: Record<string, unknown>;
+  generateAudio: boolean;
+  watermark: boolean;
+  effectiveDurationSec: number;
+  isVolcDockModel: boolean;
+  smartMulti: boolean;
+  refCapsMultiShotsBlocksFirstLast?: boolean;
+};
+
+/** Dock / 弹层共用 · 写入 engine 与节点顶层字段 */
+export function buildSbv1VideoEngineSettingsPatch(
+  input: Sbv1VideoEngineSettingsPatchInput,
+): Partial<Sbv1VideoEngineNodeData> {
+  const mergedParams = input.isVolcDockModel
+    ? {
+        ...input.engineParams,
+        resolution: input.resolution,
+        generate_audio: input.generateAudio,
+        watermark: input.watermark,
+        aspect_ratio: input.aspectRatio,
+        ...(input.smartMulti ? {} : { duration: input.effectiveDurationSec }),
+      }
+    : {
+        ...input.engineParams,
+        generate_audio: input.generateAudio,
+        sound: input.generateAudio,
+        ...(input.refCapsMultiShotsBlocksFirstLast &&
+        input.referenceMode === "first_last"
+          ? { multi_shots: false }
+          : {}),
+      };
+  const engine = {
+    providerId: input.providerId,
+    modelKey: input.modelKey,
+    params: mergedParams,
+  };
+  const variantId = resolveSbv1VariantIdFromEngine(engine);
+  return {
+    referenceMode: input.referenceMode,
+    aspectRatio: input.aspectRatio,
+    durationSec: input.smartMulti ? 0 : input.effectiveDurationSec,
+    resolution: input.resolution,
+    volcengineVariantId: variantId,
+    jimengModelId: variantId,
+    engine,
+  };
+}
+
+export function collectSbv1DockVideoModels(
+  providers: CanvasProviderDto[],
+): { providerId: string; model: CanvasProviderModelDto }[] {
+  const allowed = new Set<string>(SBV1_DOCK_VIDEO_MODEL_KEYS);
+  const providerIds = new Set(SBV1_DOCK_VIDEO_PROVIDER_IDS);
+  const out: { providerId: string; model: CanvasProviderModelDto }[] = [];
+  const seen = new Set<string>();
+  for (const p of providers) {
+    if (!providerIds.has(p.id)) continue;
+    for (const m of p.models) {
+      if (m.role !== "VIDEO" || !m.enabled || !allowed.has(m.modelKey)) continue;
+      const key = `${p.id}:${m.modelKey}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ providerId: p.id, model: m });
+    }
+  }
+  return out;
+}
+
+export function normalizeSbv1EngineProviderId(id: string | undefined): string {
+  const trimmed = id?.trim() ?? "";
+  if (!trimmed || trimmed === "gateway:volcengine") {
+    return GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID;
+  }
+  return trimmed;
+}
+
+export function isSbv1MotionControlModelKey(k: string): boolean {
+  return k === "kling-2.6/motion-control" || k === "kling-3.0/motion-control";
+}
+
 export type Sbv1VideoGenerateSettingsModalProps = {
   open: boolean;
   data: Sbv1VideoEngineNodeData;
@@ -182,38 +274,23 @@ export function Sbv1VideoGenerateSettingsModal({
 
   const handleConfirm = () => {
     if (!providerId.trim() || !modelKey.trim()) return;
-    const mergedParams = isVolcDockModel
-      ? {
-          ...engineParams,
-          resolution,
-          generate_audio: generateAudio,
-          watermark,
-          aspect_ratio: aspectRatio,
-          ...(smartMulti ? {} : { duration: effectiveDurationSec }),
-        }
-      : {
-            ...engineParams,
-            generate_audio: generateAudio,
-            sound: generateAudio,
-            ...(refCaps.multiShotsBlocksFirstLast && referenceMode === "first_last"
-              ? { multi_shots: false }
-              : {}),
-          };
-    const engine = {
-      providerId,
-      modelKey,
-      params: mergedParams,
-    };
-    const variantId = resolveSbv1VariantIdFromEngine(engine);
-    onConfirm({
-      referenceMode,
-      aspectRatio,
-      durationSec: smartMulti ? 0 : effectiveDurationSec,
-      resolution,
-      volcengineVariantId: variantId,
-      jimengModelId: variantId,
-      engine,
-    });
+    onConfirm(
+      buildSbv1VideoEngineSettingsPatch({
+        referenceMode,
+        aspectRatio,
+        durationSec,
+        resolution,
+        providerId,
+        modelKey,
+        engineParams,
+        generateAudio,
+        watermark,
+        effectiveDurationSec,
+        isVolcDockModel,
+        smartMulti,
+        refCapsMultiShotsBlocksFirstLast: refCaps.multiShotsBlocksFirstLast,
+      }),
+    );
     onClose();
   };
 
@@ -591,19 +668,7 @@ function SegmentRow({
   );
 }
 
-function normalizeSbv1EngineProviderId(id: string | undefined): string {
-  const trimmed = id?.trim() ?? "";
-  if (!trimmed || trimmed === "gateway:volcengine") {
-    return GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID;
-  }
-  return trimmed;
-}
-
-function isSbv1MotionControlModelKey(k: string): boolean {
-  return k === "kling-2.6/motion-control" || k === "kling-3.0/motion-control";
-}
-
-function syncSbv1UiFromModelParams(
+export function syncSbv1UiFromModelParams(
   modelKey: string,
   p: Record<string, unknown>,
   setters: {

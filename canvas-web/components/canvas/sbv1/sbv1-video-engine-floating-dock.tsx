@@ -6,7 +6,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "@/lib/canvas/pro2-video-board-dock-links";
-import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
+import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
@@ -154,7 +154,11 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     const storeNode = latestNodes.find((n) => n.id === nodeId);
     const latestData = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
 
-    const prompt = (latestData.prompt ?? "").trim();
+    const prompt = resolveSbv1VideoEngineEffectivePrompt(
+      nodeId,
+      latestNodes,
+      latestEdges,
+    );
     const resolved = resolveSbv1VideoEngineInputs(latestNodes, latestEdges, nodeId, {
       prompt,
       referenceMode: latestData.referenceMode ?? "omni",

@@ -11,29 +11,47 @@ import {
 import { createPortal } from "react-dom";
 import { useViewport } from "@xyflow/react";
 
-export function useSbv1ToolbarAnchor(): {
+export function useSbv1ToolbarAnchor(isOpen?: boolean): {
   anchorRef: RefObject<HTMLButtonElement>;
   open: boolean;
   setOpen: (v: boolean) => void;
   rect: DOMRect | null;
 } {
   const anchorRef = useRef<HTMLButtonElement>(null!);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const effectiveOpen = isOpen ?? internalOpen;
   const viewport = useViewport();
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (!open) return;
+    if (!effectiveOpen) return;
     const id = window.setInterval(() => setTick((t) => t + 1), 120);
     return () => window.clearInterval(id);
-  }, [open, viewport.x, viewport.y, viewport.zoom]);
+  }, [effectiveOpen, viewport.x, viewport.y, viewport.zoom]);
 
   const rect = useMemo(() => {
-    if (!open) return null;
+    if (!effectiveOpen) return null;
     return anchorRef.current?.getBoundingClientRect() ?? null;
-  }, [open, tick, viewport.x, viewport.y, viewport.zoom]);
+  }, [effectiveOpen, tick, viewport.x, viewport.y, viewport.zoom]);
 
-  return { anchorRef, open, setOpen, rect };
+  return { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect };
+}
+
+export type Sbv1ToolbarDropdownPlacement = "auto" | "above" | "below";
+
+function resolveToolbarDropdownSide(
+  rect: DOMRect,
+  placement: Sbv1ToolbarDropdownPlacement,
+  estimatedHeight: number,
+): "above" | "below" {
+  if (placement === "above") return "above";
+  if (placement === "below") return "below";
+  const gap = 6;
+  const spaceAbove = rect.top - gap;
+  const spaceBelow = window.innerHeight - rect.bottom - gap;
+  if (spaceBelow >= estimatedHeight) return "below";
+  if (spaceAbove >= estimatedHeight) return "above";
+  return spaceBelow >= spaceAbove ? "below" : "above";
 }
 
 export function Sbv1ToolbarDropdown({
@@ -43,6 +61,8 @@ export function Sbv1ToolbarDropdown({
   children,
   className,
   align = "start",
+  placement = "auto",
+  estimatedHeight = 320,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -50,17 +70,31 @@ export function Sbv1ToolbarDropdown({
   children: ReactNode;
   className?: string;
   align?: "start" | "center";
+  placement?: Sbv1ToolbarDropdownPlacement;
+  /** auto 时用于判断向上/向下展开 */
+  estimatedHeight?: number;
 }) {
   if (!open || !rect || typeof document === "undefined") return null;
 
+  const gap = 6;
+  const side = resolveToolbarDropdownSide(rect, placement, estimatedHeight);
   const left =
     align === "center" ? rect.left + rect.width / 2 : rect.left;
+  const top = side === "above" ? rect.top - gap : rect.bottom + gap;
+  const transform =
+    side === "above"
+      ? align === "center"
+        ? "translate(-50%, -100%)"
+        : "translateY(-100%)"
+      : align === "center"
+        ? "translate(-50%, 0)"
+        : undefined;
 
   return createPortal(
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[200]"
+        className="fixed inset-0 z-[1100]"
         aria-label="关闭"
         onClick={() => setOpen(false)}
       />
@@ -69,12 +103,9 @@ export function Sbv1ToolbarDropdown({
         style={{
           position: "fixed",
           left,
-          top: rect.top - 6,
-          transform:
-            align === "center"
-              ? "translate(-50%, -100%)"
-              : "translateY(-100%)",
-          zIndex: 201,
+          top,
+          transform,
+          zIndex: 1101,
         }}
       >
         {children}

@@ -105,6 +105,23 @@ export function resolvePro2VideoBoardCellDockLinks(
   return out;
 }
 
+/** 分镜视频组格 · 有效 prompt（prompt / dockInput / 同镜分镜脚本） */
+export function resolvePro2VideoBoardCellDefaultPrompt(
+  nodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): string {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return "";
+  const d = node.data as { prompt?: string; dockInput?: string };
+  const direct = d.prompt?.trim() || d.dockInput?.trim();
+  if (direct) return direct;
+  const script = resolvePro2VideoBoardCellDockLinks(nodeId, nodes, edges).find(
+    (l) => l.kind === "text",
+  )?.previewMd;
+  return script?.trim() ?? "";
+}
+
 export function resolvePro2FrameBoardGroupIdForVideoColumn(
   videoColumnId: string,
   nodes: CanvasFlowNode[],
