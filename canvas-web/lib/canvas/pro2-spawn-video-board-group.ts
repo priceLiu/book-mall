@@ -13,7 +13,10 @@ import {
   ensurePro2FrameBoardToVideoBoardEdge,
   ensurePro2HubToMediaGroupEdge,
 } from "./pro2-hub-media-group-edge";
-import { resolvePro2FrameBoardGroupIdForVideoColumn } from "./pro2-video-board-dock-links";
+import {
+  resolvePro2FrameBoardGroupIdForVideoColumn,
+  resolvePro2VideoBoardCellDefaultPrompt,
+} from "./pro2-video-board-dock-links";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 
@@ -120,6 +123,7 @@ export function ensurePro2VideoBoardGroup(
       args.updateNodeData(existing.id, {
         label,
         dockInput: prompt,
+        prompt,
         runtime: preview.runtime,
         pro2MediaRole: "video",
         pro2RowKey: row.key,
@@ -135,6 +139,7 @@ export function ensurePro2VideoBoardGroup(
     const data = {
       label,
       dockInput: prompt,
+      prompt,
       runtime: preview.runtime,
       pro2MediaRole: "video",
       pro2RowKey: row.key,
@@ -393,6 +398,28 @@ export function repairPro2VideoBoardVisualGroups(
   }
 
   repairPro2VideoBoardGroupEdges(getStore);
+  repairPro2VideoBoardCellPrompts(getStore);
+}
+
+/** 旧格数据 · 补齐 prompt（与 dockInput / 分镜脚本对齐） */
+export function repairPro2VideoBoardCellPrompts(
+  getStore: () => RepairPro2VideoBoardStore,
+): void {
+  const { nodes, edges, updateNodeData } = getStore();
+  for (const n of nodes) {
+    if (n.type !== "sbv1-video-engine") continue;
+    const d = n.data as {
+      pro2MediaRole?: string;
+      pro2ControllerNodeId?: string;
+      prompt?: string;
+      dockInput?: string;
+    };
+    if (d.pro2MediaRole !== "video" || !d.pro2ControllerNodeId?.trim()) continue;
+    if (d.prompt?.trim() && d.dockInput?.trim()) continue;
+    const prompt = resolvePro2VideoBoardCellDefaultPrompt(n.id, nodes, edges);
+    if (!prompt) continue;
+    updateNodeData(n.id, { prompt, dockInput: prompt });
+  }
 }
 
 /** 已有分镜视频组 · 修正 hub→组 为 分镜图组→组 */
@@ -421,6 +448,7 @@ export function syncPro2VideoBoardFromRows(
   videoColumnId: string,
   rows: StoryProVideoRow[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  edges: CanvasFlowEdge[] = [],
 ): void {
   const videoNode = nodes.find((n) => n.id === videoColumnId);
   const syncGroupId =
@@ -441,9 +469,13 @@ export function syncPro2VideoBoardFromRows(
     });
     if (!cell) continue;
     const preview = videoRowPreview(row);
+    const prompt =
+      row.videoPrompt?.trim() ||
+      resolvePro2VideoBoardCellDefaultPrompt(cell.id, nodes, edges);
     updateNodeData(cell.id, {
       label: `镜 ${row.frameIndex}`,
-      dockInput: row.videoPrompt?.trim() || "",
+      dockInput: prompt,
+      prompt,
       runtime: preview.runtime,
     });
   }

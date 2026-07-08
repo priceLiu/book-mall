@@ -15,6 +15,8 @@ import {
 } from "./sbv1-upstream-ref-links";
 import type { Sbv1ReferenceMode } from "./sbv1-workspace-types";
 import { directPredecessors } from "./topo";
+import type { Sbv1VideoEngineNodeData } from "./sbv1-workspace-types";
+import { resolvePro2VideoBoardCellDefaultPrompt } from "./pro2-video-board-dock-links";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 export type ResolveSbv1VideoEngineInputsResult =
@@ -118,6 +120,20 @@ function resolveMotionVideoInputs(
     if (url) out.push(url);
   }
   return [...new Set(out)];
+}
+
+/** sbv1 视频引擎 · 合并 prompt / dockInput / Pro2 分镜脚本 */
+export function resolveSbv1VideoEngineEffectivePrompt(
+  nodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): string {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node || node.type !== "sbv1-video-engine") return "";
+  const d = node.data as Sbv1VideoEngineNodeData;
+  const direct = String(d.prompt ?? "").trim() || String(d.dockInput ?? "").trim();
+  if (direct) return direct;
+  return resolvePro2VideoBoardCellDefaultPrompt(nodeId, nodes, edges);
 }
 
 /**

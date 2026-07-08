@@ -3,7 +3,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
-  ChevronDown,
   ImageIcon,
   Loader2,
   Zap,
@@ -48,6 +47,7 @@ import {
   portraitImportUiState,
   type CanvasPortraitNodeFields,
 } from "@/lib/canvas/portrait-node-data";
+import { resolvePro2VideoBoardCellDefaultPrompt } from "@/lib/canvas/pro2-video-board-dock-links";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
@@ -59,9 +59,9 @@ import {
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { Sbv1VideoDockModeBar } from "./sbv1-video-dock-mode-bar";
 import {
-  Sbv1VideoGenerateSettingsModal,
-  sbv1VideoSettingsTriggerLabel,
-} from "./sbv1-video-generate-settings-modal";
+  Sbv1VideoDockModelPicker,
+  Sbv1VideoDockParamsPicker,
+} from "./sbv1-video-dock-pickers";
 
 export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   nodeId,
@@ -104,12 +104,9 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   } = useLibtvDockRefThumbMetrics();
   const chipFontPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
   const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
-  const modelPickerFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
-  const modelPickerIconPx = 13;
   const creditsFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
   const sendBtnPx = 44;
   const sendIconPx = 18;
-  const toolbarMinHeightPx = 48;
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -122,18 +119,34 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       (s) =>
         String(
           (s.nodes.find((n) => n.id === nodeId)?.data as Sbv1VideoEngineNodeData | undefined)
-            ?.prompt ?? "",
+            ?.prompt ??
+            (s.nodes.find((n) => n.id === nodeId)?.data as Sbv1VideoEngineNodeData | undefined)
+              ?.dockInput ??
+            "",
         ),
       [nodeId],
     ),
   );
   const [livePrompt, setLivePrompt] = useState(storedPrompt);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
   useEffect(() => {
     setLivePrompt(storedPrompt);
   }, [storedPrompt, nodeId]);
+
+  useEffect(() => {
+    const d = data as Sbv1VideoEngineNodeData & {
+      pro2MediaRole?: string;
+      pro2ControllerNodeId?: string;
+    };
+    if (d.pro2MediaRole !== "video" || !d.pro2ControllerNodeId?.trim()) return;
+    if (String(d.prompt ?? "").trim() || String(d.dockInput ?? "").trim()) return;
+    const { nodes, edges } = useCanvasStore.getState();
+    const prompt = resolvePro2VideoBoardCellDefaultPrompt(nodeId, nodes, edges);
+    if (!prompt) return;
+    updateNodeData(nodeId, { prompt, dockInput: prompt }, { commit: true });
+  }, [nodeId, data, updateNodeData]);
 
   const smartMulti = data.referenceMode === "smart_multi";
   const referenceMode = data.referenceMode ?? "omni";
@@ -188,7 +201,6 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       onPatch(dockInputModeToPatch(activeDockMode));
     }
   }, [data.dockInputMode, dockChips, activeDockMode, onPatch]);
-  const settingsLabel = sbv1VideoSettingsTriggerLabel(data, providers);
   const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
 
   const hasRefs = upstreamLinks.some((l) => l.previewUrl);
@@ -418,22 +430,22 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   const toolbar = (
     <Pro2DockToolbar compact className="gap-2 py-2.5">
-      <button
-        type="button"
-        disabled={isGenerating}
-        className="nodrag flex w-auto max-w-full shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-white hover:bg-white/[0.06]"
-        style={{
-          fontSize: modelPickerFontPx,
-          minHeight: toolbarMinHeightPx,
-        }}
-        onClick={() => setSettingsOpen(true)}
-      >
-        <span className="whitespace-nowrap">{settingsLabel}</span>
-        <ChevronDown
-          className="shrink-0 opacity-45"
-          style={{ width: modelPickerIconPx, height: modelPickerIconPx }}
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
+        <Sbv1VideoDockModelPicker
+          data={data}
+          disabled={isGenerating}
+          onPatch={onPatch}
+          open={dockMenu === "model"}
+          onOpenChange={(next) => setDockMenu(next ? "model" : null)}
         />
-      </button>
+        <Sbv1VideoDockParamsPicker
+          data={data}
+          disabled={isGenerating}
+          onPatch={onPatch}
+          open={dockMenu === "params"}
+          onOpenChange={(next) => setDockMenu(next ? "params" : null)}
+        />
+      </div>
 
       <div className="min-w-0 flex-1" />
 
@@ -527,7 +539,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               setLivePrompt(prompt);
               updateNodeData(
                 nodeId,
-                { prompt },
+                { prompt, dockInput: prompt },
                 { commit: meta?.commit ?? true },
               );
             }}
@@ -552,11 +564,6 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         }}
       />
 
-      <Sbv1VideoGenerateSettingsModal
-        open={settingsOpen}
-        data={data}
-        onClose={() => setSettingsOpen(false)}
-        onConfirm={onPatch}
       />
     </>
   );

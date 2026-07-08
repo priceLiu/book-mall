@@ -12,7 +12,7 @@ import {
 import { useCanvasStore } from "./store";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
-import { resolveSbv1VideoEngineInputs } from "./resolve-sbv1-video-engine-inputs";
+import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "./resolve-sbv1-video-engine-inputs";
 import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
@@ -894,14 +894,20 @@ export function useCanvasRunner(
             stateAfterPortrait.nodes.find((n) => n.id === nodeId) ?? node;
           const vd = nodeAfterPortrait.data as {
             prompt?: string;
+            dockInput?: string;
             referenceMode?: string;
           };
+          const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
+            nodeId,
+            stateAfterPortrait.nodes,
+            stateAfterPortrait.edges,
+          );
           const resolved = resolveSbv1VideoEngineInputs(
             stateAfterPortrait.nodes,
             stateAfterPortrait.edges,
             nodeId,
             {
-              prompt: String(vd.prompt ?? ""),
+              prompt: effectivePrompt,
               referenceMode:
                 vd.referenceMode === "first_last" ||
                 vd.referenceMode === "smart_multi"
@@ -940,6 +946,20 @@ export function useCanvasRunner(
         let runData = isLibtvFreestandingImageNode(node)
           ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
           : data;
+        if (node.type === "sbv1-video-engine") {
+          const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
+            nodeId,
+            state.nodes,
+            state.edges,
+          );
+          if (effectivePrompt) {
+            runData = {
+              ...runData,
+              prompt: effectivePrompt,
+              dockInput: effectivePrompt,
+            };
+          }
+        }
         if (
           sbv1VideoResolved?.ok &&
           sbv1VideoResolved.videoInputs.length > 0
