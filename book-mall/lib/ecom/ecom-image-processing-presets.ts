@@ -405,3 +405,102 @@ export function buildGifPrompt(opts: {
     "Simple clear motion, GIF-friendly compression, no watermark.",
   ].join(" ");
 }
+
+export const REALISTIC_CAMERA_IDS = [
+  "35mm-street",
+  "50mm-portrait",
+  "85mm-editorial",
+  "24mm-wide",
+  "100mm-macro",
+  "drone-aerial",
+  "film-noir",
+  "anamorphic",
+] as const;
+
+const REALISTIC_CAMERA_HINTS: Record<string, string> = {
+  "35mm-street":
+    "35mm street photography lens, natural perspective, documentary realism.",
+  "50mm-portrait":
+    "50mm portrait lens, flattering facial proportions, shallow depth of field.",
+  "85mm-editorial":
+    "85mm editorial lens, magazine-quality compression, elegant bokeh.",
+  "24mm-wide": "24mm wide-angle lens, environmental context, dynamic perspective.",
+  "100mm-macro":
+    "100mm macro lens, extreme detail, product and texture fidelity.",
+  "drone-aerial": "Drone aerial photography, elevated viewpoint, cinematic scale.",
+  "film-noir": "Film noir black-and-white cinematography, dramatic contrast.",
+  anamorphic:
+    "Anamorphic cinema lens, widescreen flare, Hollywood motion-picture look.",
+};
+
+const REALISTIC_LIGHTING_HINTS: Record<string, string> = {
+  "golden-hour": "Golden hour warm sunlight, soft long shadows, natural glow.",
+  overcast: "Overcast soft diffused daylight, even exposure, gentle tones.",
+  "blue-hour": "Blue hour twilight, cool ambient sky, moody atmosphere.",
+  "studio-flash": "Studio flash lighting, controlled highlights, commercial polish.",
+  tungsten: "Warm tungsten indoor lighting, cozy incandescent ambience.",
+  "neon-night": "Neon night city lights, vibrant color contrast, urban nightlife.",
+};
+
+export function buildRealisticPrompt(opts: {
+  sceneDescription: string;
+  cameraLens?: string;
+  lighting?: string;
+}): string {
+  const camera =
+    REALISTIC_CAMERA_HINTS[opts.cameraLens ?? "35mm-street"] ??
+    REALISTIC_CAMERA_HINTS["35mm-street"];
+  const lighting =
+    REALISTIC_LIGHTING_HINTS[opts.lighting ?? "golden-hour"] ??
+    REALISTIC_LIGHTING_HINTS["golden-hour"];
+  return [
+    "Ultra-photorealistic photograph, professional camera simulation.",
+    camera,
+    lighting,
+    `Scene: ${opts.sceneDescription.trim()}.`,
+    "Natural skin tones, accurate physics, sharp focus, no watermark, no CGI artifacts.",
+  ].join(" ");
+}
+
+export const IMAGE_GENERATOR_STYLE_IDS = [
+  "none",
+  "photography",
+  "digital-art",
+  "anime",
+  "3d-render",
+  "pencil-sketch",
+  "watercolor",
+  "oil-painting",
+  "pixel-art",
+] as const;
+
+const IMAGE_GENERATOR_STYLE_HINTS: Record<string, string> = {
+  none: "",
+  photography: "Photography style, realistic lighting and lens character.",
+  "digital-art": "Digital art illustration, vibrant stylized rendering.",
+  anime: "Japanese anime illustration style.",
+  "3d-render": "3D rendered look, clean materials and studio lighting.",
+  "pencil-sketch": "Pencil sketch drawing, graphite texture and hatching.",
+  watercolor: "Watercolor painting, soft washes and paper texture.",
+  "oil-painting": "Oil painting, rich brushstrokes and canvas texture.",
+  "pixel-art": "Pixel art, retro 8-bit aesthetic.",
+};
+
+export function buildImageGeneratorPrompt(opts: {
+  prompt: string;
+  styleId?: string;
+  negativePrompt?: string;
+}): string {
+  const style =
+    IMAGE_GENERATOR_STYLE_HINTS[opts.styleId ?? "none"] ??
+    IMAGE_GENERATOR_STYLE_HINTS.none;
+  const parts = [
+    opts.prompt.trim(),
+    style,
+    "High quality, detailed, no watermark.",
+  ].filter(Boolean);
+  if (opts.negativePrompt?.trim()) {
+    parts.push(`Avoid: ${opts.negativePrompt.trim()}.`);
+  }
+  return parts.join(" ");
+}

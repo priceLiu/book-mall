@@ -5,6 +5,10 @@ import {
   isMinimaxSpeechModelKey,
 } from "@/lib/gateway/minimax-speech-models";
 import {
+  isKieElevenLabsMarketModelKey,
+  isKieSunoModelKey,
+} from "@/lib/gateway/kie-audio-models";
+import {
   isElevenLabsSfxModelKey,
   isElevenLabsStsModelKey,
   isElevenLabsMusicModelKey,
@@ -34,6 +38,10 @@ const KIE_CHAT_MODELS = new Set([
   "gemini-2.5-flash",
   "google/gemini-2.5-flash",
   "google/gemini-2.5-flash-preview",
+  "gemini-3-5-flash",
+  "gemini-3-pro",
+  "claude-opus-4-8",
+  "claude-opus-4-5",
   "gpt-5-5",
   "gpt-5.5",
 ]);
@@ -206,9 +214,25 @@ export function routeGatewayModel(model: string): RoutedModel {
     m.startsWith("seedream-") ||
     m.startsWith("gpt-image-") ||
     m.startsWith("flux-") ||
-    m === "qwen-text-to-image"
+    m === "qwen-text-to-image" ||
+    m === "google/nano-banana" ||
+    m === "google/nano-banana-edit" ||
+    m === "nano-banana-2" ||
+    m === "4o-image"
   ) {
     return { providerKind: "KIE", requestKind: "IMAGE" };
+  }
+
+  if (m.startsWith("claude-opus") || m.startsWith("claude-sonnet")) {
+    return { providerKind: "KIE", requestKind: "CHAT" };
+  }
+
+  if (m === "veo3" || m === "veo3.1" || m === "veo3_fast") {
+    return { providerKind: "KIE", requestKind: "VIDEO" };
+  }
+
+  if (m.startsWith("hailuo/")) {
+    return { providerKind: "KIE", requestKind: "VIDEO" };
   }
 
   if (m.startsWith("grok-imagine/") && m.includes("text-to-image")) {
@@ -259,6 +283,18 @@ export function routeGatewayModel(model: string): RoutedModel {
       providerKind: "KIE",
       requestKind: isVideo ? "VIDEO" : "IMAGE",
     };
+  }
+
+  if (isKieSunoModelKey(raw) || isKieSunoModelKey(m)) {
+    return { providerKind: "KIE", requestKind: "MUSIC" };
+  }
+
+  if (isKieElevenLabsMarketModelKey(raw) || isKieElevenLabsMarketModelKey(m)) {
+    return { providerKind: "KIE", requestKind: "TTS" };
+  }
+
+  if (m.startsWith("elevenlabs/")) {
+    return { providerKind: "KIE", requestKind: "TTS" };
   }
 
   if (isMinimaxSpeechModelKey(raw) || isMinimaxSpeechModelKey(m)) {

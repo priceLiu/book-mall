@@ -10,9 +10,11 @@ import {
   buildFaceSwapPrompt,
   buildAvatarPrompt,
   buildGifPrompt,
+  buildImageGeneratorPrompt,
   buildMemePrompt,
   buildObjectRemovePrompt,
   buildPosterPrompt,
+  buildRealisticPrompt,
   buildRestorePrompt,
 } from "@/lib/ecom/ecom-image-processing-presets";
 import {
@@ -23,7 +25,7 @@ import {
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
   ECOM_WAN_I2I_MODEL_KEY,
   ECOM_WANX_PAINTING_MODEL_KEY,
-  isKieNanoProModelKey,
+  isKieGenerativeImageModelKey,
   isOutpaintModelKey,
   isQwenEditModelKey,
   isSeedreamEditorModelKey,
@@ -1003,7 +1005,7 @@ export async function ecomImageProcessingPoster(opts: {
     "doubao-seedream-5-0-lite";
   const params = buildGenerativeParameters(opts.parameters);
 
-  if (isKieNanoProModelKey(model)) {
+  if (isKieGenerativeImageModelKey(model)) {
     return runKieTextToImage({
       userId: opts.userId,
       model,
@@ -1043,7 +1045,7 @@ async function ecomImageProcessingTextToImage(opts: {
     "doubao-seedream-5-0-lite";
   const params = buildGenerativeParameters(opts.parameters);
 
-  if (isKieNanoProModelKey(model)) {
+  if (isKieGenerativeImageModelKey(model)) {
     return runKieTextToImage({
       userId: opts.userId,
       model,
@@ -1153,5 +1155,59 @@ export async function ecomImageProcessingGif(opts: {
     styleImageDataUrl: opts.styleImageDataUrl,
     parameters: opts.parameters,
     mode: "gif",
+  });
+}
+
+export async function ecomImageProcessingRealistic(opts: {
+  userId: string;
+  sceneDescription: string;
+  generativeModel?: string;
+  cameraLens?: string;
+  lighting?: string;
+  styleImageDataUrl?: string;
+  parameters?: Record<string, unknown>;
+}) {
+  if (!opts.sceneDescription.trim()) {
+    throw new Error("请描述场景或主题");
+  }
+  const prompt = buildRealisticPrompt({
+    sceneDescription: opts.sceneDescription,
+    cameraLens: opts.cameraLens,
+    lighting: opts.lighting,
+  });
+  return ecomImageProcessingTextToImage({
+    userId: opts.userId,
+    prompt,
+    generativeModel: opts.generativeModel,
+    styleImageDataUrl: opts.styleImageDataUrl,
+    parameters: opts.parameters,
+    mode: "realistic",
+  });
+}
+
+export async function ecomImageProcessingImageGenerator(opts: {
+  userId: string;
+  prompt: string;
+  generativeModel?: string;
+  styleId?: string;
+  negativePrompt?: string;
+  styleImageDataUrl?: string;
+  parameters?: Record<string, unknown>;
+}) {
+  if (!opts.prompt.trim()) {
+    throw new Error("请描述你的图片");
+  }
+  const builtPrompt = buildImageGeneratorPrompt({
+    prompt: opts.prompt,
+    styleId: opts.styleId,
+    negativePrompt: opts.negativePrompt,
+  });
+  return ecomImageProcessingTextToImage({
+    userId: opts.userId,
+    prompt: builtPrompt,
+    generativeModel: opts.generativeModel,
+    styleImageDataUrl: opts.styleImageDataUrl,
+    parameters: opts.parameters,
+    mode: "image-generator",
   });
 }

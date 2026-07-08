@@ -1,6 +1,7 @@
 import type { CanvasEnginePick } from "./types";
 import type { GatewayModelRole } from "./gateway-model-role";
 import { GATEWAY_MODEL_ROLE_ORDER } from "./gateway-model-role";
+import { isPro2SunoModelKey } from "./kie-audio-models";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import {
   resolvePro2TextPurpose,
@@ -12,6 +13,8 @@ const IMAGE_TARGET_TYPES = new Set([
   "sbv1-image",
   "story-pro2-three-view",
 ]);
+
+const AUDIO_TARGET_TYPES = new Set(["story-pro2-audio"]);
 
 const VIDEO_TARGET_TYPES = new Set(["sbv1-video-engine"]);
 
@@ -29,6 +32,7 @@ export type Pro2TextNodeEngineData = Pro2TextPurposeNodeData & {
   params?: Record<string, unknown>;
   imageEngine?: CanvasEnginePick;
   videoEngine?: CanvasEnginePick;
+  musicEngine?: CanvasEnginePick;
 };
 
 export function readPro2TextNodeEngine(
@@ -50,11 +54,26 @@ export function readPro2TextNodeEngine(
       params: { ...(e?.params ?? {}) },
     };
   }
-  const e = data.videoEngine;
+  if (role === "VIDEO") {
+    const e = data.videoEngine;
+    return {
+      providerId: String(e?.providerId ?? ""),
+      modelKey: String(e?.modelKey ?? ""),
+      params: { ...(e?.params ?? {}) },
+    };
+  }
+  if (role === "MUSIC") {
+    const e = data.musicEngine;
+    return {
+      providerId: String(e?.providerId ?? ""),
+      modelKey: String(e?.modelKey ?? ""),
+      params: { ...(e?.params ?? {}) },
+    };
+  }
   return {
-    providerId: String(e?.providerId ?? ""),
-    modelKey: String(e?.modelKey ?? ""),
-    params: { ...(e?.params ?? {}) },
+    providerId: "",
+    modelKey: "",
+    params: {},
   };
 }
 
@@ -72,7 +91,13 @@ export function patchPro2TextNodeEngine(
   if (role === "IMAGE") {
     return { imageEngine: pick };
   }
-  return { videoEngine: pick };
+  if (role === "VIDEO") {
+    return { videoEngine: pick };
+  }
+  if (role === "MUSIC") {
+    return { musicEngine: pick };
+  }
+  return {};
 }
 
 export function pro2TextNodeLlmNeedsVision(
@@ -116,6 +141,8 @@ export function resolvePro2TextNodeEngineRoles(
 
   const preset = String(data.pro2PresetKind ?? "").trim();
   if (preset === "text-to-video") return ["VIDEO"];
+  /** 文字生音乐 · 与文本模型同一选择层（Suno 出现在 Select text model） */
+  if (preset === "text-to-music") return ["LLM"];
   // 反推预设：文本节点只选 LLM；IMAGE/VIDEO 模型在上游媒体节点 Dock 选择
   if (
     preset === "image-to-prompt" ||
@@ -140,6 +167,7 @@ export function resolvePro2TextNodeEngineRoles(
         if (tgt && VIDEO_TARGET_TYPES.has(String(tgt.type ?? ""))) {
           roles.add("VIDEO");
         }
+        // 连音频节点不再单独展示 Music model；Suno 并入 Text model 选择层
       }
       if (e.target === nodeId) {
         const src = nodes.find((n) => n.id === e.source);
@@ -157,7 +185,7 @@ export function resolvePro2TextNodeEngineRoles(
   return GATEWAY_MODEL_ROLE_ORDER.filter((r) => roles.has(r));
 }
 
-/** 文本节点所选 IMAGE/VIDEO 引擎同步到直连下游媒体节点 */
+/** 文本节点所选引擎同步到直连下游媒体节点（含 Text model 中选 Suno → 音频节点） */
 export function syncPro2TextNodeEngineToDownstream(
   nodeId: string,
   role: GatewayModelRole,
@@ -166,12 +194,14 @@ export function syncPro2TextNodeEngineToDownstream(
   edges: CanvasFlowEdge[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): void {
-  if (role !== "IMAGE" && role !== "VIDEO") return;
   const engine = {
     providerId: pick.providerId,
     modelKey: pick.modelKey,
     params: pick.params ?? {},
   };
+  const syncAudio =
+    (role === "MUSIC" || (role === "LLM" && isPro2SunoModelKey(pick.modelKey)));
+  if (role !== "IMAGE" && role !== "VIDEO" && !syncAudio) return;
   for (const e of edges) {
     if (e.source !== nodeId) continue;
     const tgt = nodes.find((n) => n.id === e.target);
@@ -185,6 +215,12 @@ export function syncPro2TextNodeEngineToDownstream(
     if (
       role === "VIDEO" &&
       VIDEO_TARGET_TYPES.has(String(tgt.type ?? ""))
+    ) {
+      updateNodeData(tgt.id, { engine });
+    }
+    if (
+      syncAudio &&
+      AUDIO_TARGET_TYPES.has(String(tgt.type ?? ""))
     ) {
       updateNodeData(tgt.id, { engine });
     }

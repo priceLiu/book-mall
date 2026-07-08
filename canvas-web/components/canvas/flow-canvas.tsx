@@ -92,6 +92,7 @@ import { LibtvSideConnectLayer } from "./pro2/libtv-side-connect-layer";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
 import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
 import { LibtvImageInputDock } from "./libtv-image-input-dock";
+import { LibtvAudioInputDock } from "./libtv-audio-input-dock";
 import { Sbv1MediaGroupToolbar } from "./sbv1/sbv1-media-group-toolbar";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
 import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floating-dock";
@@ -1459,6 +1460,13 @@ function FlowCanvasInner({
         onNodeDoubleClick={
           pro2FloatingInspector
             ? (_e, node) => {
+                setRfNodes((prev) =>
+                  prev.map((n) => ({ ...n, selected: false })),
+                );
+                useCanvasStore.getState().setLibtvFloatingDockSelection(
+                  null,
+                  null,
+                );
                 if (node.type === "story-pro2-starter") {
                   const d = node.data as StoryProStarterNodeData;
                   if (!d.generatedOutlineMd?.trim()) return;
@@ -1559,6 +1567,7 @@ function FlowCanvasInner({
         </>
       ) : null}
       {pro2FloatingInspector || sbv1Canvas ? <LibtvImageInputDock /> : null}
+      {pro2FloatingInspector ? <LibtvAudioInputDock /> : null}
       {pro2FloatingInspector || sbv1Canvas ? (
         <>
           <Sbv1VideoEngineFloatingDock />

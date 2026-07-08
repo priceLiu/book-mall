@@ -7,11 +7,8 @@ import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isPro2CharacterBoardGroup } from "@/lib/canvas/pro2-resolve-character-board-group";
 import { isPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
+import { isPro2VideoBoardGroup } from "@/lib/canvas/pro2-resolve-video-board-group";
 import { isPro2StyledGroup } from "@/lib/canvas/pro2-media-group-meta";
-import {
-  pinPro2MediaGroupToolbarHover,
-  schedulePro2MediaGroupToolbarHide,
-} from "@/lib/canvas/pro2-media-group-toolbar-hover";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { Pro2MediaGroupToolbarPanel } from "./pro2-media-group-toolbar-panel";
 
@@ -20,8 +17,7 @@ const HEADER_RESERVED = 56;
 const GAP = 8;
 
 /**
- * 图 2 · Pro2 媒体组（角色三视图 / 分镜图）被直接选中 → 顶部统一工具条。
- * 坐标用 internal-node 绝对坐标（与框选条同一算法），避免 DOM 量位丢失。
+ * Pro2 媒体组 · 仅单击选中组时显示顶部工具条（不随鼠标悬停出现）。
  */
 export function Pro2MediaGroupToolbar({
   rfNodes,
@@ -31,11 +27,8 @@ export function Pro2MediaGroupToolbar({
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
   const marqueeSelecting = useCanvasMarqueeSelecting();
-  const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
-  const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
 
   const resolved = useMemo(() => {
-    // 有非组节点被选中时（框选 / 多选）→ 让位给框选工具条，避免双条
     const hasNonGroupSelected = rfNodes.some(
       (n) => n.selected && n.type !== "group",
     );
@@ -43,23 +36,19 @@ export function Pro2MediaGroupToolbar({
     const selectedGroup = rfNodes.find(
       (n) => n.selected && n.type === "group",
     );
-    const targetGroup =
-      selectedGroup ??
-      (hoveredMediaGroupId
-        ? rfNodes.find(
-            (n) => n.id === hoveredMediaGroupId && n.type === "group",
-          )
-        : undefined);
-    if (!targetGroup) return null;
-    if (!isPro2StyledGroup(targetGroup, rfNodes)) return null;
-    if (isPro2CharacterBoardGroup(targetGroup, rfNodes)) {
-      return { group: targetGroup, kind: "character-board" as const };
+    if (!selectedGroup) return null;
+    if (!isPro2StyledGroup(selectedGroup, rfNodes)) return null;
+    if (isPro2CharacterBoardGroup(selectedGroup, rfNodes)) {
+      return { group: selectedGroup, kind: "character-board" as const };
     }
-    if (isPro2FrameBoardGroup(targetGroup, rfNodes)) {
-      return { group: targetGroup, kind: "frame-board" as const };
+    if (isPro2FrameBoardGroup(selectedGroup, rfNodes)) {
+      return { group: selectedGroup, kind: "frame-board" as const };
     }
-    return { group: targetGroup, kind: null };
-  }, [rfNodes, hoveredMediaGroupId]);
+    if (isPro2VideoBoardGroup(selectedGroup, rfNodes)) {
+      return { group: selectedGroup, kind: "video-board" as const };
+    }
+    return { group: selectedGroup, kind: null };
+  }, [rfNodes]);
 
   const viewport = useViewportTransformActive(Boolean(resolved) && !viewportMoving);
 
@@ -105,19 +94,6 @@ export function Pro2MediaGroupToolbar({
 
   if (marqueeSelecting || viewportMoving || !resolved || !placement) return null;
 
-  const keepHover = () =>
-    pinPro2MediaGroupToolbarHover(resolved.group.id, setHoveredMediaGroupId);
-  const releaseHover = () => {
-    if (resolved.group.selected) return;
-    schedulePro2MediaGroupToolbarHide(resolved.group.id, () => {
-      if (
-        useCanvasStore.getState().hoveredMediaGroupId === resolved.group.id
-      ) {
-        setHoveredMediaGroupId(null);
-      }
-    });
-  };
-
   return (
     <div
       className="pointer-events-auto fixed z-[1600]"
@@ -128,9 +104,6 @@ export function Pro2MediaGroupToolbar({
         padding: "14px 20px",
         margin: "-14px -20px",
       }}
-      onPointerEnter={keepHover}
-      onPointerLeave={releaseHover}
-      onPointerDown={keepHover}
     >
       <Pro2MediaGroupToolbarPanel
         groupId={resolved.group.id}

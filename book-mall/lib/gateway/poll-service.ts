@@ -14,6 +14,12 @@ import {
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
+  createKieSunoTaskWithKey,
+  getKieSunoTaskWithKey,
+  type KieSunoGenerateInput,
+} from "@/lib/story/kie-suno-client";
+import { isKieSunoModelKey } from "@/lib/gateway/kie-audio-models";
+import {
   bailianR2vCreateTask,
   bailianR2vGetTask,
 } from "@/lib/canvas/canvas-video-bailian-r2v";
@@ -679,6 +685,29 @@ export async function submitKieJobForLog(opts: {
   if (!cred) throw new Error("凭证不可用");
   const { resolveKieApiRoot } = await import("@/lib/gateway/model-router");
   const baseUrl = resolveKieApiRoot(cred.baseUrl);
+
+  if (isKieSunoModelKey(opts.model)) {
+    const input = opts.input as KieSunoGenerateInput;
+    const { taskId } = await createKieSunoTaskWithKey(
+      cred.apiKey,
+      {
+        prompt: String(input.prompt ?? ""),
+        customMode: input.customMode === true,
+        instrumental: input.instrumental === true,
+        model: typeof input.model === "string" ? input.model : undefined,
+        style: typeof input.style === "string" ? input.style : undefined,
+        title: typeof input.title === "string" ? input.title : undefined,
+        callBackUrl: opts.callBackUrl ?? null,
+      },
+      baseUrl,
+    );
+    await prisma.gatewayRequestLog.update({
+      where: { id: opts.logId },
+      data: { externalTaskId: taskId, status: "RUNNING" },
+    });
+    return taskId;
+  }
+
   const { taskId } = await createKieTaskWithKey(
     cred.apiKey,
     {
@@ -732,10 +761,35 @@ export async function pollKieTaskForLog(opts: {
   logId: string;
   credentialId: string;
   taskId: string;
+  model?: string;
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
-  return getKieTaskWithKey(cred.apiKey, opts.taskId);
+  const { resolveKieApiRoot } = await import("@/lib/gateway/model-router");
+  const baseUrl = resolveKieApiRoot(cred.baseUrl);
+  if (opts.model && isKieSunoModelKey(opts.model)) {
+    const suno = await getKieSunoTaskWithKey(cred.apiKey, opts.taskId, baseUrl);
+    const st = (suno.status ?? "").trim().toLowerCase();
+    const state =
+      st === "success" || st === "succeeded"
+        ? "success"
+        : st === "fail" || st === "failed"
+          ? "fail"
+          : st === "generating"
+            ? "generating"
+            : st === "queuing"
+              ? "queuing"
+              : "waiting";
+    return {
+      taskId: suno.taskId,
+      model: opts.model,
+      state,
+      resultJson: suno.resultJson ?? undefined,
+      failCode: suno.failCode ?? undefined,
+      failMsg: suno.failMsg ?? undefined,
+    };
+  }
+  return getKieTaskWithKey(cred.apiKey, opts.taskId, baseUrl);
 }
 
 export async function pollBailianR2vTaskForLog(opts: {

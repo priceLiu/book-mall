@@ -1,7 +1,10 @@
 "use client";
 
 import { nanoid } from "nanoid";
-import { ensurePro2HubToMediaGroupEdge } from "./pro2-hub-media-group-edge";
+import {
+  ensurePro2FrameBoardToVideoBoardEdge,
+  ensurePro2HubToMediaGroupEdge,
+} from "./pro2-hub-media-group-edge";
 import { PRO2_MEDIA_GROUP_EXTRA, PRO2_MEDIA_GROUP_PAD } from "./pro2-media-group-layout";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
@@ -85,7 +88,34 @@ export function duplicateMediaGroupInGraph(
 
   let nextEdges = [...edges];
   const hubId = gd.pro2HubNodeId?.trim();
-  if (hubId && nodes.some((n) => n.id === hubId)) {
+  const frameGroupId =
+    gd.pro2Kind === "video-board" && gd.pro2ControllerNodeId
+      ? (() => {
+          const videoCol = nodes.find((n) => n.id === gd.pro2ControllerNodeId);
+          const frameColumnId = (
+            videoCol?.data as { frameColumnId?: string }
+          )?.frameColumnId?.trim();
+          if (!frameColumnId) return null;
+          return (
+            nodes.find(
+              (n) =>
+                n.type === "group" &&
+                (n.data as { pro2ControllerNodeId?: string })
+                  .pro2ControllerNodeId === frameColumnId,
+            )?.id ?? null
+          );
+        })()
+      : null;
+
+  if (frameGroupId) {
+    ensurePro2FrameBoardToVideoBoardEdge(
+      (fn) => {
+        nextEdges = fn(nextEdges);
+      },
+      frameGroupId,
+      newGroupId,
+    );
+  } else if (hubId && nodes.some((n) => n.id === hubId)) {
     ensurePro2HubToMediaGroupEdge(
       (fn) => {
         nextEdges = fn(nextEdges);

@@ -16,18 +16,21 @@ import {
 } from "./story-pro2-node-chrome";
 import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
 import { buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
+import { buildPro2AudioNodeData } from "./pro2-spawn-nodes";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
 export type Pro2ShortcutPresetId =
   | "image-to-prompt"
   | "video-to-prompt"
-  | "text-to-video";
+  | "text-to-video"
+  | "text-to-music";
 
 const PRESET_LABEL: Record<Pro2ShortcutPresetId, string> = {
   "image-to-prompt": "预设 - 图片反推提示词",
   "video-to-prompt": "预设 - 视频反推提示词",
   "text-to-video": "预设 - 文生视频",
+  "text-to-music": "预设 - 文字生音乐",
 };
 
 type SpawnStore = {
@@ -229,6 +232,56 @@ export function spawnPro2ShortcutPreset(
   const totalW = textW + gap + videoW;
   const maxH = Math.max(PRO2_TEXT_NODE_HEIGHT, SBV1_VIDEO_ENGINE_HEIGHT);
   const y = center.y - maxH / 2;
+  if (preset === "text-to-music") {
+    const audioW = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
+    const audioH = 220;
+    const totalMusicW = textW + gap + audioW;
+    const musicY = center.y - Math.max(PRO2_TEXT_NODE_HEIGHT, audioH) / 2;
+    const textId = store.addNode(
+      "story-pro2-starter",
+      { x: center.x - totalMusicW / 2, y: musicY },
+      buildPro2GeneralTextNodeData({ pro2PresetKind: preset }),
+    );
+    const audioId = store.addNode(
+      "story-pro2-audio",
+      { x: center.x - totalMusicW / 2 + textW + gap, y: musicY },
+      buildPro2AudioNodeData({
+        label: "音频",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!textId || !audioId) {
+      return { groupId: null, focusNodeId: textId || audioId };
+    }
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${textId}-${audioId}`,
+        source: textId,
+        target: audioId,
+        sourceHandle: "text",
+        targetHandle: "in_audio",
+      },
+    ]);
+    const groupId = store.createGroupContaining([textId, audioId], {
+      label: PRESET_LABEL[preset],
+      ...SHORTCUT_GROUP_OPTS,
+    });
+    queueMicrotask(() => {
+      relayoutShortcutPresetGroup(
+        store.setNodes,
+        groupId,
+        [
+          { id: textId, width: textW, height: PRO2_TEXT_NODE_HEIGHT },
+          { id: audioId, width: audioW, height: audioH },
+        ],
+        gap,
+      );
+      selectPro2NodeAfterSpawn(store.setNodes, textId);
+    });
+    return { groupId, focusNodeId: textId };
+  }
+
   const textId = store.addNode(
     "story-pro2-starter",
     { x: center.x - totalW / 2, y },
@@ -349,6 +402,11 @@ export function attachPro2StarterShortcutPreset(
     return;
   }
 
+  if (preset === "text-to-music") {
+    attachTextToMusicPreset(starterId, sx, sy, textW, gap, store);
+    return;
+  }
+
   const videoId = store.addNode(
     "sbv1-video-engine",
     { x: sx + textW + gap, y: sy },
@@ -366,6 +424,36 @@ export function attachPro2StarterShortcutPreset(
       target: videoId,
       sourceHandle: "text",
       targetHandle: "in_ref",
+    },
+  ]);
+  selectPro2NodeAfterSpawn(store.setNodes, starterId);
+}
+
+function attachTextToMusicPreset(
+  starterId: string,
+  sx: number,
+  sy: number,
+  textW: number,
+  gap: number,
+  store: AttachStarterStore,
+): void {
+  const audioId = store.addNode(
+    "story-pro2-audio",
+    { x: sx + textW + gap, y: sy },
+    buildPro2AudioNodeData({
+      label: "音频",
+      pro2PresetKind: "text-to-music",
+    }),
+  );
+  if (!audioId) return;
+  store.setEdges((prev) => [
+    ...prev,
+    {
+      id: `e-${starterId}-${audioId}`,
+      source: starterId,
+      target: audioId,
+      sourceHandle: "text",
+      targetHandle: "in_audio",
     },
   ]);
   selectPro2NodeAfterSpawn(store.setNodes, starterId);

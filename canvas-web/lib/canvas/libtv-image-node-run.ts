@@ -106,7 +106,8 @@ export function clearOrphanLibtvMediaInflightInNodes<
   const next = nodes.map((n) => {
     const isMedia =
       isLibtvFreestandingImageNode(n as Pick<CanvasFlowNode, "type" | "data">) ||
-      n.type === "sbv1-video-engine";
+      n.type === "sbv1-video-engine" ||
+      n.type === "story-pro2-audio";
     if (!isMedia || !isOrphanLibtvMediaInflight((n.data ?? {}) as never)) {
       return n;
     }
@@ -138,14 +139,14 @@ export function commitLibtvImageRunPendingPatch(
   return true;
 }
 
-/** 图片 / 视频媒体节点 · 入队后立即 pending */
+/** 图片 / 视频 / 音频媒体节点 · 入队后立即 pending */
 export function commitLibtvMediaRunPendingPatch(
   node: Pick<CanvasFlowNode, "id" | "type" | "data"> | undefined,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): boolean {
   if (!node) return false;
   if (commitLibtvImageRunPendingPatch(node, updateNodeData)) return true;
-  if (node.type === "sbv1-video-engine") {
+  if (node.type === "sbv1-video-engine" || node.type === "story-pro2-audio") {
     updateNodeData(node.id, libtvImageRunPendingPatch());
     return true;
   }

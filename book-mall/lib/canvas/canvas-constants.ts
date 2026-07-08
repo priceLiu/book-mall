@@ -86,7 +86,7 @@ export function getCanvasAiPublicBase(): string | null {
 }
 
 export function buildCanvasAiKieCallbackUrl(
-  kind: "image" | "text" | "video",
+  kind: "image" | "text" | "video" | "audio",
   taskRef: string,
 ): string | null {
   const base = getCanvasAiPublicBase();

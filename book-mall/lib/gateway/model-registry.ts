@@ -15,6 +15,13 @@ import {
   GATEWAY_CANONICAL_REGISTRY,
 } from "@/lib/platform-model/canonical-registry";
 import { prisma } from "@/lib/prisma";
+import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
+import {
+  gatewayRouteDisplayName,
+  marketTaskTagsForModel,
+  shouldShowRouteInGatewayCatalog,
+  taskTagsToCapabilities,
+} from "@/lib/gateway/gateway-model-capabilities";
 import { WORLDLABS_MARBLE_MODELS } from "@/lib/gateway/worldlabs-marble-models";
 import {
   ELEVENLABS_SFX_MODELS,
@@ -62,6 +69,18 @@ export function dedupeByCanonical<T extends { canonicalModelKey: string }>(rows:
   for (const r of rows) {
     if (seen.has(r.canonicalModelKey)) continue;
     seen.add(r.canonicalModelKey);
+    out.push(r);
+  }
+  return out;
+}
+
+/** Gateway 控制台：按 modelKey 去重，保留各厂商路由独立展示。 */
+export function dedupeByModelKey<T extends { modelKey: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    if (seen.has(r.modelKey)) continue;
+    seen.add(r.modelKey);
     out.push(r);
   }
   return out;
@@ -212,6 +231,7 @@ export async function listActiveRoutes(): Promise<
     };
   }>
 > {
+  await ensureGatewayCanonicalRegistrySynced();
   const routes = await prisma.gatewayModelRoute.findMany({
     where: { active: true, catalog: { active: true, gatewayPublished: true } },
     include: {
@@ -250,6 +270,7 @@ export async function listActiveRoutes(): Promise<
 }
 
 export async function listModelsForApp(input: ListModelsForAppInput): Promise<RegistryModelRow[]> {
+  await ensureGatewayCanonicalRegistrySynced();
   const appTag = input.appTag.trim().toLowerCase();
   const routes = await listActiveRoutes();
 
@@ -337,6 +358,7 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
 
 /** Gateway 控制台全量目录（按 provider 分组）。 */
 export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProviderKind[]) {
+  await ensureGatewayCanonicalRegistrySynced();
   const routes = await listActiveRoutes();
   type GroupModel = {
     modelKey: string;
@@ -346,20 +368,33 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     description: string | null;
     canonicalModelKey: string;
     credentialBound: boolean;
+    capabilities: string[];
   };
 
   const byProvider = new Map<GatewayProviderKind, GroupModel[]>();
 
   for (const { route, catalog } of routes) {
+    if (!shouldShowRouteInGatewayCatalog(route.modelKey)) continue;
+    const taskTags = marketTaskTagsForModel({
+      canonicalKey: catalog.canonicalKey,
+      mediaKind: catalog.mediaKind,
+      requestKind: catalog.requestKind ?? "OTHER",
+      role: catalog.role ?? "LLM",
+      modelKey: route.modelKey,
+    });
     const list = byProvider.get(route.providerKind) ?? [];
     list.push({
       modelKey: route.modelKey,
-      displayName: catalog.displayName,
+      displayName: gatewayRouteDisplayName(
+        { displayName: catalog.displayName, canonicalKey: catalog.canonicalKey },
+        route.modelKey,
+      ),
       requestKind: catalog.requestKind ?? "OTHER",
       role: catalog.role ?? "LLM",
       description: canonicalByKey(catalog.canonicalKey)?.description ?? null,
       canonicalModelKey: catalog.canonicalKey,
       credentialBound: isGatewayProviderBound(boundKinds, route.providerKind),
+      capabilities: taskTagsToCapabilities(taskTags),
     });
     byProvider.set(route.providerKind, list);
   }
@@ -439,9 +474,11 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     providerKind,
     label: PROVIDER_LABEL[providerKind] ?? providerKind,
     credentialBound: isGatewayProviderBound(boundKinds, providerKind),
-    models: dedupeByCanonical(
+    models: dedupeByModelKey(
       models.map((m) => ({ ...m, canonicalModelKey: m.canonicalModelKey })),
-    ).map(({ canonicalModelKey: _c, ...m }) => m),
+    )
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, "zh"))
+      .map(({ canonicalModelKey: _c, ...m }) => m),
   }));
 
   const isText = (m: CatalogModel) => m.requestKind === "CHAT" || m.role === "LLM";

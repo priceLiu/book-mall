@@ -317,6 +317,7 @@ export async function GET(request: NextRequest) {
       logId: log?.id ?? "",
       credentialId,
       taskId,
+      model: log?.model ?? undefined,
     });
     if (log) {
       if (isKieRecordSuccess(data.state)) {

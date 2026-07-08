@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { EnginePicker } from "@/components/canvas/engine-picker";
+import {
+  EnginePicker,
+  ENGINE_PICKER_EMPTY_PARAMS,
+} from "@/components/canvas/engine-picker";
 import {
   gatewayModelRoleSectionTitle,
   type GatewayModelRole,
 } from "@/lib/canvas/gateway-model-role";
+import {
+  pickDefaultPro2SunoEngine,
+  pickDefaultPro2TtsEngine,
+  PRO2_SUNO_MODEL_KEYS,
+  PRO2_TTS_MODEL_KEYS,
+  isPro2SunoModelKey,
+} from "@/lib/canvas/kie-audio-models";
 import {
   patchPro2TextNodeEngine,
   readPro2TextNodeEngine,
@@ -46,16 +56,31 @@ type RolePickerConfig = {
 function rolePickerConfig(
   role: GatewayModelRole,
   needsVision: boolean,
+  data: Pro2TextNodeEngineData,
+  _ctx: { nodeId: string; nodes: CanvasFlowNode[]; edges: CanvasFlowEdge[] },
 ): RolePickerConfig {
+  const preset = String(data.pro2PresetKind ?? "").trim();
   if (role === "LLM") {
+    if (preset === "text-to-music") {
+      return { allowedModelKeys: [...PRO2_SUNO_MODEL_KEYS] };
+    }
+    const llmKeys = needsVision
+      ? [...STORY_LLM_VISION_MODEL_KEYS]
+      : [...STORY_LLM_MODEL_KEYS];
     return {
-      allowedModelKeys: needsVision
-        ? [...STORY_LLM_VISION_MODEL_KEYS]
-        : [...STORY_LLM_MODEL_KEYS],
+      allowedModelKeys: [
+        ...new Set([...llmKeys, ...PRO2_SUNO_MODEL_KEYS]),
+      ],
     };
   }
   if (role === "IMAGE") {
     return { allowedModelKeys: [...SBV1_IMAGE_MODEL_KEYS] };
+  }
+  if (role === "MUSIC") {
+    return { allowedModelKeys: [...PRO2_SUNO_MODEL_KEYS] };
+  }
+  if (role === "TTS") {
+    return { allowedModelKeys: [...PRO2_TTS_MODEL_KEYS] };
   }
   return {
     providerIds: [GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID],
@@ -67,8 +92,15 @@ function defaultPickForRole(
   role: GatewayModelRole,
   providers: CanvasProviderDto[],
   needsVision: boolean,
+  data?: Pro2TextNodeEngineData,
 ): CanvasEnginePick | null {
   if (role === "LLM") {
+    const preset = String(data?.pro2PresetKind ?? "").trim();
+    if (preset === "text-to-music") {
+      const pick = pickDefaultPro2SunoEngine(providers);
+      if (!pick) return null;
+      return { ...pick, params: pick.params ?? {} };
+    }
     const pick = needsVision
       ? pickDefaultStoryVisionLlmEngine(providers)
       : pickDefaultStoryLlmEngine(providers);
@@ -80,6 +112,16 @@ function defaultPickForRole(
   }
   if (role === "IMAGE") {
     const pick = pickDefaultSbv1ImageEngine(providers);
+    if (!pick) return null;
+    return { ...pick, params: pick.params ?? {} };
+  }
+  if (role === "MUSIC") {
+    const pick = pickDefaultPro2SunoEngine(providers);
+    if (!pick) return null;
+    return { ...pick, params: pick.params ?? {} };
+  }
+  if (role === "TTS") {
+    const pick = pickDefaultPro2TtsEngine(providers);
     if (!pick) return null;
     return { ...pick, params: pick.params ?? {} };
   }
@@ -146,14 +188,17 @@ export function Pro2TextNodeEnginePickers({
       const allowedLlm =
         role === "LLM" && llmNeedsVision
           ? STORY_LLM_VISION_MODEL_KEYS
-          : null;
+          : role === "LLM" &&
+              String(data.pro2PresetKind ?? "").trim() === "text-to-music"
+            ? PRO2_SUNO_MODEL_KEYS
+            : null;
       if (
         role === "LLM" &&
         llmNeedsVision &&
         cur.modelKey.trim() &&
         !isStoryLlmVisionModel(cur.modelKey)
       ) {
-        const pick = defaultPickForRole(role, providers, true);
+        const pick = defaultPickForRole(role, providers, true, data);
         if (pick) {
           seededRolesRef.current.add(seedKey);
           updateNodeData(nodeId, patchPro2TextNodeEngine(role, pick));
@@ -161,6 +206,10 @@ export function Pro2TextNodeEnginePickers({
         }
       }
       if (cur.providerId.trim() && cur.modelKey.trim()) {
+        if (role === "LLM" && isPro2SunoModelKey(cur.modelKey)) {
+          seededRolesRef.current.add(seedKey);
+          continue;
+        }
         if (
           !allowedLlm ||
           allowedLlm.some((k) => k === cur.modelKey.trim())
@@ -169,7 +218,7 @@ export function Pro2TextNodeEnginePickers({
           continue;
         }
       }
-      const pick = defaultPickForRole(role, providers, llmNeedsVision);
+      const pick = defaultPickForRole(role, providers, llmNeedsVision, data);
       if (!pick) continue;
       seededRolesRef.current.add(seedKey);
       updateNodeData(nodeId, patchPro2TextNodeEngine(role, pick));
@@ -181,7 +230,11 @@ export function Pro2TextNodeEnginePickers({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
       {roles.map((role) => {
-        const cfg = rolePickerConfig(role, llmNeedsVision);
+        const cfg = rolePickerConfig(role, llmNeedsVision, data, {
+          nodeId,
+          nodes,
+          edges,
+        });
         const cur = readPro2TextNodeEngine(data, role);
         return (
           <div key={role} className="min-w-0 shrink-0">
@@ -203,9 +256,10 @@ export function Pro2TextNodeEnginePickers({
               role={role}
               allowedModelKeys={cfg.allowedModelKeys}
               providerIds={cfg.providerIds}
+              externalProviders={providers}
               providerId={cur.providerId}
               modelKey={cur.modelKey}
-              params={cur.params ?? {}}
+              params={cur.params ?? ENGINE_PICKER_EMPTY_PARAMS}
               triggerVariant="dock"
               triggerFontPx={triggerFontPx}
               triggerMinHeightPx={minHeightPx}

@@ -38,6 +38,14 @@ describe("resolvePro2TextNodeEngineRoles", () => {
     ).toBe(true);
   });
 
+  it("text-to-music preset uses LLM picker (Suno in Select text model)", () => {
+    const roles = resolvePro2TextNodeEngineRoles({
+      pro2TextPurpose: "general",
+      pro2PresetKind: "text-to-music",
+    });
+    expect(roles).toEqual(["LLM"]);
+  });
+
   it("general write mode stays LLM only even when linked to image", () => {
     const textId = "text-1";
     const imageId = "img-1";

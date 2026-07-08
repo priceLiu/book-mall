@@ -76,6 +76,20 @@ export function buildPro2ImageNodeData(
   };
 }
 
+export function buildPro2AudioNodeData(
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    label: "音频",
+    dockInput: "",
+    engine: undefined,
+    ossUrl: undefined,
+    blobUrl: undefined,
+    runtime: { status: "idle" },
+    ...overrides,
+  };
+}
+
 export function buildPro2ThreeViewNodeData(
   overrides?: Record<string, unknown>,
 ): Record<string, unknown> {

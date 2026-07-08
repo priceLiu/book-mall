@@ -22,6 +22,7 @@ import {
   MEME_TEXT_STYLE_OPTIONS,
   T2I_MODEL_OPTIONS,
 } from "@/lib/image-processing-presets";
+import { ipTagSelectedClass, ipTagUnselectedClass } from "@/lib/image-processing-theme";
 import { cn } from "@/lib/utils";
 
 const USE_CASES = [
@@ -154,8 +155,8 @@ export function ImageMemePanel({
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium",
                   memeFormat === o.id
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-[#e5e5ea] text-[#1d1d1f]",
+                    ? ipTagSelectedClass
+                    : ipTagUnselectedClass,
                 )}
               >
                 {o.label}

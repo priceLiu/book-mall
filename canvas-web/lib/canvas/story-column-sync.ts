@@ -156,6 +156,24 @@ function dialogueLine(dialogue?: string): string {
   return `对白：${d}`;
 }
 
+/** 分镜静帧生图 · 不含英文视频运镜（避免 prompt 超 5000 字） */
+export function buildFrameRowImagePrompt(frame: {
+  frameIndex: number;
+  scene: string;
+  shotSize?: string;
+  description: string;
+  dialogue?: string;
+}): string {
+  const parts = [
+    `镜 ${frame.frameIndex}`,
+    frame.shotSize?.trim() ? `景别：${frame.shotSize.trim()}` : "",
+    frame.scene?.trim() ? `场景：${frame.scene.trim()}` : "",
+    frame.description?.trim() ? `镜头描述：${frame.description.trim()}` : "",
+    dialogueLine(frame.dialogue),
+  ].filter(Boolean);
+  return parts.join("\n");
+}
+
 /** 分镜脚本列 / 视频生成共用：镜号 + 景别 + 场景 + 镜头描述 + 对白 + 运镜 */
 export function buildFrameRowScriptPrompt(frame: {
   frameIndex: number;
@@ -194,7 +212,7 @@ export function buildDefaultFrameRowPrompt(frame: {
   dialogue?: string;
   videoPrompt?: string;
 }): string {
-  return buildFrameRowScriptPrompt(frame);
+  return buildFrameRowImagePrompt(frame);
 }
 
 const SHOT_SIZE_SCENE_LABELS = new Set([

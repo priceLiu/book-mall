@@ -77,6 +77,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as Sbv1VideoEngineNodeData & {
     crewTaskId?: string;
     crewTaskLabel?: string;
+    pro2MediaRole?: string;
+    pro2ControllerNodeId?: string;
+    label?: string;
   };
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const { succeeded, history } = useNodeTaskHistory(id);
@@ -128,6 +131,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     [id, d.runtime, succeeded, nodes, edges],
   );
 
+  const isPro2VideoBoardCell =
+    d.pro2MediaRole === "video" && Boolean(d.pro2ControllerNodeId?.trim());
+  const nodeEdition = isPro2VideoBoardCell ? "pro2" : "sbv1";
+  const nodeTitle =
+    d.label?.trim() ||
+    d.crewTaskLabel?.trim() ||
+    (isPro2VideoBoardCell ? "分镜视频" : SBV1_VIDEO_COMPOSE_LABEL);
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
 
@@ -215,7 +225,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     posterUrl,
     kind: "video",
     profile: "sbv1-video",
-    disabled: !hasVideo || isGenerating,
+    disabled: isPro2VideoBoardCell || !hasVideo || isGenerating,
   });
 
   const spawnStore = useMemo(
@@ -424,14 +434,14 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           style={libtvNodeBorderStyle({
             selected: !!selected,
             hovered: hovered && !selected,
-            edition: "sbv1",
+            edition: nodeEdition,
           })}
         >
           <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Video className="size-3.5 shrink-0 text-white/70" />
               <p className="truncate text-xs font-medium text-white">
-                {d.crewTaskLabel?.trim() || SBV1_VIDEO_COMPOSE_LABEL}
+                {nodeTitle}
               </p>
             </div>
             {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
@@ -460,7 +470,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           <div className={cn(SBV1_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
-                variant="cyan"
+                variant={isPro2VideoBoardCell ? "violet" : "cyan"}
                 tone={isBackground ? "background" : "active"}
               >
                 {hasVideo ? (
@@ -523,13 +533,27 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 </div>
               </div>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
                 <Pro2MediaNodeEmptyState
                   icon={Video}
-                  label="选中本节点，在下方编辑 prompt 并生成"
+                  label={
+                    isPro2VideoBoardCell
+                      ? "添加或生成视频"
+                      : "选中本节点，在下方编辑 prompt 并生成"
+                  }
                   className="min-h-0 pb-0"
                   passNodeDrag
                 />
+                {isPro2VideoBoardCell && !selected ? (
+                  <p className="mt-3 text-[10px] text-white/35">
+                    选中节点以编辑提示词
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

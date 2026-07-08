@@ -46,6 +46,7 @@ import {
   pro2TextNodeLlmNeedsVision,
 } from "@/lib/canvas/pro2-text-node-engine-roles";
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
+import { isPro2SunoModelKey } from "@/lib/canvas/kie-audio-models";
 
 /** 2.0 文本节点 · 底部输入坞 */
 export function Pro2StarterInputDock() {
@@ -112,7 +113,9 @@ export function Pro2StarterInputDock() {
 
   const onSendGeneralText = useCallback(async () => {
     if (!storeNode) return;
+    if (isPro2StarterTextGenerating(d)) return;
     const text = themeInput.trim();
+    const isMusicPreset = String(d.pro2PresetKind ?? "") === "text-to-music";
     const canSend = pro2StarterCanSendGeneralText({
       themeInput: text,
       pro2PresetKind: d.pro2PresetKind,
@@ -135,27 +138,41 @@ export function Pro2StarterInputDock() {
       .getState()
       .nodes.find((n) => n.id === storeNode.id);
     const liveData = (live?.data ?? {}) as StoryProStarterNodeData;
-    if (!liveData.providerId?.trim() || !liveData.modelKey?.trim()) {
+    const modelProviderId = liveData.providerId?.trim();
+    const modelKey = liveData.modelKey?.trim();
+    if (!modelProviderId || !modelKey) {
       await alert({
         title: "请选择模型",
-        message: "点击左下角模型选择器，选择 Text model 后再生成。",
+        message: isMusicPreset
+          ? "点击左下角「Select text model」，选择 Suno API 后再生成。"
+          : "点击左下角模型选择器，选择 Text model 后再生成。",
         variant: "warning",
       });
       return;
     }
-    const needsVision = pro2TextNodeLlmNeedsVision(liveData, {
-      nodeId: storeNode.id,
-      nodes,
-      edges,
-    });
-    if (needsVision && !isStoryLlmVisionModel(liveData.modelKey)) {
+    if (isMusicPreset && !isPro2SunoModelKey(modelKey)) {
       await alert({
-        title: "请换用支持图片理解的模型",
-        message:
-          "图片/视频反推提示词须使用 Gemini 3 Flash 或 GPT-5.5 等多模态文本模型；DeepSeek / 通义等纯文本模型无法读取参考图。",
+        title: "请选择 Suno 模型",
+        message: "文字生音乐须使用 Suno API（在 Select text model 中选择）。",
         variant: "warning",
       });
       return;
+    }
+    if (!isMusicPreset) {
+      const needsVision = pro2TextNodeLlmNeedsVision(liveData, {
+        nodeId: storeNode.id,
+        nodes,
+        edges,
+      });
+      if (needsVision && !isStoryLlmVisionModel(liveData.modelKey)) {
+        await alert({
+          title: "请换用支持图片理解的模型",
+          message:
+            "图片/视频反推提示词须使用 Gemini 3 Flash 或 GPT-5.5 等多模态文本模型；DeepSeek / 通义等纯文本模型无法读取参考图。",
+          variant: "warning",
+        });
+        return;
+      }
     }
     if (!base) {
       await alert({
@@ -167,17 +184,19 @@ export function Pro2StarterInputDock() {
     }
     updateNodeData(storeNode.id, {
       themeInput: text,
+      pro2TextPurpose: "general",
       generatedOutlineMd: undefined,
       themeOutlineRuntime: {
         status: "pending",
         taskId: undefined,
         failCode: undefined,
         failMessage: undefined,
+        dismissedFailTaskId: undefined,
       },
     });
     const queued = busEnqueueStoryRun({
       nodeId: storeNode.id,
-      mediaKind: "generalText",
+      mediaKind: isMusicPreset ? "music" : "generalText",
       forceFresh: true,
     });
     if (!queued) {
@@ -188,11 +207,17 @@ export function Pro2StarterInputDock() {
           failMessage: "生成任务未能入队，请稍候再试。",
         },
       });
+      await alert({
+        title: "生成未能开始",
+        message: "任务队列繁忙或上一任务仍在进行，请稍候再试。",
+        variant: "warning",
+      });
     }
   }, [storeNode, themeInput, d.pro2PresetKind, nodes, edges, base, alert, updateNodeData]);
 
   const onSendOutline = useCallback(async () => {
     if (!storeNode) return;
+    if (isPro2StarterTextGenerating(d)) return;
     const theme = themeInput.trim();
     if (!theme) {
       await alert({

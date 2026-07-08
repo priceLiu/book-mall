@@ -13,6 +13,7 @@ import {
   OBJECT_OUTPUT_FORMAT_OPTIONS,
   OBJECT_REMOVE_MODE_OPTIONS,
 } from "@/lib/image-processing-presets";
+import { ipStepNumberClass } from "@/lib/image-processing-theme";
 
 export function ImageObjectRemoverPanel({
   submitting,
@@ -174,7 +175,7 @@ export function ImageObjectRemoverPanel({
             { title: "下载结果", desc: "生成结果自动保存到「我的资产」。" },
           ].map((s, i) => (
             <li key={s.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
+              <span className={ipStepNumberClass}>
                 {i + 1}
               </span>
               <div>

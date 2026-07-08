@@ -64,6 +64,23 @@ export function runStoryHubSection(
   });
 }
 
+/** 列节点 · 按行并发 enqueue（不同 rowKey 可并行，Gateway 队列负责限流） */
+export function batchRunStoryRows(
+  columnNodeId: string,
+  rowKeys: string[],
+  mediaKind: "threeView" | "sceneRef" | "frameImage" | "video" | "tts",
+  options?: { forceFresh?: boolean },
+) {
+  for (const rowKey of rowKeys) {
+    busEnqueueStoryRun({
+      nodeId: columnNodeId,
+      rowKey,
+      mediaKind,
+      forceFresh: options?.forceFresh,
+    });
+  }
+}
+
 /** 列节点 · 按行顺序跑 */
 export function batchRunStoryRowsSequential(
   columnNodeId: string,

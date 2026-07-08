@@ -86,10 +86,9 @@ type StarterTryAction =
   | {
       id: Pro2ShortcutPresetId;
       label: string;
-      icon: typeof Play;
+      icon: typeof Play | typeof Music;
       kind: "preset";
-    }
-  | { id: "text-to-music"; label: string; icon: typeof Music; kind: "soon" };
+    };
 
 const STARTER_TRY_ACTIONS: StarterTryAction[] = [
   { id: "write", label: "自己编写内容", icon: PenLine, kind: "write" },
@@ -100,7 +99,7 @@ const STARTER_TRY_ACTIONS: StarterTryAction[] = [
     icon: ImageIcon,
     kind: "preset",
   },
-  { id: "text-to-music", label: "文字生音乐", icon: Music, kind: "soon" },
+  { id: "text-to-music", label: "文字生音乐", icon: Music, kind: "preset" },
 ];
 
 export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
@@ -223,15 +222,10 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         onTryWrite();
         return;
       }
-      if (action.kind === "soon") {
-        void alert({
-          title: "即将推出",
-          message: "文字生音乐预设正在开发中，请稍后再试。",
-          variant: "info",
-        });
+      if (action.kind === "preset") {
+        onTryPreset(action.id);
         return;
       }
-      onTryPreset(action.id);
     },
     [onTryWrite, onTryPreset, alert],
   );

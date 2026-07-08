@@ -1,10 +1,15 @@
 import type { CanvasFlowNode, GroupNodeData, Pro2MediaGroupKind } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
+import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
 
-/** Pro2 媒体组子节点（三视图 / 分镜图 / 分镜视频占位） */
+/** Pro2 媒体组子节点（三视图 / 分镜图 / 分镜视频组格） */
 export function isPro2MediaChildNode(n: CanvasFlowNode): boolean {
-  return n.type === "story-pro2-three-view" || n.type === "story-pro2-image";
+  return (
+    n.type === "story-pro2-three-view" ||
+    n.type === "story-pro2-image" ||
+    isPro2VideoBoardChild(n)
+  );
 }
 
 /** 根据子节点推断媒体组类型 */
@@ -32,6 +37,9 @@ export function inferPro2MediaGroupKind(
   );
   if (hasScene) return "scene-board";
 
+  const hasPro2Video = children.some(isPro2VideoBoardChild);
+  if (hasPro2Video) return "video-board";
+
   const hasFrame = children.some(
     (n) =>
       n.type === "story-pro2-image" &&
@@ -53,6 +61,7 @@ export function pro2MediaGroupDefaultLabel(
   if (kind === "character-board") return "三视图";
   if (kind === "scene-board") return "场景图";
   if (kind === "frame-board") return "分镜图";
+  if (kind === "video-board") return "分镜视频";
   return "分镜视频";
 }
 
@@ -81,6 +90,11 @@ export function reconcilePro2MediaGroupMetadata(
   const next = nodes.map((n) => {
     if (n.type !== "group") return n;
     const d = n.data as GroupNodeData;
+    if (d.pro2Kind === "video-board" && d.sbv1Styled) {
+      changed = true;
+      const { sbv1Styled: _drop, ...rest } = d;
+      return { ...n, data: rest } as CanvasFlowNode;
+    }
     if (d.pro2Kind) return n;
 
     const childIds = nodes
@@ -92,14 +106,18 @@ export function reconcilePro2MediaGroupMetadata(
     if (!kind) return n;
 
     changed = true;
+    const nextData: GroupNodeData = {
+      ...d,
+      pro2Kind: kind,
+      label: pro2MediaGroupDefaultLabel(kind, d.label),
+      color: d.color || GROUP_COLOR_PRESETS[2],
+    };
+    if (kind === "video-board" && nextData.sbv1Styled) {
+      delete nextData.sbv1Styled;
+    }
     return {
       ...n,
-      data: {
-        ...d,
-        pro2Kind: kind,
-        label: pro2MediaGroupDefaultLabel(kind, d.label),
-        color: d.color || GROUP_COLOR_PRESETS[2],
-      },
+      data: nextData,
     } as CanvasFlowNode;
   });
   return changed ? next : nodes;

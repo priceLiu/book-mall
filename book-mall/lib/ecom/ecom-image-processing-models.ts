@@ -14,13 +14,18 @@ export const ECOM_WANX_PAINTING_MODEL_KEY = "wanx-x-painting";
 export const ECOM_WAN_I2I_MODEL_KEY = "wan2.5-i2i-preview";
 export const ECOM_SEEDREAM_EDITOR_MODEL_KEY = "doubao-seedream-5-0-260128";
 export const ECOM_KIE_NANO_PRO_MODEL_KEY = "lib-nano-pro";
+/** KIE · NanoBanana Gemini 2.5 Flash Image（文生图 / 图生图） */
+export const ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY = "google/nano-banana";
 
 export const ECOM_IMAGE_PROCESSING_MODEL_KEYS = [
   ...ECOM_QWEN_EDIT_MODEL_KEYS,
   "doubao-seedream-5-0-lite",
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
   ECOM_KIE_NANO_PRO_MODEL_KEY,
+  ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY,
   "nano-banana-pro",
+  "seedream-4.5",
+  "nano-banana-2",
   ECOM_OUTPAINT_MODEL_KEY,
   ECOM_WANX_PAINTING_MODEL_KEY,
   ECOM_WAN_I2I_MODEL_KEY,
@@ -40,7 +45,9 @@ export type ImageProcessingMode =
   | "poster"
   | "meme"
   | "avatar"
-  | "gif";
+  | "gif"
+  | "realistic"
+  | "image-generator";
 
 export type QwenEditModelKey = (typeof ECOM_QWEN_EDIT_MODEL_KEYS)[number];
 
@@ -83,7 +90,21 @@ export function isKieNanoProModelKey(modelKey: string): boolean {
   return (
     modelKey === ECOM_KIE_NANO_PRO_MODEL_KEY ||
     modelKey === "nano-banana-pro" ||
-    modelKey.includes("nano-banana")
+    (modelKey.includes("nano-banana") &&
+      modelKey !== ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY &&
+      modelKey !== "google/nano-banana-edit")
+  );
+}
+
+/** Gateway 文生图 / 风格参考图走 KIE createTask */
+export function isKieGenerativeImageModelKey(modelKey: string): boolean {
+  return (
+    isKieNanoProModelKey(modelKey) ||
+    modelKey === ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY ||
+    modelKey === "google/nano-banana-edit" ||
+    modelKey === "nano-banana-2" ||
+    modelKey === "seedream-4.5" ||
+    modelKey === "seedream-5-lite"
   );
 }
 

@@ -46,7 +46,7 @@ export type ImageProcessingTag = {
 };
 
 export const IMAGE_PROCESSING_TAGS: ImageProcessingTag[] = [
-  { id: "ai-image-generator", label: "AI图像生成器" },
+  { id: "ai-image-generator", label: "AI图像生成器", live: true },
   { id: "ai-retouch", label: "AI修图", live: true },
   { id: "ai-image-editor", label: "AI图像编辑器", live: true },
   { id: "ai-image-enhancer", label: "AI图像增强器", live: true },
@@ -63,7 +63,7 @@ export const IMAGE_PROCESSING_TAGS: ImageProcessingTag[] = [
   { id: "ai-3d-generator", label: "AI 3D生成器" },
   { id: "ai-anime-generator", label: "AI动漫生成器" },
   { id: "ai-cartoon-generator", label: "AI卡通生成器" },
-  { id: "ai-realistic-generator", label: "AI逼真图像生成器" },
+  { id: "ai-realistic-generator", label: "AI逼真图像生成器", live: true },
   { id: "ai-logo-generator", label: "AI标志生成器" },
   { id: "ai-qr-generator", label: "AI二维码生成器" },
   { id: "ai-pixel-art", label: "AI像素艺术" },
@@ -100,6 +100,8 @@ export function imageProcessingPageTitle(activeTag: ImageProcessingTagId | null)
   if (activeTag === "ai-meme-generator") return "AI表情包生成器";
   if (activeTag === "ai-avatar-generator") return "AI虚拟形象生成器";
   if (activeTag === "ai-gif-generator") return "GIF生成器";
+  if (activeTag === "ai-realistic-generator") return "AI逼真图像生成器";
+  if (activeTag === "ai-image-generator") return "AI图像生成器";
   if (activeTag === "face-swap") return "换脸";
   if (activeTag === "ai-retouch" || activeTag === null) return "AI 修图";
   const tag = IMAGE_PROCESSING_TAGS.find((t) => t.id === activeTag);

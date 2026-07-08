@@ -3,7 +3,6 @@ export const LIBTV_PRO2_IMAGE_DOCK_NODE_TYPES = [
   "story-pro2-image",
   "story-pro2-prop",
   "story-pro2-mood",
-  "story-pro2-audio",
 ] as const;
 
 export type LibtvPro2ImageDockNodeType =

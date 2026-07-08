@@ -9,10 +9,12 @@ import {
   ecomImageProcessingEnhancer,
   ecomImageProcessingFaceSwap,
   ecomImageProcessingGif,
+  ecomImageProcessingImageGenerator,
   ecomImageProcessingMeme,
   ecomImageProcessingObjectRemove,
   ecomImageProcessingOutpaint,
   ecomImageProcessingPoster,
+  ecomImageProcessingRealistic,
   ecomImageProcessingRestore,
   ecomImageProcessingRetouch,
 } from "@/lib/ecom/ecom-image-processing";
@@ -594,9 +596,86 @@ export async function POST(req: Request) {
       });
     }
 
+    if (mode === "realistic") {
+      const sceneDescription =
+        typeof body.sceneDescription === "string"
+          ? body.sceneDescription.trim()
+          : prompt;
+      if (!sceneDescription) {
+        return NextResponse.json({ error: "请描述场景或主题" }, { status: 400 });
+      }
+      const styleFromParams =
+        parameters?.styleImageDataUrl &&
+        typeof parameters.styleImageDataUrl === "string"
+          ? parameters.styleImageDataUrl
+          : typeof body.styleImageDataUrl === "string"
+            ? body.styleImageDataUrl.trim()
+            : undefined;
+      const result = await ecomImageProcessingRealistic({
+        userId: auth.userId,
+        sceneDescription,
+        generativeModel:
+          typeof body.generativeModel === "string"
+            ? body.generativeModel.trim()
+            : undefined,
+        cameraLens:
+          typeof body.cameraLens === "string" ? body.cameraLens.trim() : undefined,
+        lighting:
+          typeof body.lighting === "string" ? body.lighting.trim() : undefined,
+        styleImageDataUrl: styleFromParams,
+        parameters,
+      });
+      return NextResponse.json({
+        assets: result.results.map((r) => r.asset),
+        imageUrls: result.results.map((r) => r.ossUrl),
+        logId: result.logId,
+        model: body.generativeModel,
+      });
+    }
+
+    if (mode === "image-generator") {
+      const userPrompt =
+        typeof body.prompt === "string" ? body.prompt.trim() : prompt;
+      if (!userPrompt) {
+        return NextResponse.json({ error: "请描述你的图片" }, { status: 400 });
+      }
+      const styleFromParams =
+        parameters?.styleImageDataUrl &&
+        typeof parameters.styleImageDataUrl === "string"
+          ? parameters.styleImageDataUrl
+          : typeof body.styleImageDataUrl === "string"
+            ? body.styleImageDataUrl.trim()
+            : undefined;
+      const negativePrompt =
+        typeof parameters?.negative_prompt === "string"
+          ? parameters.negative_prompt
+          : typeof body.negativePrompt === "string"
+            ? body.negativePrompt
+            : undefined;
+      const result = await ecomImageProcessingImageGenerator({
+        userId: auth.userId,
+        prompt: userPrompt,
+        generativeModel:
+          typeof body.generativeModel === "string"
+            ? body.generativeModel.trim()
+            : undefined,
+        styleId:
+          typeof body.styleId === "string" ? body.styleId.trim() : undefined,
+        negativePrompt,
+        styleImageDataUrl: styleFromParams,
+        parameters,
+      });
+      return NextResponse.json({
+        assets: result.results.map((r) => r.asset),
+        imageUrls: result.results.map((r) => r.ossUrl),
+        logId: result.logId,
+        model: body.generativeModel,
+      });
+    }
+
     return NextResponse.json({
       error:
-        "mode 须为 retouch、editor、enhancer、outpaint、restore、face-swap、bg-remove、object-remove、deblur、camera-angle、poster、meme、avatar 或 gif",
+        "mode 须为 retouch、editor、enhancer、outpaint、restore、face-swap、bg-remove、object-remove、deblur、camera-angle、poster、meme、avatar、gif、realistic 或 image-generator",
     }, { status: 400 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "处理失败";

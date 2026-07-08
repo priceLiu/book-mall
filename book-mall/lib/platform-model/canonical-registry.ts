@@ -260,7 +260,6 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/秒",
     routes: dedupeRoutes([
       { vendor: "volcengine", modelKey: "doubao-seedance-2.0", providerKind: "VOLCENGINE" },
-      { vendor: "kie", modelKey: "bytedance/seedance-2", providerKind: "KIE" },
     ]),
   },
   {

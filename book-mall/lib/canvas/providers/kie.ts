@@ -22,6 +22,7 @@ import {
   kieCodexResponseToChatCompletions,
 } from "@/lib/gateway/kie-codex-chat";
 import { buildKieGrokTextToImageCreateArgs } from "@/lib/canvas/kie-grok-builders";
+import { KIE_AUDIO_GATEWAY_MODELS } from "@/lib/gateway/kie-audio-models";
 
 import {
   CanvasGatewayError,
@@ -379,6 +380,51 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     description: "Seedream 4.5 · 高质量写实；有参考图时走 Edit。",
     paramsSchema: SEEDREAM_ASPECT_SCHEMA,
     defaultParams: { aspect_ratio: "1:1", quality: "basic" },
+  },
+  {
+    modelKey: "google/nano-banana",
+    displayName: "NanoBanana Gemini 2.5 Flash Image (KIE)",
+    role: "IMAGE",
+    description: "Gemini 2.5 Flash Image · 逼真文生图；有参考图走 nano-banana-edit。",
+    paramsSchema: STD_IMAGE_ASPECT_SCHEMA,
+    defaultParams: { aspect_ratio: "1:1" },
+  },
+  {
+    modelKey: "google/nano-banana-edit",
+    displayName: "NanoBanana Gemini 2.5 Flash Edit (KIE)",
+    role: "IMAGE",
+    description: "Gemini 2.5 Flash Image · 图生图 / 编辑。",
+    paramsSchema: STD_IMAGE_ASPECT_SCHEMA,
+    defaultParams: { aspect_ratio: "1:1" },
+  },
+  {
+    modelKey: "nano-banana-2",
+    displayName: "Nano Banana 2 (KIE)",
+    role: "IMAGE",
+    description: "Gemini 3.1 Flash Image · 快速高质量文生图 / 图生图。",
+    paramsSchema: [
+      ...STD_IMAGE_ASPECT_SCHEMA,
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          { value: "2K", label: "2K" },
+          { value: "4K", label: "4K" },
+        ],
+        defaultValue: "2K",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "1:1", resolution: "2K" },
+  },
+  {
+    modelKey: "4o-image",
+    displayName: "4o Image (KIE)",
+    role: "IMAGE",
+    description: "ChatGPT 4o Image · 文生图 / 参考图编辑。",
+    paramsSchema: STD_IMAGE_ASPECT_SCHEMA,
+    defaultParams: { aspect_ratio: "1:1" },
   },
   {
     modelKey: "gpt-image-2",
@@ -869,6 +915,166 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     },
   },
   {
+    modelKey: "bytedance/seedance-2-mini",
+    displayName: "Seedance 2.0 Mini (KIE · 图/视频生视频)",
+    role: "VIDEO",
+    description: "字节 Seedance 2 Mini · 轻量图/视频参考生视频。",
+    paramsSchema: [
+      {
+        key: "aspect_ratio",
+        label: "画布比例",
+        type: "select",
+        options: [
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+          { value: "1:1", label: "1:1" },
+        ],
+        defaultValue: "16:9",
+      },
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        defaultValue: "720p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 4,
+        max: 12,
+        step: 1,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "16:9", resolution: "720p", duration: 5 },
+  },
+  {
+    modelKey: "veo3",
+    displayName: "Veo 3 (KIE)",
+    role: "VIDEO",
+    description: "Google Veo 3 · 图/文/视频多模态生视频。",
+    paramsSchema: [
+      {
+        key: "aspect_ratio",
+        label: "画幅",
+        type: "select",
+        options: [
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+        ],
+        defaultValue: "16:9",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "16:9" },
+  },
+  {
+    modelKey: "veo3.1",
+    displayName: "Veo 3.1 (KIE)",
+    role: "VIDEO",
+    description: "Google Veo 3.1 · 图/文/视频多模态生视频。",
+    paramsSchema: [
+      {
+        key: "aspect_ratio",
+        label: "画幅",
+        type: "select",
+        options: [
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+        ],
+        defaultValue: "16:9",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "16:9" },
+  },
+  {
+    modelKey: "hailuo/2-3-image-to-video-standard",
+    displayName: "海螺 2.3 图生视频 · Standard (KIE)",
+    role: "VIDEO",
+    description: "MiniMax 海螺 2.3 · 图生视频标准档。",
+    paramsSchema: [
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 6,
+        max: 10,
+        step: 1,
+        defaultValue: 6,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { duration: 6 },
+  },
+  {
+    modelKey: "hailuo/2-3-image-to-video-pro",
+    displayName: "海螺 2.3 图生视频 · Pro (KIE)",
+    role: "VIDEO",
+    description: "MiniMax 海螺 2.3 · 图生视频 Pro 档。",
+    paramsSchema: [
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 6,
+        max: 10,
+        step: 1,
+        defaultValue: 6,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { duration: 6 },
+  },
+  {
+    modelKey: "kling/v2-5-turbo-image-to-video-pro",
+    displayName: "可灵 2.5 Turbo 图生视频 (KIE)",
+    role: "VIDEO",
+    description: "快手可灵 2.5 Turbo · 图生视频 Pro。",
+    paramsSchema: [
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 5,
+        max: 10,
+        step: 5,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { duration: 5 },
+  },
+  {
+    modelKey: "kling/v2-5-turbo-text-to-video-pro",
+    displayName: "可灵 2.5 Turbo 文生视频 (KIE)",
+    role: "VIDEO",
+    description: "快手可灵 2.5 Turbo · 文生视频 Pro。",
+    paramsSchema: [
+      {
+        key: "aspect_ratio",
+        label: "画幅",
+        type: "select",
+        options: [
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+          { value: "1:1", label: "1:1" },
+        ],
+        defaultValue: "16:9",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 5,
+        max: 10,
+        step: 5,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "16:9", duration: 5 },
+  },
+  {
     modelKey: "wan/2-7-image-to-video",
     displayName: "Wan 2.7 i2v (KIE)",
     role: "VIDEO",
@@ -924,6 +1130,14 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     ] satisfies CanvasParamSchema,
     defaultParams: { resolution: "1080p", duration: 5 },
   },
+  ...KIE_AUDIO_GATEWAY_MODELS.map((m) => ({
+    modelKey: m.modelKey,
+    displayName: m.displayName,
+    role: m.role,
+    description: m.subtitle,
+    paramsSchema: m.paramsSchema,
+    defaultParams: m.defaultParams,
+  })),
 ];
 
 /** 画布 modelKey → KIE createTask 的 model + input（含 gpt-image-1 映射） */
@@ -1059,6 +1273,43 @@ export function buildKieImageCreateArgs(args: {
         output_format,
       },
     };
+  }
+
+  if (args.modelKey === "nano-banana-2") {
+    const resolution =
+      params.resolution === "1K" ||
+      params.resolution === "2K" ||
+      params.resolution === "4K"
+        ? params.resolution
+        : "2K";
+    const output_format = params.output_format === "jpg" ? "jpg" : "png";
+    const input: Record<string, unknown> = {
+      prompt: args.prompt,
+      aspect_ratio: aspect,
+      resolution,
+      output_format,
+    };
+    if (hasRefs) input.image_input = imageUrls;
+    return { model: "nano-banana-2", input };
+  }
+
+  if (
+    args.modelKey === "google/nano-banana" ||
+    args.modelKey === "google/nano-banana-edit"
+  ) {
+    const output_format = params.output_format === "jpeg" ? "jpeg" : "png";
+    const input: Record<string, unknown> = {
+      prompt: args.prompt,
+      aspect_ratio: aspect,
+      output_format,
+    };
+    if (hasRefs) {
+      return {
+        model: "google/nano-banana-edit",
+        input: { ...input, image_urls: imageUrls },
+      };
+    }
+    return { model: "google/nano-banana", input };
   }
 
   const resolution = (params.resolution as "1K" | "2K" | undefined) ?? "2K";

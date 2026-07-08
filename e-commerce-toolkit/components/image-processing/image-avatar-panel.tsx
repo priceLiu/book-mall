@@ -22,6 +22,7 @@ import {
   COUNT_OPTIONS,
   T2I_MODEL_OPTIONS,
 } from "@/lib/image-processing-presets";
+import { ipTagSelectedClass, ipTagUnselectedClass } from "@/lib/image-processing-theme";
 import { cn } from "@/lib/utils";
 
 const QUICK_TAGS = ["巫师", "黑客", "创始人", "猫女", "滑板手"];
@@ -152,8 +153,8 @@ export function ImageAvatarPanel({
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium",
                   avatarStyle === o.id
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-[#e5e5ea] text-[#1d1d1f]",
+                    ? ipTagSelectedClass
+                    : ipTagUnselectedClass,
                 )}
               >
                 {o.label}

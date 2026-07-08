@@ -1,10 +1,12 @@
 /** Gateway `CanvasProviderModelDto.role` · 与 book-mall Gateway 登记一致 */
-export type GatewayModelRole = "LLM" | "IMAGE" | "VIDEO";
+export type GatewayModelRole = "LLM" | "IMAGE" | "VIDEO" | "MUSIC" | "TTS";
 
 export const GATEWAY_MODEL_ROLE_ORDER: GatewayModelRole[] = [
   "LLM",
   "IMAGE",
   "VIDEO",
+  "MUSIC",
+  "TTS",
 ];
 
 export type GatewayModelRoleMeta = {
@@ -44,6 +46,20 @@ export const GATEWAY_MODEL_ROLE_META: Record<
     sectionLabelZh: "视频模型",
     pickerPlaceholder: "Select video model",
     modalTitle: "Select video model",
+  },
+  MUSIC: {
+    gatewayRole: "MUSIC",
+    sectionLabelEn: "Music model",
+    sectionLabelZh: "音乐模型",
+    pickerPlaceholder: "Select music model",
+    modalTitle: "Select music model",
+  },
+  TTS: {
+    gatewayRole: "TTS",
+    sectionLabelEn: "Speech model",
+    sectionLabelZh: "语音模型",
+    pickerPlaceholder: "Select speech model",
+    modalTitle: "Select speech model",
   },
 };
 

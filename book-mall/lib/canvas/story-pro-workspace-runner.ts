@@ -4,6 +4,7 @@
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
   runImageEngineNode,
+  runKieAudioEngineNode,
   runStoryLlmEngineNode,
   runTtsEngineNode,
   runVideoEngineNode,
@@ -11,6 +12,7 @@ import {
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
 import { prependStoryProStyleAnchor } from "./story-pro-style-anchor";
+import { clampStoryProImagePrompt } from "./story-pro-image-prompt-limit";
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { assertStoryVideoFrameGate } from "./story-frame-gate";
 import { resolveStoryRowRefUrls, parseMentionIds } from "./story-row-ref-urls";
@@ -218,6 +220,50 @@ export async function runStoryProStarterGeneralText(
   });
 }
 
+/** 2.0 文本节点 · 文字生音乐（Suno API · KIE） */
+export async function runStoryProStarterTextToMusic(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const data = args.node.data ?? {};
+  const musicEngine =
+    (data.musicEngine as Record<string, unknown> | undefined) ?? {};
+  const providerId = String(
+    musicEngine.providerId ?? data.providerId ?? "",
+  ).trim();
+  const modelKey = String(
+    musicEngine.modelKey ?? data.modelKey ?? "",
+  ).trim();
+  const prompt =
+    (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
+    (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
+  if (!prompt) {
+    throw new Error("请先填写音乐描述或风格提示词");
+  }
+  if (!providerId || !modelKey) {
+    throw new Error("请在 Dock 选择 Suno API 音乐模型");
+  }
+  const params =
+    (musicEngine.params as Record<string, unknown> | undefined) ??
+    (data.params as Record<string, unknown> | undefined) ??
+    {};
+
+  return runKieAudioEngineNode({
+    ...args,
+    storyScope: args.storyScope ?? { mediaKind: "music" },
+    node: {
+      ...args.node,
+      type: "audio-engine",
+      data: {
+        ...data,
+        providerId,
+        modelKey,
+        prompt,
+        params,
+      },
+    },
+  });
+}
+
 export async function runStoryProScriptHubSection(
   args: RunEngineNodeArgs & {
     llmSection: StoryProLlmSection;
@@ -377,6 +423,7 @@ export async function runStoryProFrameRow(
   });
   let prompt = prependStoryProStyleAnchor(String(row.prompt ?? ""), args.styleAnchor);
   if (promptSuffix) prompt = `${prompt}\n\n${promptSuffix}`;
+  prompt = clampStoryProImagePrompt(prompt);
   const batch = (nodeData.batchImage as Record<string, unknown>) ?? {};
   const node: CanvasRunNodeInput = {
     ...args.node,

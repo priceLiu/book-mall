@@ -11,7 +11,9 @@
 | `--ecom-hairline` | `#e0e0e0` | 分割线、描边 |
 | `--ecom-primary` | `#0066cc` | **主操作蓝**（按钮、链接强调） |
 | `--ecom-primary-focus` | `#0071e3` | 主色 hover |
-| `--ecom-tile` / 黑 | `#000000` | 顶栏、视频播放器底 |
+| `--ecom-tile` / 黑 | `#000000` | 顶栏、视频播放器底、**图像处理步骤序号圆** |
+
+图像处理工作台配色细则见 [`IMAGE-PROCESSING.md`](./IMAGE-PROCESSING.md)。
 
 功能色：destructive 文本/按钮 `#dc2626`（`red-600`），不替代品牌蓝。
 

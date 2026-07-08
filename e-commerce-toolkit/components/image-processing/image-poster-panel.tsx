@@ -23,6 +23,7 @@ import {
   POSTER_PRINT_FORMAT_OPTIONS,
   POSTER_STYLE_OPTIONS,
 } from "@/lib/image-processing-presets";
+import { ipTagSelectedClass, ipTagUnselectedClass } from "@/lib/image-processing-theme";
 import { cn } from "@/lib/utils";
 
 const STYLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -201,8 +202,8 @@ export function ImagePosterPanel({
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
                     posterStyle === o.id
-                      ? "border-emerald-600 bg-emerald-600 text-white"
-                      : "border-[#e5e5ea] text-[#1d1d1f]",
+                      ? ipTagSelectedClass
+                      : ipTagUnselectedClass,
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />

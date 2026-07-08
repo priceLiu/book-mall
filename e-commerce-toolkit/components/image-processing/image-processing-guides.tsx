@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { ipStepNumberClass } from "@/lib/image-processing-theme";
 import { cn } from "@/lib/utils";
 
 export function ImageEnhancerGuideSections() {
@@ -149,7 +150,7 @@ export function ImageOutpaintGuideSections() {
         <ol className="mt-4 grid gap-4 sm:grid-cols-2">
           {steps.map((s, i) => (
             <li key={s.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
+              <span className={ipStepNumberClass}>
                 {i + 1}
               </span>
               <div>

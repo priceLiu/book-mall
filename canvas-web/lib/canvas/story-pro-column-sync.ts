@@ -4,6 +4,7 @@ import { compactGfmTables, parseMdTable, parseStoryboardRows } from "./parse-md-
 import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
+  buildFrameRowScriptPrompt,
   buildDefaultSceneRowPrompt,
   buildSceneRowsFromHub,
   buildVideoRowsFromFrames,
@@ -286,7 +287,9 @@ function mergeProVideoRows(
       (f) => f.key === row.key || f.frameIndex === row.frameIndex,
     );
     const script = frameRow
-      ? frameRow.prompt?.trim() || buildDefaultFrameRowPrompt(frameRow)
+      ? frameRow.prompt?.trim() ||
+        buildFrameRowScriptPrompt(frameRow) ||
+        buildDefaultFrameRowPrompt(frameRow)
       : row.videoPrompt;
     return {
       ...row,
