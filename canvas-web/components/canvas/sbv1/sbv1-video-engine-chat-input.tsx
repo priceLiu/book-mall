@@ -38,6 +38,7 @@ import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
+import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
@@ -67,23 +68,27 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   data,
   upstreamLinks,
   upstreamTextLinks,
+  extraDockUpstreamLinks,
   mentionables,
   isGenerating,
   onPatch,
   onRun,
   placement,
   hidden,
+  sendTitle,
 }: {
   nodeId: string;
   data: Sbv1VideoEngineNodeData;
   upstreamLinks: Sbv1UpstreamRefLink[];
   upstreamTextLinks: Sbv1UpstreamTextLink[];
+  extraDockUpstreamLinks?: Pro2DockUpstreamLink[];
   mentionables: MentionableItem[];
   isGenerating: boolean;
   onPatch: (patch: Partial<Sbv1VideoEngineNodeData>) => void;
   onRun: () => void;
   placement: LibtvDockFlowPlacement;
   hidden?: boolean;
+  sendTitle?: string;
 }) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
@@ -163,10 +168,17 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const showFirstLastSlots = activeDockMode === "first_last";
   const allRefsHighlighted =
     activeDockMode === "omni" || activeDockMode === "multi_ref";
-  const textDockLinks = useMemo(
-    () => sbv1TextLinksToDockUpstream(upstreamTextLinks),
-    [upstreamTextLinks],
-  );
+  const textDockLinks = useMemo(() => {
+    const base = sbv1TextLinksToDockUpstream(upstreamTextLinks);
+    const extra =
+      extraDockUpstreamLinks?.filter((l) => l.kind === "text") ?? [];
+    const seen = new Set<string>();
+    return [...extra, ...base].filter((l) => {
+      if (seen.has(l.id)) return false;
+      seen.add(l.id);
+      return true;
+    });
+  }, [upstreamTextLinks, extraDockUpstreamLinks]);
 
   useEffect(() => {
     if (
@@ -445,7 +457,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         <button
           type="button"
           disabled={!canSend}
-          title={isGenerating ? "生成中" : "生成视频"}
+          title={isGenerating ? "生成中" : sendTitle ?? "生成视频"}
           className="nodrag flex shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ width: sendBtnPx, height: sendBtnPx }}
           onClick={runWithCommittedPrompt}

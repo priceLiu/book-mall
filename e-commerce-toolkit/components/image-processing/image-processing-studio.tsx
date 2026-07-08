@@ -22,11 +22,13 @@ import { ImageAvatarPanel } from "@/components/image-processing/image-avatar-pan
 import { ImageCameraAnglePanel } from "@/components/image-processing/image-camera-angle-panel";
 import { ImageDeblurPanel } from "@/components/image-processing/image-deblur-panel";
 import { ImageGifPanel } from "@/components/image-processing/image-gif-panel";
+import { ImageGeneratorPanel } from "@/components/image-processing/image-generator-panel";
 import { ImageMemePanel } from "@/components/image-processing/image-meme-panel";
 import { ImageFaceSwapPanel } from "@/components/image-processing/image-face-swap-panel";
 import { ImageMultiUpload } from "@/components/image-processing/image-multi-upload";
 import { ImageObjectRemoverPanel } from "@/components/image-processing/image-object-remover-panel";
 import { ImagePosterPanel } from "@/components/image-processing/image-poster-panel";
+import { ImageRealisticPanel } from "@/components/image-processing/image-realistic-panel";
 import { ImageRestorePanel } from "@/components/image-processing/image-restore-panel";
 import {
   ImageMaskCanvas,
@@ -125,7 +127,7 @@ function ImageProcessingCtaButton({
   disabled,
   onClick,
   className,
-  variant = "green",
+  variant = "blue",
 }: {
   children: React.ReactNode;
   disabled?: boolean;
@@ -140,9 +142,9 @@ function ImageProcessingCtaButton({
       onClick={onClick}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        variant === "blue"
-          ? "bg-[#0071e3] hover:bg-[#0077ed]"
-          : "bg-emerald-600 hover:bg-emerald-700",
+        variant === "green"
+          ? "bg-emerald-600 hover:bg-emerald-700"
+          : "bg-[#0071e3] hover:bg-[#0066cc]",
         className,
       )}
     >
@@ -254,7 +256,7 @@ function HowToUse({ variant }: { variant: "retouch" | "editor" }) {
       <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {steps.map((s, i) => (
           <li key={s.title} className="flex gap-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-sm font-semibold text-white">
               {i + 1}
             </span>
             <div>
@@ -314,6 +316,12 @@ export function ImageProcessingStudio() {
   const [memeDefaultModel, setMemeDefaultModel] = useState("doubao-seedream-5-0-lite");
   const [avatarDefaultModel, setAvatarDefaultModel] = useState("doubao-seedream-5-0-lite");
   const [gifDefaultModel, setGifDefaultModel] = useState("doubao-seedream-5-0-lite");
+  const [realisticDefaultModel, setRealisticDefaultModel] = useState(
+    "doubao-seedream-5-0-lite",
+  );
+  const [imageGeneratorDefaultModel, setImageGeneratorDefaultModel] = useState(
+    "doubao-seedream-5-0-lite",
+  );
 
   const [outpaintModel, setOutpaintModel] = useState(OUTPAINT_MODEL_KEY);
   const [outpaintParams, setOutpaintParams] = useState<Record<string, unknown>>({
@@ -361,6 +369,10 @@ export function ImageProcessingStudio() {
                             ? "avatar"
                             : activeTag === "ai-gif-generator"
                               ? "gif"
+                              : activeTag === "ai-realistic-generator"
+                                ? "realistic"
+                                : activeTag === "ai-image-generator"
+                                  ? "image-generator"
             : "placeholder";
 
   useEffect(() => {
@@ -380,6 +392,12 @@ export function ImageProcessingStudio() {
         setMemeDefaultModel(data.defaults.meme || "doubao-seedream-5-0-lite");
         setAvatarDefaultModel(data.defaults.avatar || "doubao-seedream-5-0-lite");
         setGifDefaultModel(data.defaults.gif || "doubao-seedream-5-0-lite");
+        setRealisticDefaultModel(
+          data.defaults.realistic || "doubao-seedream-5-0-lite",
+        );
+        setImageGeneratorDefaultModel(
+          data.defaults.imageGenerator || "doubao-seedream-5-0-lite",
+        );
       })
       .catch((e) => {
         void showAlert({
@@ -1272,6 +1290,24 @@ export function ImageProcessingStudio() {
           ) : panel === "gif" ? (
             <ImageGifPanel
               defaultModel={gifDefaultModel}
+              submitting={submitting}
+              setSubmitting={setSubmitting}
+              onResults={setResults}
+              onError={(title, message) => void showAlert({ title, message, variant: "error" })}
+              CtaButton={ImageProcessingCtaButton}
+            />
+          ) : panel === "realistic" ? (
+            <ImageRealisticPanel
+              defaultModel={realisticDefaultModel}
+              submitting={submitting}
+              setSubmitting={setSubmitting}
+              onResults={setResults}
+              onError={(title, message) => void showAlert({ title, message, variant: "error" })}
+              CtaButton={ImageProcessingCtaButton}
+            />
+          ) : panel === "image-generator" ? (
+            <ImageGeneratorPanel
+              defaultModel={imageGeneratorDefaultModel}
               submitting={submitting}
               setSubmitting={setSubmitting}
               onResults={setResults}

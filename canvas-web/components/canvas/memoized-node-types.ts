@@ -24,12 +24,14 @@ import { StoryProSceneColumnNode } from "./nodes/story-pro-scene-column-node";
 import { StoryProScriptHubNode } from "./nodes/story-pro-script-hub-node";
 import { StoryPro2StarterNode } from "./pro2/story-pro2-starter-node";
 import { StoryPro2ImageNode } from "./pro2/story-pro2-image-node";
-import { StoryPro2PlaceholderMediaNode } from "./pro2/story-pro2-placeholder-media-node";
+import { StoryPro2AudioNode } from "./pro2/story-pro2-audio-node";
 import { StoryPro2ThreeViewNode } from "./pro2/story-pro2-three-view-node";
 import { StoryPro2StyleAssetNode } from "./pro2/story-pro2-style-asset-node";
 import { StoryPro2ScriptHubNode } from "./pro2/story-pro2-script-hub-node";
+import { StoryPro2PlaceholderMediaNode } from "./pro2/story-pro2-placeholder-media-node";
 import { StoryPro2CharacterBoardNode } from "./pro2/story-pro2-character-board-node";
 import { StoryPro2FrameBoardNode } from "./pro2/story-pro2-frame-board-node";
+import { StoryPro2VideoBoardNode } from "./pro2/story-pro2-video-board-node";
 import { JianyingExportPro2Node } from "./pro2/jianying-export-pro2-node";
 import { JianyingAutoRenderPro2Node } from "./pro2/jianying-auto-render-pro2-node";
 import {
@@ -82,10 +84,10 @@ export const memoizedNodeTypes = {
   "story-pro2-character": memoFlowNode(StoryPro2CharacterBoardNode),
   "story-pro2-scene": memoFlowNode(Pro2ColumnThinNode),
   "story-pro2-frame": memoFlowNode(StoryPro2FrameBoardNode),
-  "story-pro2-video": memoFlowNode(Pro2ColumnThinNode),
+  "story-pro2-video": memoFlowNode(StoryPro2VideoBoardNode),
   "story-pro2-prop": memoFlowNode(StoryPro2PlaceholderMediaNode),
   "story-pro2-mood": memoFlowNode(StoryPro2PlaceholderMediaNode),
-  "story-pro2-audio": memoFlowNode(StoryPro2PlaceholderMediaNode),
+  "story-pro2-audio": memoFlowNode(StoryPro2AudioNode),
   "jianying-export-pro2": memoFlowNode(JianyingExportPro2Node),
   "jianying-auto-render-pro2": memoFlowNode(JianyingAutoRenderPro2Node),
   "story-pro-starter": memoFlowNode(StoryProStarterNode),

@@ -7,7 +7,7 @@ import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable"
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
-import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   useLibtvFloatingDock,
@@ -43,7 +43,10 @@ import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { isLibtvMediaGenerating } from "@/components/canvas/libtv-media-generating-state";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
-import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
+import {
+  normalizeModelKey,
+  useModelCreditsPreview,
+} from "@/lib/canvas/use-model-credits-preview";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "./libtv-dock-send-button";
@@ -69,13 +72,11 @@ type DockImageNodeType =
   | "sbv1-image"
   | "story-pro2-image"
   | "story-pro2-prop"
-  | "story-pro2-mood"
-  | "story-pro2-audio";
+  | "story-pro2-mood";
 
 function placeholderDockLabel(type: string | undefined): string | undefined {
   if (type === "story-pro2-prop") return "描述道具外观与材质；输入 @ 引用风格或场景…";
   if (type === "story-pro2-mood") return "描述氛围、光线与情绪；输入 @ 引用风格…";
-  if (type === "story-pro2-audio") return "描述环境音效或 BGM 意向…";
   return undefined;
 }
 
@@ -141,7 +142,26 @@ export function LibtvImageInputDock() {
   const isPro2 = isLibtvPro2ImageDockNodeType(nodeType);
   const pro2Data = (storeNode?.data ?? {}) as StoryPro2ImageNodeData;
   const isPipelineCell = isLibtvPipelineImageCell(storeNode ?? undefined);
-  const showModelPicker = !isPipelineCell;
+  const isFramePipelineCell =
+    isPipelineCell && pro2Data.pro2MediaRole === "frame";
+  const showModelPicker = !isPipelineCell || isFramePipelineCell;
+
+  const framePipelineController = useMemo(() => {
+    if (!isFramePipelineCell || !pro2Data.pro2ControllerNodeId) return null;
+    return nodes.find((n) => n.id === pro2Data.pro2ControllerNodeId) ?? null;
+  }, [isFramePipelineCell, pro2Data.pro2ControllerNodeId, nodes]);
+
+  const frameBatchImage = (
+    framePipelineController?.data as
+      | {
+          batchImage?: {
+            providerId?: string;
+            modelKey?: string;
+            params?: Record<string, unknown>;
+          };
+        }
+      | undefined
+  )?.batchImage;
 
   const settingsData = (storeNode?.data ?? {}) as Sbv1ImageNodeData;
   const dockInput = settingsData.dockInput ?? "";
@@ -151,10 +171,22 @@ export function LibtvImageInputDock() {
     (storeNode?.data ?? {}) as { uploading?: boolean; runtime?: { status?: string } },
   );
 
-  const engine = settingsData.engine;
-  const modelKey = engine?.modelKey?.trim() ?? "";
+  const engine = isFramePipelineCell
+    ? frameBatchImage?.providerId && frameBatchImage?.modelKey
+      ? {
+          providerId: frameBatchImage.providerId,
+          modelKey: frameBatchImage.modelKey,
+          params: frameBatchImage.params,
+        }
+      : undefined
+    : settingsData.engine;
+  const modelKey = normalizeModelKey(engine?.modelKey);
   const outputCount = settingsData.outputCount ?? 1;
-  const settingsLabel = sbv1ImageSettingsTriggerLabel(settingsData, providers);
+  const settingsLabel = isFramePipelineCell
+    ? modelKey
+      ? modelKey
+      : "选择生图模型"
+    : sbv1ImageSettingsTriggerLabel(settingsData, providers);
   const estCredits = useModelCreditsPreview(
     modelKey,
     0,
@@ -177,6 +209,10 @@ export function LibtvImageInputDock() {
         ? pickDefaultPro2FrameImageEngine(providers)
         : pickDefaultSbv1ImageEngine(providers);
     if (!seed) return;
+    if (isFramePipelineCell && framePipelineController) {
+      updateNodeData(framePipelineController.id, { batchImage: seed });
+      return;
+    }
     updateNodeData(storeNode.id, { engine: seed });
   }, [
     storeNode,
@@ -186,6 +222,8 @@ export function LibtvImageInputDock() {
     updateNodeData,
     isFrameFreestanding,
     pro2Data.pro2MediaRole,
+    isFramePipelineCell,
+    framePipelineController,
   ]);
 
   const upstreamLinks = useMemo(() => {
@@ -278,7 +316,7 @@ export function LibtvImageInputDock() {
     const controllerId = pro2Data.pro2ControllerNodeId;
     const rowKey = pro2Data.pro2RowKey;
     if (!controllerId || !rowKey || pro2Data.pro2MediaRole !== "frame") return;
-    batchRunStoryRowsSequential(controllerId, [rowKey], "frameImage", {
+    batchRunStoryRows(controllerId, [rowKey], "frameImage", {
       forceFresh: true,
     });
   }, [storeNode, isPipelineCell, pro2Data]);
@@ -298,7 +336,7 @@ export function LibtvImageInputDock() {
         updateNodeData(storeNode.id, { engine: seed });
       }
     }
-    if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
+    if (!runEngine?.providerId?.trim() || !normalizeModelKey(runEngine?.modelKey)) {
       await alert({
         title: "请选择模型",
         message:
@@ -381,11 +419,12 @@ export function LibtvImageInputDock() {
     isPipelineCell &&
     Boolean(pro2Data.pro2ControllerNodeId && pro2Data.pro2RowKey) &&
     !isRunning &&
-    (Boolean(dockInput.trim()) || hasImage);
+    (Boolean(dockInput.trim()) || hasImage) &&
+    (isFramePipelineCell ? Boolean(engine?.providerId && modelKey) : true);
 
   const canSendFreestanding =
     showModelPicker &&
-    Boolean(engine?.providerId && engine?.modelKey) &&
+    Boolean(engine?.providerId && modelKey) &&
     !isRunning &&
     (Boolean(dockInput.trim()) ||
       hasImage ||
@@ -446,7 +485,7 @@ export function LibtvImageInputDock() {
         }
         footer={
           <LibtvImageDockFooter
-            isPipelineCell={isPipelineCell}
+            isPipelineCell={isPipelineCell && !isFramePipelineCell}
             isRunning={isRunning}
             settingsLabel={settingsLabel}
             estCredits={estCredits}
@@ -482,14 +521,40 @@ export function LibtvImageInputDock() {
         </Pro2DockPasteZone>
       </Pro2InputDockShell>
 
-      {!isPipelineCell ? (
+      {(showModelPicker || isFramePipelineCell) ? (
         <Sbv1ImageGenerateSettingsModal
           open={settingsOpen}
-          data={settingsData}
+          data={
+            isFramePipelineCell
+              ? ({
+                  ...settingsData,
+                  engine: engine ?? settingsData.engine,
+                } as Sbv1ImageNodeData)
+              : settingsData
+          }
           allowedModelKeys={imageModelKeys}
           onClose={() => setSettingsOpen(false)}
           onConfirm={(patch) => {
             if (!storeNode) return;
+            if (isFramePipelineCell && framePipelineController) {
+              const nextEngine = (
+                patch as { engine?: typeof engine }
+              ).engine;
+              if (nextEngine?.providerId && nextEngine.modelKey) {
+                updateNodeData(framePipelineController.id, {
+                  batchImage: {
+                    providerId: nextEngine.providerId,
+                    modelKey: nextEngine.modelKey,
+                    params: nextEngine.params ?? {
+                      aspect_ratio: "16:9",
+                      resolution: "2K",
+                      output_format: "png",
+                    },
+                  },
+                });
+              }
+              return;
+            }
             updateNodeData(storeNode.id, patch);
           }}
         />

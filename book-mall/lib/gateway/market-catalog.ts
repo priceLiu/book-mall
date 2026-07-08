@@ -6,7 +6,12 @@ import type { ModelMediaKind } from "@prisma/client";
 import marketPresentation from "@/config/gateway-market-presentation.json";
 import { listGatewayCredentials } from "@/lib/gateway/credential-service";
 import {
-  dedupeByCanonical,
+  gatewayRouteDisplayName,
+  marketTaskTagsForModel,
+  type MarketTaskTag,
+} from "@/lib/gateway/gateway-model-capabilities";
+import {
+  dedupeByModelKey,
   listActiveRoutes,
   type RegistryModelRow,
 } from "@/lib/gateway/model-registry";
@@ -15,14 +20,7 @@ import { PLATFORM_MEDIA_KIND_LABEL, canonicalByKey } from "@/lib/platform-model/
 import { showcaseCoverUrlFor } from "@/lib/gateway/market-showcase-covers";
 import { prisma } from "@/lib/prisma";
 
-export type MarketTaskTag =
-  | "text-to-image"
-  | "image-to-image"
-  | "image-to-video"
-  | "video-to-video"
-  | "motion-control"
-  | "video-upscale"
-  | "chat";
+export type { MarketTaskTag } from "@/lib/gateway/gateway-model-capabilities";
 
 export type MarketModelCard = {
   canonicalKey: string;
@@ -79,55 +77,7 @@ const HIDDEN_PLATFORM_LABELS = new Set([
   "volcengine gateway",
 ]);
 
-export function marketTaskTagsForModel(input: {
-  canonicalKey: string;
-  mediaKind: ModelMediaKind | null;
-  requestKind: string;
-  role: string;
-  modelKey: string;
-}): MarketTaskTag[] {
-  const preset = PRESENTATION.models?.[input.canonicalKey]?.taskTags;
-  if (preset?.length) {
-    return preset.map(normalizeTaskTag).filter(Boolean) as MarketTaskTag[];
-  }
-  const k = input.modelKey.toLowerCase();
-  if (input.requestKind === "CHAT" || input.role === "LLM") return ["chat"];
-  if (k.includes("motion-control")) return ["motion-control"];
-  if (k.includes("topaz") || k.includes("upscale")) return ["video-upscale"];
-  if (input.mediaKind === "VIDEO_TO_VIDEO" || k.includes("video-to-video")) {
-    return ["video-to-video"];
-  }
-  if (input.mediaKind === "IMAGE_TO_VIDEO" || k.includes("i2v") || k.includes("image-to-video")) {
-    return ["image-to-video"];
-  }
-  if (input.mediaKind === "TEXT_TO_IMAGE") {
-    const tags: MarketTaskTag[] = ["text-to-image"];
-    if (
-      k.includes("gpt-image") ||
-      k.includes("flux") ||
-      k.includes("seedream") ||
-      k.includes("nano")
-    ) {
-      tags.push("image-to-image");
-    }
-    return tags;
-  }
-  return [];
-}
-
-function normalizeTaskTag(raw: string): MarketTaskTag | null {
-  const s = raw.trim().toLowerCase().replace(/\s+/g, "-");
-  const map: Record<string, MarketTaskTag> = {
-    "text-to-image": "text-to-image",
-    "image-to-image": "image-to-image",
-    "image-to-video": "image-to-video",
-    "video-to-video": "video-to-video",
-    "motion-control": "motion-control",
-    "video-upscale": "video-upscale",
-    chat: "chat",
-  };
-  return map[s] ?? null;
-}
+export { marketTaskTagsForModel } from "@/lib/gateway/gateway-model-capabilities";
 
 function resolveOfferingCredits(
   canonicalModelKey: string,
@@ -236,14 +186,18 @@ export async function listMarketModelsForGatewayUser(input: {
     const routes = await listActiveRoutes();
     const seen = new Set<string>();
     for (const { route, catalog } of routes) {
-      if (seen.has(catalog.canonicalKey)) continue;
+      const dedupeKey = `${route.providerKind}:${route.modelKey}`;
+      if (seen.has(dedupeKey)) continue;
       if (!isGatewayProviderBound(boundKinds, route.providerKind)) continue;
-      seen.add(catalog.canonicalKey);
+      seen.add(dedupeKey);
       const def = canonicalByKey(catalog.canonicalKey);
       rows.push({
         canonicalModelKey: catalog.canonicalKey,
         modelKey: route.modelKey,
-        displayName: catalog.displayName,
+        displayName: gatewayRouteDisplayName(
+          { displayName: catalog.displayName, canonicalKey: catalog.canonicalKey },
+          route.modelKey,
+        ),
         description: def?.description ?? "",
         role: catalog.role ?? "LLM",
         requestKind: catalog.requestKind ?? "OTHER",
@@ -303,7 +257,9 @@ export async function listMarketModelsForGatewayUser(input: {
     }
   }
 
-  const deduped = dedupeByCanonical(rows);
+  const deduped = dedupeByModelKey(
+    rows.map((r) => ({ ...r, modelKey: r.modelKey })),
+  );
   const cards: MarketModelCard[] = deduped.map((r) => {
     const taskTags = marketTaskTagsForModel({
       canonicalKey: r.canonicalModelKey,

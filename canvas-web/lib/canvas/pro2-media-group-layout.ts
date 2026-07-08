@@ -17,7 +17,7 @@ import { sortNodesForReactFlow } from "./normalize-graph-nodes";
 import type { CanvasFlowNode } from "./types";
 
 export const PRO2_MEDIA_GRID_GAP = 28;
-export const PRO2_MEDIA_GROUP_HEADER = 40;
+export const PRO2_MEDIA_GROUP_HEADER = 48;
 /** 组内边距（大留白：空白区即「选中组」可点区域） */
 export const PRO2_MEDIA_GROUP_PAD = 64;
 /** 组右 / 下额外空白，进一步扩大可点选组区域（复刻图 2） */
@@ -61,7 +61,8 @@ export function pro2MediaChildSize(node: {
     return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
   }
   if (node.pro2MediaRole === "video") {
-    return { width: PRO2_VIDEO_CELL_WIDTH, height: PRO2_VIDEO_CELL_HEIGHT };
+    // 分镜视频组 · 与分镜图组同宫格尺寸（图 3/4）
+    return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
   }
   return { width: PRO2_IMAGE_NODE_WIDTH, height: PRO2_IMAGE_NODE_HEIGHT };
 }
@@ -230,7 +231,7 @@ export function pro2MediaGroupDimensions(
   return { width, height };
 }
 
-/** 媒体组锚点：脚本节点右侧 */
+/** 媒体组锚点：脚本节点右侧（已有同 hub 组时纵向错开，避免叠在一起） */
 export function pro2MediaGroupOrigin(
   nodes: CanvasFlowNode[],
   hubNodeId: string,
@@ -239,10 +240,26 @@ export function pro2MediaGroupOrigin(
   if (!hub) return { x: 240, y: 160 };
   const hubW = hub.width ?? PRO2_SCRIPT_NODE_WIDTH;
   const gap = 56;
-  return {
+  const base = {
     x: (hub.position?.x ?? 0) + hubW + gap,
     y: hub.position?.y ?? 160,
   };
+  const siblings = nodes.filter(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === hubNodeId,
+  );
+  if (!siblings.length) return base;
+  let maxBottom = base.y;
+  for (const g of siblings) {
+    const h =
+      (typeof g.height === "number" ? g.height : undefined) ??
+      (g.style as { height?: number } | undefined)?.height ??
+      320;
+    const bottom = (g.position?.y ?? base.y) + h + 48;
+    maxBottom = Math.max(maxBottom, bottom);
+  }
+  return { x: base.x, y: maxBottom };
 }
 
 function sortMediaChildren(children: CanvasFlowNode[]): CanvasFlowNode[] {
@@ -251,7 +268,10 @@ function sortMediaChildren(children: CanvasFlowNode[]): CanvasFlowNode[] {
     const bf = (b.data as { pro2MediaRole?: string }).pro2MediaRole;
     const aLabel = (a.data as { label?: string }).label ?? "";
     const bLabel = (b.data as { label?: string }).label ?? "";
-    if (af === "frame" && bf === "frame") {
+    if (
+      (af === "frame" || af === "video") &&
+      (bf === "frame" || bf === "video")
+    ) {
       const ai = Number.parseInt(aLabel.replace(/\D/g, ""), 10) || 0;
       const bi = Number.parseInt(bLabel.replace(/\D/g, ""), 10) || 0;
       return ai - bi;
@@ -272,6 +292,13 @@ function isMediaGroupChildForRelayout(
   n: CanvasFlowNode,
   group: CanvasFlowNode,
 ): boolean {
+  const kind = (group.data as { pro2Kind?: string }).pro2Kind;
+  if (kind === "video-board" && n.type === "sbv1-video-engine") {
+    return (
+      (n.data as { pro2MediaRole?: string }).pro2MediaRole === "video" ||
+      n.parentId === group.id
+    );
+  }
   if (!isPro2MediaGroupChild(n)) return false;
   if (n.type === "sbv1-image") {
     return Boolean((group.data as { sbv1Styled?: boolean }).sbv1Styled);
@@ -280,7 +307,7 @@ function isMediaGroupChildForRelayout(
 }
 
 /** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 4;
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 5;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(

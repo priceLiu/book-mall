@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LayoutGrid, X } from "lucide-react";
 import {
@@ -67,8 +67,15 @@ export function Pro2FrameGeneratePicker({
     setMounted(true);
   }, []);
 
+  const openInitRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      openInitRef.current = false;
+      return;
+    }
+    if (openInitRef.current) return;
+    openInitRef.current = true;
     setSelected(new Set(sorted.map((r) => r.frameIndex)));
     const seed =
       initialBatchImage ??
@@ -80,6 +87,18 @@ export function Pro2FrameGeneratePicker({
       setParams(seed.params ?? {});
     }
   }, [open, sorted, initialBatchImage, providers]);
+
+  useEffect(() => {
+    if (!open || providerId.trim()) return;
+    const seed =
+      initialBatchImage ??
+      pickDefaultPro2FrameImageEngine(providers) ??
+      null;
+    if (!seed) return;
+    setProviderId(seed.providerId);
+    setModelKey(seed.modelKey);
+    setParams(seed.params ?? {});
+  }, [open, initialBatchImage, providers, providerId]);
 
   useEffect(() => {
     if (!open) return;

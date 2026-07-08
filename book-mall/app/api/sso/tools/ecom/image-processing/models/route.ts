@@ -73,6 +73,8 @@ export async function GET(req: Request) {
       meme: "doubao-seedream-5-0-lite",
       avatar: "doubao-seedream-5-0-lite",
       gif: "doubao-seedream-5-0-lite",
+      realistic: "doubao-seedream-5-0-lite",
+      imageGenerator: "doubao-seedream-5-0-lite",
     },
     modelGroups: {
       retouch: ["qwen-image-edit", "qwen-image-edit-max", ECOM_WANX_PAINTING_MODEL_KEY],
@@ -110,6 +112,16 @@ export async function GET(req: Request) {
       meme: ["doubao-seedream-5-0-lite", "lib-nano-pro"],
       avatar: ["doubao-seedream-5-0-lite", "lib-nano-pro"],
       gif: ["doubao-seedream-5-0-lite", "lib-nano-pro"],
+      realistic: [
+        "doubao-seedream-5-0-lite",
+        "lib-nano-pro",
+        "google/nano-banana",
+      ],
+      imageGenerator: [
+        "doubao-seedream-5-0-lite",
+        "lib-nano-pro",
+        "google/nano-banana",
+      ],
     },
   });
 }

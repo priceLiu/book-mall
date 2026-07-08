@@ -214,7 +214,12 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const marqueeSelecting = useCanvasMarqueeSelecting();
   const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
-  const showToolbar = Boolean(soleSelected && hasPreviewContent && !isGenerating);
+  const scriptTableEditorOpen = useCanvasStore(
+    (s) => s.pro2ScriptTableEditorNodeId === id,
+  );
+  const showToolbar = Boolean(
+    soleSelected && hasPreviewContent && !isGenerating && !scriptTableEditorOpen,
+  );
   const showThinTitle = displayState !== "generated" || isGenerating;
   const previewTitle =
     displayState === "generated" && !isGenerating ? tableTitle : undefined;

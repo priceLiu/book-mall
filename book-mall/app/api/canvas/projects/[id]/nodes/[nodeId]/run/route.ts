@@ -37,6 +37,7 @@ import {
   runStoryProScriptHubSection,
   runStoryProStarterThemeOutline,
   runStoryProStarterGeneralText,
+  runStoryProStarterTextToMusic,
   runStoryProStyleDraft,
   runStoryProTtsRow,
   runStoryProVideoRow,
@@ -49,6 +50,7 @@ import {
 } from "@/lib/canvas/canvas-story-edition";
 import { runSbv1ImageNode } from "@/lib/canvas/sbv1-image-runner";
 import { runSbv1VideoEngineNode } from "@/lib/canvas/sbv1-video-engine-runner";
+import { runPro2AudioNode } from "@/lib/canvas/pro2-audio-runner";
 import { storyProStyleGateError } from "@/lib/canvas/story-pro-style-anchor";
 import { resolveCharacterRowAssetRefUrls } from "@/lib/canvas/story-pro-character-ref-resolve";
 import { assertStoryProRunModelCapabilities } from "@/lib/canvas/story-pro-run-guards";
@@ -98,6 +100,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "sceneRef"
     | "themeOutline"
     | "generalText"
+    | "music"
     | undefined;
   const storyScope =
     rowKey || mediaKind || llmSection
@@ -213,12 +216,19 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       mediaKind === "generalText"
     ) {
       result = await runStoryProStarterGeneralText({ ...baseArgs, forceFresh });
+    } else if (
+      runnerType === "story-pro-starter" &&
+      mediaKind === "music"
+    ) {
+      result = await runStoryProStarterTextToMusic({ ...baseArgs, forceFresh });
     } else if (runnerType === "story-pro-script-hub" && llmSection) {
       result = await runStoryProScriptHubSection({
         ...baseArgs,
         forceFresh,
         llmSection: llmSection as StoryProLlmSection,
       });
+    } else if (node.type === "story-pro2-audio") {
+      result = await runPro2AudioNode({ ...baseArgs, forceFresh });
     } else if (runnerType === "story-pro-style") {
       result = await runStoryProStyleDraft({ ...baseArgs, forceFresh });
     } else if (

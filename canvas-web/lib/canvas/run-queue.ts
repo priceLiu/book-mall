@@ -77,6 +77,11 @@ import {
   isSameSbv1MediaDataPatch,
 } from "./sbv1-image-task-apply";
 import {
+  libtvAudioPatchFromTask,
+  isSameLibtvAudioDataPatch,
+  type LibtvAudioNodeData,
+} from "./libtv-audio-task-apply";
+import {
   commitLibtvMediaRunPendingPatch,
   isLibtvFreestandingImageNode,
   resolveLibtvImageEngineFromNodeData,
@@ -299,6 +304,9 @@ function promptForDockMentionFilter(
   ) {
     return String(d.dockInput ?? "");
   }
+  if (node.type === "story-pro2-audio") {
+    return String(d.dockInput ?? "");
+  }
   if (rowKey && isStoryWorkspaceNodeType(node.type ?? "")) {
     const rows = (d.rows as { key?: string; prompt?: string }[] | undefined) ?? [];
     const row = rows.find((r) => r.key === rowKey);
@@ -462,6 +470,44 @@ function propagateAiOutputToDownstreamText(
   propagateTextOutputToDownstream(nodeId, textOutput, setNodeRuntime);
 }
 
+function applyLibtvAudioTaskResult(
+  node: CanvasFlowNode,
+  task: CanvasTaskRecord,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): boolean {
+  if (node.type !== "story-pro2-audio") return false;
+  const patch = libtvAudioPatchFromTask(
+    (node.data ?? {}) as LibtvAudioNodeData,
+    task,
+  );
+  if (!patch) return false;
+  if (isSameLibtvAudioDataPatch(node.data as Record<string, unknown>, patch)) {
+    return true;
+  }
+  updateNodeData(node.id, patch);
+  return true;
+}
+
+function propagateMusicResultToDownstreamAudio(
+  sourceNodeId: string,
+  task: CanvasTaskRecord,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const mediaUrl = pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined;
+  if (!mediaUrl) return;
+  const { nodes, edges } = useCanvasStore.getState();
+  for (const e of edges) {
+    if (e.source !== sourceNodeId) continue;
+    const tgt = nodes.find((n) => n.id === e.target);
+    if (!tgt || tgt.type !== "story-pro2-audio") continue;
+    const patch = libtvAudioPatchFromTask(
+      (tgt.data ?? {}) as LibtvAudioNodeData,
+      { ...task, status: "SUCCEEDED", ossUrl: mediaUrl },
+    );
+    if (patch) updateNodeData(tgt.id, patch);
+  }
+}
+
 function applySbv1ImageTaskResult(
   node: CanvasFlowNode,
   task: CanvasTaskRecord,
@@ -503,7 +549,7 @@ function applyLibtvMediaRunFailure(
 ): boolean {
   if (!node) return false;
   clearCanvasNodeRunSession(node.id);
-  if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine") {
+  if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine" || node.type === "story-pro2-audio") {
     updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
     return true;
   }
@@ -1001,7 +1047,26 @@ export function useCanvasRunner(
           r.task.status === "SUCCEEDED" &&
           (r.task.textOutput || pickTaskResultMediaUrl(r.task))
         ) {
-          if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+          if (
+            nodeNow.type === "story-pro2-starter" &&
+            job.mediaKind === "music"
+          ) {
+            propagateMusicResultToDownstreamAudio(
+              nodeId,
+              r.task,
+              updateNodeData,
+            );
+            updateNodeData(nodeId, {
+              themeOutlineRuntime: {
+                status: "done",
+                taskId: r.task.id,
+                failCode: undefined,
+                failMessage: undefined,
+              },
+            });
+          } else if (applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)) {
+            /* audio node */
+          } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
             storyApplyTaskResult(
               nodeNow,
               r.task,
@@ -1011,7 +1076,8 @@ export function useCanvasRunner(
             );
           } else if (
             applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
-            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData)
+            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
+            applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
           ) {
             /* ossUrl + runtime */
           } else {
@@ -1037,7 +1103,25 @@ export function useCanvasRunner(
           }
           maybeNotifyCanvasCreditsSettled(r.task);
         } else if (r.task.status === "FAILED") {
-          if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+          if (
+            nodeNow.type === "story-pro2-starter" &&
+            job.mediaKind === "music"
+          ) {
+            updateNodeData(nodeId, {
+              themeOutlineRuntime: {
+                status: "error",
+                taskId: r.task.id,
+                failCode: r.task.failCode ?? "FAILED",
+                failMessage: formatCanvasTaskError(
+                  r.task.failCode,
+                  r.task.failMessage,
+                  r.task.model,
+                ),
+              },
+            });
+          } else if (applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)) {
+            /* audio node */
+          } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
             storyApplyTaskResult(
               nodeNow,
               r.task,
@@ -1047,7 +1131,8 @@ export function useCanvasRunner(
             );
           } else if (
             applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
-            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData)
+            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
+            applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
           ) {
             /* ossUrl + runtime */
           } else {
@@ -1077,7 +1162,8 @@ export function useCanvasRunner(
           );
         } else if (
           applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
-          applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData)
+          applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
+          applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
         ) {
           /* pending / running */
         } else {
@@ -1134,7 +1220,44 @@ export function useCanvasRunner(
                 useCanvasStore.getState().nodes.find((n) => n.id === nodeId) ??
                 errNode;
               if (!nodeNow) return;
-              if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+              if (
+                nodeNow.type === "story-pro2-starter" &&
+                job.mediaKind === "music" &&
+                pick.status === "SUCCEEDED"
+              ) {
+                propagateMusicResultToDownstreamAudio(
+                  nodeId,
+                  pick,
+                  updateNodeData,
+                );
+                updateNodeData(nodeId, {
+                  themeOutlineRuntime: {
+                    status: "done",
+                    taskId: pick.id,
+                    failCode: undefined,
+                    failMessage: undefined,
+                  },
+                });
+              } else if (
+                nodeNow.type === "story-pro2-starter" &&
+                job.mediaKind === "music" &&
+                pick.status === "FAILED"
+              ) {
+                updateNodeData(nodeId, {
+                  themeOutlineRuntime: {
+                    status: "error",
+                    taskId: pick.id,
+                    failCode: pick.failCode ?? "FAILED",
+                    failMessage: formatCanvasTaskError(
+                      pick.failCode,
+                      pick.failMessage,
+                      pick.model,
+                    ),
+                  },
+                });
+              } else if (applyLibtvAudioTaskResult(nodeNow, pick, updateNodeData)) {
+                /* audio node */
+              } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
                 storyApplyTaskResult(
                   nodeNow,
                   pick,
@@ -1144,7 +1267,8 @@ export function useCanvasRunner(
                 );
               } else if (
                 applySbv1ImageTaskResult(nodeNow, pick, updateNodeData) ||
-                applySbv1VideoTaskResult(nodeNow, pick, updateNodeData)
+                applySbv1VideoTaskResult(nodeNow, pick, updateNodeData) ||
+                applyLibtvAudioTaskResult(nodeNow, pick, updateNodeData)
               ) {
                 /* ossUrl + runtime */
               } else if (
@@ -1313,6 +1437,12 @@ export function useCanvasRunner(
       const node = useCanvasStore
         .getState()
         .nodes.find((n) => n.id === job.nodeId);
+      const outlineRt =
+        node?.type === "story-pro2-starter" || node?.type === "story-pro-starter"
+          ? (node.data as { themeOutlineRuntime?: CanvasNodeRuntime })
+              .themeOutlineRuntime
+          : undefined;
+      if (outlineRt?.taskId?.trim()) return false;
       const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
         ?.runtime;
       if (rt?.taskId?.trim()) return false;

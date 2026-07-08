@@ -5,6 +5,7 @@ import { useNodes } from "@xyflow/react";
 import { resolveLibtvFloatingDockSelection } from "./libtv-floating-dock-selection";
 import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 import { useCanvasStore } from "./store";
+import { libtvDetailEditorOpenForNode } from "./libtv-detail-editor-open";
 import {
   useLibtvDockFlowPlacement,
   useStableLibtvDockFlowPlacement,
@@ -33,6 +34,8 @@ export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
 
   // RF 已无选中时 Dock 必须收起；勿回退 pin（否则点空白常需两次才关）
   if (!rfGlobal) return null;
+
+  if (libtvDetailEditorOpenForNode(rfGlobal.nodeId)) return null;
 
   if (rfGlobal.nodeType !== nodeType) return null;
   return rfGlobal.nodeId;

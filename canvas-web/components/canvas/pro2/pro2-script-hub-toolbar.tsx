@@ -50,6 +50,7 @@ import {
 import {
   resolvePro2FrameBatchImageForHub,
 } from "@/lib/canvas/pro2-frame-batch-image";
+import { hubHasPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import {
   Pro2CharacterThreeViewPicker,
   type Pro2CharacterThreeViewResult,
@@ -123,6 +124,9 @@ export function Pro2ScriptHubToolbar({
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [framePickerOpen, setFramePickerOpen] = useState(false);
+  const [framePickerMode, setFramePickerMode] = useState<
+    "first" | "regenerate" | "spawnNew"
+  >("first");
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? "";
@@ -161,7 +165,18 @@ export function Pro2ScriptHubToolbar({
     [hubId, nodes, edges],
   );
 
+  const hasFrameBoardGroup = useMemo(
+    () => hubHasPro2FrameBoardGroup(hubId, nodes),
+    [hubId, nodes],
+  );
+
   const runFrameGenerate = (result: Pro2FrameGenerateResult) => {
+    const kickoffOptions =
+      framePickerMode === "spawnNew"
+        ? { spawnNewGroup: true as const }
+        : framePickerMode === "regenerate"
+          ? { forceFresh: true as const }
+          : undefined;
     generatePro2FrameBoardFromHub(
       hubId,
       hubData,
@@ -171,7 +186,9 @@ export function Pro2ScriptHubToolbar({
       pro2HubBatchStore,
       result.frameIndices,
       result.batchImage,
+      kickoffOptions,
     );
+    setFramePickerMode("first");
   };
 
   const runThreeViewGenerate = (result: Pro2CharacterThreeViewResult) => {
@@ -225,16 +242,18 @@ export function Pro2ScriptHubToolbar({
     );
   };
 
-  const onGenerateFrames = async () => {
+  const onGenerateFrames = async (mode: "first" | "regenerate" | "spawnNew") => {
     if (isGenerating) return;
     if (!hasTable) {
       await alert({
         title: "请先生成分镜脚本",
-        message: "在底部输入坞发送生成专业版分镜脚本后，再点击「生成分镜」。",
+        message:
+          "在底部输入坞发送生成专业版分镜脚本后，再点击「生成分镜组」。",
         variant: "warning",
       });
       return;
     }
+    setFramePickerMode(mode);
     setFramePickerOpen(true);
   };
 
@@ -393,15 +412,33 @@ export function Pro2ScriptHubToolbar({
           <MapPin className="size-3.5" />
           <span>生成场景图</span>
         </button>
+        {hasFrameBoardGroup ? (
+          <button
+            type="button"
+            className={TOOL_BTN}
+            disabled={isGenerating || !hasTable}
+            title="选择镜号并重新生成当前分镜组（覆盖已有分镜图）"
+            onClick={() => void onGenerateFrames("regenerate")}
+          >
+            <RotateCw className="size-3.5" />
+            <span>重新生成分镜组</span>
+          </button>
+        ) : null}
         <button
           type="button"
           className={TOOL_BTN}
           disabled={isGenerating || !hasTable}
-          title="选择镜号并生成分镜图（自动关联角色三视图与场景图）"
-          onClick={() => void onGenerateFrames()}
+          title={
+            hasFrameBoardGroup
+              ? "选择镜号并新增一个分镜组（保留已有分镜组）"
+              : "选择镜号并生成分镜图（自动关联角色三视图与场景图）"
+          }
+          onClick={() =>
+            void onGenerateFrames(hasFrameBoardGroup ? "spawnNew" : "first")
+          }
         >
           <LayoutGrid className="size-3.5" />
-          <span>生成分镜</span>
+          <span>生成分镜组</span>
         </button>
         <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
         <button
@@ -464,7 +501,10 @@ export function Pro2ScriptHubToolbar({
         open={framePickerOpen}
         rows={storyboardRows}
         initialBatchImage={initialFrameBatchImage}
-        onClose={() => setFramePickerOpen(false)}
+        onClose={() => {
+          setFramePickerOpen(false);
+          setFramePickerMode("first");
+        }}
         onConfirm={runFrameGenerate}
       />
 

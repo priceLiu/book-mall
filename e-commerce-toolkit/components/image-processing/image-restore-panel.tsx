@@ -20,6 +20,7 @@ import {
   RESTORE_REPAIR_OPTIONS,
   RESTORE_UPSCALE_OPTIONS,
 } from "@/lib/image-processing-presets";
+import { ipStepNumberClass } from "@/lib/image-processing-theme";
 import { cn } from "@/lib/utils";
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -266,7 +267,7 @@ export function ImageRestorePanel({
             { title: "下载结果", desc: "修复完成后保存到资产库。" },
           ].map((s, i) => (
             <li key={s.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
+              <span className={ipStepNumberClass}>
                 {i + 1}
               </span>
               <div>

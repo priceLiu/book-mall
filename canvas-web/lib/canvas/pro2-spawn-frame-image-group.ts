@@ -11,6 +11,7 @@ import {
 } from "./pro2-media-group-layout";
 import { ensurePro2HubToMediaGroupEdge } from "./pro2-hub-media-group-edge";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import { isPro2FrameBoardGroup } from "./pro2-resolve-frame-board-group";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 
@@ -18,25 +19,52 @@ function frameRowPreview(row: StoryProFrameRow): {
   ossUrl?: string;
   uploading?: boolean;
   uploadError?: string;
+  runtime?: StoryProFrameRow["runtime"];
 } {
   const rt = row.runtime;
-  const url =
-    pickRuntimeImagePreviewUrl(rt, undefined) ||
-    rt?.ossUrl ||
-    rt?.ephemeralUrl;
-  const uploading =
-    rt?.status === "running" || rt?.status === "pending";
+  const inflight = rt?.status === "running" || rt?.status === "pending";
+  const url = inflight
+    ? undefined
+    : pickRuntimeImagePreviewUrl(rt, undefined) ||
+      rt?.ossUrl ||
+      rt?.ephemeralUrl;
   return {
     ossUrl: url,
-    uploading,
-    uploadError: rt?.failMessage,
+    uploading: inflight,
+    uploadError: rt?.status === "error" ? rt?.failMessage : undefined,
+    runtime: inflight ? rt : undefined,
   };
 }
 
-function groupLabel(hubNodeId: string, nodes: CanvasFlowNode[]): string {
+function groupLabel(
+  hubNodeId: string,
+  nodes: CanvasFlowNode[],
+  spawnNewGroup?: boolean,
+): string {
   const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");
   const idx = hubs.findIndex((h) => h.id === hubNodeId);
-  return `分镜图 · 脚本 ${idx >= 0 ? idx + 1 : 1}`;
+  const base = `分镜图 · 脚本 ${idx >= 0 ? idx + 1 : 1}`;
+  if (!spawnNewGroup) return base;
+  const existing = nodes.filter(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === hubNodeId &&
+      isPro2FrameBoardGroup(n, nodes),
+  ).length;
+  return existing > 0 ? `${base} (${existing + 1})` : base;
+}
+
+function resolveFrameSyncGroupId(
+  nodes: CanvasFlowNode[],
+  frameColumnId: string,
+): string | undefined {
+  const frameNode = nodes.find((n) => n.id === frameColumnId);
+  if (!frameNode) return undefined;
+  const d = frameNode.data as {
+    pro2PendingSyncGroupId?: string;
+    pro2VisualGroupId?: string;
+  };
+  return d.pro2PendingSyncGroupId?.trim() || d.pro2VisualGroupId?.trim() || undefined;
 }
 
 export type EnsurePro2FrameImageGroupArgs = {
@@ -62,6 +90,8 @@ export type EnsurePro2FrameImageGroupArgs = {
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
   setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
   setEdges?: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  /** 已有分镜组时追加新组（不覆盖主组） */
+  spawnNewGroup?: boolean;
 };
 
 /** 为分镜列生成/更新「组 + N 个图片子节点」视觉层 */
@@ -71,12 +101,16 @@ export function ensurePro2FrameImageGroup(
   const frameNode = args.nodes.find((n) => n.id === args.frameColumnId);
   if (!frameNode) return null;
 
-  const existingGroup = args.nodes.find(
-    (n) =>
-      n.type === "group" &&
-      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
-        args.frameColumnId,
-  );
+  const spawnNew = Boolean(args.spawnNewGroup);
+
+  const existingGroup = spawnNew
+    ? undefined
+    : args.nodes.find(
+        (n) =>
+          n.type === "group" &&
+          (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+            args.frameColumnId,
+      );
 
   const sorted = [...args.rows].sort((a, b) => a.frameIndex - b.frameIndex);
   if (!sorted.length) {
@@ -93,12 +127,14 @@ export function ensurePro2FrameImageGroup(
   const origin = pro2MediaGroupOrigin(args.nodes, args.hubNodeId);
   let groupId = existingGroup?.id;
 
-  const childImages = args.nodes.filter(
-    (n) =>
-      n.type === "story-pro2-image" &&
-      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
-        args.frameColumnId,
-  );
+  const childImages = spawnNew
+    ? []
+    : args.nodes.filter(
+        (n) =>
+          n.type === "story-pro2-image" &&
+          (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+            args.frameColumnId,
+      );
 
   const newChildIds: string[] = [];
   const frameCell = pro2MediaChildSize({ pro2MediaRole: "frame" });
@@ -106,7 +142,7 @@ export function ensurePro2FrameImageGroup(
 
   for (let i = 0; i < sorted.length; i++) {
     const row = sorted[i]!;
-    const preview = frameRowPreview(row);
+    const preview = spawnNew ? {} : frameRowPreview(row);
     const label = `镜 ${row.frameIndex}`;
     const existing = childImages.find(
       (n) => (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,
@@ -156,7 +192,7 @@ export function ensurePro2FrameImageGroup(
   if (!groupId) {
     groupId =
       args.createGroupContaining(newChildIds, {
-        label: groupLabel(args.hubNodeId, args.nodes),
+        label: groupLabel(args.hubNodeId, args.nodes, spawnNew),
         color: GROUP_COLOR_PRESETS[1],
       }) ?? undefined;
     if (groupId) {
@@ -171,10 +207,15 @@ export function ensurePro2FrameImageGroup(
     }
   }
 
-  args.updateNodeData(args.frameColumnId, {
-    pro2VisualGroupId: groupId,
+  const framePatch: Record<string, unknown> = {
     hubNodeId: args.hubNodeId,
-  });
+  };
+  if (spawnNew && groupId) {
+    framePatch.pro2PendingSyncGroupId = groupId;
+  } else if (groupId) {
+    framePatch.pro2VisualGroupId = groupId;
+  }
+  args.updateNodeData(args.frameColumnId, framePatch);
 
   if (groupId) {
     relayoutPro2MediaGroup(args.setNodes, groupId, { resetOrigin: true });
@@ -193,14 +234,20 @@ export function syncPro2FrameImagesFromRows(
   rows: StoryProFrameRow[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): void {
+  const syncGroupId = resolveFrameSyncGroupId(nodes, frameColumnId);
   for (const row of rows) {
-    const img = nodes.find(
-      (n) =>
-        n.type === "story-pro2-image" &&
-        (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
-          frameColumnId &&
-        (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,
-    );
+    const img = nodes.find((n) => {
+      if (n.type !== "story-pro2-image") return false;
+      const d = n.data as {
+        pro2ControllerNodeId?: string;
+        pro2RowKey?: string;
+        pro2GroupId?: string;
+      };
+      if (d.pro2ControllerNodeId !== frameColumnId) return false;
+      if (d.pro2RowKey !== row.key) return false;
+      if (!syncGroupId) return true;
+      return d.pro2GroupId === syncGroupId;
+    });
     if (!img) continue;
     const preview = frameRowPreview(row);
     updateNodeData(img.id, {

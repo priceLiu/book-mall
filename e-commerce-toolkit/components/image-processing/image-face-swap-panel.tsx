@@ -219,7 +219,7 @@ export function ImageFaceSwapPanel({
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium",
                   blendMode === o.id
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                    ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
                     : "border-[#e5e5ea] text-[#1d1d1f]",
                 )}
               >

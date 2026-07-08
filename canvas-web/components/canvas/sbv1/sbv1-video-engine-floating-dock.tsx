@@ -4,9 +4,12 @@ import { memo, useCallback, useMemo } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
+import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { resolvePro2VideoBoardCellDockLinks } from "@/lib/canvas/pro2-video-board-dock-links";
 import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
+import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import {
@@ -72,7 +75,22 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     ),
   );
 
-  const nodeData = (data ?? {}) as Sbv1VideoEngineNodeData;
+  const nodeData = (data ?? {}) as Sbv1VideoEngineNodeData & {
+    pro2MediaRole?: string;
+    pro2ControllerNodeId?: string;
+  };
+
+  const isPro2VideoBoardCell =
+    nodeData.pro2MediaRole === "video" &&
+    Boolean(nodeData.pro2ControllerNodeId?.trim());
+
+  const pro2BoardDockLinks = useMemo(
+    () =>
+      isPro2VideoBoardCell
+        ? resolvePro2VideoBoardCellDockLinks(nodeId, nodes, edges)
+        : [],
+    [isPro2VideoBoardCell, nodeId, nodes, edges],
+  );
 
   const upstreamLinks = useMemo(
     () => resolveSbv1UpstreamRefLinks(nodeId, nodes, edges),
@@ -84,9 +102,31 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     [nodeId, nodes, edges],
   );
 
-  const mentionables = useMemo(
-    () => buildSbv1DockMentionables(upstreamLinks, nodes),
-    [upstreamLinks, nodes],
+  const mentionables = useMemo(() => {
+    const items = buildSbv1DockMentionables(upstreamLinks, nodes);
+    const pro2Items = buildPro2DockMentionables(pro2BoardDockLinks);
+    const seen = new Set(items.map((i) => i.id));
+    for (const item of pro2Items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      items.push(item);
+    }
+    return items;
+  }, [upstreamLinks, nodes, pro2BoardDockLinks]);
+
+  const dockUpstreamForChips = useMemo(() => {
+    const textAsDock = sbv1TextLinksToDockUpstream(upstreamTextLinks);
+    const seen = new Set<string>();
+    const merged = [...pro2BoardDockLinks, ...textAsDock];
+    return merged.filter((l) => {
+      if (seen.has(l.id)) return false;
+      seen.add(l.id);
+      return true;
+    });
+  }, [pro2BoardDockLinks, upstreamTextLinks]);
+
+  const hasVideo = Boolean(
+    nodeData.runtime?.ossUrl?.trim() || nodeData.runtime?.ephemeralUrl?.trim(),
   );
 
   const isGenerating =
@@ -171,12 +211,16 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       data={nodeData}
       upstreamLinks={upstreamLinks}
       upstreamTextLinks={upstreamTextLinks}
+      extraDockUpstreamLinks={dockUpstreamForChips}
       mentionables={mentionables}
       isGenerating={isGenerating}
       onPatch={onPatch}
       onRun={onRun}
       placement={placement}
       hidden={hidden}
+      sendTitle={
+        isPro2VideoBoardCell && hasVideo ? "重新生成视频" : undefined
+      }
     />
   );
 });

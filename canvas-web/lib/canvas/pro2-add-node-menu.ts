@@ -65,7 +65,7 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
     enabled: true,
     nodeType: "sbv1-video-engine",
   },
-  { id: "audio", label: "音频", icon: Music, enabled: true },
+  { id: "audio", label: "音频", icon: Music, enabled: true, nodeType: "story-pro2-audio" },
   {
     id: "script",
     label: "脚本",

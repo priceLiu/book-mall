@@ -19,7 +19,8 @@ export type StoryProRunContext = {
     | "video"
     | "tts"
     | "themeOutline"
-    | "generalText";
+    | "generalText"
+    | "music";
 };
 
 export type StoryProFeasibilityItem = {

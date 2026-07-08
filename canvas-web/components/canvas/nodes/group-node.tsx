@@ -22,6 +22,7 @@ import {
   Trash2,
   GripVertical,
   Users,
+  Video,
 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
@@ -81,6 +82,7 @@ const TOOLBAR_GAP = 8;
 
 function pro2MediaGroupIcon(kind?: Pro2MediaGroupKind) {
   if (kind === "frame-board") return Film;
+  if (kind === "video-board") return Video;
   if (kind === "character-board") return Users;
   if (kind === "scene-board") return MapPin;
   return Film;
@@ -122,7 +124,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     s.nodes.some(
       (n) =>
         n.parentId === id &&
-        (isPro2MediaChildNode(n) || n.type === "sbv1-image"),
+        (isPro2MediaChildNode(n) ||
+          n.type === "sbv1-image" ||
+          (n.type === "sbv1-video-engine" &&
+            (n.data as { pro2MediaRole?: string }).pro2MediaRole === "video")),
     ),
   );
   const childrenIdsKey = useCanvasStore((s) =>
@@ -320,7 +325,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const hasMediaChildrenMemo = hasMediaChildren;
   useEffect(() => {
     if (!hasMediaChildrenMemo) return;
-    if (isSbv1Group) return;
+    if (isSbv1Group && d.pro2Kind !== "video-board") return;
     if (d.pro2ShortcutPreset) return;
     if (relayoutDoneRef.current) return;
     const version = (d as { pro2LayoutVersion?: number }).pro2LayoutVersion;

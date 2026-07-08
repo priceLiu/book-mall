@@ -56,3 +56,45 @@ export function resolvePro2FrameBoardGroupSelection(
 
   return null;
 }
+
+/** 脚本 hub 下已存在的分镜图媒体组 */
+export function findPro2FrameBoardGroupsForHub(
+  hubNodeId: string,
+  allNodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return allNodes.filter(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === hubNodeId &&
+      isPro2FrameBoardGroup(n, allNodes),
+  );
+}
+
+export function hubHasPro2FrameBoardGroup(
+  hubNodeId: string,
+  allNodes: CanvasFlowNode[],
+): boolean {
+  return findPro2FrameBoardGroupsForHub(hubNodeId, allNodes).length > 0;
+}
+
+/** 分镜列控制器 → 分镜图媒体组 id */
+export function resolvePro2FrameBoardGroupIdForColumn(
+  frameColumnId: string,
+  allNodes: CanvasFlowNode[],
+): string | null {
+  const frameCol = allNodes.find((n) => n.id === frameColumnId);
+  const visualId = (
+    frameCol?.data as { pro2VisualGroupId?: string }
+  )?.pro2VisualGroupId?.trim();
+  if (visualId && allNodes.some((n) => n.id === visualId && n.type === "group")) {
+    return visualId;
+  }
+  const byController = allNodes.find(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+        frameColumnId &&
+      isPro2FrameBoardGroup(n, allNodes),
+  );
+  return byController?.id ?? null;
+}

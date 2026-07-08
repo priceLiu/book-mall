@@ -11,13 +11,16 @@ import {
   RotateCw,
   Rows3,
   Unlink,
+  Video,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
-import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
+import { kickoffPro2VideoBoardFromFrameGroup } from "@/lib/canvas/pro2-script-hub-helpers";
+import { resolvePro2VideoBatchVideoForHub } from "@/lib/canvas/pro2-video-batch-video";
 import {
   batchRunPro2SceneImageNodes,
   readPro2SceneRowsForHub,
@@ -27,6 +30,7 @@ import type {
   StoryProCharacterRow,
   StoryProFrameRow,
   StoryProSceneRow,
+  StoryProVideoRow,
 } from "@/lib/canvas/story-pro2-workspace-types";
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -36,8 +40,17 @@ import {
   PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
   PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
 } from "./pro2-image-node-toolbar";
+import {
+  Pro2VideoGeneratePicker,
+  type Pro2VideoGenerateResult,
+} from "./pro2-video-generate-picker";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
 
-export type Pro2MediaGroupKind = "character-board" | "frame-board" | "scene-board";
+export type Pro2MediaGroupKind =
+  | "character-board"
+  | "frame-board"
+  | "scene-board"
+  | "video-board";
 
 export type Pro2MediaGroupToolbarPanelProps = {
   groupId: string;
@@ -115,6 +128,7 @@ export function Pro2MediaGroupToolbarPanel({
   onMouseDown,
 }: Pro2MediaGroupToolbarPanelProps) {
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const duplicateMediaGroup = useCanvasStore((s) => s.duplicateMediaGroup);
@@ -130,7 +144,9 @@ export function Pro2MediaGroupToolbarPanel({
   );
   const saveGroupAsAsset = useSaveGroupAsAsset();
   const { confirm } = useDialogs();
+  const { providers } = useUserProviders();
   const [editOpen, setEditOpen] = useState(false);
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
   const [downloading, setDownloading] = useState(false);
@@ -164,12 +180,23 @@ export function Pro2MediaGroupToolbarPanel({
             groupId,
       );
     }
-    return nodes.find(
-      (n) =>
-        n.type === "story-pro2-frame" &&
-        (n.data as { pro2VisualGroupId?: string }).pro2VisualGroupId ===
-          groupId,
-    );
+    if (kind === "frame-board") {
+      return nodes.find(
+        (n) =>
+          n.type === "story-pro2-frame" &&
+          (n.data as { pro2VisualGroupId?: string }).pro2VisualGroupId ===
+            groupId,
+      );
+    }
+    if (kind === "video-board") {
+      return nodes.find(
+        (n) =>
+          n.type === "story-pro2-video" &&
+          (n.data as { pro2VisualGroupId?: string }).pro2VisualGroupId ===
+            groupId,
+      );
+    }
+    return undefined;
   }, [group, groupId, kind, nodes]);
 
   const rowCount = useMemo(() => {
@@ -184,6 +211,9 @@ export function Pro2MediaGroupToolbarPanel({
     }
     if (kind === "frame-board") {
       return readRows<StoryProFrameRow>(controller).length;
+    }
+    if (kind === "video-board") {
+      return readRows<StoryProVideoRow>(controller).length;
     }
     return 0;
   }, [controller, kind]);
@@ -211,6 +241,19 @@ export function Pro2MediaGroupToolbarPanel({
       }
       return items;
     }
+    if (kind === "video-board") {
+      return nodes
+        .filter(
+          (n) =>
+            n.parentId === groupId &&
+            n.type === "sbv1-video-engine" &&
+            videoUrlOf(n),
+        )
+        .map((n) => ({
+          url: videoUrlOf(n),
+          label: ((n.data as { label?: string }).label ?? "video").trim(),
+        }));
+    }
     return nodes
       .filter(
         (n) =>
@@ -223,12 +266,35 @@ export function Pro2MediaGroupToolbarPanel({
         url: imageUrlOf(n),
         label: ((n.data as { label?: string }).label ?? "image").trim(),
       }));
-  }, [edition, groupId, nodes]);
+  }, [edition, groupId, kind, nodes]);
 
-  const canRegenerate = edition === "pro2" && Boolean(kind && controller && rowCount);
+  const videoBoardHasMedia = useMemo(() => {
+    if (kind !== "video-board") return false;
+    for (const n of nodes) {
+      if (n.parentId !== groupId) continue;
+      if (n.type === "sbv1-video-engine" && videoUrlOf(n)) return true;
+    }
+    const rows = readRows<StoryProVideoRow>(controller);
+    return rows.some(
+      (r) =>
+        Boolean(r.videoRuntime?.ossUrl?.trim()) ||
+        Boolean(r.videoRuntime?.ephemeralUrl?.trim()),
+    );
+  }, [kind, groupId, nodes, controller]);
+
+  const canRegenerate =
+    edition === "pro2" &&
+    Boolean(kind && controller && rowCount) &&
+    (kind !== "video-board" || videoBoardHasMedia);
   const canCopyGroup =
     edition === "pro2" &&
-    Boolean(kind && (kind === "scene-board" || kind === "frame-board" || kind === "character-board"));
+    Boolean(
+      kind &&
+        (kind === "scene-board" ||
+          kind === "frame-board" ||
+          kind === "video-board" ||
+          kind === "character-board"),
+    );
 
   const onRegenerateAll = () => {
     if (!controller) return;
@@ -244,7 +310,7 @@ export function Pro2MediaGroupToolbarPanel({
         }),
       }));
       updateNodeData(controller.id, { rows: refreshedRows });
-      batchRunStoryRowsSequential(
+      batchRunStoryRows(
         controller.id,
         refreshedRows.map((r) => r.key),
         "threeView",
@@ -267,7 +333,7 @@ export function Pro2MediaGroupToolbarPanel({
       }
       const rows = readRows<StoryProSceneRow>(controller);
       if (!rows.length) return;
-      batchRunStoryRowsSequential(
+      batchRunStoryRows(
         controller.id,
         rows.map((r) => r.key),
         "sceneRef",
@@ -275,13 +341,68 @@ export function Pro2MediaGroupToolbarPanel({
       );
       return;
     }
-    const rows = readRows<StoryProFrameRow>(controller);
-    if (!rows.length) return;
-    batchRunStoryRowsSequential(
-      controller.id,
-      rows.map((r) => r.key),
-      "frameImage",
-      { forceFresh: true },
+    if (kind === "video-board") {
+      const rows = readRows<StoryProVideoRow>(controller);
+      if (!rows.length) return;
+      batchRunStoryRows(
+        controller.id,
+        rows.map((r) => r.key),
+        "video",
+        { forceFresh: true },
+      );
+      return;
+    }
+    if (kind === "frame-board") {
+      const rows = readRows<StoryProFrameRow>(controller);
+      if (!rows.length) return;
+      batchRunStoryRows(
+        controller.id,
+        rows.map((r) => r.key),
+        "frameImage",
+        { forceFresh: true },
+      );
+      return;
+    }
+  };
+
+  const hubNodeId = (group?.data as { pro2HubNodeId?: string }).pro2HubNodeId;
+  const frameRowsForVideo = useMemo(() => {
+    if (kind !== "frame-board" || !controller) return [];
+    return readRows<StoryProFrameRow>(controller);
+  }, [kind, controller]);
+
+  const initialVideoBatch = useMemo(() => {
+    if (!hubNodeId) return null;
+    return resolvePro2VideoBatchVideoForHub(hubNodeId, nodes, edges);
+  }, [hubNodeId, nodes, edges]);
+
+  const onGenerateVideoGroup = () => {
+    if (kind !== "frame-board" || !controller || !hubNodeId) return;
+    setVideoPickerOpen(true);
+  };
+
+  const runVideoGroupGenerate = (result: Pro2VideoGenerateResult) => {
+    if (!controller || !hubNodeId) return;
+    setVideoPickerOpen(false);
+    const state = useCanvasStore.getState();
+    kickoffPro2VideoBoardFromFrameGroup(
+      () => ({
+        nodes: state.nodes,
+        edges: state.edges,
+        addNode: state.addNode,
+        addNodeInGroup: state.addNodeInGroup,
+        createGroupContaining: state.createGroupContaining,
+        setEdges: state.setEdges,
+        updateNodeData: state.updateNodeData,
+        setNodes: state.setNodes,
+      }),
+      {
+        frameColumnId: controller.id,
+        hubNodeId,
+        selectedFrameIndices: result.frameIndices,
+        batchVideo: result.batchVideo,
+      },
+      providers,
     );
   };
 
@@ -289,12 +410,20 @@ export function Pro2MediaGroupToolbarPanel({
     duplicateMediaGroup(groupId);
   };
 
+  const copyGroupTitle =
+    kind === "video-board"
+      ? "复制整组（含全部子节点）并从分镜图组再连一条线"
+      : kind === "frame-board" || kind === "scene-board"
+        ? "复制整组（含全部子节点）并从脚本中枢再连一条线"
+        : "复制整组（含全部子节点）";
   const regenerateTitle =
     kind === "character-board"
       ? "重新生成全部三视图"
       : kind === "scene-board"
         ? "重新生成全部场景图"
-        : "重新生成全部分镜图";
+        : kind === "video-board"
+          ? "重新生成全部视频"
+          : "重新生成全部分镜图";
 
   const onBatchDownload = async () => {
     if (!downloadable.length || downloading) return;
@@ -378,11 +507,22 @@ export function Pro2MediaGroupToolbarPanel({
           <button
             type="button"
             className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-            title="复制整组（含全部子节点）并从脚本中枢再连一条线"
+            title={copyGroupTitle}
             onClick={onCopyGroup}
           >
             <Copy className="size-3.5" />
             复制组
+          </button>
+        ) : null}
+        {kind === "frame-board" ? (
+          <button
+            type="button"
+            className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+            title="选择镜号并生成分镜视频组（须已有分镜图）"
+            onClick={onGenerateVideoGroup}
+          >
+            <Video className="size-3.5" />
+            生成视频组
           </button>
         ) : null}
         {onRelayout ? (
@@ -529,6 +669,13 @@ export function Pro2MediaGroupToolbarPanel({
           </div>
         </div>
       ) : null}
+      <Pro2VideoGeneratePicker
+        open={videoPickerOpen}
+        rows={frameRowsForVideo}
+        initialBatchVideo={initialVideoBatch}
+        onClose={() => setVideoPickerOpen(false)}
+        onConfirm={runVideoGroupGenerate}
+      />
     </div>
   );
 }

@@ -27,9 +27,10 @@ import { shouldSkipStoryRowTaskApply } from "./task-pick";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
+import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
 import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
-import type { StoryProSceneRow } from "./story-pro-workspace-types";
+import type { StoryProFrameRow, StoryProSceneRow } from "./story-pro-workspace-types";
 import {
   findStarterByHubId,
   isAnyStoryCharacterColumnType,
@@ -221,6 +222,33 @@ export function commitStoryRunPendingPatch(
       node,
       pending.rows as StoryProSceneRow[],
       allNodes,
+      updateNodeData,
+    );
+  }
+  if (
+    isAnyStoryFrameColumnType(node.type ?? "") &&
+    Array.isArray(pending.rows) &&
+    ctx?.rowKey
+  ) {
+    syncPro2FrameImagesFromRows(
+      allNodes,
+      node.id,
+      pending.rows as StoryProFrameRow[],
+      updateNodeData,
+    );
+  }
+  if (
+    isAnyStoryVideoColumnType(node.type ?? "") &&
+    Array.isArray(pending.rows)
+  ) {
+    syncPro2VideoBoardFromRows(
+      allNodes.map((n) =>
+        n.id === node.id
+          ? { ...n, data: { ...n.data, rows: pending.rows } }
+          : n,
+      ),
+      node.id,
+      pending.rows as never,
       updateNodeData,
     );
   }
@@ -478,6 +506,18 @@ export function storyApplyTaskResult(
       nextRows as never,
       updateNodeData,
     );
+    const pendingSyncGroupId = (
+      node.data as { pro2PendingSyncGroupId?: string }
+    ).pro2PendingSyncGroupId?.trim();
+    if (pendingSyncGroupId) {
+      const anyInflight = (nextRows as StoryProFrameRow[]).some(
+        (r) =>
+          r.runtime?.status === "pending" || r.runtime?.status === "running",
+      );
+      if (!anyInflight) {
+        updateNodeData(node.id, { pro2PendingSyncGroupId: undefined });
+      }
+    }
     const starterFrame = findStarterByHubId(
       allNodes,
       (node.data as { hubNodeId?: string }).hubNodeId ?? "",
@@ -531,14 +571,21 @@ export function storyApplyTaskResult(
   if (isAnyStoryVideoColumnType(node.type ?? "") && ctx?.rowKey && ctx.mediaKind) {
     const latest = allNodes.find((n) => n.id === node.id) ?? node;
     const rows = (latest.data as { rows: { key: string }[] }).rows ?? [];
-    updateNodeData(node.id, {
-      rows: applyVideoRowRuntime(
-        rows as never,
-        ctx.rowKey,
-        ctx.mediaKind === "tts" ? "tts" : "video",
-        runtime,
+    const nextRows = applyVideoRowRuntime(
+      rows as never,
+      ctx.rowKey,
+      ctx.mediaKind === "tts" ? "tts" : "video",
+      runtime,
+    );
+    updateNodeData(node.id, { rows: nextRows });
+    syncPro2VideoBoardFromRows(
+      allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
       ),
-    });
+      node.id,
+      nextRows as never,
+      updateNodeData,
+    );
     const starterVid = findStarterByHubId(
       allNodes,
       (node.data as { hubNodeId?: string }).hubNodeId ?? "",

@@ -868,6 +868,29 @@ function normalizeRefVideoWorkflowNodeSizes(
   });
 }
 
+/** 2.0 分镜视频列 · 仅数据锚点，画布上折叠为 1×1 */
+function collapsePro2VideoColumnAnchors(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (n.type !== "story-pro2-video") return n;
+    if (n.width === 1 && n.height === 1) return n;
+    changed = true;
+    return {
+      ...n,
+      width: 1,
+      height: 1,
+      style: {
+        ...(typeof n.style === "object" && n.style ? n.style : {}),
+        width: 1,
+        height: 1,
+      },
+    } as CanvasFlowNode;
+  });
+  return changed ? next : nodes;
+}
+
 export function normalizeCanvasNodes(
   nodes: CanvasFlowNode[],
   edges?: CanvasFlowEdge[],
@@ -887,7 +910,7 @@ export function normalizeCanvasNodes(
   const withPro2Groups = sized.some((n) =>
     String(n.type ?? "").startsWith("story-pro2-"),
   )
-    ? reconcilePro2MediaGroupMetadata(sized)
+    ? collapsePro2VideoColumnAnchors(reconcilePro2MediaGroupMetadata(sized))
     : sized;
 
   if (!hasStoryTemplateGroups(withPro2Groups)) {

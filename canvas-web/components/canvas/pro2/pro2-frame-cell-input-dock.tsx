@@ -6,7 +6,7 @@ import { useNodes } from "@xyflow/react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDockHidden } from "@/lib/canvas/use-libtv-floating-dock";
 import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
-import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
@@ -81,12 +81,9 @@ export function Pro2FrameCellInputDock() {
 
   const onRegenerate = useCallback(() => {
     if (!storeNode || !activeFocus || !row) return;
-    batchRunStoryRowsSequential(
-      storeNode.id,
-      [activeFocus.rowKey],
-      "frameImage",
-      { forceFresh: true },
-    );
+    batchRunStoryRows(storeNode.id, [activeFocus.rowKey], "frameImage", {
+      forceFresh: true,
+    });
   }, [storeNode, activeFocus, row]);
 
   if (!storeNode || !row || !placement || !activeFocus) return null;

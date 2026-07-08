@@ -105,10 +105,51 @@ export const GENERATIVE_MODEL_OPTIONS = [
 export const POSTER_MODEL_OPTIONS = [
   { id: "doubao-seedream-5-0-lite", label: "Seedream 5.0 Lite" },
   { id: "lib-nano-pro", label: "KIE NanoBanana Pro" },
+  { id: "google/nano-banana", label: "NanoBanana Gemini 2.5 Flash Image" },
 ] as const;
 
 /** Seedream + KIE 文生图面板共用 */
 export const T2I_MODEL_OPTIONS = POSTER_MODEL_OPTIONS;
+
+export const REALISTIC_CAMERA_OPTIONS = [
+  { id: "35mm-street", label: "35毫米街" },
+  { id: "50mm-portrait", label: "50毫米人像" },
+  { id: "85mm-editorial", label: "85毫米编辑" },
+  { id: "24mm-wide", label: "24毫米宽" },
+  { id: "100mm-macro", label: "100mm微距镜头" },
+  { id: "drone-aerial", label: "无人机航拍" },
+  { id: "film-noir", label: "黑色电影黑白片" },
+  { id: "anamorphic", label: "电影变形镜头" },
+] as const;
+
+export const REALISTIC_LIGHTING_OPTIONS = [
+  { id: "golden-hour", label: "黄金时段" },
+  { id: "overcast", label: "阴天，柔和" },
+  { id: "blue-hour", label: "蓝色时刻" },
+  { id: "studio-flash", label: "影室闪光灯" },
+  { id: "tungsten", label: "钨合金内衬" },
+  { id: "neon-night", label: "霓虹之夜" },
+] as const;
+
+export const IMAGE_GENERATOR_ASPECT_OPTIONS = [
+  { id: "1:1", label: "1:1 (正方形)" },
+  { id: "16:9", label: "16:9 (横向)" },
+  { id: "9:16", label: "9:16 (竖屏)" },
+  { id: "4:3", label: "4:3" },
+  { id: "3:4", label: "3:4" },
+] as const;
+
+export const IMAGE_GENERATOR_STYLE_OPTIONS = [
+  { id: "none", label: "没有任何" },
+  { id: "photography", label: "摄影" },
+  { id: "digital-art", label: "数字艺术" },
+  { id: "anime", label: "日本动画片" },
+  { id: "3d-render", label: "3D 渲染" },
+  { id: "pencil-sketch", label: "铅笔素描" },
+  { id: "watercolor", label: "水彩" },
+  { id: "oil-painting", label: "油画" },
+  { id: "pixel-art", label: "像素艺术" },
+] as const;
 
 export const MEME_FORMAT_OPTIONS = [
   { id: "classic", label: "经典（顶部/底部文字）" },

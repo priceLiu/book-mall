@@ -61,7 +61,6 @@ function InspectorBody({ node }: { node: CanvasFlowNode }) {
     case "story-pro2-character":
     case "story-pro2-scene":
     case "story-pro2-frame":
-    case "story-pro2-video":
       return <Pro2ColumnInspector node={node} />;
     case "jianying-export-pro2":
       return <JianyingExportPro2Inspector {...props} />;
@@ -180,6 +179,8 @@ export function Pro2FloatingInspector() {
     storeNode.type === "story-pro2-image" ||
     storeNode.type === "story-pro2-three-view" ||
     storeNode.type === "story-pro2-style-asset" ||
+    storeNode.type === "story-pro2-audio" ||
+    storeNode.type === "story-pro2-video" ||
     storeNode.type === "jianying-export-pro2" ||
     storeNode.type === "jianying-auto-render-pro2" ||
     storeNode.type === "group" ||

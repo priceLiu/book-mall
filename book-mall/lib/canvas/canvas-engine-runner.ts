@@ -68,6 +68,10 @@ import {
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { buildKieToolVideoCreateArgs } from "./kie-video-tool-builders";
+import {
+  buildKieAudioCreateInput,
+  normalizeKieAudioModelKey,
+} from "./kie-audio-builders";
 import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
 import { modelHasStoryCapabilities } from "./story-model-capabilities";
@@ -334,6 +338,7 @@ export async function runAiEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
+    skipInflightScopeConflict: args.forceFresh === true,
     initialStatus: "SUBMITTED",
     data: {
       kind: "TEXT",
@@ -757,6 +762,44 @@ async function executeStoryLlmEngineTask(
     imageUrls,
   } = ctx;
 
+  const existing = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: { status: true, resultPayload: true },
+  });
+  if (!existing || existing.status !== "SUBMITTED") {
+    const done = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+    });
+    if (done) {
+      return {
+        reused: done.status === "SUCCEEDED",
+        task: done,
+      };
+    }
+    throw new CanvasProjectError(
+      "TASK_NOT_FOUND",
+      "LLM 任务不存在或已结束",
+      404,
+    );
+  }
+  const prevPayload =
+    (existing.resultPayload as Record<string, unknown> | null) ?? {};
+  if (prevPayload.llmExecuteClaimed === true) {
+    const done = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+    });
+    if (done) return { reused: done.status === "SUCCEEDED", task: done };
+  }
+  await prisma.canvasGenerationTask.update({
+    where: { id: taskId },
+    data: {
+      resultPayload: {
+        ...prevPayload,
+        llmExecuteClaimed: true,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
   try {
     const customSystem =
       engineKind === "story-outline-engine"
@@ -934,6 +977,7 @@ export async function runStoryLlmEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
+    skipInflightScopeConflict: args.forceFresh === true,
     initialStatus: "SUBMITTED",
     data: {
       kind: "TEXT",
@@ -1404,6 +1448,137 @@ export async function runVideoEngineNode(
           ...submitPayloadBase,
           gatewayKieSubmitClaimed: false,
         } as Prisma.InputJsonValue,
+      },
+    });
+    return { reused: false, task: updated };
+  }
+}
+
+/** KIE 音频引擎 —— ElevenLabs TTS / Suno 音乐，异步 poll。 */
+export async function runKieAudioEngineNode(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const { userId, projectId, nodeId, node } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
+  const data = node.data ?? {};
+  const providerId = String(data.providerId ?? "");
+  const modelKey = normalizeKieAudioModelKey(
+    String(data.modelKey ?? node.modelKey ?? ""),
+  );
+  const promptRaw = String(data.prompt ?? data.dockInput ?? "");
+  const params = (data.params as Record<string, unknown>) ?? {};
+
+  if (!providerId) {
+    throw new CanvasProjectError("INVALID_INPUT", "audio-engine 缺少 providerId");
+  }
+  if (!modelKey) {
+    throw new CanvasProjectError("INVALID_INPUT", "audio-engine 缺少 modelKey");
+  }
+
+  const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
+  const expandedPrompt = [promptRaw.trim(), ...upstreamText]
+    .filter(Boolean)
+    .join("\n\n");
+  if (!expandedPrompt.trim()) {
+    throw new CanvasProjectError("EMPTY_PROMPT", "audio-engine prompt 为空");
+  }
+
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
+
+  const inputHash = computeInputHash({
+    modelKey,
+    prompt: expandedPrompt,
+    imageUrls: [],
+    params,
+    providerId,
+  });
+
+  if (!args.forceFresh) {
+    const reusable = await findReusableSucceededTask({
+      projectId,
+      nodeId,
+      inputHash,
+      useGateway: true,
+    });
+    if (reusable) return { reused: true, task: reusable };
+  }
+
+  await ensureProjectInflightCapacity(projectId);
+  await ensureUserInflightCapacity(userId);
+
+  const kieInput = buildKieAudioCreateInput({
+    modelKey,
+    prompt: expandedPrompt,
+    params,
+  });
+
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope,
+    skipInflightScopeConflict: args.forceFresh === true,
+    initialStatus: "PENDING",
+    data: {
+      kind: "IMAGE",
+      model: modelKey,
+      providerId: null,
+      inputHash,
+      inputPayload: {
+        kind: "audio-engine",
+        prompt: clipPrompt(expandedPrompt),
+        params,
+        providerId,
+        modelKey,
+        kieInput,
+        clientPage: gwClientPage,
+        syncGatewaySubmit: true,
+        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  const callBackUrl = buildCanvasAiKieCallbackUrl("audio", created.id);
+
+  try {
+    const job = await canvasGwCreateKieJob(userId, {
+      model: modelKey,
+      input: kieInput,
+      callBackUrl,
+      clientPage: gwClientPage,
+      projectId,
+      canvasTaskId: created.id,
+    });
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUBMITTED",
+        kieTaskId: job.taskId,
+        submittedAt: new Date(),
+        inputPayload: {
+          kind: "audio-engine",
+          prompt: clipPrompt(expandedPrompt),
+          params,
+          providerId,
+          modelKey,
+          kieInput,
+          clientPage: gwClientPage,
+          gatewayLogId: job.logId,
+          providerKind: "KIE",
+          syncGatewaySubmit: true,
+          ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+        } as Prisma.InputJsonValue,
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "FAILED",
+        failCode: "AUDIO_ENGINE_FAILED",
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
       },
     });
     return { reused: false, task: updated };

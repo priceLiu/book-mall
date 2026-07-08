@@ -35,7 +35,9 @@ export type ImageProcessingMode =
   | "poster"
   | "meme"
   | "avatar"
-  | "gif";
+  | "gif"
+  | "realistic"
+  | "image-generator";
 
 export async function fetchImageProcessingModels() {
   const data = await ecomBookFetch("api/sso/tools/ecom/image-processing/models");
@@ -57,6 +59,8 @@ export async function fetchImageProcessingModels() {
       meme?: string;
       avatar?: string;
       gif?: string;
+      realistic?: string;
+      imageGenerator?: string;
     };
     modelGroups?: Record<string, string[]>;
     platformOffering?: boolean;
@@ -79,6 +83,7 @@ export async function submitImageProcessingEdit(body: {
   blurType?: string;
   sharpenStrength?: string;
   cameraAngle?: string;
+  cameraLens?: string;
   extraGuidance?: string;
   title?: string;
   subtitle?: string;
@@ -108,6 +113,9 @@ export async function submitImageProcessingEdit(body: {
   algorithm?: string;
   maskImageDataUrl?: string;
   styleImageDataUrl?: string;
+  lighting?: string;
+  styleId?: string;
+  negativePrompt?: string;
   parameters?: Record<string, unknown>;
 }) {
   const data = await ecomBookFetch("api/sso/tools/ecom/image-processing/edit", {

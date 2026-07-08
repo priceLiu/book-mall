@@ -68,11 +68,14 @@ import {
 } from "./pro2-media-group-meta";
 import {
   applyPro2MediaGroupRelayout,
+  PRO2_FRAME_CELL_HEIGHT,
+  PRO2_FRAME_CELL_WIDTH,
   PRO2_MEDIA_GROUP_HEADER,
   PRO2_MEDIA_GROUP_PAD,
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
 import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
+import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
 import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
 import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
 import { duplicateMediaGroupInGraph } from "./duplicate-media-group";
@@ -91,6 +94,7 @@ import {
   migratePro2SceneColumnOffCanvas,
 } from "./pro2-spawn-scene-image-group";
 import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
+import { repairPro2VideoBoardVisualGroups } from "./pro2-spawn-video-board-group";
 import { canvasNotify } from "./canvas-notify";
 import {
   isCanvasInteractiveGeometryInProgress,
@@ -147,6 +151,44 @@ function finalizeHydratedGraph(
     nodes: ensureNodeDragHandles(nextNodes),
     edges: nextEdges,
   };
+}
+
+function runPostHydratePro2VideoBoardRepair(
+  get: () => {
+    nodes: CanvasFlowNode[];
+    edges: CanvasFlowEdge[];
+    addNode: (
+      type: CanvasNodeType,
+      position: { x: number; y: number },
+      data?: Record<string, unknown>,
+    ) => string;
+    addNodeInGroup: (
+      type: CanvasNodeType,
+      groupId: string,
+      relativePosition: { x: number; y: number },
+      data?: Record<string, unknown>,
+    ) => string;
+    createGroupContaining: (
+      childIds: string[],
+      args: {
+        label: string;
+        color: string;
+        measuredSizes?: Record<string, { w: number; h: number }>;
+        pro2Styled?: boolean;
+        pro2ShortcutPreset?: boolean;
+      },
+    ) => string | null;
+    updateNodeData: (
+      id: string,
+      patch: Record<string, unknown>,
+      options?: { commit?: boolean },
+    ) => void;
+    setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
+    setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  },
+): void {
+  if (!get().nodes.some((n) => n.type === "story-pro2-video")) return;
+  repairPro2VideoBoardVisualGroups(get);
 }
 import { validateStoryPipelineDeletion } from "./story-pipeline-delete-guard";
 import { pruneMentionsAfterNodeRemoval } from "./strip-dock-mentions";
@@ -368,6 +410,12 @@ function defaultNodeSize(
   if (type === "image-engine" && typeof data?.frameIndex === "number") {
     return STORY_FRAME_IMAGE_ENGINE_SIZE;
   }
+  if (type === "sbv1-video-engine" && data?.pro2MediaRole === "video") {
+    return {
+      width: PRO2_FRAME_CELL_WIDTH,
+      height: PRO2_FRAME_CELL_HEIGHT,
+    };
+  }
   return NODE_DEFAULT_SIZE[type] ?? { width: 320, height: 240 };
 }
 
@@ -488,6 +536,7 @@ export const useCanvasStore = create<CanvasState>()(
               edges: laid.edges,
             }),
           );
+          queueMicrotask(() => runPostHydratePro2VideoBoardRepair(get));
         };
 
         if (nodes.length >= DEFER_HYDRATE_LAYOUT_NODE_COUNT) {
@@ -526,6 +575,7 @@ export const useCanvasStore = create<CanvasState>()(
             graphMeta: g.meta ?? null,
           }),
         );
+        queueMicrotask(() => runPostHydratePro2VideoBoardRepair(get));
       },
 
       toGraph: () => {
@@ -1155,8 +1205,11 @@ export const useCanvasStore = create<CanvasState>()(
         };
 
         const pro2Kind = inferPro2MediaGroupKind(all, effectiveChildIds);
+        const pro2VideoBoardOnly =
+          children.length > 0 && children.every(isPro2VideoBoardChild);
         const sbv1OnlyMedia =
           children.length > 0 &&
+          !pro2VideoBoardOnly &&
           children.every(
             (c) => c.type === "sbv1-image" || c.type === "sbv1-video-engine",
           );

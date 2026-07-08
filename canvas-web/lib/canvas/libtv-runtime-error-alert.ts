@@ -96,7 +96,23 @@ export function useLibtvRuntimeErrorAlert(opts: {
     const prev = prevStatusRef.current;
     prevStatusRef.current = status;
 
-    if (status !== "error") return;
+    if (status !== "error") {
+      if (status === "pending" && prev === "error") {
+        lastAlertedRef.current = null;
+        if (typeof window !== "undefined") {
+          try {
+            const prefix = `${STORAGE_PREFIX}${libtvRuntimeErrorAlertScope()}:${opts.nodeId}:`;
+            for (let i = sessionStorage.length - 1; i >= 0; i--) {
+              const k = sessionStorage.key(i);
+              if (k?.startsWith(prefix)) sessionStorage.removeItem(k);
+            }
+          } catch {
+            /* quota / private mode */
+          }
+        }
+      }
+      return;
+    }
     if (prev !== "pending" && prev !== "running") return;
 
     const msg = opts.failMessage?.trim();

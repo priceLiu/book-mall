@@ -12,6 +12,7 @@ const GENERAL_PRESETS = new Set<string>([
   "image-to-prompt",
   "video-to-prompt",
   "text-to-video",
+  "text-to-music",
 ]);
 
 function edgeLinksScriptHub(

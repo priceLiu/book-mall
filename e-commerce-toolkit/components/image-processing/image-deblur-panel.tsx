@@ -14,6 +14,7 @@ import {
   DEBLUR_STRENGTH_OPTIONS,
   isSeedreamLiteModel,
 } from "@/lib/image-processing-presets";
+import { ipStepNumberClass } from "@/lib/image-processing-theme";
 
 export function ImageDeblurPanel({
   defaultModel,
@@ -206,7 +207,7 @@ export function ImageDeblurPanel({
         <ol className="mt-4 grid gap-4 sm:grid-cols-3">
           {steps.map((s, i) => (
             <li key={s.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
+              <span className={ipStepNumberClass}>
                 {i + 1}
               </span>
               <div>

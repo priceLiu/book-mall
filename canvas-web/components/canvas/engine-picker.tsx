@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  useClientPortalMounted,
   useModalBodyScrollLock,
   useModalEscapeClose,
 } from "@/lib/canvas/use-modal-portal-effects";
@@ -33,8 +32,8 @@ import {
 } from "@/lib/canvas/gateway-model-role";
 
 export type EnginePickerProps = {
-  /** 过滤模型 role：LLM / IMAGE / VIDEO */
-  role: "LLM" | "IMAGE" | "VIDEO";
+  /** 过滤模型 role：LLM / IMAGE / VIDEO / MUSIC / TTS */
+  role: GatewayModelRole;
   /** 仅展示这些 modelKey（三视图引擎白名单等） */
   allowedModelKeys?: string[];
   /** 须具备的能力（如 image_multi_ref / video_i2v） */
@@ -70,6 +69,8 @@ export type EnginePickerProps = {
   triggerIconPx?: number;
   /** Dock 底栏样式（无边框 · 与图片节点 Dock 底栏一致） */
   triggerVariant?: "default" | "dock";
+  /** 父级已拉取 providers 时传入，避免弹层内重复订阅导致 draft 重置闪烁 */
+  externalProviders?: CanvasProviderDto[];
 };
 
 /* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
@@ -78,7 +79,9 @@ import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-set
 const ENGINE_PICKER_MODAL_Z = LIBTV_GENERATE_SETTINGS_MODAL_Z;
 
 /** 稳定的空参数引用：避免默认 `params = {}` 每次 render 产生新对象，触发弹层 effect 反复 setDraft */
-const EMPTY_PARAMS: Record<string, unknown> = Object.freeze({});
+export const ENGINE_PICKER_EMPTY_PARAMS: Record<string, unknown> =
+  Object.freeze({});
+const EMPTY_PARAMS = ENGINE_PICKER_EMPTY_PARAMS;
 
 /**
  * - 触发按钮显示当前选中
@@ -102,8 +105,11 @@ export function EnginePicker({
   triggerMinHeightPx,
   triggerIconPx,
   triggerVariant = "default",
+  externalProviders,
 }: EnginePickerProps) {
-  const { providers, loading } = useUserProviders();
+  const { providers: hookProviders, loading: hookLoading } = useUserProviders();
+  const providers = externalProviders ?? hookProviders;
+  const loading = externalProviders ? false : hookLoading;
   const [open, setOpen] = useState(false);
 
   // 调用方常以「内联数组字面量」传入这些 props（每次 render 新引用），
@@ -143,9 +149,9 @@ export function EnginePicker({
           provider: p,
           models: p.models.filter(
             (m) =>
-              m.role === role &&
               m.enabled &&
               (!allowedSet || allowedSet.has(m.modelKey)) &&
+              (allowedSet?.has(m.modelKey) || m.role === role) &&
               (!stableReqCaps?.length ||
                 modelHasStoryCapabilities(m.modelKey, stableReqCaps)),
           ),
@@ -284,7 +290,7 @@ function EnginePickerInlinePanel({
   layout = "grid",
   onChange,
 }: {
-  role: "LLM" | "IMAGE" | "VIDEO";
+  role: GatewayModelRole;
   groups: Group[];
   loading: boolean;
   providerId: string;
@@ -313,7 +319,7 @@ function EnginePickerInlinePanel({
 
   useEffect(() => {
     setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
-  }, [groupsKey, groups, providerId, modelKey, paramsKey]);
+  }, [groupsKey, providerId, modelKey, paramsKey]);
 
   const hasParams =
     !!draft?.model.paramsSchema && draft.model.paramsSchema.length > 0;
@@ -473,7 +479,7 @@ function EngineModelModal({
   onClose,
   onConfirm,
 }: {
-  role: "LLM" | "IMAGE" | "VIDEO";
+  role: GatewayModelRole;
   groups: Group[];
   providerId: string;
   modelKey: string;
@@ -487,7 +493,6 @@ function EngineModelModal({
     provider: CanvasProviderDto;
   }) => void;
 }) {
-  const mounted = useClientPortalMounted();
   const [draft, setDraft] = useState<DraftSelection | null>(() =>
     resolveInitialDraft(groups, providerId, modelKey, params),
   );
@@ -511,9 +516,7 @@ function EngineModelModal({
   useEffect(() => {
     if (userPickedRef.current) return;
     setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
-  }, [groupsKey, groups, providerId, modelKey, paramsKey]);
-
-  if (!mounted) return null;
+  }, [groupsKey, providerId, modelKey, paramsKey]);
 
   const title = gatewayModelRoleMeta(role as GatewayModelRole).modalTitle;
 
@@ -522,14 +525,8 @@ function EngineModelModal({
 
   const node = (
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4"
-      style={{
-        zIndex: ENGINE_PICKER_MODAL_Z,
-        // 把毛玻璃背板隔离到独立合成层：弹层内 hover 重绘不再触发 backdrop 重栅格化 → 消除闪烁
-        isolation: "isolate",
-        transform: "translateZ(0)",
-        backfaceVisibility: "hidden",
-      }}
+      className="fixed inset-0 flex items-center justify-center bg-black/70 p-4"
+      style={{ zIndex: ENGINE_PICKER_MODAL_Z }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -824,15 +821,13 @@ function ModelCard({
   );
 }
 
-function EmptyState({ role }: { role: "LLM" | "IMAGE" | "VIDEO" }) {
+function EmptyState({ role }: { role: GatewayModelRole }) {
+  const label = gatewayModelRoleMeta(role).gatewayRole;
   return (
     <div className="grid place-items-center gap-3 px-4 py-10 text-center text-[13px] text-white/70">
       <p>
         还没有可用的
-        <span className="font-medium text-white">
-          {" "}
-          {role === "LLM" ? "LLM" : role === "VIDEO" ? "VIDEO" : "IMAGE"}{" "}
-        </span>
+        <span className="font-medium text-white"> {label} </span>
         模型。
       </p>
       <a

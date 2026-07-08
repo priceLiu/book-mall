@@ -15,7 +15,7 @@ import {
 } from "./story-hub-runtime";
 import { syncStoryProColumnRows } from "./story-pro-column-sync";
 import {
-  batchRunStoryRowsSequential,
+  batchRunStoryRows,
   runStoryHubSectionsSequential,
 } from "./batch-run-nodes";
 import { pickDefaultStoryImageEngine } from "./system-providers";
@@ -32,6 +32,7 @@ import {
   findStoryPro2WorkspaceForStarter,
   spawnStoryPro2CharacterColumnFromHub,
   spawnStoryPro2FrameColumnFromHub,
+  spawnStoryPro2VideoColumnFromFrame,
 } from "./spawn-story-pro2-workspace";
 import {
   pickDefaultPro2ThreeViewImageEngine,
@@ -44,6 +45,9 @@ import {
 import { reflowStoryPro2Workspace } from "./story-pro2-workspace-layout";
 import { pro2ThinNodeIsLinked } from "./pro2-thin-node-display-state";
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
+import { ensurePro2VideoBoardGroup } from "./pro2-spawn-video-board-group";
+import { pickDefaultPro2VideoEngine } from "./pro2-video-batch-video";
+import { resolveStoryFrameImageUrl } from "./story-frame-gate";
 import { ensurePro2CharacterImageGroup } from "./pro2-spawn-character-image-group";
 import {
   batchRunPro2SceneImageNodes,
@@ -355,6 +359,10 @@ export type KickoffPro2FrameBoardOptions = {
     modelKey: string;
     params?: Record<string, unknown>;
   };
+  /** 已有分镜组时追加新组 */
+  spawnNewGroup?: boolean;
+  /** 重新生成时强制新任务 */
+  forceFresh?: boolean;
 };
 
 type UpstreamMediaKickoffStore = FrameKickoffStore & {
@@ -426,39 +434,13 @@ function ensurePro2UpstreamMediaGroupsForFrameBoard(
       hubNodeId: hubId,
     });
     store = getStore();
-    ensurePro2CharacterImageGroup({
-      characterColumnId: characterColumnId!,
-      hubNodeId: hubId,
-      rows: columnSync.characterRows,
-      nodes: store.nodes,
-      addNode: store.addNode,
-      addNodeInGroup: store.addNodeInGroup,
-      createGroupContaining: store.createGroupContaining,
-      updateNodeData: store.updateNodeData,
-      setNodes: store.setNodes,
-      setEdges: store.setEdges,
-    });
-    store = getStore();
+    // 生成分镜图时仅同步角色行数据供 @ 引用，不自动 spawn 角色三视图媒体组
   }
 
   if (columnSync.sceneRows.length > 0) {
     store.updateNodeData(hubId, { sceneRows: columnSync.sceneRows });
     store = getStore();
-    ensurePro2SceneImageGroup({
-      hubNodeId: hubId,
-      rows: columnSync.sceneRows,
-      nodes: store.nodes,
-      edges: store.edges,
-      starterNodeId: starterId,
-      legacySceneColumnId,
-      addNode: store.addNode,
-      addNodeInGroup: store.addNodeInGroup,
-      createGroupContaining: store.createGroupContaining,
-      updateNodeData: store.updateNodeData,
-      setNodes: store.setNodes,
-      setEdges: store.setEdges,
-    });
-    store = getStore();
+    // 生成分镜图时仅同步场景行，不自动 spawn 场景图媒体组
   }
 
   return {
@@ -628,17 +610,224 @@ export function kickoffPro2FrameBoardFromHub(
     updateNodeData: store.updateNodeData,
     setNodes: store.setNodes,
     setEdges: store.setEdges,
+    spawnNewGroup: options?.spawnNewGroup,
   });
+
+  if (!options?.spawnNewGroup) {
+    store = getStore();
+    store.updateNodeData(frameColumnId!, {
+      pro2PendingSyncGroupId: undefined,
+    });
+  }
 
   if (keys.length) {
     window.setTimeout(() => {
-      batchRunStoryRowsSequential(frameColumnId!, keys, "frameImage", {
-        forceFresh: false,
+      batchRunStoryRows(frameColumnId!, keys, "frameImage", {
+        forceFresh: Boolean(options?.forceFresh || options?.spawnNewGroup),
       });
     }, 0);
   }
 
   return { frameColumnId };
+}
+
+export type KickoffPro2VideoBoardOptions = {
+  selectedFrameIndices?: number[];
+  batchVideo?: {
+    providerId: string;
+    modelKey: string;
+    params?: Record<string, unknown>;
+  };
+  frameColumnId: string;
+  hubNodeId: string;
+};
+
+type VideoKickoffStore = FrameKickoffStore & {
+  addNode: (
+    type: "story-pro2-video" | "sbv1-video-engine" | "group",
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  addNodeInGroup: (
+    type: "sbv1-video-engine",
+    groupId: string,
+    relativePosition: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+};
+
+/** 从分镜图组 · 选择镜号后 spawn 视频组并批量生成 */
+export function kickoffPro2VideoBoardFromFrameGroup(
+  getStore: () => VideoKickoffStore,
+  options: KickoffPro2VideoBoardOptions,
+  providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
+): { videoColumnId: string } | null {
+  let store = getStore();
+  const { frameColumnId, hubNodeId } = options;
+  const starter = resolveStarterForHub(store.nodes, store.edges, hubNodeId);
+  if (!starter) return null;
+
+  const frameNode = store.nodes.find((n) => n.id === frameColumnId);
+  if (!frameNode) return null;
+
+  const hub = store.nodes.find((n) => n.id === hubNodeId);
+  const hubData = (hub?.data ?? {}) as StoryProScriptHubNodeData;
+
+  const synced = syncStoryProColumnRows(
+    hubData,
+    { frameRows: (frameNode.data as { rows?: unknown[] })?.rows as never },
+    hubNodeId,
+  );
+
+  let frameRows = synced.frameRows.map((row) => {
+    const url = resolveStoryFrameImageUrl(row);
+    if (url && !row.frameApprovedAt) {
+      return { ...row, frameApprovedAt: new Date().toISOString() };
+    }
+    return row;
+  });
+
+  store.updateNodeData(frameColumnId, { rows: frameRows });
+  store = getStore();
+
+  const picked = options.selectedFrameIndices?.filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  let targetFrameRows = frameRows;
+  if (picked?.length) {
+    const allowed = new Set(picked);
+    targetFrameRows = frameRows.filter((r) => allowed.has(r.frameIndex));
+  }
+
+  targetFrameRows = targetFrameRows.filter((r) =>
+    Boolean(resolveStoryFrameImageUrl(r)),
+  );
+  if (!targetFrameRows.length) return null;
+
+  const videoColumnId = spawnStoryPro2VideoColumnFromFrame({
+    scriptHubId: hubNodeId,
+    starterNodeId: starter.id,
+    frameColumnId,
+    nodes: store.nodes,
+    edges: store.edges,
+    addNode: store.addNode,
+    setEdges: store.setEdges,
+    updateNodeData: store.updateNodeData,
+  });
+  store = getStore();
+
+  const videoSynced = syncStoryProColumnRows(
+    hubData,
+    {
+      frameRows,
+      videoRows: (
+        store.nodes.find((n) => n.id === videoColumnId)?.data as {
+          rows?: unknown[];
+        }
+      )?.rows as never,
+    },
+    hubNodeId,
+  );
+
+  const videoRows = videoSynced.videoRows.filter((v) =>
+    targetFrameRows.some(
+      (f) => f.key === v.key || f.frameIndex === v.frameIndex,
+    ),
+  );
+
+  const batchFromPicker = options.batchVideo;
+  if (batchFromPicker?.providerId?.trim() && batchFromPicker.modelKey?.trim()) {
+    store.updateNodeData(videoColumnId, {
+      batchVideo: {
+        providerId: batchFromPicker.providerId,
+        modelKey: batchFromPicker.modelKey,
+        params: batchFromPicker.params ?? { duration: 5, resolution: "720p" },
+      },
+      frameColumnId,
+      hubNodeId,
+    });
+  } else {
+    const videoPick = pickDefaultPro2VideoEngine(providers);
+    if (videoPick) {
+      store.updateNodeData(videoColumnId, {
+        batchVideo: videoPick,
+        frameColumnId,
+        hubNodeId,
+      });
+    }
+  }
+
+  store.updateNodeData(videoColumnId, { rows: videoRows });
+  store = getStore();
+
+  const keys = videoRows.map((r) => r.key);
+
+  ensurePro2VideoBoardGroup({
+    videoColumnId,
+    frameColumnId,
+    hubNodeId,
+    frameRows: targetFrameRows,
+    videoRows,
+    nodes: store.nodes,
+    addNode: store.addNode,
+    addNodeInGroup: store.addNodeInGroup,
+    createGroupContaining: store.createGroupContaining,
+    updateNodeData: store.updateNodeData,
+    setNodes: store.setNodes,
+    setEdges: store.setEdges,
+  });
+
+  store = getStore();
+  store.setEdges((prev) => {
+    let next = prev;
+    const videos = store.nodes.filter(
+      (n) =>
+        n.type === "sbv1-video-engine" &&
+        (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+          videoColumnId,
+    );
+    for (const video of videos) {
+      const rowKey = (video.data as { pro2RowKey?: string }).pro2RowKey;
+      if (!rowKey) continue;
+      const frameImg = store.nodes.find(
+        (n) =>
+          n.type === "story-pro2-image" &&
+          (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+            frameColumnId &&
+          (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+      );
+      if (!frameImg) continue;
+      if (
+        next.some(
+          (e) =>
+            e.source === frameImg.id &&
+            e.target === video.id &&
+            e.targetHandle === "in_ref",
+        )
+      ) {
+        continue;
+      }
+      next = [
+        ...next,
+        {
+          id: `e-${frameImg.id}-${video.id}-ref`,
+          source: frameImg.id,
+          target: video.id,
+          sourceHandle: "out_image",
+          targetHandle: "in_ref",
+        },
+      ];
+    }
+    return next;
+  });
+
+  if (keys.length) {
+    window.setTimeout(() => {
+      batchRunStoryRows(videoColumnId, keys, "video", { forceFresh: false });
+    }, 0);
+  }
+
+  return { videoColumnId };
 }
 
 type CharacterThreeViewKickoffStore = FrameKickoffStore & {

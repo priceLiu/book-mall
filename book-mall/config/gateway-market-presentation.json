@@ -74,8 +74,63 @@
       "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
       "heroUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
       "providerLabel": "ByteDance",
-      "taskTags": ["Image to Video", "Text to Video"],
-      "readme": "Seedance 2.0 · 多参考图生视频，经 Gateway KIE 路由。"
+      "taskTags": ["Image to Video"],
+      "readme": "Seedance 2.0 · 火山方舟 doubao-seedance-2.0。"
+    },
+    "kie-seedance-2.0": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "heroUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "ByteDance",
+      "taskTags": ["Image to Video", "Video to Video"],
+      "readme": "Seedance 2.0 (KIE) · bytedance/seedance-2 · 图/视频/音频多参考。"
+    },
+    "seedance-2.0-mini": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "ByteDance",
+      "taskTags": ["Image to Video", "Video to Video"],
+      "readme": "Seedance 2.0 Mini · bytedance/seedance-2-mini。"
+    },
+    "google-nano-banana": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "Google",
+      "taskTags": ["Text to Image"],
+      "readme": "NanoBanana Gemini 2.5 Flash · google/nano-banana 文生图。"
+    },
+    "google-nano-banana-i2i": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "Google",
+      "taskTags": ["Image to Image"],
+      "readme": "NanoBanana Gemini 2.5 Flash · google/nano-banana-edit 图生图。"
+    },
+    "kie-4o-image": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "OpenAI",
+      "taskTags": ["Text to Image", "Image to Image"],
+      "readme": "4o Image · 文生图 / 参考图编辑。"
+    },
+    "veo-3": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "Google",
+      "taskTags": ["Image to Video", "Video to Video"],
+      "readme": "Google Veo 3 · KIE veo3。"
+    },
+    "veo-3.1": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "Google",
+      "taskTags": ["Image to Video", "Video to Video"],
+      "readme": "Google Veo 3.1 · KIE veo3.1。"
+    },
+    "hailuo-2.3-i2v": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "MiniMax",
+      "taskTags": ["Image to Video"],
+      "readme": "海螺 2.3 图生视频 · standard / pro。"
+    },
+    "kling-2.5-turbo-i2v": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "Kling",
+      "taskTags": ["Image to Video"],
+      "readme": "可灵 2.5 Turbo · 图生/文生视频。"
     },
     "wan2.7-image": {
       "providerLabel": "Alibaba",

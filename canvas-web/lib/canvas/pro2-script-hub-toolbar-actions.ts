@@ -88,6 +88,10 @@ export function generatePro2FrameBoardFromHub(
     modelKey: string;
     params?: Record<string, unknown>;
   },
+  kickoffOptions?: Pick<
+    KickoffPro2FrameBoardOptions,
+    "spawnNewGroup" | "forceFresh"
+  >,
 ): boolean {
   if (!pro2HubHasScriptTable(hubData)) return false;
   const opts: KickoffPro2FrameBoardOptions = {};
@@ -96,6 +100,12 @@ export function generatePro2FrameBoardFromHub(
   }
   if (batchImage?.providerId?.trim() && batchImage.modelKey?.trim()) {
     opts.batchImage = batchImage;
+  }
+  if (kickoffOptions?.spawnNewGroup) {
+    opts.spawnNewGroup = true;
+  }
+  if (kickoffOptions?.forceFresh) {
+    opts.forceFresh = true;
   }
   kickoffPro2FrameBoardFromHub(
     getStore,

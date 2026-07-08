@@ -429,6 +429,66 @@ export function spawnStoryPro2FrameColumnFromHub(args: {
   return frameColumnId;
 }
 
+/** 2.0 LibTV · 从分镜列 spawn 视频列（视觉组 kickoff 用） */
+export function spawnStoryPro2VideoColumnFromFrame(args: {
+  scriptHubId: string;
+  starterNodeId: string;
+  frameColumnId: string;
+  nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
+  addNode: (
+    type: "story-pro2-video",
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+}): string {
+  const ws = (
+    args.nodes.find((n) => n.id === args.starterNodeId)?.data as {
+      workspaceIds?: StoryPro2WorkspaceIds;
+    }
+  )?.workspaceIds;
+  if (ws?.videoColumnId) {
+    const existing = args.nodes.find((n) => n.id === ws.videoColumnId);
+    if (existing?.type === "story-pro2-video") {
+      args.updateNodeData(existing.id, {
+        frameColumnId: args.frameColumnId,
+        hubNodeId: args.scriptHubId,
+      });
+      return existing.id;
+    }
+  }
+
+  const frame = args.nodes.find((n) => n.id === args.frameColumnId);
+  const hub = args.nodes.find((n) => n.id === args.scriptHubId);
+  const gap = 56;
+  const frameW = frame?.width ?? NODE_DEFAULT_SIZE["story-pro2-frame"].width;
+  const videoColumnId = args.addNode(
+    "story-pro2-video",
+    {
+      x: (frame?.position?.x ?? hub?.position?.x ?? 0) + frameW + gap,
+      y: frame?.position?.y ?? hub?.position?.y ?? 120,
+    },
+    {
+      rows: [],
+      hubNodeId: args.scriptHubId,
+      frameColumnId: args.frameColumnId,
+    },
+  );
+
+  connect(args.setEdges, args.frameColumnId, videoColumnId, "text", "in_text");
+
+  const nextWs: StoryPro2WorkspaceIds = {
+    ...(ws ?? { scriptHubId: args.scriptHubId }),
+    scriptHubId: args.scriptHubId,
+    frameColumnId: args.frameColumnId,
+    videoColumnId,
+  };
+  args.updateNodeData(args.starterNodeId, { workspaceIds: nextWs });
+  return videoColumnId;
+}
+
 export function spawnStoryPro2StyleNode(
   args: SpawnProHubArgs & { scriptHubId: string },
 ): string {

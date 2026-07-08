@@ -210,6 +210,17 @@ export function ModelManager({
           </button>
         ))}
       </div>
+      <p className="text-xs text-[var(--gw-muted)]">
+        当前 Tab 按模型类型筛选。Seedance、Veo、海螺、可灵等视频模型在{" "}
+        <button
+          type="button"
+          className="text-[var(--gw-accent)] hover:underline"
+          onClick={() => setTab("video")}
+        >
+          Video Models
+        </button>
+        ；对话模型在 Text Models。
+      </p>
 
       <div className="space-y-3">
         {groups.map((g) => {
@@ -226,6 +237,9 @@ export function ModelManager({
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2>{g.label}</h2>
+                    <span className="text-xs text-[var(--gw-muted)]">
+                      {g.models.length} 个模型
+                    </span>
                     <ProviderApplyLink
                       providerKind={g.providerKind}
                       className="text-xs text-[var(--gw-accent)] hover:underline"
@@ -244,19 +258,15 @@ export function ModelManager({
                     >
                       {formatProviderKindLabel(g.providerKind)}
                     </span>
-                    {g.models.slice(0, 6).map((m) => (
+                    {g.models.map((m) => (
                       <span
                         key={m.modelKey}
+                        title={m.modelKey}
                         className={`rounded-full border px-2 py-0.5 text-xs ${tagClass("model")}`}
                       >
                         {m.displayName}
                       </span>
                     ))}
-                    {g.models.length > 6 ? (
-                      <span className="text-xs text-[var(--gw-muted)]">
-                        +{g.models.length - 6} 更多
-                      </span>
-                    ) : null}
                     {[...new Set(g.models.flatMap((m) => m.capabilities ?? []))].map(
                       (cap) => (
                         <span
