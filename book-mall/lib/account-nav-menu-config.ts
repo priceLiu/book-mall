@@ -78,15 +78,18 @@ function financeNavItem(
 export function buildAccountNavMenuGroups(input: {
   isAdmin: boolean;
   billingPersona: BillingPersona | null;
-  showToolsLaunch: boolean;
-  showCanvasLaunch: boolean;
-  showEcomLaunch: boolean;
-  showQuickReplicaLaunch: boolean;
   /** 任意有效订阅（个人套餐或团队 OWNER）显示分享返佣入口；团队非 OWNER 成员不显示 */
   showReferral?: boolean;
 }): AccountNavMenuGroup[] {
   const isByok = input.billingPersona === "BYOK";
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
+
+  const appItems: AccountNavMenuItem[] = [
+    { kind: "action", id: "launch-tools", label: "AI 工具站", icon: Wrench },
+    { kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid },
+    { kind: "action", id: "launch-ecom", label: "电商工具箱", icon: LayoutGrid },
+    { kind: "action", id: "launch-quick-replica", label: "快速复制", icon: Copy },
+  ];
 
   const billingItems: AccountNavMenuItem[] = [
     { kind: "link", href: "/account/billing", label: "轻量包购买", icon: Sparkles, exact: true },
@@ -120,6 +123,11 @@ export function buildAccountNavMenuGroups(input: {
 
   const groups: AccountNavMenuGroup[] = [
     {
+      id: "apps",
+      label: GROUP_LABELS.apps,
+      items: appItems,
+    },
+    {
       id: "billing",
       label: GROUP_LABELS.billing,
       items: billingItems,
@@ -147,23 +155,6 @@ export function buildAccountNavMenuGroups(input: {
         },
       ],
     });
-  }
-
-  const appItems: AccountNavMenuItem[] = [];
-  if (input.showToolsLaunch) {
-    appItems.push({ kind: "action", id: "launch-tools", label: "AI 工具站", icon: Wrench });
-  }
-  if (input.showCanvasLaunch) {
-    appItems.push({ kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid });
-  }
-  if (input.showEcomLaunch) {
-    appItems.push({ kind: "action", id: "launch-ecom", label: "打开电商工具箱", icon: LayoutGrid });
-  }
-  if (input.showQuickReplicaLaunch) {
-    appItems.push({ kind: "action", id: "launch-quick-replica", label: "快速复制", icon: Copy });
-  }
-  if (appItems.length > 0) {
-    groups.push({ id: "apps", label: GROUP_LABELS.apps, items: appItems });
   }
 
   const accountItems: AccountNavMenuItem[] = [
