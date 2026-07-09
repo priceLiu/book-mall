@@ -205,7 +205,9 @@ export function LibtvAudioInputDock() {
           </div>
           <span className="ml-auto flex items-center gap-2 text-white/40">
             <Zap className="size-3.5" />
-            <span style={{ fontSize: fontPx }}>{estCredits ?? "—"}</span>
+            <span style={{ fontSize: fontPx }}>
+              {estCredits?.creditsLabel ?? estCredits?.credits ?? "—"}
+            </span>
           </span>
           <LibtvDockSendButton
             disabled={!canSend}

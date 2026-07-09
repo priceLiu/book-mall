@@ -17,9 +17,11 @@ import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 export function ReferralRegisterForm({
   code,
   referrerName,
+  welcomeGift,
 }: {
   code: string;
   referrerName: string | null;
+  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
 }) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -102,6 +104,17 @@ export function ReferralRegisterForm({
             ，填写昵称并验证手机号即可完成，无需设置密码（后续可用短信验证码登录）。
           </p>
         </BoxReveal>
+
+        {welcomeGift &&
+        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+            完成注册立得 {welcomeGift.generalCredits.toLocaleString()} 通用积分
+            {welcomeGift.videoCredits > 0
+              ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
+              : ""}
+            （含视频，长期有效），可直接体验生图与生视频。
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4">
           <AnimatedAuthFields

@@ -100,7 +100,6 @@ export function useLibtvRuntimeErrorBanner(opts: {
     opts.dismissedFailTaskId,
     opts.autoDismissMs,
     opts.hasMedia,
-    opts.failCode,
   ]);
 
   return { visible, message, dismiss };

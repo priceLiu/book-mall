@@ -148,6 +148,8 @@ model User {
   referrals        User[]           @relation("UserReferrals")
   /// 分享返佣：作为分享人的档案（分享码 + 财务后台设置的返佣比例）
   referralProfile  ReferralProfile? @relation("ReferralProfileOwner")
+  /// 分享返佣：作为分享人的历史返佣单
+  referralPayouts  ReferralPayout[] @relation("ReferralPayoutOwner")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,6 +179,47 @@ model ReferralProfile {
   updatedAt      DateTime  @updatedAt
 
   @@index([code])
+}
+
+/// 返佣单结算状态
+enum ReferralPayoutStatus {
+  PENDING // 待支付（已生成，待财务打款）
+  PAID // 已支付
+  VOID // 作废
+}
+
+/// 返佣单（按分享人 + 结算周期出单；财务生成、核对、标记打款、导出）
+model ReferralPayout {
+  id                  String               @id @default(cuid())
+  referrerUserId      String
+  referrer            User                 @relation("ReferralPayoutOwner", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  /// 结算周期 key（YYYY-MM），与 periodStart/End 一致，便于唯一约束与检索
+  periodKey           String
+  periodStart         DateTime
+  periodEnd           DateTime
+  /// 出单时快照的返佣比例（0~1）
+  commissionRate      Decimal              @db.Decimal(5, 4)
+  /// 周期内下线套餐实付合计
+  planAmountYuan      Decimal              @default(0) @db.Decimal(12, 2)
+  /// 周期内下线充值实付合计
+  rechargeAmountYuan  Decimal              @default(0) @db.Decimal(12, 2)
+  /// 返佣计算基数（= plan + recharge）
+  baseAmountYuan      Decimal              @default(0) @db.Decimal(12, 2)
+  /// 应返佣金额（= base × rate，出单时定格）
+  commissionYuan      Decimal              @default(0) @db.Decimal(12, 2)
+  /// 周期内产生消费的下线人数
+  referredCount       Int                  @default(0)
+  status              ReferralPayoutStatus @default(PENDING)
+  note                String?
+  createdByUserId     String?
+  paidAt              DateTime?
+  paidByUserId        String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([referrerUserId, periodKey])
+  @@index([periodKey])
+  @@index([status])
 }
 
 /// 按用户 + 模型 + 账期累计用量（用于云厂商阶梯价，如 aitryon-refiner 按生成张数分档）。
@@ -2698,6 +2741,11 @@ model PlatformPricingConfig {
   defaultVideoSec     Int      @default(15) // 视频默认/封顶计费秒数（财务 2.0：15s）
   videoMarginM        Decimal  @default("4") @db.Decimal(6, 3) // 视频专项系数 M（4 → 75% 毛利）
   videoMinMarginGuard Decimal  @default("0.75") @db.Decimal(6, 4) // 视频专项毛利护栏 ≥75%
+  // 新用户注册赠送积分（分享链接 1.0）：长期有效、不清零；财务可调
+  welcomeGiftGeneralCredits Int  @default(500) // 注册赠送通用积分
+  welcomeGiftVideoCredits   Int  @default(100) // 注册赠送视频专项积分
+  // 分享返佣默认比例（0~1）：新建分享档案时的初始返佣（建议 0.05 保 20% 毛利）
+  referralDefaultRate       Decimal @default("0.05") @db.Decimal(5, 4)
   updatedAt           DateTime @updatedAt
   createdAt           DateTime @default(now())
 }

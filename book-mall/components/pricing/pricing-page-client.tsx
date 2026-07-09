@@ -15,6 +15,7 @@ import {
   Film,
   ImageIcon,
   Info,
+  Gift,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -203,6 +204,7 @@ export function PricingPageClient({
   rates,
   teamTenants = [],
   isLoggedIn,
+  welcomeGift,
 }: {
   anchorYuan: number;
   plans: Plan[];
@@ -211,6 +213,7 @@ export function PricingPageClient({
   rates: ResourceRate[];
   teamTenants?: { id: string; name: string }[];
   isLoggedIn: boolean;
+  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
 }) {
   const [family, setFamily] = useState<"PERSONAL" | "TEAM">("PERSONAL");
   const [interval, setInterval] = useState<"MONTH" | "YEAR">("MONTH");
@@ -251,6 +254,20 @@ export function PricingPageClient({
         <p className="site-pricing-subtitle">
           透明积分体系：按月订阅发放积分，全站 AI 应用通用；自带 Key 用户厂商费用自理，超额从轻量包扣点。
         </p>
+
+        {welcomeGift &&
+        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+          <div className="mx-auto mt-5 inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[#8957e5]/30 bg-[#8957e5]/10 px-4 py-2 text-sm text-[#5a32a3]">
+            <Gift className="h-4 w-4" />
+            <span>
+              新用户注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
+              {welcomeGift.videoCredits > 0
+                ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
+                : ""}
+              ，长期有效
+            </span>
+          </div>
+        ) : null}
 
         <div className="site-pricing-toggles">
           <div className="site-pricing-toggle-group">

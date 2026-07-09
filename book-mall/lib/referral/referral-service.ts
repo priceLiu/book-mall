@@ -3,18 +3,19 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 /**
- * 分享返佣 · 领域服务
+ * 分享返佣 · 领域服务（分享链接 1.0）
  *
- * 门禁（谁能生成分享链接）：个人套餐（PERSONAL）且
- *   - 月付 priceYuan ≥ 599，或
- *   - 年付 priceYuan ≥ 1490
- * 「及以上」档位同样满足（按金额阈值判定，对套餐改名稳健）。
+ * 门禁（谁能生成分享链接）：
+ *   - 任意有效订阅均可：个人套餐（PERSONAL，任意档）或团队 OWNER（团队套餐有效）。
+ *   - 团队非 OWNER 成员（ADMIN / MEMBER）严格排除：即便其另有个人订阅也不给。
  *
- * 返佣比例（commissionRate）不在代码写死，由财务管理员在后台逐个分享人录入。
+ * 返佣比例（commissionRate）不在代码写死；新建档案用财务可调的默认比例
+ * （PlatformPricingConfig.referralDefaultRate，缺省 0.05 ≈ 保 20% 毛利），
+ * 后续可由财务管理员在后台逐个分享人调整。
  */
 
-export const REFERRAL_MIN_MONTH_PRICE_YUAN = 599;
-export const REFERRAL_MIN_YEAR_PRICE_YUAN = 1490;
+/** 分享返佣默认比例回退值（DB 无配置时使用；0.05 ≈ 对全部产品保 20% 毛利）。 */
+export const REFERRAL_DEFAULT_RATE_FALLBACK = 0.05;
 
 /** 计入「套餐金额」的订单类型（会员/订阅类） */
 const PLAN_ORDER_TYPES: Prisma.OrderWhereInput["type"] = {
@@ -31,43 +32,90 @@ export type ReferralEligibility = {
   reason: string | null;
 };
 
-/** 判定某用户是否满足分享门禁（个人 月付≥599 / 年付≥1490 及以上）。 */
+/**
+ * 判定某用户是否满足分享门禁（分享链接 1.0）：
+ *   1. 团队非 OWNER 成员（ACTIVE 的 ADMIN/MEMBER，团队 ACTIVE）→ 严格排除（优先级最高）。
+ *   2. 有效个人套餐（任意档）→ 合格。
+ *   3. 团队 OWNER 且团队套餐有效 → 合格。
+ */
 export async function getReferralEligibility(
   userId: string,
 ): Promise<ReferralEligibility> {
   const now = new Date();
+
+  // 1) 团队非 OWNER 成员：硬排除（即便其自有个人订阅）。
+  const teamNonOwner = await prisma.tenantMember.findFirst({
+    where: {
+      userId,
+      status: "ACTIVE",
+      role: { in: ["ADMIN", "MEMBER"] },
+      tenant: { type: "TEAM", status: "ACTIVE" },
+    },
+    select: { id: true },
+  });
+  if (teamNonOwner) {
+    return { eligible: false, planLabel: null, reason: "团队成员不可分享" };
+  }
+
+  // 2) 有效个人套餐（任意档，已取消 ¥599/¥1490 门槛）。
   const acc = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
     select: { planId: true, monthlyGrantCredits: true, currentPeriodEnd: true },
   });
-  if (!acc?.planId || acc.monthlyGrantCredits <= 0) {
-    return { eligible: false, planLabel: null, reason: "无有效个人套餐" };
+  if (acc?.planId && acc.monthlyGrantCredits > 0) {
+    const periodOk = !acc.currentPeriodEnd || acc.currentPeriodEnd > now;
+    if (periodOk) {
+      const plan = await prisma.membershipPlan.findUnique({
+        where: { id: acc.planId },
+        select: { family: true, interval: true, tier: true },
+      });
+      if (plan?.family === "PERSONAL") {
+        const planLabel = `个人 · ${plan.tier}（${plan.interval === "YEAR" ? "年付" : "月付"}）`;
+        return { eligible: true, planLabel, reason: null };
+      }
+    }
   }
-  const periodOk = !acc.currentPeriodEnd || acc.currentPeriodEnd > now;
-  if (!periodOk) {
-    return { eligible: false, planLabel: null, reason: "套餐已过期" };
-  }
-  const plan = await prisma.membershipPlan.findUnique({
-    where: { id: acc.planId },
-    select: { family: true, interval: true, priceYuan: true, tier: true },
+
+  // 3) 团队 OWNER 且团队套餐有效。
+  const ownerMembership = await prisma.tenantMember.findFirst({
+    where: {
+      userId,
+      status: "ACTIVE",
+      role: "OWNER",
+      tenant: {
+        type: "TEAM",
+        status: "ACTIVE",
+        planId: { not: null },
+        OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: now } }],
+      },
+    },
+    select: { tenant: { select: { name: true, packageLevel: true, interval: true } } },
   });
-  if (!plan || plan.family !== "PERSONAL") {
-    return { eligible: false, planLabel: null, reason: "非个人套餐" };
+  if (ownerMembership?.tenant) {
+    const t = ownerMembership.tenant;
+    const intervalLabel = t.interval === "YEAR" ? "年付" : "月付";
+    const planLabel = `团队 · ${t.name}${t.packageLevel ? `（${t.packageLevel} · ${intervalLabel}）` : ""}`;
+    return { eligible: true, planLabel, reason: null };
   }
-  const price = Number(plan.priceYuan);
-  const min =
-    plan.interval === "YEAR"
-      ? REFERRAL_MIN_YEAR_PRICE_YUAN
-      : REFERRAL_MIN_MONTH_PRICE_YUAN;
-  const planLabel = `个人 · ${plan.tier}（${plan.interval === "YEAR" ? "年付" : "月付"}）`;
-  if (price < min) {
-    return {
-      eligible: false,
-      planLabel,
-      reason: `当前套餐未达分享门槛（${plan.interval === "YEAR" ? "年付≥¥1490" : "月付≥¥599"}）`,
-    };
+
+  return { eligible: false, planLabel: null, reason: "无有效订阅" };
+}
+
+/** 读取分享返佣默认比例（财务可在 PlatformPricingConfig 调；缺省 0.05）。 */
+export async function getReferralDefaultRate(): Promise<number> {
+  try {
+    const cfg = await prisma.platformPricingConfig.findUnique({
+      where: { id: "default" },
+      select: { referralDefaultRate: true },
+    });
+    const rate = cfg ? Number(cfg.referralDefaultRate) : REFERRAL_DEFAULT_RATE_FALLBACK;
+    return Number.isFinite(rate) && rate >= 0 && rate <= 1
+      ? rate
+      : REFERRAL_DEFAULT_RATE_FALLBACK;
+  } catch {
+    // 迁移尚未应用（列缺失）等场景：回退默认，不阻断分享档案创建。
+    return REFERRAL_DEFAULT_RATE_FALLBACK;
   }
-  return { eligible: true, planLabel, reason: null };
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 去掉易混淆 I O 0 1
@@ -111,11 +159,13 @@ export async function ensureReferralProfile(
     return { ok: false, reason: elig.reason ?? "不满足分享门禁" };
   }
 
+  const defaultRate = await getReferralDefaultRate();
+
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const code = generateReferralCode();
     try {
       const created = await prisma.referralProfile.create({
-        data: { referrerUserId: userId, code },
+        data: { referrerUserId: userId, code, commissionRate: defaultRate },
         select: { code: true, commissionRate: true, enabled: true },
       });
       return {

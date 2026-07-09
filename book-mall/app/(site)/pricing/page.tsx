@@ -7,6 +7,7 @@ import {
 } from "@/lib/billing/byok-pricing";
 import { prisma } from "@/lib/prisma";
 import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
+import { getWelcomeGiftConfig } from "@/lib/billing/welcome-gift";
 import { listUserTenantMemberships } from "@/lib/tenant/context";
 import { PricingPageClient } from "@/components/pricing/pricing-page-client";
 
@@ -23,7 +24,7 @@ export default async function PricingPage() {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
 
-  const [config, plansRaw, pricesRaw, byokQuotas, rates, teamTenants] = await Promise.all([
+  const [config, plansRaw, pricesRaw, byokQuotas, rates, teamTenants, welcomeGift] = await Promise.all([
     loadPricingConfig(),
     prisma.membershipPlan.findMany({
       where: { active: true },
@@ -43,6 +44,7 @@ export default async function PricingPage() {
             .map((m) => ({ id: m.tenantId, name: m.tenantName })),
         )
       : Promise.resolve([] as { id: string; name: string }[]),
+    getWelcomeGiftConfig(),
   ]);
 
   return (
@@ -83,6 +85,7 @@ export default async function PricingPage() {
       }))}
       rates={rates.map((r) => ({ resourceType: r.resourceType, coefficientYuan: Number(r.coefficientYuan), unitLabel: r.unitLabel }))}
       teamTenants={teamTenants}
+      welcomeGift={welcomeGift}
     />
   );
 }

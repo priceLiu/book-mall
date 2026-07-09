@@ -13,6 +13,7 @@ import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
 import { prisma } from "@/lib/prisma";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
+import { grantWelcomeGift } from "@/lib/billing/welcome-gift";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
 
 export const dynamic = "force-dynamic";
@@ -139,6 +140,13 @@ export async function POST(request: Request) {
 
     // Gateway 身份 / sk-gw 在首次 SSO 或生成时懒加载（见 sync-user / platform-managed-key），
     // 不在注册热路径阻塞，避免注册 + 登录连续等待 2～3 秒。
+
+    // 新用户注册赠送积分（通用 + 视频，长期有效、幂等）。失败不阻断注册主流程。
+    try {
+      await grantWelcomeGift(createdUserId);
+    } catch (giftErr) {
+      console.warn("[register] grantWelcomeGift failed", giftErr);
+    }
 
     // 免密注册场景：返回一次性自动登录票据，客户端据此建立会话（无需二次短信）。
     const autoLoginToken = issueAutoLoginToken(createdUserId);

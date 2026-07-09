@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { ReferralRegisterForm } from "@/components/auth/referral-register-form";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
+import { getWelcomeGiftConfig } from "@/lib/billing/welcome-gift";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,10 @@ export default async function ReferralRegisterPage({
   params: { code: string };
 }) {
   const code = params.code?.trim().toUpperCase() ?? "";
-  const referrer = code ? await resolveReferrerByCode(code) : null;
+  const [referrer, welcomeGift] = await Promise.all([
+    code ? resolveReferrerByCode(code) : Promise.resolve(null),
+    getWelcomeGiftConfig(),
+  ]);
 
   return (
     <Suspense
@@ -26,6 +30,7 @@ export default async function ReferralRegisterPage({
       <ReferralRegisterForm
         code={code}
         referrerName={referrer?.referrerName ?? null}
+        welcomeGift={welcomeGift}
       />
     </Suspense>
   );

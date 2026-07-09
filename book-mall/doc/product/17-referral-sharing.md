@@ -1,20 +1,21 @@
-# 分享返佣（邀请注册）
+# 分享链接 1.0（邀请注册 / 分享返佣）
 
-> 面向「个人套餐 月付 ¥599 / 年付 ¥1490 及以上」会员的分享拉新能力：
-> 生成专属分享链接 → 好友免密注册并与分享人关联 → 分享人/财务查看业绩 →
-> 财务后台逐人录入返佣比例。
+> 面向**任意有效订阅**（个人套餐或团队主账号）会员的分享拉新能力：
+> 生成专属分享链接 → 好友免密注册并与分享人关联 → 新用户获赠积分 →
+> 分享人/财务查看业绩 → 财务后台按统一默认比例（可逐人调整）返佣。
 
-## 1. 门禁（谁能分享）
+## 1. 门禁（谁能分享）— 分享链接 1.0
 
-- **资格**：个人套餐（`MembershipFamily.PERSONAL`）且
-  - 月付 `priceYuan ≥ 599`，或
-  - 年付 `priceYuan ≥ 1490`，
-  - 「及以上」档位同样满足（按金额阈值判定，对套餐改名稳健）。
-- **判定**：`lib/referral/referral-service.ts` · `getReferralEligibility(userId)`
-  读取 `CreditAccount(ownerType=USER).planId → MembershipPlan`，校验
-  `family / interval / priceYuan` 与有效期 `currentPeriodEnd`。
-- **阈值常量**：`REFERRAL_MIN_MONTH_PRICE_YUAN = 599`、`REFERRAL_MIN_YEAR_PRICE_YUAN = 1490`。
-- 个人中心仅在满足门禁时展示「分享返佣」菜单（`account-nav-menu-config.ts` · `showReferral`）。
+- **资格（放开档位门槛）**：任意有效订阅均可生成分享链接：
+  - **个人套餐**（`MembershipFamily.PERSONAL`，**任意档**，已取消 ¥599/¥1490 门槛），或
+  - **团队 OWNER**（`TenantRole.OWNER`，团队 ACTIVE 且 `Tenant.planId` 有效、`currentPeriodEnd` 未过期）。
+- **严格排除**：**团队非 OWNER 成员**（ACTIVE 的 `ADMIN` / `MEMBER`，团队 ACTIVE）**一律不可**分享——
+  即便其另有个人订阅，也以此排除为最高优先级。
+- **判定**：`lib/referral/referral-service.ts` · `getReferralEligibility(userId)`：
+  1. 命中 `TenantMember(role∈{ADMIN,MEMBER}, status=ACTIVE, tenant.type=TEAM, tenant.status=ACTIVE)` → 不合格（`团队成员不可分享`）；
+  2. `CreditAccount(ownerType=USER).planId` 有效且 `MembershipPlan.family=PERSONAL`、有效期内 → 合格；
+  3. 团队 OWNER 且团队套餐有效 → 合格。
+- 个人中心仅在满足门禁时展示「分享返佣」菜单（`account-nav-menu-config.ts` · `showReferral`；由 `(account)/layout.tsx` 传 `getReferralEligibility().eligible`）。
 
 ## 2. 数据模型
 
@@ -24,11 +25,28 @@
   仅在新建用户、或既有未归因用户首次注册时写入，**不覆盖**已有归因。
 - `ReferralProfile`（分享人档案，1 用户 1 条）：
   - `code`（分享码，全站唯一，出现在 `/r/{code}`）
-  - `commissionRate Decimal(5,4)`（0~1，默认 0 = 未设置；由财务后台录入）
+  - `commissionRate Decimal(5,4)`（0~1，**新建档案时取默认比例** `PlatformPricingConfig.referralDefaultRate`，缺省 0.05；财务可逐人调整）
   - `enabled`（财务可停用分享码）
   - `note` / `rateUpdatedAt` / `rateUpdatedBy`（财务备注与留痕）
 
-> 比例**不在代码写死**，统一由财务管理员后台逐个分享人录入。
+> 比例**不在业务代码写死**：默认值由 `PlatformPricingConfig.referralDefaultRate` 提供（财务可调），
+> 逐人可在财务后台微调。
+
+## 2.1 返佣测算（保证毛利）
+
+- 公式：`最大返佣% = 产品毛利% − 目标毛利下限%`（返佣按订单实付 `amountYuan` 计）。
+- 口径：保守满额消耗（不吃积分沉淀），通用 ¥0.016/积分、视频 ¥0.0267/积分（锚定 ¥0.04 ÷ M）。
+- 全局最低毛利产品 ≈ **视频加量包 25.9%**，作为单一统一返佣的兜底约束：
+  - 保 **20% 毛利** → 统一返佣 ≤ 5.9% → **默认 5%**；
+  - 保 **15% 毛利** → 统一返佣 ≤ 10.9% → 可选 10%。
+- 设计支持**逐套餐等级**不同返佣（各档毛利见 finance-web `/admin/referrals` 反算工具），当前统一取一个默认值。
+
+## 2.2 新用户注册赠送（分享链接 1.0）
+
+- 所有新注册用户（含分享落地注册）赠送积分：默认 **500 通用 + 100 视频**，长期有效、**不清零**。
+- 额度落 `PlatformPricingConfig.welcomeGiftGeneralCredits / welcomeGiftVideoCredits`（财务可调）。
+- 发放：`lib/billing/welcome-gift.ts` · `grantWelcomeGift(userId)`（幂等，失败不阻断注册）。
+- 展示：价格页横幅 + 注册页 / 分享落地注册页（读同一配置，不硬编码）。
 
 ## 3. 分享链接与注册
 
@@ -72,19 +90,63 @@
 - 管理员可对**某个分享人**逐条录入返佣比例（0~100%）、停用分享码、加结算备注；
   比例修改留痕（`rateUpdatedAt` / `rateUpdatedBy`）。
 
+## 6.1 返佣结算 · 返佣单（怎么返 / 何时返）
+
+- **计算基数**：下线用户在「结算周期」内 **实付**（`Order.status=PAID`，按 `paidAt` 落账；`paidAt` 为空回退 `createdAt`）的「套餐订阅 + 轻量包充值」金额合计。
+- **应返佣金** = 计算基数 × 分享人当前返佣比例（**出单时定格快照**，之后改比例不影响历史返佣单）。
+- **结算节奏**：按自然月出单（次月结算上月）；财务也可选任意月份手动计算。
+- **流程**：财务选周期 → **计算**（预览，不落库）→ **生成返佣单**（`PENDING`）→ 线下打款后 **标记已支付**（`PAID`）；可 **作废**（`VOID`）；可 **导出 CSV** 作为打款依据。
+- **幂等**：同一 `(分享人, periodKey)` 仅一张返佣单；重复「生成」为覆盖式 upsert，但 **已支付 / 已作废不被覆盖**。
+- 页面：finance-web `/admin/referral-payouts`（门禁 `viewCost`，生成/打款需 `managePricing`）。
+- API：`.../referral-payouts/preview`（计算）· `/generate`（生成）· `/list`（列出）· `/status`（打款/作废）。
+- 服务：`lib/referral/referral-payout-service.ts`；模型：`ReferralPayout`（唯一 `referrerUserId+periodKey`）。
+
 ## 7. 关键文件
 
 | 层 | 文件 |
 |---|---|
-| 领域服务 | `book-mall/lib/referral/referral-service.ts` |
+| 领域服务 | `book-mall/lib/referral/referral-service.ts`；`lib/referral/referral-payout-service.ts` |
 | 自动登录票据 | `book-mall/lib/auth/auto-login-token.ts`；`lib/auth.ts`（autologin 分支） |
 | 注册 | `app/api/auth/register/route.ts`；`components/auth/referral-register-form.tsx`；`app/(site)/r/[code]/page.tsx` |
 | 个人中心 | `app/(account)/account/referral/page.tsx`；`components/account/referral-panel.tsx`；`lib/account-nav-menu-config.ts` |
-| 财务 API | `app/api/finance/admin/referrals/route.ts`；`app/api/finance/admin/referrals/rate/route.ts` |
-| 财务前端 | `finance-web/app/admin/referrals/page.tsx`；`finance-web/components/admin/referrals-client.tsx` |
-| Schema | `prisma/schema.prisma`（`ReferralProfile`、`User.referredByUserId`） |
+| 财务 API | `app/api/finance/admin/referrals/*`；`app/api/finance/admin/referral-payouts/*` |
+| 财务前端 | `finance-web/app/admin/referrals/*`；`finance-web/app/admin/referral-payouts/*`（+ `components/admin/referral-payouts-client.tsx`） |
+| Schema | `prisma/schema.prisma`（`ReferralProfile`、`ReferralPayout`、`User.referredByUserId`） |
 
-## 8. 待办 / 后续
+## 8. 测试用例
 
-- 返佣**结算与打款**（提现流程、账期、对账）尚未实现，当前仅展示预估。
+### 8.1 门禁（`getReferralEligibility`）
+| # | 场景 | 期望 |
+|---|---|---|
+| G1 | 个人套餐（任意档，有效期内） | 合格，菜单显示 |
+| G2 | 无任何订阅 | 不合格（无有效订阅） |
+| G3 | 团队 OWNER，团队套餐有效 | 合格 |
+| G4 | 团队 ADMIN（另有个人订阅） | **不合格**（团队成员不可分享）— 硬排除优先 |
+| G5 | 团队 MEMBER（无个人订阅） | 不合格（团队成员不可分享） |
+| G6 | 个人套餐过期 | 不合格（回落无有效订阅） |
+| G7 | 已有分享档案但降级为团队成员 | 菜单隐藏、`/account/referral` 展示排除文案；档案保留 |
+
+### 8.2 默认返佣比例
+| # | 场景 | 期望 |
+|---|---|---|
+| R1 | 新建分享档案（配置 `referralDefaultRate=0.05`） | 档案 `commissionRate=0.05` |
+| R2 | `PlatformPricingConfig` 列缺失（迁移未应用） | 回退 0.05，不报错 |
+| R3 | finance-web 反算工具，目标毛利 20% | 统一返佣上限 ≈ 5.9%（视频加量包 25.9% 兜底） |
+
+### 8.3 返佣结算 / 返佣单
+| # | 场景 | 期望 |
+|---|---|---|
+| P1 | 下线在 7 月支付套餐 ¥599 + 充值 ¥100，比例 5% | 计算基数 ¥699，应返 ¥34.95 |
+| P2 | 生成 7 月返佣单 | 落库 `PENDING`，金额与预览一致 |
+| P3 | 重复「生成」7 月（仍 PENDING） | 覆盖刷新，不产生重复单 |
+| P4 | 标记已支付后再「生成」 | 该单被跳过（不覆盖 PAID） |
+| P5 | 修改分享人比例后重生成 8 月 | 8 月按新比例；7 月历史单不变 |
+| P6 | 导出 CSV | 含周期/分享人/基数/比例/应返/状态 |
+| P7 | `monthPeriodRange`（单测） | `2026-07`→[7/1,8/1)；`2026-12`→跨年；非法→null |
+
+### 8.4 冒烟
+- finance-web `/admin/referrals`、`/admin/referral-payouts`、`/admin/vip-packages` 均返回 200 且门禁生效。
+
+## 9. 待办 / 后续
+- 提现自动打款渠道对接（当前线下打款 + CSV 依据）。
 - 如需多级分销 / 防刷（同设备、风控）后续扩展。
