@@ -1406,6 +1406,36 @@ async function pollOneSubmittedCanvasTask(
   });
   if (gatewayLog?.status === "SUCCEEDED") {
     const providerKind = gatewayProviderKindFromPayload(payload);
+    const logProvider = gatewayLog.providerKind ?? providerKind;
+    if (logProvider === "KIE") {
+      const { kieRecordFromGatewaySummary } = await import(
+        "@/lib/canvas/canvas-kie-image-recover"
+      );
+      const { isKieRecordSuccess } = await import("@/lib/story/kie-client");
+      const record = kieRecordFromGatewaySummary(
+        gatewayLog.resultSummary,
+        task.kieTaskId ?? "",
+        task.model,
+      );
+      if (record && isKieRecordSuccess(record.state)) {
+        await applyCanvasKieTaskResult(task.id, record);
+        const afterKie = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+        });
+        if (afterKie?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+          return "succeeded";
+        }
+        if (afterKie?.status === "FAILED" && before !== "FAILED") {
+          return "failed";
+        }
+        return "pending";
+      }
+    }
     if (
       providerKind === "VOLCENGINE" ||
       gatewayLog.providerKind === "VOLCENGINE"

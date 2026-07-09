@@ -12,6 +12,8 @@ export type MarketTaskTag =
   | "video-to-video"
   | "motion-control"
   | "video-upscale"
+  | "text-to-music"
+  | "text-to-speech"
   | "chat";
 
 type PresentationFile = {
@@ -30,6 +32,8 @@ function normalizeTaskTag(raw: string): MarketTaskTag | null {
     "text-to-video": "image-to-video",
     "motion-control": "motion-control",
     "video-upscale": "video-upscale",
+    "text-to-music": "text-to-music",
+    "text-to-speech": "text-to-speech",
     chat: "chat",
   };
   return map[s] ?? null;

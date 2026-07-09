@@ -84,15 +84,26 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
           ? ("manual" as const)
           : ("autosave" as const);
       const labelRaw = (hs as { label?: unknown }).label;
-      historyItem = await createCanvasProjectHistoryForUser(guard.user.id, id, {
-        canvas: project.canvas,
-        thumbnailUrl:
-          project.thumbnailUrl?.trim() ||
-          pickProjectThumbnailUrl(project.canvas) ||
-          undefined,
-        source,
-        label: typeof labelRaw === "string" ? labelRaw : undefined,
-      });
+      try {
+        historyItem = await createCanvasProjectHistoryForUser(
+          guard.user.id,
+          id,
+          {
+            canvas: project.canvas,
+            thumbnailUrl:
+              project.thumbnailUrl?.trim() ||
+              pickProjectThumbnailUrl(project.canvas) ||
+              undefined,
+            source,
+            label: typeof labelRaw === "string" ? labelRaw : undefined,
+          },
+        );
+      } catch (historyErr) {
+        console.warn(
+          "[canvas] history snapshot skipped",
+          historyErr instanceof Error ? historyErr.message : String(historyErr),
+        );
+      }
     }
 
     return NextResponse.json(

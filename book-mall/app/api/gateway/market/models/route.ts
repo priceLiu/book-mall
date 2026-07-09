@@ -17,6 +17,8 @@ const TASK_TAGS = new Set<MarketTaskTag>([
   "video-to-video",
   "motion-control",
   "video-upscale",
+  "text-to-music",
+  "text-to-speech",
   "chat",
 ]);
 

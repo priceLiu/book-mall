@@ -42,13 +42,16 @@ export function isStaleServerInflightTask(
   nodeTasks: CanvasTaskRecord[],
 ): boolean {
   if (!isServerInflightTaskStatus(task.status)) return false;
-  const taskTime = new Date(task.updatedAt).getTime();
+  // 用 submittedAt 判定滞后 SUBMITTED；勿用 updatedAt（poll 会刷新导致永远压过 SUCCEEDED）
+  const taskTime = new Date(
+    task.submittedAt ?? task.createdAt ?? task.updatedAt,
+  ).getTime();
   return nodeTasks.some(
     (t) =>
       t.id !== task.id &&
       t.status === "SUCCEEDED" &&
       taskHasSuccessPayload(t) &&
-      new Date(t.updatedAt).getTime() >= taskTime,
+      new Date(t.completedAt ?? t.updatedAt).getTime() >= taskTime,
   );
 }
 

@@ -55,6 +55,10 @@ function vendorTaskIdFromSubmitError(e: unknown): string | undefined {
   return undefined;
 }
 
+function asStringOrNumber(v: unknown): string | number | undefined {
+  return typeof v === "string" || typeof v === "number" ? v : undefined;
+}
+
 const BAILIAN_R2V = new Set([
   "happyhorse-1.0-r2v",
   "wan2.6-r2v",
@@ -242,10 +246,12 @@ export async function POST(request: NextRequest) {
                 ? body.input.filter_model
                 : undefined,
           upscaleFactor:
-            tz.upscaleFactor ??
-            body.input?.upscale_factor ??
-            body.input?.upscaleFactor,
-          slowmo: tz.slowmo ?? body.input?.slowmo,
+            asStringOrNumber(tz.upscaleFactor) ??
+            asStringOrNumber(body.input?.upscale_factor) ??
+            asStringOrNumber(body.input?.upscaleFactor),
+          slowmo:
+            asStringOrNumber(tz.slowmo) ??
+            asStringOrNumber(body.input?.slowmo),
           frameInterpolation:
             typeof tz.frameInterpolation === "string"
               ? tz.frameInterpolation
