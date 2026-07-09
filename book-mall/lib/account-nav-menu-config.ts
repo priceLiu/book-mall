@@ -82,7 +82,7 @@ export function buildAccountNavMenuGroups(input: {
   showCanvasLaunch: boolean;
   showEcomLaunch: boolean;
   showQuickReplicaLaunch: boolean;
-  /** 个人套餐 月付≥599 / 年付≥1490 及以上：显示分享返佣入口 */
+  /** 任意有效订阅（个人套餐或团队 OWNER）显示分享返佣入口；团队非 OWNER 成员不显示 */
   showReferral?: boolean;
 }): AccountNavMenuGroup[] {
   const isByok = input.billingPersona === "BYOK";

@@ -146,6 +146,9 @@ function canvasStoryRunJobKey(job: CanvasStoryRunJob): string {
   return parts.join(":");
 }
 
+/** 模块级别名：作业唯一键。放模块作用域，避免 hook 内引用被 eslint 误判为缺失依赖。 */
+const runKey = canvasStoryRunJobKey;
+
 function nodeRuntimeStatus(node: CanvasFlowNode): string | undefined {
   return (node.data as { runtime?: { status?: string } }).runtime?.status;
 }
@@ -688,8 +691,6 @@ export function useCanvasRunner(
     forceFresh?: boolean;
     activeKey: string | null;
   } | null>(null);
-
-  const runKey = canvasStoryRunJobKey;
 
   const emitTaskPanelSync = useCallback(
     (

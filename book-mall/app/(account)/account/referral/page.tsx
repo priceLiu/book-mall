@@ -44,10 +44,13 @@ export default async function AccountReferralPage() {
         />
         <div className="rounded-xl border border-[#d0d7de] bg-white p-6">
           <p className="text-sm text-[#1f2328]">
-            分享返佣功能面向「个人套餐 月付 ¥599 / 年付 ¥1490 及以上」的会员开放。
+            分享返佣面向任意有效订阅（个人套餐或团队主账号）开放；团队下的普通成员不可生成分享链接。
           </p>
           <p className="mt-2 text-sm text-[#656d76]">
-            {eligibility.reason ?? "当前套餐暂不支持分享返佣。"}升级套餐后即可生成专属分享链接。
+            {eligibility.reason ?? "当前账号暂不支持分享返佣。"}
+            {eligibility.reason === "团队成员不可分享"
+              ? "如需分享请使用你自己的个人订阅账号。"
+              : "订阅任意套餐后即可生成专属分享链接。"}
           </p>
           <Link
             href="/pricing"

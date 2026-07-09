@@ -1,6 +1,12 @@
 /**
  * 月度积分发放 / 重置（unified-credit-billing · 里程碑 4）
  *
+ * ⚠️ 运营约束（积分不清零，见 doc/product/18-vip-package.md §1 与需求 5）：
+ *   当前产品口径为「积分不清零、长期有效」。该脚本会把余额**重置**为月发放额
+ *   （use-it-or-lose-it），因此 **禁止将本脚本挂到 cron / 定时任务**。仅在明确
+ *   需要恢复月度清零策略、并经业务确认后，才可手动或定时执行。VIP 一次性预充账户
+ *   （monthlyGrantCredits=0）与注册赠送积分（TOPUP 入余额，非月发放额）天然不受影响。
+ *
  *   cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/grant-monthly-credits.ts [--confirm] [--account=<id>] [--now=2026-07-01]
  *
  * 行为（见 doc/product/14-tenant-team-design.md §8.3「会员：周期末重置发放 monthlyGrantCredits」）：

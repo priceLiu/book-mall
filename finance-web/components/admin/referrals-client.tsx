@@ -32,6 +32,83 @@ function yuan(n: number): string {
   return `¥${n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/**
+ * 返佣反算工具（保守满额消耗口径）：最大返佣% = 产品毛利% − 目标毛利下限%。
+ * 全局最低毛利产品 ≈ 视频加量包 25.9%，作为单一统一返佣的兜底约束。
+ */
+const LOWEST_PRODUCT_MARGIN_PCT = 25.9; // 视频加量包（保守：视频成本 ¥0.0267/积分）
+const PRODUCT_MARGIN_REFERENCE: { label: string; marginPct: number }[] = [
+  { label: "个人月付（标准~至尊）", marginPct: 54.6 },
+  { label: "个人年付（至尊，最低）", marginPct: 45.6 },
+  { label: "团队年付（至尊，最低）", marginPct: 27.5 },
+  { label: "通用加油包（最低）", marginPct: 57.9 },
+  { label: "视频加油包（视频加量，全局最低）", marginPct: 25.9 },
+];
+
+function ReferralCommissionCalc() {
+  const [targetPct, setTargetPct] = useState("20");
+  const target = Number(targetPct);
+  const validTarget = Number.isFinite(target) && target >= 0 && target < 100;
+  const uniformMax = validTarget
+    ? Math.max(0, Math.round((LOWEST_PRODUCT_MARGIN_PCT - target) * 10) / 10)
+    : 0;
+
+  return (
+    <details className="rounded border border-[#e8e8e8] bg-[#fafcff] p-3 text-sm text-[#262626]">
+      <summary className="cursor-pointer font-medium text-[#262626]">
+        返佣反算工具（按目标毛利算最大返佣）
+      </summary>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="text-xs text-[#595959]">目标毛利下限(%)</label>
+        <input
+          type="number"
+          min={0}
+          max={99}
+          step={1}
+          value={targetPct}
+          onChange={(e) => setTargetPct(e.target.value)}
+          className={`${inputCls} w-24`}
+        />
+        <span className="text-[#8c8c8c]">→</span>
+        <span className="font-medium text-[#52c41a]">
+          单一统一返佣上限 ≈ {uniformMax}%
+        </span>
+        <span className="text-xs text-[#8c8c8c]">
+          （由全局最低毛利产品 {LOWEST_PRODUCT_MARGIN_PCT}% 兜底）
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-[#8c8c8c]">
+        推荐：保 20% 毛利 → 返 5%；保 15% 毛利 → 返 10%。以下为各产品毛利与该目标下的逐档上限（设计支持逐档，当前统一取一个值）。
+      </p>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[28rem] text-xs">
+          <thead>
+            <tr className="border-b border-[#e8e8e8] bg-white text-left text-[#595959]">
+              <th className="px-2 py-1 font-medium">产品</th>
+              <th className="px-2 py-1 text-right font-medium">毛利</th>
+              <th className="px-2 py-1 text-right font-medium">该目标下最大返佣</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PRODUCT_MARGIN_REFERENCE.map((p) => {
+              const max = validTarget
+                ? Math.max(0, Math.round((p.marginPct - target) * 10) / 10)
+                : 0;
+              return (
+                <tr key={p.label} className="border-b border-[#f0f0f0] last:border-0">
+                  <td className="px-2 py-1">{p.label}</td>
+                  <td className="px-2 py-1 text-right">{p.marginPct}%</td>
+                  <td className="px-2 py-1 text-right text-[#52c41a]">{max}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 export function ReferralsClient() {
   const base = useBookMallBaseUrl();
   const [rows, setRows] = useState<ReferralRow[]>([]);
@@ -143,9 +220,11 @@ export function ReferralsClient() {
       </div>
 
       <p className="text-xs text-[#8c8c8c]">
-        分享门槛：个人套餐 月付 ¥599 / 年付 ¥1490 及以上。返佣比例由财务录入（0~100%），
-        金额按下线「套餐消费 + 充值消费」实付汇总；预估返佣 = 总消费 × 比例。
+        分享门槛（分享链接 1.0）：任意有效订阅（个人套餐或团队主账号）；团队下的普通成员不可分享。
+        返佣比例由财务录入（0~100%），金额按下线「套餐消费 + 充值消费」实付汇总；预估返佣 = 总消费 × 比例。
       </p>
+
+      <ReferralCommissionCalc />
 
       <div className="flex flex-wrap gap-4 text-sm text-[#262626]">
         <span>分享人：{rows.length}</span>

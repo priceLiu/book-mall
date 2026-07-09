@@ -33,7 +33,11 @@ const PERSONA_OPTIONS: {
   },
 ];
 
-export function RegisterForm() {
+export function RegisterForm({
+  welcomeGift,
+}: {
+  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
+} = {}) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
@@ -105,6 +109,17 @@ export function RegisterForm() {
             使用手机号注册；请选择计费方式（注册后不可更改）
           </p>
         </BoxReveal>
+
+        {welcomeGift &&
+        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+            注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
+            {welcomeGift.videoCredits > 0
+              ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
+              : ""}
+            （含视频，长期有效）。
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
