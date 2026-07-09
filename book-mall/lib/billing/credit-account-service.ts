@@ -8,7 +8,21 @@
  */
 import { createHash } from "node:crypto";
 
-import { Prisma, type BillingPersona, type CreditLedgerType, type CreditOwnerType, type CreditPool, type ResourceMeterType } from "@prisma/client";
+import { Prisma, type BillingPersona, type CreditLedgerType, type CreditOwnerType, type CreditPool, type CreditSource, type ResourceMeterType } from "@prisma/client";
+import {
+  addDays,
+  addMonths,
+  computeOwnedDelta,
+  FREE_VALIDITY_DAYS,
+  type LotRow,
+  monthPeriodKeyOf,
+  planAllocation,
+  planExpiry,
+  planRestoreTargetId,
+  TOPUP_VALIDITY_MONTHS,
+} from "./credit-lot-logic";
+
+export { TOPUP_VALIDITY_MONTHS, FREE_VALIDITY_DAYS, addDays, addMonths } from "./credit-lot-logic";
 
 import { isStaffRole } from "@/lib/billing/billing-persona";
 import { buildGatewayLogWhereFromUsageQuery } from "@/lib/gateway/log-query-scope";
@@ -31,6 +45,138 @@ function poolFields(pool: PoolKind): { balance: "balanceCredits" | "videoBalance
   return pool === "VIDEO"
     ? { balance: "videoBalanceCredits", reserved: "videoReservedCredits" }
     : { balance: "balanceCredits", reserved: "reservedCredits" };
+}
+
+// ——————————————————— 积分批次（CreditLot）到期覆盖层 ———————————————————
+//
+// 账户池余额（balanceCredits / videoBalanceCredits）仍为快路径真相；批次用于
+//   1) 扣费优先级（先到期先扣）；2) 到期清扫。
+// 不变量：sum(未过期 lot.remaining, pool) == 账户该池「已拥有」额度 = 可用余额 + 冻结中
+//   （balance + reserved）。因此：
+//   - RESERVE：balance−c、reserved+c → 已拥有不变 → 批次不动；
+//   - RELEASE：reserved−c、balance+c → 已拥有不变 → 批次不动；
+//   - CONSUME / SETTLE：已拥有−c → 从批次 FIFO 扣减；
+//   - GRANT / TOPUP：已拥有+c → 建批次；REFUND：已拥有+c → 回补批次。
+
+type TxClient = Prisma.TransactionClient;
+
+/** 建新批次（GRANT/TOPUP/免费赠送）。 */
+async function createLot(
+  tx: TxClient,
+  accountId: string,
+  pool: PoolKind,
+  amount: number,
+  source: CreditSource,
+  expiresAt: Date | null,
+  periodKey: string | null,
+  refType: string | null,
+  refId: string | null,
+): Promise<void> {
+  if (amount <= 0) return;
+  await tx.creditLot.create({
+    data: {
+      accountId,
+      pool,
+      source,
+      originalCredits: amount,
+      remainingCredits: amount,
+      expiresAt: expiresAt ?? null,
+      periodKey: periodKey ?? null,
+      refType: refType ?? null,
+      refId: refId ?? null,
+    },
+  });
+}
+
+/** 从未过期批次按「先到期先扣」FIFO 扣减 amount（消费/结算）。 */
+async function allocateFromLots(
+  tx: TxClient,
+  accountId: string,
+  pool: PoolKind,
+  amount: number,
+  now: Date,
+): Promise<void> {
+  if (amount <= 0) return;
+  const lots = (await tx.creditLot.findMany({
+    where: {
+      accountId,
+      pool,
+      remainingCredits: { gt: 0 },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    select: { id: true, source: true, remainingCredits: true, expiresAt: true, grantedAt: true },
+  })) as LotRow[];
+  const { steps } = planAllocation(lots, amount);
+  for (const step of steps) {
+    await tx.creditLot.update({ where: { id: step.id }, data: { remainingCredits: step.newRemaining } });
+  }
+  // planAllocation.shortfall>0 表示批次不足（不变量漂移 / allowNegative 欠费）——由对账/清扫纠偏，不阻断。
+}
+
+/** 回补批次（REFUND / 正向 ADJUST）：优先加回最早到期的未过期批次；无则建永久批次。 */
+async function restoreToLots(
+  tx: TxClient,
+  accountId: string,
+  pool: PoolKind,
+  amount: number,
+  now: Date,
+): Promise<void> {
+  if (amount <= 0) return;
+  const lots = (await tx.creditLot.findMany({
+    where: {
+      accountId,
+      pool,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    select: { id: true, source: true, remainingCredits: true, expiresAt: true, grantedAt: true },
+  })) as LotRow[];
+  const targetId = planRestoreTargetId(lots);
+  if (targetId) {
+    const target = lots.find((l) => l.id === targetId)!;
+    await tx.creditLot.update({
+      where: { id: targetId },
+      data: { remainingCredits: target.remainingCredits + amount },
+    });
+    return;
+  }
+  await createLot(tx, accountId, pool, amount, "TOPUP", null, null, "refund_restore", null);
+}
+
+/**
+ * 事务内：按本条流水的「已拥有额度变化」同步批次。
+ * ownedDelta = credits + reservedDelta（见文件头不变量说明）。
+ */
+async function syncLotsForLedger(
+  tx: TxClient,
+  accountId: string,
+  input: LedgerWriteInput,
+  now: Date,
+): Promise<void> {
+  if (input.skipLotSync) return;
+  const pool: PoolKind = input.pool ?? "GENERAL";
+  const ownedDelta = computeOwnedDelta(input.credits, input.reservedDelta ?? 0);
+  if (ownedDelta === 0) return; // RESERVE / RELEASE
+
+  if (ownedDelta < 0) {
+    await allocateFromLots(tx, accountId, pool, -ownedDelta, now);
+    return;
+  }
+  // ownedDelta > 0：GRANT/TOPUP 带来源 → 建批次；否则（REFUND 等）→ 回补
+  if (input.lotSource) {
+    await createLot(
+      tx,
+      accountId,
+      pool,
+      ownedDelta,
+      input.lotSource,
+      input.lotExpiresAt ?? null,
+      input.lotPeriodKey ?? null,
+      input.refType ?? null,
+      input.refId ?? null,
+    );
+  } else {
+    await restoreToLots(tx, accountId, pool, ownedDelta, now);
+  }
 }
 
 /** 确保账户存在（个人或租户），返回账户。 */
@@ -110,6 +256,12 @@ interface LedgerWriteInput {
   allowNegative?: boolean;
   staffFlag?: boolean;
   billingPersonaSnap?: BillingPersona | null;
+  /** 批次覆盖层：增额时（GRANT/TOPUP/免费）建批次的来源与到期。缺省则正向增额按 REFUND 回补处理。 */
+  lotSource?: CreditSource;
+  lotExpiresAt?: Date | null;
+  lotPeriodKey?: string | null;
+  /** 跳过批次同步（清扫/月度重置等自行管理批次的场景）。 */
+  skipLotSync?: boolean;
 }
 
 async function resolveLedgerPersonaFields(input: LedgerWriteInput): Promise<{
@@ -155,6 +307,7 @@ function accountAdvisoryLockKeys(ref: AccountRef): [number, number] {
 async function writeLedger(input: LedgerWriteInput) {
   const pool: PoolKind = input.pool ?? "GENERAL";
   const fields = poolFields(pool);
+  const now = new Date();
   // 幂等：相同 idempotencyKey 已存在则直接返回原流水
   if (input.idempotencyKey) {
     const existing = await prisma.creditLedger.findUnique({
@@ -234,6 +387,8 @@ async function writeLedger(input: LedgerWriteInput) {
           throw e;
         }
 
+        await syncLotsForLedger(tx, account.id, input, now);
+
         return {
           ledger,
           balanceAfter: (updated[fields.balance] as number) ?? balanceAfter,
@@ -259,7 +414,15 @@ export async function grantCredits(input: {
   perSeatCapCredits?: number | null;
   idempotencyKey?: string | null;
   description?: string | null;
+  /** 批次来源（默认 SUBSCRIPTION；VIP 大额可传 TOPUP）。 */
+  lotSource?: CreditSource;
+  /** 批次到期（默认 = currentPeriodEnd；传 null = 永久，如 VIP）。 */
+  lotExpiresAt?: Date | null;
+  lotPeriodKey?: string | null;
 }) {
+  const lotSource: CreditSource = input.lotSource ?? "SUBSCRIPTION";
+  const lotExpiresAt =
+    input.lotExpiresAt !== undefined ? input.lotExpiresAt : (input.currentPeriodEnd ?? null);
   const res = await writeLedger({
     ref: input.ref,
     type: "GRANT",
@@ -268,6 +431,9 @@ export async function grantCredits(input: {
     refType: "plan_grant",
     idempotencyKey: input.idempotencyKey,
     description: input.description ?? "套餐积分发放",
+    lotSource,
+    lotExpiresAt,
+    lotPeriodKey: input.lotPeriodKey ?? null,
   });
   // 视频专项池发放（独立流水，pool=VIDEO）
   const videoCredits = Math.max(0, Math.round(input.videoCredits ?? 0));
@@ -280,6 +446,9 @@ export async function grantCredits(input: {
       refType: "plan_grant",
       idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}:video` : null,
       description: (input.description ?? "套餐积分发放") + "（视频池）",
+      lotSource,
+      lotExpiresAt,
+      lotPeriodKey: input.lotPeriodKey ?? null,
     });
   }
   await prisma.creditAccount.update({
@@ -296,13 +465,52 @@ export async function grantCredits(input: {
   return res;
 }
 
+/** 过期某账户某池「订阅批次（上一周期）」：写 EXPIRE 减余额并把该批次归零。 */
+async function expireSubscriptionLotsForPool(
+  ref: AccountRef,
+  accountId: string,
+  pool: PoolKind,
+  targetPeriodKey: string,
+): Promise<number> {
+  const fields = poolFields(pool);
+  const oldLots = await prisma.creditLot.findMany({
+    where: {
+      accountId,
+      pool,
+      source: "SUBSCRIPTION",
+      remainingCredits: { gt: 0 },
+      OR: [{ periodKey: null }, { periodKey: { not: targetPeriodKey } }],
+    },
+    select: { id: true, remainingCredits: true },
+  });
+  const sum = oldLots.reduce((s, l) => s + l.remainingCredits, 0);
+  if (sum <= 0) return 0;
+  // 上一周期订阅积分 use-it-or-lose-it：全额清零（余额可能已被消费，故 allowNegative 防漏记）。
+  await writeLedger({
+    ref,
+    type: "EXPIRE",
+    credits: -sum,
+    pool,
+    refType: "monthly_reset_expire",
+    description: `订阅积分月度清零（清上一周期，${pool}）`,
+    allowNegative: true,
+    skipLotSync: true,
+  });
+  await prisma.creditLot.updateMany({
+    where: { id: { in: oldLots.map((l) => l.id) } },
+    data: { remainingCredits: 0 },
+  });
+  return sum;
+}
+
 /**
- * 月度积分重置（周期末「重置发放」，见 14-tenant-team-design §8.3）。
+ * 月度积分重置（会员周期刷新，见 14-tenant-team-design §8.3）。
  *
- * 语义：把账户余额重置为 `monthlyGrantCredits`（会员月积分为 use-it-or-lose-it），
- * 通过一条差额流水实现：delta>0 记 GRANT，delta<0 记 EXPIRE（清零未用部分）。
- * 幂等键 `monthly_grant:<accountId>:<periodKey>` 保证同一周期重复执行不重复发放。
- * 年付套餐的积分同样按「月」刷新（计费周期与积分刷新周期解耦）。
+ * 批次化语义（积分清零 1.0）：**仅**清零并重发「订阅」积分，**保留**充值 / 免费批次。
+ *   1) 过期上一周期订阅批次（写 EXPIRE、余额扣减、批次归零）；
+ *   2) 按 monthlyGrantCredits / videoMonthlyGrant 发放新订阅批次（expiresAt=nextPeriodEnd，periodKey=目标周期）。
+ * 幂等键 `monthly_grant:<accountId>:<periodKey>` 保证同周期重复执行不重复发放。
+ * 年付套餐的订阅积分同样按「月」刷新（计费周期与积分刷新周期解耦）。
  */
 export async function resetMonthlyCredits(input: {
   ref: AccountRef;
@@ -315,38 +523,47 @@ export async function resetMonthlyCredits(input: {
   perSeatCapCredits?: number | null;
 }) {
   const account = await ensureCreditAccount(input.ref, input.planId);
+  const balanceBefore = account.balanceCredits;
   const target = Math.max(0, Math.round(input.monthlyGrantCredits));
-  const delta = target - account.balanceCredits;
+  const videoTarget = Math.max(
+    0,
+    Math.round(input.videoMonthlyGrantCredits ?? account.videoMonthlyGrant ?? 0),
+  );
   const idempotencyKey = `monthly_grant:${account.id}:${input.periodKey}`;
 
+  // 1) 清零上一周期订阅批次（通用 + 视频）。
+  await expireSubscriptionLotsForPool(input.ref, account.id, "GENERAL", input.periodKey);
+  await expireSubscriptionLotsForPool(input.ref, account.id, "VIDEO", input.periodKey);
+
+  // 2) 发放本周期订阅批次。
   let deduped = true;
-  if (delta !== 0) {
+  if (target > 0) {
     const res = await writeLedger({
       ref: input.ref,
-      type: delta > 0 ? "GRANT" : "EXPIRE",
-      credits: delta,
+      type: "GRANT",
+      credits: target,
+      pool: "GENERAL",
       refType: "monthly_grant",
       idempotencyKey,
-      description: `月度积分重置（${input.periodKey}）`,
-      allowNegative: true,
+      description: `月度积分发放（${input.periodKey}）`,
+      lotSource: "SUBSCRIPTION",
+      lotExpiresAt: input.nextPeriodEnd ?? null,
+      lotPeriodKey: input.periodKey,
     });
     deduped = res.deduped;
   }
-
-  // 视频专项池同样按月「重置发放」（use-it-or-lose-it）：把视频余额拉回 videoMonthlyGrant。
-  // 注意：冻结中（videoReservedCredits）不计入余额，重置只动 balance，不影响进行中的冻结。
-  const videoTarget = Math.max(0, Math.round(input.videoMonthlyGrantCredits ?? account.videoMonthlyGrant ?? 0));
-  const videoDelta = videoTarget - account.videoBalanceCredits;
-  if (videoDelta !== 0) {
+  if (videoTarget > 0) {
     await writeLedger({
       ref: input.ref,
-      type: videoDelta > 0 ? "GRANT" : "EXPIRE",
-      credits: videoDelta,
+      type: "GRANT",
+      credits: videoTarget,
       pool: "VIDEO",
       refType: "monthly_grant",
       idempotencyKey: `${idempotencyKey}:video`,
-      description: `月度积分重置·视频池（${input.periodKey}）`,
-      allowNegative: true,
+      description: `月度积分发放·视频池（${input.periodKey}）`,
+      lotSource: "SUBSCRIPTION",
+      lotExpiresAt: input.nextPeriodEnd ?? null,
+      lotPeriodKey: input.periodKey,
     });
   }
 
@@ -361,10 +578,142 @@ export async function resetMonthlyCredits(input: {
     },
   });
 
-  return { deduped, delta, target, balanceBefore: account.balanceCredits };
+  return { deduped, target, videoTarget, balanceBefore };
 }
 
-/** 充值积分包（TOPUP）。 */
+// ——————————————————— 批次到期清扫 ———————————————————
+
+/** 过期某账户已到期批次（expiresAt<=now），写 EXPIRE、批次归零、扣减余额（按池上限封顶不为负）。 */
+export async function expireDueLotsForAccount(
+  ref: AccountRef,
+  now: Date = new Date(),
+): Promise<{ expiredGeneral: number; expiredVideo: number }> {
+  const account = await prisma.creditAccount.findUnique({
+    where: { ownerType_ownerId: { ownerType: ref.ownerType, ownerId: ref.ownerId } },
+    select: { id: true, balanceCredits: true, videoBalanceCredits: true },
+  });
+  if (!account) return { expiredGeneral: 0, expiredVideo: 0 };
+
+  const out = { expiredGeneral: 0, expiredVideo: 0 };
+  for (const pool of ["GENERAL", "VIDEO"] as const) {
+    const available = pool === "VIDEO" ? account.videoBalanceCredits : account.balanceCredits;
+    if (available <= 0) continue;
+    const dueLots = await prisma.creditLot.findMany({
+      where: { accountId: account.id, pool, remainingCredits: { gt: 0 }, expiresAt: { lte: now } },
+      orderBy: { expiresAt: "asc" },
+      select: { id: true, remainingCredits: true },
+    });
+    const { toExpire, steps } = planExpiry(dueLots, available);
+    if (toExpire <= 0) continue;
+    await writeLedger({
+      ref,
+      type: "EXPIRE",
+      credits: -toExpire,
+      pool,
+      refType: "expire_sweep",
+      description: `积分到期清零（${pool}）`,
+      skipLotSync: true,
+    });
+    for (const step of steps) {
+      await prisma.creditLot.update({ where: { id: step.id }, data: { remainingCredits: step.newRemaining } });
+    }
+    if (pool === "VIDEO") out.expiredVideo = toExpire;
+    else out.expiredGeneral = toExpire;
+  }
+  return out;
+}
+
+/** 全站清扫：扫所有含到期批次的账户并逐一过期。返回处理账户数与清零总额。 */
+export async function sweepExpiredLots(now: Date = new Date()): Promise<{
+  accounts: number;
+  totalExpired: number;
+}> {
+  const dueAccounts = await prisma.creditLot.findMany({
+    where: { remainingCredits: { gt: 0 }, expiresAt: { lte: now } },
+    distinct: ["accountId"],
+    select: { accountId: true },
+  });
+  const accountIds = dueAccounts.map((a) => a.accountId);
+  if (accountIds.length === 0) return { accounts: 0, totalExpired: 0 };
+
+  const accounts = await prisma.creditAccount.findMany({
+    where: { id: { in: accountIds } },
+    select: { id: true, ownerType: true, ownerId: true },
+  });
+  let totalExpired = 0;
+  for (const a of accounts) {
+    const r = await expireDueLotsForAccount({ ownerType: a.ownerType, ownerId: a.ownerId }, now);
+    totalExpired += r.expiredGeneral + r.expiredVideo;
+  }
+  return { accounts: accounts.length, totalExpired };
+}
+
+/**
+ * 月度重置清扫：找出 currentPeriodEnd 已到期且有订阅月额度的账户，逐一按月刷新订阅积分。
+ * 每次每账户只推进 1 个月；跨多月欠账由每日 cron 逐日追平。VIP（monthlyGrant=0 / period=null）不受影响。
+ */
+export async function runMonthlyResetSweep(now: Date = new Date()): Promise<{ reset: number }> {
+  const due = await prisma.creditAccount.findMany({
+    where: { currentPeriodEnd: { lte: now }, monthlyGrantCredits: { gt: 0 } },
+    select: {
+      ownerType: true,
+      ownerId: true,
+      monthlyGrantCredits: true,
+      videoMonthlyGrant: true,
+      currentPeriodEnd: true,
+      planId: true,
+      perSeatCapCredits: true,
+    },
+  });
+  let reset = 0;
+  for (const a of due) {
+    const base = a.currentPeriodEnd ?? now;
+    const nextEnd = addMonths(base, 1);
+    // periodKey 取「本次刷新所属周期起点」的月份（= 旧 currentPeriodEnd 所在月），保证每次 catch-up 幂等键不同。
+    const periodKey = monthPeriodKeyOf(base);
+    await resetMonthlyCredits({
+      ref: { ownerType: a.ownerType, ownerId: a.ownerId },
+      monthlyGrantCredits: a.monthlyGrantCredits,
+      videoMonthlyGrantCredits: a.videoMonthlyGrant,
+      periodKey,
+      planId: a.planId,
+      nextPeriodEnd: nextEnd,
+      perSeatCapCredits: a.perSeatCapCredits,
+    });
+    reset += 1;
+  }
+  return { reset };
+}
+
+/** 账户中心：按池 + 来源 + 最近到期展示批次明细（透明化）。 */
+export async function getLotBreakdown(ref: AccountRef, now: Date = new Date()) {
+  const account = await prisma.creditAccount.findUnique({
+    where: { ownerType_ownerId: { ownerType: ref.ownerType, ownerId: ref.ownerId } },
+    select: { id: true },
+  });
+  if (!account) return [];
+  const lots = await prisma.creditLot.findMany({
+    where: {
+      accountId: account.id,
+      remainingCredits: { gt: 0 },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    orderBy: [{ expiresAt: "asc" }],
+    select: { pool: true, source: true, remainingCredits: true, expiresAt: true },
+  });
+  return lots.map((l) => ({
+    pool: l.pool,
+    source: l.source,
+    remainingCredits: l.remainingCredits,
+    expiresAt: l.expiresAt,
+  }));
+}
+
+/**
+ * 充值积分包（TOPUP）。
+ * 批次来源默认 TOPUP、有效期默认 12 个月；注册/活动赠送传 source="FREE"（默认 30 天），
+ * VIP 大额传 expiresAt=null（永久）。
+ */
 export async function topupCredits(input: {
   ref: AccountRef;
   credits: number;
@@ -373,7 +722,20 @@ export async function topupCredits(input: {
   refId?: string;
   idempotencyKey?: string;
   description?: string | null;
+  /** 批次来源（TOPUP / FREE）。默认 TOPUP。 */
+  source?: CreditSource;
+  /** 批次到期。undefined = 按 source 取默认（TOPUP=+12月 / FREE=+30天）；null = 永久。 */
+  expiresAt?: Date | null;
 }) {
+  const source: CreditSource = input.source ?? "TOPUP";
+  let lotExpiresAt: Date | null;
+  if (input.expiresAt !== undefined) {
+    lotExpiresAt = input.expiresAt;
+  } else if (source === "FREE") {
+    lotExpiresAt = addDays(new Date(), FREE_VALIDITY_DAYS);
+  } else {
+    lotExpiresAt = addMonths(new Date(), TOPUP_VALIDITY_MONTHS);
+  }
   return writeLedger({
     ref: input.ref,
     type: "TOPUP",
@@ -383,6 +745,8 @@ export async function topupCredits(input: {
     refId: input.refId,
     idempotencyKey: input.idempotencyKey,
     description: input.description ?? (input.pool === "VIDEO" ? "视频专项积分包充值" : "积分包充值"),
+    lotSource: source,
+    lotExpiresAt,
   });
 }
 

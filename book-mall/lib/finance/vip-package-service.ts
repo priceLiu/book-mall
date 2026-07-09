@@ -76,7 +76,7 @@ export async function provisionVipPackage(
     perSeatCapCredits: alloc.perSeatGeneral > 0 ? alloc.perSeatGeneral : null,
   });
 
-  // 一次性发放：monthlyGrant = 0（不触发月度重置），currentPeriodEnd = null（长期有效）。
+  // 一次性发放：monthlyGrant = 0（不触发月度重置），批次 TOPUP + 永久（expiresAt=null），长期有效不清零。
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: tenant.id },
     credits: scheme.generalCredits,
@@ -86,6 +86,8 @@ export async function provisionVipPackage(
     pricePerCreditYuan: scheme.pricePerCreditYuan,
     currentPeriodEnd: null,
     perSeatCapCredits: alloc.perSeatGeneral > 0 ? alloc.perSeatGeneral : null,
+    lotSource: "TOPUP",
+    lotExpiresAt: null,
     idempotencyKey: `vip_grant:${tenant.id}`,
     description: `VIP 套餐开通（充值 ¥${amount.toLocaleString()} · ${
       input.scheme === "video_heavy" ? "视频多" : "通用多"

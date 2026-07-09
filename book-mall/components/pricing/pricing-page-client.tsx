@@ -264,7 +264,7 @@ export function PricingPageClient({
               {welcomeGift.videoCredits > 0
                 ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
                 : ""}
-              ，长期有效
+              ，30 天内有效
             </span>
           </div>
         ) : null}
@@ -433,6 +433,13 @@ export function PricingPageClient({
               <li>每次生成按该模型「积分/次」从对应池扣；不是每个模型各有配额。</li>
               <li>上表「X 张 / X 秒」是只用该模型的上限，同池内互斥——做图就少了做视频的额度。</li>
               <li>失败 / 取消全额返还积分。</li>
+              <li>
+                积分有效期：订阅积分按月清零、充值积分 12 个月、注册/活动赠送 30 天；扣费优先用最先到期的积分。详见
+                <Link href="/pricing-disclosure#credit-expiry" className="ml-1 text-foreground underline">
+                  积分清零规则
+                </Link>
+                。
+              </li>
             </ul>
             <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 site-pricing-body-text">
               <div className="site-pricing-panel-title">积分用完了怎么办？</div>

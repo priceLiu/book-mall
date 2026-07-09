@@ -117,7 +117,7 @@ export function RegisterForm({
             {welcomeGift.videoCredits > 0
               ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
               : ""}
-            （含视频，长期有效）。
+            （含视频，30 天内有效）。
           </div>
         ) : null}
 

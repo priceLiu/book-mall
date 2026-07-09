@@ -14,6 +14,7 @@ import {
 import { PricingDisclosureRouteSync } from "@/components/pricing/pricing-disclosure-route-sync";
 import { PricingDisclosureMeteredSection } from "@/components/pricing/pricing-disclosure-metered";
 import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
+import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
 import { SubscriptionPlansTable } from "@/components/pricing/subscription-plans-table";
 import { Button } from "@/components/ui/button";
 
@@ -242,6 +243,8 @@ export async function PricingDisclosureContent({
           </li>
         </ul>
       </section>
+
+      <CreditExpiryPolicySection embedded={embedded} />
 
       <BillingPolicySection />
 

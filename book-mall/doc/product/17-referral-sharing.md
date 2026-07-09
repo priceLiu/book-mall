@@ -43,9 +43,10 @@
 
 ## 2.2 新用户注册赠送（分享链接 1.0）
 
-- 所有新注册用户（含分享落地注册）赠送积分：默认 **500 通用 + 100 视频**，长期有效、**不清零**。
+- 所有新注册用户（含分享落地注册）赠送积分：默认 **500 通用 + 100 视频**，归**免费积分（`source=FREE`）·30 天有效**（积分清零 1.0，见 `19-credit-expiry`）。
 - 额度落 `PlatformPricingConfig.welcomeGiftGeneralCredits / welcomeGiftVideoCredits`（财务可调）。
-- 发放：`lib/billing/welcome-gift.ts` · `grantWelcomeGift(userId)`（幂等，失败不阻断注册）。
+- 发放：`lib/billing/welcome-gift.ts` · `grantWelcomeGift(userId)`（幂等，失败不阻断注册；`topupCredits({ source: "FREE" })` → 30 天到期批次）。
+- 前端文案：价格页 hero、注册页 / 分享注册页均显示「30 天内有效」。
 - 展示：价格页横幅 + 注册页 / 分享落地注册页（读同一配置，不硬编码）。
 
 ## 3. 分享链接与注册

@@ -4,6 +4,14 @@
     {
       "path": "/api/admin/wallet-holds/expire",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/admin/credits/expire-sweep",
+      "schedule": "15 0 * * *"
+    },
+    {
+      "path": "/api/admin/credits/monthly-reset",
+      "schedule": "30 0 * * *"
     }
   ]
 }
