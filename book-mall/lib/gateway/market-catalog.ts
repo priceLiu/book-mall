@@ -342,6 +342,8 @@ export async function listMarketModelsForGatewayUser(input: {
     "video-to-video",
     "motion-control",
     "video-upscale",
+    "text-to-music",
+    "text-to-speech",
     "chat",
   ];
 

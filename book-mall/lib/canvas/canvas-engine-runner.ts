@@ -848,7 +848,7 @@ async function executeStoryLlmEngineTask(
       };
     }
     throw new CanvasProjectError(
-      "TASK_NOT_FOUND",
+      "NOT_FOUND",
       "LLM 任务不存在或已结束",
       404,
     );

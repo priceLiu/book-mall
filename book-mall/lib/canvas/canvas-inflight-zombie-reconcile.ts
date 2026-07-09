@@ -6,6 +6,7 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 import { recoverCanvasTextLlmFromGateway } from "@/lib/canvas/canvas-text-llm-recover";
+import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
 
 const SUBMITTED_INCOMPLETE_MS = 3 * 60 * 1000;
 /** 视觉 LLM 可能需十余秒；异步 execute 允许更长窗口，勿与视频 kieTaskId 混判 */
@@ -24,6 +25,7 @@ export type CanvasInflightZombieReconcileSummary = {
   requeuedDispatching: number;
   displayRecovered: number;
   textLlmRecovered: number;
+  imageKieRecovered: number;
 };
 
 /** poll 每轮开头：释放无法 poll 的 SUBMITTED/DISPATCHING 僵尸，并尝试 Gateway 已成功但未写回的任务。 */
@@ -39,6 +41,7 @@ export async function reconcileCanvasInflightZombies(opts?: {
     requeuedDispatching: 0,
     displayRecovered: 0,
     textLlmRecovered: 0,
+    imageKieRecovered: 0,
   };
 
   const textSubmitted = await prisma.canvasGenerationTask.findMany({
@@ -69,6 +72,24 @@ export async function reconcileCanvasInflightZombies(opts?: {
         },
       });
       summary.failedIncomplete += 1;
+    }
+  }
+
+  const imageSubmitted = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "SUBMITTED",
+      kind: "IMAGE",
+      kieTaskId: { not: null },
+      ...projectFilter,
+    },
+    orderBy: { updatedAt: "asc" },
+    take: limit,
+    select: { id: true, updatedAt: true },
+  });
+  for (const t of imageSubmitted) {
+    const r = await recoverCanvasKieImageFromGateway(t.id);
+    if (r === "succeeded" || r === "failed") {
+      summary.imageKieRecovered += 1;
     }
   }
 

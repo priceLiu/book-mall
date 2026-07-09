@@ -413,6 +413,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
         description: m.description,
         canonicalModelKey: m.modelKey,
         credentialBound: isGatewayProviderBound(boundKinds, "WORLDLABS"),
+        capabilities: [],
       })),
     );
   }
@@ -429,6 +430,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
           description: m.subtitle,
           canonicalModelKey: m.modelKey,
           credentialBound: isGatewayProviderBound(boundKinds, "ELEVENLABS"),
+          capabilities: taskTagsToCapabilities(["text-to-speech"]),
         })),
         ...ELEVENLABS_SFX_MODELS.map((m) => ({
           modelKey: m.modelKey,
@@ -438,6 +440,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
           description: m.subtitle,
           canonicalModelKey: m.modelKey,
           credentialBound: isGatewayProviderBound(boundKinds, "ELEVENLABS"),
+          capabilities: [],
         })),
         ...ELEVENLABS_MUSIC_MODELS.map((m) => ({
           modelKey: m.modelKey,
@@ -447,6 +450,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
           description: m.subtitle,
           canonicalModelKey: m.modelKey,
           credentialBound: isGatewayProviderBound(boundKinds, "ELEVENLABS"),
+          capabilities: taskTagsToCapabilities(["text-to-music"]),
         })),
       ],
     );

@@ -665,7 +665,15 @@ export async function canvasGwRecordInfo(
       progress?: number;
       errorMessage?: string;
     };
-    return { providerKind: "TOPAZ", polled: data };
+    return {
+      providerKind: "TOPAZ",
+      polled: {
+        state: data.state ?? "pending",
+        downloadUrl: data.downloadUrl,
+        progress: data.progress,
+        errorMessage: data.errorMessage,
+      },
+    };
   }
 
   return {

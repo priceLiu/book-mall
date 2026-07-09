@@ -140,7 +140,10 @@ export async function GET(request: NextRequest) {
             buildGatewayLogProgressSummary({
               providerKind: "TOPAZ",
               status: polled.state,
-              progress: polled.progress,
+              detail:
+                polled.progress != null
+                  ? `progress ${polled.progress}`
+                  : undefined,
             }),
           );
         }
@@ -369,7 +372,7 @@ export async function GET(request: NextRequest) {
             ? Date.now() - log.submittedAt.getTime()
             : 0,
           vendorDurationMs:
-            typeof data.costTime === "number"
+            "costTime" in data && typeof data.costTime === "number"
               ? Math.round(data.costTime * 1000)
               : undefined,
           resultSummary: { state: data.state, resultJson: data.resultJson },

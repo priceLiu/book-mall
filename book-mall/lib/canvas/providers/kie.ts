@@ -1133,12 +1133,39 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   ...KIE_AUDIO_GATEWAY_MODELS.map((m) => ({
     modelKey: m.modelKey,
     displayName: m.displayName,
-    role: m.role,
+    role: m.role === "TTS" ? ("LLM" as const) : m.role,
     description: m.subtitle,
-    paramsSchema: m.paramsSchema,
+    paramsSchema: normalizeKieAudioParamsSchema(m.paramsSchema),
     defaultParams: m.defaultParams,
   })),
 ];
+
+function normalizeKieAudioParamsSchema(
+  schema: (typeof KIE_AUDIO_GATEWAY_MODELS)[number]["paramsSchema"],
+): CanvasParamSchema {
+  return schema.map((item) => {
+    if (item.type === "checkbox") {
+      return {
+        key: item.key,
+        label: item.label,
+        type: "boolean" as const,
+        defaultValue: item.defaultValue,
+      };
+    }
+    if (item.type === "slider") {
+      return {
+        key: item.key,
+        label: item.label,
+        type: "number" as const,
+        min: item.min,
+        max: item.max,
+        step: item.step,
+        defaultValue: item.defaultValue,
+      };
+    }
+    return item;
+  });
+}
 
 /** 画布 modelKey → KIE createTask 的 model + input（含 gpt-image-1 映射） */
 export function buildKieImageCreateArgs(args: {
