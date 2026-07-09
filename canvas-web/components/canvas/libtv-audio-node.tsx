@@ -196,7 +196,7 @@ export function LibtvAudioNode({
     d.runtime?.failMessage?.trim() ||
     "生成失败，请重试";
 
-  const soleSelected = useLibtvIsNodeSoleSelected(id);
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
   const showSidePlus = soleSelected && !connectingFromNodeId;
   const showToolbar = soleSelected && hasAudio && !isGenerating;
 
