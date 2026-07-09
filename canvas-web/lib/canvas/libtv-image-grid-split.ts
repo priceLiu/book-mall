@@ -11,8 +11,8 @@ import {
 } from "./pro2-media-group-layout";
 import {
   computeLibtvMediaNodeSize,
-  LIBTV_MEDIA_FIT_VERSION,
 } from "./libtv-media-node-auto-fit";
+import { LIBTV_MEDIA_FIT_VERSION } from "./libtv-node-chrome";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
