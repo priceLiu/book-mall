@@ -37,6 +37,7 @@ import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
 import {
   PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_POPOVER_CLASS,
   PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
   PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
 } from "./pro2-image-node-toolbar";
@@ -616,7 +617,10 @@ export function Pro2MediaGroupToolbarPanel({
 
       {editOpen ? (
         <div
-          className="absolute left-1/2 top-[calc(100%+8px)] z-[1] w-[240px] -translate-x-1/2 rounded-xl border border-white/12 bg-[#1c1c1e]/98 p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+          className={cn(
+            "absolute left-1/2 top-[calc(100%+8px)] z-[1] w-[240px] -translate-x-1/2",
+            PRO2_IMAGE_NODE_TOOLBAR_POPOVER_CLASS,
+          )}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <p className="mb-1.5 text-[11px] font-medium text-white/55">组名</p>

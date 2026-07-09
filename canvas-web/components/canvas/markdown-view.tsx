@@ -47,7 +47,11 @@ function MarkdownProse({
               className={
                 isDoc
                   ? "mb-6 border-b border-neutral-200 pb-3 text-[28px] font-bold leading-tight text-neutral-900"
-                  : undefined
+                  : isDarkPreview
+                    ? darkInherit
+                      ? "mb-2 mt-5 border-b border-white/15 pb-1 text-[1.45em] font-bold leading-snug text-white first:mt-0"
+                      : "mb-2 mt-5 border-b border-white/15 pb-1 text-[16px] font-bold leading-snug text-white first:mt-0"
+                    : undefined
               }
             >
               {children}
@@ -62,7 +66,7 @@ function MarkdownProse({
                     ? "mb-2 mt-5 border-b border-neutral-200 pb-1 text-[15px] font-semibold leading-snug text-neutral-800 first:mt-0"
                     : isDarkPreview
                       ? darkInherit
-                        ? "mb-2 mt-5 border-b border-white/15 pb-1 font-semibold leading-snug text-white first:mt-0"
+                        ? "mb-2 mt-5 border-b border-white/15 pb-1 text-[1.28em] font-semibold leading-snug text-white first:mt-0"
                         : "mb-2 mt-5 border-b border-white/15 pb-1 text-[14px] font-semibold leading-snug text-white first:mt-0"
                       : undefined
               }
@@ -79,7 +83,7 @@ function MarkdownProse({
                     ? "mb-2 mt-4 text-[14px] font-semibold leading-snug text-neutral-800"
                     : isDarkPreview
                       ? darkInherit
-                        ? "mb-2 mt-4 font-semibold leading-snug text-white/95"
+                        ? "mb-2 mt-4 text-[1.12em] font-semibold leading-snug text-white/95"
                         : "mb-2 mt-4 text-[13px] font-semibold leading-snug text-white/95"
                       : undefined
               }
@@ -201,7 +205,7 @@ export function MarkdownView({
       : isDarkPreview
         ? `max-w-none leading-[1.75] text-white ${
             inheritFontSize
-              ? "text-inherit [&_*]:text-[length:inherit]"
+              ? "text-inherit [&_p]:text-[length:inherit] [&_li]:text-[length:inherit]"
               : "text-[13px]"
           } ${className}`
         : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`;

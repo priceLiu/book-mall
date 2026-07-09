@@ -125,6 +125,9 @@ export async function canvasGwChat(
   const chatParams = { ...(opts.params ?? {}) };
   // Suno 等音频模型的版本号也会写在 params.model，勿让其覆盖 Gateway modelKey
   delete chatParams.model;
+  if (route.providerKind === "VOLCENGINE") {
+    delete chatParams.reasoning_effort;
+  }
 
   const body: Record<string, unknown> = {
     ...chatParams,

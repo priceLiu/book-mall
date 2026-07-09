@@ -12,6 +12,7 @@ export function mentionIdsForRemovedCanvasNode(nodeId: string): string[] {
     `up-img-${nodeId}`,
     `up-outline-${nodeId}`,
     `up-text-${nodeId}`,
+    `up-tag-${nodeId}`,
   ];
 }
 

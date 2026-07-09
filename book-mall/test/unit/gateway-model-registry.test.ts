@@ -31,4 +31,20 @@ describe("resolveKnownGatewayModelRegistration", () => {
       providerKind: "KIE",
     });
   });
+
+  it("resolves Volcengine Doubao Seed 2.1 Pro vision", () => {
+    expect(resolveKnownGatewayModelRegistration("doubao-seed-2.1-pro")).toMatchObject({
+      canonicalModelKey: "doubao-seed-2.1-pro",
+      providerKind: "VOLCENGINE",
+      vendor: "volcengine",
+    });
+  });
+
+  it("resolves Volcengine Doubao Seed 2.0 vision alias", () => {
+    expect(resolveKnownGatewayModelRegistration("doubao-seed-2.0")).toMatchObject({
+      canonicalModelKey: "doubao-seed-2.0",
+      providerKind: "VOLCENGINE",
+      vendor: "volcengine",
+    });
+  });
 });

@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ENGINE_PICKER_EMPTY_PARAMS } from "@/components/canvas/engine-picker";
 import { buildModelParams } from "@/components/canvas/dynamic-param-form";
 import {
-  gatewayModelRoleSectionTitle,
+  buildStoryLlmDockParams,
+  sanitizeStoryLlmParamsForModel,
+  storyLlmParamsNeedSanitize,
+} from "@/lib/canvas/story-llm-dock-params";
+import { resolveLibtvDockEngineModel } from "@/lib/canvas/libtv-dock-engine-models";
+import {
   type GatewayModelRole,
 } from "@/lib/canvas/gateway-model-role";
 import {
@@ -104,9 +109,16 @@ function defaultPickForRole(
       ? pickDefaultStoryVisionLlmEngine(providers)
       : pickDefaultStoryLlmEngine(providers);
     if (!pick) return null;
+    const model = resolveLibtvDockEngineModel(
+      providers,
+      pick.providerId,
+      pick.modelKey,
+    );
     return {
       ...pick,
-      params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+      params: model
+        ? buildStoryLlmDockParams(model, {})
+        : { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     };
   }
   if (role === "IMAGE") {
@@ -130,12 +142,10 @@ function defaultPickForRole(
 }
 
 function buildLlmDockParams(
-  model: Parameters<typeof buildModelParams>[0],
+  model: Parameters<typeof buildStoryLlmDockParams>[0],
   curParams: Record<string, unknown>,
 ): Record<string, unknown> {
-  const built = buildModelParams(model, curParams);
-  delete built.model;
-  return { ...STORY_PRO_LLM_PARAMS_DEFAULT, ...built };
+  return buildStoryLlmDockParams(model, curParams);
 }
 
 function paramsSummaryForRole(
@@ -181,7 +191,6 @@ export function Pro2TextNodeEnginePickers({
   providers,
   disabled,
   updateNodeData,
-  sectionFontPx,
 }: Pro2TextNodeEnginePickersProps) {
   const roles = useMemo(
     () =>
@@ -265,6 +274,29 @@ export function Pro2TextNodeEnginePickers({
           continue;
         }
         if (
+          role === "LLM" &&
+          storyLlmParamsNeedSanitize(cur.modelKey, cur.params ?? {})
+        ) {
+          const model = resolveLibtvDockEngineModel(
+            providers,
+            cur.providerId,
+            cur.modelKey,
+          );
+          seededRolesRef.current.add(seedKey);
+          updateNodeData(
+            nodeId,
+            patchPro2TextNodeEngine(role, {
+              ...cur,
+              params: sanitizeStoryLlmParamsForModel(
+                cur.modelKey,
+                cur.params ?? {},
+                model,
+              ),
+            }),
+          );
+          continue;
+        }
+        if (
           !allowedLlm ||
           allowedLlm.some((k) => k === cur.modelKey.trim())
         ) {
@@ -286,7 +318,23 @@ export function Pro2TextNodeEnginePickers({
       {roles.map((role) => {
         const cfg = rolePickerConfig(role, llmNeedsVision, data);
         const cur = readPro2TextNodeEngine(data, role);
-        const params = cur.params ?? ENGINE_PICKER_EMPTY_PARAMS;
+        const rawParams = cur.params ?? ENGINE_PICKER_EMPTY_PARAMS;
+        const resolvedModel =
+          role === "LLM"
+            ? resolveLibtvDockEngineModel(
+                providers,
+                cur.providerId,
+                cur.modelKey,
+              )
+            : null;
+        const params =
+          role === "LLM" && cur.modelKey.trim()
+            ? sanitizeStoryLlmParamsForModel(
+                cur.modelKey,
+                rawParams,
+                resolvedModel,
+              )
+            : rawParams;
 
         const applyPick = (pick: CanvasEnginePick) => {
           const patch = patchPro2TextNodeEngine(role, pick);
@@ -318,20 +366,6 @@ export function Pro2TextNodeEnginePickers({
 
         return (
           <div key={role} className="min-w-0 shrink-0">
-            <p
-              className={
-                sectionFontPx != null
-                  ? "mb-0.5 truncate font-medium tracking-wide text-white/45"
-                  : "mb-0.5 truncate text-[10px] font-medium tracking-wide text-white/45"
-              }
-              style={
-                sectionFontPx != null
-                  ? { fontSize: sectionFontPx }
-                  : undefined
-              }
-            >
-              {gatewayModelRoleSectionTitle(role)}
-            </p>
             <div className="flex min-w-0 flex-wrap items-center gap-0.5">
               <LibtvDockEngineModelPicker
                 role={role}

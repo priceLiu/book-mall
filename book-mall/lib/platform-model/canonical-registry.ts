@@ -122,6 +122,40 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "doubao-seed-2.1-pro",
+    displayName: "Doubao Seed 2.1 Pro · 视觉理解",
+    description:
+      "火山方舟 · 多模态图片理解 · 画布文本节点反推提示词（上游 doubao-seed-2-1-pro-260628）",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 14,
+    primaryVendor: "volcengine",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "volcengine", modelKey: "doubao-seed-2.1-pro", providerKind: "VOLCENGINE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "doubao-seed-2.0",
+    displayName: "Doubao Seed 2.0 Pro · 视觉理解",
+    description:
+      "火山方舟 · 多模态图片理解 · 画布文本节点反推提示词（上游 doubao-seed-2-1-pro-260628）",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 14,
+    primaryVendor: "volcengine",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "volcengine", modelKey: "doubao-seed-2.0", providerKind: "VOLCENGINE" },
+    ]),
+  },
+  {
     canonicalModelKey: "wan2.7-image",
     displayName: "通义万相 2.7 生图",
     description: "多图参考生图",

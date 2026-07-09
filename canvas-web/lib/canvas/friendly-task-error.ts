@@ -28,8 +28,10 @@ export function isGatewayImageModelKey(modelKey?: string | null): boolean {
     m.startsWith("gpt-image") ||
     m.startsWith("seedream") ||
     m.startsWith("flux-") ||
+    m.startsWith("kling/") ||
     m.includes("text-to-image") ||
     m.includes("image-to-image") ||
+    m.includes("image-generation") ||
     m.includes("/edit") ||
     m === "qwen-text-to-image" ||
     m.includes("wanx") ||
@@ -169,6 +171,9 @@ function networkFailureMessage(modelKey?: string | null): string {
   if (vendor === "deepseek") {
     return "DeepSeek 服务暂时不可用，请稍后重试。";
   }
+  if (vendor === "volcengine") {
+    return "火山方舟服务暂时不可用（视觉理解通常需十余秒），请稍后重试。";
+  }
   return "模型服务暂时不可用，请稍后重试。";
 }
 
@@ -272,8 +277,31 @@ export function formatCanvasTaskError(
     return "KIE 账户余额不足，请充值后重试。";
   }
 
+  if (
+    blob.includes("product is not activated") ||
+    blob.includes("not activated") && blob.includes("product")
+  ) {
+    const m = (modelKey ?? "").trim().toLowerCase();
+    if (m.includes("kling")) {
+      return "可灵（Kling）产品未开通或已停用。请在 KIE 控制台确认已激活对应生图/生视频产品，并在 Gateway 绑定有效凭证后重试。";
+    }
+    return "厂商产品未开通，请在对应控制台激活产品并检查 Gateway 凭证后重试。";
+  }
+
   if (blob.includes("kie chat empty content")) {
     return "模型返回空内容，请稍后重试或更换模型。";
+  }
+
+  if (blob.includes("canvas_submit_incomplete")) {
+    return inferLlmVendorFromModelKey(modelKey) === "volcengine"
+      ? "火山方舟文本任务轮询异常（请重新生成；视觉理解通常需十余秒）。"
+      : "任务提交异常，请重新生成。";
+  }
+
+  if (blob.includes("story_llm_stale") || blob.includes("story_llm_failed")) {
+    if (inferLlmVendorFromModelKey(modelKey) === "volcengine") {
+      return "火山方舟文本生成未完成，请重试。";
+    }
   }
 
   if (

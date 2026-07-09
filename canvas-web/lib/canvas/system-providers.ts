@@ -13,7 +13,6 @@ import {
   STORY_TTS_MODEL_KEYS,
 } from "./types";
 import {
-  isStoryLlmVisionModel,
   STORY_LLM_VISION_MODEL_KEYS,
 } from "./story-llm-vision-models";
 
@@ -98,30 +97,15 @@ function findLlmOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 图片/视频反推 · 仅多模态 LLM（Gemini / GPT-5.5） */
+/** 图片/视频反推 · 多模态 LLM（Doubao Seed 2.0 / Gemini / GPT-5.5） */
 export function pickDefaultStoryVisionLlmEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
   const active = activeCanvasProviders(providers);
-  const kie = findProviderByKind(providers, "KIE");
-  if (kie) {
-    for (const key of STORY_LLM_VISION_MODEL_KEYS) {
-      if (key === "gpt-5-5") continue;
-      const pick = findLlmOnProvider(kie, key, STORY_LLM_VISION_ALLOWED);
+  for (const key of STORY_LLM_VISION_MODEL_KEYS) {
+    for (const provider of active) {
+      const pick = findLlmOnProvider(provider, key, STORY_LLM_VISION_ALLOWED);
       if (pick) return pick;
-    }
-    const gpt = findLlmOnProvider(kie, "gpt-5-5", STORY_LLM_VISION_ALLOWED);
-    if (gpt) return gpt;
-  }
-  for (const provider of active) {
-    for (const m of provider.models) {
-      if (
-        m.role === "LLM" &&
-        m.enabled &&
-        isStoryLlmVisionModel(m.modelKey)
-      ) {
-        return { providerId: provider.id, modelKey: m.modelKey };
-      }
     }
   }
   return null;

@@ -84,6 +84,9 @@ function inferCapabilities(
   ) {
     caps.push("Reasoning");
   }
+  if (m === "doubao-seed-2.1-pro" || m === "doubao-seed-2.0" || m === "gpt-5-5" || m.includes("gemini")) {
+    caps.push("Vision");
+  }
   return caps;
 }
 

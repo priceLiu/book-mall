@@ -555,6 +555,12 @@ async function forwardKieChatViaGateway(
   }
 }
 
+const VOLCENGINE_CHAT_MAX_ATTEMPTS = 3;
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function forwardChatCompletions(opts: {
   credentialId: string;
   providerKind: GatewayProviderKind;
@@ -581,20 +587,35 @@ export async function forwardChatCompletions(opts: {
       : cred.apiKey;
 
   const started = Date.now();
-  const r = await gatewayFetch(
-    url,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${bearerKey}`,
-      },
-      body: JSON.stringify(requestBody),
+  const fetchOpts = {
+    method: "POST" as const,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${bearerKey}`,
     },
-    { hop: "upstream", providerKind: cred.providerKind },
-  );
-  const text = await r.text();
-  return { status: r.status, text, durationMs: Date.now() - started };
+    body: JSON.stringify(requestBody),
+  };
+  const hopCtx = {
+    hop: "upstream" as const,
+    providerKind: cred.providerKind,
+  };
+  const maxAttempts =
+    cred.providerKind === "VOLCENGINE" ? VOLCENGINE_CHAT_MAX_ATTEMPTS : 1;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const r = await gatewayFetch(url, fetchOpts, hopCtx);
+      const text = await r.text();
+      return { status: r.status, text, durationMs: Date.now() - started };
+    } catch (e) {
+      lastErr = e;
+      if (attempt >= maxAttempts) break;
+      await sleepMs(800 * attempt);
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error(String(lastErr ?? "chat/completions failed"));
 }
 
 export async function forwardChatCompletionsStream(opts: {

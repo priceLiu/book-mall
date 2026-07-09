@@ -33,7 +33,12 @@ import type {
 import {
   isLibtvFreestandingImageNode,
 } from "./libtv-image-node-run";
-import { sbv1ImageFailurePatch } from "./sbv1-image-task-apply";
+import {
+  isSameSbv1MediaDataPatch,
+  sbv1ImageFailurePatch,
+  sbv1ImagePatchFromTask,
+} from "./sbv1-image-task-apply";
+import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import {
   clearCanvasNodeRunSession,
   shouldDeferLibtvOrphanReconcile,
@@ -413,6 +418,28 @@ export function reconcileStaleInflightRuntimes(
         );
         if (!hasServerInflight) {
           if (shouldDeferLibtvOrphanReconcile(node.id)) {
+            continue;
+          }
+          const terminalPick = pickPreferredCanvasTask(nodeTasks);
+          if (
+            terminalPick &&
+            (terminalPick.status === "FAILED" ||
+              terminalPick.status === "CANCELLED")
+          ) {
+            const patch = sbv1ImagePatchFromTask(
+              node.data as unknown as Sbv1ImageNodeData,
+              terminalPick,
+            );
+            if (
+              patch &&
+              !isSameSbv1MediaDataPatch(
+                node.data as Record<string, unknown>,
+                patch,
+              )
+            ) {
+              clearCanvasNodeRunSession(node.id);
+              updateNodeData(node.id, patch);
+            }
             continue;
           }
           clearCanvasNodeRunSession(node.id);

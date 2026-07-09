@@ -56,6 +56,13 @@ import {
   LibtvMediaGeneratingState,
   isLibtvMediaGenerating,
 } from "./libtv-media-generating-state";
+import { LibtvNodeErrorBanner } from "./libtv-node-error-banner";
+import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
+import {
+  libtvRuntimeErrorAlertTitle,
+  useLibtvRuntimeErrorAlert,
+} from "@/lib/canvas/libtv-runtime-error-alert";
+import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
 import {
   gridSplitCropBackgroundStyle,
   type GridSplitCrop,
@@ -202,6 +209,35 @@ export function LibtvImageNode({
   const errorMessage = hasRuntimeError
     ? d.runtime?.failMessage?.trim() || "生成失败"
     : d.uploadError?.trim() || "生成失败";
+  const errorBanner = useLibtvRuntimeErrorBanner({
+    nodeId: id,
+    status: d.runtime?.status,
+    taskId: d.runtime?.taskId,
+    failCode: d.runtime?.failCode,
+    failMessage: d.runtime?.failMessage,
+    dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    hasMedia: Boolean(hasImage && !hasRuntimeError),
+  });
+  useLibtvRuntimeErrorAlert({
+    nodeId: id,
+    status: d.runtime?.status,
+    taskId: d.runtime?.taskId,
+    failCode: d.runtime?.failCode,
+    failMessage: d.runtime?.failMessage,
+    dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    enabled: !isMislabeledVendorSuccessError(
+      d.runtime?.failCode,
+      d.runtime?.failMessage,
+    ),
+    onAlert: ({ message, failCode }) => {
+      void alert({
+        title: libtvRuntimeErrorAlertTitle(failCode, message),
+        message,
+        variant: "error",
+        dismissOnly: true,
+      });
+    },
+  });
   const showSidePlus = Boolean(
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
@@ -508,6 +544,27 @@ export function LibtvImageNode({
         </LibtvMediaGeneratingState>
       );
     }
+    if (hasRuntimeError) {
+      return (
+        <div className="absolute inset-0 flex flex-col">
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl}
+              alt=""
+              className="absolute inset-0 size-full object-contain opacity-25"
+              draggable={false}
+              onError={onPreviewLoadError}
+            />
+          ) : null}
+          <Pro2MediaNodeErrorState
+            icon={AlertTriangle}
+            title={hasUploadError && !hasRuntimeError ? "上传失败" : "生成失败"}
+            message={errorMessage}
+          />
+        </div>
+      );
+    }
     if (hasImage) {
       if (gridSplit && previewUrl) {
         return (
@@ -754,8 +811,13 @@ export function LibtvImageNode({
             </div>
           </div>
 
-          <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
+          <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative flex min-h-0 flex-col")}>
             {renderStage()}
+            <LibtvNodeErrorBanner
+              message={errorBanner.message}
+              visible={errorBanner.visible}
+              onDismiss={errorBanner.dismiss}
+            />
           </div>
         </div>
       </div>

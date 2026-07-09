@@ -33,6 +33,11 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
   "Doubao-Seed-2.0-lite": "doubao-seed-2-0-lite-260215",
   "doubao-seed-2.0-mini": "doubao-seed-2-0-mini-260215",
   "Doubao-Seed-2.0-mini": "doubao-seed-2-0-mini-260215",
+  /** 多模态视觉理解 · 上游 doubao-seed-2-1-pro（须在方舟控制台开通） */
+  "doubao-seed-2.1-pro": "doubao-seed-2-1-pro-260628",
+  "Doubao-Seed-2.1-pro": "doubao-seed-2-1-pro-260628",
+  "doubao-seed-2.0": "doubao-seed-2-1-pro-260628",
+  "Doubao-Seed-2.0": "doubao-seed-2-1-pro-260628",
   /** 须在方舟控制台开通对应模型；未开通时返回 ModelNotOpen */
   "doubao-lite-32k": "doubao-1-5-lite-32k-250115",
   "Doubao-lite-32k": "doubao-1-5-lite-32k-250115",
@@ -43,6 +48,24 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
 };
 
 export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
+  {
+    modelKey: "doubao-seed-2.1-pro",
+    displayName: "Doubao Seed 2.1 Pro · 视觉理解",
+    role: "LLM",
+    description:
+      "火山方舟 · 多模态图片/视频理解 · 反推提示词（上游 doubao-seed-2-1-pro-260628）",
+    paramsSchema: [...LLM_TEMP_SCHEMA],
+    defaultParams: { temperature: 0.7, max_tokens: 8000 },
+  },
+  {
+    modelKey: "doubao-seed-2.0",
+    displayName: "Doubao Seed 2.0 Pro · 视觉理解",
+    role: "LLM",
+    description:
+      "火山方舟 · 兼容别名 · 同上游 doubao-seed-2-1-pro-260628（请优先选 2.1 Pro）",
+    paramsSchema: [...LLM_TEMP_SCHEMA],
+    defaultParams: { temperature: 0.7, max_tokens: 8000 },
+  },
   {
     modelKey: "doubao-seed-2.0-lite",
     displayName: "Doubao-Seed-2.0-lite",
