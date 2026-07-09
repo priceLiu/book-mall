@@ -145,7 +145,7 @@ export function isPro2StyledGroup(
 
 const PRO2_MEDIA_GROUP_Z_BASE = 5;
 const PRO2_MEDIA_GROUP_Z_SELECTED = 5;
-/** 高于 `.react-flow__edges`（globals.css · 4），连线可见但不压住图片 */
+/** 高于 `.react-flow__edges`（globals.css · 12），连线可见但不压住图片 */
 const PRO2_MEDIA_GROUP_CHILD_Z_BASE = 22;
 const PRO2_MEDIA_GROUP_CHILD_Z_SELECTED = 1201;
 
@@ -160,7 +160,15 @@ export function syncPro2MediaGroupZIndex(
   const selectedGroup = nodes.find(
     (n) => n.type === "group" && n.selected && isStyledMediaGroup(n),
   );
-  const selectedId = selectedGroup?.id;
+  const draggingGroup = nodes.find(
+    (n) =>
+      n.type === "group" &&
+      isStyledMediaGroup(n) &&
+      Boolean((n as { dragging?: boolean }).dragging),
+  );
+  const activeGroupIds = new Set<string>();
+  if (selectedGroup?.id) activeGroupIds.add(selectedGroup.id);
+  if (draggingGroup?.id) activeGroupIds.add(draggingGroup.id);
   const styledGroupIds = new Set(
     nodes.filter(isStyledMediaGroup).map((n) => n.id),
   );
@@ -169,15 +177,16 @@ export function syncPro2MediaGroupZIndex(
   let changed = false;
   const next = nodes.map((n) => {
     if (n.type === "group" && styledGroupIds.has(n.id)) {
-      const z =
-        n.id === selectedId ? PRO2_MEDIA_GROUP_Z_SELECTED : PRO2_MEDIA_GROUP_Z_BASE;
+      const z = activeGroupIds.has(n.id)
+        ? PRO2_MEDIA_GROUP_Z_SELECTED
+        : PRO2_MEDIA_GROUP_Z_BASE;
       if (n.zIndex === z) return n;
       changed = true;
       return { ...n, zIndex: z };
     }
     if (n.parentId && styledGroupIds.has(n.parentId)) {
       const z =
-        n.parentId === selectedId
+        activeGroupIds.has(n.parentId)
           ? PRO2_MEDIA_GROUP_CHILD_Z_SELECTED
           : PRO2_MEDIA_GROUP_CHILD_Z_BASE;
       if (n.zIndex === z) return n;

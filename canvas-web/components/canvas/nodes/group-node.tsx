@@ -25,8 +25,7 @@ import {
   Video,
 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
-import { relayoutSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-layout";
+import { PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
   cancelPro2MediaGroupToolbarHide,
   pinPro2MediaGroupToolbarHover,
@@ -37,6 +36,7 @@ import {
   isPro2StyledGroup,
   pro2MediaGroupBorderColor,
 } from "@/lib/canvas/pro2-media-group-meta";
+import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
   PRO2_MEDIA_GROUP_BG,
   PRO2_MEDIA_GROUP_BORDER_WIDTH,
@@ -116,6 +116,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
+  const autoLayoutGroupChildren = useCanvasStore((s) => s.autoLayoutGroupChildren);
   const reflowStoryTemplateGroups = useCanvasStore(
     (s) => s.reflowStoryTemplateGroups,
   );
@@ -161,7 +162,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     [storeNodes, id],
   );
   const isPro2MediaGroup = Boolean(d.pro2Kind);
-  const isSbv1Group = Boolean(d.sbv1Styled);
+  const isSbv1Group = Boolean(
+    selfNode && isSbv1MediaGroup(selfNode, storeNodes),
+  );
   const isStoryTemplateGroup =
     id === "sc-group-characters" ||
     id === "sc-group-media" ||
@@ -334,25 +337,15 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       return;
     }
     relayoutDoneRef.current = true;
-    if (isSbv1Group && d.pro2Kind !== "video-board") {
-      relayoutSbv1MediaGroup(setNodes, id, storeEdges);
-      updateNodeData(id, {
-        pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
-      });
-      return;
-    }
-    relayoutPro2MediaGroup(setNodes, id);
+    autoLayoutGroupChildren(id, "auto");
     updateNodeData(id, {
       pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
     });
   }, [
     hasMediaChildrenMemo,
-    isSbv1Group,
     id,
-    setNodes,
-    storeEdges,
+    autoLayoutGroupChildren,
     updateNodeData,
-    d.pro2Kind,
     d.pro2ShortcutPreset,
     pro2LayoutVersion,
   ]);

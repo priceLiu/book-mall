@@ -36,12 +36,14 @@ export const PRO2_VIDEO_CELL_MIN_WIDTH = LIBTV_VIDEO_MEDIA_NODE_MIN_WIDTH;
 export const PRO2_VIDEO_CELL_MIN_HEIGHT = LIBTV_VIDEO_MEDIA_NODE_MIN_HEIGHT;
 
 /**
- * 宫格列数：按子节点数量推导，偏横向（列 ≥ 行），尽量不竖排。
- * 1→1, 2→2, 3→2, 4→2, 5→3, 6→3, 9→3 …
+ * 宫格列数：偏横向（列 ≥ 行），行数最少以避免末行大量空格。
+ * rows = floor(√count)，cols = ceil(count / rows)。
+ * 1→1, 2→2, 3→3, 4→2, 5→3, 6→3, 7→4, 8→4, 9→3 …
  */
 export function pro2MediaGridCols(count: number): number {
   if (count <= 1) return 1;
-  return Math.ceil(Math.sqrt(count));
+  const rows = Math.max(1, Math.floor(Math.sqrt(count)));
+  return Math.ceil(count / rows);
 }
 
 export function pro2MediaChildSize(node: {
@@ -128,16 +130,17 @@ type MediaChildLayout = {
   height: number;
 };
 
-/** 宫格重排 · 按每格实测宽高计算行高/列宽（避免生图后 auto-fit 撑破组框） */
-export function pro2MediaGridLayoutForChildren(
+/** 宫格重排 · 按自定义尺寸函数计算行高/列宽 */
+export function mediaGridLayoutForChildren(
   children: CanvasFlowNode[],
   cols: number,
+  sizeOf: (node: CanvasFlowNode) => { width: number; height: number },
 ): MediaChildLayout[] {
   const count = children.length;
   if (count === 0) return [];
   const c = Math.max(1, cols);
   const rows = Math.ceil(count / c);
-  const sizes = children.map((n) => effectivePro2MediaChildSize(n));
+  const sizes = children.map((n) => sizeOf(n));
 
   const colWidths = Array.from({ length: c }, (_, col) => {
     let maxW = 0;
@@ -184,6 +187,14 @@ export function pro2MediaGridLayoutForChildren(
       height: size.height,
     };
   });
+}
+
+/** 宫格重排 · 按每格实测宽高计算行高/列宽（避免生图后 auto-fit 撑破组框） */
+export function pro2MediaGridLayoutForChildren(
+  children: CanvasFlowNode[],
+  cols: number,
+): MediaChildLayout[] {
+  return mediaGridLayoutForChildren(children, cols, effectivePro2MediaChildSize);
 }
 
 export function pro2MediaGroupDimensionsFromLayouts(
@@ -317,7 +328,7 @@ function isMediaGroupChildForRelayout(
 }
 
 /** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 5;
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 9;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(

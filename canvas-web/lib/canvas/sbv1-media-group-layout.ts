@@ -1,7 +1,12 @@
 "use client";
 
-import { sbv1ImageChildren } from "./sbv1-media-group-meta";
 import {
+  isSbv1MediaGroup as isSbv1MediaGroupByMeta,
+  sbv1ImageChildren,
+} from "./sbv1-media-group-meta";
+import {
+  SBV1_IMAGE_NODE_HEIGHT,
+  SBV1_IMAGE_NODE_WIDTH,
   SBV1_VIDEO_ENGINE_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
@@ -13,14 +18,53 @@ import {
   PRO2_MEDIA_GROUP_LAYOUT_VERSION,
   PRO2_MEDIA_GROUP_PAD,
   applyPro2MediaGroupRelayout,
+  mediaGridLayoutForChildren,
   pro2MediaGridCols,
-  pro2MediaGridLayout,
-  pro2MediaGridLayoutForChildren,
   pro2MediaGroupDimensionsFromLayouts,
 } from "./pro2-media-group-layout";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 const SBV1_VIDEO_GAP = 48;
+
+/** sbv1 组内参考图 · 统一宫格单元（忽略组外 auto-fit 的大尺寸，除非用户手动拉伸） */
+function sbv1GroupImageCellSize(node: CanvasFlowNode): {
+  width: number;
+  height: number;
+} {
+  const isCanonicalImageNode =
+    node.type === "sbv1-image" ||
+    node.type === "story-pro2-image" ||
+    node.type === "story-pro2-three-view";
+  if (Boolean((node.data as { manualSize?: boolean }).manualSize)) {
+    const style = node.style as { width?: number; height?: number } | undefined;
+    const w =
+      node.measured?.width ??
+      (typeof node.width === "number" ? node.width : undefined) ??
+      style?.width ??
+      SBV1_IMAGE_NODE_WIDTH;
+    const h =
+      node.measured?.height ??
+      (typeof node.height === "number" ? node.height : undefined) ??
+      style?.height ??
+      SBV1_IMAGE_NODE_HEIGHT;
+    return { width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
+  }
+  if (isCanonicalImageNode) {
+    return { width: SBV1_IMAGE_NODE_WIDTH, height: SBV1_IMAGE_NODE_HEIGHT };
+  }
+  const style = node.style as { width?: number; height?: number } | undefined;
+  const w =
+    node.measured?.width ??
+    (typeof node.width === "number" ? node.width : undefined) ??
+    style?.width ??
+    320;
+  const h =
+    node.measured?.height ??
+    (typeof node.height === "number" ? node.height : undefined) ??
+    style?.height ??
+    220;
+  return { width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
+}
 
 function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
   width: number;
@@ -46,9 +90,12 @@ function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
   };
 }
 
-function isSbv1MediaGroup(group: CanvasFlowNode | undefined): boolean {
-  if (!group || group.type !== "group") return false;
-  return Boolean((group.data as { sbv1Styled?: boolean }).sbv1Styled);
+/**
+ * sbv1 组内「左侧网格」子节点：除视频引擎外的全部可视子节点（图片/标签等）。
+ * 混合分组（图片 + 视频 + 标签）若只排 sbv1-image，会出现标签悬浮重叠。
+ */
+function isSbv1GroupImageChild(n: CanvasFlowNode): boolean {
+  return n.type !== "group" && n.type !== "sbv1-video-engine";
 }
 
 function sortSbv1GroupChildren(children: CanvasFlowNode[]): CanvasFlowNode[] {
@@ -81,14 +128,13 @@ export function findSbv1GroupLinkedVideoEngine(
     targetCounts.set(e.target, (targetCounts.get(e.target) ?? 0) + 1);
   }
 
+  let best: { node: CanvasFlowNode; count: number } | undefined;
   for (const [targetId, count] of targetCounts) {
-    if (count !== images.length) continue;
     const node = nodes.find((n) => n.id === targetId);
-    if (node?.type === "sbv1-video-engine" && node.parentId !== groupId) {
-      return node;
-    }
+    if (node?.type !== "sbv1-video-engine" || node.parentId === groupId) continue;
+    if (!best || count > best.count) best = { node, count };
   }
-  return undefined;
+  return best?.count ? best.node : undefined;
 }
 
 function reparentToGroup(
@@ -120,7 +166,7 @@ function applySbv1GroupImageGrid(
   }
 
   const cols = pro2MediaGridCols(images.length);
-  const layouts = pro2MediaGridLayoutForChildren(images, cols);
+  const layouts = mediaGridLayoutForChildren(images, cols, sbv1GroupImageCellSize);
   let next = nodes;
 
   for (let i = 0; i < images.length; i++) {
@@ -210,7 +256,7 @@ export function applySbv1MediaGroupRelayout(
   groupId: string,
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
-  if (!isSbv1MediaGroup(group)) {
+  if (!group || !isSbv1MediaGroupByMeta(group, nodes)) {
     return applyPro2MediaGroupRelayout(nodes, groupId);
   }
 
@@ -222,19 +268,79 @@ export function applySbv1MediaGroupRelayout(
   }
 
   const images = sortSbv1GroupChildren(
-    next.filter((n) => n.parentId === groupId && n.type === "sbv1-image"),
+    next.filter((n) => n.parentId === groupId && isSbv1GroupImageChild(n)),
   );
   const engines = sortSbv1GroupChildren(
     next.filter((n) => n.parentId === groupId && n.type === "sbv1-video-engine"),
   );
+  const allChildren = sortSbv1GroupChildren(
+    next.filter((n) => n.parentId === groupId && n.type !== "group"),
+  );
 
-  if (images.length === 0 && engines.length === 0) {
+  if (allChildren.length === 0) {
+    return sortNodesForReactFlow(next);
+  }
+
+  const hasMixedContent = allChildren.some(
+    (n) => n.type !== "sbv1-image" && n.type !== "sbv1-video-engine",
+  );
+  if (hasMixedContent) {
+    const cols = pro2MediaGridCols(allChildren.length);
+    const layouts = mediaGridLayoutForChildren(allChildren, cols, (n) =>
+      n.type === "sbv1-video-engine"
+        ? sbv1VideoEngineDimensions(n)
+        : sbv1GroupImageCellSize(n),
+    );
+    for (let i = 0; i < allChildren.length; i++) {
+      const child = allChildren[i]!;
+      const lay = layouts[i]!;
+      next = next.map((n) =>
+        n.id === child.id
+          ? {
+              ...n,
+              position: { x: lay.x, y: lay.y },
+              width: lay.width,
+              height: lay.height,
+              style: {
+                ...(typeof n.style === "object" && n.style ? n.style : {}),
+                width: lay.width,
+                height: lay.height,
+              },
+              data: { ...n.data, pro2GroupId: groupId },
+            }
+          : n,
+      );
+    }
+    const { width: groupWidth, height: groupHeight } =
+      pro2MediaGroupDimensionsFromLayouts(layouts, cols);
+    next = next.map((n) =>
+      n.id === groupId
+        ? {
+            ...n,
+            width: groupWidth,
+            height: groupHeight,
+            style: {
+              ...(typeof n.style === "object" && n.style ? n.style : {}),
+              width: groupWidth,
+              height: groupHeight,
+            },
+            data: {
+              ...(n.data as Record<string, unknown>),
+              pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
+            },
+          }
+        : n,
+    );
     return sortNodesForReactFlow(next);
   }
 
   if (images.length === 0 && engines.length > 0) {
     const cols = pro2MediaGridCols(engines.length);
-    const layouts = pro2MediaGridLayoutForChildren(engines, cols);
+    const layouts = mediaGridLayoutForChildren(
+      engines,
+      cols,
+      sbv1VideoEngineDimensions,
+    );
     for (let i = 0; i < engines.length; i++) {
       const engine = engines[i]!;
       const lay = layouts[i]!;

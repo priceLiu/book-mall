@@ -63,18 +63,17 @@ import {
 import {
   inferPro2MediaGroupKind,
   isPro2MediaChildNode,
+  isPro2StyledGroup,
   pro2MediaGroupDefaultLabel,
   syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
 import {
-  applyPro2MediaGroupRelayout,
   PRO2_FRAME_CELL_HEIGHT,
   PRO2_FRAME_CELL_WIDTH,
   PRO2_MEDIA_GROUP_HEADER,
   PRO2_MEDIA_GROUP_PAD,
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
-import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
 import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
@@ -373,6 +372,11 @@ type CanvasState = {
    */
   autoLayoutNodes: (
     nodeIds: string[],
+    mode?: "auto" | "row" | "column",
+  ) => void;
+  /** 对分组内全部子节点执行 autoLayoutNodes（与顶栏「自动」相同） */
+  autoLayoutGroupChildren: (
+    groupId: string,
     mode?: "auto" | "row" | "column",
   ) => void;
 
@@ -1208,13 +1212,15 @@ export const useCanvasStore = create<CanvasState>()(
         const pro2Kind = inferPro2MediaGroupKind(all, effectiveChildIds);
         const pro2VideoBoardOnly =
           children.length > 0 && children.every(isPro2VideoBoardChild);
-        const sbv1OnlyMedia =
+        const hasSbv1MediaChildren = children.some(
+          (c) => c.type === "sbv1-image" || c.type === "sbv1-video-engine",
+        );
+        const hasPro2MediaChildren = children.some(isPro2MediaChildNode);
+        const sbv1Styled =
           children.length > 0 &&
-          !pro2VideoBoardOnly &&
-          children.every(
-            (c) => c.type === "sbv1-image" || c.type === "sbv1-video-engine",
-          );
-        const sbv1Styled = sbv1OnlyMedia;
+          hasSbv1MediaChildren &&
+          !hasPro2MediaChildren &&
+          !pro2VideoBoardOnly;
         const mediaGridChildrenOnly =
           children.length > 0 &&
           children.every(
@@ -1321,20 +1327,17 @@ export const useCanvasStore = create<CanvasState>()(
             newNodes.push(n);
           }
         }
-        let laidOutNodes = newNodes;
-        if (usePro2MediaGrid) {
-          laidOutNodes = sbv1Styled
-            ? applySbv1MediaGroupRelayout(newNodes, get().edges, groupId)
-            : applyPro2MediaGroupRelayout(newNodes, groupId);
-        }
         set((state) =>
           withGraphRevision(state, {
-            nodes: normalizeCanvasNodes(laidOutNodes, state.edges).map((n) => ({
+            nodes: normalizeCanvasNodes(newNodes, state.edges).map((n) => ({
               ...n,
               selected: n.id === groupId,
             })),
           }),
         );
+        if (effectiveChildIds.length >= 2) {
+          get().autoLayoutGroupChildren(groupId, "auto");
+        }
         return groupId;
       },
 
@@ -1514,6 +1517,17 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
+      autoLayoutGroupChildren: (groupId, mode = "auto") => {
+        const childIds = get()
+          .nodes.filter(
+            (n) => n.parentId === groupId && !isGroupNode(n.type),
+          )
+          .map((n) => n.id);
+        if (childIds.length >= 2) {
+          get().autoLayoutNodes(childIds, mode);
+        }
+      },
+
       commitFlowNodePositions: (patches) => {
         if (!patches.length) return;
         const byId = new Map(patches.map((p) => [p.id, p.position]));
@@ -1578,25 +1592,12 @@ export const useCanvasStore = create<CanvasState>()(
           const state = get();
           const g = state.nodes.find((n) => n.id === groupId && n.type === "group");
           if (!g) return;
-          if (isSbv1MediaGroup(g, state.nodes)) {
-            set((s) =>
-              withGraphRevision(s, {
-                nodes: applySbv1MediaGroupRelayout(
-                  s.nodes,
-                  s.edges,
-                  groupId,
-                ),
-              }),
-            );
-            return;
+          if (
+            isSbv1MediaGroup(g, state.nodes) ||
+            isPro2StyledGroup(g, state.nodes)
+          ) {
+            get().autoLayoutGroupChildren(groupId, "auto");
           }
-          const gd = g.data as { pro2Kind?: string; pro2Styled?: boolean };
-          if (!gd.pro2Kind && !gd.pro2Styled) return;
-          set((s) =>
-            withGraphRevision(s, {
-              nodes: applyPro2MediaGroupRelayout(s.nodes, groupId),
-            }),
-          );
         };
         relayoutGroup(newParentGroupId);
         relayoutGroup(oldParentId);
