@@ -107,7 +107,7 @@ export function AccountMenuDropdown({
     gatewayLinked,
   });
 
-  async function handleAppLaunch(actionId: string, launch: () => void | Promise<void>) {
+  async function handleAppLaunch(actionId: string, launch: () => void | Promise<unknown>) {
     if (isAppLaunchAction(actionId)) {
       const blocked = resolveAppLaunchBlockedRedirect({
         actionId,
