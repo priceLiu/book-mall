@@ -329,6 +329,11 @@ html[data-canvas-modal-open] .pro2-input-dock {
   transition: opacity 0.2s ease-out;
 }
 
+/* 静止连线 · 白线（选中高亮 pro2-edge-active 保持原色与流动动效） */
+.canvas-flow-wrap .react-flow__edge:not(.pro2-edge-active) .react-flow__edge-path {
+  stroke: #ffffff !important;
+}
+
 /* Pro2 脚本 / 大纲节点 · 横纵滚动条（避开右侧连线 Handle 热区） */
 .pro2-node-scroll {
   scrollbar-gutter: stable;
