@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
+import { relayoutSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-layout";
 import {
   cancelPro2MediaGroupToolbarHide,
   pinPro2MediaGroupToolbarHover,
@@ -325,7 +326,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const hasMediaChildrenMemo = hasMediaChildren;
   useEffect(() => {
     if (!hasMediaChildrenMemo) return;
-    if (isSbv1Group && d.pro2Kind !== "video-board") return;
     if (d.pro2ShortcutPreset) return;
     if (relayoutDoneRef.current) return;
     const version = (d as { pro2LayoutVersion?: number }).pro2LayoutVersion;
@@ -334,6 +334,13 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       return;
     }
     relayoutDoneRef.current = true;
+    if (isSbv1Group && d.pro2Kind !== "video-board") {
+      relayoutSbv1MediaGroup(setNodes, id, storeEdges);
+      updateNodeData(id, {
+        pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
+      });
+      return;
+    }
     relayoutPro2MediaGroup(setNodes, id);
     updateNodeData(id, {
       pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
@@ -343,7 +350,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     isSbv1Group,
     id,
     setNodes,
+    storeEdges,
     updateNodeData,
+    d.pro2Kind,
     d.pro2ShortcutPreset,
     pro2LayoutVersion,
   ]);

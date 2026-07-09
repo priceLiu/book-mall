@@ -1,4 +1,4 @@
-import type { CanvasEnginePick } from "./types";
+import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
 import type { GatewayModelRole } from "./gateway-model-role";
 import { GATEWAY_MODEL_ROLE_ORDER } from "./gateway-model-role";
 import { isPro2SunoModelKey } from "./kie-audio-models";
@@ -33,6 +33,7 @@ export type Pro2TextNodeEngineData = Pro2TextPurposeNodeData & {
   imageEngine?: CanvasEnginePick;
   videoEngine?: CanvasEnginePick;
   musicEngine?: CanvasEnginePick;
+  themeOutlineRuntime?: CanvasNodeRuntime;
 };
 
 export function readPro2TextNodeEngine(

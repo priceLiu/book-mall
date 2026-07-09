@@ -10,6 +10,7 @@ import {
   PRO2_MEDIA_GRID_GAP,
   PRO2_MEDIA_GROUP_EXTRA,
   PRO2_MEDIA_GROUP_HEADER,
+  PRO2_MEDIA_GROUP_LAYOUT_VERSION,
   PRO2_MEDIA_GROUP_PAD,
   applyPro2MediaGroupRelayout,
   pro2MediaGridCols,
@@ -232,31 +233,22 @@ export function applySbv1MediaGroupRelayout(
   }
 
   if (images.length === 0 && engines.length > 0) {
-    const defaultCell = {
-      width: SBV1_VIDEO_ENGINE_WIDTH,
-      height: SBV1_VIDEO_ENGINE_HEIGHT,
-    };
     const cols = pro2MediaGridCols(engines.length);
-    const engineDimsList = engines.map((e) => sbv1VideoEngineDimensions(e));
-    const rowHeights: number[] = [];
-
+    const layouts = pro2MediaGridLayoutForChildren(engines, cols);
     for (let i = 0; i < engines.length; i++) {
       const engine = engines[i]!;
-      const dims = engineDimsList[i]!;
-      const row = Math.floor(i / cols);
-      rowHeights[row] = Math.max(rowHeights[row] ?? 0, dims.height);
-      const rel = pro2MediaGridLayout(i, defaultCell, cols);
+      const lay = layouts[i]!;
       next = next.map((n) =>
         n.id === engine.id
           ? {
               ...n,
-              position: rel,
-              width: dims.width,
-              height: dims.height,
+              position: { x: lay.x, y: lay.y },
+              width: lay.width,
+              height: lay.height,
               style: {
                 ...(typeof n.style === "object" && n.style ? n.style : {}),
-                width: dims.width,
-                height: dims.height,
+                width: lay.width,
+                height: lay.height,
               },
               data: { ...n.data, pro2GroupId: groupId },
             }
@@ -264,22 +256,8 @@ export function applySbv1MediaGroupRelayout(
       );
     }
 
-    const gridContentWidth =
-      cols * defaultCell.width + Math.max(0, cols - 1) * PRO2_MEDIA_GRID_GAP;
-    const rows = Math.ceil(engines.length / cols);
-    let gridContentHeight = 0;
-    for (let r = 0; r < rows; r++) {
-      gridContentHeight +=
-        (rowHeights[r] ?? defaultCell.height) + (r > 0 ? PRO2_MEDIA_GRID_GAP : 0);
-    }
-
-    const groupWidth =
-      PRO2_MEDIA_GROUP_PAD * 2 + gridContentWidth + PRO2_MEDIA_GROUP_EXTRA;
-    const groupHeight =
-      PRO2_MEDIA_GROUP_PAD * 2 +
-      PRO2_MEDIA_GROUP_HEADER +
-      gridContentHeight +
-      PRO2_MEDIA_GROUP_EXTRA;
+    const { width: groupWidth, height: groupHeight } =
+      pro2MediaGroupDimensionsFromLayouts(layouts, cols);
     next = next.map((n) =>
       n.id === groupId
         ? {
@@ -290,6 +268,10 @@ export function applySbv1MediaGroupRelayout(
               ...(typeof n.style === "object" && n.style ? n.style : {}),
               width: groupWidth,
               height: groupHeight,
+            },
+            data: {
+              ...(n.data as Record<string, unknown>),
+              pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
             },
           }
         : n,
@@ -339,6 +321,10 @@ export function applySbv1MediaGroupRelayout(
             ...(typeof n.style === "object" && n.style ? n.style : {}),
             width: groupWidth,
             height: groupHeight,
+          },
+          data: {
+            ...(n.data as Record<string, unknown>),
+            pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
           },
         }
       : n,

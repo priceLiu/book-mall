@@ -1474,6 +1474,7 @@ export function useCanvasRunner(
       abortSequential,
       abortSequentialOnError,
       base,
+      emitTaskPanelSync,
       finishSequentialStep,
       projectId,
       releaseInflightKey,

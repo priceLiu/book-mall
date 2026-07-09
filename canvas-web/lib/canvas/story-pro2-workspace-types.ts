@@ -59,6 +59,8 @@ export type StoryPro2ImageNodeData = ImageNodeData &
   > & {
   /** 底部输入坞提示词（@ 引用上游） */
   dockInput?: string;
+  /** Dock 粘贴的参考图（@ 引用） */
+  dockRefImages?: import("./story-ref-image").StoryRefImage[];
   /** 组内分镜 / 三视图子节点 */
   pro2MediaRole?: Pro2ImageMediaRole;
   pro2RowKey?: string;

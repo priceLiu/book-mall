@@ -22,7 +22,7 @@ import {
   LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
-import type { CanvasEnginePick } from "@/lib/canvas/types";
+import type { CanvasEnginePick, CanvasNodeRuntime } from "@/lib/canvas/types";
 import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types";
 import type { CanvasPortraitNodeFields } from "@/lib/canvas/portrait-node-data";
 import { isPortraitNodeActive } from "@/lib/canvas/portrait-node-data";
@@ -92,7 +92,7 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   blobUrl?: string;
   uploading?: boolean;
   uploadError?: string;
-  runtime?: { status?: string; failMessage?: string };
+  runtime?: CanvasNodeRuntime;
   dockInput?: string;
   engine?: CanvasEnginePick;
   imageMode?: string;

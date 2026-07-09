@@ -75,6 +75,7 @@ import {
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
 import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
+import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
 import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
 import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
@@ -1574,13 +1575,26 @@ export const useCanvasStore = create<CanvasState>()(
 
         const relayoutGroup = (groupId: string | null) => {
           if (!groupId) return;
-          const g = get().nodes.find((n) => n.id === groupId && n.type === "group");
+          const state = get();
+          const g = state.nodes.find((n) => n.id === groupId && n.type === "group");
           if (!g) return;
-          const kind = (g.data as { pro2Kind?: string }).pro2Kind;
-          if (!kind) return;
-          set((state) =>
-            withGraphRevision(state, {
-              nodes: applyPro2MediaGroupRelayout(state.nodes, groupId),
+          if (isSbv1MediaGroup(g, state.nodes)) {
+            set((s) =>
+              withGraphRevision(s, {
+                nodes: applySbv1MediaGroupRelayout(
+                  s.nodes,
+                  s.edges,
+                  groupId,
+                ),
+              }),
+            );
+            return;
+          }
+          const gd = g.data as { pro2Kind?: string; pro2Styled?: boolean };
+          if (!gd.pro2Kind && !gd.pro2Styled) return;
+          set((s) =>
+            withGraphRevision(s, {
+              nodes: applyPro2MediaGroupRelayout(s.nodes, groupId),
             }),
           );
         };

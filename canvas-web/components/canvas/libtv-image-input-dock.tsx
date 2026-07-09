@@ -164,7 +164,7 @@ export function LibtvImageInputDock() {
 
   const settingsData = (storeNode?.data ?? {}) as Sbv1ImageNodeData;
   const dockInput = settingsData.dockInput ?? "";
-  const dockRefImages = (settingsData.dockRefImages ?? []) as import("@/lib/canvas/story-ref-image").StoryRefImage[];
+  const dockRefImages = settingsData.dockRefImages ?? [];
   const previewUrl = settingsData.ossUrl ?? settingsData.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const isRunning = isLibtvMediaGenerating(
@@ -505,10 +505,15 @@ export function LibtvImageInputDock() {
                   />
                 ) : null}
                 <Pro2DockRefImages
-                  refs={[]}
-                  onChange={() => {}}
+                  refs={dockRefImages}
+                  onChange={(next) =>
+                    updateNodeData(storeNode.id, { dockRefImages: next })
+                  }
+                  promptValue={dockInput}
+                  onPromptChange={onPromptChange}
                   disabled={isRunning}
                   pasteActive={false}
+                  activeIds={activeRefIds}
                   spawnAnchor={{
                     nodeId: storeNode.id,
                     nodeType,

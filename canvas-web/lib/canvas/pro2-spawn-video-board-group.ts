@@ -391,12 +391,14 @@ export function repairPro2VideoBoardVisualGroups(
     });
 
     const after = getStore();
-    wirePro2VideoBoardRefEdges(
-      after.setEdges,
-      after.nodes,
-      col.id,
-      d.frameColumnId,
-    );
+    if (after.setEdges) {
+      wirePro2VideoBoardRefEdges(
+        after.setEdges,
+        after.nodes,
+        col.id,
+        d.frameColumnId,
+      );
+    }
   }
 
   repairPro2VideoBoardGroupEdges(getStore);
@@ -429,6 +431,7 @@ export function repairPro2VideoBoardGroupEdges(
   getStore: () => RepairPro2VideoBoardStore,
 ): void {
   const { nodes, setEdges } = getStore();
+  if (!setEdges) return;
   for (const group of nodes) {
     if (group.type !== "group") continue;
     const gd = group.data as { pro2Kind?: string; pro2ControllerNodeId?: string };
@@ -454,6 +457,7 @@ function mergePro2VideoBoardCellRuntime(
   const incomingUrl =
     incoming.ossUrl?.trim() || incoming.ephemeralUrl?.trim() || "";
   if (
+    existing &&
     existingUrl &&
     incoming.status === "error" &&
     !incomingUrl &&

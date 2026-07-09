@@ -288,10 +288,22 @@ function isPro2MediaGroupChild(n: CanvasFlowNode): boolean {
   );
 }
 
+function groupUsesMediaGrid(group: CanvasFlowNode): boolean {
+  const d = group.data as {
+    pro2Kind?: string;
+    sbv1Styled?: boolean;
+    pro2Styled?: boolean;
+    pro2ShortcutPreset?: boolean;
+  };
+  if (d.pro2ShortcutPreset) return false;
+  return Boolean(d.pro2Kind || d.sbv1Styled || d.pro2Styled);
+}
+
 function isMediaGroupChildForRelayout(
   n: CanvasFlowNode,
   group: CanvasFlowNode,
 ): boolean {
+  if (!groupUsesMediaGrid(group)) return false;
   const kind = (group.data as { pro2Kind?: string }).pro2Kind;
   if (kind === "video-board" && n.type === "sbv1-video-engine") {
     return (
@@ -300,9 +312,7 @@ function isMediaGroupChildForRelayout(
     );
   }
   if (!isPro2MediaGroupChild(n)) return false;
-  if (n.type === "sbv1-image") {
-    return Boolean((group.data as { sbv1Styled?: boolean }).sbv1Styled);
-  }
+  if (n.type === "sbv1-image") return true;
   return n.type === "story-pro2-image" || n.type === "story-pro2-three-view";
 }
 

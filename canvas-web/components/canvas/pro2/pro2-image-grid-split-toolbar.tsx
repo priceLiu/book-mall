@@ -129,7 +129,7 @@ export function Pro2ImageGridSplitToolbar({
           ref={hdMenu.anchorRef}
           className={TOOL_BTN}
           disabled={selectedCount === 0}
-          onClick={() => hdMenu.setOpen((v) => !v)}
+          onClick={() => hdMenu.setOpen(!hdMenu.open)}
         >
           <ImageUpscale className="size-3.5" />
           <span>生成高清图片</span>

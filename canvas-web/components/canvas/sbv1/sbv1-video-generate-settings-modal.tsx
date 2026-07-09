@@ -78,7 +78,7 @@ export type Sbv1VideoEngineSettingsPatchInput = {
   referenceMode: Sbv1ReferenceMode;
   aspectRatio: Sbv1AspectRatio;
   durationSec: number;
-  resolution: "720p" | "1080p";
+  resolution: Sbv1VideoEngineNodeData["resolution"];
   providerId: string;
   modelKey: string;
   engineParams: Record<string, unknown>;

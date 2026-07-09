@@ -555,7 +555,6 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
                   <LibtvTryActionRow
                     icon={action.icon}
                     label={action.label}
-                    disabled={action.kind === "soon"}
                     onClick={() => onTryAction(action)}
                   />
                 </li>

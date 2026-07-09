@@ -14,7 +14,8 @@ export type StoryRunContext = {
     | "tts"
     | "sceneRef"
     | "themeOutline"
-    | "generalText";
+    | "generalText"
+    | "music";
 };
 
 export type StoryCharacterRow = {
