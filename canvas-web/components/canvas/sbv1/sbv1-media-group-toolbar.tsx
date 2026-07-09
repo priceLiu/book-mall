@@ -8,7 +8,6 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
   findSbv1GroupLinkedVideoEngine,
-  relayoutSbv1MediaGroup,
 } from "@/lib/canvas/sbv1-media-group-layout";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { Pro2MediaGroupToolbarPanel } from "../pro2/pro2-media-group-toolbar-panel";
@@ -27,7 +26,8 @@ export function Sbv1MediaGroupToolbar({
 }: {
   rfNodes: CanvasFlowNode[];
 }) {
-  const setNodes = useCanvasStore((s) => s.setNodes);
+  const reparentNode = useCanvasStore((s) => s.reparentNode);
+  const autoLayoutGroupChildren = useCanvasStore((s) => s.autoLayoutGroupChildren);
   const edges = useCanvasStore((s) => s.edges);
   const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
   const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
@@ -59,9 +59,9 @@ export function Sbv1MediaGroupToolbar({
     const nodes = useCanvasStore.getState().nodes;
     const linked = findSbv1GroupLinkedVideoEngine(group.id, nodes, edges);
     if (linked && linked.parentId !== group.id) {
-      relayoutSbv1MediaGroup(setNodes, group.id, edges);
+      reparentNode(linked.id, group.id);
     }
-  }, [group?.id, group?.selected, edges, setNodes, group]);
+  }, [group?.id, group?.selected, edges, reparentNode, group]);
 
   const viewport = useViewportTransformActive(Boolean(group) && !viewportMoving);
 
@@ -135,7 +135,7 @@ export function Sbv1MediaGroupToolbar({
         groupId={group.id}
         kind={null}
         edition="sbv1"
-        onRelayout={() => relayoutSbv1MediaGroup(setNodes, group.id, edges)}
+        onRelayout={() => autoLayoutGroupChildren(group.id, "auto")}
         onMouseDown={(e) => e.stopPropagation()}
       />
     </div>

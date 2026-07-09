@@ -256,6 +256,16 @@ html[data-canvas-modal-open] .pro2-input-dock {
   z-index: 1000 !important;
 }
 
+/* 媒体组容器始终位于普通节点之下，避免拖动时遮挡子节点 */
+.canvas-flow-wrap .react-flow__node-group {
+  z-index: 5 !important;
+}
+
+/* 分组拖动时不能抬到子节点上层，否则会出现“只见组底色、子节点消失” */
+.react-flow__node-group.dragging {
+  z-index: 5 !important;
+}
+
 .react-flow__node.dragging .canvas-node-shell {
   pointer-events: none;
 }
@@ -269,9 +279,9 @@ html[data-canvas-modal-open] .pro2-input-dock {
   cursor: default;
 }
 
-/* 组内连线：低于媒体子节点 · 见 pro2-media-group-meta.ts */
+/* 组内连线：高于组背景(5)、低于媒体子节点(22) · 见 pro2-media-group-meta.ts */
 .canvas-flow-wrap .react-flow__edges {
-  z-index: 4 !important;
+  z-index: 12 !important;
 }
 /* 勿整层 nodes 盖住 edges；各节点用 zIndex / 下方规则分层 */
 .canvas-flow-wrap .react-flow__nodes {

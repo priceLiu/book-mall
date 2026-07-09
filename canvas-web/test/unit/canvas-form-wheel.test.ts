@@ -21,7 +21,7 @@ describe("canvas-form-wheel · libtv dock", () => {
     const ta = document.querySelector("textarea")!;
     expect(isCanvasWheelScrollBlockTarget(ta)).toBe(false);
     expect(isCanvasViewportWheelTarget(ta)).toBe(false);
-    expect(shouldBlockCanvasViewportWheel({ target: ta } as WheelEvent)).toBe(
+    expect(shouldBlockCanvasViewportWheel({ target: ta } as unknown as WheelEvent)).toBe(
       false,
     );
   });
@@ -59,7 +59,7 @@ h</textarea>
       metaKey: false,
       preventDefault: () => {},
       stopPropagation: () => {},
-    } as WheelEvent);
+    } as unknown as WheelEvent);
 
     expect(prevented).toBe(true);
     expect(ta.scrollTop).toBe(25);
@@ -86,7 +86,7 @@ h</textarea>
       metaKey: false,
       preventDefault: () => {},
       stopPropagation: () => {},
-    } as WheelEvent);
+    } as unknown as WheelEvent);
 
     expect(prevented).toBe(true);
     expect(scrollEl.scrollTop).toBe(40);
@@ -113,10 +113,12 @@ h</textarea>
       metaKey: false,
       preventDefault: () => {},
       stopPropagation: () => {},
-    } as WheelEvent);
+    } as unknown as WheelEvent);
 
     expect(consumed).toBe(false);
     expect(scrollEl.scrollTop).toBe(0);
+  });
+
   it("scrolls pro2 node preview on wheel", () => {
     document.body.innerHTML = `
       <div class="react-flow">
@@ -144,7 +146,7 @@ h</textarea>
       metaKey: false,
       preventDefault: () => {},
       stopPropagation: () => {},
-    } as WheelEvent);
+    } as unknown as WheelEvent);
 
     expect(prevented).toBe(true);
     expect(scrollEl.scrollTop).toBe(30);
