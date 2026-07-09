@@ -23,6 +23,10 @@ import {
 } from "@/lib/account-app-launch";
 import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
 import {
+  isAppLaunchAction,
+  resolveAppLaunchBlockedRedirect,
+} from "@/lib/account-app-launch-gate";
+import {
   buildAccountNavMenuGroups,
   isAccountNavLinkActive,
   type AccountNavLinkItem,
@@ -53,10 +57,6 @@ type Profile = {
 type NavRuntimeProps = {
   groups: AccountNavMenuGroup[];
   pathname: string;
-  canLaunchTools: boolean;
-  canvasReady: boolean;
-  ecomReady: boolean;
-  quickReplicaReady: boolean;
   onAction: (id: string) => void;
   onNavigate?: () => void;
 };
@@ -65,14 +65,9 @@ type NavRuntimeProps = {
 function AccountSidebarNav({
   groups,
   pathname,
-  canLaunchTools,
-  canvasReady,
-  ecomReady,
-  quickReplicaReady,
   onAction,
-  appsMenuHint,
   onNavigate,
-}: NavRuntimeProps & { appsMenuHint: string | null }) {
+}: NavRuntimeProps) {
   function renderLink(item: AccountNavLinkItem) {
     const active = isAccountNavLinkActive(pathname, item.href, item.exact);
     const Icon = item.icon;
@@ -111,23 +106,13 @@ function AccountSidebarNav({
   function renderItem(item: AccountNavMenuItem) {
     if (item.kind === "link") return renderLink(item);
     const Icon = item.icon;
-    const disabled =
-      (item.id === "launch-tools" && !canLaunchTools) ||
-      (item.id === "launch-canvas" && !canvasReady) ||
-      (item.id === "launch-ecom" && !ecomReady) ||
-      (item.id === "launch-quick-replica" && !quickReplicaReady);
-
     const subscriptionAction = isSubscriptionAction(item);
 
     return (
       <button
         key={item.id}
         type="button"
-        className={cn(
-          subscriptionAction ? signOutButtonClass : itemClass,
-          disabled && "pointer-events-none opacity-50",
-        )}
-        disabled={disabled}
+        className={subscriptionAction ? signOutButtonClass : itemClass}
         onClick={() => {
           onNavigate?.();
           void onAction(item.id);
@@ -142,8 +127,6 @@ function AccountSidebarNav({
     );
   }
 
-  const hasAppsGroup = groups.some((g) => g.id === "apps");
-
   return (
     <nav className="mt-2 min-w-0 w-full" aria-label="个人中心导航">
       {groups.map((group, index) => (
@@ -155,11 +138,6 @@ function AccountSidebarNav({
           {index < groups.length - 1 ? <div className={separatorClass} role="separator" /> : null}
         </div>
       ))}
-      {!hasAppsGroup && appsMenuHint ? (
-        <p className="mt-3 px-3 text-[11px] leading-relaxed text-[#656d76]">
-          {appsMenuHint}
-        </p>
-      ) : null}
     </nav>
   );
 }
@@ -233,24 +211,9 @@ export function AccountNavMenu({
       buildAccountNavMenuGroups({
         isAdmin,
         billingPersona,
-        showToolsLaunch: showToolsCta && canLaunchTools,
-        showCanvasLaunch: canLaunchCanvas && canvasOriginConfigured,
-        showEcomLaunch: ecomReady,
-        showQuickReplicaLaunch: canLaunchQuickReplica && quickReplicaOriginConfigured,
         showReferral,
       }),
-    [
-      isAdmin,
-      billingPersona,
-      showToolsCta,
-      canLaunchTools,
-      canLaunchCanvas,
-      canvasOriginConfigured,
-      ecomReady,
-      canLaunchQuickReplica,
-      quickReplicaOriginConfigured,
-      showReferral,
-    ],
+    [isAdmin, billingPersona, showReferral],
   );
 
   async function runAction(id: string) {
@@ -258,6 +221,25 @@ export function AccountNavMenu({
     if (id === "sign-out") {
       navigateBookMallFullSignOut("/");
       return;
+    }
+    if (isAppLaunchAction(id)) {
+      const blocked = resolveAppLaunchBlockedRedirect({
+        actionId: id,
+        canLaunchTools,
+        canLaunchCanvas,
+        canvasOriginConfigured,
+        canvasReady,
+        ecomReady,
+        canLaunchQuickReplica,
+        quickReplicaOriginConfigured,
+        quickReplicaReady,
+        billingPersona,
+        gatewayLinked,
+      });
+      if (blocked) {
+        window.location.href = blocked;
+        return;
+      }
     }
     if (id === "launch-tools") {
       const r = await openToolsAppInNewTab("/fitting-room");
@@ -277,16 +259,11 @@ export function AccountNavMenu({
     }
   }
 
-  const navProps: NavRuntimeProps & { appsMenuHint: string | null } = {
+  const navProps: NavRuntimeProps = {
     groups,
     pathname,
-    canLaunchTools,
-    canvasReady,
-    ecomReady,
-    quickReplicaReady,
     onAction: (id) => void runAction(id),
     onNavigate: () => setMobileOpen(false),
-    appsMenuHint,
   };
 
   if (isSidebar) {

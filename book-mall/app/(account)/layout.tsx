@@ -55,7 +55,8 @@ export default async function AccountGroupLayout({
     ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
-  const canLaunchTools = toolsSsoReady && hasMembership;
+  const isAdmin = session.user.role === "ADMIN";
+  const canLaunchTools = toolsSsoReady && (isAdmin || hasMembership);
   const canLaunchCanvas = canLaunchTools;
   const { gatewayLinked, canvasOriginConfigured } = canvasLaunch;
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
@@ -74,7 +75,7 @@ export default async function AccountGroupLayout({
     ecomOriginConfigured,
     quickReplicaOriginConfigured,
     canLaunchQuickReplica,
-    isAdmin: session.user.role === "ADMIN",
+    isAdmin,
     billingPersona: userRecord.billingPersona,
   });
 
@@ -89,7 +90,7 @@ export default async function AccountGroupLayout({
           name: profile?.name ?? session.user.name ?? null,
           phone: profile?.phone ?? session.user.phone ?? null,
         }}
-        isAdmin={session.user.role === "ADMIN"}
+        isAdmin={isAdmin}
         showToolsCta={showToolsCta}
         canLaunchTools={canLaunchTools}
         canLaunchCanvas={canLaunchCanvas}

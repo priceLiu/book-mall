@@ -51,7 +51,7 @@ export function buildAccountAppsMenuHint(input: {
   }
 
   if (!input.isAdmin && !input.hasToolService) {
-    return "应用未显示：请在「工具技术服务费」开通至少一项有效月费。课程订阅不代替工具月费。";
+    return "应用入口已显示；开通有效会员套餐后可点击打开（课程订阅不代替工具准入）。";
   }
 
   if (!input.gatewayLinked && canLaunchTools) {

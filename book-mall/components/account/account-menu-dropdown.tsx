@@ -42,6 +42,10 @@ import {
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
 import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
+import {
+  isAppLaunchAction,
+  resolveAppLaunchBlockedRedirect,
+} from "@/lib/account-app-launch-gate";
 import { GATEWAY_LOGS_SSO_HREF } from "@/lib/gateway/gateway-console-sso";
 
 const NAV_LINKS = [
@@ -102,6 +106,29 @@ export function AccountMenuDropdown({
     billingPersona,
     gatewayLinked,
   });
+
+  async function handleAppLaunch(actionId: string, launch: () => void | Promise<void>) {
+    if (isAppLaunchAction(actionId)) {
+      const blocked = resolveAppLaunchBlockedRedirect({
+        actionId,
+        canLaunchTools,
+        canLaunchCanvas,
+        canvasOriginConfigured,
+        canvasReady,
+        ecomReady,
+        canLaunchQuickReplica,
+        quickReplicaOriginConfigured,
+        quickReplicaReady,
+        billingPersona,
+        gatewayLinked,
+      });
+      if (blocked) {
+        window.location.href = blocked;
+        return;
+      }
+    }
+    await launch();
+  }
 
   function signOut() {
     navigateBookMallFullSignOut("/");
@@ -185,50 +212,48 @@ export function AccountMenuDropdown({
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
                 <DropdownMenuSubContent>
-                  {showToolsCta ? (
-                    <DropdownMenuItem
-                      disabled={!canLaunchTools}
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        void openToolsAppInNewTab("/fitting-room");
-                      }}
-                    >
-                      <Zap />
-                      <span>AI 工具站</span>
-                    </DropdownMenuItem>
-                  ) : null}
                   <DropdownMenuItem
-                    disabled={!canvasReady}
                     onSelect={(e) => {
                       e.preventDefault();
-                      openCanvasAppInNewTab("/projects");
+                      void handleAppLaunch("launch-tools", () =>
+                        openToolsAppInNewTab("/fitting-room"),
+                      );
+                    }}
+                  >
+                    <Zap />
+                    <span>AI 工具站</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      void handleAppLaunch("launch-canvas", () =>
+                        openCanvasAppInNewTab("/projects"),
+                      );
                     }}
                   >
                     <LayoutGrid />
                     <span>AI 画布</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    disabled={!ecomReady}
                     onSelect={(e) => {
                       e.preventDefault();
-                      openEcomAppInNewTab("/");
+                      void handleAppLaunch("launch-ecom", () => openEcomAppInNewTab("/"));
                     }}
                   >
                     <ShoppingBag />
                     <span>电商工具箱</span>
                   </DropdownMenuItem>
-                  {quickReplicaOriginConfigured ? (
-                    <DropdownMenuItem
-                      disabled={!quickReplicaReady}
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        openQuickReplicaAppInNewTab("/");
-                      }}
-                    >
-                      <Copy />
-                      <span>快速复制</span>
-                    </DropdownMenuItem>
-                  ) : null}
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      void handleAppLaunch("launch-quick-replica", () =>
+                        openQuickReplicaAppInNewTab("/"),
+                      );
+                    }}
+                  >
+                    <Copy />
+                    <span>快速复制</span>
+                  </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
