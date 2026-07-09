@@ -4,6 +4,7 @@ import type {
   Sbv1ImageResolution,
 } from "./sbv1-image-models";
 import { buildSbv1ImageEngineParams } from "./sbv1-image-models";
+import type { StoryRefImage } from "./story-ref-image";
 import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
 import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "./system-providers";
 
@@ -40,6 +41,8 @@ export type Sbv1ImageNodeData = {
   runtime?: CanvasNodeRuntime;
   /** 底部 / 内嵌输入坞 prompt（@ 引用上游） */
   dockInput?: string;
+  /** Dock 粘贴的参考图（@ 引用） */
+  dockRefImages?: StoryRefImage[];
   dockStyleRef?: {
     presetId: string;
     name: string;
@@ -56,6 +59,7 @@ export type Sbv1ImageNodeData = {
 export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {
   label: "图片",
   dockInput: "",
+  dockRefImages: [],
   aspectRatio: "auto",
   imageQuality: "standard",
   resolution: "2K",
@@ -69,6 +73,8 @@ export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {
 
 export type Sbv1VideoEngineNodeData = {
   prompt: string;
+  /** 与 prompt 同步 · 浮动 Dock 编辑用 */
+  dockInput?: string;
   creationType: Sbv1CreationType;
   referenceMode: Sbv1ReferenceMode;
   jimengModelId: string;

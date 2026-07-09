@@ -425,7 +425,7 @@ export function displaySceneRows(
     return stored;
   }
   const hub = nodes.find((n) => n.id === hubNodeId);
-  if (isStoryProScriptHubType(hub?.type)) {
+  if (hub && isStoryProScriptHubType(hub.type)) {
     const synced = syncStoryProColumnRows(
       hubDataForColumnSync(
         hub.data as StoryProScriptHubNodeData,
@@ -458,7 +458,7 @@ export function displayCharacterRows(
     return stored;
   }
   const hub = nodes.find((n) => n.id === hubNodeId);
-  if (isStoryProScriptHubType(hub?.type)) {
+  if (hub && isStoryProScriptHubType(hub.type)) {
     const synced = syncStoryProColumnRows(
       hubDataForColumnSync(
         hub.data as StoryProScriptHubNodeData,
@@ -566,7 +566,7 @@ export function effectiveFrameRowsForColumn(
   }
 
   const hub = nodes.find((n) => n.id === hubNodeId);
-  if (isStoryProScriptHubType(hub?.type)) {
+  if (hub && isStoryProScriptHubType(hub.type)) {
     const synced = syncStoryProColumnRows(
       hubDataForColumnSync(
         hub.data as StoryProScriptHubNodeData,
@@ -686,7 +686,7 @@ export function displayVideoRows(
     return stored;
   }
   const hub = nodes.find((n) => n.id === hubNodeId);
-  if (isStoryProScriptHubType(hub?.type)) {
+  if (hub && isStoryProScriptHubType(hub.type)) {
     const synced = syncStoryProColumnRows(
       hubDataForColumnSync(
         hub.data as StoryProScriptHubNodeData,

@@ -153,9 +153,12 @@ export function formatCanvasApiError(raw: string): string {
       return "保存接口未找到（404）。请确认 book-mall（:3000）与 canvas-web（:3004）均在运行；若刚执行过 build，请重启 dev:all 或删除 canvas-web/.next 后重试。";
     }
     if (/\b500\b/.test(t)) {
-      return "画布服务内部错误（500）。请重启 canvas-web 开发服务；若仍失败，删除 canvas-web/.next 后重试。";
+      return "画布服务内部错误（500）。请确认 book-mall（:3000）与 canvas-web（:3004）均在运行；查看 book-mall 终端日志；若刚 build 过，重启 dev:all 或删除 canvas-web/.next 后重试。";
     }
     return "服务器返回了异常页面而非 JSON，请重启 canvas-web / book-mall 开发服务后重试。";
+  }
+  if (/\b500\b/.test(t) && !t.includes("INTERNAL_ERROR")) {
+    return "主站 book-mall 保存失败（500）。请查看 book-mall 终端日志，确认数据库连接正常后重试。";
   }
   return t;
 }
@@ -619,7 +622,8 @@ export async function runCanvasNode(
       | "tts"
       | "sceneRef"
       | "themeOutline"
-      | "generalText";
+      | "generalText"
+      | "music";
     /** 影视专业版 · 风格定稿门禁 */
     styleFinalized?: boolean;
     styleAnchor?: {

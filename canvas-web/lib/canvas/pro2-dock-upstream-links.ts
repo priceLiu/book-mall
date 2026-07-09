@@ -6,7 +6,10 @@ import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import type { ImageNodeData, ImageEngineNodeData } from "./types";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { storyThemePromptDisplayMd } from "./story-theme-prompt-display";
-import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
+import type {
+  StoryProScriptHubNodeData,
+  StoryProStarterNodeData,
+} from "./story-pro-workspace-types";
 import type { StoryPro2TagNodeData } from "./story-pro2-workspace-types";
 
 export type Pro2DockUpstreamLink = {

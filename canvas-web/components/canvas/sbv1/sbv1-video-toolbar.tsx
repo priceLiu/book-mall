@@ -87,7 +87,7 @@ export function Sbv1VideoToolbar({
           <>
             <span className="mx-0.5 h-4 w-px bg-white/10" />
             <Sbv1ResolutionPicker
-              value={data.resolution}
+              value={data.resolution === "1080p" ? "1080p" : "720p"}
               onChange={(resolution) =>
                 onPatch({
                   resolution,
