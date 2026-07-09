@@ -43,5 +43,5 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return financeJson(request, { error: result.reason }, { status: 400 });
   }
-  return financeJson(request, { ok: true, ...result });
+  return financeJson(request, { ...result });
 }

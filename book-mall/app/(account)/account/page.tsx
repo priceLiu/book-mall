@@ -6,7 +6,7 @@ import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { getActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
 import { getMembershipFlags } from "@/lib/membership";
 import { getMembershipToolAccess } from "@/lib/membership-tool-access";
-import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getPoolBalances, getLotBreakdown } from "@/lib/billing/credit-account-service";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import {
   getAccountPackageUsageRows,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/finance/account-usage-summary";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
 import { AccountOverviewCards } from "@/components/account/account-overview-cards";
+import { CreditLotBreakdown } from "@/components/account/credit-lot-breakdown";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
 import { prisma } from "@/lib/prisma";
 import { getActiveTenantContext } from "@/lib/tenant/context";
@@ -109,7 +110,7 @@ export default async function AccountPage({
     ownerId: session.user.id,
   };
 
-  const [poolBalances, creditAcc, usageSummary, teamTenant] = await Promise.all([
+  const [poolBalances, creditAcc, usageSummary, teamTenant, lotBreakdown] = await Promise.all([
     getPoolBalances(billingRef),
     prisma.creditAccount.findUnique({
       where: {
@@ -129,6 +130,7 @@ export default async function AccountPage({
           },
         })
       : Promise.resolve(null),
+    getLotBreakdown(billingRef),
   ]);
 
   const packageUsageRows =
@@ -222,6 +224,8 @@ export default async function AccountPage({
         packageUsageRows={packageUsageRows}
         isTeamSharedPool={Boolean(teamBillingRef)}
       />
+
+      <CreditLotBreakdown lots={lotBreakdown} />
 
       {process.env.NODE_ENV === "development" ? (
         <section className="mt-8">

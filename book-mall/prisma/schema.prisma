@@ -2957,6 +2957,7 @@ model CreditAccount {
   planId               String?
   currentPeriodEnd     DateTime?
   entries              CreditLedger[]
+  lots                 CreditLot[]
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
@@ -2989,6 +2990,39 @@ model CreditLedger {
 enum CreditPool {
   GENERAL // 通用积分池（文本/图像/其它）
   VIDEO // 视频专项池
+}
+
+/// 积分批次来源（决定到期口径）
+enum CreditSource {
+  SUBSCRIPTION // 订阅套餐赠送（按会员周期清零）
+  TOPUP // 单独充值（默认 12 个月有效；VIP 大额可设永久）
+  FREE // 活动 / 注册赠送（默认 30 天有效）
+}
+
+/// 积分批次：账户余额的「按来源分别到期」覆盖层。
+/// 账户 CreditAccount.balanceCredits/videoBalanceCredits 仍为快路径真相，
+/// 批次用于扣费优先级（先到期先扣）与到期清扫。
+/// 不变量：sum(active lot.remainingCredits, pool) == 账户该池余额。
+model CreditLot {
+  id               String       @id @default(cuid())
+  accountId        String
+  account          CreditAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  pool             CreditPool   @default(GENERAL)
+  source           CreditSource
+  originalCredits  Int
+  remainingCredits Int
+  grantedAt        DateTime     @default(now())
+  /// 到期时间；null = 永久有效（如历史回填、VIP 大额预充）
+  expiresAt        DateTime?
+  /// 订阅批次的周期 key（YYYY-MM），便于幂等与检索
+  periodKey        String?
+  refType          String?
+  refId            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([accountId, pool, expiresAt])
+  @@index([expiresAt])
 }
 
 /// 调价提案审批流（运营提交 → 财务复核 → 超管终审 → 生效）

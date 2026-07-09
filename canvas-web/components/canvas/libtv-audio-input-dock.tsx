@@ -81,7 +81,7 @@ export function LibtvAudioInputDock() {
 
   const estCredits = useModelCreditsPreview(engine?.modelKey, 0);
 
-  const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
+  const { fontPx } = useLibtvDockToolbarMetrics();
 
   const onPromptChange = useCallback(
     (value: string) => {
@@ -212,7 +212,7 @@ export function LibtvAudioInputDock() {
           <LibtvDockSendButton
             disabled={!canSend}
             loading={isRunning}
-            iconPx={sendIconPx}
+            title={isRunning ? "生成中" : "生成音频"}
             onClick={() => void onRun()}
           />
         </Pro2DockToolbar>

@@ -1,7 +1,7 @@
 /**
  * 新用户注册赠送积分（分享链接 1.0）
  *
- * - 通用池 + 视频专项池双池发放，长期有效、不清零（见需求 5）。
+ * - 通用池 + 视频专项池双池发放；归为「活动免费积分」，批次 source=FREE、30 天有效（积分清零 1.0）。
  * - 额度落 PlatformPricingConfig（welcomeGiftGeneralCredits / welcomeGiftVideoCredits），
  *   财务可调；缺省 500 通用 + 100 视频。
  * - 幂等：按 userId 生成幂等键，重复注册回放不重复发放。
@@ -54,6 +54,7 @@ export async function grantWelcomeGift(userId: string): Promise<void> {
       refType: "welcome_gift",
       idempotencyKey: `welcome_gift:general:${userId}`,
       description: "新用户注册赠送积分（通用池）",
+      source: "FREE",
     });
   }
   if (videoCredits > 0) {
@@ -64,6 +65,7 @@ export async function grantWelcomeGift(userId: string): Promise<void> {
       refType: "welcome_gift",
       idempotencyKey: `welcome_gift:video:${userId}`,
       description: "新用户注册赠送积分（视频池）",
+      source: "FREE",
     });
   }
 }

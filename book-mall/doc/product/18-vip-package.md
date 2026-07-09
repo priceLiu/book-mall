@@ -2,13 +2,14 @@
 
 > 面向大额预充客户（如 ¥20 万对等积分，**起订 ¥100,000**）的定制套餐：
 > 财务后台按充值金额测算「通用多 / 视频多」两套积分方案供客户二选一，
-> 一键开通 VIP 团队并一次性发放双池积分。VIP 积分**长期有效、不清零**。
+> 一键开通 VIP 团队并一次性发放双池积分。VIP 积分**永久有效、不清零**（批次 `source=TOPUP`、`expiresAt=null`；见 `19-credit-expiry`）。
 
 ## 1. 形态
 
 - VIP 作为 **TEAM 租户的变体**按需创建（`Tenant.type=TEAM`、`packageLevel="VIP"`、`planId=null`）。
 - **一次性预充**：`monthlyGrantCredits=0`、`videoMonthlyGrant=0`、`currentPeriodEnd=null`——
-  月度重置脚本（若启用）据此跳过该账户，积分不清零（见需求 5）。
+  月度重置（`runMonthlyResetSweep` 仅扫 `currentPeriodEnd<=now` 且 `monthlyGrantCredits>0`）据此**天然跳过**该账户；
+  批次 `expiresAt=null` 使到期清扫（`sweepExpiredLots`）永不清零 VIP 积分。
 - 席位可自主分配：`seatLimit` 由财务设定；`perSeatCapCredits` 默认取「通用积分 ÷ 席位」平均值（治理用）。
 
 ## 2. 测算口径（保证毛利）
@@ -45,14 +46,15 @@
 - 当前实现按团队 **共享池** 发放（`CreditAccount ownerType=TENANT`）+ `perSeatCapCredits` 治理；
   逐席「独立钱包」如需硬隔离，后续可扩展 Seat 级子账户（非本期）。
 
-## 6. 积分不清零（需求 5，已确认）
+## 6. 积分到期口径（积分清零 1.0 · 已切换）
 
-- 全站积分口径：**长期有效、不清零**。
-- 核查结论：`resetMonthlyCredits` **仅**被手动脚本 `scripts/grant-monthly-credits.ts` 调用；
-  `book-mall/vercel.json` 的唯一 cron 为 `wallet-holds/expire`（释放过期预占），**不触碰月度积分**。
-  无任何定时任务/请求路径自动重置月度积分。
-- VIP 一次性预充 `monthlyGrantCredits=0`、`currentPeriodEnd=null`，即便将来误跑重置脚本也会被跳过。
-- **运维红线**：不得把 `pnpm credits:grant-monthly` 挂到 cron（脚本头部已加警示）。
+> 全站已从「积分不清零」切换为**按来源分别到期**（见 `19-credit-expiry` 与 `docs/积分清零.md`）。
+> 本节仅说明 **VIP 的例外**：VIP 预充积分**永久不清零**。
+
+- 订阅积分按月清零、充值 12 个月、免费 30 天；由每日 cron `credits/expire-sweep` + `credits/monthly-reset` 执行。
+- **VIP 永久**：预充批次 `source=TOPUP`、`expiresAt=null`；`monthlyGrantCredits=0`、`currentPeriodEnd=null`，
+  故月度重置与到期清扫都不会触及 VIP 积分。
+- `scripts/grant-monthly-credits.ts` 现为等价的手动/排障入口（不再禁 cron；生产由 API+cron 接管）。
 
 ## 7. 测试用例
 

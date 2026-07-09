@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:finance-integration": "dotenv -e .env.local -- tsx test/integration/finance-2.0-video.integration.ts",
     "test:gen-hotcold-integration": "dotenv -e .env.local -- tsx test/integration/gen-hotcold.integration.ts",
+    "test:credit-lot-integration": "dotenv -e .env.local -- tsx test/integration/credit-lot-expiry.integration.ts",
     "build": "dotenv -e .env.local -- prisma migrate deploy && prisma generate && next build",
     "build:docker": "prisma generate && next build",
     "start": "next start",
