@@ -17,13 +17,14 @@ import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
 import { directPredecessors } from "./topo";
-import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
+import { parseReferencedIds } from "./dock-mention-parse";
+import type { StoryRefImage } from "./story-ref-image";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
-import { pro2DockMentionRefCatalog } from "./pro2-dock-ref-catalog";
+import { pro2DockMentionRefCatalog, resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
+import { resolveDockRunPrompt } from "./resolve-dock-run-prompt";
 import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
-import type { StoryRefImage } from "./story-ref-image";
 import { collectRefImageUrlsFromGridNode } from "./ref-video-edges";
 import { isRefGridNodeType } from "./ref-video-models";
 import type {
@@ -409,8 +410,34 @@ function resolveImageInputs(
   const prompt =
     opts?.prompt ??
     promptForDockMentionFilter(node, nodes, edges, opts?.rowKey);
-  const catalog = mentionCatalogForNode(node, nodes, edges, opts?.rowKey);
   const raw = resolveImageInputsRaw(nodes, edges, nodeId);
+  const nodeType = node.type ?? "";
+  const dockImageTypes = new Set([
+    "sbv1-image",
+    "story-pro2-image",
+    "story-pro2-three-view",
+  ]);
+  if (!dockImageTypes.has(nodeType)) {
+    const catalog = mentionCatalogForNode(node, nodes, edges, opts?.rowKey);
+    if (!catalog.length) return raw;
+    const fromCatalog = dockMentionRefUrlsForPrompt(prompt, catalog);
+    return Array.from(new Set([...fromCatalog, ...raw]));
+  }
+
+  const links = resolvePro2DockUpstreamLinks(nodeId, nodeType, nodes, edges);
+  const dockRefImages = (
+    (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
+  ) as StoryRefImage[];
+  const mentioned = parseReferencedIds(prompt);
+  if (mentioned.length > 0) {
+    const refs = resolveDockRefsForRun(prompt, links, dockRefImages);
+    const urls = refs
+      .map((r) => r.url)
+      .filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
+    if (urls.length) return Array.from(new Set(urls));
+  }
+
+  const catalog = pro2DockMentionRefCatalog(links, dockRefImages);
   if (!catalog.length) return raw;
   const fromCatalog = dockMentionRefUrlsForPrompt(prompt, catalog);
   return Array.from(new Set([...fromCatalog, ...raw]));
@@ -611,6 +638,9 @@ function resolveTextInputs(
       if (d.systemPrompt?.trim()) {
         out.push(`## 导演提示词\n\n${d.systemPrompt.trim()}`);
       }
+    } else if (p.type === "story-pro2-tag") {
+      const d = p.data as { body?: string };
+      if (d.body?.trim()) out.push(d.body.trim());
     } else if (isAnyStoryScriptHubType(p.type ?? "")) {
       const d = p.data as {
         outlineMd?: string;
@@ -942,11 +972,38 @@ export function useCanvasRunner(
           job.llmSection,
           resolveTextInputs(state.nodes, state.edges, nodeId),
         );
+        let mergedTextInputs = textInputs;
 
         const data = node.data as Record<string, unknown>;
         let runData = isLibtvFreestandingImageNode(node)
           ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
           : data;
+
+        if (
+          node.type === "sbv1-image" ||
+          node.type === "story-pro2-image" ||
+          node.type === "story-pro2-three-view"
+        ) {
+          const links = resolvePro2DockUpstreamLinks(
+            nodeId,
+            node.type ?? "",
+            state.nodes,
+            state.edges,
+          );
+          const dockPrompt = String(
+            (runData as { dockInput?: string }).dockInput ?? "",
+          );
+          const { prompt: cleanedPrompt, extraText } = resolveDockRunPrompt(
+            dockPrompt,
+            links,
+          );
+          if (cleanedPrompt !== dockPrompt) {
+            runData = { ...runData, dockInput: cleanedPrompt };
+          }
+          if (extraText.length) {
+            mergedTextInputs = [...extraText, ...mergedTextInputs];
+          }
+        }
         if (node.type === "sbv1-video-engine") {
           const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
             nodeId,
@@ -1046,7 +1103,7 @@ export function useCanvasRunner(
             modelKey,
             data: runData,
             imageInputs,
-            textInputs,
+            textInputs: mergedTextInputs,
             portraitAssetRefs,
           },
           forceFresh,

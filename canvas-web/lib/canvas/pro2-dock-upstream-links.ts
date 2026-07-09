@@ -7,7 +7,7 @@ import type { ImageNodeData, ImageEngineNodeData } from "./types";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { storyThemePromptDisplayMd } from "./story-theme-prompt-display";
 import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
-import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
+import type { StoryPro2TagNodeData } from "./story-pro2-workspace-types";
 
 export type Pro2DockUpstreamLink = {
   id: string;
@@ -114,6 +114,20 @@ function linkFromSource(
     }
   }
 
+  if (source.type === "story-pro2-tag") {
+    const d = source.data as unknown as StoryPro2TagNodeData;
+    const body = d.body?.trim();
+    if (!body) return null;
+    const label = d.label?.trim() || "标签";
+    return {
+      id: `up-tag-${source.id}`,
+      kind: "text",
+      label,
+      previewMd: body,
+      sourceNodeId: source.id,
+    };
+  }
+
   if (source.type === "story-pro2-style-asset") {
     const d = source.data as { styleName?: string; label?: string; stylePrompt?: string };
     const name = d.styleName?.trim() || d.label?.trim() || "风格";
@@ -166,6 +180,8 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
   "three-view-engine",
 ]);
 
+const TEXT_UPSTREAM_SOURCE_TYPES = new Set(["story-pro2-tag", "story-pro2-starter"]);
+
 function edgeMatchesDockInput(
   edge: CanvasFlowEdge,
   nodeId: string,
@@ -181,6 +197,14 @@ function edgeMatchesDockInput(
     if (source?.type && IMAGE_UPSTREAM_SOURCE_TYPES.has(source.type)) {
       return (
         edge.targetHandle === "in_text" || edge.targetHandle === "default"
+      );
+    }
+    if (source?.type && TEXT_UPSTREAM_SOURCE_TYPES.has(source.type)) {
+      return (
+        !edge.targetHandle ||
+        edge.targetHandle === "in_image" ||
+        edge.targetHandle === "in_text" ||
+        edge.targetHandle === "default"
       );
     }
   }

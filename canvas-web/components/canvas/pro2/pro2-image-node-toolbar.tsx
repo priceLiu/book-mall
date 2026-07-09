@@ -46,6 +46,10 @@ import { cn } from "@/lib/utils";
 export const PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS =
   "inline-flex w-max max-w-none flex-nowrap items-center gap-0.5 rounded-full border border-white/[0.06] bg-[#262626] px-1.5 py-1 shadow-[0_4px_20px_rgba(0,0,0,0.42)]";
 
+/** 顶栏下拉 / 打组弹层 · 与工具条同色实心底（禁止半透明） */
+export const PRO2_IMAGE_NODE_TOOLBAR_POPOVER_CLASS =
+  "rounded-xl border border-white/[0.06] bg-[#262626] p-3 shadow-[0_4px_20px_rgba(0,0,0,0.42)]";
+
 /** 带文案的操作钮（字号比画布固定 · 不随 zoom 变化，见 §5.4） */
 export const PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS =
   "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[15px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";

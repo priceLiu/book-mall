@@ -5,8 +5,11 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
+import { recoverCanvasTextLlmFromGateway } from "@/lib/canvas/canvas-text-llm-recover";
 
 const SUBMITTED_INCOMPLETE_MS = 3 * 60 * 1000;
+/** 视觉 LLM 可能需十余秒；异步 execute 允许更长窗口，勿与视频 kieTaskId 混判 */
+const TEXT_LLM_SUBMITTED_STALE_MS = 15 * 60 * 1000;
 
 function taskPayload(
   task: Pick<CanvasGenerationTask, "inputPayload">,
@@ -20,6 +23,7 @@ export type CanvasInflightZombieReconcileSummary = {
   failedIncomplete: number;
   requeuedDispatching: number;
   displayRecovered: number;
+  textLlmRecovered: number;
 };
 
 /** poll 每轮开头：释放无法 poll 的 SUBMITTED/DISPATCHING 僵尸，并尝试 Gateway 已成功但未写回的任务。 */
@@ -34,13 +38,46 @@ export async function reconcileCanvasInflightZombies(opts?: {
     failedIncomplete: 0,
     requeuedDispatching: 0,
     displayRecovered: 0,
+    textLlmRecovered: 0,
   };
+
+  const textSubmitted = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "SUBMITTED",
+      kind: "TEXT",
+      ...projectFilter,
+    },
+    orderBy: { updatedAt: "asc" },
+    take: limit,
+    select: { id: true, updatedAt: true },
+  });
+  for (const t of textSubmitted) {
+    const r = await recoverCanvasTextLlmFromGateway(t.id);
+    if (r === "succeeded" || r === "failed") {
+      summary.textLlmRecovered += 1;
+      continue;
+    }
+    if (now - t.updatedAt.getTime() >= TEXT_LLM_SUBMITTED_STALE_MS) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: t.id },
+        data: {
+          status: "FAILED",
+          failCode: "STORY_LLM_STALE",
+          failMessage: "文本生成超时或中断，请重试",
+          completedAt: new Date(),
+          lastPolledAt: new Date(),
+        },
+      });
+      summary.failedIncomplete += 1;
+    }
+  }
 
   const incompleteCutoff = new Date(now - SUBMITTED_INCOMPLETE_MS);
   const incomplete = await prisma.canvasGenerationTask.findMany({
     where: {
       status: "SUBMITTED",
       kieTaskId: null,
+      kind: { not: "TEXT" },
       updatedAt: { lt: incompleteCutoff },
       ...projectFilter,
     },

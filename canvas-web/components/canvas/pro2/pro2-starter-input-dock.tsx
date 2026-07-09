@@ -177,7 +177,7 @@ export function Pro2StarterInputDock() {
         await alert({
           title: "请换用支持图片理解的模型",
           message:
-            "图片/视频反推提示词须使用 Gemini 3 Flash 或 GPT-5.5 等多模态文本模型；DeepSeek / 通义等纯文本模型无法读取参考图。",
+            "图片/视频反推提示词须使用 Doubao Seed 2.1 Pro、Gemini 3 Flash 或 GPT-5.5 等多模态文本模型；DeepSeek / 通义等纯文本模型无法读取参考图。",
           variant: "warning",
         });
         return;

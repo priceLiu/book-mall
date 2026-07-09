@@ -42,14 +42,29 @@ describe("pro2-starter-dock-send", () => {
     ).toBe(true);
   });
 
-  it("requires text for non-preset general nodes", () => {
+  it("allows send for general node with upstream image and empty prompt", () => {
     expect(
       pro2StarterCanSendGeneralText({
         themeInput: "",
         pro2PresetKind: undefined,
         nodeId: textId,
-        nodes,
+        nodes: [
+          { ...nodes[0]!, data: {} },
+          nodes[1]!,
+        ],
         edges,
+      }),
+    ).toBe(true);
+  });
+
+  it("requires text or upstream image when neither present", () => {
+    expect(
+      pro2StarterCanSendGeneralText({
+        themeInput: "",
+        pro2PresetKind: undefined,
+        nodeId: textId,
+        nodes: [{ ...nodes[0]!, data: {} }],
+        edges: [],
       }),
     ).toBe(false);
   });

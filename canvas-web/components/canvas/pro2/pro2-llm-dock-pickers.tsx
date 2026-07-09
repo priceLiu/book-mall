@@ -1,7 +1,7 @@
 "use client";
 
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
-import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
+import { buildStoryLlmDockParams } from "@/lib/canvas/story-llm-dock-params";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { resolveLibtvDockEngineModelDisplayName } from "@/lib/canvas/libtv-dock-engine-models";
 import { LibtvDockEngineModelPicker } from "../libtv-dock-engine-model-picker";
@@ -61,11 +61,11 @@ export function Pro2LlmDockModelPicker({
       disabled={disabled}
       open={open}
       onOpenChange={onOpenChange}
-      onSelect={({ providerId: pid, modelKey: key }) => {
+      onSelect={({ providerId: pid, modelKey: key, model }) => {
         onConfirm({
           providerId: pid,
           modelKey: key,
-          params: { ...STORY_PRO_LLM_PARAMS_DEFAULT, ...params },
+          params: buildStoryLlmDockParams(model, params),
         });
       }}
     />

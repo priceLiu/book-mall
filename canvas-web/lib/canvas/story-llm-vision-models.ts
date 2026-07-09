@@ -4,6 +4,8 @@
  */
 
 export const STORY_LLM_VISION_MODEL_KEYS = [
+  "doubao-seed-2.1-pro",
+  "doubao-seed-2.0",
   "google/gemini-3-flash-preview",
   "gemini-3-flash",
   "gemini-2.5-flash",

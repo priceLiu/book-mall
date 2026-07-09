@@ -10,6 +10,7 @@ import {
 import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_NODE_STAGE_DRAG_CLASS } from "@/components/canvas/libtv-thin-node-try-row";
 import { cn } from "@/lib/utils";
 import { MarkdownView } from "../markdown-view";
 import { Pro2ScriptHubViewTabs } from "./pro2-script-hub-view-tabs";
@@ -149,7 +150,7 @@ export function Pro2ScriptHubContentPreview({
 
   if (tab === "outline") {
     return (
-      <div className={cn("flex h-full min-h-0 flex-col", className)}>
+      <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
         {header}
         <Pro2NodeScrollArea className="py-2 pl-2 pr-1">
           {outlinePreview.trim() ? (
@@ -182,7 +183,7 @@ export function Pro2ScriptHubContentPreview({
         : STORYBOARD_COLS;
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col", className)}>
+    <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
       {header}
       <Pro2NodeScrollArea className="py-1 pl-2 pr-1">
         <table className={TABLE}>

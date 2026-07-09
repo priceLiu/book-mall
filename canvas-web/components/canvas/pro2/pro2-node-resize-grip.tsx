@@ -1,15 +1,23 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 /** 节点右下角拉伸指示（对角线 · 仅视觉，交互由 NodeResizeControl 承担） */
-export function Pro2NodeResizeGrip({ className }: { className?: string }) {
+export function Pro2NodeResizeGrip({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
     <div
       className={cn(
         "pointer-events-none absolute bottom-1.5 right-1.5 z-20 text-white/40",
         className,
       )}
+      style={style}
       aria-hidden
     >
       <svg

@@ -5,7 +5,9 @@ import {
 } from "@/lib/canvas/story-llm-vision-models";
 
 describe("story-llm-vision-models", () => {
-  it("gemini and gpt-5-5 support vision", () => {
+  it("gemini, doubao and gpt-5-5 support vision", () => {
+    expect(isStoryLlmVisionModel("doubao-seed-2.1-pro")).toBe(true);
+    expect(isStoryLlmVisionModel("doubao-seed-2.0")).toBe(true);
     expect(isStoryLlmVisionModel("google/gemini-3-flash-preview")).toBe(true);
     expect(isStoryLlmVisionModel("gemini-3-flash")).toBe(true);
     expect(isStoryLlmVisionModel("gpt-5-5")).toBe(true);

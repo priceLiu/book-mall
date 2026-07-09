@@ -12,7 +12,17 @@ function mergeUpstreamAbortSignal(init: RequestInit): RequestInit {
 }
 
 function formatUpstreamTimeoutMessage(provider: string): string {
-  return `${provider} API 连接超时，请稍后重试。`;
+  const label =
+    provider === "VOLCENGINE"
+      ? "火山方舟"
+      : provider === "KIE"
+        ? "KIE"
+        : provider === "BAILIAN"
+          ? "百炼"
+          : provider === "DEEPSEEK"
+            ? "DeepSeek"
+            : provider;
+  return `${label} API 连接超时，请稍后重试。`;
 }
 
 export function formatGatewayFetchError(

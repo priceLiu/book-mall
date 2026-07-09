@@ -565,14 +565,22 @@ html[data-canvas-modal-open] .pro2-input-dock {
 }
 
 .canvas-flow-wrap .react-flow__resize-control.handle.pro2-node-resizer-handle {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  width: 18px !important;
-  height: 18px !important;
-  border-radius: 4px !important;
+  z-index: 100 !important;
+  pointer-events: auto !important;
+  background: transparent !important;
+  border: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 0 !important;
   margin: 0 !important;
-  inset: auto 6px 6px auto !important;
+  inset: auto 4px 4px auto !important;
   cursor: nwse-resize !important;
+  opacity: 0 !important;
+}
+
+.canvas-flow-wrap .react-flow__node.selected:hover .react-flow__resize-control.handle.pro2-node-resizer-handle,
+.canvas-flow-wrap .react-flow__resize-control.handle.pro2-node-resizer-handle:active {
+  opacity: 0 !important;
 }
 
 /* 剪映导出节点：加大拖角热区 */
