@@ -313,3 +313,6 @@ export function libtvNodeHasMediaFit(node: {
 }): boolean {
   return Boolean((node.data as { mediaFit?: boolean })?.mediaFit);
 }
+
+/** @deprecated 请从 `libtv-node-chrome` 导入；保留 re-export 兼容历史 import 路径 */
+export { LIBTV_MEDIA_FIT_VERSION } from "./libtv-node-chrome";
