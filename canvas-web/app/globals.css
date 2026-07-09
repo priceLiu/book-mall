@@ -301,25 +301,39 @@ html[data-canvas-modal-open] .pro2-input-dock {
   pointer-events: all !important;
 }
 
-/* 选中节点 → 上下游连线流动动效 */
-@keyframes pro2-edge-dash {
+/* 选中节点 → 上下游连线扫光（光带沿路径流动，类似媒体生成扫光） */
+@keyframes canvas-edge-sweep {
   to {
-    stroke-dashoffset: -10;
+    stroke-dashoffset: -80;
   }
 }
-.react-flow__edge.pro2-edge-active .react-flow__edge-path {
-  stroke-dasharray: 4 6;
+.react-flow__edge.pro2-edge-active .react-flow__edge-path:not(.pro2-edge-sweep-overlay) {
   stroke-width: 1.5 !important;
-  animation: pro2-edge-dash 0.55s linear infinite;
+  stroke-dasharray: none;
+  animation: none;
   transition:
     stroke 0.2s ease-out,
     stroke-width 0.2s ease-out;
 }
-.react-flow__edge.pro2-edge-up .react-flow__edge-path {
-  filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.45));
+.react-flow__edge.pro2-edge-up .react-flow__edge-path:not(.pro2-edge-sweep-overlay) {
+  filter: drop-shadow(0 0 3px rgba(96, 165, 250, 0.5));
 }
-.react-flow__edge.pro2-edge-down .react-flow__edge-path {
-  filter: drop-shadow(0 0 2px rgba(167, 139, 250, 0.45));
+.react-flow__edge.pro2-edge-down .react-flow__edge-path:not(.pro2-edge-sweep-overlay) {
+  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.5));
+}
+.react-flow__edge-path.pro2-edge-sweep-overlay {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 20 60;
+  animation: canvas-edge-sweep 1.35s ease-in-out infinite;
+}
+.react-flow__edge-path.pro2-edge-sweep-up {
+  stroke: rgba(147, 197, 253, 0.95);
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.75));
+}
+.react-flow__edge-path.pro2-edge-sweep-down {
+  stroke: rgba(196, 181, 253, 0.95);
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.75));
 }
 .react-flow__connection-path {
   stroke-width: 1 !important;
