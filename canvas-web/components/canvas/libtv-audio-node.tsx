@@ -327,8 +327,8 @@ export function LibtvAudioNode({
           <div className="flex shrink-0 items-center gap-1">
             <Pro2CrewTaskStatusBadge nodeId={id} />
             <LibtvNodeHeaderActions
-              previewDisabled={!hasAudio}
-              onExpandPreview={() => {
+              showPreview={hasAudio}
+              onPreview={() => {
                 if (previewUrl) setPlaying(true);
               }}
             />
