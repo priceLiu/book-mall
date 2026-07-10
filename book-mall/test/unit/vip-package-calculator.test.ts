@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAutoSeatPlans,
   computeVipCreditScheme,
   computeVipPackageQuote,
   computeVipSeatAllocation,
@@ -63,6 +64,19 @@ describe("席位分配守恒", () => {
     });
     expect(alloc.perSeatGeneral * 3 + alloc.remainderGeneral).toBe(1_000_003);
     expect(alloc.perSeatVideo * 3 + alloc.remainderVideo).toBe(500_002);
+  });
+
+  it("buildAutoSeatPlans 与 computeVipSeatAllocation 一致", () => {
+    const plans = buildAutoSeatPlans({
+      totalGeneralCredits: 100,
+      totalVideoCredits: 50,
+      seats: 3,
+      ownerPhone: "13800138000",
+    });
+    expect(plans).toHaveLength(3);
+    expect(plans[0].phone).toBe("13800138000");
+    expect(plans[0].generalCredits + plans[1].generalCredits + plans[2].generalCredits).toBe(100);
+    expect(plans[0].videoCredits + plans[1].videoCredits + plans[2].videoCredits).toBe(50);
   });
 
   it("手动分配合计不等于池总数则拒绝", () => {

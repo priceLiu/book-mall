@@ -13,7 +13,7 @@ const cards = [
   { href: "/admin/credit-pricing", title: "积分报价与换算", desc: "全局参数、模型换算发布、已上架报价一览。" },
   { href: "/admin/test-cases", title: "财务测算", desc: "个人/团队日消耗与月汇总：积分、成本、收入、利润。" },
   { href: "/admin/membership-plans", title: "会员套餐", desc: "个人/团队套餐与席位带。" },
-  { href: "/admin/vip-packages", title: "VIP 大额套餐", desc: "大额充值测算器（两方案）+ 开通 VIP 团队。" },
+  { href: "/admin/vip-ops", title: "VIP 大额预充", desc: "充值测算、开通账号、合同/凭证、席位与积分运维。" },
   { href: "/admin/referrals", title: "分享返佣", desc: "分享人业绩汇总 · 逐人录入返佣比例。" },
   { href: "/admin/referral-payouts", title: "返佣结算 · 返佣单", desc: "按月计算返佣、生成返佣单、标记打款、导出 CSV。" },
   { href: "/admin/reconciliation", title: "云账单对账", desc: "上传 CSV 对账与补扣。" },

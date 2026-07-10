@@ -17,6 +17,10 @@ import { packById } from "@/lib/billing/credit-topup-packs";
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
+import {
+  fulfillVipPackageFromPayment,
+  type VipSchemeKind,
+} from "@/lib/finance/vip-package-service";
 import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { orderTypeForProductKind } from "@/lib/payments/product-labels";
@@ -259,6 +263,44 @@ async function fulfillByok(checkout: PaymentCheckout, snap: Record<string, unkno
   };
 }
 
+async function fulfillVipPackage(checkout: PaymentCheckout, snap: Record<string, unknown>) {
+  await assertBillingPersona(checkout.userId, "PLATFORM_CREDIT");
+
+  const scheme = snap.scheme === "video_heavy" ? "video_heavy" : "general_heavy";
+  const amountYuan = Math.round(Number(snap.amountYuan));
+  const seats = Math.max(1, Math.round(Number(snap.seats) || 3));
+  const teamName =
+    typeof snap.teamName === "string" && snap.teamName.trim() ? snap.teamName.trim() : null;
+
+  const result = await fulfillVipPackageFromPayment({
+    userId: checkout.userId,
+    checkoutId: checkout.id,
+    amountYuan,
+    scheme: scheme as VipSchemeKind,
+    seats,
+    teamName,
+  });
+
+  if (!result.renewed) {
+    try {
+      await ensurePlatformManagedKeyForTenant(result.tenantId);
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  return {
+    amountPoints: result.generalCredits + result.videoCredits,
+    meta: {
+      tenantId: result.tenantId,
+      family: "VIP",
+      scheme,
+      seats,
+      renewed: result.renewed,
+    },
+  };
+}
+
 async function runProductFulfillment(checkout: PaymentCheckout, snap: Record<string, unknown>) {
   switch (checkout.productKind) {
     case "MEMBERSHIP_PERSONAL":
@@ -266,6 +308,8 @@ async function runProductFulfillment(checkout: PaymentCheckout, snap: Record<str
       return fulfillMembership(checkout, snap);
     case "CREDIT_TOPUP":
       return fulfillCreditTopup(checkout, snap);
+    case "VIP_PACKAGE":
+      return fulfillVipPackage(checkout, snap);
     case "BYOK_PERSONAL":
     case "BYOK_TEAM":
       return fulfillByok(checkout, snap);

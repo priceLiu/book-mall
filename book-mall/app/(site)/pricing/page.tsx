@@ -17,7 +17,7 @@ export const revalidate = 0;
 export const metadata = {
   title: "积分报价 · 个人 / 团队会员",
   description:
-    "统一积分体系：个人 / 团队会员订阅 + 轻量包充值；透明公式：套餐积分 → 各模型每次消耗。自带 Key 用户厂商 API 自理，超额编排从轻量包扣积分。",
+    "统一积分体系：个人 / 团队会员订阅与轻量包充值；透明公式：套餐积分 → 各模型每次消耗。",
 };
 
 export default async function PricingPage() {

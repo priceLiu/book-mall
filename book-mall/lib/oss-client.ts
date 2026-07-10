@@ -111,6 +111,13 @@ export async function ossGetBuffer(
   return content && content.byteLength ? content : null;
 }
 
+/** 对象公网 URL（优先 OSS_PUBLIC_URL_BASE，与 canvas / story 一致）。 */
+export function ossPublicUrlForKey(cfg: OssEnvConfig, key: string): string {
+  const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
+  if (base) return `${base}/${key}`;
+  return `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${key}`;
+}
+
 const RETRYABLE = /ResponseError|timeout|ECONNRESET|ETIMEDOUT|socket disconnected/i;
 
 /** OSS 读写重试（指数退避） */

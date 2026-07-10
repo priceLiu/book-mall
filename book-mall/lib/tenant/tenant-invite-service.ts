@@ -54,6 +54,8 @@ export async function createInvite(input: {
   role?: TenantRole;
   createdById: string;
   sendIp?: string | null;
+  plannedGeneralCredits?: number | null;
+  plannedVideoCredits?: number | null;
 }) {
   const phone = normalizePhone(input.phone);
   if (!phone) {
@@ -102,6 +104,10 @@ export async function createInvite(input: {
       status: "PENDING",
       expiresAt: new Date(Date.now() + INVITE_TTL_MS),
       createdById: input.createdById,
+      plannedGeneralCredits:
+        input.plannedGeneralCredits != null ? Math.max(0, Math.round(input.plannedGeneralCredits)) : null,
+      plannedVideoCredits:
+        input.plannedVideoCredits != null ? Math.max(0, Math.round(input.plannedVideoCredits)) : null,
     },
   });
 
@@ -238,7 +244,14 @@ export async function acceptInvite(input: { token: string; userId: string }) {
     const member = existing
       ? await tx.tenantMember.update({
           where: { id: existing.id },
-          data: { status: "ACTIVE", role: invite.role, seatId },
+          data: {
+            status: "ACTIVE",
+            role: invite.role,
+            seatId,
+            ...(invite.plannedGeneralCredits != null
+              ? { monthlyCapCredits: invite.plannedGeneralCredits }
+              : {}),
+          },
         })
       : await tx.tenantMember.create({
           data: {
@@ -247,6 +260,7 @@ export async function acceptInvite(input: { token: string; userId: string }) {
             role: invite.role,
             status: "ACTIVE",
             seatId,
+            monthlyCapCredits: invite.plannedGeneralCredits ?? null,
           },
         });
 
