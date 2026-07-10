@@ -1,12 +1,5 @@
-import { FinanceAdminGate } from "@/components/finance-admin-gate";
-import { VipPackagesClient } from "@/components/admin/vip-packages-client";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function AdminVipPackagesPage() {
-  return (
-    <FinanceAdminGate require="managePricing">
-      <VipPackagesClient />
-    </FinanceAdminGate>
-  );
+export default function AdminVipPackagesRedirectPage() {
+  redirect("/admin/vip-ops");
 }

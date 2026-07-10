@@ -5,6 +5,11 @@ import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { packById } from "@/lib/billing/credit-topup-packs";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
+import {
+  resolveVipVideoFraction,
+  type VipSchemeKind,
+} from "@/lib/finance/vip-package-service";
+import { VIP_MIN_AMOUNT_YUAN } from "@/lib/finance/vip-package-calculator";
 import { generateOutTradeNo } from "@/lib/payments/out-trade-no";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { generateUniqueRemarkCode } from "@/lib/payments/remark-code";
@@ -38,6 +43,13 @@ export type CreateCheckoutInput =
       packId: string;
       target?: "personal" | "team";
       tenantId?: string | null;
+    }
+  | {
+      productKind: "VIP_PACKAGE";
+      amountYuan: number;
+      scheme: VipSchemeKind;
+      seats?: number;
+      teamName?: string | null;
     };
 
 export async function createPaymentCheckout(input: {
@@ -115,6 +127,25 @@ export async function createPaymentCheckout(input: {
       }
       break;
     }
+    case "VIP_PACKAGE": {
+      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      const vipAmount = Math.round(payload.amountYuan);
+      if (vipAmount < VIP_MIN_AMOUNT_YUAN) {
+        throw new Error(`VIP 起订金额为 ¥${VIP_MIN_AMOUNT_YUAN.toLocaleString()}`);
+      }
+      const seats = Math.max(1, Math.round(payload.seats ?? 3));
+      const videoFraction = resolveVipVideoFraction(payload.scheme);
+      amountYuan = vipAmount;
+      productSnapshot = {
+        amountYuan: vipAmount,
+        scheme: payload.scheme,
+        videoFraction,
+        seats,
+        teamName: payload.teamName ?? null,
+        planLabel: `VIP 大额 · ${payload.scheme === "video_heavy" ? "视频多" : "通用多"} · ${seats} 席`,
+      };
+      break;
+    }
     default:
       throw new Error("未知商品类型");
   }
@@ -139,7 +170,11 @@ export async function createPaymentCheckout(input: {
       const sameProduct =
         productKind === "CREDIT_TOPUP"
           ? snap?.packId === productSnapshot.packId && snap?.target === productSnapshot.target
-          : productKind.startsWith("BYOK_")
+          : productKind === "VIP_PACKAGE"
+            ? snap?.amountYuan === productSnapshot.amountYuan &&
+              snap?.scheme === productSnapshot.scheme &&
+              snap?.seats === productSnapshot.seats
+            : productKind.startsWith("BYOK_")
             ? snap?.scopeKey === productSnapshot.scopeKey &&
               (productKind !== "BYOK_TEAM" || snap?.tenantId === productSnapshot.tenantId)
             : productKind.startsWith("MEMBERSHIP_")

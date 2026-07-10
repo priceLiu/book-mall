@@ -1041,6 +1041,7 @@ enum PaymentProductKind {
   BYOK_PERSONAL
   BYOK_TEAM
   CREDIT_TOPUP
+  VIP_PACKAGE
 }
 
 enum PaymentChannel {
@@ -1146,6 +1147,31 @@ model PaymentEvent {
   createdAt DateTime @default(now())
 
   @@index([checkoutId, createdAt])
+}
+
+/// VIP 大额预充 · 合同 / 支付凭证 / 发票等附件（OSS URL，财务后台上传）
+enum VipDealDocumentKind {
+  CONTRACT
+  PAYMENT_PROOF
+  INVOICE
+  OTHER
+}
+
+model VipDealDocument {
+  id               String              @id @default(cuid())
+  tenantId         String?
+  ownerUserId      String?
+  kind             VipDealDocumentKind
+  ossUrl           String
+  filename         String
+  mimeType         String?
+  fileSizeBytes    Int?
+  note             String?             @db.Text
+  uploadedByUserId String
+  createdAt        DateTime            @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([ownerUserId, createdAt])
 }
 
 // —— 充值优惠：模板（平台配置）+ 用户领取的优惠券（核销后绑定 Order）——
@@ -3346,6 +3372,10 @@ model TenantInvite {
   token       String             @unique
   /// 邀请链接 query 中的验证码（与短信一并发出，供复制链接使用）
   urlCode     String?
+  /// VIP 预分配通用积分额度（受邀人加入后写入 monthlyCapCredits）
+  plannedGeneralCredits Int?
+  /// VIP 预分配视频积分额度（展示/台账；视频池按团队共享扣减）
+  plannedVideoCredits   Int?
   role        TenantRole         @default(MEMBER)
   status      TenantInviteStatus @default(PENDING)
   expiresAt   DateTime

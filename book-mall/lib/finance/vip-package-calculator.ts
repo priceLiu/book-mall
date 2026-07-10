@@ -19,6 +19,9 @@
 /** VIP 起订金额（元）。 */
 export const VIP_MIN_AMOUNT_YUAN = 100_000;
 
+/** 企业大额预充积分有效期（年）。公示见 docs/大额vip.md */
+export const VIP_CREDIT_VALIDITY_YEARS = 5;
+
 /** 保守单位成本（元/积分）。 */
 export const VIP_DEFAULT_COST_GENERAL_YUAN = 0.016; // 锚定 0.04 ÷ M 2.5
 export const VIP_DEFAULT_COST_VIDEO_YUAN = 0.04 / 1.5; // ≈ 0.026667，锚定 0.04 ÷ M 1.5
@@ -171,19 +174,74 @@ export function computeVipSeatAllocation(
   };
 }
 
-/** 校验手动分配合计是否等于池总数（通用、视频各自守恒）。 */
+/** VIP 充值档位（元）。 */
+export const VIP_AMOUNT_TIERS_YUAN = [100_000, 200_000, 500_000] as const;
+
+export interface VipSeatPlan {
+  seatIndex: number;
+  label: string;
+  phone?: string;
+  role: "OWNER" | "MEMBER";
+  generalCredits: number;
+  videoCredits: number;
+  isChief?: boolean;
+}
+
+/** 自动平均分配到各席位（首席席含余数）。 */
+export function buildAutoSeatPlans(input: {
+  totalGeneralCredits: number;
+  totalVideoCredits: number;
+  seats: number;
+  ownerPhone?: string;
+}): VipSeatPlan[] {
+  const seats = Math.max(1, Math.round(input.seats || 1));
+  const alloc = computeVipSeatAllocation({
+    totalGeneralCredits: input.totalGeneralCredits,
+    totalVideoCredits: input.totalVideoCredits,
+    seats,
+  });
+  return Array.from({ length: seats }, (_, i) => {
+    const isChief = i === 0;
+    return {
+      seatIndex: i + 1,
+      label: isChief ? "首席席（含余数）" : `席位 ${i + 1}`,
+      phone: isChief ? input.ownerPhone?.trim() || undefined : undefined,
+      role: isChief ? "OWNER" : "MEMBER",
+      generalCredits: alloc.perSeatGeneral + (isChief ? alloc.remainderGeneral : 0),
+      videoCredits: alloc.perSeatVideo + (isChief ? alloc.remainderVideo : 0),
+      isChief,
+    };
+  });
+}
+
+/** 手动席位分配合计与池总数校验。 */
 export function validateVipManualAllocation(input: {
   totalGeneralCredits: number;
   totalVideoCredits: number;
   perSeat: { generalCredits: number; videoCredits: number }[];
-}): { ok: boolean; reason?: string } {
-  const sumGeneral = input.perSeat.reduce((s, x) => s + Math.max(0, x.generalCredits), 0);
-  const sumVideo = input.perSeat.reduce((s, x) => s + Math.max(0, x.videoCredits), 0);
+}): { ok: boolean; reason?: string; sumGeneral?: number; sumVideo?: number } {
+  const sumGeneral = input.perSeat.reduce((s, x) => s + Math.max(0, Math.round(x.generalCredits)), 0);
+  const sumVideo = input.perSeat.reduce((s, x) => s + Math.max(0, Math.round(x.videoCredits)), 0);
   if (sumGeneral !== input.totalGeneralCredits) {
-    return { ok: false, reason: `通用积分分配合计 ${sumGeneral} ≠ 池总数 ${input.totalGeneralCredits}` };
+    return {
+      ok: false,
+      reason: `通用积分分配合计 ${sumGeneral.toLocaleString()} ≠ 池总数 ${input.totalGeneralCredits.toLocaleString()}`,
+      sumGeneral,
+      sumVideo,
+    };
   }
   if (sumVideo !== input.totalVideoCredits) {
-    return { ok: false, reason: `视频积分分配合计 ${sumVideo} ≠ 池总数 ${input.totalVideoCredits}` };
+    return {
+      ok: false,
+      reason: `视频积分分配合计 ${sumVideo.toLocaleString()} ≠ 池总数 ${input.totalVideoCredits.toLocaleString()}`,
+      sumGeneral,
+      sumVideo,
+    };
   }
-  return { ok: true };
+  return { ok: true, sumGeneral, sumVideo };
+}
+
+/** 算力市场价参考（合规展示，非现金面值）。 */
+export function computePowerRefYuan(scheme: Pick<VipCreditScheme, "faceValueYuan">): number {
+  return scheme.faceValueYuan;
 }

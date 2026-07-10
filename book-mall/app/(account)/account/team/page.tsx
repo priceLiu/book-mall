@@ -106,6 +106,7 @@ export default async function AccountTeamPage() {
                 },
                 usedSeats: overview.usedSeats,
                 balanceCredits: overview.account?.balanceCredits ?? 0,
+                videoBalanceCredits: overview.account?.videoBalanceCredits ?? 0,
                 monthlyGrantCredits: overview.account?.monthlyGrantCredits ?? 0,
                 members: overview.members.map((m) => ({
                   id: m.id,
@@ -116,6 +117,7 @@ export default async function AccountTeamPage() {
                   role: m.role,
                   status: m.status,
                   seatLabel: m.seat?.label ?? null,
+                  monthlyCapCredits: m.monthlyCapCredits,
                 })),
               }
             : null
@@ -127,6 +129,8 @@ export default async function AccountTeamPage() {
           role: i.role,
           expiresAt: i.expiresAt.toISOString(),
           urlCode: i.urlCode,
+          plannedGeneralCredits: i.plannedGeneralCredits,
+          plannedVideoCredits: i.plannedVideoCredits,
         }))}
         incomingInvites={incomingInvites.map((i) => ({
           token: i.token,

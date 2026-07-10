@@ -171,6 +171,14 @@ export async function inviteMemberAction(
       role: pickRole(str(formData.get("role"))),
       createdById: auth.userId,
       sendIp,
+      plannedGeneralCredits: (() => {
+        const raw = str(formData.get("plannedGeneralCredits"));
+        return raw === "" ? null : Math.max(0, Math.round(Number(raw)));
+      })(),
+      plannedVideoCredits: (() => {
+        const raw = str(formData.get("plannedVideoCredits"));
+        return raw === "" ? null : Math.max(0, Math.round(Number(raw)));
+      })(),
     });
     revalidatePath("/account/team");
     return { ok: true, data: { inviteUrl } };
@@ -345,6 +353,40 @@ export async function acceptInviteAction(formData: FormData): Promise<ActionResu
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+  revalidatePath("/account/team");
+  return { ok: true };
+}
+
+/** VIP 团队：主账号为成员设置个人通用积分额度上限。 */
+export async function updateMemberCapAction(formData: FormData): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
+  const tenantId = str(formData.get("tenantId"));
+  const perm = await requirePermission(auth.userId, tenantId, "tenant:configure");
+  if (!perm.ok) return perm;
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { packageLevel: true },
+  });
+  if (tenant?.packageLevel !== "VIP") {
+    return { ok: false, error: "仅 VIP 大额预充团队支持按成员分配积分" };
+  }
+
+  const capRaw = str(formData.get("monthlyCapCredits"));
+  const monthlyCapCredits = capRaw === "" ? null : Math.max(0, Math.round(Number(capRaw)));
+  const memberId = str(formData.get("memberId"));
+  if (!memberId) return { ok: false, error: "缺少成员 ID" };
+
+  const member = await prisma.tenantMember.findFirst({
+    where: { id: memberId, tenantId, status: "ACTIVE" },
+  });
+  if (!member) return { ok: false, error: "成员不存在" };
+
+  await prisma.tenantMember.update({
+    where: { id: member.id },
+    data: { monthlyCapCredits },
+  });
   revalidatePath("/account/team");
   return { ok: true };
 }

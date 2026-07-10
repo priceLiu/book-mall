@@ -16,6 +16,7 @@ import {
   Layers,
   LayoutDashboard,
   ClipboardList,
+  Crown,
   ListChecks,
   Tags,
   UserCircle2,
@@ -54,16 +55,36 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: "ledger",
-    label: "账务明细",
+    id: "finance-console",
+    label: "财务控制台",
     items: [
       {
+        href: "/admin/vip-ops",
+        label: "VIP 大额预充",
+        icon: Crown,
+        prefix: "/admin/vip-ops",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
         href: "/admin/teams",
-        label: "团队列表",
+        label: "团队财务",
         icon: Users,
         prefix: "/admin/teams",
         show: (v) => canViewFinanceCost(v.user.role),
       },
+      {
+        href: "/admin/reconciliation",
+        label: "云账单对账",
+        icon: CloudUpload,
+        prefix: "/admin/reconciliation",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+    ],
+  },
+  {
+    id: "ledger",
+    label: "账务明细",
+    items: [
       {
         href: "/admin/billing/users",
         label: "用户明细",
@@ -97,13 +118,6 @@ const NAV_GROUPS: NavGroup[] = [
         label: "P&L 报表",
         icon: Calculator,
         prefix: "/admin/pnl-report",
-        show: (v) => canViewFinanceCost(v.user.role),
-      },
-      {
-        href: "/admin/reconciliation",
-        label: "云账单对账",
-        icon: CloudUpload,
-        prefix: "/admin/reconciliation",
         show: (v) => canViewFinanceCost(v.user.role),
       },
     ],

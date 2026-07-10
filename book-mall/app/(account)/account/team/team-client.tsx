@@ -31,6 +31,7 @@ import {
   switchSpaceAction,
   transferOwnershipAction,
   updateConfigAction,
+  updateMemberCapAction,
   updateRoleAction,
 } from "./team-actions";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
@@ -61,6 +62,7 @@ interface Overview {
   };
   usedSeats: number;
   balanceCredits: number;
+  videoBalanceCredits: number;
   monthlyGrantCredits: number;
   members: {
     id: string;
@@ -71,6 +73,7 @@ interface Overview {
     role: Role;
     status: string;
     seatLabel: string | null;
+    monthlyCapCredits: number | null;
   }[];
 }
 
@@ -89,6 +92,8 @@ interface Props {
     role: Role;
     expiresAt: string;
     urlCode: string | null;
+    plannedGeneralCredits: number | null;
+    plannedVideoCredits: number | null;
   }[];
   incomingInvites: { token: string; tenantName: string; role: Role; urlCode: string | null }[];
   teamPlans: {
@@ -112,6 +117,57 @@ const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "管理员",
   MEMBER: "成员",
 };
+
+function MemberCapEditor({
+  memberId,
+  tenantId,
+  value,
+  pending,
+  buildFD,
+  run,
+}: {
+  memberId: string;
+  tenantId: string;
+  value: number | null;
+  pending: boolean;
+  buildFD: (e: Record<string, string>) => FormData;
+  run: <T>(a: () => Promise<ActionResult<T>>, ok?: string) => void;
+}) {
+  const [cap, setCap] = useState(value != null ? String(value) : "");
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        className="h-8 w-24"
+        type="number"
+        min={0}
+        value={cap}
+        placeholder="不限"
+        onChange={(e) => setCap(e.target.value)}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={pending}
+        onClick={() =>
+          run(
+            () =>
+              updateMemberCapAction(
+                buildFD({
+                  tenantId,
+                  memberId,
+                  monthlyCapCredits: cap,
+                }),
+              ),
+            "额度已保存",
+          )
+        }
+      >
+        保存
+      </Button>
+    </div>
+  );
+}
 
 function CopyInviteLinkButton({ token }: { token: string }) {
   const [copied, setCopied] = useState(false);
@@ -500,8 +556,11 @@ function TeamOverview({
   }) => void;
 }) {
   const t = overview.tenant;
+  const isVip = t.packageLevel === "VIP";
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("MEMBER");
+  const [inviteGeneral, setInviteGeneral] = useState("");
+  const [inviteVideo, setInviteVideo] = useState("");
   const [cfgName, setCfgName] = useState(t.name);
   const [cfgSeatLimit, setCfgSeatLimit] = useState(t.seatLimit);
   const [cfgCap, setCfgCap] = useState(
@@ -517,41 +576,86 @@ function TeamOverview({
             <CardTitle className="text-sm">团队套餐</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold">{t.packageLevel ?? "—"}</div>
-            <CardDescription>{t.interval === "YEAR" ? "年付" : "月付"}</CardDescription>
+            <div className="flex items-center gap-2">
+              <div className="text-lg font-bold">{t.packageLevel ?? "—"}</div>
+              {isVip ? <Badge variant="secondary">大额预充</Badge> : null}
+            </div>
+            <CardDescription>
+              {isVip ? "双池积分 · 5年有效" : t.interval === "YEAR" ? "年付" : "月付"}
+            </CardDescription>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-1">
-            <CardTitle className="text-sm">共享积分池</CardTitle>
+            <CardTitle className="text-sm">{isVip ? "通用积分池" : "共享积分池"}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{overview.balanceCredits.toLocaleString()}</div>
-            <CardDescription>月发放 {overview.monthlyGrantCredits.toLocaleString()}</CardDescription>
+            <CardDescription>
+              {isVip
+                ? "预充额度 · 无月度清零"
+                : `月发放 ${overview.monthlyGrantCredits.toLocaleString()}`}
+            </CardDescription>
           </CardContent>
         </Card>
+        {isVip ? (
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm">视频积分池</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{overview.videoBalanceCredits.toLocaleString()}</div>
+              <CardDescription>与通用池独立消耗</CardDescription>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm">席位占用</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {overview.usedSeats}/{t.seatLimit}
+              </div>
+              <CardDescription>已用 / 总席位</CardDescription>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardHeader className="pb-1">
-            <CardTitle className="text-sm">席位占用</CardTitle>
+            <CardTitle className="text-sm">{isVip ? "席位占用" : "人均月上限"}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {overview.usedSeats}/{t.seatLimit}
-            </div>
-            <CardDescription>已用 / 总席位</CardDescription>
+            {isVip ? (
+              <>
+                <div className="text-2xl font-bold">
+                  {overview.usedSeats}/{t.seatLimit}
+                </div>
+                <CardDescription>已用 / 总席位</CardDescription>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {t.perSeatCapCredits != null ? t.perSeatCapCredits.toLocaleString() : "不限"}
+                </div>
+                <CardDescription>每成员积分上限</CardDescription>
+              </>
+            )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm">人均月上限</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {t.perSeatCapCredits != null ? t.perSeatCapCredits.toLocaleString() : "不限"}
-            </div>
-            <CardDescription>每成员积分上限</CardDescription>
-          </CardContent>
-        </Card>
+        {!isVip ? null : (
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm">默认人均上限</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {t.perSeatCapCredits != null ? t.perSeatCapCredits.toLocaleString() : "按成员分配"}
+              </div>
+              <CardDescription>新成员默认参考值</CardDescription>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* 成员管理 */}
@@ -567,6 +671,7 @@ function TeamOverview({
                 <TableHead>成员</TableHead>
                 <TableHead>角色</TableHead>
                 <TableHead>席位</TableHead>
+                {isVip && canConfigure ? <TableHead>通用额度</TableHead> : null}
                 {canManage ? <TableHead className="text-right">操作</TableHead> : null}
               </TableRow>
             </TableHeader>
@@ -611,6 +716,18 @@ function TeamOverview({
                   <TableCell className="text-xs text-muted-foreground">
                     {m.seatLabel ?? "—"}
                   </TableCell>
+                  {isVip && canConfigure ? (
+                    <TableCell>
+                      <MemberCapEditor
+                        memberId={m.id}
+                        tenantId={t.id}
+                        value={m.monthlyCapCredits}
+                        pending={pending}
+                        buildFD={buildFD}
+                        run={run}
+                      />
+                    </TableCell>
+                  ) : null}
                   {canManage ? (
                     <TableCell className="text-right">
                       {m.role !== "OWNER" ? (
@@ -680,7 +797,9 @@ function TeamOverview({
           <CardHeader>
             <CardTitle className="text-base">邀请成员</CardTitle>
             <CardDescription>
-              邀请将占用一个席位名额。请将邀请链接发给成员（新用户需在链接页注册后再加入团队）。
+              {isVip
+                ? "按手机号邀请成员并预分配积分额度；请将邀请链接发给席位使用者（与团队邀请相同）。"
+                : "邀请将占用一个席位名额。请将邀请链接发给成员（新用户需在链接页注册后再加入团队）。"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -695,6 +814,32 @@ function TeamOverview({
                   placeholder="13800138000"
                 />
               </div>
+              {isVip ? (
+                <>
+                  <div>
+                    <Label htmlFor="invite-general">通用积分</Label>
+                    <Input
+                      id="invite-general"
+                      type="number"
+                      min={0}
+                      value={inviteGeneral}
+                      onChange={(e) => setInviteGeneral(e.target.value)}
+                      placeholder="预分配"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="invite-video">视频积分</Label>
+                    <Input
+                      id="invite-video"
+                      type="number"
+                      min={0}
+                      value={inviteVideo}
+                      onChange={(e) => setInviteVideo(e.target.value)}
+                      placeholder="预分配"
+                    />
+                  </div>
+                </>
+              ) : null}
               <div>
                 <Label htmlFor="invite-role">角色</Label>
                 <select
@@ -717,6 +862,12 @@ function TeamOverview({
                           tenantId: t.id,
                           phone: invitePhone,
                           role: inviteRole,
+                          ...(isVip
+                            ? {
+                                plannedGeneralCredits: inviteGeneral,
+                                plannedVideoCredits: inviteVideo,
+                              }
+                            : {}),
                         }),
                       ),
                     "邀请短信已发送",
@@ -738,6 +889,19 @@ function TeamOverview({
                     <span>
                       {maskPhone(i.phone)}（{ROLE_LABEL[i.role]}） · 过期{" "}
                       {new Date(i.expiresAt).toLocaleDateString("zh-CN")}
+                      {isVip &&
+                      (i.plannedGeneralCredits != null || i.plannedVideoCredits != null) ? (
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          预分配：通用{" "}
+                          {i.plannedGeneralCredits != null
+                            ? i.plannedGeneralCredits.toLocaleString()
+                            : "—"}
+                          {" · "}视频{" "}
+                          {i.plannedVideoCredits != null
+                            ? i.plannedVideoCredits.toLocaleString()
+                            : "—"}
+                        </span>
+                      ) : null}
                     </span>
                     <div className="flex shrink-0 gap-2">
                       <CopyInviteLinkButton token={i.token} />

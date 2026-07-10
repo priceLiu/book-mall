@@ -105,7 +105,9 @@ export async function getTenantOverview(tenantId: string) {
     where: { ownerType_ownerId: { ownerType: "TENANT", ownerId: tenantId } },
     select: {
       balanceCredits: true,
+      videoBalanceCredits: true,
       monthlyGrantCredits: true,
+      videoMonthlyGrant: true,
       perSeatCapCredits: true,
       currentPeriodEnd: true,
     },

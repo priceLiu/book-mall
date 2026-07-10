@@ -37,6 +37,13 @@ const bodySchema = z.discriminatedUnion("productKind", [
     target: z.enum(["personal", "team"]).optional(),
     tenantId: z.string().optional().nullable(),
   }),
+  z.object({
+    productKind: z.literal("VIP_PACKAGE"),
+    amountYuan: z.number().int().min(100_000),
+    scheme: z.enum(["general_heavy", "video_heavy"]),
+    seats: z.number().int().min(1).max(999).optional(),
+    teamName: z.string().max(64).optional().nullable(),
+  }),
 ]);
 
 export async function POST(request: NextRequest) {

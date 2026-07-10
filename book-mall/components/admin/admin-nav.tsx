@@ -136,8 +136,6 @@ function AdminNavDropdown({ group }: { group: AdminNavGroup }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-[min(70vh,28rem)] w-56 overflow-y-auto">
-        <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
         {group.items.map((item) => (
           <DropdownMenuItem key={`${group.id}-${item.href}-${item.label}`} asChild>
             {item.external ? (

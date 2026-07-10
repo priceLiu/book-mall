@@ -59,6 +59,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
       id: "finance",
       label: "财务控制台",
       items: [
+        fin(o, "/admin/vip-ops", "VIP 大额预充", "/admin/finance/vip-ops"),
         fin(o, "/admin/usage-overview", "费用多维度概览", "/admin/finance/usage-overview"),
         fin(o, "/admin/reconciliation", "云账单对账", "/admin/finance/reconciliation"),
         fin(o, "/admin/model-cost", "模型成本与折扣", "/admin/finance/model-cost"),
