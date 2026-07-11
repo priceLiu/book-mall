@@ -751,6 +751,39 @@ export async function topupCredits(input: {
 }
 
 /**
+ * 将账户快路径余额与未过期批次合计对齐（运维修复：如全站清零只改了 balance 未改批次）。
+ */
+export async function reconcileCreditBalanceFromLots(
+  ref: AccountRef,
+): Promise<{ general: number; video: number; changed: boolean }> {
+  const account = await ensureCreditAccount(ref);
+  const now = new Date();
+  const lots = await prisma.creditLot.findMany({
+    where: {
+      accountId: account.id,
+      remainingCredits: { gt: 0 },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    select: { pool: true, remainingCredits: true },
+  });
+  const general = lots
+    .filter((l) => l.pool !== "VIDEO")
+    .reduce((s, l) => s + l.remainingCredits, 0);
+  const video = lots
+    .filter((l) => l.pool === "VIDEO")
+    .reduce((s, l) => s + l.remainingCredits, 0);
+  const changed =
+    general !== account.balanceCredits || video !== account.videoBalanceCredits;
+  if (changed) {
+    await prisma.creditAccount.update({
+      where: { id: account.id },
+      data: { balanceCredits: general, videoBalanceCredits: video },
+    });
+  }
+  return { general, video, changed };
+}
+
+/**
  * 生成扣费（CONSUME）。idempotencyKey 建议用 `gateway_log:<logId>`，避免重复扣。
  * 同时把 creditsCharged / billingMode 写回对应 GatewayRequestLog（若提供 gatewayLogId）。
  */

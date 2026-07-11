@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Check,
@@ -37,7 +38,13 @@ import {
   type SeatBand,
 } from "@/lib/pricing/credit-pricing-formulas";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
+import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
 import { ByokMembershipCta } from "@/components/pricing/byok-subscribe-buttons";
+import {
+  buildLoginRedirectForCheckout,
+  buildMembershipCheckoutPath,
+} from "@/lib/payments/checkout-login-redirect";
+import type { BillingPersona } from "@prisma/client";
 
 interface SeatTier {
   seatMin: number;
@@ -204,6 +211,7 @@ export function PricingPageClient({
   rates,
   teamTenants = [],
   isLoggedIn,
+  billingPersona = null,
   welcomeGift,
 }: {
   anchorYuan: number;
@@ -213,10 +221,29 @@ export function PricingPageClient({
   rates: ResourceRate[];
   teamTenants?: { id: string; name: string }[];
   isLoggedIn: boolean;
+  billingPersona?: BillingPersona | null;
   welcomeGift?: { generalCredits: number; videoCredits: number } | null;
 }) {
   const [family, setFamily] = useState<"PERSONAL" | "TEAM">("PERSONAL");
   const [interval, setInterval] = useState<"MONTH" | "YEAR">("MONTH");
+  const searchParams = useSearchParams();
+  const checkoutError = searchParams.get("error");
+
+  const checkoutErrorMessage =
+    checkoutError === "byok-persona"
+      ? "当前账号为自带 Key（BYOK）身份，无法购买平台代付会员套餐。积分清零不影响此限制——计费身份在注册时已锁定。请使用 BYOK 入口，或由财务后台为您续充。"
+      : checkoutError === "persona"
+        ? "请先完成计费身份选择后再开通会员。"
+        : checkoutError === "no-plan"
+          ? "未选择有效套餐，请从下方卡片重新点击「立即开通」。"
+          : checkoutError === "invalid-plan"
+            ? "所选套餐已下架或不存在，请刷新页面后重试。"
+            : null;
+
+  useEffect(() => {
+    if (!checkoutError) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [checkoutError]);
 
   const visible = useMemo(
     () =>
@@ -266,6 +293,42 @@ export function PricingPageClient({
                 : ""}
               ，30 天内有效
             </span>
+          </div>
+        ) : null}
+
+        {checkoutErrorMessage ? (
+          <div
+            id="checkout-error-banner"
+            className="mx-auto mt-5 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            {checkoutErrorMessage}
+            {checkoutError === "persona" ? (
+              <>
+                {" "}
+                <Link href="/onboarding/billing-persona" className="font-medium underline">
+                  去选择计费身份
+                </Link>
+              </>
+            ) : null}
+            {checkoutError === "byok-persona" ? (
+              <>
+                {" "}
+                <Link href="/account/billing" className="font-medium underline">
+                  查看账户计费
+                </Link>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isLoggedIn && billingPersona === "BYOK" && !checkoutErrorMessage ? (
+          <div className="mx-auto mt-5 max-w-2xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            您当前为 <strong>自带 Key（BYOK）</strong> 身份，报价页「立即开通」仅适用于
+            <strong>平台代付</strong> 会员。积分清零不会解除此限制。如需续充 VIP 大额预充，请联系商务或在
+            <Link href="/account/team" className="font-medium underline">
+              团队中心
+            </Link>
+            查看现有团队。
           </div>
         ) : null}
 
@@ -322,6 +385,8 @@ export function PricingPageClient({
                 plan={p}
                 index={i}
                 isTeam={isTeam}
+                isLoggedIn={isLoggedIn}
+                billingPersona={billingPersona}
                 interval={interval}
                 periodLabel={periodLabel}
                 anchorYuan={anchorYuan}
@@ -524,6 +589,8 @@ export function PricingPageClient({
           </div>
         </section>
 
+        <CreditExpiryPolicySection embedded />
+
         <p className="mt-10 text-center site-pricing-footnote">
           AI 课程不在积分体系内，单独购买、不受积分限制。最终解释权与计费明细见
           <Link href="/pricing-disclosure" className="ml-1 text-foreground underline">
@@ -542,6 +609,8 @@ function PlanCard({
   plan,
   index,
   isTeam,
+  isLoggedIn,
+  billingPersona,
   interval,
   periodLabel,
   anchorYuan,
@@ -553,6 +622,8 @@ function PlanCard({
   plan: Plan;
   index: number;
   isTeam: boolean;
+  isLoggedIn: boolean;
+  billingPersona: BillingPersona | null;
   interval: string;
   periodLabel: string;
   anchorYuan: number;
@@ -561,6 +632,7 @@ function PlanCard({
   minVideoCpu: number;
   annualSavingPct: number | null;
 }) {
+  const router = useRouter();
   const [seats, setSeats] = useState<number>(
     Math.max(TEAM_MIN_INCLUDED_SEATS, plan.includedSeats),
   );
@@ -609,6 +681,22 @@ function PlanCard({
     maxImages,
     maxVideoSecFromVideoPool,
   });
+
+  function goCheckout() {
+    if (isLoggedIn && billingPersona === "BYOK") {
+      window.location.assign("/pricing?error=byok-persona");
+      return;
+    }
+    const checkoutPath = buildMembershipCheckoutPath({
+      planId: plan.id,
+      seats: isTeam ? quote.seats : undefined,
+    });
+    if (!isLoggedIn) {
+      router.push(buildLoginRedirectForCheckout(checkoutPath));
+      return;
+    }
+    window.location.assign(checkoutPath);
+  }
 
   return (
     <motion.div
@@ -724,15 +812,17 @@ function PlanCard({
       {/* ===== 按钮 / footer ===== */}
       <div className="mt-auto px-6 pb-8 pt-6">
         <Button
-          asChild
+          type="button"
           variant={featured ? "default" : "outline"}
           className="h-11 w-full rounded-full text-sm font-medium"
+          onClick={goCheckout}
+          disabled={isLoggedIn && billingPersona === "BYOK"}
         >
-          <Link
-            href={isTeam ? `/checkout/membership?planId=${plan.id}&seats=${quote.seats}` : `/checkout/membership?planId=${plan.id}`}
-          >
-            {isTeam ? "开通团队会员" : "立即开通"}
-          </Link>
+          {isLoggedIn && billingPersona === "BYOK"
+            ? "BYOK 账号不可购"
+            : isTeam
+              ? "开通团队会员"
+              : "立即开通"}
         </Button>
       </div>
     </motion.div>

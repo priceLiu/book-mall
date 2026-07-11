@@ -141,7 +141,7 @@ export async function POST(request: Request) {
     // Gateway 身份 / sk-gw 在首次 SSO 或生成时懒加载（见 sync-user / platform-managed-key），
     // 不在注册热路径阻塞，避免注册 + 登录连续等待 2～3 秒。
 
-    // 新用户注册赠送积分（通用 + 视频，长期有效、幂等）。失败不阻断注册主流程。
+    // 新用户注册赠送积分（通用 + 视频，30 天有效、幂等）。失败不阻断注册主流程。
     try {
       await grantWelcomeGift(createdUserId);
     } catch (giftErr) {
