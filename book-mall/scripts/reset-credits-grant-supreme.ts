@@ -72,6 +72,9 @@ async function main() {
       where: { status: "ACTIVE" },
       data: { status: "EXPIRED" },
     }),
+    prisma.creditLot.updateMany({
+      data: { remainingCredits: 0 },
+    }),
     prisma.creditAccount.updateMany({
       data: {
         balanceCredits: 0,
