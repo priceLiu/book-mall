@@ -2981,7 +2981,10 @@ model CreditAccount {
   pricePerCreditYuan   Decimal?        @db.Decimal(12, 6) // 该账户档位「每积分单价」快照（逐档积分换算）
   perSeatCapCredits    Int? // 子账号人均上限（可选）
   planId               String?
+  /// 积分批次下一刷新截止（每 31 天滚动；与会员付费截止解耦）
   currentPeriodEnd     DateTime?
+  /// 个人会员付费服务截止（月付 +31 天 / 年付 +365 天；团队见 Tenant.currentPeriodEnd）
+  membershipPaidUntil  DateTime?
   entries              CreditLedger[]
   lots                 CreditLot[]
   createdAt            DateTime        @default(now())

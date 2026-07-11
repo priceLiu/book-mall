@@ -7,7 +7,7 @@ import { runMonthlyResetSweep } from "@/lib/billing/credit-account-service";
 export const dynamic = "force-dynamic";
 
 /**
- * 订阅积分月度重置清扫（积分清零 1.0）：对 currentPeriodEnd 已到期的订阅账户按月刷新
+ * 订阅积分月度重置清扫（积分清零 1.0）：对 currentPeriodEnd 已到期且会员服务仍有效的订阅账户按 31 天滚动刷新
  * （清上一周期订阅积分、发放本周期，保留充值/免费批次），并推进 currentPeriodEnd。
  * 触发方式同 credits/expire-sweep。
  */

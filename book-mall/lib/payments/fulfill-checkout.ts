@@ -13,6 +13,11 @@ import {
   BYOK_SCOPE_TEAM_SEAT,
 } from "@/lib/billing/byok-pricing";
 import { grantCredits, topupCredits } from "@/lib/billing/credit-account-service";
+import { subscriptionCreditPeriodEnd } from "@/lib/billing/credit-lot-logic";
+import {
+  extendMembershipPaidUntil,
+  membershipPaidUntilFromPurchase,
+} from "@/lib/billing/membership-service-period";
 import { packById } from "@/lib/billing/credit-topup-packs";
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
@@ -75,9 +80,8 @@ async function fulfillMembership(
 
   await assertBillingPersona(checkout.userId, "PLATFORM_CREDIT");
 
-  const periodEnd = new Date();
-  if (plan.interval === "YEAR") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-  else periodEnd.setMonth(periodEnd.getMonth() + 1);
+  const now = new Date();
+  const creditPeriodEnd = subscriptionCreditPeriodEnd(now);
 
   const idem = idempotencyBase(checkout.id);
 
@@ -103,6 +107,7 @@ async function fulfillMembership(
     });
 
     let tenantId = existingTeam?.tenantId;
+    let tenantPaidUntil: Date;
     if (!tenantId) {
       const tenant = await createTeamTenant({
         ownerUserId: checkout.userId,
@@ -114,6 +119,11 @@ async function fulfillMembership(
         perSeatCapCredits: null,
       });
       tenantId = tenant.id;
+      tenantPaidUntil = membershipPaidUntilFromPurchase(plan.interval, now);
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { currentPeriodEnd: tenantPaidUntil },
+      });
       try {
         await ensurePlatformManagedKeyForTenant(tenantId);
       } catch {
@@ -126,6 +136,15 @@ async function fulfillMembership(
       if (!member || !canTenant(member.role, "billing:manage")) {
         throw new Error("仅团队主账号可续订团队套餐");
       }
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { currentPeriodEnd: true },
+      });
+      tenantPaidUntil = extendMembershipPaidUntil(tenant?.currentPeriodEnd, plan.interval, now);
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { currentPeriodEnd: tenantPaidUntil },
+      });
     }
 
     const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
@@ -138,14 +157,19 @@ async function fulfillMembership(
       pricePerCreditYuan:
         quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
       planId: plan.id,
-      currentPeriodEnd: periodEnd,
+      currentPeriodEnd: creditPeriodEnd,
       idempotencyKey: idem,
       description: `团队会员开通（${plan.tier} × ${quote.totalSeats} 席）`,
     });
 
     return {
       amountPoints: grants.generalCredits + grants.videoCredits,
-      meta: { tenantId, planId: plan.id, family: "TEAM" },
+      meta: {
+        tenantId,
+        planId: plan.id,
+        family: "TEAM",
+        membershipPaidUntil: tenantPaidUntil.toISOString(),
+      },
     };
   }
 
@@ -158,6 +182,16 @@ async function fulfillMembership(
     };
   }
 
+  const existingAcc = await prisma.creditAccount.findUnique({
+    where: { ownerType_ownerId: { ownerType: "USER", ownerId: checkout.userId } },
+    select: { membershipPaidUntil: true },
+  });
+  const membershipPaidUntil = extendMembershipPaidUntil(
+    existingAcc?.membershipPaidUntil,
+    plan.interval,
+    now,
+  );
+
   await grantCredits({
     ref: { ownerType: "USER", ownerId: checkout.userId },
     credits: grants.generalCredits,
@@ -167,14 +201,19 @@ async function fulfillMembership(
     pricePerCreditYuan:
       plan.monthlyCredits > 0 ? Number(plan.priceYuan) / plan.monthlyCredits : null,
     planId: plan.id,
-    currentPeriodEnd: periodEnd,
+    currentPeriodEnd: creditPeriodEnd,
+    membershipPaidUntil,
     idempotencyKey: idem,
     description: `个人会员开通（${plan.tier}）`,
   });
 
   return {
     amountPoints: grants.generalCredits + grants.videoCredits,
-    meta: { planId: plan.id, family: "PERSONAL" },
+    meta: {
+      planId: plan.id,
+      family: "PERSONAL",
+      membershipPaidUntil: membershipPaidUntil.toISOString(),
+    },
   };
 }
 

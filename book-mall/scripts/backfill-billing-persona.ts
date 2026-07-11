@@ -9,6 +9,7 @@ import {
   ensurePlatformManagedKeyForTenant,
   ensurePlatformManagedKeyForUser,
 } from "../lib/gateway/platform-managed-key";
+import { isMembershipServiceActive } from "../lib/billing/membership-service-period";
 
 type ConflictPolicy = "byok" | "platform";
 
@@ -32,7 +33,7 @@ async function inferPersona(userId: string, conflict: ConflictPolicy) {
     }),
     prisma.creditAccount.findUnique({
       where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
-      select: { planId: true, monthlyGrantCredits: true, currentPeriodEnd: true },
+      select: { planId: true, monthlyGrantCredits: true, membershipPaidUntil: true },
     }),
     prisma.tenantMember.findFirst({
       where: {
@@ -51,7 +52,7 @@ async function inferPersona(userId: string, conflict: ConflictPolicy) {
     Boolean(
       creditAcc?.planId &&
         creditAcc.monthlyGrantCredits > 0 &&
-        (!creditAcc.currentPeriodEnd || creditAcc.currentPeriodEnd > now),
+        isMembershipServiceActive(creditAcc.membershipPaidUntil, now),
     ) || Boolean(teamPlan);
 
   const user = await prisma.user.findUnique({

@@ -8,6 +8,8 @@ import type { CreditSource } from "@prisma/client";
 export const TOPUP_VALIDITY_MONTHS = 12;
 /** 活动 / 注册赠送免费积分默认有效期（政策：30 天）。 */
 export const FREE_VALIDITY_DAYS = 30;
+/** 订阅套餐赠送积分单周期有效期（政策：31 天，自发放/刷新到账起算）。 */
+export const SUBSCRIPTION_CREDIT_VALIDITY_DAYS = 31;
 
 export function addMonths(base: Date, months: number): Date {
   const d = new Date(base);
@@ -21,6 +23,16 @@ export function addDays(base: Date, days: number): Date {
 }
 export function monthPeriodKeyOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 订阅积分批次到期时刻（自 anchor 起 31 天）。 */
+export function subscriptionCreditPeriodEnd(anchor: Date = new Date()): Date {
+  return addDays(anchor, SUBSCRIPTION_CREDIT_VALIDITY_DAYS);
+}
+
+/** 订阅积分刷新幂等键：以本周期到期日的 UTC 日期标识（YYYY-MM-DD）。 */
+export function subscriptionCreditPeriodKey(periodEnd: Date): string {
+  return periodEnd.toISOString().slice(0, 10);
 }
 
 /** 扣费顺序里的来源兜底排序：即将到期优先，同到期则订阅 < 免费 < 充值。 */
@@ -116,5 +128,6 @@ export function resolveLotExpiry(
   if (explicit !== undefined) return explicit;
   if (source === "FREE") return addDays(now, FREE_VALIDITY_DAYS);
   if (source === "TOPUP") return addMonths(now, TOPUP_VALIDITY_MONTHS);
-  return null; // SUBSCRIPTION 无显式到期时按永久（实际由调用方传 currentPeriodEnd）
+  if (source === "SUBSCRIPTION") return subscriptionCreditPeriodEnd(now);
+  return null;
 }

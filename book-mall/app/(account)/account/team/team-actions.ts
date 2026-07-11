@@ -28,6 +28,8 @@ import {
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { grantCredits } from "@/lib/billing/credit-account-service";
+import { subscriptionCreditPeriodEnd } from "@/lib/billing/credit-lot-logic";
+import { membershipPaidUntilFromPurchase } from "@/lib/billing/membership-service-period";
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import {
   ensurePlatformManagedKeyForTenant,
@@ -116,10 +118,15 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
     perSeatCapCredits: null,
   });
 
-  // 发放共享积分池（按周期：月/年都先发首期月度池；续费由月度任务处理）
-  const periodEnd = new Date();
-  if (plan.interval === "YEAR") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-  else periodEnd.setMonth(periodEnd.getMonth() + 1);
+  const now = new Date();
+  const tenantPaidUntil = membershipPaidUntilFromPurchase(plan.interval, now);
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { currentPeriodEnd: tenantPaidUntil },
+  });
+
+  // 发放共享积分池（首期；后续每 31 天由 credits/monthly-reset 刷新）
+  const creditPeriodEnd = subscriptionCreditPeriodEnd(now);
   const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: tenant.id },
@@ -129,7 +136,7 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
     videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
     pricePerCreditYuan: quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
     planId,
-    currentPeriodEnd: periodEnd,
+    currentPeriodEnd: creditPeriodEnd,
     idempotencyKey: `team_open:${tenant.id}`,
     description: `团队开通发放（${plan.tier} × ${quote.totalSeats} 席）`,
   });

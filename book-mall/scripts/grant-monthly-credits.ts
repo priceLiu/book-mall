@@ -12,14 +12,20 @@
  * 行为（见 doc/product/14-tenant-team-design.md §8.3「会员：周期末重置发放 monthlyGrantCredits」）：
  *   - 扫描所有「到期」积分账户（currentPeriodEnd 为空，或 ≤ 当前时间），且 monthlyGrantCredits > 0。
  *   - 把余额「重置」为该账户月发放额（会员月积分 use-it-or-lose-it）：delta>0 记 GRANT，delta<0 记 EXPIRE。
- *   - 积分按「月」刷新——年付套餐同样每月刷新（计费周期与积分刷新解耦），currentPeriodEnd 向后滚 1 个月。
+ *   - 积分每 **31 天** 刷新——年付会员的付费周期与积分刷新解耦，currentPeriodEnd 向后滚 31 天。
  *   - 幂等：同一周期重复执行不重复发放（idempotencyKey=monthly_grant:<accountId>:<YYYY-MM>）。
- *   - 团队账户（ownerType=TENANT）仅当对应 Tenant.status=ACTIVE 且订阅未过期（Tenant.currentPeriodEnd）时发放。
+ *   - 团队账户（ownerType=TENANT）仅当对应 Tenant.status=ACTIVE 且会员服务未过期（Tenant.currentPeriodEnd）时发放。
+ *   - 个人账户（ownerType=USER）仅当 membershipPaidUntil 未过期（或存量未写入时放行）时发放。
  *
  * 默认 dry-run（仅预览），加 --confirm 才真正写入。
  */
 import { prisma } from "../lib/prisma";
 import { resetMonthlyCredits } from "../lib/billing/credit-account-service";
+import {
+  subscriptionCreditPeriodEnd,
+  subscriptionCreditPeriodKey,
+} from "../lib/billing/credit-lot-logic";
+import { isMembershipServiceActive } from "../lib/billing/membership-service-period";
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -29,16 +35,9 @@ function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
-/** 周期 key（目标月）：YYYY-MM。 */
+/** 周期 key：本周期到期日 YYYY-MM-DD（31 天滚动）。 */
 function periodKeyOf(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-/** 向后滚动 1 个自然月（保持「月初刷新」语义）。 */
-function addOneMonth(d: Date): Date {
-  const next = new Date(d);
-  next.setMonth(next.getMonth() + 1);
-  return next;
+  return subscriptionCreditPeriodKey(d);
 }
 
 async function main() {
@@ -68,6 +67,7 @@ async function main() {
       perSeatCapCredits: true,
       planId: true,
       currentPeriodEnd: true,
+      membershipPaidUntil: true,
     },
   });
 
@@ -76,27 +76,35 @@ async function main() {
   let deduped = 0;
 
   for (const acc of accounts) {
-    // 团队账户：仅当租户在用且订阅未过期才刷新积分
+    // 团队账户：仅当租户在用且会员服务未过期才刷新积分
     if (acc.ownerType === "TENANT") {
       const tenant = await prisma.tenant.findUnique({
         where: { id: acc.ownerId },
         select: { status: true, currentPeriodEnd: true },
       });
-      const subscriptionEnded =
-        tenant?.currentPeriodEnd != null && tenant.currentPeriodEnd <= now;
-      if (!tenant || tenant.status !== "ACTIVE" || subscriptionEnded) {
+      if (
+        !tenant ||
+        tenant.status !== "ACTIVE" ||
+        !isMembershipServiceActive(tenant.currentPeriodEnd, now)
+      ) {
         skipped += 1;
         console.log(
-          `  - 跳过 TENANT ${acc.ownerId}（status=${tenant?.status ?? "缺失"} 订阅末=${tenant?.currentPeriodEnd?.toISOString() ?? "—"}）`,
+          `  - 跳过 TENANT ${acc.ownerId}（status=${tenant?.status ?? "缺失"} 服务末=${tenant?.currentPeriodEnd?.toISOString() ?? "—"}）`,
         );
         continue;
       }
+    } else if (!isMembershipServiceActive(acc.membershipPaidUntil, now)) {
+      skipped += 1;
+      console.log(
+        `  - 跳过 USER ${acc.ownerId}（会员服务末=${acc.membershipPaidUntil?.toISOString() ?? "—"}）`,
+      );
+      continue;
     }
 
-    // 目标周期 = 当前周期末（无则取基准时间），积分按月刷新
+    // 目标周期 = 当前周期末（无则取基准时间），积分每 31 天刷新
     const periodStart = acc.currentPeriodEnd ?? now;
     const periodKey = periodKeyOf(periodStart);
-    const nextPeriodEnd = addOneMonth(periodStart);
+    const nextPeriodEnd = subscriptionCreditPeriodEnd(periodStart);
     const delta = acc.monthlyGrantCredits - acc.balanceCredits;
 
     if (!confirm) {

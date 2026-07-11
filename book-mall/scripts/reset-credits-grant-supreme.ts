@@ -7,6 +7,8 @@
  */
 import { prisma } from "../lib/prisma";
 import { grantCredits } from "../lib/billing/credit-account-service";
+import { subscriptionCreditPeriodEnd } from "../lib/billing/credit-lot-logic";
+import { membershipPaidUntilFromPurchase } from "../lib/billing/membership-service-period";
 import { resolvePlanCreditGrants } from "../lib/billing/plan-credit-grants";
 
 const SUPREME_EMAILS = ["13808816802@126.com", "123456789@126.com"] as const;
@@ -55,8 +57,9 @@ async function main() {
   }
 
   const grants = resolvePlanCreditGrants(supremePlan, 1);
-  const periodEnd = new Date();
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
+  const now = new Date();
+  const periodEnd = subscriptionCreditPeriodEnd(now);
+  const membershipPaidUntil = membershipPaidUntilFromPurchase(supremePlan.interval, now);
 
   if (!confirm) {
     console.log("[reset-credits] 预览完成。加 --confirm 执行。");
@@ -85,6 +88,7 @@ async function main() {
         videoMonthlyGrant: 0,
         planId: null,
         currentPeriodEnd: null,
+        membershipPaidUntil: null,
         pricePerCreditYuan: null,
         perSeatCapCredits: null,
       },
@@ -103,6 +107,7 @@ async function main() {
         : null,
       planId: supremePlan.id,
       currentPeriodEnd: periodEnd,
+      membershipPaidUntil,
       idempotencyKey: `bootstrap_supreme:${user.id}`,
       description: `运维重置：个人至尊版首期发放（${user.email}）`,
     });

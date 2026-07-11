@@ -127,7 +127,7 @@ export function AccountOverviewCards({
           </div>
           {membershipPeriodEnd ? (
             <p className="mt-2 text-xs text-muted-foreground tabular-nums">
-              当前周期至 {membershipPeriodEnd.toLocaleDateString("zh-CN")}
+              会员服务至 {membershipPeriodEnd.toLocaleString("zh-CN")}
             </p>
           ) : null}
         </CardContent>
