@@ -15,14 +15,24 @@ import {
   computeOwnedDelta,
   FREE_VALIDITY_DAYS,
   type LotRow,
-  monthPeriodKeyOf,
   planAllocation,
   planExpiry,
   planRestoreTargetId,
+  subscriptionCreditPeriodEnd,
+  subscriptionCreditPeriodKey,
+  SUBSCRIPTION_CREDIT_VALIDITY_DAYS,
   TOPUP_VALIDITY_MONTHS,
 } from "./credit-lot-logic";
+import { isMembershipServiceActive } from "./membership-service-period";
 
-export { TOPUP_VALIDITY_MONTHS, FREE_VALIDITY_DAYS, addDays, addMonths } from "./credit-lot-logic";
+export {
+  TOPUP_VALIDITY_MONTHS,
+  FREE_VALIDITY_DAYS,
+  SUBSCRIPTION_CREDIT_VALIDITY_DAYS,
+  subscriptionCreditPeriodEnd,
+  addDays,
+  addMonths,
+} from "./credit-lot-logic";
 
 import { isStaffRole } from "@/lib/billing/billing-persona";
 import { buildGatewayLogWhereFromUsageQuery } from "@/lib/gateway/log-query-scope";
@@ -411,6 +421,8 @@ export async function grantCredits(input: {
   pricePerCreditYuan?: number | null;
   planId?: string | null;
   currentPeriodEnd?: Date | null;
+  /** 个人会员付费服务截止（团队由 Tenant.currentPeriodEnd 维护）。 */
+  membershipPaidUntil?: Date | null;
   perSeatCapCredits?: number | null;
   idempotencyKey?: string | null;
   description?: string | null;
@@ -459,6 +471,7 @@ export async function grantCredits(input: {
       pricePerCreditYuan: input.pricePerCreditYuan ?? undefined,
       planId: input.planId ?? undefined,
       currentPeriodEnd: input.currentPeriodEnd ?? undefined,
+      membershipPaidUntil: input.membershipPaidUntil ?? undefined,
       perSeatCapCredits: input.perSeatCapCredits ?? undefined,
     },
   });
@@ -492,7 +505,7 @@ async function expireSubscriptionLotsForPool(
     credits: -sum,
     pool,
     refType: "monthly_reset_expire",
-    description: `订阅积分月度清零（清上一周期，${pool}）`,
+      description: `订阅积分周期清零（清上一周期，${pool}）`,
     allowNegative: true,
     skipLotSync: true,
   });
@@ -504,13 +517,13 @@ async function expireSubscriptionLotsForPool(
 }
 
 /**
- * 月度积分重置（会员周期刷新，见 14-tenant-team-design §8.3）。
+ * 订阅积分周期重置（31 天刷新，见 14-tenant-team-design §8.3）。
  *
  * 批次化语义（积分清零 1.0）：**仅**清零并重发「订阅」积分，**保留**充值 / 免费批次。
  *   1) 过期上一周期订阅批次（写 EXPIRE、余额扣减、批次归零）；
  *   2) 按 monthlyGrantCredits / videoMonthlyGrant 发放新订阅批次（expiresAt=nextPeriodEnd，periodKey=目标周期）。
  * 幂等键 `monthly_grant:<accountId>:<periodKey>` 保证同周期重复执行不重复发放。
- * 年付套餐的订阅积分同样按「月」刷新（计费周期与积分刷新周期解耦）。
+ * 年付会员的**付费周期**与积分刷新解耦：积分仍每 31 天刷新一次。
  */
 export async function resetMonthlyCredits(input: {
   ref: AccountRef;
@@ -545,7 +558,7 @@ export async function resetMonthlyCredits(input: {
       pool: "GENERAL",
       refType: "monthly_grant",
       idempotencyKey,
-      description: `月度积分发放（${input.periodKey}）`,
+      description: `订阅积分发放（${input.periodKey}）`,
       lotSource: "SUBSCRIPTION",
       lotExpiresAt: input.nextPeriodEnd ?? null,
       lotPeriodKey: input.periodKey,
@@ -560,7 +573,7 @@ export async function resetMonthlyCredits(input: {
       pool: "VIDEO",
       refType: "monthly_grant",
       idempotencyKey: `${idempotencyKey}:video`,
-      description: `月度积分发放·视频池（${input.periodKey}）`,
+      description: `订阅积分发放·视频池（${input.periodKey}）`,
       lotSource: "SUBSCRIPTION",
       lotExpiresAt: input.nextPeriodEnd ?? null,
       lotPeriodKey: input.periodKey,
@@ -649,10 +662,14 @@ export async function sweepExpiredLots(now: Date = new Date()): Promise<{
 }
 
 /**
- * 月度重置清扫：找出 currentPeriodEnd 已到期且有订阅月额度的账户，逐一按月刷新订阅积分。
- * 每次每账户只推进 1 个月；跨多月欠账由每日 cron 逐日追平。VIP（monthlyGrant=0 / period=null）不受影响。
+ * 订阅积分周期清扫：找出 currentPeriodEnd 已到期且有订阅额度的账户，按 31 天滚动刷新。
+ * 会员付费服务已过期（个人 membershipPaidUntil / 团队 Tenant.currentPeriodEnd）则跳过。
+ * 每次每账户只推进 1 个周期；跨多周期欠账由每日 cron 逐日追平。VIP（monthlyGrant=0 / period=null）不受影响。
  */
-export async function runMonthlyResetSweep(now: Date = new Date()): Promise<{ reset: number }> {
+export async function runMonthlyResetSweep(now: Date = new Date()): Promise<{
+  reset: number;
+  skippedExpired: number;
+}> {
   const due = await prisma.creditAccount.findMany({
     where: { currentPeriodEnd: { lte: now }, monthlyGrantCredits: { gt: 0 } },
     select: {
@@ -663,14 +680,41 @@ export async function runMonthlyResetSweep(now: Date = new Date()): Promise<{ re
       currentPeriodEnd: true,
       planId: true,
       perSeatCapCredits: true,
+      membershipPaidUntil: true,
     },
   });
+
+  const tenantIds = due.filter((a) => a.ownerType === "TENANT").map((a) => a.ownerId);
+  const tenants =
+    tenantIds.length > 0
+      ? await prisma.tenant.findMany({
+          where: { id: { in: tenantIds } },
+          select: { id: true, currentPeriodEnd: true, status: true },
+        })
+      : [];
+  const tenantMap = new Map(tenants.map((t) => [t.id, t]));
+
   let reset = 0;
+  let skippedExpired = 0;
   for (const a of due) {
+    if (a.ownerType === "TENANT") {
+      const tenant = tenantMap.get(a.ownerId);
+      if (!tenant || tenant.status !== "ACTIVE") {
+        skippedExpired += 1;
+        continue;
+      }
+      if (!isMembershipServiceActive(tenant.currentPeriodEnd, now)) {
+        skippedExpired += 1;
+        continue;
+      }
+    } else if (!isMembershipServiceActive(a.membershipPaidUntil, now)) {
+      skippedExpired += 1;
+      continue;
+    }
+
     const base = a.currentPeriodEnd ?? now;
-    const nextEnd = addMonths(base, 1);
-    // periodKey 取「本次刷新所属周期起点」的月份（= 旧 currentPeriodEnd 所在月），保证每次 catch-up 幂等键不同。
-    const periodKey = monthPeriodKeyOf(base);
+    const nextEnd = subscriptionCreditPeriodEnd(base);
+    const periodKey = subscriptionCreditPeriodKey(base);
     await resetMonthlyCredits({
       ref: { ownerType: a.ownerType, ownerId: a.ownerId },
       monthlyGrantCredits: a.monthlyGrantCredits,
@@ -682,7 +726,7 @@ export async function runMonthlyResetSweep(now: Date = new Date()): Promise<{ re
     });
     reset += 1;
   }
-  return { reset };
+  return { reset, skippedExpired };
 }
 
 /** 账户中心：按池 + 来源 + 最近到期展示批次明细（透明化）。 */

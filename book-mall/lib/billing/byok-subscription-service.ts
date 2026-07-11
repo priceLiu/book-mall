@@ -1,6 +1,7 @@
 import type { ByokSubscription, CreditOwnerType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
 import {
   BYOK_SCOPE_PERSONAL,
   BYOK_SCOPE_TEAM_SEAT,
@@ -46,12 +47,9 @@ export async function assertActiveByokSubscription(ref: AccountRef): Promise<Byo
   if (ref.ownerType === "USER") {
     const acc = await prisma.creditAccount.findUnique({
       where: { ownerType_ownerId: { ownerType: "USER", ownerId: ref.ownerId } },
-      select: { planId: true, currentPeriodEnd: true },
+      select: { planId: true, membershipPaidUntil: true },
     });
-    if (
-      acc?.planId &&
-      (!acc.currentPeriodEnd || acc.currentPeriodEnd > now)
-    ) {
+    if (acc?.planId && isMembershipServiceActive(acc.membershipPaidUntil, now)) {
       return null;
     }
   } else {
@@ -63,7 +61,7 @@ export async function assertActiveByokSubscription(ref: AccountRef): Promise<Byo
       tenant?.type === "TEAM" &&
       tenant.status === "ACTIVE" &&
       tenant.planId &&
-      (!tenant.currentPeriodEnd || tenant.currentPeriodEnd > now)
+      isMembershipServiceActive(tenant.currentPeriodEnd, now)
     ) {
       return null;
     }

@@ -499,7 +499,12 @@ export function PricingPageClient({
               <li>上表「X 张 / X 秒」是只用该模型的上限，同池内互斥——做图就少了做视频的额度。</li>
               <li>失败 / 取消全额返还积分。</li>
               <li>
-                积分有效期：订阅积分按月清零、充值积分 12 个月、注册/活动赠送 30 天；扣费优先用最先到期的积分。详见
+                会员服务：月付自购买起 <strong className="text-foreground">31 天</strong>、年付{" "}
+                <strong className="text-foreground">365 天</strong>（点到点，非自然月/年）；期内订阅积分每{" "}
+                <strong className="text-foreground">31 天</strong> 清零刷新。
+              </li>
+              <li>
+                其它积分：充值 12 个月、注册/活动赠送 30 天；扣费优先用最先到期的积分。详见
                 <Link href="/pricing-disclosure#credit-expiry" className="ml-1 text-foreground underline">
                   积分清零规则
                 </Link>
@@ -509,7 +514,7 @@ export function PricingPageClient({
             <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 site-pricing-body-text">
               <div className="site-pricing-panel-title">积分用完了怎么办？</div>
               <ul className="mt-1 space-y-1">
-                <li>① 暂停生成，下个账期自动重置发放；</li>
+                <li>① 暂停生成，待下一积分周期（31 天）自动重置发放，或续费延长会员服务；</li>
                 <li>② 随时购买积分加油包（含视频专项包），即时到账（团队进共享池）；</li>
                 <li>③ 升级更高档，立即补足差额积分。</li>
               </ul>

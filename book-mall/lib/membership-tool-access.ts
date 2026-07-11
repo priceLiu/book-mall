@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
+import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
 
 export type MembershipToolAccessSource =
   | "personal_plan"
@@ -72,14 +73,13 @@ async function getPlatformCreditToolAccess(
       id: true,
       planId: true,
       monthlyGrantCredits: true,
-      currentPeriodEnd: true,
+      membershipPaidUntil: true,
       balanceCredits: true,
       videoBalanceCredits: true,
     },
   });
   if (creditAcc?.planId && creditAcc.monthlyGrantCredits > 0) {
-    const periodOk =
-      !creditAcc.currentPeriodEnd || creditAcc.currentPeriodEnd > now;
+    const periodOk = isMembershipServiceActive(creditAcc.membershipPaidUntil, now);
     if (periodOk) {
       const plan = await prisma.membershipPlan.findUnique({
         where: { id: creditAcc.planId },
@@ -175,11 +175,10 @@ async function getByokToolAccess(
   // 积分换算 1.0：BYOK 准入 = 有效会员订阅 + Gateway Key（不再单独收技术服务费）
   const creditAcc = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
-    select: { planId: true, currentPeriodEnd: true },
+    select: { planId: true, membershipPaidUntil: true },
   });
   if (creditAcc?.planId) {
-    const periodOk =
-      !creditAcc.currentPeriodEnd || creditAcc.currentPeriodEnd > now;
+    const periodOk = isMembershipServiceActive(creditAcc.membershipPaidUntil, now);
     if (periodOk) {
       const plan = await prisma.membershipPlan.findUnique({
         where: { id: creditAcc.planId },

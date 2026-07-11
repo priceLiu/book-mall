@@ -6,6 +6,11 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { grantCredits } from "@/lib/billing/credit-account-service";
+import { subscriptionCreditPeriodEnd } from "@/lib/billing/credit-lot-logic";
+import {
+  extendMembershipPaidUntil,
+  membershipPaidUntilFromPurchase,
+} from "@/lib/billing/membership-service-period";
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
@@ -25,9 +30,8 @@ export async function applyMockMembershipSubscribe(input: {
   if (!plan || !plan.active) throw new Error("无效的会员套餐");
 
   const orderId = `mock_membership_${randomUUID()}`;
-  const periodEnd = new Date();
-  if (plan.interval === "YEAR") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-  else periodEnd.setMonth(periodEnd.getMonth() + 1);
+  const now = new Date();
+  const creditPeriodEnd = subscriptionCreditPeriodEnd(now);
 
   if (plan.family === "TEAM") {
     const totalSeats = Math.max(
@@ -48,6 +52,7 @@ export async function applyMockMembershipSubscribe(input: {
     });
 
     let tenantId = existingTeam?.tenantId;
+    let tenantPaidUntil: Date;
     if (!tenantId) {
       const tenant = await createTeamTenant({
         ownerUserId: input.userId,
@@ -59,6 +64,11 @@ export async function applyMockMembershipSubscribe(input: {
         perSeatCapCredits: null,
       });
       tenantId = tenant.id;
+      tenantPaidUntil = membershipPaidUntilFromPurchase(plan.interval, now);
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { currentPeriodEnd: tenantPaidUntil },
+      });
       try {
         await ensurePlatformManagedKeyForTenant(tenantId);
       } catch {
@@ -71,6 +81,15 @@ export async function applyMockMembershipSubscribe(input: {
       if (!member || !canTenant(member.role, "billing:manage")) {
         throw new Error("仅团队主账号可续订团队套餐");
       }
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { currentPeriodEnd: true },
+      });
+      tenantPaidUntil = extendMembershipPaidUntil(tenant?.currentPeriodEnd, plan.interval, now);
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { currentPeriodEnd: tenantPaidUntil },
+      });
     }
 
     const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
@@ -83,7 +102,7 @@ export async function applyMockMembershipSubscribe(input: {
       pricePerCreditYuan:
         quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
       planId: plan.id,
-      currentPeriodEnd: periodEnd,
+      currentPeriodEnd: creditPeriodEnd,
       idempotencyKey: orderId,
       description: `团队会员开通（${plan.tier} × ${quote.totalSeats} 席）`,
     });
@@ -92,6 +111,15 @@ export async function applyMockMembershipSubscribe(input: {
   }
 
   const grants = resolvePlanCreditGrants(plan, 1);
+  const existingAcc = await prisma.creditAccount.findUnique({
+    where: { ownerType_ownerId: { ownerType: "USER", ownerId: input.userId } },
+    select: { membershipPaidUntil: true },
+  });
+  const membershipPaidUntil = extendMembershipPaidUntil(
+    existingAcc?.membershipPaidUntil,
+    plan.interval,
+    now,
+  );
   await grantCredits({
     ref: { ownerType: "USER", ownerId: input.userId },
     credits: grants.generalCredits,
@@ -101,7 +129,8 @@ export async function applyMockMembershipSubscribe(input: {
     pricePerCreditYuan:
       plan.monthlyCredits > 0 ? Number(plan.priceYuan) / plan.monthlyCredits : null,
     planId: plan.id,
-    currentPeriodEnd: periodEnd,
+    currentPeriodEnd: creditPeriodEnd,
+    membershipPaidUntil,
     idempotencyKey: orderId,
     description: `个人会员开通（${plan.tier}）`,
   });

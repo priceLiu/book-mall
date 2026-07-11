@@ -68,7 +68,7 @@ export function CreditLotBreakdown({ lots }: { lots: Lot[] }) {
         </Link>
       </div>
       <p className="mb-4 text-xs text-muted-foreground">
-        扣费时优先使用最先到期的积分。订阅积分按月清零、充值积分 12 个月、活动/注册赠送 30 天。
+        扣费时优先使用最先到期的积分。会员服务月付 31 天、年付 365 天；订阅积分每 31 天清零刷新、充值 12 个月、活动/注册赠送 30 天。
       </p>
       <ul className="divide-y divide-secondary">
         {rows.map((r) => (

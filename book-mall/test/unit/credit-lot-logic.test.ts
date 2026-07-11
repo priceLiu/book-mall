@@ -13,6 +13,9 @@ import {
   planRestoreTargetId,
   resolveLotExpiry,
   sortLotsForSpend,
+  SUBSCRIPTION_CREDIT_VALIDITY_DAYS,
+  subscriptionCreditPeriodEnd,
+  subscriptionCreditPeriodKey,
   TOPUP_VALIDITY_MONTHS,
 } from "@/lib/billing/credit-lot-logic";
 
@@ -181,5 +184,23 @@ describe("resolveLotExpiry（按来源默认到期）", () => {
     expect(resolveLotExpiry("TOPUP", undefined, now)!.getTime()).toBe(
       addMonths(now, TOPUP_VALIDITY_MONTHS).getTime(),
     );
+  });
+  it("SUBSCRIPTION 默认 31 天", () => {
+    expect(resolveLotExpiry("SUBSCRIPTION", undefined, now)!.getTime()).toBe(
+      subscriptionCreditPeriodEnd(now).getTime(),
+    );
+    expect(SUBSCRIPTION_CREDIT_VALIDITY_DAYS).toBe(31);
+  });
+});
+
+describe("subscriptionCreditPeriodEnd / subscriptionCreditPeriodKey", () => {
+  it("31 天滚动到期", () => {
+    const start = d("2026-07-11T03:16:06Z");
+    expect(subscriptionCreditPeriodEnd(start).getTime()).toBe(
+      addDays(start, 31).getTime(),
+    );
+  });
+  it("periodKey 为到期日 YYYY-MM-DD", () => {
+    expect(subscriptionCreditPeriodKey(d("2026-08-11T03:16:06Z"))).toBe("2026-08-11");
   });
 });

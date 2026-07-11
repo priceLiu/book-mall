@@ -11,22 +11,49 @@ export function CreditExpiryPolicySection({ embedded = false }: { embedded?: boo
       <div className="rounded-2xl border border-secondary bg-card p-6 md:p-8">
         <h2 className="mb-2 text-lg font-semibold md:text-xl">五、积分有效期与清零规则</h2>
         <p className="mb-6 text-sm text-muted-foreground">
-          积分为平台内虚拟服务权益，不具现金价值、不可提现/转让/折现。以下三类积分的清零规则相互独立。
+          积分为平台内虚拟服务权益，不具现金价值、不可提现/转让/折现。会员付费周期与积分清零周期相互独立，规则如下。
         </p>
 
         <div className="space-y-6 text-sm leading-relaxed text-muted-foreground">
+          <div>
+            <h3 className="mb-2 text-lg font-semibold text-foreground">
+              会员服务有效期（付费准入）
+            </h3>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <strong className="text-foreground">月付</strong>：自支付成功时刻起{" "}
+                <strong className="text-foreground">31 天</strong>（固定天数、点到点，非自然月）。
+                例：7 月 10 日 14:00 购买 → 服务至 8 月 10 日 14:00。
+              </li>
+              <li>
+                <strong className="text-foreground">年付</strong>：自支付成功时刻起{" "}
+                <strong className="text-foreground">365 天</strong>（固定天数、点到点，非自然年）。
+                例：7 月 10 日 14:00 购买 → 服务至次年 7 月 10 日 14:00。
+              </li>
+              <li>
+                续费：会员<strong className="text-foreground">未过期</strong>时从当前截止时刻顺延对应天数；已过期则从续费成功时刻重新起算。
+              </li>
+              <li>
+                会员服务到期后：不再发放新的订阅套餐积分；当期已到账积分仍可用至本积分周期结束；充值积分与活动赠送积分按各自规则独立计算。
+              </li>
+            </ul>
+          </div>
+
           <div>
             <h3 className="mb-2 text-lg font-semibold text-foreground">
               一、订阅套餐赠送积分（会员额度）
             </h3>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                按会员计费周期<strong className="text-foreground">按月刷新</strong>：以开通当日为周期起始，按月循环；
-                周期内未用完的订阅积分到期<strong className="text-foreground">自动清零、不结转</strong>。年付套餐的订阅积分同样按月刷新。
+                自发放/刷新到账起<strong className="text-foreground">31 天有效</strong>（固定天数，非自然月）；
+                每满 31 天自动刷新下一期额度，上一期未用完的订阅积分<strong className="text-foreground">自动清零、不结转</strong>。
               </li>
-              <li>中途取消续费：当前周期剩余订阅积分可用至周期结束，到期依旧清零，不折现。</li>
+              <li>中途取消续费：当前 31 天积分周期内剩余订阅积分可用至本周期结束，到期依旧清零，不折现。</li>
               <li>
-                消耗顺序：系统<strong className="text-foreground">优先消耗最先到期</strong>的积分（一般为订阅积分），再依次消耗其它积分。
+                年付会员：在 365 天付费有效期内，套餐赠送积分仍按<strong className="text-foreground">每 31 天</strong>刷新（约 12 期）；付费期满后不再刷新。
+              </li>
+              <li>
+                消耗顺序：系统<strong className="text-foreground">优先消耗最先到期</strong>的积分（一般为即将到期的订阅积分），再依次消耗其它积分。
               </li>
             </ul>
           </div>

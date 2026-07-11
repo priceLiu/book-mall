@@ -116,7 +116,7 @@ export default async function AccountPage({
       where: {
         ownerType_ownerId: billingRef,
       },
-      select: { currentPeriodEnd: true, planId: true, monthlyGrantCredits: true },
+      select: { currentPeriodEnd: true, membershipPaidUntil: true, planId: true, monthlyGrantCredits: true },
     }),
     getAccountUsageSummary(session.user.id, teamBillingRef ?? undefined),
     teamBillingRef
@@ -180,7 +180,7 @@ export default async function AccountPage({
 
   const membershipPeriodEnd =
     teamTenant?.currentPeriodEnd ??
-    creditAcc?.currentPeriodEnd ??
+    creditAcc?.membershipPaidUntil ??
     byokSub?.periodEnd ??
     null;
 

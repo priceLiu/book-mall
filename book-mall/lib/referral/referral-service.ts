@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
 
 /**
  * 分享返佣 · 领域服务（分享链接 1.0）
@@ -60,10 +61,10 @@ export async function getReferralEligibility(
   // 2) 有效个人套餐（任意档，已取消 ¥599/¥1490 门槛）。
   const acc = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
-    select: { planId: true, monthlyGrantCredits: true, currentPeriodEnd: true },
+    select: { planId: true, monthlyGrantCredits: true, membershipPaidUntil: true },
   });
   if (acc?.planId && acc.monthlyGrantCredits > 0) {
-    const periodOk = !acc.currentPeriodEnd || acc.currentPeriodEnd > now;
+    const periodOk = isMembershipServiceActive(acc.membershipPaidUntil, now);
     if (periodOk) {
       const plan = await prisma.membershipPlan.findUnique({
         where: { id: acc.planId },

@@ -2,6 +2,7 @@ import type { MembershipInterval } from "@prisma/client";
 
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
+import { membershipServicePeriodStart } from "@/lib/billing/membership-service-period";
 import { prisma } from "@/lib/prisma";
 
 export type TenantPackageSnapshot = {
@@ -46,14 +47,8 @@ function computePeriodStart(
   periodEnd: Date | null | undefined,
   interval: MembershipInterval | null | undefined,
 ): Date | null {
-  if (!periodEnd) return null;
-  const start = new Date(periodEnd);
-  if (interval === "YEAR") {
-    start.setUTCFullYear(start.getUTCFullYear() - 1);
-  } else {
-    start.setUTCMonth(start.getUTCMonth() - 1);
-  }
-  return start;
+  if (!periodEnd || !interval) return null;
+  return membershipServicePeriodStart(periodEnd, interval);
 }
 
 /** 续期次数：首期 1 + 已执行的 monthly_grant 周期数。 */

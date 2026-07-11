@@ -9,9 +9,24 @@ alwaysApply: true
 
 在 **不涉及删除** 的前提下，以下事项可由 Agent 使用终端/编辑工具完成；**动手前必须先向用户简短说明将要做什么及范围**，再执行。
 
-- **数据库**：新增/修改 Prisma schema、编写迁移 SQL、`prisma migrate deploy` / `migrate dev`、`prisma generate`、`prisma migrate status`、按文档套用本地 `.env.local` 的数据库命令（如 `pnpm db:deploy`、`pnpm db:migrate`）。
+- **数据库**：新增/修改 Prisma schema、编写迁移 SQL、`prisma generate`、按文档套用本地 `.env.local` 的数据库命令（见下「防火墙迁移」）。
 - **配置文件**：新增或编辑示例/模板 env（如 `.env.example`）、部署与环境文档中与连接相关的占位说明、`docker-compose` / CI 中非密钥占位、`next.config` 等与运行相关的安全配置项。
 - **说明**：执行可能影响远端或多环境的命令前，在一句预告里写清目录与工作目录（例如 `book-mall`）。
+
+## 防火墙迁移（腾讯云 PostgreSQL · 默认路径）
+
+本仓库 `DIRECT_DATABASE_URL`（直连端口，如 `24155`）常被防火墙拦截，`prisma migrate deploy` / `migrate status` 会 **P1001**；应用运行时经 **DATABASE_URL**（连接池）可连库。
+
+**涉及 schema 变更 + 迁移时，Agent 默认按此顺序执行（不要先跑 `db:deploy`）：**
+
+1. 改 `prisma/schema.prisma` + 新增 `prisma/migrations/<timestamp>_<name>/migration.sql`
+2. **落库**：`cd book-mall && pnpm db:apply-pending`（`scripts/apply-pending-migrations.ts`，经运行时连接池，与 `migrate deploy` 等效）
+   - 单条迁移也可用：`pnpm db:deploy:runtime` 或 `tsx scripts/apply-migration-via-pool.ts <迁移目录名>`
+   - 复杂 DDL 可另写幂等脚本（参考 `scripts/apply-credit-lot-migration.ts`）
+3. **必做**：`pnpm db:generate` — 否则 Prisma Client 无新字段，运行时报 `Unknown field … for select`（见图）
+4. 验证：`pnpm db:apply-pending` 应输出「无待应用迁移」；必要时查 `information_schema` 或 `_prisma_migrations`
+
+**禁止**在防火墙环境下把 `prisma migrate deploy` 失败当作「迁移已完成」；也 **禁止**只改 schema/业务代码而不 `db:apply-pending` + `db:generate`。
 
 ## 删除类：不由 Agent 擅自执行
 
