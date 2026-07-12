@@ -36,6 +36,7 @@ import type { QrTemplate } from "@/lib/qr-template-types";
 import {
   fetchQrWorldViewerPayload,
   proxifyWorldImageUrl,
+  repairQrWorldTemplate,
   type QrWorldViewerPayload,
 } from "@/lib/qr-world-viewer-api";
 import { useLockBodyScroll } from "@/lib/use-lock-body-scroll";
@@ -213,6 +214,7 @@ function ToolbarButton({
 export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Props) {
   const [mounted, setMounted] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [activeTemplate, setActiveTemplate] = useState(template);
   const [payload, setPayload] = useState<QrWorldViewerPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -230,16 +232,20 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     setViewerToast(message);
   }, []);
 
-  const worldId = resolveWorldId(template);
-  const marbleUrl = resolveWorldMarbleUrl(template);
+  useEffect(() => {
+    setActiveTemplate(template);
+  }, [template]);
+
+  const worldId = resolveWorldId(activeTemplate);
+  const marbleUrl = resolveWorldMarbleUrl(activeTemplate);
   const templateSplats = useMemo(
-    () => (worldId ? resolveTemplateSplatUrls(template, worldId) : null),
-    [template, worldId],
+    () => (worldId ? resolveTemplateSplatUrls(activeTemplate, worldId) : null),
+    [activeTemplate, worldId],
   );
-  const promptPreview = template.reference.prompt.text.trim();
+  const promptPreview = activeTemplate.reference.prompt.text.trim();
   const previewThumb =
-    template.reference.slots.sceneImages?.[0]?.url?.trim() ||
-    template.thumbnailUrl?.trim() ||
+    activeTemplate.reference.slots.sceneImages?.[0]?.url?.trim() ||
+    activeTemplate.thumbnailUrl?.trim() ||
     undefined;
 
   useLockBodyScroll(true);
@@ -249,11 +255,40 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
   }, []);
 
   useEffect(() => {
-    if (!worldId) {
+    if (worldId) return;
+    if (activeTemplate.source === "builtin") {
       setLoading(false);
       setLoadError("该条目缺少 world_id");
       return;
     }
+
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+
+    void repairQrWorldTemplate(activeTemplate.id)
+      .then((saved) => {
+        if (cancelled) return;
+        if (saved.template && resolveWorldId(saved.template)) {
+          setActiveTemplate(saved.template);
+          return;
+        }
+        setLoading(false);
+        setLoadError(saved.error ?? "该条目缺少 world_id");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoading(false);
+        setLoadError(err instanceof Error ? err.message : "修复场景元数据失败");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTemplate.id, activeTemplate.source, worldId]);
+
+  useEffect(() => {
+    if (!worldId) return;
 
     let cancelled = false;
     setLoading(true);
@@ -340,11 +375,11 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     }
     const ext = url.split("?")[0]?.split(".").pop()?.toLowerCase() || "spz";
     const slug =
-      template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
+      activeTemplate.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
     const filename = `${slug}-${worldId.slice(0, 8)}.${ext}`;
     showToast("正在下载 3D 资产…");
     scheduleSameOriginDownload(url, filename);
-  }, [payload, template.title, templateSplats?.highResUrl, worldId, showToast]);
+  }, [payload, activeTemplate.title, templateSplats?.highResUrl, worldId, showToast]);
 
   const takeScreenshot = useCallback(() => {
     setShutterFlash((n) => n + 1);
@@ -359,7 +394,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
       downloadBlob(blob, `${slug}-screenshot.jpg`);
       showToast("截图已保存");
     })();
-  }, [captureFrameBlob, template.title, showToast]);
+  }, [captureFrameBlob, activeTemplate.title, showToast]);
 
   const takePanoramaScreenshot = useCallback(() => {
     if (!worldId) {
@@ -368,7 +403,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     }
     const rawPano =
       payload?.panoUrl?.trim() ||
-      resolveTemplatePanoUrl(template) ||
+      resolveTemplatePanoUrl(activeTemplate) ||
       previewThumb ||
       null;
     if (!rawPano) {
@@ -383,13 +418,13 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     }
     setShutterFlash((n) => n + 1);
     const slug =
-      template.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
+      activeTemplate.title.trim().replace(/[/\\?%*:|"<>]/g, "_").slice(0, 48) || "marble-world";
     const ext = rawPano.split("?")[0]?.split(".").pop()?.toLowerCase() || "jpg";
     const filename = `${slug}-panorama.${ext}`;
     showToast("正在下载全景图…");
     scheduleSameOriginDownload(proxied, filename);
     window.setTimeout(() => showToast("全景图已保存"), 400);
-  }, [payload?.panoUrl, previewThumb, takeScreenshot, template, worldId, showToast]);
+  }, [payload?.panoUrl, previewThumb, takeScreenshot, activeTemplate, worldId, showToast]);
 
   if (!mounted) return null;
 
@@ -446,7 +481,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
       {showSpark ? (
         <QrWorldSparkCanvas
           ref={sparkRef}
-          key={worldId ?? template.id}
+          key={worldId ?? activeTemplate.id}
           lowResUrl={lowResUrl}
           highResUrl={highResUrl}
           naturalMouse={naturalMouse}
@@ -484,7 +519,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
       {promptPreview ? (
         <button
           type="button"
-          onClick={() => onEditPrompt?.(template)}
+          onClick={() => onEditPrompt?.(activeTemplate)}
           className="absolute left-1/2 top-4 z-[105] w-[min(640px,calc(100vw-6rem))] -translate-x-1/2 rounded-xl border border-white/10 bg-black/55 px-4 py-2.5 text-left backdrop-blur-md transition hover:border-white/25 hover:bg-black/65"
         >
           <span className="flex items-start gap-3">
@@ -555,7 +590,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
                 type="button"
                 title="编辑提示词与参考图"
                 aria-label="编辑提示词"
-                onClick={() => onEditPrompt(template)}
+                onClick={() => onEditPrompt(activeTemplate)}
                 className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition hover:text-white"
               >
                 <Info className="h-[18px] w-[18px]" />

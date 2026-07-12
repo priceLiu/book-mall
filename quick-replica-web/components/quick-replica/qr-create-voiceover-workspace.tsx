@@ -1,11 +1,10 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   QrAudioModelPickerButton,
-  QrAudioOptionSheet,
   QrAudioVoiceControlHeading,
   QrAudioVoiceControlSlider,
   QrAudioVoicePickerButton,
@@ -14,7 +13,13 @@ import {
   QrAudioPromptTemplatePills,
   resolveActivePromptTemplateId,
 } from "@/components/quick-replica/qr-audio-prompt-template-pills";
+import { QrModelPicker } from "@/components/quick-replica/qr-model-picker";
 import { useQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
+import {
+  buildAudioModelPickerCatalog,
+  buildAudioProviderOptions,
+  QR_AUDIO_FEATURE_FILTER_OPTIONS,
+} from "@/lib/qr-audio-model-picker-catalog";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 
 const PROMPT_MAX = 10_000;
@@ -39,6 +44,10 @@ export function QrCreateVoiceoverForm({
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
 
   const promptLength = draft.prompt.length;
+  const modelCatalog = useMemo(
+    () => buildAudioModelPickerCatalog(catalog?.models ?? [], "create-voiceover"),
+    [catalog?.models],
+  );
 
   if (loading || !catalog) {
     return (
@@ -69,6 +78,7 @@ export function QrCreateVoiceoverForm({
         catalog={catalog}
         modelKey={draft.modelKey}
         busy={busy}
+        kind="create-voiceover"
         onOpen={() => setModelSheetOpen(true)}
       />
 
@@ -194,19 +204,18 @@ export function QrCreateVoiceoverForm({
         />
       </section>
 
-      {modelSheetOpen ? (
-        <QrAudioOptionSheet
-          title="Audio model"
-          options={catalog.models.map((m) => ({
-            value: m.modelKey,
-            label: m.label,
-            hint: m.subtitle,
-          }))}
-          value={draft.modelKey}
-          onSelect={(modelKey) => onDraftChange({ ...draft, modelKey })}
-          onClose={() => setModelSheetOpen(false)}
-        />
-      ) : null}
+      <QrModelPicker
+        open={modelSheetOpen}
+        title="Audio model"
+        selectedModelKey={draft.modelKey}
+        catalog={modelCatalog}
+        filterOptions={{
+          providerOptions: buildAudioProviderOptions(modelCatalog),
+          featureOptions: QR_AUDIO_FEATURE_FILTER_OPTIONS,
+        }}
+        onSelect={(modelKey) => onDraftChange({ ...draft, modelKey })}
+        onClose={() => setModelSheetOpen(false)}
+      />
     </div>
   );
 }

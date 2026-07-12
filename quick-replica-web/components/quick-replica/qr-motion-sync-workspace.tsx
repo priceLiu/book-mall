@@ -5,7 +5,6 @@ import {
   Clapperboard,
   Loader2,
   SlidersHorizontal,
-  Sparkles,
   Upload,
   UserRound,
   Volume2,
@@ -26,8 +25,16 @@ import {
   MOTION_SYNC_VIDEO_MODES,
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
+import {
+  getMotionSyncModelCatalogEntry,
+  QR_MOTION_SYNC_CATEGORY_OPTIONS,
+  QR_MOTION_SYNC_FEATURE_FILTER_OPTIONS,
+  QR_MOTION_SYNC_MODEL_CATALOG,
+  QR_MOTION_SYNC_PROVIDER_OPTIONS,
+} from "@/lib/qr-motion-sync-model-catalog";
 import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
+import { QrModelPicker, QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 
 /** HappyHorse 参考图缩略边长（较 h-14 高约 20%） */
@@ -198,7 +205,7 @@ export function QrMotionSyncForm({
   const [resolutionSheetOpen, setResolutionSheetOpen] = useState(false);
   const [aspectSheetOpen, setAspectSheetOpen] = useState(false);
 
-  const selectedModel = modelMeta(draft.modelKey);
+  const catalogEntry = getMotionSyncModelCatalogEntry(draft.modelKey);
   const isHappyHorse = isHappyHorseR2vModel(draft.modelKey);
   const orientation =
     MOTION_SYNC_CHARACTER_ORIENTATIONS.find(
@@ -277,27 +284,11 @@ export function QrMotionSyncForm({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* 模型选择 */}
-      <button
-        type="button"
-        onClick={() => setModelSheetOpen(true)}
-        disabled={busy}
-        className="qr-card flex w-full items-center gap-3 p-4 text-left disabled:opacity-60"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-500">
-          <Sparkles className="h-5 w-5 text-white" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs text-[var(--qr-text-muted)]">模型</span>
-          <span className="block text-sm font-medium text-[var(--qr-text-primary)]">
-            {selectedModel.label}
-          </span>
-          <span className="block text-xs text-[var(--qr-text-secondary)]">
-            {selectedModel.subtitle}
-          </span>
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-[var(--qr-text-muted)]" />
-      </button>
+      <QrModelPickerTrigger
+        entry={catalogEntry}
+        busy={busy}
+        onOpen={() => setModelSheetOpen(true)}
+      />
 
       {/* 提示词（模板/后台录入 · 可编辑） */}
       <section className="qr-card p-4">
@@ -665,19 +656,18 @@ export function QrMotionSyncForm({
         )}
       </section>
 
-      {modelSheetOpen ? (
-        <OptionSheet
-          title="选择模型"
-          options={MOTION_SYNC_MODELS.map((m) => ({
-            value: m.modelKey,
-            label: `${m.label} · ${m.subtitle}`,
-            hint: m.defaultMode === "pro" ? "默认 1080p" : "默认 720p",
-          }))}
-          value={draft.modelKey}
-          onSelect={pickModel}
-          onClose={() => setModelSheetOpen(false)}
-        />
-      ) : null}
+      <QrModelPicker
+        open={modelSheetOpen}
+        selectedModelKey={draft.modelKey}
+        catalog={QR_MOTION_SYNC_MODEL_CATALOG}
+        filterOptions={{
+          providerOptions: QR_MOTION_SYNC_PROVIDER_OPTIONS,
+          categoryOptions: QR_MOTION_SYNC_CATEGORY_OPTIONS,
+          featureOptions: QR_MOTION_SYNC_FEATURE_FILTER_OPTIONS,
+        }}
+        onSelect={pickModel}
+        onClose={() => setModelSheetOpen(false)}
+      />
 
       {orientationSheetOpen ? (
         <OptionSheet

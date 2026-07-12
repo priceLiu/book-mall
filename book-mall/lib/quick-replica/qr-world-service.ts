@@ -1,4 +1,4 @@
-import type { GatewayProviderKind } from "@prisma/client";
+import type { GatewayProviderKind, Prisma } from "@prisma/client";
 
 import {
   GatewayRequiredError,
@@ -25,12 +25,19 @@ import {
   listWorldSplatUrls,
   operationErrorMessage,
   type WorldlabsContentRef,
+  type WorldlabsOperation,
+  type WorldlabsWorld,
   type WorldlabsWorldPrompt,
 } from "@/lib/gateway/worldlabs-proxy";
 import { findBuiltinWorldAssetEntry } from "@/lib/quick-replica/builtin-world-gallery-assets";
 import { rememberWorldImageUrls } from "@/lib/quick-replica/qr-world-image-proxy";
 import { rememberWorldSplatUrls } from "@/lib/quick-replica/qr-world-splat-proxy";
-import type { QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
+import {
+  createUserQrTemplate,
+  findQrTemplateByLogId,
+  rowToJson,
+} from "@/lib/quick-replica/qr-template-service";
+import type { QrTemplateJson, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { prisma } from "@/lib/prisma";
 
 const CLIENT_SOURCE = "QUICK_REPLICA" as const;
@@ -310,11 +317,244 @@ export function readWorldDraftFromLog(log: {
 }): QrWorkspaceDraft | null {
   if (!log.inputSummary || typeof log.inputSummary !== "object") return null;
   const root = log.inputSummary as Record<string, unknown>;
-  const snap = root.qrWorld;
+  const snap = root.qrWorld ?? root.qrGenerate;
   if (!snap || typeof snap !== "object") return null;
-  const draft = (snap as Record<string, unknown>).draft;
+  const record = snap as Record<string, unknown>;
+  const draft = record.draft;
   if (!draft || typeof draft !== "object") return null;
-  return draft as QrWorkspaceDraft;
+  const parsed = draft as QrWorkspaceDraft;
+  if (parsed.category === "world" && parsed.kind === "create-world") {
+    return parsed;
+  }
+  return null;
+}
+
+export function extractWorldFromLogResult(resultSummary: unknown): WorldlabsWorld | null {
+  if (!resultSummary || typeof resultSummary !== "object") return null;
+  const root = resultSummary as Record<string, unknown>;
+  if (root.world && typeof root.world === "object") {
+    const world = root.world as WorldlabsWorld;
+    if (world.world_id?.trim()) return world;
+  }
+  if (root.operation && typeof root.operation === "object") {
+    return extractWorldFromOperation(root.operation as WorldlabsOperation);
+  }
+  return null;
+}
+
+function buildWorldTemplateModelParams(world: WorldlabsWorld): Record<string, unknown> {
+  const splatUrls = world.assets?.splats?.spz_urls ?? {};
+  return {
+    world_id: world.world_id,
+    world_marble_url: world.world_marble_url,
+    tags: world.tags ?? [],
+    splat_urls: splatUrls,
+    pano_url: world.assets?.imagery?.pano_url?.trim() || null,
+    collider_mesh_url: world.assets?.mesh?.collider_mesh_url?.trim() || null,
+    thumbnail_source_url: world.assets?.thumbnail_url?.trim() || null,
+  };
+}
+
+async function createUserWorldTemplateFromLog(args: {
+  userId: string;
+  logId: string;
+  draft: QrWorkspaceDraft;
+  world: WorldlabsWorld;
+  outputUrl: string;
+}): Promise<QrTemplateJson> {
+  const thumb = extractWorldThumbnailUrl(args.world) || args.outputUrl;
+  const title =
+    args.draft.title?.trim() ||
+    args.world.display_name?.trim() ||
+    args.draft.prompt.trim().slice(0, 64) ||
+    `场景 · ${new Date().toLocaleString("zh-CN")}`;
+
+  rememberWorldSplatUrls(args.userId, args.world.world_id, listWorldSplatUrls(args.world));
+  rememberWorldImageUrls(
+    args.userId,
+    args.world.world_id,
+    [
+      args.world.assets?.imagery?.pano_url?.trim(),
+      extractWorldThumbnailUrl(args.world),
+      ...args.draft.sceneImageUrls,
+    ].filter((u): u is string => Boolean(u?.trim())),
+  );
+
+  const sceneImages = args.draft.sceneImageUrls.filter((u) => u.trim());
+  const slots: QrTemplateJson["reference"]["slots"] = {};
+  if (sceneImages.length > 0) {
+    slots.sceneImages = sceneImages.map((url) => ({ url }));
+  } else if (thumb) {
+    slots.sceneImages = [{ url: thumb, label: "主场景" }];
+  }
+
+  const now = new Date().toISOString();
+  return createUserQrTemplate({
+    userId: args.userId,
+    category: "world",
+    kind: "create-world",
+    title,
+    thumbnailUrl: thumb,
+    sortOrder: 0,
+    gatewayRequestLogId: args.logId,
+    reference: {
+      slots,
+      prompt: {
+        text: args.draft.prompt,
+        locale: /[\u4e00-\u9fff]/.test(args.draft.prompt) ? "zh" : "en",
+      },
+      model: {
+        role: "IMAGE",
+        modelKey: args.draft.modelKey.trim() || args.world.model?.trim() || "marble-1.1",
+        params: buildWorldTemplateModelParams(args.world),
+      },
+    },
+    output: {
+      mediaType: "image",
+      url: args.outputUrl,
+      gatewayRequestLogId: args.logId,
+      createdAt: now,
+    },
+  });
+}
+
+async function resolveWorldFromGenerateLog(
+  userId: string,
+  log: {
+    resultSummary: unknown;
+    externalTaskId: string | null;
+  },
+): Promise<WorldlabsWorld | null> {
+  let world = extractWorldFromLogResult(log.resultSummary);
+  if (world?.world_id) return world;
+
+  const operationId = log.externalTaskId?.trim();
+  if (!operationId) return null;
+
+  try {
+    const { credentialId } = await requireWorldlabsAuth(userId);
+    const { operation } = await forwardWorldlabsGetOperation({
+      credentialId,
+      operationId,
+    });
+    world = extractWorldFromOperation(operation);
+    if (world?.world_id) return world;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function repairWorldTemplateIfNeeded(
+  userId: string,
+  logId: string,
+  existing: QrTemplateJson,
+): Promise<QrTemplateJson> {
+  const params = existing.reference?.model?.params;
+  const hasWorldId = typeof params?.world_id === "string" && params.world_id.trim();
+  if (hasWorldId) return existing;
+
+  const log = await prisma.gatewayRequestLog.findFirst({
+    where: { id: logId, actorBookUserId: userId, status: "SUCCEEDED" },
+  });
+  if (!log) return existing;
+
+  const world = await resolveWorldFromGenerateLog(userId, log);
+  if (!world?.world_id) return existing;
+
+  const nextReference = {
+    ...existing.reference,
+    model: {
+      ...existing.reference.model,
+      params: {
+        ...existing.reference.model.params,
+        ...buildWorldTemplateModelParams(world),
+      },
+    },
+  };
+
+  const row = await prisma.qrTemplate.update({
+    where: { id: existing.id, ownerUserId: userId },
+    data: { reference: nextReference as Prisma.InputJsonValue },
+  });
+  return rowToJson(row);
+}
+
+/** 用户确认「保存为我的」后写入场景作品；补齐 world_id 等 Marble 元数据 */
+export async function qrMaterializeWorldJobTemplate(
+  userId: string,
+  logId: string,
+): Promise<QrTemplateJson | null> {
+  const existing = await findQrTemplateByLogId(logId);
+  if (existing) {
+    return repairWorldTemplateIfNeeded(userId, logId, existing);
+  }
+
+  const log = await prisma.gatewayRequestLog.findFirst({
+    where: { id: logId, actorBookUserId: userId },
+  });
+  if (!log || log.status !== "SUCCEEDED") return null;
+
+  const draft = readWorldDraftFromLog(log);
+  if (!draft || draft.kind !== "create-world") return null;
+
+  const world = await resolveWorldFromGenerateLog(userId, log);
+  if (!world?.world_id) return null;
+
+  const out = extractWorldOutputFromLog(log.resultSummary);
+  const outputUrl = out.outputUrl ?? out.worldMarbleUrl ?? world.world_marble_url;
+  if (!outputUrl) return null;
+
+  return createUserWorldTemplateFromLog({
+    userId,
+    logId,
+    draft,
+    world,
+    outputUrl,
+  });
+}
+
+/** 按作品 id 修复缺失的 world_id（打开旧场景作品时调用） */
+export async function qrRepairWorldTemplateById(
+  userId: string,
+  templateId: string,
+): Promise<{ template?: QrTemplateJson; error?: string }> {
+  const row = await prisma.qrTemplate.findFirst({
+    where: {
+      id: templateId,
+      ownerUserId: userId,
+      deletedAt: null,
+      category: "world",
+    },
+  });
+  if (!row) {
+    return { error: "作品不存在或无权访问" };
+  }
+
+  let template = rowToJson(row);
+  const params = template.reference?.model?.params;
+  if (typeof params?.world_id === "string" && params.world_id.trim()) {
+    return { template };
+  }
+
+  const logId =
+    row.gatewayRequestLogId?.trim() || template.output?.gatewayRequestLogId?.trim() || "";
+  if (!logId) {
+    return { error: "该条目缺少 world_id，且无法关联生成记录" };
+  }
+
+  template = await repairWorldTemplateIfNeeded(userId, logId, template);
+  const repairedId = template.reference?.model?.params?.world_id;
+  if (typeof repairedId === "string" && repairedId.trim()) {
+    return { template };
+  }
+
+  const materialized = await qrMaterializeWorldJobTemplate(userId, logId);
+  if (materialized && typeof materialized.reference?.model?.params?.world_id === "string") {
+    return { template: materialized };
+  }
+
+  return { error: "该条目缺少 world_id" };
 }
 
 export type QrWorldViewerPayload = {

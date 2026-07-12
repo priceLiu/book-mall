@@ -2,12 +2,17 @@
 
 import { ChevronRight, Mic2, Volume2, X } from "lucide-react";
 
+import { QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import type { QrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import {
-  getQrAudioModelFromCatalog,
   QR_VOICE_EMOTION_DEFS,
   QR_VOICE_EMOTION_MAX_TOTAL,
 } from "@/lib/qr-audio-catalog-client";
+import {
+  buildAudioModelPickerCatalog,
+  getAudioModelCatalogEntry,
+  type QrAudioPickerKind,
+} from "@/lib/qr-audio-model-picker-catalog";
 import { resolveQrSelectedVoiceDisplay } from "@/lib/qr-audio-voice-selection";
 
 export function QrAudioOptionSheet({
@@ -72,30 +77,24 @@ export function QrAudioModelPickerButton({
   modelKey,
   busy,
   onOpen,
+  kind = "create-voiceover",
 }: {
   catalog: QrAudioCatalog;
   modelKey: string;
   busy?: boolean;
   onOpen: () => void;
+  kind?: QrAudioPickerKind;
 }) {
-  const model = getQrAudioModelFromCatalog(catalog, modelKey);
+  const pickerCatalog = buildAudioModelPickerCatalog(catalog.models, kind);
+  const entry = getAudioModelCatalogEntry(pickerCatalog, modelKey);
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      disabled={busy}
-      className="qr-card flex w-full items-center gap-3 p-4 text-left disabled:opacity-60"
-    >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500">
-        <Volume2 className="h-5 w-5 text-white" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs text-[var(--qr-text-muted)]">Audio model</span>
-        <span className="block text-sm font-medium text-[var(--qr-text-primary)]">{model.label}</span>
-        <span className="block text-xs text-[var(--qr-text-secondary)]">{model.subtitle}</span>
-      </span>
-      <ChevronRight className="h-5 w-5 shrink-0 text-[var(--qr-text-muted)]" />
-    </button>
+    <QrModelPickerTrigger
+      entry={entry}
+      busy={busy}
+      onOpen={onOpen}
+      label="Audio model"
+      subtitle={entry.description}
+    />
   );
 }
 

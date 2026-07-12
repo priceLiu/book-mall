@@ -42,6 +42,29 @@ function applyCatalogOverridesToBuiltin(
   });
 }
 
+function normalizeTemplateOutput(row: {
+  output: unknown;
+  gatewayRequestLogId: string | null;
+  thumbnailUrl: string;
+  createdAt: Date;
+}): QrTemplateJson["output"] | undefined {
+  const raw = row.output as QrTemplateJson["output"] | null | undefined;
+  const logId = raw?.gatewayRequestLogId?.trim() || row.gatewayRequestLogId?.trim() || undefined;
+  if (!raw && !logId) return undefined;
+  if (!raw) {
+    return {
+      mediaType: "image",
+      url: row.thumbnailUrl,
+      gatewayRequestLogId: logId,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+  return {
+    ...raw,
+    gatewayRequestLogId: logId ?? raw.gatewayRequestLogId,
+  };
+}
+
 export function rowToJson(row: {
   id: string;
   category: string;
@@ -75,7 +98,7 @@ export function rowToJson(row: {
     ownerUserId: row.ownerUserId ?? undefined,
     visibility: row.visibility === "public" ? "public" : "private",
     reference: row.reference as QrTemplateJson["reference"],
-    output: row.output ? (row.output as QrTemplateJson["output"]) : undefined,
+    output: normalizeTemplateOutput(row),
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

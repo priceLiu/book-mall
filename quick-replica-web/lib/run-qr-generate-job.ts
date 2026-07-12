@@ -1,4 +1,4 @@
-import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
+import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
 import type { QrGenerateJobResult } from "@/components/quick-replica/qr-workspace-panel";
 
 const POLL_INTERVAL_MS = 3000;
@@ -8,12 +8,35 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function pollOnce(logId: string): Promise<QrGenerateJobResult | null> {
-  const pollRes = await fetchQrPlatform(
-    `/api/book-mall/api/platform/v1/quick-replica/jobs/${encodeURIComponent(logId)}`,
-  );
-  if (!pollRes.ok) return null;
-  return (await pollRes.json()) as QrGenerateJobResult;
+async function pollOnce(logId: string): Promise<QrGenerateJobResult> {
+  try {
+    const pollRes = await fetchQrPlatform(
+      `/api/book-mall/api/platform/v1/quick-replica/jobs/${encodeURIComponent(logId)}`,
+    );
+    const body = (await pollRes.json().catch(() => ({}))) as QrGenerateJobResult & {
+      error?: string;
+    };
+    if (!pollRes.ok) {
+      return {
+        status: "FAILED",
+        error: formatQrPlatformError(body.error) || `轮询失败（${pollRes.status}）`,
+      };
+    }
+    return body;
+  } catch (e) {
+    return {
+      status: "FAILED",
+      error: e instanceof Error ? e.message : "轮询请求失败",
+    };
+  }
+}
+
+function isTerminalPollFailure(job: QrGenerateJobResult): boolean {
+  return job.status === "FAILED" && Boolean(job.error?.trim());
+}
+
+function isTerminalPollSuccess(job: QrGenerateJobResult): boolean {
+  return job.status === "SUCCEEDED" && Boolean(job.outputUrl?.trim());
 }
 
 export type QrGenerateJobRun = QrGenerateJobResult & { logId?: string };
@@ -33,7 +56,7 @@ export async function runQrGenerateJob(
     const body = (await createRes.json().catch(() => ({}))) as { error?: string };
     return {
       status: "FAILED",
-      error: body.error ?? `创建任务失败（${createRes.status}）`,
+      error: formatQrPlatformError(body.error) || `创建任务失败（${createRes.status}）`,
     };
   }
   const created = (await createRes.json()) as { logId: string };
@@ -41,26 +64,31 @@ export async function runQrGenerateJob(
   const deadline = Date.now() + MAX_POLL_MS;
 
   while (Date.now() < deadline) {
-    await sleep(POLL_INTERVAL_MS);
     const job = await pollOnce(logId);
-    if (!job) continue;
-    if (job.status === "FAILED") {
+
+    if (isTerminalPollFailure(job)) {
+      return { ...job, logId };
+    }
+    if (isTerminalPollSuccess(job)) {
       return { ...job, logId };
     }
     if (job.status === "SUCCEEDED") {
-      if (job.outputUrl) {
-        return { ...job, logId };
-      }
       // 日志已成功但 URL 解析延迟，继续轮询
+      await sleep(POLL_INTERVAL_MS);
       continue;
     }
+    if (job.status === "FAILED") {
+      return { ...job, logId };
+    }
+
+    await sleep(POLL_INTERVAL_MS);
   }
 
   const final = await pollOnce(logId);
-  if (final?.status === "SUCCEEDED" && final.outputUrl) {
+  if (final && isTerminalPollSuccess(final)) {
     return { ...final, logId };
   }
-  if (final?.status === "FAILED") {
+  if (final && (isTerminalPollFailure(final) || final.status === "FAILED")) {
     return { ...final, logId };
   }
 
@@ -73,9 +101,6 @@ export async function runQrGenerateJob(
 
 export async function refreshQrGenerateJob(logId: string): Promise<QrGenerateJobRun> {
   const job = await pollOnce(logId);
-  if (!job) {
-    return { status: "FAILED", logId, error: "无法获取任务状态" };
-  }
   return { ...job, logId };
 }
 

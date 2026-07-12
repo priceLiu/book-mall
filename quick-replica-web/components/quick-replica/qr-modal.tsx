@@ -9,8 +9,8 @@ type Props = {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  /** default: 窄条；square: 80% 正方形；preview: 居中盒；audio / audio-track: 音轨弹层（同宽） */
-  variant?: "default" | "square" | "preview" | "audio" | "audio-track";
+  /** default: 窄条；square: 80% 正方形；preview: 居中盒；model-picker: 模型选择器；audio / audio-track: 音轨弹层（同宽） */
+  variant?: "default" | "square" | "preview" | "model-picker" | "audio" | "audio-track";
   hideHeader?: boolean;
 };
 
@@ -43,6 +43,8 @@ export function QrModal({
   const shellClass =
     variant === "preview"
       ? "qr-modal-shell relative z-10 flex h-[min(calc(100vh-80px),90dvh)] w-[min(90vw,1400px)] max-h-[calc(100vh-80px)] max-w-[min(90vw,1400px)] min-h-[33vh]"
+      : variant === "model-picker"
+        ? "qr-modal-shell relative z-10 flex h-[clamp(480px,80dvh,92dvh)] w-[min(92vw,clamp(480px,33vw,1200px))] max-h-[92dvh]"
       : variant === "audio-track"
         ? `relative z-10 flex ${audioTrackWidth} pointer-events-auto`
         : variant === "audio"
