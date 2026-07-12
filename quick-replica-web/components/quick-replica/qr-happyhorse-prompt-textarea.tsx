@@ -10,18 +10,20 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { formatHappyHorseImageRefToken } from "@/lib/qr-template-types";
+import {
+  buildPromptEditableFragment,
+  createImageRefBadge,
+  resolveCaretTextAnchor,
+  scanImageRefTriggerBeforeCursor,
+  serializePromptEditable,
+  type QrPromptImageRef,
+} from "@/lib/qr-prompt-mention-dom";
 
-export type QrHappyHorseImageRef = {
-  url: string;
-  /** 1-based index for [Image N] */
-  index: number;
-};
+export type QrHappyHorseImageRef = QrPromptImageRef;
 
-type MentionAnchor = {
-  start: number;
-  end: number;
-  query: string;
+type TriggerAnchor = {
+  node: Text;
+  at: number;
 };
 
 type PickerPosition = {
@@ -34,18 +36,7 @@ const PICKER_GAP = 8;
 const PICKER_Z = 5000;
 const PICKER_EST_HEIGHT = 260;
 
-function detectMentionAnchor(text: string, cursor: number): MentionAnchor | null {
-  const before = text.slice(0, cursor);
-  const atIndex = before.lastIndexOf("@");
-  if (atIndex === -1) return null;
-  const query = before.slice(atIndex + 1);
-  // 已有文字中间也可 @；仅当 @ 到光标之间出现空白，或已进入 [Image N] 括号时关闭
-  if (/[\s\n\r]/.test(query)) return null;
-  if (/[[\]]/.test(query)) return null;
-  return { start: atIndex, end: cursor, query };
-}
-
-function filterImageRefs(items: QrHappyHorseImageRef[], query: string): QrHappyHorseImageRef[] {
+function filterImageRefs(items: QrPromptImageRef[], query: string): QrPromptImageRef[] {
   if (!query) return items;
   const q = query.toLowerCase();
   return items.filter(({ index }) => {
@@ -59,21 +50,11 @@ function filterImageRefs(items: QrHappyHorseImageRef[], query: string): QrHappyH
   });
 }
 
-function insertImageRefToken(
-  text: string,
-  anchor: MentionAnchor,
-  imageIndex: number,
-): { text: string; cursor: number } {
-  const token = formatHappyHorseImageRefToken(imageIndex);
-  const next = text.slice(0, anchor.start) + token + text.slice(anchor.end);
-  return { text: next, cursor: anchor.start + token.length };
-}
-
 function resolvePickerPosition(
   anchorRect: DOMRect,
   pickerHeight: number,
 ): PickerPosition {
-  const width = Math.min(anchorRect.width, window.innerWidth - 24);
+  const width = Math.min(Math.max(anchorRect.width, 240), window.innerWidth - 24);
   let left = anchorRect.left;
   left = Math.min(Math.max(12, left), window.innerWidth - width - 12);
 
@@ -93,7 +74,7 @@ type Props = {
   value: string;
   maxLength: number;
   disabled?: boolean;
-  referenceImages: QrHappyHorseImageRef[];
+  referenceImages: QrPromptImageRef[];
   onChange: (value: string) => void;
   /** 默认 min-h-[180px]；文字转视频中栏可传 min-h-[360px] */
   minHeightClass?: string;
@@ -108,53 +89,180 @@ export function QrHappyHorsePromptTextarea({
   onChange,
   minHeightClass = "min-h-[180px]",
 }: Props) {
-  const anchorRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
-  const [mentionAnchor, setMentionAnchor] = useState<MentionAnchor | null>(null);
-  const [highlightIndex, setHighlightIndex] = useState(0);
+  const triggerAnchorRef = useRef<TriggerAnchor | null>(null);
+  const focusedRef = useRef(false);
+  const lastValueRef = useRef<string>("\u0000");
+
+  const refsRef = useRef(referenceImages);
+  refsRef.current = referenceImages;
+
+  const [isEmpty, setIsEmpty] = useState(!value);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [popoverFilter, setPopoverFilter] = useState("");
+  const [popoverIndex, setPopoverIndex] = useState(0);
+  const [anchorTick, setAnchorTick] = useState(0);
   const [pickerPos, setPickerPos] = useState<PickerPosition | null>(null);
   const [pickerHeight, setPickerHeight] = useState(PICKER_EST_HEIGHT);
 
   const filteredImages = useMemo(
-    () => filterImageRefs(referenceImages, mentionAnchor?.query ?? ""),
-    [referenceImages, mentionAnchor?.query],
+    () => filterImageRefs(referenceImages, popoverFilter),
+    [referenceImages, popoverFilter],
   );
 
-  const pickerOpen = mentionAnchor !== null;
-
-  const syncPickerPosition = useCallback(() => {
-    const anchor = anchorRef.current;
-    if (!anchor) return;
-    const measured = pickerRef.current?.getBoundingClientRect().height;
-    const height = measured && measured > 0 ? measured : pickerHeight;
-    setPickerPos(resolvePickerPosition(anchor.getBoundingClientRect(), height));
-  }, [pickerHeight]);
-
-  const syncMentionAnchorFrom = useCallback(
-    (text: string, cursor: number) => {
-      if (disabled) {
-        setMentionAnchor(null);
-        return;
+  const syncFromDom = useCallback(
+    (nextValue?: string) => {
+      const root = editorRef.current;
+      if (!root) return;
+      let store = nextValue ?? serializePromptEditable(root);
+      if (store.length > maxLength) {
+        store = store.slice(0, maxLength);
+        root.replaceChildren(buildPromptEditableFragment(store, refsRef.current));
       }
-      const anchor = detectMentionAnchor(text, cursor);
-      setMentionAnchor(anchor);
-      setHighlightIndex(0);
+      lastValueRef.current = store;
+      setIsEmpty(store.length === 0);
+      onChange(store);
     },
-    [disabled],
+    [maxLength, onChange],
   );
 
-  const syncMentionAnchor = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el || disabled) {
-      setMentionAnchor(null);
+  useEffect(() => {
+    const root = editorRef.current;
+    if (!root || focusedRef.current) return;
+    if (value === lastValueRef.current) {
+      root.replaceChildren(buildPromptEditableFragment(value, refsRef.current));
       return;
     }
-    syncMentionAnchorFrom(value, el.selectionStart ?? value.length);
-  }, [disabled, syncMentionAnchorFrom, value]);
+    root.replaceChildren(buildPromptEditableFragment(value, refsRef.current));
+    lastValueRef.current = value;
+    setIsEmpty(value.length === 0);
+  }, [value, referenceImages]);
+
+  const closePopover = useCallback(() => {
+    setPopoverOpen(false);
+    setPopoverFilter("");
+    setPopoverIndex(0);
+    triggerAnchorRef.current = null;
+  }, []);
+
+  const detectTrigger = useCallback(() => {
+    const root = editorRef.current;
+    if (!root || disabled) return closePopover();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return closePopover();
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return closePopover();
+
+    const anchor = resolveCaretTextAnchor(root, range);
+    if (!anchor) return closePopover();
+
+    const textBefore = (anchor.node.textContent ?? "").slice(0, anchor.offset);
+    const hit = scanImageRefTriggerBeforeCursor(textBefore);
+    if (!hit) return closePopover();
+
+    triggerAnchorRef.current = { node: anchor.node, at: hit.at };
+    setPopoverFilter(hit.filter);
+    setPopoverOpen(true);
+    setPopoverIndex(0);
+    setAnchorTick((t) => t + 1);
+  }, [closePopover, disabled]);
+
+  const getAnchorRect = useCallback(() => {
+    void anchorTick;
+    const anchor = triggerAnchorRef.current;
+    const root = editorRef.current;
+    if (!root) return null;
+    try {
+      const range = document.createRange();
+      if (anchor && root.contains(anchor.node)) {
+        const len = anchor.node.textContent?.length ?? 0;
+        range.setStart(anchor.node, Math.min(anchor.at, len));
+        range.collapse(true);
+      } else {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const r = sel.getRangeAt(0).cloneRange();
+          range.setStart(r.startContainer, r.startOffset);
+          range.collapse(true);
+        } else {
+          return null;
+        }
+      }
+      const rect = range.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width };
+    } catch {
+      return null;
+    }
+  }, [anchorTick]);
+
+  const insertImageRef = useCallback(
+    (imageIndex: number) => {
+      const root = editorRef.current;
+      const anchor = triggerAnchorRef.current;
+      if (!root) return;
+      root.focus();
+
+      const range = document.createRange();
+      const sel = window.getSelection();
+
+      if (anchor && root.contains(anchor.node)) {
+        const node = anchor.node;
+        const caretOffset =
+          sel && sel.rangeCount > 0 && sel.getRangeAt(0).startContainer === node
+            ? sel.getRangeAt(0).startOffset
+            : (node.textContent?.length ?? anchor.at + 1);
+        range.setStart(node, Math.min(anchor.at, node.textContent?.length ?? 0));
+        range.setEnd(
+          node,
+          Math.min(Math.max(caretOffset, anchor.at), node.textContent?.length ?? 0),
+        );
+      } else if (sel && sel.rangeCount > 0) {
+        const r = sel.getRangeAt(0);
+        range.setStart(r.startContainer, r.startOffset);
+        range.setEnd(r.endContainer, r.endOffset);
+      } else {
+        return;
+      }
+
+      closePopover();
+
+      const item = refsRef.current.find((r) => r.index === imageIndex);
+      const badge = createImageRefBadge(imageIndex, item);
+      const space = document.createTextNode("\u00a0");
+      const frag = document.createDocumentFragment();
+      frag.appendChild(badge);
+      frag.appendChild(space);
+      range.deleteContents();
+      range.insertNode(frag);
+
+      const after = document.createRange();
+      after.setStart(space, space.length);
+      after.collapse(true);
+      sel?.removeAllRanges();
+      sel?.addRange(after);
+
+      syncFromDom();
+    },
+    [closePopover, syncFromDom],
+  );
+
+  const syncPickerPosition = useCallback(() => {
+    const rect = getAnchorRect();
+    if (!rect) return;
+    const measured = pickerRef.current?.getBoundingClientRect().height;
+    const height = measured && measured > 0 ? measured : pickerHeight;
+    setPickerPos(
+      resolvePickerPosition(
+        new DOMRect(rect.left, rect.top, rect.width, rect.bottom - rect.top),
+        height,
+      ),
+    );
+  }, [getAnchorRect, pickerHeight]);
 
   useLayoutEffect(() => {
-    if (!pickerOpen) {
+    if (!popoverOpen) {
       setPickerPos(null);
       return;
     }
@@ -166,91 +274,83 @@ export function QrHappyHorsePromptTextarea({
       window.removeEventListener("resize", onReflow);
       window.removeEventListener("scroll", onReflow, true);
     };
-  }, [pickerOpen, syncPickerPosition, filteredImages.length, referenceImages.length]);
+  }, [popoverOpen, syncPickerPosition, filteredImages.length, referenceImages.length]);
 
   useLayoutEffect(() => {
-    if (!pickerOpen || !pickerRef.current) return;
+    if (!popoverOpen || !pickerRef.current) return;
     const nextHeight = pickerRef.current.getBoundingClientRect().height;
     if (nextHeight > 0 && Math.abs(nextHeight - pickerHeight) > 2) {
       setPickerHeight(nextHeight);
       syncPickerPosition();
     }
-  }, [pickerOpen, pickerHeight, syncPickerPosition, filteredImages.length]);
+  }, [popoverOpen, pickerHeight, syncPickerPosition, filteredImages.length]);
 
   useEffect(() => {
-    if (!pickerOpen) return;
+    if (!popoverOpen) return;
     const onDocMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (anchorRef.current?.contains(target)) return;
+      if (wrapperRef.current?.contains(target)) return;
       if (pickerRef.current?.contains(target)) return;
-      setMentionAnchor(null);
+      closePopover();
     };
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [pickerOpen]);
+  }, [closePopover, popoverOpen]);
 
   useEffect(() => {
-    if (highlightIndex >= filteredImages.length) {
-      setHighlightIndex(Math.max(0, filteredImages.length - 1));
+    if (popoverIndex >= filteredImages.length) {
+      setPopoverIndex(Math.max(0, filteredImages.length - 1));
     }
-  }, [filteredImages.length, highlightIndex]);
+  }, [filteredImages.length, popoverIndex]);
 
-  const applyImageRef = useCallback(
-    (imageIndex: number) => {
-      if (!mentionAnchor) return;
-      const { text, cursor } = insertImageRefToken(value, mentionAnchor, imageIndex);
-      onChange(text.slice(0, maxLength));
-      setMentionAnchor(null);
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (!el) return;
-        el.focus();
-        const pos = Math.min(cursor, maxLength);
-        el.setSelectionRange(pos, pos);
-      });
-    },
-    [maxLength, mentionAnchor, onChange, value],
-  );
+  const onInput = useCallback(() => {
+    syncFromDom();
+    requestAnimationFrame(() => detectTrigger());
+  }, [detectTrigger, syncFromDom]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const el = e.target;
-    const next = el.value.slice(0, maxLength);
-    const cursor = el.selectionStart ?? next.length;
-    onChange(next);
-    syncMentionAnchorFrom(next, cursor);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!pickerOpen) return;
-
-    if (e.key === "Escape") {
-      e.preventDefault();
-      setMentionAnchor(null);
-      return;
-    }
-
-    if (filteredImages.length === 0) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIndex((i) => (i + 1) % filteredImages.length);
-      return;
-    }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIndex((i) => (i - 1 + filteredImages.length) % filteredImages.length);
-      return;
-    }
-
-    if (e.key === "Enter" || e.key === "Tab") {
-      e.preventDefault();
-      const picked = filteredImages[highlightIndex];
-      if (picked) applyImageRef(picked.index);
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (popoverOpen) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (filteredImages.length > 0) {
+          setPopoverIndex((i) => (i + 1) % filteredImages.length);
+        }
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (filteredImages.length > 0) {
+          setPopoverIndex((i) => (i - 1 + filteredImages.length) % filteredImages.length);
+        }
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        const picked = filteredImages[popoverIndex];
+        if (picked) {
+          e.preventDefault();
+          insertImageRef(picked.index);
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closePopover();
+        return;
+      }
     }
   };
 
-  const pickerPanel = pickerOpen ? (
+  const onPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const text = e.clipboardData.getData("text/plain");
+    if (text) {
+      e.preventDefault();
+      document.execCommand("insertText", false, text);
+      syncFromDom();
+      requestAnimationFrame(() => detectTrigger());
+    }
+  };
+
+  const pickerPanel = popoverOpen ? (
     <div
       ref={pickerRef}
       className="overflow-hidden rounded-xl border shadow-lg"
@@ -265,20 +365,20 @@ export function QrHappyHorsePromptTextarea({
         background: "var(--qr-bg-surface)",
       }}
       role="listbox"
-      aria-label="选择参考图"
+      aria-label="选择引用图片"
     >
       {referenceImages.length === 0 ? (
         <p className="px-4 py-3 text-xs text-[var(--qr-text-muted)]">
-          请先在下方上传参考图，再输入 @ 引用
+          请先在下方上传引用图片，再输入 @ 引用
         </p>
       ) : filteredImages.length === 0 ? (
         <p className="px-4 py-3 text-xs text-[var(--qr-text-muted)]">
-          没有匹配的参考图
+          没有匹配的引用图片
         </p>
       ) : (
         <ul className="max-h-[240px] overflow-y-auto p-2">
           {filteredImages.map((item, listIndex) => {
-            const active = listIndex === highlightIndex;
+            const active = listIndex === popoverIndex;
             return (
               <li key={`${item.url}-${item.index}`}>
                 <button
@@ -288,9 +388,9 @@ export function QrHappyHorsePromptTextarea({
                   className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition ${
                     active ? "bg-[rgba(59,130,246,0.18)]" : "hover:bg-white/5"
                   }`}
-                  onMouseEnter={() => setHighlightIndex(listIndex)}
+                  onMouseEnter={() => setPopoverIndex(listIndex)}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => applyImageRef(item.index)}
+                  onClick={() => insertImageRef(item.index)}
                 >
                   <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -318,21 +418,35 @@ export function QrHappyHorsePromptTextarea({
   ) : null;
 
   return (
-    <div ref={anchorRef} className="relative mt-3">
-      <textarea
-        ref={textareaRef}
+    <div ref={wrapperRef} className="relative mt-3">
+      <div
+        ref={editorRef}
         id={id}
-        className={`qr-input qr-textarea-resizable ${minHeightClass} w-full`}
-        value={value}
-        maxLength={maxLength}
-        disabled={disabled}
-        placeholder="对所需输出的文本描述… 输入 @ 引用下方参考图"
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onClick={syncMentionAnchor}
-        onKeyUp={syncMentionAnchor}
-        onSelect={syncMentionAnchor}
+        role="textbox"
+        aria-multiline="true"
+        aria-label="提示词"
+        contentEditable={!disabled}
+        suppressContentEditableWarning
+        spellCheck={false}
+        className={`qr-input qr-textarea-resizable ${minHeightClass} w-full whitespace-pre-wrap break-words outline-none`}
+        onInput={onInput}
+        onKeyDown={onKeyDown}
+        onPaste={onPaste}
+        onFocus={() => {
+          focusedRef.current = true;
+        }}
+        onBlur={() => {
+          focusedRef.current = false;
+          closePopover();
+          const root = editorRef.current;
+          if (root) syncFromDom(serializePromptEditable(root));
+        }}
       />
+      {isEmpty ? (
+        <div className="pointer-events-none absolute left-0 top-0 select-none px-[14px] py-[10px] text-sm text-[var(--qr-text-muted)]">
+          对所需输出的文本描述… 输入 @ 引用下方图片
+        </div>
+      ) : null}
 
       {typeof document !== "undefined" && pickerPanel
         ? createPortal(pickerPanel, document.body)

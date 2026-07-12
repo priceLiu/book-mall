@@ -339,10 +339,10 @@ export function QrMotionSyncForm({
         ) : null}
       </section>
 
-      {/* 选择科目 / 参考图 */}
+      {/* 引用图片 */}
       <section className={`qr-card ${isHappyHorse ? "p-3" : "p-4"}`}>
         <h3 className={`font-semibold text-[var(--qr-text-primary)] ${isHappyHorse ? "text-sm" : "text-base"}`}>
-          选择科目
+          引用图片
         </h3>
         {!isHappyHorse ? (
         <p className="mt-1 text-xs leading-relaxed text-[var(--qr-text-muted)]">

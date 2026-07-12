@@ -4,7 +4,7 @@ export function isMotionSyncKind(kind: string, toolKey?: string): boolean {
   return kind === "motion-sync" || toolKey === "motion-sync";
 }
 
-/** 管理后台模板可配置多张引用图（复制到工作区「选择科目」） */
+/** 管理后台模板可配置多张引用图（复制到工作区「引用图片」） */
 export function supportsAdminSceneImages(form: {
   category: string;
   kind: string;
