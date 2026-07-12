@@ -91,7 +91,7 @@ export function ModelsPageClient() {
 
   if (loading) {
     return (
-      <div className="story-container flex items-center justify-center gap-2 py-24 text-[var(--story-muted)]">
+      <div className="story-shell-page flex items-center justify-center gap-2 py-24 text-[var(--story-muted)]">
         <Loader2 className="size-5 animate-spin" />
         加载模型配置…
       </div>
@@ -100,7 +100,7 @@ export function ModelsPageClient() {
 
   if (error && selections.length === 0) {
     return (
-      <div className="story-container py-16 text-center">
+      <div className="story-shell-page py-16 text-center">
         <p className="text-red-400">{error}</p>
         <p className="mt-2 text-sm text-[var(--story-muted)]">
           请先在顶部栏登录 book-mall 账号。
@@ -113,7 +113,7 @@ export function ModelsPageClient() {
   }
 
   return (
-    <div className="story-container py-12 sm:py-16">
+    <div className="story-shell-page py-12 sm:py-16">
       <div className="max-w-3xl">
         <h1 className="story-serif text-3xl text-white">模型配置</h1>
         <p className="twenty-body mt-2">

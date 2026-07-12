@@ -42,9 +42,9 @@ export function QrRefImageThumb({
   return (
     <>
       <div
-        className={`group relative ${SIZE_CLASS[size]} shrink-0 overflow-hidden rounded-lg bg-zinc-900`}
+        className={`group relative ${SIZE_CLASS[size]} shrink-0 overflow-visible`}
       >
-        <div className="h-full w-full overflow-hidden rounded-lg">
+        <div className="h-full w-full overflow-hidden rounded-lg bg-zinc-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={url} alt="" className="h-full w-full object-cover" />
         </div>
@@ -58,15 +58,15 @@ export function QrRefImageThumb({
         {onRemove && !readonly ? (
           <button
             type="button"
-            className="absolute right-0.5 top-0.5 z-[4] rounded bg-black/60 p-px text-white hover:bg-red-600/80"
+            className="absolute -right-1.5 -top-1.5 z-[4] flex h-5 w-5 items-center justify-center rounded-full bg-white text-black shadow-md transition hover:bg-red-50 hover:text-red-600"
             onClick={onRemove}
             aria-label="移除参考图"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3" strokeWidth={2.5} />
           </button>
         ) : null}
 
-        <div className="absolute inset-0 z-[2] flex items-center justify-center gap-2.5 bg-black/55 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute inset-0 z-[2] flex items-center justify-center gap-2.5 overflow-hidden rounded-lg bg-black/55 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             type="button"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white transition hover:bg-black/70"

@@ -4,7 +4,7 @@ import { getMainSiteOrigin } from "@/lib/site-origin";
  * 跨门户头部导航：链接画布 / 快速复制 / 电商，工具站指向 Book。
  * 跨门户跳转经 Book `re-enter`：已登录用户（持有 Book 会话）无感换票进入目标门户。
  */
-type PortalKey = "quick-replica" | "canvas" | "e-commerce" | "tool";
+type PortalKey = "quick-replica" | "canvas" | "e-commerce" | "story" | "tool";
 
 function reEnter(book: string | null, app: PortalKey, fallback: string | null): string | null {
   if (!book) return fallback;
@@ -17,11 +17,13 @@ export function PortalNav({ current = "canvas" }: { current?: PortalKey }) {
   const canvasOrigin = process.env.NEXT_PUBLIC_CANVAS_WEB_ORIGIN?.trim() || null;
   const qrOrigin = process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN?.trim() || null;
   const ecomOrigin = process.env.NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN?.trim() || null;
+  const storyOrigin = process.env.NEXT_PUBLIC_STORY_WEB_ORIGIN?.trim() || null;
 
   const items: { key: PortalKey; label: string; href: string | null }[] = [
     { key: "canvas", label: "画布", href: reEnter(book, "canvas", canvasOrigin) },
     { key: "quick-replica", label: "快速复制", href: reEnter(book, "quick-replica", qrOrigin) },
     { key: "e-commerce", label: "电商工具箱", href: reEnter(book, "e-commerce", ecomOrigin) },
+    { key: "story", label: "故事版", href: reEnter(book, "story", storyOrigin) },
     { key: "tool", label: "工具站", href: reEnter(book, "tool", book) },
   ];
 

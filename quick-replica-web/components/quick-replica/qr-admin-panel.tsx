@@ -800,6 +800,58 @@ export function QrAdminPanel({
                 const motionSync = isMotionSyncKind(form.kind, form.toolKey);
                 const characterEdit = isCharacterCatalogEdit(form);
                 const sceneImagesEnabled = supportsAdminSceneImages(form);
+                const isTextToVideo = form.kind === "text-to-video";
+                const referenceImagesBlock = sceneImagesEnabled ? (
+                  <QrImageUploadZone
+                    className="space-y-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-xl"
+                    disabled={uploading}
+                    onFiles={(files) => void uploadReferenceImages(files)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-[var(--qr-text-muted)]">
+                        引用图（可选，最多 {ADMIN_SCENE_IMAGE_MAX} 张）
+                      </span>
+                      <span className="text-[10px] text-[var(--qr-text-muted)]">
+                        {form.sceneImageUrls.length}/{ADMIN_SCENE_IMAGE_MAX}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-[var(--qr-text-muted)]">
+                      生成时可作参考图；点击「复制」会带入中栏「选择科目」。与上方列表封面无关。
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {form.sceneImageUrls.map((url, index) => (
+                        <QrRefImageThumb
+                          key={`${url}-${index}`}
+                          url={url}
+                          index={index}
+                          size="md"
+                          onRemove={() =>
+                            setForm((p) => ({
+                              ...p,
+                              sceneImageUrls: p.sceneImageUrls.filter((_, i) => i !== index),
+                            }))
+                          }
+                        />
+                      ))}
+                      {form.sceneImageUrls.length < ADMIN_SCENE_IMAGE_MAX ? (
+                        <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[var(--qr-border)] text-xs text-[var(--qr-text-muted)] hover:border-[var(--qr-brand)] hover:text-[var(--qr-brand)]">
+                          上传引用图
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files ?? []);
+                              e.target.value = "";
+                              if (files.length) void uploadReferenceImages(files);
+                            }}
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+                  </QrImageUploadZone>
+                ) : null;
                 return (
                   <>
                     <label className="block space-y-1">
@@ -956,12 +1008,16 @@ export function QrAdminPanel({
                           uploading={uploading}
                           onUploadFile={(file) => uploadMedia(file, "thumbnail")}
                           onClear={() => setForm((p) => ({ ...p, thumbnailUrl: "" }))}
+                          label={form.category === "video" || form.category === "world" ? "列表封面" : "封面图"}
                           hint={
                             motionSync
-                              ? "上传参考视频后也会自动截取首帧；可手动更换列表封面"
-                              : "上传媒体视频后自动截取首帧；可手动上传或粘贴替换"
+                              ? "画廊缩略图；上传参考视频后也会自动截取首帧"
+                              : isTextToVideo
+                                ? "画廊/列表缩略图（非生成引用图）；上传示例视频后自动截取首帧，也可手动更换"
+                                : "画廊缩略图；上传媒体视频后自动截取首帧，也可手动上传或粘贴替换"
                           }
                         />
+                        {referenceImagesBlock}
                         {!motionSync ? (
                           <label className="block space-y-1">
                             <span className="text-xs text-[var(--qr-text-muted)]">
@@ -1046,57 +1102,6 @@ export function QrAdminPanel({
                             </QrImageUploadZone>
                           )}
                         </div>
-                        {sceneImagesEnabled ? (
-                          <QrImageUploadZone
-                            className="space-y-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-xl"
-                            disabled={uploading}
-                            onFiles={(files) => void uploadReferenceImages(files)}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs text-[var(--qr-text-muted)]">
-                                引用图片（可选，最多 {ADMIN_SCENE_IMAGE_MAX} 张）
-                              </span>
-                              <span className="text-[10px] text-[var(--qr-text-muted)]">
-                                {form.sceneImageUrls.length}/{ADMIN_SCENE_IMAGE_MAX}
-                              </span>
-                            </div>
-                            <p className="text-[10px] leading-relaxed text-[var(--qr-text-muted)]">
-                              复制模板时带入工作区「选择科目」；不上传则保持纯提示词初始状态。
-                            </p>
-                            <div className="flex flex-wrap gap-3">
-                              {form.sceneImageUrls.map((url, index) => (
-                                <QrRefImageThumb
-                                  key={`${url}-${index}`}
-                                  url={url}
-                                  index={index}
-                                  size="md"
-                                  onRemove={() =>
-                                    setForm((p) => ({
-                                      ...p,
-                                      sceneImageUrls: p.sceneImageUrls.filter((_, i) => i !== index),
-                                    }))
-                                  }
-                                />
-                              ))}
-                              {form.sceneImageUrls.length < ADMIN_SCENE_IMAGE_MAX ? (
-                                <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[var(--qr-border)] text-xs text-[var(--qr-text-muted)] hover:border-[var(--qr-brand)] hover:text-[var(--qr-brand)]">
-                                  添加
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    className="hidden"
-                                    onChange={(e) => {
-                                      const files = Array.from(e.target.files ?? []);
-                                      e.target.value = "";
-                                      if (files.length) void uploadReferenceImages(files);
-                                    }}
-                                  />
-                                </label>
-                              ) : null}
-                            </div>
-                          </QrImageUploadZone>
-                        ) : null}
                       </>
                     ) : (
                       <p className="text-xs text-[var(--qr-text-muted)]">

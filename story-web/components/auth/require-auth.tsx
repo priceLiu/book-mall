@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { bookMallLoginHref, bookMallReEnterHref } from "@/lib/platform-sso-links";
+import { bookMallReEnterHref } from "@/lib/platform-sso-links";
 import { isSsoReenterSuppressedClient } from "@/lib/tools-logout-next-url";
 import {
   bumpSsoReenterAttempts,
@@ -10,6 +10,15 @@ import {
   MAX_SSO_REENTER_ATTEMPTS,
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
+
+/** 未认证跳本域品牌登录页（不再弹主站），保留 redirect 回跳。 */
+function localLoginHref(): string {
+  const path =
+    typeof window !== "undefined"
+      ? window.location.pathname + window.location.search
+      : "/";
+  return `/login?redirect=${encodeURIComponent(path || "/")}`;
+}
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -32,7 +41,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           setNeedsLogin(true);
           return;
         }
-        // 静默自动换票：连续 MAX 次仍未建立会话才停下并提示重新登录
+        // 静默自动换票：连续 MAX 次仍未建立会话才停下并跳本域品牌登录页
         if (readSsoReenterAttempts() >= MAX_SSO_REENTER_ATTEMPTS) {
           setExhausted(true);
           setNeedsLogin(true);
@@ -45,8 +54,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           window.location.href = reEnter;
           return;
         }
-        const login = bookMallLoginHref(typeof window !== "undefined" ? window.location.href : "/");
-        if (login) window.location.href = login;
+        window.location.href = localLoginHref();
       } catch {
         if (!cancelled) setNeedsLogin(true);
       }
@@ -63,19 +71,18 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
         <p className="text-sm">
           {exhausted
-            ? "多次自动连接 Book 账号均未成功，请重新登录后继续使用。"
-            : "会话已退出，请重新连接 Book 账号。"}
+            ? "多次自动连接账号均未成功，请重新登录后继续使用。"
+            : "会话已退出，请重新登录。"}
         </p>
         <button
           type="button"
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white"
           onClick={() => {
             clearSsoReenterAttempts();
-            const login = bookMallLoginHref(typeof window !== "undefined" ? window.location.href : "/");
-            if (login) window.location.href = login;
+            window.location.href = localLoginHref();
           }}
         >
-          去主站登录
+          登录 / 注册
         </button>
       </div>
     );

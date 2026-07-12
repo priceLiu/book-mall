@@ -23,6 +23,12 @@ export function getMainSiteOrigin(): string | null {
   return u?.origin ?? null;
 }
 
+/** 子门户不承载个人中心，统一跳主站 Book /account。 */
+export function getBookAccountUrl(): string | null {
+  const origin = getMainSiteOrigin();
+  return origin ? `${origin}/account` : null;
+}
+
 /** 浏览器访问 story-web 的 Origin。 */
 export function getAppPublicOrigin(): string | null {
   const raw =

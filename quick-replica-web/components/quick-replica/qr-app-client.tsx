@@ -538,6 +538,7 @@ export function QrAppClient({
     }
     const nextDraft = templateToWorkspaceDraft(t);
     const isMotionSync = t.kind === "motion-sync" || t.toolKey === "motion-sync";
+    const refCount = nextDraft.sceneImageUrls.filter((u) => u.trim()).length;
     setDraft((prev) => ({
       ...nextDraft,
       ...(isMotionSync
@@ -554,7 +555,11 @@ export function QrAppClient({
     if (navMode === "home" || navMode === "admin") {
       setNavMode("category");
     }
-    setCopyToast("已载入工作区，编辑后点「产生」生成");
+    setCopyToast(
+      refCount > 0
+        ? `已载入工作区（含 ${refCount} 张引用图），编辑后点「产生」生成`
+        : "已载入工作区，编辑后点「产生」生成",
+    );
   };
 
   const handleGenerate = useCallback(async (draftToRun: QrWorkspaceDraft) => {
