@@ -270,7 +270,7 @@ export function QrTemplatePreviewModal({
             {sceneImageUrls.length > 0 ? (
               <div>
                 <div className="mb-2 text-xs font-medium text-[var(--qr-text-secondary)]">
-                  引用图片
+                  引用图
                 </div>
                 <div className="flex flex-wrap gap-2.5">
                   {sceneImageUrls.map((url, index) => (

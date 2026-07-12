@@ -41,6 +41,7 @@ import {
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrCategory, QrTemplateJson, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
+import { resolveQrGenerateThumbnailUrl } from "@/lib/quick-replica/qr-video-thumbnail";
 import { getQrAudioVoiceDef } from "@/lib/quick-replica/qr-audio-catalog";
 import { findMinimaxVoiceById } from "@/lib/quick-replica/minimax-voice-catalog";
 
@@ -363,18 +364,20 @@ async function createUserTemplateFromLog(args: {
     args.draft.title?.trim() ||
     `${getKindDef(args.draft.kind)?.label ?? args.draft.kind} · ${new Date().toLocaleString("zh-CN")}`;
 
+  const thumbnailUrl = await resolveQrGenerateThumbnailUrl({
+    userId: args.userId,
+    mediaType: args.mediaType,
+    outputUrl: args.outputUrl,
+    draft: args.draft,
+  });
+
   return createUserQrTemplate({
     userId: args.userId,
     category: args.draft.category,
     kind: args.draft.kind,
     toolKey: args.draft.toolKey,
     title,
-    thumbnailUrl:
-      args.mediaType === "image"
-        ? args.outputUrl
-        : args.mediaType === "audio"
-          ? args.draft.targetImageUrl || ""
-          : args.draft.targetImageUrl || args.outputUrl,
+    thumbnailUrl,
     sortOrder: 0,
     gatewayRequestLogId: args.logId,
     reference: {

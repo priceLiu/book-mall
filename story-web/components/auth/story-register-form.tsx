@@ -1,0 +1,196 @@
+"use client";
+
+import { type FormEvent, useCallback, useState } from "react";
+import { Clapperboard } from "lucide-react";
+
+function buildPortalSigninHref(
+  bookOrigin: string,
+  token: string,
+  phone: string,
+  redirect: string,
+): string {
+  const q = new URLSearchParams({
+    t: token,
+    phone,
+    app: "story",
+    redirect,
+  });
+  return `${bookOrigin.replace(/\/$/, "")}/portal-signin?${q.toString()}`;
+}
+
+export function StoryRegisterForm({
+  bookOrigin,
+  redirect,
+}: {
+  bookOrigin: string | null;
+  redirect: string;
+}) {
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const sendCode = useCallback(async () => {
+    setError(null);
+    if (!/^\d{11}$/.test(phone.trim())) {
+      setError("请输入 11 位手机号");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch("/api/auth/sms/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone.trim(), purpose: "REGISTER" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        mockCode?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "发送失败");
+        return;
+      }
+      if (data.mockCode) {
+        setCode(data.mockCode);
+        setHint(`开发环境验证码：${data.mockCode}`);
+      } else {
+        setHint("验证码已发送");
+      }
+    } finally {
+      setSending(false);
+    }
+  }, [phone]);
+
+  const onSubmit = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      if (!bookOrigin) {
+        setError("门户未配置主站地址，请联系管理员。");
+        return;
+      }
+      if (password.length < 8) {
+        setError("密码至少 8 位");
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: phone.trim(),
+            code: code.trim(),
+            password,
+            name: name.trim() || undefined,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          autoLoginToken?: string;
+        };
+        if (!res.ok || !data.autoLoginToken) {
+          setError(data.error ?? "注册失败，请稍后重试");
+          return;
+        }
+        window.location.href = buildPortalSigninHref(
+          bookOrigin,
+          data.autoLoginToken,
+          phone.trim(),
+          redirect,
+        );
+      } catch {
+        setError("无法连接注册服务，请稍后重试。");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [bookOrigin, phone, code, password, name, redirect],
+  );
+
+  return (
+    <div className="mx-auto flex w-full max-w-sm flex-col gap-6">
+      <div className="flex items-center gap-2 text-white">
+        <span className="flex size-9 items-center justify-center rounded-md border border-white/15 bg-white/5">
+          <Clapperboard className="size-4 text-white" strokeWidth={2} />
+        </span>
+        <span className="story-serif text-xl">story-web</span>
+      </div>
+      <div>
+        <h1 className="story-serif text-3xl text-white">创建账号</h1>
+        <p className="twenty-body mt-2">注册即可开始你的漫剧创作</p>
+      </div>
+
+      <form onSubmit={onSubmit} className="flex flex-col gap-3">
+        <input
+          className="story-input"
+          type="tel"
+          inputMode="numeric"
+          placeholder="手机号"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          autoComplete="username"
+        />
+        <div className="flex gap-2">
+          <input
+            className="story-input flex-1"
+            type="text"
+            inputMode="numeric"
+            placeholder="短信验证码"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <button
+            type="button"
+            className="twenty-btn-ghost whitespace-nowrap"
+            onClick={() => void sendCode()}
+            disabled={sending}
+          >
+            {sending ? "发送中…" : "获取验证码"}
+          </button>
+        </div>
+        <input
+          className="story-input"
+          type="password"
+          placeholder="设置密码（至少 8 位）"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+        />
+        <input
+          className="story-input"
+          type="text"
+          placeholder="昵称（可选）"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+
+        {hint ? <p className="text-xs text-[var(--story-muted)]">{hint}</p> : null}
+        {error ? (
+          <p className="text-sm text-red-400" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <button type="submit" className="twenty-btn w-full" disabled={loading}>
+          {loading ? "注册中…" : "注册并登录"}
+        </button>
+      </form>
+
+      <p className="text-center text-sm text-[var(--story-muted)]">
+        已有账号？{" "}
+        <a
+          href={`/login?redirect=${encodeURIComponent(redirect)}`}
+          className="font-medium text-[var(--story-accent)] hover:underline"
+        >
+          登录
+        </a>
+      </p>
+    </div>
+  );
+}

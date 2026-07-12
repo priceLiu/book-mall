@@ -13,7 +13,7 @@ export function PlaceholderWorkspace({
   nextLabel: string;
 }) {
   return (
-    <div className="story-container py-16 sm:py-20">
+    <div className="story-shell-page py-16 sm:py-20">
       <div className="mx-auto max-w-2xl rounded-lg border border-white/10 bg-[var(--story-surface)] p-8 text-center sm:p-12">
         <div className="mx-auto mb-6 flex size-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
           <Construction className="size-7 text-[var(--story-muted)]" />

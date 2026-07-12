@@ -91,7 +91,7 @@ function ProjectsPageInner() {
   }, [projects]);
 
   return (
-    <div className="story-container py-10 sm:py-14">
+    <div className="story-shell-page py-10 sm:py-14">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="twenty-eyebrow">Studio</p>

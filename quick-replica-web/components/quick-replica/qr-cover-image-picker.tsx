@@ -13,6 +13,8 @@ type Props = {
   onUploadFile: (file: File) => void | Promise<void>;
   onClear?: () => void;
   hint?: string;
+  /** 默认「封面图」；视频类模板可传「列表封面」以与「引用图」区分 */
+  label?: string;
 };
 
 /** 模板 / 列表封面：大图预览 + 点击上传 + 粘贴 */
@@ -23,6 +25,7 @@ export function QrCoverImagePicker({
   onUploadFile,
   onClear,
   hint = "上传视频后将自动截取首帧；也可手动上传或粘贴替换封面",
+  label = "封面图",
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasCover = Boolean(coverUrl.trim());
@@ -34,7 +37,7 @@ export function QrCoverImagePicker({
 
   return (
     <div className="space-y-2">
-      <span className="text-xs text-[var(--qr-text-muted)]">封面图</span>
+      <span className="text-xs text-[var(--qr-text-muted)]">{label}</span>
       <QrImageUploadZone
         className="outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-xl"
         disabled={disabled || uploading}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Maximize2 } from "lucide-react";
 import { getStoryWebOrigin } from "@/lib/story-web-origin";
 import { mainSiteStoryOpenHref } from "@/lib/main-site-app-open-links";
@@ -34,6 +34,11 @@ export function StoryTheaterCreatorClient({ videos }: StoryTheaterCreatorClientP
   const storyOrigin = getStoryWebOrigin();
   const storyOpenHref = mainSiteStoryOpenHref("/");
   const [savedHint, setSavedHint] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const onFullscreen = useCallback((video: HTMLVideoElement) => {
     requestVideoFullscreen(video);
@@ -71,28 +76,34 @@ export function StoryTheaterCreatorClient({ videos }: StoryTheaterCreatorClientP
             key={src}
             className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-black shadow-lg"
           >
-            <video
-              className="aspect-video w-full object-cover"
-              controls
-              playsInline
-              preload="metadata"
-              muted
-              autoPlay={index === 0}
-              loop
-              src={src}
-            />
-            <button
-              type="button"
-              className="absolute bottom-3 right-3 rounded-lg bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
-              onClick={(e) => {
-                const video = (e.currentTarget.parentElement?.querySelector("video") ??
-                  null) as HTMLVideoElement | null;
-                if (video) onFullscreen(video);
-              }}
-              aria-label="全屏播放"
-            >
-              <Maximize2 className="size-4" />
-            </button>
+            {mounted ? (
+              <video
+                className="aspect-video w-full object-cover"
+                controls
+                playsInline
+                preload="metadata"
+                muted
+                autoPlay={index === 0}
+                loop
+                src={src}
+              />
+            ) : (
+              <div className="aspect-video w-full bg-neutral-900" aria-hidden />
+            )}
+            {mounted ? (
+              <button
+                type="button"
+                className="absolute bottom-3 right-3 rounded-lg bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
+                onClick={(e) => {
+                  const video = (e.currentTarget.parentElement?.querySelector("video") ??
+                    null) as HTMLVideoElement | null;
+                  if (video) onFullscreen(video);
+                }}
+                aria-label="全屏播放"
+              >
+                <Maximize2 className="size-4" />
+              </button>
+            ) : null}
           </div>
         ))}
       </div>

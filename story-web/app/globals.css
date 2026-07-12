@@ -35,6 +35,7 @@
   --story-muted: #a3a3a3;
   --story-accent: #6ea8fe;
   --story-accent-soft: #4c7dff;
+  --story-header-h: 3.5rem;
 }
 
 body {
@@ -50,6 +51,16 @@ body {
 @layer components {
   .story-container {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /** 全屏自适应：顶栏与内容区占满视口宽度（对齐画布 canvas-page） */
+  .story-page {
+    @apply w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 2xl:px-16;
+  }
+
+  /** 应用内容页：全宽自适应但设上限，避免超宽屏拉伸（对齐画布 canvas-shell-page） */
+  .story-shell-page {
+    @apply story-page mx-auto w-full max-w-[1920px];
   }
 
   .story-serif {
@@ -82,6 +93,14 @@ body {
 
   .twenty-btn-ghost {
     @apply story-sans inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-2.5 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/5;
+  }
+
+  .twenty-btn-accent {
+    @apply story-sans inline-flex items-center justify-center rounded-full bg-[var(--story-accent)] px-6 py-2.5 text-sm font-medium text-black transition hover:bg-[var(--story-accent-soft)] hover:text-white;
+  }
+
+  .story-input {
+    @apply story-sans w-full rounded-lg border border-white/20 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-[var(--story-muted)] outline-none transition focus:border-[var(--story-accent)] focus:ring-1 focus:ring-[var(--story-accent)];
   }
 
   .hot-comics-marquee-track {
