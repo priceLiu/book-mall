@@ -393,7 +393,7 @@ export function QrTextToVideoForm({
         >
           提示词
         </label>
-        {usesImageTokens ? (
+        {maxRefImages > 0 ? (
           <QrHappyHorsePromptTextarea
             id="qr-text-to-video-prompt"
             value={draft.prompt}
@@ -425,11 +425,11 @@ export function QrTextToVideoForm({
             await onUploadReferenceImages(files);
           }}
         >
-          <h3 className="text-sm font-semibold text-[var(--qr-text-primary)]">选择科目</h3>
+          <h3 className="text-sm font-semibold text-[var(--qr-text-primary)]">引用图片</h3>
           <p className="mt-1 text-xs text-[var(--qr-text-muted)]">
             {usesImageTokens
-              ? "上传参考图（HappyHorse 必填），在提示词中用 @ 引用 [Image N]"
-              : `可选参考图（最多 ${maxRefImages} 张）；不上传则为纯文生视频`}
+              ? "上传引用图片（HappyHorse 必填），在提示词中用 @ 引用"
+              : `可选引用图片（最多 ${maxRefImages} 张）；不上传则为纯文生视频，上传后可用 @ 在提示词中引用`}
           </p>
           <input
             ref={multiImageInputRef}

@@ -13,10 +13,11 @@ import {
   extractAudioFieldsFromTemplate,
 } from "@/components/quick-replica/qr-admin-audio-fields";
 import { QrCoverImagePicker } from "@/components/quick-replica/qr-cover-image-picker";
+import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrModal } from "@/components/quick-replica/qr-modal";
-import { QR_CATEGORIES, QR_KINDS_BY_CATEGORY, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
+import { QR_CATEGORIES, QR_KINDS_BY_CATEGORY, TEXT_TO_VIDEO_PROMPT_MAX_LENGTH, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
 import { extractAdminFormFieldsFromTemplate, isCharacterCatalogEdit, isMotionSyncKind, supportsAdminSceneImages, ADMIN_SCENE_IMAGE_MAX } from "@/lib/qr-admin-form";
 import { QrAdminPreviewThumb } from "@/components/quick-replica/qr-admin-preview-thumb";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
@@ -801,6 +802,12 @@ export function QrAdminPanel({
                 const characterEdit = isCharacterCatalogEdit(form);
                 const sceneImagesEnabled = supportsAdminSceneImages(form);
                 const isTextToVideo = form.kind === "text-to-video";
+                const adminImageRefs = form.sceneImageUrls
+                  .filter((u) => u.trim())
+                  .map((url, index) => ({ url, index: index + 1 }));
+                const adminPromptMaxLength = isTextToVideo
+                  ? TEXT_TO_VIDEO_PROMPT_MAX_LENGTH
+                  : 10_000;
                 const referenceImagesBlock = sceneImagesEnabled ? (
                   <QrImageUploadZone
                     className="space-y-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/40 rounded-xl"
@@ -816,7 +823,7 @@ export function QrAdminPanel({
                       </span>
                     </div>
                     <p className="text-[10px] leading-relaxed text-[var(--qr-text-muted)]">
-                      生成时可作参考图；点击「复制」会带入中栏「选择科目」。与上方列表封面无关。
+                      生成时可作参考图；点击「复制」会带入中栏「引用图片」。与上方列表封面无关。
                     </p>
                     <div className="flex flex-wrap gap-3">
                       {form.sceneImageUrls.map((url, index) => (
@@ -888,14 +895,27 @@ export function QrAdminPanel({
                         ))}
                       </select>
                     </label>
-                    <label className="block space-y-1">
+                    <div className="block space-y-1">
                       <span className="text-xs text-[var(--qr-text-muted)]">提示词</span>
-                      <textarea
-                        className="qr-input min-h-[120px] w-full resize-y"
-                        value={form.promptText}
-                        onChange={(e) => setForm((p) => ({ ...p, promptText: e.target.value }))}
-                      />
-                    </label>
+                      {sceneImagesEnabled ? (
+                        <QrHappyHorsePromptTextarea
+                          id="qr-admin-prompt"
+                          value={form.promptText}
+                          maxLength={adminPromptMaxLength}
+                          disabled={saving || uploading}
+                          referenceImages={adminImageRefs}
+                          minHeightClass="min-h-[120px]"
+                          onChange={(promptText) => setForm((p) => ({ ...p, promptText }))}
+                        />
+                      ) : (
+                        <textarea
+                          id="qr-admin-prompt"
+                          className="qr-input min-h-[120px] w-full resize-y"
+                          value={form.promptText}
+                          onChange={(e) => setForm((p) => ({ ...p, promptText: e.target.value }))}
+                        />
+                      )}
+                    </div>
                     {form.category === "audio" &&
                     (form.kind === "create-voiceover" ||
                       form.kind === "voice-changer" ||
