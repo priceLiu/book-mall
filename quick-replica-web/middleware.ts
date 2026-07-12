@@ -30,23 +30,21 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/auth/sso/callback")) return true;
   if (pathname.startsWith("/sso-error")) return true;
   if (pathname.startsWith("/_next/")) return true;
+  // 门户独立入口：落地页与品牌登录/注册页无需 token（供 SEO 与直接注册登录）。
+  if (pathname === "/") return true;
+  if (pathname === "/login" || pathname === "/register") return true;
   if (pathname === "/favicon.ico" || pathname === "/robots.txt") return true;
+  if (pathname === "/sitemap.xml") return true;
   if (/\.[a-z0-9]+$/i.test(pathname)) return true;
   return false;
 }
 
-function buildReEnterUrl(request: NextRequest): string | null {
-  const main =
-    process.env.MAIN_SITE_ORIGIN?.trim() ||
-    process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim();
-  if (!main) return null;
-  const base = main.replace(/\/$/, "");
+/** 未认证访问受保护路径 → 跳本域品牌登录页（不再弹主站）。 */
+function buildLocalLoginUrl(request: NextRequest): URL {
+  const url = new URL("/login", request.url);
   const redirect = request.nextUrl.pathname + request.nextUrl.search || "/";
-  const q = new URLSearchParams({
-    app: "quick-replica",
-    redirect,
-  });
-  return `${base}/api/sso/tools/re-enter?${q}`;
+  url.searchParams.set("redirect", redirect);
+  return url;
 }
 
 export function middleware(request: NextRequest) {
@@ -83,14 +81,7 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("tools_token")?.value?.trim();
   if (token) return NextResponse.next();
 
-  const reEnter = buildReEnterUrl(request);
-  if (reEnter) {
-    return NextResponse.redirect(reEnter);
-  }
-
-  return NextResponse.redirect(
-    new URL("/sso-error?reason=missing_main_origin", request.url),
-  );
+  return NextResponse.redirect(buildLocalLoginUrl(request));
 }
 
 export const config = {

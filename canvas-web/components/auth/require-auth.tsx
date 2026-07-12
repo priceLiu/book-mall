@@ -9,10 +9,7 @@ import {
   introspectSessionRevoked,
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-revoked";
-import {
-  bookMallLoginHref,
-  bookMallReEnterHref,
-} from "@/lib/platform-sso-links";
+import { bookMallReEnterHref } from "@/lib/platform-sso-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
   buildSilentReEnterHref,
@@ -120,21 +117,24 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }, [mainOrigin]);
 
+  // 未认证兜底：跳本域品牌登录页（保留回跳），不再弹主站登录。
+  const localLoginHref = useCallback(() => {
+    const path =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/projects";
+    return `/login?redirect=${encodeURIComponent(path || "/projects")}`;
+  }, []);
+
   const redirectToSso = useCallback(() => {
     const reEnter = reEnterHref();
     if (reEnter) {
       window.location.href = reEnter;
       return true;
     }
-    const login = bookMallLoginHref(
-      typeof window !== "undefined" ? window.location.href : "/",
-    );
-    if (login) {
-      window.location.href = login;
-      return true;
-    }
-    return false;
-  }, [reEnterHref]);
+    window.location.href = localLoginHref();
+    return true;
+  }, [reEnterHref, localLoginHref]);
 
   const loadSession = useCallback(async (opts?: { retry?: boolean }) => {
     const gen = ++loadGenRef.current;
@@ -245,12 +245,14 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     if (!href) return;
     if (readSsoReenterAttempts() >= MAX_SSO_REENTER_ATTEMPTS) {
       setExhausted(true);
+      // 多次静默换票仍未建立会话（通常无 Book 会话）→ 落本域品牌登录页。
+      window.location.href = localLoginHref();
       return;
     }
     bumpSsoReenterAttempts();
     silentAttemptedRef.current = true;
     window.location.href = href;
-  }, [loading, hasTokenCookie, sessionActive, reEnterHref, error, inactiveReason]);
+  }, [loading, hasTokenCookie, sessionActive, reEnterHref, error, inactiveReason, localLoginHref]);
 
   /**
    * 是否正处于「静默自动换票」过程中：此时不展示手动屏，只显示连接 loader，避免闪烁。
@@ -333,14 +335,10 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           className="rounded-lg border border-[var(--canvas-accent)]/40 bg-[var(--canvas-accent)]/15 px-4 py-2 text-sm text-[var(--canvas-accent)] transition hover:bg-[var(--canvas-accent)]/25"
           onClick={() => {
             clearSsoReenterAttempts();
-            if (!redirectToSso()) {
-              setError(
-                "未配置 MAIN_SITE_ORIGIN / NEXT_PUBLIC_BOOK_MALL_URL，无法跳转登录。",
-              );
-            }
+            window.location.href = localLoginHref();
           }}
         >
-          去主站登录 / 换票
+          去登录
         </button>
       </div>
     </div>

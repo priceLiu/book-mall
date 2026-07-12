@@ -13,7 +13,7 @@ function base64UrlDecodeToString(segment: string): string {
 
 export type VerifiedToolsJwt = {
   sub: string;
-  tier: "gold" | "admin";
+  tier: "gold" | "admin" | "member";
   exp: number;
   email?: string;
   phone?: string;
@@ -23,8 +23,8 @@ export type VerifiedToolsJwt = {
   sv?: number;
 };
 
-function pickTier(raw: unknown): "gold" | "admin" | null {
-  if (raw === "gold" || raw === "admin") return raw;
+function pickTier(raw: unknown): "gold" | "admin" | "member" | null {
+  if (raw === "gold" || raw === "admin" || raw === "member") return raw;
   return null;
 }
 

@@ -23,6 +23,12 @@ export function getMainSiteOrigin(): string | null {
   return u?.origin ?? null;
 }
 
+/** 主站个人中心（全站统一入口，子门户不承载独立账户页） */
+export function getBookAccountUrl(): string | null {
+  const origin = getMainSiteOrigin();
+  return origin ? `${origin.replace(/\/$/, "")}/account` : null;
+}
+
 /** 浏览器访问 canvas-web 的 Origin（与 NEXT_PUBLIC_CANVAS_WEB_ORIGIN 一致）。 */
 export function getAppPublicOrigin(): string | null {
   const raw =

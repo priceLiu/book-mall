@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { QrAppClient } from "@/components/quick-replica/qr-app-client";
+import { QrLanding } from "@/components/qr-landing";
 import { fetchToolsSession } from "@/lib/tools-introspect";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
@@ -25,6 +26,10 @@ async function fetchCanManageFeatured(token: string | undefined): Promise<boolea
 export default async function HomePage() {
   const token = cookies().get("tools_token")?.value;
   const session = await fetchToolsSession(token);
+  // 未登录：展示可被搜索引擎收录的公开落地页（独立门户 SEO）。
+  if (!session.active) {
+    return <QrLanding />;
+  }
   const intro = session.introspect;
   const canManageFeatured = await fetchCanManageFeatured(token);
   const mainOrigin = getMainSiteOrigin();

@@ -16,25 +16,22 @@ export type IssueToolsAccessTokenResult =
       ok: true;
       accessToken: string;
       expiresIn: number;
-      tokenSubtype: "tools_sso_admin" | "tools_sso_gold";
+      tokenSubtype: "tools_sso_admin" | "tools_sso_gold" | "tools_sso_member";
     }
   | { ok: false; status: number; error: string; code?: string };
 
-/** 为已登录用户签发 tools JWT（exchange / refresh-token 共用） */
+/**
+ * 为已登录用户签发 tools JWT（exchange / refresh-token / 门户登录共用）。
+ *
+ * 准入解耦：已登录但未开通工具月费者签发 `member` 令牌（`tools_nav_keys` 可空），
+ * 可进门户浏览个人中心/定价/开通引导；生成能力仍由网关按 entitlement 复查。
+ */
 export async function issueToolsAccessTokenForUser(
   userId: string,
 ): Promise<IssueToolsAccessTokenResult> {
   const elig = await getToolsSsoEligibility(userId);
   const ecomOk = await userCanAccessEcommerceToolkit(userId);
-  if (!elig.ok && !ecomOk) {
-    return {
-      ok: false,
-      status: 403,
-      error:
-        "当前不满足工具站准入条件（须管理员，或至少一项有效工具技术服务费）",
-      code: "TOOLS_ACCESS_DENIED",
-    };
-  }
+  const entitled = elig.ok || ecomOk;
 
   const resolvedNav = await resolveToolsNavKeysForUser(userId);
   let toolsNavKeys = elig.isAdmin ? [...TOOL_SUITE_NAV_KEYS] : resolvedNav.keys;
@@ -44,15 +41,11 @@ export async function issueToolsAccessTokenForUser(
     elig.isAdmin,
   );
 
-  if (!elig.isAdmin && toolsNavKeys.length === 0 && !ecomOk) {
-    return {
-      ok: false,
-      status: 403,
-      error:
-        "当前未开通任何工具分组的技术服务费，请先在个人中心「工具技术服务费」页开通后再试",
-      code: "TOOLS_ACCESS_DENIED",
-    };
-  }
+  const tier: "admin" | "gold" | "member" = elig.isAdmin
+    ? "admin"
+    : entitled
+      ? "gold"
+      : "member";
 
   let jwtSecret: string;
   try {
@@ -69,7 +62,7 @@ export async function issueToolsAccessTokenForUser(
     userId,
     secret: jwtSecret,
     expiresInSec: expiresIn,
-    tier: elig.isAdmin ? "admin" : "gold",
+    tier,
     toolsNavKeys,
     ecomBillingMode,
     sessionVersion,
@@ -93,6 +86,11 @@ export async function issueToolsAccessTokenForUser(
     ok: true,
     accessToken,
     expiresIn,
-    tokenSubtype: elig.isAdmin ? "tools_sso_admin" : "tools_sso_gold",
+    tokenSubtype:
+      tier === "admin"
+        ? "tools_sso_admin"
+        : tier === "gold"
+          ? "tools_sso_gold"
+          : "tools_sso_member",
   };
 }

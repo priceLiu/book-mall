@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { EcomAuthBanner } from "@/components/auth/ecom-auth-banner";
 import { EcomMobileBar } from "@/components/layout/ecom-mobile-bar";
+import { EcomPortalTopBar } from "@/components/layout/ecom-portal-top-bar";
 import { EcomProfileSidebar } from "@/components/layout/ecom-profile-sidebar";
 import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
@@ -72,6 +73,7 @@ export function EcomAppShell({
         className="hidden h-full md:flex"
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-[var(--ecom-parchment)] shadow-inner">
+        <EcomPortalTopBar authed={loggedIn} />
         <EcomMobileBar />
         <EcomAuthBanner />
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
