@@ -10,7 +10,7 @@ function base64UrlDecodeToString(segment: string): string {
 
 export type ToolsJwtPayload = {
   sub: string;
-  tier: "gold" | "admin";
+  tier: "gold" | "admin" | "member";
   toolsNavKeys?: string[];
   ecomBillingMode?: string;
   exp: number;
@@ -48,7 +48,12 @@ export function verifyToolsJwt(
   if (exp < Math.floor(Date.now() / 1000)) return null;
   const sub = typeof parsed.sub === "string" ? parsed.sub : "";
   if (!sub) return null;
-  const tier = parsed.tier === "admin" ? "admin" : "gold";
+  const tier: "gold" | "admin" | "member" =
+    parsed.tier === "admin"
+      ? "admin"
+      : parsed.tier === "member"
+        ? "member"
+        : "gold";
   const toolsNavKeys = Array.isArray(parsed.tools_nav_keys)
     ? (parsed.tools_nav_keys as unknown[]).filter((k) => typeof k === "string")
     : undefined;

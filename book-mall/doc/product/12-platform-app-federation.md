@@ -32,9 +32,20 @@
 | 自有门户 | 每个应用有自己的首页、导航、品牌（如 canvas-web、tool-web、story-web） |
 | 统一身份源 | Book `User` + NextAuth；子应用 **不** 维护独立账号体系 |
 | 互通协议 | Book SSO：`issue` / `re-enter` → 一次性 code → 子站 `exchange` → **platform access token**（今日实现名为 `tools_token`，可演进为标准 OIDC） |
-| 用户体验 | 主站已登录时 **静默换票**；未登录跳转 Book `/login?callbackUrl=…` |
+| 用户体验 | 主站已登录时 **静默换票**；未登录跳转 Book `/login?callbackUrl=…` 或门户自有品牌登录页 |
 
 **禁止** 长期并存两种互不兼容的互通方式（Cookie 透传 vs 换票 SSO）。Canvas 的 Cookie 代理为 **迁移前历史方案**。
+
+### 2.2.1 门户独立登录（画布 / 快速复制 / 电商）
+
+为独立推广与 SEO，画布、快速复制、电商工具箱各自域名可承载 **品牌化登录/注册/个人中心 UI**，但认证仍走 Book 单一真源（不重写认证逻辑）：
+
+- 共用校验：`lib/auth/verify-credentials.ts` 的 `verifyCredentialsLogin()`，NextAuth `authorize()` 与门户端点共用。
+- 门户端点：`POST /api/sso/portal/verify`（`Bearer TOOLS_SSO_SERVER_SECRET`）校验凭证后签发一次性 `autoLoginToken`；注册复用 `POST /api/auth/register`；短信复用 `/api/auth/sms/send`。子应用经 **BFF** 服务端调用，不向浏览器暴露 secret。
+- 建立会话：门户前端整页跳 Book `/portal-signin`，复用现有 NextAuth `autologin` 建立 Book 会话（共享身份），再走既有 `re-enter → exchange → callback` 落子应用 `tools_token`。
+- 无感切换：用户具 Book 会话后，跨门户仅一次不可见 `re-enter` 重定向；用户与积分为 Book 单账本，天然全站一致。
+
+**准入解耦**：登录/注册成功即可进门户（`member` tier 令牌，`tools_nav_keys` 可空）；`introspect` 返回 `active:true` + `entitled`。工具能力（生成）仍由 `assertPlatformGatewayEntitlement` 在调用时按工具月费 + Gateway 关联拦截。详见 `docs/门户独立开发需求.md`。
 
 ### 2.3 Book 是框架，第三方可接入
 

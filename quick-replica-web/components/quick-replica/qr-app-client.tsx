@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
-import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2 } from "lucide-react";
+import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
 
 import {
   QrGeneratePreviewModal,
@@ -11,6 +11,7 @@ import {
 import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
 import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
+import { QrHomeWorksPanel } from "@/components/quick-replica/qr-home-works-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
@@ -36,6 +37,12 @@ import {
   templateToWorkspaceDraft,
 } from "@/lib/qr-template-types";
 import { runQrGenerateJob, deleteQrUserTemplate } from "@/lib/run-qr-generate-job";
+import { PortalNav } from "@/components/portal-nav";
+import { getBookAccountUrl } from "@/lib/site-origin";
+import {
+  QR_HOME_FEED_CACHE_KEY,
+  buildHomeFeedTemplates,
+} from "@/lib/qr-home-feed";
 
 type SessionInfo = {
   name?: string | null;
@@ -104,6 +111,8 @@ export function QrAppClient({
   const isWorldBrowse =
     navMode === "category" && category === "world" && middleMode === "browse";
 
+  const bookAccountUrl = getBookAccountUrl();
+
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
     const parts = [templateScope];
@@ -120,10 +129,49 @@ export function QrAppClient({
   const browseKeyRef = useRef(browseKey);
   browseKeyRef.current = browseKey;
 
+  const navModeRef = useRef(navMode);
+  navModeRef.current = navMode;
+
+  const loadHomeFeed = useCallback(async (force = false) => {
+    if (!force) {
+      const cached = templatesCacheRef.current.get(QR_HOME_FEED_CACHE_KEY);
+      if (cached) {
+        setTemplates(cached);
+        setTemplatesLoading(false);
+        return;
+      }
+    } else {
+      templatesCacheRef.current.delete(QR_HOME_FEED_CACHE_KEY);
+    }
+
+    setTemplatesLoading(true);
+    const requestNav = "home";
+    try {
+      const categories = QR_CATEGORIES.map((c) => c.id);
+      const results = await Promise.all(
+        categories.map(async (cat) => {
+          const res = await fetchQrPlatform(
+            `/api/book-mall/api/platform/v1/quick-replica/templates?scope=all&category=${encodeURIComponent(cat)}`,
+          );
+          if (!res.ok) return [] as QrTemplate[];
+          const data = (await res.json()) as { templates?: QrTemplate[] };
+          return data.templates ?? [];
+        }),
+      );
+      if (navModeRef.current !== requestNav) return;
+      const feed = buildHomeFeedTemplates(results.flat());
+      templatesCacheRef.current.set(QR_HOME_FEED_CACHE_KEY, feed);
+      setTemplates(feed);
+    } finally {
+      if (navModeRef.current === requestNav) {
+        setTemplatesLoading(false);
+      }
+    }
+  }, []);
+
   const loadTemplates = useCallback(async () => {
     if (navMode === "home") {
-      setTemplates([]);
-      setTemplatesLoading(false);
+      await loadHomeFeed();
       return;
     }
 
@@ -162,7 +210,7 @@ export function QrAppClient({
         setTemplatesLoading(false);
       }
     }
-  }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory]);
+  }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory, loadHomeFeed]);
 
   const loadKinds = useCallback(async () => {
     if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool" || navMode === "generate-history") {
@@ -278,8 +326,64 @@ export function QrAppClient({
     setSelectedKind(null);
     setPinnedToolKey(null);
     setWorldOmniboxExpanded(false);
-    setTemplates([]);
+    const cached = templatesCacheRef.current.get(QR_HOME_FEED_CACHE_KEY);
+    setTemplates(cached ?? []);
+    setTemplatesLoading(!cached);
   };
+
+  const openCategoryWithKind = useCallback(
+    (cat: QrCategory, kind: string, toolKey?: string | null) => {
+      setNavMode("category");
+      setCategory(cat);
+      setPinnedToolKey(toolKey ?? getKindDef(kind)?.toolKey ?? null);
+      setSelectedKind(kind);
+
+      if (cat === "audio") {
+        setMiddleMode("workspace");
+        setDraft(defaultWorkspaceDraft({ category: cat, kind, toolKey: toolKey ?? undefined }));
+      } else if (cat === "world") {
+        setMiddleMode("browse");
+        setWorldOmniboxExpanded(false);
+        setDraft(defaultWorkspaceDraft({ category: cat, kind }));
+      } else {
+        setMiddleMode("browse");
+      }
+
+      const cachedKinds = kindsCacheRef.current.get(cat);
+      setKindItems(cachedKinds ?? []);
+      setKindsLoading(!cachedKinds);
+
+      const cacheKey = qrTemplateCacheKey("all", cat, kind);
+      let cachedTemplates = templatesCacheRef.current.get(cacheKey);
+      if (!cachedTemplates && cat === "video" && kind === "text-to-video") {
+        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
+      }
+      if (!cachedTemplates && cat === "image" && kind === "create-image") {
+        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
+      }
+      if (!cachedTemplates && cat === "character" && kind === "create-character") {
+        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
+      }
+      if (!cachedTemplates && cat === "audio" && kind === "create-voiceover") {
+        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
+      }
+      setTemplates(cachedTemplates ?? []);
+      setTemplatesLoading(true);
+    },
+    [],
+  );
+
+  const onSelectHomeWork = useCallback(
+    (t: QrTemplate) => {
+      openCategoryWithKind(t.category, t.kind, t.toolKey ?? getKindDef(t.kind)?.toolKey ?? null);
+    },
+    [openCategoryWithKind],
+  );
+
+  const refreshHomeFeed = useCallback(() => {
+    if (navModeRef.current !== "home") return;
+    void loadHomeFeed(true);
+  }, [loadHomeFeed]);
 
   const onCategory = (cat: QrCategory) => {
     setNavMode("category");
@@ -636,13 +740,13 @@ export function QrAppClient({
   return (
     <div className="flex h-dvh flex-col overflow-hidden" style={{ background: "var(--qr-bg-page)" }}>
       <header
-        className="flex shrink-0 items-center justify-between px-4 py-3"
+        className="flex shrink-0 items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
         style={{
           borderBottom: "1px solid var(--qr-border)",
           background: "var(--qr-bg-surface)",
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <button
             type="button"
             className="rounded-lg border p-2 lg:hidden"
@@ -653,21 +757,42 @@ export function QrAppClient({
             <Menu className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" style={{ color: "var(--qr-brand)" }} />
+            <Sparkles className="h-5 w-5 shrink-0" style={{ color: "var(--qr-brand)" }} />
             <span className="font-semibold">QuickReplica</span>
             <span className="hidden text-xs qr-panel-muted sm:inline">快速复制</span>
           </div>
         </div>
-        <div className="text-xs text-[var(--qr-text-secondary)]">
-          {session?.name ?? session?.phone ?? session?.email ?? "已登录"}
+
+        <div className="min-w-0 flex-1" aria-hidden />
+
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 [&::-webkit-scrollbar]:hidden">
+          <PortalNav current="quick-replica" />
+          <span className="hidden h-4 w-px shrink-0 bg-white/15 sm:block" aria-hidden />
+          {bookAccountUrl ? (
+            <a
+              href={bookAccountUrl}
+              className="hidden rounded-full border border-[var(--qr-border)] px-2.5 py-1.5 text-xs transition hover:bg-white/5 sm:inline"
+            >
+              个人中心
+            </a>
+          ) : null}
+          <span className="max-w-[100px] truncate text-xs text-[var(--qr-text-secondary)] md:max-w-[140px]">
+            {session?.name ?? session?.phone ?? session?.email ?? "已登录"}
+          </span>
           {canManageFeatured ? (
             <span
-              className="ml-2 rounded px-1.5 py-0.5 text-[10px]"
+              className="rounded px-1.5 py-0.5 text-[10px]"
               style={{ background: "rgba(59,130,246,0.25)", color: "#bfdbfe" }}
             >
               管理
             </span>
           ) : null}
+          <a
+            href="/api/auth/logout"
+            className="shrink-0 rounded-full border border-[var(--qr-border)] px-2.5 py-1.5 text-xs transition hover:bg-white/5"
+          >
+            退出
+          </a>
         </div>
       </header>
 
@@ -688,7 +813,16 @@ export function QrAppClient({
           onAdmin={canManageFeatured ? onAdmin : undefined}
         />
 
-        {isWorldBrowse ? (
+        {navMode === "home" ? (
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <QrHomeWorksPanel
+              templates={templates}
+              loading={templatesLoading}
+              onSelectWork={onSelectHomeWork}
+              onRefresh={refreshHomeFeed}
+            />
+          </main>
+        ) : isWorldBrowse ? (
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <QrWorldBrowsePanel
               templates={templates}
@@ -716,11 +850,7 @@ export function QrAppClient({
             ref={audioRightPanelRef}
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[400px]"
           >
-            {navMode === "home" ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-                选择分类后在此浏览模板
-              </div>
-            ) : category === "audio" && navMode === "category" ? (
+            {category === "audio" && navMode === "category" ? (
               <QrAudioRightPanel
                 key={browseKey || category}
                 category={category}
@@ -770,6 +900,16 @@ export function QrAppClient({
           background: "var(--qr-bg-surface)",
         }}
       >
+        <button
+          type="button"
+          onClick={onHome}
+          className={`flex flex-col items-center gap-1 rounded-full px-3 py-1 text-[10px] ${
+            navMode === "home" ? "qr-nav-category-active" : "text-[var(--qr-text-muted)]"
+          }`}
+        >
+          <Home className="h-4 w-4" />
+          首页
+        </button>
         {QR_CATEGORIES.map((c) => {
           const Icon = CATEGORY_ICONS[c.id];
           const active = navMode === "category" && category === c.id;

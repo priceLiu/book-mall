@@ -25,13 +25,13 @@ export function getBookOriginClient(): string {
 }
 
 /**
- * 经主站 Book SSO 登录并回到工具站指定路径。
- * 使用 /ecom-open 过渡页，避免直接打开 re-enter 出现空白页。
+ * 门户独立登录：跳本域品牌登录页（携带回跳），不再直接弹主站。
+ * 已有 Book 会话的用户由 `silentEcomSessionRefresh`（隐藏 iframe re-enter）无感续期，
+ * 无 Book 会话者在本域品牌页完成登录/注册。
  */
 export function buildEcomLoginUrl(returnPath = "/"): string {
-  const book = getBookOriginClient();
   const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
-  return `${book}/ecom-open?path=${encodeURIComponent(path)}`;
+  return `/login?redirect=${encodeURIComponent(path)}`;
 }
 
 export function throwIfUnauthorized(res: Response, data: Record<string, unknown>): void {

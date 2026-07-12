@@ -47,7 +47,11 @@ export async function POST(req: Request) {
 
   const elig = await getToolsSsoEligibility(row.userId);
   const ecomOk = await userCanAccessEcommerceToolkit(row.userId);
-  if (!elig.ok && !ecomOk) {
+  const entitled = elig.ok || ecomOk;
+  // 第三方注册客户端（Phase F）仍严格要求已开通；第一方门户（tool/canvas/story/quick-replica/
+  // e-commerce）登录 != 开通，未开通亦签发 member 令牌进门户，生成时再由网关复查 entitlement。
+  const isThirdParty = Boolean(row.clientId?.trim());
+  if (isThirdParty && !entitled) {
     await prisma.ssoAuthorizationCode.update({
       where: { id: row.id },
       data: { consumedAt: now },
@@ -91,7 +95,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (!elig.isAdmin && toolsNavKeys.length === 0 && !ecomOk) {
+  if (isThirdParty && !elig.isAdmin && toolsNavKeys.length === 0 && !ecomOk) {
     await prisma.ssoAuthorizationCode.update({
       where: { id: row.id },
       data: { consumedAt: now },

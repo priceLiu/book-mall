@@ -27,8 +27,11 @@ export function signToolsAccessToken(opts: {
   userId: string;
   secret: string;
   expiresInSec: number;
-  /** 主站签发：`gold` 会员工具准入，`admin` 为管理员直通（仍须 introspect 复核敏感路径）。 */
-  tier?: "gold" | "admin";
+  /**
+   * 主站签发：`gold` 会员工具准入，`admin` 管理员直通，`member` 已登录但未开通工具月费
+   * （门户会话；可进门户浏览，生成时再由网关复查 entitlement）。仍须 introspect 复核敏感路径。
+   */
+  tier?: "gold" | "admin" | "member";
   /** 工具站分组 navKey，不含套件外的自定义字符串（长度裁剪）。 */
   toolsNavKeys?: readonly string[];
   /** 电商工具箱计费模式 */
@@ -124,7 +127,7 @@ export function signToolsAccessToken(opts: {
 export type VerifiedToolsToken = {
   sub: string;
   aud: string;
-  tier: "gold" | "admin";
+  tier: "gold" | "admin" | "member";
   exp: number;
   email?: string;
   phone?: string;
@@ -142,8 +145,8 @@ export type VerifiedToolsToken = {
   sv?: number;
 };
 
-function pickTier(raw: unknown): "gold" | "admin" | null {
-  if (raw === "gold" || raw === "admin") return raw;
+function pickTier(raw: unknown): "gold" | "admin" | "member" | null {
+  if (raw === "gold" || raw === "admin" || raw === "member") return raw;
   return null;
 }
 

@@ -5,16 +5,9 @@ applyBookMallProductionOriginDefaults();
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { normalizePhone } from "@/lib/auth/phone";
-import {
-  SmsVerificationError,
-  verifySmsCode,
-} from "@/lib/auth/sms-verification-service";
-import { verifyAutoLoginToken } from "@/lib/auth/auto-login-token";
-import { allowDevMockAuth, DEV_AUTH_PASSWORD, isDevAuthPhone } from "@/lib/dev-mock-auth";
+import { verifyCredentialsLogin } from "@/lib/auth/verify-credentials";
 import {
   bumpSessionVersion,
   isSingleSessionEnforced,
@@ -88,55 +81,15 @@ export const authOptions: NextAuthOptions = {
         autoLoginToken: { label: "自动登录票据", type: "text" },
       },
       async authorize(credentials) {
-        const phone = normalizePhone(credentials?.phone);
-        if (!phone) return null;
-
-        const loginMode = credentials?.loginMode?.trim() || "password";
-        const inviteToken = credentials?.inviteToken?.trim() || undefined;
-
-        const user = await prisma.user.findUnique({
-          where: { phone },
-        });
-        if (!user) return null;
-
-        if (loginMode === "autologin") {
-          // 注册成功后免密自动登录：校验服务端签发的一次性票据，且票据 userId 与手机号匹配。
-          const tokenUserId = verifyAutoLoginToken(credentials?.autoLoginToken);
-          if (!tokenUserId || tokenUserId !== user.id) return null;
-        } else if (loginMode === "otp") {
-          const code = credentials?.code?.trim();
-          if (!code) return null;
-          try {
-            await verifySmsCode({
-              phoneRaw: phone,
-              purpose: inviteToken ? "TEAM_INVITE" : "LOGIN",
-              code,
-              inviteToken,
-            });
-          } catch (e) {
-            if (e instanceof SmsVerificationError) return null;
-            throw e;
-          }
-        } else if (loginMode === "password") {
-          const password = credentials?.password;
-          if (!password || !user.passwordHash) return null;
-          const ok = await bcrypt.compare(password, user.passwordHash);
-          if (!ok) return null;
-          if (allowDevMockAuth() && isDevAuthPhone(phone) && password === DEV_AUTH_PASSWORD) {
-            // dev test account
-          }
-        } else {
-          return null;
-        }
-
-        if (!user.phoneVerifiedAt) return null;
-
+        // 统一凭证校验（唯一真源，门户无头登录端点亦复用之）。
+        const verified = await verifyCredentialsLogin(credentials);
+        if (!verified) return null;
         return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
+          id: verified.id,
+          email: verified.email,
+          name: verified.name,
+          image: verified.image,
+          role: verified.role,
         };
       },
     }),

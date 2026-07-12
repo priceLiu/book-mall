@@ -8,7 +8,10 @@ import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import {
   getSessionVersion,
 } from "@/lib/auth-session-version";
-import { mergeEcomToolkitNavKeys } from "@/lib/ecom/ecom-access";
+import {
+  mergeEcomToolkitNavKeys,
+  userCanAccessEcommerceToolkit,
+} from "@/lib/ecom/ecom-access";
 import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
@@ -116,6 +119,8 @@ export async function GET(req: Request) {
 
   const tElig0 = performance.now();
   const elig = await getToolsSsoEligibility(verified.sub);
+  const ecomOk = await userCanAccessEcommerceToolkit(verified.sub);
+  const entitled = elig.ok || ecomOk;
   const msEligibility = performance.now() - tElig0;
 
   const headers = new Headers();
@@ -125,7 +130,7 @@ export async function GET(req: Request) {
   );
   headers.set(
     "X-Tools-Introspect-Phase",
-    elig.ok ? "ok" : "access_denied",
+    entitled ? "ok" : "authenticated_unentitled",
   );
 
   const baseDiag = {
@@ -135,23 +140,10 @@ export async function GET(req: Request) {
     userId: verified.sub,
   };
 
-  if (!elig.ok) {
-    logToolsIntrospectToConsole({
-      phase: "access_denied",
-      msJwtVerify,
-      msEligibility,
-      msTotal: performance.now() - tRoute,
-    });
-    const payload = {
-      active: false,
-      reason: "tools_access_denied" as const,
-      sub: verified.sub,
-    };
-    const body = diagEnabled ? mergeDiag(payload, { ...baseDiag, phase: "access_denied" }) : payload;
-    return NextResponse.json(body, { headers });
-  }
-
+  // 准入解耦：有效令牌 + 有效会话即视为 active（已登录门户会话）；是否已开通工具能力由
+  // `entitled` 表达。未开通用户可进门户浏览个人中心/定价/开通引导，生成时再由网关复查。
   logToolsIntrospectToConsole({
+    // 控制台仅记录会话是否有效；是否开通由响应体 `entitled` 表达。
     phase: "ok",
     msJwtVerify,
     msEligibility,
@@ -203,6 +195,7 @@ export async function GET(req: Request) {
 
   const payload = {
     active: true,
+    entitled,
     sub: verified.sub,
     tier: verified.tier,
     tools_role: elig.isAdmin ? ("admin" as const) : ("member" as const),

@@ -23,6 +23,12 @@ export function getMainSiteOrigin(): string | null {
   return u?.origin ?? null;
 }
 
+/** 主站个人中心（全站统一入口，子门户不承载独立账户页） */
+export function getBookAccountUrl(): string | null {
+  const origin = getMainSiteOrigin();
+  return origin ? `${origin.replace(/\/$/, "")}/account` : null;
+}
+
 export function getAppPublicOrigin(): string | null {
   const raw =
     process.env.QUICK_REPLICA_PUBLIC_ORIGIN?.trim() ||
