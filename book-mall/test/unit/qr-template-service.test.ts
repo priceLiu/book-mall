@@ -25,6 +25,35 @@ describe("qr-template-service", () => {
     expect(json.source).toBe("catalog");
   });
 
+  it("rowToJson merges gatewayRequestLogId from row column into output", () => {
+    const json = rowToJson({
+      id: "tpl-world-1",
+      category: "world",
+      kind: "create-world",
+      toolKey: null,
+      title: "My world",
+      thumbnailUrl: "https://example.com/thumb.webp",
+      badges: [],
+      ownerUserId: "user-1",
+      visibility: "private",
+      reference: {
+        slots: {},
+        prompt: { text: "forest", locale: "zh" },
+        model: { role: "IMAGE", modelKey: "marble-1.1", params: {} },
+      },
+      output: {
+        mediaType: "image",
+        url: "https://example.com/thumb.webp",
+        createdAt: "2026-06-20T00:00:00.000Z",
+      },
+      sortOrder: 0,
+      gatewayRequestLogId: "log-abc",
+      createdAt: new Date("2026-06-20T00:00:00.000Z"),
+      updatedAt: new Date("2026-06-20T00:00:00.000Z"),
+    });
+    expect(json.output?.gatewayRequestLogId).toBe("log-abc");
+  });
+
   it("buildPlatformCatalogWhere matches motion-sync catalog without toolKey", () => {
     const where = buildPlatformCatalogWhere({
       category: "video",

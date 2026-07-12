@@ -5,7 +5,6 @@ import {
   Clapperboard,
   Loader2,
   SlidersHorizontal,
-  Sparkles,
   Upload,
   Volume2,
   X,
@@ -15,6 +14,8 @@ import { useMemo, useRef, useState } from "react";
 import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
+import { QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
+import { QrTextToVideoModelPicker } from "@/components/quick-replica/qr-text-to-video-model-picker";
 import {
   GROK_I2V_ASPECT_RATIOS,
   GROK_I2V_DURATION_MAX,
@@ -33,7 +34,6 @@ import {
   SEEDANCE20_DURATION_MAX,
   SEEDANCE20_DURATION_MIN,
   SEEDANCE20_RESOLUTIONS,
-  TEXT_TO_VIDEO_MODELS,
   TEXT_TO_VIDEO_PROMPT_MAX_LENGTH,
   WAN_T2V_ASPECT_RATIOS,
   WAN_T2V_DURATION_MAX,
@@ -43,6 +43,7 @@ import {
   textToVideoModelSupportsSound,
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
+import { getT2vModelCatalogEntry } from "@/lib/qr-text-to-video-model-catalog";
 
 const PROMPT_MIN_HEIGHT = "min-h-[360px]";
 
@@ -246,6 +247,7 @@ export function QrTextToVideoForm({
   const [grokModeSheetOpen, setGrokModeSheetOpen] = useState(false);
 
   const selectedModel = getTextToVideoModelDef(draft.modelKey);
+  const catalogEntry = getT2vModelCatalogEntry(draft.modelKey);
   const profile = selectedModel.paramProfile;
   const usesImageTokens = "usesImageTokens" in selectedModel && selectedModel.usesImageTokens;
   const supportsSound = textToVideoModelSupportsSound(draft.modelKey);
@@ -365,26 +367,11 @@ export function QrTextToVideoForm({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <button
-        type="button"
-        onClick={() => setModelSheetOpen(true)}
-        disabled={busy}
-        className="qr-card flex w-full items-center gap-3 p-4 text-left disabled:opacity-60"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-500">
-          <Sparkles className="h-5 w-5 text-white" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs text-[var(--qr-text-muted)]">模型</span>
-          <span className="block text-sm font-medium text-[var(--qr-text-primary)]">
-            {selectedModel.label}
-          </span>
-          <span className="block text-xs text-[var(--qr-text-secondary)]">
-            {selectedModel.subtitle}
-          </span>
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-[var(--qr-text-muted)]" />
-      </button>
+      <QrModelPickerTrigger
+        entry={catalogEntry}
+        busy={busy}
+        onOpen={() => setModelSheetOpen(true)}
+      />
 
       <section className="qr-card flex min-h-0 flex-1 flex-col p-4">
         <label
@@ -694,22 +681,12 @@ export function QrTextToVideoForm({
         ) : null}
       </section>
 
-      {modelSheetOpen ? (
-        <OptionSheet
-          title="选择模型"
-          options={TEXT_TO_VIDEO_MODELS.map((m) => ({
-            value: m.modelKey,
-            label: `${m.label} · ${m.subtitle}`,
-            hint:
-              m.maxRefImages > 0
-                ? `最多 ${m.maxRefImages} 张参考图（可选）`
-                : "纯文生视频",
-          }))}
-          value={draft.modelKey}
-          onSelect={pickModel}
-          onClose={() => setModelSheetOpen(false)}
-        />
-      ) : null}
+      <QrTextToVideoModelPicker
+        open={modelSheetOpen}
+        selectedModelKey={draft.modelKey}
+        onSelect={pickModel}
+        onClose={() => setModelSheetOpen(false)}
+      />
 
       {modeSheetOpen ? (
         <OptionSheet

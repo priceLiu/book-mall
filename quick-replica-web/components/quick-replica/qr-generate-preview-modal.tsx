@@ -86,6 +86,18 @@ export function QrGeneratePreviewModal({
   };
 
   const audioGenerating = generating && isAudio;
+  const loadingHint =
+    generateDraft?.category === "world"
+      ? "场景生成中…"
+      : generateDraft?.category === "image" || generateDraft?.category === "character"
+        ? "图像生成中…"
+        : generateDraft?.category === "audio"
+          ? "音频生成中…"
+          : "视频生成中…";
+  const loadingEta =
+    generateDraft?.category === "world"
+      ? "3D 场景通常需要数分钟，请保持此窗口打开"
+      : "通常需要 1～3 分钟，请保持此窗口打开";
 
   return (
     <QrModal
@@ -122,10 +134,8 @@ export function QrGeneratePreviewModal({
               <div className="qr-generate-sweep pointer-events-none absolute inset-0" />
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/35">
                 <Loader2 className="h-10 w-10 animate-spin text-[var(--qr-brand)]" />
-                <p className="text-sm text-white/90">视频生成中…</p>
-                <p className="px-4 text-center text-xs text-white/55">
-                  通常需要 1～3 分钟，请保持此窗口打开
-                </p>
+                <p className="text-sm text-white/90">{loadingHint}</p>
+                <p className="px-4 text-center text-xs text-white/55">{loadingEta}</p>
               </div>
             </div>
           </div>

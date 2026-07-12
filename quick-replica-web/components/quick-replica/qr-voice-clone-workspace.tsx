@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Play, Trash2, Upload } from "lucide-react";
 
 import {
@@ -8,12 +8,18 @@ import {
   QrAudioOptionSheet,
 } from "@/components/quick-replica/qr-audio-form-parts";
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
+import { QrModelPicker, QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import {
   QR_VOICE_CLONE_PROMPT_MAX,
-  getQrVoiceCloneModelFromCatalog,
   getQrVoiceCloneModelsFromCatalog,
   useQrAudioCatalog,
 } from "@/lib/qr-audio-catalog-client";
+import {
+  buildAudioModelPickerCatalog,
+  buildAudioProviderOptions,
+  getAudioModelCatalogEntry,
+  QR_AUDIO_FEATURE_FILTER_OPTIONS,
+} from "@/lib/qr-audio-model-picker-catalog";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 
@@ -185,6 +191,19 @@ export function QrVoiceCloneForm({ draft, onDraftChange, busy }: Props) {
   const [langSheetOpen, setLangSheetOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const cloneModels = useMemo(
+    () => (catalog ? getQrVoiceCloneModelsFromCatalog(catalog) : []),
+    [catalog],
+  );
+  const modelCatalog = useMemo(
+    () => buildAudioModelPickerCatalog(cloneModels, "voice-clone"),
+    [cloneModels],
+  );
+  const catalogEntry = useMemo(
+    () => getAudioModelCatalogEntry(modelCatalog, draft.modelKey),
+    [modelCatalog, draft.modelKey],
+  );
+
   if (loading || !catalog) {
     return (
       <div className="space-y-4">
@@ -195,8 +214,6 @@ export function QrVoiceCloneForm({ draft, onDraftChange, busy }: Props) {
     );
   }
 
-  const cloneModels = getQrVoiceCloneModelsFromCatalog(catalog);
-  const model = getQrVoiceCloneModelFromCatalog(catalog, draft.modelKey);
   const refUrl = draft.referenceAudioUrl ?? draft.sourceAudioUrl ?? "";
   const promptLen = draft.prompt.length;
   const languageBoost = draft.languageBoost ?? catalog.defaults.languageBoost ?? "auto";
@@ -228,21 +245,13 @@ export function QrVoiceCloneForm({ draft, onDraftChange, busy }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <button
-        type="button"
-        onClick={() => setModelSheetOpen(true)}
-        disabled={busy}
-        className="qr-card flex w-full items-center gap-3 p-4 text-left disabled:opacity-60"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 text-sm font-semibold text-white">
-          AI
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs text-[var(--qr-text-muted)]">Audio model</span>
-          <span className="block text-sm font-medium text-[var(--qr-text-primary)]">{model.label}</span>
-          <span className="block text-xs text-[var(--qr-text-secondary)]">{model.subtitle}</span>
-        </span>
-      </button>
+      <QrModelPickerTrigger
+        entry={catalogEntry}
+        busy={busy}
+        label="Audio model"
+        subtitle={catalogEntry.description}
+        onOpen={() => setModelSheetOpen(true)}
+      />
 
       <section className="qr-card p-4">
         <h3 className="mb-3 text-sm font-medium text-[var(--qr-text-primary)]">
@@ -353,19 +362,18 @@ export function QrVoiceCloneForm({ draft, onDraftChange, busy }: Props) {
         </div>
       </section>
 
-      {modelSheetOpen ? (
-        <QrAudioOptionSheet
-          title="Voice clone model"
-          options={cloneModels.map((m) => ({
-            value: m.modelKey,
-            label: m.label,
-            hint: m.subtitle,
-          }))}
-          value={draft.modelKey}
-          onSelect={(modelKey) => onDraftChange({ ...draft, modelKey })}
-          onClose={() => setModelSheetOpen(false)}
-        />
-      ) : null}
+      <QrModelPicker
+        open={modelSheetOpen}
+        title="Voice clone model"
+        selectedModelKey={draft.modelKey}
+        catalog={modelCatalog}
+        filterOptions={{
+          providerOptions: buildAudioProviderOptions(modelCatalog),
+          featureOptions: QR_AUDIO_FEATURE_FILTER_OPTIONS,
+        }}
+        onSelect={(modelKey) => onDraftChange({ ...draft, modelKey })}
+        onClose={() => setModelSheetOpen(false)}
+      />
 
       {langSheetOpen ? (
         <QrAudioOptionSheet

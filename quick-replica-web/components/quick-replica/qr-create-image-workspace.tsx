@@ -13,7 +13,15 @@ import {
 import { useRef, useState } from "react";
 
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
+import { QrModelPicker, QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
+import {
+  getT2iModelCatalogEntry,
+  QR_T2I_CATEGORY_OPTIONS,
+  QR_T2I_FEATURE_FILTER_OPTIONS,
+  QR_T2I_MODEL_CATALOG,
+  QR_T2I_PROVIDER_OPTIONS,
+} from "@/lib/qr-text-to-image-model-catalog";
 import {
   FLUX2_RESOLUTIONS,
   GPT_IMAGE_1_QUALITIES,
@@ -23,7 +31,6 @@ import {
   NANO_PRO_RESOLUTIONS,
   QWEN_OUTPUT_FORMATS,
   SEEDREAM_QUALITIES,
-  TEXT_TO_IMAGE_MODELS,
   TEXT_TO_IMAGE_PROMPT_MAX_LENGTH,
   getTextToImageModelDef,
   type QrWorkspaceDraft,
@@ -157,6 +164,7 @@ export function QrCreateImageForm({
   const [formatSheetOpen, setFormatSheetOpen] = useState(false);
 
   const selectedModel = getTextToImageModelDef(draft.modelKey);
+  const catalogEntry = getT2iModelCatalogEntry(draft.modelKey);
   const profile = selectedModel.paramProfile;
   const maxRefImages = selectedModel.maxRefImages;
   const refImages = draft.sceneImageUrls.filter((u) => u.trim());
@@ -249,26 +257,11 @@ export function QrCreateImageForm({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <button
-        type="button"
-        onClick={() => setModelSheetOpen(true)}
-        disabled={busy}
-        className="qr-card flex w-full items-center gap-3 p-4 text-left disabled:opacity-60"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-500">
-          <Sparkles className="h-5 w-5 text-white" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs text-[var(--qr-text-muted)]">模型</span>
-          <span className="block text-sm font-medium text-[var(--qr-text-primary)]">
-            {selectedModel.label}
-          </span>
-          <span className="block text-xs text-[var(--qr-text-secondary)]">
-            {selectedModel.subtitle}
-          </span>
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-[var(--qr-text-muted)]" />
-      </button>
+      <QrModelPickerTrigger
+        entry={catalogEntry}
+        busy={busy}
+        onOpen={() => setModelSheetOpen(true)}
+      />
 
       <section className="qr-card flex min-h-0 flex-1 flex-col p-4">
         <label
@@ -390,22 +383,18 @@ export function QrCreateImageForm({
         </div>
       </section>
 
-      {modelSheetOpen ? (
-        <OptionSheet
-          title="选择模型"
-          options={TEXT_TO_IMAGE_MODELS.map((m) => ({
-            value: m.modelKey,
-            label: `${m.label} · ${m.subtitle}`,
-            hint:
-              m.maxRefImages > 0
-                ? `最多 ${m.maxRefImages} 张参考图（可选）`
-                : "纯文生图",
-          }))}
-          value={draft.modelKey}
-          onSelect={pickModel}
-          onClose={() => setModelSheetOpen(false)}
-        />
-      ) : null}
+      <QrModelPicker
+        open={modelSheetOpen}
+        selectedModelKey={draft.modelKey}
+        catalog={QR_T2I_MODEL_CATALOG}
+        filterOptions={{
+          providerOptions: QR_T2I_PROVIDER_OPTIONS,
+          categoryOptions: QR_T2I_CATEGORY_OPTIONS,
+          featureOptions: QR_T2I_FEATURE_FILTER_OPTIONS,
+        }}
+        onSelect={pickModel}
+        onClose={() => setModelSheetOpen(false)}
+      />
 
       {resolutionSheetOpen ? (
         <OptionSheet

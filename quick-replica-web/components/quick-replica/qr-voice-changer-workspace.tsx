@@ -1,16 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
 
 import {
   QrAudioModelPickerButton,
-  QrAudioOptionSheet,
   QrAudioVoiceControlHeading,
   QrAudioVoiceControlSlider,
   QrAudioVoicePickerButton,
 } from "@/components/quick-replica/qr-audio-form-parts";
+import { QrModelPicker } from "@/components/quick-replica/qr-model-picker";
 import { useQrAudioCatalog, isElevenLabsStsModelKey } from "@/lib/qr-audio-catalog-client";
+import {
+  buildAudioModelPickerCatalog,
+  buildAudioProviderOptions,
+  QR_AUDIO_FEATURE_FILTER_OPTIONS,
+} from "@/lib/qr-audio-model-picker-catalog";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 
@@ -51,6 +56,17 @@ export function QrVoiceChangerForm({
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const vcModels = useMemo(() => {
+    if (!catalog) return [];
+    return catalog.voiceChangerModels?.length
+      ? catalog.voiceChangerModels
+      : catalog.models.filter((m) => m.provider === "elevenlabs");
+  }, [catalog]);
+  const modelCatalog = useMemo(
+    () => buildAudioModelPickerCatalog(vcModels, "voice-changer"),
+    [vcModels],
+  );
+
   if (loading || !catalog) {
     return (
       <div className="space-y-4">
@@ -65,9 +81,6 @@ export function QrVoiceChangerForm({
   const similarity = draft.voiceSimilarityBoost ?? catalog.defaults.voiceSimilarityBoost;
   const exaggeration = draft.voiceStyleExaggeration ?? catalog.defaults.voiceStyleExaggeration;
   const sourceUrl = draft.sourceAudioUrl ?? draft.referenceAudioUrl ?? "";
-  const vcModels = catalog.voiceChangerModels?.length
-    ? catalog.voiceChangerModels
-    : catalog.models.filter((m) => m.provider === "elevenlabs");
   const showElevenControls = isElevenLabsStsModelKey(draft.modelKey);
 
   return (
@@ -76,6 +89,7 @@ export function QrVoiceChangerForm({
         catalog={{ ...catalog, models: vcModels }}
         modelKey={draft.modelKey}
         busy={busy}
+        kind="voice-changer"
         onOpen={() => setModelSheetOpen(true)}
       />
 
@@ -190,27 +204,26 @@ export function QrVoiceChangerForm({
         </section>
       ) : null}
 
-      {modelSheetOpen ? (
-        <QrAudioOptionSheet
-          title="Audio model"
-          options={vcModels.map((m) => ({
-            value: m.modelKey,
-            label: m.label,
-            hint: m.subtitle,
-          }))}
-          value={draft.modelKey}
-          onSelect={(modelKey) =>
-            onDraftChange({
-              ...draft,
-              modelKey,
-              voiceId: isElevenLabsStsModelKey(modelKey)
-                ? catalog.defaults.elevenVoiceId ?? draft.voiceId
-                : draft.voiceId,
-            })
-          }
-          onClose={() => setModelSheetOpen(false)}
-        />
-      ) : null}
+      <QrModelPicker
+        open={modelSheetOpen}
+        title="Audio model"
+        selectedModelKey={draft.modelKey}
+        catalog={modelCatalog}
+        filterOptions={{
+          providerOptions: buildAudioProviderOptions(modelCatalog),
+          featureOptions: QR_AUDIO_FEATURE_FILTER_OPTIONS,
+        }}
+        onSelect={(modelKey) =>
+          onDraftChange({
+            ...draft,
+            modelKey,
+            voiceId: isElevenLabsStsModelKey(modelKey)
+              ? catalog.defaults.elevenVoiceId ?? draft.voiceId
+              : draft.voiceId,
+          })
+        }
+        onClose={() => setModelSheetOpen(false)}
+      />
     </div>
   );
 }

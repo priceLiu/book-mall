@@ -1,4 +1,5 @@
 import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
+import type { QrTemplate } from "@/lib/qr-template-types";
 
 export type QrWorldViewerPayload = {
   worldId: string;
@@ -91,4 +92,24 @@ export async function fetchQrWorldViewerPayload(worldId: string): Promise<QrWorl
     throw new Error("场景数据无效");
   }
   return proxifyWorldViewerPayload(data);
+}
+
+/** 修复旧场景作品缺失的 world_id 元数据 */
+export async function repairQrWorldTemplate(
+  templateId: string,
+): Promise<{ template?: QrTemplate; error?: string }> {
+  const res = await fetchQrPlatform(
+    `/api/book-mall/api/platform/v1/quick-replica/templates/${encodeURIComponent(templateId)}/repair-world`,
+    { method: "POST" },
+  );
+  const data = (await res.json().catch(() => ({}))) as {
+    template?: QrTemplate;
+    error?: string;
+  };
+  if (!res.ok || !data.template) {
+    return {
+      error: formatQrPlatformError(data.error) || `修复失败（${res.status}）`,
+    };
+  }
+  return { template: data.template };
 }

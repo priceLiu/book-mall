@@ -32,6 +32,7 @@ import { qrCreateTextToAudioJob } from "@/lib/quick-replica/qr-text-to-audio-ser
 import {
   extractWorldOutputFromLog,
   qrCreateWorldJob,
+  qrMaterializeWorldJobTemplate,
   qrPollWorldJob,
   readWorldDraftFromLog,
 } from "@/lib/quick-replica/qr-world-service";
@@ -428,6 +429,9 @@ export async function qrMaterializeGenerateJobTemplate(
 
   const motion = await qrMaterializeMotionSyncJobTemplate(userId, logId);
   if (motion) return motion;
+
+  const world = await qrMaterializeWorldJobTemplate(userId, logId);
+  if (world) return world;
 
   const log = await prisma.gatewayRequestLog.findFirst({
     where: { id: logId, actorBookUserId: userId },

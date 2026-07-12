@@ -37,6 +37,7 @@ import {
   templateToWorkspaceDraft,
 } from "@/lib/qr-template-types";
 import { runQrGenerateJob, deleteQrUserTemplate } from "@/lib/run-qr-generate-job";
+import { formatQrPlatformError } from "@/lib/qr-platform-fetch";
 import { PortalNav } from "@/components/portal-nav";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import {
@@ -575,13 +576,24 @@ export function QrAppClient({
         undefined,
     );
 
-    const job = await runQrGenerateJob(draftToRun);
-    setGenerating(false);
-    setGenerateLogId(job.logId ?? null);
-    setGenerateResult(job);
-    setGeneratePhase(
-      job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed",
-    );
+    try {
+      const job = await runQrGenerateJob(draftToRun);
+      setGenerateLogId(job.logId ?? null);
+      setGenerateResult(job);
+      setGeneratePhase(
+        job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed",
+      );
+      if (job.status === "FAILED" && job.error) {
+        setCopyToast(formatQrPlatformError(job.error));
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "生成请求失败";
+      setGenerateResult({ status: "FAILED", error: message });
+      setGeneratePhase("failed");
+      setCopyToast(formatQrPlatformError(message));
+    } finally {
+      setGenerating(false);
+    }
   }, []);
 
   const onGenerateSaved = (template: QrTemplate) => {
