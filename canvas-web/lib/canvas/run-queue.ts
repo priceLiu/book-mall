@@ -13,6 +13,7 @@ import { useCanvasStore } from "./store";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "./resolve-sbv1-video-engine-inputs";
+import { sbv1VideoModelUsesPortraitLibrary } from "./sbv1-video-model-reference";
 import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
@@ -911,7 +912,16 @@ export function useCanvasRunner(
           typeof resolveSbv1VideoEngineInputs
         > | null = null;
         if (node.type === "sbv1-video-engine") {
-          if (base && projectId) {
+          const vdPre = node.data as {
+            engine?: { modelKey?: string; providerId?: string };
+          };
+          const engineModelKey = vdPre.engine?.modelKey?.trim() ?? "";
+          const engineProviderId = vdPre.engine?.providerId?.trim() ?? "";
+          if (
+            base &&
+            projectId &&
+            sbv1VideoModelUsesPortraitLibrary(engineModelKey, engineProviderId)
+          ) {
             await refreshSbv1UpstreamPortraitStatuses({
               base,
               engineNodeId: nodeId,
@@ -928,6 +938,7 @@ export function useCanvasRunner(
             prompt?: string;
             dockInput?: string;
             referenceMode?: string;
+            engine?: { modelKey?: string; providerId?: string };
           };
           const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
             nodeId,
@@ -948,10 +959,8 @@ export function useCanvasRunner(
               dockInputMode: (vd as { dockInputMode?: string }).dockInputMode as
                 | import("./sbv1-workspace-types").Sbv1DockInputMode
                 | undefined,
-              modelKey: (
-                (nodeAfterPortrait.data as { engine?: { modelKey?: string } })
-                  .engine?.modelKey ?? ""
-              ).trim() || undefined,
+              modelKey: vd.engine?.modelKey?.trim() || undefined,
+              providerId: vd.engine?.providerId?.trim() || undefined,
             },
           );
           if (!resolved.ok) {

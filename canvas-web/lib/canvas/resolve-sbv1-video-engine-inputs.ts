@@ -1,4 +1,5 @@
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
+import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import {
   dedupePortraitAssetRefs,
   type PortraitAssetRefPayload,
@@ -13,6 +14,7 @@ import {
   isSbv1VideoEngineRefImageNode,
   resolveSbv1UpstreamRefLinks,
 } from "./sbv1-upstream-ref-links";
+import { sbv1VideoModelUsesPortraitLibrary } from "./sbv1-video-model-reference";
 import type { Sbv1ReferenceMode } from "./sbv1-workspace-types";
 import { directPredecessors } from "./topo";
 import type { Sbv1VideoEngineNodeData } from "./sbv1-workspace-types";
@@ -60,9 +62,17 @@ function portraitRefWithRole(
 }
 
 function httpsOssFromImageNode(node: CanvasFlowNode): string | null {
-  const oss = String((node.data as { ossUrl?: string }).ossUrl ?? "").trim();
+  const d = node.data as {
+    ossUrl?: string;
+    blobUrl?: string;
+    modelKey?: string;
+    runtime?: { ossUrl?: string; ephemeralUrl?: string };
+  };
+  const oss = String(d.ossUrl ?? "").trim();
   if (/^https:\/\//.test(oss)) return oss;
-  const blob = String((node.data as { blobUrl?: string }).blobUrl ?? "").trim();
+  const fromRuntime = pickRuntimeImagePreviewUrl(d.runtime, d.modelKey ?? "");
+  if (fromRuntime && /^https:\/\//.test(fromRuntime)) return fromRuntime;
+  const blob = String(d.blobUrl ?? "").trim();
   if (/^https:\/\//.test(blob)) return blob;
   return null;
 }
@@ -71,25 +81,43 @@ type UpstreamMediaSlot =
   | { kind: "asset"; url: string }
   | { kind: "oss"; url: string };
 
-function resolveUpstreamMediaSlot(
+function resolveHttpsOssSlot(
   imgNode: CanvasFlowNode,
   previewUrl?: string,
-): UpstreamMediaSlot | "pending" | null {
-  const ref = portraitAssetRefFromNodeData(
-    imgNode.data as CanvasPortraitNodeFields,
+): string | null {
+  return (
+    httpsOssFromImageNode(imgNode) ??
+    (previewUrl && /^https:\/\//.test(previewUrl) ? previewUrl : null)
   );
-  if (ref) return { kind: "asset", url: ref.url };
+}
+
+/**
+ * 上游参考图解析：
+ * - Seedance（火山）：节点已打入库标记 active → asset://；否则 OSS HTTPS
+ * - 其它模型：一律 OSS HTTPS，忽略入库标记
+ */
+function resolveUpstreamMediaSlot(
+  imgNode: CanvasFlowNode,
+  previewUrl: string | undefined,
+  usePortraitLibrary: boolean,
+): UpstreamMediaSlot | "pending" | null {
+  if (!usePortraitLibrary) {
+    const oss = resolveHttpsOssSlot(imgNode, previewUrl);
+    return oss ? { kind: "oss", url: oss } : null;
+  }
 
   const importState = portraitImportUiState(
     imgNode.data as CanvasPortraitNodeFields,
   );
   if (importState === "pending") return "pending";
 
-  const oss = httpsOssFromImageNode(imgNode);
+  const ref = portraitAssetRefFromNodeData(
+    imgNode.data as CanvasPortraitNodeFields,
+  );
+  if (ref) return { kind: "asset", url: ref.url };
+
+  const oss = resolveHttpsOssSlot(imgNode, previewUrl);
   if (oss) return { kind: "oss", url: oss };
-  if (previewUrl && /^https:\/\//.test(previewUrl)) {
-    return { kind: "oss", url: previewUrl };
-  }
   return null;
 }
 
@@ -137,10 +165,10 @@ export function resolveSbv1VideoEngineEffectivePrompt(
 }
 
 /**
- * sbv1 视频合成 · Seedance 2.0 参考图：
- * - 已「私域人像入库」→ asset://（portraitAssetRefs）
- * - 未入库 → 公网 HTTPS OSS（imageInputs，与旧逻辑一致）
- * 真人人像主体须入库；虚拟/场景图可按需选择是否入库。
+ * sbv1 视频合成 · 参考图路由：
+ * - 仅 Seedance：已入库（portraitStatus=active）→ asset://；未入库 → OSS
+ * - 其它模型（百炼 R2V / 可灵 / KIE 等）：一律 OSS HTTPS，不要求入库
+ * - 全能参考（omni）：始终提交全部已连接参考图；@ 仅写在 prompt 里
  */
 export function resolveSbv1VideoEngineInputs(
   nodes: CanvasFlowNode[],
@@ -151,10 +179,15 @@ export function resolveSbv1VideoEngineInputs(
     referenceMode?: Sbv1ReferenceMode;
     dockInputMode?: import("./sbv1-workspace-types").Sbv1DockInputMode;
     modelKey?: string;
+    providerId?: string;
   },
 ): ResolveSbv1VideoEngineInputsResult {
   const prompt = String(opts.prompt ?? "").trim();
   const referenceMode = opts.referenceMode ?? "omni";
+  const usePortraitLibrary = sbv1VideoModelUsesPortraitLibrary(
+    opts.modelKey,
+    opts.providerId,
+  );
   const allowKlingTextToVideo =
     opts.modelKey?.trim() === "kling-3.0/video" &&
     opts.dockInputMode === "t2v";
@@ -163,10 +196,13 @@ export function resolveSbv1VideoEngineInputs(
     opts.modelKey?.trim() === "topaz/video-upscale";
   const upstreamLinks = resolveSbv1UpstreamRefLinks(engineNodeId, nodes, edges);
   const mentionedIds = parseReferencedIds(prompt);
-  const activeLinks =
-    mentionedIds.length > 0
-      ? upstreamLinks.filter((l) => mentionedIds.includes(l.id))
-      : upstreamLinks;
+  // 全能参考：始终提交全部已连接参考图（@ 仅影响 prompt 文案，不裁剪参考图列表）
+  // 其它模式：有 @ 时仅提交被引用项；@ id 失效时回退全部（与 dockMentionRefUrlsForPrompt 一致）
+  let activeLinks = upstreamLinks;
+  if (referenceMode !== "omni" && mentionedIds.length > 0) {
+    const mentioned = upstreamLinks.filter((l) => mentionedIds.includes(l.id));
+    if (mentioned.length > 0) activeLinks = mentioned;
+  }
 
   const slots: UpstreamMediaSlot[] = [];
   const pendingImport: string[] = [];
@@ -174,14 +210,20 @@ export function resolveSbv1VideoEngineInputs(
   for (const link of activeLinks) {
     const imgNode = nodes.find((n) => n.id === link.sourceNodeId);
     if (!imgNode || !isSbv1VideoEngineRefImageNode(imgNode)) continue;
-    if (
-      !link.previewUrl &&
-      !isPortraitNodeActive(imgNode.data as CanvasPortraitNodeFields) &&
-      !httpsOssFromImageNode(imgNode)
-    ) {
+
+    const hasOss = Boolean(resolveHttpsOssSlot(imgNode, link.previewUrl));
+    const portraitActive = isPortraitNodeActive(
+      imgNode.data as CanvasPortraitNodeFields,
+    );
+    if (!hasOss && !(usePortraitLibrary && portraitActive)) {
       continue;
     }
-    const slot = resolveUpstreamMediaSlot(imgNode, link.previewUrl);
+
+    const slot = resolveUpstreamMediaSlot(
+      imgNode,
+      link.previewUrl,
+      usePortraitLibrary,
+    );
     if (slot === "pending") {
       pendingImport.push(link.label);
       continue;
@@ -189,7 +231,7 @@ export function resolveSbv1VideoEngineInputs(
     if (slot) slots.push(slot);
   }
 
-  if (pendingImport.length > 0) {
+  if (usePortraitLibrary && pendingImport.length > 0) {
     return {
       ok: false,
       error: `参考图 ${pendingImport.join("、")} 仍在火山侧处理中。请在对应图片节点等待标题栏勾标出现后再生成。`,
@@ -273,6 +315,14 @@ export function resolveSbv1VideoEngineInputs(
       error: isTopazHdVideo
         ? "请连接上游视频节点后再生成高清视频。"
         : "请填写 prompt 或连接至少一张参考图。",
+    };
+  }
+
+  if (!usePortraitLibrary && dedupedImages.length === 0 && upstreamLinks.length > 0) {
+    return {
+      ok: false,
+      error:
+        "请确认上游图片已生成完成并上传 OSS 后再生成视频（非 Seedance 模型直接使用 OSS 参考图，无需入库）。",
     };
   }
 

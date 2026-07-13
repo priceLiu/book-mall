@@ -12,6 +12,7 @@ import {
 } from "@/lib/gateway/proxy-common";
 import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
+import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
 import {
   routeGatewayModel,
   UnknownGatewayModelError,
@@ -192,17 +193,30 @@ export async function POST(request: NextRequest) {
     route.providerKind === "BAILIAN" && BAILIAN_R2V.has(model.toLowerCase());
   const b = body.bailian ?? {};
   const inputForLog: Record<string, unknown> = isBailianR2v
-    ? {
-        prompt: String(b.prompt ?? body.input?.prompt ?? "").trim(),
-        referenceImageUrls: Array.isArray(b.referenceImageUrls)
+    ? (() => {
+        const prompt = String(b.prompt ?? body.input?.prompt ?? "").trim();
+        const referenceImageUrls = Array.isArray(b.referenceImageUrls)
           ? b.referenceImageUrls.filter((u): u is string => typeof u === "string")
-          : [],
-        resolution: b.resolution === "720P" ? "720P" : "1080P",
-        ratio: String(b.ratio ?? "16:9"),
-        duration: Number(b.duration ?? 5),
-        ...(b.seedStr ? { seed: b.seedStr } : {}),
-        ...(b.parameterExtras ?? {}),
-      }
+          : [];
+        const resolution = b.resolution === "720P" ? "720P" : "1080P";
+        const ratio = String(b.ratio ?? "16:9");
+        const duration = Number(b.duration ?? 5);
+        const built = buildBailianR2vRequestBody({
+          model,
+          prompt,
+          referenceImageUrls,
+          resolution,
+          ratio,
+          duration,
+          seedStr: typeof b.seedStr === "string" ? b.seedStr : undefined,
+          parameterExtras: b.parameterExtras,
+        });
+        return {
+          ...built.input,
+          parameters: built.parameters,
+          referenceImageUrls,
+        };
+      })()
     : (body.input ?? {});
 
   let log;
@@ -412,14 +426,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (isBailianR2v) {
-      const prompt = String(inputForLog.prompt ?? "").trim();
-      const referenceImageUrls = Array.isArray(inputForLog.referenceImageUrls)
-        ? inputForLog.referenceImageUrls.filter(
+      const prompt = String(b.prompt ?? body.input?.prompt ?? "").trim();
+      const referenceImageUrls = Array.isArray(b.referenceImageUrls)
+        ? b.referenceImageUrls.filter(
             (u): u is string => typeof u === "string",
           )
         : [];
-      const resolution =
-        inputForLog.resolution === "720P" ? "720P" : "1080P";
+      const resolution = b.resolution === "720P" ? "720P" : "1080P";
       const taskId = await submitBailianR2vJobForLog({
         logId: log.id,
         credentialId,
@@ -427,8 +440,8 @@ export async function POST(request: NextRequest) {
         prompt,
         referenceImageUrls,
         resolution,
-        ratio: String(inputForLog.ratio ?? "16:9"),
-        duration: Number(inputForLog.duration ?? 5),
+        ratio: String(b.ratio ?? "16:9"),
+        duration: Number(b.duration ?? 5),
         seedStr: typeof b.seedStr === "string" ? b.seedStr : undefined,
         parameterExtras: b.parameterExtras,
       });

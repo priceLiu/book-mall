@@ -1,6 +1,7 @@
 "use client";
 
 import { nanoid } from "nanoid";
+import { duplicateCanvasNodeData } from "./clone-node-data";
 import {
   ensurePro2FrameBoardToVideoBoardEdge,
   ensurePro2HubToMediaGroupEdge,
@@ -64,6 +65,8 @@ export function duplicateMediaGroupInGraph(
     },
   };
 
+  const childIdSet = new Set(children.map((c) => c.id));
+
   const newChildren: CanvasFlowNode[] = children.map((c) => {
     const newId = idMap.get(c.id)!;
     const cd = c.data as Record<string, unknown>;
@@ -74,7 +77,7 @@ export function duplicateMediaGroupInGraph(
       parentId: newGroupId,
       extent: "parent" as const,
       data: {
-        ...structuredClone(cd),
+        ...duplicateCanvasNodeData(cd, true),
         pro2GroupId: newGroupId,
       },
     };
@@ -124,6 +127,23 @@ export function duplicateMediaGroupInGraph(
       newGroupId,
     );
   }
+
+  const duplicatedInternalEdges: CanvasFlowEdge[] = edges
+    .filter(
+      (e) =>
+        childIdSet.has(e.source) &&
+        childIdSet.has(e.target) &&
+        idMap.has(e.source) &&
+        idMap.has(e.target),
+    )
+    .map((e) => ({
+      ...e,
+      id: `e_${nanoid(8)}`,
+      source: idMap.get(e.source)!,
+      target: idMap.get(e.target)!,
+    }));
+
+  nextEdges = [...nextEdges, ...duplicatedInternalEdges];
 
   return { nodes: nextNodes, edges: nextEdges, newGroupId };
 }

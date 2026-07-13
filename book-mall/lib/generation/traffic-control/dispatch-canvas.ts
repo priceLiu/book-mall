@@ -72,8 +72,9 @@ async function submitCanvasVideoToGateway(
     const refs = Array.isArray(payload.referenceImageUrls)
       ? (payload.referenceImageUrls as string[])
       : [];
-    const resolution =
-      String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
+    const resolution = /^720p$/i.test(String(params.resolution ?? ""))
+      ? "720P"
+      : "1080P";
     const job = await canvasGwCreateBailianR2vJob(userId, {
       model: task.model,
       prompt: String(payload.prompt ?? ""),

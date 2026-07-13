@@ -44,6 +44,14 @@ function isVolcengineSbv1Model(modelKey: string, providerId?: string): boolean {
   );
 }
 
+/** 仅火山 Seedance 生视频须走人像库 asset://；其它模型一律用 OSS HTTPS */
+export function sbv1VideoModelUsesPortraitLibrary(
+  modelKey?: string,
+  providerId?: string,
+): boolean {
+  return isVolcengineSbv1Model(modelKey?.trim() ?? "", providerId);
+}
+
 export function getSbv1VideoModelRefCaps(
   modelKey: string,
   opts?: { multiShots?: boolean; providerId?: string },

@@ -21,6 +21,28 @@ export function mergeCanvasNodeInitialData(
   };
 }
 
+/** 复制时去掉进行中的 runtime，避免「生成中」扫光跟到副本节点 */
+function stripInflightRuntimeOnDuplicate(
+  runtime: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const status = runtime.status;
+  const hasOutput =
+    Boolean(String(runtime.ossUrl ?? "").trim()) ||
+    Boolean(String(runtime.ephemeralUrl ?? "").trim());
+  if (status === "pending" || status === "running") {
+    if (!hasOutput) return undefined;
+    const next = { ...runtime };
+    delete next.taskId;
+    delete next.activeTaskId;
+    next.status = "done";
+    return next;
+  }
+  const next = { ...runtime };
+  delete next.taskId;
+  delete next.activeTaskId;
+  return next;
+}
+
 /** 复制节点 data：可选保留内容；保留时解绑 taskId，避免轮询写回源节点任务 */
 export function duplicateCanvasNodeData(
   srcData: Record<string, unknown>,
@@ -29,13 +51,23 @@ export function duplicateCanvasNodeData(
   if (!preserveContent) {
     const next = cloneCanvasNodeData(srcData);
     delete next.runtime;
+    delete next.activeTaskId;
+    delete next.uploading;
+    delete next.uploadError;
     return next;
   }
   const next = cloneCanvasNodeData(srcData);
   const rt = next.runtime;
   if (rt && typeof rt === "object" && !Array.isArray(rt)) {
-    next.runtime = { ...(rt as Record<string, unknown>), taskId: undefined };
+    const cleaned = stripInflightRuntimeOnDuplicate(
+      rt as Record<string, unknown>,
+    );
+    if (cleaned) next.runtime = cleaned;
+    else delete next.runtime;
   }
+  delete next.activeTaskId;
+  delete next.uploading;
+  delete next.uploadError;
   return next;
 }
 
