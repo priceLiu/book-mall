@@ -165,6 +165,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       referenceMode: latestData.referenceMode ?? "omni",
       dockInputMode: latestData.dockInputMode,
       modelKey: latestData.engine?.modelKey,
+      providerId: latestData.engine?.providerId,
     });
     if (!resolved.ok) {
       revertPending();

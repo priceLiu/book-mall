@@ -1220,6 +1220,18 @@ export async function runVideoEngineNode(
     ].filter(
       (u, i, arr) => Boolean(u?.trim()) && arr.indexOf(u) === i,
     );
+    if (referenceImageUrlsForR2v.length < 1) {
+      if (portraitAssetRefs.length > 0) {
+        throw new CanvasProjectError(
+          "INVALID_INPUT",
+          "该模型需要公网 HTTPS 参考图，不支持人像库 asset://。请使用 OSS 原图，或改用火山 Seedance 模型。",
+        );
+      }
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "百炼参考生视频需要至少 1 张参考图",
+      );
+    }
     return runRefVideoEngineNode({
       ...args,
       node: {
@@ -1923,9 +1935,10 @@ export async function runRefVideoEngineNode(
   await ensureUserInflightCapacity(userId);
 
   if (isBailian) {
-    const resolution =
-      String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
-    const ratio = String(params.ratio ?? "16:9");
+    const resolution = /^720p$/i.test(String(params.resolution ?? ""))
+      ? "720P"
+      : "1080P";
+    const ratio = String(params.ratio ?? params.aspect_ratio ?? "16:9");
     const duration = Number(params.duration ?? 5);
     const seedStr = String(params.seed ?? "");
     const parameterExtras: Record<string, unknown> = {};

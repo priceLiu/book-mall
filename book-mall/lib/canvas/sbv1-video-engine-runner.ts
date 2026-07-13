@@ -11,6 +11,7 @@ import {
 import {
   clampSbv1ReferenceMode,
   getSbv1VideoModelRefCaps,
+  sbv1VideoModelUsesPortraitLibrary,
 } from "./sbv1-video-model-reference";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 
@@ -49,9 +50,15 @@ export async function runSbv1VideoEngineNode(
   ).toLowerCase();
 
   const promptRaw = String(data.prompt ?? "").trim();
-  const portraitRefs = args.node.portraitAssetRefs ?? [];
+  const usesPortraitLibrary = sbv1VideoModelUsesPortraitLibrary(
+    modelKey,
+    providerId,
+  );
+  const portraitRefs = usesPortraitLibrary
+    ? (args.node.portraitAssetRefs ?? [])
+    : [];
   const hasPortraitRefs = portraitRefs.length > 0;
-  /** 已入库走 asset://；未入库仍走 HTTPS OSS（可与 asset 混用） */
+  /** Seedance：已入库 asset://；其它模型：仅 OSS HTTPS */
   const imageInputs = httpsImageUrls(args.node.imageInputs ?? []);
 
   if (!providerId || !modelKey) {
@@ -185,6 +192,15 @@ export async function runSbv1VideoEngineNode(
   }
 
   params.aspect_ratio = aspectRatio;
+  const refApi = getSbv1VideoModelRefCaps(modelKey, {
+    multiShots: params.multi_shots === true,
+    providerId,
+  }).refApi;
+  if (refApi === "bailian_r2v_media") {
+    params.ratio = aspectRatio;
+    params.resolution = /^720p$/i.test(resolution) ? "720P" : "1080P";
+    params.duration = durationSec;
+  }
   if (referenceMode !== "smart_multi") {
     params.duration = durationSec;
   }
@@ -254,7 +270,7 @@ export async function runSbv1VideoEngineNode(
       ...args.node,
       type: "video-engine",
       modelKey,
-      portraitAssetRefs: args.node.portraitAssetRefs,
+      portraitAssetRefs: usesPortraitLibrary ? args.node.portraitAssetRefs : [],
       data: {
         providerId,
         modelKey,

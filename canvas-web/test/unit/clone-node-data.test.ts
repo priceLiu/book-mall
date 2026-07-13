@@ -35,6 +35,33 @@ describe("clone-node-data", () => {
     expect(src.prompt).toBe("a");
   });
 
+  it("duplicate drops in-flight runtime without output", () => {
+    const src = {
+      prompt: "a",
+      runtime: { status: "running", taskId: "task_1" },
+      uploading: true,
+    };
+    const dup = duplicateCanvasNodeData(src, true);
+    expect(dup.runtime).toBeUndefined();
+    expect(dup.uploading).toBeUndefined();
+  });
+
+  it("duplicate keeps completed output but clears in-flight status", () => {
+    const src = {
+      runtime: {
+        status: "running",
+        taskId: "task_1",
+        ossUrl: "https://x/frame.png",
+      },
+    };
+    const dup = duplicateCanvasNodeData(src, true);
+    expect((dup.runtime as { status?: string }).status).toBe("done");
+    expect((dup.runtime as { taskId?: string }).taskId).toBeUndefined();
+    expect((dup.runtime as { ossUrl?: string }).ossUrl).toBe(
+      "https://x/frame.png",
+    );
+  });
+
   it("detects shared data references between nodes", () => {
     const shared = { prompt: "x" };
     const nodes = [{ id: "a", data: shared }, { id: "b", data: shared }];

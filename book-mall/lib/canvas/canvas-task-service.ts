@@ -1947,8 +1947,9 @@ export async function runCanvasPollWorker(opts?: {
           )
         : [];
       const params = (payload.params as Record<string, unknown>) ?? {};
-      const resolution =
-        String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
+      const resolution = /^720p$/i.test(String(params.resolution ?? ""))
+        ? "720P"
+        : "1080P";
       const modelKey = String(payload.modelKey ?? task.model);
       try {
         const job = await Promise.race([
@@ -1957,7 +1958,7 @@ export async function runCanvasPollWorker(opts?: {
             prompt: String(payload.prompt ?? ""),
             referenceImageUrls: refs,
             resolution,
-            ratio: String(params.ratio ?? "16:9"),
+            ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
             duration: Number(params.duration ?? 5),
             seedStr: String(params.seed ?? ""),
             parameterExtras:

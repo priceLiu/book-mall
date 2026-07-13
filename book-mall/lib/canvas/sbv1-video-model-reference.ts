@@ -24,6 +24,16 @@ const VOLCENGINE_VIDEO_KEYS = new Set([
   "doubao-seedance-1.5-pro",
 ]);
 
+/** 仅火山 Seedance 生视频须走人像库 asset://；其它模型一律用 OSS HTTPS */
+export function sbv1VideoModelUsesPortraitLibrary(
+  modelKey: string,
+  providerId?: string,
+): boolean {
+  const k = modelKey.trim();
+  const pid = providerId?.trim() ?? "";
+  return pid.includes("volcengine") || VOLCENGINE_VIDEO_KEYS.has(k);
+}
+
 const MOTION_KEYS = new Set([
   "kling-2.6/motion-control",
   "kling-3.0/motion-control",
