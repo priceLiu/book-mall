@@ -8,12 +8,15 @@ export type CanvasNavItem = {
 export const CANVAS_NAV_ITEMS: CanvasNavItem[] = [
   { href: "/", label: "首页" },
   { href: "/projects", label: "我的画布" },
+];
+
+/** 「我的画布」内页居中子导航（原顶栏二级入口） */
+export const CANVAS_PROJECTS_SUB_NAV: CanvasNavItem[] = [
   { href: "/assets", label: "项目资产" },
-  { href: "/style-library", label: "风格库" },
-  { href: "/gallery", label: "画作" },
-  { href: "/settings/providers", label: "配置" },
+  { href: "/characters", label: "角色库" },
+  { href: "/scripts", label: "脚本" },
+  { href: "/storyboards", label: "分镜" },
   { href: "/guides/project-assets", label: "资产指南" },
-  { href: "/implementation", label: "实现逻辑" },
 ];
 
 export function getCanvasWebOrigin(): string {

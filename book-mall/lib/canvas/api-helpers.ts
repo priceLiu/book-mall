@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { resolvePlatformUser } from "@/lib/platform-auth";
+import { getToolsSsoEligibility } from "@/lib/tools-sso-access";
+import { prisma } from "@/lib/prisma";
 import { canvasCorsHeaders } from "./cors";
 import { CanvasProjectError } from "./canvas-project-service";
 import { CanvasProviderError } from "./canvas-provider-service";
@@ -47,19 +49,49 @@ export async function requireSessionUser(
       ),
     };
   }
+  let role = user.role;
+  if (!role) {
+    try {
+      const row = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { role: true },
+      });
+      role = row?.role ?? undefined;
+    } catch {
+      /* 不阻塞鉴权 */
+    }
+  }
   return {
     ok: true,
     user: {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role,
     },
   };
 }
 
+export function isAdminRole(role: string | null | undefined): boolean {
+  const r = (role ?? "").trim().toUpperCase();
+  return r === "ADMIN" || r === "SUPER_ADMIN";
+}
+
 export function isAdmin(user: AuthorizedSessionUser): boolean {
-  return user.role === "admin";
+  return isAdminRole(user.role);
+}
+
+/** Canvas API 管理员：Session role 或 DB（兼容 tools Bearer 无 role 字段） */
+export async function resolveCanvasApiAdmin(
+  user: AuthorizedSessionUser,
+): Promise<boolean> {
+  if (isAdmin(user)) return true;
+  try {
+    const elig = await getToolsSsoEligibility(user.id);
+    return elig.isAdmin;
+  } catch {
+    return false;
+  }
 }
 
 /** schema 已含 VOLCENGINE 等枚举，但运行中 Prisma Client 未 regenerate */

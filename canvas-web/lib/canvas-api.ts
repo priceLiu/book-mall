@@ -238,6 +238,52 @@ export async function listMyCanvasProjects(
   return Array.isArray(j.projects) ? j.projects : [];
 }
 
+export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
+  portalFeaturedBlurb: string;
+};
+
+/** 门户首页 · 精选示例项目（与「我的画布」同源 thumbnailUrl） */
+export async function listPortalFeaturedProjects(
+  base: string,
+): Promise<PortalFeaturedProjectSummary[]> {
+  const j = await call<{ projects: PortalFeaturedProjectSummary[] }>(
+    base,
+    "/api/canvas/projects/portal-featured",
+  );
+  return Array.isArray(j.projects) ? j.projects : [];
+}
+
+/** 从门户示例复制到当前用户画布 */
+export async function duplicatePortalFeaturedProject(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const j = await call<{ project: CanvasProjectDetail }>(
+    base,
+    `/api/canvas/projects/portal-featured/${id}/duplicate`,
+    { method: "POST" },
+  );
+  return j.project;
+}
+
+/** 管理员 · 设置/取消门户精选 */
+export async function patchPortalFeaturedProject(
+  base: string,
+  id: string,
+  patch: { featured: boolean; sort?: number; blurb?: string },
+): Promise<PortalFeaturedProjectSummary> {
+  const j = await call<{ project: PortalFeaturedProjectSummary }>(
+    base,
+    `/api/canvas/projects/${id}/portal-featured`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return j.project;
+}
+
 export async function createCanvasProject(
   base: string,
   args: { name: string; description?: string; canvas?: unknown },
@@ -782,26 +828,46 @@ export type CanvasTemplateRecord = {
   name: string;
   category: string;
   thumbnail: string;
+  /** 与项目列表 thumbnailUrl 同源（服务端从 canvas 回填） */
+  thumbnailUrl?: string;
+  description?: string;
+  visibility?: string;
+  featured?: boolean;
+  edition?: string;
+  forkCount?: number;
+  sourceLabel?: string;
   builtin: boolean;
   ownerUserId: string | null;
   canvas: unknown;
   createdAt: string;
   updatedAt: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
 export async function listCanvasTemplates(
   base: string,
+  scope?: "featured" | "public" | "my" | "all",
 ): Promise<CanvasTemplateRecord[]> {
+  const qs = scope && scope !== "all" ? `?scope=${encodeURIComponent(scope)}` : "";
   const j = await call<{ templates: CanvasTemplateRecord[] }>(
     base,
-    "/api/canvas/templates",
+    `/api/canvas/templates${qs}`,
   );
   return Array.isArray(j.templates) ? j.templates : [];
 }
 
 export async function saveCanvasTemplate(
   base: string,
-  args: { name: string; canvas: unknown; category?: string; thumbnail?: string },
+  args: {
+    name: string;
+    canvas: unknown;
+    category?: string;
+    thumbnail?: string;
+    description?: string;
+    edition?: string;
+    sourceLabel?: string;
+    visibility?: "private" | "public";
+  },
 ): Promise<CanvasTemplateRecord> {
   const j = await call<{ template: CanvasTemplateRecord }>(
     base,
@@ -811,6 +877,48 @@ export async function saveCanvasTemplate(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(args),
     },
+  );
+  return j.template;
+}
+
+export async function patchCanvasTemplate(
+  base: string,
+  id: string,
+  patch: {
+    name?: string;
+    description?: string;
+    visibility?: "private" | "public";
+  },
+): Promise<CanvasTemplateRecord> {
+  const j = await call<{ template: CanvasTemplateRecord }>(
+    base,
+    `/api/canvas/templates/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return j.template;
+}
+
+export async function deleteCanvasTemplate(
+  base: string,
+  id: string,
+): Promise<void> {
+  await call(base, `/api/canvas/templates/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function forkCanvasTemplate(
+  base: string,
+  id: string,
+): Promise<CanvasTemplateRecord> {
+  const j = await call<{ template: CanvasTemplateRecord }>(
+    base,
+    `/api/canvas/templates/${encodeURIComponent(id)}/fork`,
+    { method: "POST" },
   );
   return j.template;
 }

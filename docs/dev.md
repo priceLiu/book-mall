@@ -134,6 +134,21 @@ pnpm build:prompt-vendor:copy  # 仅拷贝已有 packages/web/dist（跳过 buil
 
 Agent 约束见 `.cursor/rules/prompt-optimizer-platform-build.mdc`。
 
+## canvas-web · 门户路由（:3004）
+
+| 路由 | 说明 |
+|------|------|
+| `/` | 首页：精选工作流（Featured）+ 社区模板（Templates） |
+| `/projects` | 我的画布列表 |
+| `/assets` | 项目资产（子导航） |
+| `/characters` | 角色库（子导航） |
+| `/scripts` | 脚本包列表（子导航） |
+| `/storyboards` | 分镜产出（子导航） |
+| `/guides/project-assets` | 资产指南（子导航） |
+| `/canvas/[id]` | 画布编辑（组顶栏/工具栏可分享工作流） |
+
+功能需求详见 `canvas-web/docs/canvas-portal-product-requirements.md`。
+
 ## QuickReplica · MiniMax 音色同步
 
 MiniMax 系统音色与试听 MP3 经离线脚本写入 OSS，并生成 `book-mall/content/quick-replica/minimax-voice-catalog.json` 供 Platform API 分页读取。

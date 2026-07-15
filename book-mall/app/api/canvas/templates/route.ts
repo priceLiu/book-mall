@@ -8,26 +8,73 @@ import {
 } from "@/lib/canvas/api-helpers";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { resolveListThumbnailUrl } from "@/lib/canvas/resolve-list-thumbnail";
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
 }
 
-/** GET：当前用户可见模板 = 内置 (builtin=true) + 私有 (ownerUserId=user) */
+function templateSelect() {
+  return {
+    id: true,
+    name: true,
+    category: true,
+    thumbnail: true,
+    description: true,
+    visibility: true,
+    featured: true,
+    edition: true,
+    forkCount: true,
+    sourceLabel: true,
+    builtin: true,
+    ownerUserId: true,
+    canvas: true,
+    sortOrder: true,
+    createdAt: true,
+    updatedAt: true,
+    owner: { select: { id: true, name: true, email: true } },
+  } as const;
+}
+
+/** GET：scope=featured|public|my|all（默认 all = builtin + 自己的） */
 export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
-  const rows = await prisma.canvasTemplate.findMany({
-    where: {
+
+  const scope = request.nextUrl.searchParams.get("scope")?.trim() || "all";
+
+  let where: Prisma.CanvasTemplateWhereInput;
+  if (scope === "featured") {
+    where = {
+      OR: [{ builtin: true, featured: true }, { featured: true, visibility: "public" }],
+    };
+  } else if (scope === "public") {
+    where = { visibility: "public", builtin: false };
+  } else if (scope === "my") {
+    where = { ownerUserId: guard.user.id };
+  } else {
+    where = {
       OR: [{ builtin: true }, { ownerUserId: guard.user.id }],
-    },
-    orderBy: [{ builtin: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    };
+  }
+
+  const rows = await prisma.canvasTemplate.findMany({
+    where,
+    orderBy: [{ featured: "desc" }, { builtin: "desc" }, { sortOrder: "asc" }, { forkCount: "desc" }, { createdAt: "desc" }],
     take: 200,
+    select: templateSelect(),
   });
-  return NextResponse.json({ templates: rows }, { headers: jsonHeaders(request) });
+  const templates = rows.map((row) => ({
+    ...row,
+    thumbnailUrl: resolveListThumbnailUrl({
+      storedUrl: row.thumbnail,
+      canvas: row.canvas,
+    }),
+  }));
+  return NextResponse.json({ templates }, { headers: jsonHeaders(request) });
 }
 
-/** POST：用户保存私有模板（不涉及 builtin） */
+/** POST：用户保存模板（私有或公开） */
 export async function POST(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
@@ -43,6 +90,12 @@ export async function POST(request: NextRequest) {
     );
   }
   const thumbnail = body.body.thumbnail ? String(body.body.thumbnail) : "";
+  const description = String(body.body.description ?? "").trim();
+  const edition = String(body.body.edition ?? "").trim();
+  const sourceLabel = String(body.body.sourceLabel ?? "").trim();
+  const visibility =
+    body.body.visibility === "public" ? "public" : "private";
+
   try {
     const created = await prisma.canvasTemplate.create({
       data: {
@@ -50,9 +103,14 @@ export async function POST(request: NextRequest) {
         category,
         name,
         thumbnail,
+        description,
+        edition,
+        sourceLabel,
+        visibility,
         canvas: canvas as Prisma.InputJsonValue,
         builtin: false,
       },
+      select: templateSelect(),
     });
     return NextResponse.json(
       { template: created },

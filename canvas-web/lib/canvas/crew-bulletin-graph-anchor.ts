@@ -1,5 +1,6 @@
 import { crewBulletinFromScriptPackagePayload, refreshGraphAnchorCrewBulletin } from "./crew-bulletin-script-package";
 import { resolveHubRowsForCrewBulletin } from "./crew-bulletin-build";
+import { dedupeProSceneRows } from "./story-pro-column-sync";
 import type { CrewBulletinState } from "./crew-bulletin-types";
 import {
   parseScriptPackageSnapshotsFromPayload,
@@ -72,13 +73,17 @@ export function enrichCrewBulletinGraphAnchorRows(
     if (stored?.length) return stored;
     return built.length ? built : stored;
   };
+  const sceneRows = dedupeProSceneRows(
+    [...(anchor.sceneRows ?? []), ...resolved.scenes],
+    CREW_BULLETIN_META_ANCHOR_ID,
+  );
   return {
     ...anchor,
     scriptStudioCharacterRows: pick(
       anchor.scriptStudioCharacterRows,
       resolved.characters,
     ),
-    sceneRows: pick(anchor.sceneRows, resolved.scenes),
+    sceneRows,
     scriptStudioPropRows: pick(anchor.scriptStudioPropRows, resolved.props),
     scriptStudioFrameRows: pick(anchor.scriptStudioFrameRows, resolved.frames),
     scriptStudioMoodRows: pick(anchor.scriptStudioMoodRows, resolved.moods),

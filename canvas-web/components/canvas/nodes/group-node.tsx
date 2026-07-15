@@ -25,6 +25,7 @@ import {
   Video,
 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useCanvasReadonly } from "@/lib/canvas/canvas-readonly-context";
 import { PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
   cancelPro2MediaGroupToolbarHide,
@@ -107,6 +108,7 @@ function pointInRect(x: number, y: number, r: ScreenRect) {
 
 /** 组容器节点：透明背景、彩色边框；hover 时在顶部边框出现屏幕固定胶囊工具条（不随画布缩放变小） */
 export function GroupNode({ id, data, selected }: NodeProps) {
+  const readonly = useCanvasReadonly();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
@@ -123,20 +125,24 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
   const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
   const hasMediaChildren = useCanvasStore((s) =>
-    s.nodes.some(
-      (n) =>
-        n.parentId === id &&
-        (isPro2MediaChildNode(n) ||
-          n.type === "sbv1-image" ||
-          (n.type === "sbv1-video-engine" &&
-            (n.data as { pro2MediaRole?: string }).pro2MediaRole === "video")),
-    ),
+    readonly
+      ? false
+      : s.nodes.some(
+          (n) =>
+            n.parentId === id &&
+            (isPro2MediaChildNode(n) ||
+              n.type === "sbv1-image" ||
+              (n.type === "sbv1-video-engine" &&
+                (n.data as { pro2MediaRole?: string }).pro2MediaRole === "video")),
+        ),
   );
   const childrenIdsKey = useCanvasStore((s) =>
-    s.nodes
-      .filter((n) => n.parentId === id && n.type !== "group")
-      .map((n) => n.id)
-      .join("\0"),
+    readonly
+      ? ""
+      : s.nodes
+          .filter((n) => n.parentId === id && n.type !== "group")
+          .map((n) => n.id)
+          .join("\0"),
   );
   const { flowToScreenPosition, getInternalNode, setNodes: rfSetNodes } =
     useReactFlow();
@@ -155,8 +161,8 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as GroupNodeData;
   const color = d.color || GROUP_COLOR_PRESETS[2];
-  const storeNodes = useCanvasStore((s) => s.nodes);
-  const storeEdges = useCanvasStore((s) => s.edges);
+  const storeNodes = useCanvasStore((s) => (readonly ? [] : s.nodes));
+  const storeEdges = useCanvasStore((s) => (readonly ? [] : s.edges));
   const selfNode = useMemo(
     () => storeNodes.find((n) => n.id === id),
     [storeNodes, id],
@@ -205,6 +211,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const marqueeSelecting = useCanvasMarqueeSelecting();
 
   const showToolbar =
+    !readonly &&
     !marqueeSelecting &&
     !isLibtvMediaGroup &&
     (selected || editOpen || pointerInside);
@@ -328,6 +335,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const pro2LayoutVersion = (d as { pro2LayoutVersion?: number }).pro2LayoutVersion;
   const hasMediaChildrenMemo = hasMediaChildren;
   useEffect(() => {
+    if (readonly) return;
     if (!hasMediaChildrenMemo) return;
     if (d.pro2ShortcutPreset) return;
     if (relayoutDoneRef.current) return;
@@ -348,9 +356,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     updateNodeData,
     d.pro2ShortcutPreset,
     pro2LayoutVersion,
+    readonly,
   ]);
 
   useEffect(() => {
+    if (readonly) return;
     if (isLibtvMediaGroup || viewportMoving) return;
     updateScreenPos();
   }, [
@@ -361,9 +371,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     viewport.zoom,
     selected,
     viewportMoving,
+    readonly,
   ]);
 
   useEffect(() => {
+    if (readonly) return;
     if (selected && isLibtvMediaGroup) {
       pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
     }
@@ -473,12 +485,14 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       )}
       data-pro2-media-group={isLibtvMediaGroup ? id : undefined}
       onPointerEnter={() => {
+        if (readonly) return;
         setPointerOverGroup(true);
         if (isLibtvMediaGroup) {
           pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
         }
       }}
       onPointerLeave={() => {
+        if (readonly) return;
         setPointerOverGroup(false);
         if (isLibtvMediaGroup) {
           schedulePro2MediaGroupToolbarHide(id, () => {
@@ -489,6 +503,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
         }
       }}
       onPointerDown={() => {
+        if (readonly) return;
         if (isLibtvMediaGroup) {
           pinPro2MediaGroupToolbarHover(id, setHoveredMediaGroupId);
         }
@@ -602,12 +617,12 @@ export function GroupNode({ id, data, selected }: NodeProps) {
         color={PRO2_NODE_RESIZER_COLOR}
         minWidth={220}
         minHeight={140}
-        isVisible={selected}
+        isVisible={!readonly && selected}
         lineStyle={PRO2_NODE_RESIZER_LINE}
         handleClassName="pro2-node-resizer-handle"
         handleStyle={PRO2_NODE_RESIZER_HANDLE}
       />
-      {selected ? <Pro2NodeResizeGrip /> : null}
+      {!readonly && selected ? <Pro2NodeResizeGrip /> : null}
 
       {isLibtvMediaGroup ? (
         <div className="relative z-10 flex h-8 shrink-0 items-center gap-1 px-2 pt-2">

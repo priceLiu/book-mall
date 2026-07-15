@@ -23,7 +23,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import {
   isCanvasInteractiveGeometryInProgress,
   isCanvasPositionCommitOnly,
-  isCanvasSelectionOnlyChange,
+  filterStoreBoundNodeChanges,
 } from "@/lib/canvas/canvas-node-changes";
 import {
   countLibtvSelectedNonGroupNodes,
@@ -52,7 +52,10 @@ import {
   parseProjectAssetDragPayload,
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
-import { mergeStoreNodesIntoRf } from "@/lib/canvas/canvas-rf-sync";
+import {
+  CANVAS_RF_SELECT_NODE_EVENT,
+  mergeStoreNodesIntoRf,
+} from "@/lib/canvas/canvas-rf-sync";
 import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
 import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
 import {
@@ -200,6 +203,22 @@ function FlowCanvasInner({
   /** 框选松手后 onPaneClick 与多选拖松手竞态 · 勿收成单选 */
   const libtvMultiNodeDragRef = useRef(false);
   const deferStoreGraphSyncRef = useRef(false);
+  /** store→RF 推送期间忽略 RF 回写的选中/测量/坐标 echo，避免打组后 Maximum update depth */
+  const syncingGraphFromStoreRef = useRef(false);
+  const syncingGraphFromStoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const armStoreToRfSyncGuard = useCallback(() => {
+    syncingGraphFromStoreRef.current = true;
+    if (syncingGraphFromStoreTimerRef.current != null) {
+      clearTimeout(syncingGraphFromStoreTimerRef.current);
+    }
+    syncingGraphFromStoreTimerRef.current = setTimeout(() => {
+      syncingGraphFromStoreRef.current = false;
+      syncingGraphFromStoreTimerRef.current = null;
+    }, 300);
+  }, []);
 
   const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
   const storeOnEdgesChange = useCanvasStore((s) => s.onEdgesChange);
@@ -424,29 +443,43 @@ function FlowCanvasInner({
   /** Zustand → RF 本地：hydrate / undo / 拖放结束等；拖动过程中跳过避免双写 */
   useEffect(() => {
     const unsub = useCanvasStore.subscribe((state, prev) => {
-      if (deferStoreGraphSyncRef.current) return;
       if (state.nodes !== prev.nodes) {
+        if (deferStoreGraphSyncRef.current) {
+          const structural =
+            state.nodes.length !== prev.nodes.length ||
+            state.nodes.some((n, i) => {
+              const p = prev.nodes[i];
+              return !p || n.id !== p.id || n.parentId !== p.parentId;
+            });
+          if (!structural) return;
+          deferStoreGraphSyncRef.current = false;
+        }
+        armStoreToRfSyncGuard();
         setRfNodes((rf) =>
           mergeStoreNodesIntoRf(rf, state.nodes, {
-            preserveRfSelection: libtvCanvas,
+            preserveRfSelection: true,
           }),
         );
       }
       if (state.edges !== prev.edges) {
+        if (deferStoreGraphSyncRef.current) {
+          deferStoreGraphSyncRef.current = false;
+        }
         setRfEdges(state.edges);
       }
     });
     return unsub;
-  }, [setRfNodes, setRfEdges, libtvCanvas]);
+  }, [armStoreToRfSyncGuard, setRfNodes, setRfEdges]);
 
   /** 撤销/重做后强制 RF 与 store 对齐（拖动中 defer 同步时 undo 可能不生效） */
   useEffect(() => {
     const onUndoRedo = () => {
       deferStoreGraphSyncRef.current = false;
       const s = useCanvasStore.getState();
+      armStoreToRfSyncGuard();
       setRfNodes((rf) =>
         mergeStoreNodesIntoRf(rf, s.nodes, {
-          preserveRfSelection: libtvCanvas,
+          preserveRfSelection: false,
         }),
       );
       setRfEdges(s.edges);
@@ -454,7 +487,22 @@ function FlowCanvasInner({
     window.addEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
     return () =>
       window.removeEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
-  }, [setRfNodes, setRfEdges, libtvCanvas]);
+  }, [armStoreToRfSyncGuard, setRfNodes, setRfEdges]);
+
+  /** RF 本地选中（打组 / focusCanvasNode），不写 zustand */
+  useEffect(() => {
+    const onRfSelect = (event: Event) => {
+      const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail
+        ?.nodeId;
+      if (!nodeId) return;
+      setRfNodes((prev) =>
+        prev.map((n) => ({ ...n, selected: n.id === nodeId })),
+      );
+    };
+    window.addEventListener(CANVAS_RF_SELECT_NODE_EVENT, onRfSelect);
+    return () =>
+      window.removeEventListener(CANVAS_RF_SELECT_NODE_EVENT, onRfSelect);
+  }, [setRfNodes]);
 
   const onMoveStart = useCallback(() => {
     setCanvasViewportMoving(true);
@@ -559,6 +607,15 @@ function FlowCanvasInner({
         }
         return;
       }
+
+      // store→RF 推送期间：RF 会批量回写选中/测量/相对坐标，一律不落库
+      if (syncingGraphFromStoreRef.current) {
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        return;
+      }
+
+      const storeChanges = filterStoreBoundNodeChanges(rfChanges);
       const syncLibtvFloatingDockPinFromRf = () => {
         const sel = resolveLibtvFloatingDockSelection(
           getNodes() as CanvasFlowNode[],
@@ -569,35 +626,33 @@ function FlowCanvasInner({
         );
       };
 
-      // LibTV 画布：选中态仅保留在 RF 本地（不写 zustand / 不进 undo），避免点击卡顿
-      if (libtvCanvas && isCanvasSelectionOnlyChange(changes)) {
+      if (storeChanges.length === 0) {
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
-        syncLibtvFloatingDockPinFromRf();
+        if (libtvCanvas && rfChanges.some((c) => c.type === "select")) {
+          syncLibtvFloatingDockPinFromRf();
+        }
         return;
       }
+
       if (libtvCanvas) {
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
-        // 坐标松手写入 store（不 normalize）；与 onNodeDragStop 双保险
-        if (isCanvasPositionCommitOnly(changes)) {
-          storeOnNodesChange(changes);
+        if (isCanvasPositionCommitOnly(storeChanges)) {
+          storeOnNodesChange(storeChanges);
           syncLibtvFloatingDockPinFromRf();
           return;
         }
         deferStoreGraphSyncRef.current = false;
-        const geometryChanges = rfChanges.filter((c) => c.type !== "select");
-        if (geometryChanges.length > 0) {
-          storeOnNodesChange(geometryChanges);
-        }
+        storeOnNodesChange(storeChanges);
         syncLibtvFloatingDockPinFromRf();
         return;
       }
       deferStoreGraphSyncRef.current = false;
       setCanvasGeometryDragging(false);
       setCanvasDraggingNodeId(null);
-      storeOnNodesChange(rfChanges);
+      storeOnNodesChange(storeChanges);
     },
     [
       onRfNodesChange,
@@ -1190,7 +1245,12 @@ function FlowCanvasInner({
             : palette === "image-engine" && presetId
               ? buildImageEngineDataFromPreset(presetId)
               : undefined;
-        addNode(palette as CanvasNodeType, position, initialData);
+        const newId = addNode(palette as CanvasNodeType, position, initialData);
+        if (newId) {
+          queueMicrotask(() => {
+            useCanvasStore.getState().focusCanvasNode(newId);
+          });
+        }
         return;
       }
 
@@ -1279,6 +1339,7 @@ function FlowCanvasInner({
         : { x: 40, y: 40 };
 
       const idMap = new Map<string, string>();
+      let lastNewId = "";
       for (const n of payload.nodes) {
         const newId = addNode(
           (n.type ?? "text") as CanvasNodeType,
@@ -1289,6 +1350,12 @@ function FlowCanvasInner({
           { ...cloneCanvasNodeData(n.data as Record<string, unknown>) },
         );
         idMap.set(n.id, newId);
+        lastNewId = newId;
+      }
+      if (lastNewId) {
+        queueMicrotask(() => {
+          useCanvasStore.getState().focusCanvasNode(lastNewId);
+        });
       }
       // 重建边（仅保留两端都被复制的）
       if (payload.edges.length) {

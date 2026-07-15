@@ -11,6 +11,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
+import { CanvasReadonlyProvider } from "@/lib/canvas/canvas-readonly-context";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import {
@@ -69,13 +70,15 @@ function TemplateReadonlyCanvasInner({ graph }: { graph: CanvasGraph }) {
 /** 模板只读预览：可平移 / 缩放，节点不可编辑、不可选中。 */
 export function TemplateReadonlyCanvas({ graph }: { graph: CanvasGraph }) {
   return (
-    <ReactFlowProvider>
-      <div
-        className="canvas-flow-wrap h-full w-full overscroll-none [&_.react-flow__edge]:pointer-events-none [&_.react-flow__node]:pointer-events-none"
-        onWheelCapture={onCanvasWheelCapture}
-      >
-        <TemplateReadonlyCanvasInner graph={graph} />
-      </div>
-    </ReactFlowProvider>
+    <CanvasReadonlyProvider>
+      <ReactFlowProvider>
+        <div
+          className="canvas-flow-wrap h-full w-full overscroll-none [&_.react-flow__edge]:pointer-events-none [&_.react-flow__node]:pointer-events-none"
+          onWheelCapture={onCanvasWheelCapture}
+        >
+          <TemplateReadonlyCanvasInner graph={graph} />
+        </div>
+      </ReactFlowProvider>
+    </CanvasReadonlyProvider>
   );
 }

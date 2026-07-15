@@ -71,6 +71,7 @@ import {
   PRO2_FRAME_CELL_HEIGHT,
   PRO2_FRAME_CELL_WIDTH,
   PRO2_MEDIA_GROUP_HEADER,
+  PRO2_MEDIA_GROUP_LAYOUT_VERSION,
   PRO2_MEDIA_GROUP_PAD,
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
@@ -97,12 +98,17 @@ import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
 import { repairPro2VideoBoardVisualGroups } from "./pro2-spawn-video-board-group";
 import { canvasNotify } from "./canvas-notify";
 import {
+  canvasNodesLayoutFieldsEqual,
+  canvasNodesSelectionAndZEqual,
   isCanvasInteractiveGeometryInProgress,
+  isCanvasInternalDimensionsOnlyChange,
+  isCanvasRfLocalOnlyChange,
   isCanvasSelectionOnlyChange,
   isCanvasDimensionCommitOnly,
   isCanvasPositionCommitOnly,
   syncNodeDimensionsFromChanges,
 } from "./canvas-node-changes";
+import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
@@ -259,6 +265,8 @@ type CanvasState = {
   clearPendingSideConnect: () => void;
   setDragHoverGroup: (id: string | null) => void;
   setHoveredMediaGroupId: (id: string | null) => void;
+  /** 门户页离开编辑器时清理浮动工具条 / Dock 锚点，避免残留在首页 */
+  clearPortalEditorChrome: () => void;
   setCanvasGeometryDragging: (dragging: boolean) => void;
   setCanvasDraggingNodeId: (nodeId: string | null) => void;
   setCanvasViewportMoving: (moving: boolean) => void;
@@ -454,6 +462,19 @@ export const useCanvasStore = create<CanvasState>()(
         set({ pendingSideConnect: null, connectingFromNodeId: null }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
       setHoveredMediaGroupId: (id) => set({ hoveredMediaGroupId: id }),
+      clearPortalEditorChrome: () =>
+        set({
+          hoveredMediaGroupId: null,
+          dragHoverGroupId: null,
+          libtvFloatingDockNodeId: null,
+          libtvFloatingDockNodeType: null,
+          canvasGeometryDragging: false,
+          canvasDraggingNodeId: null,
+          canvasMarqueeSelecting: false,
+          canvasSelectionDragging: false,
+          connectingFromNodeId: null,
+          pendingSideConnect: null,
+        }),
       setCanvasGeometryDragging: (dragging) =>
         set({ canvasGeometryDragging: dragging }),
       setCanvasDraggingNodeId: (nodeId) =>
@@ -620,13 +641,10 @@ export const useCanvasStore = create<CanvasState>()(
         const all = get().nodes;
         if (!all.some((n) => n.id === nodeId)) return;
         set({
-          nodes: all.map((n) => ({
-            ...n,
-            selected: n.id === nodeId,
-          })),
           canvasFocusNodeId: nodeId,
           canvasFocusNonce: get().canvasFocusNonce + 1,
         });
+        dispatchCanvasRfSelectNode(nodeId);
       },
 
       onNodesChange: (changes) => {
@@ -662,6 +680,9 @@ export const useCanvasStore = create<CanvasState>()(
               ("id" in c && typeof c.id === "string" && allowed.has(c.id)),
           );
         }
+        if (isCanvasRfLocalOnlyChange(filteredChanges)) {
+          return;
+        }
         const manualIds = new Set<string>();
         for (const ch of filteredChanges) {
           if (
@@ -680,16 +701,34 @@ export const useCanvasStore = create<CanvasState>()(
         );
         if (isCanvasSelectionOnlyChange(filteredChanges)) {
           next = syncPro2MediaGroupZIndex(next);
+          // 选中态不进撤销栈，否则撤销只会来回切选中
+          if (canvasNodesSelectionAndZEqual(prev, next)) return;
+          useCanvasStore.temporal.getState().pause();
           set({ nodes: next });
+          useCanvasStore.temporal.getState().resume();
           return;
         }
         if (isCanvasInteractiveGeometryInProgress(filteredChanges)) {
-          // 拖动/缩放过程中只同步几何，不跑 normalize（避免松手后尺寸回弹）
+          // 拖动/缩放过程中的中间帧不进撤销栈；松手 commit 再记一次
+          useCanvasStore.temporal.getState().pause();
           set({ nodes: next });
+          useCanvasStore.temporal.getState().resume();
           return;
         }
         if (isCanvasPositionCommitOnly(filteredChanges)) {
+          const posIds = filteredChanges
+            .filter(
+              (c): c is NodeChange & { type: "position"; id: string } =>
+                c.type === "position" && "id" in c && typeof c.id === "string",
+            )
+            .map((c) => c.id);
+          if (canvasNodesLayoutFieldsEqual(prev, next, posIds)) return;
           set((state) => withGraphRevision(state, { nodes: next }));
+          return;
+        }
+        if (isCanvasInternalDimensionsOnlyChange(filteredChanges)) {
+          // RF ResizeObserver 纯测量：不写回 store（RF 本地 measured 已足够），
+          // 避免组框子像素测量抖动导致 store↔RF 无限循环
           return;
         }
         const manualSized = new Map<string, CanvasFlowNode>();
@@ -1193,14 +1232,6 @@ export const useCanvasStore = create<CanvasState>()(
         { label, color, measuredSizes, pro2Styled, pro2ShortcutPreset },
       ) => {
         const all = get().nodes;
-        const effectiveChildIds = childIds.filter((id) => {
-          const n = all.find((x) => x.id === id);
-          return n && !isGroupNode(n.type);
-        });
-        const children = all.filter((n) => effectiveChildIds.includes(n.id));
-        if (children.length === 0) return null;
-
-        // 递归绝对坐标（为后续支持嵌套组留余地）
         const absOf = (n: CanvasFlowNode): { x: number; y: number } => {
           if (!n.parentId) return n.position;
           const p = all.find((x) => x.id === n.parentId);
@@ -1208,6 +1239,82 @@ export const useCanvasStore = create<CanvasState>()(
           const pa = absOf(p);
           return { x: pa.x + n.position.x, y: pa.y + n.position.y };
         };
+
+        const explicitGroupIds = childIds.filter((id) => {
+          const n = all.find((x) => x.id === id);
+          return Boolean(n && isGroupNode(n.type));
+        });
+        const leafIds = childIds.filter((id) => {
+          const n = all.find((x) => x.id === id);
+          return Boolean(n && !isGroupNode(n.type));
+        });
+
+        /** 选中叶子若完整覆盖 ≥2 个已有组 → 抽出子节点重新打组（不嵌套子组） */
+        const leavesByParent = new Map<string | null, string[]>();
+        for (const id of leafIds) {
+          const n = all.find((x) => x.id === id)!;
+          const pid = n.parentId ?? null;
+          const parentIsGroup =
+            pid != null &&
+            all.some((x) => x.id === pid && isGroupNode(x.type));
+          const key = parentIsGroup ? pid : null;
+          const list = leavesByParent.get(key) ?? [];
+          list.push(id);
+          leavesByParent.set(key, list);
+        }
+
+        const fullyCoveredGroupIds: string[] = [];
+        for (const [pid, selected] of leavesByParent) {
+          if (!pid) continue;
+          const groupChildren = all.filter(
+            (n) => n.parentId === pid && !isGroupNode(n.type),
+          );
+          if (
+            groupChildren.length > 0 &&
+            groupChildren.every((c) => selected.includes(c.id))
+          ) {
+            fullyCoveredGroupIds.push(pid);
+          }
+        }
+
+        const groupsToMerge = [
+          ...new Set([...fullyCoveredGroupIds, ...explicitGroupIds]),
+        ].filter((id) => {
+          const g = all.find((x) => x.id === id);
+          return g && isGroupNode(g.type);
+        });
+
+        const freeLeaves = leavesByParent.get(null) ?? [];
+        const partialLeaves: string[] = [];
+        for (const [pid, selected] of leavesByParent) {
+          if (!pid) continue;
+          if (!fullyCoveredGroupIds.includes(pid)) {
+            partialLeaves.push(...selected);
+          }
+        }
+
+        // ── 默认：选中叶子装进新组；多组合并时抽出各组子节点；抽空后的旧组删除 ──
+        const coveredLeaves = fullyCoveredGroupIds.flatMap(
+          (pid) => leavesByParent.get(pid) ?? [],
+        );
+        let effectiveChildIds = [
+          ...new Set([...freeLeaves, ...partialLeaves, ...coveredLeaves]),
+        ];
+        if (groupsToMerge.length >= 2 && partialLeaves.length === 0) {
+          const leavesFromMergedGroups = all
+            .filter(
+              (n) =>
+                n.parentId &&
+                groupsToMerge.includes(n.parentId) &&
+                !isGroupNode(n.type),
+            )
+            .map((n) => n.id);
+          effectiveChildIds = [
+            ...new Set([...effectiveChildIds, ...leavesFromMergedGroups]),
+          ];
+        }
+        const children = all.filter((n) => effectiveChildIds.includes(n.id));
+        if (children.length === 0) return null;
 
         const pro2Kind = inferPro2MediaGroupKind(all, effectiveChildIds);
         const pro2VideoBoardOnly =
@@ -1244,7 +1351,6 @@ export const useCanvasStore = create<CanvasState>()(
                   .pro2MediaRole,
               })
             : null;
-          // 优先信任 RF 实测尺寸；Pro2 媒体组用标准宫格单元尺寸
           const w =
             m?.w ??
             c.measured?.width ??
@@ -1295,6 +1401,9 @@ export const useCanvasStore = create<CanvasState>()(
         if (sbv1Styled) {
           groupData.sbv1Styled = true;
         }
+        if (usePro2MediaGrid || pro2Kind || sbv1Styled) {
+          groupData.pro2LayoutVersion = PRO2_MEDIA_GROUP_LAYOUT_VERSION;
+        }
 
         const groupNode: CanvasFlowNode = {
           id: groupId,
@@ -1309,12 +1418,16 @@ export const useCanvasStore = create<CanvasState>()(
         } as CanvasFlowNode;
 
         const childIdSet = new Set(effectiveChildIds);
+        const emptiedParentIds = new Set<string>(groupsToMerge);
+        for (const id of effectiveChildIds) {
+          const n = all.find((x) => x.id === id);
+          if (n?.parentId) emptiedParentIds.add(n.parentId);
+        }
+
         const newNodes: CanvasFlowNode[] = [];
-        // 必须 group 在 children 之前；React Flow 要求父节点先于子节点出现
         newNodes.push(groupNode);
         for (const n of all) {
           if (childIdSet.has(n.id) && !isGroupNode(n.type)) {
-            // 把每个子节点改为相对 group 原点的位置（用绝对坐标减 groupX/Y）
             const a = absOf(n);
             newNodes.push({
               ...n,
@@ -1327,17 +1440,30 @@ export const useCanvasStore = create<CanvasState>()(
             newNodes.push(n);
           }
         }
+
+        // 抽空后的空组删除，避免留下黑块
+        const kept = newNodes.filter((n) => {
+          if (!isGroupNode(n.type) || !emptiedParentIds.has(n.id)) return true;
+          const stillHasChild = newNodes.some(
+            (c) => c.parentId === n.id && c.id !== n.id,
+          );
+          return stillHasChild;
+        });
+
         set((state) =>
           withGraphRevision(state, {
-            nodes: normalizeCanvasNodes(newNodes, state.edges).map((n) => ({
-              ...n,
-              selected: n.id === groupId,
-            })),
+            nodes: sortNodesForReactFlow(
+              normalizeCanvasNodes(kept, state.edges),
+            ),
           }),
         );
-        if (effectiveChildIds.length >= 2) {
-          get().autoLayoutGroupChildren(groupId, "auto");
-        }
+        queueMicrotask(() => {
+          // 两组合并时子节点已按绝对坐标落入新组，勿再 autoLayout（会改组框尺寸触发测量死循环）
+          if (effectiveChildIds.length >= 2 && groupsToMerge.length < 2) {
+            get().autoLayoutGroupChildren(groupId, "auto");
+          }
+          dispatchCanvasRfSelectNode(groupId);
+        });
         return groupId;
       },
 
@@ -1345,18 +1471,41 @@ export const useCanvasStore = create<CanvasState>()(
         const all = get().nodes;
         const group = all.find((n) => n.id === groupId);
         if (!group) return;
+
+        const absOf = (n: CanvasFlowNode): { x: number; y: number } => {
+          if (!n.parentId) return n.position;
+          const p = all.find((x) => x.id === n.parentId);
+          if (!p) return n.position;
+          const pa = absOf(p);
+          return { x: pa.x + n.position.x, y: pa.y + n.position.y };
+        };
+
+        const groupAbs = absOf(group);
+        const grandParentId = group.parentId ?? undefined;
+        let grandParentAbs = { x: 0, y: 0 };
+        if (grandParentId) {
+          const gp = all.find((x) => x.id === grandParentId);
+          if (gp) grandParentAbs = absOf(gp);
+        }
+
         const next: CanvasFlowNode[] = [];
         for (const n of all) {
           if (n.id === groupId) continue;
           if (n.parentId === groupId) {
+            const abs = {
+              x: n.position.x + groupAbs.x,
+              y: n.position.y + groupAbs.y,
+            };
             next.push({
               ...n,
-              parentId: undefined,
-              extent: undefined,
-              position: {
-                x: n.position.x + group.position.x,
-                y: n.position.y + group.position.y,
-              },
+              parentId: grandParentId,
+              extent: grandParentId ? "parent" : undefined,
+              position: grandParentId
+                ? {
+                    x: abs.x - grandParentAbs.x,
+                    y: abs.y - grandParentAbs.y,
+                  }
+                : abs,
             } as CanvasFlowNode);
           } else {
             next.push(n);
@@ -1364,7 +1513,9 @@ export const useCanvasStore = create<CanvasState>()(
         }
         set((state) =>
           withGraphRevision(state, {
-            nodes: normalizeCanvasNodes(next, state.edges),
+            nodes: sortNodesForReactFlow(
+              normalizeCanvasNodes(next, state.edges),
+            ),
           }),
         );
       },
@@ -1494,12 +1645,20 @@ export const useCanvasStore = create<CanvasState>()(
               ]),
             );
 
-            set({
-              nodes: all.map((n) => {
+            set((state) => {
+              const mapped = all.map((n) => {
                 if (n.id === sharedParentId) return updatedGroup;
                 const m = relMap.get(n.id);
                 return m ? { ...n, position: m } : n;
-              }),
+              });
+              const affected = new Set([
+                sharedParentId,
+                ...finalAbs.map((b) => b.id),
+              ]);
+              if (canvasNodesLayoutFieldsEqual(all, mapped, affected)) {
+                return state;
+              }
+              return withGraphRevision(state, { nodes: mapped });
             });
             return;
           }
@@ -1509,11 +1668,21 @@ export const useCanvasStore = create<CanvasState>()(
         const absMap = new Map(
           finalAbs.map((b) => [b.id, { x: b.x, y: b.y }]),
         );
-        set({
-          nodes: all.map((n) => {
+        set((state) => {
+          const mapped = all.map((n) => {
             const m = absMap.get(n.id);
             return m ? { ...n, position: m } : n;
-          }),
+          });
+          if (
+            canvasNodesLayoutFieldsEqual(
+              all,
+              mapped,
+              finalAbs.map((b) => b.id),
+            )
+          ) {
+            return state;
+          }
+          return withGraphRevision(state, { nodes: mapped });
         });
       },
 
@@ -1549,7 +1718,18 @@ export const useCanvasStore = create<CanvasState>()(
         const all = get().nodes;
         const node = all.find((n) => n.id === nodeId);
         if (!node) return;
-        if (isGroupNode(node.type)) return; // group 不能嵌套（暂不支持）
+        if (newParentGroupId) {
+          if (nodeId === newParentGroupId) return;
+          let cur = all.find((x) => x.id === newParentGroupId);
+          const seen = new Set<string>();
+          while (cur && !seen.has(cur.id)) {
+            if (cur.id === nodeId) return;
+            seen.add(cur.id);
+            cur = cur.parentId
+              ? all.find((x) => x.id === cur!.parentId)
+              : undefined;
+          }
+        }
         const oldParentId = node.parentId ?? null;
         if (oldParentId === newParentGroupId) return;
 
@@ -1566,7 +1746,8 @@ export const useCanvasStore = create<CanvasState>()(
         if (newParentGroupId) {
           const g = all.find((x) => x.id === newParentGroupId);
           if (!g) return;
-          newPosition = { x: abs.x - g.position.x, y: abs.y - g.position.y };
+          const gAbs = absOf(g);
+          newPosition = { x: abs.x - gAbs.x, y: abs.y - gAbs.y };
         }
 
         const updated = all.map((n) =>

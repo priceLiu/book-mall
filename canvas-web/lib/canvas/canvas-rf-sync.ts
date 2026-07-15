@@ -1,6 +1,16 @@
 import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
 
+/** 仅更新 RF 本地选中（不写 zustand），供 focusCanvasNode / 打组后选中新组 */
+export const CANVAS_RF_SELECT_NODE_EVENT = "canvas:rf-select-node";
+
+export function dispatchCanvasRfSelectNode(nodeId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(CANVAS_RF_SELECT_NODE_EVENT, { detail: { nodeId } }),
+  );
+}
+
 function applyRfSelectionPreserved(
   nodes: CanvasFlowNode[],
   rfNodes: CanvasFlowNode[],

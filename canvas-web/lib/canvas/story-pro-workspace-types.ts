@@ -164,6 +164,16 @@ export type StoryProScriptHubNodeData = {
   scriptPackageSnapshots?: import("./script-package-snapshots").ScriptPackageSnapshotsByKind;
 };
 
+/** 公告栏行编辑 · 名称/描述/提示词快照 */
+export type StoryRowFieldRevision = {
+  savedAt: string;
+  name?: string;
+  description?: string;
+  prompt?: string;
+  appearance?: string;
+  role?: string;
+};
+
 export type StoryProCharacterRow = {
   key: string;
   name: string;
@@ -171,6 +181,7 @@ export type StoryProCharacterRow = {
   appearance: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  rowRevisionHistory?: StoryRowFieldRevision[];
   /** 绑定角色资产库 */
   assetId?: string;
   lockedRefIds?: string[];
@@ -183,6 +194,7 @@ export type StoryProSceneRow = {
   description: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  rowRevisionHistory?: StoryRowFieldRevision[];
   refImages?: StoryRefImage[];
   runtime?: CanvasNodeRuntime;
 };
@@ -195,6 +207,7 @@ export type StoryProPropRow = {
   description: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  rowRevisionHistory?: StoryRowFieldRevision[];
   refImages?: StoryRefImage[];
   /** 绑定道具资产库（ProjectAssetKind.PROP） */
   assetId?: string;
@@ -212,6 +225,7 @@ export type StoryProMoodRow = {
   description: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  rowRevisionHistory?: StoryRowFieldRevision[];
   refImages?: StoryRefImage[];
   /** 剧本创作 · 对应 LibTV 媒体卡节点 id */
   mediaNodeId?: string;
@@ -229,6 +243,7 @@ export type StoryProAudioRow = {
   /** 音效生成提示词 */
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  rowRevisionHistory?: StoryRowFieldRevision[];
   /** 剧本创作 · 对应 LibTV 媒体卡节点 id */
   mediaNodeId?: string;
   /** 生成产物 OSS URL */
@@ -251,6 +266,7 @@ export type StoryProFrameRow = {
   videoPrompt: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  rowRevisionHistory?: StoryRowFieldRevision[];
   referencedNodeIds?: string[];
   runtime?: CanvasNodeRuntime;
   refImages?: StoryRefImage[];

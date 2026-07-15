@@ -21,6 +21,7 @@ import {
   buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
+import { useCanvasStore } from "./store";
 import { cloneCanvasNodeData } from "./clone-node-data";
 import { PRO2_TEXT_NODE_MIN_WIDTH } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
@@ -72,6 +73,9 @@ export function selectSbv1NodeAfterSpawn(
       ),
     ),
   );
+  queueMicrotask(() => {
+    useCanvasStore.getState().focusCanvasNode(nodeId);
+  });
 }
 
 type SpawnStore = {

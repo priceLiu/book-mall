@@ -37,6 +37,12 @@ import {
 } from "@/lib/canvas/crew-bulletin-task-actions";
 import type { CrewBulletinTask } from "@/lib/canvas/crew-bulletin-types";
 import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
+import {
+  applyCrewBulletinHubRowChange,
+  addCrewBulletinHubRow,
+  isCrewBulletinKindEditable,
+  patchHubRowFromTaskCells,
+} from "@/lib/canvas/crew-bulletin-hub-row-crud";
 import { refreshCrewBulletinFromHub } from "@/lib/canvas/crew-bulletin-build";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { formatCrewTaskTableCells } from "@/lib/canvas/crew-bulletin-task-prompts";
@@ -268,6 +274,9 @@ function PhaseActionPanel({
   scriptPackageSnapshots,
   scriptTitle,
   onCopySnapshot,
+  onAddRow,
+  onSaveTaskCells,
+  rowEditingEnabled = false,
 }: {
   phase: CrewProductionPhase;
   published: boolean;
@@ -292,6 +301,12 @@ function PhaseActionPanel({
   scriptPackageSnapshots?: import("@/lib/canvas/script-package-snapshots").ScriptPackageSnapshotsByKind;
   scriptTitle?: string;
   onCopySnapshot?: (snapshot: import("@/lib/canvas/script-package-snapshots").ScriptPackageSnapshot) => void;
+  onAddRow?: () => void;
+  onSaveTaskCells?: (
+    task: CrewBulletinTask,
+    cells: Record<string, string>,
+  ) => void;
+  rowEditingEnabled?: boolean;
 }) {
   if (phase.id === "scriptPackage") {
     return (
@@ -414,6 +429,15 @@ function PhaseActionPanel({
             : ""}
         </p>
         <div className="flex shrink-0 items-center gap-1.5">
+          {rowEditingEnabled && onAddRow ? (
+            <button
+              type="button"
+              className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100 transition hover:bg-emerald-500/20"
+              onClick={onAddRow}
+            >
+              + 新增
+            </button>
+          ) : null}
           {emptyPhase ? (
                   <button
                     type="button"
@@ -467,6 +491,8 @@ function PhaseActionPanel({
             statusColor={crewTaskStatusColor}
             contentScale={contentScale}
             fullscreen={fullscreen}
+            editable={rowEditingEnabled}
+            onSaveTaskCells={onSaveTaskCells}
           />
               </div>
       )}
@@ -814,8 +840,20 @@ export function Pro2CrewBulletin() {
     const freshFrames = fresh.tasks.filter((t) => t.kind === "frame").length;
     const curFrames = bulletin?.tasks.filter((t) => t.kind === "frame").length ?? 0;
     const rowFrames = d.scriptStudioFrameRows?.length ?? 0;
+    const freshSceneLabels = fresh.tasks
+      .filter((t) => t.kind === "scene")
+      .map((t) => t.label)
+      .sort()
+      .join("\0");
+    const curSceneLabels =
+      bulletin?.tasks
+        .filter((t) => t.kind === "scene")
+        .map((t) => t.label)
+        .sort()
+        .join("\0") ?? "";
     if (
-      freshAsset > curAsset ||
+      freshAsset !== curAsset ||
+      freshSceneLabels !== curSceneLabels ||
       (rowFrames > 0 && freshFrames !== curFrames)
     ) {
       patchCrewBulletinOnAnchor(anchor, fresh, bulletinPatch);
@@ -1025,6 +1063,61 @@ export function Pro2CrewBulletin() {
     [anchor, bulletin, nodes, edges, addNode, setNodes, setEdges, updateNodeData, patchGraphMeta, graphMeta, base],
   );
 
+  const activePhaseKind = useMemo(() => {
+    if (
+      !expandedPhaseId ||
+      expandedPhaseId === "authoring" ||
+      expandedPhaseId === "scriptPackage"
+    ) {
+      return null;
+    }
+    return expandedPhaseId as import("@/lib/canvas/crew-bulletin-types").CrewTaskKind;
+  }, [expandedPhaseId]);
+
+  const onAddHubRow = useCallback(async () => {
+    if (!anchor || !hubId || !activePhaseKind || !isCrewBulletinKindEditable(activePhaseKind)) {
+      return;
+    }
+    const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
+    const liveData = (live?.data ?? d) as StoryProScriptHubNodeData;
+    const hubPatch = addCrewBulletinHubRow(liveData, hubId, activePhaseKind);
+    if (!hubPatch) return;
+    await applyCrewBulletinHubRowChange({
+      anchor,
+      hubId,
+      hubData: liveData,
+      hubPatch,
+      store: bulletinPatch,
+      bookMallBase: base,
+      graphMeta,
+    });
+    void canvasNotify({
+      title: "已新增",
+      message: "新行已写入剧本并刷新公告栏任务",
+      variant: "info",
+    });
+  }, [anchor, hubId, activePhaseKind, d, bulletinPatch, base, graphMeta]);
+
+  const onSaveHubTaskCells = useCallback(
+    async (task: CrewBulletinTask, cells: Record<string, string>) => {
+      if (!anchor || !hubId) return;
+      const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
+      const liveData = (live?.data ?? d) as StoryProScriptHubNodeData;
+      const hubPatch = patchHubRowFromTaskCells(liveData, hubId, task, cells);
+      if (!hubPatch) return;
+      await applyCrewBulletinHubRowChange({
+        anchor,
+        hubId,
+        hubData: liveData,
+        hubPatch,
+        store: bulletinPatch,
+        bookMallBase: base,
+        graphMeta,
+      });
+    },
+    [anchor, hubId, d, bulletinPatch, base, graphMeta],
+  );
+
   const onUploadClick = useCallback(() => {
     fileRef.current?.click();
   }, []);
@@ -1203,6 +1296,15 @@ export function Pro2CrewBulletin() {
             scriptPackageSnapshots={scriptPackageSnapshots}
             scriptTitle={scriptPackageTitle}
             onCopySnapshot={onCopySnapshot}
+            rowEditingEnabled={
+              Boolean(
+                published &&
+                  activePhaseKind &&
+                  isCrewBulletinKindEditable(activePhaseKind),
+              )
+            }
+            onAddRow={() => void onAddHubRow()}
+            onSaveTaskCells={(task, cells) => void onSaveHubTaskCells(task, cells)}
           />
         </CrewBulletinPhaseFullscreen>
       ) : null}

@@ -10,6 +10,7 @@ import {
   listMyCanvasProjects,
   type CanvasProjectSummary,
 } from "@/lib/canvas-api";
+import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
 
 function Inner() {
   const base = useBookMallBaseUrl();
@@ -40,6 +41,9 @@ function Inner() {
 
   return (
     <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
+      <div className="mb-6 flex justify-center">
+        <ProjectsSubNav />
+      </div>
       <header className="mb-8">
         <p className="twenty-eyebrow">canvas-web · story-pro</p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">

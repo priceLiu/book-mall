@@ -16,6 +16,7 @@ import {
   Play,
   Redo2,
   Save,
+  Share2,
   Sparkles,
   Undo2,
   UserRound,
@@ -43,6 +44,7 @@ export function CanvasToolbar({
   onRedo,
   onRunAll,
   onSaveTemplate,
+  onShareTemplate,
   onOpenMyTemplates,
   onOpenMyHistory,
   onOpenGenerationRecords,
@@ -70,6 +72,7 @@ export function CanvasToolbar({
   onRedo: () => void;
   onRunAll: () => void;
   onSaveTemplate?: () => void;
+  onShareTemplate?: () => void;
   onOpenMyTemplates?: () => void;
   onOpenMyHistory?: () => void;
   onOpenGenerationRecords?: () => void;
@@ -277,6 +280,17 @@ export function CanvasToolbar({
           >
             <BookmarkPlus className="size-3" />
             存为模板
+          </button>
+        ) : null}
+        {onShareTemplate ? (
+          <button
+            type="button"
+            onClick={onShareTemplate}
+            className={CANVAS_TOOLBAR_BTN_CLASS}
+            title="将当前画布分享到社区模板"
+          >
+            <Share2 className="size-3" />
+            分享到社区
           </button>
         ) : null}
         {onToggleImmersive ? (

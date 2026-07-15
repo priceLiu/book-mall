@@ -14,7 +14,18 @@ import {
   type CrewTaskKind,
 } from "./crew-bulletin-types";
 import { resolvePro2HubTableTitle } from "./pro2-hub-display-title";
-import { syncStoryProColumnRows } from "./story-pro-column-sync";
+import {
+  dedupeProSceneRows,
+  syncStoryProColumnRows,
+} from "./story-pro-column-sync";
+
+const ROW_TASK_DEDUPE_KINDS = new Set<CrewTaskKind>([
+  "character",
+  "scene",
+  "prop",
+  "mood",
+  "audio",
+]);
 
 function pushRowTasks(
   tasks: CrewBulletinTask[],
@@ -22,9 +33,15 @@ function pushRowTasks(
   rows: Array<{ key: string; name?: string; episodeNo?: number; frameIndex?: number }>,
   labelFn: (r: (typeof rows)[number]) => string,
 ): void {
+  const seenLabels = new Set<string>();
   for (const row of rows) {
     const label = labelFn(row);
     if (!label.trim()) continue;
+    if (ROW_TASK_DEDUPE_KINDS.has(kind)) {
+      const dedupeKey = `${kind}:${label.trim()}`;
+      if (seenLabels.has(dedupeKey)) continue;
+      seenLabels.add(dedupeKey);
+    }
     tasks.push({
       id: crewTaskId(kind, row.key, row.episodeNo, row.frameIndex),
       kind,
@@ -68,24 +85,33 @@ function mergeCrewBulletinRowsByName<
   const syncedByName = new Map(
     synced.map((r) => [r.name?.trim() || r.key, r]),
   );
-  const seenNames = new Set<string>();
-  const merged = stored.map((row) => {
+  const byName = new Map<string, T>();
+  for (const row of stored) {
     const name = row.name?.trim() || row.key;
-    seenNames.add(name);
     const parsed = syncedByName.get(name);
-    if (!parsed) return row;
+    const candidate = parsed
+      ? ({
+          ...(rowDetailScore(row) >= rowDetailScore(parsed) ? row : parsed),
+          key: row.key,
+        } as T)
+      : row;
+    const prev = byName.get(name);
+    if (!prev) {
+      byName.set(name, candidate);
+      continue;
+    }
     const richer =
-      rowDetailScore(row) >= rowDetailScore(parsed) ? row : parsed;
-    return { ...richer, key: row.key };
-  });
+      rowDetailScore(candidate) >= rowDetailScore(prev) ? candidate : prev;
+    byName.set(name, { ...richer, key: prev.key } as T);
+  }
 
   for (const row of synced) {
     const name = row.name?.trim() || row.key;
-    if (seenNames.has(name)) continue;
+    if (byName.has(name)) continue;
     if (stored.some((s) => s.key === row.key)) continue;
-    merged.push(row);
+    byName.set(name, row);
   }
-  return merged;
+  return Array.from(byName.values());
 }
 
 /** 分镜行 · 按 key 合并，补全场景/画面等字段 */
@@ -146,9 +172,12 @@ export function resolveHubRowsForCrewBulletin(
       hubData.scriptStudioCharacterRows ?? [],
       synced.characterRows,
     ),
-    scenes: mergeCrewBulletinRowsByName(
-      hubData.sceneRows ?? [],
-      synced.sceneRows,
+    scenes: dedupeProSceneRows(
+      mergeCrewBulletinRowsByName(
+        hubData.sceneRows ?? [],
+        synced.sceneRows,
+      ),
+      hubId,
     ),
     props: hubData.scriptStudioPropRows ?? [],
     moods: hubData.scriptStudioMoodRows ?? [],
