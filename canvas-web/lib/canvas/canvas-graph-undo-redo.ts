@@ -22,6 +22,7 @@ export function canvasGraphUndo(): boolean {
     return false;
   }
   temporal.undo();
+  useCanvasStore.setState((s) => ({ graphRevision: s.graphRevision + 1 }));
   dispatchGraphUndoRedo();
   return true;
 }
@@ -38,6 +39,7 @@ export function canvasGraphRedo(): boolean {
     return false;
   }
   temporal.redo();
+  useCanvasStore.setState((s) => ({ graphRevision: s.graphRevision + 1 }));
   dispatchGraphUndoRedo();
   return true;
 }

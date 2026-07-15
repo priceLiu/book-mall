@@ -134,6 +134,41 @@ function isStaleSceneRow(row: StoryProSceneRow): boolean {
   return false;
 }
 
+function sceneRowDetailScore(row: StoryProSceneRow): number {
+  let score = 0;
+  if (row.description?.trim()) score += 1;
+  if (row.prompt?.trim()) score += 2;
+  if (row.runtime) score += 1;
+  return score;
+}
+
+/** 场景行按 name / hubKey 去重（公告栏与剧本包导入共用） */
+export function dedupeProSceneRows(
+  rows: StoryProSceneRow[],
+  scriptHubId = "",
+): StoryProSceneRow[] {
+  const hub = scriptHubId.trim();
+  const out: StoryProSceneRow[] = [];
+  for (const row of rows) {
+    if (isStaleSceneRow(row)) continue;
+    const migrated: StoryProSceneRow = hub
+      ? { ...row, key: migrateSceneRowToHubKey(row, hub) }
+      : row;
+    const prev = findPrevSceneRow(out, migrated, hub);
+    if (prev) {
+      const idx = out.indexOf(prev);
+      const richer =
+        sceneRowDetailScore(migrated) >= sceneRowDetailScore(prev)
+          ? { ...migrated, key: prev.key }
+          : { ...prev, ...migrated, key: prev.key };
+      out[idx] = richer;
+    } else {
+      out.push(migrated);
+    }
+  }
+  return out;
+}
+
 function mergeProSceneRows(
   built: StoryProSceneRow[],
   existing?: StoryProSceneRow[],

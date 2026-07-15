@@ -250,14 +250,30 @@ function applyStoryLayout(
   return sortNodesForReactFlow(next);
 }
 
-/** React Flow 要求 group 父节点排在子节点之前。 */
+/** React Flow 要求祖先 group 排在后代之前，再排根节点与叶子。 */
 export function sortNodesForReactFlow(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   const groupIds = new Set(
     nodes.filter((n) => isGroupNode(n.type)).map((n) => n.id),
   );
-  const groups = nodes.filter((n) => isGroupNode(n.type));
+
+  const groupDepth = (id: string): number => {
+    let depth = 0;
+    let cur = byId.get(id);
+    const seen = new Set<string>();
+    while (cur?.parentId && groupIds.has(cur.parentId) && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      depth += 1;
+      cur = byId.get(cur.parentId);
+    }
+    return depth;
+  };
+
+  const groups = nodes
+    .filter((n) => isGroupNode(n.type))
+    .sort((a, b) => groupDepth(a.id) - groupDepth(b.id));
   const roots = nodes.filter(
     (n) => !isGroupNode(n.type) && (!n.parentId || !groupIds.has(n.parentId)),
   );

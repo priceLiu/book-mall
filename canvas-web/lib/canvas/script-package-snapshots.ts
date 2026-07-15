@@ -27,6 +27,10 @@ export type ScriptPackageSnapshot = {
   assigneeDisplayName?: string;
   completedAt: string;
   copiedFromSnapshotId?: string;
+  /** 关联 hub 行修订 id（行编辑后完成制作时写入） */
+  revisionId?: string;
+  /** 被更新版本取代时标记 */
+  supersededAt?: string;
 };
 
 export type ScriptPackageSnapshotsByKind = Partial<
@@ -195,7 +199,13 @@ function appendToByKind(
   current: ScriptPackageSnapshotsByKind,
   snapshot: ScriptPackageSnapshot,
 ): ScriptPackageSnapshotsByKind {
-  const list = [...(current[snapshot.kind] ?? []), snapshot];
+  const prevList = current[snapshot.kind] ?? [];
+  const superseded = prevList.map((s) =>
+    s.taskId === snapshot.taskId && !s.supersededAt
+      ? { ...s, supersededAt: snapshot.completedAt }
+      : s,
+  );
+  const list = [...superseded, snapshot];
   return { ...current, [snapshot.kind]: list };
 }
 
@@ -242,10 +252,19 @@ export function appendScriptPackageSnapshot(
   nodes?: CanvasFlowNode[],
 ): ScriptPackageSnapshotsByKind {
   const current = resolveScriptPackageSnapshots(anchor, graphMeta, nodes);
-  const withoutTask = removeTaskSnapshots(current, snapshot.taskId);
-  const next = appendToByKind(withoutTask, snapshot);
+  const next = appendToByKind(current, snapshot);
   patchScriptPackageSnapshotsOnAnchor(anchor, next, store);
   return next;
+}
+
+/** 某 taskId 的活跃（未取代）快照，按完成时间倒序 */
+export function listActiveSnapshotsForTask(
+  byKind: ScriptPackageSnapshotsByKind | undefined,
+  taskId: string,
+): ScriptPackageSnapshot[] {
+  return flattenScriptPackageSnapshots(byKind).filter(
+    (s) => s.taskId === taskId && !s.supersededAt,
+  );
 }
 
 export function removeScriptPackageSnapshotForTask(

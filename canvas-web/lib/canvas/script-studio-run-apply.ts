@@ -4,6 +4,7 @@
 import { extractScriptStudioFrozenBiblesMd } from "./script-studio-frozen-bibles";
 import { parseScriptStudioBatch } from "./script-studio-parse";
 import { syncScriptStudioEpisodeToProRows } from "./script-studio-column-sync";
+import { dedupeProSceneRows } from "./story-pro-column-sync";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
@@ -17,6 +18,14 @@ import type {
 import type { CanvasFlowNode } from "./types";
 
 const INLINE_MD_LIMIT = 32_000;
+
+function mergeSceneRows(
+  existing: StoryProSceneRow[],
+  incoming: StoryProSceneRow[],
+  hubId: string,
+): StoryProSceneRow[] {
+  return dedupeProSceneRows([...existing, ...incoming], hubId);
+}
 
 function mergeRowsByKey<T extends { key: string }>(existing: T[], incoming: T[]): T[] {
   const map = new Map(existing.map((r) => [r.key, r]));
@@ -74,7 +83,7 @@ function aggregateBatchRows(batchMd: string, hubId: string): AggregatedSync {
   for (const episode of batch.episodes) {
     const sync = syncScriptStudioEpisodeToProRows(episode, hubId);
     out.characters = mergeRowsByKey(out.characters, sync.characters);
-    out.scenes = mergeRowsByKey(out.scenes, sync.scenes);
+    out.scenes = mergeSceneRows(out.scenes, sync.scenes, hubId);
     out.props = mergeRowsByKey(out.props, sync.props);
     out.frames = mergeFrameRows(out.frames, sync.frames);
     out.moods = mergeRowsByKey(out.moods, sync.moods);
@@ -217,7 +226,7 @@ export function applyScriptStudioThemeOutlineResult(
   }));
 
   hubPatch.scriptStudioCharacterRows = mergeRowsByKey(prevChars, sync.characters);
-  hubPatch.sceneRows = mergeRowsByKey(prevScenes, sync.scenes);
+  hubPatch.sceneRows = mergeSceneRows(prevScenes, sync.scenes, hubId);
   hubPatch.scriptStudioPropRows = mergeRowsByKey(prevProps, sync.props);
   hubPatch.scriptStudioFrameRows = mergedFrames;
   hubPatch.scriptStudioMoodRows = mergeRowsByKey(prevMoods, sync.moods);

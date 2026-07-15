@@ -53,6 +53,21 @@ describe("buildCrewBulletinFromHub", () => {
     ).toBe(true);
   });
 
+  it("dedupes scene tasks when stored sceneRows share the same name", () => {
+    const hubData = {
+      outlineMd: "# 大纲",
+      sceneRows: [
+        { key: "s1", name: "教室内", description: "内景", prompt: "" },
+        { key: "hub-1::教室内", name: "教室内", description: "内景", prompt: "详细" },
+      ],
+    } as StoryProScriptHubNodeData;
+
+    const bulletin = buildCrewBulletinFromHub("hub-1", hubData);
+    const scenes = bulletin.tasks.filter((t) => t.kind === "scene");
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0]?.label).toBe("教室内");
+  });
+
   it("falls back to characterMd and storyboardMd when scriptStudio rows empty", () => {
     const hubData = {
       outlineMd: "# 大纲",

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Copy, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Copy, Plus, Trash2, X, Star } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { ProjectCoverMedia } from "@/components/canvas/project-cover-media";
+import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import {
   createCanvasProject,
   deleteCanvasProject,
@@ -13,7 +14,9 @@ import {
   formatCanvasApiError,
   listCanvasTemplates,
   listMyCanvasProjects,
+  listPortalFeaturedProjects,
   patchCanvasProject,
+  patchPortalFeaturedProject,
   type CanvasProjectSummary,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
@@ -44,6 +47,8 @@ import {
   type NewProjectScriptPackageAsset,
 } from "@/lib/canvas/pro2-new-project-script-package";
 import type { CanvasGraph } from "@/lib/canvas/types";
+import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
+import { cn } from "@/lib/utils";
 
 type StarterPick =
   | { kind: "blank" }
@@ -62,7 +67,11 @@ function normalizeEdition(
 function Inner() {
   const base = useBookMallBaseUrl();
   const dialogs = useDialogs();
+  const isAdmin = useCanvasAdmin();
   const [projects, setProjects] = useState<CanvasProjectSummary[]>([]);
+  const [portalFeaturedIds, setPortalFeaturedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [userTemplates, setUserTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -114,6 +123,40 @@ function Inner() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const refreshPortalFeaturedIds = useCallback(async () => {
+    if (!base?.trim() || !isAdmin) {
+      setPortalFeaturedIds(new Set());
+      return;
+    }
+    try {
+      const list = await listPortalFeaturedProjects(base);
+      setPortalFeaturedIds(new Set(list.map((p) => p.id)));
+    } catch {
+      setPortalFeaturedIds(new Set());
+    }
+  }, [base, isAdmin]);
+
+  useEffect(() => {
+    void refreshPortalFeaturedIds();
+  }, [refreshPortalFeaturedIds]);
+
+  const onTogglePortalFeatured = useCallback(
+    async (id: string, featured: boolean) => {
+      if (!base?.trim()) return;
+      try {
+        await patchPortalFeaturedProject(base, id, { featured });
+        await refreshPortalFeaturedIds();
+      } catch (e) {
+        await dialogs.alert({
+          title: featured ? "设为首页示例失败" : "取消首页示例失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      }
+    },
+    [base, dialogs, refreshPortalFeaturedIds],
+  );
 
   const resetCreateWizard = useCallback(() => {
     setCreateStep(1);
@@ -417,6 +460,9 @@ function Inner() {
 
   return (
     <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
+      <div className="mb-6 flex justify-center">
+        <ProjectsSubNav />
+      </div>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="twenty-eyebrow">canvas-web · projects</p>
@@ -487,6 +533,9 @@ function Inner() {
             duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={() => onOpenPicker("sbv1")}
+            isAdmin={isAdmin}
+            portalFeaturedIds={portalFeaturedIds}
+            onTogglePortalFeatured={onTogglePortalFeatured}
           />
           <ProjectsSection
             title="影视专业版 2.0"
@@ -498,6 +547,9 @@ function Inner() {
             duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={openPro2CreateDialog}
+            isAdmin={isAdmin}
+            portalFeaturedIds={portalFeaturedIds}
+            onTogglePortalFeatured={onTogglePortalFeatured}
           />
           <ProjectsSection
             title="影视专业版"
@@ -509,6 +561,9 @@ function Inner() {
             duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={() => onOpenPicker("pro")}
+            isAdmin={isAdmin}
+            portalFeaturedIds={portalFeaturedIds}
+            onTogglePortalFeatured={onTogglePortalFeatured}
           />
         </div>
       )}
@@ -748,6 +803,9 @@ function ProjectsSection({
   duplicatingId,
   onRename,
   onCreate,
+  isAdmin,
+  portalFeaturedIds,
+  onTogglePortalFeatured,
 }: {
   title: string;
   subtitle: string;
@@ -758,6 +816,9 @@ function ProjectsSection({
   duplicatingId: string | null;
   onRename: (id: string, nextName: string) => void | Promise<void>;
   onCreate: () => void;
+  isAdmin?: boolean;
+  portalFeaturedIds?: Set<string>;
+  onTogglePortalFeatured?: (id: string, featured: boolean) => void | Promise<void>;
 }) {
   return (
     <section>
@@ -796,13 +857,7 @@ function ProjectsSection({
               className="group rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
             >
               <Link href={`/canvas/${p.id}`} className="block">
-                <div className="aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-[var(--canvas-accent)]/15 to-[var(--canvas-surface-2)]">
-                  <ProjectCoverMedia
-                    url={p.thumbnailUrl}
-                    alt={p.name}
-                    placeholderLetter={p.name}
-                  />
-                </div>
+                <CanvasListCover url={p.thumbnailUrl} name={p.name} />
                 <ProjectNameEditor
                   name={p.name}
                   onSave={(next) => void onRename(p.id, next)}
@@ -817,6 +872,36 @@ function ProjectsSection({
                 </p>
               </Link>
               <div className="mt-3 flex items-center justify-end gap-2">
+                {isAdmin && onTogglePortalFeatured ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void onTogglePortalFeatured(
+                        p.id,
+                        !portalFeaturedIds?.has(p.id),
+                      )
+                    }
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
+                      portalFeaturedIds?.has(p.id)
+                        ? "border-amber-400/40 text-amber-200 hover:border-amber-400/60"
+                        : "border-white/10 text-[var(--canvas-muted)] hover:border-amber-400/35 hover:text-amber-200/90",
+                    )}
+                    title={
+                      portalFeaturedIds?.has(p.id)
+                        ? "取消首页示例"
+                        : "设为首页精选示例"
+                    }
+                  >
+                    <Star
+                      className={cn(
+                        "size-3",
+                        portalFeaturedIds?.has(p.id) && "fill-current",
+                      )}
+                    />
+                    首页
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   disabled={duplicatingId === p.id}

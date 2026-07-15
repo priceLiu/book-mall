@@ -10,7 +10,7 @@ import {
 } from "./pro2-spawn-nodes";
 import { NODE_DEFAULT_DATA } from "./types";
 import { PRO2_CHARACTER_THREE_VIEW_HEIGHT, PRO2_CHARACTER_THREE_VIEW_WIDTH } from "./story-pro2-node-chrome";
-import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
+import { selectPro2NodeAfterSpawn, focusNodeAfterSpawn } from "./pro2-spawn-select";
 import { buildSbv1ImageNodeData, buildSbv1VideoEngineNodeDataForMenuItem, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   resolveLibtvSideSpawnNodeType,

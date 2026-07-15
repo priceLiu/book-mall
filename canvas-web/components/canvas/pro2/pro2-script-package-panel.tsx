@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Copy, Package } from "lucide-react";
 import {
   CREW_PRODUCTION_PHASE_LABELS,
@@ -36,13 +37,19 @@ type ScriptPackagePanelProps = {
 
 function SnapshotCard({
   snapshot,
+  versions,
   onCopy,
 }: {
   snapshot: ScriptPackageSnapshot;
-  onCopy: () => void;
+  versions?: ScriptPackageSnapshot[];
+  onCopy: (snapshot: ScriptPackageSnapshot) => void;
 }) {
-  const mediaUrl = snapshot.previewUrl ?? snapshot.videoUrl;
-  const isVideo = Boolean(snapshot.videoUrl && !snapshot.previewUrl);
+  const [versionId, setVersionId] = useState(snapshot.id);
+  const active =
+    versions?.find((v) => v.id === versionId) ?? snapshot;
+  const mediaUrl = active.previewUrl ?? active.videoUrl;
+  const isVideo = Boolean(active.videoUrl && !active.previewUrl);
+  const versionOptions = versions ?? [snapshot];
 
   return (
     <div className="flex gap-2 rounded-lg border border-black/35 bg-black/20 p-2">
@@ -67,21 +74,40 @@ function SnapshotCard({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[11px] font-medium text-white/85">
-          {snapshot.label}
+          {active.label}
         </p>
         <p className="text-[10px] text-white/45">
-          {snapshot.assigneeDisplayName ?? "—"}
-          {snapshot.episodeNo != null ? ` · 第 ${snapshot.episodeNo} 集` : ""}
+          {active.assigneeDisplayName ?? "—"}
+          {active.episodeNo != null ? ` · 第 ${active.episodeNo} 集` : ""}
         </p>
         <p className="text-[9px] text-white/30">
-          {new Date(snapshot.completedAt).toLocaleString()}
+          {new Date(active.completedAt).toLocaleString()}
+          {active.supersededAt ? " · 历史版本" : ""}
         </p>
+        {versionOptions.length > 1 ? (
+          <select
+            value={versionId}
+            onChange={(e) => setVersionId(e.target.value)}
+            className="mt-1 max-w-full rounded border border-white/10 bg-black/30 px-1.5 py-0.5 text-[9px] text-white/70"
+          >
+            {versionOptions.map((v, i) => (
+              <option key={v.id} value={v.id}>
+                版本 {versionOptions.length - i}
+                {v.supersededAt ? "（已取代）" : "（当前）"}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
       <button
         type="button"
         title="复制到画布"
         className="inline-flex h-8 shrink-0 items-center gap-1 self-start rounded-md border border-black/40 bg-black/25 px-2 text-[10px] text-white/80 transition hover:bg-black/35"
-        onClick={onCopy}
+        onClick={() => {
+          const picked =
+            versions?.find((v) => v.id === versionId) ?? snapshot;
+          onCopy(picked);
+        }}
       >
         <Copy className="size-3" />
         复制
@@ -98,8 +124,33 @@ export function Pro2ScriptPackagePanel({
   hubNodeId,
   onCopySnapshot,
 }: ScriptPackagePanelProps) {
+  const groupedByKind = useMemo(() => {
+    const out: Partial<
+      Record<CrewTaskKind, { taskId: string; versions: ScriptPackageSnapshot[] }[]>
+    > = {};
+    for (const kind of SNAPSHOT_KIND_ORDER) {
+      const list = snapshots[kind];
+      if (!list?.length) continue;
+      const byTask = new Map<string, ScriptPackageSnapshot[]>();
+      for (const s of list) {
+        const arr = byTask.get(s.taskId) ?? [];
+        arr.push(s);
+        byTask.set(s.taskId, arr);
+      }
+      out[kind] = Array.from(byTask.entries()).map(([taskId, versions]) => ({
+        taskId,
+        versions: versions.sort(
+          (a, b) =>
+            new Date(b.completedAt).getTime() -
+            new Date(a.completedAt).getTime(),
+        ),
+      }));
+    }
+    return out;
+  }, [snapshots]);
+
   const total = SNAPSHOT_KIND_ORDER.reduce(
-    (n, kind) => n + (snapshots[kind]?.length ?? 0),
+    (n, kind) => n + (groupedByKind[kind]?.length ?? 0),
     0,
   );
 
@@ -131,24 +182,28 @@ export function Pro2ScriptPackagePanel({
           style={{ fontSize: `${Math.round(11 * contentScale)}px` }}
         >
           {SNAPSHOT_KIND_ORDER.map((kind) => {
-            const list = snapshots[kind];
-            if (!list?.length) return null;
+            const groups = groupedByKind[kind];
+            if (!groups?.length) return null;
             return (
               <section key={kind}>
                 <h3 className="mb-1.5 text-[10px] font-medium text-cyan-200/80">
                   {phaseLabelForKind(kind)}
                   <span className="ml-1 font-normal text-white/35">
-                    ({list.length})
+                    ({groups.length})
                   </span>
                 </h3>
                 <div className="space-y-1.5">
-                  {list.map((snapshot) => (
-                    <SnapshotCard
-                      key={snapshot.id}
-                      snapshot={snapshot}
-                      onCopy={() => onCopySnapshot(snapshot)}
-                    />
-                  ))}
+                  {groups.map(({ taskId, versions }) => {
+                    const latest = versions[0]!;
+                    return (
+                      <SnapshotCard
+                        key={taskId}
+                        snapshot={latest}
+                        versions={versions}
+                        onCopy={(picked) => onCopySnapshot(picked)}
+                      />
+                    );
+                  })}
                 </div>
               </section>
             );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
 
 export const metadata = {
   title: "项目资产使用说明 · canvas-web",
@@ -9,6 +10,9 @@ export const metadata = {
 export default function ProjectAssetsGuidePage() {
   return (
     <div className="canvas-page canvas-page-fill max-w-3xl py-8 pb-16 sm:py-10">
+      <div className="mb-6 flex justify-center">
+        <ProjectsSubNav />
+      </div>
       <header className="mb-10">
         <p className="twenty-eyebrow">canvas-web · story-pro · 用户指南</p>
         <h1 className="canvas-serif mt-3 text-3xl text-white">项目资产 · 使用说明</h1>

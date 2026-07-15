@@ -148,6 +148,37 @@ describe("crewBulletinFromScriptPackagePayload rebuild", () => {
     expect(bulletin.tasks.some((t) => t.kind === "scene")).toBe(true);
   });
 
+  it("does not duplicate scene tasks when stored bulletin uses legacy rowKey ids", () => {
+    const stored: CrewBulletinState = {
+      hubNodeId: "asset-dup",
+      scriptTitle: "测试剧",
+      totalEpisodes: 5,
+      publishedAt: "2026-01-01T00:00:00.000Z",
+      tasks: [
+        { id: "s1", kind: "script", label: "剧本", rowKey: "script", status: "done" },
+        {
+          id: "scene:pkg-asset-dup::教室内",
+          kind: "scene",
+          label: "教室内",
+          rowKey: "pkg-asset-dup::教室内",
+          status: "unclaimed",
+        },
+      ],
+    };
+    const { bulletin } = crewBulletinFromScriptPackagePayload(
+      "asset-dup",
+      "剧本包 · 测试",
+      {
+        crewBulletin: stored,
+        markdown: "# 大纲",
+        sceneRows: [{ key: "教室内", name: "教室内", description: "内景" }],
+      },
+    );
+    const scenes = bulletin.tasks.filter((t) => t.kind === "scene");
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0]?.label).toBe("教室内");
+  });
+
   it("loads script package snapshots from payload", () => {
     const snapshots = parseScriptPackageSnapshotsFromPayload({
       scriptPackageSnapshots: {

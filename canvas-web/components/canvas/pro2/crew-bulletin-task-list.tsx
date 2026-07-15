@@ -77,6 +77,12 @@ export type CrewBulletinVirtualTaskListProps = {
   contentScale?: number;
   /** 全屏模式：表格占满视口高度 */
   fullscreen?: boolean;
+  /** 允许行内编辑可编辑列 */
+  editable?: boolean;
+  onSaveTaskCells?: (
+    task: CrewBulletinTask,
+    cells: Record<string, string>,
+  ) => void;
 };
 
 function gridTemplate(
@@ -112,6 +118,8 @@ function TaskTableRow({
   onPreview,
   contentScale = 1,
   fullscreen = false,
+  editable = false,
+  onSaveTaskCells,
 }: {
   task: CrewBulletinTask;
   columns: CrewBulletinTableColumn[];
@@ -127,9 +135,28 @@ function TaskTableRow({
   onPreview?: (url: string, title: string) => void;
   contentScale?: number;
   fullscreen?: boolean;
+  editable?: boolean;
+  onSaveTaskCells?: (
+    task: CrewBulletinTask,
+    cells: Record<string, string>,
+  ) => void;
 }) {
   const grid = gridTemplate(columns, fullscreen);
   const smallFontPx = Math.round(9 * contentScale);
+  const [editingCol, setEditingCol] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  const beginEdit = (colKey: string, value: string) => {
+    if (!editable || !onSaveTaskCells) return;
+    setEditingCol(colKey);
+    setDraft(value === "—" ? "" : value);
+  };
+
+  const commitEdit = () => {
+    if (!editingCol || !onSaveTaskCells) return;
+    onSaveTaskCells(task, { ...cells, [editingCol]: draft });
+    setEditingCol(null);
+  };
 
   return (
     <div
@@ -172,10 +199,33 @@ function TaskTableRow({
           key={col.key}
           role="cell"
           className="min-w-0 break-words text-white/65"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            beginEdit(col.key, cells[col.key]?.trim() || "—");
+          }}
         >
-          <span className="whitespace-pre-wrap">
-            {cells[col.key]?.trim() || "—"}
-          </span>
+          {editingCol === col.key ? (
+            <textarea
+              autoFocus
+              value={draft}
+              rows={2}
+              className="nodrag w-full resize-y rounded border border-cyan-400/30 bg-black/40 px-1.5 py-1 text-[inherit] text-white/85 focus:outline-none"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  commitEdit();
+                }
+                if (e.key === "Escape") setEditingCol(null);
+              }}
+            />
+          ) : (
+            <span className="whitespace-pre-wrap">
+              {cells[col.key]?.trim() || "—"}
+            </span>
+          )}
         </div>
       ))}
 
@@ -259,6 +309,8 @@ export function CrewBulletinVirtualTaskList({
   statusColor,
   contentScale = 1,
   fullscreen = false,
+  editable = false,
+  onSaveTaskCells,
 }: CrewBulletinVirtualTaskListProps) {
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(
     null,
@@ -371,6 +423,8 @@ export function CrewBulletinVirtualTaskList({
                 onPreview={(url, title) => setPreview({ url, title })}
                 contentScale={contentScale}
                 fullscreen={fullscreen}
+                editable={editable}
+                onSaveTaskCells={onSaveTaskCells}
               />
             );
           })}

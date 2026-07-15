@@ -36,8 +36,14 @@ function remapGraphIds(src: CanvasGraph): CanvasGraph {
   };
 }
 
+/**
+ * 从模板新建 / fork：重分配 id，仅清瞬时态；保留模板内已有 OSS 媒体快照。
+ * （结构空白模板本身不含 ossUrl；社区模板含图则 fork 后可见。）
+ */
 export function cloneGraphForNewProject(src: CanvasGraph): CanvasGraph {
-  return remapGraphIds(stripRuntimeForTemplate(src));
+  return remapGraphIds(
+    stripRuntimeForTemplate(src, { keepPersistableMedia: true }),
+  );
 }
 
 /** 复制画布：保留媒体与内容，重分配 nodeId / edgeId，并清理进行中的任务态。 */

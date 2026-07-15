@@ -2,7 +2,7 @@ import {
   buildCrewBulletinFromHub,
   mergeCrewBulletinPreservingClaims,
 } from "./crew-bulletin-build";
-import type { CrewBulletinState, CrewBulletinTask } from "./crew-bulletin-types";
+import type { CrewBulletinState, CrewBulletinTask, CrewTaskKind } from "./crew-bulletin-types";
 import { parseScriptPackageSnapshotsFromPayload } from "./script-package-snapshots";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
@@ -90,6 +90,18 @@ function looksLikeThemePrompt(title: string): boolean {
   );
 }
 
+const MERGEABLE_TASK_KINDS = new Set<CrewTaskKind>([
+  "character",
+  "scene",
+  "prop",
+  "mood",
+  "audio",
+]);
+
+function bulletinTaskMergeKey(task: CrewBulletinTask): string {
+  return `${task.kind}:${task.label.trim()}`;
+}
+
 /** 从 payload 行/Markdown 重建任务，并合并旧清单里可能缺失的种类 */
 function rebuildBulletinFromPayload(
   assetId: string,
@@ -98,7 +110,7 @@ function rebuildBulletinFromPayload(
   stored?: CrewBulletinState,
 ): CrewBulletinState {
   const hubFields = hubFieldsFromPayload(payload, stored);
-  const rebuilt = buildCrewBulletinFromHub(`pkg-${assetId}`, hubFields, {
+  const rebuilt = buildCrewBulletinFromHub(assetId, hubFields, {
     scriptTitle: scriptTitleFromAsset(displayName, payload, stored),
     publishedBy: stored?.publishedBy,
   });
@@ -112,19 +124,46 @@ function mergeBulletinTaskKinds(
   rebuilt: CrewBulletinState,
 ): CrewBulletinState {
   const storedById = new Map(stored.tasks.map((t) => [t.id, t]));
+  const storedByMergeKey = new Map(
+    stored.tasks
+      .filter((t) => MERGEABLE_TASK_KINDS.has(t.kind))
+      .map((t) => [bulletinTaskMergeKey(t), t]),
+  );
   const rebuiltIds = new Set(rebuilt.tasks.map((t) => t.id));
+  const rebuiltMergeKeys = new Set(
+    rebuilt.tasks
+      .filter((t) => MERGEABLE_TASK_KINDS.has(t.kind))
+      .map((t) => bulletinTaskMergeKey(t)),
+  );
   const tasks: CrewBulletinTask[] = rebuilt.tasks.map((t) => {
     const old = storedById.get(t.id);
-    if (!old) return t;
+    const legacy =
+      !old && MERGEABLE_TASK_KINDS.has(t.kind)
+        ? storedByMergeKey.get(bulletinTaskMergeKey(t))
+        : undefined;
+    const prev = old ?? legacy;
+    if (!prev) return t;
     return {
       ...t,
-      label: t.label || old.label,
-      episodeNo: t.episodeNo ?? old.episodeNo,
-      frameIndex: t.frameIndex ?? old.frameIndex,
+      label: t.label || prev.label,
+      episodeNo: t.episodeNo ?? prev.episodeNo,
+      frameIndex: t.frameIndex ?? prev.frameIndex,
+      status: prev.status !== "unclaimed" ? prev.status : t.status,
+      assigneeUserId: prev.assigneeUserId ?? t.assigneeUserId,
+      assigneeDisplayName: prev.assigneeDisplayName ?? t.assigneeDisplayName,
+      canvasNodeId: prev.canvasNodeId ?? t.canvasNodeId,
+      claimedAt: prev.claimedAt ?? t.claimedAt,
+      completedAt: prev.completedAt ?? t.completedAt,
     };
   });
   for (const old of stored.tasks) {
     if (!rebuiltIds.has(old.id) && old.kind !== "script") {
+      if (
+        MERGEABLE_TASK_KINDS.has(old.kind) &&
+        rebuiltMergeKeys.has(bulletinTaskMergeKey(old))
+      ) {
+        continue;
+      }
       tasks.push(old);
     }
   }

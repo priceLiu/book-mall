@@ -1,43 +1,88 @@
 /**
- * canvas v2 · 工作流模板"保存清洗"
+ * canvas v2 · 工作流模板清洗
  *
- * 把当前画布抽象成"可复用的工作流"：
- * - 删除运行时字段（runtime, ossUrl, blobUrl, uploading, activeTaskId, ...）
- * - 删除已上传的图片节点的 ossUrl / blobUrl（避免把用户当次素材带到模板里）
- * - 保留结构 / handles / prompt / params / providerId（但 providerId 通常会随用户变化；保留但允许目标用户覆盖）
- *
- * 调用：在 saveCanvasTemplate 之前调一次。
+ * - 始终清除瞬时态（blob、上传中、任务 id、ephemeral）
+ * - keepPersistableMedia=false：再清 ossUrl（空白结构模板）
+ * - keepPersistableMedia=true：保留 OSS / runtime.ossUrl / poster（社区分享预览与 fork）
  */
 
 import type { CanvasFlowNode, CanvasGraph } from "./types";
 
-const RUNTIME_KEYS = [
-  "runtime",
-  "ossUrl",
+const TRANSIENT_KEYS = [
   "blobUrl",
   "uploading",
   "uploadError",
   "activeTaskId",
 ] as const;
 
-function stripNodeRuntime(n: CanvasFlowNode): CanvasFlowNode {
-  const data = { ...(n.data ?? {}) } as Record<string, unknown>;
-  for (const k of RUNTIME_KEYS) {
-    delete data[k];
+function stripTransientRuntime(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...data };
+  for (const k of TRANSIENT_KEYS) {
+    delete next[k];
   }
-  // image 节点：保留 label，但清空当次的图片
-  if (n.type === "image" || n.type === "story-pro2-image") {
-    delete data.ossUrl;
-    delete data.blobUrl;
-    delete data.uploading;
-    delete data.uploadError;
+  const rt = next.runtime;
+  if (rt && typeof rt === "object" && !Array.isArray(rt)) {
+    const runtime = { ...(rt as Record<string, unknown>) };
+    delete runtime.ephemeralUrl;
+    delete runtime.taskId;
+    if (
+      runtime.status === "running" ||
+      runtime.status === "pending" ||
+      runtime.status === "queued"
+    ) {
+      runtime.status = "idle";
+    }
+    next.runtime = runtime;
+  }
+  return next;
+}
+
+function stripPersistableMedia(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...data };
+  delete next.ossUrl;
+  delete next.imageUrl;
+  delete next.videoUrl;
+  delete next.outputUrl;
+  const rt = next.runtime;
+  if (rt && typeof rt === "object" && !Array.isArray(rt)) {
+    const runtime = { ...(rt as Record<string, unknown>) };
+    delete runtime.ossUrl;
+    delete runtime.posterUrl;
+    delete runtime.ephemeralUrl;
+    next.runtime = runtime;
+  }
+  return next;
+}
+
+function stripNodeRuntime(
+  n: CanvasFlowNode,
+  keepPersistableMedia: boolean,
+): CanvasFlowNode {
+  let data = stripTransientRuntime({
+    ...(n.data ?? {}),
+  } as Record<string, unknown>);
+  if (!keepPersistableMedia) {
+    data = stripPersistableMedia(data);
   }
   return { ...n, data };
 }
 
-export function stripRuntimeForTemplate(graph: CanvasGraph): CanvasGraph {
+export type StripRuntimeOptions = {
+  /** true：社区分享 / fork 预览，保留 OSS 媒体快照 */
+  keepPersistableMedia?: boolean;
+};
+
+export function stripRuntimeForTemplate(
+  graph: CanvasGraph,
+  opts?: StripRuntimeOptions,
+): CanvasGraph {
+  const keep = opts?.keepPersistableMedia === true;
   return {
     ...graph,
-    nodes: graph.nodes.map(stripNodeRuntime),
+    nodes: graph.nodes.map((n) => stripNodeRuntime(n, keep)),
   };
 }

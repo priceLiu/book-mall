@@ -1773,6 +1773,12 @@ model CanvasProject {
   /// 缩略图（最近一张 OutputNode 输出）
   thumbnailUrl String @default("")
 
+  /// 门户首页精选示例（方案 C：展示真实项目封面，非空白模板）
+  portalFeatured      Boolean @default(false)
+  portalFeaturedSort  Int     @default(0)
+  /// 首页卡片副文案（空则用 description）
+  portalFeaturedBlurb String  @default("") @db.Text
+
   deletedAt DateTime?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
@@ -1789,6 +1795,7 @@ model CanvasProject {
 
   @@index([userId, deletedAt, updatedAt])
   @@index([tenantId, visibility, updatedAt])
+  @@index([portalFeatured, portalFeaturedSort])
 }
 
 /// 画布自动/手动保存历史（每项目最多保留 20 条）
@@ -1812,25 +1819,35 @@ model CanvasProjectHistory {
   @@index([projectId, createdAt])
 }
 
-/// 画布模板：系统模板（builtin=true 且 ownerUserId=null）+ 用户私有模板
+/// 画布模板：系统模板（builtin=true 且 ownerUserId=null）+ 用户私有/公开模板
 model CanvasTemplate {
   id          String  @id @default(cuid())
   ownerUserId String?
   owner       User?   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
-  category  String
-  name      String
-  thumbnail String  @default("")
+  category    String
+  name        String
+  thumbnail   String  @default("")
+  description String  @default("")
+  /// private | public
+  visibility  String  @default("private")
+  /// 平台精选（首页 Featured）
+  featured    Boolean @default(false)
+  /// pro2 | sbv1 | classic
+  edition     String  @default("")
+  forkCount   Int     @default(0)
+  sourceLabel String  @default("")
   /// 同 CanvasProject.canvas 结构
-  canvas    Json
-  builtin   Boolean @default(false)
-  sortOrder Int     @default(0)
+  canvas      Json
+  builtin     Boolean @default(false)
+  sortOrder   Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerUserId, sortOrder])
   @@index([builtin, sortOrder])
+  @@index([visibility, featured, sortOrder])
 }
 
 /// 用户保存的三视图角色（从三视图引擎生成后入库，可在画布快速插入图片节点）

@@ -393,3 +393,96 @@ export async function duplicateCanvasProjectForUser(
     canvas: updated.canvas,
   };
 }
+
+export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
+  portalFeaturedBlurb: string;
+};
+
+function portalFeaturedBlurbOf(p: {
+  portalFeaturedBlurb: string;
+  description: string;
+}): string {
+  const blurb = p.portalFeaturedBlurb?.trim();
+  if (blurb) return blurb;
+  return p.description?.trim() ?? "";
+}
+
+/** 门户首页 · 精选示例项目（与「我的画布」同源 thumbnailUrl） */
+export async function listPortalFeaturedCanvasProjects(): Promise<
+  PortalFeaturedProjectSummary[]
+> {
+  const rows = await prisma.canvasProject.findMany({
+    where: { portalFeatured: true, deletedAt: null },
+    orderBy: [{ portalFeaturedSort: "asc" }, { updatedAt: "desc" }],
+    take: 50,
+  });
+  return rows.map((p) => ({
+    ...toSummary(p),
+    portalFeaturedBlurb: portalFeaturedBlurbOf(p),
+  }));
+}
+
+async function getPortalFeaturedCanvasProjectRow(projectId: string) {
+  const p = await prisma.canvasProject.findFirst({
+    where: { id: projectId, deletedAt: null, portalFeatured: true },
+  });
+  if (!p) {
+    throw new CanvasProjectError("NOT_FOUND", "portal featured project not found", 404);
+  }
+  return p;
+}
+
+/** 从门户示例复制到当前用户（不要求拥有源项目） */
+export async function duplicatePortalFeaturedProjectForUser(
+  userId: string,
+  sourceProjectId: string,
+): Promise<CanvasProjectDetail> {
+  const source = await getPortalFeaturedCanvasProjectRow(sourceProjectId);
+  const canvas = cloneCanvasGraphForDuplicate(source.canvas);
+  const thumbnailUrl =
+    resolveThumbnailUrl({
+      thumbnailUrl: source.thumbnailUrl,
+      canvas: source.canvas,
+    }) || "";
+  const created = await createCanvasProjectForUser(userId, {
+    name: duplicateProjectName(source.name),
+    description: source.description,
+    canvas,
+  });
+  if (!thumbnailUrl) return created;
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: created.id },
+    data: { thumbnailUrl },
+  });
+  return {
+    ...toSummary(updated),
+    canvas: updated.canvas,
+  };
+}
+
+/** 管理员 · 设置/取消门户精选 */
+export async function setCanvasProjectPortalFeatured(args: {
+  projectId: string;
+  featured: boolean;
+  sort?: number;
+  blurb?: string;
+}): Promise<PortalFeaturedProjectSummary> {
+  const p = await prisma.canvasProject.findFirst({
+    where: { id: args.projectId, deletedAt: null },
+  });
+  if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: args.projectId },
+    data: {
+      portalFeatured: args.featured,
+      ...(typeof args.sort === "number" ? { portalFeaturedSort: args.sort } : {}),
+      ...(typeof args.blurb === "string" ? { portalFeaturedBlurb: args.blurb } : {}),
+    },
+  });
+  return {
+    ...toSummary(updated),
+    portalFeaturedBlurb: portalFeaturedBlurbOf(updated),
+  };
+}

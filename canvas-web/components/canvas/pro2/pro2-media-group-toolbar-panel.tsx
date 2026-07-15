@@ -10,11 +10,15 @@ import {
   Palette,
   RotateCw,
   Rows3,
+  Share2,
   Unlink,
   Video,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { extractGroupSubgraph } from "@/lib/canvas/extract-group-subgraph";
+import { shareWorkflowAsTemplate } from "@/lib/canvas/share-workflow";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
@@ -130,6 +134,7 @@ export function Pro2MediaGroupToolbarPanel({
 }: Pro2MediaGroupToolbarPanelProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const graphMeta = useCanvasStore((s) => s.graphMeta);
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const duplicateMediaGroup = useCanvasStore((s) => s.duplicateMediaGroup);
@@ -144,13 +149,89 @@ export function Pro2MediaGroupToolbarPanel({
     [nodes, groupId],
   );
   const saveGroupAsAsset = useSaveGroupAsAsset();
-  const { confirm } = useDialogs();
+  const { confirm, prompt, alert } = useDialogs();
+  const base = useBookMallBaseUrl();
   const { providers } = useUserProviders();
   const [editOpen, setEditOpen] = useState(false);
   const [videoPickerOpen, setVideoPickerOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
   const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const onShareWorkflow = async () => {
+    if (!base?.trim()) {
+      await alert({
+        title: "无法分享",
+        message: "未配置主站地址",
+        variant: "error",
+      });
+      return;
+    }
+    const subgraph = extractGroupSubgraph(nodes, edges, groupId, graphMeta ?? undefined);
+    if (!subgraph?.nodes.length) {
+      await alert({
+        title: "无法分享",
+        message: "组内无有效节点",
+        variant: "error",
+      });
+      return;
+    }
+    const defaultName =
+      (group?.data as { label?: string })?.label?.trim() || "工作流组";
+    const name = await prompt({
+      title: "分享工作流",
+      message: "将本组节点结构保存为模板，可设为公开供他人复制。",
+      label: "标题",
+      defaultValue: defaultName,
+      placeholder: "工作流名称",
+      confirmLabel: "下一步",
+      validate: (v) => (v.trim() ? null : "标题不能为空"),
+    });
+    if (!name) return;
+    const description = await prompt({
+      title: "工作流描述",
+      message: "可选：说明适用场景与节点用途。",
+      label: "描述",
+      defaultValue: "",
+      placeholder: "描述（可选）",
+      confirmLabel: "分享",
+    });
+    if (description === null) return;
+    const sharePublic = await confirm({
+      title: "分享到社区？",
+      message: "公开后将在首页「社区模板」展示；选「仅自己」则仅保存为私有模板。",
+      confirmLabel: "公开到社区",
+      cancelLabel: "仅自己可见",
+    });
+    setSharing(true);
+    try {
+      await shareWorkflowAsTemplate({
+        base,
+        name: name.trim(),
+        description: description.trim(),
+        graph: subgraph,
+        edition,
+        sourceLabel: defaultName,
+        visibility: sharePublic ? "public" : "private",
+      });
+      await alert({
+        title: sharePublic ? "已公开分享" : "已保存模板",
+        message: sharePublic
+          ? "工作流已出现在首页社区模板区。"
+          : "可在「我的模板」中复用。",
+        variant: "success",
+      });
+    } catch (e) {
+      await alert({
+        title: "分享失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const controller = useMemo(() => {
     if (!group || !kind) return undefined;
@@ -603,6 +684,20 @@ export function Pro2MediaGroupToolbarPanel({
         >
           <BookmarkPlus className="size-3.5" />
           保存为资产
+        </button>
+        <button
+          type="button"
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+          title="分享本组为工作流模板"
+          disabled={sharing}
+          onClick={() => void onShareWorkflow()}
+        >
+          {sharing ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Share2 className="size-3.5" />
+          )}
+          分享工作流
         </button>
         <button
           type="button"

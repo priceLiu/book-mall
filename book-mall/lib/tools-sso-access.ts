@@ -40,7 +40,8 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
     getMembershipToolAccess(userId),
     getUserBillingPersona(userId),
   ]);
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin =
+    user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const hasMembershipSubscription = membership.hasActiveSubscription;
   const hasToolProductSubscription = membership.hasActiveToolProductSubscription;
   const hasActiveToolService = memberAccess.ok;
