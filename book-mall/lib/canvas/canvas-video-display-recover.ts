@@ -3,8 +3,14 @@
  */
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
-import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
-import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-service";
+import {
+  isCanvasBailianR2vVideoTaskPayload,
+  isCanvasVolcengineVideoTaskPayload,
+} from "@/lib/canvas/canvas-constants";
+import {
+  applyCanvasBailianR2vPollResult,
+  applyCanvasVolcengineVideoResult,
+} from "@/lib/canvas/canvas-task-service";
 import {
   CANVAS_MEDIA_NODE_TYPES,
   CANVAS_VIDEO_MEDIA_NODE_TYPES,
@@ -17,6 +23,7 @@ import {
   extractVolcengineVideoUrlFromGatewaySummary,
   recoverCanvasVolcengineTimedOutTask,
 } from "@/lib/canvas/canvas-volcengine-recover";
+import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
 import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
 import { prisma } from "@/lib/prisma";
@@ -45,10 +52,20 @@ function taskInputPayload(
   return task.inputPayload as Record<string, unknown>;
 }
 
-function isVolcengineVideoCanvasTask(
+function isRecoverableCanvasVideoTask(
   task: Pick<CanvasGenerationTask, "inputPayload">,
 ): boolean {
-  return isCanvasVolcengineVideoTaskPayload(taskInputPayload(task));
+  const payload = taskInputPayload(task);
+  return (
+    isCanvasVolcengineVideoTaskPayload(payload) ||
+    isCanvasBailianR2vVideoTaskPayload(payload)
+  );
+}
+
+function isBailianR2vVideoCanvasTask(
+  task: Pick<CanvasGenerationTask, "inputPayload">,
+): boolean {
+  return isCanvasBailianR2vVideoTaskPayload(taskInputPayload(task));
 }
 
 /** @deprecated 使用 canvasNodeShowsPersistedMedia */
@@ -92,16 +109,18 @@ export async function recoverCanvasVideoTaskDisplay(
   if (!task) {
     return { ok: false, action: "failed", reason: "task_not_found", taskId };
   }
-  if (!isVolcengineVideoCanvasTask(task)) {
+  if (!isRecoverableCanvasVideoTask(task)) {
     return {
       ok: false,
       action: "failed",
-      reason: "not_volcengine_video_task",
+      reason: "not_recoverable_video_task",
       taskId,
       projectId: task.projectId,
       nodeId: task.nodeId,
     };
   }
+
+  const isBailian = isBailianR2vVideoCanvasTask(task);
 
   const base = {
     taskId: task.id,
@@ -135,11 +154,19 @@ export async function recoverCanvasVideoTaskDisplay(
   if (gatewayLogId) {
     const log = await loadGatewayLog(gatewayLogId);
     if (log?.status === "SUCCEEDED") {
-      const videoUrl = extractVolcengineVideoUrlFromGatewaySummary(
-        log.resultSummary,
-      );
+      const videoUrl = isBailian
+        ? extractBailianR2vVideoUrlFromGatewaySummary(log.resultSummary)
+        : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
       if (videoUrl) {
-        await applyCanvasVolcengineVideoResult(task.id, videoUrl);
+        if (isBailian) {
+          await applyCanvasBailianR2vPollResult(task.id, {
+            ok: true,
+            output: { task_status: "SUCCEEDED", video_url: videoUrl },
+            raw: log.resultSummary,
+          });
+        } else {
+          await applyCanvasVolcengineVideoResult(task.id, videoUrl);
+        }
         const updated = await prisma.canvasGenerationTask.findUnique({
           where: { id: task.id },
           select: { status: true, ossUrl: true, ephemeralUrl: true },
@@ -404,7 +431,7 @@ export async function findCanvasVideoTasksNeedingRecovery(opts?: {
   const out: CanvasVideoRecoverCandidate[] = [];
 
   for (const t of tasks) {
-    if (!isVolcengineVideoCanvasTask(t)) continue;
+    if (!isRecoverableCanvasVideoTask(t)) continue;
 
     const payload = taskInputPayload(t);
     const gwId =
@@ -447,7 +474,7 @@ export async function recoverCanvasVideoProjectDisplay(
 
   const latestByNode = new Map<string, string>();
   for (const t of tasks) {
-    if (!isVolcengineVideoCanvasTask(t)) continue;
+    if (!isRecoverableCanvasVideoTask(t)) continue;
     if (!latestByNode.has(t.nodeId)) latestByNode.set(t.nodeId, t.id);
   }
 
@@ -558,7 +585,7 @@ export async function reconcileStaleCanvasMediaRuntimeOnProjectRead(
     if (!task) continue;
     if (
       CANVAS_VIDEO_MEDIA_NODE_TYPES.has(node.type ?? "") &&
-      !isVolcengineVideoCanvasTask(task)
+      !isRecoverableCanvasVideoTask(task)
     ) {
       continue;
     }

@@ -47,6 +47,19 @@ pnpm dev:all:story
 
 `dev:all` + 三条 poll-loop 会**同时**连同一 `DATABASE_URL`。腾讯云 CDB **直连**时务必限制每进程连接数，否则易出现 `Can't reach database server` / `Server has closed the connection`（P1001）。
 
+### 本地开发怎么连库
+
+| 变量 | 用途 |
+|------|------|
+| `DATABASE_URL` | **运行时**（book-mall / poll-loop / Prisma Client）— 走连接池端口或直连 CDB |
+| `DIRECT_DATABASE_URL` | **仅** Prisma CLI `migrate deploy`；防火墙常拦直连 → 迁移改用 `pnpm db:apply-pending` |
+
+**VPN**：腾讯云 CDB 通常在私有网络。VPN 未连时 TCP 不通，表现为登录慢、生图报「服务暂时不可用」或 Prisma P1001。`pnpm dev:all` 启动时会 TCP 探测远程库并黄色提示；随时可自检：
+
+```bash
+pnpm --dir book-mall db:ping
+```
+
 **推荐**在 `book-mall/.env.local` 的 `DATABASE_URL` query 追加：
 
 ```

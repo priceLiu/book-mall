@@ -160,6 +160,12 @@ export function shouldApplyCanvasTaskRuntimePatch(
     return false;
   }
   if (patch.status !== "error") return true;
+  const hasMedia = Boolean(
+    localRuntime?.ossUrl?.trim() || localRuntime?.ephemeralUrl?.trim(),
+  );
+  if (hasMedia && localRuntime?.status === "done") {
+    return false;
+  }
   const dismissed = localRuntime?.dismissedFailTaskId?.trim();
   if (!dismissed) return true;
   return task.id !== dismissed;
@@ -255,7 +261,8 @@ export function storyRunContextFromScope(
 }
 
 /**
- * 同一 scope 多条任务：优先最新进行中，否则取最新一条（含重新生成后的失败终态）。
+ * 同一 scope 多条任务：优先最新进行中，否则取最新成功成片，最后才取最新失败终态。
+ * 避免轮询误用 updatedAt 更新的失败任务覆盖已有视频/图片（与 pickStoryRowApplyTask 一致）。
  */
 export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
@@ -267,6 +274,12 @@ export function pickPreferredCanvasTask(
       !isStaleServerInflightTask(t, tasks),
   );
   if (inflight.length) return newestTaskByUpdatedAt(inflight);
+
+  const succeeded = tasks.filter(
+    (t) => t.status === "SUCCEEDED" && taskHasDisplayableResult(t),
+  );
+  if (succeeded.length) return newestTaskByUpdatedAt(succeeded);
+
   return newestTaskByUpdatedAt(tasks);
 }
 

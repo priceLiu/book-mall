@@ -311,8 +311,14 @@ export function formatCanvasTaskError(
     blob.includes("connection pool") ||
     blob.includes("timed out fetching a new connection") ||
     blob.includes("server has closed the connection") ||
-    blob.includes("can't reach database server")
+    blob.includes("can't reach database server") ||
+    blob.includes("p1001") ||
+    blob.includes("p1017") ||
+    blob.includes("p2024")
   ) {
+    if (process.env.NODE_ENV !== "production") {
+      return "数据库连接失败（本地开发通常需 VPN 连接腾讯云 CDB）。请检查 VPN 与 book-mall/.env.local 的 DATABASE_URL，可用 pnpm --dir book-mall db:ping 自检。";
+    }
     return "系统繁忙，任务已加入队列，请稍候勿重复点击。";
   }
 

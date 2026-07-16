@@ -1,5 +1,6 @@
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
+import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import {
@@ -203,6 +204,23 @@ export async function probeCanvasSubmittedTaskAtTimeout(input: {
   }
 
   base.gatewayLogStatus = log.status;
+
+  if (
+    (providerKind === "BAILIAN" || providerKind === "BAILIAN_R2V") &&
+    log.status === "SUCCEEDED"
+  ) {
+    const videoUrl = extractBailianR2vVideoUrlFromGatewaySummary(
+      log.resultSummary,
+    );
+    if (videoUrl) {
+      return {
+        ...base,
+        cause: "vendor_already_succeeded",
+        videoUrl,
+        note: "gateway_log_bailian_r2v_succeeded",
+      };
+    }
+  }
 
   if (providerKind === "VOLCENGINE" && log.credentialId) {
     const vendor = await probeVolcengineVendor({

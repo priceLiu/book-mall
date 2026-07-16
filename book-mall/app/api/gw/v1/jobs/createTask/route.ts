@@ -138,18 +138,32 @@ export async function POST(request: NextRequest) {
     }
     throw e;
   }
+
+  /** 以 modelKey 为准（非 route）：happyhorse/wan R2V 须走 body.bailian，不能落 DASHSCOPE 空 input 分支 */
+  const isBailianR2vModel = BAILIAN_R2V.has(model.toLowerCase());
+  const effectiveRoute = isBailianR2vModel
+    ? ({ providerKind: "BAILIAN", requestKind: "VIDEO" } as const)
+    : route;
+
   const credentialId =
-    route.providerKind === "VOLCENGINE" && route.requestKind === "VIDEO"
+    route.providerKind === "VOLCENGINE" &&
+    route.requestKind === "VIDEO" &&
+    !isBailianR2vModel
       ? pickVolcengineCredentialForGatewayJob({
           credentials: auth.credentials,
           modelKey: model,
           clientPage: logMeta.clientPage,
           input: (body.input ?? null) as Record<string, unknown> | null,
         })
-      : pickCredentialForKind(auth.credentials, route.providerKind);
+      : pickCredentialForKind(
+          auth.credentials,
+          effectiveRoute.providerKind,
+        );
   if (!credentialId) {
     return NextResponse.json(
-      { error: `No ${route.providerKind} credential bound to this API key` },
+      {
+        error: `No ${effectiveRoute.providerKind} credential bound to this API key`,
+      },
       { status: 400 },
     );
   }
@@ -189,8 +203,7 @@ export async function POST(request: NextRequest) {
     logMeta.clientSource ?? request.headers.get("x-gateway-client"),
   );
 
-  const isBailianR2v =
-    route.providerKind === "BAILIAN" && BAILIAN_R2V.has(model.toLowerCase());
+  const isBailianR2v = isBailianR2vModel;
   const b = body.bailian ?? {};
   const inputForLog: Record<string, unknown> = isBailianR2v
     ? (() => {
@@ -227,8 +240,8 @@ export async function POST(request: NextRequest) {
       credentialId,
       model,
       endpoint: "/v1/jobs/createTask",
-      providerKind: route.providerKind,
-      requestKind: route.requestKind,
+      providerKind: effectiveRoute.providerKind,
+      requestKind: effectiveRoute.requestKind,
       clientSource,
       inputSummary: buildGatewayInputSummary(model, inputForLog),
       ...logMetaToRequestLogFields(logMeta),
@@ -303,6 +316,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         code: 200,
         data: { taskId, logId: log.id, providerKind: "HUNYUAN" },
+      });
+    }
+
+    if (isBailianR2v) {
+      const prompt = String(b.prompt ?? body.input?.prompt ?? "").trim();
+      const referenceImageUrls = Array.isArray(b.referenceImageUrls)
+        ? b.referenceImageUrls.filter(
+            (u): u is string => typeof u === "string",
+          )
+        : [];
+      if (!prompt) {
+        return NextResponse.json(
+          { error: "bailian prompt required" },
+          { status: 400 },
+        );
+      }
+      if (referenceImageUrls.length < 1) {
+        return NextResponse.json(
+          { error: "bailian referenceImageUrls required (1–9)" },
+          { status: 400 },
+        );
+      }
+      const resolution = b.resolution === "720P" ? "720P" : "1080P";
+      const taskId = await submitBailianR2vJobForLog({
+        logId: log.id,
+        credentialId,
+        model,
+        prompt,
+        referenceImageUrls,
+        resolution,
+        ratio: String(b.ratio ?? "16:9"),
+        duration: Number(b.duration ?? 5),
+        seedStr: typeof b.seedStr === "string" ? b.seedStr : undefined,
+        parameterExtras: b.parameterExtras,
+      });
+      return NextResponse.json({
+        code: 200,
+        data: { taskId, logId: log.id, providerKind: "BAILIAN" },
       });
     }
 
@@ -422,32 +473,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         code: 200,
         data: { taskId, logId: log.id, providerKind: "VOLCENGINE" },
-      });
-    }
-
-    if (isBailianR2v) {
-      const prompt = String(b.prompt ?? body.input?.prompt ?? "").trim();
-      const referenceImageUrls = Array.isArray(b.referenceImageUrls)
-        ? b.referenceImageUrls.filter(
-            (u): u is string => typeof u === "string",
-          )
-        : [];
-      const resolution = b.resolution === "720P" ? "720P" : "1080P";
-      const taskId = await submitBailianR2vJobForLog({
-        logId: log.id,
-        credentialId,
-        model,
-        prompt,
-        referenceImageUrls,
-        resolution,
-        ratio: String(b.ratio ?? "16:9"),
-        duration: Number(b.duration ?? 5),
-        seedStr: typeof b.seedStr === "string" ? b.seedStr : undefined,
-        parameterExtras: b.parameterExtras,
-      });
-      return NextResponse.json({
-        code: 200,
-        data: { taskId, logId: log.id, providerKind: "BAILIAN" },
       });
     }
 

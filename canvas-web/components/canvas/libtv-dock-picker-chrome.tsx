@@ -7,6 +7,24 @@ import { cn } from "@/lib/utils";
 export const LIBTV_DOCK_POPOVER_CLASS =
   "nodrag nowheel max-h-[min(420px,70vh)] w-[min(22rem,calc(100vw-24px))] overflow-y-auto rounded-xl border border-white/12 bg-[#1a1a1c] py-2 shadow-2xl";
 
+/** 参数 Popover · 更宽更高，容纳 Gateway schema + 参考模式，尽量避免滚动条 */
+export const LIBTV_DOCK_PARAMS_POPOVER_CLASS =
+  "nodrag nowheel w-[min(30rem,calc(100vw-20px))] max-h-[min(560px,88vh)] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2.5 shadow-2xl";
+
+/** Dock 分段钮 · 选中态不用亮白描边，仅背景提亮 */
+export function libtvDockSegmentButtonClass(
+  active: boolean,
+  opts?: { compact?: boolean },
+): string {
+  return cn(
+    "rounded-lg border font-medium transition",
+    opts?.compact ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 text-[13px]",
+    active
+      ? "border-transparent bg-white/[0.10] text-white"
+      : "border-transparent bg-white/[0.04] text-white/65 hover:bg-white/[0.07] hover:text-white/85",
+  );
+}
+
 /** Pro2 / LibTV Dock · 模型列表项（无彩色边框 / hover） */
 export function libtvDockModelItemClassName(selected: boolean): string {
   return cn(
@@ -42,8 +60,8 @@ export function LibtvDockParamGrid({
             className={cn(
               "relative rounded-lg border px-2 py-2 text-[12px] font-medium transition",
               opt.id === value
-                ? "border-white/28 bg-white/[0.06] text-white"
-                : "border-white/10 text-white/70 hover:border-white/20 hover:bg-white/[0.04]",
+                ? "border-transparent bg-white/[0.10] text-white"
+                : "border-transparent bg-white/[0.04] text-white/70 hover:bg-white/[0.07]",
             )}
             onClick={() => onChange(opt.id)}
           >

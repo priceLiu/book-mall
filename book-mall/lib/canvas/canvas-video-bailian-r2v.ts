@@ -120,3 +120,24 @@ export async function bailianR2vGetTask(opts: {
 
   return { ok: true, output, raw };
 }
+
+/** 从 Gateway 终态 resultSummary 提取百炼 R2V video_url（免二次 recordInfo / 厂商轮询） */
+export function extractBailianR2vVideoUrlFromGatewaySummary(
+  summary: unknown,
+): string | null {
+  if (!summary || typeof summary !== "object") return null;
+  const root = summary as Record<string, unknown>;
+
+  const fromObj = (obj: Record<string, unknown>): string | null => {
+    const url = obj.video_url;
+    return typeof url === "string" && url.trim() ? url.trim() : null;
+  };
+
+  const output = root.output;
+  if (output && typeof output === "object") {
+    const nested = fromObj(output as Record<string, unknown>);
+    if (nested) return nested;
+  }
+
+  return fromObj(root);
+}

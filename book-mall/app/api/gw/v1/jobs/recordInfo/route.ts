@@ -37,6 +37,7 @@ import {
   volcengineVideoTaskFailMessage,
 } from "@/lib/gateway/volcengine-client";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
+import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 
 export const dynamic = "force-dynamic";
 
@@ -196,6 +197,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (providerKind === "BAILIAN") {
+      if (log?.status === "SUCCEEDED") {
+        const cachedUrl = extractBailianR2vVideoUrlFromGatewaySummary(
+          log.resultSummary,
+        );
+        if (cachedUrl) {
+          return NextResponse.json({
+            code: 200,
+            data: {
+              task_id: taskId,
+              task_status: "SUCCEEDED",
+              video_url: cachedUrl,
+            },
+            providerKind: "BAILIAN",
+          });
+        }
+      }
       const polled = await pollBailianR2vTaskForLog({
         credentialId,
         taskId,

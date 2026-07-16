@@ -26,6 +26,12 @@ export function prismaConnectionUnavailableMessage(error: unknown): string {
     }
     return "系统繁忙，请稍候再试；任务会自动排队重试。";
   }
+  if (
+    process.env.NODE_ENV === "development" &&
+    /Can't reach database server|P1001|Server has closed the connection/i.test(msg)
+  ) {
+    return "数据库不可达（本地开发通常需 VPN 连接腾讯云）。请检查 VPN 后执行 pnpm --dir book-mall db:ping。";
+  }
   return "系统繁忙，请稍候再试。";
 }
 
