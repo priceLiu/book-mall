@@ -25,6 +25,7 @@ import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-
 import { cn } from "@/lib/utils";
 import {
   LIBTV_DOCK_POPOVER_CLASS,
+  LIBTV_DOCK_PARAMS_POPOVER_CLASS,
   LibtvDockParamGrid,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
   libtvDockModelItemClassName,
@@ -36,10 +37,13 @@ import {
 import {
   buildSbv1VideoEngineSettingsPatch,
   collectSbv1DockVideoModels,
+} from "./sbv1-video-generate-settings-modal";
+import {
   isSbv1MotionControlModelKey,
   normalizeSbv1EngineProviderId,
+  sbv1VideoParamsTriggerLabel,
   syncSbv1UiFromModelParams,
-} from "./sbv1-video-generate-settings-modal";
+} from "@/lib/canvas/sbv1-video-ui-sync";
 
 const RESOLUTION_OPTIONS = [
   { id: "720p", label: "720p" },
@@ -69,18 +73,7 @@ export function sbv1VideoModelTriggerLabel(
   return resolveVideoModelDisplayName(engineKey, providers);
 }
 
-/** Dock 底栏 · 参数触发钮文案 */
-export function sbv1VideoParamsTriggerLabel(data: Sbv1VideoEngineNodeData): string {
-  if (!data.engine?.modelKey?.trim()) return "参数";
-  const parts: string[] = [sbv1AspectRatioLabel(data.aspectRatio)];
-  if (data.resolution) parts.push(data.resolution.toUpperCase());
-  if (data.referenceMode === "smart_multi") {
-    parts.push("智能多帧");
-  } else if (data.durationSec >= 4 && data.durationSec <= 15) {
-    parts.push(`${data.durationSec}s`);
-  }
-  return parts.join(" · ");
-}
+export { sbv1VideoParamsTriggerLabel } from "@/lib/canvas/sbv1-video-ui-sync";
 
 function useSbv1VideoSettingsDerived(data: Sbv1VideoEngineNodeData) {
   const providerId = normalizeSbv1EngineProviderId(data.engine?.providerId);
@@ -146,9 +139,25 @@ function patchVideoSettings(
   if (!providerId || !modelKey) return;
   const engineParams = next.engineParams ?? data.engine?.params ?? {};
   const referenceMode = next.referenceMode ?? data.referenceMode;
-  const aspectRatio = next.aspectRatio ?? data.aspectRatio;
-  const durationSec = next.durationSec ?? data.durationSec;
-  const resolution = next.resolution ?? data.resolution;
+  let aspectRatio = next.aspectRatio ?? data.aspectRatio;
+  let durationSec = next.durationSec ?? data.durationSec;
+  let resolution = next.resolution ?? data.resolution;
+  if (next.engineParams !== undefined) {
+    syncSbv1UiFromModelParams(modelKey, engineParams, {
+      setAspectRatio: (v) => {
+        aspectRatio = v;
+      },
+      setDurationSec: (v) => {
+        durationSec = v;
+      },
+      setResolution: (v) => {
+        resolution = v;
+      },
+      setGenerateAudio: () => {},
+      setReferenceMode: () => {},
+      providerId,
+    });
+  }
   const generateAudio =
     next.generateAudio ?? engineParams.generate_audio !== false;
   const watermark = next.watermark ?? Boolean(engineParams.watermark);
@@ -391,10 +400,10 @@ export function Sbv1VideoDockParamsPicker({
         setOpen={setOpen}
         rect={rect}
         placement="auto"
-        estimatedHeight={360}
-        className={LIBTV_DOCK_POPOVER_CLASS}
+        estimatedHeight={520}
+        className={LIBTV_DOCK_PARAMS_POPOVER_CLASS}
       >
-        <div className="space-y-3 pb-1">
+        <div className="space-y-2.5 px-1 pb-1">
           {derived.isVolcDockModel ? (
             <>
               <LibtvDockParamGrid
@@ -496,9 +505,9 @@ export function Sbv1VideoDockParamsPicker({
               ) : null}
               {resolvedModel?.paramsSchema &&
               resolvedModel.paramsSchema.length > 0 ? (
-                <div className="px-3">
+                <div className="px-2">
                   <DynamicParamForm
-                    variant="panel"
+                    variant="dock"
                     schema={resolvedModel.paramsSchema}
                     value={derived.engineParams}
                     onChange={(next) => {

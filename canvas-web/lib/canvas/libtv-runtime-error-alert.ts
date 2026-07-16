@@ -48,9 +48,12 @@ export function libtvRuntimeErrorAlertScope(): string {
   return window.location.pathname;
 }
 
+export type LibtvRuntimeErrorMediaKind = "image" | "video";
+
 export function libtvRuntimeErrorAlertTitle(
   failCode?: string,
   message?: string,
+  kind?: LibtvRuntimeErrorMediaKind,
 ): string {
   const code = failCode?.trim();
   const msg = message ?? "";
@@ -61,7 +64,19 @@ export function libtvRuntimeErrorAlertTitle(
   ) {
     return "积分不足";
   }
-  return "视频生成失败";
+  if (
+    kind === "image" ||
+    /生图|图片生成|参考图|image generation/i.test(msg)
+  ) {
+    return "图片生成失败";
+  }
+  if (
+    kind === "video" ||
+    /视频|分镜视频|video generation/i.test(msg)
+  ) {
+    return "视频生成失败";
+  }
+  return "生成失败";
 }
 
 /**

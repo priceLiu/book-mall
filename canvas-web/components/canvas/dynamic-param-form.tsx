@@ -3,13 +3,15 @@
 import type { CanvasParamSchema } from "@/lib/canvas-providers-api";
 import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
 import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { libtvDockSegmentButtonClass } from "@/components/canvas/libtv-dock-picker-chrome";
+import { cn } from "@/lib/utils";
 
 export type DynamicParamFormProps = {
   schema: CanvasParamSchema | null | undefined;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
-  /** compact=节点内折叠；panel=弹层大面板（分段按钮 / 滑条） */
-  variant?: "compact" | "panel";
+  /** compact=节点内折叠；panel=弹层大面板；dock=浮动 Dock 参数 Popover（紧凑、无亮白描边） */
+  variant?: "compact" | "panel" | "dock";
 };
 
 /**
@@ -37,15 +39,17 @@ export function DynamicParamForm({
     );
   }
 
-  if (variant === "panel") {
+  if (variant === "panel" || variant === "dock") {
+    const isDock = variant === "dock";
     return (
-      <div className="space-y-5">
+      <div className={isDock ? "space-y-2.5" : "space-y-5"}>
         {schema.map((item) => (
           <PanelField
             key={item.key}
             item={item}
             cur={value[item.key]}
             onPatch={(v) => onChange({ ...value, [item.key]: v })}
+            dock={isDock}
           />
         ))}
       </div>
@@ -100,17 +104,35 @@ function PanelField({
   item,
   cur,
   onPatch,
+  dock = false,
 }: {
   item: CanvasParamSchema[number];
   cur: unknown;
   onPatch: (v: unknown) => void;
+  dock?: boolean;
 }) {
   if (item.type === "select") {
     const val = String(cur ?? item.defaultValue ?? item.options[0]?.value ?? "");
     return (
       <div>
-        <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
-        <div className="flex flex-wrap gap-2" role="group" aria-label={item.label}>
+        <p
+          className={
+            dock
+              ? "mb-1.5 text-[12px] text-white/50"
+              : "mb-2 text-[13px] text-white/85"
+          }
+        >
+          {item.label}
+        </p>
+        <div
+          className={
+            dock
+              ? "grid grid-cols-3 gap-1.5"
+              : "flex flex-wrap gap-2"
+          }
+          role="group"
+          aria-label={item.label}
+        >
           {item.options.map((o) => {
             const active = val === o.value;
             return (
@@ -119,12 +141,16 @@ function PanelField({
                 type="button"
                 aria-pressed={active}
                 onClick={() => onPatch(o.value)}
-                className={[
-                  "min-w-[4.5rem] rounded-lg border px-4 py-2 text-[13px] font-medium transition",
-                  active
-                    ? "border-white bg-white/[.06] text-white"
-                    : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
-                ].join(" ")}
+                className={
+                  dock
+                    ? libtvDockSegmentButtonClass(active, { compact: true })
+                    : [
+                        "min-w-[4.5rem] rounded-lg border px-4 py-2 text-[13px] font-medium transition",
+                        active
+                          ? "border-transparent bg-white/[0.10] text-white"
+                          : "border-transparent bg-white/[0.04] text-white/65 hover:bg-white/[0.07] hover:text-white/85",
+                      ].join(" ")
+                }
               >
                 {o.label}
               </button>
@@ -150,7 +176,15 @@ function PanelField({
       const suffix = item.label.includes("时长") ? "s" : "";
       return (
         <div>
-          <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
+          <p
+            className={
+              dock
+                ? "mb-1.5 text-[12px] text-white/50"
+                : "mb-2 text-[13px] text-white/85"
+            }
+          >
+            {item.label}
+          </p>
           <div className="flex items-center gap-3">
             <input
               type="range"
@@ -161,7 +195,13 @@ function PanelField({
               onChange={(e) => onPatch(Number(e.target.value))}
               className={`${RF_NODE_SCROLL} h-1.5 flex-1 cursor-pointer accent-white`}
             />
-            <span className="min-w-[2.5rem] text-right text-[13px] font-medium text-white">
+            <span
+              className={
+                dock
+                  ? "min-w-[2.5rem] text-right text-[12px] tabular-nums text-white/75"
+                  : "min-w-[2.5rem] text-right text-[13px] font-medium text-white"
+              }
+            >
               {num}
               {suffix}
             </span>
@@ -193,7 +233,15 @@ function PanelField({
     const checked = cur === undefined ? !!item.defaultValue : !!cur;
     return (
       <div>
-        <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
+        <p
+          className={
+            dock
+              ? "mb-1.5 text-[12px] text-white/50"
+              : "mb-2 text-[13px] text-white/85"
+          }
+        >
+          {item.label}
+        </p>
         <div className="flex gap-2" role="group" aria-label={item.label}>
           {[
             { id: true, label: "开启" },
@@ -206,12 +254,16 @@ function PanelField({
                 type="button"
                 aria-pressed={active}
                 onClick={() => onPatch(opt.id)}
-                className={[
-                  "flex-1 rounded-lg border px-4 py-2 text-[13px] font-medium transition",
-                  active
-                    ? "border-white bg-white/[.06] text-white"
-                    : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
-                ].join(" ")}
+                className={
+                  dock
+                    ? cn("flex-1", libtvDockSegmentButtonClass(active, { compact: true }))
+                    : [
+                        "flex-1 rounded-lg border px-4 py-2 text-[13px] font-medium transition",
+                        active
+                          ? "border-transparent bg-white/[0.10] text-white"
+                          : "border-transparent bg-white/[0.04] text-white/65 hover:bg-white/[0.07] hover:text-white/85",
+                      ].join(" ")
+                }
               >
                 {opt.label}
               </button>

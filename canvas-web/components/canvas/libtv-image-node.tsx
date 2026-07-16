@@ -231,7 +231,7 @@ export function LibtvImageNode({
     ),
     onAlert: ({ message, failCode }) => {
       void alert({
-        title: libtvRuntimeErrorAlertTitle(failCode, message),
+        title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),
         message,
         variant: "error",
         dismissOnly: true,

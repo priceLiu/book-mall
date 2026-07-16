@@ -23,10 +23,12 @@ import {
 } from "@/lib/canvas/canvas-task-prompt-archive";
 import {
   CANVAS_AI_TASK_TIMEOUT_MIN,
+  CANVAS_BAILIAN_R2V_POLL_INTERVAL_MS,
   buildCanvasAiKieCallbackUrl,
   getCanvasProjectInflightMax,
   getCanvasUserInflightMax,
   getGenerationPollBatch,
+  isCanvasBailianR2vVideoTaskPayload,
   resolveCanvasSubmittedTaskTimeoutMin,
   resolveCanvasSubmittedTaskTimeoutMs,
 } from "./canvas-constants";
@@ -128,7 +130,7 @@ import {
 } from "./providers";
 import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
-import { type BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
+import { type BailianR2vTaskOutput, extractBailianR2vVideoUrlFromGatewaySummary } from "./canvas-video-bailian-r2v";
 import {
   dashscopeExtractTaskImageUrl,
   isDashscopeTaskFailed,
@@ -1347,11 +1349,11 @@ function shouldDeferPollSyncGatewaySubmit(
   return Date.now() - task.createdAt.getTime() < SYNC_GATEWAY_SUBMIT_GRACE_MS;
 }
 
-/** SUBMITTED 异步出图：固定短间隔；超 800s 预警任务每轮必 poll */
+/** SUBMITTED 异步出图：固定短间隔；超 800s 预警任务每轮必 poll；百炼 R2V 用 15s */
 function shouldPollSubmittedNow(
   task: Pick<
     CanvasGenerationTask,
-    "lastPolledAt" | "submittedAt" | "createdAt"
+    "lastPolledAt" | "submittedAt" | "createdAt" | "inputPayload"
   >,
 ): boolean {
   if (
@@ -1360,7 +1362,11 @@ function shouldPollSubmittedNow(
     return true;
   }
   if (!task.lastPolledAt) return true;
-  return Date.now() - task.lastPolledAt.getTime() >= 3_000;
+  const payload = taskInputPayload(task);
+  const intervalMs = isCanvasBailianR2vVideoTaskPayload(payload)
+    ? CANVAS_BAILIAN_R2V_POLL_INTERVAL_MS
+    : 3_000;
+  return Date.now() - task.lastPolledAt.getTime() >= intervalMs;
 }
 
 type SubmittedCanvasPollTask = CanvasGenerationTask & {
@@ -1462,6 +1468,36 @@ async function pollOneSubmittedCanvasTask(
         return "pending";
       }
     }
+    if (
+      providerKind === "BAILIAN" ||
+      gatewayLog.providerKind === "BAILIAN"
+    ) {
+      const videoUrl = extractBailianR2vVideoUrlFromGatewaySummary(
+        gatewayLog.resultSummary,
+      );
+      if (videoUrl) {
+        await applyCanvasBailianR2vPollResult(task.id, {
+          ok: true,
+          output: { task_status: "SUCCEEDED", video_url: videoUrl },
+          raw: gatewayLog.resultSummary,
+        });
+        const after = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+        });
+        if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+          return "succeeded";
+        }
+        if (after?.status === "FAILED" && before !== "FAILED") {
+          return "failed";
+        }
+        return "pending";
+      }
+    }
   } else if (gatewayLog?.status === "FAILED") {
     const stallFail =
       gatewayLog.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
@@ -1500,7 +1536,8 @@ async function pollOneSubmittedCanvasTask(
 
   if (
     isSlowGenerationAge(task.submittedAt, task.createdAt) &&
-    isCanvasVolcengineVideoTaskPayload(payload)
+    (isCanvasVolcengineVideoTaskPayload(payload) ||
+      isCanvasBailianR2vVideoTaskPayload(payload))
   ) {
     const recovered = await recoverCanvasVideoTaskDisplay(task.id);
     if (recovered.ok && recovered.action !== "noop" && recovered.action !== "failed") {
@@ -1684,7 +1721,19 @@ async function advanceOneSubmittedCanvasTask(
       diagnosis.cause === "vendor_already_succeeded" &&
       diagnosis.videoUrl?.trim()
     ) {
-      await applyCanvasVolcengineVideoResult(task.id, diagnosis.videoUrl);
+      const payload = taskInputPayload(task);
+      if (isCanvasBailianR2vVideoTaskPayload(payload)) {
+        await applyCanvasBailianR2vPollResult(task.id, {
+          ok: true,
+          output: {
+            task_status: "SUCCEEDED",
+            video_url: diagnosis.videoUrl.trim(),
+          },
+          raw: { recoveredFromTimeoutProbe: true },
+        });
+      } else {
+        await applyCanvasVolcengineVideoResult(task.id, diagnosis.videoUrl);
+      }
       const recovered = await prisma.canvasGenerationTask.findUnique({
         where: { id: task.id },
         select: { status: true },

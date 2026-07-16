@@ -4,7 +4,10 @@
 import type { Prisma } from "@prisma/client";
 
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
-import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
+import {
+  isCanvasBailianR2vVideoTaskPayload,
+  isCanvasVolcengineVideoTaskPayload,
+} from "@/lib/canvas/canvas-constants";
 import { prisma } from "@/lib/prisma";
 
 import { getGenerationSlowWarnMs } from "./poll-config";
@@ -77,7 +80,13 @@ export async function escalateSlowCanvasSubmittedTasks(opts?: {
 
   let recovered = 0;
   for (const task of tasks) {
-    if (!isCanvasVolcengineVideoTaskPayload(taskInputPayload(task))) continue;
+    const payload = taskInputPayload(task);
+    if (
+      !isCanvasVolcengineVideoTaskPayload(payload) &&
+      !isCanvasBailianR2vVideoTaskPayload(payload)
+    ) {
+      continue;
+    }
     const r = await recoverCanvasVideoTaskDisplay(task.id);
     if (
       r.ok &&

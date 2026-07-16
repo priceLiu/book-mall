@@ -143,6 +143,12 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "KIE", requestKind: "VIDEO" };
   }
 
+  // 百炼 R2V（happyhorse / wan2.*-r2v）须在 DASHSCOPE 视频前缀之前：否则 happyhorse-1.0-r2v
+  // 会误落 DASHSCOPE，createTask 忽略 body.bailian → 厂商报 input.prompt / input.media 缺失。
+  if (BAILIAN_R2V.has(m)) {
+    return { providerKind: "BAILIAN", requestKind: "VIDEO" };
+  }
+
   if (
     DASHSCOPE_VIDEO_PREFIXES.some((p) => m.startsWith(p)) ||
     (m.includes("-i2v") && !m.includes("/")) ||
@@ -150,10 +156,6 @@ export function routeGatewayModel(model: string): RoutedModel {
     (m.includes("-r2v") && !BAILIAN_R2V.has(m))
   ) {
     return { providerKind: "DASHSCOPE", requestKind: "VIDEO" };
-  }
-
-  if (BAILIAN_R2V.has(m)) {
-    return { providerKind: "BAILIAN", requestKind: "VIDEO" };
   }
 
   if (DEEPSEEK_MODELS.has(m) || m.startsWith("deepseek")) {

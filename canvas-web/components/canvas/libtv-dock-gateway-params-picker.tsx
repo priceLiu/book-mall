@@ -11,7 +11,7 @@ import {
   Sbv1ToolbarDropdown,
   useSbv1ToolbarAnchor,
 } from "./sbv1/sbv1-toolbar-anchor-popover";
-import { LIBTV_DOCK_POPOVER_CLASS } from "./libtv-dock-picker-chrome";
+import { LIBTV_DOCK_PARAMS_POPOVER_CLASS } from "./libtv-dock-picker-chrome";
 
 export type LibtvDockGatewayParamsPickerProps = {
   providerId: string;
@@ -78,13 +78,13 @@ export function LibtvDockGatewayParamsPicker({
         setOpen={setOpen}
         rect={rect}
         placement="auto"
-        estimatedHeight={320}
-        className={LIBTV_DOCK_POPOVER_CLASS}
+        estimatedHeight={480}
+        className={LIBTV_DOCK_PARAMS_POPOVER_CLASS}
       >
         {hasParams ? (
-          <div className="px-3 pb-1">
+          <div className="px-2 pb-1">
             <DynamicParamForm
-              variant="panel"
+              variant="dock"
               schema={schema}
               value={params}
               onChange={onChange}

@@ -176,11 +176,16 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
+  const latestSucceeded = taskSucceeded[taskSucceeded.length - 1];
+  const succeededMediaUrl =
+    pickTaskResultMediaUrl(latestSucceeded ?? {}) ??
+    latestSucceeded?.ossUrl ??
+    undefined;
+
   const videoUrl =
+    succeededMediaUrl ??
     pro2VideoBoardRowMediaUrl({ runtime: d.runtime, task: rowDisplayTask }) ??
     pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??
-    pickTaskResultMediaUrl(taskSucceeded[taskSucceeded.length - 1] ?? {}) ??
-    taskSucceeded[taskSucceeded.length - 1]?.ossUrl ??
     undefined;
   const hasVideo = Boolean(videoUrl);
   const stageVideoFit: "cover" | "contain" = isPro2VideoBoardCell
@@ -209,7 +214,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     enabled: !hasVideo && !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
     onAlert: ({ message, failCode }) => {
       void alert({
-        title: libtvRuntimeErrorAlertTitle(failCode, message),
+        title: libtvRuntimeErrorAlertTitle(failCode, message, "video"),
         message,
         variant: "error",
         dismissOnly: true,

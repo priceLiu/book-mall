@@ -121,27 +121,40 @@ function checkDatabasePreflight() {
   const port = url.port || "5432";
   const usesPool =
     port === "6432" || url.searchParams.get("pgbouncer") === "true";
-  if (!usesPool || (host !== "127.0.0.1" && host !== "localhost")) {
-    return true;
+  if (usesPool && (host === "127.0.0.1" || host === "localhost")) {
+    if (tcpPortOpen(host, port)) return true;
+
+    const RED = "\x1b[31m";
+    const YEL = "\x1b[33m";
+    const GRN = "\x1b[32m";
+    const RST = "\x1b[0m";
+    console.error(
+      `\n${RED}✗ 数据库预检未通过${RST} — \`book-mall/.env.local\` 的 DATABASE_URL 指向 ` +
+        `${YEL}${host}:${port}${RST}（PgBouncer），但本机该端口未监听。\n` +
+        `  这会导致画布/登录等 API 极慢并在 prisma 重试后报 500。\n\n` +
+        `处置（二选一）：\n` +
+        `  ${GRN}A) 启动本地 PgBouncer${RST}：${GRN}./deploy/tencent/pgbouncer/start-local.sh${RST} 后 ${GRN}pnpm dev:all:clean${RST}\n` +
+        `     （需 Docker/Colima 可用；macOS brew 版连远程 CDB 可能仍失败）\n` +
+        `  ${GRN}B) 本地直连 CDB${RST}：将 DATABASE_URL 改为与 DIRECT_DATABASE_URL 相同的主机:24155，\n` +
+        `     去掉 pgbouncer=true，追加 connection_limit=30&pool_timeout=30\n`,
+    );
+    return false;
   }
 
-  if (tcpPortOpen(host, port)) return true;
+  if (host !== "127.0.0.1" && host !== "localhost") {
+    if (!tcpPortOpen(host, port)) {
+      const YEL = "\x1b[33m";
+      const GRN = "\x1b[32m";
+      const RST = "\x1b[0m";
+      console.warn(
+        `\n${YEL}⚠ 远程数据库 TCP 不可达${RST} — ${YEL}${host}:${port}${RST}\n` +
+          `  本地开发若使用腾讯云 CDB，通常需先连接 VPN；否则生图/登录等会失败或极慢。\n` +
+          `  自检：${GRN}pnpm --dir book-mall db:ping${RST}  ·  详见 ${GRN}docs/dev.md${RST} §数据库连接\n`,
+      );
+    }
+  }
 
-  const RED = "\x1b[31m";
-  const YEL = "\x1b[33m";
-  const GRN = "\x1b[32m";
-  const RST = "\x1b[0m";
-  console.error(
-    `\n${RED}✗ 数据库预检未通过${RST} — \`book-mall/.env.local\` 的 DATABASE_URL 指向 ` +
-      `${YEL}${host}:${port}${RST}（PgBouncer），但本机该端口未监听。\n` +
-      `  这会导致画布/登录等 API 极慢并在 prisma 重试后报 500。\n\n` +
-      `处置（二选一）：\n` +
-      `  ${GRN}A) 启动本地 PgBouncer${RST}：${GRN}./deploy/tencent/pgbouncer/start-local.sh${RST} 后 ${GRN}pnpm dev:all:clean${RST}\n` +
-      `     （需 Docker/Colima 可用；macOS brew 版连远程 CDB 可能仍失败）\n` +
-      `  ${GRN}B) 本地直连 CDB${RST}：将 DATABASE_URL 改为与 DIRECT_DATABASE_URL 相同的主机:24155，\n` +
-      `     去掉 pgbouncer=true，追加 connection_limit=30&pool_timeout=30\n`,
-  );
-  return false;
+  return true;
 }
 
 if (conflicts.length === 0) {

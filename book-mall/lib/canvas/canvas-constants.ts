@@ -17,7 +17,25 @@ export function isCanvasVolcengineVideoTaskPayload(
   return kind === "video-engine" || kind === "ai-video-engine";
 }
 
-/** SUBMITTED 任务超时阈值（毫秒）：火山视频用更长窗口。 */
+/** 百炼参考生视频（HappyHorse / 万相 R2V）实测可超过 20min，单独放宽。 */
+export function getCanvasBailianR2vVideoTimeoutMin(): number {
+  const raw = Number(process.env.CANVAS_BAILIAN_R2V_VIDEO_TIMEOUT_MIN ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : 30;
+}
+
+export function isCanvasBailianR2vVideoTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  if (payload.providerKind !== "BAILIAN_R2V") return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  return kind === "video-engine" || kind === "ai-video-engine";
+}
+
+/** SUBMITTED 百炼 R2V 轮询间隔（DashScope 建议约 15s，避免 3s 频繁 recordInfo）。 */
+export const CANVAS_BAILIAN_R2V_POLL_INTERVAL_MS = 15_000;
+
+/** SUBMITTED 任务超时阈值（毫秒）：火山 / 百炼 R2V 视频用更长窗口。 */
 export function resolveCanvasSubmittedTaskTimeoutMs(input: {
   inputPayload: unknown;
 }): number {
@@ -27,7 +45,9 @@ export function resolveCanvasSubmittedTaskTimeoutMs(input: {
       : null;
   const min = isCanvasVolcengineVideoTaskPayload(payload)
     ? getCanvasVolcengineVideoTimeoutMin()
-    : CANVAS_AI_TASK_TIMEOUT_MIN;
+    : isCanvasBailianR2vVideoTaskPayload(payload)
+      ? getCanvasBailianR2vVideoTimeoutMin()
+      : CANVAS_AI_TASK_TIMEOUT_MIN;
   return min * 60 * 1000;
 }
 

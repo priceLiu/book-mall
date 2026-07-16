@@ -36,6 +36,11 @@ import {
   clampSbv1ReferenceMode,
   getSbv1VideoModelRefCaps,
 } from "@/lib/canvas/sbv1-video-model-reference";
+import {
+  isSbv1MotionControlModelKey,
+  normalizeSbv1EngineProviderId,
+  syncSbv1UiFromModelParams,
+} from "@/lib/canvas/sbv1-video-ui-sync";
 import { cn } from "@/lib/utils";
 
 import { LIBTV_GENERATE_SETTINGS_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
@@ -149,17 +154,11 @@ export function collectSbv1DockVideoModels(
   return out;
 }
 
-export function normalizeSbv1EngineProviderId(id: string | undefined): string {
-  const trimmed = id?.trim() ?? "";
-  if (!trimmed || trimmed === "gateway:volcengine") {
-    return GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID;
-  }
-  return trimmed;
-}
-
-export function isSbv1MotionControlModelKey(k: string): boolean {
-  return k === "kling-2.6/motion-control" || k === "kling-3.0/motion-control";
-}
+export {
+  isSbv1MotionControlModelKey,
+  normalizeSbv1EngineProviderId,
+  syncSbv1UiFromModelParams,
+} from "@/lib/canvas/sbv1-video-ui-sync";
 
 export type Sbv1VideoGenerateSettingsModalProps = {
   open: boolean;
@@ -656,8 +655,8 @@ function SegmentRow({
               ? "min-w-[2.75rem] px-2 py-1 text-[11px]"
               : "min-w-[2.25rem] px-2.5 py-1 text-[12px]",
             opt.id === value
-              ? "border-white bg-white/[.06] text-white"
-              : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
+              ? "border-white/28 bg-white/[.06] text-white"
+              : "border-white/10 text-white/70 hover:border-white/20 hover:bg-white/[0.04]",
           )}
           onClick={() => onChange(opt.id)}
         >
@@ -666,54 +665,6 @@ function SegmentRow({
       ))}
     </div>
   );
-}
-
-export function syncSbv1UiFromModelParams(
-  modelKey: string,
-  p: Record<string, unknown>,
-  setters: {
-    setAspectRatio: (v: Sbv1AspectRatio) => void;
-    setDurationSec: (v: number) => void;
-    setResolution: (v: "720p" | "1080p") => void;
-    setGenerateAudio: (v: boolean) => void;
-    setReferenceMode: (v: Sbv1ReferenceMode) => void;
-    providerId?: string;
-    currentReferenceMode?: Sbv1ReferenceMode;
-  },
-) {
-  const res = p.resolution;
-  if (typeof res === "string") {
-    const rl = res.toLowerCase();
-    if (rl === "720p" || rl === "1080p") setters.setResolution(rl);
-  }
-  const dur = Number(p.duration);
-  if (Number.isFinite(dur) && dur >= 3 && dur <= 15) {
-    setters.setDurationSec(Math.round(dur));
-  }
-  const ar = p.aspect_ratio ?? p.ratio;
-  if (
-    typeof ar === "string" &&
-    (SBV1_ASPECT_RATIOS as readonly string[]).includes(ar)
-  ) {
-    setters.setAspectRatio(ar as Sbv1AspectRatio);
-  }
-  const audio = p.generate_audio ?? p.generateAudio ?? p.sound;
-  if (audio !== undefined) setters.setGenerateAudio(audio !== false);
-  if (isSbv1MotionControlModelKey(modelKey)) {
-    setters.setReferenceMode("omni");
-  }
-  const caps = getSbv1VideoModelRefCaps(modelKey, {
-    multiShots: p.multi_shots === true,
-    providerId: setters.providerId,
-  });
-  if (p.multi_shots === true && caps.multiShotsBlocksFirstLast) {
-    setters.setReferenceMode("omni");
-  }
-  if (setters.currentReferenceMode) {
-    setters.setReferenceMode(
-      clampSbv1ReferenceMode(setters.currentReferenceMode, caps),
-    );
-  }
 }
 
 /** 工具条触发按钮文案 */
