@@ -367,11 +367,14 @@ export function StoryMediaPreviewModal({
   url,
   kind = "image",
   title,
+  posterUrl,
   onClose,
 }: {
   url: string;
   kind?: "image" | "video";
   title?: string;
+  /** 视频封面 · 弹层播放器模糊铺底，加载期避免灰屏 */
+  posterUrl?: string;
   onClose: () => void;
 }) {
   const mounted = useClientPortalMounted();
@@ -418,6 +421,7 @@ export function StoryMediaPreviewModal({
           {kind === "video" ? (
             <CanvasVideoPlayer
               src={url}
+              poster={posterUrl?.trim() || undefined}
               autoPlay
               className="max-h-[calc(100dvh-88px)] w-[min(96vw,960px)]"
             />

@@ -1,12 +1,38 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Canvas 统一视频播放（与 tool-web 图生视频实验室一致：原生 controls + 黑底容器）。
+ * Canvas 统一视频播放（与 tool-web 图生视频实验室一致：原生 controls）。
+ * 弹层预览默认开启 adaptiveBackdrop：按视频比例定框 + 模糊封面填充留白（避免 9:16 黑边与加载灰屏）。
  * 见 canvas-web/docs/design.md §12
  */
+
+function resolveAdaptiveBoxStyle(
+  aspectRatio: number | null,
+  fill: boolean,
+): React.CSSProperties | undefined {
+  if (fill || !aspectRatio) return undefined;
+  const maxH = "calc(100dvh - 88px)";
+  const maxW = "min(96vw, 960px)";
+  if (aspectRatio >= 1) {
+    return {
+      aspectRatio: String(aspectRatio),
+      width: maxW,
+      maxWidth: maxW,
+      maxHeight: maxH,
+    };
+  }
+  return {
+    aspectRatio: String(aspectRatio),
+    height: maxH,
+    maxHeight: maxH,
+    width: `min(${maxW}, calc(${maxH} * ${aspectRatio}))`,
+    maxWidth: maxW,
+  };
+}
+
 export function CanvasVideoPlayer({
   src,
   className,
@@ -14,16 +40,31 @@ export function CanvasVideoPlayer({
   poster,
   fill = false,
   objectFit = "contain",
+  /** 竖屏/横屏弹层：模糊封面铺底 + 按 metadata 自适应外框（fill 模式默认关） */
+  adaptiveBackdrop = !fill,
 }: {
   src: string;
   className?: string;
   autoPlay?: boolean;
   poster?: string;
-  /** 填满父容器（不强制 16:9），由外层节点决定可用高度 */
   fill?: boolean;
   objectFit?: "contain" | "cover";
+  adaptiveBackdrop?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
+
+  const syncAspect = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || v.videoWidth <= 0 || v.videoHeight <= 0) return;
+    setAspectRatio(v.videoWidth / v.videoHeight);
+  }, []);
+
+  useEffect(() => {
+    setVideoReady(false);
+    setAspectRatio(null);
+  }, [src]);
 
   useEffect(() => {
     if (!autoPlay) return;
@@ -34,24 +75,60 @@ export function CanvasVideoPlayer({
     });
   }, [autoPlay, src]);
 
+  const posterUrl = poster?.trim() || undefined;
+  const boxStyle = resolveAdaptiveBoxStyle(aspectRatio, fill);
+
   return (
     <div
       className={cn(
-        "relative max-w-full overflow-hidden bg-black/95",
-        fill ? "h-full w-full" : "aspect-video w-full",
+        "relative overflow-hidden rounded-md",
+        fill ? "h-full w-full" : "mx-auto w-full",
+        !fill && !aspectRatio && !adaptiveBackdrop && "aspect-video",
+        !fill && !aspectRatio && adaptiveBackdrop && "aspect-video max-h-[calc(100dvh-88px)]",
         className,
       )}
+      style={boxStyle}
     >
+      {adaptiveBackdrop ? (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          {posterUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={posterUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full scale-110 object-cover blur-3xl saturate-150"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-black to-zinc-900" />
+          )}
+          <div className="absolute inset-0 bg-black/45" />
+        </div>
+      ) : (
+        <div className="absolute inset-0 bg-black/95" aria-hidden />
+      )}
+
+      {!videoReady && adaptiveBackdrop ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] bg-black/25"
+          aria-hidden
+        />
+      ) : null}
+
       <video
         ref={videoRef}
         key={src}
         src={src}
-        poster={poster}
+        poster={posterUrl}
         controls
         playsInline
-        preload="metadata"
+        preload="auto"
+        onLoadedMetadata={() => {
+          syncAspect();
+          setVideoReady(true);
+        }}
+        onLoadedData={() => setVideoReady(true)}
         className={cn(
-          "h-full w-full",
+          "relative z-10 h-full w-full bg-transparent",
           objectFit === "cover" ? "object-cover" : "object-contain",
         )}
       />

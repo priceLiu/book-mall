@@ -772,6 +772,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           url={videoUrl}
           kind="video"
           title={SBV1_VIDEO_COMPOSE_LABEL}
+          posterUrl={posterUrl}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}
