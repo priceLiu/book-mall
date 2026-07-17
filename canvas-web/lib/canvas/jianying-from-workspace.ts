@@ -269,29 +269,28 @@ export function collectJianyingLibtvConnectionSnapshot(
   );
   const nodeById = new Map(videoNodes.map((n) => [n.id, n]));
 
-  const clipSlots: JianyingLibtvClipSlot[] = orderNodeIds
-    .map((id, i) => {
-      const node = nodeById.get(id);
-      if (!node) return null;
-      const videoUrl = videoUrlFromConnectedNode(node);
-      const runtime = (node.data as { runtime?: { posterUrl?: string } }).runtime;
-      const posterUrl = resolveLibtvVideoPosterUrl({
-        nodeId: id,
-        runtime,
-        nodes,
-        edges,
-      });
-      return {
-        sourceNodeId: id,
-        sequence: i + 1,
-        label: clipLabelFromVideoNode(node),
-        videoUrl,
-        posterUrl,
-        dialogue: dialogueFromConnectedVideoNode(node),
-        hasVideo: Boolean(videoUrl),
-      };
-    })
-    .filter((s): s is JianyingLibtvClipSlot => s != null);
+  const clipSlots: JianyingLibtvClipSlot[] = [];
+  orderNodeIds.forEach((id, i) => {
+    const node = nodeById.get(id);
+    if (!node) return;
+    const videoUrl = videoUrlFromConnectedNode(node);
+    const runtime = (node.data as { runtime?: { posterUrl?: string } }).runtime;
+    const posterUrl = resolveLibtvVideoPosterUrl({
+      nodeId: id,
+      runtime,
+      nodes,
+      edges,
+    });
+    clipSlots.push({
+      sourceNodeId: id,
+      sequence: i + 1,
+      label: clipLabelFromVideoNode(node),
+      videoUrl,
+      posterUrl,
+      dialogue: dialogueFromConnectedVideoNode(node),
+      hasVideo: Boolean(videoUrl),
+    });
+  });
 
   const frames: JianyingFrameExport[] = clipSlots
     .filter((s) => s.hasVideo)
