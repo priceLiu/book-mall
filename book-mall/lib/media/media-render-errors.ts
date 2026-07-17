@@ -18,6 +18,9 @@ export function mediaRenderErrorMessage(err: unknown): string {
     return USER_MESSAGE;
   }
   if (err instanceof Error && err.message.trim()) {
+    if (/Response timeout for 60000ms/i.test(err.message)) {
+      return "成片上传云端超时，请稍后重试或降低输出画质；若多次失败请联系客服。";
+    }
     return err.message;
   }
   return USER_MESSAGE;

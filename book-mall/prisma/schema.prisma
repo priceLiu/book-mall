@@ -575,6 +575,7 @@ model MediaRenderJob {
   progress      Int                    @default(0)
   progressLabel String?                @db.VarChar(120)
   resultOssUrl String?
+  resultPosterOssUrl String?
   errorMessage String?                @db.Text
   bytesOut     Int?
   expiresAt    DateTime

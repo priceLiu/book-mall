@@ -6,6 +6,72 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
+/** 从本地 mp4 截取第一帧 JPEG；失败返回 null（不阻断入库）。 */
+export async function extractVideoFirstFrameJpegFromPath(
+  filePath: string,
+): Promise<Buffer | null> {
+  let dir: string | null = null;
+  try {
+    dir = await mkdtemp(join(tmpdir(), "canvas-vposter-"));
+    const output = join(dir, "frame.jpg");
+    await execFileAsync(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        filePath,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "4",
+        output,
+      ],
+      { timeout: 120_000 },
+    );
+    const frame = await readFile(output);
+    return frame.byteLength > 0 ? frame : null;
+  } catch {
+    return null;
+  } finally {
+    if (dir) {
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+}
+
+/** 将 moov atom 移到文件头（faststart），输出到新路径；失败返回 false。 */
+export async function remuxMp4FaststartFromPath(
+  inputPath: string,
+  outputPath: string,
+): Promise<boolean> {
+  try {
+    await execFileAsync(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        inputPath,
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+        outputPath,
+      ],
+      { timeout: 120_000 },
+    );
+    const out = await readFile(outputPath);
+    return out.byteLength > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** 从 mp4 buffer 截取第一帧 JPEG；ffmpeg 不可用或失败时返回 null（不阻断视频入库）。 */
 export async function extractVideoFirstFrameJpeg(
   videoBuf: Buffer,

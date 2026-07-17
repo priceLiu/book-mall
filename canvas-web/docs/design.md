@@ -535,22 +535,41 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 ### 12.1 唯一播放组件
 
 - 真源：[`components/canvas/canvas-video-player.tsx`](../components/canvas/canvas-video-player.tsx) · **`CanvasVideoPlayer`**
-- 结构：`relative aspect-video bg-black/95` 容器 + 原生 `<video controls playsInline preload="metadata" class="h-full w-full object-contain">`
+- 结构：`relative` 容器 + 原生 `<video controls playsInline preload="auto">` + `object-contain`
+- **弹层 / 全屏**（`StoryMediaPreviewModal`、`MediaPreviewLightbox`）：默认 `adaptiveBackdrop` — 按 `loadedmetadata` 宽高比定外框；有 `poster` 时模糊铺底，避免竖屏黑边与加载灰屏
 
-### 12.2 使用范围
+### 12.2 节点内展示（与视频节点一致）
 
 | 场景 | 做法 |
 |------|------|
-| 节点内联播放 | `CanvasVideoPlayer`（如 `video-preview-node`） |
-| 弹层全屏预览 | `StoryMediaPreviewModal` / `MediaPreviewLightbox` 内 `CanvasVideoPlayer`，`autoPlay` |
+| 节点 stage 缩略 | **`LazyViewportImage`**（有 `posterUrl`）或 **`LazyViewportVideo`**（无封面时）；`object-contain` 按真实比例铺满 stage，**禁止**固定 `aspect-video` 16:9 外框 |
+| 节点尺寸 | **`useLibtvMediaNodeAutoFit`** · `profile: "sbv1-video"`（含 `jianying-auto-render-pro2`、sbv1 视频引擎）；有封面时优先用 JPEG 探测尺寸 |
+| 点击播放 | 弹层内 **`CanvasVideoPlayer`** + `autoPlay` + 传入 `poster` |
 | 缩略图槽位 | 允许 **muted、无 controls** 的 `<video>` 仅作封面；点击后弹层必须用 `CanvasVideoPlayer` |
 
-### 12.3 禁止
+### 12.3 封面（poster）
 
-- 节点/弹层内自定义 seek 条、hover 才出现的控制条、或裸 `<video controls>` 绕过 `CanvasVideoPlayer`
+- 云端入库 / 自动剪辑完成时，服务端须 **ffmpeg 截首帧 JPEG** 上传 OSS，并写回 `posterUrl`（任务 `resultPosterOssUrl` 或节点 `mediaRenderResult.posterUrl`）
+- **自动剪辑成片**：按**首镜宽高比**输出（竖屏 → 竖屏 MP4，如 1080×1920）；`fit1080p`/`fit720p` 仅限制长边，**禁止** pad 成 16:9 黑边
+- 节点加载时 **先显示封面图**，禁止等 mp4 下载完才出现画面（灰屏）
+- 弹层播放时 `poster` 传给 `CanvasVideoPlayer` 作 `adaptiveBackdrop` 铺底
+
+### 12.4 使用范围
+
+| 场景 | 做法 |
+|------|------|
+| 节点内联 controls | **禁止**（与 sbv1 视频节点一致：stage 仅封面 + 播放钮，controls 仅在弹层） |
+| 弹层全屏预览 | `StoryMediaPreviewModal` / `MediaPreviewLightbox` 内 `CanvasVideoPlayer`，`autoPlay` |
+| 实验室对齐 | 弹层内 controls 皮肤与 tool-web 图生视频实验室一致 |
+
+### 12.5 禁止
+
+- 节点 stage 内嵌带 controls 的 `CanvasVideoPlayer`（自动成片历史例外已废除）
+- 节点/弹层内自定义 seek 条、hover 才出现的控制条、或裸 `<video controls>` 绕过 `CanvasVideoPlayer`（弹层除外）
+- 固定 16:9 盒展示竖屏成片
 - 与实验室不一致的播放器皮肤
 
-### 12.4 弹层
+### 12.6 弹层
 
 - 视频预览弹层 z-index：**1100**（与 §6 一致）
 - 弹层 header 可保留下载/关闭；**播放控件**仅走 `CanvasVideoPlayer`

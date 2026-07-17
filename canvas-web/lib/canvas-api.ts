@@ -1472,6 +1472,7 @@ export type MediaRenderJob = {
   progress: number;
   progressLabel?: string | null;
   downloadUrl: string | null;
+  posterUrl: string | null;
   expiresAt: string;
   errorMessage: string | null;
 };

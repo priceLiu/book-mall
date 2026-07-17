@@ -114,6 +114,7 @@ export function JianyingExportProNode({ id, data, selected }: NodeProps) {
           projectId={projectId}
           frames={frames}
           persisted={d.mediaRenderResult}
+          inFlight={d.mediaRenderInFlight}
         />
         <p className="text-[10px] leading-relaxed text-[var(--canvas-muted)]">
           草稿包解压至剪映「草稿位置」对应文件夹。剪映 6+ 若无法打开，请用分镜包。

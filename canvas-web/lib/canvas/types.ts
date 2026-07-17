@@ -525,7 +525,14 @@ export type JianyingMediaRenderResult = {
   downloadUrl: string;
   expiresAt: string;
   completedAt: string;
+  /** 首帧 JPEG · 节点懒加载与弹层铺底 */
+  posterUrl?: string;
 };
+
+export type {
+  JianyingMediaRenderInFlight,
+  JianyingMediaRenderTransitionKind,
+} from "./media-render-in-flight";
 
 export type JianyingExportNodeData = {
   label?: string;
@@ -534,6 +541,8 @@ export type JianyingExportNodeData = {
   runtime?: CanvasNodeRuntime;
   /** 云端自动剪辑成片结果（持久化，避免缩放/重绘后下载链接丢失） */
   mediaRenderResult?: JianyingMediaRenderResult | null;
+  /** 进行中的剪辑任务（Dock 隐藏后仍可恢复进度） */
+  mediaRenderInFlight?: import("./media-render-in-flight").JianyingMediaRenderInFlight | null;
 };
 
 /** 2.0 · 自动成片（播放器 + 云端剪辑 Dock） */
@@ -541,7 +550,13 @@ export type JianyingAutoRenderNodeData = {
   label?: string;
   /** 持久化播放 URL（与 mediaRenderResult.downloadUrl 同步） */
   videoUrl?: string;
+  /** 首帧封面（与 mediaRenderResult.posterUrl 同步） */
+  posterUrl?: string;
   mediaRenderResult?: JianyingMediaRenderResult | null;
+  /** 进行中的剪辑任务（Dock 隐藏后仍可恢复进度） */
+  mediaRenderInFlight?: import("./media-render-in-flight").JianyingMediaRenderInFlight | null;
+  /** 入边视频源节点 id · 剪辑顺序（持久化用户调整） */
+  clipOrderNodeIds?: string[];
   mediaFit?: boolean;
   mediaFitKey?: string;
 };
@@ -1004,8 +1019,8 @@ export const NODE_DEFAULT_SIZE: Record<
     height: 460,
   },
   "jianying-auto-render-pro2": {
-    width: 720,
-    height: 840,
+    width: SBV1_VIDEO_ENGINE_WIDTH,
+    height: SBV1_VIDEO_ENGINE_HEIGHT,
   },
   "sbv1-image": {
     width: SBV1_IMAGE_NODE_WIDTH,

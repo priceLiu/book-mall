@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Clapperboard, Download } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -11,16 +11,30 @@ import {
   type MediaRenderJob,
   type MediaRenderScaleMode,
   submitMediaRender,
-  waitMediaRenderJob,
 } from "@/lib/canvas-api";
+import {
+  friendlyMediaRenderError,
+  isMediaRenderJobInflight,
+  isMediaRenderJobPolling,
+  pollMediaRenderJobUntilDone,
+  renderStatusLabel,
+  type JianyingMediaRenderInFlight,
+  type JianyingMediaRenderTransitionKind,
+} from "@/lib/canvas/media-render-in-flight";
+import type { JianyingLibtvClipSlot } from "@/lib/canvas/jianying-from-workspace";
 import { cn } from "@/lib/utils";
+import { JianyingClipOrderStrip } from "./jianying-clip-order-strip";
 
 type Props = {
   nodeId: string;
   base: string | null;
   projectId: string | null;
   frames: JianyingExportFrame[];
+  clipSlots?: JianyingLibtvClipSlot[];
+  clipOrderNodeIds?: string[];
+  onClipOrderChange?: (orderNodeIds: string[]) => void;
   persisted?: JianyingMediaRenderResult | null;
+  inFlight?: JianyingMediaRenderInFlight | null;
   /** false = 成片留在当前节点，不另 spawn video-preview */
   spawnPreview?: boolean;
   layout?: "default" | "dock";
@@ -28,28 +42,16 @@ type Props = {
   renderedCount?: number;
 };
 
-type TransitionKind = "xfade" | "none";
-
 const SCALE_OPTIONS: { value: MediaRenderScaleMode; label: string }[] = [
-  { value: "source", label: "原片（不缩放）" },
-  { value: "fit720p", label: "720P" },
-  { value: "fit1080p", label: "1080P" },
+  { value: "source", label: "原片（首镜分辨率）" },
+  { value: "fit720p", label: "720P（按源片比例）" },
+  { value: "fit1080p", label: "1080P（按源片比例）" },
 ];
 
-const TRANSITION_OPTIONS: { value: TransitionKind; label: string }[] = [
+const TRANSITION_OPTIONS: { value: JianyingMediaRenderTransitionKind; label: string }[] = [
   { value: "xfade", label: "交叉淡化" },
   { value: "none", label: "无转场" },
 ];
-
-function renderStatusLabel(job: MediaRenderJob | null): string {
-  if (!job) return "提交任务…";
-  if (job.status === "PENDING") {
-    return job.progressLabel?.trim() || "排队中…";
-  }
-  if (job.progressLabel?.trim()) return job.progressLabel.trim();
-  if (job.progress > 0) return `处理中… ${job.progress}%`;
-  return "处理中…";
-}
 
 const fieldSelectClass =
   "nodrag h-8 min-w-0 flex-1 rounded-md border border-white/20 bg-black/30 px-2.5 text-[13px] text-white";
@@ -57,12 +59,22 @@ const fieldSelectClass =
 const dockFieldSelectClass =
   "nodrag h-8 w-[132px] shrink-0 rounded-md border border-white/20 bg-black/30 px-2.5 text-[13px] text-white";
 
+function inflightStatus(
+  job: MediaRenderJob,
+): JianyingMediaRenderInFlight["status"] {
+  return job.status === "PENDING" ? "PENDING" : "RUNNING";
+}
+
 export function JianyingMediaRenderActions({
   nodeId,
   base,
   projectId,
   frames,
+  clipSlots = [],
+  clipOrderNodeIds = [],
+  onClipOrderChange,
   persisted,
+  inFlight,
   spawnPreview = true,
   layout = "default",
   connectedCount = 0,
@@ -72,53 +84,221 @@ export function JianyingMediaRenderActions({
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
-  const [busy, setBusy] = useState(false);
-  const [transitionKind, setTransitionKind] = useState<TransitionKind>("xfade");
-  const [transitionSec, setTransitionSec] = useState(0.6);
-  const [scaleMode, setScaleMode] = useState<MediaRenderScaleMode>("fit1080p");
-  const [burnIn, setBurnIn] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+
+  const [transitionKind, setTransitionKind] = useState<JianyingMediaRenderTransitionKind>(
+    inFlight?.transitionKind ?? "xfade",
+  );
+  const [transitionSec, setTransitionSec] = useState(inFlight?.transitionSec ?? 0.6);
+  const [scaleMode, setScaleMode] = useState<MediaRenderScaleMode>(
+    inFlight?.scaleMode ?? "fit1080p",
+  );
+  const [burnIn, setBurnIn] = useState(inFlight?.burnIn ?? false);
+  const [err, setErr] = useState<string | null>(
+    inFlight?.status === "FAILED" && inFlight.errorMessage
+      ? friendlyMediaRenderError(inFlight.errorMessage)
+      : null,
+  );
   const [doneUrl, setDoneUrl] = useState<string | null>(
     persisted?.downloadUrl ?? null,
   );
   const [expiresAt, setExpiresAt] = useState<string | null>(
     persisted?.expiresAt ?? null,
   );
-  const [progress, setProgress] = useState<number | null>(null);
-  const [stepLabel, setStepLabel] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number | null>(
+    isMediaRenderJobInflight(inFlight) ? inFlight?.progress ?? 0 : null,
+  );
+  const [stepLabel, setStepLabel] = useState<string | null>(
+    isMediaRenderJobInflight(inFlight)
+      ? inFlight?.progressLabel?.trim() || "处理中…"
+      : null,
+  );
+  const [busy, setBusy] = useState(() => isMediaRenderJobInflight(inFlight));
+
+  const settingsRef = useRef({
+    transitionKind,
+    transitionSec,
+    scaleMode,
+    burnIn,
+  });
+  settingsRef.current = { transitionKind, transitionSec, scaleMode, burnIn };
 
   const videoFrames = frames.filter((f) => f.videoUrl);
   const canRender = Boolean(base && projectId && videoFrames.length >= 1);
   const isDock = layout === "dock";
 
-  const persistResult = (downloadUrl: string, expires: string) => {
-    setDoneUrl(downloadUrl);
-    setExpiresAt(expires);
-    updateNodeData(nodeId, {
-      videoUrl: downloadUrl,
-      mediaRenderResult: {
-        downloadUrl,
-        expiresAt: expires,
-        completedAt: new Date().toISOString(),
-      },
-    });
-    if (spawnPreview) {
-      const state = useCanvasStore.getState();
-      spawnJianyingRenderPreviewNode(nodeId, downloadUrl, {
-        nodes: state.nodes,
-        edges: state.edges,
-        addNode,
-        setNodes,
-        setEdges,
-        updateNodeData,
-      });
+  useEffect(() => {
+    if (isMediaRenderJobInflight(inFlight)) {
+      setBusy(true);
+      setProgress(inFlight?.progress ?? 0);
+      setStepLabel(inFlight?.progressLabel?.trim() || "处理中…");
+      setErr(null);
+      if (inFlight?.transitionKind) setTransitionKind(inFlight.transitionKind);
+      if (typeof inFlight?.transitionSec === "number") {
+        setTransitionSec(inFlight.transitionSec);
+      }
+      if (inFlight?.scaleMode) setScaleMode(inFlight.scaleMode);
+      if (typeof inFlight?.burnIn === "boolean") setBurnIn(inFlight.burnIn);
+      return;
     }
-  };
+    if (inFlight?.status === "FAILED" && inFlight.errorMessage) {
+      setErr(friendlyMediaRenderError(inFlight.errorMessage));
+      setBusy(false);
+      setProgress(null);
+      setStepLabel(null);
+      return;
+    }
+    if (!busy) {
+      setProgress(null);
+      setStepLabel(null);
+    }
+  }, [inFlight, busy]);
 
-  const applyJobProgress = (job: MediaRenderJob) => {
-    setProgress(job.progress);
-    setStepLabel(renderStatusLabel(job));
-  };
+  useEffect(() => {
+    setDoneUrl(persisted?.downloadUrl ?? null);
+    setExpiresAt(persisted?.expiresAt ?? null);
+  }, [persisted?.downloadUrl, persisted?.expiresAt]);
+
+  const patchInFlight = useCallback(
+    (patch: JianyingMediaRenderInFlight | null) => {
+      updateNodeData(nodeId, { mediaRenderInFlight: patch });
+    },
+    [nodeId, updateNodeData],
+  );
+
+  const persistResult = useCallback(
+    (downloadUrl: string, expires: string, poster?: string | null) => {
+      const posterUrl = poster?.trim() || undefined;
+      setDoneUrl(downloadUrl);
+      setExpiresAt(expires);
+      updateNodeData(nodeId, {
+        videoUrl: downloadUrl,
+        posterUrl,
+        mediaRenderInFlight: null,
+        mediaFit: false,
+        mediaFitKey: undefined,
+        mediaRenderResult: {
+          downloadUrl,
+          expiresAt: expires,
+          completedAt: new Date().toISOString(),
+          ...(posterUrl ? { posterUrl } : {}),
+        },
+      });
+      if (spawnPreview) {
+        const state = useCanvasStore.getState();
+        spawnJianyingRenderPreviewNode(nodeId, downloadUrl, {
+          nodes: state.nodes,
+          edges: state.edges,
+          addNode,
+          setNodes,
+          setEdges,
+          updateNodeData,
+        });
+      }
+    },
+    [nodeId, spawnPreview, updateNodeData, addNode, setNodes, setEdges],
+  );
+
+  const applyJobProgress = useCallback(
+    (job: MediaRenderJob) => {
+      setProgress(job.progress);
+      setStepLabel(renderStatusLabel(job));
+      if (job.status === "PENDING" || job.status === "RUNNING") {
+        const settings = settingsRef.current;
+        patchInFlight({
+          jobId: job.id,
+          status: inflightStatus(job),
+          progress: job.progress,
+          progressLabel: job.progressLabel ?? null,
+          errorMessage: null,
+          transitionKind: settings.transitionKind,
+          transitionSec: settings.transitionSec,
+          scaleMode: settings.scaleMode,
+          burnIn: settings.burnIn,
+        });
+      }
+    },
+    [patchInFlight],
+  );
+
+  const finishJob = useCallback(
+    async (finalJob: MediaRenderJob) => {
+      if (finalJob.status !== "SUCCEEDED" || !finalJob.downloadUrl) {
+        const message = friendlyMediaRenderError(
+          finalJob.errorMessage ?? "云端剪辑失败",
+        );
+        patchInFlight({
+          jobId: finalJob.id,
+          status: "FAILED",
+          progress: finalJob.progress,
+          progressLabel: finalJob.progressLabel ?? null,
+          errorMessage: message,
+          ...settingsRef.current,
+        });
+        setErr(message);
+        return;
+      }
+      persistResult(finalJob.downloadUrl, finalJob.expiresAt, finalJob.posterUrl);
+      setProgress(100);
+      setStepLabel("剪辑完成");
+      setErr(null);
+    },
+    [patchInFlight, persistResult],
+  );
+
+  const runTrackedJob = useCallback(
+    async (jobId: string) => {
+      if (!base) throw new Error("画布未就绪，请刷新页面后重试");
+      const finalJob = await pollMediaRenderJobUntilDone({
+        nodeId,
+        jobId,
+        base,
+        onPoll: applyJobProgress,
+      });
+      await finishJob(finalJob);
+    },
+    [applyJobProgress, base, finishJob, nodeId],
+  );
+
+  useEffect(() => {
+    if (!base || !isMediaRenderJobInflight(inFlight)) return;
+    const jobId = inFlight!.jobId.trim();
+    if (!jobId || isMediaRenderJobPolling(nodeId, jobId)) return;
+
+    let cancelled = false;
+    setBusy(true);
+    void runTrackedJob(jobId)
+      .catch((e) => {
+        if (cancelled) return;
+        const message = friendlyMediaRenderError(
+          e instanceof Error ? e.message : String(e),
+        );
+        patchInFlight({
+          jobId,
+          status: "FAILED",
+          progress: inFlight?.progress ?? 0,
+          progressLabel: inFlight?.progressLabel ?? null,
+          errorMessage: message,
+          ...settingsRef.current,
+        });
+        setErr(message);
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    base,
+    inFlight?.jobId,
+    inFlight?.status,
+    nodeId,
+    patchInFlight,
+    runTrackedJob,
+    inFlight?.progress,
+    inFlight?.progressLabel,
+  ]);
 
   const onRender = async () => {
     if (!canRender) {
@@ -150,17 +330,13 @@ export function JianyingMediaRenderActions({
         },
       });
       applyJobProgress(job);
-      const finalJob = await waitMediaRenderJob(base!, job.id, {
-        onPoll: applyJobProgress,
-      });
-      if (finalJob.status !== "SUCCEEDED" || !finalJob.downloadUrl) {
-        throw new Error(finalJob.errorMessage ?? "云端剪辑失败");
-      }
-      persistResult(finalJob.downloadUrl, finalJob.expiresAt);
-      setProgress(100);
-      setStepLabel("剪辑完成");
+      await runTrackedJob(job.id);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      const message = friendlyMediaRenderError(
+        e instanceof Error ? e.message : String(e),
+      );
+      patchInFlight(null);
+      setErr(message);
     } finally {
       setBusy(false);
     }
@@ -260,6 +436,16 @@ export function JianyingMediaRenderActions({
           <p className="text-[13px] font-medium text-white/90">云端自动剪辑成片</p>
         </div>
 
+        {clipSlots.length > 0 && onClipOrderChange ? (
+          <JianyingClipOrderStrip
+            slots={clipSlots}
+            orderNodeIds={clipOrderNodeIds}
+            disabled={busy}
+            onOrderChange={onClipOrderChange}
+            className="shrink-0 border-b border-white/[0.06] pb-2"
+          />
+        ) : null}
+
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
           <label className="flex items-center gap-2 text-[13px] text-white/70">
             <span className="shrink-0">转场时长</span>
@@ -281,7 +467,7 @@ export function JianyingMediaRenderActions({
               value={transitionKind}
               disabled={busy}
               className={dockFieldSelectClass}
-              onChange={(e) => setTransitionKind(e.target.value as TransitionKind)}
+              onChange={(e) => setTransitionKind(e.target.value as JianyingMediaRenderTransitionKind)}
             >
               {TRANSITION_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -352,7 +538,7 @@ export function JianyingMediaRenderActions({
           value={transitionKind}
           disabled={busy}
           className={fieldSelectClass}
-          onChange={(e) => setTransitionKind(e.target.value as TransitionKind)}
+          onChange={(e) => setTransitionKind(e.target.value as JianyingMediaRenderTransitionKind)}
         >
           {TRANSITION_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

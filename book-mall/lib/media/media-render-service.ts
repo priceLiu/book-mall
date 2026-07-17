@@ -161,6 +161,7 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
         progress: 100,
         progressLabel: "剪辑完成",
         resultOssUrl: result.ossUrl,
+        resultPosterOssUrl: result.posterUrl ?? null,
         bytesOut: result.bytesOut,
         completedAt: new Date(),
       },
@@ -211,6 +212,7 @@ export type MediaRenderJobDto = {
   progress: number;
   progressLabel: string | null;
   downloadUrl: string | null;
+  posterUrl: string | null;
   expiresAt: string;
   storageTier: MediaRenderStorageTier;
   pinnedAt: string | null;
@@ -246,6 +248,10 @@ export async function getMediaRenderJobForUser(
     job.status === MediaRenderJobStatus.SUCCEEDED && job.resultOssUrl
       ? job.resultOssUrl
       : null;
+  const posterUrl =
+    job.status === MediaRenderJobStatus.SUCCEEDED && job.resultPosterOssUrl
+      ? job.resultPosterOssUrl
+      : null;
 
   return {
     id: job.id,
@@ -255,6 +261,7 @@ export async function getMediaRenderJobForUser(
     progress: job.progress,
     progressLabel: job.progressLabel,
     downloadUrl,
+    posterUrl,
     expiresAt: job.expiresAt.toISOString(),
     storageTier: job.storageTier,
     pinnedAt: job.pinnedAt?.toISOString() ?? null,

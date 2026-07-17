@@ -4,6 +4,9 @@ import {
   collectJianyingFramesForExportNode,
   collectJianyingFramesFromLibtvVideos,
   collectJianyingLibtvConnectionSnapshot,
+  mergeLibtvClipOrderNodeIds,
+  moveClipOrderNodeIds,
+  sortLibtvVideoNodesDefault,
 } from "@/lib/canvas/jianying-from-workspace";
 import {
   buildBatchConnectEdges,
@@ -17,11 +20,12 @@ function videoNode(
   x: number,
   ossUrl?: string,
   prompt?: string,
+  y = 0,
 ): CanvasFlowNode {
   return {
     id,
     type: "sbv1-video-engine",
-    position: { x, y: 0 },
+    position: { x, y },
     data: {
       prompt,
       runtime: ossUrl ? { status: "done", ossUrl } : { status: "idle" },
@@ -113,7 +117,76 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     expect(snap.renderedCount).toBe(1);
     expect(snap.frames).toHaveLength(1);
   });
+
+  it("follows out_video chain before canvas position", () => {
+    const exportId = "export-1";
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v-a", 300, "https://oss/a.mp4", "A"),
+      videoNode("v-b", 100, "https://oss/b.mp4", "B"),
+      videoNode("v-c", 200, "https://oss/c.mp4", "C"),
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 500, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "chain-ab", source: "v-a", target: "v-b", sourceHandle: "out_video" },
+      { id: "chain-bc", source: "v-b", target: "v-c", sourceHandle: "out_video" },
+      { id: "e-a", source: "v-a", target: exportId, targetHandle: "in_video" },
+      { id: "e-b", source: "v-b", target: exportId, targetHandle: "in_video" },
+      { id: "e-c", source: "v-c", target: exportId, targetHandle: "in_video" },
+    ];
+
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
+    expect(snap.frames.map((f) => f.videoUrl)).toEqual([
+      "https://oss/a.mp4",
+      "https://oss/b.mp4",
+      "https://oss/c.mp4",
+    ]);
+  });
+
+  it("respects saved clip order overrides", () => {
+    const exportId = "export-1";
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v-a", 100, "https://oss/a.mp4"),
+      videoNode("v-b", 200, "https://oss/b.mp4"),
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "e1", source: "v-a", target: exportId, targetHandle: "in_video" },
+      { id: "e2", source: "v-b", target: exportId, targetHandle: "in_video" },
+    ];
+
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges, [
+      "v-b",
+      "v-a",
+    ]);
+    expect(snap.orderNodeIds).toEqual(["v-b", "v-a"]);
+    expect(snap.frames[0]?.videoUrl).toBe("https://oss/b.mp4");
+    expect(snap.frames[1]?.videoUrl).toBe("https://oss/a.mp4");
+  });
+
+  it("sorts by Y then X when no chain exists", () => {
+    const nodes: CanvasFlowNode[] = [
+      videoNode("bottom", 100, undefined, undefined, 200),
+      videoNode("top", 300, undefined, undefined, 50),
+    ];
+    const sorted = sortLibtvVideoNodesDefault(nodes, nodes, []);
+    expect(sorted.map((n) => n.id)).toEqual(["top", "bottom"]);
+  });
+
+  it("moveClipOrderNodeIds swaps adjacent ids", () => {
+    expect(moveClipOrderNodeIds(["a", "b", "c"], "b", -1)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
+    expect(
+      mergeLibtvClipOrderNodeIds(["c", "a"], nodesFromIds(["a", "b", "c"]), nodesFromIds(["a", "b", "c"]), []),
+    ).toEqual(["c", "a", "b"]);
+  });
 });
+
+function nodesFromIds(ids: string[]): CanvasFlowNode[] {
+  return ids.map((id, i) => videoNode(id, i * 100, "https://oss/x.mp4"));
+}
 
 describe("pro2-batch-connect", () => {
   it("builds batch edges to export node", () => {

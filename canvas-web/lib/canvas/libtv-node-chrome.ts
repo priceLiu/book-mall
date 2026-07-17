@@ -38,7 +38,7 @@ export const LIBTV_VIDEO_NODE_HEADER_HEIGHT = 38;
  * 旧节点（含已手动拉伸/旧版本适配过的）下次进画布会按新算法**重算一次**外框，
  * 确保 `object-contain` 四边贴合、消除历史留边；重算后写回版本号，不再重复探测。
  */
-export const LIBTV_MEDIA_FIT_VERSION = 5;
+export const LIBTV_MEDIA_FIT_VERSION = 6;
 
 /** 生成图自适配 · 预览区（stage）长边目标 px（不含标题栏）· 约空态 350 的 2.5 倍 */
 export const LIBTV_MEDIA_AUTO_FIT_LONG_EDGE = 875;
