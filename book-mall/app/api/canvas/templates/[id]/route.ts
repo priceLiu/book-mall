@@ -2,11 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import {
   canvasErrorToResponse,
   corsOptionsResponse,
-  isAdmin,
   jsonHeaders,
   readJsonBody,
   requireSessionUser,
   resolveCanvasApiAdmin,
+  type AuthorizedSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { prisma } from "@/lib/prisma";
 
@@ -16,16 +16,9 @@ export async function OPTIONS(request: NextRequest) {
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
-function canManageTemplate(
-  ownerUserId: string | null,
-  user: { id: string; role?: string },
-): boolean {
-  return ownerUserId === user.id || isAdmin(user);
-}
-
 async function canManageTemplateAsync(
   ownerUserId: string | null,
-  user: { id: string; role?: string },
+  user: AuthorizedSessionUser,
 ): Promise<boolean> {
   if (ownerUserId === user.id) return true;
   return resolveCanvasApiAdmin(user);
