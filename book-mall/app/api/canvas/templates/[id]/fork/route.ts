@@ -4,6 +4,7 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
+import { prismaJsonValue } from "@/lib/media/prisma-json";
 import { prisma } from "@/lib/prisma";
 
 export async function OPTIONS(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
         edition: source.edition,
         sourceLabel: source.sourceLabel || source.name,
         visibility: "private",
-        canvas: source.canvas,
+        canvas: prismaJsonValue(source.canvas),
         builtin: false,
       },
     }),
