@@ -71,9 +71,17 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
     ),
   );
 
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+
   const snapshot = useMemo(
-    () => collectJianyingLibtvConnectionSnapshot(nodeId, nodes, edges),
-    [nodeId, nodes, edges],
+    () =>
+      collectJianyingLibtvConnectionSnapshot(
+        nodeId,
+        nodes,
+        edges,
+        data?.clipOrderNodeIds,
+      ),
+    [nodeId, nodes, edges, data?.clipOrderNodeIds],
   );
 
   const exportFrames = useMemo(
@@ -83,6 +91,13 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
         dialogue: f.dialogue ?? "",
       })),
     [snapshot.frames],
+  );
+
+  const onClipOrderChange = useCallback(
+    (orderNodeIds: string[]) => {
+      updateNodeData(nodeId, { clipOrderNodeIds: orderNodeIds });
+    },
+    [nodeId, updateNodeData],
   );
 
   return (
@@ -102,7 +117,11 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
         base={base}
         projectId={projectId}
         frames={exportFrames}
+        clipSlots={snapshot.clipSlots}
+        clipOrderNodeIds={snapshot.orderNodeIds}
+        onClipOrderChange={onClipOrderChange}
         persisted={data?.mediaRenderResult}
+        inFlight={data?.mediaRenderInFlight}
         spawnPreview={false}
         layout="dock"
         connectedCount={snapshot.connectedCount}

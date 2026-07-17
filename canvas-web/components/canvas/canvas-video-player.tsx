@@ -9,28 +9,42 @@ import { cn } from "@/lib/utils";
  * 见 canvas-web/docs/design.md §12
  */
 
+const ADAPTIVE_MAX_H = "calc(100dvh - 88px)";
+const ADAPTIVE_MAX_W = "min(96vw, 960px)";
+
 function resolveAdaptiveBoxStyle(
   aspectRatio: number | null,
   fill: boolean,
 ): React.CSSProperties | undefined {
   if (fill || !aspectRatio) return undefined;
-  const maxH = "calc(100dvh - 88px)";
-  const maxW = "min(96vw, 960px)";
   if (aspectRatio >= 1) {
     return {
       aspectRatio: String(aspectRatio),
-      width: maxW,
-      maxWidth: maxW,
-      maxHeight: maxH,
+      width: ADAPTIVE_MAX_W,
+      maxWidth: ADAPTIVE_MAX_W,
+      maxHeight: ADAPTIVE_MAX_H,
     };
   }
   return {
     aspectRatio: String(aspectRatio),
-    height: maxH,
-    maxHeight: maxH,
-    width: `min(${maxW}, calc(${maxH} * ${aspectRatio}))`,
-    maxWidth: maxW,
+    height: ADAPTIVE_MAX_H,
+    maxHeight: ADAPTIVE_MAX_H,
+    width: `min(${ADAPTIVE_MAX_W}, calc(${ADAPTIVE_MAX_H} * ${aspectRatio}))`,
+    maxWidth: ADAPTIVE_MAX_W,
   };
+}
+
+function loadImageAspectRatio(url: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      resolve(w > 0 && h > 0 ? w / h : null);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 }
 
 export function CanvasVideoPlayer({
@@ -67,6 +81,19 @@ export function CanvasVideoPlayer({
   }, [src]);
 
   useEffect(() => {
+    const posterUrl = poster?.trim();
+    if (!posterUrl || fill || !adaptiveBackdrop) return;
+    let cancelled = false;
+    void loadImageAspectRatio(posterUrl).then((ratio) => {
+      if (cancelled || ratio == null) return;
+      setAspectRatio((prev) => prev ?? ratio);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [poster, fill, adaptiveBackdrop]);
+
+  useEffect(() => {
     if (!autoPlay) return;
     const v = videoRef.current;
     if (!v) return;
@@ -77,14 +104,21 @@ export function CanvasVideoPlayer({
 
   const posterUrl = poster?.trim() || undefined;
   const boxStyle = resolveAdaptiveBoxStyle(aspectRatio, fill);
+  const hasAdaptiveAspect = !fill && adaptiveBackdrop && aspectRatio != null;
 
   return (
     <div
       className={cn(
         "relative overflow-hidden rounded-md",
-        fill ? "h-full w-full" : "mx-auto w-full",
-        !fill && !aspectRatio && !adaptiveBackdrop && "aspect-video",
-        !fill && !aspectRatio && adaptiveBackdrop && "aspect-video max-h-[calc(100dvh-88px)]",
+        fill ? "h-full w-full" : "mx-auto w-auto max-w-full",
+        !fill &&
+          !hasAdaptiveAspect &&
+          !adaptiveBackdrop &&
+          "aspect-video w-full",
+        !fill &&
+          !hasAdaptiveAspect &&
+          adaptiveBackdrop &&
+          "aspect-video w-[min(96vw,960px)] max-h-[calc(100dvh-88px)]",
         className,
       )}
       style={boxStyle}

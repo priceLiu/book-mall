@@ -78,6 +78,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   placement,
   hidden,
   sendTitle,
+  hasExistingVideo = false,
 }: {
   nodeId: string;
   data: Sbv1VideoEngineNodeData;
@@ -91,6 +92,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   placement: LibtvDockFlowPlacement;
   hidden?: boolean;
   sendTitle?: string;
+  /** 节点或任务历史已有成片 · 允许无 prompt/参考图时再次生成 */
+  hasExistingVideo?: boolean;
 }) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
@@ -246,7 +249,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     ? hasMotionVideo &&
       !isGenerating &&
       Boolean(data.engine?.providerId && data.engine?.modelKey)
-    : (hasPrompt || hasRefs) &&
+    : (hasPrompt || hasRefs || hasExistingVideo) &&
       !isGenerating &&
       Boolean(data.engine?.providerId && data.engine?.modelKey);
 

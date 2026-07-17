@@ -17,6 +17,10 @@ import {
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
+import { isLibtvMediaGenerating } from "../libtv-media-generating-state";
+import { pickActiveServerInflightTask } from "@/lib/canvas/task-pick";
+import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   useLibtvFloatingDock,
@@ -126,12 +130,34 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     });
   }, [pro2BoardDockLinks, upstreamTextLinks]);
 
-  const hasVideo = Boolean(
+  const { succeeded, history } = useNodeTaskHistory(nodeId);
+  const latestSucceeded = succeeded[succeeded.length - 1];
+  const succeededMediaUrl =
+    pickTaskResultMediaUrl(latestSucceeded ?? {}) ??
+    latestSucceeded?.ossUrl ??
+    undefined;
+  const mediaOnRuntime = Boolean(
     nodeData.runtime?.ossUrl?.trim() || nodeData.runtime?.ephemeralUrl?.trim(),
   );
+  const hasVideo = Boolean(mediaOnRuntime || succeededMediaUrl);
 
+  const inflightTask = useMemo(
+    () =>
+      pickActiveServerInflightTask(
+        history,
+        nodeData.runtime?.taskId,
+        nodeData.runtime,
+      ),
+    [history, nodeData.runtime],
+  );
+
+  /** 与节点 stage 一致：有成片且 runtime 无在途任务时，勿因遗留 pending 锁死发送钮 */
   const isGenerating =
-    nodeData.runtime?.status === "pending" || nodeData.runtime?.status === "running";
+    Boolean(inflightTask) ||
+    (isLibtvMediaGenerating(nodeData) &&
+      (!hasVideo ||
+        Boolean(nodeData.uploading) ||
+        mediaOnRuntime));
 
   const onPatch = useCallback(
     (patch: Partial<Sbv1VideoEngineNodeData>) => {
@@ -210,7 +236,15 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
-    busEnqueueStoryRun({ nodeId, forceFresh: true });
+    const queued = busEnqueueStoryRun({ nodeId, forceFresh: true });
+    if (!queued) {
+      revertPending();
+      await alert({
+        title: "无法开始生成",
+        message: "该节点已有进行中的生成任务，请稍候完成后再试。",
+        variant: "warning",
+      });
+    }
   }, [nodeId, base, alert, updateNodeData, setNodeRuntime]);
 
   return (
@@ -227,9 +261,8 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       onRun={onRun}
       placement={placement}
       hidden={hidden}
-      sendTitle={
-        isPro2VideoBoardCell && hasVideo ? "重新生成视频" : undefined
-      }
+      hasExistingVideo={hasVideo}
+      sendTitle={hasVideo ? "重新生成视频" : undefined}
     />
   );
 });

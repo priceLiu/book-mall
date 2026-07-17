@@ -438,7 +438,6 @@ export function MediaPreviewLightbox({
                   src={src}
                   poster={posterUrl?.trim() || undefined}
                   autoPlay
-                  className="max-h-[calc(100dvh-72px)] w-[min(98vw,960px)]"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element

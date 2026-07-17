@@ -1,12 +1,19 @@
 import { execFile } from "child_process";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { promisify } from "util";
 
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { buildMergedSrt } from "@/lib/canvas/canvas-jianying-export";
-import { uploadMediaRenderOutput } from "@/lib/media/media-render-oss";
+import {
+  extractVideoFirstFrameJpegFromPath,
+  remuxMp4FaststartFromPath,
+} from "@/lib/canvas/video-poster-ffmpeg";
+import {
+  uploadMediaRenderOutputFromPath,
+  uploadMediaRenderPosterFromBuffer,
+} from "@/lib/media/media-render-oss";
 import {
   MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC,
   MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
@@ -55,14 +62,64 @@ export async function ffprobeDurationSec(filePath: string): Promise<number> {
   return sec;
 }
 
-function scaleFilter(scaleMode: RenderProfile["video"]["scaleMode"]): string {
-  if (scaleMode === "source") {
-    return "setsar=1";
+export async function ffprobeVideoSize(
+  filePath: string,
+): Promise<{ w: number; h: number }> {
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height",
+    "-of",
+    "csv=p=0",
+    filePath,
+  ]);
+  const [wStr, hStr] = stdout.trim().split(",");
+  const w = Number.parseInt(wStr ?? "0", 10);
+  const h = Number.parseInt(hStr ?? "0", 10);
+  if (w <= 0 || h <= 0) {
+    throw new Error(`无法探测视频分辨率: ${filePath}`);
   }
-  const [w, h] = scaleMode === "fit720p" ? [1280, 720] : [1920, 1080];
+  return { w, h };
+}
+
+function makeEven(n: number): number {
+  const v = Math.max(2, Math.round(n));
+  return v % 2 === 0 ? v : v + 1;
+}
+
+/** 按首镜宽高比定输出画布；fit720p/fit1080p 限制长边，不再 pad 成 16:9 */
+export function computeRenderTargetSize(
+  sizes: { w: number; h: number }[],
+  scaleMode: RenderProfile["video"]["scaleMode"],
+): { w: number; h: number } {
+  if (sizes.length === 0) {
+    throw new Error("无可用镜头尺寸");
+  }
+  const ref = sizes[0]!;
+  const aspect = ref.w / ref.h;
+
+  if (scaleMode === "source") {
+    return { w: makeEven(ref.w), h: makeEven(ref.h) };
+  }
+
+  const longEdgeMax = scaleMode === "fit720p" ? 1280 : 1920;
+
+  if (aspect >= 1) {
+    const w = longEdgeMax;
+    return { w: makeEven(w), h: makeEven(w / aspect) };
+  }
+  const h = longEdgeMax;
+  return { w: makeEven(h * aspect), h: makeEven(h) };
+}
+
+/** 缩放并居中裁剪到目标尺寸，避免 pad 黑边（多镜 xfade 须统一分辨率） */
+function scaleFilterToTarget(tw: number, th: number): string {
   return [
-    `scale=${w}:${h}:force_original_aspect_ratio=decrease`,
-    `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black`,
+    `scale=${tw}:${th}:force_original_aspect_ratio=increase`,
+    `crop=${tw}:${th}`,
     "setsar=1",
     "fps=30",
   ].join(",");
@@ -90,9 +147,9 @@ async function clipHasAudio(filePath: string): Promise<boolean> {
 async function normalizeClip(
   inputPath: string,
   outputPath: string,
-  profile: RenderProfile,
+  targetSize: { w: number; h: number },
 ): Promise<void> {
-  const vf = scaleFilter(profile.video.scaleMode);
+  const vf = scaleFilterToTarget(targetSize.w, targetSize.h);
   const withAudio = await clipHasAudio(inputPath);
   const args = [
     "-y",
@@ -295,6 +352,7 @@ export function timelineToSrtFrames(
 
 export type RenderFfmpegResult = {
   ossUrl: string;
+  posterUrl?: string;
   bytesOut: number;
   totalDurationSec: number;
   srtContent?: string;
@@ -313,6 +371,7 @@ export async function runFfmpegMediaRender(args: {
   try {
     args.onProgress?.(2, "准备剪辑环境");
     const probed: ProbedClip[] = [];
+    const sourceSizes: { w: number; h: number }[] = [];
     for (let i = 0; i < timeline.clips.length; i++) {
       const clip = timeline.clips[i]!;
       args.onProgress?.(
@@ -329,6 +388,8 @@ export async function runFfmpegMediaRender(args: {
         clip.durationSec && clip.durationSec > 0
           ? clip.durationSec
           : await ffprobeDurationSec(rawPath);
+      const size = await ffprobeVideoSize(rawPath);
+      sourceSizes.push(size);
       probed.push({
         order: clip.order,
         localPath: rawPath,
@@ -355,14 +416,20 @@ export async function runFfmpegMediaRender(args: {
       );
     }
 
+    const targetSize = computeRenderTargetSize(
+      sourceSizes,
+      profile.video.scaleMode,
+    );
+    const targetLabel = `${targetSize.w}×${targetSize.h}`;
+
     const normPaths: string[] = [];
     for (let i = 0; i < probed.length; i++) {
       args.onProgress?.(
         35 + Math.round((i / Math.max(probed.length, 1)) * 30),
-        `标准化第 ${i + 1}/${probed.length} 镜（分辨率/帧率）`,
+        `标准化第 ${i + 1}/${probed.length} 镜（${targetLabel}）`,
       );
       const normPath = join(tmp, `norm-${i}.mp4`);
-      await normalizeClip(probed[i]!.localPath, normPath, profile);
+      await normalizeClip(probed[i]!.localPath, normPath, targetSize);
       normPaths.push(normPath);
       args.onProgress?.(
         35 + Math.round(((i + 1) / probed.length) * 30),
@@ -393,18 +460,48 @@ export async function runFfmpegMediaRender(args: {
     await renderXfade(normPaths, durations, profile, outPath, srtPath);
     args.onProgress?.(85, "编码完成，准备上传");
 
-    const mergedBuf = await readFile(outPath);
-    args.onProgress?.(88, "上传成片到云端");
-    const ossUrl = await uploadMediaRenderOutput({
+    const fastPath = join(tmp, "merged-faststart.mp4");
+    const faststarted = await remuxMp4FaststartFromPath(outPath, fastPath);
+    const uploadPath = faststarted ? fastPath : outPath;
+
+    const outStat = await stat(uploadPath);
+    const outMb = Math.max(1, Math.round(outStat.size / 1024 / 1024));
+    args.onProgress?.(86, `生成封面（约 ${outMb}MB 成片）`);
+
+    let posterUrl: string | undefined;
+    const posterBuf = await extractVideoFirstFrameJpegFromPath(uploadPath);
+    if (posterBuf) {
+      try {
+        posterUrl = await uploadMediaRenderPosterFromBuffer({
+          userId,
+          jobId,
+          buf: posterBuf,
+        });
+      } catch {
+        /* 封面失败不阻断成片 */
+      }
+    }
+
+    args.onProgress?.(88, `上传成片到云端（约 ${outMb}MB）`);
+    const { url: ossUrl, bytesOut } = await uploadMediaRenderOutputFromPath({
       userId,
       jobId,
-      buf: mergedBuf,
+      filePath: uploadPath,
+      onUploadProgress: (ratio) => {
+        const pct = 88 + Math.round(Math.min(1, ratio) * 10);
+        const uploadPct = Math.round(Math.min(1, ratio) * 100);
+        args.onProgress?.(
+          Math.min(99, pct),
+          ratio >= 0.999 ? "上传完成，正在收尾" : `上传中 ${uploadPct}%`,
+        );
+      },
     });
     args.onProgress?.(100, "剪辑完成");
 
     return {
       ossUrl,
-      bytesOut: mergedBuf.byteLength,
+      posterUrl,
+      bytesOut,
       totalDurationSec: totalEstimate,
       srtContent: srtContent?.trim() || undefined,
     };

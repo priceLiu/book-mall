@@ -417,13 +417,15 @@ export function StoryMediaPreviewModal({
         </div>
       </div>
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-        <div onClick={(e) => e.stopPropagation()} className="max-w-full">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex max-h-full max-w-full items-center justify-center"
+        >
           {kind === "video" ? (
             <CanvasVideoPlayer
               src={url}
               poster={posterUrl?.trim() || undefined}
               autoPlay
-              className="max-h-[calc(100dvh-88px)] w-[min(96vw,960px)]"
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element

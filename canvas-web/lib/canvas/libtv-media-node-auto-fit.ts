@@ -237,7 +237,8 @@ export function useLibtvMediaNodeAutoFit({
     const fitVersionStale =
       !parentId && mediaFitVersion !== LIBTV_MEDIA_FIT_VERSION;
 
-    if (mediaFit && mediaFitKey === url && !fitVersionStale) {
+    // mediaFitKey 须含 probe 源（含 poster），否则封面到达后不会重算 stage 比例
+    if (mediaFit && mediaFitKey === fitKey && !fitVersionStale) {
       lastFitKey.current = fitKey;
       return;
     }
@@ -254,7 +255,7 @@ export function useLibtvMediaNodeAutoFit({
           resizeNode(nodeId, size);
           updateNodeData(nodeId, {
             mediaFit: true,
-            mediaFitKey: url,
+            mediaFitKey: fitKey,
             mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
           });
           lastFitKey.current = fitKey;

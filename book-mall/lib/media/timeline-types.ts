@@ -37,6 +37,7 @@ export const renderProfileSchema = z.object({
     .optional(),
   video: z
     .object({
+      /** fit720p/fit1080p：按首镜比例缩放，长边封顶；不再 pad 成 16:9 */
       scaleMode: z
         .enum(["source", "fit720p", "fit1080p"])
         .default("fit1080p"),
