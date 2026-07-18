@@ -475,6 +475,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
   const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
     KIE: "KIE",
     DEEPSEEK: "DeepSeek",
+    MOONSHOT: "Kimi / Moonshot",
     BAILIAN: "通义百炼",
     DASHSCOPE: "DashScope",
     HUNYUAN: "腾讯混元",
