@@ -30,8 +30,8 @@ export function libtvDockModelItemClassName(selected: boolean): string {
   return cn(
     "flex w-full items-center gap-2 rounded-lg border px-2.5 py-2.5 text-left transition",
     selected
-      ? "border-white/25 bg-white/[0.06] text-white"
-      : "border-transparent text-white/80 hover:border-white/18 hover:bg-white/[0.04]",
+      ? "border-transparent bg-white/[0.10] text-white"
+      : "border-transparent text-white/80 hover:bg-white/[0.04]",
   );
 }
 

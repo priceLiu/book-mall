@@ -150,6 +150,20 @@ async function ensureCredential(
         ...(targetBase ? { baseUrl: targetBase } : {}),
       });
     }
+    if (envKey && spec.kind === "BAILIAN") {
+      await updateGatewayCredential(gatewayUserId, existing.id, {
+        apiKey: envKey,
+        active: true,
+        ...(targetBase ? { baseUrl: targetBase } : {}),
+      });
+    }
+    if (envKey && spec.kind === "DASHSCOPE") {
+      await updateGatewayCredential(gatewayUserId, existing.id, {
+        apiKey: envKey,
+        active: true,
+        ...(targetBase ? { baseUrl: targetBase } : {}),
+      });
+    }
     return existing.id;
   }
 

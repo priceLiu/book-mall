@@ -9,7 +9,6 @@ import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import {
   libtvNodeBorderStyle,
   LIBTV_INPUT_DOCK_BG,
-  LIBTV_MEDIA_GENERATING_CYAN_CLASS,
   LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
   LIBTV_NODE_SIDE_PLUS_SIZE,
 } from "@/lib/canvas/libtv-node-chrome";
@@ -131,7 +130,6 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             SBV1_CARD_SHELL_CLASS,
             SBV1_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
-            renderInFlight && LIBTV_MEDIA_GENERATING_CYAN_CLASS,
           )}
           style={borderStyle}
         >

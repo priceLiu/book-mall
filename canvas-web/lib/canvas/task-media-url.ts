@@ -102,6 +102,17 @@ export function pickRuntimeImagePreviewUrl(
   });
 }
 
+/** 节点 runtime · 视频成片 URL（供视频反推 LLM） */
+export function pickRuntimeVideoUrl(
+  runtime: Pick<CanvasNodeRuntime, "ossUrl" | "ephemeralUrl"> | undefined,
+): string | undefined {
+  if (!runtime) return undefined;
+  return pickTaskVideoUrl({
+    ossUrl: runtime.ossUrl ?? null,
+    ephemeralUrl: runtime.ephemeralUrl ?? null,
+  });
+}
+
 export function taskHasDisplayableResult(
   task: Pick<
     CanvasTaskRecord,

@@ -94,7 +94,7 @@ export function Sbv1ToolbarDropdown({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[1100]"
+        className="fixed inset-0 z-[1600]"
         aria-label="关闭"
         onClick={() => setOpen(false)}
       />
@@ -105,7 +105,7 @@ export function Sbv1ToolbarDropdown({
           left,
           top,
           transform,
-          zIndex: 1101,
+          zIndex: 1601,
         }}
       >
         {children}

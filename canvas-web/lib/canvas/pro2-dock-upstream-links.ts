@@ -4,7 +4,11 @@ import { collectRefImageUrlsFromGridNode } from "./ref-video-edges";
 import { isRefGridNodeType } from "./ref-video-models";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import type { ImageNodeData, ImageEngineNodeData } from "./types";
-import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import {
+  isLikelyVideoUrl,
+  pickRuntimeImagePreviewUrl,
+  pickRuntimeVideoUrl,
+} from "./task-media-url";
 import { storyThemePromptDisplayMd } from "./story-theme-prompt-display";
 import type {
   StoryProScriptHubNodeData,
@@ -53,6 +57,12 @@ function imageUrlFromNode(node: CanvasFlowNode): string | undefined {
       blobUrl?: string;
       videoUrl?: string;
     };
+    const videoUrl =
+      pickRuntimeVideoUrl(d.runtime) ??
+      (typeof d.videoUrl === "string" && isLikelyVideoUrl(d.videoUrl)
+        ? d.videoUrl.trim()
+        : undefined);
+    if (videoUrl) return videoUrl;
     return (
       pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
       d.runtime?.ossUrl ??
@@ -179,6 +189,8 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
   "story-pro2-three-view",
   "story-pro2-style-asset",
   "sbv1-image",
+  "sbv1-video-engine",
+  "video-engine",
   "image-engine",
   "three-view-engine",
 ]);

@@ -45,6 +45,7 @@ import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import {
   isStoryLlmVisionModel,
   STORY_LLM_VISION_MODEL_KEYS,
+  STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS,
 } from "@/lib/canvas/story-llm-vision-models";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "@/lib/canvas/types";
@@ -70,9 +71,12 @@ function rolePickerConfig(
     if (preset === "text-to-music") {
       return { allowedModelKeys: [...PRO2_SUNO_MODEL_KEYS] };
     }
-    const llmKeys = needsVision
-      ? [...STORY_LLM_VISION_MODEL_KEYS]
-      : [...STORY_LLM_MODEL_KEYS];
+    const llmKeys =
+      needsVision && preset === "video-to-prompt"
+        ? [...STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS]
+        : needsVision
+          ? [...STORY_LLM_VISION_MODEL_KEYS]
+          : [...STORY_LLM_MODEL_KEYS];
     return {
       allowedModelKeys: [...llmKeys],
     };

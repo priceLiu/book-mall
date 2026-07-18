@@ -211,6 +211,18 @@ export function spawnLibtvNeighborFromAnchor(
         sourceHandle: "image",
         targetHandle: "in_ref",
       });
+    } else if (
+      side === "left" &&
+      (anchor.type === "story-pro2-starter" ||
+        anchor.type === "story-pro2-script-hub")
+    ) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: newId,
+        target: anchorId,
+        sourceHandle: "out_video",
+        targetHandle: "in_text",
+      });
     }
     selectSbv1NodeAfterSpawn(setNodes, newId);
     return newId;

@@ -1,4 +1,4 @@
-import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import { pickRuntimeImagePreviewUrl, pickRuntimeVideoUrl, isLikelyVideoUrl } from "./task-media-url";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 function upstreamHttpsImageUrl(node: CanvasFlowNode): string | null {
@@ -23,7 +23,8 @@ function upstreamHttpsImageUrl(node: CanvasFlowNode): string | null {
       modelKey?: string;
     };
     const url = String(
-      pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
+      pickRuntimeVideoUrl(d.runtime) ??
+        pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
         d.runtime?.ossUrl ??
         d.ossUrl ??
         d.blobUrl ??

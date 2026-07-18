@@ -188,7 +188,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       resolveSbv1VariantIdFromEngine(data.engine, providers),
   );
   const selectedModel = getSbv1VolcengineModelById(variantId, providers);
-  const modelKey = selectedModel.engine.modelKey;
+  const modelKey =
+    data.engine?.modelKey?.trim() || selectedModel.engine.modelKey;
   const multiShots = data.engine?.params?.multi_shots === true;
   const dockChips = useMemo(
     () =>
@@ -205,6 +206,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     data.dockInputMode,
     dockChips,
   );
+  const activeModeLabel =
+    dockChips.find((c) => c.id === activeDockMode)?.label ?? null;
   const showFirstLastSlots = activeDockMode === "first_last";
   const allRefsHighlighted =
     activeDockMode === "omni" || activeDockMode === "multi_ref";
@@ -470,6 +473,14 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
           />
         ) : (
           <>
+            {activeModeLabel ? (
+              <span
+                className="nodrag shrink-0 rounded-full border border-white/10 px-2.5 py-1 font-medium text-white/55"
+                style={{ fontSize: Math.max(10, chipFontPx - 1) }}
+              >
+                {activeModeLabel}
+              </span>
+            ) : null}
             <Sbv1VideoDockModelPicker
               data={data}
               disabled={isGenerating}

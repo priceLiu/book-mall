@@ -52,7 +52,32 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "wan2.6-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v-flash": ["video_r2v", "video_multi_ref"],
   "wan2.7-r2v": ["video_r2v", "video_multi_ref"],
+  "wan2.6-t2v": ["video_t2v"],
+  "wan2.7-t2v": ["video_t2v"],
+  "wan2.7-t2v-2026-04-25": ["video_t2v"],
 };
+
+const VIDEO_CAPABILITY_LABELS: Record<
+  Extract<
+    StoryModelCapability,
+    "video_t2v" | "video_i2v" | "video_r2v" | "video_v2v" | "video_multi_ref"
+  >,
+  string
+> = {
+  video_t2v: "文生视频",
+  video_i2v: "图生视频",
+  video_r2v: "参考生视频",
+  video_v2v: "视频生视频",
+  video_multi_ref: "多参考图",
+};
+
+const VIDEO_CAPABILITY_ORDER: StoryModelCapability[] = [
+  "video_t2v",
+  "video_i2v",
+  "video_r2v",
+  "video_v2v",
+  "video_multi_ref",
+];
 
 function inferCapabilities(modelKey: string): StoryModelCapability[] {
   const k = modelKey.trim().toLowerCase();
@@ -146,4 +171,13 @@ export function storyCapabilityHint(
     video_multi_ref: "多参考图 API",
   };
   return required.map((c) => labels[c]).join(" · ");
+}
+
+/** 视频节点 Dock · 模型能力类型标签（文生视频 / 图生视频 …） */
+export function getSbv1VideoModelTypeLabels(modelKey: string): string[] {
+  const caps = new Set(getStoryModelCapabilities(modelKey));
+  return VIDEO_CAPABILITY_ORDER.filter(
+    (c): c is keyof typeof VIDEO_CAPABILITY_LABELS =>
+      caps.has(c) && c in VIDEO_CAPABILITY_LABELS,
+  ).map((c) => VIDEO_CAPABILITY_LABELS[c]);
 }

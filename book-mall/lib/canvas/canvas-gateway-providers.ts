@@ -10,6 +10,7 @@ import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/dee
 import { MOONSHOT_KNOWN_MODELS, MOONSHOT_SYSTEM_BASE_URL } from "./providers/moonshot-system";
 import { BAILIAN_IMAGE_KNOWN_MODELS } from "./providers/bailian-image";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
+import { BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS } from "./providers/bailian-dashscope-t2v";
 import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
 import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
@@ -109,7 +110,18 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       enabled: true,
       sortOrder: r2v.length + image.length + idx,
     }));
-    return [...r2v, ...image, ...tts];
+    const t2v = BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS.map((m, idx) => ({
+      id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
+      modelKey: m.modelKey,
+      displayName: m.displayName,
+      role: m.role,
+      description: m.description ?? null,
+      paramsSchema: m.paramsSchema ?? null,
+      defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+      enabled: true,
+      sortOrder: r2v.length + image.length + tts.length + idx,
+    }));
+    return [...r2v, ...image, ...tts, ...t2v];
   }
   if (kind === "VOLCENGINE") {
     return VOLCENGINE_ALL_KNOWN_MODELS.map((m, idx) => ({

@@ -507,11 +507,17 @@ export function JianyingMediaRenderActions({
             {renderBtn}
             {downloadBtn}
           </div>
-          <div className="w-full max-w-[640px] text-center">
-            {progressBlock ?? expiryHint}
-          </div>
-          {err ? <p className="text-center text-[12px] text-red-300">{err}</p> : null}
+          {!busy ? (
+            <div className="w-full max-w-[640px] shrink-0 text-center">{expiryHint}</div>
+          ) : null}
         </div>
+
+        {busy ? (
+          <div className="shrink-0 px-1 pb-1">{progressBlock}</div>
+        ) : null}
+        {err ? (
+          <p className="shrink-0 px-2 pb-1 text-center text-[12px] text-red-300">{err}</p>
+        ) : null}
       </div>
     );
   }
