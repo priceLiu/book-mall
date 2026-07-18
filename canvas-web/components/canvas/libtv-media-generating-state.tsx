@@ -24,9 +24,10 @@ export function isLibtvMediaGenerating(data: {
   // 终态优先：乐观 UI 可能遗留 uploading=true，勿把已完成节点仍显示为生成中
   if (s === "done" || s === "error" || s === "idle") return false;
   if (data.uploading) return true;
-  // runtime 已写回成片但 status 仍 pending/running（任务表滞后或 SUBMITTED 未刷新）
+  if (s === "running" || s === "pending") return true;
+  // 终态已写回成片但 status 未及时刷新（勿在 pending/running 之前短路，否则重生成无扫光）
   if (rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim()) return false;
-  return s === "running" || s === "pending";
+  return false;
 }
 
 /** LibTV 媒体 stage · 生成中（外框扫光 + 中央 RefreshCw），见 design.md §15 */
@@ -58,11 +59,17 @@ export function LibtvMediaGeneratingState({
   const labelClass = `text-[11px] font-medium ${CANVAS_SEMANTIC_STATUS_CLASS}`;
 
   return (
-    <div className={cn("absolute inset-0 overflow-hidden", shimmerClass, className)}>
-      {children}
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 px-6 py-10 text-center">
-        <RefreshCw className={spinClass} />
-        {label?.trim() ? <span className={labelClass}>{label}</span> : null}
+    <div className={cn("absolute inset-0", className)}>
+      {/*
+        扫光类 `.canvas-story-media-generating` 自带 `position: relative`，
+        不可与 `absolute inset-0` 同元素混用，否则 stage 内高度塌陷、扫光不可见。
+      */}
+      <div className={cn("relative size-full overflow-hidden", shimmerClass)}>
+        {children}
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 px-6 py-10 text-center">
+          <RefreshCw className={spinClass} />
+          {label?.trim() ? <span className={labelClass}>{label}</span> : null}
+        </div>
       </div>
     </div>
   );

@@ -3,13 +3,13 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** 浮动 Dock 底栏 · 模型/参数锚点 Popover 容器（z ≥ 1100 · 高于 Dock z-1000） */
+/** 浮动 Dock 底栏 · 模型/参数锚点 Popover 容器（z ≥ 1600 · 高于节点顶栏 z-1500） */
 export const LIBTV_DOCK_POPOVER_CLASS =
-  "nodrag nowheel max-h-[min(420px,70vh)] w-[min(22rem,calc(100vw-24px))] overflow-y-auto rounded-xl border border-white/12 bg-[#1a1a1c] py-2 shadow-2xl";
+  "nodrag nowheel max-h-[min(420px,70vh)] w-[min(22rem,calc(100vw-24px))] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-0 outline-none";
 
 /** 参数 Popover · 更宽更高，容纳 Gateway schema + 参考模式，尽量避免滚动条 */
 export const LIBTV_DOCK_PARAMS_POPOVER_CLASS =
-  "nodrag nowheel w-[min(30rem,calc(100vw-20px))] max-h-[min(560px,88vh)] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2.5 shadow-2xl";
+  "nodrag nowheel w-[min(30rem,calc(100vw-20px))] max-h-[min(560px,88vh)] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-0 outline-none";
 
 /** Dock 分段钮 · 选中态不用亮白描边，仅背景提亮 */
 export function libtvDockSegmentButtonClass(

@@ -1175,10 +1175,11 @@ export async function runVideoEngineNode(
   const isKieTopazUpscale = modelKey === "topaz/video-upscale";
   const isVideoOnlyV2v =
     isTopazDirectV2v || isKieTopazUpscale || modelKey === "wan/2-6-video-to-video";
-  const dockInputMode = String(data.dockInputMode ?? "").trim();
+  const dockInputModeRaw = String(data.dockInputMode ?? "").trim();
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingT2v =
-    modelKey === "kling-3.0/video" && dockInputMode === "t2v";
+    modelKey === "kling-3.0/video" &&
+    (dockInputModeRaw === "t2v" || !dockInputModeRaw);
   const isTextToVideoOnly = isDashscopeT2v || isKlingT2v;
   const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)

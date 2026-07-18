@@ -15,7 +15,9 @@ import {
   resolveSbv1UpstreamRefLinks,
 } from "./sbv1-upstream-ref-links";
 import {
+  getSbv1VideoDockModeChips,
   isDashscopeSbv1TextToVideoModel,
+  resolveSbv1DockInputMode,
   sbv1VideoModelUsesPortraitLibrary,
 } from "./sbv1-video-model-reference";
 import type { Sbv1ReferenceMode } from "./sbv1-workspace-types";
@@ -187,13 +189,22 @@ export function resolveSbv1VideoEngineInputs(
 ): ResolveSbv1VideoEngineInputsResult {
   const prompt = String(opts.prompt ?? "").trim();
   const referenceMode = opts.referenceMode ?? "omni";
+  const modelKey = opts.modelKey?.trim() ?? "";
   const usePortraitLibrary = sbv1VideoModelUsesPortraitLibrary(
-    opts.modelKey,
+    modelKey,
     opts.providerId,
   );
+  const dockChips = modelKey
+    ? getSbv1VideoDockModeChips(modelKey, { providerId: opts.providerId })
+    : [];
+  const effectiveDockMode = resolveSbv1DockInputMode(
+    referenceMode,
+    opts.dockInputMode,
+    dockChips,
+  );
   const allowTextToVideo =
-    opts.dockInputMode === "t2v" ||
-    isDashscopeSbv1TextToVideoModel(opts.modelKey?.trim() ?? "");
+    effectiveDockMode === "t2v" ||
+    isDashscopeSbv1TextToVideoModel(modelKey);
   const isTopazHdVideo =
     opts.modelKey?.trim() === "topaz-labs/video-enhance" ||
     opts.modelKey?.trim() === "topaz/video-upscale";

@@ -218,34 +218,30 @@ async function recoverStaleDispatchingOnly(opts?: {
       t.actorUserId ?? t.project.userId,
     );
 
+    let promoted = false;
     if (gwId) {
-      const promoted = await promoteDispatchingWithGatewayLog(
+      promoted = await promoteDispatchingWithGatewayLog(
         t,
         gwId,
         payload,
         scope.scopeKey,
       );
-      if (promoted) {
-        n++;
-        continue;
-      }
-    } else {
-      // 无 gatewayLogId：可能是「提交超时但其实成功」的孤儿日志。凭 storyTaskId=task.id 找回并 promote，
-      // 避免自愈重派再次 createTask（重复扣费 + 假性失败）。
+    }
+    if (!promoted) {
       const orphan = await findPromotableCanvasGatewayLog(t.id);
       if (orphan) {
-        const promoted = await promoteCanvasTaskFromGatewayLog({
+        promoted = await promoteCanvasTaskFromGatewayLog({
           taskId: t.id,
           payload,
           logId: orphan.logId,
           externalTaskId: orphan.externalTaskId,
           scopeKey: scope.scopeKey,
         });
-        if (promoted) {
-          n++;
-          continue;
-        }
       }
+    }
+    if (promoted) {
+      n++;
+      continue;
     }
 
     if (isPreSubmitRetryExhausted(payload)) {

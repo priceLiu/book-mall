@@ -63,6 +63,7 @@ import {
   libtvRuntimeErrorAlertTitle,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
+import { isCanvasNodeRunSessionActive } from "@/lib/canvas/canvas-run-session";
 import {
   pro2VideoBoardRowMediaUrl,
   pickPro2VideoBoardRowApplyTask,
@@ -244,7 +245,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     d.label?.trim() ||
     d.crewTaskLabel?.trim() ||
     defaultVideoTitle;
-  const isGenerating = isLibtvMediaGenerating(d) && !hasVideo;
 
   const inflightTask = useMemo(
     () =>
@@ -260,6 +260,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       rowRuntime,
     ],
   );
+
+  const isGenerating =
+    Boolean(inflightTask) || isLibtvMediaGenerating(d);
 
   const waitSince =
     inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
@@ -365,7 +368,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     updateNodeData(id, patch);
   }, [d.uploading, d.runtime?.status, id, updateNodeData]);
 
-  /** 已有成片但 runtime 仍标 error / pending / running · 自动恢复为 done */
+  /** 已有成片但 runtime 仍标 error / pending / running · 自动恢复为 done（排除重新生成中） */
   useEffect(() => {
     const st = d.runtime?.status;
     if (
@@ -374,6 +377,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     ) {
       return;
     }
+    if (inflightTask) return;
+    if (d.uploading) return;
+    if (isCanvasNodeRunSessionActive(id)) return;
     const url =
       videoUrl ??
       pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask });
@@ -391,11 +397,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   }, [
     hasVideo,
     d.runtime,
+    d.uploading,
     id,
     updateNodeData,
     rowDisplayTask,
     rowRuntime,
     videoUrl,
+    inflightTask,
   ]);
 
   const hasToolbarContent = Boolean(

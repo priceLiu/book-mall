@@ -5,12 +5,14 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import {
   isCanvasBailianR2vVideoTaskPayload,
+  isCanvasKieVideoTaskPayload,
   isCanvasVolcengineVideoTaskPayload,
 } from "@/lib/canvas/canvas-constants";
 import {
   applyCanvasBailianR2vPollResult,
   applyCanvasVolcengineVideoResult,
 } from "@/lib/canvas/canvas-task-service";
+import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
 import {
   CANVAS_MEDIA_NODE_TYPES,
   CANVAS_VIDEO_MEDIA_NODE_TYPES,
@@ -59,8 +61,15 @@ function isRecoverableCanvasVideoTask(
   const payload = taskInputPayload(task);
   return (
     isCanvasVolcengineVideoTaskPayload(payload) ||
-    isCanvasBailianR2vVideoTaskPayload(payload)
+    isCanvasBailianR2vVideoTaskPayload(payload) ||
+    isCanvasKieVideoTaskPayload(payload)
   );
+}
+
+function isKieVideoCanvasTask(
+  task: Pick<CanvasGenerationTask, "inputPayload">,
+): boolean {
+  return isCanvasKieVideoTaskPayload(taskInputPayload(task));
 }
 
 function isBailianR2vVideoCanvasTask(
@@ -122,6 +131,7 @@ export async function recoverCanvasVideoTaskDisplay(
   }
 
   const isBailian = isBailianR2vVideoCanvasTask(task);
+  const isKie = isKieVideoCanvasTask(task);
 
   const base = {
     taskId: task.id,
@@ -163,6 +173,29 @@ export async function recoverCanvasVideoTaskDisplay(
   if (gatewayLogId) {
     const log = await loadGatewayLog(gatewayLogId);
     if (log?.status === "SUCCEEDED") {
+      if (isKie) {
+        const kieOutcome = await recoverCanvasKieImageFromGateway(task.id);
+        if (kieOutcome === "succeeded") {
+          const updated = await prisma.canvasGenerationTask.findUnique({
+            where: { id: task.id },
+            select: { status: true, ossUrl: true, ephemeralUrl: true },
+          });
+          if (
+            updated?.status === "SUCCEEDED" &&
+            (updated.ossUrl || updated.ephemeralUrl)
+          ) {
+            return {
+              ok: true,
+              action: "applied_from_gateway",
+              ...base,
+              ossUrl: updated.ossUrl ?? updated.ephemeralUrl ?? undefined,
+            };
+          }
+        }
+        if (kieOutcome === "failed") {
+          return { ok: false, action: "failed", reason: "kie_gateway_failed", ...base };
+        }
+      }
       if (task.status === "FAILED") {
         await prisma.canvasGenerationTask.update({
           where: { id: task.id },

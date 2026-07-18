@@ -78,6 +78,23 @@ export async function runGatewayV1KieCreateTask(opts: {
   const clientSource = parseGatewayClientSource(opts.logMeta?.clientSource);
   const inputForLog = opts.body.input;
 
+  const storyTaskId = opts.logMeta?.storyTaskId?.trim();
+  if (storyTaskId) {
+    const existing = await prisma.gatewayRequestLog.findFirst({
+      where: {
+        storyTaskId,
+        status: { not: "FAILED" },
+        externalTaskId: { not: null },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, externalTaskId: true },
+    });
+    const ext = existing?.externalTaskId?.trim();
+    if (existing && ext) {
+      return { taskId: ext, logId: existing.id, providerKind: "KIE" };
+    }
+  }
+
   let log;
   try {
     log = await createRequestLog({

@@ -5,7 +5,11 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { getMediaRenderJobForUser } from "@/lib/media/media-render-service";
+import {
+  getMediaRenderJobForUser,
+  retryMediaRenderJobUpload,
+} from "@/lib/media/media-render-service";
+import { mediaRenderErrorMessage } from "@/lib/media/media-render-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +19,16 @@ export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
 }
 
-export async function GET(request: NextRequest, ctx: Ctx) {
+export async function POST(request: NextRequest, ctx: Ctx) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   const { jobId } = await ctx.params;
+
   try {
+    await retryMediaRenderJobUpload({
+      jobId,
+      userId: guard.user.id,
+    });
     const job = await getMediaRenderJobForUser(jobId, guard.user.id);
     if (!job) {
       return NextResponse.json(
@@ -29,12 +38,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     }
     return NextResponse.json({ job }, { headers: jsonHeaders(request) });
   } catch (err) {
-    const { mediaRenderErrorMessage } = await import(
-      "@/lib/media/media-render-errors"
-    );
     return NextResponse.json(
-      { error: "POLL_FAILED", message: mediaRenderErrorMessage(err) },
-      { status: 500, headers: jsonHeaders(request) },
+      { error: "RETRY_FAILED", message: mediaRenderErrorMessage(err) },
+      { status: 400, headers: jsonHeaders(request) },
     );
   }
 }

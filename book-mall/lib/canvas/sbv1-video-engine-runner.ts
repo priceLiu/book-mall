@@ -111,7 +111,14 @@ export async function runSbv1VideoEngineNode(
     modelKey === "kling-2.6/motion-control" ||
     modelKey === "kling-3.0/motion-control";
 
-  const dockInputMode = data.dockInputMode as Sbv1DockInputMode | undefined;
+  const dockInputModeRaw = data.dockInputMode as Sbv1DockInputMode | undefined;
+  const dockInputMode: Sbv1DockInputMode =
+    dockInputModeRaw ??
+    (modelKey === "kling-3.0/video"
+      ? "t2v"
+      : isDashscopeSbv1TextToVideoModel(modelKey)
+        ? "t2v"
+        : "omni");
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";

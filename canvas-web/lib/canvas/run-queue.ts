@@ -13,7 +13,12 @@ import { useCanvasStore } from "./store";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "./resolve-sbv1-video-engine-inputs";
-import { sbv1VideoModelUsesPortraitLibrary } from "./sbv1-video-model-reference";
+import {
+  dockInputModeToPatch,
+  getSbv1VideoDockModeChips,
+  resolveSbv1DockInputMode,
+  sbv1VideoModelUsesPortraitLibrary,
+} from "@/lib/canvas/sbv1-video-model-reference";
 import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
@@ -1048,6 +1053,25 @@ export function useCanvasRunner(
               prompt: effectivePrompt,
               dockInput: effectivePrompt,
             };
+          }
+          const vdRun = runData as import("./sbv1-workspace-types").Sbv1VideoEngineNodeData;
+          const mk = vdRun.engine?.modelKey?.trim() ?? "";
+          if (mk) {
+            const chips = getSbv1VideoDockModeChips(mk, {
+              providerId: vdRun.engine?.providerId,
+              multiShots: vdRun.engine?.params?.multi_shots === true,
+            });
+            const mode = resolveSbv1DockInputMode(
+              vdRun.referenceMode ?? "omni",
+              vdRun.dockInputMode,
+              chips,
+            );
+            if (mode !== vdRun.dockInputMode) {
+              runData = {
+                ...runData,
+                ...dockInputModeToPatch(mode),
+              };
+            }
           }
         }
         if (

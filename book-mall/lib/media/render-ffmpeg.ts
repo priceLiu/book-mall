@@ -6,14 +6,8 @@ import { promisify } from "util";
 
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { buildMergedSrt } from "@/lib/canvas/canvas-jianying-export";
-import {
-  extractVideoFirstFrameJpegFromPath,
-  remuxMp4FaststartFromPath,
-} from "@/lib/canvas/video-poster-ffmpeg";
-import {
-  uploadMediaRenderOutputFromPath,
-  uploadMediaRenderPosterFromBuffer,
-} from "@/lib/media/media-render-oss";
+import { remuxMp4FaststartFromPath } from "@/lib/canvas/video-poster-ffmpeg";
+import { persistMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
 import {
   MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC,
   MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
@@ -351,8 +345,7 @@ export function timelineToSrtFrames(
 }
 
 export type RenderFfmpegResult = {
-  ossUrl: string;
-  posterUrl?: string;
+  localPath: string;
   bytesOut: number;
   totalDurationSec: number;
   srtContent?: string;
@@ -365,7 +358,7 @@ export async function runFfmpegMediaRender(args: {
   profile: RenderProfile;
   onProgress?: (pct: number, label: string) => void;
 }): Promise<RenderFfmpegResult> {
-  const { timeline, profile, userId, jobId } = args;
+  const { timeline, profile, jobId } = args;
   const clipCount = timeline.clips.length;
   const tmp = await mkdtemp(join(tmpdir(), "media-render-"));
   try {
@@ -458,7 +451,7 @@ export async function runFfmpegMediaRender(args: {
           : "拼接镜头";
     args.onProgress?.(72, xfadeLabel);
     await renderXfade(normPaths, durations, profile, outPath, srtPath);
-    args.onProgress?.(85, "编码完成，准备上传");
+    args.onProgress?.(85, "编码完成，准备保存");
 
     const fastPath = join(tmp, "merged-faststart.mp4");
     const faststarted = await remuxMp4FaststartFromPath(outPath, fastPath);
@@ -466,42 +459,14 @@ export async function runFfmpegMediaRender(args: {
 
     const outStat = await stat(uploadPath);
     const outMb = Math.max(1, Math.round(outStat.size / 1024 / 1024));
-    args.onProgress?.(86, `生成封面（约 ${outMb}MB 成片）`);
+    args.onProgress?.(88, `保存成片（约 ${outMb}MB）`);
 
-    let posterUrl: string | undefined;
-    const posterBuf = await extractVideoFirstFrameJpegFromPath(uploadPath);
-    if (posterBuf) {
-      try {
-        posterUrl = await uploadMediaRenderPosterFromBuffer({
-          userId,
-          jobId,
-          buf: posterBuf,
-        });
-      } catch {
-        /* 封面失败不阻断成片 */
-      }
-    }
-
-    args.onProgress?.(88, `上传成片到云端（约 ${outMb}MB）`);
-    const { url: ossUrl, bytesOut } = await uploadMediaRenderOutputFromPath({
-      userId,
-      jobId,
-      filePath: uploadPath,
-      onUploadProgress: (ratio) => {
-        const pct = 88 + Math.round(Math.min(1, ratio) * 10);
-        const uploadPct = Math.round(Math.min(1, ratio) * 100);
-        args.onProgress?.(
-          Math.min(99, pct),
-          ratio >= 0.999 ? "上传完成，正在收尾" : `上传中 ${uploadPct}%`,
-        );
-      },
-    });
-    args.onProgress?.(100, "剪辑完成");
+    const persisted = await persistMediaRenderLocalOutput(jobId, uploadPath);
+    args.onProgress?.(89, "剪辑完成，可下载");
 
     return {
-      ossUrl,
-      posterUrl,
-      bytesOut,
+      localPath: persisted.path,
+      bytesOut: persisted.bytesOut,
       totalDurationSec: totalEstimate,
       srtContent: srtContent?.trim() || undefined,
     };

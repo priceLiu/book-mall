@@ -1472,10 +1472,26 @@ export type MediaRenderJob = {
   progress: number;
   progressLabel?: string | null;
   downloadUrl: string | null;
+  localDownloadPath?: string | null;
+  uploadFailed?: boolean;
   posterUrl: string | null;
   expiresAt: string;
   errorMessage: string | null;
 };
+
+export function resolveMediaRenderDownloadUrl(
+  base: string,
+  job: Pick<MediaRenderJob, "downloadUrl" | "localDownloadPath" | "id">,
+): string | null {
+  if (job.downloadUrl?.trim()) return job.downloadUrl.trim();
+  if (job.localDownloadPath?.trim()) {
+    const { url } = resolveBookMallBrowserRequest(base, job.localDownloadPath, {
+      method: "GET",
+    });
+    return url;
+  }
+  return null;
+}
 
 export type MediaRenderScaleMode = "source" | "fit720p" | "fit1080p";
 
@@ -1515,21 +1531,49 @@ export async function submitMediaRender(
 export async function pollMediaRender(
   base: string,
   jobId: string,
+  opts?: { retries?: number },
+): Promise<MediaRenderJob> {
+  const maxAttempts = Math.max(1, opts?.retries ?? 3);
+  let lastError = "poll failed";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { url, init } = resolveBookMallBrowserRequest(
+      base,
+      `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
+      { method: "GET" },
+    );
+    const r = await fetch(url, init);
+    const data = (await r.json().catch(() => ({}))) as {
+      job?: MediaRenderJob;
+      message?: string;
+    };
+    if (r.ok && data.job) return data.job;
+    lastError = data.message ?? `poll failed HTTP ${r.status}`;
+    if (r.status >= 500 && attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1200 * attempt));
+      continue;
+    }
+    throw new Error(lastError);
+  }
+  throw new Error(lastError);
+}
+
+export async function retryMediaRenderUpload(
+  base: string,
+  jobId: string,
 ): Promise<MediaRenderJob> {
   const { url, init } = resolveBookMallBrowserRequest(
     base,
-    `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
-    { method: "GET" },
+    `/api/canvas/media/render/${encodeURIComponent(jobId)}/retry-upload`,
+    { method: "POST" },
   );
   const r = await fetch(url, init);
   const data = (await r.json().catch(() => ({}))) as {
     job?: MediaRenderJob;
     message?: string;
   };
-  if (!r.ok) {
-    throw new Error(data.message ?? `poll failed HTTP ${r.status}`);
+  if (!r.ok || !data.job) {
+    throw new Error(data.message ?? `retry upload HTTP ${r.status}`);
   }
-  if (!data.job) throw new Error("invalid poll response");
   return data.job;
 }
 
@@ -1553,6 +1597,9 @@ export async function waitMediaRenderJob(
       job.status === "FAILED" ||
       job.status === "EXPIRED"
     ) {
+      return job;
+    }
+    if (job.uploadFailed && job.localDownloadPath) {
       return job;
     }
     await new Promise((r) => setTimeout(r, intervalMs));

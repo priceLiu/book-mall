@@ -29,6 +29,8 @@ import {
   getCanvasUserInflightMax,
   getGenerationPollBatch,
   isCanvasBailianR2vVideoTaskPayload,
+  isCanvasKieVideoTaskPayload,
+  isCanvasVolcengineVideoTaskPayload,
   resolveCanvasSubmittedTaskTimeoutMin,
   resolveCanvasSubmittedTaskTimeoutMs,
 } from "./canvas-constants";
@@ -105,7 +107,7 @@ import {
   recoverCanvasVideoTaskDisplay,
   runCanvasDisplayReconcileWorker,
 } from "@/lib/canvas/canvas-video-display-recover";
-import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
+import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
 import { getGenerationPollInnerTimeoutMs } from "@/lib/generation/poll-config";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
@@ -1492,6 +1494,23 @@ async function pollOneSubmittedCanvasTask(
         }
         return "pending";
       }
+      const recovered = await recoverCanvasKieImageFromGateway(task.id);
+      if (recovered === "succeeded" || recovered === "failed") {
+        const afterRecover = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+        });
+        if (afterRecover?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+          return "succeeded";
+        }
+        if (afterRecover?.status === "FAILED" && before !== "FAILED") {
+          return "failed";
+        }
+      }
     }
     if (
       providerKind === "VOLCENGINE" ||
@@ -1588,7 +1607,8 @@ async function pollOneSubmittedCanvasTask(
   if (
     isSlowGenerationAge(task.submittedAt, task.createdAt) &&
     (isCanvasVolcengineVideoTaskPayload(payload) ||
-      isCanvasBailianR2vVideoTaskPayload(payload))
+      isCanvasBailianR2vVideoTaskPayload(payload) ||
+      isCanvasKieVideoTaskPayload(payload))
   ) {
     const recovered = await recoverCanvasVideoTaskDisplay(task.id);
     if (recovered.ok && recovered.action !== "noop" && recovered.action !== "failed") {
