@@ -17,6 +17,7 @@ import { CanvasProjectError } from "./canvas-project-service";
 import {
   GATEWAY_BAILIAN_PROVIDER_ID,
   GATEWAY_DEEPSEEK_PROVIDER_ID,
+  GATEWAY_MOONSHOT_PROVIDER_ID,
   GATEWAY_HUNYUAN_PROVIDER_ID,
   GATEWAY_KIE_PROVIDER_ID,
   GATEWAY_TOPAZ_PROVIDER_ID,
@@ -75,6 +76,7 @@ const GATEWAY_ID_BY_PROVIDER_KIND: Partial<
 > = {
   KIE: GATEWAY_KIE_PROVIDER_ID,
   DEEPSEEK: GATEWAY_DEEPSEEK_PROVIDER_ID,
+  MOONSHOT: GATEWAY_MOONSHOT_PROVIDER_ID,
   BAILIAN: GATEWAY_BAILIAN_PROVIDER_ID,
   HUNYUAN: GATEWAY_HUNYUAN_PROVIDER_ID,
   VOLCENGINE: GATEWAY_VOLCENGINE_PROVIDER_ID,
@@ -102,6 +104,7 @@ export function canvasProviderIdForGateway(providerId: string): string {
   if (isGatewayVirtualProviderId(providerId)) return providerId;
   if (providerId === "system:kie") return "gateway:kie";
   if (providerId === "system:deepseek") return "gateway:deepseek";
+  if (providerId === "system:moonshot") return "gateway:moonshot";
   if (providerId === "system:bailian-r2v") return "gateway:bailian";
   if (providerId === "system:hunyuan-3d") return "gateway:hunyuan";
   return providerId;

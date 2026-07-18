@@ -17,6 +17,7 @@ import {
   resolveDeepseekChatModelKey,
   resolveKieApiRoot,
   resolveKieGeminiChatPath,
+  resolveMoonshotChatCompletionsBody,
   resolveOpenAiCompatibleBaseUrl,
   resolveVolcengineModelKey,
   routeGatewayModel,
@@ -492,6 +493,9 @@ function resolveChatCompletionsBody(
   }
   if (providerKind === "DEEPSEEK") {
     return { ...body, model: resolveDeepseekChatModelKey(model) };
+  }
+  if (providerKind === "MOONSHOT") {
+    return resolveMoonshotChatCompletionsBody(body);
   }
   return body;
 }

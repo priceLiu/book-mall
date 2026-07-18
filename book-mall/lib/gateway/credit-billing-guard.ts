@@ -31,6 +31,8 @@ export function vendorForProviderKind(kind: GatewayProviderKind): string {
       return "tencent";
     case "DEEPSEEK":
       return "deepseek";
+    case "MOONSHOT":
+      return "moonshot";
     default:
       return String(kind).toLowerCase();
   }

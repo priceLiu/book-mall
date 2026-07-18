@@ -10,6 +10,7 @@ const PROVIDERS = [
   "KIE",
   "BAILIAN",
   "DEEPSEEK",
+  "MOONSHOT",
   "DASHSCOPE",
   "HUNYUAN",
   "VOLCENGINE",

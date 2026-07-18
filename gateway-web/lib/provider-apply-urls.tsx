@@ -4,6 +4,7 @@ export const PROVIDER_APPLY_URLS: Partial<
     | "KIE"
     | "BAILIAN"
     | "DEEPSEEK"
+    | "MOONSHOT"
     | "DASHSCOPE"
     | "HUNYUAN"
     | "VOLCENGINE"
@@ -17,6 +18,8 @@ export const PROVIDER_APPLY_URLS: Partial<
   KIE: "https://kie.ai/api-key",
   BAILIAN:
     "https://bailian.console.aliyun.com/cn-beijing?spm=5176.42028462.overview_recent.5.2124154amlfGdb&tab=model#/api-key",
+  DEEPSEEK: "https://platform.deepseek.com/api_keys",
+  MOONSHOT: "https://platform.kimi.com/console/api-keys",
   VOLCENGINE:
     "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
   MINIMAX: "https://platform.minimaxi.com/user-center/basic-information/interface-key",

@@ -2,6 +2,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   KIE: "KIE",
   BAILIAN: "百炼",
   DEEPSEEK: "DeepSeek",
+  MOONSHOT: "Kimi",
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山方舟",

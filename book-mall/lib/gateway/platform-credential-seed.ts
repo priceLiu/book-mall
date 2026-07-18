@@ -43,6 +43,12 @@ const CREDENTIALS: Array<{
     baseUrl: "https://api.deepseek.com/v1",
   },
   {
+    kind: "MOONSHOT",
+    alias: "Kimi",
+    env: "MOONSHOT_API_KEY",
+    baseUrl: "https://api.moonshot.cn/v1",
+  },
+  {
     kind: "BAILIAN",
     alias: "百炼",
     env: "DASHSCOPE_API_KEY",
@@ -131,6 +137,13 @@ async function ensureCredential(
       });
     }
     if (envKey && spec.kind === "TOPAZ") {
+      await updateGatewayCredential(gatewayUserId, existing.id, {
+        apiKey: envKey,
+        active: true,
+        ...(targetBase ? { baseUrl: targetBase } : {}),
+      });
+    }
+    if (envKey && spec.kind === "MOONSHOT") {
       await updateGatewayCredential(gatewayUserId, existing.id, {
         apiKey: envKey,
         active: true,

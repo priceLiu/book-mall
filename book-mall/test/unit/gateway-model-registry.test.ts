@@ -21,6 +21,14 @@ describe("resolveKnownGatewayModelRegistration", () => {
     });
   });
 
+  it("resolves Kimi K3 via canonical registry", () => {
+    expect(resolveKnownGatewayModelRegistration("kimi-k3")).toMatchObject({
+      canonicalModelKey: "kimi-k3",
+      providerKind: "MOONSHOT",
+      vendor: "moonshot",
+    });
+  });
+
   it("returns null for unknown model keys", () => {
     expect(resolveKnownGatewayModelRegistration("not-a-real-model-key")).toBeNull();
   });
