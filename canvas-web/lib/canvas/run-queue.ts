@@ -279,7 +279,7 @@ function resolveImageInputsRaw(
       if (d.imageUrl?.trim()) out.push(d.imageUrl.trim());
     } else if (isRefGridNodeType(p.type ?? "")) {
       out.push(...collectRefImageUrlsFromGridNode(p));
-    } else if (p.type === "image-engine" || p.type === "three-view-engine" || p.type === "video-engine") {
+    } else if (p.type === "image-engine" || p.type === "three-view-engine") {
       const d = p.data as unknown as ImageEngineNodeData;
       const url =
         pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ?? d.runtime?.ossUrl;
