@@ -8,6 +8,7 @@ import {
   defaultBaseUrl,
   resolveDeepSeekBaseUrl,
   resolveKieApiRoot,
+  resolveMoonshotBaseUrl,
   resolveOpenAiCompatibleBaseUrl,
 } from "@/lib/gateway/model-router";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
@@ -21,6 +22,7 @@ function toCanvasKind(kind: GatewayProviderKind): CanvasProviderKind {
     case "DEEPSEEK":
     case "DASHSCOPE":
     case "VOLCENGINE":
+    case "MOONSHOT":
       return "OPENAI_COMPAT";
     case "HUNYUAN":
       return "HUNYUAN_3D";
@@ -41,7 +43,9 @@ function buildTestConfig(row: {
       ? resolveOpenAiCompatibleBaseUrl(row.providerKind, row.baseUrl)
       : row.providerKind === "DEEPSEEK"
         ? resolveDeepSeekBaseUrl(row.baseUrl)
-        : row.providerKind === "VOLCENGINE"
+        : row.providerKind === "MOONSHOT"
+          ? resolveMoonshotBaseUrl(row.baseUrl)
+          : row.providerKind === "VOLCENGINE"
           ? (row.baseUrl?.trim() || defaultBaseUrl("VOLCENGINE")).replace(
               /\/$/,
               "",

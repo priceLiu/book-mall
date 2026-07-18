@@ -9,6 +9,7 @@ export const GATEWAY_PROVIDER_KINDS = [
   "KIE",
   "BAILIAN",
   "DEEPSEEK",
+  "MOONSHOT",
   "DASHSCOPE",
   "HUNYUAN",
   "VOLCENGINE",

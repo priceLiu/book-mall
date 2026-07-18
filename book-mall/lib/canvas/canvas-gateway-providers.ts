@@ -7,6 +7,7 @@ import type { GatewayProviderKind } from "@prisma/client";
 import type { CanvasProviderDto } from "./canvas-provider-service";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/deepseek-system";
+import { MOONSHOT_KNOWN_MODELS, MOONSHOT_SYSTEM_BASE_URL } from "./providers/moonshot-system";
 import { BAILIAN_IMAGE_KNOWN_MODELS } from "./providers/bailian-image";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
@@ -21,6 +22,7 @@ import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
 
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
+export const GATEWAY_MOONSHOT_PROVIDER_ID = "gateway:moonshot";
 export const GATEWAY_BAILIAN_PROVIDER_ID = "gateway:bailian";
 export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
 export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
@@ -50,6 +52,19 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
   if (kind === "DEEPSEEK") {
     return DEEPSEEK_KNOWN_MODELS.map((m, idx) => ({
       id: `${GATEWAY_DEEPSEEK_PROVIDER_ID}::${m.modelKey}`,
+      modelKey: m.modelKey,
+      displayName: m.displayName,
+      role: m.role,
+      description: m.description ?? null,
+      paramsSchema: m.paramsSchema ?? null,
+      defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+      enabled: true,
+      sortOrder: idx,
+    }));
+  }
+  if (kind === "MOONSHOT") {
+    return MOONSHOT_KNOWN_MODELS.map((m, idx) => ({
+      id: `${GATEWAY_MOONSHOT_PROVIDER_ID}::${m.modelKey}`,
       modelKey: m.modelKey,
       displayName: m.displayName,
       role: m.role,
@@ -205,6 +220,21 @@ export async function listGatewayVirtualProvidersForUser(
       lastTestedAt: null,
       lastTestStatus: "gateway",
       models: modelsForKind("DEEPSEEK"),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  if (link.boundKinds.includes("MOONSHOT")) {
+    out.push({
+      id: GATEWAY_MOONSHOT_PROVIDER_ID,
+      alias: "Gateway · Kimi",
+      kind: "OPENAI_COMPAT",
+      baseUrl: MOONSHOT_SYSTEM_BASE_URL,
+      apiKeyMasked: "gateway",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "gateway",
+      models: modelsForKind("MOONSHOT"),
       createdAt: now,
       updatedAt: now,
     });

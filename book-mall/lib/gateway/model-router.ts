@@ -32,6 +32,17 @@ const DEEPSEEK_MODELS = new Set([
   "deepseek-coder",
 ]);
 
+const MOONSHOT_MODELS = new Set([
+  "kimi-k3",
+  "kimi-k2.6",
+  "kimi-k2.5",
+  "kimi-k2.7-code",
+  "kimi-k2.7-code-highspeed",
+  "moonshot-v1-8k",
+  "moonshot-v1-32k",
+  "moonshot-v1-128k",
+]);
+
 const KIE_CHAT_MODELS = new Set([
   "gemini-3-flash",
   "google/gemini-3-flash",
@@ -160,6 +171,14 @@ export function routeGatewayModel(model: string): RoutedModel {
 
   if (DEEPSEEK_MODELS.has(m) || m.startsWith("deepseek")) {
     return { providerKind: "DEEPSEEK", requestKind: "CHAT" };
+  }
+
+  if (
+    MOONSHOT_MODELS.has(m) ||
+    m.startsWith("kimi-") ||
+    m.startsWith("moonshot-")
+  ) {
+    return { providerKind: "MOONSHOT", requestKind: "CHAT" };
   }
 
   if (
@@ -348,6 +367,8 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
   switch (kind) {
     case "DEEPSEEK":
       return "https://api.deepseek.com/v1";
+    case "MOONSHOT":
+      return "https://api.moonshot.cn/v1";
     case "BAILIAN":
     case "DASHSCOPE":
       return "https://dashscope.aliyuncs.com/compatible-mode/v1";
@@ -397,6 +418,7 @@ export function resolveVolcengineArkApiRoot(
 
 const DASHSCOPE_HOST_RE = /^https?:\/\/dashscope\.aliyuncs\.com\/?$/i;
 const DEEPSEEK_HOST_RE = /^https?:\/\/api\.deepseek\.com\/?$/i;
+const MOONSHOT_HOST_RE = /^https?:\/\/api\.moonshot\.cn\/?$/i;
 
 /** DeepSeek OpenAI 兼容端点须带 /v1，避免裸域名路径不一致。 */
 export function resolveDeepSeekBaseUrl(
@@ -410,6 +432,42 @@ export function resolveDeepSeekBaseUrl(
     return `${raw}/v1`;
   }
   return raw;
+}
+
+/** Moonshot / Kimi OpenAI 兼容端点须带 /v1。 */
+export function resolveMoonshotBaseUrl(
+  baseUrl: string | null | undefined,
+): string {
+  const fallback = defaultBaseUrl("MOONSHOT").replace(/\/$/, "");
+  const raw = (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  if (!raw) return fallback;
+  if (MOONSHOT_HOST_RE.test(raw)) return `${raw}/v1`;
+  if (/api\.moonshot\.cn/i.test(raw) && !/\/v\d+$/i.test(raw)) {
+    return `${raw}/v1`;
+  }
+  return raw;
+}
+
+/** Kimi 模型 temperature / top_p 等为固定值；K2.6 thinking_mode → thinking 对象。 */
+export function resolveMoonshotChatCompletionsBody(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...body };
+  delete out.temperature;
+  delete out.top_p;
+  delete out.n;
+  delete out.presence_penalty;
+  delete out.frequency_penalty;
+
+  const model =
+    typeof out.model === "string" ? out.model.trim().toLowerCase() : "";
+  const thinkingMode = out.thinking_mode;
+  if (typeof thinkingMode === "string" && model === "kimi-k2.6") {
+    out.thinking = { type: thinkingMode === "disabled" ? "disabled" : "enabled" };
+  }
+  delete out.thinking_mode;
+
+  return out;
 }
 
 /**
@@ -429,6 +487,14 @@ export function resolveOpenAiCompatibleBaseUrl(
 
   if (kind === "KIE") {
     return resolveKieApiRoot(baseUrl);
+  }
+
+  if (kind === "MOONSHOT") {
+    return resolveMoonshotBaseUrl(baseUrl);
+  }
+
+  if (kind === "DEEPSEEK") {
+    return resolveDeepSeekBaseUrl(baseUrl);
   }
 
   if (kind !== "BAILIAN" && kind !== "DASHSCOPE") {

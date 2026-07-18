@@ -21,6 +21,7 @@ export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
 export const SYSTEM_BAILIAN_R2V_PROVIDER_ID = "system:bailian-r2v";
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
+export const GATEWAY_MOONSHOT_PROVIDER_ID = "gateway:moonshot";
 export const GATEWAY_BAILIAN_PROVIDER_ID = "gateway:bailian";
 export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
 export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";

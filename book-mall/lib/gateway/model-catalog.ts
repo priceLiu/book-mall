@@ -11,6 +11,7 @@ import {
   VOLCENGINE_VIDEO_KNOWN_MODELS,
 } from "@/lib/gateway/volcengine-chat-models";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
+import { MOONSHOT_KNOWN_MODELS } from "@/lib/canvas/providers/moonshot-system";
 import { listHunyuanKnownModels } from "@/lib/canvas/providers/hunyuan-3d";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
 import type { CanvasGatewayListedModel } from "@/lib/canvas/providers/types";
@@ -94,6 +95,7 @@ const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   KIE: "KIE",
   BAILIAN: "百炼 / DashScope 兼容",
   DEEPSEEK: "DeepSeek",
+  MOONSHOT: "Kimi / Moonshot",
   DASHSCOPE: "DashScope 原生",
   HUNYUAN: "混元 3D",
   VOLCENGINE: "火山方舟 / 豆包",
@@ -402,6 +404,12 @@ export function buildGatewayModelCatalog(
     ),
   );
 
+  const moonshotModels = sortModels(
+    MOONSHOT_KNOWN_MODELS.map((m) =>
+      fromListed(m, "MOONSHOT", ["Canvas", "Story", "工具站", "提示词优化器"]),
+    ),
+  );
+
   const bailianModels = sortModels(
     dedupeByKey([
       ...BAILIAN_CHAT_KNOWN_MODELS.map((m) =>
@@ -504,6 +512,7 @@ export function buildGatewayModelCatalog(
     [
       ["KIE", kieModels],
       ["DEEPSEEK", deepseekModels],
+      ["MOONSHOT", moonshotModels],
       ["BAILIAN", bailianModels],
       ["DASHSCOPE", dashscopeModels],
       ["HUNYUAN", hunyuanModels],

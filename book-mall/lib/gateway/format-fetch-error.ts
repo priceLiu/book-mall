@@ -21,7 +21,9 @@ function formatUpstreamTimeoutMessage(provider: string): string {
           ? "百炼"
           : provider === "DEEPSEEK"
             ? "DeepSeek"
-            : provider;
+            : provider === "MOONSHOT"
+              ? "Kimi"
+              : provider;
   return `${label} API 连接超时，请稍后重试。`;
 }
 

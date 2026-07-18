@@ -22,6 +22,14 @@ const PROVIDER_ROWS = [
     products: "Canvas · Story · 工具站智能客服",
   },
   {
+    kind: "MOONSHOT",
+    label: "Kimi / Moonshot",
+    registerHint: "platform.kimi.com 控制台创建 API Key",
+    applyUrl: "https://platform.kimi.com/console/api-keys",
+    models: "kimi-k3 / kimi-k2.6 / kimi-k2.7-code",
+    products: "Canvas · Story 剧本",
+  },
+  {
     kind: "BAILIAN",
     label: "百炼",
     registerHint: "阿里云百炼 / DashScope 控制台",
