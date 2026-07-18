@@ -38,6 +38,75 @@ export async function findPromotableCanvasGatewayLog(
  * 把 DISPATCHING 的 canvas 任务按已存在的厂商日志 promote 成 SUBMITTED（绝不再次 createTask）。
  * 与正常成功路径同口径：promote 成功后 releaseGatewayVideoTrafficSlotIfOccupying 放槽 + fireDispatch。
  */
+/**
+ * SUBMITTED 轮询前补全 gatewayLogId / kieTaskId（提交成功但 payload 未回写的孤儿对账）。
+ * 凭 GatewayRequestLog.storyTaskId = canvas task id 找回，避免误判 GATEWAY_LEGACY_TASK。
+ */
+export async function backfillCanvasTaskGatewayLink(args: {
+  taskId: string;
+  kieTaskId: string | null;
+  payload: Record<string, unknown>;
+}): Promise<{
+  payload: Record<string, unknown>;
+  gatewayLogId: string;
+  kieTaskId: string;
+} | null> {
+  let gatewayLogId =
+    typeof args.payload.gatewayLogId === "string"
+      ? args.payload.gatewayLogId.trim()
+      : "";
+  let kieTaskId = args.kieTaskId?.trim() ?? "";
+
+  if (!gatewayLogId) {
+    const orphan = await findPromotableCanvasGatewayLog(args.taskId);
+    if (orphan) {
+      gatewayLogId = orphan.logId;
+      if (!kieTaskId) kieTaskId = orphan.externalTaskId;
+    } else {
+      const log = await prisma.gatewayRequestLog.findFirst({
+        where: {
+          storyTaskId: args.taskId,
+          status: { not: "FAILED" },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, externalTaskId: true },
+      });
+      if (log?.id) {
+        gatewayLogId = log.id;
+        const ext = log.externalTaskId?.trim();
+        if (ext && !kieTaskId) kieTaskId = ext;
+      }
+    }
+  }
+
+  if (!gatewayLogId) return null;
+
+  const nextPayload = { ...args.payload, gatewayLogId };
+  const data: Prisma.CanvasGenerationTaskUpdateInput = {
+    inputPayload: nextPayload as Prisma.InputJsonValue,
+  };
+  if (kieTaskId && kieTaskId !== args.kieTaskId) {
+    data.kieTaskId = kieTaskId;
+  }
+  const payloadChanged =
+    gatewayLogId !==
+    (typeof args.payload.gatewayLogId === "string"
+      ? args.payload.gatewayLogId.trim()
+      : "");
+  if (payloadChanged || data.kieTaskId) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: args.taskId },
+      data,
+    });
+  }
+
+  return {
+    payload: nextPayload,
+    gatewayLogId,
+    kieTaskId: kieTaskId || args.kieTaskId?.trim() || "",
+  };
+}
+
 export async function promoteCanvasTaskFromGatewayLog(args: {
   taskId: string;
   payload: Record<string, unknown>;

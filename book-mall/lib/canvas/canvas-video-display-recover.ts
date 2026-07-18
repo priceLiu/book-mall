@@ -26,6 +26,7 @@ import {
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
 import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
+import { backfillCanvasTaskGatewayLink } from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
 import { prisma } from "@/lib/prisma";
 
 export type CanvasVideoRecoverAction =
@@ -147,13 +148,33 @@ export async function recoverCanvasVideoTaskDisplay(
   }
 
   const payload = taskInputPayload(task);
-  const gatewayLogId =
+  let gatewayLogId =
     typeof payload?.gatewayLogId === "string"
       ? payload.gatewayLogId.trim()
       : "";
+  if (!gatewayLogId) {
+    const linked = await backfillCanvasTaskGatewayLink({
+      taskId: task.id,
+      kieTaskId: task.kieTaskId,
+      payload: payload ?? {},
+    });
+    if (linked) gatewayLogId = linked.gatewayLogId;
+  }
   if (gatewayLogId) {
     const log = await loadGatewayLog(gatewayLogId);
     if (log?.status === "SUCCEEDED") {
+      if (task.status === "FAILED") {
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            status: "SUBMITTED",
+            failCode: null,
+            failMessage: null,
+            completedAt: null,
+            lastPolledAt: new Date(),
+          },
+        });
+      }
       const videoUrl = isBailian
         ? extractBailianR2vVideoUrlFromGatewaySummary(log.resultSummary)
         : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
@@ -207,8 +228,93 @@ export async function recoverCanvasVideoTaskDisplay(
       "OSS_UPLOAD_FAILED",
       "VOLCENGINE_GATEWAY_POLL_STALL",
       "GATEWAY_TASK_FAILED",
+      "GATEWAY_LEGACY_TASK",
     ].includes(task.failCode)
   ) {
+    if (task.failCode === "GATEWAY_LEGACY_TASK") {
+      const linked = await backfillCanvasTaskGatewayLink({
+        taskId: task.id,
+        kieTaskId: task.kieTaskId,
+        payload: payload ?? {},
+      });
+      const gwId = linked?.gatewayLogId ?? gatewayLogId;
+      if (gwId) {
+        const log = await loadGatewayLog(gwId);
+        if (log?.status === "RUNNING" || log?.status === "PENDING") {
+          await prisma.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "SUBMITTED",
+              failCode: null,
+              failMessage: null,
+              completedAt: null,
+              lastPolledAt: new Date(),
+              ...(linked
+                ? {
+                    kieTaskId: linked.kieTaskId || task.kieTaskId,
+                    inputPayload: linked.payload as Prisma.InputJsonValue,
+                  }
+                : {}),
+            },
+          });
+          return {
+            ok: true,
+            action: "noop",
+            reason: "gateway_legacy_task_reopened",
+            ...base,
+          };
+        }
+        if (log?.status === "SUCCEEDED") {
+          if (task.status === "FAILED") {
+            await prisma.canvasGenerationTask.update({
+              where: { id: task.id },
+              data: {
+                status: "SUBMITTED",
+                failCode: null,
+                failMessage: null,
+                completedAt: null,
+                lastPolledAt: new Date(),
+              },
+            });
+          }
+          const videoUrl = isBailian
+            ? extractBailianR2vVideoUrlFromGatewaySummary(log.resultSummary)
+            : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
+          if (videoUrl) {
+            if (isBailian) {
+              await applyCanvasBailianR2vPollResult(task.id, {
+                ok: true,
+                output: { task_status: "SUCCEEDED", video_url: videoUrl },
+                raw: log.resultSummary,
+              });
+            } else {
+              await applyCanvasVolcengineVideoResult(task.id, videoUrl);
+            }
+            const updated = await prisma.canvasGenerationTask.findUnique({
+              where: { id: task.id },
+              select: { status: true, ossUrl: true, ephemeralUrl: true },
+            });
+            if (
+              updated?.status === "SUCCEEDED" &&
+              (updated.ossUrl || updated.ephemeralUrl)
+            ) {
+              return {
+                ok: true,
+                action: "applied_from_gateway",
+                ...base,
+                ossUrl: updated.ossUrl ?? updated.ephemeralUrl ?? undefined,
+              };
+            }
+          }
+        }
+      }
+      return {
+        ok: false,
+        action: "failed",
+        reason: "gateway_legacy_task_unlinked",
+        ...base,
+      };
+    }
     const r = await recoverCanvasVolcengineTimedOutTask(task.id);
     return {
       ok: r.ok,
