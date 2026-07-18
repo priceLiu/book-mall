@@ -28,11 +28,10 @@ const T2V_PARAMS_SCHEMA = [
   {
     key: "duration",
     label: "时长(秒)",
-    type: "select",
-    options: [
-      { value: 5, label: "5s" },
-      { value: 10, label: "10s" },
-    ],
+    type: "number",
+    min: 5,
+    max: 10,
+    step: 5,
     defaultValue: 5,
   },
   {
