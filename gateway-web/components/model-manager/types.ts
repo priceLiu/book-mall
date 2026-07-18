@@ -20,6 +20,7 @@ export type CatalogModel = {
   modelKey: string;
   displayName: string;
   requestKind: string;
+  canonicalModelKey?: string | null;
   capabilities?: string[];
 };
 
