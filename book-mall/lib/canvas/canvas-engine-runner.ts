@@ -850,8 +850,8 @@ async function executeStoryLlmEngineTask(
     imageUrls: mediaUrls,
   } = ctx;
 
-  const videoUrls = imageUrls.filter((u) => isLikelyVideoUrl(u));
-  const pureImageUrls = imageUrls.filter((u) => !isLikelyVideoUrl(u));
+  const videoUrls = mediaUrls.filter((u) => isLikelyVideoUrl(u));
+  const pureImageUrls = mediaUrls.filter((u) => !isLikelyVideoUrl(u));
 
   const existing = await prisma.canvasGenerationTask.findUnique({
     where: { id: taskId },
