@@ -40,6 +40,8 @@ import {
 } from "@/lib/generation/poll-config";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
+import { backfillCanvasTaskGatewayLink } from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
+import { recoverCanvasTextLlmFromGateway } from "@/lib/canvas/canvas-text-llm-recover";
 import {
   GENERATION_INFLIGHT_STATUSES,
   GENERATION_PIPELINE_INFLIGHT_STATUSES,
@@ -1378,13 +1380,55 @@ async function pollOneSubmittedCanvasTask(
   task: SubmittedCanvasPollTask,
 ): Promise<"succeeded" | "failed" | "pending"> {
   const before = task.status;
-  const payload = taskInputPayload(task);
+  let payload = taskInputPayload(task) ?? {};
   const useGateway = await shouldCanvasTaskUseGateway(
     task.project.userId,
     payload,
   );
 
-  if (!useGateway || !task.kieTaskId || !payload?.gatewayLogId) {
+  if (!useGateway) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        failCode: "GATEWAY_LEGACY_TASK",
+        failMessage: "旧任务须经 Gateway，请重新生成",
+        completedAt: new Date(),
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+      },
+    });
+    return "failed";
+  }
+
+  if (task.kind === "TEXT") {
+    const textOutcome = await recoverCanvasTextLlmFromGateway(task.id);
+    if (textOutcome === "succeeded") return "succeeded";
+    if (textOutcome === "failed") return "failed";
+    if (textOutcome === "pending") {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+      });
+      return "pending";
+    }
+  }
+
+  const linked = await backfillCanvasTaskGatewayLink({
+    taskId: task.id,
+    kieTaskId: task.kieTaskId,
+    payload,
+  });
+  if (linked) {
+    payload = linked.payload;
+  }
+  const gatewayLogId =
+    linked?.gatewayLogId ??
+    (typeof payload.gatewayLogId === "string" ? payload.gatewayLogId.trim() : "");
+  const kieTaskId =
+    linked?.kieTaskId ?? task.kieTaskId?.trim() ?? "";
+
+  if (!gatewayLogId || !kieTaskId) {
     await prisma.canvasGenerationTask.update({
       where: { id: task.id },
       data: {
@@ -1398,8 +1442,6 @@ async function pollOneSubmittedCanvasTask(
     });
     return "failed";
   }
-
-  const gatewayLogId = String(payload.gatewayLogId).trim();
   const gatewayLog = await prisma.gatewayRequestLog.findUnique({
     where: { id: gatewayLogId },
     select: {
@@ -1557,9 +1599,9 @@ async function pollOneSubmittedCanvasTask(
   const providerKind = gatewayProviderKindFromPayload(payload);
   const gw = await Promise.race([
     canvasGwRecordInfo(task.project.userId, {
-      taskId: task.kieTaskId,
+      taskId: kieTaskId,
       providerKind,
-      gatewayLogId: String(payload.gatewayLogId),
+      gatewayLogId,
     }),
     new Promise<never>((_, reject) =>
       setTimeout(
