@@ -28,10 +28,10 @@ const LLM_TEMP_SCHEMA = [
 
 export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
-    modelKey: "qwen3.5-27b",
-    displayName: "Qwen3.5-27B",
+    modelKey: "qwen3.7-plus",
+    displayName: "Qwen3.7-Plus",
     role: "LLM",
-    description: "百炼 · 均衡性价比 · 提示词优化推荐",
+    description: "百炼 · 旗舰 · 视频/图片理解 · 反推提示词",
     paramsSchema: [...LLM_TEMP_SCHEMA],
     defaultParams: { temperature: 0.7, max_tokens: 8000 },
   },
@@ -39,7 +39,23 @@ export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     modelKey: "qwen3.5-plus",
     displayName: "Qwen3.5-Plus",
     role: "LLM",
-    description: "百炼 · 效果优先",
+    description: "百炼 · 效果优先 · 视频/图片理解",
+    paramsSchema: [...LLM_TEMP_SCHEMA],
+    defaultParams: { temperature: 0.7, max_tokens: 8000 },
+  },
+  {
+    modelKey: "qwen3-vl-plus",
+    displayName: "Qwen3-VL-Plus",
+    role: "LLM",
+    description: "百炼 · 多模态 · 视频理解 · 反推提示词推荐",
+    paramsSchema: [...LLM_TEMP_SCHEMA],
+    defaultParams: { temperature: 0.7, max_tokens: 8000 },
+  },
+  {
+    modelKey: "qwen3.5-27b",
+    displayName: "Qwen3.5-27B",
+    role: "LLM",
+    description: "百炼 · 均衡性价比 · 提示词优化推荐",
     paramsSchema: [...LLM_TEMP_SCHEMA],
     defaultParams: { temperature: 0.7, max_tokens: 8000 },
   },

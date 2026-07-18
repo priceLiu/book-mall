@@ -439,6 +439,49 @@ export async function canvasGwCreateDashscopeKlingImageJob(
   };
 }
 
+/** Canvas · DashScope 文生视频（wan2.6-t2v / wan2.7-t2v） */
+export async function canvasGwCreateDashscopeVideoJob(
+  userId: string,
+  opts: {
+    model: string;
+    videoBody: Record<string, unknown>;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  if (!pickDashscopeCredentialForCanvas(auth.credentials)) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope / 百炼凭证（万相文生视频需要阿里云 DashScope Key）",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      dashscope: {
+        jobKind: "video" as const,
+        videoBody: opts.videoBody,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
+}
+
 export async function canvasGwCreateTopazVideoJob(
   userId: string,
   opts: {

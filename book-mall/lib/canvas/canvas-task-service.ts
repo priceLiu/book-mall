@@ -135,6 +135,7 @@ import { buildKieImageCreateArgs } from "./providers/kie";
 import { type BailianR2vTaskOutput, extractBailianR2vVideoUrlFromGatewaySummary } from "./canvas-video-bailian-r2v";
 import {
   dashscopeExtractTaskImageUrl,
+  dashscopeExtractTaskVideoUrl,
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
   type DashscopeTaskOutput,
@@ -690,6 +691,14 @@ export async function applyCanvasDashscopeImagePollResult(
   }
 
   if (!isDashscopeTaskSuccess(status)) return;
+
+  const videoUrl = dashscopeExtractTaskVideoUrl(
+    output as Record<string, unknown>,
+  );
+  if (videoUrl) {
+    await applyCanvasVolcengineVideoResult(taskId, videoUrl);
+    return;
+  }
 
   const ephemeralUrl = dashscopeExtractTaskImageUrl(
     output as Record<string, unknown>,

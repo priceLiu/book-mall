@@ -29,6 +29,7 @@ import {
 } from "@/lib/canvas/sbv1-video-models";
 import type {
   Sbv1AspectRatio,
+  Sbv1DockInputMode,
   Sbv1ReferenceMode,
   Sbv1VideoEngineNodeData,
 } from "@/lib/canvas/sbv1-workspace-types";
@@ -66,6 +67,8 @@ const SBV1_DOCK_EXTRA_VIDEO_MODEL_KEYS = [
   "kling-3.0/motion-control",
   "happyhorse-1.0-r2v",
   "wan2.7-r2v",
+  "wan2.6-t2v",
+  "wan2.7-t2v",
 ] as const;
 
 const SBV1_DOCK_VIDEO_PROVIDER_IDS = [
@@ -93,6 +96,7 @@ export type Sbv1VideoEngineSettingsPatchInput = {
   isVolcDockModel: boolean;
   smartMulti: boolean;
   refCapsMultiShotsBlocksFirstLast?: boolean;
+  dockInputMode?: Sbv1DockInputMode;
 };
 
 /** Dock / 弹层共用 · 写入 engine 与节点顶层字段 */
@@ -131,6 +135,7 @@ export function buildSbv1VideoEngineSettingsPatch(
     volcengineVariantId: variantId,
     jimengModelId: variantId,
     engine,
+    ...(input.dockInputMode ? { dockInputMode: input.dockInputMode } : {}),
   };
 }
 

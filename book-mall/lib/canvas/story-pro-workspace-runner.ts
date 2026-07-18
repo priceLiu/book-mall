@@ -30,6 +30,7 @@ import {
 } from "./script-studio-prompts";
 import { isPro2GeneralTextNode, isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
+import { isLikelyVideoUrl } from "./media-url-kind";
 
 function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
@@ -161,6 +162,12 @@ const STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM =
 const STORY_PRO2_IMAGE_TO_PROMPT_USER =
   "请根据所附图片反推一份详细的生图提示词。";
 
+const STORY_PRO2_VIDEO_TO_PROMPT_SYSTEM =
+  "你是专业视频提示词工程师。根据用户附带的参考视频，反推一份可用于 AI 生视频/分镜的详细中文提示词（含画面、运镜、节奏）。只输出提示词正文，不要解释或寒暄。";
+
+const STORY_PRO2_VIDEO_TO_PROMPT_USER =
+  "请根据所附视频反推一份详细的视频/分镜提示词。";
+
 /** 2.0 文本节点 · general 模式：按 Dock 提示词调用 LLM，结果写入节点卡片 */
 export async function runStoryProStarterGeneralText(
   args: RunEngineNodeArgs,
@@ -171,9 +178,11 @@ export async function runStoryProStarterGeneralText(
       "该文本节点用于故事大纲，请使用故事大纲生成；general 模式节点才走提示词 LLM",
     );
   }
-  const imageUrls = (args.node.imageInputs ?? []).filter(
+  const mediaUrls = (args.node.imageInputs ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
   );
+  const videoUrls = mediaUrls.filter((u) => isLikelyVideoUrl(u));
+  const imageUrls = mediaUrls.filter((u) => !isLikelyVideoUrl(u));
   let prompt =
     (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
     (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
@@ -181,13 +190,19 @@ export async function runStoryProStarterGeneralText(
   if (!prompt && preset === "image-to-prompt" && imageUrls.length > 0) {
     prompt = STORY_PRO2_IMAGE_TO_PROMPT_USER;
   }
-  if (!prompt && imageUrls.length === 0) {
-    throw new Error("请先填写提示词内容，或链接并上传参考图片");
+  if (!prompt && preset === "video-to-prompt" && videoUrls.length > 0) {
+    prompt = STORY_PRO2_VIDEO_TO_PROMPT_USER;
+  }
+  if (!prompt && imageUrls.length === 0 && videoUrls.length === 0) {
+    throw new Error("请先填写提示词内容，或链接并上传参考图片/视频");
   }
 
   const modelKey = String(data.modelKey ?? args.node.modelKey ?? "").trim();
-  if (imageUrls.length > 0) {
-    assertStoryLlmVisionModel(modelKey, "图片反推提示词");
+  if (imageUrls.length > 0 || videoUrls.length > 0) {
+    assertStoryLlmVisionModel(
+      modelKey,
+      preset === "video-to-prompt" ? "视频反推提示词" : "图片反推提示词",
+    );
   }
 
   const customSystem =
@@ -197,9 +212,11 @@ export async function runStoryProStarterGeneralText(
         ? data.systemPrompt
         : ""
     ).trim() ||
-    (preset === "image-to-prompt" && imageUrls.length > 0
-      ? STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM
-      : STORY_PRO2_GENERAL_TEXT_SYSTEM);
+    (preset === "video-to-prompt" && videoUrls.length > 0
+      ? STORY_PRO2_VIDEO_TO_PROMPT_SYSTEM
+      : preset === "image-to-prompt" && imageUrls.length > 0
+        ? STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM
+        : STORY_PRO2_GENERAL_TEXT_SYSTEM);
 
   const node: CanvasRunNodeInput = {
     ...args.node,

@@ -57,7 +57,8 @@ export type CanvasProviderConfig = {
 /** OpenAI 兼容多模态 content part（v2 加入 Gemini 3 Flash 多模态） */
 export type CanvasChatContentPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "video_url"; video_url: { url: string } };
 
 export type CanvasChatMessage = {
   role: "system" | "user" | "assistant";

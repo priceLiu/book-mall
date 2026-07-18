@@ -14,13 +14,17 @@ import {
 } from "@/lib/canvas/sbv1-video-models";
 import type {
   Sbv1AspectRatio,
+  Sbv1DockInputMode,
   Sbv1ReferenceMode,
   Sbv1VideoEngineNodeData,
 } from "@/lib/canvas/sbv1-workspace-types";
 import {
   clampSbv1ReferenceMode,
+  defaultSbv1DockInputModeForModel,
+  dockInputModeToPatch,
   getSbv1VideoModelRefCaps,
 } from "@/lib/canvas/sbv1-video-model-reference";
+import { getSbv1VideoModelTypeLabels } from "@/lib/canvas/story-model-capabilities";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
 import {
@@ -130,6 +134,7 @@ function patchVideoSettings(
     engineParams?: Record<string, unknown>;
     generateAudio?: boolean;
     watermark?: boolean;
+    dockInputMode?: Sbv1DockInputMode;
   },
 ) {
   const providerId = normalizeSbv1EngineProviderId(
@@ -197,6 +202,7 @@ function patchVideoSettings(
       isVolcDockModel,
       smartMulti,
       refCapsMultiShotsBlocksFirstLast: refCaps.multiShotsBlocksFirstLast,
+      dockInputMode: next.dockInputMode ?? data.dockInputMode,
     }),
   );
 }
@@ -259,15 +265,21 @@ export function Sbv1VideoDockModelPicker({
       providerId,
     });
     referenceMode = clampSbv1ReferenceMode(referenceMode, caps);
+    const defaultMode = defaultSbv1DockInputModeForModel(model.modelKey, {
+      multiShots: p.multi_shots === true,
+      providerId,
+    });
+    const modePatch = dockInputModeToPatch(defaultMode);
     patchVideoSettings(data, onPatch, {
       providerId,
       modelKey: model.modelKey,
       engineParams: p,
-      referenceMode,
+      referenceMode: modePatch.referenceMode,
       aspectRatio,
       durationSec,
       resolution,
       generateAudio,
+      dockInputMode: modePatch.dockInputMode,
     });
     setOpen(false);
   };
@@ -309,6 +321,7 @@ export function Sbv1VideoDockModelPicker({
             const displayName = hideKieVendorLabel(
               model.displayName || model.modelKey,
             );
+            const typeLabels = getSbv1VideoModelTypeLabels(model.modelKey);
             return (
               <button
                 key={`${providerId}:${model.modelKey}`}
@@ -319,13 +332,20 @@ export function Sbv1VideoDockModelPicker({
                 <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.06] text-[10px] font-semibold text-white/70">
                   {displayName.slice(0, 1)}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-white">
-                    {displayName}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-white">
+                      {displayName}
+                    </span>
+                    <span className="block truncate text-[10px] text-white/40">
+                      {model.modelKey}
+                    </span>
                   </span>
-                  <span className="block truncate text-[10px] text-white/40">
-                    {model.modelKey}
-                  </span>
+                  {typeLabels.length > 0 ? (
+                    <span className="shrink-0 text-[10px] text-white/45">
+                      {typeLabels.join(" · ")}
+                    </span>
+                  ) : null}
                 </span>
                 {selected ? (
                   <Check className={LIBTV_DOCK_PICKER_CHECK_CLASS} />

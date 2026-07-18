@@ -13,6 +13,7 @@ import {
   getSbv1VideoModelRefCaps,
   sbv1VideoModelUsesPortraitLibrary,
 } from "./sbv1-video-model-reference";
+import { isDashscopeSbv1TextToVideoModel } from "./dashscope-sbv1-t2v";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
@@ -111,15 +112,17 @@ export async function runSbv1VideoEngineNode(
     modelKey === "kling-3.0/motion-control";
 
   const dockInputMode = data.dockInputMode as Sbv1DockInputMode | undefined;
+  const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
+  const isTextToVideoOnly = isDashscopeT2v || isKlingTextToVideo;
 
   if (
     !promptRaw &&
     imageInputs.length === 0 &&
     !hasPortraitRefs &&
     !isMotionControl &&
-    !isKlingTextToVideo
+    !isTextToVideoOnly
   ) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
@@ -133,7 +136,7 @@ export async function runSbv1VideoEngineNode(
   let lastFrameImageUrl = "";
   let forceReferenceMode = false;
 
-  if (isKlingTextToVideo) {
+  if (isTextToVideoOnly) {
     mainFrameImageUrl = "";
     referenceImageUrls = [];
     lastFrameImageUrl = "";
@@ -285,6 +288,7 @@ export async function runSbv1VideoEngineNode(
             ? false
             : forceReferenceMode || portraitRefs.length > 0,
         sbv1Billing,
+        dockInputMode,
       },
       imageInputs,
       textInputs: [],

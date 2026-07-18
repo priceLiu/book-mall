@@ -41,6 +41,7 @@ export function ModelManager({
   tabGroups: Record<ModelTab, CatalogGroup[]>;
 }) {
   const [tab, setTab] = useState<ModelTab>("text");
+  const [query, setQuery] = useState("");
   const [credentials, setCredentials] = useState(initialCredentials);
   const [editOpen, setEditOpen] = useState(false);
   const [editCredential, setEditCredential] = useState<CredentialRow | null>(null);
@@ -53,11 +54,32 @@ export function ModelManager({
   const groups = useMemo(() => {
     const base = tabGroups[tab] ?? [];
     const volcFull = initialGroups.find((g) => g.providerKind === "VOLCENGINE");
-    if (!volcFull) return base;
-    return base.map((g) =>
-      g.providerKind === "VOLCENGINE" ? volcFull : g,
-    );
-  }, [tab, tabGroups, initialGroups]);
+    const merged = !volcFull
+      ? base
+      : base.map((g) =>
+          g.providerKind === "VOLCENGINE" ? volcFull : g,
+        );
+    const q = query.trim().toLowerCase();
+    if (!q) return merged;
+    return merged
+      .map((g) => ({
+        ...g,
+        models: g.models.filter((m) => {
+          const hay = [
+            m.modelKey,
+            m.displayName,
+            m.canonicalModelKey ?? "",
+            ...(m.capabilities ?? []),
+            g.label,
+            g.providerKind,
+          ]
+            .join(" ")
+            .toLowerCase();
+          return hay.includes(q);
+        }),
+      }))
+      .filter((g) => g.models.length > 0);
+  }, [tab, tabGroups, initialGroups, query]);
 
   const credsByKind = useMemo(() => {
     const map = new Map<string, CredentialRow[]>();
@@ -193,6 +215,21 @@ export function ModelManager({
           {toast}
         </div>
       ) : null}
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-[220px] flex-1">
+          <span className="mb-1 block text-xs text-[var(--gw-muted)]">
+            搜索 modelKey / 名称 / 能力
+          </span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="例如 qwen3.7、百炼、Vision"
+            className="w-full rounded-lg border border-[var(--gw-border)] bg-black/30 px-3 py-2 text-sm text-[var(--gw-ink)] placeholder:text-[var(--gw-muted)]"
+          />
+        </label>
+      </div>
 
       <div className="flex gap-1 rounded-lg border border-[var(--gw-border)] bg-black/20 p-1">
         {(Object.keys(TAB_LABELS) as ModelTab[]).map((key) => (

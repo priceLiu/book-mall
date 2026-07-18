@@ -14,7 +14,10 @@ import {
   isSbv1VideoEngineRefImageNode,
   resolveSbv1UpstreamRefLinks,
 } from "./sbv1-upstream-ref-links";
-import { sbv1VideoModelUsesPortraitLibrary } from "./sbv1-video-model-reference";
+import {
+  isDashscopeSbv1TextToVideoModel,
+  sbv1VideoModelUsesPortraitLibrary,
+} from "./sbv1-video-model-reference";
 import type { Sbv1ReferenceMode } from "./sbv1-workspace-types";
 import { directPredecessors } from "./topo";
 import type { Sbv1VideoEngineNodeData } from "./sbv1-workspace-types";
@@ -188,9 +191,9 @@ export function resolveSbv1VideoEngineInputs(
     opts.modelKey,
     opts.providerId,
   );
-  const allowKlingTextToVideo =
-    opts.modelKey?.trim() === "kling-3.0/video" &&
-    opts.dockInputMode === "t2v";
+  const allowTextToVideo =
+    opts.dockInputMode === "t2v" ||
+    isDashscopeSbv1TextToVideoModel(opts.modelKey?.trim() ?? "");
   const isTopazHdVideo =
     opts.modelKey?.trim() === "topaz-labs/video-enhance" ||
     opts.modelKey?.trim() === "topaz/video-upscale";
@@ -242,7 +245,7 @@ export function resolveSbv1VideoEngineInputs(
   const videoInputs = resolveMotionVideoInputs(nodes, edges, engineNodeId);
 
   if (referenceMode === "first_last") {
-    if (slots.length < 1 && !allowKlingTextToVideo) {
+    if (slots.length < 1 && !allowTextToVideo) {
       return {
         ok: false,
         error: "首尾帧模式需要至少一张参考图（已入库 asset:// 或未入库 OSS 均可）。",
@@ -273,7 +276,7 @@ export function resolveSbv1VideoEngineInputs(
       portraitAssetRefs.length === 0 &&
       imageInputs.length === 0 &&
       styleHttps.length === 0 &&
-      !allowKlingTextToVideo
+      !allowTextToVideo
     ) {
       return {
         ok: false,
@@ -307,7 +310,7 @@ export function resolveSbv1VideoEngineInputs(
     !prompt &&
     dedupedAssets.length === 0 &&
     dedupedImages.length === 0 &&
-    !allowKlingTextToVideo &&
+    !allowTextToVideo &&
     !(isTopazHdVideo && videoInputs.length > 0)
   ) {
     return {

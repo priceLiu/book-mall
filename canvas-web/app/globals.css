@@ -633,6 +633,8 @@ html[data-canvas-modal-open] .pro2-input-dock {
 }
 
 .canvas-story-media-generating {
+  position: relative;
+  overflow: hidden;
   box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.55),
     0 0 16px rgba(251, 146, 60, 0.35);
 }

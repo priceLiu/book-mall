@@ -39,6 +39,7 @@ const EXTRA_INVOKE_MODEL_KEYS = [
   "qwen-vl-plus",
   "qwen3-vl-plus",
   "qwen3-vl-flash",
+  "qwen3.7-plus",
   "qwen3.5-plus",
   "qwen3.5-flash",
   "qwen3.5-27b",

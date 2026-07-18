@@ -29,6 +29,7 @@ import {
 } from "./canvas-constants";
 import { CanvasProjectError } from "./canvas-project-service";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
+import { isLikelyVideoUrl } from "./media-url-kind";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
@@ -44,6 +45,7 @@ import {
   canvasGwChat,
   canvasGwCreateBailianR2vJob,
   canvasGwCreateDashscopeKlingImageJob,
+  canvasGwCreateDashscopeVideoJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
   canvasGwCreateTopazVideoJob,
@@ -69,6 +71,10 @@ import {
 } from "./canvas-video-volcengine";
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
+import {
+  buildDashscopeSbv1T2vVideoBody,
+  isDashscopeSbv1TextToVideoModel,
+} from "./dashscope-sbv1-t2v";
 import {
   parseTopazFrameInterpolation,
   parseTopazSlowmoFactor,
@@ -765,11 +771,22 @@ function expandMentionsText(prompt: string, node: CanvasRunNodeInput): string {
   }
   const imgs = (node.imageInputs ?? []).filter(Boolean);
   if (imgs.length > 0) {
-    // 只是给 LLM 一个"我们一共附了 N 张图"的提示，URL 不重复贴出来
-    segs.push(
-      `\n\n# 上游附带 ${imgs.length} 张参考图（已作为 image_url 附在本条消息）`,
-      "- 第 1 张为产品主体（必保），其余为风格 / 灵感参考。",
-    );
+    const videoCount = imgs.filter((u) => isLikelyVideoUrl(String(u))).length;
+    const imageCount = imgs.length - videoCount;
+    if (videoCount > 0 && imageCount > 0) {
+      segs.push(
+        `\n\n# 上游附带 ${imageCount} 张参考图与 ${videoCount} 段参考视频（已作为多模态附件附在本条消息）`,
+      );
+    } else if (videoCount > 0) {
+      segs.push(
+        `\n\n# 上游附带 ${videoCount} 段参考视频（已作为 video_url 附在本条消息）`,
+      );
+    } else {
+      segs.push(
+        `\n\n# 上游附带 ${imageCount} 张参考图（已作为 image_url 附在本条消息）`,
+        "- 第 1 张为产品主体（必保），其余为风格 / 灵感参考。",
+      );
+    }
   }
   return segs.join("\n");
 }
@@ -830,8 +847,11 @@ async function executeStoryLlmEngineTask(
     providerId,
     params,
     userText,
-    imageUrls,
+    imageUrls: mediaUrls,
   } = ctx;
+
+  const videoUrls = imageUrls.filter((u) => isLikelyVideoUrl(u));
+  const pureImageUrls = imageUrls.filter((u) => !isLikelyVideoUrl(u));
 
   const existing = await prisma.canvasGenerationTask.findUnique({
     where: { id: taskId },
@@ -881,9 +901,13 @@ async function executeStoryLlmEngineTask(
     const userContent: (
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string } }
+      | { type: "video_url"; video_url: { url: string } }
     )[] = [];
-    for (const u of imageUrls) {
+    for (const u of pureImageUrls) {
       userContent.push({ type: "image_url", image_url: { url: u } });
+    }
+    for (const u of videoUrls) {
+      userContent.push({ type: "video_url", video_url: { url: u } });
     }
     userContent.push({
       type: "text",
@@ -1006,10 +1030,12 @@ export async function runStoryLlmEngineNode(
   }
   const userText = userTextParts.filter(Boolean).join("\n\n");
 
-  const imageUrls = (node.imageInputs ?? []).filter(
+  const mediaUrls = (node.imageInputs ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
   );
-  if (imageUrls.length > 0) {
+  const videoUrls = mediaUrls.filter((u) => isLikelyVideoUrl(u));
+  const imageUrls = mediaUrls.filter((u) => !isLikelyVideoUrl(u));
+  if (imageUrls.length > 0 || videoUrls.length > 0) {
     try {
       assertStoryLlmVisionModel(modelKey, "多模态 LLM");
     } catch (e) {
@@ -1023,7 +1049,7 @@ export async function runStoryLlmEngineNode(
   const inputHash = computeInputHash({
     modelKey,
     prompt: userText,
-    imageUrls,
+    imageUrls: mediaUrls,
     params,
     providerId,
   });
@@ -1081,7 +1107,7 @@ export async function runStoryLlmEngineNode(
     providerId,
     params,
     userText,
-    imageUrls,
+    imageUrls: mediaUrls,
   };
 
   if (args.executeAsync) {
@@ -1149,6 +1175,11 @@ export async function runVideoEngineNode(
   const isKieTopazUpscale = modelKey === "topaz/video-upscale";
   const isVideoOnlyV2v =
     isTopazDirectV2v || isKieTopazUpscale || modelKey === "wan/2-6-video-to-video";
+  const dockInputMode = String(data.dockInputMode ?? "").trim();
+  const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
+  const isKlingT2v =
+    modelKey === "kling-3.0/video" && dockInputMode === "t2v";
+  const isTextToVideoOnly = isDashscopeT2v || isKlingT2v;
   const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)
         ? (params.reference_video_urls as unknown[])
@@ -1163,7 +1194,12 @@ export async function runVideoEngineNode(
     throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
   }
 
-  if (!isVideoOnlyV2v && !mainFrameImageUrl && portraitAssetRefs.length === 0) {
+  if (
+    !isVideoOnlyV2v &&
+    !isTextToVideoOnly &&
+    !mainFrameImageUrl &&
+    portraitAssetRefs.length === 0
+  ) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "video-engine 需要分镜图作为主图",
@@ -1253,7 +1289,8 @@ export async function runVideoEngineNode(
     if (
       !isVolcengineStoryVideoModelKey(effectiveModelKey) &&
       !isMotionControl &&
-      !isVideoOnlyV2v
+      !isVideoOnlyV2v &&
+      !isDashscopeT2v
     ) {
       throw new CanvasProjectError(
         "INVALID_INPUT",
@@ -1320,9 +1357,9 @@ export async function runVideoEngineNode(
 
   let model: string;
   let input: Record<string, unknown>;
-  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" = isVolcengineVideo
-    ? "VOLCENGINE"
-    : "KIE";
+  let dashscopeVideoBody: Record<string, unknown> | undefined;
+  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" | "DASHSCOPE" =
+    isVolcengineVideo ? "VOLCENGINE" : "KIE";
 
   if (isTopazDirectV2v) {
     model = effectiveModelKey;
@@ -1389,6 +1426,31 @@ export async function runVideoEngineNode(
     });
     model = built.model;
     input = built.body as Record<string, unknown>;
+  } else if (isDashscopeT2v) {
+    try {
+      const aspectRatio = String(
+        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      );
+      const resolution = String(
+        params.resolution ?? data.resolution ?? "720p",
+      );
+      const durationSec = Number(params.duration ?? data.durationSec ?? 5);
+      dashscopeVideoBody = buildDashscopeSbv1T2vVideoBody({
+        prompt: expandedPrompt,
+        aspectRatio,
+        resolution,
+        durationSec,
+        promptExtend: params.prompt_extend !== false,
+      });
+      model = effectiveModelKey;
+      input = dashscopeVideoBody;
+      videoProviderKind = "DASHSCOPE";
+    } catch (e) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
   } else if (isMotionControl) {
     try {
       const built = buildKieToolVideoCreateArgs({
@@ -1473,7 +1535,9 @@ export async function runVideoEngineNode(
           ? { volcengineModel: model, volcengineBody: input }
           : videoProviderKind === "TOPAZ"
             ? { topazModel: model, topazInput: input }
-            : { kieModel: model, kieInput: input }),
+            : videoProviderKind === "DASHSCOPE"
+              ? { dashscopeModel: model, dashscopeVideoBody: dashscopeVideoBody ?? input }
+              : { kieModel: model, kieInput: input }),
         ...(data.sbv1Billing && typeof data.sbv1Billing === "object"
           ? { sbv1Billing: data.sbv1Billing }
           : {}),
@@ -1506,10 +1570,14 @@ export async function runVideoEngineNode(
     mainFrameImageUrl,
     referenceImageUrls,
     syncGatewaySubmit: true,
-    providerKind: isVolcengineVideo ? ("VOLCENGINE" as const) : ("KIE" as const),
-    ...(isVolcengineVideo
+    providerKind: videoProviderKind,
+    ...(videoProviderKind === "VOLCENGINE"
       ? { volcengineModel: model, volcengineBody: input }
-      : { kieModel: model, kieInput: input }),
+      : videoProviderKind === "TOPAZ"
+        ? { topazModel: model, topazInput: input }
+        : videoProviderKind === "DASHSCOPE"
+          ? { dashscopeModel: model, dashscopeVideoBody: dashscopeVideoBody ?? input }
+          : { kieModel: model, kieInput: input }),
     ...(data.sbv1Billing && typeof data.sbv1Billing === "object"
       ? { sbv1Billing: data.sbv1Billing }
       : {}),
@@ -1569,6 +1637,14 @@ export async function runVideoEngineNode(
               ? (data.sbv1Billing as Record<string, unknown>)
               : undefined,
         })
+      : videoProviderKind === "DASHSCOPE"
+        ? await canvasGwCreateDashscopeVideoJob(userId, {
+            model,
+            videoBody: (dashscopeVideoBody ?? input) as Record<string, unknown>,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: claimedTask.id,
+          })
       : await canvasGwCreateKieJob(userId, {
           model,
           input: input as Record<string, unknown>,

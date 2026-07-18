@@ -89,6 +89,8 @@
     "qr:sync-minimax-voices:dry-run": "tsx scripts/sync-minimax-voice-catalog.ts --dry-run",
     "qr:bind-minimax-gateway": "dotenv -e .env.local -- tsx scripts/bind-minimax-gateway-credential.ts",
     "gateway:bind-moonshot": "dotenv -e .env.local -- tsx scripts/bind-moonshot-gateway-credential.ts",
+    "gateway:bind-bailian": "dotenv -e .env.local -- tsx scripts/bind-bailian-gateway-credential.ts",
+    "gateway:test-bailian-qwen": "dotenv -e .env.local -- tsx scripts/test-bailian-qwen-models.ts",
     "qr:bind-worldlabs-gateway": "dotenv -e .env.local -- tsx scripts/bind-worldlabs-gateway-credential.ts",
     "qr:bind-topaz-gateway": "dotenv -e .env.local -- tsx scripts/bind-topaz-gateway-credential.ts",
     "gateway:apply-topaz-enum": "dotenv -e .env.local -- tsx scripts/apply-topaz-enum.ts",

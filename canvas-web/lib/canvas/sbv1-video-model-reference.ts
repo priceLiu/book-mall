@@ -37,6 +37,12 @@ const SINGLE_I2V_KEYS = new Set([
 
 const KIE_MULTI_REF_KEYS = new Set(["bytedance/seedance-2"]);
 
+const DASHSCOPE_T2V_KEYS = new Set([
+  "wan2.6-t2v",
+  "wan2.7-t2v",
+  "wan2.7-t2v-2026-04-25",
+]);
+
 function isVolcengineSbv1Model(modelKey: string, providerId?: string): boolean {
   if (providerId === GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID) return true;
   return (SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS as readonly string[]).includes(
@@ -105,6 +111,14 @@ export function getSbv1VideoModelRefCaps(
       supportedModes: ["omni", "first_last"],
       refApi: "wan_first_last_url",
       maxRefsOmni: 1,
+    };
+  }
+
+  if (DASHSCOPE_T2V_KEYS.has(k)) {
+    return {
+      supportedModes: ["omni"],
+      refApi: "single_i2v",
+      maxRefsOmni: 0,
     };
   }
 
@@ -206,6 +220,10 @@ export function getSbv1VideoDockModeChips(
     ];
   }
 
+  if (DASHSCOPE_T2V_KEYS.has(k)) {
+    return [chip("t2v")];
+  }
+
   if (k === "kling-3.0/video") {
     const multi = opts?.multiShots === true;
     const out: Sbv1DockModeChip[] = [chip("t2v"), chip("i2v")];
@@ -249,9 +267,20 @@ export function resolveSbv1DockInputMode(
     const multi = chips.find((c) => c.id === "multi_ref");
     return multi?.id ?? "omni";
   }
-  const i2v = chips.find((c) => c.id === "i2v");
-  if (i2v) return "i2v";
   return chips[0]?.id ?? "omni";
+}
+
+/** 切换模型时的默认 Dock 输入模式（与 chip 列表顺序一致） */
+export function defaultSbv1DockInputModeForModel(
+  modelKey: string,
+  opts?: { multiShots?: boolean; providerId?: string },
+): Sbv1DockInputMode {
+  const chips = getSbv1VideoDockModeChips(modelKey, opts);
+  return chips[0]?.id ?? "omni";
+}
+
+export function isDashscopeSbv1TextToVideoModel(modelKey: string): boolean {
+  return DASHSCOPE_T2V_KEYS.has(modelKey.trim());
 }
 
 export function dockInputModeToPatch(mode: Sbv1DockInputMode): {

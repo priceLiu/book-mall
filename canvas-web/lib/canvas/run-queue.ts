@@ -107,7 +107,9 @@ import {
   storyLlmNodeNeedsRun,
 } from "./story-llm-runtime";
 import {
+  isLikelyVideoUrl,
   pickRuntimeImagePreviewUrl,
+  pickRuntimeVideoUrl,
   pickTaskImagePreviewUrl,
   pickTaskModelDownloadUrl,
   pickTaskResultMediaUrl,
@@ -280,6 +282,26 @@ function resolveImageInputsRaw(
     } else if (p.type === "tts-engine") {
       const d = p.data as unknown as { runtime?: { ossUrl?: string } };
       if (d.runtime?.ossUrl) out.push(d.runtime.ossUrl);
+    } else if (p.type === "sbv1-video-engine" || p.type === "video-engine") {
+      const d = p.data as {
+        runtime?: { ossUrl?: string; ephemeralUrl?: string };
+        ossUrl?: string;
+        blobUrl?: string;
+        videoUrl?: string;
+        modelKey?: string;
+      };
+      const videoUrl =
+        pickRuntimeVideoUrl(d.runtime) ??
+        [d.runtime?.ossUrl, d.ossUrl, d.blobUrl, d.videoUrl]
+          .map((u) => String(u ?? "").trim())
+          .find((u) => u && isLikelyVideoUrl(u));
+      if (videoUrl) {
+        out.push(videoUrl);
+      } else {
+        const preview =
+          pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ?? d.runtime?.ossUrl;
+        if (preview) out.push(preview);
+      }
     }
   }
   return Array.from(new Set(out));

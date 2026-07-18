@@ -10,6 +10,7 @@ import {
   Music,
   PenLine,
   Play,
+  Video,
 } from "lucide-react";
 import { Handle, Position, useNodes } from "@xyflow/react";
 
@@ -87,7 +88,7 @@ type StarterTryAction =
   | {
       id: Pro2ShortcutPresetId;
       label: string;
-      icon: typeof Play | typeof Music;
+      icon: typeof Play | typeof Music | typeof Video;
       kind: "preset";
     };
 
@@ -98,6 +99,12 @@ const STARTER_TRY_ACTIONS: StarterTryAction[] = [
     id: "image-to-prompt",
     label: "图片反推提示词",
     icon: ImageIcon,
+    kind: "preset",
+  },
+  {
+    id: "video-to-prompt",
+    label: "视频反推",
+    icon: Video,
     kind: "preset",
   },
   { id: "text-to-music", label: "文字生音乐", icon: Music, kind: "preset" },
@@ -374,6 +381,12 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               setNodes,
               setEdges,
             });
+            if (spawnType === "sbv1-video-engine" && side === "left") {
+              updateNodeData(id, {
+                pro2TextPurpose: "general",
+                pro2PresetKind: "video-to-prompt",
+              });
+            }
             return;
           }
           if (itemId === "script" || nodeType === "story-pro2-script-hub") {
@@ -390,7 +403,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         },
       );
     },
-    [spawnNeighbor, alert],
+    [spawnNeighbor, alert, id, nodes, edges, addNode, addNodeInGroup, setNodes, setEdges, updateNodeData],
   );
 
   return (
