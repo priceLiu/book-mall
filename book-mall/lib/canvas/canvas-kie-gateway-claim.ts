@@ -8,6 +8,8 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
 import { CanvasProjectError } from "./canvas-project-service";
+import { findPromotableCanvasGatewayLog } from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
+import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 
 function taskInputPayload(
   task: Pick<CanvasGenerationTask, "inputPayload">,
@@ -50,6 +52,75 @@ export async function assertNoProjectInflightByInputHash(
       409,
     );
   }
+}
+
+/** 同节点同 inputHash 的兄弟任务是否已有厂商在跑（防 supersede 后重复 createTask）。 */
+export async function findSiblingActiveVendorJob(args: {
+  projectId: string;
+  nodeId: string;
+  inputHash: string;
+  excludeTaskId: string;
+}): Promise<{
+  canvasTaskId: string;
+  gatewayLogId: string;
+  externalTaskId: string;
+} | null> {
+  const sibling = await prisma.canvasGenerationTask.findFirst({
+    where: {
+      projectId: args.projectId,
+      nodeId: args.nodeId,
+      inputHash: args.inputHash,
+      id: { not: args.excludeTaskId },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES, "SUBMITTED"] },
+      deletedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, kieTaskId: true, inputPayload: true },
+  });
+  if (!sibling) return null;
+
+  const payload = taskInputPayload(sibling);
+  let gatewayLogId =
+    typeof payload.gatewayLogId === "string" ? payload.gatewayLogId.trim() : "";
+  let externalTaskId = sibling.kieTaskId?.trim() ?? "";
+
+  if (!gatewayLogId || !externalTaskId) {
+    const orphan = await findPromotableCanvasGatewayLog(sibling.id);
+    if (orphan) {
+      gatewayLogId = orphan.logId;
+      externalTaskId = orphan.externalTaskId;
+    }
+  }
+
+  if (!gatewayLogId) {
+    const log = await prisma.gatewayRequestLog.findFirst({
+      where: {
+        storyTaskId: sibling.id,
+        status: { in: ["RUNNING", "PENDING", "SUCCEEDED"] },
+        externalTaskId: { not: null },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, externalTaskId: true },
+    });
+    if (log?.id && log.externalTaskId?.trim()) {
+      gatewayLogId = log.id;
+      externalTaskId = log.externalTaskId.trim();
+    }
+  }
+
+  if (!gatewayLogId || !externalTaskId) return null;
+
+  const gw = await prisma.gatewayRequestLog.findUnique({
+    where: { id: gatewayLogId },
+    select: { status: true },
+  });
+  if (!gw || gw.status === "FAILED") return null;
+
+  return {
+    canvasTaskId: sibling.id,
+    gatewayLogId,
+    externalTaskId,
+  };
 }
 
 /**

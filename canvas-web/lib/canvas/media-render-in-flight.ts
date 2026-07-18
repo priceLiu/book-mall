@@ -30,6 +30,9 @@ export function isMediaRenderJobPolling(
 }
 
 export function friendlyMediaRenderError(message: string): string {
+  if (/poll failed HTTP 5/i.test(message)) {
+    return "进度查询暂时失败，成片若已生成可直接下载；稍后会自动重试同步。";
+  }
   if (/Response timeout for 60000ms/i.test(message)) {
     return "成片上传云端超时，请稍后重试或降低输出画质；若多次失败请联系客服。";
   }

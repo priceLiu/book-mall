@@ -224,13 +224,20 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   }, [upstreamTextLinks, extraDockUpstreamLinks]);
 
   useEffect(() => {
+    if (isHdVideo || !dockChips.length) return;
     if (
-      data.dockInputMode &&
+      !data.dockInputMode ||
       !dockChips.some((c) => c.id === data.dockInputMode)
     ) {
       onPatch(dockInputModeToPatch(activeDockMode));
     }
-  }, [data.dockInputMode, dockChips, activeDockMode, onPatch]);
+  }, [
+    isHdVideo,
+    data.dockInputMode,
+    dockChips,
+    activeDockMode,
+    onPatch,
+  ]);
   const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
 
   const hasRefs = upstreamLinks.some((l) => l.previewUrl);

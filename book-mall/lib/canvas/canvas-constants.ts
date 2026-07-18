@@ -32,6 +32,16 @@ export function isCanvasBailianR2vVideoTaskPayload(
   return kind === "video-engine" || kind === "ai-video-engine";
 }
 
+/** KIE 异步视频（kling / veo / seedance 等 · sbv1 / Pro2 video-engine） */
+export function isCanvasKieVideoTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  if (payload.providerKind !== "KIE") return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  return kind === "video-engine" || kind === "ai-video-engine";
+}
+
 /** SUBMITTED 百炼 R2V 轮询间隔（DashScope 建议约 15s，避免 3s 频繁 recordInfo）。 */
 export const CANVAS_BAILIAN_R2V_POLL_INTERVAL_MS = 15_000;
 

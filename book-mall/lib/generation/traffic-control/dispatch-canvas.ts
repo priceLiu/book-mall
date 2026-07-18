@@ -4,7 +4,7 @@ import {
   buildCanvasAiKieCallbackUrl,
 } from "@/lib/canvas/canvas-constants";
 import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
-import { claimCanvasTaskKieSubmit } from "@/lib/canvas/canvas-kie-gateway-claim";
+import { claimCanvasTaskKieSubmit, findSiblingActiveVendorJob } from "@/lib/canvas/canvas-kie-gateway-claim";
 import {
   canvasGwCreateBailianR2vJob,
   canvasGwCreateKieJob,
@@ -301,6 +301,28 @@ async function dispatchOneCanvasQueuedTask(
       });
       if (promoted) return "dispatched";
       await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
+
+    const siblingVendor = await findSiblingActiveVendorJob({
+      projectId: task.projectId,
+      nodeId: task.nodeId,
+      inputHash: task.inputHash,
+      excludeTaskId: task.id,
+    });
+    if (siblingVendor) {
+      console.warn(
+        "[canvas-dispatch] skip duplicate vendor submit for same node+inputHash",
+        task.id.slice(0, 12),
+        siblingVendor.canvasTaskId.slice(0, 12),
+      );
+      await releaseTrafficSlot(scope.scopeKey);
+      await revertStuckDispatchingTask(
+        task.id,
+        scope.scopeKey,
+        taskInputPayload(claimedTask ?? task),
+        new Date(Date.now() + 30_000),
+      );
       return "skipped";
     }
 

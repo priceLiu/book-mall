@@ -77,11 +77,16 @@ export function pickActiveServerInflightTask(
     }
   }
 
-  return nodeTasks.find(
+  const inflight = nodeTasks.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
       !isStaleServerInflightTask(t, nodeTasks),
   );
+  if (!inflight.length) return undefined;
+  return [...inflight].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0];
 }
 
 export function canvasTaskInflightLabel(status: string): string | null {

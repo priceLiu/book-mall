@@ -23,6 +23,11 @@ import {
   type MediaTimelineV1,
   type RenderProfile,
 } from "@/lib/media/timeline-types";
+import {
+  enqueueMediaRenderJobUpload,
+  retryMediaRenderJobUpload,
+} from "@/lib/media/media-render-upload";
+import { hasMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
 
 export type CreateMediaRenderJobInput = {
   userId: string;
@@ -31,39 +36,6 @@ export type CreateMediaRenderJobInput = {
   timeline: MediaTimelineV1;
   profile?: RenderProfile;
 };
-
-async function onMediaRenderJobSucceeded(job: {
-  userId: string;
-  sourceApp: MediaRenderSourceApp;
-  sourceRef: unknown;
-  id: string;
-  resultOssUrl: string | null;
-  expiresAt: Date;
-}): Promise<void> {
-  if (job.sourceApp !== MediaRenderSourceApp.ecom || !job.resultOssUrl) return;
-  const ref = job.sourceRef as { projectId?: string } | null;
-  const projectId = ref?.projectId?.trim();
-  if (!projectId) return;
-
-  const { persistStoryboardDeliverableSnapshot } = await import(
-    "@/lib/ecom/ecom-storyboard-snapshot"
-  );
-  const { prisma: db } = await import("@/lib/prisma");
-
-  await db.ecomStoryboardProject.update({
-    where: { id: projectId },
-    data: { status: "done" },
-  });
-
-  await persistStoryboardDeliverableSnapshot({
-    userId: job.userId,
-    projectId,
-    videoUrl: job.resultOssUrl,
-    videoMode: "merged_panels",
-    renderJobId: job.id,
-    renderExpiresAt: job.expiresAt.toISOString(),
-  });
-}
 
 export async function countActiveRenderJobs(userId: string): Promise<number> {
   return prisma.mediaRenderJob.count({
@@ -146,7 +118,7 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
           .update({
             where: { id: jobId },
             data: {
-              progress: Math.min(99, pct),
+              progress: Math.min(89, pct),
               progressLabel: label,
             },
           })
@@ -154,19 +126,23 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
       },
     });
 
-    const updated = await prisma.mediaRenderJob.update({
+    await prisma.mediaRenderJob.update({
       where: { id: jobId },
       data: {
-        status: MediaRenderJobStatus.SUCCEEDED,
-        progress: 100,
-        progressLabel: "剪辑完成",
-        resultOssUrl: result.ossUrl,
-        resultPosterOssUrl: result.posterUrl ?? null,
+        status: MediaRenderJobStatus.RUNNING,
+        progress: 90,
+        progressLabel: "剪辑完成，可下载",
         bytesOut: result.bytesOut,
-        completedAt: new Date(),
+        errorMessage: null,
       },
     });
-    await onMediaRenderJobSucceeded(updated).catch(() => undefined);
+
+    enqueueMediaRenderJobUpload({
+      jobId: job.id,
+      userId: job.userId,
+      localPath: result.localPath,
+      bytesOut: result.bytesOut,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "剪辑失败";
     await prisma.mediaRenderJob.update({
@@ -212,6 +188,9 @@ export type MediaRenderJobDto = {
   progress: number;
   progressLabel: string | null;
   downloadUrl: string | null;
+  /** 本地剪辑已完成、OSS 未就绪时的同源下载路径（相对 book-mall API） */
+  localDownloadPath: string | null;
+  uploadFailed: boolean;
   posterUrl: string | null;
   expiresAt: string;
   storageTier: MediaRenderStorageTier;
@@ -248,6 +227,16 @@ export async function getMediaRenderJobForUser(
     job.status === MediaRenderJobStatus.SUCCEEDED && job.resultOssUrl
       ? job.resultOssUrl
       : null;
+  const localReady =
+    !downloadUrl && (await hasMediaRenderLocalOutput(job.id));
+  const localDownloadPath = localReady
+    ? `/api/canvas/media/render/${job.id}/download`
+    : null;
+  const uploadFailed = Boolean(
+    localReady &&
+      job.status === MediaRenderJobStatus.RUNNING &&
+      job.progressLabel?.includes("上传失败"),
+  );
   const posterUrl =
     job.status === MediaRenderJobStatus.SUCCEEDED && job.resultPosterOssUrl
       ? job.resultPosterOssUrl
@@ -261,6 +250,8 @@ export async function getMediaRenderJobForUser(
     progress: job.progress,
     progressLabel: job.progressLabel,
     downloadUrl,
+    localDownloadPath,
+    uploadFailed,
     posterUrl,
     expiresAt: job.expiresAt.toISOString(),
     storageTier: job.storageTier,
@@ -388,3 +379,5 @@ export async function pinMediaRenderJob(args: {
   if (!dto) throw new Error("剪辑任务不存在");
   return dto;
 }
+
+export { retryMediaRenderJobUpload };

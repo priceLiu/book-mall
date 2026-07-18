@@ -6,6 +6,11 @@ import type { Prisma, CanvasGenerationTask } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
 import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
+import {
+  cleanupSupersededCanvasTaskSideEffects,
+  supersedeCanvasInflightTasksInTx,
+  type SupersededCanvasTaskSnapshot,
+} from "@/lib/canvas/canvas-supersede-inflight";
 import { CanvasProjectError } from "./canvas-project-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
@@ -145,7 +150,8 @@ export async function createStoryScopedCanvasTask(
   // 同 (project,node,scope) 由 pg_advisory_xact_lock 串行化，已足够互斥去重，
   // 无需 Serializable（其谓词锁在并发下徒增 P2034 写冲突 → "数据库繁忙，任务未提交"）。
   // 改默认隔离级 + 瞬时错误重试（连接池耗尽 / 写冲突），消除「点几次才成功」。
-  return runTxWithRetry(
+  let supersededTasks: SupersededCanvasTaskSnapshot[] = [];
+  const created = await runTxWithRetry(
     () =>
       prisma.$transaction(async (tx) => {
       const [k1, k2] = storyScopeAdvisoryLockKeys(
@@ -155,7 +161,13 @@ export async function createStoryScopedCanvasTask(
       );
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
 
-      if (!args.skipInflightScopeConflict) {
+      if (args.skipInflightScopeConflict) {
+        supersededTasks = await supersedeCanvasInflightTasksInTx(tx, {
+          projectId: args.projectId,
+          nodeId: args.nodeId,
+          storyScope: args.storyScope,
+        });
+      } else {
         await findInflightScopeConflict(
           tx,
           args.projectId,
@@ -210,4 +222,8 @@ export async function createStoryScopedCanvasTask(
       }, CANVAS_DB_TX_OPTIONS),
     { label: "createStoryScopedCanvasTask", maxRetries: 5 },
   );
+  if (supersededTasks.length) {
+    await cleanupSupersededCanvasTaskSideEffects(supersededTasks);
+  }
+  return created;
 }

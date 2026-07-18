@@ -11,6 +11,10 @@ import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-link
 import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
+import {
+  getSbv1VideoDockModeChips,
+  resolveSbv1DockInputMode,
+} from "@/lib/canvas/sbv1-video-model-reference";
 import { isSbv1HdVideoNode } from "@/lib/canvas/sbv1-hd-video-params";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import {
@@ -186,10 +190,22 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       latestNodes,
       latestEdges,
     );
+    const modelKey = latestData.engine?.modelKey?.trim() ?? "";
+    const dockChips = modelKey
+      ? getSbv1VideoDockModeChips(modelKey, {
+          providerId: latestData.engine?.providerId,
+          multiShots: latestData.engine?.params?.multi_shots === true,
+        })
+      : [];
+    const effectiveDockMode = resolveSbv1DockInputMode(
+      latestData.referenceMode ?? "omni",
+      latestData.dockInputMode,
+      dockChips,
+    );
     const resolved = resolveSbv1VideoEngineInputs(latestNodes, latestEdges, nodeId, {
       prompt,
       referenceMode: latestData.referenceMode ?? "omni",
-      dockInputMode: latestData.dockInputMode,
+      dockInputMode: effectiveDockMode,
       modelKey: latestData.engine?.modelKey,
       providerId: latestData.engine?.providerId,
     });
@@ -236,7 +252,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
-    const queued = busEnqueueStoryRun({ nodeId, forceFresh: true });
+    const queued = busEnqueueStoryRun({ nodeId, forceFresh: hasVideo });
     if (!queued) {
       revertPending();
       await alert({

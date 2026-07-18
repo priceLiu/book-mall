@@ -10,6 +10,8 @@ import {
   type JianyingExportFrame,
   type MediaRenderJob,
   type MediaRenderScaleMode,
+  resolveMediaRenderDownloadUrl,
+  retryMediaRenderUpload,
   submitMediaRender,
 } from "@/lib/canvas-api";
 import {
@@ -112,6 +114,7 @@ export function JianyingMediaRenderActions({
       ? inFlight?.progressLabel?.trim() || "处理中…"
       : null,
   );
+  const [uploadFailed, setUploadFailed] = useState(false);
   const [busy, setBusy] = useState(() => isMediaRenderJobInflight(inFlight));
 
   const settingsRef = useRef({
@@ -120,6 +123,7 @@ export function JianyingMediaRenderActions({
     scaleMode,
     burnIn,
   });
+  const downloadableRef = useRef<string | null>(doneUrl);
   settingsRef.current = { transitionKind, transitionSec, scaleMode, burnIn };
 
   const videoFrames = frames.filter((f) => f.videoUrl);
@@ -202,6 +206,21 @@ export function JianyingMediaRenderActions({
     (job: MediaRenderJob) => {
       setProgress(job.progress);
       setStepLabel(renderStatusLabel(job));
+      const localUrl = base ? resolveMediaRenderDownloadUrl(base, job) : null;
+      if (localUrl) {
+        setDoneUrl(localUrl);
+        downloadableRef.current = localUrl;
+        if (job.uploadFailed) {
+          setUploadFailed(true);
+          setErr(
+            friendlyMediaRenderError(job.errorMessage ?? "云端上传失败，可重试"),
+          );
+        } else if (job.status === "RUNNING" && job.localDownloadPath) {
+          setUploadFailed(false);
+          setErr(null);
+          setStepLabel("剪辑完成，云端同步中…");
+        }
+      }
       if (job.status === "PENDING" || job.status === "RUNNING") {
         const settings = settingsRef.current;
         patchInFlight({
@@ -209,7 +228,9 @@ export function JianyingMediaRenderActions({
           status: inflightStatus(job),
           progress: job.progress,
           progressLabel: job.progressLabel ?? null,
-          errorMessage: null,
+          errorMessage: job.uploadFailed
+            ? job.errorMessage ?? "云端上传失败，可重试"
+            : null,
           transitionKind: settings.transitionKind,
           transitionSec: settings.transitionSec,
           scaleMode: settings.scaleMode,
@@ -217,12 +238,33 @@ export function JianyingMediaRenderActions({
         });
       }
     },
-    [patchInFlight],
+    [base, patchInFlight],
   );
 
   const finishJob = useCallback(
     async (finalJob: MediaRenderJob) => {
-      if (finalJob.status !== "SUCCEEDED" || !finalJob.downloadUrl) {
+      const downloadUrl = base
+        ? resolveMediaRenderDownloadUrl(base, finalJob)
+        : finalJob.downloadUrl;
+      if (finalJob.uploadFailed && downloadUrl) {
+        setDoneUrl(downloadUrl);
+        setUploadFailed(true);
+        setErr(
+          friendlyMediaRenderError(finalJob.errorMessage ?? "云端上传失败，可重试"),
+        );
+        setProgress(finalJob.progress);
+        setStepLabel("剪辑完成，云端同步失败");
+        patchInFlight({
+          jobId: finalJob.id,
+          status: "RUNNING",
+          progress: finalJob.progress,
+          progressLabel: finalJob.progressLabel ?? null,
+          errorMessage: finalJob.errorMessage ?? "云端上传失败，可重试",
+          ...settingsRef.current,
+        });
+        return;
+      }
+      if (finalJob.status !== "SUCCEEDED" || !downloadUrl) {
         const message = friendlyMediaRenderError(
           finalJob.errorMessage ?? "云端剪辑失败",
         );
@@ -237,12 +279,18 @@ export function JianyingMediaRenderActions({
         setErr(message);
         return;
       }
-      persistResult(finalJob.downloadUrl, finalJob.expiresAt, finalJob.posterUrl);
+      persistResult(
+        downloadUrl,
+        finalJob.expiresAt,
+        finalJob.posterUrl,
+      );
+      downloadableRef.current = downloadUrl;
       setProgress(100);
       setStepLabel("剪辑完成");
+      setUploadFailed(false);
       setErr(null);
     },
-    [patchInFlight, persistResult],
+    [base, patchInFlight, persistResult],
   );
 
   const runTrackedJob = useCallback(
@@ -272,6 +320,10 @@ export function JianyingMediaRenderActions({
         const message = friendlyMediaRenderError(
           e instanceof Error ? e.message : String(e),
         );
+        if (downloadableRef.current || doneUrl) {
+          setErr(message);
+          return;
+        }
         patchInFlight({
           jobId,
           status: "FAILED",
@@ -368,6 +420,28 @@ export function JianyingMediaRenderActions({
     </p>
   );
 
+  const onRetryUpload = async () => {
+    const jobId = inFlight?.jobId?.trim();
+    if (!base || !jobId) return;
+    setBusy(true);
+    setUploadFailed(false);
+    setErr(null);
+    try {
+      const job = await retryMediaRenderUpload(base, jobId);
+      applyJobProgress(job);
+      await runTrackedJob(jobId);
+    } catch (e) {
+      setErr(
+        friendlyMediaRenderError(e instanceof Error ? e.message : String(e)),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const ffmpegBusy = busy && !doneUrl;
+  const syncBusy = busy && Boolean(doneUrl);
+
   const progressBlock = busy ? (
     <div
       className={cn(
@@ -396,7 +470,7 @@ export function JianyingMediaRenderActions({
   const renderBtn = (
     <button
       type="button"
-      disabled={busy || !canRender}
+      disabled={ffmpegBusy || !canRender}
       className={cn(
         "nodrag inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-600/20 px-5 py-2 text-[13px] font-medium text-emerald-100 transition hover:bg-emerald-600/30 disabled:opacity-50",
         isDock ? "h-9 shrink-0 whitespace-nowrap" : "w-full",
@@ -404,9 +478,24 @@ export function JianyingMediaRenderActions({
       onClick={() => void onRender()}
     >
       <Clapperboard className="size-4 shrink-0" />
-      {busy ? "剪辑中…" : "自动剪辑成片（MP4）"}
+      {ffmpegBusy ? "剪辑中…" : "自动剪辑成片（MP4）"}
     </button>
   );
+
+  const retryUploadBtn =
+    uploadFailed && inFlight?.jobId ? (
+      <button
+        type="button"
+        disabled={busy}
+        className={cn(
+          "nodrag inline-flex items-center justify-center gap-2 rounded-lg border border-amber-500/40 bg-amber-600/15 px-4 py-2 text-[13px] font-medium text-amber-100 transition hover:bg-amber-600/25 disabled:opacity-50",
+          isDock ? "h-9 shrink-0 whitespace-nowrap" : "w-full",
+        )}
+        onClick={() => void onRetryUpload()}
+      >
+        重试云端同步
+      </button>
+    ) : null;
 
   const downloadBtn = doneUrl ? (
     <a
@@ -420,7 +509,7 @@ export function JianyingMediaRenderActions({
       )}
     >
       <Download className="size-4 shrink-0" />
-      下载成片 MP4
+      {syncBusy ? "下载 / 打开成片" : "下载成片 MP4"}
     </a>
   ) : null;
 
@@ -506,8 +595,9 @@ export function JianyingMediaRenderActions({
           <div className="flex flex-wrap items-center justify-center gap-3">
             {renderBtn}
             {downloadBtn}
+            {retryUploadBtn}
           </div>
-          {!busy ? (
+          {!ffmpegBusy ? (
             <div className="w-full max-w-[640px] shrink-0 text-center">{expiryHint}</div>
           ) : null}
         </div>
@@ -581,6 +671,7 @@ export function JianyingMediaRenderActions({
       {progressBlock}
       {expiryHint}
       {downloadBtn}
+      {retryUploadBtn}
       {err ? <p className="text-[10px] text-red-300">{err}</p> : null}
     </div>
   );
