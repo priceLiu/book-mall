@@ -6,7 +6,7 @@ import { SiteHomeGatewayModelsSection } from "@/components/layout/site-home/site
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
 import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
-import { pickRandomStoryVideos } from "@/lib/story-theater-videos";
+import { pickRandomStoryVideoClips } from "@/lib/story-theater-videos";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export const metadata = {
 };
 
 export default function Home() {
-  const heroClips = pickRandomStoryVideos(3);
+  const heroClips = pickRandomStoryVideoClips(3);
 
   return (
     <>
