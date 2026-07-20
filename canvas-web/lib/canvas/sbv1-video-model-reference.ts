@@ -41,6 +41,8 @@ const DASHSCOPE_T2V_KEYS = new Set([
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
+  "happyhorse-1.0-t2v",
+  "happyhorse-1.1-t2v",
 ]);
 
 function isVolcengineSbv1Model(modelKey: string, providerId?: string): boolean {
@@ -130,7 +132,7 @@ export function getSbv1VideoModelRefCaps(
     };
   }
 
-  if (k === "happyhorse-1.0-r2v") {
+  if (k === "happyhorse-1.0-r2v" || k === "happyhorse-1.1-r2v") {
     return {
       supportedModes: ["omni", "first_last"],
       refApi: "bailian_r2v_media",
@@ -195,6 +197,7 @@ export function getSbv1VideoDockModeChips(
 
   const r2v =
     k === "happyhorse-1.0-r2v" ||
+    k === "happyhorse-1.1-r2v" ||
     k === "wan2.7-r2v" ||
     k === "wan2.6-r2v" ||
     k === "wan2.6-r2v-flash";
@@ -324,6 +327,7 @@ export function sbv1DockRefCornerLabelForModel(
 
   const r2v =
     k === "happyhorse-1.0-r2v" ||
+    k === "happyhorse-1.1-r2v" ||
     k === "wan2.7-r2v" ||
     k === "wan2.6-r2v" ||
     k === "wan2.6-r2v-flash";

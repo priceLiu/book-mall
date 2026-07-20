@@ -49,6 +49,7 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "wan/2-7-image-to-video": ["video_i2v"],
   "happyhorse/image-to-video": ["video_i2v"],
   "happyhorse-1.0-r2v": ["video_r2v", "video_multi_ref"],
+  "happyhorse-1.1-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v-flash": ["video_r2v", "video_multi_ref"],
   "wan2.7-r2v": ["video_r2v", "video_multi_ref"],

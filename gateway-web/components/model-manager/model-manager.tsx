@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CredentialEditModal } from "./credential-edit-modal";
 import { CredentialKeyReveal } from "./credential-key-reveal";
@@ -51,35 +51,65 @@ export function ModelManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const groups = useMemo(() => {
-    const base = tabGroups[tab] ?? [];
-    const volcFull = initialGroups.find((g) => g.providerKind === "VOLCENGINE");
-    const merged = !volcFull
-      ? base
-      : base.map((g) =>
-          g.providerKind === "VOLCENGINE" ? volcFull : g,
-        );
+  const filterGroups = useCallback(
+    (base: CatalogGroup[], q: string) => {
+      const volcFull = initialGroups.find((g) => g.providerKind === "VOLCENGINE");
+      const merged = !volcFull
+        ? base
+        : base.map((g) =>
+            g.providerKind === "VOLCENGINE" ? volcFull : g,
+          );
+      if (!q) return merged;
+      return merged
+        .map((g) => ({
+          ...g,
+          models: g.models.filter((m) => {
+            const hay = [
+              m.modelKey,
+              m.displayName,
+              m.canonicalModelKey ?? "",
+              ...(m.capabilities ?? []),
+              g.label,
+              g.providerKind,
+            ]
+              .join(" ")
+              .toLowerCase();
+            return hay.includes(q);
+          }),
+        }))
+        .filter((g) => g.models.length > 0);
+    },
+    [initialGroups],
+  );
+
+  const tabStats = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return merged;
-    return merged
-      .map((g) => ({
-        ...g,
-        models: g.models.filter((m) => {
-          const hay = [
-            m.modelKey,
-            m.displayName,
-            m.canonicalModelKey ?? "",
-            ...(m.capabilities ?? []),
-            g.label,
-            g.providerKind,
-          ]
-            .join(" ")
-            .toLowerCase();
-          return hay.includes(q);
-        }),
-      }))
-      .filter((g) => g.models.length > 0);
-  }, [tab, tabGroups, initialGroups, query]);
+    const stats = {} as Record<ModelTab, { total: number; matched: number }>;
+    for (const key of Object.keys(TAB_LABELS) as ModelTab[]) {
+      const base = tabGroups[key] ?? [];
+      const total = base.reduce((n, g) => n + g.models.length, 0);
+      const matched = q
+        ? filterGroups(base, q).reduce((n, g) => n + g.models.length, 0)
+        : total;
+      stats[key] = { total, matched };
+    }
+    return stats;
+  }, [tabGroups, query, filterGroups]);
+
+  const groups = useMemo(
+    () => filterGroups(tabGroups[tab] ?? [], query.trim().toLowerCase()),
+    [tab, tabGroups, query, filterGroups],
+  );
+
+  useEffect(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+    if ((tabStats[tab]?.matched ?? 0) > 0) return;
+    const next = (Object.keys(TAB_LABELS) as ModelTab[]).find(
+      (key) => (tabStats[key]?.matched ?? 0) > 0,
+    );
+    if (next && next !== tab) setTab(next);
+  }, [query, tab, tabStats]);
 
   const credsByKind = useMemo(() => {
     const map = new Map<string, CredentialRow[]>();
@@ -232,7 +262,11 @@ export function ModelManager({
       </div>
 
       <div className="flex gap-1 rounded-lg border border-[var(--gw-border)] bg-black/20 p-1">
-        {(Object.keys(TAB_LABELS) as ModelTab[]).map((key) => (
+        {(Object.keys(TAB_LABELS) as ModelTab[]).map((key) => {
+          const { total, matched } = tabStats[key] ?? { total: 0, matched: 0 };
+          const q = query.trim();
+          const countLabel = q ? matched : total;
+          return (
           <button
             key={key}
             type="button"
@@ -244,8 +278,13 @@ export function ModelManager({
             }`}
           >
             {TAB_LABELS[key]}
+            <span className="ml-1.5 tabular-nums text-xs opacity-80">
+              ({countLabel}
+              {q && matched !== total ? ` / ${total}` : ""})
+            </span>
           </button>
-        ))}
+          );
+        })}
       </div>
       <p className="text-xs text-[var(--gw-muted)]">
         当前 Tab 按模型类型筛选。Seedance、Veo、海螺、可灵等视频模型在{" "}

@@ -74,6 +74,7 @@ const KIE_JOB_PREFIXES = [
 
 const BAILIAN_R2V = new Set([
   "happyhorse-1.0-r2v",
+  "happyhorse-1.1-r2v",
   "wan2.6-r2v",
   "wan2.6-r2v-flash",
   "wan2.7-r2v",
@@ -87,6 +88,7 @@ const HUNYUAN_MODELS = new Set(["hunyuan-3d-pro", "hunyuan-3d-express"]);
 
 const DASHSCOPE_VIDEO_PREFIXES = [
   "happyhorse-1.0-",
+  "happyhorse-1.1-",
   "happyhorse-1-0-",
   "wan2.",
   "pixverse-",

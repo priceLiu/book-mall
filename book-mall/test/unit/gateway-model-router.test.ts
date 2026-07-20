@@ -23,4 +23,18 @@ describe("routeGatewayModel · 百炼 R2V", () => {
       requestKind: "VIDEO",
     });
   });
+
+  it("happyhorse-1.1-t2v 走 DASHSCOPE 文生视频", () => {
+    expect(routeGatewayModel("happyhorse-1.1-t2v")).toEqual({
+      providerKind: "DASHSCOPE",
+      requestKind: "VIDEO",
+    });
+  });
+
+  it("happyhorse-1.1-r2v 走 BAILIAN", () => {
+    expect(routeGatewayModel("happyhorse-1.1-r2v")).toEqual({
+      providerKind: "BAILIAN",
+      requestKind: "VIDEO",
+    });
+  });
 });

@@ -3,7 +3,8 @@ export function isWan27BailianR2vModel(model: string): boolean {
 }
 
 export function isHappyhorseBailianR2vModel(model: string): boolean {
-  return model.trim() === "happyhorse-1.0-r2v";
+  const m = model.trim();
+  return m === "happyhorse-1.0-r2v" || m === "happyhorse-1.1-r2v";
 }
 
 export function isWan26BailianR2vModel(model: string): boolean {
