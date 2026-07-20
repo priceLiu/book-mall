@@ -6,7 +6,7 @@ import { SiteHomeGatewayModelsSection } from "@/components/layout/site-home/site
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
 import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
-import { pickRandomStoryVideoClips } from "@/lib/story-theater-videos";
+import { pickRandomStoryHeroBackground, pickRandomStoryVideoClips } from "@/lib/story-theater-videos";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
 export const dynamic = "force-dynamic";
@@ -45,10 +45,11 @@ export const metadata = {
 
 export default function Home() {
   const heroClips = pickRandomStoryVideoClips(3);
+  const heroBackground = pickRandomStoryHeroBackground();
 
   return (
     <>
-      <SiteHomeHeroSection clips={heroClips} />
+      <SiteHomeHeroSection clips={heroClips} background={heroBackground} />
       <SiteHomeLogoMarquee />
       <div className="site-home-below-hero">
         <FeaturedProductsSection />

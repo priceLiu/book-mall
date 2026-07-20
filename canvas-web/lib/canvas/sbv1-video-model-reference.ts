@@ -45,6 +45,11 @@ const DASHSCOPE_T2V_KEYS = new Set([
   "happyhorse-1.1-t2v",
 ]);
 
+const DASHSCOPE_I2V_KEYS = new Set([
+  "happyhorse-1.0-i2v",
+  "happyhorse-1.1-i2v",
+]);
+
 function isVolcengineSbv1Model(modelKey: string, providerId?: string): boolean {
   if (providerId === GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID) return true;
   return (SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS as readonly string[]).includes(
@@ -121,6 +126,14 @@ export function getSbv1VideoModelRefCaps(
       supportedModes: ["omni"],
       refApi: "single_i2v",
       maxRefsOmni: 0,
+    };
+  }
+
+  if (DASHSCOPE_I2V_KEYS.has(k)) {
+    return {
+      supportedModes: ["omni"],
+      refApi: "single_i2v",
+      maxRefsOmni: 1,
     };
   }
 
@@ -225,6 +238,10 @@ export function getSbv1VideoDockModeChips(
 
   if (DASHSCOPE_T2V_KEYS.has(k)) {
     return [chip("t2v")];
+  }
+
+  if (DASHSCOPE_I2V_KEYS.has(k)) {
+    return [chip("i2v")];
   }
 
   if (k === "kling-3.0/video") {
