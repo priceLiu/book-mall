@@ -80,6 +80,11 @@ const BAILIAN_R2V = new Set([
   "wan2.7-r2v",
 ]);
 
+/** createTask / 日志 Params · 百炼 R2V modelKey 白名单（与 routeGatewayModel 一致） */
+export function isBailianR2vGatewayModel(model: string): boolean {
+  return BAILIAN_R2V.has(model.trim().toLowerCase());
+}
+
 const TTS_MODELS = new Set(["tts-1", "tts-1-hd", "qwen3-tts"]);
 
 const TRYON_PREFIXES = ["aitryon"];

@@ -263,7 +263,14 @@ async function gatewayLogsFetchText(
 
 function SpinnerIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
@@ -315,7 +322,14 @@ function LogsListSkeletonRows({
 
 function RefreshIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
       <path
         d="M21 12a9 9 0 11-2.64-6.36"
         stroke="currentColor"
@@ -337,6 +351,8 @@ function ChevronIcon({ className, expanded }: { className?: string; expanded: bo
   return (
     <svg
       className={className}
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden

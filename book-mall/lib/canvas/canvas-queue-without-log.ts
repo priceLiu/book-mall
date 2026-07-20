@@ -6,10 +6,51 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readTrafficStartedAtIso } from "@/lib/generation/traffic-control/traffic-timing";
 
-export const CANVAS_QUEUE_WITHOUT_LOG_STATUSES = ["QUEUED", "DISPATCHING"] as const;
+/** 交通控流 · 尚未提交厂商（必无 Gateway log） */
+export const CANVAS_QUEUE_WITHOUT_LOG_STATUSES = [
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
+] as const;
 
 export type CanvasQueueWithoutLogStatus =
   (typeof CANVAS_QUEUE_WITHOUT_LOG_STATUSES)[number];
+
+export function readCanvasTaskGatewayLogId(
+  payload: Record<string, unknown> | null | undefined,
+): string | null {
+  const raw = payload?.gatewayLogId;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
+function readPayloadRecord(inputPayload: unknown): Record<string, unknown> | null {
+  if (!inputPayload || typeof inputPayload !== "object" || Array.isArray(inputPayload)) {
+    return null;
+  }
+  return inputPayload as Record<string, unknown>;
+}
+
+/** 画布视频 · 用户已点击生成、但 Gateway 日志尚未出现（含 SUBMITTED 但未写 gatewayLogId 的窗口期） */
+export function isCanvasVideoPreGatewayLogTask(input: {
+  status: string;
+  inputPayload: unknown;
+}): boolean {
+  const payload = readPayloadRecord(input.inputPayload);
+  if (!payload) return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  if (kind !== "video-engine" && kind !== "ai-video-engine") return false;
+  if (
+    input.status === "QUEUED" ||
+    input.status === "DISPATCHING" ||
+    input.status === "PENDING"
+  ) {
+    return true;
+  }
+  if (input.status === "SUBMITTED") {
+    return !readCanvasTaskGatewayLogId(payload);
+  }
+  return false;
+}
 
 /** inputPayload.kind 为画布视频引擎（DB kind 常为 IMAGE，以 payload 为准） */
 export function canvasVideoPayloadWhere(): Prisma.CanvasGenerationTaskWhereInput {
@@ -25,8 +66,11 @@ export function buildCanvasQueueWithoutLogWhere(
   ownerUserIds: string[] | null,
 ): Prisma.CanvasGenerationTaskWhereInput {
   const base: Prisma.CanvasGenerationTaskWhereInput = {
-    status: { in: [...CANVAS_QUEUE_WITHOUT_LOG_STATUSES] },
     ...canvasVideoPayloadWhere(),
+    OR: [
+      { status: { in: [...CANVAS_QUEUE_WITHOUT_LOG_STATUSES] } },
+      { status: "SUBMITTED" },
+    ],
   };
   if (ownerUserIds === null) return base;
   if (ownerUserIds.length === 0) return { id: "__none__" };
@@ -98,12 +142,33 @@ export async function fetchCanvasQueueWithoutLogStats(input: {
     }),
   ]);
 
+  const submittedCandidates = await prisma.canvasGenerationTask.findMany({
+    where: {
+      AND: [
+        where,
+        { status: "SUBMITTED" },
+      ],
+    },
+    select: { inputPayload: true },
+  });
+  const submittedPreLog = submittedCandidates.filter((t) =>
+    isCanvasVideoPreGatewayLogTask({
+      status: "SUBMITTED",
+      inputPayload: t.inputPayload,
+    }),
+  ).length;
+
   const byStatus = Object.fromEntries(
-    grouped.map((r) => [r.status, r._count._all]),
+    grouped
+      .filter((r) => r.status !== "SUBMITTED")
+      .map((r) => [r.status, r._count._all]),
   ) as Record<string, number>;
 
   const queued = byStatus.QUEUED ?? 0;
-  const dispatching = byStatus.DISPATCHING ?? 0;
+  const dispatching =
+    (byStatus.DISPATCHING ?? 0) +
+    (byStatus.PENDING ?? 0) +
+    submittedPreLog;
 
   const stats: CanvasQueueWithoutLogStats = {
     total: queued + dispatching,
@@ -132,6 +197,7 @@ export type CanvasQueuedTaskRow = {
   waitMinutes: number;
   payloadKind: string | null;
   actorUserId: string | null;
+  inputPayload: Record<string, unknown> | null;
 };
 
 export async function listCanvasQueuedWithoutLogTasks(input: {
@@ -167,7 +233,14 @@ export async function listCanvasQueuedWithoutLogTasks(input: {
   });
 
   const now = Date.now();
-  return rows.map((t) => {
+  return rows
+    .filter((t) =>
+      isCanvasVideoPreGatewayLogTask({
+        status: t.status,
+        inputPayload: t.inputPayload,
+      }),
+    )
+    .map((t) => {
     const anchor = t.queuedAt ?? t.createdAt;
     const payload =
       t.inputPayload && typeof t.inputPayload === "object"
@@ -191,6 +264,7 @@ export async function listCanvasQueuedWithoutLogTasks(input: {
       payloadKind:
         typeof payload?.kind === "string" ? payload.kind : null,
       actorUserId: t.actorUserId,
+      inputPayload: payload,
     };
   });
 }

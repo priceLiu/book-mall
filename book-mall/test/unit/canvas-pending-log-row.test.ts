@@ -22,6 +22,7 @@ function task(overrides: Partial<CanvasQueuedTaskRow> = {}): CanvasQueuedTaskRow
     waitMinutes: 0,
     payloadKind: "video-engine",
     actorUserId: "user-1",
+    inputPayload: null,
     ...overrides,
   };
 }
@@ -58,8 +59,11 @@ describe("buildCanvasPendingLogRow", () => {
     expect(row.appTaskNodeId).toBe("node-1");
   });
 
-  it("DISPATCHING 状态透传；其余归一化为 QUEUED", () => {
+  it("DISPATCHING / PENDING / SUBMITTED(无 log) 合成行显示 dispatching", () => {
     expect(buildCanvasPendingLogRow(task({ status: "DISPATCHING" })).status).toBe(
+      "DISPATCHING",
+    );
+    expect(buildCanvasPendingLogRow(task({ status: "PENDING" })).status).toBe(
       "DISPATCHING",
     );
     expect(buildCanvasPendingLogRow(task({ status: "QUEUED" })).status).toBe(
@@ -69,6 +73,27 @@ describe("buildCanvasPendingLogRow", () => {
 
   it("model 为空时回落为空串而非 null（满足 GatewayLogRow.model: string）", () => {
     expect(buildCanvasPendingLogRow(task({ model: null })).model).toBe("");
+  });
+
+  it("百炼 R2V 排队行从 inputPayload 合成 Params（非空 input）", () => {
+    const row = buildCanvasPendingLogRow(
+      task({
+        model: "happyhorse-1.1-r2v",
+        inputPayload: {
+          kind: "ai-video-engine",
+          providerKind: "BAILIAN_R2V",
+          prompt: "小猫跳舞",
+          referenceImageUrls: ["https://cdn.example/a.png"],
+          params: { ratio: "16:9", resolution: "1080P", duration: 5 },
+        },
+      }),
+    );
+    expect(row.inputSummary).not.toBeNull();
+    expect(row.inputSummary?.model).toBe("happyhorse-1.1-r2v");
+    expect(row.inputSummary?.input.prompt).toBe("小猫跳舞");
+    expect(row.inputSummary?.input.referenceImageUrls).toEqual([
+      "https://cdn.example/a.png",
+    ]);
   });
 });
 

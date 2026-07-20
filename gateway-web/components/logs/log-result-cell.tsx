@@ -111,6 +111,8 @@ export function LogResultCell({
       >
         <svg
           className="size-3.5 shrink-0 animate-spin text-[var(--gw-accent)]/90"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden
