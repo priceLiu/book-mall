@@ -8,6 +8,7 @@
  * 因此本行是「活的」，每秒在前端递增，提交厂商后真实日志出现即被去重替换。
  */
 import type { CanvasQueuedTaskRow } from "@/lib/canvas/canvas-queue-without-log";
+import { buildCanvasPendingInputSummary } from "@/lib/canvas/canvas-pending-input-summary";
 
 export type CanvasPendingLogStatus = "QUEUED" | "DISPATCHING";
 
@@ -42,7 +43,7 @@ export type CanvasPendingLogRow = {
   estimatedVendorCostYuan: null;
   failCode: null;
   failMessage: null;
-  inputSummary: null;
+  inputSummary: { model: string; input: Record<string, unknown> } | null;
   resultSummary: null;
 };
 
@@ -50,7 +51,7 @@ export function buildCanvasPendingLogRow(
   task: CanvasQueuedTaskRow,
 ): CanvasPendingLogRow {
   const status: CanvasPendingLogStatus =
-    task.status === "DISPATCHING" ? "DISPATCHING" : "QUEUED";
+    task.status === "QUEUED" ? "QUEUED" : "DISPATCHING";
   const startedAt = task.trafficStartedAt;
   return {
     id: `pending:${task.id}`,
@@ -80,7 +81,7 @@ export function buildCanvasPendingLogRow(
     estimatedVendorCostYuan: null,
     failCode: null,
     failMessage: null,
-    inputSummary: null,
+    inputSummary: buildCanvasPendingInputSummary(task.model, task.inputPayload),
     resultSummary: null,
   };
 }

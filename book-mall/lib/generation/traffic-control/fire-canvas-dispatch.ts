@@ -19,7 +19,15 @@ function runDispatch(source: string, opts?: DispatchRunOpts): void {
   const fastPath = opts?.fastPath ?? true;
   const projectId = opts?.projectId;
   if (projectId) {
-    if (projectDispatchInFlight.has(projectId)) return;
+    if (projectDispatchInFlight.has(projectId)) {
+      // 同项目已有 dispatch 在跑（createTask 可能 30–45s）：仍触发全局 backlog，
+      // 避免第二条 QUEUED 只能等整轮结束才出队。
+      fireVideoTrafficDispatchBacklog(`${source}-while-project-busy`, {
+        fastPath,
+        bypassDebounce: opts?.bypassDebounce,
+      });
+      return;
+    }
     projectDispatchInFlight.add(projectId);
   }
 

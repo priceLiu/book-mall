@@ -134,15 +134,16 @@ import {
   ingestCanvasProjectTasks,
   markCanvasProjectTasksPoolForbidden,
 } from "./use-node-task-history";
+import { restoreServerInflightNodeRuntimes } from "./restore-server-inflight-node-runtimes";
 import {
   CANVAS_POLL_IDLE_RECHECK_MS,
   nextPollIntervalMs,
 } from "./poll-interval";
 
-/** 打开画布后延迟全量任务扫描，避免首屏与大量媒体加载抢主线程 */
-const INITIAL_FULL_SCAN_DELAY_MS = 5000;
-/** 首 tick 也延后，避免与 hydrate / fitView 同帧抢主线程 */
-const INITIAL_TICK_DELAY_MS = 800;
+/** 打开画布后尽快全量任务扫描，刷新后恢复服务端在飞任务（原 5s 会导致生成态短暂消失） */
+const INITIAL_FULL_SCAN_DELAY_MS = 300;
+/** 首 tick 略延后，避免与 hydrate / fitView 同帧抢主线程 */
+const INITIAL_TICK_DELAY_MS = 200;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
 const FULL_SCAN_EVERY_N_TICKS = 3;
 
@@ -1857,6 +1858,7 @@ export function useCanvasRunner(
     /** 上一次轮询是否读道降级（tasks==null）；用于自适应退避到 15s */
     let lastPollStale = false;
     const serverInflightRef = { current: false };
+    let firstPollTick = true;
     const applyStoryColumnRowTasks = (
       tasks: CanvasTaskRecord[],
       nodes: CanvasFlowNode[],
@@ -2165,7 +2167,9 @@ export function useCanvasRunner(
       tickCount++;
       const periodicFullScan =
         !forceFullScan && tickCount % FULL_SCAN_EVERY_N_TICKS === 0;
-      const fullScan = forceFullScan || periodicFullScan;
+      const fullScan =
+        forceFullScan || periodicFullScan || firstPollTick;
+      if (firstPollTick) firstPollTick = false;
 
       const state = useCanvasStore.getState();
       const localInflightIds = collectCanvasTaskPollNodeIds(state.nodes);
@@ -2194,6 +2198,12 @@ export function useCanvasRunner(
         lastPollStale = false;
         ingestCanvasProjectTasks(projectId, tasks);
         const nodesNow = useCanvasStore.getState().nodes;
+        restoreServerInflightNodeRuntimes(
+          nodesNow,
+          tasks,
+          updateNodeData,
+          setNodeRuntime,
+        );
         applyStoryColumnRowTasks(tasks, nodesNow);
         const skipReconcileNodeIds = new Set<string>();
         for (const key of inflightRef.current) {

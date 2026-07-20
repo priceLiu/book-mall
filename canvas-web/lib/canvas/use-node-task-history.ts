@@ -14,8 +14,8 @@ import { useCanvasStore } from "./store";
 
 /** 打开画布后合并批量拉任务，避免 N 个节点各发一次 HTTP */
 const BATCH_DEBOUNCE_MS = 120;
-/** 首屏后再拉历史，与媒体懒加载错开 */
-const INITIAL_FETCH_DELAY_MS = 1200;
+/** 首屏尽快拉任务历史（与 run-queue 首 tick 全量扫描配合，刷新后恢复生成中态） */
+const INITIAL_FETCH_DELAY_MS = 0;
 
 type ProjectTaskPool = {
   tasks: CanvasTaskRecord[];

@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
+import { restoreServerInflightNodeRuntimes } from "@/lib/canvas/restore-server-inflight-node-runtimes";
 import { pickPreferredCanvasTask } from "@/lib/canvas/task-pick";
+import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 function task(
   partial: Partial<CanvasTaskRecord> & Pick<CanvasTaskRecord, "id" | "status">,
@@ -52,5 +54,39 @@ describe("pickPreferredCanvasTask", () => {
       }),
     ]);
     expect(pick?.id).toBe("running");
+  });
+});
+
+describe("restoreServerInflightNodeRuntimes", () => {
+  it("sbv1-video-engine idle 时从服务端 SUBMITTED 恢复 running", () => {
+    const node: CanvasFlowNode = {
+      id: "video-1",
+      type: "sbv1-video-engine",
+      position: { x: 0, y: 0 },
+      data: { runtime: { status: "idle" } },
+    };
+    const updateNodeData = vi.fn();
+    restoreServerInflightNodeRuntimes(
+      [node],
+      [
+        task({
+          id: "task-1",
+          nodeId: "video-1",
+          status: "SUBMITTED",
+          submittedAt: "2026-07-16T10:11:00.000Z",
+        }),
+      ],
+      updateNodeData,
+      vi.fn(),
+    );
+    expect(updateNodeData).toHaveBeenCalledWith(
+      "video-1",
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          status: "running",
+          taskId: "task-1",
+        }),
+      }),
+    );
   });
 });

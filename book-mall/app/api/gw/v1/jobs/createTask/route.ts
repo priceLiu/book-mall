@@ -16,6 +16,7 @@ import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
 import {
   routeGatewayModel,
   UnknownGatewayModelError,
+  isBailianR2vGatewayModel,
 } from "@/lib/gateway/model-router";
 import {
   parseGatewayClientSource,
@@ -59,13 +60,6 @@ function vendorTaskIdFromSubmitError(e: unknown): string | undefined {
 function asStringOrNumber(v: unknown): string | number | undefined {
   return typeof v === "string" || typeof v === "number" ? v : undefined;
 }
-
-const BAILIAN_R2V = new Set([
-  "happyhorse-1.0-r2v",
-  "wan2.6-r2v",
-  "wan2.6-r2v-flash",
-  "wan2.7-r2v",
-]);
 
 export async function POST(request: NextRequest) {
   const authOrResp = await requireGatewayV1Auth(request);
@@ -140,7 +134,7 @@ export async function POST(request: NextRequest) {
   }
 
   /** 以 modelKey 为准（非 route）：happyhorse/wan R2V 须走 body.bailian，不能落 DASHSCOPE 空 input 分支 */
-  const isBailianR2vModel = BAILIAN_R2V.has(model.toLowerCase());
+  const isBailianR2vModel = isBailianR2vGatewayModel(model);
   const effectiveRoute = isBailianR2vModel
     ? ({ providerKind: "BAILIAN", requestKind: "VIDEO" } as const)
     : route;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { routeGatewayModel, isBailianR2vGatewayModel } from "@/lib/gateway/model-router";
 
 describe("routeGatewayModel · 百炼 R2V", () => {
   it("happyhorse-1.0-r2v 走 BAILIAN 而非 DASHSCOPE 前缀", () => {
@@ -36,5 +36,6 @@ describe("routeGatewayModel · 百炼 R2V", () => {
       providerKind: "BAILIAN",
       requestKind: "VIDEO",
     });
+    expect(isBailianR2vGatewayModel("happyhorse-1.1-r2v")).toBe(true);
   });
 });
