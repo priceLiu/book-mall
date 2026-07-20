@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SiteHomeFrameworks } from "@/components/layout/site-home/site-home-frameworks";
 import { SiteHomeHeroClips } from "@/components/layout/site-home/site-home-hero-clips";
+import type { StoryHeroClip } from "@/lib/story-theater-videos";
 import Image from "next/image";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
@@ -72,7 +73,7 @@ function SiteHomeHeroBackgroundVideo({
 }
 
 /** 首屏：全屏视频背景 + 底部文案浮层 */
-export function SiteHomeHeroSection({ clips }: { clips: string[] }) {
+export function SiteHomeHeroSection({ clips }: { clips: StoryHeroClip[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mounted, setMounted] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -135,7 +136,7 @@ export function SiteHomeHeroSection({ clips }: { clips: string[] }) {
       <div className="site-home-hero-inner">
         <div className="site-home-hero-content">
           <div className="site-home-hero-bottom">
-            <SiteHomeHeroClips sources={clips} />
+            <SiteHomeHeroClips clips={clips} />
 
             <div className="site-home-hero-copy-panel">
               <div className="site-home-hero-copy">

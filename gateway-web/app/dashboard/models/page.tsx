@@ -1,38 +1,8 @@
-import { ModelManager } from "@/components/model-manager/model-manager";
-import type { CatalogGroup, CredentialRow, ModelTab } from "@/components/model-manager/types";
-import { gatewayJson } from "@/lib/gateway-api";
+import { ModelsPageClient } from "@/components/model-manager/models-page-client";
 
 export const dynamic = "force-dynamic";
 
-type CatalogResponse = {
-  groups: CatalogGroup[];
-  totalCount: number;
-  boundKinds: string[];
-  tabs?: Record<ModelTab, CatalogGroup[]>;
-};
-
-type CredentialsResponse = {
-  credentials: CredentialRow[];
-  platformPoolDelegate?: { canonicalOwnerEmail: string } | null;
-};
-
-export default async function DashboardModelsPage() {
-  const [catalogRes, credRes] = await Promise.all([
-    gatewayJson<CatalogResponse>("/api/gateway/models"),
-    gatewayJson<CredentialsResponse>("/api/gateway/credentials"),
-  ]);
-
-  const catalog = catalogRes.data;
-  const credentials = credRes.data?.credentials ?? [];
-  const platformPoolDelegate = credRes.data?.platformPoolDelegate ?? null;
-
-  const tabGroups: Record<ModelTab, CatalogGroup[]> = catalog?.tabs ?? {
-    text: catalog?.groups ?? [],
-    image: [],
-    video: [],
-    function: [],
-  };
-
+export default function DashboardModelsPage() {
   return (
     <div className="space-y-4">
       <div>
@@ -43,19 +13,7 @@ export default async function DashboardModelsPage() {
         </p>
       </div>
 
-      {platformPoolDelegate ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-[var(--gw-accent)]">
-          正在代管平台共用凭证池（canonical:{" "}
-          <span className="font-mono text-xs">{platformPoolDelegate.canonicalOwnerEmail}</span>
-          ）。此处增删改会直接影响平台代付用户的 AI 调用。
-        </div>
-      ) : null}
-
-      <ModelManager
-        initialGroups={catalog?.groups ?? []}
-        initialCredentials={credentials}
-        tabGroups={tabGroups}
-      />
+      <ModelsPageClient />
     </div>
   );
 }

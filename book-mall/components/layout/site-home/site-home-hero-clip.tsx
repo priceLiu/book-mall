@@ -3,11 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
 
-/** 首屏小窗：首帧/元数据懒加载，悬停播放、移开停止 */
-export function SiteHomeHeroClip({ src }: { src: string }) {
+/** 首屏小窗：封面立即可见，视频懒加载；悬停播放、移开停止 */
+export function SiteHomeHeroClip({
+  src,
+  poster,
+  eagerPoster = false,
+}: {
+  src: string;
+  poster: string;
+  eagerPoster?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const srcAttachedRef = useRef(false);
   const [mounted, setMounted] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -44,7 +53,6 @@ export function SiteHomeHeroClip({ src }: { src: string }) {
     const v = videoRef.current;
     if (!v) return;
     v.preload = "auto";
-    // 悬停播放并发声（取消静音）。
     makeVideoAudible(v);
   }, [attachSrc]);
 
@@ -66,14 +74,26 @@ export function SiteHomeHeroClip({ src }: { src: string }) {
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={poster}
+        alt=""
+        aria-hidden
+        className={`site-home-hero-clip-poster${videoReady ? " site-home-hero-clip-poster-hidden" : ""}`}
+        loading={eagerPoster ? "eager" : "lazy"}
+        fetchPriority={eagerPoster ? "high" : "auto"}
+        decoding="async"
+      />
       {mounted ? (
         <video
           ref={videoRef}
-          className="site-home-hero-clip-video"
+          className={`site-home-hero-clip-video${videoReady ? " site-home-hero-clip-video-ready" : ""}`}
+          poster={poster}
           muted
           playsInline
           loop
           preload="none"
+          onLoadedData={() => setVideoReady(true)}
         />
       ) : null}
     </div>
