@@ -3,53 +3,74 @@
 import Link from "next/link";
 import { SiteHomeFrameworks } from "@/components/layout/site-home/site-home-frameworks";
 import { SiteHomeHeroClips } from "@/components/layout/site-home/site-home-hero-clips";
-import type { StoryHeroClip } from "@/lib/story-theater-videos";
+import type {
+  StoryHeroBackground,
+  StoryHeroClip,
+} from "@/lib/story-theater-videos";
 import Image from "next/image";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
 
-// 首帧海报（webp，约 72KB，与视频首帧完全一致 → 视频加载前后无跳变）。
-const HERO_POSTER = "/home-hero-poster.webp";
-// 压缩后的背景视频：优先 webm（VP9），回退 mp4（H.264，已 faststart）。
-const HERO_VIDEO_WEBM = "/home-hero-opt.webm";
-const HERO_VIDEO_MP4 = "/home-hero-opt.mp4";
+const LOCAL_HERO_POSTER = "/home-hero-poster.webp";
+const LOCAL_HERO_VIDEO_WEBM = "/home-hero-opt.webm";
+const LOCAL_HERO_VIDEO_MP4 = "/home-hero-opt.mp4";
 const POSTER_DIM = { w: 1920, h: 1080 } as const;
 
-function HeroPosterImage() {
+function isLocalHeroVideo(url: string): boolean {
+  return url.startsWith("/home-hero");
+}
+
+function HeroPosterImage({ poster }: { poster: string }) {
+  if (poster === LOCAL_HERO_POSTER) {
+    return (
+      <Image
+        width={POSTER_DIM.w}
+        height={POSTER_DIM.h}
+        sizes="100vw"
+        priority
+        className="site-home-hero-bg-video"
+        src={poster}
+        alt=""
+      />
+    );
+  }
+
   return (
-    <Image
-      width={POSTER_DIM.w}
-      height={POSTER_DIM.h}
-      sizes="100vw"
-      priority
-      className="site-home-hero-bg-video"
-      src={HERO_POSTER}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={poster}
       alt=""
+      aria-hidden
+      className="site-home-hero-bg-video"
+      fetchPriority="high"
+      decoding="async"
     />
   );
 }
 
 function SiteHomeHeroBackgroundVideo({
   videoRef,
+  background,
   audible,
   onError,
   onMutedChange,
 }: {
   videoRef: RefObject<HTMLVideoElement>;
+  background: StoryHeroBackground;
   audible: boolean;
   onError: () => void;
   onMutedChange: (muted: boolean) => void;
 }) {
+  const useLocalSources = isLocalHeroVideo(background.url);
+
   return (
     <video
       ref={videoRef}
       className="site-home-hero-bg-video"
-      poster={HERO_POSTER}
+      poster={background.poster}
       playsInline
       preload="auto"
-      // muted 由 audible 状态驱动：硬编码 muted 会在每次 re-render 被 React 重新置真，
-      // 导致点击取消静音后立刻又被静音（点了没声音）。
       muted={!audible}
       autoPlay
       loop
@@ -66,26 +87,54 @@ function SiteHomeHeroBackgroundVideo({
       }}
       onError={onError}
     >
-      <source src={HERO_VIDEO_WEBM} type="video/webm" />
-      <source src={HERO_VIDEO_MP4} type="video/mp4" />
+      {useLocalSources ? (
+        <>
+          <source src={LOCAL_HERO_VIDEO_WEBM} type="video/webm" />
+          <source src={LOCAL_HERO_VIDEO_MP4} type="video/mp4" />
+        </>
+      ) : (
+        <source src={background.url} type="video/mp4" />
+      )}
     </video>
   );
 }
 
 /** 首屏：全屏视频背景 + 底部文案浮层 */
-export function SiteHomeHeroSection({ clips }: { clips: StoryHeroClip[] }) {
+export function SiteHomeHeroSection({
+  clips,
+  background: initialBackground,
+}: {
+  clips: StoryHeroClip[];
+  background: StoryHeroBackground;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mounted, setMounted] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [audible, setAudible] = useState(false);
+  const [background, setBackground] = useState(initialBackground);
 
-  // 视频仅在挂载后（客户端）渲染：服务端与首个客户端渲染都用首帧海报 <img>，
-  // 二者一致 → 无注水比对；浏览器扩展往 <video> 注入 <div> 也不再触发 hydration 报错。
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    setBackground(initialBackground);
+    setVideoError(false);
+  }, [initialBackground]);
+
   const showVideo = mounted && !videoError;
+
+  const handleVideoError = () => {
+    if (!isLocalHeroVideo(background.url)) {
+      setBackground({
+        url: LOCAL_HERO_VIDEO_MP4,
+        poster: LOCAL_HERO_POSTER,
+      });
+      setVideoError(false);
+      return;
+    }
+    setVideoError(true);
+  };
 
   const toggleSound = () => {
     const v = videoRef.current;
@@ -105,13 +154,15 @@ export function SiteHomeHeroSection({ clips }: { clips: StoryHeroClip[] }) {
         <div className="site-home-hero-bg-media" suppressHydrationWarning>
           {showVideo ? (
             <SiteHomeHeroBackgroundVideo
+              key={background.url}
               videoRef={videoRef}
+              background={background}
               audible={audible}
-              onError={() => setVideoError(true)}
+              onError={handleVideoError}
               onMutedChange={(muted) => setAudible(!muted)}
             />
           ) : (
-            <HeroPosterImage />
+            <HeroPosterImage poster={background.poster} />
           )}
         </div>
         <div className="site-home-hero-bg-scrim" />

@@ -90,6 +90,52 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     },
   },
   {
+    modelKey: "happyhorse-1.1-i2v",
+    displayName: "HappyHorse-1.1-I2V",
+    role: "VIDEO",
+    description: "DashScope happyhorse-1.1-i2v · image-to-video (first frame)",
+    paramsSchema: [
+      ...T2V_PARAMS_SCHEMA.slice(0, 3),
+      {
+        key: "duration",
+        label: "duration (sec)",
+        type: "number",
+        min: 3,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ],
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 5,
+    },
+  },
+  {
+    modelKey: "happyhorse-1.0-i2v",
+    displayName: "HappyHorse-1.0-I2V",
+    role: "VIDEO",
+    description: "DashScope happyhorse-1.0-i2v · image-to-video (first frame)",
+    paramsSchema: [
+      ...T2V_PARAMS_SCHEMA.slice(0, 3),
+      {
+        key: "duration",
+        label: "duration (sec)",
+        type: "number",
+        min: 3,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ],
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 5,
+    },
+  },
+  {
     modelKey: "wan2.6-t2v",
     displayName: "Wan 2.6 T2V",
     role: "VIDEO",

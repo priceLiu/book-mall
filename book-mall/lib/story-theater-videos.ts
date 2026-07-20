@@ -9,6 +9,14 @@ export type StoryHeroClip = {
   poster: string;
 };
 
+/** 首屏全屏背景：与 story-web 首页「发现更多」同源 OSS 16:9 视频 */
+export type StoryHeroBackground = StoryHeroClip;
+
+const LOCAL_HERO_BACKGROUND: StoryHeroBackground = {
+  url: "/home-hero-opt.mp4",
+  poster: "/home-hero-poster.webp",
+};
+
 /** 与 story-web/public/imgs/covers 对齐；book-mall 同源静态资源 */
 export function posterForStoryVideoUrl(url: string): string {
   const match = /demo-(\d+)\.mp4/i.exec(url);
@@ -39,4 +47,15 @@ export function pickRandomStoryVideoClips(count: number): StoryHeroClip[] {
     url,
     poster: posterForStoryVideoUrl(url),
   }));
+}
+
+/** 首屏全屏背景：每次刷新随机一条 OSS 16:9 漫剧片段；无 OSS 池时回退本地压缩视频 */
+export function pickRandomStoryHeroBackground(): StoryHeroBackground {
+  const pool = getStoryTheaterVideoPool().filter((url) =>
+    /demo-\d+\.mp4/i.test(url),
+  );
+  if (pool.length === 0) return LOCAL_HERO_BACKGROUND;
+  const idx = Math.floor(Math.random() * pool.length);
+  const url = pool[idx]!;
+  return { url, poster: posterForStoryVideoUrl(url) };
 }

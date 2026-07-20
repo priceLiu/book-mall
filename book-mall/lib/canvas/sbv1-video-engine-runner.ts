@@ -121,7 +121,9 @@ export async function runSbv1VideoEngineNode(
       ? "t2v"
       : isDashscopeSbv1TextToVideoModel(modelKey)
         ? "t2v"
-        : "omni");
+        : isDashscopeHappyhorseImageToVideoModel(modelKey)
+          ? "i2v"
+          : "omni");
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
