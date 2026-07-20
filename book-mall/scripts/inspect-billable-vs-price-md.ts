@@ -38,6 +38,9 @@ const PRICE_MD: Record<
   "happyhorse-1.0-i2v": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
   "happyhorse-1.0-t2v": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
   "happyhorse-1.0-r2v": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
+  "happyhorse-1.1-i2v": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
+  "happyhorse-1.1-t2v": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
+  "happyhorse-1.1-r2v": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
   "happyhorse-1.0-video-edit": { kind: "video_per_sec_bySr", bySr: { "720": 0.9, "1080": 1.6 } },
   // —— wan2.7 ——
   "wan2.7-i2v-2026-04-25": { kind: "video_per_sec_bySr", bySr: { "720": 0.6, "1080": 1.0 } },

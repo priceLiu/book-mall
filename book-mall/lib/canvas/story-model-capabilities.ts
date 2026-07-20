@@ -55,6 +55,7 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "doubao-seedance-2.0": ["video_i2v", "video_r2v", "video_multi_ref"],
   "doubao-seedance-1.5-pro": ["video_i2v"],
   "happyhorse-1.0-r2v": ["video_r2v", "video_multi_ref"],
+  "happyhorse-1.1-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v-flash": ["video_r2v", "video_multi_ref"],
   "wan2.7-r2v": ["video_r2v", "video_multi_ref"],

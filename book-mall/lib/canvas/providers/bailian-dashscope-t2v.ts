@@ -44,10 +44,56 @@ const T2V_PARAMS_SCHEMA = [
 
 export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
-    modelKey: "wan2.6-t2v",
-    displayName: "万相 2.6 · 文生视频",
+    modelKey: "happyhorse-1.0-t2v",
+    displayName: "HappyHorse-1.0-T2V",
     role: "VIDEO",
-    description: "DashScope wan2.6-t2v · 纯文生视频",
+    description: "DashScope happyhorse-1.0-t2v · text-to-video",
+    paramsSchema: [
+      ...T2V_PARAMS_SCHEMA.slice(0, 3),
+      {
+        key: "duration",
+        label: "duration (sec)",
+        type: "number",
+        min: 3,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ],
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 5,
+    },
+  },
+  {
+    modelKey: "happyhorse-1.1-t2v",
+    displayName: "HappyHorse-1.1-T2V",
+    role: "VIDEO",
+    description: "DashScope happyhorse-1.1-t2v · text-to-video",
+    paramsSchema: [
+      ...T2V_PARAMS_SCHEMA.slice(0, 3),
+      {
+        key: "duration",
+        label: "duration (sec)",
+        type: "number",
+        min: 3,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ],
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 5,
+    },
+  },
+  {
+    modelKey: "wan2.6-t2v",
+    displayName: "Wan 2.6 T2V",
+    role: "VIDEO",
+    description: "DashScope wan2.6-t2v · text-to-video",
     paramsSchema: T2V_PARAMS_SCHEMA,
     defaultParams: {
       ratio: "16:9",
@@ -58,9 +104,9 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "wan2.7-t2v",
-    displayName: "万相 2.7 · 文生视频",
+    displayName: "Wan 2.7 T2V",
     role: "VIDEO",
-    description: "DashScope wan2.7-t2v · 纯文生视频",
+    description: "DashScope wan2.7-t2v · text-to-video",
     paramsSchema: T2V_PARAMS_SCHEMA,
     defaultParams: {
       ratio: "16:9",

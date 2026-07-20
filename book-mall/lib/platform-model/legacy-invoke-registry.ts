@@ -190,7 +190,7 @@ function bailianChat(modelKey: string, sortOrder: number): CanonicalModelDef {
 export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "wanx2.1-t2i-plus",
-    displayName: "万相文生图 Plus",
+    displayName: "Wanx 2.1 T2I Plus",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -203,7 +203,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wanx2.1-t2i-turbo",
-    displayName: "万相文生图 Turbo",
+    displayName: "Wanx 2.1 T2I Turbo",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -216,7 +216,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "qwen3-tts-flash",
-    displayName: "通义 TTS Flash",
+    displayName: "Qwen3 TTS Flash",
     mediaKind: "TEXT_LLM",
     role: "LLM",
     requestKind: "TTS",
@@ -227,7 +227,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "qwen3-tts",
-    displayName: "通义 TTS",
+    displayName: "Qwen3 TTS",
     mediaKind: "TEXT_LLM",
     role: "LLM",
     requestKind: "TTS",
@@ -238,6 +238,9 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   dashVideo("happyhorse-1.0-i2v", 54),
   dashVideo("happyhorse-1.0-t2v", 55),
+  dashVideo("happyhorse-1.1-i2v", 551),
+  dashVideo("happyhorse-1.1-t2v", 552),
+  bailianVideo("happyhorse-1.1-r2v", 553),
   dashVideo("happyhorse-1.0-video-edit", 56),
   dashVideo("wan2.6-i2v", 57),
   dashVideo("wan2.6-t2v", 58),
@@ -287,7 +290,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   kieImage("seedream-5-lite", 74),
   {
     canonicalModelKey: "google-nano-banana",
-    displayName: "NanoBanana Gemini 2.5 Flash · 文生图",
+    displayName: "NanoBanana Gemini 2.5 Flash T2I",
     description: "KIE · google/nano-banana 文生图",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -301,7 +304,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "google-nano-banana-i2i",
-    displayName: "NanoBanana Gemini 2.5 Flash · 图生图",
+    displayName: "NanoBanana Gemini 2.5 Flash I2I",
     description: "KIE · google/nano-banana-edit 图生图 / 编辑",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -316,7 +319,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   kieImage("nano-banana-2", 74.6),
   {
     canonicalModelKey: "kie-4o-image",
-    displayName: "4o Image · 文/图生图",
+    displayName: "4o Image T2I/I2I",
     description: "KIE · 4o-image API · 文生图 / 参考图编辑",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -331,7 +334,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   kieImage("qwen-text-to-image", 75),
   {
     canonicalModelKey: "grok-imagine/text-to-image",
-    displayName: "Grok Imagine · 文生图",
+    displayName: "Grok Imagine T2I",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -344,7 +347,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "grok-imagine/image-to-video",
-    displayName: "Grok Imagine · 图生视频",
+    displayName: "Grok Imagine I2V",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -375,7 +378,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   kieV2v("kling-3.0/motion-control", 92),
   {
     canonicalModelKey: "topaz-labs/video-enhance",
-    displayName: "Topaz Labs · 高清视频增强",
+    displayName: "Topaz Video Upscale",
     mediaKind: "VIDEO_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -462,7 +465,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "hailuo-2.3-i2v",
-    displayName: "海螺 2.3 图生视频",
+    displayName: "Hailuo 2.3 I2V",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -478,7 +481,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-2.5-turbo-i2v",
-    displayName: "可灵 2.5 Turbo 图生视频",
+    displayName: "Kling 2.5 Turbo I2V",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -576,7 +579,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   ),
   {
     canonicalModelKey: "hunyuan-3d-express",
-    displayName: "混元 3D Express",
+    displayName: "Hunyuan 3D Express",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -587,7 +590,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "hy-3d-express",
-    displayName: "混元 3D Express（别名）",
+    displayName: "Hunyuan 3D Express Alias",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",

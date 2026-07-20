@@ -2,6 +2,7 @@
 
 export const REF_VIDEO_BAILIAN_MODEL_KEYS = [
   "happyhorse-1.0-r2v",
+  "happyhorse-1.1-r2v",
   "wan2.6-r2v",
   "wan2.6-r2v-flash",
   "wan2.7-r2v",
@@ -53,9 +54,21 @@ export const REF_VIDEO_MODEL_META: Record<
       seed: "",
     },
   },
+  "happyhorse-1.1-r2v": {
+    modelKey: "happyhorse-1.1-r2v",
+    displayName: "HappyHorse-1.1-R2V",
+    providerKind: "BAILIAN_R2V",
+    maxRefImages: 9,
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "1080P",
+      duration: 5,
+      seed: "",
+    },
+  },
   "wan2.6-r2v": {
     modelKey: "wan2.6-r2v",
-    displayName: "万相 2.6 · 参考生视频",
+    displayName: "Wan 2.6 R2V",
     providerKind: "BAILIAN_R2V",
     maxRefImages: 9,
     defaultParams: {
@@ -68,7 +81,7 @@ export const REF_VIDEO_MODEL_META: Record<
   },
   "wan2.6-r2v-flash": {
     modelKey: "wan2.6-r2v-flash",
-    displayName: "万相 2.6 R2V Flash",
+    displayName: "Wan 2.6 R2V Flash",
     providerKind: "BAILIAN_R2V",
     maxRefImages: 9,
     defaultParams: {
@@ -81,7 +94,7 @@ export const REF_VIDEO_MODEL_META: Record<
   },
   "wan2.7-r2v": {
     modelKey: "wan2.7-r2v",
-    displayName: "万相 2.7 · 参考生视频",
+    displayName: "Wan 2.7 R2V",
     providerKind: "BAILIAN_R2V",
     maxRefImages: 9,
     defaultParams: {

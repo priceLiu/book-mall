@@ -116,7 +116,7 @@ export function getSbv1VideoModelRefCaps(
     };
   }
 
-  if (k === "happyhorse-1.0-r2v") {
+  if (k === "happyhorse-1.0-r2v" || k === "happyhorse-1.1-r2v") {
     return {
       supportedModes: ["omni", "first_last"],
       refApi: "bailian_r2v_media",

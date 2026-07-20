@@ -72,7 +72,9 @@ import {
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 import {
+  buildDashscopeHappyhorseI2vVideoBody,
   buildDashscopeSbv1T2vVideoBody,
+  isDashscopeHappyhorseImageToVideoModel,
   isDashscopeSbv1TextToVideoModel,
 } from "./dashscope-sbv1-t2v";
 import {
@@ -1177,6 +1179,8 @@ export async function runVideoEngineNode(
     isTopazDirectV2v || isKieTopazUpscale || modelKey === "wan/2-6-video-to-video";
   const dockInputModeRaw = String(data.dockInputMode ?? "").trim();
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
+  const isDashscopeHappyhorseI2v =
+    isDashscopeHappyhorseImageToVideoModel(modelKey);
   const isKlingT2v =
     modelKey === "kling-3.0/video" &&
     (dockInputModeRaw === "t2v" || !dockInputModeRaw);
@@ -1442,6 +1446,34 @@ export async function runVideoEngineNode(
         resolution,
         durationSec,
         promptExtend: params.prompt_extend !== false,
+        modelKey: effectiveModelKey,
+        watermark: params.watermark === true,
+      });
+      model = effectiveModelKey;
+      input = dashscopeVideoBody;
+      videoProviderKind = "DASHSCOPE";
+    } catch (e) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  } else if (isDashscopeHappyhorseI2v) {
+    try {
+      const aspectRatio = String(
+        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      );
+      const resolution = String(
+        params.resolution ?? data.resolution ?? "720p",
+      );
+      const durationSec = Number(params.duration ?? data.durationSec ?? 5);
+      dashscopeVideoBody = buildDashscopeHappyhorseI2vVideoBody({
+        prompt: expandedPrompt,
+        firstFrameUrl: mainFrameImageUrl,
+        aspectRatio,
+        resolution,
+        durationSec,
+        watermark: params.watermark === true,
       });
       model = effectiveModelKey;
       input = dashscopeVideoBody;

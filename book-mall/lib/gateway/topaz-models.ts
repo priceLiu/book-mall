@@ -13,7 +13,7 @@ export type TopazFilterModel =
 export const TOPAZ_VIDEO_MODELS = [
   {
     modelKey: TOPAZ_LABS_VIDEO_ENHANCE_MODEL_KEY,
-    displayName: "Topaz Labs · 高清视频增强",
+    displayName: "Topaz Video Upscale",
     label: "Topaz Labs · 高清视频增强",
     description:
       "Topaz Video API · 视频超分 / 增强（Express 上传 · Proteus / Starlight 等滤镜）",

@@ -134,7 +134,7 @@ const EXPECTATIONS: Expect[] = [
     note: "万相文生图 wanx2.1-t2i-plus（按张）",
   },
   // ============ 视频：happyhorse 系列（720P 0.9 / 1080P 1.6） ============
-  ...(["happyhorse-1.0-i2v", "happyhorse-1.0-t2v", "happyhorse-1.0-r2v", "happyhorse-1.0-video-edit"] as const).flatMap(
+  ...(["happyhorse-1.0-i2v", "happyhorse-1.0-t2v", "happyhorse-1.0-r2v", "happyhorse-1.0-video-edit", "happyhorse-1.1-i2v", "happyhorse-1.1-t2v", "happyhorse-1.1-r2v"] as const).flatMap(
     (mk) =>
       ([
         { sr: 720, c: 0.9 },

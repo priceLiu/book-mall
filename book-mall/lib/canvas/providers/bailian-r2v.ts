@@ -72,8 +72,21 @@ export const BAILIAN_R2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     },
   },
   {
+    modelKey: "happyhorse-1.1-r2v",
+    displayName: "HappyHorse-1.1-R2V",
+    role: "VIDEO",
+    description: "Bailian HappyHorse 1.1 · reference-to-video · 1–9 refs",
+    paramsSchema: R2V_PARAMS_SCHEMA,
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "1080P",
+      duration: 5,
+      seed: "",
+    },
+  },
+  {
     modelKey: "wan2.6-r2v",
-    displayName: "万相 2.6 · 参考生视频",
+    displayName: "Wan 2.6 R2V",
     role: "VIDEO",
     description: "百炼 wan2.6-r2v · 多图参考（最多 5 张 · multi-shot）",
     paramsSchema: [...R2V_PARAMS_SCHEMA, ...WAN_EXTRA_SCHEMA],
@@ -101,7 +114,7 @@ export const BAILIAN_R2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "wan2.7-r2v",
-    displayName: "万相 2.7 · 参考生视频",
+    displayName: "Wan 2.7 R2V",
     role: "VIDEO",
     description: "百炼 wan2.7-r2v · 全能参考最多 5 张 media；首尾帧取连线前 2 张。",
     paramsSchema: [...R2V_PARAMS_SCHEMA, ...WAN_EXTRA_SCHEMA],

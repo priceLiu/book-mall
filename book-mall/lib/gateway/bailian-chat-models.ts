@@ -69,7 +69,7 @@ export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "qwen-plus",
-    displayName: "通义千问 Plus",
+    displayName: "Qwen Plus",
     role: "LLM",
     description: "百炼 · 经典均衡模型",
     paramsSchema: [...LLM_TEMP_SCHEMA],
@@ -77,7 +77,7 @@ export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "qwen-max",
-    displayName: "通义千问 Max",
+    displayName: "Qwen Max",
     role: "LLM",
     description: "百炼 · 效果优先（耗时更长）",
     paramsSchema: [...LLM_TEMP_SCHEMA],
@@ -121,7 +121,7 @@ export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "MiniMax-M2.5",
-    displayName: "MiniMax M2.5（旧别名）",
+    displayName: "MiniMax M2.5 Legacy Alias",
     role: "LLM",
     description: "百炼 · 历史 modelKey 别名，等同 MiniMax/MiniMax-M2.5",
     paramsSchema: [

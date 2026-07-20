@@ -50,7 +50,7 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
 export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
     modelKey: "doubao-seed-2.1-pro",
-    displayName: "Doubao Seed 2.1 Pro · 视觉理解",
+    displayName: "Doubao Seed 2.1 Pro Vision",
     role: "LLM",
     description:
       "火山方舟 · 多模态图片/视频理解 · 反推提示词（上游 doubao-seed-2-1-pro-260628）",
@@ -59,7 +59,7 @@ export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "doubao-seed-2.0",
-    displayName: "Doubao Seed 2.0 Pro · 视觉理解",
+    displayName: "Doubao Seed 2.0 Pro Vision",
     role: "LLM",
     description:
       "火山方舟 · 兼容别名 · 同上游 doubao-seed-2-1-pro-260628（请优先选 2.1 Pro）",
@@ -129,7 +129,7 @@ const VIDEO_PARAM_SCHEMA = [
 export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
     modelKey: "doubao-seedance-2.0",
-    displayName: "Seedance 2.0 · 真人",
+    displayName: "Seedance 2.0 Real Person",
     role: "VIDEO",
     description:
       "火山方舟 · 图/文/音视频参考 · 真人人像须录入人像库并通过审核（asset://）",
@@ -143,7 +143,7 @@ export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "doubao-seedance-1.5-pro",
-    displayName: "Seedance 1.5 Pro · 真人",
+    displayName: "Seedance 1.5 Pro Real Person",
     role: "VIDEO",
     description:
       "火山方舟 · 首尾帧/有声 · 真人人像库 asset://（须审核通过）",

@@ -57,7 +57,7 @@ import { LEGACY_INVOKE_MODEL_REGISTRY } from "@/lib/platform-model/legacy-invoke
 const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "deepseek-chat",
-    displayName: "DeepSeek 快速对话",
+    displayName: "DeepSeek Chat Flash",
     description: "对话 / 助手 / 文案",
     mediaKind: "TEXT_LLM",
     role: "LLM",
@@ -123,7 +123,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "qwen-turbo",
-    displayName: "通义 Qwen 快速对话",
+    displayName: "Qwen Turbo Flash",
     mediaKind: "TEXT_LLM",
     role: "LLM",
     requestKind: "CHAT",
@@ -138,7 +138,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "gemini-flash",
-    displayName: "Gemini 快速对话",
+    displayName: "Gemini Flash Chat",
     mediaKind: "TEXT_LLM",
     role: "LLM",
     requestKind: "CHAT",
@@ -155,7 +155,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "gpt-5-5-chat",
-    displayName: "GPT-5.5 对话",
+    displayName: "GPT-5.5 Chat",
     description: "OpenAI GPT-5.5 · 复杂推理 / 剧本脚本",
     mediaKind: "TEXT_LLM",
     role: "LLM",
@@ -171,7 +171,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "doubao-seed-2.1-pro",
-    displayName: "Doubao Seed 2.1 Pro · 视觉理解",
+    displayName: "Doubao Seed 2.1 Pro Vision",
     description:
       "火山方舟 · 多模态图片理解 · 画布文本节点反推提示词（上游 doubao-seed-2-1-pro-260628）",
     mediaKind: "TEXT_LLM",
@@ -188,7 +188,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "doubao-seed-2.0",
-    displayName: "Doubao Seed 2.0 Pro · 视觉理解",
+    displayName: "Doubao Seed 2.0 Pro Vision",
     description:
       "火山方舟 · 多模态图片理解 · 画布文本节点反推提示词（上游 doubao-seed-2-1-pro-260628）",
     mediaKind: "TEXT_LLM",
@@ -205,7 +205,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wan2.7-image",
-    displayName: "通义万相 2.7 生图",
+    displayName: "Wan 2.7 Image",
     description: "多图参考生图",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -221,7 +221,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wan2.7-image-pro",
-    displayName: "通义万相 2.7 Pro 生图",
+    displayName: "Wan 2.7 Image Pro",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -236,7 +236,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-3.0-image",
-    displayName: "可灵 3.0 生图",
+    displayName: "Kling 3.0 Image",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -266,7 +266,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "aitryon",
-    displayName: "AI 试衣-基础版",
+    displayName: "AI Try-On Basic",
     description: "百炼 aitryon 虚拟试衣成片",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -282,7 +282,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "aitryon-plus",
-    displayName: "AI 试衣-Plus 版",
+    displayName: "AI Try-On Plus",
     description: "百炼 aitryon-plus 虚拟试衣成片",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -298,7 +298,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "aitryon-parsing-v1",
-    displayName: "AI 试衣-图片分割",
+    displayName: "AI Try-On Parsing",
     description: "全身图上下装分割（角色资产服装槽 / 试衣预处理）",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -314,7 +314,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "aitryon-refiner",
-    displayName: "AI 试衣-图片精修",
+    displayName: "AI Try-On Refiner",
     description: "百炼 aitryon-refiner 试衣精修（阶梯价）",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -330,7 +330,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "seedance-2.0",
-    displayName: "Seedance 2.0 图生视频",
+    displayName: "Seedance 2.0 I2V",
     description: "图生视频 / 分镜成片",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
@@ -346,7 +346,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-3.0-video",
-    displayName: "可灵 3.0 图/文生视频",
+    displayName: "Kling 3.0 I2V/T2V",
     description: "KIE · 可灵 3.0 · 图生/文生视频，多镜头 + 元素引用。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
@@ -362,7 +362,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-3.0-turbo-i2v",
-    displayName: "可灵 3.0 Turbo 图生视频",
+    displayName: "Kling 3.0 Turbo I2V",
     description: "KIE · 可灵 3.0 Turbo · 首帧图生视频，速度优先。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
@@ -378,7 +378,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-3.0-turbo-t2v",
-    displayName: "可灵 3.0 Turbo 文生视频",
+    displayName: "Kling 3.0 Turbo T2V",
     description: "KIE · 可灵 3.0 Turbo · 纯文生视频，速度优先。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
@@ -394,7 +394,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-3.0-motion-control",
-    displayName: "可灵 3.0 动作控制",
+    displayName: "Kling 3.0 Motion Control",
     description: "KIE · 可灵 3.0 Motion Control · 参考图 + 动作视频驱动角色。",
     mediaKind: "VIDEO_TO_VIDEO",
     role: "VIDEO",
@@ -410,7 +410,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-2.6-motion-control",
-    displayName: "可灵 2.6 动作控制",
+    displayName: "Kling 2.6 Motion Control",
     description: "KIE · 可灵 2.6 Motion Control · 参考图 + 动作视频驱动角色。",
     mediaKind: "VIDEO_TO_VIDEO",
     role: "VIDEO",
@@ -426,7 +426,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-ai-avatar-standard",
-    displayName: "可灵 AI 数字人 · 标准",
+    displayName: "Kling AI Avatar Standard",
     description: "KIE · 可灵 AI Avatar · 头像图 + 音频生成口型同步数字人视频。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
@@ -442,7 +442,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "kling-ai-avatar-pro",
-    displayName: "可灵 AI 数字人 · Pro",
+    displayName: "Kling AI Avatar Pro",
     description: "KIE · 可灵 AI Avatar Pro · 头像图 + 音频生成高质量口型同步数字人视频。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
@@ -458,7 +458,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wanxiang-video-2.7-i2v",
-    displayName: "万相 2.7 图生视频",
+    displayName: "Wan 2.7 I2V",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -473,7 +473,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "happyhorse-r2v",
-    displayName: "HappyHorse 参考生视频",
+    displayName: "HappyHorse R2V",
     mediaKind: "VIDEO_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -484,11 +484,12 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/秒",
     routes: dedupeRoutes([
       { vendor: "aliyun", modelKey: "happyhorse-1.0-r2v", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "happyhorse-1.1-r2v", providerKind: "BAILIAN" },
     ]),
   },
   {
     canonicalModelKey: "wanxiang-video-2.6",
-    displayName: "万相 2.6 参考生视频",
+    displayName: "Wan 2.6 R2V",
     mediaKind: "VIDEO_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -503,7 +504,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wanxiang-video-2.7",
-    displayName: "万相 2.7 参考生视频",
+    displayName: "Wan 2.7 R2V",
     mediaKind: "VIDEO_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
@@ -518,7 +519,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "qwen-image-edit",
-    displayName: "Qwen 图像编辑",
+    displayName: "Qwen Image Edit",
     description: "百炼 · 局部修图 / 多图融合（qwen-image-edit）",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -534,7 +535,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "qwen-image-edit-max",
-    displayName: "Qwen 图像编辑 Max",
+    displayName: "Qwen Image Edit Max",
     description: "百炼 · 增强工业设计与几何推理（qwen-image-edit-max）",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -570,7 +571,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "image-out-painting",
-    displayName: "百炼 · 图像画面扩展",
+    displayName: "Bailian Out-Painting",
     description: "阿里百炼 image-out-painting · 等比/定向/旋转扩图",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -586,7 +587,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wanx-x-painting",
-    displayName: "万相 · 图像局部重绘",
+    displayName: "Wanx Local Inpaint",
     description: "百炼 wanx-x-painting · 涂抹区域局部重绘",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -602,7 +603,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "wan2.5-i2i-preview",
-    displayName: "万相 2.5 · 图像编辑",
+    displayName: "Wan 2.5 Image Edit",
     description: "百炼 wan2.5-i2i-preview · 单图/多图融合编辑",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -618,7 +619,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "portrait-virtual",
-    displayName: "私域虚拟人像库",
+    displayName: "Virtual Portrait Library",
     description: "火山方舟 Assets API · 虚拟人像入库 asset://",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
@@ -634,7 +635,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "portrait-real",
-    displayName: "真人人像库",
+    displayName: "Real Portrait Library",
     description: "火山方舟 Assets API · H5 活体 + 真人 CreateAsset",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",

@@ -13,7 +13,10 @@ import {
   getSbv1VideoModelRefCaps,
   sbv1VideoModelUsesPortraitLibrary,
 } from "./sbv1-video-model-reference";
-import { isDashscopeSbv1TextToVideoModel } from "./dashscope-sbv1-t2v";
+import {
+  isDashscopeHappyhorseImageToVideoModel,
+  isDashscopeSbv1TextToVideoModel,
+} from "./dashscope-sbv1-t2v";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
