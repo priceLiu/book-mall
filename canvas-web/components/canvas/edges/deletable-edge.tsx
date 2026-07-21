@@ -18,13 +18,6 @@ function edgeFocusToneFromStyle(
   return null;
 }
 
-function edgeFocusTone(props: EdgeProps): "up" | "down" | null {
-  const cls = String(props.className ?? "");
-  if (cls.includes("pro2-edge-up")) return "up";
-  if (cls.includes("pro2-edge-down")) return "down";
-  return edgeFocusToneFromStyle(props.style);
-}
-
 /**
  * 可删除连线 · 宽命中带；悬停 1s 出剪刀由 FlowCanvas · useCanvasEdgeCutHover 统一处理。
  * 选中节点高亮时叠加扫光层（沿路径流动的光带）。
@@ -51,7 +44,7 @@ export function DeletableEdge(props: EdgeProps) {
     targetPosition,
   });
 
-  const focusTone = edgeFocusTone(props);
+  const focusTone = edgeFocusToneFromStyle(style);
 
   return (
     <>
