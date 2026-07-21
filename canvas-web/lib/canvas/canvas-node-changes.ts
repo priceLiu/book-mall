@@ -1,4 +1,4 @@
-import type { NodeChange } from "@xyflow/react";
+import { applyNodeChanges, type NodeChange } from "@xyflow/react";
 
 import type { CanvasFlowNode } from "./types";
 
@@ -339,6 +339,40 @@ export function buildGroupResizeFrozenAbs(
     });
   }
   return frozen;
+}
+
+/**
+ * LibTV 组框缩放单帧：只应用组框变更，子节点保持 parentId + 高 z-index，
+ * 相对坐标钉回冻结绝对坐标（extent 暂解除，避免组框小于内容时被 RF 裁切隐藏）。
+ */
+export function applyLibtvGroupResizeFrame(
+  rfBeforeChange: CanvasFlowNode[],
+  rfChanges: NodeChange[],
+  groupId: string,
+  frozen: GroupResizeFrozenAbs,
+): CanvasFlowNode[] {
+  const groupOnlyChanges = rfChanges.filter(
+    (c) => !("id" in c && typeof c.id === "string" && frozen.has(c.id)),
+  );
+  const next = applyNodeChanges(
+    groupOnlyChanges,
+    rfBeforeChange,
+  ) as CanvasFlowNode[];
+  const group = next.find((n) => n.id === groupId);
+  if (!group) return next;
+  return next.map((n) => {
+    const abs = frozen.get(n.id);
+    if (!abs) return n;
+    return {
+      ...n,
+      parentId: groupId,
+      extent: undefined,
+      position: {
+        x: abs.x - group.position.x,
+        y: abs.y - group.position.y,
+      },
+    };
+  });
 }
 
 export function augmentStoreChangesWithResizePositions(

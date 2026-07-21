@@ -24,6 +24,7 @@ import { hasLibtvMediaCanvasNodes } from "@/lib/canvas/libtv-canvas-detect";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   augmentStoreChangesWithResizePositions,
+  applyLibtvGroupResizeFrame,
   buildGroupResizeFrozenAbs,
   buildGeometryPatchesFromRf,
   extractResizeCommitIds,
@@ -623,6 +624,7 @@ function FlowCanvasInner({
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
       const rfBeforeChange = getNodes() as CanvasFlowNode[];
       const groupResizingId = findGroupResizeInProgress(changes, rfBeforeChange);
+      const resizeCommitIdsEarly = extractResizeCommitIds(rfChanges);
       if (groupResizingId) {
         if (groupResizeIdRef.current !== groupResizingId) {
           groupResizeIdRef.current = groupResizingId;
@@ -634,38 +636,42 @@ function FlowCanvasInner({
           groupResizeSnapshotRef.current = groupNode
             ? readGroupResizeGeometry(groupNode)
             : null;
-          groupResizeDetachedRef.current = false;
+          groupResizeDetachedRef.current = true;
         }
       }
 
-      // 组框缩放：绿框实时跟手。子节点脱离 parent、每帧钉回冻结的绝对坐标，
-      // 并「只应用组框自身的变更」——忽略 NodeResizer 从左/上手柄发出的子节点补偿位移，
-      // 否则子节点会被拖着漂移（右/下手柄原点不动才「碰巧」正常）。松手再 reparent 回组内。
+      const activeGroupResizeId = groupResizeIdRef.current;
+      const isGroupResizeCommit =
+        activeGroupResizeId != null &&
+        resizeCommitIdsEarly.includes(activeGroupResizeId);
+
+      // 组框缩放：绿框实时跟手；子节点保持 parentId（z-index 正常），
+      // 每帧钉回冻结绝对坐标；extent 暂解除避免组框小于内容时被裁切。
+      let rfAfterChange = rfBeforeChange;
       let appliedRfChanges = false;
-      if (groupResizingId && groupResizeFrozenRef.current) {
-        groupResizeDetachedRef.current = true;
-        const frozen = groupResizeFrozenRef.current;
-        const base = rfBeforeChange.map((n) => {
-          const abs = frozen.get(n.id);
-          if (!abs) return n;
-          return {
-            ...n,
-            parentId: undefined,
-            extent: undefined,
-            position: { x: abs.x, y: abs.y },
-          };
-        });
-        const groupOnlyChanges = rfChanges.filter(
-          (c) => !("id" in c && typeof c.id === "string" && frozen.has(c.id)),
+      if (activeGroupResizeId && groupResizeFrozenRef.current) {
+        rfAfterChange = applyLibtvGroupResizeFrame(
+          rfBeforeChange,
+          rfChanges,
+          activeGroupResizeId,
+          groupResizeFrozenRef.current,
         );
-        setRfNodes(applyNodeChanges(groupOnlyChanges, base) as CanvasFlowNode[]);
+        setRfNodes(rfAfterChange);
         appliedRfChanges = true;
       }
       if (!appliedRfChanges) {
         onRfNodesChange(rfChanges);
+        rfAfterChange = applyNodeChanges(
+          rfChanges,
+          rfBeforeChange,
+        ) as CanvasFlowNode[];
       }
 
-      if (isCanvasInteractiveGeometryInProgress(changes)) {
+      if (
+        (isCanvasInteractiveGeometryInProgress(changes) ||
+          (activeGroupResizeId && !isGroupResizeCommit)) &&
+        !syncingGraphFromStoreRef.current
+      ) {
         // 拖动 / 缩放过程中不写 zustand：避免每帧触发所有订阅 s.nodes 的节点重渲染
         // 终态（dragging:false / resizing:false）会在松手那帧落库
         deferStoreGraphSyncRef.current = true;
@@ -688,7 +694,10 @@ function FlowCanvasInner({
         );
         if (draggingChange && "id" in draggingChange) {
           setCanvasDraggingNodeId(draggingChange.id);
-        } else if (resizingChange) {
+        } else if (
+          resizingChange ||
+          (activeGroupResizeId && !isGroupResizeCommit)
+        ) {
           // 拖角缩放不算「拖动节点」· 勿隐藏浮动 Dock
           setCanvasDraggingNodeId(null);
         }
@@ -718,7 +727,7 @@ function FlowCanvasInner({
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
-        const rfNodeList = getNodes() as CanvasFlowNode[];
+        const rfNodeList = appliedRfChanges ? rfAfterChange : (getNodes() as CanvasFlowNode[]);
         const groupResizeCommits = resizeCommitIds.filter((nodeId) => {
           const n = rfNodeList.find((x) => x.id === nodeId);
           return n?.type === "group";
@@ -755,8 +764,8 @@ function FlowCanvasInner({
             height,
             children,
           });
-          setRfNodes((nodes) =>
-            nodes.map((n) => {
+          setRfNodes(
+            rfNodeList.map((n) => {
               if (n.id === groupId) {
                 return {
                   ...n,
