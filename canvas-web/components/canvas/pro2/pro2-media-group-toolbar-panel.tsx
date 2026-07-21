@@ -2,6 +2,7 @@
 
 import {
   BookmarkPlus,
+  ChevronDown,
   Columns3,
   Copy,
   Download,
@@ -46,6 +47,11 @@ import {
   PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
 } from "./pro2-image-node-toolbar";
 import {
+  Pro2ToolbarDropdownItem,
+  Pro2ToolbarDropdownMenu,
+  usePro2ToolbarDropdownAnchor,
+} from "./pro2-toolbar-dropdown-menu";
+import {
   Pro2VideoGeneratePicker,
   type Pro2VideoGenerateResult,
 } from "./pro2-video-generate-picker";
@@ -60,10 +66,8 @@ export type Pro2MediaGroupKind =
 export type Pro2MediaGroupToolbarPanelProps = {
   groupId: string;
   kind: Pro2MediaGroupKind | null;
-  /** 分镜视频 1.0 媒体组：批量下载 / 重排等行为与 Pro2 壳层一致 */
+  /** 分镜视频 1.0 媒体组：批量下载等行为与 Pro2 壳层一致 */
   edition?: "pro2" | "sbv1";
-  /** sbv1 · 参考图与视频合成重新纳入组框 */
-  onRelayout?: () => void;
   className?: string;
   style?: React.CSSProperties;
   /** 与图片节点顶栏一致：空白区可拖组，仅按钮 nodrag */
@@ -126,7 +130,6 @@ export function Pro2MediaGroupToolbarPanel({
   groupId,
   kind,
   edition = "pro2",
-  onRelayout,
   className,
   style,
   passNodeDrag = true,
@@ -136,9 +139,10 @@ export function Pro2MediaGroupToolbarPanel({
   const edges = useCanvasStore((s) => s.edges);
   const graphMeta = useCanvasStore((s) => s.graphMeta);
   const ungroup = useCanvasStore((s) => s.ungroup);
-  const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
+  const autoLayoutGroupChildren = useCanvasStore((s) => s.autoLayoutGroupChildren);
   const duplicateMediaGroup = useCanvasStore((s) => s.duplicateMediaGroup);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const arrangeMenu = usePro2ToolbarDropdownAnchor();
 
   const group = nodes.find((n) => n.id === groupId);
   const childrenIds = useMemo(
@@ -368,15 +372,7 @@ export function Pro2MediaGroupToolbarPanel({
     edition === "pro2" &&
     Boolean(kind && controller && rowCount) &&
     (kind !== "video-board" || videoBoardHasMedia);
-  const canCopyGroup =
-    edition === "pro2" &&
-    Boolean(
-      kind &&
-        (kind === "scene-board" ||
-          kind === "frame-board" ||
-          kind === "video-board" ||
-          kind === "character-board"),
-    );
+  const canCopyGroup = childrenIds.length > 0;
 
   const onRegenerateAll = () => {
     if (!controller) return;
@@ -550,6 +546,11 @@ export function Pro2MediaGroupToolbarPanel({
     setEditOpen(false);
   };
 
+  const applyGroupArrange = (mode: "auto" | "row" | "column") => {
+    arrangeMenu.setOpen(false);
+    autoLayoutGroupChildren(groupId, mode);
+  };
+
   return (
     <div className={className} style={style}>
       <div
@@ -607,46 +608,17 @@ export function Pro2MediaGroupToolbarPanel({
             生成视频组
           </button>
         ) : null}
-        {onRelayout ? (
-          <button
-            type="button"
-            className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-            title="参考图与视频重新纳入组框"
-            onClick={onRelayout}
-          >
-            <LayoutGrid className="size-3.5" />
-            重排
-          </button>
-        ) : null}
         <button
           type="button"
+          ref={arrangeMenu.anchorRef}
           className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-          title={`把本组 ${childrenIds.length} 个子节点排成一行（横为主）`}
+          title={`排列本组 ${childrenIds.length} 个子节点`}
           disabled={childrenIds.length < 2}
-          onClick={() => autoLayoutNodes(childrenIds, "row")}
-        >
-          <Columns3 className="size-3.5" />
-          横排
-        </button>
-        <button
-          type="button"
-          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-          title={`把本组 ${childrenIds.length} 个子节点排成一列（竖为主）`}
-          disabled={childrenIds.length < 2}
-          onClick={() => autoLayoutNodes(childrenIds, "column")}
-        >
-          <Rows3 className="size-3.5" />
-          竖排
-        </button>
-        <button
-          type="button"
-          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-          title={`按拓扑顺序自动整理本组 ${childrenIds.length} 个子节点`}
-          disabled={childrenIds.length < 2}
-          onClick={() => autoLayoutNodes(childrenIds, "auto")}
+          onClick={() => arrangeMenu.setOpen(!arrangeMenu.open)}
         >
           <LayoutGrid className="size-3.5" />
-          自动
+          组排列
+          <ChevronDown className="size-3 opacity-50" />
         </button>
         <button
           type="button"
@@ -709,6 +681,32 @@ export function Pro2MediaGroupToolbarPanel({
           解组
         </button>
       </div>
+
+      <Pro2ToolbarDropdownMenu
+        open={arrangeMenu.open}
+        setOpen={arrangeMenu.setOpen}
+        rect={arrangeMenu.rect}
+        minWidth={200}
+      >
+        <Pro2ToolbarDropdownItem
+          icon={Columns3}
+          label="横排"
+          disabled={childrenIds.length < 2}
+          onClick={() => applyGroupArrange("row")}
+        />
+        <Pro2ToolbarDropdownItem
+          icon={Rows3}
+          label="竖排"
+          disabled={childrenIds.length < 2}
+          onClick={() => applyGroupArrange("column")}
+        />
+        <Pro2ToolbarDropdownItem
+          icon={LayoutGrid}
+          label="自动"
+          disabled={childrenIds.length < 2}
+          onClick={() => applyGroupArrange("auto")}
+        />
+      </Pro2ToolbarDropdownMenu>
 
       {editOpen ? (
         <div

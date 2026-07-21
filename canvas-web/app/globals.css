@@ -279,11 +279,11 @@ html[data-canvas-modal-open] .pro2-input-dock {
   cursor: default;
 }
 
-/* 组内连线：高于组背景(5)、低于媒体子节点(22) · 见 pro2-media-group-meta.ts */
-.canvas-flow-wrap .react-flow__edges {
-  z-index: 12 !important;
-}
-/* 勿整层 nodes 盖住 edges；各节点用 zIndex / 下方规则分层 */
+/*
+ * 连线 / 节点容器均勿建 stacking context，否则边的 svg zIndex 无法与节点交错：
+ * 组框 z=5 < 连线 z=12 < 媒体子节点 z=22（zIndexMode=manual + defaultEdgeOptions）
+ */
+.canvas-flow-wrap .react-flow__edges,
 .canvas-flow-wrap .react-flow__nodes {
   z-index: auto !important;
 }
@@ -610,6 +610,32 @@ html[data-canvas-modal-open] .pro2-input-dock {
 .canvas-flow-wrap .react-flow__node.selected:hover .react-flow__resize-control.handle.pro2-node-resizer-handle,
 .canvas-flow-wrap .react-flow__resize-control.handle.pro2-node-resizer-handle:active {
   opacity: 0 !important;
+}
+
+/* 分组容器 · 选中时可拖角调整组框大小 */
+.canvas-flow-wrap .react-flow__resize-control.handle.canvas-group-resizer-handle {
+  z-index: 100 !important;
+  pointer-events: auto !important;
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 3px !important;
+  border: 2px solid rgba(255, 255, 255, 0.55) !important;
+  background: rgba(12, 12, 14, 0.85) !important;
+  opacity: 0 !important;
+}
+
+.canvas-flow-wrap
+  .react-flow__node-group.selected:hover
+  .react-flow__resize-control.handle.canvas-group-resizer-handle,
+.canvas-flow-wrap
+  .react-flow__resize-control.handle.canvas-group-resizer-handle:active {
+  opacity: 1 !important;
+}
+
+/* 分组 · 选中时显示四边缩放线（左/右缘缩放须同步 position） */
+.canvas-flow-wrap .react-flow__node-group.selected .react-flow__resize-control.line {
+  display: block !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
 }
 
 /* 剪映导出节点：加大拖角热区 */

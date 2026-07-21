@@ -9,13 +9,20 @@ import {
 
 const EDGE_HIT_WIDTH = 40;
 
-function edgeFocusTone(
+function edgeFocusToneFromStyle(
   style: EdgeProps["style"],
 ): "up" | "down" | null {
   const stroke = (style as CSSProperties | undefined)?.stroke;
   if (stroke === "#60a5fa") return "up";
   if (stroke === "#238636") return "down";
   return null;
+}
+
+function edgeFocusTone(props: EdgeProps): "up" | "down" | null {
+  const cls = String(props.className ?? "");
+  if (cls.includes("pro2-edge-up")) return "up";
+  if (cls.includes("pro2-edge-down")) return "down";
+  return edgeFocusToneFromStyle(props.style);
 }
 
 /**
@@ -44,7 +51,7 @@ export function DeletableEdge(props: EdgeProps) {
     targetPosition,
   });
 
-  const focusTone = edgeFocusTone(style);
+  const focusTone = edgeFocusTone(props);
 
   return (
     <>

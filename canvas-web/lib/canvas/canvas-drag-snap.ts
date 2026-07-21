@@ -72,10 +72,49 @@ export type DragSnapResult = {
   guides: SnapGuideLine[];
 };
 
+/** 当前视口在 flow 坐标下的矩形 · 参考线全屏延伸 */
+export type FlowViewportRect = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+};
+
+export function flowViewportRect(
+  width: number,
+  height: number,
+  transform: readonly [number, number, number],
+): FlowViewportRect {
+  const [tx, ty, zoom] = transform;
+  const z = Math.max(zoom, 0.08);
+  return {
+    minX: -tx / z,
+    minY: -ty / z,
+    maxX: (width - tx) / z,
+    maxY: (height - ty) / z,
+  };
+}
+
 export function snapGuideKey(guides: SnapGuideLine[]): string {
   return guides
     .map((g) => `${g.orientation}:${Math.round(g.position)}`)
     .join("|");
+}
+
+/** 拖动吸附候选：含 group 外框；拖 group 时排除其子节点 */
+export function buildDragSnapCandidates(
+  dragging: CanvasFlowNode,
+  all: CanvasFlowNode[],
+): NodeSnapBox[] {
+  const exclude = new Set<string>([dragging.id]);
+  if (dragging.type === "group") {
+    for (const n of all) {
+      if (n.parentId === dragging.id) exclude.add(n.id);
+    }
+  }
+  return all
+    .filter((n) => !exclude.has(n.id))
+    .map((n) => nodeSnapBox(n, all));
 }
 
 /** 仅保留拖动节点附近的候选，减少每帧计算量 */
@@ -102,6 +141,7 @@ export function computeDragSnap(
   dragging: NodeSnapBox,
   others: NodeSnapBox[],
   threshold = CANVAS_DRAG_SNAP_THRESHOLD,
+  guideViewport?: FlowViewportRect,
 ): DragSnapResult {
   const xTargets: number[] = [];
   const yTargets: number[] = [];
@@ -124,42 +164,59 @@ export function computeDragSnap(
   const dx = snapX?.delta ?? 0;
   const dy = snapY?.delta ?? 0;
   const guides: SnapGuideLine[] = [];
-  const extend = 280;
 
   if (snapX) {
-    const allY = [
-      dragging.top + dy,
-      dragging.centerY + dy,
-      dragging.bottom + dy,
-      ...others.flatMap((o) => [o.top, o.centerY, o.bottom]),
-    ];
-    const span = Math.max(...allY) - Math.min(...allY);
-    const mid = (Math.min(...allY) + Math.max(...allY)) / 2;
-    const half = span / 2 + extend;
-    guides.push({
-      orientation: "vertical",
-      position: snapX.value,
-      from: mid - half,
-      to: mid + half,
-    });
+    if (guideViewport) {
+      guides.push({
+        orientation: "vertical",
+        position: snapX.value,
+        from: guideViewport.minY,
+        to: guideViewport.maxY,
+      });
+    } else {
+      const allY = [
+        dragging.top + dy,
+        dragging.centerY + dy,
+        dragging.bottom + dy,
+        ...others.flatMap((o) => [o.top, o.centerY, o.bottom]),
+      ];
+      const span = Math.max(...allY) - Math.min(...allY);
+      const mid = (Math.min(...allY) + Math.max(...allY)) / 2;
+      const half = span / 2 + 1200;
+      guides.push({
+        orientation: "vertical",
+        position: snapX.value,
+        from: mid - half,
+        to: mid + half,
+      });
+    }
   }
 
   if (snapY) {
-    const allX = [
-      dragging.left + dx,
-      dragging.centerX + dx,
-      dragging.right + dx,
-      ...others.flatMap((o) => [o.left, o.centerX, o.right]),
-    ];
-    const span = Math.max(...allX) - Math.min(...allX);
-    const mid = (Math.min(...allX) + Math.max(...allX)) / 2;
-    const half = span / 2 + extend;
-    guides.push({
-      orientation: "horizontal",
-      position: snapY.value,
-      from: mid - half,
-      to: mid + half,
-    });
+    if (guideViewport) {
+      guides.push({
+        orientation: "horizontal",
+        position: snapY.value,
+        from: guideViewport.minX,
+        to: guideViewport.maxX,
+      });
+    } else {
+      const allX = [
+        dragging.left + dx,
+        dragging.centerX + dx,
+        dragging.right + dx,
+        ...others.flatMap((o) => [o.left, o.centerX, o.right]),
+      ];
+      const span = Math.max(...allX) - Math.min(...allX);
+      const mid = (Math.min(...allX) + Math.max(...allX)) / 2;
+      const half = span / 2 + 1200;
+      guides.push({
+        orientation: "horizontal",
+        position: snapY.value,
+        from: mid - half,
+        to: mid + half,
+      });
+    }
   }
 
   return { dx, dy, guides };

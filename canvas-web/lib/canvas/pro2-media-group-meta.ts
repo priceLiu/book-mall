@@ -65,7 +65,7 @@ export function pro2MediaGroupDefaultLabel(
   return "分镜视频";
 }
 
-/** 媒体组边框色：用户选色仅影响边框，背景保持暗色点阵 */
+/** 媒体组边框色 */
 export function pro2MediaGroupBorderColor(
   color: string | undefined,
   selected?: boolean,
@@ -80,6 +80,19 @@ export function pro2MediaGroupBorderColor(
   if (selected) return c;
   if (hovered) return `${c}99`;
   return `${c}66`;
+}
+
+/** 组背景 · 不透明底色（连线层 zIndex 12 须高于组框 5） */
+export function pro2MediaGroupBackgroundColor(
+  color: string | undefined,
+  emphasized?: boolean,
+): string {
+  const c = color?.trim() || GROUP_COLOR_PRESETS[2];
+  if (!c.startsWith("#") || c.length !== 7) {
+    return emphasized ? "#1c1c24" : "#18181f";
+  }
+  const mix = emphasized ? 32 : 26;
+  return `color-mix(in srgb, ${c} ${mix}%, #12121a)`;
 }
 
 /** 为缺少 pro2Kind 的 Pro2 媒体组补齐元数据 */

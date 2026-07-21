@@ -17,6 +17,11 @@ import { sortNodesForReactFlow } from "./normalize-graph-nodes";
 import type { CanvasFlowNode } from "./types";
 
 export const PRO2_MEDIA_GRID_GAP = 28;
+
+/** 组内宫格间距 · 约为单元宽度的一半 */
+export function pro2MediaGridGap(cellWidth: number): number {
+  return Math.max(PRO2_MEDIA_GRID_GAP, Math.round(cellWidth / 2));
+}
 export const PRO2_MEDIA_GROUP_HEADER = 48;
 /** 组内边距（大留白：空白区即「选中组」可点区域） */
 export const PRO2_MEDIA_GROUP_PAD = 64;
@@ -77,12 +82,13 @@ export function pro2MediaGridLayout(
   const c = Math.max(1, cols);
   const col = index % c;
   const row = Math.floor(index / c);
+  const gap = pro2MediaGridGap(cell.width);
   return {
-    x: PRO2_MEDIA_GROUP_PAD + col * (cell.width + PRO2_MEDIA_GRID_GAP),
+    x: PRO2_MEDIA_GROUP_PAD + col * (cell.width + gap),
     y:
       PRO2_MEDIA_GROUP_PAD +
       PRO2_MEDIA_GROUP_HEADER +
-      row * (cell.height + PRO2_MEDIA_GRID_GAP),
+      row * (cell.height + gap),
   };
 }
 
@@ -163,17 +169,18 @@ export function mediaGridLayoutForChildren(
   });
 
   const colX: number[] = [];
+  const gap = pro2MediaGridGap(Math.max(...colWidths, PRO2_IMAGE_NODE_WIDTH));
   let x = PRO2_MEDIA_GROUP_PAD;
   for (let col = 0; col < c; col++) {
     colX.push(x);
-    x += colWidths[col]! + PRO2_MEDIA_GRID_GAP;
+    x += colWidths[col]! + gap;
   }
 
   const rowY: number[] = [];
   let y = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
   for (let row = 0; row < rows; row++) {
     rowY.push(y);
-    y += rowHeights[row]! + PRO2_MEDIA_GRID_GAP;
+    y += rowHeights[row]! + gap;
   }
 
   return children.map((_, index) => {
@@ -228,16 +235,17 @@ export function pro2MediaGroupDimensions(
 } {
   const c = Math.max(1, cols);
   const rows = Math.max(1, Math.ceil(childCount / c));
+  const gap = pro2MediaGridGap(cell.width);
   const width =
     PRO2_MEDIA_GROUP_PAD * 2 +
     c * cell.width +
-    (c - 1) * PRO2_MEDIA_GRID_GAP +
+    (c - 1) * gap +
     PRO2_MEDIA_GROUP_EXTRA;
   const height =
     PRO2_MEDIA_GROUP_PAD * 2 +
     PRO2_MEDIA_GROUP_HEADER +
     rows * cell.height +
-    (rows - 1) * PRO2_MEDIA_GRID_GAP +
+    (rows - 1) * gap +
     PRO2_MEDIA_GROUP_EXTRA;
   return { width, height };
 }
@@ -328,7 +336,7 @@ function isMediaGroupChildForRelayout(
 }
 
 /** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 9;
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 10;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(

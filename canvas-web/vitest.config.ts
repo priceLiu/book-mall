@@ -45,6 +45,7 @@ export default defineConfig({
       "test/unit/sbv1-upstream-ref-links.test.ts",
       "test/unit/jianying-from-workspace.test.ts",
       "test/unit/libtv-node-toolbar-scale.test.ts",
+      "test/unit/libtv-group-content-bounds.test.ts",
       "test/unit/task-pick-preferred.test.ts",
     ],
     environment: "node",

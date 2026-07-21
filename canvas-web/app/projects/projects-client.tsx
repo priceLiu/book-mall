@@ -25,6 +25,7 @@ import {
   BUILTIN_CANVAS_TEMPLATES,
 } from "@/lib/canvas/templates";
 import { cloneGraphForNewProject } from "@/lib/canvas/clone";
+import { ensureGraphMetaEdition } from "@/lib/canvas/canvas-layout-mode";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import {
   canvasEditionBadgeClass,
@@ -327,10 +328,23 @@ function Inner() {
           scriptPackagePick,
         );
       }
+      let graph = canvas as CanvasGraph;
+      if (pickerEdition === "pro2" || pickerEdition === "sbv1") {
+        graph = {
+          ...graph,
+          meta: { ...(graph.meta ?? {}), edition: pickerEdition },
+        };
+      }
+      graph = {
+        ...graph,
+        meta:
+          ensureGraphMetaEdition(graph.nodes ?? [], graph.meta ?? null) ??
+          graph.meta,
+      };
       const finalName = name.trim() || defaultCanvasProjectName();
       const created = await createCanvasProject(base, {
         name: finalName,
-        canvas,
+        canvas: graph,
       });
       window.location.href = `/canvas/${created.id}`;
     } catch (e) {
@@ -338,7 +352,7 @@ function Inner() {
     } finally {
       setCreating(false);
     }
-  }, [base, name, pick, userTemplates, scriptPackagePick]);
+  }, [base, name, pick, pickerEdition, userTemplates, scriptPackagePick]);
 
   const onPrimaryCreateAction = useCallback(async () => {
     if (

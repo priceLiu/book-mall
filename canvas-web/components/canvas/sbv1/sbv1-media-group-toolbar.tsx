@@ -6,33 +6,25 @@ import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selec
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
-import {
-  findSbv1GroupLinkedVideoEngine,
-} from "@/lib/canvas/sbv1-media-group-layout";
+import { findSbv1GroupLinkedVideoEngine } from "@/lib/canvas/sbv1-media-group-layout";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { Pro2MediaGroupToolbarPanel } from "../pro2/pro2-media-group-toolbar-panel";
-import {
-  pinPro2MediaGroupToolbarHover,
-  schedulePro2MediaGroupToolbarHide,
-} from "@/lib/canvas/pro2-media-group-toolbar-hover";
 
 const TOOLBAR_HEIGHT = 44;
 const HEADER_RESERVED = 56;
 const GAP = 8;
 
-/** sbv1 参考图分组被选中 → 顶部工具条（壳层与 Pro2 媒体组一致） */
+/** sbv1 参考图分组 · 仅单击选中组时显示顶部工具条（拖动中隐藏，松手恢复） */
 export function Sbv1MediaGroupToolbar({
   rfNodes,
 }: {
   rfNodes: CanvasFlowNode[];
 }) {
   const reparentNode = useCanvasStore((s) => s.reparentNode);
-  const autoLayoutGroupChildren = useCanvasStore((s) => s.autoLayoutGroupChildren);
   const edges = useCanvasStore((s) => s.edges);
-  const hoveredMediaGroupId = useCanvasStore((s) => s.hoveredMediaGroupId);
-  const setHoveredMediaGroupId = useCanvasStore((s) => s.setHoveredMediaGroupId);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const geometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
   const marqueeSelecting = useCanvasMarqueeSelecting();
 
   const group = useMemo(() => {
@@ -41,19 +33,11 @@ export function Sbv1MediaGroupToolbar({
     );
     if (hasNonGroupSelected) return null;
     const selected = rfNodes.find((n) => n.selected && n.type === "group");
-    const target =
-      selected ??
-      (hoveredMediaGroupId
-        ? rfNodes.find(
-            (n) => n.id === hoveredMediaGroupId && n.type === "group",
-          )
-        : undefined);
-    if (!target) return null;
-    if (!isSbv1MediaGroup(target, rfNodes)) return null;
-    return target;
-  }, [rfNodes, hoveredMediaGroupId]);
+    if (!selected) return null;
+    if (!isSbv1MediaGroup(selected, rfNodes)) return null;
+    return selected;
+  }, [rfNodes]);
 
-  // 选中组时：若视频引擎在组外但已连线，纳入组内并排布（悬停预览顶栏时不重排）
   useEffect(() => {
     if (!group?.selected) return;
     const nodes = useCanvasStore.getState().nodes;
@@ -104,18 +88,15 @@ export function Sbv1MediaGroupToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group, getInternalNode, flowToScreenPosition, rfNodes, viewport]);
 
-  if (marqueeSelecting || viewportMoving || !group || !placement) return null;
-
-  const keepHover = () =>
-    pinPro2MediaGroupToolbarHover(group.id, setHoveredMediaGroupId);
-  const releaseHover = () => {
-    if (group.selected) return;
-    schedulePro2MediaGroupToolbarHide(group.id, () => {
-      if (useCanvasStore.getState().hoveredMediaGroupId === group.id) {
-        setHoveredMediaGroupId(null);
-      }
-    });
-  };
+  if (
+    marqueeSelecting ||
+    viewportMoving ||
+    geometryDragging ||
+    !group ||
+    !placement
+  ) {
+    return null;
+  }
 
   return (
     <div
@@ -127,15 +108,11 @@ export function Sbv1MediaGroupToolbar({
         padding: "14px 20px",
         margin: "-14px -20px",
       }}
-      onPointerEnter={keepHover}
-      onPointerLeave={releaseHover}
-      onPointerDown={keepHover}
     >
       <Pro2MediaGroupToolbarPanel
         groupId={group.id}
         kind={null}
         edition="sbv1"
-        onRelayout={() => autoLayoutGroupChildren(group.id, "auto")}
         onMouseDown={(e) => e.stopPropagation()}
       />
     </div>
