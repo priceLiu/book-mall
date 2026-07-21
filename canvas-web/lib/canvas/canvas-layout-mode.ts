@@ -2,7 +2,7 @@ import {
   hasLibtvMediaCanvasNodes,
   hasOnlySbv1LibtvCanvas,
 } from "./libtv-canvas-detect";
-import type { CanvasFlowNode } from "./types";
+import type { CanvasFlowNode, CanvasGraph } from "./types";
 import { hasStoryPro2Pipeline } from "./story-pro2-pipeline";
 import { hasSbv1Pipeline } from "./sbv1-pipeline";
 
@@ -12,12 +12,8 @@ export type CanvasLayoutShell = "pro2" | "sbv1" | "legacy";
 /** 根据 graph 推断 meta.edition（hydrate / 新建时补齐，避免落 legacy 外壳） */
 export function ensureGraphMetaEdition(
   nodes: CanvasFlowNode[],
-  meta?: {
-    edition?: string;
-    crewBulletinAnchor?: unknown;
-    linkedScriptPackageAssetId?: string;
-  } | null,
-): typeof meta {
+  meta?: CanvasGraph["meta"] | null,
+): CanvasGraph["meta"] | null {
   const shell = resolveCanvasLayoutShell({
     projectEdition: meta?.edition,
     nodes,
@@ -36,7 +32,7 @@ export function ensureGraphMetaEdition(
 export function resolveCanvasLayoutShell(args: {
   projectEdition?: string | null;
   nodes: CanvasFlowNode[];
-  graphMeta?: { edition?: string; crewBulletinAnchor?: unknown; linkedScriptPackageAssetId?: string } | null;
+  graphMeta?: CanvasGraph["meta"] | null;
 }): CanvasLayoutShell {
   const { projectEdition, nodes, graphMeta } = args;
   const metaEdition = graphMeta?.edition;
