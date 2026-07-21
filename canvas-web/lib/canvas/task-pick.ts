@@ -36,6 +36,17 @@ export function isServerInflightTaskStatus(status: string): boolean {
   );
 }
 
+/** 超过合理等待上限的进行中任务 · 勿再恢复 UI「生成中」（旧项目孤儿任务） */
+export const CANVAS_ABANDONED_INFLIGHT_MS = 6 * 60 * 60 * 1000;
+
+export function isAbandonedCanvasInflightTask(task: CanvasTaskRecord): boolean {
+  if (!isServerInflightTaskStatus(task.status)) return false;
+  const ts = new Date(
+    task.submittedAt ?? task.updatedAt ?? task.createdAt,
+  ).getTime();
+  return Date.now() - ts > CANVAS_ABANDONED_INFLIGHT_MS;
+}
+
 /** SUBMITTED 滞后但同节点已有更新的成功成片 → 勿再当作进行中阻塞 UI */
 export function isStaleServerInflightTask(
   task: CanvasTaskRecord,
@@ -80,9 +91,11 @@ export function pickActiveServerInflightTask(
   const inflight = nodeTasks.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
-      !isStaleServerInflightTask(t, nodeTasks),
+      !isStaleServerInflightTask(t, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(t),
   );
   if (!inflight.length) return undefined;
+  if (hasRtMedia && !boundId) return undefined;
   return [...inflight].sort(
     (a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

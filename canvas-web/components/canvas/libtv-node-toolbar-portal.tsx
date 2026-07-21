@@ -41,6 +41,11 @@ export function LibtvNodeToolbarPortal({
 
   if (!mounted || !effectiveVisible || !placement) return null;
 
+  const translateY =
+    placement.place === "below"
+      ? `${LIBTV_TOOLBAR_PORTAL_GAP_PX}px`
+      : `calc(-100% - ${LIBTV_TOOLBAR_PORTAL_GAP_PX}px)`;
+
   return createPortal(
     <LibtvToolbarPortaledContext.Provider value={true}>
       <div
@@ -48,8 +53,8 @@ export function LibtvNodeToolbarPortal({
         style={{
           left: placement.x,
           top: placement.y,
-          transform: `translate(-50%, calc(-100% - ${LIBTV_TOOLBAR_PORTAL_GAP_PX}px)) scale(${toolbarScale})`,
-          transformOrigin: "center bottom",
+          transform: `translate(-50%, ${translateY}) scale(${toolbarScale})`,
+          transformOrigin: placement.place === "below" ? "center top" : "center bottom",
           visibility: hidden ? "hidden" : "visible",
           pointerEvents: hidden ? "none" : "auto",
         }}

@@ -12,6 +12,10 @@ import {
   pro2NodeBoxSize,
 } from "@/lib/canvas/pro2-selection-bbox";
 
+const NODE_TOOLBAR_HEADER_RESERVED = 56;
+const NODE_TOOLBAR_HEIGHT = 44;
+const NODE_TOOLBAR_GAP = 8;
+
 /** 拖动所属节点时隐藏顶栏（与浮动 Dock 同一规则） */
 export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
   return useCanvasStore((s) =>
@@ -23,7 +27,7 @@ export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
 export function useLibtvNodeToolbarScreenPlacement(
   nodeId: string,
   visible: boolean,
-): { x: number; y: number } | null {
+): { x: number; y: number; place: "above" | "below" } | null {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const flowNode = useCanvasStore((s) => s.nodes.find((n) => n.id === nodeId));
   const allNodes = useCanvasStore((s) => s.nodes);
@@ -58,8 +62,13 @@ export function useLibtvNodeToolbarScreenPlacement(
       w = pro2NodeBoxSize(flowNode).w;
     }
 
-    const top = flowToScreenPosition({ x: pos.x + w / 2, y: pos.y });
-    return { x: top.x, y: top.y };
+    const cx = pos.x + w / 2;
+    const top = flowToScreenPosition({ x: cx, y: pos.y });
+    const bottom = flowToScreenPosition({ x: cx, y: pos.y + pro2NodeBoxSize(flowNode).h });
+    if (top.y - NODE_TOOLBAR_HEIGHT - NODE_TOOLBAR_GAP < NODE_TOOLBAR_HEADER_RESERVED) {
+      return { x: bottom.x, y: bottom.y + NODE_TOOLBAR_GAP, place: "below" };
+    }
+    return { x: top.x, y: top.y - NODE_TOOLBAR_GAP, place: "above" };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     nodeId,

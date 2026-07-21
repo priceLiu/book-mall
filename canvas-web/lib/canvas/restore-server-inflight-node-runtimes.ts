@@ -50,9 +50,9 @@ function shouldRestoreInflight(
   return !bound || bound !== inflight.id;
 }
 
-/**
- * 刷新 / 轮询后：服务端仍有 QUEUED…SUBMITTED，但节点 runtime 已 idle 或未绑定 taskId 时，
+/** 刷新 / 轮询后：服务端仍有 QUEUED…SUBMITTED，但节点 runtime 已 idle 或未绑定 taskId 时，
  * 从任务表恢复「生成中」态，避免 UI 与 Gateway 日志脱节。
+ * 跳过已超时孤儿任务（旧项目误显示生成中）。
  */
 export function restoreServerInflightNodeRuntimes(
   nodes: CanvasFlowNode[],

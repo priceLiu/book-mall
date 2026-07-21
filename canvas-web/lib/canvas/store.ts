@@ -70,12 +70,15 @@ import {
 import {
   PRO2_FRAME_CELL_HEIGHT,
   PRO2_FRAME_CELL_WIDTH,
-  PRO2_MEDIA_GROUP_HEADER,
   PRO2_MEDIA_GROUP_LAYOUT_VERSION,
   PRO2_MEDIA_GROUP_PAD,
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
+import {
+  applySbv1MediaGroupRelayout,
+  shouldUseSbv1ImageVideoColumnLayout,
+} from "./sbv1-media-group-layout";
 import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
 import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
 import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
@@ -110,6 +113,7 @@ import {
 } from "./canvas-node-changes";
 import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
+import { ensureGraphMetaEdition } from "./canvas-layout-mode";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
@@ -345,6 +349,26 @@ type CanvasState = {
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
   resizeNode: (id: string, size: { width: number; height: number }) => void;
+  /** NodeResizer 松手：从 RF 权威几何一次性写入 store（含左/上缘 position） */
+  commitNodesGeometryFromRf: (
+    patches: Array<{
+      id: string;
+      position: { x: number; y: number };
+      width: number;
+      height: number;
+    }>,
+  ) => void;
+  /**
+   * 组框缩放松手：写入组几何，并同步子节点相对坐标。
+   * 左/上缘缩放会改组 origin，须把子节点相对位移抵消，屏幕绝对位置不变。
+   */
+  commitGroupResizeFromRf: (args: {
+    groupId: string;
+    position: { x: number; y: number };
+    width: number;
+    height: number;
+    children: Array<{ id: string; position: { x: number; y: number } }>;
+  }) => void;
   removeNode: (id: string) => void;
   duplicateNode: (
     id: string,
@@ -548,6 +572,7 @@ export const useCanvasStore = create<CanvasState>()(
             : reconcileStoryProWorkspace(normalized),
         );
         const viewport = g.viewport ?? { x: 0, y: 0, zoom: 1 };
+        const hydratedMeta = ensureGraphMetaEdition(nodes, g.meta ?? null);
 
         const applyDeferredLayout = () => {
           const current = get();
@@ -556,10 +581,15 @@ export const useCanvasStore = create<CanvasState>()(
             current.nodes,
             laid.nodes,
           );
+          const meta = ensureGraphMetaEdition(
+            nodesWithInflight,
+            current.graphMeta ?? hydratedMeta ?? null,
+          );
           set((state) =>
             withGraphRevision(state, {
               nodes: isolateSharedCanvasNodeData(nodesWithInflight),
               edges: laid.edges,
+              graphMeta: meta ?? null,
             }),
           );
           queueMicrotask(() => runPostHydratePro2VideoBoardRepair(get));
@@ -579,7 +609,7 @@ export const useCanvasStore = create<CanvasState>()(
               pro2ScriptTableEditorNodeId: null,
               libtvFloatingDockNodeId: null,
               libtvFloatingDockNodeType: null,
-              graphMeta: g.meta ?? null,
+              graphMeta: hydratedMeta ?? null,
             }),
           );
           queueMicrotask(applyDeferredLayout);
@@ -587,6 +617,7 @@ export const useCanvasStore = create<CanvasState>()(
         }
 
         const laid = finalizeHydratedGraph(nodes, edges);
+        const meta = ensureGraphMetaEdition(laid.nodes, hydratedMeta ?? null);
         set((state) =>
           withGraphRevision(state, {
             projectId,
@@ -598,7 +629,7 @@ export const useCanvasStore = create<CanvasState>()(
             pro2ScriptTableEditorNodeId: null,
             libtvFloatingDockNodeId: null,
             libtvFloatingDockNodeType: null,
-            graphMeta: g.meta ?? null,
+            graphMeta: meta ?? null,
           }),
         );
         queueMicrotask(() => runPostHydratePro2VideoBoardRepair(get));
@@ -754,6 +785,7 @@ export const useCanvasStore = create<CanvasState>()(
               if (!width || !height) return n;
               return {
                 ...n,
+                position: saved.position,
                 width,
                 height,
                 style: {
@@ -1147,6 +1179,74 @@ export const useCanvasStore = create<CanvasState>()(
         );
       },
 
+      commitNodesGeometryFromRf: (patches) => {
+        if (patches.length === 0) return;
+        const byId = new Map(patches.map((p) => [p.id, p]));
+        set((state) => {
+          const prev = state.nodes;
+          const ids = patches.map((p) => p.id);
+          const next = prev.map((n) => {
+            const p = byId.get(n.id);
+            if (!p) return n;
+            return {
+              ...n,
+              position: p.position,
+              width: p.width,
+              height: p.height,
+              style: {
+                ...(typeof n.style === "object" && n.style ? n.style : {}),
+                width: p.width,
+                height: p.height,
+              },
+              data: { ...n.data, manualSize: true },
+            } as CanvasFlowNode;
+          });
+          if (canvasNodesLayoutFieldsEqual(prev, next, ids)) return state;
+          useCanvasStore.temporal.getState().pause();
+          const result = withGraphRevision(state, { nodes: next });
+          useCanvasStore.temporal.getState().resume();
+          return result;
+        });
+      },
+
+      commitGroupResizeFromRf: ({ groupId, position, width, height, children }) => {
+        const childById = new Map(children.map((c) => [c.id, c.position]));
+        set((state) => {
+          const prev = state.nodes;
+          const touched = [groupId, ...children.map((c) => c.id)];
+          const next = prev.map((n) => {
+            if (n.id === groupId) {
+              return {
+                ...n,
+                position,
+                width,
+                height,
+                style: {
+                  ...(typeof n.style === "object" && n.style ? n.style : {}),
+                  width,
+                  height,
+                },
+                data: { ...n.data, manualSize: true },
+              } as CanvasFlowNode;
+            }
+            const childPos = childById.get(n.id);
+            if (!childPos || n.parentId !== groupId) return n;
+            return {
+              ...n,
+              position: childPos,
+              extent: "parent",
+            } as CanvasFlowNode;
+          });
+          if (canvasNodesLayoutFieldsEqual(prev, next, touched)) {
+            return { ...state, canvasGeometryDragging: false };
+          }
+          return {
+            ...withGraphRevision(state, { nodes: next }),
+            canvasGeometryDragging: false,
+          };
+        });
+      },
+
       removeNode: (id) => {
         const validation = validateStoryPipelineDeletion(
           [id],
@@ -1341,7 +1441,6 @@ export const useCanvasStore = create<CanvasState>()(
             (pro2Kind || sbv1Styled || (pro2Styled && mediaGridChildrenOnly)),
         );
         const PADDING = usePro2MediaGrid ? PRO2_MEDIA_GROUP_PAD : 28;
-        const HEADER = usePro2MediaGrid ? PRO2_MEDIA_GROUP_HEADER : 32;
         const boxes = children.map((c) => {
           const m = measuredSizes?.[c.id];
           const cell = usePro2MediaGrid
@@ -1373,13 +1472,9 @@ export const useCanvasStore = create<CanvasState>()(
 
         const groupId = `g_${nanoid(8)}`;
         const groupX = minX - PADDING;
-        const groupY = minY - PADDING - HEADER;
-        const groupW = usePro2MediaGrid
-          ? 320
-          : maxX - minX + PADDING * 2;
-        const groupH = usePro2MediaGrid
-          ? 240
-          : maxY - minY + PADDING * 2 + HEADER;
+        const groupY = minY - PADDING;
+        const groupW = maxX - minX + PADDING * 2;
+        const groupH = maxY - minY + PADDING * 2;
 
         const groupData: Record<string, unknown> = {
           __t: "group",
@@ -1458,10 +1553,6 @@ export const useCanvasStore = create<CanvasState>()(
           }),
         );
         queueMicrotask(() => {
-          // 两组合并时子节点已按绝对坐标落入新组，勿再 autoLayout（会改组框尺寸触发测量死循环）
-          if (effectiveChildIds.length >= 2 && groupsToMerge.length < 2) {
-            get().autoLayoutGroupChildren(groupId, "auto");
-          }
           dispatchCanvasRfSelectNode(groupId);
         });
         return groupId;
@@ -1687,14 +1778,43 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       autoLayoutGroupChildren: (groupId, mode = "auto") => {
-        const childIds = get()
-          .nodes.filter(
+        const { nodes, edges } = get();
+        const group = nodes.find((n) => n.id === groupId && n.type === "group");
+        if (!group) return;
+
+        const childIds = nodes
+          .filter(
             (n) => n.parentId === groupId && !isGroupNode(n.type),
           )
           .map((n) => n.id);
-        if (childIds.length >= 2) {
-          get().autoLayoutNodes(childIds, mode);
+        if (childIds.length < 2) return;
+
+        const d = group.data as CanvasNodeData & {
+          pro2Kind?: string;
+          pro2ShortcutPreset?: boolean;
+        };
+        const useMediaRelayout =
+          mode === "auto" &&
+          !d.pro2ShortcutPreset &&
+          (shouldUseSbv1ImageVideoColumnLayout(group, nodes) ||
+            isSbv1MediaGroup(group, nodes) ||
+            isPro2StyledGroup(group, nodes) ||
+            Boolean(d.pro2Kind));
+
+        if (useMediaRelayout) {
+          set((state) =>
+            withGraphRevision(state, {
+              nodes: applySbv1MediaGroupRelayout(
+                state.nodes,
+                state.edges,
+                groupId,
+              ),
+            }),
+          );
+          return;
         }
+
+        get().autoLayoutNodes(childIds, mode);
       },
 
       commitFlowNodePositions: (patches) => {
@@ -1767,21 +1887,6 @@ export const useCanvasStore = create<CanvasState>()(
             dragHoverGroupId: null,
           }),
         );
-
-        const relayoutGroup = (groupId: string | null) => {
-          if (!groupId) return;
-          const state = get();
-          const g = state.nodes.find((n) => n.id === groupId && n.type === "group");
-          if (!g) return;
-          if (
-            isSbv1MediaGroup(g, state.nodes) ||
-            isPro2StyledGroup(g, state.nodes)
-          ) {
-            get().autoLayoutGroupChildren(groupId, "auto");
-          }
-        };
-        relayoutGroup(newParentGroupId);
-        relayoutGroup(oldParentId);
       },
 
       reflowStoryTemplateGroups: () => {

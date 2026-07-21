@@ -108,6 +108,10 @@ export const PRO2_MEDIA_GROUP_BORDER_SELECTED = "rgba(255, 255, 255, 0.32)";
 export const PRO2_MEDIA_GROUP_BORDER_WIDTH = 2;
 export const PRO2_MEDIA_GROUP_SHELL_CLASS =
   "pro2-media-group-node relative h-full w-full overflow-visible rounded-[20px]";
+/** 组标题 · 浮在组框外左上方（图 1） */
+export const PRO2_MEDIA_GROUP_EXTERNAL_TITLE_CLASS =
+  "pointer-events-auto absolute left-3 z-30 flex max-w-[min(calc(100%-12px),480px)] min-w-0 items-center gap-1.5";
+export const PRO2_MEDIA_GROUP_EXTERNAL_TITLE_OFFSET_PX = 28;
 
 /** 媒体图片卡：无边框、无底色；nodrag 保证仅标题栏拖动 */
 export const PRO2_MEDIA_CARD_SHELL_CLASS =
