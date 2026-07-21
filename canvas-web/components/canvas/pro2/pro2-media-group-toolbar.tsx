@@ -46,7 +46,7 @@ export function Pro2MediaGroupToolbar({
     if (isSbv1MediaGroup(selectedGroup, rfNodes)) {
       return {
         group: selectedGroup,
-        kind: null as const,
+        kind: null,
         edition: "sbv1" as const,
       };
     }
