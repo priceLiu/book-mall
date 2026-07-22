@@ -296,20 +296,28 @@ function FlowCanvasInner({
 
   const applyInitialViewport = useCallback(() => {
     if (initialFitDoneRef.current) return;
-    const vp = useCanvasStore.getState().viewport;
-    const laid = useCanvasStore.getState().nodes;
+    const state = useCanvasStore.getState();
+    const vp = state.viewport;
+    const laid = state.nodes;
     if (laid.length === 0) return;
     initialFitDoneRef.current = true;
+    const isLibtv =
+      pro2FloatingInspector ||
+      sbv1Canvas ||
+      hasLibtvMediaCanvasNodes(laid);
     const noSavedViewport =
       Math.abs(vp.x) < 1 &&
       Math.abs(vp.y) < 1 &&
       Math.abs(vp.zoom - 1) < 0.01;
-    if (noSavedViewport) {
-      void fitView({ padding: 0.12, duration: 0 });
+    // LibTV（Pro2 / sbv1）统一 fitView，避免各项目 saved viewport 缩放不一致
+    if (isLibtv || noSavedViewport) {
+      const runFit = () => void fitView({ padding: 0.12, duration: 0 });
+      runFit();
+      requestAnimationFrame(runFit);
     } else {
       void rfSetViewport(vp, { duration: 0 });
     }
-  }, [fitView, rfSetViewport]);
+  }, [fitView, rfSetViewport, pro2FloatingInspector, sbv1Canvas]);
 
   const libtvCanvas =
     pro2FloatingInspector ||

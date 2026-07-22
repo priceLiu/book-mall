@@ -134,6 +134,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const unifiedGroupShellStyle = {
     backgroundColor: pro2MediaGroupBackgroundColor(color, groupBackgroundEmphasis),
     border: `${groupBorderWidth}px solid ${groupBorderColor}`,
+    borderRadius: 20,
     transition: "border-width 120ms ease, border-color 120ms ease",
   } as const;
 
