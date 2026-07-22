@@ -86,3 +86,8 @@ export function stripRuntimeForTemplate(
     nodes: graph.nodes.map((n) => stripNodeRuntime(n, keep)),
   };
 }
+
+/** autosave / PATCH 前剥离 blob、上传中、ephemeral 等瞬时字段，保留 OSS 成片 */
+export function stripGraphForPersist(graph: CanvasGraph): CanvasGraph {
+  return stripRuntimeForTemplate(graph, { keepPersistableMedia: true });
+}

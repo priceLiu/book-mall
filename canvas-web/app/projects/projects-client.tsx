@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Copy, Plus, Trash2, X, Star } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -66,6 +67,7 @@ function normalizeEdition(
 }
 
 function Inner() {
+  const router = useRouter();
   const base = useBookMallBaseUrl();
   const dialogs = useDialogs();
   const isAdmin = useCanvasAdmin();
@@ -124,6 +126,13 @@ function Inner() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const prefetchProject = useCallback(
+    (id: string) => {
+      router.prefetch(`/canvas/${id}`);
+    },
+    [router],
+  );
 
   const refreshPortalFeaturedIds = useCallback(async () => {
     if (!base?.trim() || !isAdmin) {
@@ -545,6 +554,7 @@ function Inner() {
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
+            onPrefetchProject={prefetchProject}
             onRename={onRename}
             onCreate={() => onOpenPicker("sbv1")}
             isAdmin={isAdmin}
@@ -559,6 +569,7 @@ function Inner() {
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
+            onPrefetchProject={prefetchProject}
             onRename={onRename}
             onCreate={openPro2CreateDialog}
             isAdmin={isAdmin}
@@ -573,6 +584,7 @@ function Inner() {
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
+            onPrefetchProject={prefetchProject}
             onRename={onRename}
             onCreate={() => onOpenPicker("pro")}
             isAdmin={isAdmin}
@@ -815,6 +827,7 @@ function ProjectsSection({
   onDelete,
   onDuplicate,
   duplicatingId,
+  onPrefetchProject,
   onRename,
   onCreate,
   isAdmin,
@@ -828,6 +841,7 @@ function ProjectsSection({
   onDelete: (id: string, label: string, collaborationLocked?: boolean) => void | Promise<void>;
   onDuplicate: (id: string, label: string) => void | Promise<void>;
   duplicatingId: string | null;
+  onPrefetchProject: (id: string) => void;
   onRename: (id: string, nextName: string) => void | Promise<void>;
   onCreate: () => void;
   isAdmin?: boolean;
@@ -868,9 +882,14 @@ function ProjectsSection({
           {projects.map((p) => (
             <li
               key={p.id}
-              className="group rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
+              className="group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
             >
-              <Link href={`/canvas/${p.id}`} className="block">
+              <Link
+                href={`/canvas/${p.id}`}
+                className="block"
+                prefetch
+                onMouseEnter={() => onPrefetchProject(p.id)}
+              >
                 <CanvasListCover url={p.thumbnailUrl} name={p.name} />
                 <ProjectNameEditor
                   name={p.name}

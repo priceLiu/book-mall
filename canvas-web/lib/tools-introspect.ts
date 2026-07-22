@@ -108,7 +108,9 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
   const timeoutMs =
     timeoutMsRaw && /^\d+$/.test(timeoutMsRaw)
       ? Math.min(Math.max(Number(timeoutMsRaw), 3000), 60000)
-      : 12000;
+      : process.env.NODE_ENV === "development"
+        ? 5_000
+        : 12_000;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);

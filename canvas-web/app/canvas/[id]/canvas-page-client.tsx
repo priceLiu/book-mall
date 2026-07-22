@@ -40,7 +40,7 @@ import {
   CanvasRunnerHost,
   useCanvasInflightTaskCount,
 } from "@/lib/canvas/run-queue";
-import { stripRuntimeForTemplate } from "@/lib/canvas/sanitize";
+import { stripRuntimeForTemplate, stripGraphForPersist } from "@/lib/canvas/sanitize";
 import { stripStoryProUploadedScriptMdForPersist } from "@/lib/canvas/story-pro-upload-script";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
@@ -223,8 +223,9 @@ function Inner({ projectId }: { projectId: string }) {
     nodes,
     graphMeta,
   });
-  const isStoryPro2Canvas = layoutShell === "pro2";
-  const isSbv1Canvas = layoutShell === "sbv1";
+  const isStoryPro2Canvas = isStoryPro2Project || layoutShell === "pro2";
+  const isSbv1Canvas =
+    !isStoryPro2Canvas && (isSbv1Project || layoutShell === "sbv1");
   const isStoryProCanvas =
     hasStoryProPipeline(nodes) && !isStoryPro2Canvas && !isSbv1Canvas;
   const showImmersiveChrome = isSbv1Canvas || isStoryPro2Canvas;
@@ -328,6 +329,8 @@ function Inner({ projectId }: { projectId: string }) {
     revision: number;
     viewport: string;
   } | null>(null);
+  /** hydrate / fitView 落定前跳过自动保存，避免打开项目时 revision 连跳导致「一直保存中」 */
+  const canvasHydratingUntilRef = useRef(0);
   const syncLastPersistedSnapshotRef = useRef<(() => void) | null>(null);
   const isCanvasDirtyRef = useRef<(() => boolean) | null>(null);
 
@@ -392,6 +395,7 @@ function Inner({ projectId }: { projectId: string }) {
         setProject(p);
         setNameDraft(p.name);
         canvasReadyRef.current = true;
+        canvasHydratingUntilRef.current = Date.now() + 2000;
         const syncLoadedPersistedSnapshot = () => {
           const s = useCanvasStore.getState();
           lastPersistedSnapshotRef.current = {
@@ -420,6 +424,9 @@ function Inner({ projectId }: { projectId: string }) {
   // Autosave on changes (debounced) — store 订阅，避免 nodes 变化触发整页重渲染
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveIntervalRef = useRef<number | null>(null);
+  const autosaveFlushDebounceRef = useRef<number | null>(null);
+  const autosaveImmediateDebounceRef = useRef<number | null>(null);
+  const autosaveSavingUiTimerRef = useRef<number | null>(null);
   const autosaveInFlightRef = useRef(false);
   const autosavePendingRef = useRef(false);
   const autosaveProjectRef = useRef(project);
@@ -477,17 +484,23 @@ function Inner({ projectId }: { projectId: string }) {
       const proj = autosaveProjectRef.current;
       const bookBase = autosaveBaseRef.current;
       if (!proj || !bookBase || !canvasReadyRef.current) return;
+      if (!force && Date.now() < canvasHydratingUntilRef.current) return;
       if (!force && !isCanvasDirty()) return;
 
       autosaveInFlightRef.current = true;
-      setSaving(true);
+      if (autosaveSavingUiTimerRef.current === null) {
+        autosaveSavingUiTimerRef.current = window.setTimeout(() => {
+          autosaveSavingUiTimerRef.current = null;
+          setSaving(true);
+        }, 450);
+      }
       try {
         window.dispatchEvent(new CustomEvent("canvas:flush-text-drafts"));
         await new Promise<void>((resolve) => {
           queueMicrotask(() => resolve());
         });
         const graph = stripStoryProUploadedScriptMdForPersist(
-          useCanvasStore.getState().toGraph(),
+          stripGraphForPersist(useCanvasStore.getState().toGraph()),
         );
         if (
           graph.nodes.length === 0 &&
@@ -529,10 +542,16 @@ function Inner({ projectId }: { projectId: string }) {
         setSaveError(e instanceof Error ? e.message : "保存失败");
       } finally {
         autosaveInFlightRef.current = false;
+        if (autosaveSavingUiTimerRef.current !== null) {
+          window.clearTimeout(autosaveSavingUiTimerRef.current);
+          autosaveSavingUiTimerRef.current = null;
+        }
         setSaving(false);
         if (autosavePendingRef.current) {
           autosavePendingRef.current = false;
-          void runAutosave(force, opts);
+          if (isCanvasDirty()) {
+            void runAutosave(force, opts);
+          }
         }
       }
     };
@@ -586,7 +605,29 @@ function Inner({ projectId }: { projectId: string }) {
       void runAutosave(true);
     };
 
-    const onFlushAutosave = () => flushAutosaveNow();
+    const onFlushAutosave = (event: Event) => {
+      const immediate = Boolean(
+        (event as CustomEvent<{ immediate?: boolean }>).detail?.immediate,
+      );
+      if (immediate) {
+        if (autosaveImmediateDebounceRef.current !== null) {
+          window.clearTimeout(autosaveImmediateDebounceRef.current);
+        }
+        // 拖动松手：短 debounce 合并连续调整，避免整图 PATCH 排队
+        autosaveImmediateDebounceRef.current = window.setTimeout(() => {
+          autosaveImmediateDebounceRef.current = null;
+          flushAutosaveNow();
+        }, 280);
+        return;
+      }
+      if (autosaveFlushDebounceRef.current !== null) {
+        window.clearTimeout(autosaveFlushDebounceRef.current);
+      }
+      autosaveFlushDebounceRef.current = window.setTimeout(() => {
+        autosaveFlushDebounceRef.current = null;
+        flushAutosaveNow();
+      }, 450);
+    };
     const onIntervalChanged = () => {
       restartAutosaveInterval();
       scheduleAutosave();
@@ -608,6 +649,18 @@ function Inner({ projectId }: { projectId: string }) {
         onIntervalChanged,
       );
       clearAutosaveTimer();
+      if (autosaveFlushDebounceRef.current !== null) {
+        window.clearTimeout(autosaveFlushDebounceRef.current);
+        autosaveFlushDebounceRef.current = null;
+      }
+      if (autosaveImmediateDebounceRef.current !== null) {
+        window.clearTimeout(autosaveImmediateDebounceRef.current);
+        autosaveImmediateDebounceRef.current = null;
+      }
+      if (autosaveSavingUiTimerRef.current !== null) {
+        window.clearTimeout(autosaveSavingUiTimerRef.current);
+        autosaveSavingUiTimerRef.current = null;
+      }
       if (autosaveIntervalRef.current !== null) {
         window.clearInterval(autosaveIntervalRef.current);
         autosaveIntervalRef.current = null;
@@ -648,7 +701,9 @@ function Inner({ projectId }: { projectId: string }) {
 
     setSaving(true);
     try {
-      const graph = stripStoryProUploadedScriptMdForPersist(toGraph());
+      const graph = stripStoryProUploadedScriptMdForPersist(
+        stripGraphForPersist(toGraph()),
+      );
       const thumb = pickPersistableProjectThumbnailUrl(graph);
       const patch: {
         canvas: typeof graph;

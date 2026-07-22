@@ -659,6 +659,7 @@ export function fitGroupBoundsToChildren(
 ): CanvasFlowNode[] {
   return nodes.map((n) => {
     if (!isGroupNode(n.type)) return n;
+    if (Boolean((n.data as { manualSize?: boolean }).manualSize)) return n;
 
     const children = nodes.filter((c) => c.parentId === n.id);
     if (children.length === 0) return n;

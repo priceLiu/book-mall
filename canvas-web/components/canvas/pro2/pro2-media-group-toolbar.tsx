@@ -1,22 +1,38 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { isPro2CharacterBoardGroup } from "@/lib/canvas/pro2-resolve-character-board-group";
 import { isPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import { isPro2VideoBoardGroup } from "@/lib/canvas/pro2-resolve-video-board-group";
 import { inferPro2MediaGroupKind } from "@/lib/canvas/pro2-media-group-meta";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import { findSbv1GroupLinkedVideoEngine } from "@/lib/canvas/sbv1-media-group-layout";
+import {
+  pro2NodeAbsolutePosition,
+  pro2NodeBoxSize,
+} from "@/lib/canvas/pro2-selection-bbox";
+import { LIBTV_TOOLBAR_PORTAL_GAP_PX } from "@/lib/canvas/libtv-node-toolbar-scale";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { Pro2MediaGroupToolbarPanel } from "./pro2-media-group-toolbar-panel";
 
 const TOOLBAR_HEIGHT = 44;
 const HEADER_RESERVED = 56;
-const GAP = 8;
+const SCREEN_PAD = 12;
+
+function clampGroupToolbarScreenPos(x: number, y: number) {
+  if (typeof window === "undefined") return { x, y };
+  const minY = HEADER_RESERVED + TOOLBAR_HEIGHT + SCREEN_PAD;
+  return {
+    x: Math.min(window.innerWidth - SCREEN_PAD, Math.max(SCREEN_PAD, x)),
+    y: Math.min(window.innerHeight - SCREEN_PAD, Math.max(minY, y)),
+  };
+}
 
 /**
  * LibTV 媒体组顶栏（Pro2 + sbv1 统一）· 仅单击选中组时显示。
@@ -26,11 +42,12 @@ export function Pro2MediaGroupToolbar({
 }: {
   rfNodes: CanvasFlowNode[];
 }) {
+  const mounted = useClientPortalMounted();
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const edges = useCanvasStore((s) => s.edges);
+  const storeNodes = useCanvasStore((s) => s.nodes);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
-  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
-  const geometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const draggingNodeId = useCanvasStore((s) => s.canvasDraggingNodeId);
   const marqueeSelecting = useCanvasMarqueeSelecting();
 
   const resolved = useMemo(() => {
@@ -94,13 +111,26 @@ export function Pro2MediaGroupToolbar({
     if (linked && linked.parentId !== resolved.group.id) {
       reparentNode(linked.id, resolved.group.id);
     }
-  }, [resolved?.group.id, resolved?.group.selected, resolved?.edition, edges, reparentNode, resolved?.group]);
+  }, [
+    resolved?.group.id,
+    resolved?.group.selected,
+    resolved?.edition,
+    edges,
+    reparentNode,
+    resolved?.group,
+  ]);
 
-  const viewport = useViewportTransformActive(Boolean(resolved) && !viewportMoving);
+  const hideForGroupPositionDrag =
+    Boolean(resolved) &&
+    Boolean(draggingNodeId) &&
+    draggingNodeId === resolved?.group.id;
+
+  const viewport = useViewportTransformActive(Boolean(resolved));
 
   const placement = useMemo(() => {
     if (!resolved) return null;
-    const internal = getInternalNode(resolved.group.id) as
+    const g = resolved.group;
+    const internal = getInternalNode(g.id) as
       | {
           measured?: { width?: number; height?: number };
           position: { x: number; y: number };
@@ -109,52 +139,71 @@ export function Pro2MediaGroupToolbar({
           height?: number;
         }
       | undefined;
-    const g = resolved.group;
-    const style = g.style as { width?: number; height?: number } | undefined;
-    const w =
-      internal?.measured?.width ??
-      (typeof internal?.width === "number" ? internal.width : undefined) ??
-      (typeof g.width === "number" ? g.width : undefined) ??
-      style?.width ??
-      360;
-    const h =
-      internal?.measured?.height ??
-      (typeof internal?.height === "number" ? internal.height : undefined) ??
-      (typeof g.height === "number" ? g.height : undefined) ??
-      style?.height ??
-      240;
+
+    const { w, h } = pro2NodeBoxSize(g);
     const pos =
       internal?.internals?.positionAbsolute ??
       internal?.position ??
-      g.position;
-    if (!pos) return null;
-    const cx = pos.x + w / 2;
+      pro2NodeAbsolutePosition(g, storeNodes.length ? storeNodes : rfNodes);
+
+    const width =
+      internal?.measured?.width ??
+      (typeof internal?.width === "number" ? internal.width : undefined) ??
+      w;
+    const height =
+      internal?.measured?.height ??
+      (typeof internal?.height === "number" ? internal.height : undefined) ??
+      h;
+
+    const cx = pos.x + width / 2;
     const top = flowToScreenPosition({ x: cx, y: pos.y });
-    const bottom = flowToScreenPosition({ x: cx, y: pos.y + h });
-    if (top.y - TOOLBAR_HEIGHT - GAP < HEADER_RESERVED) {
-      return { x: bottom.x, y: bottom.y + GAP, place: "below" as const };
+    const bottom = flowToScreenPosition({ x: cx, y: pos.y + height });
+
+    let place: "above" | "below" = "above";
+    let rawX = top.x;
+    let rawY = top.y - LIBTV_TOOLBAR_PORTAL_GAP_PX;
+    if (top.y - TOOLBAR_HEIGHT - LIBTV_TOOLBAR_PORTAL_GAP_PX < HEADER_RESERVED) {
+      place = "below";
+      rawX = bottom.x;
+      rawY = bottom.y + LIBTV_TOOLBAR_PORTAL_GAP_PX;
     }
-    return { x: top.x, y: top.y - GAP, place: "above" as const };
+
+    const clamped = clampGroupToolbarScreenPos(rawX, rawY);
+    return { ...clamped, place };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved, getInternalNode, flowToScreenPosition, rfNodes, viewport]);
+  }, [
+    resolved,
+    getInternalNode,
+    flowToScreenPosition,
+    rfNodes,
+    storeNodes,
+    viewport,
+  ]);
 
   if (
     marqueeSelecting ||
-    viewportMoving ||
-    geometryDragging ||
+    hideForGroupPositionDrag ||
     !resolved ||
-    !placement
+    !placement ||
+    !mounted
   ) {
     return null;
   }
 
-  return (
+  const translateY =
+    placement.place === "below"
+      ? `${LIBTV_TOOLBAR_PORTAL_GAP_PX}px`
+      : `calc(-100% - ${LIBTV_TOOLBAR_PORTAL_GAP_PX}px)`;
+
+  return createPortal(
     <div
-      className="pointer-events-auto fixed z-[1600]"
+      className="pointer-events-auto fixed z-[1600] flex justify-center"
       style={{
         left: placement.x,
         top: placement.y,
-        transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
+        transform: `translate(-50%, ${translateY})`,
+        transformOrigin:
+          placement.place === "below" ? "center top" : "center bottom",
         padding: "14px 20px",
         margin: "-14px -20px",
       }}
@@ -165,6 +214,7 @@ export function Pro2MediaGroupToolbar({
         edition={resolved.edition}
         onMouseDown={(e) => e.stopPropagation()}
       />
-    </div>
+    </div>,
+    document.body,
   );
 }

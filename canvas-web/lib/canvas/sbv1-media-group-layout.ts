@@ -285,7 +285,11 @@ export function applySbv1MediaGroupRelayout(
   groupId: string,
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
-  if (!group || !shouldUseSbv1ImageVideoColumnLayout(group, nodes)) {
+  if (!group) return nodes;
+  if (Boolean((group.data as { manualSize?: boolean }).manualSize)) {
+    return sortNodesForReactFlow(nodes);
+  }
+  if (!shouldUseSbv1ImageVideoColumnLayout(group, nodes)) {
     return applyPro2MediaGroupRelayout(nodes, groupId);
   }
 

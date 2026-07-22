@@ -28,7 +28,8 @@ import {
   buildGroupResizeFrozenAbs,
   buildGeometryPatchesFromRf,
   extractResizeCommitIds,
-  findGroupResizeInProgress,
+  findGroupResizeSessionId,
+  isGroupResizeCommitFrame,
   isCanvasInteractiveGeometryInProgress,
   isResizeRelatedChange,
   filterStoreBoundNodeChanges,
@@ -212,6 +213,7 @@ function FlowCanvasInner({
   } = useReactFlow();
   const rfStore = useStoreApi();
   const initialFitDoneRef = useRef(false);
+  const rfReadyRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
   const dragHoverRafRef = useRef<number | null>(null);
   const dragSnapRafRef = useRef<number | null>(null);
@@ -230,6 +232,8 @@ function FlowCanvasInner({
   const groupResizeSnapshotRef = useRef<GroupResizeSnapshot | null>(null);
   const groupResizeIdRef = useRef<string | null>(null);
   const groupResizeDetachedRef = useRef(false);
+  /** 用户真实拖过组框角/边（resizing:true）· pointerup 仅此时落库 */
+  const groupResizeUserActiveRef = useRef(false);
   /** store→RF 推送期间忽略 RF 回写的选中/测量/坐标 echo，避免打组后 Maximum update depth */
   const syncingGraphFromStoreRef = useRef(false);
   const syncingGraphFromStoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -295,29 +299,49 @@ function FlowCanvasInner({
   } = useCanvasEdgeCutHover();
 
   const applyInitialViewport = useCallback(() => {
-    if (initialFitDoneRef.current) return;
+    if (!rfReadyRef.current || initialFitDoneRef.current) return;
     const state = useCanvasStore.getState();
-    const vp = state.viewport;
     const laid = state.nodes;
     if (laid.length === 0) return;
-    initialFitDoneRef.current = true;
     const isLibtv =
       pro2FloatingInspector ||
       sbv1Canvas ||
       hasLibtvMediaCanvasNodes(laid);
-    const noSavedViewport =
-      Math.abs(vp.x) < 1 &&
-      Math.abs(vp.y) < 1 &&
-      Math.abs(vp.zoom - 1) < 0.01;
-    // LibTV（Pro2 / sbv1）统一 fitView，避免各项目 saved viewport 缩放不一致
-    if (isLibtv || noSavedViewport) {
-      const runFit = () => void fitView({ padding: 0.12, duration: 0 });
-      runFit();
-      requestAnimationFrame(runFit);
-    } else {
-      void rfSetViewport(vp, { duration: 0 });
+    const syncVp = () => setViewport(getViewport());
+    const finishInitialFit = () => {
+      initialFitDoneRef.current = true;
+    };
+    // Pro2 打开时统一 fitView，忽略 DB 里各项目不一致的旧 viewport
+    if (isLibtv && pro2FloatingInspector) {
+      void fitView({ padding: 0.12, duration: 0 }).then(() => {
+        syncVp();
+        requestAnimationFrame(() => {
+          void fitView({ padding: 0.12, duration: 0 }).then(() => {
+            syncVp();
+            finishInitialFit();
+          });
+        });
+      });
+      return;
     }
-  }, [fitView, rfSetViewport, pro2FloatingInspector, sbv1Canvas]);
+    finishInitialFit();
+    const noSavedViewport =
+      Math.abs(state.viewport.x) < 1 &&
+      Math.abs(state.viewport.y) < 1 &&
+      Math.abs(state.viewport.zoom - 1) < 0.01;
+    if (noSavedViewport) {
+      void fitView({ padding: 0.12, duration: 0 }).then(syncVp);
+      return;
+    }
+    void rfSetViewport(state.viewport, { duration: 0 }).then(syncVp);
+  }, [
+    fitView,
+    rfSetViewport,
+    getViewport,
+    setViewport,
+    pro2FloatingInspector,
+    sbv1Canvas,
+  ]);
 
   const libtvCanvas =
     pro2FloatingInspector ||
@@ -479,17 +503,34 @@ function FlowCanvasInner({
   useEffect(() => {
     initialFitDoneRef.current = false;
     setCanvasViewportMoving(false);
+    setCanvasGeometryDragging(false);
+    setCanvasDraggingNodeId(null);
     const s = useCanvasStore.getState();
     setRfNodes(
       ensureNodeDragHandles(s.nodes).map((n) => ({ ...n, selected: false })),
     );
     s.setLibtvFloatingDockSelection(null, null);
     setRfEdges(s.edges);
-  }, [projectId, setRfNodes, setRfEdges, setCanvasViewportMoving]);
+  }, [
+    projectId,
+    setRfNodes,
+    setRfEdges,
+    setCanvasViewportMoving,
+    setCanvasGeometryDragging,
+    setCanvasDraggingNodeId,
+  ]);
 
-  useEffect(() => {
-    applyInitialViewport();
-  }, [projectId, rfNodes.length, applyInitialViewport]);
+  /** LibTV 打开时勿用 graph 里旧 viewport 作为 RF 初值，等 fitView 完成 */
+  const flowDefaultViewport = useMemo(() => {
+    const isLibtv =
+      pro2FloatingInspector ||
+      sbv1Canvas ||
+      (storeNodes.length > 0 && hasLibtvMediaCanvasNodes(storeNodes));
+    if (isLibtv) {
+      return { x: 0, y: 0, zoom: 1 };
+    }
+    return viewport;
+  }, [pro2FloatingInspector, sbv1Canvas, storeNodes, viewport]);
 
   /** Zustand → RF 本地：hydrate / undo / 拖放结束等；拖动过程中跳过避免双写 */
   useEffect(() => {
@@ -594,6 +635,122 @@ function FlowCanvasInner({
     ],
   );
 
+  const flushAutosaveAfterDrag = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("canvas:flush-autosave", { detail: { immediate: true } }),
+    );
+  }, []);
+
+  const clearGroupResizeSession = useCallback(() => {
+    groupResizeFrozenRef.current = null;
+    groupResizeSnapshotRef.current = null;
+    groupResizeIdRef.current = null;
+    groupResizeDetachedRef.current = false;
+    groupResizeUserActiveRef.current = false;
+  }, []);
+
+  /** 组框缩放松手落库（单边 clamp + manualSize） */
+  const performGroupResizeCommit = useCallback(
+    (groupId: string, rfNodeList: CanvasFlowNode[]): boolean => {
+      const group = rfNodeList.find((n) => n.id === groupId);
+      if (!group) return false;
+      const storeNodes = useCanvasStore.getState().nodes;
+      const frozen =
+        groupResizeFrozenRef.current?.size
+          ? groupResizeFrozenRef.current
+          : buildGroupResizeFrozenAbs(groupId, storeNodes);
+      if (!frozen.size) return false;
+      const proposed =
+        readGroupResizeGeometry(group) ?? {
+          position: group.position,
+          width: Number(group.width ?? 0),
+          height: Number(group.height ?? 0),
+        };
+      const bounds = computeGroupChildrenAbsBounds(frozen, storeNodes);
+      const finalGeometry = bounds
+        ? clampGroupBoxToBounds(proposed, bounds)
+        : proposed;
+      const { position, width, height } = finalGeometry;
+      if (!width || !height) return false;
+      const children = [...frozen.entries()].map(([childId, abs]) => ({
+        id: childId,
+        position: {
+          x: abs.x - position.x,
+          y: abs.y - position.y,
+        },
+      }));
+      useCanvasStore.getState().commitGroupResizeFromRf({
+        groupId,
+        position,
+        width,
+        height,
+        children,
+      });
+      setRfNodes(
+        rfNodeList.map((n) => {
+          if (n.id === groupId) {
+            return {
+              ...n,
+              position,
+              width,
+              height,
+              style: {
+                ...(typeof n.style === "object" && n.style ? n.style : {}),
+                width,
+                height,
+              },
+            };
+          }
+          const child = children.find((c) => c.id === n.id);
+          if (child) {
+            return {
+              ...n,
+              parentId: groupId,
+              extent: "parent" as const,
+              position: child.position,
+            };
+          }
+          return n;
+        }),
+      );
+      return true;
+    },
+    [setRfNodes],
+  );
+
+  /** RF 末帧无 resizing:false 时，pointerup 兜底提交；须曾出现 resizing:true */
+  useEffect(() => {
+    const onPointerUp = () => {
+      if (!groupResizeUserActiveRef.current) {
+        clearGroupResizeSession();
+        return;
+      }
+      const groupId = groupResizeIdRef.current;
+      if (!groupId || !groupResizeFrozenRef.current) {
+        clearGroupResizeSession();
+        return;
+      }
+      const rfNodeList = getNodes() as CanvasFlowNode[];
+      if (performGroupResizeCommit(groupId, rfNodeList)) {
+        flushAutosaveAfterDrag();
+      }
+      clearGroupResizeSession();
+      deferStoreGraphSyncRef.current = false;
+      setCanvasGeometryDragging(false);
+      setCanvasDraggingNodeId(null);
+    };
+    window.addEventListener("pointerup", onPointerUp, true);
+    return () => window.removeEventListener("pointerup", onPointerUp, true);
+  }, [
+    performGroupResizeCommit,
+    flushAutosaveAfterDrag,
+    clearGroupResizeSession,
+    getNodes,
+    setCanvasGeometryDragging,
+    setCanvasDraggingNodeId,
+  ]);
+
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasFlowNode>[]) => {
       let rfChanges = changes;
@@ -631,9 +788,10 @@ function FlowCanvasInner({
 
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
       const rfBeforeChange = getNodes() as CanvasFlowNode[];
-      const groupResizingId = findGroupResizeInProgress(changes, rfBeforeChange);
+      const groupResizingId = findGroupResizeSessionId(changes, rfBeforeChange);
       const resizeCommitIdsEarly = extractResizeCommitIds(rfChanges);
       if (groupResizingId) {
+        groupResizeUserActiveRef.current = true;
         if (groupResizeIdRef.current !== groupResizingId) {
           groupResizeIdRef.current = groupResizingId;
           groupResizeFrozenRef.current = buildGroupResizeFrozenAbs(
@@ -649,9 +807,11 @@ function FlowCanvasInner({
       }
 
       const activeGroupResizeId = groupResizeIdRef.current;
-      const isGroupResizeCommit =
-        activeGroupResizeId != null &&
-        resizeCommitIdsEarly.includes(activeGroupResizeId);
+      const isGroupResizeCommit = isGroupResizeCommitFrame(
+        changes,
+        activeGroupResizeId,
+        resizeCommitIdsEarly,
+      );
 
       // 组框缩放：绿框实时跟手；子节点保持 parentId（z-index 正常），
       // 每帧钉回冻结绝对坐标；extent 暂解除避免组框小于内容时被裁切。
@@ -683,7 +843,9 @@ function FlowCanvasInner({
         // 拖动 / 缩放过程中不写 zustand：避免每帧触发所有订阅 s.nodes 的节点重渲染
         // 终态（dragging:false / resizing:false）会在松手那帧落库
         deferStoreGraphSyncRef.current = true;
-        setCanvasGeometryDragging(true);
+        if (!useCanvasStore.getState().canvasGeometryDragging) {
+          setCanvasGeometryDragging(true);
+        }
         const draggingChange = changes.find(
           (c) =>
             c.type === "position" &&
@@ -740,70 +902,16 @@ function FlowCanvasInner({
           const n = rfNodeList.find((x) => x.id === nodeId);
           return n?.type === "group";
         });
+        let didCommitAnyGroup = false;
         for (const groupId of groupResizeCommits) {
-          const group = rfNodeList.find((n) => n.id === groupId);
-          const frozen = groupResizeFrozenRef.current;
-          if (!group || !frozen) continue;
-          const storeNodes = useCanvasStore.getState().nodes;
-          const proposed =
-            readGroupResizeGeometry(group) ?? {
-              position: group.position,
-              width: Number(group.width ?? 0),
-              height: Number(group.height ?? 0),
-            };
-          // 单边境界：四条边各自 clamp 到内容边界，引哪条边只收哪条边，反面保持——不拉扯
-          const bounds = computeGroupChildrenAbsBounds(frozen, storeNodes);
-          const finalGeometry = bounds
-            ? clampGroupBoxToBounds(proposed, bounds)
-            : proposed;
-          const { position, width, height } = finalGeometry;
-          if (!width || !height) continue;
-          const children = [...frozen.entries()].map(([childId, abs]) => ({
-            id: childId,
-            position: {
-              x: abs.x - position.x,
-              y: abs.y - position.y,
-            },
-          }));
-          useCanvasStore.getState().commitGroupResizeFromRf({
-            groupId,
-            position,
-            width,
-            height,
-            children,
-          });
-          setRfNodes(
-            rfNodeList.map((n) => {
-              if (n.id === groupId) {
-                return {
-                  ...n,
-                  position,
-                  width,
-                  height,
-                  style: {
-                    ...(typeof n.style === "object" && n.style ? n.style : {}),
-                    width,
-                    height,
-                  },
-                };
-              }
-              const child = children.find((c) => c.id === n.id);
-              if (child) {
-                return {
-                  ...n,
-                  parentId: groupId,
-                  extent: "parent" as const,
-                  position: child.position,
-                };
-              }
-              return n;
-            }),
-          );
+          if (performGroupResizeCommit(groupId, rfNodeList)) {
+            didCommitAnyGroup = true;
+          }
         }
-        groupResizeFrozenRef.current = null;
-        groupResizeSnapshotRef.current = null;
-        groupResizeIdRef.current = null;
-        groupResizeDetachedRef.current = false;
+        clearGroupResizeSession();
+        if (didCommitAnyGroup) {
+          flushAutosaveAfterDrag();
+        }
         const nonGroupResizeIds = resizeCommitIds.filter((nodeId) => {
           const n = rfNodeList.find((x) => x.id === nodeId);
           return n?.type !== "group";
@@ -869,6 +977,10 @@ function FlowCanvasInner({
       setCanvasDraggingNodeId,
       libtvCanvas,
       getNodes,
+      flushAutosaveAfterDrag,
+      performGroupResizeCommit,
+      clearGroupResizeSession,
+      setRfNodes,
     ],
   );
 
@@ -901,8 +1013,29 @@ function FlowCanvasInner({
   );
 
   const onInit = useCallback(() => {
+    rfReadyRef.current = true;
+    initialFitDoneRef.current = false;
     applyInitialViewport();
   }, [applyInitialViewport]);
+
+  /** hydrate 后节点才到位 · onInit 时可能仍为空，此处补一次 LibTV fitView */
+  useEffect(() => {
+    if (!rfReadyRef.current || initialFitDoneRef.current) return;
+    if (storeNodes.length === 0) return;
+    if (useCanvasStore.getState().projectId !== projectId) return;
+    const isLibtv =
+      pro2FloatingInspector ||
+      sbv1Canvas ||
+      hasLibtvMediaCanvasNodes(storeNodes);
+    if (!isLibtv) return;
+    applyInitialViewport();
+  }, [
+    storeNodes.length,
+    pro2FloatingInspector,
+    sbv1Canvas,
+    applyInitialViewport,
+    projectId,
+  ]);
 
   useEffect(() => {
     registerCanvasViewportPlacement({
@@ -914,11 +1047,20 @@ function FlowCanvasInner({
 
   useEffect(() => {
     if (fitViewNonce <= 0) return;
+    const syncVp = () => setViewport(getViewport());
+    const runFit = () =>
+      fitView({ padding: 0.12, duration: 0 }).then(() => {
+        syncVp();
+      });
     const t = window.requestAnimationFrame(() => {
-      void fitView({ padding: 0.12, duration: 280 });
+      void runFit().then(() => {
+        window.requestAnimationFrame(() => {
+          void runFit();
+        });
+      });
     });
     return () => window.cancelAnimationFrame(t);
-  }, [fitViewNonce, fitView]);
+  }, [fitViewNonce, fitView, getViewport, setViewport]);
 
   useEffect(() => {
     if (canvasFocusNonce <= 0 || !canvasFocusNodeId) return;
@@ -1103,11 +1245,6 @@ function FlowCanvasInner({
     ],
   );
 
-  const flushAutosaveAfterDrag = useCallback(() => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
-  }, []);
-
   const commitFlowPositionsFromRf = useCallback(() => {
     const rf = getNodes();
     const storeNodes = useCanvasStore.getState().nodes;
@@ -1157,10 +1294,10 @@ function FlowCanvasInner({
             }
           }
         }
-        const didCommitGroup = commitFlowPositionsFromRf();
+        commitFlowPositionsFromRf();
         deferStoreGraphSyncRef.current = false;
         setDragHoverGroup(null);
-        if (didCommitGroup) flushAutosaveAfterDrag();
+        flushAutosaveAfterDrag();
         return;
       }
       if (enableDragSnapGuides) {
@@ -1183,7 +1320,7 @@ function FlowCanvasInner({
           }
         }
       }
-      const didCommitPositions = commitFlowPositionsFromRf();
+      commitFlowPositionsFromRf();
       const gid = findGroupAtPoint(event.clientX, event.clientY);
       const willReparent = gid !== (node.parentId ?? null);
       if (willReparent) {
@@ -1208,9 +1345,8 @@ function FlowCanvasInner({
         libtvMultiNodeDragRef.current = false;
       }
       deferStoreGraphSyncRef.current = false;
-      if (didCommitPositions || willReparent) {
-        flushAutosaveAfterDrag();
-      }
+      // 坐标可能在 handleNodesChange(dragging:false) 已写入 store；松手一律立即 flush
+      flushAutosaveAfterDrag();
     },
     [
       commitFlowPositionsFromRf,
@@ -1760,7 +1896,7 @@ function FlowCanvasInner({
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
-        defaultViewport={viewport}
+        defaultViewport={flowDefaultViewport}
         onMoveStart={onMoveStart}
         onMoveEnd={onMoveEnd}
         onInit={onInit}

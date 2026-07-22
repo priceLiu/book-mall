@@ -135,6 +135,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     backgroundColor: pro2MediaGroupBackgroundColor(color, groupBackgroundEmphasis),
     border: `${groupBorderWidth}px solid ${groupBorderColor}`,
     borderRadius: 20,
+    boxSizing: "border-box" as const,
     transition: "border-width 120ms ease, border-color 120ms ease",
   } as const;
 

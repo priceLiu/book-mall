@@ -346,6 +346,13 @@ export function applyPro2MediaGroupRelayout(
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
   if (!group) return nodes;
+  // 用户手动拖过组框尺寸后，禁止 auto-fit / relayout 覆盖 width/height
+  if (
+    Boolean((group.data as { manualSize?: boolean }).manualSize) &&
+    opts?.resetOrigin !== true
+  ) {
+    return sortNodesForReactFlow(nodes);
+  }
 
   const controllerId = (group.data as { pro2ControllerNodeId?: string })
     .pro2ControllerNodeId;

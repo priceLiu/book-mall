@@ -114,7 +114,6 @@ import {
 import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
 import { ensureGraphMetaEdition } from "./canvas-layout-mode";
-import { hasLibtvMediaCanvasNodes } from "./libtv-canvas-detect";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
@@ -164,17 +163,26 @@ function finalizeHydratedGraph(
   };
 }
 
-/** hydrate 布局落定后，LibTV 画布请求 fitView（节点测量完成后再框选） */
-function requestLibtvFitViewAfterHydrate(
-  nodes: CanvasFlowNode[],
+/** hydrate 布局落定后，Pro2 画布请求 fitView（节点测量完成后再框选） */
+function requestPro2FitViewAfterHydrate(
+  meta: { edition?: "pro2" | "sbv1" } | null | undefined,
   set: (
     partial:
       | Partial<{ fitViewNonce: number }>
       | ((state: { fitViewNonce: number }) => Partial<{ fitViewNonce: number }>),
   ) => void,
 ) {
-  if (!hasLibtvMediaCanvasNodes(nodes)) return;
+  if (meta?.edition !== "pro2") return;
   set((s) => ({ fitViewNonce: s.fitViewNonce + 1 }));
+}
+
+/** Pro2 打开时忽略 DB 里各项目不一致的旧 viewport，统一 fitView */
+function pro2NeutralViewportOnOpen(
+  meta: { edition?: "pro2" | "sbv1" } | null | undefined,
+  saved: { x: number; y: number; zoom: number },
+): { x: number; y: number; zoom: number } {
+  if (meta?.edition === "pro2") return { x: 0, y: 0, zoom: 1 };
+  return saved;
 }
 
 function runPostHydratePro2VideoBoardRepair(
@@ -585,8 +593,11 @@ export const useCanvasStore = create<CanvasState>()(
             ? reconcileStoryPro2Workspace(normalized)
             : reconcileStoryProWorkspace(normalized),
         );
-        const viewport = g.viewport ?? { x: 0, y: 0, zoom: 1 };
         const hydratedMeta = ensureGraphMetaEdition(nodes, g.meta ?? null);
+        const viewport = pro2NeutralViewportOnOpen(
+          hydratedMeta,
+          g.viewport ?? { x: 0, y: 0, zoom: 1 },
+        );
 
         const applyDeferredLayout = () => {
           const current = get();
@@ -608,7 +619,7 @@ export const useCanvasStore = create<CanvasState>()(
           );
           queueMicrotask(() => {
             runPostHydratePro2VideoBoardRepair(get);
-            requestLibtvFitViewAfterHydrate(nodesWithInflight, set);
+            requestPro2FitViewAfterHydrate(meta, set);
           });
         };
 
@@ -651,7 +662,7 @@ export const useCanvasStore = create<CanvasState>()(
         );
         queueMicrotask(() => {
           runPostHydratePro2VideoBoardRepair(get);
-          requestLibtvFitViewAfterHydrate(laid.nodes, set);
+          requestPro2FitViewAfterHydrate(meta, set);
         });
       },
 
@@ -1258,6 +1269,20 @@ export const useCanvasStore = create<CanvasState>()(
             } as CanvasFlowNode;
           });
           if (canvasNodesLayoutFieldsEqual(prev, next, touched)) {
+            const prevGroup = prev.find((n) => n.id === groupId);
+            const nextGroup = next.find((n) => n.id === groupId);
+            const manualNew = Boolean(
+              (nextGroup?.data as { manualSize?: boolean }).manualSize,
+            );
+            const manualOld = Boolean(
+              (prevGroup?.data as { manualSize?: boolean }).manualSize,
+            );
+            if (manualNew && !manualOld) {
+              return {
+                ...withGraphRevision(state, { nodes: next }),
+                canvasGeometryDragging: false,
+              };
+            }
             return { ...state, canvasGeometryDragging: false };
           }
           return {

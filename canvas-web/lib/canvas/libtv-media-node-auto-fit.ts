@@ -264,7 +264,12 @@ export function useLibtvMediaNodeAutoFit({
           const parentGroup = parentId
             ? state.nodes.find((n) => n.id === parentId)
             : undefined;
+          const parentManualSize = Boolean(
+            (parentGroup?.data as { manualSize?: boolean } | undefined)
+              ?.manualSize,
+          );
           if (
+            !parentManualSize &&
             parentId &&
             parentGroup &&
             isSbv1MediaGroup(parentGroup, state.nodes) &&
@@ -272,6 +277,7 @@ export function useLibtvMediaNodeAutoFit({
           ) {
             relayoutSbv1MediaGroup(setNodes, parentId, edges);
           } else if (
+            !parentManualSize &&
             parentId &&
             parentGroup &&
             isPro2StyledGroup(parentGroup, state.nodes)
