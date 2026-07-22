@@ -3,9 +3,12 @@ import type { NodeChange } from "@xyflow/react";
 import {
   canvasNodesLayoutFieldsEqual,
   canvasNodesSelectionAndZEqual,
+  extractResizeCommitIds,
   filterStoreBoundNodeChanges,
   isCanvasInternalDimensionsOnlyChange,
   isCanvasRfLocalOnlyChange,
+  isGroupResizeCommitFrame,
+  findGroupResizeSessionId,
 } from "@/lib/canvas/canvas-node-changes";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
@@ -103,5 +106,77 @@ describe("canvasNodesLayoutFieldsEqual", () => {
     const prev = [node("a", { width: 320, height: 240, position: { x: 1, y: 2 } })];
     const next = [node("a", { width: 320, height: 240, position: { x: 1, y: 2 } })];
     expect(canvasNodesLayoutFieldsEqual(prev, next, ["a"])).toBe(true);
+  });
+});
+
+describe("findGroupResizeSessionId", () => {
+  it("ignores ResizeObserver dimensions without resizing:true", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "g1",
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(findGroupResizeSessionId(changes, [{ id: "g1", type: "group" }])).toBe(
+      null,
+    );
+  });
+
+  it("starts session on resizing:true", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: true,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(findGroupResizeSessionId(changes, [{ id: "g1", type: "group" }])).toBe(
+      "g1",
+    );
+  });
+});
+
+describe("isGroupResizeCommitFrame", () => {
+  it("does not commit on dimensions-only intermediate frames", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "g1",
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(extractResizeCommitIds(changes)).toEqual([]);
+    expect(
+      isGroupResizeCommitFrame(changes, "g1", extractResizeCommitIds(changes)),
+    ).toBe(false);
+  });
+
+  it("commits when resizing:false is present", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: false,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    const commitIds = extractResizeCommitIds(changes);
+    expect(isGroupResizeCommitFrame(changes, "g1", commitIds)).toBe(true);
+  });
+
+  it("does not commit while resizing:true", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: true,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(
+      isGroupResizeCommitFrame(changes, "g1", extractResizeCommitIds(changes)),
+    ).toBe(false);
   });
 });

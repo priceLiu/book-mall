@@ -43,6 +43,7 @@ export function reflowPro2CanvasLayout(
     (n) => n.type === "group" && isPro2StyledGroup(n, next),
   );
   for (const group of groups) {
+    if (Boolean((group.data as { manualSize?: boolean }).manualSize)) continue;
     next = applyPro2MediaGroupRelayout(next, group.id);
   }
 

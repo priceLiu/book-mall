@@ -30,14 +30,30 @@ import {
   MAX_SSO_REENTER_ATTEMPTS,
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
+import {
+  clearCachedToolsSession,
+  getCachedToolsSession,
+  setCachedToolsSession,
+} from "@/lib/tools-session-client-cache";
 
-const SESSION_FETCH_TIMEOUT_MS = 20_000;
+/** 须大于服务端 introspect 超时 + JWT 兜底余量，避免客户端先 abort */
+const SESSION_FETCH_TIMEOUT_MS = 22_000;
 const SESSION_FETCH_RETRY_DELAY_MS = 800;
+const SESSION_FETCH_TIMEOUT_RETRIES = 3;
+const SESSION_FETCH_TIMEOUT_RETRY_DELAY_MS = 1_500;
 const SESSION_FETCH_FRESH_EXCHANGE_RETRIES = 4;
 const SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS = 1_200;
 const SESSION_POLL_MS = 60_000;
+const SESSION_BACKGROUND_REVALIDATE_MS = 8_000;
 
-async function fetchToolsSessionClient(): Promise<
+function isFetchAbortedError(e: unknown): boolean {
+  return (
+    e instanceof Error &&
+    (e.name === "AbortError" || e.message.includes("aborted"))
+  );
+}
+
+async function fetchToolsSessionClientOnce(): Promise<
   ReturnType<typeof parseToolsSessionPayload>
 > {
   const ac = new AbortController();
@@ -49,10 +65,35 @@ async function fetchToolsSessionClient(): Promise<
       signal: ac.signal,
     });
     const raw = await r.json().catch(() => null);
-    return parseToolsSessionPayload(raw);
+    const parsed = parseToolsSessionPayload(raw);
+    if (parsed.active) {
+      setCachedToolsSession(parsed);
+    }
+    return parsed;
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+async function fetchToolsSessionClient(opts?: {
+  timeoutRetries?: number;
+}): Promise<ReturnType<typeof parseToolsSessionPayload>> {
+  const maxAttempts = Math.max(1, opts?.timeoutRetries ?? 1);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fetchToolsSessionClientOnce();
+    } catch (e) {
+      lastError = e;
+      if (!isFetchAbortedError(e) || attempt >= maxAttempts - 1) {
+        throw e;
+      }
+      await new Promise((r) =>
+        setTimeout(r, SESSION_FETCH_TIMEOUT_RETRY_DELAY_MS * (attempt + 1)),
+      );
+    }
+  }
+  throw lastError;
 }
 
 function SessionRevokedPoller({
@@ -107,6 +148,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [exhausted, setExhausted] = useState(false);
   const silentAttemptedRef = useRef(false);
   const loadGenRef = useRef(0);
+  const readyRef = useRef(false);
+  readyRef.current = ready;
 
   const reEnterHref = useCallback(() => {
     const path =
@@ -136,89 +179,139 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     return true;
   }, [reEnterHref, localLoginHref]);
 
-  const loadSession = useCallback(async (opts?: { retry?: boolean }) => {
-    const gen = ++loadGenRef.current;
-    if (!ready || opts?.retry) {
-      setLoading(true);
-    }
-    setError(null);
-    const freshExchange = isSsoExchangeFreshClient();
-    const maxAttempts = freshExchange
-      ? SESSION_FETCH_FRESH_EXCHANGE_RETRIES
-      : opts?.retry === false
-        ? 1
-        : 2;
-    const retryDelayMs = freshExchange
-      ? SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS
-      : SESSION_FETCH_RETRY_DELAY_MS;
-    try {
-      let data = await fetchToolsSessionClient();
-      for (let attempt = 1; attempt < maxAttempts && !data.active; attempt++) {
-        await new Promise((r) => setTimeout(r, retryDelayMs));
+  const loadSession = useCallback(
+    async (opts?: { retry?: boolean; background?: boolean }) => {
+      const gen = ++loadGenRef.current;
+      const background = opts?.background === true;
+      if ((!readyRef.current || opts?.retry) && !background) {
+        setLoading(true);
+      }
+      if (!background) {
+        setError(null);
+      }
+      const freshExchange = isSsoExchangeFreshClient();
+      const inactivePollAttempts = freshExchange
+        ? SESSION_FETCH_FRESH_EXCHANGE_RETRIES
+        : opts?.retry === false
+          ? 1
+          : 2;
+      const inactivePollDelayMs = freshExchange
+        ? SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS
+        : SESSION_FETCH_RETRY_DELAY_MS;
+      const timeoutRetries =
+        freshExchange || opts?.retry
+          ? SESSION_FETCH_TIMEOUT_RETRIES
+          : 2;
+      try {
+        let data = await fetchToolsSessionClient({ timeoutRetries });
+        for (
+          let attempt = 1;
+          attempt < inactivePollAttempts && !data.active;
+          attempt++
+        ) {
+          await new Promise((r) => setTimeout(r, inactivePollDelayMs));
+          if (gen !== loadGenRef.current) return;
+          data = await fetchToolsSessionClient({ timeoutRetries });
+        }
         if (gen !== loadGenRef.current) return;
-        data = await fetchToolsSessionClient();
-      }
-      if (gen !== loadGenRef.current) return;
-      setHasTokenCookie(Boolean(data.hasCookie));
-      setSessionActive(Boolean(data.active));
-      setInactiveReason(parseToolsSessionInactiveReason(data));
-      if (data.active) {
-        clearSsoExchangeFreshClient();
-        setReady(true);
-        return;
-      }
-      setReady(false);
-    } catch (e) {
-      if (gen !== loadGenRef.current) return;
-      if (opts?.retry !== false) {
-        try {
-          await new Promise((r) =>
-            setTimeout(r, SESSION_FETCH_RETRY_DELAY_MS),
-          );
-          if (gen !== loadGenRef.current) return;
-          const retryData = await fetchToolsSessionClient();
-          if (gen !== loadGenRef.current) return;
-          setHasTokenCookie(Boolean(retryData.hasCookie));
-          setSessionActive(Boolean(retryData.active));
-          setInactiveReason(parseToolsSessionInactiveReason(retryData));
-          if (retryData.active) {
-            setReady(true);
+        setHasTokenCookie(Boolean(data.hasCookie));
+        setSessionActive(Boolean(data.active));
+        setInactiveReason(parseToolsSessionInactiveReason(data));
+        if (data.active) {
+          clearSsoExchangeFreshClient();
+          setReady(true);
+          return;
+        }
+        const inactive = parseToolsSessionInactiveReason(data);
+        if (background && readyRef.current) {
+          if (
+            inactive === "introspect_timeout" ||
+            (inactive === "unknown" && data.hasCookie)
+          ) {
+            window.setTimeout(() => {
+              if (gen === loadGenRef.current) {
+                void loadSession({ background: true });
+              }
+            }, SESSION_BACKGROUND_REVALIDATE_MS);
             return;
           }
-          setReady(false);
-        } catch {
-          // 二次失败，展示下方错误
+        }
+        clearCachedToolsSession();
+        setReady(false);
+      } catch (e) {
+        if (gen !== loadGenRef.current) return;
+        if (background && readyRef.current) {
+          window.setTimeout(() => {
+            if (gen === loadGenRef.current) {
+              void loadSession({ background: true });
+            }
+          }, SESSION_BACKGROUND_REVALIDATE_MS);
+          return;
+        }
+        if (opts?.retry !== false) {
+          try {
+            await new Promise((r) =>
+              setTimeout(r, SESSION_FETCH_RETRY_DELAY_MS),
+            );
+            if (gen !== loadGenRef.current) return;
+            const retryData = await fetchToolsSessionClient({
+              timeoutRetries: SESSION_FETCH_TIMEOUT_RETRIES,
+            });
+            if (gen !== loadGenRef.current) return;
+            setHasTokenCookie(Boolean(retryData.hasCookie));
+            setSessionActive(Boolean(retryData.active));
+            setInactiveReason(parseToolsSessionInactiveReason(retryData));
+            if (retryData.active) {
+              clearSsoExchangeFreshClient();
+              setReady(true);
+              return;
+            }
+            setReady(false);
+          } catch {
+            // 二次失败，展示下方错误
+          }
+        }
+        if (gen !== loadGenRef.current) return;
+        setHasTokenCookie(false);
+        setSessionActive(false);
+        setInactiveReason("introspect_timeout");
+        setReady(false);
+        setError(
+          isFetchAbortedError(e)
+            ? "连接主站超时（常见于 book-mall 冷启动）。请点「重新连接」或确认 pnpm dev:all 已启动。"
+            : "无法校验登录状态，请检查网络或主站是否可访问。",
+        );
+      } finally {
+        if (gen === loadGenRef.current && !background) {
+          setLoading(false);
         }
       }
-      if (gen !== loadGenRef.current) return;
-      setHasTokenCookie(false);
-      setSessionActive(false);
-      setInactiveReason("introspect_timeout");
-      setReady(false);
-      const aborted =
-        e instanceof Error &&
-        (e.name === "AbortError" || e.message.includes("aborted"));
-      setError(
-        aborted
-          ? "连接主站超时（常见于 book-mall 冷启动）。请点「重新连接」或确认 pnpm dev:all 已启动。"
-          : "无法校验登录状态，请检查网络或主站是否可访问。",
-      );
-    } finally {
-      if (gen === loadGenRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [ready]);
+    },
+    [],
+  );
 
   useEffect(() => {
+    const freshExchange = isSsoExchangeFreshClient();
+    if (!freshExchange) {
+      const cached = getCachedToolsSession();
+      if (cached?.active) {
+        readyRef.current = true;
+        setHasTokenCookie(Boolean(cached.hasCookie));
+        setSessionActive(true);
+        setInactiveReason(parseToolsSessionInactiveReason(cached));
+        setReady(true);
+        setLoading(false);
+        void loadSession({ background: true });
+        return;
+      }
+    }
     void loadSession();
   }, [loadSession]);
 
-  /** 会话建立成功后清零静默换票计数，便于下一轮失效重新自动换票 */
+  /** 会话建立成功后清零静默换票计数 */
   useEffect(() => {
     if (ready) {
       clearSsoReenterAttempts();
-      clearSsoExchangeFreshClient();
     }
   }, [ready]);
 
@@ -279,14 +372,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (loading || autoConnecting) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
         <div className="flex items-center">
           <Loader2 className="mr-2 size-5 animate-spin" />
-          连接 Book 账号…
+          正在进入我的画布…
         </div>
-        <p className="text-xs text-zinc-500">
-          正在校验工具站令牌（约 20 秒，失败会自动重试）
-        </p>
       </div>
     );
   }

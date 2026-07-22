@@ -136,6 +136,9 @@ export function canvasNodesLayoutFieldsEqual(
       return false;
     }
     if (a.parentId !== b.parentId) return false;
+    const aManual = Boolean((a.data as { manualSize?: boolean }).manualSize);
+    const bManual = Boolean((b.data as { manualSize?: boolean }).manualSize);
+    if (aManual !== bManual) return false;
   }
   return true;
 }
@@ -222,6 +225,19 @@ export function extractResizeCommitIds(changes: NodeChange[]): string[] {
   return ids;
 }
 
+/**
+ * LibTV 组框缩放松手：仅认 RF 明确发出的 `resizing: false`。
+ * 末帧仅有 dimensions、无 resizing 键时由 pointerup 兜底提交（见 flow-canvas）。
+ */
+export function isGroupResizeCommitFrame(
+  _changes: NodeChange[],
+  activeGroupResizeId: string | null,
+  resizeCommitIds: string[],
+): boolean {
+  if (!activeGroupResizeId) return false;
+  return resizeCommitIds.includes(activeGroupResizeId);
+}
+
 export function isResizeRelatedChange(
   c: NodeChange,
   resizeIds: Set<string>,
@@ -276,6 +292,18 @@ export function findGroupResizeInProgress(
     }
   }
   return null;
+}
+
+/**
+ * 组框缩放 session · 仅认 `resizing: true`。
+ * 勿把 ResizeObserver 纯测量（无 resizing 键）当成缩放，否则会误开 session、
+ * pointerup 误 commit + flush-autosave，导致「一直保存中」与拖动闪烁。
+ */
+export function findGroupResizeSessionId(
+  changes: NodeChange[],
+  rfNodes: Array<{ id: string; type?: string }>,
+): string | null {
+  return findGroupResizeInProgress(changes, rfNodes);
 }
 
 export const GROUP_RESIZE_MIN_WIDTH = 220;

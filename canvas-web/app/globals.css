@@ -234,6 +234,15 @@ html[data-canvas-modal-open] .pro2-input-dock {
   overflow: visible !important;
 }
 
+/* LibTV 媒体组 · RF 外层也圆角，避免 global border-radius:0 影响视觉 */
+.canvas-flow-wrap .react-flow__node-group:has(.pro2-media-group-node) {
+  border-radius: 20px !important;
+}
+
+.canvas-flow-wrap .react-flow__node-group:has([data-pro2-media-group]) {
+  border-radius: 20px !important;
+}
+
 /* LibTV 节点顶栏 / 侧 + 须露出节点边框外（Pro2 · sbv1 共用） */
 .canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {
   overflow: visible !important;
@@ -632,16 +641,15 @@ html[data-canvas-modal-open] .pro2-input-dock {
   opacity: 1 !important;
 }
 
-/* 分组 · 选中时显示四边缩放线（左/右缘缩放须同步 position）· 圆角与组壳 20px 对齐 */
+/* 分组 · 选中时不显示 NodeResizer 直角四边线（四条独立 line 无法圆角，会盖住 20px 组壳） */
 .canvas-flow-wrap .react-flow__node-group.selected .react-flow__resize-control.line {
-  display: block !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
-  border-radius: 20px !important;
+  display: none !important;
 }
 
-/* LibTV 媒体组壳 · 圆角与 Pro2 图 1 一致（内层 + 选中缩放框） */
-.canvas-flow-wrap .react-flow__node-group .canvas-group-node.pro2-media-group-node {
-  border-radius: 20px;
+/* LibTV 媒体组壳 · 圆角与 Pro2 图 1 一致 */
+.canvas-flow-wrap .react-flow__node-group .canvas-group-node.pro2-media-group-node,
+.canvas-flow-wrap .canvas-group-node.pro2-media-group-node[data-pro2-media-group] {
+  border-radius: 20px !important;
 }
 
 /* 剪映导出节点：加大拖角热区 */

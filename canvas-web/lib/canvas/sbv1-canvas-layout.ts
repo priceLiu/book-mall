@@ -24,6 +24,7 @@ export function reflowSbv1Canvas(
     (n) => n.type === "group" && isSbv1MediaGroup(n, next),
   );
   for (const group of groups) {
+    if (Boolean((group.data as { manualSize?: boolean }).manualSize)) continue;
     next = applySbv1MediaGroupRelayout(next, edges, group.id);
   }
 
