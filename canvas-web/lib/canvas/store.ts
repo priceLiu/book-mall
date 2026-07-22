@@ -114,6 +114,7 @@ import {
 import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
 import { ensureGraphMetaEdition } from "./canvas-layout-mode";
+import { hasLibtvMediaCanvasNodes } from "./libtv-canvas-detect";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
@@ -161,6 +162,19 @@ function finalizeHydratedGraph(
     nodes: ensureNodeDragHandles(nextNodes),
     edges: nextEdges,
   };
+}
+
+/** hydrate 布局落定后，LibTV 画布请求 fitView（节点测量完成后再框选） */
+function requestLibtvFitViewAfterHydrate(
+  nodes: CanvasFlowNode[],
+  set: (
+    partial:
+      | Partial<{ fitViewNonce: number }>
+      | ((state: { fitViewNonce: number }) => Partial<{ fitViewNonce: number }>),
+  ) => void,
+) {
+  if (!hasLibtvMediaCanvasNodes(nodes)) return;
+  set((s) => ({ fitViewNonce: s.fitViewNonce + 1 }));
 }
 
 function runPostHydratePro2VideoBoardRepair(
@@ -592,7 +606,10 @@ export const useCanvasStore = create<CanvasState>()(
               graphMeta: meta ?? null,
             }),
           );
-          queueMicrotask(() => runPostHydratePro2VideoBoardRepair(get));
+          queueMicrotask(() => {
+            runPostHydratePro2VideoBoardRepair(get);
+            requestLibtvFitViewAfterHydrate(nodesWithInflight, set);
+          });
         };
 
         if (nodes.length >= DEFER_HYDRATE_LAYOUT_NODE_COUNT) {
@@ -632,7 +649,10 @@ export const useCanvasStore = create<CanvasState>()(
             graphMeta: meta ?? null,
           }),
         );
-        queueMicrotask(() => runPostHydratePro2VideoBoardRepair(get));
+        queueMicrotask(() => {
+          runPostHydratePro2VideoBoardRepair(get);
+          requestLibtvFitViewAfterHydrate(laid.nodes, set);
+        });
       },
 
       toGraph: () => {

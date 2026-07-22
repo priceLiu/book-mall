@@ -632,10 +632,16 @@ html[data-canvas-modal-open] .pro2-input-dock {
   opacity: 1 !important;
 }
 
-/* 分组 · 选中时显示四边缩放线（左/右缘缩放须同步 position） */
+/* 分组 · 选中时显示四边缩放线（左/右缘缩放须同步 position）· 圆角与组壳 20px 对齐 */
 .canvas-flow-wrap .react-flow__node-group.selected .react-flow__resize-control.line {
   display: block !important;
   border-color: rgba(255, 255, 255, 0.28) !important;
+  border-radius: 20px !important;
+}
+
+/* LibTV 媒体组壳 · 圆角与 Pro2 图 1 一致（内层 + 选中缩放框） */
+.canvas-flow-wrap .react-flow__node-group .canvas-group-node.pro2-media-group-node {
+  border-radius: 20px;
 }
 
 /* 剪映导出节点：加大拖角热区 */
