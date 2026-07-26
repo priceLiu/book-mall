@@ -44,6 +44,31 @@ export function isDashscopeSbv1TextToVideoModel(modelKey: string): boolean {
   );
 }
 
+/** 文生视频模型 · 有参考图时自动升级为对应 R2V（百炼 media） */
+const DASHSCOPE_SBV1_T2V_TO_R2V: Record<string, string> = {
+  "happyhorse-1.0-t2v": "happyhorse-1.0-r2v",
+  "happyhorse-1.1-t2v": "happyhorse-1.1-r2v",
+  "wan2.6-t2v": "wan2.6-r2v",
+  "wan2.7-t2v": "wan2.7-r2v",
+  "wan2.7-t2v-2026-04-25": "wan2.7-r2v",
+};
+
+export function dashscopeSbv1T2vModelToR2v(modelKey: string): string | null {
+  return DASHSCOPE_SBV1_T2V_TO_R2V[modelKey.trim()] ?? null;
+}
+
+/** 用户选了 T2V 但连了参考图 → 走 R2V API，保留 HappyHorse / 万相同系列 */
+export function upgradeDashscopeT2vModelWhenRefsPresent(
+  modelKey: string,
+  referenceImageUrls: readonly string[],
+): string {
+  const trimmed = modelKey.trim();
+  if (!isDashscopeSbv1TextToVideoModel(trimmed)) return trimmed;
+  const hasRefs = referenceImageUrls.some((u) => u.trim().length > 0);
+  if (!hasRefs) return trimmed;
+  return dashscopeSbv1T2vModelToR2v(trimmed) ?? trimmed;
+}
+
 const T2V_ASPECT_TO_SIZE: Record<string, readonly [string, string]> = {
   "16:9": ["1280*720", "1920*1080"],
   "9:16": ["720*1280", "1080*1920"],

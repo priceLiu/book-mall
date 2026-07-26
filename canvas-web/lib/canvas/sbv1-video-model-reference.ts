@@ -124,8 +124,8 @@ export function getSbv1VideoModelRefCaps(
   if (DASHSCOPE_T2V_KEYS.has(k)) {
     return {
       supportedModes: ["omni"],
-      refApi: "single_i2v",
-      maxRefsOmni: 0,
+      refApi: "bailian_r2v_media",
+      maxRefsOmni: k.startsWith("happyhorse") ? 9 : 5,
     };
   }
 

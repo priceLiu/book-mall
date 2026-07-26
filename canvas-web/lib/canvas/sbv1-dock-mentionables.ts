@@ -1,9 +1,13 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
+import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
+import { buildPro2DockMentionables } from "./pro2-dock-mentionables";
 import {
   isSbv1VideoEngineRefImageNode,
   type Sbv1UpstreamRefLink,
 } from "./sbv1-upstream-ref-links";
+import type { Sbv1UpstreamTextLink } from "./sbv1-upstream-text-links";
+import { sbv1TextLinksToDockUpstream } from "./sbv1-upstream-text-links";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
 
@@ -62,4 +66,59 @@ export function buildSbv1DockMentionables(
   }
 
   return [...byId.values()];
+}
+
+export function sbv1RefLinksToDockUpstream(
+  upstreamLinks: Sbv1UpstreamRefLink[],
+): Pro2DockUpstreamLink[] {
+  return upstreamLinks.map((l) => ({
+    id: l.id,
+    kind: "image" as const,
+    label: l.label,
+    previewUrl: l.previewUrl,
+    sourceNodeId: l.sourceNodeId,
+  }));
+}
+
+/** 视频 Dock · 合并文本 / 图片 / 分镜脚本上游，供 @ 与 resolveDockRunPrompt */
+export function buildSbv1VideoEngineDockUpstreamLinks(
+  upstreamRefLinks: Sbv1UpstreamRefLink[],
+  upstreamTextLinks: Sbv1UpstreamTextLink[],
+  extraLinks: Pro2DockUpstreamLink[] = [],
+): Pro2DockUpstreamLink[] {
+  const seen = new Set<string>();
+  const out: Pro2DockUpstreamLink[] = [];
+  const push = (link: Pro2DockUpstreamLink) => {
+    if (seen.has(link.id)) return;
+    seen.add(link.id);
+    out.push(link);
+  };
+  for (const link of extraLinks) push(link);
+  for (const link of sbv1TextLinksToDockUpstream(upstreamTextLinks)) push(link);
+  for (const link of sbv1RefLinksToDockUpstream(upstreamRefLinks)) push(link);
+  return out;
+}
+
+/** 视频 Dock @ 列表：文本上游 + 参考图 + 分镜脚本 chip */
+export function buildSbv1VideoEngineDockMentionables(
+  upstreamRefLinks: Sbv1UpstreamRefLink[],
+  upstreamTextLinks: Sbv1UpstreamTextLink[],
+  extraLinks: Pro2DockUpstreamLink[] = [],
+  nodes?: CanvasFlowNode[],
+  prompt?: string,
+): MentionableItem[] {
+  const upstream = buildSbv1VideoEngineDockUpstreamLinks(
+    upstreamRefLinks,
+    upstreamTextLinks,
+    extraLinks,
+  );
+  const items = buildPro2DockMentionables(upstream);
+  const imageExtras = buildSbv1DockMentionables(upstreamRefLinks, nodes, prompt);
+  const seen = new Set(items.map((i) => i.id));
+  for (const item of imageExtras) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    items.push(item);
+  }
+  return items;
 }

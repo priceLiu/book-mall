@@ -127,7 +127,10 @@ export async function runSbv1VideoEngineNode(
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
-  const isTextToVideoOnly = isDashscopeT2v || isKlingTextToVideo;
+  const hasReferenceImages = imageInputs.length > 0 || hasPortraitRefs;
+  /** 纯文生视频：无参考图；有 @图片 / 连线参考时保留图片并走 R2V 升级 */
+  const isTextToVideoOnly =
+    (isDashscopeT2v || isKlingTextToVideo) && !hasReferenceImages;
 
   if (
     !promptRaw &&
@@ -211,7 +214,10 @@ export async function runSbv1VideoEngineNode(
     multiShots: params.multi_shots === true,
     providerId,
   }).refApi;
-  if (refApi === "bailian_r2v_media") {
+  if (
+    refApi === "bailian_r2v_media" ||
+    (isDashscopeT2v && hasReferenceImages)
+  ) {
     params.ratio = aspectRatio;
     params.resolution = /^720p$/i.test(resolution) ? "720P" : "1080P";
     params.duration = durationSec;

@@ -7,6 +7,7 @@ import {
 } from "@/lib/canvas/spawn-story-pro2-workspace";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { resolvePro2TextPurpose } from "@/lib/canvas/pro2-text-purpose";
+import { isPlainLibtvTextContent } from "@/lib/canvas/libtv-plain-text-display";
 import {
   pushStoryRevision,
   type StoryTextRevision,
@@ -30,15 +31,6 @@ export function Pro2TextNodeOutlineEditorHost() {
   );
 
   const d = (node?.data ?? {}) as StoryProStarterNodeData;
-  const outlineMd = d.generatedOutlineMd ?? "";
-
-  const nodeLabel = useMemo(() => {
-    if (!node) return "文本节点";
-    const starters = nodes.filter((n) => n.type === "story-pro2-starter");
-    const idx = starters.findIndex((n) => n.id === node.id);
-    return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
-  }, [node, nodes]);
-
   const textPurpose = useMemo(
     () =>
       node
@@ -47,6 +39,17 @@ export function Pro2TextNodeOutlineEditorHost() {
     [node, d, nodes, edges],
   );
   const isGeneral = textPurpose === "general";
+  const outlineMd =
+    d.generatedOutlineMd?.trim() ||
+    (isGeneral ? d.themeInput?.trim() : "") ||
+    "";
+
+  const nodeLabel = useMemo(() => {
+    if (!node) return "文本节点";
+    const starters = nodes.filter((n) => n.type === "story-pro2-starter");
+    const idx = starters.findIndex((n) => n.id === node.id);
+    return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
+  }, [node, nodes]);
 
   const persistOutline = useCallback(
     (md: string) => {
@@ -77,11 +80,14 @@ export function Pro2TextNodeOutlineEditorHost() {
   if (!node) return null;
   if (!outlineMd.trim() && !isGeneral) return null;
 
+  const usePlainEditor = isGeneral || isPlainLibtvTextContent(outlineMd);
+
   return (
     <Pro2TextNodeOutlineModal
       open
       title={`${nodeLabel} · ${isGeneral ? "内容" : "故事大纲"}`}
       value={outlineMd}
+      plainText={usePlainEditor}
       onClose={closeEditor}
       onAutoSave={persistOutline}
     />

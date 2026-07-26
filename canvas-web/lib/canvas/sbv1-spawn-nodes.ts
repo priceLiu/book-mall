@@ -360,6 +360,21 @@ export function spawnSbv1NeighborFromNode(
           targetHandle: "in_video",
         },
       ]);
+    } else if (
+      (self.type === "story-pro2-starter" ||
+        self.type === "story-pro2-script-hub") &&
+      side === "right"
+    ) {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${anchorId}-${newId}`,
+          source: anchorId,
+          target: newId,
+          sourceHandle: "text",
+          targetHandle: "in_text",
+        },
+      ]);
     } else {
       const edge =
         self.type === "sbv1-image"

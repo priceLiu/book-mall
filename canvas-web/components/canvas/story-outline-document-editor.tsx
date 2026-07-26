@@ -17,7 +17,7 @@ import {
 } from "./story-generic-md-table-editor";
 
 const DOC_TEXT =
-  "w-full resize-none border-0 bg-transparent font-sans text-[17px] leading-[1.85] text-neutral-800 shadow-none focus:outline-none focus:ring-0";
+  "w-full resize-none border-0 bg-transparent font-sans text-[17px] leading-[1.85] text-neutral-800 shadow-none focus:outline-none focus:ring-0 break-words whitespace-pre-wrap [overflow-wrap:anywhere]";
 
 function splitOutlineBlocks(md: string): MarkdownBlock[] {
   const normalized = prepareMarkdownForPreview(md);
@@ -78,7 +78,7 @@ export function StoryOutlineDocumentEditor({
       );
     }
     return (
-      <div className="nodrag flex min-h-0 w-full flex-1 flex-col gap-6">
+      <div className="nodrag flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-x-hidden">
         {splitOutlineBlocks(value).map((block, index) =>
           block.kind === "table" ? (
             canEditGenericMdTable(block.value) ? (
@@ -136,7 +136,7 @@ export function StoryOutlineDocumentEditor({
     "表格可直接点单元格编辑；正文点段落后，上方保持渲染预览、下方编辑 Markdown";
 
   return (
-    <div className="nodrag flex min-h-0 w-full flex-1 flex-col gap-6">
+    <div className="nodrag flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-x-hidden">
       <p className="text-[12px] text-neutral-500">{hint}</p>
       {blocks.map((block, index) => {
         if (block.kind === "table" && canEditGenericMdTable(block.value)) {

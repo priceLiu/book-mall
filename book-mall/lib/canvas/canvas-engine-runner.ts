@@ -76,6 +76,7 @@ import {
   buildDashscopeSbv1T2vVideoBody,
   isDashscopeHappyhorseImageToVideoModel,
   isDashscopeSbv1TextToVideoModel,
+  upgradeDashscopeT2vModelWhenRefsPresent,
 } from "./dashscope-sbv1-t2v";
 import {
   parseTopazFrameInterpolation,
@@ -503,7 +504,7 @@ export async function runImageEngineNode(
 
   // 上游 textInputs（含 ai-engine 输出）+ 节点 prompt 拼接
   const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
-  const expandedPrompt = expandMentions(
+  const expandedPrompt = expandMentionsText(
     [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
     node,
   );
@@ -1135,7 +1136,7 @@ export async function runVideoEngineNode(
   const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
-  const modelKey = String(data.modelKey ?? node.modelKey ?? "");
+  let modelKey = String(data.modelKey ?? node.modelKey ?? "");
   const promptRaw = String(data.prompt ?? "");
   const params = (data.params as Record<string, unknown>) ?? {};
 
@@ -1164,6 +1165,11 @@ export async function runVideoEngineNode(
       )
     : imageInputs.slice(1);
   const lastFrameImageUrl = String(data.lastFrameImageUrl ?? "").trim();
+  modelKey = upgradeDashscopeT2vModelWhenRefsPresent(modelKey, [
+    mainFrameImageUrl,
+    ...(lastFrameImageUrl ? [lastFrameImageUrl] : []),
+    ...referenceImageUrls,
+  ]);
   const forceReferenceMode = data.forceReferenceMode === true;
   const portraitAssetRefs = normalizePortraitAssetRefs(
     node.portraitAssetRefs ?? data.portraitAssetRefs,

@@ -27,3 +27,12 @@ export function resolveDockRunPrompt(
 
   return { prompt: cleaned.replace(/\s{2,}/g, " ").trim(), extraText };
 }
+
+/** sbv1 视频合成 · 将 @ 文本展开进最终 prompt（@ 图片 token 由 resolveSbv1VideoEngineInputs 处理） */
+export function resolveSbv1VideoEngineRunPrompt(
+  prompt: string,
+  upstreamLinks: Pro2DockUpstreamLink[],
+): string {
+  const { prompt: cleaned, extraText } = resolveDockRunPrompt(prompt, upstreamLinks);
+  return [cleaned, ...extraText].filter(Boolean).join("\n\n").trim();
+}

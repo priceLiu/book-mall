@@ -31,6 +31,8 @@ import {
   findGroupResizeSessionId,
   isGroupResizeCommitFrame,
   isCanvasInteractiveGeometryInProgress,
+  isCanvasPositionCommitOnly,
+  isCanvasDimensionCommitOnly,
   isResizeRelatedChange,
   filterStoreBoundNodeChanges,
   readGroupResizeGeometry,
@@ -239,6 +241,21 @@ function FlowCanvasInner({
   const syncingGraphFromStoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+
+  useEffect(() => {
+    const onSuppressPaneClick = () => {
+      ignoreNextPaneClickRef.current = true;
+    };
+    window.addEventListener(
+      "canvas:suppress-next-pane-click",
+      onSuppressPaneClick,
+    );
+    return () =>
+      window.removeEventListener(
+        "canvas:suppress-next-pane-click",
+        onSuppressPaneClick,
+      );
+  }, []);
 
   const armStoreToRfSyncGuard = useCallback(() => {
     syncingGraphFromStoreRef.current = true;
@@ -891,6 +908,24 @@ function FlowCanvasInner({
           sel?.nodeType ?? null,
         );
       };
+
+      // 拖动 session 内 pause 了 undo；松手帧若此时写 store 会被 zundo 吞掉 → 延后到 onNodeDragStop
+      if (dragUndoPausedRef.current && storeChanges.length > 0) {
+        const resizeCommitIdsForDefer = extractResizeCommitIds(rfChanges);
+        const manualIdsForDefer = new Set(resizeCommitIdsForDefer);
+        if (
+          isCanvasPositionCommitOnly(storeChanges) ||
+          isCanvasDimensionCommitOnly(storeChanges, manualIdsForDefer)
+        ) {
+          deferStoreGraphSyncRef.current = false;
+          setCanvasGeometryDragging(false);
+          setCanvasDraggingNodeId(null);
+          if (libtvCanvas && rfChanges.some((c) => c.type === "select")) {
+            syncLibtvFloatingDockPinFromRf();
+          }
+          return;
+        }
+      }
 
       const resizeCommitIds = extractResizeCommitIds(rfChanges);
       if (resizeCommitIds.length > 0) {

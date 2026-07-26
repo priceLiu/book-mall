@@ -34,6 +34,12 @@ describe("sbv1-video-model-reference", () => {
     expect(caps.supportedModes).toContain("first_last");
   });
 
+  it("HappyHorse T2V with @ refs upgrades via bailian_r2v_media caps", () => {
+    const caps = getSbv1VideoModelRefCaps("happyhorse-1.1-t2v");
+    expect(caps.refApi).toBe("bailian_r2v_media");
+    expect(caps.maxRefsOmni).toBe(9);
+  });
+
   it("Kling 3.0 multi_shots disables first_last", () => {
     const caps = getSbv1VideoModelRefCaps("kling-3.0/video", {
       multiShots: true,

@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ export type BatchConnectSpawnMenuItem = {
 };
 
 /** 框选批量连线松手菜单 · 锚定在指针位置，轻量无 flyout */
-export function BatchConnectSpawnMenu({
+export const BatchConnectSpawnMenu = memo(function BatchConnectSpawnMenu({
   anchor,
   title,
   items,
@@ -30,9 +30,15 @@ export function BatchConnectSpawnMenu({
   onMenuRect?: (rect: { x: number; y: number }) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const openedAtRef = useRef(0);
+
+  useEffect(() => {
+    openedAtRef.current = Date.now();
+  }, [anchor.x, anchor.y]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
+      if (Date.now() - openedAtRef.current < 150) return;
       if (ref.current?.contains(e.target as HTMLElement)) return;
       onClose();
     };
@@ -100,4 +106,4 @@ export function BatchConnectSpawnMenu({
     </div>,
     document.body,
   );
-}
+});
