@@ -3,8 +3,7 @@
 import { memo, useCallback, useMemo } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { buildSbv1VideoEngineDockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "@/lib/canvas/pro2-video-board-dock-links";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
@@ -111,17 +110,16 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     [nodeId, nodes, edges],
   );
 
-  const mentionables = useMemo(() => {
-    const items = buildSbv1DockMentionables(upstreamLinks, nodes);
-    const pro2Items = buildPro2DockMentionables(pro2BoardDockLinks);
-    const seen = new Set(items.map((i) => i.id));
-    for (const item of pro2Items) {
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      items.push(item);
-    }
-    return items;
-  }, [upstreamLinks, nodes, pro2BoardDockLinks]);
+  const mentionables = useMemo(
+    () =>
+      buildSbv1VideoEngineDockMentionables(
+        upstreamLinks,
+        upstreamTextLinks,
+        pro2BoardDockLinks,
+        nodes,
+      ),
+    [upstreamLinks, upstreamTextLinks, pro2BoardDockLinks, nodes],
+  );
 
   const dockUpstreamForChips = useMemo(() => {
     const textAsDock = sbv1TextLinksToDockUpstream(upstreamTextLinks);

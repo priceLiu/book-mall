@@ -7,11 +7,13 @@ export type Sbv1UpstreamTextLink = {
   index: number;
   label: string;
   preview: string;
+  /** 展开 @ 引用 / 提交生成时使用（完整正文，非 chip 截断） */
+  fullText: string;
   sourceNodeId: string;
   edgeId: string;
 };
 
-function textPreviewFromStarter(
+function textFullFromStarter(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   nodeId: string,
@@ -24,38 +26,87 @@ function textPreviewFromStarter(
       }
     | undefined;
   const script = resolveStoryProStarterScriptInput(nodes, edges, nodeId);
-  const raw =
+  return (
     script?.trim() ||
     d?.dockInput?.trim() ||
     d?.generatedOutlineMd?.trim() ||
     d?.themeInput?.trim() ||
-    "";
+    ""
+  );
+}
+
+function textPreviewFromStarter(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  nodeId: string,
+): string {
+  const raw = textFullFromStarter(nodes, edges, nodeId);
   if (!raw) return "文本节点";
   return raw.length > 48 ? `${raw.slice(0, 48)}…` : raw;
 }
 
-/** sbv1-video-engine · in_text 上游文本节点 */
+function textFullFromScriptHub(node: CanvasFlowNode | undefined): string {
+  const d = node?.data as
+    | {
+        outlineMd?: string;
+        storyboardMd?: string;
+        characterMd?: string;
+      }
+    | undefined;
+  return (
+    d?.storyboardMd?.trim() ||
+    d?.outlineMd?.trim() ||
+    d?.characterMd?.trim() ||
+    ""
+  );
+}
+
+/** sbv1-video-engine · in_text 上游文本节点（兼容历史误标 in_ref 的文本连线） */
 export function resolveSbv1UpstreamTextLinks(
   engineNodeId: string,
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): Sbv1UpstreamTextLink[] {
-  const incoming = edges.filter(
-    (e) =>
-      e.target === engineNodeId &&
-      (e.targetHandle === "in_text" || e.targetHandle === "in_prompt"),
-  );
+  const incoming = edges.filter((e) => {
+    if (e.target !== engineNodeId) return false;
+    if (e.targetHandle === "in_text" || e.targetHandle === "in_prompt") {
+      return true;
+    }
+    const source = nodes.find((n) => n.id === e.source);
+    const isTextSource =
+      source?.type === "story-pro2-starter" ||
+      source?.type === "story-pro2-script-hub";
+    if (!isTextSource) return false;
+    return (
+      e.targetHandle === "in_ref" ||
+      e.targetHandle === "default" ||
+      !e.targetHandle
+    );
+  });
   const links: Sbv1UpstreamTextLink[] = [];
   let index = 0;
   for (const edge of incoming) {
     const source = nodes.find((n) => n.id === edge.source);
-    if (!source || source.type !== "story-pro2-starter") continue;
+    if (!source) continue;
+    const isStarter = source.type === "story-pro2-starter";
+    const isHub = source.type === "story-pro2-script-hub";
+    if (!isStarter && !isHub) continue;
     index += 1;
+    const fullText = isStarter
+      ? textFullFromStarter(nodes, edges, source.id)
+      : textFullFromScriptHub(source);
     links.push({
       id: `sbv1-text-${source.id}`,
       index,
       label: `文本 ${index}`,
-      preview: textPreviewFromStarter(nodes, edges, source.id),
+      preview: isStarter
+        ? textPreviewFromStarter(nodes, edges, source.id)
+        : fullText
+          ? fullText.length > 48
+            ? `${fullText.slice(0, 48)}…`
+            : fullText
+          : "脚本生成器",
+      fullText,
       sourceNodeId: source.id,
       edgeId: edge.id,
     });
@@ -70,8 +121,8 @@ export function sbv1TextLinksToDockUpstream(
   return links.map((l) => ({
     id: l.id,
     kind: "text" as const,
-    label: l.preview,
-    previewMd: l.preview,
+    label: l.label,
+    previewMd: l.fullText.trim() || l.preview,
     sourceNodeId: l.sourceNodeId,
   }));
 }

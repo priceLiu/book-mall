@@ -212,6 +212,19 @@ export function spawnLibtvNeighborFromAnchor(
         targetHandle: "in_ref",
       });
     } else if (
+      side === "right" &&
+      (anchor.type === "story-pro2-starter" ||
+        anchor.type === "story-pro2-script-hub")
+    ) {
+      // 文生视频：文本右侧 + → 视频（text → in_text）
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: anchorId,
+        target: newId,
+        sourceHandle: "text",
+        targetHandle: "in_text",
+      });
+    } else if (
       side === "left" &&
       (anchor.type === "story-pro2-starter" ||
         anchor.type === "story-pro2-script-hub")

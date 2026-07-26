@@ -29,9 +29,12 @@ export function resolveLibtvThinNodeDisplayState(input: {
 export function pro2StarterHasContent(data: {
   generatedOutlineMd?: string;
   uploadedScriptMd?: string;
+  themeInput?: string;
 }): boolean {
   return Boolean(
-    data.generatedOutlineMd?.trim() || data.uploadedScriptMd?.trim(),
+    data.generatedOutlineMd?.trim() ||
+      data.uploadedScriptMd?.trim() ||
+      data.themeInput?.trim(),
   );
 }
 

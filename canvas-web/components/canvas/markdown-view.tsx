@@ -38,7 +38,7 @@ function MarkdownProse({
   const darkInherit = isDarkPreview && inheritFontSize;
 
   return (
-    <div className={`w-full min-w-0 ${className}`}>
+    <div className={`w-full min-w-0 max-w-full overflow-x-hidden ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -95,13 +95,13 @@ function MarkdownProse({
             <p
               className={
                 isDoc
-                  ? "mb-4 text-[17px] leading-[1.85] text-neutral-800"
+                  ? "mb-4 break-words text-[17px] leading-[1.85] text-neutral-800 [overflow-wrap:anywhere]"
                   : isNodePreview
-                    ? "mb-3 text-[13px] leading-[1.75] text-neutral-700"
+                    ? "mb-3 break-words text-[13px] leading-[1.75] text-neutral-700 [overflow-wrap:anywhere]"
                     : isDarkPreview
                       ? darkInherit
-                        ? "mb-3 leading-[1.75] text-white/90"
-                        : "mb-3 text-[13px] leading-[1.75] text-white/90"
+                        ? "mb-3 break-words leading-[1.75] text-white/90 [overflow-wrap:anywhere]"
+                        : "mb-3 break-words text-[13px] leading-[1.75] text-white/90 [overflow-wrap:anywhere]"
                       : undefined
               }
             >
@@ -198,17 +198,18 @@ export function MarkdownView({
   const isLightDoc = isDoc || isNodePreview;
   const tableVariant: StoryMdTableVariant = isNodePreview ? "nodePreview" : "document";
 
+  const wrapClass = "break-words [overflow-wrap:anywhere]";
   const proseClass = isDoc
-    ? `max-w-none text-[17px] leading-[1.75] text-neutral-900 ${className}`
+    ? `max-w-none text-[17px] leading-[1.75] text-neutral-900 ${wrapClass} ${className}`
     : isNodePreview
-      ? `max-w-none text-[13px] leading-[1.7] text-neutral-800 ${className}`
+      ? `max-w-none text-[13px] leading-[1.7] text-neutral-800 ${wrapClass} ${className}`
       : isDarkPreview
-        ? `max-w-none leading-[1.75] text-white ${
+        ? `max-w-none leading-[1.75] text-white ${wrapClass} ${
             inheritFontSize
               ? "text-inherit [&_p]:text-[length:inherit] [&_li]:text-[length:inherit]"
               : "text-[13px]"
           } ${className}`
-        : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`;
+        : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${wrapClass} ${className}`;
 
   const useRichPreview =
     variant === "document" || variant === "nodePreview" || variant === "darkPreview";

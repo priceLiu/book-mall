@@ -1233,10 +1233,7 @@ export const useCanvasStore = create<CanvasState>()(
             } as CanvasFlowNode;
           });
           if (canvasNodesLayoutFieldsEqual(prev, next, ids)) return state;
-          useCanvasStore.temporal.getState().pause();
-          const result = withGraphRevision(state, { nodes: next });
-          useCanvasStore.temporal.getState().resume();
-          return result;
+          return withGraphRevision(state, { nodes: next });
         });
       },
 

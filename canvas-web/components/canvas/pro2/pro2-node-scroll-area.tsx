@@ -11,14 +11,18 @@ import { cn } from "@/lib/utils";
 export function Pro2NodeScrollArea({
   className,
   children,
+  /** 纯文本换行展示时禁止横向滚动撑宽节点 */
+  wrapContent = false,
 }: {
   className?: string;
   children: ReactNode;
+  wrapContent?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "pro2-node-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto",
+        "pro2-node-scroll min-h-0 flex-1 overflow-y-auto",
+        wrapContent ? "overflow-x-hidden" : "overflow-x-auto",
         className,
       )}
       onPointerDown={(e) => {

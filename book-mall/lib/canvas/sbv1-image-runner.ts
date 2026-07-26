@@ -102,17 +102,11 @@ export async function runSbv1ImageNode(
       ? data.ossUrl
       : "";
   const upstreamUrls = httpsImageUrls(args.node.imageInputs ?? []);
-  const styleUrl =
-    typeof styleRef?.imageUrl === "string" &&
-    /^https?:\/\//.test(styleRef.imageUrl)
-      ? styleRef.imageUrl
-      : "";
-
-  const imageUrls = Array.from(
-    new Set(
-      [selfUrl, ...upstreamUrls, styleUrl].filter(Boolean),
-    ),
-  ).slice(0, 8);
+  // 风格仅拼进 prompt（stylePrompt）；参考图只认前端 imageInputs / 节点自身 ossUrl，避免风格缩略图多传一张
+  const imageUrls = Array.from(new Set([selfUrl, ...upstreamUrls].filter(Boolean))).slice(
+    0,
+    8,
+  );
 
   const hasRefs = imageUrls.length > 0;
   const stylePrompt = styleRef?.prompt?.trim() ?? "";
