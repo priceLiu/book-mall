@@ -31,8 +31,10 @@ import {
   type LibtvImageMagicMenuId,
 } from "@/lib/canvas/libtv-image-toolbar-magic";
 import {
+  LIBTV_GRID_SPLIT_MAX,
+  LIBTV_GRID_SPLIT_MIN,
   LIBTV_GRID_SPLIT_PRESETS,
-  type LibtvGridSplitPresetId,
+  libtvGridSplitFromDimensions,
 } from "@/lib/canvas/libtv-image-grid-split";
 import { useLibtvToolbarPortaled } from "@/components/canvas/libtv-node-toolbar-portal";
 import {
@@ -85,8 +87,8 @@ export type Pro2ImageNodeToolbarProps = {
   minimal?: boolean;
   /** Pro2 图片节点 ·「编辑」菜单 */
   onEditPick?: (menuId: LibtvImageEditMenuId) => void;
-  /** Pro2 图片节点 · 宫格切分预设 */
-  onGridSplitPick?: (presetId: LibtvGridSplitPresetId) => void;
+  /** Pro2 图片节点 · 宫格切分（列 × 行） */
+  onGridSplitPick?: (cols: number, rows: number) => void;
   /** Pro2 图片节点 ·「魔术」菜单 */
   onMagicPick?: (menuId: LibtvImageMagicMenuId) => void;
   /** 是否展示编辑 / 宫格切分（Pro2 有图节点） */
@@ -118,6 +120,8 @@ export function Pro2ImageNodeToolbar({
     "magic",
     "grid",
   ] as const);
+  const [customGridCols, setCustomGridCols] = useState("3");
+  const [customGridRows, setCustomGridRows] = useState("3");
 
   const soon = async (label: string) => {
     await alert({
@@ -371,7 +375,7 @@ export function Pro2ImageNodeToolbar({
             open={dropdowns.isOpen("grid")}
             setOpen={(v) => (v ? dropdowns.toggle("grid") : dropdowns.close())}
             rect={dropdowns.isOpen("grid") ? dropdowns.rect : null}
-            minWidth={180}
+            minWidth={220}
           >
             {LIBTV_GRID_SPLIT_PRESETS.map((preset) => (
               <Pro2ToolbarDropdownItem
@@ -380,14 +384,107 @@ export function Pro2ImageNodeToolbar({
                 label={preset.label}
                 onClick={() => {
                   dropdowns.close();
-                  onGridSplitPick?.(preset.id);
+                  onGridSplitPick?.(preset.cols, preset.rows);
                 }}
               />
             ))}
+            <div className="my-1 border-t border-white/10" />
+            <GridSplitCustomPanel
+              cols={customGridCols}
+              rows={customGridRows}
+              onColsChange={setCustomGridCols}
+              onRowsChange={setCustomGridRows}
+              onApply={() => {
+                const split = libtvGridSplitFromDimensions(
+                  Number(customGridCols),
+                  Number(customGridRows),
+                );
+                if (!split) {
+                  void alert({
+                    title: "无效宫格",
+                    message: `请输入 ${LIBTV_GRID_SPLIT_MIN}～${LIBTV_GRID_SPLIT_MAX} 之间的列数与行数。`,
+                    variant: "error",
+                  });
+                  return;
+                }
+                dropdowns.close();
+                onGridSplitPick?.(split.cols, split.rows);
+              }}
+            />
           </Pro2ToolbarDropdownMenu>
         </>
       ) : null}
     </>
+  );
+}
+
+function GridSplitCustomPanel({
+  cols,
+  rows,
+  onColsChange,
+  onRowsChange,
+  onApply,
+}: {
+  cols: string;
+  rows: string;
+  onColsChange: (v: string) => void;
+  onRowsChange: (v: string) => void;
+  onApply: () => void;
+}) {
+  return (
+    <div
+      className="nodrag px-3 py-2"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="mb-2 text-[12px] font-medium text-white/55">自定义</p>
+      <div className="flex items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-white/75">
+          <span className="shrink-0 text-white/45">列</span>
+          <input
+            type="number"
+            min={LIBTV_GRID_SPLIT_MIN}
+            max={LIBTV_GRID_SPLIT_MAX}
+            inputMode="numeric"
+            value={cols}
+            onChange={(e) => onColsChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onApply();
+              }
+            }}
+            className="nodrag w-full min-w-0 rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[13px] text-white outline-none focus:border-white/25"
+          />
+        </label>
+        <span className="text-white/30">×</span>
+        <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-white/75">
+          <span className="shrink-0 text-white/45">行</span>
+          <input
+            type="number"
+            min={LIBTV_GRID_SPLIT_MIN}
+            max={LIBTV_GRID_SPLIT_MAX}
+            inputMode="numeric"
+            value={rows}
+            onChange={(e) => onRowsChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onApply();
+              }
+            }}
+            className="nodrag w-full min-w-0 rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[13px] text-white outline-none focus:border-white/25"
+          />
+        </label>
+      </div>
+      <button
+        type="button"
+        className={cn(TOOL_BTN, "mt-2 w-full justify-center")}
+        onClick={onApply}
+      >
+        应用
+      </button>
+    </div>
   );
 }
 

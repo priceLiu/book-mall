@@ -47,12 +47,6 @@ export class CanvasProjectError extends Error {
 
 const MAX_NAME = 80;
 
-function canvasNodeCount(canvas: unknown): number {
-  if (!canvas || typeof canvas !== "object") return 0;
-  const nodes = (canvas as { nodes?: unknown }).nodes;
-  return Array.isArray(nodes) ? nodes.length : 0;
-}
-
 export type CanvasProjectSummary = {
   id: string;
   name: string;
@@ -278,15 +272,6 @@ export async function updateCanvasProjectForUser(
   if (patch.canvas !== undefined) {
     if (!patch.canvas || typeof patch.canvas !== "object") {
       throw new CanvasProjectError("INVALID_INPUT", "canvas must be object");
-    }
-    const prevNodes = canvasNodeCount(p.canvas);
-    const nextNodes = canvasNodeCount(patch.canvas);
-    if (prevNodes > 0 && nextNodes === 0) {
-      throw new CanvasProjectError(
-        "INVALID_INPUT",
-        "refusing to save empty canvas over existing nodes",
-        409,
-      );
     }
     const mergedCanvas = mergePersistedMediaIntoCanvasGraph(
       patch.canvas,

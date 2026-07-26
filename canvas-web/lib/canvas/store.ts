@@ -163,20 +163,7 @@ function finalizeHydratedGraph(
   };
 }
 
-/** hydrate 布局落定后，Pro2 画布请求 fitView（节点测量完成后再框选） */
-function requestPro2FitViewAfterHydrate(
-  meta: { edition?: "pro2" | "sbv1" } | null | undefined,
-  set: (
-    partial:
-      | Partial<{ fitViewNonce: number }>
-      | ((state: { fitViewNonce: number }) => Partial<{ fitViewNonce: number }>),
-  ) => void,
-) {
-  if (meta?.edition !== "pro2") return;
-  set((s) => ({ fitViewNonce: s.fitViewNonce + 1 }));
-}
-
-/** Pro2 打开时忽略 DB 里各项目不一致的旧 viewport，统一 fitView */
+/** Pro2 打开时使用统一 100% 视口，忽略 DB 里各项目不一致的旧 viewport */
 function pro2NeutralViewportOnOpen(
   meta: { edition?: "pro2" | "sbv1" } | null | undefined,
   saved: { x: number; y: number; zoom: number },
@@ -619,7 +606,6 @@ export const useCanvasStore = create<CanvasState>()(
           );
           queueMicrotask(() => {
             runPostHydratePro2VideoBoardRepair(get);
-            requestPro2FitViewAfterHydrate(meta, set);
           });
         };
 
@@ -662,7 +648,6 @@ export const useCanvasStore = create<CanvasState>()(
         );
         queueMicrotask(() => {
           runPostHydratePro2VideoBoardRepair(get);
-          requestPro2FitViewAfterHydrate(meta, set);
         });
       },
 

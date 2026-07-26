@@ -9,8 +9,12 @@
  */
 import type { CanvasQueuedTaskRow } from "@/lib/canvas/canvas-queue-without-log";
 import { buildCanvasPendingInputSummary } from "@/lib/canvas/canvas-pending-input-summary";
+import {
+  isCanvasImageTrafficKind,
+  readPipelineStage,
+} from "@/lib/canvas/canvas-traffic-kind";
 
-export type CanvasPendingLogStatus = "QUEUED" | "DISPATCHING";
+export type CanvasPendingLogStatus = "QUEUED" | "PREPARING" | "DISPATCHING";
 
 /** 与 gateway-web GatewayLogRow 必填字段对齐 + 排队专用扩展（pending / canvasTaskId）。 */
 export type CanvasPendingLogRow = {
@@ -21,7 +25,7 @@ export type CanvasPendingLogRow = {
   model: string;
   endpoint: string;
   status: CanvasPendingLogStatus;
-  requestKind: "VIDEO";
+  requestKind: "VIDEO" | "IMAGE";
   providerKind: null;
   credentialKeyMasked: null;
   clientSource: "CANVAS";
@@ -50,17 +54,29 @@ export type CanvasPendingLogRow = {
 export function buildCanvasPendingLogRow(
   task: CanvasQueuedTaskRow,
 ): CanvasPendingLogRow {
-  const status: CanvasPendingLogStatus =
+  const payload = task.inputPayload ?? {};
+  const pipelineStage = readPipelineStage(payload);
+  let status: CanvasPendingLogStatus =
     task.status === "QUEUED" ? "QUEUED" : "DISPATCHING";
+  if (pipelineStage === "PREPARING") {
+    status = "PREPARING";
+  } else if (task.status === "QUEUED") {
+    status = "QUEUED";
+  } else {
+    status = "DISPATCHING";
+  }
+  const requestKind: "VIDEO" | "IMAGE" = isCanvasImageTrafficKind(payload)
+    ? "IMAGE"
+    : "VIDEO";
   const startedAt = task.trafficStartedAt;
   return {
     id: `pending:${task.id}`,
     canvasTaskId: task.id,
     pending: true,
     model: task.model ?? "",
-    endpoint: "jobs/createTask",
+    endpoint: status === "PREPARING" ? "canvas/grid-split/prepare" : "jobs/createTask",
     status,
-    requestKind: "VIDEO",
+    requestKind,
     providerKind: null,
     credentialKeyMasked: null,
     clientSource: "CANVAS",

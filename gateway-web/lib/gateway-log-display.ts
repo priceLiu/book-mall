@@ -293,6 +293,7 @@ export function logProviderFilterOptions(
 
 const STATUS_LABEL: Record<string, string> = {
   QUEUED: "排队中",
+  PREPARING: "准备中",
   DISPATCHING: "派发中",
   PENDING: "排队",
   RUNNING: "进行中",
@@ -375,6 +376,8 @@ export function formatRequestStatusShortLabel(status: LogRequestStatus): string 
       return "pending";
     case "QUEUED":
       return "queued";
+    case "PREPARING":
+      return "preparing";
     case "DISPATCHING":
       return "dispatching";
     case "CANCELLED":
@@ -395,6 +398,7 @@ export function statusDotClass(status: LogRequestStatus): string {
     case "PENDING":
       return "bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.55)]";
     case "QUEUED":
+    case "PREPARING":
     case "DISPATCHING":
       return "bg-zinc-400/80 shadow-[0_0_6px_rgba(161,161,170,0.5)]";
     case "CANCELLED":
@@ -419,6 +423,7 @@ export function statusBadgeClass(status: LogRequestStatus): string {
     case "PENDING":
       return "bg-amber-500/15 text-amber-300";
     case "QUEUED":
+    case "PREPARING":
     case "DISPATCHING":
       return "bg-zinc-500/15 text-zinc-300";
     case "CANCELLED":

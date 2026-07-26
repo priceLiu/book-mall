@@ -504,13 +504,6 @@ function Inner({ projectId }: { projectId: string }) {
         const graph = stripStoryProUploadedScriptMdForPersist(
           stripGraphForPersist(useCanvasStore.getState().toGraph()),
         );
-        if (
-          graph.nodes.length === 0 &&
-          loadedNodeCountRef.current > 0
-        ) {
-          setSaveError("检测到画布被清空，已阻止自动保存。");
-          return;
-        }
         const thumb = pickPersistableProjectThumbnailUrl(graph);
         const patch: {
           canvas: typeof graph;
@@ -561,15 +554,6 @@ function Inner({ projectId }: { projectId: string }) {
     const scheduleAutosave = () => {
       if (!canvasReadyRef.current) return;
       if (!isCanvasDirty()) return;
-      const state = useCanvasStore.getState();
-      if (
-        state.nodes.length === 0 &&
-        loadedNodeCountRef.current > 0 &&
-        state.edges.length === 0
-      ) {
-        setSaveError("检测到画布被清空，已阻止自动保存。请刷新或点「恢复漫剧模板」。");
-        return;
-      }
       clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;

@@ -8,6 +8,7 @@ import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { useImagePasteWhenActive } from "@/lib/canvas/image-upload-handlers";
+import { LibtvGridSplitCropSprite } from "@/components/canvas/libtv-grid-split-crop-sprite";
 import { spawnPro2DockPastedImages } from "@/lib/canvas/spawn-pro2-dock-paste-images";
 import { spawnSbv1ImageDockPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -65,6 +66,7 @@ function DockRefImageChip({
     label: refItem.label,
     kind: "image",
     previewUrl: refItem.url,
+    gridSplitCrop: refItem.gridSplitCrop,
   };
 
   return (
@@ -106,13 +108,21 @@ function DockRefImageChip({
         onMouseLeave={() => setHover(null)}
       >
         {refItem.url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={refItem.url}
-            alt={refItem.label}
-            draggable={false}
-            className="size-full object-contain"
-          />
+          refItem.gridSplitCrop ? (
+            <LibtvGridSplitCropSprite
+              url={refItem.url}
+              crop={refItem.gridSplitCrop}
+              className="size-full"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={refItem.url}
+              alt={refItem.label}
+              draggable={false}
+              className="size-full object-contain"
+            />
+          )
         ) : (
           <div className="flex size-full items-center justify-center text-[11px] text-white/40">
             图

@@ -11,7 +11,7 @@
 
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
-import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
+import { canvasTrafficPayloadWhere } from "@/lib/canvas/canvas-traffic-kind";
 import { prisma } from "@/lib/prisma";
 
 import { getDispatchingStaleSec } from "./constants";
@@ -70,7 +70,7 @@ function staleDispatchingWhere(
   return {
     status: "DISPATCHING",
     ...(projectId ? { projectId } : {}),
-    ...canvasVideoPayloadWhere(),
+    ...canvasTrafficPayloadWhere(),
     OR: [
       { updatedAt: { lte: cutoff } },
       { kieTaskId: null, queuedAt: { lte: cutoff } },
@@ -87,7 +87,7 @@ function staleQueuedWhere(
   return {
     status: "QUEUED",
     ...(projectId ? { projectId } : {}),
-    ...canvasVideoPayloadWhere(),
+    ...canvasTrafficPayloadWhere(),
     AND: [
       {
         OR: [

@@ -31,7 +31,7 @@ export type LibtvMediaNodeSize = {
   height: number;
 };
 
-function loadImageNaturalSize(url: string): Promise<{ w: number; h: number }> {
+export function loadImageNaturalSize(url: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () =>
@@ -220,11 +220,23 @@ export function useLibtvMediaNodeAutoFit({
     return Boolean(parentGroup && isPro2StyledGroup(parentGroup, s.nodes));
   });
 
+  const skipForHdGridSplitPlaceholder = useCanvasStore((s) => {
+    const self = s.nodes.find((n) => n.id === nodeId);
+    const d = self?.data as {
+      pro2HdFromGridSplit?: boolean;
+      gridSplitCrop?: unknown;
+      gridSplitFrameCrop?: boolean;
+    };
+    return Boolean(
+      d?.pro2HdFromGridSplit && d?.gridSplitCrop && !d?.gridSplitFrameCrop,
+    );
+  });
+
   const lastFitKey = useRef("");
 
   useEffect(() => {
     const url = mediaUrl?.trim();
-    if (!url || disabled || skipForSbv1GroupImage || skipForPro2GroupImage) return;
+    if (!url || disabled || skipForSbv1GroupImage || skipForPro2GroupImage || skipForHdGridSplitPlaceholder) return;
 
     const poster = posterUrl?.trim();
     const probeUrl = kind === "video" && poster ? poster : url;
@@ -303,6 +315,7 @@ export function useLibtvMediaNodeAutoFit({
     disabled,
     skipForSbv1GroupImage,
     skipForPro2GroupImage,
+    skipForHdGridSplitPlaceholder,
     parentId,
     mediaFit,
     mediaFitKey,

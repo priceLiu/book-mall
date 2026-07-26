@@ -803,6 +803,42 @@ export async function uploadCanvasFile(
   return j.ossUrl;
 }
 
+export async function cropCanvasGridSplitCell(
+  base: string,
+  body: {
+    projectId: string;
+    imageUrl: string;
+    col: number;
+    row: number;
+    cols: number;
+    rows: number;
+  },
+): Promise<string> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    "/api/canvas/grid-split/crop-cell",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  const r = await fetch(url, init);
+  if (!r.ok) {
+    let detail = String(r.status);
+    try {
+      const j = (await r.json()) as { message?: string; error?: string };
+      detail = j.message ?? j.error ?? detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`grid split crop failed: ${detail}`);
+  }
+  const j = (await r.json()) as { ossUrl?: string };
+  if (!j.ossUrl?.trim()) throw new Error("grid split crop missing ossUrl");
+  return j.ossUrl.trim();
+}
+
 // ── works (gallery) ──
 
 export type CanvasWorkRecord = {

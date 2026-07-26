@@ -54,6 +54,10 @@ export function busEnqueueNodesSequential(
   opts?: CanvasRunSequentialOpts,
 ) {
   if (!nodeIds.length) return;
+  if (handlers) {
+    handlers.enqueueNodesSequential(nodeIds, opts);
+    return;
+  }
   busEnqueueStoryRunsSequential(
     nodeIds.map((nodeId) => ({ nodeId, forceFresh: opts?.forceFresh })),
     opts,

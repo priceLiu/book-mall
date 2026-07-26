@@ -97,16 +97,37 @@ export async function runSbv1ImageNode(
     );
   }
 
+  const isHdGridSplit = Boolean(data.pro2HdFromGridSplit);
+  const pendingGridCrop =
+    isHdGridSplit &&
+    data.gridSplitCrop &&
+    typeof data.gridSplitCrop === "object" &&
+    data.gridSplitFrameCrop !== true;
   const selfUrl =
-    typeof data.ossUrl === "string" && /^https?:\/\//.test(data.ossUrl)
+    !isHdGridSplit &&
+    typeof data.ossUrl === "string" &&
+    /^https?:\/\//.test(data.ossUrl)
       ? data.ossUrl
       : "";
   const upstreamUrls = httpsImageUrls(args.node.imageInputs ?? []);
-  // 风格仅拼进 prompt（stylePrompt）；参考图只认前端 imageInputs / 节点自身 ossUrl，避免风格缩略图多传一张
-  const imageUrls = Array.from(new Set([selfUrl, ...upstreamUrls].filter(Boolean))).slice(
-    0,
-    8,
-  );
+  const precroppedUrl =
+    isHdGridSplit &&
+    data.gridSplitFrameCrop === true &&
+    typeof data.ossUrl === "string" &&
+    /^https?:\/\//.test(data.ossUrl)
+      ? data.ossUrl
+      : "";
+  const imageUrls = pendingGridCrop
+    ? []
+    : Array.from(
+        new Set([
+          ...(precroppedUrl
+            ? [precroppedUrl]
+            : isHdGridSplit
+              ? upstreamUrls
+              : [selfUrl, ...upstreamUrls]),
+        ].filter(Boolean)),
+      ).slice(0, 8);
 
   const hasRefs = imageUrls.length > 0;
   const stylePrompt = styleRef?.prompt?.trim() ?? "";

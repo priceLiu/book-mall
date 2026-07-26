@@ -3,6 +3,7 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import {
   buildCanvasAiKieCallbackUrl,
 } from "@/lib/canvas/canvas-constants";
+import { canvasTrafficPayloadWhere } from "@/lib/canvas/canvas-traffic-kind";
 import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
 import { claimCanvasTaskKieSubmit, findSiblingActiveVendorJob } from "@/lib/canvas/canvas-kie-gateway-claim";
 import {
@@ -29,7 +30,11 @@ import {
   getQueueTimeoutMin,
   isTrafficControlEnabled,
 } from "./constants";
-import { isCanvasVideoTrafficKind } from "./admit-canvas";
+import {
+  isCanvasImageTrafficKind,
+  isCanvasVideoTrafficKind,
+} from "@/lib/canvas/canvas-traffic-kind";
+import { dispatchCanvasImageQueuedTask } from "./dispatch-canvas-image";
 import {
   acquireTrafficSlotInTx,
   releaseTrafficSlot,
@@ -184,7 +189,7 @@ async function cancelQueueTimeouts(projectId?: string): Promise<number> {
       status: "QUEUED",
       queuedAt: { lt: cutoff },
       ...(projectId ? { projectId } : {}),
-      NOT: canvasVideoPayloadWhere(),
+      NOT: canvasTrafficPayloadWhere(),
     },
     data: {
       status: "CANCELLED",
@@ -242,7 +247,9 @@ async function dispatchOneCanvasQueuedTask(
   let scopeKey: string | null = null;
   try {
   const payload = taskInputPayload(task);
-  if (!isCanvasVideoTrafficKind(payload)) return "skipped";
+  const isVideo = isCanvasVideoTrafficKind(payload);
+  const isImage = isCanvasImageTrafficKind(payload);
+  if (!isVideo && !isImage) return "skipped";
 
   const now = new Date();
   if (task.dispatchAfter && task.dispatchAfter.getTime() > now.getTime()) {
@@ -290,6 +297,14 @@ async function dispatchOneCanvasQueuedTask(
   );
 
   if (slotResult.action !== "claimed") return "skipped";
+
+  if (isImage) {
+    return dispatchCanvasImageQueuedTask(task, scope.scopeKey, {
+      releaseTrafficSlot,
+      revertStuckDispatchingTask,
+      releaseGatewayVideoTrafficSlotIfOccupying,
+    });
+  }
 
   // 仅当 createTask 成功返回 logId 后为 true；503 预检失败时仍为 false，可安全退回队列。
   let vendorJob: { taskId: string; logId: string } | null = null;

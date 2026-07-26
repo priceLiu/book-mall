@@ -284,6 +284,7 @@ export function isStoryLlmNodeType(t: string): t is StoryLlmNodeType {
 
 export type CanvasNodeRunStatus =
   | "idle"
+  | "queued"
   | "pending"
   | "running"
   | "done"

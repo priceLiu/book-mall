@@ -233,6 +233,14 @@ export function resolvePro2DockUpstreamLinks(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): Pro2DockUpstreamLink[] {
+  const self = nodes.find((n) => n.id === nodeId);
+  if (
+    nodeType === "story-pro2-image" &&
+    (self?.data as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+  ) {
+    return [];
+  }
+
   const incoming = edges.filter((e) =>
     edgeMatchesDockInput(e, nodeId, nodeType, nodes),
   );

@@ -3,6 +3,7 @@
  */
 import type { Prisma } from "@prisma/client";
 
+import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
 import { prisma } from "@/lib/prisma";
 
 export function extractChatTextFromGatewaySummary(
@@ -16,7 +17,28 @@ export function extractChatTextFromGatewaySummary(
   if (s.kind === "chat" && typeof s.text === "string" && s.text.trim()) {
     return s.text.trim();
   }
+  const normalized = buildGatewayChatResultSummary(summary);
+  if (
+    normalized &&
+    typeof normalized.text === "string" &&
+    normalized.text.trim()
+  ) {
+    return normalized.text.trim();
+  }
   return null;
+}
+
+/** 读路径快速写回：Gateway 已成功但 canvas TEXT 仍 SUBMITTED（限条数，避免拖慢 /tasks）。 */
+export async function recoverProjectInflightTextTasksForRead(
+  taskIds: string[],
+  limit = 5,
+): Promise<number> {
+  let recovered = 0;
+  for (const taskId of taskIds.slice(0, limit)) {
+    const outcome = await recoverCanvasTextLlmFromGateway(taskId);
+    if (outcome === "succeeded" || outcome === "failed") recovered += 1;
+  }
+  return recovered;
 }
 
 export type CanvasTextLlmRecoverResult =

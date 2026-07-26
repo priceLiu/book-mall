@@ -12,7 +12,14 @@ function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
   return undefined;
 }
 
-/** sbv1-image 任务结果写回节点 ossUrl + runtime */
+const IMAGE_INFLIGHT_STATUSES = new Set([
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
+  "SUBMITTED",
+]);
+
+/** sbv1-image / story-pro2-image 任务结果写回节点 ossUrl + runtime */
 export function sbv1ImagePatchFromTask(
   prev: Sbv1ImageNodeData,
   task: CanvasTaskRecord,
@@ -55,12 +62,18 @@ export function sbv1ImagePatchFromTask(
     };
   }
 
-  if (task.status === "SUBMITTED" || task.status === "PENDING") {
+  if (IMAGE_INFLIGHT_STATUSES.has(task.status)) {
+    const hadUpload = Boolean(prev.uploading);
     return {
-      uploading: true,
+      ...(hadUpload ? { uploading: true } : {}),
       uploadError: undefined,
       runtime: {
-        status: task.status === "PENDING" ? "pending" : "running",
+        status:
+          task.status === "QUEUED" ||
+          task.status === "PENDING" ||
+          task.status === "DISPATCHING"
+            ? "pending"
+            : "running",
         taskId: task.id,
         failCode: undefined,
         failMessage: undefined,
@@ -123,7 +136,6 @@ export function sbv1VideoPatchFromTask(
 
   if (VIDEO_INFLIGHT_STATUSES.has(task.status)) {
     return {
-      uploading: true,
       uploadError: undefined,
       runtime: {
         status:
@@ -144,6 +156,7 @@ export function sbv1VideoPatchFromTask(
 export function sbv1ImageFailurePatch(
   failCode: string,
   failMessage: string,
+  modelKey?: string | null,
 ): Record<string, unknown> {
   return {
     uploading: false,
@@ -151,7 +164,7 @@ export function sbv1ImageFailurePatch(
     runtime: {
       status: "error",
       failCode,
-      failMessage: formatCanvasTaskError(failCode, failMessage),
+      failMessage: formatCanvasTaskError(failCode, failMessage, modelKey),
     } satisfies CanvasNodeRuntime,
   };
 }

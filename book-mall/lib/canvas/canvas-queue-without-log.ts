@@ -1,9 +1,14 @@
 /**
- * 画布视频任务 · 交通控流排队（QUEUED / DISPATCHING）且尚未创建 Gateway 日志。
+ * 画布交通控流任务 · 排队（QUEUED / DISPATCHING）且尚未创建 Gateway 日志。
  */
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import {
+  canvasTrafficPayloadWhere,
+  isCanvasImageTrafficKind,
+  isCanvasVideoTrafficKind,
+} from "@/lib/canvas/canvas-traffic-kind";
 import { readTrafficStartedAtIso } from "@/lib/generation/traffic-control/traffic-timing";
 
 /** 交通控流 · 尚未提交厂商（必无 Gateway log） */
@@ -30,15 +35,16 @@ function readPayloadRecord(inputPayload: unknown): Record<string, unknown> | nul
   return inputPayload as Record<string, unknown>;
 }
 
-/** 画布视频 · 用户已点击生成、但 Gateway 日志尚未出现（含 SUBMITTED 但未写 gatewayLogId 的窗口期） */
-export function isCanvasVideoPreGatewayLogTask(input: {
+/** 画布 · 用户已点击生成、但 Gateway 日志尚未出现（含 SUBMITTED 但未写 gatewayLogId 的窗口期） */
+export function isCanvasPreGatewayLogTask(input: {
   status: string;
   inputPayload: unknown;
 }): boolean {
   const payload = readPayloadRecord(input.inputPayload);
   if (!payload) return false;
-  const kind = typeof payload.kind === "string" ? payload.kind : "";
-  if (kind !== "video-engine" && kind !== "ai-video-engine") return false;
+  if (!isCanvasVideoTrafficKind(payload) && !isCanvasImageTrafficKind(payload)) {
+    return false;
+  }
   if (
     input.status === "QUEUED" ||
     input.status === "DISPATCHING" ||
@@ -52,6 +58,14 @@ export function isCanvasVideoPreGatewayLogTask(input: {
   return false;
 }
 
+/** @deprecated use isCanvasPreGatewayLogTask */
+export function isCanvasVideoPreGatewayLogTask(input: {
+  status: string;
+  inputPayload: unknown;
+}): boolean {
+  return isCanvasPreGatewayLogTask(input);
+}
+
 /** inputPayload.kind 为画布视频引擎（DB kind 常为 IMAGE，以 payload 为准） */
 export function canvasVideoPayloadWhere(): Prisma.CanvasGenerationTaskWhereInput {
   return {
@@ -62,11 +76,13 @@ export function canvasVideoPayloadWhere(): Prisma.CanvasGenerationTaskWhereInput
   };
 }
 
+export { canvasTrafficPayloadWhere };
+
 export function buildCanvasQueueWithoutLogWhere(
   ownerUserIds: string[] | null,
 ): Prisma.CanvasGenerationTaskWhereInput {
   const base: Prisma.CanvasGenerationTaskWhereInput = {
-    ...canvasVideoPayloadWhere(),
+    ...canvasTrafficPayloadWhere(),
     OR: [
       { status: { in: [...CANVAS_QUEUE_WITHOUT_LOG_STATUSES] } },
       { status: "SUBMITTED" },
@@ -152,7 +168,7 @@ export async function fetchCanvasQueueWithoutLogStats(input: {
     select: { inputPayload: true },
   });
   const submittedPreLog = submittedCandidates.filter((t) =>
-    isCanvasVideoPreGatewayLogTask({
+    isCanvasPreGatewayLogTask({
       status: "SUBMITTED",
       inputPayload: t.inputPayload,
     }),
@@ -235,7 +251,7 @@ export async function listCanvasQueuedWithoutLogTasks(input: {
   const now = Date.now();
   return rows
     .filter((t) =>
-      isCanvasVideoPreGatewayLogTask({
+      isCanvasPreGatewayLogTask({
         status: t.status,
         inputPayload: t.inputPayload,
       }),

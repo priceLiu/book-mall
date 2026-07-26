@@ -284,8 +284,26 @@ export function storyRunContextFromScope(
  */
 export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
+  opts?: { localRuntime?: CanvasNodeRuntime | null },
 ): CanvasTaskRecord | undefined {
   if (!tasks.length) return undefined;
+
+  const localTaskId = opts?.localRuntime?.taskId?.trim();
+  const localInflight = isInflightRuntimeStatus(opts?.localRuntime?.status);
+  if (localTaskId && localInflight) {
+    const bound = tasks.find((t) => t.id === localTaskId);
+    if (bound?.status === "SUCCEEDED" && taskHasDisplayableResult(bound)) {
+      return bound;
+    }
+    if (
+      bound &&
+      isServerInflightTaskStatus(bound.status) &&
+      !isStaleServerInflightTask(bound, tasks)
+    ) {
+      return bound;
+    }
+  }
+
   const inflight = tasks.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
@@ -377,6 +395,7 @@ export function pickStoryRowApplyTask(
 
 export function preferredTasksByNode(
   tasks: CanvasTaskRecord[],
+  nodes?: CanvasFlowNode[],
 ): Map<string, CanvasTaskRecord> {
   const grouped = new Map<string, CanvasTaskRecord[]>();
   for (const t of tasks) {
@@ -386,7 +405,10 @@ export function preferredTasksByNode(
   }
   const out = new Map<string, CanvasTaskRecord>();
   for (const [nodeId, list] of Array.from(grouped.entries())) {
-    const pick = pickPreferredCanvasTask(list);
+    const node = nodes?.find((n) => n.id === nodeId);
+    const localRt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
+      ?.runtime;
+    const pick = pickPreferredCanvasTask(list, { localRuntime: localRt });
     if (pick) out.set(nodeId, pick);
   }
   return out;

@@ -37,7 +37,9 @@ import {
   isSameSbv1MediaDataPatch,
   sbv1ImageFailurePatch,
   sbv1ImagePatchFromTask,
+  sbv1VideoPatchFromTask,
 } from "./sbv1-image-task-apply";
+import { pickTaskResultMediaUrl } from "./task-media-url";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import {
   clearCanvasNodeRunSession,
@@ -162,7 +164,6 @@ export function reconcileStaleInflightRuntimes(
         node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
       ).themeOutlineRuntime;
       if (isInflightStatus(rt?.status)) {
-        if (rt?.status === "pending" && !rt?.taskId) continue;
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         const scopes = [
           { mediaKind: "themeOutline" as const },
@@ -460,7 +461,7 @@ export function reconcileStaleInflightRuntimes(
       continue;
     }
 
-    const pick = pickPreferredCanvasTask(nodeTasks);
+    const pick = pickPreferredCanvasTask(nodeTasks, { localRuntime: rt });
     if (pick && (pick.status === "SUCCEEDED" || pick.status === "FAILED")) {
       if (isStoryWorkspaceNodeType(node.type ?? "")) {
         storyApplyTaskResult(
@@ -470,10 +471,34 @@ export function reconcileStaleInflightRuntimes(
           updateNodeData,
           nodes,
         );
+      } else if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine") {
+        const imagePatch =
+          node.type === "sbv1-video-engine"
+            ? sbv1VideoPatchFromTask(pick)
+            : sbv1ImagePatchFromTask(
+                node.data as unknown as Sbv1ImageNodeData,
+                pick,
+              );
+        const patch = imagePatch ?? runtimePatchFromCanvasTask(pick);
+        if (imagePatch && !isSameSbv1MediaDataPatch(node.data as Record<string, unknown>, imagePatch)) {
+          clearCanvasNodeRunSession(node.id);
+          updateNodeData(node.id, imagePatch);
+        } else if (patch && shouldApplyCanvasTaskRuntimePatch(rt, pick, patch, node.id)) {
+          if (isLibtvFreestandingImageNode(node) && pick.status === "SUCCEEDED") {
+            const mediaUrl = pickTaskResultMediaUrl(pick) ?? pick.ossUrl ?? undefined;
+            updateNodeData(node.id, {
+              uploading: false,
+              ossUrl: mediaUrl,
+              blobUrl: undefined,
+              runtime: patch,
+            });
+          } else {
+            setNodeRuntime(node.id, patch);
+          }
+        }
       } else {
         const patch = runtimePatchFromCanvasTask(pick);
-        const localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
-        if (patch && shouldApplyCanvasTaskRuntimePatch(localRt, pick, patch, node.id)) {
+        if (patch && shouldApplyCanvasTaskRuntimePatch(rt, pick, patch, node.id)) {
           setNodeRuntime(node.id, patch);
         }
       }

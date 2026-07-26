@@ -22,6 +22,8 @@ import {
 import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
+import { materializeImageInputsForRun } from "./materialize-image-inputs-for-run";
+import { resolveHdGridSplitImageInputs } from "./resolve-hd-grid-split-image-inputs";
 import { directPredecessors } from "./topo";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
 import { parseReferencedIds } from "./dock-mention-parse";
@@ -166,7 +168,7 @@ function nodeRuntimeStatus(node: CanvasFlowNode): string | undefined {
 }
 
 function isLocalInflightStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return status === "queued" || status === "pending" || status === "running";
 }
 
 function isServerInflightStatus(status?: string): boolean {
@@ -248,8 +250,9 @@ function shouldReleaseStoryRunInflight(
 
 function latestTasksByNode(
   tasks: CanvasTaskRecord[],
+  nodes: CanvasFlowNode[],
 ): Map<string, CanvasTaskRecord> {
-  return preferredTasksByNode(tasks);
+  return preferredTasksByNode(tasks, nodes);
 }
 
 /** 顶部工具栏：进行中的生成任务数（含漫剧行级 / 文案段） */
@@ -263,6 +266,14 @@ function resolveImageInputsRaw(
   edges: CanvasFlowEdge[],
   nodeId: string,
 ): string[] {
+  const self = nodes.find((n) => n.id === nodeId);
+  if (
+    self?.type === "story-pro2-image" &&
+    (self.data as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+  ) {
+    return [];
+  }
+
   const out: string[] = [];
   for (const pid of directPredecessors(edges, nodeId)) {
     const p = nodes.find((n) => n.id === pid);
@@ -442,11 +453,35 @@ function resolveImageInputs(
   const node = nodes.find((n) => n.id === nodeId);
   if (!node) return [];
 
+  const nodeType = node.type ?? "";
+    if (
+    nodeType === "story-pro2-image" &&
+    (node.data as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+  ) {
+    const d = node.data as {
+      gridSplitCrop?: unknown;
+      ossUrl?: string;
+      blobUrl?: string;
+      dockRefImages?: StoryRefImage[];
+      gridSplitFrameCrop?: boolean;
+    };
+    if (d.gridSplitCrop) return [];
+    const urls: string[] = [];
+    const selfOss = d.ossUrl?.trim();
+    const selfBlob = d.blobUrl?.trim();
+    if (selfOss && /^https?:\/\//.test(selfOss)) urls.push(selfOss);
+    else if (selfBlob) urls.push(selfBlob);
+    for (const ref of d.dockRefImages ?? []) {
+      const u = ref.url?.trim();
+      if (u && !urls.includes(u)) urls.push(u);
+    }
+    return urls;
+  }
+
   const prompt =
     opts?.prompt ??
     promptForDockMentionFilter(node, nodes, edges, opts?.rowKey);
   const raw = resolveImageInputsRaw(nodes, edges, nodeId);
-  const nodeType = node.type ?? "";
   const dockImageTypes = new Set([
     "sbv1-image",
     "story-pro2-image",
@@ -603,6 +638,35 @@ function applySbv1VideoTaskResult(
   return true;
 }
 
+function modelKeyFromCanvasNode(
+  node: CanvasFlowNode | undefined,
+): string | undefined {
+  if (!node) return undefined;
+  const d = node.data as {
+    engine?: { modelKey?: string };
+    modelKey?: string;
+  };
+  return d.engine?.modelKey?.trim() || d.modelKey?.trim() || undefined;
+}
+
+/** 独立节点顺序跑（宫格高清等）· 单节点失败不阻断后续 */
+function isIndependentCanvasNodeJob(job: QueueItem): boolean {
+  return !job.rowKey && !job.llmSection && !job.mediaKind;
+}
+
+function advanceSequentialAfterNodeError(
+  job: QueueItem,
+  key: string,
+  finishSequentialStep: (completedKey: string) => void,
+  abortSequentialOnError: (completedKey: string) => void,
+): void {
+  if (isIndependentCanvasNodeJob(job)) {
+    finishSequentialStep(key);
+    return;
+  }
+  abortSequentialOnError(key);
+}
+
 function applyLibtvMediaRunFailure(
   node: CanvasFlowNode | undefined,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
@@ -611,8 +675,9 @@ function applyLibtvMediaRunFailure(
 ): boolean {
   if (!node) return false;
   clearCanvasNodeRunSession(node.id);
+  const modelKey = modelKeyFromCanvasNode(node);
   if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine" || node.type === "story-pro2-audio") {
-    updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
+    updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage, modelKey));
     return true;
   }
   return false;
@@ -834,13 +899,30 @@ export function useCanvasRunner(
               message,
             )
           ) {
+            const modelKey = modelKeyFromCanvasNode(node);
             setNodeRuntime(job.nodeId, {
               status: "error",
               failCode: "RUN_ABORTED",
-              failMessage: formatCanvasTaskError("RUN_ABORTED", message),
+              failMessage: formatCanvasTaskError(
+                "RUN_ABORTED",
+                message,
+                modelKey,
+              ),
             });
           }
         }
+      }
+      if (job && isIndependentCanvasNodeJob(job)) {
+        const seq = sequentialRef.current;
+        if (seq) {
+          const key = runKey(job);
+          if (seq.activeKey === key) {
+            seq.activeKey = null;
+            seq.cursor += 1;
+            pumpSequentialRef.current();
+          }
+        }
+        return;
       }
       sequentialRef.current = null;
     },
@@ -864,6 +946,12 @@ export function useCanvasRunner(
     const key = runKey(job);
     const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
     if (!node) {
+      if (isIndependentCanvasNodeJob(job)) {
+        seq.cursor += 1;
+        seq.activeKey = null;
+        pumpSequential();
+        return;
+      }
       abortSequential(job, "找不到节点，请刷新页面或重新创建工作区");
       return;
     }
@@ -1181,6 +1269,135 @@ export function useCanvasRunner(
             taskByNodeRef.current.set(key, vr.taskId);
             jobByTaskRef.current.set(vr.taskId, job);
           }
+          return;
+        }
+
+        const latestForInputs = useCanvasStore.getState();
+        const nodeForInputs =
+          latestForInputs.nodes.find((n) => n.id === nodeId) ?? node;
+        const inputData = nodeForInputs.data as {
+          pro2HdFromGridSplit?: boolean;
+          gridSplitCrop?: import("./libtv-grid-split-crop").GridSplitCrop;
+          gridSplitFrameCrop?: boolean;
+          gridSplitSourceUrl?: string;
+          ossUrl?: string;
+          blobUrl?: string;
+        };
+
+        const precroppedOss = inputData.ossUrl?.trim();
+        const hasPrecroppedHdRef =
+          nodeForInputs.type === "story-pro2-image" &&
+          inputData.pro2HdFromGridSplit &&
+          inputData.gridSplitFrameCrop &&
+          !inputData.gridSplitCrop &&
+          Boolean(precroppedOss && /^https?:\/\//.test(precroppedOss));
+
+        if (hasPrecroppedHdRef) {
+          imageInputs = [precroppedOss!];
+          runData = {
+            ...runData,
+            ossUrl: precroppedOss,
+            blobUrl: undefined,
+            gridSplitCrop: undefined,
+            gridSplitFrameCrop: true,
+          };
+        } else if (
+          nodeForInputs.type === "story-pro2-image" &&
+          inputData.pro2HdFromGridSplit &&
+          inputData.gridSplitCrop &&
+          base &&
+          projectId
+        ) {
+          const sourceUrl = String(inputData.gridSplitSourceUrl ?? "").trim();
+          const serverWillPrepare = /^https?:\/\//.test(sourceUrl);
+          if (serverWillPrepare) {
+            imageInputs = [];
+          } else {
+            try {
+              imageInputs = await resolveHdGridSplitImageInputs(
+                base,
+                projectId,
+                nodeId,
+                inputData,
+                updateNodeData,
+              );
+              const croppedUrl = imageInputs[0]?.trim();
+              if (
+                croppedUrl &&
+                (runData as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+              ) {
+                runData = {
+                  ...runData,
+                  ossUrl: croppedUrl,
+                  blobUrl: undefined,
+                  gridSplitCrop: undefined,
+                  gridSplitFrameCrop: true,
+                };
+              }
+            } catch (e) {
+              abortSequential(
+                job,
+                e instanceof Error ? e.message : "宫格裁切参考图失败",
+              );
+              return;
+            }
+          }
+        } else {
+          imageInputs = resolveImageInputs(
+            latestForInputs.nodes,
+            latestForInputs.edges,
+            nodeId,
+            { rowKey: job.rowKey },
+          );
+          if (base && imageInputs.some((u) => u.startsWith("blob:"))) {
+            try {
+              imageInputs = await materializeImageInputsForRun(
+                base,
+                imageInputs,
+              );
+              const ossUrl = imageInputs[0]?.trim();
+              if (
+                ossUrl &&
+                /^https?:\/\//.test(ossUrl) &&
+                (runData as { pro2HdFromGridSplit?: boolean })
+                  .pro2HdFromGridSplit
+              ) {
+                const refId = `hd-ref-${nodeId}`;
+                updateNodeData(nodeId, {
+                  ossUrl,
+                  blobUrl: undefined,
+                  uploading: false,
+                  mediaFitKey: ossUrl,
+                  dockRefImages: [
+                    { id: refId, label: "参考图", url: ossUrl },
+                  ],
+                });
+              }
+            } catch (e) {
+              abortSequential(
+                job,
+                e instanceof Error
+                  ? e.message
+                  : "参考图上传 OSS 失败，无法发起图生图",
+              );
+              return;
+            }
+          }
+        }
+
+        if (
+          node.type === "story-pro2-image" &&
+          (runData as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit &&
+          imageInputs.length === 0 &&
+          !(
+            inputData.gridSplitCrop &&
+            /^https?:\/\//.test(String(inputData.gridSplitSourceUrl ?? ""))
+          )
+        ) {
+          abortSequential(
+            job,
+            "高清参考图未就绪，无法发起图生图，请重新选择宫格并生成。",
+          );
           return;
         }
 
@@ -1505,13 +1722,14 @@ export function useCanvasRunner(
           );
         } else {
           const failCode = resolveLibtvRunFailureCode(msg);
+          const modelKey = modelKeyFromCanvasNode(errNode);
           if (
             !applySbv1ImageRunFailure(errNode, updateNodeData, failCode, msg)
           ) {
             setNodeRuntime(nodeId, {
               status: "error",
               failCode,
-              failMessage: formatCanvasTaskError(failCode, msg),
+              failMessage: formatCanvasTaskError(failCode, msg, modelKey),
             });
           }
         }
@@ -1547,7 +1765,12 @@ export function useCanvasRunner(
             if (rowErr && job.mediaKind === "sceneRef") {
               finishSequentialStep(key);
             } else if (rowErr || (node && nodeRuntimeStatus(node) === "error")) {
-              abortSequentialOnError(key);
+              advanceSequentialAfterNodeError(
+                job,
+                key,
+                finishSequentialStep,
+                abortSequentialOnError,
+              );
             } else {
               finishSequentialStep(key);
             }
@@ -1719,6 +1942,14 @@ export function useCanvasRunner(
   const enqueueNodesSequential = useCallback(
     (nodeIds: string[], forceFresh?: boolean) => {
       if (!nodeIds.length) return;
+      for (const nodeId of nodeIds) {
+        setNodeRuntime(nodeId, {
+          status: "queued",
+          taskId: undefined,
+          failCode: undefined,
+          failMessage: undefined,
+        });
+      }
       sequentialRef.current = {
         jobs: nodeIds.map((nodeId) => ({ nodeId, forceFresh })),
         cursor: 0,
@@ -1727,7 +1958,7 @@ export function useCanvasRunner(
       };
       pumpSequential();
     },
-    [pumpSequential],
+    [pumpSequential, setNodeRuntime],
   );
 
   const enqueueStoryRunsSequential = useCallback(
@@ -1775,9 +2006,17 @@ export function useCanvasRunner(
         forceFresh,
         activeKey: null,
       };
+      for (const job of runnable) {
+        setNodeRuntime(job.nodeId, {
+          status: "queued",
+          taskId: undefined,
+          failCode: undefined,
+          failMessage: undefined,
+        });
+      }
       pumpSequential();
     },
-    [pumpSequential],
+    [pumpSequential, setNodeRuntime],
   );
 
   const enqueueStoryRunRef = useRef(enqueueStoryRun);
@@ -1871,7 +2110,12 @@ export function useCanvasRunner(
         return;
       }
       if (rowErr || nodeRuntimeStatus(node) === "error") {
-        abortSequentialOnError(key);
+        advanceSequentialAfterNodeError(
+          job,
+          key,
+          finishSequentialStep,
+          abortSequentialOnError,
+        );
         return;
       }
       finishSequentialStep(key);
@@ -2041,30 +2285,33 @@ export function useCanvasRunner(
       const node = nodes.find((n) => n.id === nodeId);
       const job = jobByTaskRef.current.get(t.id);
       if (node && isStoryWorkspaceNodeType(node.type ?? "")) {
-        if (job) {
-          if (
-            job.llmSection &&
-            (t.status === "SUBMITTED" ||
-              t.status === "DISPATCHING" ||
-              t.status === "PENDING" ||
-              t.status === "QUEUED") &&
-            hubSectionIsComplete(node, job.llmSection) &&
-            !isCanvasInflightStatus(hubSectionRuntime(node, job.llmSection)?.status)
-          ) {
-            return;
-          }
-          storyApplyTaskResult(node, t, job, updateNodeData, nodes);
-        } else {
-          const scope = t.storyScope ?? {};
-          if (scope.llmSection || scope.rowKey || scope.mediaKind) {
-            storyApplyTaskResult(
-              node,
-              t,
-              storyRunContextFromScope(nodeId, scope),
-              updateNodeData,
-              nodes,
-            );
-          }
+        const scope = t.storyScope ?? {};
+        const ctx: CanvasStoryRunJob = {
+          nodeId,
+          ...(job ?? {}),
+          ...storyRunContextFromScope(nodeId, scope),
+        };
+        if (
+          ctx.llmSection &&
+          (t.status === "SUBMITTED" ||
+            t.status === "DISPATCHING" ||
+            t.status === "PENDING" ||
+            t.status === "QUEUED") &&
+          hubSectionIsComplete(node, ctx.llmSection) &&
+          !isCanvasInflightStatus(hubSectionRuntime(node, ctx.llmSection)?.status)
+        ) {
+          return;
+        }
+        storyApplyTaskResult(node, t, ctx, updateNodeData, nodes);
+        if (
+          t.status === "SUCCEEDED" ||
+          t.status === "FAILED" ||
+          t.status === "CANCELLED"
+        ) {
+          releaseInflightKey(runKey(ctx));
+          releaseInflightKey(nodeId);
+          if (t.status === "SUCCEEDED") maybeNotifyCanvasCreditsSettled(t);
+          emitTaskPanelSync(t, { flushAutosave: t.status === "SUCCEEDED" });
         }
         return;
       }
@@ -2128,9 +2375,44 @@ export function useCanvasRunner(
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
             const job = jobByTaskRef.current.get(t.id);
-            if (job) releaseInflightKey(runKey(job));
+            if (job) {
+              releaseInflightKey(runKey(job));
+              taskByNodeRef.current.delete(runKey(job));
+            }
+            taskByNodeRef.current.delete(nodeId);
             if (st === "done") maybeNotifyCanvasCreditsSettled(t);
             emitTaskPanelSync(t, { flushAutosave: st === "done" });
+          }
+        } else if (
+          patch &&
+          (t.status === "SUCCEEDED" || t.status === "FAILED" || t.status === "CANCELLED")
+        ) {
+          const mediaUrl = pickTaskResultMediaUrl(t) ?? t.ossUrl ?? undefined;
+          const fallbackPatch: Record<string, unknown> = {
+            uploading: false,
+            uploadError: undefined,
+            runtime: patch,
+            ...(mediaUrl && t.status === "SUCCEEDED"
+              ? { ossUrl: mediaUrl, blobUrl: undefined }
+              : {}),
+          };
+          if (
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              fallbackPatch,
+            )
+          ) {
+            updateNodeData(nodeId, fallbackPatch);
+          }
+          if (patch.status === "done" || patch.status === "error") {
+            const job = jobByTaskRef.current.get(t.id);
+            if (job) {
+              releaseInflightKey(runKey(job));
+              taskByNodeRef.current.delete(runKey(job));
+            }
+            taskByNodeRef.current.delete(nodeId);
+            if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
+            emitTaskPanelSync(t, { flushAutosave: patch.status === "done" });
           }
         }
         return;
@@ -2261,7 +2543,7 @@ export function useCanvasRunner(
           { skipNodeIds: skipReconcileNodeIds },
         );
         const columnIds = storyColumnNodeIds();
-        const latestByNode = latestTasksByNode(tasks);
+        const latestByNode = latestTasksByNode(tasks, useCanvasStore.getState().nodes);
         let serverInflight = 0;
         latestByNode.forEach((t, nodeId) => {
           if (isServerInflightStatus(t.status)) serverInflight++;

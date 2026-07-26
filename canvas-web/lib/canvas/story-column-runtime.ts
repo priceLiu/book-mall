@@ -69,7 +69,7 @@ export function storyColumnIsGenerating(runtime: CanvasNodeRuntime): boolean {
 }
 
 export function isCanvasInflightStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return status === "queued" || status === "pending" || status === "running";
 }
 
 function hubSectionInflightCount(d: StoryScriptHubNodeData): number {

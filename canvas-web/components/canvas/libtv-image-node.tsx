@@ -63,16 +63,16 @@ import {
   useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
+import { LibtvGridSplitCropSprite } from "@/components/canvas/libtv-grid-split-crop-sprite";
+import type { GridSplitCrop } from "@/lib/canvas/libtv-grid-split-crop";
+import { batchRunNodes } from "@/lib/canvas/batch-run-nodes";
+import type { LibtvGridHdScaleId } from "@/lib/canvas/libtv-grid-split-hd";
 import {
-  gridSplitCropBackgroundStyle,
-  type GridSplitCrop,
-} from "@/lib/canvas/libtv-grid-split-crop";
-import {
-  libtvGridSplitFromPreset,
+  libtvGridSplitFromDimensions,
   spawnExpandImageFromGridSplit,
   spawnFrameGroupFromGridSplit,
+  spawnHdImageFromGridSplit,
   toggleGridSplitCell,
-  type LibtvGridSplitPresetId,
   type LibtvImageGridSplitState,
 } from "@/lib/canvas/libtv-image-grid-split";
 import {
@@ -170,16 +170,25 @@ export function LibtvImageNode({
     setPreferBlobPreview(false);
   }, [d.ossUrl, d.blobUrl, d.uploading]);
 
-  const previewUrl = useMemo(
-    () =>
-      resolveLibtvMediaPreviewUrl({
-        ossUrl: d.ossUrl,
-        blobUrl: d.blobUrl,
-        uploading: d.uploading,
-        preferBlob: preferBlobPreview,
-      }),
-    [d.ossUrl, d.blobUrl, d.uploading, preferBlobPreview],
-  );
+  const previewUrl = useMemo(() => {
+    const gridSource = String(
+      (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl ?? "",
+    ).trim();
+    if (d.gridSplitCrop && gridSource) return gridSource;
+    return resolveLibtvMediaPreviewUrl({
+      ossUrl: d.ossUrl,
+      blobUrl: d.blobUrl,
+      uploading: d.uploading,
+      preferBlob: preferBlobPreview,
+    });
+  }, [
+    d.gridSplitCrop,
+    (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl,
+    d.ossUrl,
+    d.blobUrl,
+    d.uploading,
+    preferBlobPreview,
+  ]);
   const onPreviewLoadError = useCallback(() => {
     if (libtvMediaPreviewCanFallbackToBlob(d)) {
       setPreferBlobPreview(true);
@@ -391,9 +400,11 @@ export function LibtvImageNode({
   );
 
   const onGridSplitPick = useCallback(
-    (presetId: LibtvGridSplitPresetId) => {
+    (cols: number, rows: number) => {
       if (edition !== "pro2" || !hasImage) return;
-      updateNodeData(id, { gridSplit: libtvGridSplitFromPreset(presetId) });
+      const split = libtvGridSplitFromDimensions(cols, rows);
+      if (!split) return;
+      updateNodeData(id, { gridSplit: split });
     },
     [edition, hasImage, id, updateNodeData],
   );
@@ -465,6 +476,48 @@ export function LibtvImageNode({
     })();
   }, [gridSplit, id, nodes, addNode, setNodes, setEdges, clearGridSplit, alert]);
 
+  const onGenerateHdFromGridSplit = useCallback(
+    (scaleId: LibtvGridHdScaleId) => {
+      if (!gridSplit?.selected.length) return;
+      if (!base) {
+        void alert({
+          title: "无法生成",
+          message: "画布未就绪，请刷新页面后重试。",
+          variant: "error",
+        });
+        return;
+      }
+      void (() => {
+        const { runnableIds } = spawnHdImageFromGridSplit(
+          id,
+          gridSplit,
+          scaleId,
+          {
+            nodes,
+            getNodes: () => useCanvasStore.getState().nodes,
+            addNode,
+            setNodes,
+            setEdges,
+            base,
+            projectId,
+            updateNodeData,
+          },
+        );
+        if (!runnableIds.length) {
+          void alert({
+            title: "生成失败",
+            message: "无法创建高清图片节点，请确认原图已加载。",
+            variant: "error",
+          });
+          return;
+        }
+        clearGridSplit();
+        batchRunNodes(runnableIds);
+      })();
+    },
+    [gridSplit, id, nodes, addNode, setNodes, setEdges, updateNodeData, clearGridSplit, alert, base, projectId],
+  );
+
   useEffect(() => {
     if (!gridSplitActive) return;
     const onKey = (e: KeyboardEvent) => {
@@ -529,18 +582,26 @@ export function LibtvImageNode({
     }
 
     if (isGenerating) {
+      const cropPreview =
+        gridSplitCropCss && previewUrl ? (
+          <LibtvGridSplitCropSprite
+            url={previewUrl}
+            crop={gridSplitCropCss}
+            className="absolute inset-0 opacity-40"
+          />
+        ) : previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt=""
+            className="absolute inset-0 size-full object-contain opacity-40"
+            draggable={false}
+            onError={onPreviewLoadError}
+          />
+        ) : null;
       return (
         <LibtvMediaGeneratingState variant={chrome.generating}>
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={previewUrl}
-              alt=""
-              className="absolute inset-0 size-full object-contain opacity-40"
-              draggable={false}
-              onError={onPreviewLoadError}
-            />
-          ) : null}
+          {cropPreview}
         </LibtvMediaGeneratingState>
       );
     }
@@ -579,11 +640,10 @@ export function LibtvImageNode({
       }
       if (gridSplitCropCss && previewUrl) {
         return (
-          <div
+          <LibtvGridSplitCropSprite
+            url={previewUrl}
+            crop={gridSplitCropCss}
             className="absolute inset-0"
-            style={gridSplitCropBackgroundStyle(previewUrl, gridSplitCropCss)}
-            aria-label={nodeLabel}
-            role="img"
           />
         );
       }
@@ -749,6 +809,7 @@ export function LibtvImageNode({
               onCancel={clearGridSplit}
               onExpandImage={onExpandFromGridSplit}
               onCreateFrameGroup={onCreateFrameGroupFromSplit}
+              onGenerateHd={onGenerateHdFromGridSplit}
             />
           </LibtvNodeToolbarPortal>
         ) : null}

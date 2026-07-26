@@ -67,7 +67,11 @@ export function shouldSkipStaleTerminalWhileLocalInflight(
     return true;
   }
 
-  if (!sessionStartedNodeIds.has(nodeId)) return true;
+  if (!sessionStartedNodeIds.has(nodeId)) {
+    // 刷新后会话丢失：服务端已终态时仍应写回，避免 Gateway 已成功但 UI 一直「生成中」
+    if (isTerminalTaskStatus(pick.status)) return false;
+    return true;
+  }
 
   const startedAt = sessionStartedAtMs.get(nodeId) ?? 0;
   const pickMs = Date.parse(pick.updatedAt || pick.createdAt || "");

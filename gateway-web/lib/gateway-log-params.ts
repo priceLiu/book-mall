@@ -479,6 +479,7 @@ export function isLogInProgress(status: string): boolean {
     s === "PENDING" ||
     // 方向 2：画布排队中（待提交）合成行也算「进行中」，让总耗时从点击起 live 递增
     s === "QUEUED" ||
+    s === "PREPARING" ||
     s === "DISPATCHING"
   );
 }
@@ -486,7 +487,7 @@ export function isLogInProgress(status: string): boolean {
 /** 画布排队中（待提交）：尚未提交厂商，仅在出队/派发阶段 */
 export function isLogPendingSubmit(status: string): boolean {
   const s = status.trim().toUpperCase();
-  return s === "QUEUED" || s === "DISPATCHING";
+  return s === "QUEUED" || s === "PREPARING" || s === "DISPATCHING";
 }
 
 /** 优先用 durationMs（>0）；0 视为未写入，回退 completedAt - submittedAt；进行中可回退 now - submittedAt */

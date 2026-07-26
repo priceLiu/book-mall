@@ -24,7 +24,7 @@ export function isLibtvMediaGenerating(data: {
   // 终态优先：乐观 UI 可能遗留 uploading=true，勿把已完成节点仍显示为生成中
   if (s === "done" || s === "error" || s === "idle") return false;
   if (data.uploading) return true;
-  if (s === "running" || s === "pending") return true;
+  if (s === "running" || s === "pending" || s === "queued") return true;
   // 终态已写回成片但 status 未及时刷新（勿在 pending/running 之前短路，否则重生成无扫光）
   if (rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim()) return false;
   return false;

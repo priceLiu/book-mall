@@ -65,6 +65,13 @@ export function libtvRuntimeErrorAlertTitle(
     return "积分不足";
   }
   if (
+    /余额不足|账户欠费|quota exceeded|credits insufficient|insufficient credit|insufficient balance/i.test(
+      msg,
+    )
+  ) {
+    return "账户余额不足";
+  }
+  if (
     kind === "image" ||
     /生图|图片生成|参考图|image generation/i.test(msg)
   ) {

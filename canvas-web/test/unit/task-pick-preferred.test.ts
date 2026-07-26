@@ -37,23 +37,26 @@ describe("pickPreferredCanvasTask", () => {
     expect(pick?.id).toBe("ok");
   });
 
-  it("still returns non-stale inflight when present", () => {
-    const pick = pickPreferredCanvasTask([
-      task({
-        id: "ok",
-        status: "SUCCEEDED",
-        updatedAt: "2026-07-16T10:05:00.000Z",
-        completedAt: "2026-07-16T10:05:00.000Z",
-        ossUrl: "https://cdn.example/ok.mp4",
-      }),
-      task({
-        id: "running",
-        status: "SUBMITTED",
-        updatedAt: "2026-07-16T10:11:00.000Z",
-        submittedAt: "2026-07-16T10:11:00.000Z",
-      }),
-    ]);
-    expect(pick?.id).toBe("running");
+  it("prefers bound SUCCEEDED task when local runtime still running", () => {
+    const pick = pickPreferredCanvasTask(
+      [
+        task({
+          id: "done",
+          status: "SUCCEEDED",
+          updatedAt: "2026-07-16T10:05:00.000Z",
+          completedAt: "2026-07-16T10:05:00.000Z",
+          ossUrl: "https://cdn.example/ok.png",
+        }),
+        task({
+          id: "other",
+          status: "SUBMITTED",
+          updatedAt: "2026-07-16T10:11:00.000Z",
+          submittedAt: "2026-07-16T10:11:00.000Z",
+        }),
+      ],
+      { localRuntime: { status: "running", taskId: "done" } },
+    );
+    expect(pick?.id).toBe("done");
   });
 });
 

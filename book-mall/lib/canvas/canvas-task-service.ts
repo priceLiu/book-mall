@@ -2545,10 +2545,16 @@ export async function listProjectTasks(args: {
   const where: Prisma.CanvasGenerationTaskWhereInput = args.lightweight
     ? { AND: [baseWhere, buildCanvasTaskHotReadWhere()] }
     : baseWhere;
+  const nodeCount = args.nodeIds?.length ?? 0;
+  const lightweightTake =
+    nodeCount > 0
+      ? Math.min(1000, Math.max(100, nodeCount * 6))
+      : 100;
+
   const rows = await findGenerationTaskRows({
     where,
     orderBy: { updatedAt: "desc" },
-    take: args.lightweight ? 100 : 200,
+    take: args.lightweight ? lightweightTake : 200,
     projectIdForRows: args.projectId,
   });
 

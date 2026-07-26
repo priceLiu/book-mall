@@ -328,16 +328,11 @@ function FlowCanvasInner({
     const finishInitialFit = () => {
       initialFitDoneRef.current = true;
     };
-    // Pro2 打开时统一 fitView，忽略 DB 里各项目不一致的旧 viewport
+    // Pro2 打开保持 100% 视口，勿 fitView（单节点新建时 fitView 会放大节点）
     if (isLibtv && pro2FloatingInspector) {
-      void fitView({ padding: 0.12, duration: 0 }).then(() => {
+      void rfSetViewport(state.viewport, { duration: 0 }).then(() => {
         syncVp();
-        requestAnimationFrame(() => {
-          void fitView({ padding: 0.12, duration: 0 }).then(() => {
-            syncVp();
-            finishInitialFit();
-          });
-        });
+        finishInitialFit();
       });
       return;
     }
@@ -537,7 +532,7 @@ function FlowCanvasInner({
     setCanvasDraggingNodeId,
   ]);
 
-  /** LibTV 打开时勿用 graph 里旧 viewport 作为 RF 初值，等 fitView 完成 */
+  /** LibTV 打开时勿用 graph 里旧 viewport 作为 RF 初值；Pro2 保持 100% */
   const flowDefaultViewport = useMemo(() => {
     const isLibtv =
       pro2FloatingInspector ||
@@ -1053,7 +1048,7 @@ function FlowCanvasInner({
     applyInitialViewport();
   }, [applyInitialViewport]);
 
-  /** hydrate 后节点才到位 · onInit 时可能仍为空，此处补一次 LibTV fitView */
+  /** hydrate 后节点才到位 · onInit 时可能仍为空，此处补一次 LibTV 初视口 */
   useEffect(() => {
     if (!rfReadyRef.current || initialFitDoneRef.current) return;
     if (storeNodes.length === 0) return;

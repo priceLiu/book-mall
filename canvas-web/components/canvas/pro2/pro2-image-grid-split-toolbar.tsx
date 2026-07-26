@@ -9,8 +9,11 @@ import {
   Scan,
 } from "lucide-react";
 import { useStore } from "@xyflow/react";
-import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
+import {
+  LIBTV_GRID_HD_SCALE_OPTIONS,
+  type LibtvGridHdScaleId,
+} from "@/lib/canvas/libtv-grid-split-hd";
 import { useLibtvToolbarPortaled } from "@/components/canvas/libtv-node-toolbar-portal";
 import {
   PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
@@ -26,18 +29,12 @@ import { cn } from "@/lib/utils";
 
 const TOOL_BTN = PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS;
 
-const HD_SCALE_OPTIONS = [
-  { id: "1", label: "1倍" },
-  { id: "1.5", label: "1.5倍" },
-  { id: "2", label: "2倍" },
-  { id: "4", label: "4倍" },
-] as const;
-
 export function Pro2ImageGridSplitToolbar({
   selectedCount,
   onCancel,
   onExpandImage,
   onCreateFrameGroup,
+  onGenerateHd,
   passNodeDrag = false,
   className,
   style,
@@ -46,15 +43,13 @@ export function Pro2ImageGridSplitToolbar({
   onCancel: () => void;
   onExpandImage: () => void;
   onCreateFrameGroup: () => void;
+  onGenerateHd: (scaleId: LibtvGridHdScaleId) => void;
   passNodeDrag?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const { alert } = useDialogs();
   const hdMenu = usePro2ToolbarDropdownAnchor();
-  const [hdScale, setHdScale] = useState<(typeof HD_SCALE_OPTIONS)[number]["id"]>(
-    "2",
-  );
+  const [hdScale, setHdScale] = useState<LibtvGridHdScaleId>("2");
   const zoom = useStore((s) => s.transform[2]);
   const portaled = useLibtvToolbarPortaled();
   const toolbarScale = portaled
@@ -63,7 +58,7 @@ export function Pro2ImageGridSplitToolbar({
   const effectivePassNodeDrag = portaled ? false : passNodeDrag;
 
   const hdLabel =
-    HD_SCALE_OPTIONS.find((o) => o.id === hdScale)?.label ?? "2倍";
+    LIBTV_GRID_HD_SCALE_OPTIONS.find((o) => o.id === hdScale)?.label ?? "2倍";
 
   return (
     <>
@@ -101,6 +96,15 @@ export function Pro2ImageGridSplitToolbar({
         >
           <CornerDownLeft className="size-3.5" />
         </button>
+
+        {selectedCount > 0 ? (
+          <>
+            <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+            <span className="nodrag shrink-0 rounded-full bg-violet-500/20 px-2.5 py-1 text-[13px] font-medium tabular-nums text-violet-100">
+              已选 {selectedCount}
+            </span>
+          </>
+        ) : null}
 
         <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
@@ -144,7 +148,7 @@ export function Pro2ImageGridSplitToolbar({
         rect={hdMenu.rect}
         minWidth={120}
       >
-        {HD_SCALE_OPTIONS.map((opt) => (
+        {LIBTV_GRID_HD_SCALE_OPTIONS.map((opt) => (
           <Pro2ToolbarDropdownItem
             key={opt.id}
             icon={ImageUpscale}
@@ -152,11 +156,7 @@ export function Pro2ImageGridSplitToolbar({
             onClick={() => {
               setHdScale(opt.id);
               hdMenu.setOpen(false);
-              void alert({
-                title: "即将推出",
-                message: `「生成高清图片 · ${opt.label}」将在后续版本接入。`,
-                variant: "info",
-              });
+              onGenerateHd(opt.id);
             }}
           />
         ))}

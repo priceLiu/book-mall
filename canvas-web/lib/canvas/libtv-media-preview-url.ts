@@ -9,9 +9,12 @@ export function resolveLibtvMediaPreviewUrl(data: {
 }): string {
   const blob = String(data.blobUrl ?? "").trim();
   const oss = String(data.ossUrl ?? "").trim();
+  const ossHttp = oss && /^https?:\/\//i.test(oss) ? oss : "";
   if (data.preferBlob && blob) return blob;
+  // 上传完成但 uploading 仍 true、或 blob 已失效时，优先用已落库 OSS
+  if (ossHttp && !data.preferBlob) return ossHttp;
   if (data.uploading && blob) return blob;
-  if (oss && /^https?:\/\//i.test(oss)) return oss;
+  if (ossHttp) return ossHttp;
   if (oss.startsWith("blob:")) return oss;
   return blob || oss;
 }

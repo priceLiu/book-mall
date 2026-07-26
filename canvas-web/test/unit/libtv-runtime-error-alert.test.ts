@@ -33,4 +33,14 @@ describe("libtvRuntimeErrorAlertTitle", () => {
       "积分不足",
     );
   });
+
+  it("returns balance title for provider quota", () => {
+    expect(
+      libtvRuntimeErrorAlertTitle(
+        "PROVIDER_QUOTA_EXCEEDED",
+        "KIE 生图账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。",
+        "image",
+      ),
+    ).toBe("账户余额不足");
+  });
 });

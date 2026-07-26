@@ -483,7 +483,7 @@ const STORY_PRO2_STARTER_ORIGIN = { x: 120, y: 160 };
 const STORY_PRO2_PIPELINE: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
   meta: { edition: "pro2" },
-  viewport: { x: 0, y: 0, zoom: 0.85 },
+  viewport: { x: 0, y: 0, zoom: 1 },
   nodes: [
     {
       id: "sp2-starter",

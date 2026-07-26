@@ -225,6 +225,65 @@ export function formatCanvasTaskError(
   }
 
   if (
+    code === "INSUFFICIENT_CREDITS" ||
+    blob.includes("insufficient_credits")
+  ) {
+    if (blob.includes("积分不足") || msg.includes("积分不足")) {
+      const base = msg.includes("积分不足")
+        ? `${msg.split("。")[0]}。请前往主站充值后重试。`
+        : "平台积分不足，请充值后重试。";
+      return `${base} ${STALE_INSUFFICIENT_HINT}`;
+    }
+    return `平台积分不足，请前往主站充值后重试。 ${STALE_INSUFFICIENT_HINT}`;
+  }
+
+  if (
+    code === "PROVIDER_QUOTA_EXCEEDED" ||
+    code === "KIE_QUOTA_EXCEEDED" ||
+    blob.includes("provider_quota_exceeded")
+  ) {
+    if (isGatewayImageModelKey(modelKey)) {
+      return "KIE 生图账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。";
+    }
+    if (isKieVideoModelKey(modelKey)) {
+      return "KIE 视频账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。";
+    }
+    return "KIE 账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。";
+  }
+
+  if (msg.includes("KIE 余额不足") || msg.includes("KIE 生图账户余额不足")) {
+    return msg;
+  }
+
+  if (
+    code === "IMAGE_ENGINE_FAILED" &&
+    (blob.includes("insufficient") ||
+      blob.includes("quota") ||
+      blob.includes("balance") ||
+      blob.includes("402") ||
+      blob.includes("余额"))
+  ) {
+    return insufficientBalanceMessage(modelKey);
+  }
+
+  if (
+    code === "IMAGE_ENGINE_FAILED" &&
+    (blob.includes("invalid_input") ||
+      blob.includes("缺少") ||
+      blob.includes("prompt 为空") ||
+      blob.includes("missing") ||
+      blob.includes("422"))
+  ) {
+    return sanitizeGatewayTechnicalMessage(msg) ?? "生图参数无效，请检查参考图与模型配置后重试。";
+  }
+
+  if (code === "IMAGE_ENGINE_FAILED" && !blob.includes("gateway")) {
+    const detail = sanitizeGatewayTechnicalMessage(msg);
+    if (detail) return detail;
+    return "生图提交失败（未到达 Gateway），请重试；若持续失败请查看 book-mall 任务记录。";
+  }
+
+  if (
     blob.includes("overdue balance") ||
     blob.includes("火山方舟") ||
     blob.includes("doubao-seedance") ||

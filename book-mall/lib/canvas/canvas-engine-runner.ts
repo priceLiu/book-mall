@@ -100,6 +100,7 @@ import {
 } from "@/lib/generation/traffic-control/constants";
 import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
+import { buildGridSplitPrepareFromNodeData } from "@/lib/generation/traffic-control/dispatch-canvas-image";
 import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 import {
@@ -512,9 +513,13 @@ export async function runImageEngineNode(
     throw new CanvasProjectError("EMPTY_PROMPT", `${engineKind} prompt 为空`);
   }
 
-  const imageUrls = (node.imageInputs ?? [])
+  const imageUrlsRaw = (node.imageInputs ?? [])
     .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
     .slice(0, 8);
+
+  const gridSplitPrepare = buildGridSplitPrepareFromNodeData(data);
+  /** 宫格高清待裁切：参考图由 dispatch PREPARING 写入，不入队 imageUrls */
+  const imageUrls = gridSplitPrepare ? [] : imageUrlsRaw;
 
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
@@ -551,6 +556,9 @@ export async function runImageEngineNode(
       ? (data.sbv1Billing as Record<string, unknown>)
       : undefined;
 
+  const gridSplitPrepareForPayload = buildGridSplitPrepareFromNodeData(data);
+  const trafficQueued = isTrafficControlEnabled();
+
   const imageInputPayload = {
     kind: engineKind,
     prompt: clipPrompt(expandedPrompt),
@@ -561,6 +569,7 @@ export async function runImageEngineNode(
     clientPage: gwClientPage,
     /** run API 同步提交 Gateway；poll worker 勿在短时内二次 createTask */
     syncGatewaySubmit: true,
+    ...(gridSplitPrepareForPayload ? { gridSplitPrepare: gridSplitPrepareForPayload } : {}),
     ...(sbv1Billing ? { sbv1Billing } : {}),
     ...(args.storyScope ? { storyScope: args.storyScope } : {}),
   } as Prisma.InputJsonValue;
@@ -569,6 +578,9 @@ export async function runImageEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
+    actorUserId: userId,
+    skipInflightScopeConflict: args.forceFresh === true,
+    initialStatus: trafficQueued ? "QUEUED" : undefined,
     data: {
       kind: "IMAGE",
       model: modelKey,
@@ -577,6 +589,11 @@ export async function runImageEngineNode(
       inputPayload: imageInputPayload,
     },
   });
+
+  if (created.status === "QUEUED") {
+    fireCanvasDispatchForProject(projectId, "runImageEngineNode");
+    return { reused: false, task: created };
+  }
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);
 

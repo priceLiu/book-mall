@@ -56,6 +56,26 @@ describe("formatCanvasTaskError", () => {
     ).toBe("KIE 视频服务暂时不可用，请稍后重试。");
   });
 
+  it("KIE quota on image model shows balance hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "PROVIDER_QUOTA_EXCEEDED",
+        "KIE 余额不足，请充值后重试",
+        "nano-banana-pro",
+      ),
+    ).toBe("KIE 生图账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。");
+  });
+
+  it("INSUFFICIENT_CREDITS without prisma noise", () => {
+    expect(
+      formatCanvasTaskError(
+        "INSUFFICIENT_CREDITS",
+        "reserve failed",
+        "nano-banana-pro",
+      ),
+    ).toContain("平台积分不足");
+  });
+
   it("strips long gateway technical messages", () => {
     expect(
       formatCanvasTaskError(
