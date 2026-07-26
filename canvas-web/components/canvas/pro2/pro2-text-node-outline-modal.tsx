@@ -6,16 +6,21 @@ import { X } from "lucide-react";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { STORY_HUB_LEFT_HINT, STORY_HUB_RIGHT_PREVIEW_HINT } from "@/lib/canvas/story-hub-editor-chrome";
+import { LIBTV_PLAIN_TEXT_WRAP_CLASS } from "@/lib/canvas/libtv-plain-text-display";
 import { StoryOutlineDocumentEditor } from "../story-outline-document-editor";
 import { StoryHubReadonlyPane } from "../story-hub-readonly-pane";
 
-const DOC_PAD = "px-10 py-12 sm:px-14 sm:py-16";
+const DOC_PAD = "px-6 py-10 sm:px-10 sm:py-12";
+const PLAIN_DOC_TEXT =
+  "nodrag w-full min-w-0 max-w-full resize-none border-0 bg-transparent font-sans text-[17px] leading-[1.85] text-neutral-800 shadow-none focus:outline-none focus:ring-0 break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word]";
 const AUTOSAVE_MS = 600;
 
 export type Pro2TextNodeOutlineModalProps = {
   open: boolean;
   title?: string;
   value: string;
+  /** 通用文本节点 · 纯文本编辑/预览（无 Markdown 块编辑） */
+  plainText?: boolean;
   onClose: () => void;
   /** 草稿变更后自动写入节点（触发画布 autosave） */
   onAutoSave: (md: string) => void;
@@ -26,6 +31,7 @@ export function Pro2TextNodeOutlineModal({
   open,
   title = "故事大纲 · 编辑",
   value,
+  plainText = false,
   onClose,
   onAutoSave,
 }: Pro2TextNodeOutlineModalProps) {
@@ -103,7 +109,7 @@ export function Pro2TextNodeOutlineModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-[#0c0a14]/92 backdrop-blur-sm"
+      className="fixed inset-0 z-[1100] flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-[#0c0a14]/92 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -132,30 +138,53 @@ export function Pro2TextNodeOutlineModal({
         </button>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div
-          className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 flex-col overflow-y-auto border-r border-violet-400/10 bg-white`}
+          className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto border-r border-violet-400/10 bg-white`}
         >
           <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-50/95 px-4 py-2.5">
             <p className="text-xs font-medium text-neutral-700">编辑区</p>
             <p className="text-[10px] text-neutral-500">
-              {STORY_HUB_LEFT_HINT.outline}
+              {plainText ? "长文本自动换行 · 编辑后自动保存" : STORY_HUB_LEFT_HINT.outline}
             </p>
           </div>
-          <div className={`min-h-0 flex-1 ${DOC_PAD}`}>
-            <StoryOutlineDocumentEditor value={draft} onChange={setDraft} />
+          <div className={`box-border min-h-0 min-w-0 w-full max-w-full flex-1 ${DOC_PAD}`}>
+            {plainText ? (
+              <textarea
+                className={PLAIN_DOC_TEXT}
+                rows={24}
+                value={draft}
+                spellCheck={false}
+                placeholder="输入提示词或正文…"
+                onChange={(e) => setDraft(e.target.value)}
+              />
+            ) : (
+              <StoryOutlineDocumentEditor value={draft} onChange={setDraft} />
+            )}
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-hidden bg-neutral-50/80">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-neutral-50/80">
           <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
             <p className="text-xs font-medium text-neutral-600">渲染预览</p>
             <p className="text-[10px] text-neutral-500">
-              {STORY_HUB_RIGHT_PREVIEW_HINT}
+              {plainText ? "与编辑区同步 · 自动换行" : STORY_HUB_RIGHT_PREVIEW_HINT}
             </p>
           </div>
-          <div className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto ${DOC_PAD}`}>
-            <StoryHubReadonlyPane md={draft} />
+          <div
+            className={`${RF_NODE_SCROLL} box-border min-h-0 min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto ${DOC_PAD}`}
+          >
+            {plainText ? (
+              <div
+                className={`${LIBTV_PLAIN_TEXT_WRAP_CLASS} font-sans text-[17px] leading-[1.85] text-neutral-800`}
+              >
+                {draft.trim() ? draft : "（暂无内容）"}
+              </div>
+            ) : (
+              <div className="min-w-0 max-w-full overflow-x-hidden">
+                <StoryHubReadonlyPane md={draft} />
+              </div>
+            )}
           </div>
         </div>
       </div>

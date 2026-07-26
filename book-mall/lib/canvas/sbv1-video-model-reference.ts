@@ -49,6 +49,14 @@ const SINGLE_I2V_KEYS = new Set([
 
 const KIE_MULTI_REF_KEYS = new Set(["bytedance/seedance-2"]);
 
+const DASHSCOPE_T2V_KEYS = new Set([
+  "wan2.6-t2v",
+  "wan2.7-t2v",
+  "wan2.7-t2v-2026-04-25",
+  "happyhorse-1.0-t2v",
+  "happyhorse-1.1-t2v",
+]);
+
 export function getSbv1VideoModelRefCaps(
   modelKey: string,
   opts?: { multiShots?: boolean; providerId?: string },
@@ -105,6 +113,14 @@ export function getSbv1VideoModelRefCaps(
       supportedModes: ["omni", "first_last"],
       refApi: "wan_first_last_url",
       maxRefsOmni: 1,
+    };
+  }
+
+  if (DASHSCOPE_T2V_KEYS.has(k)) {
+    return {
+      supportedModes: ["omni"],
+      refApi: "bailian_r2v_media",
+      maxRefsOmni: k.startsWith("happyhorse") ? 9 : 5,
     };
   }
 

@@ -7,7 +7,9 @@ import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
 import { claimCanvasTaskKieSubmit, findSiblingActiveVendorJob } from "@/lib/canvas/canvas-kie-gateway-claim";
 import {
   canvasGwCreateBailianR2vJob,
+  canvasGwCreateDashscopeVideoJob,
   canvasGwCreateKieJob,
+  canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
 } from "@/lib/canvas/canvas-gateway-client";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
@@ -111,6 +113,37 @@ async function submitCanvasVideoToGateway(
         data.sbv1Billing && typeof data.sbv1Billing === "object"
           ? (data.sbv1Billing as Record<string, unknown>)
           : undefined,
+    });
+    return { taskId: job.taskId, logId: job.logId };
+  }
+
+  if (providerKind === "DASHSCOPE") {
+    const job = await canvasGwCreateDashscopeVideoJob(userId, {
+      model: String(payload.dashscopeModel ?? task.model),
+      videoBody:
+        (payload.dashscopeVideoBody as Record<string, unknown>) ?? {},
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
+    });
+    return { taskId: job.taskId, logId: job.logId };
+  }
+
+  if (providerKind === "TOPAZ") {
+    const topazInput =
+      (payload.topazInput as Record<string, unknown> | undefined) ?? {};
+    const job = await canvasGwCreateTopazVideoJob(userId, {
+      model: String(payload.topazModel ?? task.model),
+      videoUrl: String(topazInput.video_url ?? topazInput.videoUrl ?? ""),
+      filterModel: String(topazInput.filter_model ?? topazInput.filterModel ?? "proteus"),
+      upscaleFactor: topazInput.upscale_factor ?? topazInput.upscaleFactor,
+      slowmo: topazInput.slowmo,
+      frameInterpolation:
+        topazInput.frame_interpolation ?? topazInput.frameInterpolation,
+      resolution: String(topazInput.resolution ?? "1080p"),
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
     });
     return { taskId: job.taskId, logId: job.logId };
   }

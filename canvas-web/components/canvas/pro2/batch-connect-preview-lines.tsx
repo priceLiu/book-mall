@@ -13,23 +13,32 @@ export function BatchConnectPreviewLines({
   cursor,
   flowToScreenPosition,
   getInternalNode,
+  /** 拖线开始时缓存的源点，避免 pointermove 每帧 querySelector */
+  sourcePoints,
 }: {
   sources: CanvasFlowNode[];
   allNodes: CanvasFlowNode[];
   cursor: { x: number; y: number };
   flowToScreenPosition: (p: { x: number; y: number }) => { x: number; y: number };
   getInternalNode: (id: string) => unknown;
+  sourcePoints?: { x: number; y: number }[];
 }) {
   const paths: string[] = [];
 
-  for (const node of sources) {
-    const start = batchConnectSourceClientPoint(
-      node,
-      allNodes,
-      flowToScreenPosition,
-      getInternalNode,
-    );
-    if (!start) continue;
+  const starts =
+    sourcePoints ??
+    sources
+      .map((node) =>
+        batchConnectSourceClientPoint(
+          node,
+          allNodes,
+          flowToScreenPosition,
+          getInternalNode,
+        ),
+      )
+      .filter((p): p is { x: number; y: number } => p != null);
+
+  for (const start of starts) {
     if (
       !Number.isFinite(start.x) ||
       !Number.isFinite(start.y) ||
@@ -42,8 +51,7 @@ export function BatchConnectPreviewLines({
     }
     if (
       !Number.isFinite(cursor.x) ||
-      !Number.isFinite(cursor.y) ||
-      Math.hypot(cursor.x - start.x, cursor.y - start.y) > 720
+      !Number.isFinite(cursor.y)
     ) {
       continue;
     }

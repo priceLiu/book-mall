@@ -8,6 +8,7 @@ import { Clapperboard, Download, Plus, Sparkles, Video } from "lucide-react";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { findBatchConnectSnapTarget } from "@/lib/canvas/libtv-connection-snap";
+import { batchConnectSourceClientPoint } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
   batchConnectTargetHandleForSnap,
   batchImageSpawnNodeType,
@@ -40,6 +41,12 @@ import {
 const DRAG_THRESHOLD = 3;
 
 const SPAWN_MENU_OFFSET_X = 12;
+
+/** 松手后忽略画布 pane 清空选区（与框选 onSelectionEnd 同机制） */
+function suppressNextCanvasPaneClick(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("canvas:suppress-next-pane-click"));
+}
 
 const VIDEO_EXPORT_MENU_ITEMS: BatchConnectSpawnMenuItem[] = [
   {
@@ -83,7 +90,6 @@ function Pro2SelectionBatchConnectLayerInner({
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
-  const setConnectingFrom = useCanvasStore((s) => s.setConnectingFrom);
 
   const selectedIds = useMemo(
     () => pro2SelectedNonGroupIds(rfNodes),
@@ -144,6 +150,11 @@ function Pro2SelectionBatchConnectLayerInner({
   const [lineTarget, setLineTarget] = useState<{ x: number; y: number } | null>(
     null,
   );
+  const [previewSourcePoints, setPreviewSourcePoints] = useState<
+    { x: number; y: number }[]
+  >([]);
+  const frozenScreenBoxRef = useRef<typeof screenBox>(null);
+  const gestureActiveRef = useRef(false);
   const gestureRef = useRef<{
     pointerId: number;
     x: number;
@@ -152,6 +163,42 @@ function Pro2SelectionBatchConnectLayerInner({
   } | null>(null);
   const pointerCleanupRef = useRef<(() => void) | null>(null);
   const menuOpenRef = useRef(false);
+  const lineTargetRafRef = useRef<number | null>(null);
+  const pendingLineTargetRef = useRef<{ x: number; y: number } | null>(null);
+  const previewSourcesCapturedRef = useRef(false);
+
+  const scheduleLineTarget = useCallback((pt: { x: number; y: number }) => {
+    pendingLineTargetRef.current = pt;
+    if (lineTargetRafRef.current != null) return;
+    lineTargetRafRef.current = window.requestAnimationFrame(() => {
+      lineTargetRafRef.current = null;
+      const next = pendingLineTargetRef.current;
+      if (next) setLineTarget(next);
+    });
+  }, []);
+
+  const capturePreviewSourcePoints = useCallback(() => {
+    if (previewSourcesCapturedRef.current) return;
+    previewSourcesCapturedRef.current = true;
+    const points = eligibleSources
+      .map((node) =>
+        batchConnectSourceClientPoint(
+          node,
+          storeNodes,
+          flowToScreenPosition,
+          getInternalNode,
+        ),
+      )
+      .filter((p): p is { x: number; y: number } => p != null);
+    setPreviewSourcePoints(points);
+  }, [eligibleSources, storeNodes, flowToScreenPosition, getInternalNode]);
+
+  const openSpawnMenu = useCallback((anchor: { x: number; y: number }) => {
+    menuOpenRef.current = true;
+    gestureActiveRef.current = true;
+    suppressNextCanvasPaneClick();
+    setMenuAnchor(anchor);
+  }, []);
 
   const connectBatchToTarget = useCallback(
     (targetId: string, targetHandle?: string) => {
@@ -174,13 +221,21 @@ function Pro2SelectionBatchConnectLayerInner({
   const clearPreview = useCallback(() => {
     pointerCleanupRef.current?.();
     pointerCleanupRef.current = null;
+    if (lineTargetRafRef.current != null) {
+      window.cancelAnimationFrame(lineTargetRafRef.current);
+      lineTargetRafRef.current = null;
+    }
+    pendingLineTargetRef.current = null;
+    previewSourcesCapturedRef.current = false;
+    gestureActiveRef.current = false;
+    frozenScreenBoxRef.current = null;
     setDragging(false);
     setMenuAnchor(null);
     menuOpenRef.current = false;
     setLineTarget(null);
-    setConnectingFrom(null);
+    setPreviewSourcePoints([]);
     gestureRef.current = null;
-  }, [setConnectingFrom]);
+  }, []);
 
   const spawnAtAnchor = useCallback(
     (
@@ -271,10 +326,11 @@ function Pro2SelectionBatchConnectLayerInner({
 
   const closeMenu = useCallback(() => {
     menuOpenRef.current = false;
+    gestureActiveRef.current = false;
+    frozenScreenBoxRef.current = null;
     setMenuAnchor(null);
     setLineTarget(null);
-    setConnectingFrom(null);
-  }, [setConnectingFrom]);
+  }, []);
 
   const connectSnapTarget = useCallback(
     (target: CanvasFlowNode, mode: BatchConnectMode): boolean => {
@@ -296,6 +352,7 @@ function Pro2SelectionBatchConnectLayerInner({
       pointerCleanupRef.current = null;
       setDragging(false);
       gestureRef.current = null;
+      setLineTarget({ x: clientX, y: clientY });
 
       const flowPoint = screenToFlowPosition({ x: clientX, y: clientY });
       const target = findBatchConnectSnapTarget(
@@ -310,18 +367,15 @@ function Pro2SelectionBatchConnectLayerInner({
       }
 
       menuOpenRef.current = true;
-      setMenuAnchor({ x: clientX, y: clientY });
-      setLineTarget({ x: clientX, y: clientY });
-      setConnectingFrom(eligibleSources[0]?.id ?? null);
+      openSpawnMenu({ x: clientX, y: clientY });
     },
     [
       batchMode,
       screenToFlowPosition,
       storeNodes,
       selectedIds,
-      eligibleSources,
       connectSnapTarget,
-      setConnectingFrom,
+      openSpawnMenu,
     ],
   );
 
@@ -341,12 +395,25 @@ function Pro2SelectionBatchConnectLayerInner({
 
   useEffect(() => {
     const onPaneClick = () => {
+      if (menuOpenRef.current) return;
       clearPreview();
       closeMenu();
     };
     window.addEventListener("canvas:pro2-pane-click", onPaneClick);
     return () => window.removeEventListener("canvas:pro2-pane-click", onPaneClick);
   }, [clearPreview, closeMenu]);
+
+  const gestureActive = dragging || menuAnchor != null;
+  gestureActiveRef.current = gestureActive;
+  if (gestureActive && screenBox) {
+    frozenScreenBoxRef.current = screenBox;
+  } else if (!gestureActive) {
+    frozenScreenBoxRef.current = null;
+  }
+  const layoutBox =
+    gestureActive && frozenScreenBoxRef.current
+      ? frozenScreenBoxRef.current
+      : screenBox;
 
   const onPlusPointerDown = (e: React.PointerEvent) => {
     if (eligibleSources.length < 2 || !batchMode) return;
@@ -366,13 +433,18 @@ function Pro2SelectionBatchConnectLayerInner({
       y: startY,
       moved: false,
     };
-    setConnectingFrom(eligibleSources[0]?.id ?? null);
+    previewSourcesCapturedRef.current = false;
+    setPreviewSourcePoints([]);
+    gestureActiveRef.current = true;
     setDragging(true);
-    setLineTarget({ x: startX, y: startY });
+    scheduleLineTarget({ x: startX, y: startY });
+    window.requestAnimationFrame(() => {
+      capturePreviewSourcePoints();
+    });
 
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
-      setLineTarget({ x: ev.clientX, y: ev.clientY });
+      scheduleLineTarget({ x: ev.clientX, y: ev.clientY });
       const g = gestureRef.current;
       if (!g) return;
       if (
@@ -389,15 +461,15 @@ function Pro2SelectionBatchConnectLayerInner({
       pointerCleanupRef.current?.();
       pointerCleanupRef.current = null;
       const moved = gestureRef.current?.moved ?? false;
+      suppressNextCanvasPaneClick();
       if (moved) {
         finishDrag(ev.clientX, ev.clientY);
       } else {
         setDragging(false);
         gestureRef.current = null;
-        menuOpenRef.current = true;
-        setMenuAnchor({ x: ev.clientX, y: ev.clientY });
-        setLineTarget({ x: ev.clientX, y: ev.clientY });
-        setConnectingFrom(eligibleSources[0]?.id ?? null);
+        setPreviewSourcePoints([]);
+        previewSourcesCapturedRef.current = false;
+        openSpawnMenu({ x: ev.clientX, y: ev.clientY });
       }
     };
 
@@ -443,23 +515,23 @@ function Pro2SelectionBatchConnectLayerInner({
     selectedIds.length < 2 ||
     eligibleSources.length < 2 ||
     !batchMode ||
-    !screenBox
+    !layoutBox
   ) {
     return null;
   }
 
-  const boxLeft = screenBox.left;
-  const boxTop = screenBox.top;
-  const boxWidth = screenBox.right - screenBox.left;
+  const boxLeft = layoutBox.left;
+  const boxTop = layoutBox.top;
+  const boxWidth = layoutBox.right - layoutBox.left;
   const boxHeight =
-    "bottom" in screenBox
-      ? screenBox.bottom - screenBox.top
-      : screenBox.height;
-  const plusLeft = screenBox.right + 4;
-  const plusTop = screenBox.midY;
+    "bottom" in layoutBox
+      ? layoutBox.bottom - layoutBox.top
+      : layoutBox.height;
+  const plusLeft = layoutBox.right + 4;
+  const plusTop = layoutBox.midY;
 
   const showPreviewLines =
-    lineTarget && dragging && eligibleSources.length >= 2;
+    lineTarget && (dragging || menuAnchor) && previewSourcePoints.length >= 2;
 
   const menuTitle =
     batchMode === "image-pipeline"
@@ -496,6 +568,7 @@ function Pro2SelectionBatchConnectLayerInner({
           cursor={lineTarget}
           flowToScreenPosition={flowToScreenPosition}
           getInternalNode={getInternalNode}
+          sourcePoints={previewSourcePoints}
         />
       ) : null}
 
@@ -525,9 +598,6 @@ function Pro2SelectionBatchConnectLayerInner({
           items={menuItems}
           onPick={onMenuPick}
           onClose={closeMenu}
-          onMenuRect={(pt) => {
-            if (menuOpenRef.current) setLineTarget(pt);
-          }}
         />
       ) : null}
     </>

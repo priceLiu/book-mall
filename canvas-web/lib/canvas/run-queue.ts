@@ -29,8 +29,11 @@ import type { StoryRefImage } from "./story-ref-image";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
 import { pro2DockMentionRefCatalog, resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
-import { resolveDockRunPrompt } from "./resolve-dock-run-prompt";
+import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "./resolve-dock-run-prompt";
 import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
+import { buildSbv1VideoEngineDockUpstreamLinks } from "./sbv1-dock-mentionables";
+import { resolvePro2VideoBoardCellDockLinks } from "./pro2-video-board-dock-links";
 import { collectRefImageUrlsFromGridNode } from "./ref-video-edges";
 import { isRefGridNodeType } from "./ref-video-models";
 import type {
@@ -466,13 +469,12 @@ function resolveImageInputs(
     const urls = refs
       .map((r) => r.url)
       .filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
-    if (urls.length) return Array.from(new Set(urls));
+    return Array.from(new Set(urls));
   }
 
   const catalog = pro2DockMentionRefCatalog(links, dockRefImages);
   if (!catalog.length) return raw;
-  const fromCatalog = dockMentionRefUrlsForPrompt(prompt, catalog);
-  return Array.from(new Set([...fromCatalog, ...raw]));
+  return dockMentionRefUrlsForPrompt(prompt, catalog);
 }
 
 function resolveSbv1ImageRunData(
@@ -1043,16 +1045,44 @@ export function useCanvasRunner(
           }
         }
         if (node.type === "sbv1-video-engine") {
+          const latestState = useCanvasStore.getState();
+          const latestNodes = latestState.nodes;
+          const latestEdges = latestState.edges;
+          const vdForPrompt =
+            latestNodes.find((n) => n.id === nodeId)?.data ?? node.data;
+          const boardLinks =
+            (vdForPrompt as { pro2MediaRole?: string; pro2ControllerNodeId?: string })
+              .pro2MediaRole === "video" &&
+            Boolean(
+              (
+                vdForPrompt as { pro2ControllerNodeId?: string }
+              ).pro2ControllerNodeId?.trim(),
+            )
+              ? resolvePro2VideoBoardCellDockLinks(
+                  nodeId,
+                  latestNodes,
+                  latestEdges,
+                )
+              : [];
+          const upstreamForMention = buildSbv1VideoEngineDockUpstreamLinks(
+            resolveSbv1UpstreamRefLinks(nodeId, latestNodes, latestEdges),
+            resolveSbv1UpstreamTextLinks(nodeId, latestNodes, latestEdges),
+            boardLinks,
+          );
           const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
             nodeId,
-            state.nodes,
-            state.edges,
+            latestNodes,
+            latestEdges,
           );
-          if (effectivePrompt) {
+          const runPrompt = resolveSbv1VideoEngineRunPrompt(
+            effectivePrompt,
+            upstreamForMention,
+          );
+          if (runPrompt) {
             runData = {
               ...runData,
-              prompt: effectivePrompt,
-              dockInput: effectivePrompt,
+              prompt: runPrompt,
+              dockInput: runPrompt,
             };
           }
           const vdRun = runData as import("./sbv1-workspace-types").Sbv1VideoEngineNodeData;

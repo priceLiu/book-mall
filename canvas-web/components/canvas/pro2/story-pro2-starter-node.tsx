@@ -47,6 +47,10 @@ import {
 import { MarkdownView } from "@/components/canvas/markdown-view";
 import type { StoryPro2StarterNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { resolvePro2TextPurpose } from "@/lib/canvas/pro2-text-purpose";
+import {
+  isPlainLibtvTextContent,
+  LIBTV_PLAIN_TEXT_WRAP_CLASS,
+} from "@/lib/canvas/libtv-plain-text-display";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import {
@@ -158,11 +162,13 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     isLinked,
   });
   const linkedMessage = pro2StarterLinkedMessage(edges, nodes, id);
+  const isGeneralText =
+    resolvePro2TextPurpose(d, { nodeId: id, nodes, edges }) === "general";
   const displayMd = useMemo(() => {
     if (uploadedMd) return uploadedMd;
     if (hasOutline) return outlineMd;
-    return "";
-  }, [uploadedMd, hasOutline, outlineMd]);
+    return d.themeInput?.trim() ?? "";
+  }, [uploadedMd, hasOutline, outlineMd, d.themeInput]);
 
   const nodeLabel = useMemo(() => {
     const starters = nodes.filter((n) => n.type === "story-pro2-starter");
@@ -386,6 +392,11 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
                 pro2TextPurpose: "general",
                 pro2PresetKind: "video-to-prompt",
               });
+            } else if (spawnType === "sbv1-video-engine" && side === "right") {
+              updateNodeData(id, {
+                pro2TextPurpose: "general",
+                pro2PresetKind: "text-to-video",
+              });
             }
             return;
           }
@@ -499,7 +510,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         className={cn(
           PRO2_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
-          "relative flex min-h-0 flex-1 flex-col overflow-hidden",
+          "relative flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden",
         )}
         style={
           libtvNodeBorderStyle({
@@ -519,7 +530,10 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           <LibtvMediaGeneratingState variant="violet" />
         ) : displayState === "generated" ? (
           <div
-            className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "h-full min-h-0 p-2")}
+            className={cn(
+              LIBTV_NODE_STAGE_DRAG_CLASS,
+              "h-full min-h-0 min-w-0 w-full p-2",
+            )}
             title={hasUploadedScript ? "已上传剧本 · 双击放大查看" : "双击放大编辑"}
             onDoubleClick={(e) => {
               e.preventDefault();
@@ -527,16 +541,21 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               openEditor();
             }}
           >
-            <Pro2NodeScrollArea className="h-full pr-1">
-              {hasUploadedScript ? (
-                <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-white/75">
+            <Pro2NodeScrollArea wrapContent className="h-full min-w-0 w-full pr-1">
+              {hasUploadedScript || isGeneralText || isPlainLibtvTextContent(displayMd) ? (
+                <div
+                  className={cn(
+                    LIBTV_PLAIN_TEXT_WRAP_CLASS,
+                    "font-sans text-[11px] leading-relaxed text-white/75",
+                  )}
+                >
                   {displayMd}
-                </pre>
+                </div>
               ) : (
                 <MarkdownView
                   content={displayMd}
                   variant="darkPreview"
-                  className="text-[11px]"
+                  className="min-w-0 max-w-full text-[11px]"
                 />
               )}
             </Pro2NodeScrollArea>
