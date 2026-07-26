@@ -1154,7 +1154,7 @@ export function Pro2CrewBulletin() {
 
   return (
     <div
-      className="pointer-events-none absolute left-0 top-0 z-[56] flex max-w-[calc(100vw-12px)] items-start"
+      className="pointer-events-none absolute left-0 top-0 z-[56] flex w-full max-w-full min-w-0 items-start overflow-hidden pr-3"
       role="region"
       aria-label="剧组公告条"
     >
@@ -1192,7 +1192,7 @@ export function Pro2CrewBulletin() {
           collapsed ? "max-w-0 opacity-0" : "max-w-[min(calc(100vw-52px),1080px)] opacity-100",
         )}
       >
-        <div className="min-w-[min(calc(100vw-52px),780px)] max-w-[min(calc(100vw-52px),1080px)] rounded-r-xl border border-black/40 border-l-0 bg-[var(--canvas-surface)]/98 shadow-lg backdrop-blur-sm">
+        <div className="min-w-0 max-w-[min(calc(100vw-52px),1080px)] rounded-r-xl border border-black/40 border-l-0 bg-[var(--canvas-surface)]/98 shadow-lg backdrop-blur-sm">
           {linkedScriptHeadline ? (
             <div className="border-b border-black/35 px-3 py-1.5">
               <p className="truncate text-[11px] font-medium text-white/90">

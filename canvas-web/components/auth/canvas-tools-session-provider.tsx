@@ -101,7 +101,7 @@ export function CanvasToolsSessionBanner() {
 
   return (
     <div
-      className="relative z-[290] shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] text-amber-100/90"
+      className="relative z-[290] max-w-full shrink-0 overflow-hidden border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] text-amber-100/90"
       role="status"
     >
       {refreshing ? (

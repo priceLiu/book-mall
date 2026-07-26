@@ -91,8 +91,14 @@ export function CanvasToolbar({
   onToggleImmersive?: () => void;
 }) {
   return (
-    <header className="relative flex shrink-0 items-center gap-2 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
-      <div className="flex min-w-0 shrink items-center gap-2">
+    <header
+      data-canvas-toolbar
+      className="relative grid w-full min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-center gap-x-2 overflow-hidden border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white"
+    >
+      <div
+        data-canvas-toolbar-meta
+        className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden"
+      >
         <Link
           href="/projects"
           className={CANVAS_TOOLBAR_BTN_CLASS}
@@ -128,18 +134,18 @@ export function CanvasToolbar({
         ) : null}
         <span
           className={cn(
-            "hidden shrink-0 text-[11px] lg:inline",
-            saving || lastSavedAt ? CANVAS_SEMANTIC_STATUS_CLASS : "",
+            "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
+            saving || lastSavedAt || saveError ? CANVAS_SEMANTIC_STATUS_CLASS : "",
           )}
+          title={
+            saveError ? `保存失败：${saveError}` : undefined
+          }
         >
           {saving
             ? "保存中…"
             : saveError
               ? (
-                  <span
-                    className={cn("truncate", CANVAS_SEMANTIC_ERROR_CLASS)}
-                    title={`保存失败：${saveError}`}
-                  >
+                  <span className={cn("truncate", CANVAS_SEMANTIC_ERROR_CLASS)}>
                     保存失败：{saveError}
                   </span>
                 )
@@ -148,7 +154,10 @@ export function CanvasToolbar({
                 : ""}
         </span>
       </div>
-      <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        data-canvas-toolbar-actions
+        className="flex min-w-0 items-center justify-end gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <button type="button" onClick={onUndo} className={CANVAS_TOOLBAR_BTN_CLASS}>
           <Undo2 className="size-3" /> 撤销
         </button>

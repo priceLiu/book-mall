@@ -111,7 +111,7 @@ export function Pro2CanvasLayout({
   );
 
   return (
-    <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden">
+    <div className="relative h-full min-h-0 min-w-0 w-full max-w-full flex-1 overflow-hidden">
       <FlowCanvas
         projectId={projectId}
         onUndo={onUndo}

@@ -15,7 +15,7 @@ export function GatewayLinkBanner() {
   return (
     <div
       role="alert"
-      className="mx-3 mt-2 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100 shadow-sm"
+      className="mx-3 mt-2 flex max-w-[calc(100%-1.5rem)] gap-2 overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100 shadow-sm"
     >
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden />
       <div className="space-y-1 leading-relaxed">

@@ -345,11 +345,13 @@ function Inner({ projectId }: { projectId: string }) {
     document.body.style.overflow = "hidden";
     document.documentElement.style.overscrollBehaviorX = "none";
     document.body.style.overscrollBehaviorX = "none";
+    document.documentElement.dataset.canvasEditorOpen = "true";
     return () => {
       document.documentElement.style.overflow = prevHtmlOverflow;
       document.body.style.overflow = prevBodyOverflow;
       document.documentElement.style.overscrollBehaviorX = prevHtmlOverscrollX;
       document.body.style.overscrollBehaviorX = prevBodyOverscrollX;
+      delete document.documentElement.dataset.canvasEditorOpen;
     };
   }, []);
 
@@ -1042,14 +1044,15 @@ function Inner({ projectId }: { projectId: string }) {
     body = (
       <div
         ref={canvasEditorRef}
-        className="fixed inset-0 z-[200] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--canvas-bg)]"
+        className="fixed inset-0 z-[200] flex flex-col overflow-hidden bg-[var(--canvas-bg)]"
         data-canvas-editor
         style={{ ["--canvas-toolbar-height" as string]: "3rem" }}
       >
         <div
           ref={toolbarShellRef}
+          data-canvas-toolbar-shell
           className={cn(
-            "z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
+            "z-[300] w-full min-w-0 max-w-full shrink-0 overflow-x-hidden bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
             showImmersiveChrome && immersive
               ? cn(
                   "fixed left-0 right-0 top-0",
@@ -1179,7 +1182,7 @@ function Inner({ projectId }: { projectId: string }) {
           onClose={() => setStyleLibraryOpen(false)}
         />
       ) : null}
-      <div className="relative z-0 flex min-h-0 flex-1 overflow-hidden isolate">
+      <div className="relative z-0 flex min-h-0 min-w-0 w-full max-w-full flex-1 overflow-hidden isolate">
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel
             projectId={projectId}
@@ -1187,7 +1190,7 @@ function Inner({ projectId }: { projectId: string }) {
             theme="pro"
           />
         ) : null}
-        <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="relative flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden">
         {isSbv1Canvas ? (
           <Sbv1CanvasLayout projectId={projectId} onUndo={undo} onRedo={redo} />
         ) : isStoryPro2Canvas ? (
