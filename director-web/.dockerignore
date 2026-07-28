@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env.local
+*.md
+director-desk/node_modules
+director-desk/dist
+director-desk/.git
+director-desk/images

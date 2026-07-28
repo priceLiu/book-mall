@@ -124,6 +124,7 @@ import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floa
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
 import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
+import { Director3dDeskEditorHost } from "./pro2/director-3d-desk-editor-host";
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
@@ -2140,6 +2141,7 @@ function FlowCanvasInner({
         onClose={closePaneAddMenu}
         onPick={onPaneAddPick}
       />
+      <Director3dDeskEditorHost />
     </div>
   );
 }

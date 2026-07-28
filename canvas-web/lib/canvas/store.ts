@@ -312,6 +312,11 @@ type CanvasState = {
   ) => void;
   closePro2ScriptTableEditor: () => void;
 
+  /** 3D导演台节点 · 全屏 iframe 编辑（双击 / 按钮打开） */
+  director3dDeskEditorNodeId: string | null;
+  openDirector3dDeskEditor: (nodeId: string) => void;
+  closeDirector3dDeskEditor: () => void;
+
   /** 2.0 分镜图板 · 当前聚焦的单格（用于格下输入坞） */
   pro2FrameDockFocus: { nodeId: string; rowKey: string } | null;
   setPro2FrameDockFocus: (
@@ -550,6 +555,12 @@ export const useCanvasStore = create<CanvasState>()(
           pro2ScriptTableEditorTab: "script",
         }),
 
+      director3dDeskEditorNodeId: null,
+      openDirector3dDeskEditor: (nodeId) =>
+        set({ director3dDeskEditorNodeId: nodeId }),
+      closeDirector3dDeskEditor: () =>
+        set({ director3dDeskEditorNodeId: null }),
+
       pro2FrameDockFocus: null,
       setPro2FrameDockFocus: (focus) => set({ pro2FrameDockFocus: focus }),
       pro2StyleLibImageNodeId: null,
@@ -621,6 +632,7 @@ export const useCanvasStore = create<CanvasState>()(
               storyHubReview: null,
               pro2TextOutlineEditorNodeId: null,
               pro2ScriptTableEditorNodeId: null,
+              director3dDeskEditorNodeId: null,
               libtvFloatingDockNodeId: null,
               libtvFloatingDockNodeType: null,
               graphMeta: hydratedMeta ?? null,
@@ -641,6 +653,7 @@ export const useCanvasStore = create<CanvasState>()(
             storyHubReview: null,
             pro2TextOutlineEditorNodeId: null,
             pro2ScriptTableEditorNodeId: null,
+            director3dDeskEditorNodeId: null,
             libtvFloatingDockNodeId: null,
             libtvFloatingDockNodeType: null,
             graphMeta: meta ?? null,

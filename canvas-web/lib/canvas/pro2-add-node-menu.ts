@@ -68,6 +68,14 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
     nodeType: "story-pro2-three-view",
   },
   {
+    id: "3d-desk",
+    label: "3D导演台",
+    icon: Box,
+    enabled: true,
+    badge: "NEW",
+    nodeType: "story-pro2-3d-desk",
+  },
+  {
     id: "hd-video",
     label: "高清视频",
     icon: ScanLine,

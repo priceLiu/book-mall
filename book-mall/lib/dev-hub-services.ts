@@ -126,6 +126,18 @@ export function getDevHubServices(): DevHubService[] {
       port: 3007,
       openable: true,
     },
+    {
+      id: "director",
+      label: "director-web",
+      description: "3D导演台 · 机位规划 / 场景摆位 / 截图导出（画布节点内嵌）",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_DIRECTOR_WEB_ORIGIN ??
+          process.env.DIRECTOR_WEB_PUBLIC_ORIGIN,
+        "http://localhost:3009",
+      ),
+      port: 3009,
+      openable: true,
+    },
   ];
 }
 

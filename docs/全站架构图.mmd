@@ -22,6 +22,7 @@ flowchart TB
     PO["prompt-optimizer :3006"]
     EC["e-commerce-toolkit :3007"]
     QR["quick-replica-web :3008"]
+    DR["director-web :3009 3D导演台"]
   end
 
   subgraph bg ["Async / Background"]
@@ -32,10 +33,11 @@ flowchart TB
   VEND["Vendor APIs<br/>Bailian / DashScope / KIE / Volcengine / DeepSeek / Hunyuan"]
 
   U --> BM
-  U --> TW & FW & SW & CW & GWC & PO & EC & QR
+  U --> TW & FW & SW & CW & GWC & PO & EC & QR & DR
 
-  TW & CW & SW & PO & EC & QR -->|"Book SSO tools_token"| BM
+  TW & CW & SW & PO & EC & QR & DR -->|"Book SSO tools_token"| BM
   TW & CW & SW & PO & EC & QR -->|"introspect / gateway proxy"| BM
+  DR -.->|"iframe embed + screenshot postMessage"| CW
   BM -->|"gateway-v1-http-client"| GWAPI
   GWAPI -->|"BYOK vendor credentials"| VEND
 

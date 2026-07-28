@@ -51,6 +51,16 @@ export function getQuickReplicaOrigin(): string {
   );
 }
 
+export function getDirectorWebOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_DIRECTOR_WEB_ORIGIN ??
+      process.env.DIRECTOR_WEB_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://director.ai-code8.com"
+      : "http://localhost:3009",
+  );
+}
+
 export function buildAppWebUrl(origin: string, path: string): string {
   const base = origin.replace(/\/$/, "");
   if (!path || path === "/") return `${base}/`;

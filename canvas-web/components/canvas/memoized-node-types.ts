@@ -27,6 +27,7 @@ import { StoryPro2TagNode } from "./pro2/story-pro2-tag-node";
 import { StoryPro2ImageNode } from "./pro2/story-pro2-image-node";
 import { StoryPro2AudioNode } from "./pro2/story-pro2-audio-node";
 import { StoryPro2ThreeViewNode } from "./pro2/story-pro2-three-view-node";
+import { StoryPro23dDeskNode } from "./pro2/story-pro2-3d-desk-node";
 import { StoryPro2StyleAssetNode } from "./pro2/story-pro2-style-asset-node";
 import { StoryPro2ScriptHubNode } from "./pro2/story-pro2-script-hub-node";
 import { StoryPro2PlaceholderMediaNode } from "./pro2/story-pro2-placeholder-media-node";
@@ -80,6 +81,7 @@ export const memoizedNodeTypes = {
   "story-pro2-tag": memoFlowNode(StoryPro2TagNode),
   "story-pro2-image": memoFlowNode(StoryPro2ImageNode),
   "story-pro2-three-view": memoFlowNode(StoryPro2ThreeViewNode),
+  "story-pro2-3d-desk": memoFlowNode(StoryPro23dDeskNode),
   "story-pro2-style-asset": memoFlowNode(StoryPro2StyleAssetNode),
   "story-pro2-script-hub": memoFlowNode(StoryPro2ScriptHubNode),
   "story-pro2-style": memoFlowNode(StoryPro2StyleThinNode),

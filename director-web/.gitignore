@@ -1,0 +1,9 @@
+node_modules
+.next
+.env.local
+# Vite 构建产物由 Docker / build:vendor 生成，不提交
+public/assets
+public/models
+public/index.html
+public/favicon.ico
+public/*.js

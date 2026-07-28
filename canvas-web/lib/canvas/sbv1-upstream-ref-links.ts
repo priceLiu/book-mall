@@ -23,7 +23,8 @@ export function isSbv1VideoEngineRefImageNode(
   return (
     node.type === "sbv1-image" ||
     node.type === "story-pro2-image" ||
-    node.type === "story-pro2-three-view"
+    node.type === "story-pro2-three-view" ||
+    node.type === "story-pro2-3d-desk"
   );
 }
 
@@ -31,7 +32,8 @@ function imageUrlFromRefNode(node: CanvasFlowNode): string | undefined {
   if (
     node.type === "sbv1-image" ||
     node.type === "story-pro2-image" ||
-    node.type === "story-pro2-three-view"
+    node.type === "story-pro2-three-view" ||
+    node.type === "story-pro2-3d-desk"
   ) {
     const d = node.data as unknown as ImageNodeData & {
       runtime?: { ossUrl?: string; ephemeralUrl?: string };

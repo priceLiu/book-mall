@@ -115,6 +115,7 @@ export type CanvasNodeType =
   | "story-pro2-tag"
   | "story-pro2-image"
   | "story-pro2-three-view"
+  | "story-pro2-3d-desk"
   | "story-pro2-script-hub"
   | "story-pro2-style"
   | "story-pro2-style-asset"
@@ -171,6 +172,7 @@ export type CanvasContentNodeType =
   | "story-pro2-tag"
   | "story-pro2-image"
   | "story-pro2-three-view"
+  | "story-pro2-3d-desk"
   | "story-pro2-script-hub"
   | "story-pro2-style"
   | "story-pro2-style-asset"
@@ -226,6 +228,7 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "story-pro2-tag",
   "story-pro2-image",
   "story-pro2-three-view",
+  "story-pro2-3d-desk",
   "story-pro2-script-hub",
   "story-pro2-style",
   "story-pro2-style-asset",
@@ -318,6 +321,19 @@ export type ImageNodeData = {
   /** 上传错误信息 */
   uploadError?: string;
   runtime?: CanvasNodeRuntime;
+};
+
+/**
+ * 3D导演台节点：内嵌 director-web（:3009）的 3D 分镜导演台。
+ * 用户双击全屏打开导演台摆位/机位/截图，导出的截图回传上传为 `ossUrl`，
+ * 可作为参考图连线喂给下游生图 / 生视频节点。场景本身由 director-web 按
+ * `sceneInstanceId`（默认节点 id）在其 localStorage 内持久化。
+ */
+export type StoryPro23dDeskNodeData = ImageNodeData & {
+  /** director-web 内场景持久化的实例 id（默认取节点 id） */
+  sceneInstanceId?: string;
+  /** 最近一次导出截图（与 ossUrl 同源，用于节点内缩略图展示） */
+  thumbUrl?: string;
 };
 
 export type TextNodeData = {
@@ -725,6 +741,9 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     label: "角色",
     dockInput: "",
   } as Record<string, unknown>,
+  "story-pro2-3d-desk": {
+    label: "3D导演台",
+  } satisfies StoryPro23dDeskNodeData as Record<string, unknown>,
   "story-pro2-script-hub": {
     outlineMd: "",
     characterMd: "",
@@ -975,6 +994,10 @@ export const NODE_DEFAULT_SIZE: Record<
     width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
     height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
   },
+  "story-pro2-3d-desk": {
+    width: PRO2_IMAGE_NODE_WIDTH,
+    height: PRO2_IMAGE_NODE_HEIGHT,
+  },
   "story-pro2-script-hub": {
     width: PRO2_SCRIPT_NODE_WIDTH,
     height: PRO2_SCRIPT_NODE_HEIGHT,
@@ -1101,6 +1124,7 @@ export const NODE_OUTPUT_KIND: Record<
   "story-pro2-tag": "none",
   "story-pro2-image": "image",
   "story-pro2-three-view": "image",
+  "story-pro2-3d-desk": "image",
   "story-pro2-script-hub": "text",
   "story-pro2-style": "text",
   "story-pro2-style-asset": "image",
