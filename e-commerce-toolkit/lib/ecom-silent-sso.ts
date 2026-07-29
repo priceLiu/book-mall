@@ -15,8 +15,28 @@ const SILENT_REFRESH_MIN_GAP_MS = 8_000;
 let silentRefreshInFlight: Promise<boolean> | null = null;
 let lastSilentRefreshOkAt = 0;
 
-/** 经主站静默换票后回到当前路径（全页跳转，兜底用） */
-export function redirectEcomSessionRefresh(returnPath?: string): void {
+function resolveBookOrigin(bookOrigin?: string): string {
+  const raw = bookOrigin?.trim() || getBookOriginClient();
+  return raw.replace(/\/$/, "");
+}
+
+function buildReEnterUrl(args: {
+  bookOrigin?: string;
+  redirectPath: string;
+}): string {
+  const book = resolveBookOrigin(args.bookOrigin);
+  return `${book}/api/sso/tools/re-enter?app=e-commerce&redirect=${encodeURIComponent(
+    args.redirectPath,
+  )}`;
+}
+
+/**
+ * 全页换票：优先走主站 re-enter（Book 会话仍在时无感），失败再落本域登录页。
+ */
+export function redirectEcomSessionRefresh(
+  returnPath?: string,
+  bookOrigin?: string,
+): void {
   const path =
     returnPath ??
     (typeof window !== "undefined"
@@ -25,15 +45,18 @@ export function redirectEcomSessionRefresh(returnPath?: string): void {
   const now = Date.now();
   if (now - lastRefreshAt < REFRESH_COOLDOWN_MS) return;
   lastRefreshAt = now;
+
+  const book = resolveBookOrigin(bookOrigin);
+  if (book && !book.includes("localhost")) {
+    window.location.href = buildReEnterUrl({ bookOrigin: book, redirectPath: path });
+    return;
+  }
   window.location.href = buildEcomLoginUrl(path);
 }
 
 /** 直连主站 re-enter（不经 /ecom-open 过渡页），用于隐藏 iframe 静默换票 */
-function buildSilentReEnterUrl(): string {
-  const book = getBookOriginClient().replace(/\/$/, "");
-  return `${book}/api/sso/tools/re-enter?app=e-commerce&redirect=${encodeURIComponent(
-    SILENT_DONE_PATH,
-  )}`;
+function buildSilentReEnterUrl(bookOrigin?: string): string {
+  return buildReEnterUrl({ bookOrigin, redirectPath: SILENT_DONE_PATH });
 }
 
 /**
@@ -41,13 +64,15 @@ function buildSilentReEnterUrl(): string {
  * iframe 内 re-enter 可带上主站会话 Cookie；换票链最终落在 ecom 同源着陆页，
  * 由其 postMessage 通知父页面完成。成功返回 true，超时/失败返回 false。
  */
-export function silentEcomSessionRefresh(): Promise<boolean> {
+export function silentEcomSessionRefresh(bookOrigin?: string): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if (silentRefreshInFlight) return silentRefreshInFlight;
   // 刚成功续期过则视为仍新鲜，避免心跳/重试短时间重复换票
   if (Date.now() - lastSilentRefreshOkAt < SILENT_REFRESH_MIN_GAP_MS) {
     return Promise.resolve(true);
   }
+
+  const reEnterUrl = buildSilentReEnterUrl(bookOrigin);
 
   silentRefreshInFlight = new Promise<boolean>((resolve) => {
     const iframe = document.createElement("iframe");
@@ -88,7 +113,7 @@ export function silentEcomSessionRefresh(): Promise<boolean> {
 
     const timer = window.setTimeout(() => finish(false), SILENT_REFRESH_TIMEOUT_MS);
     window.addEventListener("message", onMessage);
-    iframe.src = buildSilentReEnterUrl();
+    iframe.src = reEnterUrl;
     document.body.appendChild(iframe);
   });
 
@@ -117,11 +142,22 @@ export async function fetchEcomToolsSession(): Promise<EcomToolsSessionInfo> {
   };
 }
 
+export type EnsureEcomSessionFreshOptions = {
+  bookOrigin?: string;
+  returnPath?: string;
+  /** 静默续期失败时是否整页跳转换票（后台心跳应 false，生图/提交前应 true） */
+  redirectOnFailure?: boolean;
+};
+
 /**
  * 令牌将在 thresholdSec 内过期时静默换票（隐藏 iframe）。
- * 静默失败（主站会话也失效）才退回全页跳转换票。
+ * 静默失败时默认不跳转（由调用方决定）；`redirectOnFailure: true` 时走 re-enter / 登录页。
  */
-export async function ensureEcomSessionFresh(thresholdSec = 120): Promise<boolean> {
+export async function ensureEcomSessionFresh(
+  thresholdSec = 120,
+  opts: EnsureEcomSessionFreshOptions = {},
+): Promise<boolean> {
+  const bookOrigin = opts.bookOrigin;
   const session = await fetchEcomToolsSession();
   const exp = session.tokenExpiresAt;
   const needsRefresh =
@@ -130,8 +166,10 @@ export async function ensureEcomSessionFresh(thresholdSec = 120): Promise<boolea
     (exp != null && exp * 1000 < Date.now() + thresholdSec * 1000);
   if (!needsRefresh) return true;
 
-  if (await silentEcomSessionRefresh()) return true;
+  if (await silentEcomSessionRefresh(bookOrigin)) return true;
 
-  redirectEcomSessionRefresh();
+  if (opts.redirectOnFailure) {
+    redirectEcomSessionRefresh(opts.returnPath, bookOrigin);
+  }
   return false;
 }

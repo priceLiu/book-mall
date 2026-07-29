@@ -409,7 +409,7 @@ export function StoryboardContentPanel({
     let failMessage: string | null = null;
     let pollEnded = false;
     try {
-      if (!(await ensureEcomSessionFresh(90))) {
+      if (!(await ensureEcomSessionFresh(90, { redirectOnFailure: true }))) {
         sessionRefreshing = true;
         return;
       }
@@ -418,7 +418,7 @@ export function StoryboardContentPanel({
         setVideoPollCount(i + 1);
 
         if (i > 0 && i % 8 === 0) {
-          if (!(await ensureEcomSessionFresh(90))) {
+          if (!(await ensureEcomSessionFresh(90, { redirectOnFailure: true }))) {
             sessionRefreshing = true;
             return;
           }

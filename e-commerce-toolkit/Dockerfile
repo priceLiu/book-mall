@@ -13,6 +13,10 @@ COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
 RUN mkdir -p public
+ARG NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com
+ARG NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN=https://ecom.ai-code8.com
+ENV NEXT_PUBLIC_BOOK_MALL_URL=${NEXT_PUBLIC_BOOK_MALL_URL}
+ENV NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN=${NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
   && pnpm run build:docker

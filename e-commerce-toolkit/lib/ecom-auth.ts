@@ -16,8 +16,12 @@ export function isEcomUnauthorizedError(err: unknown): boolean {
   );
 }
 
+import { getEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
+
 /** 浏览器侧主站地址（须配置 NEXT_PUBLIC_BOOK_MALL_URL） */
 export function getBookOriginClient(): string {
+  const runtime = getEcomRuntimeBookOrigin();
+  if (runtime) return runtime;
   const raw =
     process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
     process.env.MAIN_SITE_ORIGIN?.trim();
