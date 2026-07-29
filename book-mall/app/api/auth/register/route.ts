@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     let referredByUserId: string | null = null;
     if (referralCode) {
       const referrer = await resolveReferrerByCode(referralCode);
-      if (referrer && referrer.referrerUserId !== existing?.id) {
+      if (referrer && referrer.referrerUserId !== existingUser?.id) {
         referredByUserId = referrer.referrerUserId;
       }
     }
@@ -103,20 +103,20 @@ export async function POST(request: Request) {
     const verifiedAt = new Date();
 
     const createdUserId = await prisma.$transaction(async (tx) => {
-      if (existing) {
+      if (existingUser) {
         const user = await tx.user.update({
-          where: { id: existing.id },
+          where: { id: existingUser.id },
           data: {
             phone,
             phoneVerifiedAt: verifiedAt,
             // 仅在用户设置了密码时更新密码，避免清空历史密码
             ...(passwordHash ? { passwordHash } : {}),
-            name: parsed.data.name?.trim() || existing.name,
+            name: parsed.data.name?.trim() || existingUser.name,
             billingPersona,
             billingPersonaLockedAt: lockedAt,
             ecomBillingMode: deriveEcomBillingMode(billingPersona),
             // 仅在尚未归因时写入分享上线
-            ...(referredByUserId && !existing.referredByUserId
+            ...(referredByUserId && !existingUser.referredByUserId
               ? { referredByUserId }
               : {}),
           },
