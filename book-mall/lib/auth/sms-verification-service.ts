@@ -224,7 +224,35 @@ export async function verifySmsCode(input: {
     orderBy: { createdAt: "desc" },
   });
 
-  if (!row) throw new SmsVerificationError("验证码无效或已过期");
+  if (!row) {
+    // 区分两种情况：消费过 vs 确实没有
+    const consumed = await prisma.smsVerification.findFirst({
+      where: {
+        phone,
+        purpose: input.purpose,
+        consumedAt: { not: null },
+        ...(input.inviteToken ? { inviteToken: input.inviteToken.trim() } : { inviteToken: null }),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (consumed) {
+      throw new SmsVerificationError("验证码已使用，请重新获取");
+    }
+    const expired = await prisma.smsVerification.findFirst({
+      where: {
+        phone,
+        purpose: input.purpose,
+        consumedAt: null,
+        expiresAt: { lte: new Date() },
+        ...(input.inviteToken ? { inviteToken: input.inviteToken.trim() } : { inviteToken: null }),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (expired) {
+      throw new SmsVerificationError("验证码已过期（5分钟有效），请重新获取");
+    }
+    throw new SmsVerificationError("验证码无效，请重新获取");
+  }
 
   if (row.attemptCount >= MAX_VERIFY_ATTEMPTS) {
     throw new SmsVerificationError("验证码错误次数过多，请重新获取");

@@ -66,13 +66,16 @@ export function RegisterForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = data as { error?: unknown; detail?: string };
+        const err = data as { error?: unknown; detail?: string; hint?: string };
         let msg: string;
         if (typeof err.error === "string") msg = err.error;
         else if (err.error && typeof err.error === "object") msg = JSON.stringify(err.error);
         else msg = "注册失败，请检查表单";
+        if (typeof err.hint === "string" && err.hint.length > 0) {
+          msg = `${msg}\n${err.hint}`;
+        }
         if (typeof err.detail === "string" && err.detail.length > 0) {
-          msg = `${msg}：${err.detail}`;
+          msg = `${msg}\n${err.detail}`;
         }
         setError(msg);
         return;
@@ -192,7 +195,7 @@ export function RegisterForm({
           />
 
           {error ? (
-            <p className="text-sm text-red-500" role="alert">
+            <p className="text-sm text-red-500 whitespace-pre-line" role="alert">
               {error}
             </p>
           ) : null}
