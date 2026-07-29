@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { PaymentProductKind } from "@prisma/client";
+import type { PaymentProductKind, PaymentChannel } from "@prisma/client";
 
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { packById } from "@/lib/billing/credit-topup-packs";
@@ -57,8 +57,10 @@ export async function createPaymentCheckout(input: {
   payload: CreateCheckoutInput;
   adminNote?: string | null;
   createdByAdminId?: string | null;
+  channel?: PaymentChannel;
 }) {
   const { userId, payload } = input;
+  const channel = input.channel ?? "WECHAT_PERSONAL";
   let productKind: PaymentProductKind = payload.productKind;
   let amountYuan = 0;
   let productSnapshot: Record<string, unknown> = {};
@@ -195,6 +197,7 @@ export async function createPaymentCheckout(input: {
         amountYuan,
         expiresAt,
         adminNote: input.adminNote?.trim() || null,
+        channel,
         status: "PENDING",
       },
     });

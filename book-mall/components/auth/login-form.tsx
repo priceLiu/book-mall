@@ -178,6 +178,13 @@ export function LoginForm() {
 
         <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
           <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-300">
+            <Link
+              href="/forgot-password"
+              className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
+            >
+              忘记密码？
+            </Link>
+            {" · "}
             还没有账号？{" "}
             <Link
               href="/register"

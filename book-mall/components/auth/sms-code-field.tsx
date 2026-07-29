@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MathCaptcha } from "@/components/auth/math-captcha";
 
 type SmsPurpose = "REGISTER" | "LOGIN" | "BIND_PHONE" | "TEAM_INVITE" | "RESET_PASSWORD";
 
@@ -31,11 +32,21 @@ export function SmsCodeField({
   const [cooldown, setCooldown] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const captchaRef = useRef<{ token: string; answer: number } | null>(null);
 
   const send = useCallback(async () => {
     setError(null);
     setHint(null);
+
+    // 需要先过 captcha
+    if (!captchaRef.current) {
+      setShowCaptcha(true);
+      return;
+    }
+
     setSending(true);
+    setShowCaptcha(false);
     try {
       const res = await fetch("/api/auth/sms/send", {
         method: "POST",
@@ -43,14 +54,19 @@ export function SmsCodeField({
         body: JSON.stringify({
           phone,
           purpose,
+          captchaToken: captchaRef.current.token,
+          captchaAnswer: captchaRef.current.answer,
           ...(inviteToken ? { inviteToken } : {}),
         }),
       });
       const data = (await res.json()) as { error?: string; mockCode?: string };
       if (!res.ok) {
         setError(data.error ?? "发送失败");
+        captchaRef.current = null;
         return;
       }
+      // 发送成功，captcha 一次性消耗
+      captchaRef.current = null;
       setCooldown(60);
       const timer = setInterval(() => {
         setCooldown((c) => {
@@ -68,10 +84,18 @@ export function SmsCodeField({
       }
     } catch {
       setError("网络错误，请重试");
+      captchaRef.current = null;
     } finally {
       setSending(false);
     }
   }, [phone, purpose, inviteToken]);
+
+  function handleCaptchaVerify(token: string, answer: number): boolean {
+    captchaRef.current = { token, answer };
+    // 验证通过后自动触发发送
+    setTimeout(() => send(), 0);
+    return true;
+  }
 
   return (
     <div className="space-y-2">
@@ -98,6 +122,14 @@ export function SmsCodeField({
           {cooldown > 0 ? `${cooldown}s` : sending ? "发送中…" : "获取验证码"}
         </Button>
       </div>
+
+      {showCaptcha && (
+        <div className="rounded-md border bg-muted/30 p-3">
+          <p className="text-xs text-muted-foreground mb-2">请先完成验证</p>
+          <MathCaptcha onVerify={handleCaptchaVerify} disabled={sending} />
+        </div>
+      )}
+
       {hint ? <p className="text-xs text-emerald-600">{hint}</p> : null}
       {error ? (
         <p className="text-xs text-red-500" role="alert">
