@@ -14,14 +14,14 @@ import { cn } from "@/lib/utils";
 import { CANVAS_TOOLBAR_BTN_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 
 export function useCanvasToolbarDropdown(): {
-  anchorRef: RefObject<HTMLButtonElement | null>;
+  anchorRef: RefObject<HTMLButtonElement>;
   open: boolean;
   setOpen: (v: boolean) => void;
   rect: DOMRect | null;
   toggle: () => void;
   close: () => void;
 } {
-  const anchorRef = useRef<HTMLButtonElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null!);
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
@@ -58,7 +58,7 @@ export function CanvasToolbarDropdownTrigger({
 }: {
   label: string;
   open: boolean;
-  anchorRef: RefObject<HTMLButtonElement | null>;
+  anchorRef: RefObject<HTMLButtonElement>;
   onClick: () => void;
 }) {
   return (

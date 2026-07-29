@@ -650,12 +650,12 @@ function modelKeyFromCanvasNode(
 }
 
 /** 独立节点顺序跑（宫格高清等）· 单节点失败不阻断后续 */
-function isIndependentCanvasNodeJob(job: QueueItem): boolean {
+function isIndependentCanvasNodeJob(job: CanvasStoryRunJob): boolean {
   return !job.rowKey && !job.llmSection && !job.mediaKind;
 }
 
 function advanceSequentialAfterNodeError(
-  job: QueueItem,
+  job: CanvasStoryRunJob,
   key: string,
   finishSequentialStep: (completedKey: string) => void,
   abortSequentialOnError: (completedKey: string) => void,
@@ -2287,9 +2287,9 @@ export function useCanvasRunner(
       if (node && isStoryWorkspaceNodeType(node.type ?? "")) {
         const scope = t.storyScope ?? {};
         const ctx: CanvasStoryRunJob = {
-          nodeId,
           ...(job ?? {}),
           ...storyRunContextFromScope(nodeId, scope),
+          nodeId,
         };
         if (
           ctx.llmSection &&

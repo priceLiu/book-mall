@@ -14,6 +14,11 @@ import {
   canvasGwCreateVolcengineVideoJob,
 } from "@/lib/canvas/canvas-gateway-client";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
+import {
+  parseTopazFrameInterpolation,
+  parseTopazSlowmoFactor,
+  topazUpscaleFromHdResolution,
+} from "@/lib/gateway/topaz-client";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { refundFailedGatewayLog } from "@/lib/billing/gateway-credit-settlement";
 import { prisma } from "@/lib/prisma";
@@ -137,15 +142,19 @@ async function submitCanvasVideoToGateway(
   if (providerKind === "TOPAZ") {
     const topazInput =
       (payload.topazInput as Record<string, unknown> | undefined) ?? {};
+    const resolution = String(topazInput.resolution ?? "1080p");
     const job = await canvasGwCreateTopazVideoJob(userId, {
       model: String(payload.topazModel ?? task.model),
       videoUrl: String(topazInput.video_url ?? topazInput.videoUrl ?? ""),
       filterModel: String(topazInput.filter_model ?? topazInput.filterModel ?? "proteus"),
-      upscaleFactor: topazInput.upscale_factor ?? topazInput.upscaleFactor,
-      slowmo: topazInput.slowmo,
-      frameInterpolation:
+      upscaleFactor: topazUpscaleFromHdResolution(
+        topazInput.upscale_factor ?? topazInput.upscaleFactor ?? resolution,
+      ),
+      slowmo: parseTopazSlowmoFactor(topazInput.slowmo),
+      frameInterpolation: parseTopazFrameInterpolation(
         topazInput.frame_interpolation ?? topazInput.frameInterpolation,
-      resolution: String(topazInput.resolution ?? "1080p"),
+      ),
+      resolution,
       clientPage,
       projectId: task.projectId,
       canvasTaskId: task.id,
