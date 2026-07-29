@@ -93,7 +93,7 @@ export function ScriptStudioBatchPanel() {
     }
     await alert({
       title: "已展开媒体卡",
-      message: `新建 ${result.spawned} 张 LibTV 媒体卡${result.skipped ? `，跳过 ${result.skipped} 张已存在` : ""}。`,
+      message: `新建 ${result.spawned} 张媒体节点${result.skipped ? `，跳过 ${result.skipped} 张已存在` : ""}。`,
       variant: "success",
     });
   }, [addNode, updateNodeData, alert]);

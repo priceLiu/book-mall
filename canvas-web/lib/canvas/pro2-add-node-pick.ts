@@ -44,6 +44,7 @@ export type Pro2AddNodePickStore = {
       | "story-pro2-script-hub"
       | "story-pro2-style-asset"
       | "story-pro2-three-view"
+      | "story-pro2-3d-desk"
       | "story-pro2-style"
       | "story-pro2-character"
       | "story-pro2-scene"
@@ -235,6 +236,21 @@ export async function handlePro2ToolbarAddNodePick(
     return;
   }
 
+  if (itemId === "3d-desk" || nodeType === "story-pro2-3d-desk") {
+    const pos = spawnPosition("story-pro2-3d-desk", options);
+    const id = addNode(
+      "story-pro2-3d-desk",
+      pos,
+      { ...(NODE_DEFAULT_DATA["story-pro2-3d-desk"] as Record<string, unknown>) },
+    );
+    if (id) {
+      useCanvasStore.getState().updateNodeData(id, { sceneInstanceId: id });
+      selectPro2NodeAfterSpawn(setNodes, id);
+      useCanvasStore.getState().openDirector3dDeskEditor(id);
+    }
+    return;
+  }
+
   if (itemId === "script" && nodeType === "story-pro2-script-hub") {
     const pos = spawnPosition("story-pro2-script-hub", options);
     const id = spawnPro2ScriptHubAt(addNode, pos);
@@ -369,6 +385,7 @@ export async function handlePro2SideAddNodePick(
     itemId === "text" ||
     itemId === "image" ||
     itemId === "three-view" ||
+    itemId === "3d-desk" ||
     itemId === "style-asset" ||
     itemId === "script" ||
     itemId === "video" ||
@@ -377,6 +394,7 @@ export async function handlePro2SideAddNodePick(
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-script-hub" ||
     nodeType === "story-pro2-three-view" ||
+    nodeType === "story-pro2-3d-desk" ||
     nodeType === "sbv1-video-engine"
   ) {
     onSpawn(itemId, nodeType ?? spawnType);

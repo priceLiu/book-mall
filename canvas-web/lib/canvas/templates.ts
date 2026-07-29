@@ -658,7 +658,7 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     category: "builtin",
     name: "影视专业版 2.0",
     description:
-      "LibTV 架构：文本节点 + 底部输入坞 + 侧栏 + 号连接下游；业务规则与 1.0 对齐。",
+      "文本节点 + 底部输入坞 + 侧栏连接下游；业务规则与 1.0 对齐。",
     canvas: STORY_PRO2_PIPELINE,
   },
   {

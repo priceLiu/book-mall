@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bookmark,
@@ -13,8 +14,6 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
-  Play,
-  Redo2,
   Save,
   Share2,
   Sparkles,
@@ -24,13 +23,20 @@ import {
 import { cn } from "@/lib/utils";
 import { CANVAS_PROJECT_HISTORY_MAX } from "@/lib/canvas/canvas-autosave-settings";
 import {
-  CANVAS_PANEL_TAB_ACTIVE_CLASS,
   CANVAS_SEMANTIC_ERROR_CLASS,
   CANVAS_SEMANTIC_STATUS_CLASS,
   CANVAS_SEMANTIC_TITLE_CLASS,
   CANVAS_TOOLBAR_BTN_CLASS,
   CANVAS_PRIMARY_BTN_SM_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
+import {
+  CanvasToolbarDropdownItem,
+  CanvasToolbarDropdownMenu,
+  CanvasToolbarDropdownTrigger,
+  useCanvasToolbarDropdown,
+} from "@/components/canvas/canvas-toolbar-dropdown";
+
+type ToolbarMenuKey = "mine";
 
 export function CanvasToolbar({
   projectName,
@@ -41,8 +47,6 @@ export function CanvasToolbar({
   lastSavedAt,
   onSave,
   onUndo,
-  onRedo,
-  onRunAll,
   onSaveTemplate,
   onShareTemplate,
   onOpenMyTemplates,
@@ -55,9 +59,7 @@ export function CanvasToolbar({
   onOpenPromptHistory,
   onOpenStyleLibrary,
   onReflowStoryLayout,
-  running,
   inflightTaskCount = 0,
-  runAllDisabled = false,
   immersive = false,
   onToggleImmersive,
 }: {
@@ -69,8 +71,6 @@ export function CanvasToolbar({
   lastSavedAt: Date | null;
   onSave: () => void;
   onUndo: () => void;
-  onRedo: () => void;
-  onRunAll: () => void;
   onSaveTemplate?: () => void;
   onShareTemplate?: () => void;
   onOpenMyTemplates?: () => void;
@@ -83,28 +83,114 @@ export function CanvasToolbar({
   onOpenPromptHistory?: () => void;
   onOpenStyleLibrary?: () => void;
   onReflowStoryLayout?: () => void;
-  running: boolean;
   inflightTaskCount?: number;
-  runAllDisabled?: boolean;
-  /** 沉浸全屏模式（Pro2 / 分镜 1.0） */
   immersive?: boolean;
   onToggleImmersive?: () => void;
 }) {
+  const mineMenu = useCanvasToolbarDropdown();
+  const [openMenu, setOpenMenu] = useState<ToolbarMenuKey | null>(null);
+
+  useEffect(() => {
+    mineMenu.setOpen(openMenu === "mine");
+  }, [openMenu, mineMenu]);
+
+  const closeMenus = useCallback(() => {
+    setOpenMenu(null);
+  }, []);
+
+  const toggleMenu = useCallback((key: ToolbarMenuKey) => {
+    setOpenMenu((prev) => (prev === key ? null : key));
+  }, []);
+
+  const runMenuAction = useCallback(
+    (action: () => void) => {
+      closeMenus();
+      action();
+    },
+    [closeMenus],
+  );
+
+  const mineItems = useMemo(() => {
+    const items: Array<{
+      icon: React.ComponentType<{ className?: string }>;
+      label: string;
+      title?: string;
+      onClick: () => void;
+    }> = [];
+    if (onOpenMyHistory) {
+      items.push({
+        icon: History,
+        label: "我的历史",
+        title: `自动/手动保存各 ${CANVAS_PROJECT_HISTORY_MAX} 条`,
+        onClick: () => runMenuAction(onOpenMyHistory),
+      });
+    }
+    if (onOpenMyTemplates) {
+      items.push({
+        icon: Bookmark,
+        label: "我的模板",
+        onClick: () => runMenuAction(onOpenMyTemplates),
+      });
+    }
+    if (onOpenMyCharacters) {
+      items.push({
+        icon: UserRound,
+        label: "我的角色",
+        onClick: () => runMenuAction(onOpenMyCharacters),
+      });
+    }
+    if (onOpenMySavedScripts) {
+      items.push({
+        icon: BookOpen,
+        label: "我保存的剧本",
+        title: "本画布内故事定稿的只读剧本历史",
+        onClick: () => runMenuAction(onOpenMySavedScripts),
+      });
+    }
+    if (onOpenMyVideoLibrary) {
+      items.push({
+        icon: Film,
+        label: "我的视频库",
+        onClick: () => runMenuAction(onOpenMyVideoLibrary),
+      });
+    }
+    if (onOpenPromptHistory) {
+      items.push({
+        icon: Sparkles,
+        label: "我的提示词",
+        title: "已提交提示词自动归档",
+        onClick: () => runMenuAction(onOpenPromptHistory),
+      });
+    }
+    if (onOpenGenerationRecords) {
+      items.push({
+        icon: Sparkles,
+        label: "生成记录",
+        title: "成功与失败的 AI 生成记录",
+        onClick: () => runMenuAction(onOpenGenerationRecords),
+      });
+    }
+    return items;
+  }, [
+    onOpenMyHistory,
+    onOpenMyTemplates,
+    onOpenMyCharacters,
+    onOpenMySavedScripts,
+    onOpenMyVideoLibrary,
+    onOpenPromptHistory,
+    onOpenGenerationRecords,
+    runMenuAction,
+  ]);
+
   return (
     <header
       data-canvas-toolbar
-      className="relative grid w-full min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-center gap-x-2 overflow-hidden border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white"
+      className="relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 overflow-hidden border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white"
     >
       <div
         data-canvas-toolbar-meta
-        className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden"
+        className="flex min-w-0 max-w-full items-center justify-start gap-2 overflow-hidden"
       >
-        <Link
-          href="/projects"
-          className={CANVAS_TOOLBAR_BTN_CLASS}
-        >
-          <ArrowLeft className="size-3" /> 返回
-        </Link>
         <input
           type="text"
           value={projectName}
@@ -137,23 +223,30 @@ export function CanvasToolbar({
             "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
             saving || lastSavedAt || saveError ? CANVAS_SEMANTIC_STATUS_CLASS : "",
           )}
-          title={
-            saveError ? `保存失败：${saveError}` : undefined
-          }
+          title={saveError ? `保存失败：${saveError}` : undefined}
         >
-          {saving
-            ? "保存中…"
-            : saveError
-              ? (
-                  <span className={cn("truncate", CANVAS_SEMANTIC_ERROR_CLASS)}>
-                    保存失败：{saveError}
-                  </span>
-                )
-              : lastSavedAt
-                ? `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
-                : ""}
+          {saving ? (
+            "保存中…"
+          ) : saveError ? (
+            <span className={cn("truncate", CANVAS_SEMANTIC_ERROR_CLASS)}>
+              保存失败：{saveError}
+            </span>
+          ) : lastSavedAt ? (
+            `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
+          ) : (
+            ""
+          )}
         </span>
       </div>
+      <Link
+        href="/projects"
+        className={cn(
+          CANVAS_TOOLBAR_BTN_CLASS,
+          "justify-self-center whitespace-nowrap",
+        )}
+      >
+        <ArrowLeft className="size-3" /> 回到画布列表
+      </Link>
       <div
         data-canvas-toolbar-actions
         className="flex min-w-0 items-center justify-end gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -161,93 +254,48 @@ export function CanvasToolbar({
         <button type="button" onClick={onUndo} className={CANVAS_TOOLBAR_BTN_CLASS}>
           <Undo2 className="size-3" /> 撤销
         </button>
-        <button type="button" onClick={onRedo} className={CANVAS_TOOLBAR_BTN_CLASS}>
-          <Redo2 className="size-3" /> 重做
-        </button>
         <button
           type="button"
           onClick={onSave}
           disabled={saving}
           className={cn(CANVAS_TOOLBAR_BTN_CLASS, "disabled:opacity-50")}
         >
-          {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
-          手动保存
+          {saving ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <Save className="size-3" />
+          )}
+          保存
         </button>
-        {onOpenMyHistory ? (
-          <button
-            type="button"
-            onClick={onOpenMyHistory}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title={`自动/手动保存各 ${CANVAS_PROJECT_HISTORY_MAX} 条，互不影响`}
-          >
-            <History className="size-3" />
-            我的历史
-          </button>
+
+        {mineItems.length > 0 ? (
+          <>
+            <CanvasToolbarDropdownTrigger
+              label="我的"
+              open={openMenu === "mine"}
+              anchorRef={mineMenu.anchorRef}
+              onClick={() => toggleMenu("mine")}
+            />
+            <CanvasToolbarDropdownMenu
+              open={openMenu === "mine"}
+              onClose={closeMenus}
+              rect={mineMenu.rect}
+              align="end"
+              minWidth={196}
+            >
+              {mineItems.map((item) => (
+                <CanvasToolbarDropdownItem
+                  key={item.label}
+                  icon={item.icon}
+                  label={item.label}
+                  title={item.title}
+                  onClick={item.onClick}
+                />
+              ))}
+            </CanvasToolbarDropdownMenu>
+          </>
         ) : null}
-        {onOpenGenerationRecords ? (
-          <button
-            type="button"
-            onClick={onOpenGenerationRecords}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="查看成功与失败的 AI 生成记录"
-          >
-            <Sparkles className="size-3" />
-            生成记录
-          </button>
-        ) : null}
-        {onOpenMyTemplates ? (
-          <button
-            type="button"
-            onClick={onOpenMyTemplates}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-          >
-            <Bookmark className="size-3" />
-            我的模板
-          </button>
-        ) : null}
-        {onOpenMyCharacters ? (
-          <button
-            type="button"
-            onClick={onOpenMyCharacters}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-          >
-            <UserRound className="size-3" />
-            我的角色
-          </button>
-        ) : null}
-        {onOpenMySavedScripts ? (
-          <button
-            type="button"
-            onClick={onOpenMySavedScripts}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="查看本画布内故事定稿的只读剧本历史"
-          >
-            <BookOpen className="size-3" />
-            我保存的剧本
-          </button>
-        ) : null}
-        {onOpenMyVideoLibrary ? (
-          <button
-            type="button"
-            onClick={onOpenMyVideoLibrary}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="查看从画布保存到云端的视频"
-          >
-            <Film className="size-3" />
-            我的视频库
-          </button>
-        ) : null}
-        {onOpenPromptHistory ? (
-          <button
-            type="button"
-            onClick={onOpenPromptHistory}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="已提交提示词自动归档，按文字/图片/视频与成败分类"
-          >
-            <Sparkles className="size-3" />
-            我的提示词
-          </button>
-        ) : null}
+
         {onOpenProjectCharacterAssets ? (
           <button
             type="button"
@@ -306,11 +354,12 @@ export function CanvasToolbar({
           <button
             type="button"
             onClick={onToggleImmersive}
-            className={cn(
-              CANVAS_TOOLBAR_BTN_CLASS,
-              immersive && CANVAS_PANEL_TAB_ACTIVE_CLASS,
-            )}
-            title={immersive ? "退出全屏（Esc）" : "全屏编辑：隐藏顶栏，鼠标移到屏幕顶部可唤出"}
+            className={CANVAS_PRIMARY_BTN_SM_CLASS}
+            title={
+              immersive
+                ? "退出全屏（Esc）"
+                : "全屏编辑：隐藏顶栏，鼠标移到屏幕顶部可唤出"
+            }
           >
             {immersive ? (
               <Minimize2 className="size-3" />
@@ -320,20 +369,6 @@ export function CanvasToolbar({
             {immersive ? "退出全屏" : "全屏"}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={onRunAll}
-          disabled={running || runAllDisabled}
-          title={
-            runAllDisabled
-              ? "请先在 Book 个人中心绑定 AI 模型密钥"
-              : undefined
-          }
-          className={CANVAS_PRIMARY_BTN_SM_CLASS}
-        >
-          {running ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
-          运行全部
-        </button>
       </div>
     </header>
   );

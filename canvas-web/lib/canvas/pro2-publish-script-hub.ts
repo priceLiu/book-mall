@@ -5,11 +5,13 @@ export type Pro2PublishScriptDialogs = {
   alert: (args: {
     title: string;
     message: string;
-    variant?: "error" | "warning" | "info";
+    variant?: "error" | "warning" | "info" | "success";
   }) => Promise<void>;
   confirm: (args: {
     title: string;
     message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
   }) => Promise<boolean>;
 };
 

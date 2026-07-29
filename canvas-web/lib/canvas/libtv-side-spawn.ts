@@ -24,6 +24,7 @@ import {
 } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 import { flowPositionAtScreenPoint } from "./viewport-placement";
+import { useCanvasStore } from "./store";
 
 const GAP = 48;
 
@@ -76,6 +77,7 @@ function canRefVideoFromAnchor(anchor: CanvasFlowNode): boolean {
   return (
     anchor.type === "story-pro2-image" ||
     anchor.type === "story-pro2-three-view" ||
+    anchor.type === "story-pro2-3d-desk" ||
     anchor.type === "sbv1-image"
   );
 }
@@ -200,6 +202,51 @@ export function spawnLibtvNeighborFromAnchor(
     return newId;
   }
 
+  if (nodeType === "story-pro2-3d-desk") {
+    const newId = addNode("story-pro2-3d-desk", { x: position.x, y: position.y }, {
+      label: "",
+    });
+    if (!newId) return "";
+    useCanvasStore.getState().updateNodeData(newId, { sceneInstanceId: newId });
+    const anchorIsImage =
+      anchor.type === "story-pro2-image" ||
+      anchor.type === "story-pro2-three-view" ||
+      anchor.type === "story-pro2-3d-desk" ||
+      anchor.type === "sbv1-image";
+    if (anchorIsImage) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: side === "right" ? anchorId : newId,
+        target: side === "right" ? newId : anchorId,
+        sourceHandle: "image",
+        targetHandle: side === "right" ? "panorama" : "in_image",
+      });
+    } else if (side === "right" && anchor.type === "sbv1-video-engine") {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: newId,
+        target: anchorId,
+        sourceHandle: "image",
+        targetHandle: "in_ref",
+      });
+    } else if (
+      side === "left" &&
+      (anchor.type === "story-pro2-starter" ||
+        anchor.type === "story-pro2-script-hub")
+    ) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: newId,
+        target: anchorId,
+        sourceHandle: "image",
+        targetHandle: "in_text",
+      });
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
+    useCanvasStore.getState().openDirector3dDeskEditor(newId);
+    return newId;
+  }
+
   if (nodeType === "sbv1-video-engine") {
     const newId = addNode("sbv1-video-engine", { x: position.x, y: position.y }, buildSbv1VideoEngineNodeData());
     if (!newId) return "";
@@ -282,6 +329,7 @@ export function isLibtvSideSpawnNodeType(nodeType?: string): boolean {
     nodeType === "story-pro2-starter" ||
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-three-view" ||
+    nodeType === "story-pro2-3d-desk" ||
     nodeType === "story-pro2-script-hub" ||
     nodeType === "story-pro2-style-asset" ||
     nodeType === "sbv1-video-engine"
@@ -296,6 +344,7 @@ export function resolveLibtvSideSpawnNodeType(
   if (itemId === "text") return "story-pro2-starter";
   if (itemId === "image") return "story-pro2-image";
   if (itemId === "three-view") return "story-pro2-three-view";
+  if (itemId === "3d-desk") return "story-pro2-3d-desk";
   if (itemId === "script") return "story-pro2-script-hub";
   if (itemId === "style-asset") return "story-pro2-style-asset";
   if (

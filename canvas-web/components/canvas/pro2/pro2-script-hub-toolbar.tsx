@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { Download, LayoutGrid, MapPin, Megaphone, Package, RotateCw, Users, BookmarkPlus, Copy } from "lucide-react";
+import { Download, LayoutGrid, MapPin, Megaphone, RotateCw, Users, BookmarkPlus, Copy } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
 import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
-import { confirmAndPublishPro2ScriptHub } from "@/lib/canvas/pro2-publish-script-hub";
-import { syncScriptPackageAssetOnPublish } from "@/lib/canvas/sync-script-package-on-publish";
+import { runPro2ScriptPublishFlow } from "@/lib/canvas/pro2-script-publish-flow";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import {
   downloadPro2ScriptMarkdown,
   generatePro2CharacterThreeViewFromHub,
@@ -35,8 +35,6 @@ import {
 } from "@/lib/canvas/pro2-scene-batch-image";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
-import { exportScriptPackageDraft } from "@/lib/canvas/export-script-package";
-import { openSaveProjectAssetDialog } from "@/components/canvas/save-project-asset-dialog";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -118,6 +116,7 @@ export function Pro2ScriptHubToolbar({
   onDuplicateNode,
 }: Pro2ScriptHubToolbarProps) {
   const { alert, confirm } = useDialogs();
+  const collaboration = useCrewCollaborationAccess();
   const base = useBookMallBaseUrl();
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -285,41 +284,6 @@ export function Pro2ScriptHubToolbar({
     setScenePickerOpen(true);
   };
 
-  const onExportScriptPackage = async () => {
-    if (!projectId) {
-      await alert({
-        title: "无法导出",
-        message: "请先保存画布项目后再导出剧本包。",
-        variant: "warning",
-      });
-      return;
-    }
-    const starter = nodes.find(
-      (n) =>
-        n.type === "story-pro2-starter" &&
-        (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId === hubId,
-    );
-    const starterData = (starter?.data ?? {}) as StoryProStarterNodeData;
-    const draft = exportScriptPackageDraft({
-      projectId,
-      edition: "pro2",
-      starterId: starter?.id ?? hubId,
-      starterData,
-      hubId,
-      hubData,
-    });
-    if (!String(draft.payload.markdown ?? "").trim()) {
-      await alert({
-        title: "暂无剧本内容",
-        message: "请先生成至少一批工业化剧本后再导出。",
-        variant: "warning",
-      });
-      return;
-    }
-    updateNodeData(hubId, { scriptFinalized: true });
-    openSaveProjectAssetDialog(draft, { showTeamShare: true });
-  };
-
   const onDownload = () => {
     const md = pro2ScriptHubExportMarkdown(hubData);
     if (!md.trim()) return;
@@ -330,16 +294,15 @@ export function Pro2ScriptHubToolbar({
     if (isGenerating) return;
     const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
     const liveData = (live?.data ?? hubData) as StoryProScriptHubNodeData;
-    const pub = await confirmAndPublishPro2ScriptHub(hubId, liveData, {
-      alert,
-      confirm,
-    }, {
-      requireBatch: liveData.scriptStudioMode === true,
-      batchIndex: liveData.scriptStudioBatchIndex,
-    });
-    if (pub) {
-      updateNodeData(hubId, pub);
-      if (base?.trim() && projectId) {
+    await runPro2ScriptPublishFlow({
+      hubId,
+      hubData: liveData,
+      projectId,
+      base,
+      dialogs: { alert, confirm },
+      collaboration,
+      updateNodeData,
+      findStarter: () => {
         const starter = useCanvasStore
           .getState()
           .nodes.find(
@@ -348,20 +311,25 @@ export function Pro2ScriptHubToolbar({
               (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId ===
                 hubId,
           );
-        const assetId = await syncScriptPackageAssetOnPublish({
-          base,
-          projectId,
-          hubId,
-          hubData: { ...liveData, ...pub } as StoryProScriptHubNodeData,
-          starterId: starter?.id,
-          starterData: (starter?.data ?? {}) as StoryProStarterNodeData,
-        });
-        if (assetId) {
-          updateNodeData(hubId, { linkedScriptPackageAssetId: assetId });
-        }
-      }
-    }
-  }, [hubId, hubData, isGenerating, alert, confirm, updateNodeData, base, projectId]);
+        return starter
+          ? {
+              id: starter.id,
+              data: starter.data as StoryProStarterNodeData,
+            }
+          : undefined;
+      },
+    });
+  }, [
+    hubId,
+    hubData,
+    isGenerating,
+    alert,
+    confirm,
+    updateNodeData,
+    base,
+    projectId,
+    collaboration,
+  ]);
 
   return (
     <>
@@ -440,26 +408,21 @@ export function Pro2ScriptHubToolbar({
           <LayoutGrid className="size-3.5" />
           <span>生成分镜组</span>
         </button>
-        <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
-        <button
-          type="button"
-          className={TOOL_BTN}
-          disabled={isGenerating}
-          title="发布剧本 · 剧组可在公告条参与制作（发布者也可参与）"
-          onClick={() => void onPublishScript()}
-        >
-          <Megaphone className="size-3.5" />
-          <span>发布剧本</span>
-        </button>
-        <button
-          type="button"
-          className={TOOL_BTN}
-          title="导出定稿剧本包（SCRIPT_PACKAGE）"
-          onClick={() => void onExportScriptPackage()}
-        >
-          <Package className="size-3.5" />
-          <span>导出剧本包</span>
-        </button>
+        {collaboration.canPublishScript ? (
+          <>
+            <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+            <button
+              type="button"
+              className={TOOL_BTN}
+              disabled={isGenerating}
+              title="发布剧本 · 同步剧本包并更新公告栏（可选团队共享）"
+              onClick={() => void onPublishScript()}
+            >
+              <Megaphone className="size-3.5" />
+              <span>发布剧本</span>
+            </button>
+          </>
+        ) : null}
         <button
           type="button"
           className={TOOL_BTN}

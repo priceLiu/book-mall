@@ -43,6 +43,7 @@ import {
   type CanvasProjectEdition,
 } from "@/lib/canvas/project-edition";
 import { pro2CreateNeedsScriptPackageStep } from "@/lib/canvas/pro2-create-script-package-step";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { listPickableScriptPackages } from "@/lib/canvas/list-pickable-script-packages";
 import {
   applyScriptPackageToNewPro2Graph,
@@ -70,6 +71,7 @@ function Inner() {
   const router = useRouter();
   const base = useBookMallBaseUrl();
   const dialogs = useDialogs();
+  const collaboration = useCrewCollaborationAccess();
   const isAdmin = useCanvasAdmin();
   const [projects, setProjects] = useState<CanvasProjectSummary[]>([]);
   const [portalFeaturedIds, setPortalFeaturedIds] = useState<Set<string>>(
@@ -299,8 +301,9 @@ function Inner() {
   const needsScriptPackageStep = useMemo(
     () =>
       pickerEdition === "pro2" &&
+      collaboration.canUseCrewBulletin &&
       pro2CreateNeedsScriptPackageStep(pick, userTemplates),
-    [pickerEdition, pick, userTemplates],
+    [pickerEdition, pick, userTemplates, collaboration.canUseCrewBulletin],
   );
 
   const loadScriptPackages = useCallback(async () => {
@@ -483,42 +486,35 @@ function Inner() {
 
   return (
     <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
-      <div className="mb-6 flex justify-center">
-        <ProjectsSubNav />
-      </div>
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="twenty-eyebrow">canvas-web · projects</p>
-          <h1 className="canvas-serif mt-2 text-3xl text-white">我的画布</h1>
-          <p className="mt-2 text-sm text-[var(--canvas-muted)]">
-            影视专业版 1.0/2.0、分镜视频 1.0 分开管理；节点类型互斥，请从对应分区新建或打开画布。
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onOpenPicker("pro")}
-            className="twenty-btn-accent text-sm"
-          >
-            <Plus className="mr-2 size-4" />
-            新建影视专业版
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenPicker("sbv1")}
-            className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
-          >
-            <Plus className="mr-2 inline size-4" />
-            新建分镜视频 1.0
-          </button>
-          <button
-            type="button"
-            onClick={openPro2CreateDialog}
-            className="rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-2 text-sm font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
-          >
-            <Plus className="mr-2 inline size-4" />
-            新建影视专业版 2.0
-          </button>
+      <header className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <ProjectsSubNav align="start" className="min-w-0 max-w-full" />
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenPicker("pro")}
+              className="twenty-btn-accent text-sm"
+            >
+              <Plus className="mr-2 size-4" />
+              新建影视专业版
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenPicker("sbv1")}
+              className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
+            >
+              <Plus className="mr-2 inline size-4" />
+              新建分镜视频 1.0
+            </button>
+            <button
+              type="button"
+              onClick={openPro2CreateDialog}
+              className="rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-2 text-sm font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
+            >
+              <Plus className="mr-2 inline size-4" />
+              新建影视专业版 2.0
+            </button>
+          </div>
         </div>
       </header>
 
@@ -548,7 +544,6 @@ function Inner() {
         <div className="space-y-10">
           <ProjectsSection
             title="分镜视频 1.0"
-            subtitle="图片 + 视频 · 即梦 Seedance 三种参考模式"
             edition="sbv1"
             projects={sbv1Projects}
             onDelete={onDelete}
@@ -563,7 +558,6 @@ function Inner() {
           />
           <ProjectsSection
             title="影视专业版 2.0"
-            subtitle="LibTV 架构：薄卡片 + 检视面板；新复杂需求入口"
             edition="pro2"
             projects={pro2Projects}
             onDelete={onDelete}
@@ -578,7 +572,6 @@ function Inner() {
           />
           <ProjectsSection
             title="影视专业版"
-            subtitle="五阶段 SOP：故事 → 风格 → 设计 → 分镜 → 视频"
             edition="pro"
             projects={proProjects}
             onDelete={onDelete}
@@ -821,7 +814,6 @@ function Inner() {
 
 function ProjectsSection({
   title,
-  subtitle,
   edition,
   projects,
   onDelete,
@@ -835,7 +827,6 @@ function ProjectsSection({
   onTogglePortalFeatured,
 }: {
   title: string;
-  subtitle: string;
   edition: CanvasProjectEdition;
   projects: CanvasProjectSummary[];
   onDelete: (id: string, label: string, collaborationLocked?: boolean) => void | Promise<void>;
@@ -861,7 +852,6 @@ function ProjectsSection({
             </span>
             <span className="text-xs text-[var(--canvas-muted)]">{projects.length} 张</span>
           </div>
-          <p className="mt-1 text-sm text-[var(--canvas-muted)]">{subtitle}</p>
         </div>
         <button
           type="button"

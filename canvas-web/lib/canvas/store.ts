@@ -163,12 +163,11 @@ function finalizeHydratedGraph(
   };
 }
 
-/** Pro2 打开时使用统一 100% 视口，忽略 DB 里各项目不一致的旧 viewport */
-function pro2NeutralViewportOnOpen(
-  meta: { edition?: "pro2" | "sbv1" } | null | undefined,
+/** 打开项目时恢复已保存视口（pan/zoom 由 autosave 持久化） */
+function hydrateSavedViewport(
+  _meta: { edition?: "pro2" | "sbv1" } | null | undefined,
   saved: { x: number; y: number; zoom: number },
 ): { x: number; y: number; zoom: number } {
-  if (meta?.edition === "pro2") return { x: 0, y: 0, zoom: 1 };
   return saved;
 }
 
@@ -592,7 +591,7 @@ export const useCanvasStore = create<CanvasState>()(
             : reconcileStoryProWorkspace(normalized),
         );
         const hydratedMeta = ensureGraphMetaEdition(nodes, g.meta ?? null);
-        const viewport = pro2NeutralViewportOnOpen(
+        const viewport = hydrateSavedViewport(
           hydratedMeta,
           g.viewport ?? { x: 0, y: 0, zoom: 1 },
         );

@@ -30,7 +30,8 @@ export type Pro2ImageMediaRole =
   | "character-three-view"
   | "scene"
   | "prop"
-  | "mood";
+  | "mood"
+  | "director-desk-shot";
 
 /** 2.0 角色三视图节点 data（独立 type · 横向矩形） */
 export type StoryPro2ThreeViewNodeData = ImageNodeData &
@@ -63,6 +64,8 @@ export type StoryPro2ImageNodeData = ImageNodeData &
   dockRefImages?: import("./story-ref-image").StoryRefImage[];
   /** 组内分镜 / 三视图子节点 */
   pro2MediaRole?: Pro2ImageMediaRole;
+  /** 3D 导演台机位图 · 来源导演台节点 id */
+  directorDeskNodeId?: string;
   pro2RowKey?: string;
   pro2HubNodeId?: string;
   /** 数据锚点列节点 id（story-pro2-frame / story-pro2-character） */

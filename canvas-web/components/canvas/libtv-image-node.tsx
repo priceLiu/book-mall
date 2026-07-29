@@ -211,7 +211,15 @@ export function LibtvImageNode({
       imageUrl: d.ossUrl,
       onNeedLiveness: () => setLivenessOpen(true),
     });
-  const isGenerating = isLibtvMediaGenerating(d);
+  const isDirectorDeskShot = mediaRole === "director-desk-shot";
+  const isDirectorDeskShotLocalPreview =
+    isDirectorDeskShot &&
+    hasImage &&
+    Boolean(d.uploading) &&
+    !d.runtime?.taskId;
+  const isGenerating = isDirectorDeskShotLocalPreview
+    ? false
+    : isLibtvMediaGenerating(d);
   const hasRuntimeError = d.runtime?.status === "error";
   const hasUploadError = Boolean(d.uploadError?.trim()) && !isGenerating;
   const hasError = hasRuntimeError || hasUploadError;

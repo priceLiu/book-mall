@@ -37,6 +37,8 @@ import {
 } from "./story-node-chrome";
 import {
   PRO2_COLUMN_CARD_HEIGHT,
+  PRO2_3D_DESK_NODE_HEIGHT,
+  PRO2_3D_DESK_NODE_WIDTH,
   PRO2_COLUMN_CARD_WIDTH,
   PRO2_CONTROL_CARD_HEIGHT,
   PRO2_CONTROL_CARD_WIDTH,
@@ -332,8 +334,6 @@ export type ImageNodeData = {
 export type StoryPro23dDeskNodeData = ImageNodeData & {
   /** director-web 内场景持久化的实例 id（默认取节点 id） */
   sceneInstanceId?: string;
-  /** 最近一次导出截图（与 ossUrl 同源，用于节点内缩略图展示） */
-  thumbUrl?: string;
 };
 
 export type TextNodeData = {
@@ -742,7 +742,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     dockInput: "",
   } as Record<string, unknown>,
   "story-pro2-3d-desk": {
-    label: "3D导演台",
+    label: "",
   } satisfies StoryPro23dDeskNodeData as Record<string, unknown>,
   "story-pro2-script-hub": {
     outlineMd: "",
@@ -995,8 +995,8 @@ export const NODE_DEFAULT_SIZE: Record<
     height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
   },
   "story-pro2-3d-desk": {
-    width: PRO2_IMAGE_NODE_WIDTH,
-    height: PRO2_IMAGE_NODE_HEIGHT,
+    width: PRO2_3D_DESK_NODE_WIDTH,
+    height: PRO2_3D_DESK_NODE_HEIGHT,
   },
   "story-pro2-script-hub": {
     width: PRO2_SCRIPT_NODE_WIDTH,

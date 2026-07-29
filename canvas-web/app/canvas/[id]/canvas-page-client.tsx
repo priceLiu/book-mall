@@ -32,11 +32,6 @@ import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useCanvasGraphSnapshot } from "@/lib/canvas/canvas-store-hooks";
 import {
-  busEnqueueNodesSequential,
-  busEnqueueStoryRunsSequential,
-} from "@/lib/canvas/canvas-run-bus";
-import { collectStoryWorkspaceRunJobs } from "@/lib/canvas/story-run-all";
-import {
   CanvasRunnerHost,
   useCanvasInflightTaskCount,
 } from "@/lib/canvas/run-queue";
@@ -45,12 +40,9 @@ import { stripStoryProUploadedScriptMdForPersist } from "@/lib/canvas/story-pro-
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
-import { topoSort } from "@/lib/canvas/topo";
 import type {
   CanvasContentNodeType,
-  CanvasNodeType,
 } from "@/lib/canvas/types";
-import { isRunnableNodeType } from "@/lib/canvas/types";
 import {
   clearCanvasProjectTasksForbidden,
   getCanvasProject,
@@ -577,10 +569,10 @@ function Inner({ projectId }: { projectId: string }) {
     };
 
     const unsub = useCanvasStore.subscribe((state, prev) => {
-      // 仅 graphRevision 变更视为「内容脏」；viewport 平移不重置 debounce 计时
-      if (state.graphRevision === prev.graphRevision) {
-        return;
-      }
+      const graphChanged = state.graphRevision !== prev.graphRevision;
+      const viewportChanged =
+        JSON.stringify(state.viewport) !== JSON.stringify(prev.viewport);
+      if (!graphChanged && !viewportChanged) return;
       scheduleAutosave();
     });
 
@@ -963,50 +955,6 @@ function Inner({ projectId }: { projectId: string }) {
     await manualSave();
   }, [dialogs, hydrate, manualSave, projectId]);
 
-  const runAll = useCallback(() => {
-    if (gatewayLinkBlocked) return;
-    const workspaceJobs = collectStoryWorkspaceRunJobs(nodes, edges);
-    if (workspaceJobs.length) {
-      busEnqueueStoryRunsSequential(workspaceJobs);
-      return;
-    }
-
-    let order: string[];
-    try {
-      order = topoSort(nodes, edges);
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "拓扑失败");
-      return;
-    }
-    const runnableIds = order.filter((id) => {
-      const n = nodes.find((x) => x.id === id);
-      if (!n || !isRunnableNodeType(n.type as CanvasNodeType)) return false;
-      if (n.type === "three-view-engine") {
-        const starter = nodes.find((x) => x.type === "story-comic-starter");
-        const stage = (starter?.data as { pipelineStage?: string })
-          ?.pipelineStage;
-        if (stage === "idle" || stage === "llm_done") return false;
-      }
-      if (n.type === "image-engine" && (n.data as { frameIndex?: number }).frameIndex != null) {
-        const starter = nodes.find((x) => x.type === "story-comic-starter");
-        const stage = (starter?.data as { pipelineStage?: string })
-          ?.pipelineStage;
-        if (stage === "idle" || stage === "llm_done" || stage === "tv_done") {
-          return false;
-        }
-      }
-      if (n.type === "video-engine" || n.type === "tts-engine") {
-        const starter = nodes.find((x) => x.type === "story-comic-starter");
-        const stage = (starter?.data as { pipelineStage?: string })
-          ?.pipelineStage;
-        if (stage !== "frames_done" && stage !== "media_done") return false;
-      }
-      return true;
-    });
-    if (!runnableIds.length) return;
-    busEnqueueNodesSequential(runnableIds);
-  }, [nodes, edges, gatewayLinkBlocked]);
-
   let body: React.ReactNode;
   if (loading) {
     body = (
@@ -1020,7 +968,7 @@ function Inner({ projectId }: { projectId: string }) {
       <div className="fixed inset-0 z-[200] flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] text-sm text-red-200">
         <p>无法加载画布：{loadError ?? "未知错误"}</p>
         <a href="/projects" className="underline">
-          返回我的画布
+          回到画布列表
         </a>
       </div>
     );
@@ -1054,8 +1002,6 @@ function Inner({ projectId }: { projectId: string }) {
             lastSavedAt={lastSavedAt}
             onSave={() => void manualSave()}
             onUndo={undo}
-            onRedo={redo}
-            onRunAll={runAll}
             onOpenMyTemplates={() => {
               closeAllToolbarPanels();
               setMyTemplatesOpen(true);
@@ -1105,9 +1051,7 @@ function Inner({ projectId }: { projectId: string }) {
             }
             onSaveTemplate={() => void onSaveTemplate()}
             onShareTemplate={() => void onShareTemplate()}
-            running={inflightTaskCount > 0}
             inflightTaskCount={inflightTaskCount}
-            runAllDisabled={gatewayLinkBlocked}
             immersive={showImmersiveChrome ? immersive : false}
             onToggleImmersive={
               showImmersiveChrome ? () => void toggleImmersive() : undefined

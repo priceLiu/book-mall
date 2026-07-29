@@ -33,6 +33,12 @@ export const PRO2_DOCK_DIVIDER = LIBTV_INPUT_DOCK_DIVIDER;
 export const PRO2_CONTROL_CARD_WIDTH = 360;
 export const PRO2_CONTROL_CARD_HEIGHT = 140;
 
+/** 2.0 · 3D 导演台控制卡（图 1） */
+export const PRO2_3D_DESK_NODE_WIDTH = 360;
+export const PRO2_3D_DESK_NODE_HEIGHT = 280;
+export const PRO2_3D_DESK_NODE_MIN_WIDTH = 300;
+export const PRO2_3D_DESK_NODE_MIN_HEIGHT = 240;
+
 /** 2.0 标签节点 · 可压成单行便签 */
 export const PRO2_TAG_NODE_MIN_WIDTH = 120;
 export const PRO2_TAG_NODE_MIN_HEIGHT = 54;

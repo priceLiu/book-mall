@@ -14,6 +14,7 @@ import { Pro2CanvasToolbar } from "./pro2-canvas-toolbar";
 import { Pro2CrewBulletin } from "./pro2-crew-bulletin";
 import { Pro2ProductionGateBanner } from "./pro2-production-gate-banner";
 import { shouldShowCrewBulletinRail } from "@/lib/canvas/crew-bulletin-context";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   useCrewBulletinSubscription,
@@ -45,11 +46,13 @@ export function Pro2CanvasLayout({
 
   const [styleLibOpen, setStyleLibOpen] = useState(false);
 
+  const collaboration = useCrewCollaborationAccess();
   const nodes = useCanvasStore((s) => s.nodes);
   const graphMeta = useCanvasStore((s) => s.graphMeta);
   const showCrewBulletin = shouldShowCrewBulletinRail(
     nodes,
     graphMeta ?? undefined,
+    collaboration,
   );
 
   useCrewBulletinSubscription(base, projectId, showCrewBulletin);

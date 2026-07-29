@@ -343,8 +343,10 @@ function PhaseActionPanel({
     return (
       <div
         className={cn(
-          "overflow-y-auto overflow-x-auto bg-black/15 px-3 py-2",
-          fullscreen ? "min-h-0 flex-1" : "max-h-[min(70vh,520px)]",
+          "px-3 py-2",
+          fullscreen
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-[#12101a]"
+            : "max-h-[min(70vh,520px)] overflow-y-auto overflow-x-auto bg-black/15",
         )}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -380,11 +382,13 @@ function PhaseActionPanel({
         </div>
         {outlineMd ? (
           <pre
-            className="mt-2 min-w-0 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-black/35 bg-black/20 p-3 leading-relaxed text-white/70"
-            style={{
-              fontSize: `${Math.round(11 * contentScale)}px`,
-              maxHeight: fullscreen ? undefined : "min(52vh, 420px)",
-            }}
+            className={cn(
+              "mt-2 min-w-0 whitespace-pre-wrap break-words rounded-lg border border-white/10 p-3 leading-relaxed text-white/80",
+              fullscreen
+                ? "min-h-0 flex-1 overflow-y-auto bg-[#1a1624]"
+                : "max-h-[min(52vh,420px)] overflow-auto bg-black/20",
+            )}
+            style={{ fontSize: `${Math.round(11 * contentScale)}px` }}
           >
             {outlineMd}
           </pre>
@@ -643,7 +647,7 @@ function CrewBulletinPhaseFullscreen({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1090] flex h-[100dvh] w-screen flex-col bg-[#0c0a14]/94 backdrop-blur-sm"
+      className="fixed inset-0 z-[1090] flex h-[100dvh] w-screen flex-col bg-[#0c0a14]"
       role="dialog"
       aria-modal="true"
       aria-label={`公告栏 · ${phaseLabel}`}
@@ -799,6 +803,7 @@ export function Pro2CrewBulletin() {
   const [expandedPhaseId, setExpandedPhaseId] =
     useState<CrewProductionPhaseId | "authoring" | null>(null);
   const linkedPackageBootRef = useRef<string | null>(null);
+  const wasPublishedRef = useRef<boolean | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -830,6 +835,15 @@ export function Pro2CrewBulletin() {
     linkedPackageBootRef.current = anchor.nodeId;
     setCollapsed(false);
   }, [anchor?.mode, anchor?.nodeId, published]);
+
+  useEffect(() => {
+    const prev = wasPublishedRef.current;
+    if (prev === false && published) {
+      setCollapsed(false);
+      setExpandedPhaseId("script");
+    }
+    wasPublishedRef.current = published;
+  }, [published]);
 
   useEffect(() => {
     if (!anchor || !published || !hubId) return;

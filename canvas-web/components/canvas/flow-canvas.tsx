@@ -625,6 +625,13 @@ function FlowCanvasInner({
   ]);
 
   /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
+  const flushAutosaveAfterDrag = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("canvas:flush-autosave", { detail: { immediate: true } }),
+    );
+  }, []);
+
   const onMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
       setCanvasViewportMoving(false);
@@ -634,26 +641,19 @@ function FlowCanvasInner({
       }
       if (viewportTimerRef.current !== null) {
         window.clearTimeout(viewportTimerRef.current);
-      }
-      viewportTimerRef.current = window.setTimeout(() => {
-        setViewport(vp);
         viewportTimerRef.current = null;
-      }, 350);
+      }
+      setViewport(vp);
+      flushAutosaveAfterDrag();
     },
     [
       setViewport,
+      flushAutosaveAfterDrag,
       setCanvasViewportMoving,
       setCanvasGeometryDragging,
       setCanvasDraggingNodeId,
     ],
   );
-
-  const flushAutosaveAfterDrag = useCallback(() => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(
-      new CustomEvent("canvas:flush-autosave", { detail: { immediate: true } }),
-    );
-  }, []);
 
   const clearGroupResizeSession = useCallback(() => {
     groupResizeFrozenRef.current = null;

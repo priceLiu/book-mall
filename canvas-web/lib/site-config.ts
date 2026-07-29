@@ -16,6 +16,7 @@ export const CANVAS_PROJECTS_SUB_NAV: CanvasNavItem[] = [
   { href: "/characters", label: "角色库" },
   { href: "/scripts", label: "脚本" },
   { href: "/storyboards", label: "分镜" },
+  { href: "/style-library", label: "风格库" },
   { href: "/guides/project-assets", label: "资产指南" },
 ];
 

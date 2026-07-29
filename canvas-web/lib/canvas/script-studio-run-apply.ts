@@ -260,12 +260,4 @@ export function applyScriptStudioThemeOutlineResult(
   }
 }
 
-export function findScriptStudioHub(
-  nodes: CanvasFlowNode[],
-): CanvasFlowNode | undefined {
-  return nodes.find(
-    (n) =>
-      n.type === "story-pro2-script-hub" &&
-      (n.data as StoryProScriptHubNodeData).scriptStudioMode === true,
-  );
-}
+export { findScriptStudioHub, findCrewBulletinHub } from "./crew-bulletin-hub-find";

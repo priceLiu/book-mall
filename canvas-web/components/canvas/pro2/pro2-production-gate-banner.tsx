@@ -9,10 +9,12 @@ import { resolvePro2ProductionGate } from "@/lib/canvas/pro2-production-gate";
 import { acquireProjectAssetLease } from "@/lib/canvas-api";
 import { buildCrewBulletinGraphAnchorFromAsset } from "@/lib/canvas/crew-bulletin-graph-anchor";
 import { listPickableScriptPackages } from "@/lib/canvas/list-pickable-script-packages";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 
 /** 生产画布 · 关联剧本提示条（非强制阻断） */
 export function Pro2ProductionGateBanner() {
+  const collaboration = useCrewCollaborationAccess();
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -109,6 +111,7 @@ export function Pro2ProductionGateBanner() {
     [base, starter, updateNodeData, patchGraphMeta],
   );
 
+  if (!collaboration.canUseCrewBulletin) return null;
   if (gate.linked) return null;
   if (!gate.requireLinkedScript && !gate.optionalLinkPrompt) return null;
 

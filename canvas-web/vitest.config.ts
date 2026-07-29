@@ -24,6 +24,8 @@ export default defineConfig({
       "test/unit/script-studio-column-sync.test.ts",
       "test/unit/script-studio-frozen-bibles.test.ts",
       "test/unit/crew-bulletin-build.test.ts",
+      "test/unit/crew-bulletin-anchor.test.ts",
+      "test/unit/crew-collaboration-access.test.ts",
       "test/unit/crew-bulletin-script-package.test.ts",
       "test/unit/dedupe-pro-scene-rows.test.ts",
       "test/unit/crew-bulletin-task-prompts.test.ts",

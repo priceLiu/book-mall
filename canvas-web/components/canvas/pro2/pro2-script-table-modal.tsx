@@ -5,9 +5,11 @@ import { createPortal } from "react-dom";
 import { Megaphone, X } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { confirmAndPublishPro2ScriptHub } from "@/lib/canvas/pro2-publish-script-hub";
-import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
+import { runPro2ScriptPublishFlow } from "@/lib/canvas/pro2-script-publish-flow";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
+import type { StoryProScriptHubNodeData, StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import {
@@ -76,6 +78,9 @@ export function Pro2ScriptHubEditorModal({
   readOnly = false,
 }: Pro2ScriptHubEditorModalProps) {
   const { alert, confirm } = useDialogs();
+  const collaboration = useCrewCollaborationAccess();
+  const base = useBookMallBaseUrl();
+  const projectId = useCanvasStore((s) => s.projectId) ?? "";
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [draftOutline, setDraftOutline] = useState(outlineMd);
   const [draftScene, setDraftScene] = useState(sceneMd);
@@ -98,15 +103,41 @@ export function Pro2ScriptHubEditorModal({
     if (!hubId || !hubData) return;
     const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
     const liveData = (live?.data ?? hubData) as StoryProScriptHubNodeData;
-    const pub = await confirmAndPublishPro2ScriptHub(hubId, liveData, {
-      alert,
-      confirm,
-    }, {
-      requireBatch: liveData.scriptStudioMode === true,
-      batchIndex: liveData.scriptStudioBatchIndex,
+    await runPro2ScriptPublishFlow({
+      hubId,
+      hubData: liveData,
+      projectId,
+      base,
+      dialogs: { alert, confirm },
+      collaboration,
+      updateNodeData,
+      findStarter: () => {
+        const starter = useCanvasStore
+          .getState()
+          .nodes.find(
+            (n) =>
+              n.type === "story-pro2-starter" &&
+              (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId ===
+                hubId,
+          );
+        return starter
+          ? {
+              id: starter.id,
+              data: starter.data as StoryProStarterNodeData,
+            }
+          : undefined;
+      },
     });
-    if (pub) updateNodeData(hubId, pub);
-  }, [hubId, hubData, alert, confirm, updateNodeData]);
+  }, [
+    hubId,
+    hubData,
+    alert,
+    confirm,
+    updateNodeData,
+    projectId,
+    base,
+    collaboration,
+  ]);
 
   useEffect(() => {
     if (!open) {
@@ -220,11 +251,11 @@ export function Pro2ScriptHubEditorModal({
           />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {hubId && hubData ? (
+          {hubId && hubData && collaboration.canPublishScript ? (
             <button
               type="button"
               className="nodrag inline-flex items-center gap-1.5 rounded-lg border border-violet-400/35 bg-violet-500/15 px-3 py-1.5 text-[11px] font-medium text-violet-100 transition hover:bg-violet-500/25"
-              title="发布剧本 · 保存后可发布至剧组公告条"
+              title="发布剧本 · 同步剧本包并更新公告栏"
               onClick={() => void onPublishScript()}
             >
               <Megaphone className="size-3.5" />

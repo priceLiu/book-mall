@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { publishDirectorDeskCapturesToCanvas } from "@/lib/canvas/director-desk-spawn-shot";
 import { getDirectorWebOrigin } from "@/lib/canvas/director-web-origin";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { resolveUpstreamImageUrls } from "@/lib/canvas/upstream-images";
@@ -12,35 +13,39 @@ import type { StoryPro23dDeskNodeData } from "@/lib/canvas/types";
 
 type HostCapture = { dataUrl?: unknown; fileName?: unknown };
 
-function dataUrlToFile(dataUrl: string, fileName: string): File | null {
-  const comma = dataUrl.indexOf(",");
-  if (!dataUrl.startsWith("data:") || comma < 0) return null;
-  const head = dataUrl.slice(5, comma);
-  const mime = head.split(";")[0] || "image/png";
-  const isBase64 = /;base64/i.test(head);
-  const body = dataUrl.slice(comma + 1);
-  try {
-    const bin = isBase64 ? atob(body) : decodeURIComponent(body);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
-    return new File([arr], fileName, { type: mime });
-  } catch {
-    return null;
-  }
-}
-
 /** 全局挂载 · 3D导演台节点全屏编辑（iframe 内嵌 director-web，postMessage 桥接截图） */
 export function Director3dDeskEditorHost() {
   const editorNodeId = useCanvasStore((s) => s.director3dDeskEditorNodeId);
   const closeEditor = useCanvasStore((s) => s.closeDirector3dDeskEditor);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const base = useBookMallBaseUrl();
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [sendToast, setSendToast] = useState<string | null>(null);
+  const sendToastTimerRef = useRef<number | null>(null);
   useEffect(() => setMounted(true), []);
+
+  const showSendSuccessToast = useCallback((message = "发送成功") => {
+    setSendToast(message);
+    if (sendToastTimerRef.current !== null) {
+      window.clearTimeout(sendToastTimerRef.current);
+    }
+    sendToastTimerRef.current = window.setTimeout(() => {
+      setSendToast(null);
+      sendToastTimerRef.current = null;
+    }, 2800);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (sendToastTimerRef.current !== null) {
+        window.clearTimeout(sendToastTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const directorOrigin = useMemo(() => getDirectorWebOrigin(), []);
 
@@ -75,45 +80,37 @@ export function Director3dDeskEditorHost() {
   }, [directorOrigin, editorNodeId, instanceId]);
 
   const onCaptures = useCallback(
-    async (captures: HostCapture[]) => {
-      const first = captures.find(
-        (c) => typeof c.dataUrl === "string" && (c.dataUrl as string).trim(),
-      );
-      if (!first || !editorNodeId) return;
-      const dataUrl = (first.dataUrl as string).trim();
-      const fileName =
-        (typeof first.fileName === "string" && first.fileName.trim()) ||
-        "director-desk-capture.png";
-      const file = dataUrlToFile(dataUrl, fileName);
-      if (!file) return;
+    (captures: HostCapture[]) => {
+      if (!editorNodeId) return;
+      const normalized = captures
+        .map((c) => ({
+          dataUrl: typeof c.dataUrl === "string" ? c.dataUrl.trim() : "",
+          fileName:
+            (typeof c.fileName === "string" && c.fileName.trim()) ||
+            "机位-shot.png",
+        }))
+        .filter((c) => c.dataUrl);
+      if (normalized.length === 0) return;
 
-      updateNodeData(editorNodeId, {
-        blobUrl: dataUrl,
-        uploading: true,
-        uploadError: undefined,
-        runtime: { status: "pending" },
+      const created = publishDirectorDeskCapturesToCanvas({
+        deskNodeId: editorNodeId,
+        captures: normalized,
+        upload: (file) => uploadCanvasImage(base, file),
       });
-      try {
-        const ossUrl = await uploadCanvasImage(base, file);
-        updateNodeData(editorNodeId, {
-          ossUrl,
-          thumbUrl: ossUrl,
-          blobUrl: undefined,
-          uploading: false,
-          runtime: { status: "done", ossUrl },
-        });
-      } catch (e) {
-        updateNodeData(editorNodeId, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-          runtime: {
-            status: "error",
-            failMessage: e instanceof Error ? e.message : String(e),
-          },
-        });
-      }
+      if (created.length === 0) return;
+
+      showSendSuccessToast("发送成功");
+
+      const win = iframeRef.current?.contentWindow;
+      win?.postMessage(
+        {
+          type: "storyai:director-desk-captures-ack",
+          payload: { ok: true, count: created.length },
+        },
+        directorOrigin,
+      );
     },
-    [base, editorNodeId, updateNodeData],
+    [base, editorNodeId, directorOrigin, showSendSuccessToast],
   );
 
   useEffect(() => {
@@ -199,6 +196,13 @@ export function Director3dDeskEditorHost() {
           className="min-h-0 w-full flex-1 border-0"
           allow="fullscreen"
         />
+      ) : null}
+      {sendToast ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-8 z-[10050] flex justify-center px-4">
+          <div className="flex items-center gap-2 rounded-xl border border-violet-400/35 bg-[#1a1a1a]/97 px-4 py-2.5 text-sm text-violet-50 shadow-lg">
+            <span>{sendToast}</span>
+          </div>
+        </div>
       ) : null}
     </div>,
     document.body,
