@@ -51,6 +51,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "手机号格式无效" }, { status: 400 });
     }
 
+    // 先检查是否已注册，避免浪费短信验证码
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    if (existingUser?.phoneVerifiedAt) {
+      return NextResponse.json({
+        error: "该手机号已注册，请直接登录",
+        hint: "如果您忘记了密码，请点击「忘记密码」找回",
+      }, { status: 409 });
+    }
+
     const inviteToken = parsed.data.inviteToken?.trim() || undefined;
     if (inviteToken) {
       const invite = await getInviteByToken(inviteToken);
@@ -78,10 +87,6 @@ export async function POST(request: Request) {
     // 分享链接注册默认平台代付；普通注册保留用户所选 persona。
     const billingPersona = (parsed.data.billingPersona ??
       "PLATFORM_CREDIT") as BillingPersona;
-    const existing = await prisma.user.findUnique({ where: { phone } });
-    if (existing?.phoneVerifiedAt) {
-      return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
-    }
 
     // 解析分享归因：仅在分享码有效且非自荐时记录 referredByUserId（仅新建用户写入）。
     let referredByUserId: string | null = null;

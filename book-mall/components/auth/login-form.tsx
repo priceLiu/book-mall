@@ -64,6 +64,36 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
     try {
+      // 先检查手机号状态，给出明确提示
+      const check = await fetch("/api/auth/check-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const checkData = await check.json().catch(() => ({}));
+      if (!check.ok || checkData.error) {
+        setError(checkData.error ?? "检查失败，请重试");
+        return;
+      }
+
+      // 未注册
+      if (!checkData.exists) {
+        setError(checkData.hint ?? "该手机号未注册");
+        return;
+      }
+
+      // 未验证
+      if (!checkData.verified) {
+        setError(checkData.hint ?? "该手机号尚未验证");
+        return;
+      }
+
+      // 密码登录但没有密码 → 引导用验证码
+      if (tab === "password" && !checkData.hasPassword) {
+        setError(checkData.hint ?? "该账号未设置密码，请使用验证码登录");
+        return;
+      }
+
       const res = await signIn("credentials", {
         phone,
         loginMode: tab,
@@ -72,7 +102,7 @@ export function LoginForm() {
         redirect: false,
       });
       if (res?.error) {
-        setError(tab === "password" ? "手机号或密码错误" : "手机号或验证码错误");
+        setError(tab === "password" ? "密码错误，请重试" : "验证码错误，请重试");
         return;
       }
       if (!res?.ok) {
