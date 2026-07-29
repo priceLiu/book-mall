@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth/sms-bypass";
 import { prisma } from "@/lib/prisma";
 import { sendSmsMessage } from "@/lib/sms/send-sms";
+import { smsProvider } from "@/lib/sms/sms-config";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 /** 团队邀请链接内验证码与 TenantInvite 同 TTL（7 天） */
@@ -101,7 +102,8 @@ export async function issueSmsCode(input: {
     }
   }
 
-  const code = isMockSmsPhone(phone) ? MOCK_SMS_CODE : generateCode();
+  const isMock = smsProvider() === "mock" || isMockSmsPhone(phone);
+  const code = isMock ? MOCK_SMS_CODE : generateCode();
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(now.getTime() + codeTtlMs(input.purpose));
 
@@ -124,7 +126,7 @@ export async function issueSmsCode(input: {
   });
 
   const result: { code: string; mockCode?: string } = { code };
-  if (isMockSmsPhone(phone) && process.env.NODE_ENV !== "production") {
+  if (isMock && process.env.NODE_ENV !== "production") {
     result.mockCode = code;
   }
   return result;

@@ -1185,6 +1185,7 @@ enum PaymentProductKind {
 
 enum PaymentChannel {
   WECHAT_PERSONAL
+  WECHAT_ENTERPRISE
   MOCK
 }
 
