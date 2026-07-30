@@ -50,7 +50,7 @@ export function shouldUseSbv1ImageVideoColumnLayout(
     (n) => n.parentId === group.id && n.type !== "group",
   );
   if (children.length < 2) return false;
-  const hasVideo = children.some((n) => n.type === "sbv1-video-engine");
+  const hasVideo = children.some((n) => isSbv1GroupVideoChild(n));
   const hasImages = children.some((n) => isSbv1GroupImageChild(n));
   return hasVideo && hasImages;
 }
@@ -122,12 +122,19 @@ function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
   };
 }
 
+/** 组内右侧视频列：生视频引擎 + 自动成片 */
+function isSbv1GroupVideoChild(n: CanvasFlowNode): boolean {
+  return (
+    n.type === "sbv1-video-engine" || n.type === "jianying-auto-render-pro2"
+  );
+}
+
 /**
- * sbv1 组内「左侧网格」子节点：除视频引擎外的全部可视子节点（图片/标签等）。
+ * sbv1 组内「左侧网格」子节点：除视频引擎/自动成片外的全部可视子节点。
  * 混合分组（图片 + 视频 + 标签）若只排 sbv1-image，会出现标签悬浮重叠。
  */
 function isSbv1GroupImageChild(n: CanvasFlowNode): boolean {
-  return n.type !== "group" && n.type !== "sbv1-video-engine";
+  return n.type !== "group" && !isSbv1GroupVideoChild(n);
 }
 
 function sortSbv1GroupChildren(children: CanvasFlowNode[]): CanvasFlowNode[] {
@@ -308,7 +315,7 @@ export function applySbv1MediaGroupRelayout(
     next.filter((n) => n.parentId === groupId && isSbv1GroupImageChild(n)),
   );
   const engines = sortSbv1GroupChildren(
-    next.filter((n) => n.parentId === groupId && n.type === "sbv1-video-engine"),
+    next.filter((n) => n.parentId === groupId && isSbv1GroupVideoChild(n)),
   );
   const allChildren = sortSbv1GroupChildren(
     next.filter((n) => n.parentId === groupId && n.type !== "group"),
@@ -319,12 +326,15 @@ export function applySbv1MediaGroupRelayout(
   }
 
   const hasMixedContent = allChildren.some(
-    (n) => n.type !== "sbv1-image" && n.type !== "sbv1-video-engine",
+    (n) =>
+      n.type !== "sbv1-image" &&
+      n.type !== "sbv1-video-engine" &&
+      n.type !== "jianying-auto-render-pro2",
   );
   if (hasMixedContent) {
     const cols = pro2MediaGridCols(allChildren.length);
     const layouts = mediaGridLayoutForChildren(allChildren, cols, (n) =>
-      n.type === "sbv1-video-engine"
+      isSbv1GroupVideoChild(n)
         ? sbv1VideoEngineDimensions(n)
         : sbv1GroupImageCellSize(n),
     );

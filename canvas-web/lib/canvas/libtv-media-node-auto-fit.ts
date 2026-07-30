@@ -8,11 +8,19 @@ import {
   isLibtvMediaNodeBoxStale,
   type LibtvMediaAutoFitProfile,
 } from "./libtv-media-node-size";
+import { expandLibtvGroupToFitChildren } from "./libtv-group-content-bounds";
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import { scheduleRelayoutSbv1MediaGroup } from "./sbv1-media-group-layout";
 import { useCanvasStore } from "./store";
+
+/** 这些节点 auto-fit 只改自身尺寸，禁止触发组内兄弟重排 */
+const SKIP_GROUP_RELAYOUT_ON_FIT = new Set([
+  "jianying-auto-render-pro2",
+  "jianying-export-pro",
+  "jianying-export",
+]);
 
 export type { LibtvMediaAutoFitProfile, LibtvMediaNodeSize } from "./libtv-media-node-size";
 export {
@@ -105,12 +113,26 @@ function applyFitAndMaybeRelayout(args: {
   });
 
   const state = useCanvasStore.getState();
+  const self = state.nodes.find((n) => n.id === args.nodeId);
   const parentGroup = args.parentId
     ? state.nodes.find((n) => n.id === args.parentId)
     : undefined;
   const parentManualSize = Boolean(
     (parentGroup?.data as { manualSize?: boolean } | undefined)?.manualSize,
   );
+
+  // 自动成片等：成片比例变化后只撑大组框，禁止宫格重排把组内节点叠乱
+  if (
+    self?.type &&
+    SKIP_GROUP_RELAYOUT_ON_FIT.has(self.type) &&
+    args.parentId &&
+    parentGroup &&
+    !parentManualSize
+  ) {
+    setNodes((nodes) => expandLibtvGroupToFitChildren(nodes, args.parentId!));
+    return;
+  }
+
   if (
     !parentManualSize &&
     args.parentId &&
