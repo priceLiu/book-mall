@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
-import { createOssClientFrom, readOssEnv } from "@/lib/oss-client";
+import { createOssClientFrom, ossGetBuffer, readOssEnv } from "@/lib/oss-client";
 import {
   assertImageProcessingGatewayAccess,
   buildImageProcessingClientPage,
@@ -113,10 +113,7 @@ async function rehostImageForVendor(
     const cfg = readOssEnv();
     if (!("error" in cfg)) {
       const client = await createOssClientFrom(cfg);
-      const got = await (
-        client as { get: (name: string) => Promise<{ content?: Buffer }> }
-      ).get(ossKey);
-      const buf = got.content;
+      const buf = await ossGetBuffer(client, { key: ossKey });
       if (buf?.byteLength) {
         const ext = ossKey.includes(".") ? ossKey.split(".").pop()! : "png";
         return uploadCanvasUserBuffer({
