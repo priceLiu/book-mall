@@ -1,14 +1,34 @@
 /** 将 undici「fetch failed」包装为可诊断文案（内部 loopback vs 厂商 upstream）。 */
 
-const UPSTREAM_CHAT_TIMEOUT_MS = 180_000;
+import dns from "node:dns";
 
-function mergeUpstreamAbortSignal(init: RequestInit): RequestInit {
+/** 生产容器 IPv6 优先时连 api.kie.ai 等厂商易 ECONNREFUSED，固定 IPv4 优先 */
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  /* Node < 17 */
+}
+
+const UPSTREAM_CHAT_TIMEOUT_MS = 180_000;
+const UPSTREAM_CREATE_TASK_TIMEOUT_MS = 120_000;
+
+function mergeUpstreamAbortSignal(
+  init: RequestInit,
+  timeoutMs: number,
+): RequestInit {
   if (init.signal) return init;
   try {
-    return { ...init, signal: AbortSignal.timeout(UPSTREAM_CHAT_TIMEOUT_MS) };
+    return { ...init, signal: AbortSignal.timeout(timeoutMs) };
   } catch {
     return init;
   }
+}
+
+function upstreamTimeoutMs(url: string, init: RequestInit): number {
+  if (init.method?.toUpperCase() === "POST" && /\/createTask$/i.test(url)) {
+    return UPSTREAM_CREATE_TASK_TIMEOUT_MS;
+  }
+  return UPSTREAM_CHAT_TIMEOUT_MS;
 }
 
 function formatUpstreamTimeoutMessage(provider: string): string {
@@ -83,7 +103,9 @@ export async function gatewayFetch(
   ctx?: { hop?: "internal" | "upstream"; providerKind?: string },
 ): Promise<Response> {
   const reqInit =
-    ctx?.hop === "upstream" ? mergeUpstreamAbortSignal(init) : init;
+    ctx?.hop === "upstream"
+      ? mergeUpstreamAbortSignal(init, upstreamTimeoutMs(url, init))
+      : init;
   try {
     return await fetch(url, reqInit);
   } catch (e) {

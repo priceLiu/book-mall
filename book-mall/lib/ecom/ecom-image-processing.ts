@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import { createOssClientFrom, readOssEnv } from "@/lib/oss-client";
 import {
   assertImageProcessingGatewayAccess,
   buildImageProcessingClientPage,
@@ -62,17 +63,105 @@ function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext:
   return { buf, contentType, ext };
 }
 
+function tryParseManagedOssObjectKey(url: string): string | null {
+  const cfg = readOssEnv();
+  if ("error" in cfg) return null;
+  try {
+    const u = new URL(url);
+    const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
+    if (base && url.startsWith(`${base}/`)) {
+      return decodeURIComponent(url.slice(base.length + 1));
+    }
+    if (u.hostname === `${cfg.bucket}.${cfg.region}.aliyuncs.com`) {
+      return decodeURIComponent(u.pathname.replace(/^\//, ""));
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function isVendorFetchableHttpUrl(url: string): Promise<boolean> {
+  try {
+    const r = await fetch(url, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(12_000),
+      redirect: "follow",
+    });
+    if (r.ok) return true;
+    if (r.status === 405) {
+      const getRes = await fetch(url, {
+        method: "GET",
+        signal: AbortSignal.timeout(20_000),
+        redirect: "follow",
+        headers: { Range: "bytes=0-0" },
+      });
+      return getRes.ok || getRes.status === 206;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function rehostImageForVendor(
+  userId: string,
+  url: string,
+): Promise<string> {
+  const ossKey = tryParseManagedOssObjectKey(url);
+  if (ossKey) {
+    const cfg = readOssEnv();
+    if (!("error" in cfg)) {
+      const client = await createOssClientFrom(cfg);
+      const got = await (
+        client as { get: (name: string) => Promise<{ content?: Buffer }> }
+      ).get(ossKey);
+      const buf = got.content;
+      if (buf?.byteLength) {
+        const ext = ossKey.includes(".") ? ossKey.split(".").pop()! : "png";
+        return uploadCanvasUserBuffer({
+          userId,
+          ext,
+          buf,
+          contentType: ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png",
+        });
+      }
+    }
+  }
+
+  const res = await fetch(url, {
+    method: "GET",
+    signal: AbortSignal.timeout(45_000),
+    redirect: "follow",
+  });
+  if (!res.ok) {
+    throw new Error(`参考图不可被厂商拉取（HTTP ${res.status}），请重新上传后重试`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  const contentType = res.headers.get("content-type") ?? "image/png";
+  const ext = contentType.includes("jpeg")
+    ? "jpg"
+    : contentType.includes("webp")
+      ? "webp"
+      : "png";
+  return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
+}
+
+/** data URL 上传 OSS；HTTP URL 须厂商可拉取（KIE image_input），不可达则转存 public-read */
 async function ensurePublicImageUrl(
   userId: string,
   image: string,
 ): Promise<string> {
   const trimmed = image.trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
   if (trimmed.startsWith("data:")) {
     const { buf, contentType, ext } = parseDataUrl(trimmed);
     return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
+  }
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    if (await isVendorFetchableHttpUrl(trimmed)) {
+      return trimmed;
+    }
+    return rehostImageForVendor(userId, trimmed);
   }
   throw new Error("不支持的图片格式");
 }
@@ -465,7 +554,7 @@ export async function ecomImageProcessingOutpaint(opts: {
   const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    opts.mode,
+    "outpaint",
   );
   const imageUrl = await ensurePublicImageUrl(opts.userId, opts.sourceImageDataUrl);
   const apiParams = buildOutpaintApiParameters(opts.parameters ?? {});
@@ -567,7 +656,7 @@ export async function ecomImageProcessingEditor(opts: {
   const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    opts.mode,
+    "editor",
   );
 
   const { images: volcImages, logId } = await ecomGwVolcengineImageEdit(opts.userId, {

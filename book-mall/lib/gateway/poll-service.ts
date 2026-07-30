@@ -12,6 +12,7 @@ import {
   recoverVolcengineGatewayLogFromVendor,
 } from "@/lib/gateway/volcengine-stall-recover";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
+import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
   createKieSunoTaskWithKey,
@@ -708,14 +709,16 @@ export async function submitKieJobForLog(opts: {
     return taskId;
   }
 
-  const { taskId } = await createKieTaskWithKey(
-    cred.apiKey,
-    {
-      model: opts.model,
-      input: opts.input as never,
-      callBackUrl: opts.callBackUrl ?? null,
-    },
-    baseUrl,
+  const { taskId } = await runGatewaySubmitWithRetry(() =>
+    createKieTaskWithKey(
+      cred.apiKey,
+      {
+        model: opts.model,
+        input: opts.input as never,
+        callBackUrl: opts.callBackUrl ?? null,
+      },
+      baseUrl,
+    ),
   );
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
