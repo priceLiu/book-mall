@@ -1,15 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { EcomAuthBanner } from "@/components/auth/ecom-auth-banner";
 import { EcomMobileBar } from "@/components/layout/ecom-mobile-bar";
 import { EcomPortalTopBar } from "@/components/layout/ecom-portal-top-bar";
 import { EcomProfileSidebar } from "@/components/layout/ecom-profile-sidebar";
 import {
+  attemptEcomColdStartSso,
+  clearEcomSsoReenterAttempts,
   ensureEcomSessionFresh,
-  silentEcomSessionRefresh,
 } from "@/lib/ecom-silent-sso";
 import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
@@ -30,6 +31,7 @@ export function EcomAppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [navCollapsed, setNavCollapsed] = React.useState(false);
 
   React.useEffect(() => {
@@ -54,17 +56,29 @@ export function EcomAppShell({
     }
   }, []);
 
-  // 冷启动：主站已登录但 ecom 无 token 时，尝试 iframe 静默换票后刷新 SSR 用户态
+  const coldStartAttemptedRef = React.useRef(false);
+
+  // 冷启动 / 硬刷新：续签过期 token 或整页 re-enter（与 tool-web 一致，不用 iframe）
   React.useEffect(() => {
-    if (user) return;
-    let cancelled = false;
-    void silentEcomSessionRefresh(bookOrigin).then((ok) => {
-      if (ok && !cancelled) router.refresh();
-    });
-    return () => {
-      cancelled = true;
+    if (user) {
+      clearEcomSsoReenterAttempts();
+      coldStartAttemptedRef.current = false;
+      return;
+    }
+    if (coldStartAttemptedRef.current) return;
+    coldStartAttemptedRef.current = true;
+    attemptEcomColdStartSso({ bookOrigin, pathname });
+  }, [user, bookOrigin, pathname]);
+
+  React.useEffect(() => {
+    const onRefreshed = () => {
+      clearEcomSsoReenterAttempts();
+      router.refresh();
     };
-  }, [user, bookOrigin, router]);
+    window.addEventListener("ecom:tools-session-refreshed", onRefreshed);
+    return () =>
+      window.removeEventListener("ecom:tools-session-refreshed", onRefreshed);
+  }, [router]);
 
   // 已登录时定时静默续期；失败时不踢到登录页，下一轮心跳再试
   const loggedIn = Boolean(user);

@@ -1,5 +1,6 @@
 import {
   getCanvasWebOrigin,
+  getCommonToolsOrigin,
   getDirectorWebOrigin,
   getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
@@ -15,7 +16,8 @@ export type PlatformSsoApp =
   | "prompt-optimizer"
   | "quick-replica"
   | "e-commerce"
-  | "director";
+  | "director"
+  | "common-tools";
 
 /** 子应用公网 Origin（SSO callback 重定向目标）。 */
 export function getPlatformAppPublicOrigin(app: PlatformSsoApp): string | null {
@@ -34,6 +36,8 @@ export function getPlatformAppPublicOrigin(app: PlatformSsoApp): string | null {
       return getEcommerceWebOrigin().replace(/\/$/, "") || null;
     case "director":
       return getDirectorWebOrigin().replace(/\/$/, "") || null;
+    case "common-tools":
+      return getCommonToolsOrigin().replace(/\/$/, "") || null;
     default:
       return null;
   }
@@ -54,6 +58,9 @@ export function parsePlatformSsoApp(raw: string | null | undefined): PlatformSso
   }
   if (v === "director" || v === "director-desk") {
     return "director";
+  }
+  if (v === "common-tools" || v === "common_tools") {
+    return "common-tools";
   }
   return "tool";
 }

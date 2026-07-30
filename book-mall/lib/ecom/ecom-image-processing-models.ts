@@ -3,6 +3,8 @@
  */
 
 export const ECOM_IMAGE_PROCESSING_TOOL_KEY = "ecom-toolkit__image-processing";
+export const COMMON_TOOLS_IMAGE_PROCESSING_TOOL_KEY =
+  "common-tools__image-processing";
 
 export const ECOM_QWEN_EDIT_MODEL_KEYS = [
   "qwen-image-edit-max",

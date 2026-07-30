@@ -138,6 +138,18 @@ export function getDevHubServices(): DevHubService[] {
       port: 3009,
       openable: true,
     },
+    {
+      id: "common",
+      label: "common-tools",
+      description: "常用工具 · AI 图像小工具菜单（修图 / 表情包 / 海报等）",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN ??
+          process.env.COMMON_TOOLS_PUBLIC_ORIGIN,
+        "http://localhost:3010",
+      ),
+      port: 3010,
+      openable: true,
+    },
   ];
 }
 

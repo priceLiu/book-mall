@@ -1,37 +1,74 @@
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 /**
- * 跨门户头部导航：链接画布 / 快速复制 / 电商，工具站指向 Book。
- * 跨门户跳转经 Book `re-enter`：已登录用户（持有 Book 会话）无感换票进入目标门户。
+ * 跨门户头部导航：经 Book re-enter 无感换票进入各子应用。
  */
-type PortalKey = "quick-replica" | "canvas" | "e-commerce" | "story" | "tool";
+export type PortalKey =
+  | "common-tools"
+  | "canvas"
+  | "e-commerce"
+  | "quick-replica"
+  | "story"
+  | "tool";
 
-function reEnter(book: string | null, app: PortalKey, fallback: string | null): string | null {
+function reEnter(
+  book: string | null,
+  app: Exclude<PortalKey, "tool">,
+  fallback: string | null,
+): string | null {
   if (!book) return fallback;
-  if (app === "tool") return `${book.replace(/\/$/, "")}/tools`;
   return `${book.replace(/\/$/, "")}/api/sso/tools/re-enter?app=${app}&redirect=/`;
 }
 
-export function PortalNav({
-  current = "e-commerce",
-  variant = "light",
-}: {
-  current?: PortalKey;
-  variant?: "light" | "dark";
-}) {
-  const book = getMainSiteOrigin();
+export function buildPortalNavItems(book: string | null): Array<{
+  key: PortalKey;
+  label: string;
+  href: string | null;
+}> {
   const canvasOrigin = process.env.NEXT_PUBLIC_CANVAS_WEB_ORIGIN?.trim() || null;
   const qrOrigin = process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN?.trim() || null;
   const ecomOrigin = process.env.NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN?.trim() || null;
   const storyOrigin = process.env.NEXT_PUBLIC_STORY_WEB_ORIGIN?.trim() || null;
+  const commonToolsOrigin =
+    process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN?.trim() ||
+    process.env.COMMON_TOOLS_PUBLIC_ORIGIN?.trim() ||
+    null;
 
-  const items: { key: PortalKey; label: string; href: string | null }[] = [
+  return [
+    {
+      key: "common-tools",
+      label: "常用工具",
+      href: reEnter(book, "common-tools", commonToolsOrigin),
+    },
     { key: "canvas", label: "画布", href: reEnter(book, "canvas", canvasOrigin) },
-    { key: "quick-replica", label: "快速复制", href: reEnter(book, "quick-replica", qrOrigin) },
-    { key: "e-commerce", label: "电商工具箱", href: reEnter(book, "e-commerce", ecomOrigin) },
+    {
+      key: "e-commerce",
+      label: "电商工具箱",
+      href: reEnter(book, "e-commerce", ecomOrigin),
+    },
+    {
+      key: "quick-replica",
+      label: "快速复制",
+      href: reEnter(book, "quick-replica", qrOrigin),
+    },
     { key: "story", label: "故事版", href: reEnter(book, "story", storyOrigin) },
-    { key: "tool", label: "工具站", href: reEnter(book, "tool", book) },
+    {
+      key: "tool",
+      label: "工具站",
+      href: book ? `${book.replace(/\/$/, "")}/tools` : null,
+    },
   ];
+}
+
+export function PortalNav({
+  current,
+  variant = "light",
+}: {
+  current: PortalKey;
+  variant?: "light" | "dark";
+}) {
+  const book = getMainSiteOrigin();
+  const items = buildPortalNavItems(book);
 
   const activeClass =
     variant === "dark"

@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { maskPhone } from "@/lib/auth/phone";
 import {
   openCanvasAppInNewTab,
+  openCommonToolsAppInNewTab,
   openEcomAppInNewTab,
   openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
@@ -154,6 +155,8 @@ export function AccountNavMenu({
   ecomOriginConfigured,
   canLaunchQuickReplica,
   quickReplicaOriginConfigured,
+  canLaunchCommonTools,
+  commonToolsOriginConfigured,
   appsMenuHint,
   billingPersona,
   showReferral = false,
@@ -172,6 +175,8 @@ export function AccountNavMenu({
   ecomOriginConfigured: boolean;
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
+  canLaunchCommonTools: boolean;
+  commonToolsOriginConfigured: boolean;
   appsMenuHint: string | null;
   placement?: "sidebar" | "drawer";
 }) {
@@ -205,6 +210,12 @@ export function AccountNavMenu({
     billingPersona,
     gatewayLinked,
   });
+  const commonToolsReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas: canLaunchCommonTools,
+    canvasOriginConfigured: commonToolsOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
 
   const groups = useMemo(
     () =>
@@ -230,6 +241,9 @@ export function AccountNavMenu({
         canvasOriginConfigured,
         canvasReady,
         ecomReady,
+        canLaunchCommonTools,
+        commonToolsOriginConfigured,
+        commonToolsReady,
         canLaunchQuickReplica,
         quickReplicaOriginConfigured,
         quickReplicaReady,
@@ -244,6 +258,10 @@ export function AccountNavMenu({
     if (id === "launch-tools") {
       const r = await openToolsAppInNewTab("/fitting-room");
       if (!r.ok) setActionMsg(r.message);
+      return;
+    }
+    if (id === "launch-common-tools") {
+      openCommonToolsAppInNewTab("/");
       return;
     }
     if (id === "launch-canvas") {

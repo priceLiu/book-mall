@@ -1,7 +1,7 @@
 "use client";
 
 import { throwIfUnauthorized } from "@/lib/ecom-auth";
-import { silentEcomSessionRefresh } from "@/lib/ecom-silent-sso";
+import { refreshEcomToolsSessionClient } from "@/lib/ecom-tools-session-client";
 
 function rawEcomBookFetch(path: string, init?: RequestInit) {
   return fetch(`/api/book-mall/${path}`, {
@@ -25,9 +25,9 @@ function isReplayableBody(body: BodyInit | null | undefined): boolean {
 export async function ecomBookFetch(path: string, init?: RequestInit) {
   let res = await rawEcomBookFetch(path, init);
 
-  // 令牌过期 → 隐藏 iframe 静默换票后重试一次（主站会话仍在时无感）
+  // 令牌过期 → 服务端 refresh 后重试一次
   if (res.status === 401 && isReplayableBody(init?.body)) {
-    const refreshed = await silentEcomSessionRefresh();
+    const refreshed = await refreshEcomToolsSessionClient();
     if (refreshed) {
       res = await rawEcomBookFetch(path, init);
     }

@@ -7,6 +7,9 @@ export function toolKeyToServiceNavKey(toolKey: string): ToolSuiteNavKey | null 
   if (t === "ecom-toolkit" || t.startsWith("ecom-toolkit__")) {
     return "e-commerce-toolkit";
   }
+  if (t === "common-tools" || t.startsWith("common-tools__")) {
+    return "common-tools";
+  }
   if (t === "fitting-room" || t.startsWith("fitting-room__")) return "fitting-room";
   if (t === "text-to-image" || t.startsWith("text-to-image__")) return "text-to-image";
   if (t === "image-to-video" || t.startsWith("image-to-video__")) return "image-to-video";
@@ -27,6 +30,9 @@ export function clientPageToServiceNavKey(clientPage: string): ToolSuiteNavKey |
   }
   if (p.startsWith("ecom/") || p.includes("e-commerce")) {
     return "e-commerce-toolkit";
+  }
+  if (p.startsWith("common-tools/") || p.includes("common-tools")) {
+    return "common-tools";
   }
   return toolKeyToServiceNavKey(p);
 }

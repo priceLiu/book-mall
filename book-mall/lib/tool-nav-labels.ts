@@ -11,4 +11,5 @@ export const TOOL_NAV_LABEL: Record<string, string> = {
   "smart-support": "AI智能客服",
   "app-history": "费用与计费说明",
   "e-commerce-toolkit": "电商工具箱",
+  "common-tools": "常用工具",
 };

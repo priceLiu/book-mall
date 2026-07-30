@@ -18,6 +18,7 @@ import {
   Sparkles,
   User,
   Users,
+  Wand2,
   Zap,
   Activity,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import {
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import {
   openCanvasAppInNewTab,
+  openCommonToolsAppInNewTab,
   openEcomAppInNewTab,
   openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
@@ -77,6 +79,8 @@ export function AccountMenuDropdown({
   ecomOriginConfigured,
   canLaunchQuickReplica,
   quickReplicaOriginConfigured,
+  canLaunchCommonTools,
+  commonToolsOriginConfigured,
   billingPersona,
 }: {
   profileLabel: string;
@@ -90,6 +94,8 @@ export function AccountMenuDropdown({
   ecomOriginConfigured: boolean;
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
+  canLaunchCommonTools: boolean;
+  commonToolsOriginConfigured: boolean;
   billingPersona: BillingPersona | null;
 }) {
   const pathname = usePathname();
@@ -106,6 +112,12 @@ export function AccountMenuDropdown({
     billingPersona,
     gatewayLinked,
   });
+  const commonToolsReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas: canLaunchCommonTools,
+    canvasOriginConfigured: commonToolsOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
 
   async function handleAppLaunch(actionId: string, launch: () => void | Promise<unknown>) {
     if (isAppLaunchAction(actionId)) {
@@ -116,6 +128,9 @@ export function AccountMenuDropdown({
         canvasOriginConfigured,
         canvasReady,
         ecomReady,
+        canLaunchCommonTools,
+        commonToolsOriginConfigured,
+        commonToolsReady,
         canLaunchQuickReplica,
         quickReplicaOriginConfigured,
         quickReplicaReady,
@@ -212,6 +227,17 @@ export function AccountMenuDropdown({
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
                 <DropdownMenuSubContent>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      void handleAppLaunch("launch-common-tools", () =>
+                        openCommonToolsAppInNewTab("/"),
+                      );
+                    }}
+                  >
+                    <Wand2 />
+                    <span>常用工具</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={(e) => {
                       e.preventDefault();

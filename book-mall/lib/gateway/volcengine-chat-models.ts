@@ -45,6 +45,9 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
   "Doubao-Seedance-1.5-pro": "doubao-seedance-1-5-pro-251215",
   "doubao-seedance-2.0": "doubao-seedance-2-0-260128",
   "Doubao-Seedance-2.0": "doubao-seedance-2-0-260128",
+  /** Seedream 5.0 Lite · Gateway 归口键 → 方舟 endpoint */
+  "doubao-seedream-5-0-lite": "doubao-seedream-5-0-260128",
+  "Doubao-Seedream-5.0-lite": "doubao-seedream-5-0-260128",
 };
 
 export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [

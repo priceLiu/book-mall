@@ -36,10 +36,13 @@ export function summarizeUpstreamFailMessage(raw: string, status: number): strin
   if (!t) return `上游服务返回 HTTP ${status}`;
   try {
     const j = JSON.parse(t) as {
-      error?: { message?: string; code?: string };
+      error?: string | { message?: string; code?: string };
       message?: string;
     };
-    const msg = j.error?.message ?? j.message;
+    if (typeof j.error === "string" && j.error.trim()) return j.error.trim();
+    const nested =
+      typeof j.error === "object" && j.error != null ? j.error.message : undefined;
+    const msg = nested ?? j.message;
     if (typeof msg === "string" && msg.trim()) return msg.trim();
   } catch {
     /* plain text */

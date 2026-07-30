@@ -30,7 +30,7 @@ export function getBookOriginClient(): string {
 
 /**
  * 门户独立登录：跳本域品牌登录页（携带回跳），不再直接弹主站。
- * 已有 Book 会话的用户由 `silentEcomSessionRefresh`（隐藏 iframe re-enter）无感续期，
+ * 已有 Book 会话的用户由 `attemptEcomColdStartSso` / refresh API 无感续期；
  * 无 Book 会话者在本域品牌页完成登录/注册。
  */
 export function buildEcomLoginUrl(returnPath = "/"): string {

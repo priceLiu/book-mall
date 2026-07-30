@@ -1,10 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useRef, useState } from "react";
 import {
   copyTextToClipboard,
-  extractLogResultUrls,
   formatLogResultText,
   isImageResultUrl,
   isVideoResultUrl,
@@ -12,6 +10,8 @@ import {
   pickLogProgressLabel,
   pickLogResultPreviewText,
 } from "@/lib/gateway-log-params";
+import { LogHoverTipLayer } from "./log-hover-tip-layer";
+import { useLogHoverTip } from "./use-log-hover-tip";
 
 function CopyIcon({ className }: { className?: string }) {
   return (
@@ -40,12 +40,8 @@ export function LogResultCell({
   resultSummary: unknown;
 }) {
   const [copied, setCopied] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const urls = extractLogResultUrls(resultSummary);
   const previewUrl = pickLogPreviewUrl(resultSummary);
   const previewText = pickLogResultPreviewText(resultSummary);
   const resultText = formatLogResultText(resultSummary);
@@ -58,41 +54,16 @@ export function LogResultCell({
     ? pickLogProgressLabel(status, resultSummary)
     : null;
 
-  const clearHideTimer = useCallback(() => {
-    if (hideTimer.current) {
-      clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-    }
-  }, []);
-
-  const scheduleHide = useCallback(() => {
-    clearHideTimer();
-    hideTimer.current = setTimeout(() => {
-      setOpen(false);
-      setPos(null);
-    }, 280);
-  }, [clearHideTimer]);
-
-  const showTip = useCallback(() => {
-    if (!hasResult) return;
-    clearHideTimer();
-    const el = btnRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const width = Math.min(420, window.innerWidth - 32);
-    let left = rect.left - width - 14;
-    if (left < 16) left = Math.min(rect.right + 14, window.innerWidth - width - 16);
-    const top = Math.min(rect.top, window.innerHeight - 680);
-    setPos({ top: Math.max(12, top), left: Math.max(12, left) });
-    setOpen(true);
-  }, [clearHideTimer, hasResult]);
-
-  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
+  const { open, pos, bindAnchor, bindTip } = useLogHoverTip({
+    tipWidth: 420,
+    tipMaxH: 680,
+    enabled: hasResult,
+  });
 
   const onCopy = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    async (e?: React.MouseEvent) => {
+      e?.preventDefault();
+      e?.stopPropagation();
       if (!copyText) return;
       const ok = await copyTextToClipboard(copyText);
       if (ok) {
@@ -102,6 +73,12 @@ export function LogResultCell({
     },
     [copyText],
   );
+
+  const previewIsImage = previewUrl ? isImageResultUrl(previewUrl) : false;
+  const previewIsVideo = previewUrl ? isVideoResultUrl(previewUrl) : false;
+
+  const hover = bindAnchor(() => btnRef.current?.getBoundingClientRect() ?? null);
+  const tipHover = bindTip();
 
   if (isInProgress) {
     return (
@@ -133,17 +110,14 @@ export function LogResultCell({
     return <span className="text-[var(--gw-muted)]">—</span>;
   }
 
-  const previewIsImage = previewUrl ? isImageResultUrl(previewUrl) : false;
-  const previewIsVideo = previewUrl ? isVideoResultUrl(previewUrl) : false;
-
   return (
     <>
       <div className="flex items-center gap-2">
         <button
           ref={btnRef}
           type="button"
-          onMouseEnter={showTip}
-          onMouseLeave={scheduleHide}
+          onMouseEnter={hover.onMouseEnter}
+          onMouseLeave={hover.onMouseLeave}
           onClick={() => {
             if (previewUrl) {
               window.open(previewUrl, "_blank", "noopener,noreferrer");
@@ -156,7 +130,7 @@ export function LogResultCell({
         </button>
         <button
           type="button"
-          onClick={onCopy}
+          onClick={(e) => void onCopy(e)}
           className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--gw-border)] text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
           title={copied ? "已复制" : "复制结果"}
         >
@@ -164,65 +138,56 @@ export function LogResultCell({
         </button>
       </div>
 
-      {open && pos && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className="gw-log-preview-tip"
-              style={{ top: pos.top, left: pos.left, width: "min(420px, calc(100vw - 32px))" }}
-              onMouseEnter={() => {
-                clearHideTimer();
-                setOpen(true);
-              }}
-              onMouseLeave={scheduleHide}
-              role="dialog"
-              aria-label="Result Preview"
+      {open && pos ? (
+        <LogHoverTipLayer
+          open={open}
+          pos={{ ...pos, width: Math.min(420, pos.width) }}
+          className="gw-log-preview-tip pointer-events-auto"
+          ariaLabel="Result Preview"
+          tipHover={tipHover}
+        >
+          <div className="border-b border-[var(--gw-border)] px-4 py-3 text-sm font-semibold text-[var(--gw-ink)]">
+            Result Preview:
+          </div>
+          <div className="gw-log-preview-tip__body">
+            {previewIsImage && previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="Result preview"
+                className="max-h-[520px] w-full rounded-md object-contain bg-black/40"
+              />
+            ) : previewIsVideo && previewUrl ? (
+              <video
+                src={previewUrl}
+                controls
+                muted
+                className="max-h-[520px] w-full rounded-md bg-black/40"
+              />
+            ) : previewText ? (
+              <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[var(--gw-ink)]">
+                {previewText.length > 8000 ? `${previewText.slice(0, 7997)}…` : previewText}
+              </pre>
+            ) : previewUrl ? (
+              <p className="break-all font-mono text-[11px] text-[var(--gw-muted)]">{previewUrl}</p>
+            ) : (
+              <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--gw-muted)]">
+                {resultText.slice(0, 8000)}
+              </pre>
+            )}
+          </div>
+          <div className="gw-log-preview-tip__footer">
+            <button
+              type="button"
+              onClick={(e) => void onCopy(e)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
+              title={copied ? "已复制" : "复制结果"}
             >
-              <div className="border-b border-[var(--gw-border)] px-4 py-3 text-sm font-semibold text-[var(--gw-ink)]">
-                Result Preview:
-              </div>
-              <div className="gw-log-preview-tip__body">
-                {previewIsImage && previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewUrl}
-                    alt="Result preview"
-                    className="max-h-[520px] w-full rounded-md object-contain bg-black/40"
-                  />
-                ) : previewIsVideo && previewUrl ? (
-                  <video
-                    src={previewUrl}
-                    controls
-                    muted
-                    className="max-h-[520px] w-full rounded-md bg-black/40"
-                  />
-                ) : previewText ? (
-                  <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[var(--gw-ink)]">
-                    {previewText.length > 8000
-                      ? `${previewText.slice(0, 7997)}…`
-                      : previewText}
-                  </pre>
-                ) : previewUrl ? (
-                  <p className="break-all font-mono text-[11px] text-[var(--gw-muted)]">{previewUrl}</p>
-                ) : (
-                  <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--gw-muted)]">
-                    {resultText.slice(0, 8000)}
-                  </pre>
-                )}
-              </div>
-              <div className="gw-log-preview-tip__footer">
-                <button
-                  type="button"
-                  onClick={(e) => void onCopy(e)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
-                  title={copied ? "已复制" : "复制结果"}
-                >
-                  <CopyIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+              <CopyIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </LogHoverTipLayer>
+      ) : null}
     </>
   );
 }

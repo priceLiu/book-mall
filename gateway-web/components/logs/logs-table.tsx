@@ -1082,6 +1082,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const hasMoreLogsRef = useRef(true);
   const historyLoadSeqRef = useRef(0);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   loadedPagesRef.current = loadedPages;
   hasMoreLogsRef.current = hasMoreLogs;
   const [pageVisible, setPageVisible] = useState(true);
@@ -1123,6 +1124,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   useEffect(() => {
     setFiltersCollapsed(readFiltersCollapsed());
+  }, []);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const closeHoverTips = () => {
+      window.dispatchEvent(new Event("gw-log-close-hover-tips"));
+    };
+    el.addEventListener("scroll", closeHoverTips, { passive: true });
+    return () => el.removeEventListener("scroll", closeHoverTips);
   }, []);
 
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
@@ -1367,6 +1378,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         });
         const merged = mergeLogsDelta(logsRef.current, delta);
         setLogs(merged.rows);
+        window.dispatchEvent(new Event("gw-log-close-hover-tips"));
         void fetchCanvasQueueStats().then((s) => {
           applyCanvasQueueFetchResult(
             s,
@@ -2029,6 +2041,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       </div>
 
       <div
+        ref={tableScrollRef}
         className="gw-logs-table-scroll gw-scrollbar-thin relative min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--gw-border)] bg-[#0f0f14]"
         aria-busy={loading}
       >

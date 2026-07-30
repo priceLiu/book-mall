@@ -1,7 +1,7 @@
 {
   "name": "private-website",
   "private": true,
-  "description": "Monorepo dev orchestration (book-mall, tool-web, finance-web, story-web, canvas-web, gateway-web, prompt-optimizer-platform, e-commerce-toolkit)",
+  "description": "Monorepo dev orchestration (book-mall, tool-web, finance-web, story-web, canvas-web, gateway-web, prompt-optimizer-platform, e-commerce-toolkit, common-tools)",
   "scripts": {
     "dev:preflight": "node scripts/dev-preflight.mjs",
     "dev:preflight:kill": "node scripts/dev-preflight.mjs --kill",

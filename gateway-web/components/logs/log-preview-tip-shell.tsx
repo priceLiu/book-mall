@@ -1,6 +1,5 @@
 "use client";
 
-import { createPortal } from "react-dom";
 import { copyTextToClipboard } from "@/lib/gateway-log-params";
 
 function CopyIcon({ className }: { className?: string }) {
@@ -12,32 +11,18 @@ function CopyIcon({ className }: { className?: string }) {
   );
 }
 
+/** 预览层内容壳（外层由单元格 fixed 定位，无 portal / Context） */
 export function LogPreviewTipShell({
-  pos,
   title,
   children,
   copyText,
-  onEnter,
-  onLeave,
-  ariaLabel,
 }: {
-  pos: { top: number; left: number };
   title: string;
   children: React.ReactNode;
   copyText?: string;
-  onEnter: () => void;
-  onLeave: () => void;
-  ariaLabel: string;
 }) {
-  return createPortal(
-    <div
-      className="gw-log-preview-tip"
-      style={{ top: pos.top, left: pos.left }}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      role="dialog"
-      aria-label={ariaLabel}
-    >
+  return (
+    <>
       <div className="border-b border-[var(--gw-border)] px-4 py-3 text-sm font-semibold text-[var(--gw-ink)]">
         {title}
       </div>
@@ -58,7 +43,6 @@ export function LogPreviewTipShell({
           </button>
         </div>
       ) : null}
-    </div>,
-    document.body,
+    </>
   );
 }

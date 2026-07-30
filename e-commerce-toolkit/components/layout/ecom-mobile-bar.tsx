@@ -14,9 +14,6 @@ export function EcomMobileBar() {
         <Link href="/ecom/main-image" className="shrink-0 hover:text-[var(--ecom-ink)]">
           主图
         </Link>
-        <Link href="/ecom/image-processing" className="shrink-0 hover:text-[var(--ecom-ink)]">
-          图像处理
-        </Link>
       </div>
     </header>
   );

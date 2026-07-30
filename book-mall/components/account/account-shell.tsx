@@ -16,6 +16,8 @@ export function AccountShell({
   ecomOriginConfigured,
   canLaunchQuickReplica,
   quickReplicaOriginConfigured,
+  canLaunchCommonTools,
+  commonToolsOriginConfigured,
   appsMenuHint,
   billingPersona,
   showReferral,
@@ -33,6 +35,8 @@ export function AccountShell({
   ecomOriginConfigured: boolean;
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
+  canLaunchCommonTools: boolean;
+  commonToolsOriginConfigured: boolean;
   appsMenuHint: string | null;
   billingPersona: import("@prisma/client").BillingPersona | null;
   children: React.ReactNode;
@@ -49,6 +53,8 @@ export function AccountShell({
     ecomOriginConfigured,
     canLaunchQuickReplica,
     quickReplicaOriginConfigured,
+    canLaunchCommonTools,
+    commonToolsOriginConfigured,
     appsMenuHint,
     billingPersona,
     showReferral,

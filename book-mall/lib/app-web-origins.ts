@@ -61,6 +61,16 @@ export function getDirectorWebOrigin(): string {
   );
 }
 
+export function getCommonToolsOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN ??
+      process.env.COMMON_TOOLS_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://common.ai-code8.com"
+      : "http://localhost:3010",
+  );
+}
+
 export function buildAppWebUrl(origin: string, path: string): string {
   const base = origin.replace(/\/$/, "");
   if (!path || path === "/") return `${base}/`;

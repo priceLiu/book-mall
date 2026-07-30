@@ -6,7 +6,7 @@ import { userHasMembershipToolAccess } from "@/lib/membership-tool-access";
 import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import { prepareAccountCanvasLaunch } from "@/lib/account-canvas-launch";
 import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
-import { getEcommerceWebOrigin, getQuickReplicaOrigin } from "@/lib/app-web-origins";
+import { getEcommerceWebOrigin, getCommonToolsOrigin, getQuickReplicaOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { getReferralEligibility } from "@/lib/referral/referral-service";
 import { AccountShell } from "@/components/account/account-shell";
@@ -61,8 +61,10 @@ export default async function AccountGroupLayout({
   const { gatewayLinked, canvasOriginConfigured } = canvasLaunch;
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
   const quickReplicaOriginConfigured = Boolean(getQuickReplicaOrigin().startsWith("http"));
+  const commonToolsOriginConfigured = Boolean(getCommonToolsOrigin().startsWith("http"));
   const canLaunchEcommerce = toolsSsoReady && ecomAccess;
   const canLaunchQuickReplica = canLaunchTools;
+  const canLaunchCommonTools = canLaunchTools;
 
   const showToolsCta = toolsSsoReady;
   const appsMenuHint = buildAccountAppsMenuHint({
@@ -75,6 +77,8 @@ export default async function AccountGroupLayout({
     ecomOriginConfigured,
     quickReplicaOriginConfigured,
     canLaunchQuickReplica,
+    commonToolsOriginConfigured,
+    canLaunchCommonTools,
     isAdmin,
     billingPersona: userRecord.billingPersona,
   });
@@ -100,6 +104,8 @@ export default async function AccountGroupLayout({
         ecomOriginConfigured={ecomOriginConfigured}
         canLaunchQuickReplica={canLaunchQuickReplica}
         quickReplicaOriginConfigured={quickReplicaOriginConfigured}
+        canLaunchCommonTools={canLaunchCommonTools}
+        commonToolsOriginConfigured={commonToolsOriginConfigured}
         appsMenuHint={appsMenuHint}
         billingPersona={userRecord.billingPersona}
         showReferral={referralEligibility.eligible}

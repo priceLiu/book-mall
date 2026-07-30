@@ -7,6 +7,7 @@ import {
 } from "@/lib/gateway-log-display";
 import { formatGatewayFailInline } from "@/lib/gateway-log-fail";
 import { LogPreviewTipShell } from "./log-preview-tip-shell";
+import { LogHoverTipLayer } from "./log-hover-tip-layer";
 import { useLogHoverTip } from "./use-log-hover-tip";
 
 function normalizeStatus(status: string): LogRequestStatus {
@@ -55,11 +56,12 @@ export function LogStatusBadge({
 
   const { open, pos, bindAnchor, bindTip } = useLogHoverTip({
     tipWidth: 520,
+    tipMaxH: 680,
     enabled: hasFailTip,
   });
 
-  const anchorHandlers = bindAnchor(() => anchorRef.current?.getBoundingClientRect() ?? null);
-  const tipHandlers = bindTip();
+  const hover = bindAnchor(() => anchorRef.current?.getBoundingClientRect() ?? null);
+  const tipHover = bindTip();
 
   return (
     <>
@@ -69,8 +71,8 @@ export function LogStatusBadge({
         className={`inline-flex max-w-full flex-col gap-1 ${
           isActive ? "rounded-md bg-[#2a2a32] px-2.5 py-1" : ""
         } ${hasFailTip ? "cursor-help" : "items-center gap-2"}`}
-        onMouseEnter={hasFailTip ? anchorHandlers.onMouseEnter : undefined}
-        onMouseLeave={hasFailTip ? anchorHandlers.onMouseLeave : undefined}
+        onMouseEnter={hasFailTip ? hover.onMouseEnter : undefined}
+        onMouseLeave={hasFailTip ? hover.onMouseLeave : undefined}
       >
         <span className="inline-flex items-center gap-2">
           <span
@@ -101,31 +103,32 @@ export function LogStatusBadge({
       </span>
 
       {hasFailTip && open && pos && fail ? (
-        <LogPreviewTipShell
-          pos={pos}
-          title="Failed"
-          copyText={copyText}
+        <LogHoverTipLayer
+          open={open}
+          pos={{ ...pos, width: Math.min(520, pos.width) }}
+          className="gw-log-preview-tip pointer-events-auto"
           ariaLabel="失败原因"
-          onEnter={tipHandlers.onMouseEnter}
-          onLeave={tipHandlers.onMouseLeave}
+          tipHover={tipHover}
         >
-          <div className="space-y-3 font-mono text-[12px] leading-[1.6]">
-            <div>
-              <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
-                failCode:
+          <LogPreviewTipShell title="Failed" copyText={copyText}>
+            <div className="space-y-3 font-mono text-[12px] leading-[1.6]">
+              <div>
+                <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
+                  failCode:
+                </div>
+                <pre className="whitespace-pre-wrap break-all text-red-200/90">{fail.code}</pre>
               </div>
-              <pre className="whitespace-pre-wrap break-all text-red-200/90">{fail.code}</pre>
-            </div>
-            <div>
-              <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
-                failMessage:
+              <div>
+                <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
+                  failMessage:
+                </div>
+                <pre className="whitespace-pre-wrap break-all text-[var(--gw-ink)]">
+                  {fail.message}
+                </pre>
               </div>
-              <pre className="whitespace-pre-wrap break-all text-[var(--gw-ink)]">
-                {fail.message}
-              </pre>
             </div>
-          </div>
-        </LogPreviewTipShell>
+          </LogPreviewTipShell>
+        </LogHoverTipLayer>
       ) : null}
     </>
   );

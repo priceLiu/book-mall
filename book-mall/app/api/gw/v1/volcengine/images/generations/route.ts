@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
       clientSource,
       inputSummary: buildGatewayInputSummary(model, {
         prompt: prompt.slice(0, 200),
-        imageCount: body.image ? 1 : 0,
+        referenceImageCount: body.image ? 1 : 0,
+        n: body.parameters?.n ?? 1,
+        size: body.parameters?.size,
       }),
       ...logMetaToRequestLogFields(logMeta),
     });

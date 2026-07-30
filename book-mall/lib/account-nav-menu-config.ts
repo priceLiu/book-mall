@@ -19,6 +19,7 @@ import {
   ScrollText,
   Activity,
   Gift,
+  Wand2,
 } from "lucide-react";
 
 export type AccountNavLinkItem = {
@@ -85,6 +86,7 @@ export function buildAccountNavMenuGroups(input: {
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
 
   const appItems: AccountNavMenuItem[] = [
+    { kind: "action", id: "launch-common-tools", label: "常用工具", icon: Wand2 },
     { kind: "action", id: "launch-tools", label: "AI 工具站", icon: Wrench },
     { kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid },
     { kind: "action", id: "launch-ecom", label: "电商工具箱", icon: LayoutGrid },

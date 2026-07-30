@@ -12,7 +12,6 @@ import {
   Settings,
   Shirt,
   Sparkles,
-  Wand2,
 } from "lucide-react";
 import { ECOM_MODULES } from "@/lib/modules/registry";
 
@@ -77,9 +76,6 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
           : Sparkles;
     rows.push(item(m.title, m.href, icon));
   }
-
-  rows.push(sep());
-  rows.push(item("图像处理", "/ecom/image-processing", Wand2));
 
   rows.push(
     item("计费与账户", `${bookOrigin}/account`, Settings, {

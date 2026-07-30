@@ -3,6 +3,7 @@
  */
 
 import { resolveVolcengineArkApiRoot } from "@/lib/gateway/model-router";
+import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
 
 export type VolcengineImageGenerationsParams = {
   size?: string;
@@ -10,6 +11,8 @@ export type VolcengineImageGenerationsParams = {
   guidance_scale?: number;
   watermark?: boolean;
   stream?: boolean;
+  /** 输出张数；Seedream 须配合 sequential_image_generation */
+  n?: number;
 };
 
 export type VolcengineImageGenerationsRequest = {
@@ -50,13 +53,24 @@ export async function volcengineImageGenerations(
   const url = `${root}/images/generations`;
   const p = req.parameters ?? {};
   const body: Record<string, unknown> = {
-    model: req.model.trim(),
+    model: resolveVolcengineModelKey(req.model.trim()),
     prompt: req.prompt.trim(),
     response_format: "url",
-    sequential_image_generation: "disabled",
     stream: false,
     watermark: false,
   };
+  const nRaw = p.n;
+  const outputCount =
+    typeof nRaw === "number" && Number.isFinite(nRaw) && nRaw > 1
+      ? Math.min(15, Math.floor(nRaw))
+      : undefined;
+  if (outputCount) {
+    // Seedream 上游会忽略裸 n；须开启组图模式
+    body.sequential_image_generation = "auto";
+    body.sequential_image_generation_options = { max_images: outputCount };
+  } else {
+    body.sequential_image_generation = "disabled";
+  }
   if (req.image?.trim()) body.image = req.image.trim();
   if (p.size?.trim()) body.size = p.size.trim();
   if (p.seed !== undefined && Number.isFinite(p.seed)) body.seed = p.seed;
