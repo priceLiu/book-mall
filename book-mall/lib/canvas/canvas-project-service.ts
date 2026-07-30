@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   assertAccessibleCanvasProject,
+  loadAccessibleCanvasProjectRow,
 } from "@/lib/canvas/canvas-project-access";
 import {
   canvasProjectEditionFromGraph,
@@ -233,11 +234,7 @@ export async function getCanvasProjectForUser(
   userId: string,
   projectId: string,
 ): Promise<CanvasProjectDetail> {
-  await assertAccessibleCanvasProject(userId, projectId);
-  const p = await prisma.canvasProject.findFirst({
-    where: { id: projectId, deletedAt: null },
-  });
-  if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  const p = await loadAccessibleCanvasProjectRow(userId, projectId, {});
   return {
     ...toSummary(p),
     canvas: p.canvas,

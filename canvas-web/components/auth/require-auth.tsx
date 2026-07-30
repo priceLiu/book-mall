@@ -41,8 +41,8 @@ const SESSION_FETCH_TIMEOUT_MS = 22_000;
 const SESSION_FETCH_RETRY_DELAY_MS = 800;
 const SESSION_FETCH_TIMEOUT_RETRIES = 3;
 const SESSION_FETCH_TIMEOUT_RETRY_DELAY_MS = 1_500;
-const SESSION_FETCH_FRESH_EXCHANGE_RETRIES = 4;
-const SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS = 1_200;
+const SESSION_FETCH_FRESH_EXCHANGE_RETRIES = 2;
+const SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS = 450;
 const SESSION_POLL_MS = 60_000;
 const SESSION_BACKGROUND_REVALIDATE_MS = 8_000;
 
@@ -292,6 +292,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const freshExchange = isSsoExchangeFreshClient();
+    if (
+      freshExchange &&
+      typeof document !== "undefined" &&
+      document.cookie.includes("tools_token=")
+    ) {
+      readyRef.current = true;
+      setHasTokenCookie(true);
+      setSessionActive(true);
+      setReady(true);
+      setLoading(false);
+      void loadSession({ background: true });
+      return;
+    }
     if (!freshExchange) {
       const cached = getCachedToolsSession();
       if (cached?.active) {

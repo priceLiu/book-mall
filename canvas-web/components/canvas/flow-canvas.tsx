@@ -27,8 +27,10 @@ import {
   applyLibtvGroupResizeFrame,
   buildGroupResizeFrozenAbs,
   buildGeometryPatchesFromRf,
+  extractNodeRemoveChanges,
   extractResizeCommitIds,
   findGroupResizeSessionId,
+  hasNodeRemoveChanges,
   isGroupResizeCommitFrame,
   isCanvasInteractiveGeometryInProgress,
   isCanvasPositionCommitOnly,
@@ -887,13 +889,6 @@ function FlowCanvasInner({
         return;
       }
 
-      // store→RF 推送期间：RF 会批量回写选中/测量/相对坐标，一律不落库
-      if (syncingGraphFromStoreRef.current) {
-        setCanvasGeometryDragging(false);
-        setCanvasDraggingNodeId(null);
-        return;
-      }
-
       const storeChanges = filterStoreBoundNodeChanges(rfChanges);
       const syncLibtvFloatingDockPinFromRf = () => {
         const sel = resolveLibtvFloatingDockSelection(
@@ -904,6 +899,20 @@ function FlowCanvasInner({
           sel?.nodeType ?? null,
         );
       };
+
+      // store→RF 推送期间：选中/测量/相对坐标回写不落库；删除须立即落库，否则 RF 已删而 store 仍留节点会被 merge 还原
+      if (syncingGraphFromStoreRef.current) {
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        if (hasNodeRemoveChanges(storeChanges)) {
+          deferStoreGraphSyncRef.current = false;
+          storeOnNodesChange(extractNodeRemoveChanges(storeChanges));
+          if (libtvCanvas) {
+            syncLibtvFloatingDockPinFromRf();
+          }
+        }
+        return;
+      }
 
       // 拖动 session 内 pause 了 undo；松手帧若此时写 store 会被 zundo 吞掉 → 延后到 onNodeDragStop
       if (dragUndoPausedRef.current && storeChanges.length > 0) {

@@ -150,7 +150,7 @@ function checkDatabasePreflight() {
       const RST = "\x1b[0m";
       console.warn(
         `\n${YEL}⚠ 远程数据库 TCP 不可达${RST} — ${YEL}${host}:${port}${RST}\n` +
-          `  本地开发若使用腾讯云 CDB，通常需先连接 VPN；否则生图/登录等会失败或极慢。\n` +
+          `  请检查 DATABASE_URL 是否为公网连接池地址、腾讯云白名单是否放行本机 IP。\n` +
           `  自检：${GRN}pnpm --dir book-mall db:ping${RST}  ·  详见 ${GRN}docs/dev.md${RST} §数据库连接\n`,
       );
     }

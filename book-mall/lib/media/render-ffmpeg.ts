@@ -1,12 +1,16 @@
-import { execFile } from "child_process";
 import { mkdtemp, rm, stat, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { promisify } from "util";
 
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { buildMergedSrt } from "@/lib/canvas/canvas-jianying-export";
+import {
+  buildAsrSubtitleSrt,
+  transcribeClipViaGateway,
+} from "@/lib/media/asr-subtitle";
+import { QWEN3_ASR_FLASH_FILETRANS_MODEL } from "@/lib/gateway/dashscope-client";
 import { remuxMp4FaststartFromPath } from "@/lib/canvas/video-poster-ffmpeg";
+import { runFfmpeg, runFfprobe } from "@/lib/media/ffmpeg-exec";
 import { persistMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
 import {
   MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC,
@@ -14,8 +18,6 @@ import {
 } from "@/lib/media/render-limits";
 import { FFMPEG_USER_MESSAGE } from "@/lib/media/ffmpeg-preflight";
 import type { MediaTimelineV1, RenderProfile } from "@/lib/media/timeline-types";
-
-const execFileAsync = promisify(execFile);
 
 export type ProbedClip = {
   order: number;
@@ -30,17 +32,33 @@ async function fetchToFile(
   dest: string,
   maxBytes: number,
 ): Promise<void> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}: ${url}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.byteLength > maxBytes) {
-    throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (!res.ok) {
+        throw new Error(`下载失败 HTTP ${res.status}: ${url}`);
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.byteLength > maxBytes) {
+        throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
+      }
+      await writeFile(dest, buf);
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 800 * attempt));
+      }
+    }
   }
-  await writeFile(dest, buf);
+  throw lastErr instanceof Error ? lastErr : new Error("下载源片失败");
 }
 
 export async function ffprobeDurationSec(filePath: string): Promise<number> {
-  const { stdout } = await execFileAsync("ffprobe", [
+  const stdout = await runFfprobe([
     "-v",
     "error",
     "-show_entries",
@@ -59,7 +77,7 @@ export async function ffprobeDurationSec(filePath: string): Promise<number> {
 export async function ffprobeVideoSize(
   filePath: string,
 ): Promise<{ w: number; h: number }> {
-  const { stdout } = await execFileAsync("ffprobe", [
+  const stdout = await runFfprobe([
     "-v",
     "error",
     "-select_streams",
@@ -121,7 +139,7 @@ function scaleFilterToTarget(tw: number, th: number): string {
 
 async function clipHasAudio(filePath: string): Promise<boolean> {
   try {
-    const { stdout } = await execFileAsync("ffprobe", [
+    const stdout = await runFfprobe([
       "-v",
       "error",
       "-select_streams",
@@ -164,7 +182,7 @@ async function normalizeClip(
     args.push("-an");
   }
   args.push(outputPath);
-  await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
+  await runFfmpeg(args);
 }
 
 function buildXfadeFilterChain(
@@ -223,7 +241,7 @@ async function concatCopy(partPaths: string[], outPath: string): Promise<void> {
     .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
     .join("\n");
   await writeFile(listPath, listBody);
-  await execFileAsync("ffmpeg", [
+  await runFfmpeg([
     "-y",
     "-f",
     "concat",
@@ -268,7 +286,7 @@ async function burnSubtitlesIntoVideo(
     args.push("-an");
   }
   args.push(outPath);
-  await execFileAsync("ffmpeg", args, { maxBuffer: 20 * 1024 * 1024 });
+  await runFfmpeg(args);
 }
 
 async function renderXfade(
@@ -330,7 +348,7 @@ async function renderXfade(
     outPath,
   );
 
-  await execFileAsync("ffmpeg", args, { maxBuffer: 20 * 1024 * 1024 });
+  await runFfmpeg(args);
 }
 
 export function timelineToSrtFrames(
@@ -431,8 +449,41 @@ export async function runFfmpegMediaRender(args: {
     }
 
     const srtFrames = timelineToSrtFrames(timeline, durations);
-    const srtContent =
-      profile.subtitle.mode === "script" ? buildMergedSrt(srtFrames) : undefined;
+    let srtContent: string | undefined;
+    if (profile.subtitle.mode === "script") {
+      srtContent = buildMergedSrt(srtFrames, {
+        transitionType: profile.transition.type,
+        transitionSec: profile.transition.durationSec,
+      });
+    } else if (profile.subtitle.mode === "asr" && profile.subtitle.burnIn) {
+      const asrModelKey =
+        profile.subtitle.asrModelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL;
+      const clipSegments: Array<
+        Array<{ startMs: number; endMs: number; text: string }>
+      > = [];
+      for (let i = 0; i < timeline.clips.length; i++) {
+        const clip = timeline.clips[i]!;
+        args.onProgress?.(
+          66 + Math.round((i / Math.max(timeline.clips.length, 1)) * 4),
+          `识别第 ${i + 1}/${timeline.clips.length} 镜台词…`,
+        );
+        try {
+          const segments = await transcribeClipViaGateway({
+            userId: args.userId,
+            fileUrl: clip.videoUrl,
+            modelKey: asrModelKey,
+          });
+          clipSegments.push(segments);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`第 ${i + 1} 镜语音识别失败：${msg}`);
+        }
+      }
+      srtContent = buildAsrSubtitleSrt(clipSegments, durations, {
+        transitionType: profile.transition.type,
+        transitionSec: profile.transition.durationSec,
+      });
+    }
     let srtPath: string | undefined;
     if (srtContent?.trim()) {
       args.onProgress?.(68, "生成字幕文件");

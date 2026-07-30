@@ -45,7 +45,7 @@ import type {
 } from "@/lib/canvas/types";
 import {
   clearCanvasProjectTasksForbidden,
-  getCanvasProject,
+  getCanvasProjectCached,
   listCanvasProjectHistory,
   patchCanvasProject,
   saveCanvasTemplate,
@@ -376,7 +376,7 @@ function Inner({ projectId }: { projectId: string }) {
     clearCanvasProjectTasksForbidden(projectId);
     void (async () => {
       try {
-        const p = await getCanvasProject(base, projectId);
+        const p = await getCanvasProjectCached(base, projectId);
         if (cancelled) return;
         const rawCanvas = p.canvas as { nodes?: unknown[] } | null;
         loadedNodeCountRef.current = Array.isArray(rawCanvas?.nodes)

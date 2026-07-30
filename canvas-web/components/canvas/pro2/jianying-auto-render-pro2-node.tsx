@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { Clapperboard, Maximize2, Play, RefreshCw } from "lucide-react";
+import { Clapperboard, Maximize2, Play } from "lucide-react";
 
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import {
@@ -26,7 +26,6 @@ import { isMediaRenderJobInflight } from "@/lib/canvas/media-render-in-flight";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
-import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { cn } from "@/lib/utils";
 import { LazyViewportImage, LazyViewportVideo } from "../lazy-viewport-media";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
@@ -47,12 +46,20 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   const setEdges = useCanvasStore((s) => s.setEdges);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
-  const videoUrl =
-    d.mediaRenderResult?.downloadUrl?.trim() || d.videoUrl?.trim() || "";
-  const posterUrl =
-    d.mediaRenderResult?.posterUrl?.trim() || d.posterUrl?.trim() || undefined;
-  const hasVideo = Boolean(videoUrl);
   const renderInFlight = isMediaRenderJobInflight(d.mediaRenderInFlight);
+  // 本地成片先写 videoUrl；勿被旧的 mediaRenderResult.downloadUrl（OSS）挡住刷新
+  const videoUrl =
+    d.videoUrl?.trim() || d.mediaRenderResult?.downloadUrl?.trim() || "";
+  const posterUrl =
+    d.posterUrl?.trim() || d.mediaRenderResult?.posterUrl?.trim() || undefined;
+  const hasVideo = Boolean(videoUrl);
+  /**
+   * 扫光：剪辑进行中且尚未拿到本地成片（progressLabel 非空）。
+   * 本地成片就绪后 Dock 仍可显示「云端同步中」，节点结束扫光并刷新预览。
+   */
+  const ffmpegPhase =
+    renderInFlight &&
+    (Boolean(d.mediaRenderInFlight?.progressLabel?.trim()) || !hasVideo);
   const title = d.label?.trim() || "自动成片";
   const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
   const stageVideoFitClass = "object-contain";
@@ -63,7 +70,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     posterUrl,
     kind: "video",
     profile: "sbv1-video",
-    disabled: renderInFlight || !hasVideo,
+    disabled: ffmpegPhase || !hasVideo,
   });
 
   const spawnStore = useMemo(
@@ -138,16 +145,6 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             <p className="min-w-0 flex-1 truncate text-xs font-medium text-white">
               {title}
             </p>
-            {renderInFlight ? (
-              <>
-                <RefreshCw
-                  className={cn("size-3.5 shrink-0 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)}
-                />
-                <span className="shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] tabular-nums text-emerald-200">
-                  剪辑中 {d.mediaRenderInFlight?.progress ?? 0}%
-                </span>
-              </>
-            ) : null}
             {hasVideo ? (
               <button
                 type="button"
@@ -167,33 +164,8 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             className={cn(SBV1_MEDIA_STAGE_CLASS, "group/stage relative")}
             style={{ backgroundColor: LIBTV_INPUT_DOCK_BG }}
           >
-            {renderInFlight ? (
-              <LibtvMediaGeneratingState
-                variant="cyan"
-                label={d.mediaRenderInFlight?.progressLabel?.trim() || undefined}
-              >
-                {hasVideo ? (
-                  posterUrl ? (
-                    <LazyViewportImage
-                      src={posterUrl}
-                      alt=""
-                      eager
-                      className="absolute inset-0"
-                      imgClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
-                      rootMargin="280px"
-                    />
-                  ) : (
-                    <LazyViewportVideo
-                      src={videoUrl}
-                      poster={posterUrl}
-                      eager
-                      className="absolute inset-0"
-                      videoClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
-                      rootMargin="280px"
-                    />
-                  )
-                ) : null}
-              </LibtvMediaGeneratingState>
+            {ffmpegPhase ? (
+              <LibtvMediaGeneratingState variant="cyan" />
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
                 {posterUrl ? (

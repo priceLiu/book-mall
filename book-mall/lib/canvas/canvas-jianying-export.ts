@@ -3,6 +3,13 @@
  */
 import archiver from "archiver";
 import { Readable } from "node:stream";
+import {
+  normalizeSubtitleBurnInText,
+  type SubtitleTimingOptions,
+  computeSubtitleCueTimes,
+  formatSrtTime,
+  splitDialogueIntoTimedCues,
+} from "@/lib/media/subtitle-burn-in";
 
 export type JianyingFrameInput = {
   frameIndex: number;
@@ -17,31 +24,35 @@ function padFrame(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-function formatSrtTime(totalSec: number): string {
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = Math.floor(totalSec % 60);
-  const ms = Math.round((totalSec % 1) * 1000);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
-}
-
-export function buildMergedSrt(frames: JianyingFrameInput[]): string {
+export function buildMergedSrt(
+  frames: JianyingFrameInput[],
+  timing?: SubtitleTimingOptions,
+): string {
   const sorted = [...frames].sort((a, b) => a.frameIndex - b.frameIndex);
-  let cursor = 0;
+  const durations = sorted.map((f) =>
+    f.durationSec && f.durationSec > 0 ? f.durationSec : 3,
+  );
+  const cues = computeSubtitleCueTimes(durations, timing);
+
   const blocks: string[] = [];
+  let cueIndex = 0;
   sorted.forEach((f, i) => {
-    const dur = f.durationSec && f.durationSec > 0 ? f.durationSec : 3;
-    const start = cursor;
-    const end = cursor + dur;
-    cursor = end;
-    const text = (f.dialogue ?? "").trim();
-    if (!text || text === "—" || text === "-") return;
-    blocks.push(
-      String(i + 1),
-      `${formatSrtTime(start)} --> ${formatSrtTime(end)}`,
-      text,
-      "",
-    );
+    const { startSec, endSec } = cues[i] ?? {
+      startSec: 0,
+      endSec: durations[i] ?? 3,
+    };
+    const timedCues = splitDialogueIntoTimedCues(f.dialogue ?? "", startSec, endSec);
+    for (const cue of timedCues) {
+      const text = normalizeSubtitleBurnInText(cue.text) || cue.text.trim();
+      if (!text) continue;
+      cueIndex += 1;
+      blocks.push(
+        String(cueIndex),
+        `${formatSrtTime(cue.startSec)} --> ${formatSrtTime(cue.endSec)}`,
+        text.slice(0, 160),
+        "",
+      );
+    }
   });
   return blocks.join("\n");
 }

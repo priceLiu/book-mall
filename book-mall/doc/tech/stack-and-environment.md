@@ -12,7 +12,7 @@
 
 1. **Neon 控制台**：打开项目 → 确认 **未暂停**；点一次 **Open** / 在 SQL Editor 执行任意查询，**唤醒计算节点**后再用本站或 `pnpm run db:deploy` 测连接。  
 2. **核对连接串**：使用控制台提供的 **Pooled** URI（主机含 `-pooler`）；query 含 `sslmode=require`，建议 **`pgbouncer=true`**、**`connect_timeout=30`**。  
-3. **网络**：代理 / VPN / 公司网络可能对海外出口不稳定，可切换网络试；若长期从国内访问，可考虑在 Neon 选择离你更近的 **Region**（仍有跨境时延，但可能更稳）。  
+3. **网络**：公司代理或出口限制可能影响海外 API；可切换网络试。本仓库 **不使用 VPN** 连库/OSS（见 `.cursor/rules/no-vpn-networking.mdc`）。  
 4. **本地验证**：在项目目录执行 `pnpm run db:deploy` 或 `dotenv -e .env.local -- npx prisma db execute --stdin <<< "select 1"`；若 CLI 也超时，问题在 **网络或 Neon 状态**，而非页面代码。  
 5. **开发体验**：若冷启动仍烦人，可在 Neon **升级套餐**或启用 **Always-on**（以控制台当前套餐为准），减少睡眠次数。
 

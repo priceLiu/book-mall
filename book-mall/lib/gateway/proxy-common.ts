@@ -76,6 +76,11 @@ import {
   bumpGatewayStatusOnCreate,
   bumpGatewayStatusOnFinalize,
 } from "@/lib/gateway/stats-counter";
+import { resolveTrafficScopeFromIds } from "@/lib/generation/traffic-control/scope-key";
+import {
+  SubmitBurstLimitError,
+  assertSubmitBurstAllowed,
+} from "@/lib/generation/submit-rate/assert-submit-burst";
 
 export type { UsageFromResponse };
 
@@ -95,6 +100,9 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
     return { status: 403, error: e.message };
   }
   if (e instanceof VideoRiskError) {
+    return { status: 429, error: e.message };
+  }
+  if (e instanceof SubmitBurstLimitError) {
     return { status: 429, error: e.message };
   }
   const billing = mapGatewayBillingFailure(e);
@@ -149,6 +157,13 @@ export async function createRequestLog(opts: {
     if (e instanceof UnregisteredGatewayModelError) throw e;
     throw e;
   });
+
+  const trafficScope = resolveTrafficScopeFromIds({
+    tenantId: opts.tenantId,
+    userId: opts.userId,
+    actorUserId: opts.actorBookUserId,
+  });
+  await assertSubmitBurstAllowed(trafficScope.scopeKey);
 
   const route = routeGatewayModel(opts.model);
 

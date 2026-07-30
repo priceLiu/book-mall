@@ -18,6 +18,8 @@ import {
   listPortalFeaturedProjects,
   patchCanvasProject,
   patchPortalFeaturedProject,
+  prefetchCanvasProject,
+  prefetchCanvasProjects,
   type CanvasProjectSummary,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
@@ -97,6 +99,7 @@ function Inner() {
   const [scriptPackages, setScriptPackages] = useState<
     NewProjectScriptPackageAsset[]
   >([]);
+  const [openingProjectId, setOpeningProjectId] = useState<string | null>(null);
   const [scriptPackageLoading, setScriptPackageLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -108,14 +111,20 @@ function Inner() {
     setLoading(true);
     setError(null);
     try {
-      const [list, tpl] = await Promise.all([
-        listMyCanvasProjects(base),
-        listCanvasTemplates(base).catch(() => []),
-      ]);
+      const list = await listMyCanvasProjects(base);
       setProjects(Array.isArray(list) ? list : []);
-      setUserTemplates(
-        (Array.isArray(tpl) ? tpl : []).filter((t) => !t.builtin),
+      prefetchCanvasProjects(
+        base,
+        (Array.isArray(list) ? list : []).map((p) => p.id),
       );
+      setLoading(false);
+      void listCanvasTemplates(base)
+        .then((tpl) => {
+          setUserTemplates(
+            (Array.isArray(tpl) ? tpl : []).filter((t) => !t.builtin),
+          );
+        })
+        .catch(() => undefined);
       setError(null);
     } catch (e) {
       const raw = e instanceof Error ? e.message : "加载失败";
@@ -132,8 +141,9 @@ function Inner() {
   const prefetchProject = useCallback(
     (id: string) => {
       router.prefetch(`/canvas/${id}`);
+      if (base) prefetchCanvasProject(base, id);
     },
-    [router],
+    [router, base],
   );
 
   const refreshPortalFeaturedIds = useCallback(async () => {
@@ -555,6 +565,8 @@ function Inner() {
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
+            openingProjectId={openingProjectId}
+            onOpeningProject={setOpeningProjectId}
           />
           <ProjectsSection
             title="影视专业版 2.0"
@@ -569,6 +581,8 @@ function Inner() {
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
+            openingProjectId={openingProjectId}
+            onOpeningProject={setOpeningProjectId}
           />
           <ProjectsSection
             title="影视专业版"
@@ -583,6 +597,8 @@ function Inner() {
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
+            openingProjectId={openingProjectId}
+            onOpeningProject={setOpeningProjectId}
           />
         </div>
       )}
@@ -825,6 +841,8 @@ function ProjectsSection({
   isAdmin,
   portalFeaturedIds,
   onTogglePortalFeatured,
+  openingProjectId,
+  onOpeningProject,
 }: {
   title: string;
   edition: CanvasProjectEdition;
@@ -838,6 +856,8 @@ function ProjectsSection({
   isAdmin?: boolean;
   portalFeaturedIds?: Set<string>;
   onTogglePortalFeatured?: (id: string, featured: boolean) => void | Promise<void>;
+  openingProjectId: string | null;
+  onOpeningProject: (id: string | null) => void;
 }) {
   return (
     <section>
@@ -878,9 +898,17 @@ function ProjectsSection({
                 href={`/canvas/${p.id}`}
                 className="block"
                 prefetch
+                onPointerDown={() => onPrefetchProject(p.id)}
                 onMouseEnter={() => onPrefetchProject(p.id)}
+                onClick={() => onOpeningProject(p.id)}
               >
                 <CanvasListCover url={p.thumbnailUrl} name={p.name} />
+                {openingProjectId === p.id ? (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--canvas-accent)]">
+                    <Loader2 className="size-3 animate-spin" />
+                    正在打开…
+                  </p>
+                ) : null}
                 <ProjectNameEditor
                   name={p.name}
                   onSave={(next) => void onRename(p.id, next)}

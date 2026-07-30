@@ -38,7 +38,7 @@ export function SaveProjectAssetDialog({
   const { alert } = useDialogs();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<ProjectAssetKind>("STORYBOARD_IMAGE");
-  const [scope, setScope] = useState<"project" | "library">("project");
+  const [scope, setScope] = useState<"project" | "user" | "library">("project");
   const [visibility, setVisibility] = useState<AssetVisibility>("PRIVATE");
   const [busy, setBusy] = useState(false);
 
@@ -46,7 +46,7 @@ export function SaveProjectAssetDialog({
     if (!open || !draft) return;
     setName(draft.displayName);
     setKind(draft.kind);
-    setScope(draft.sourceProjectId ? "project" : "library");
+    setScope(draft.sourceProjectId ? "project" : "user");
     try {
       const saved = localStorage.getItem(VISIBILITY_KEY) as AssetVisibility | null;
       if (saved === "PRIVATE" || saved === "TEAM_PUBLIC") setVisibility(saved);
@@ -59,7 +59,12 @@ export function SaveProjectAssetDialog({
     if (!draft || !base) return;
     setBusy(true);
     try {
-      const vis = showTeamShare ? visibility : "PRIVATE";
+      let vis: AssetVisibility = "PRIVATE";
+      if (scope === "library") {
+        vis = "TEAM_PUBLIC";
+      } else if (scope === "project" && showTeamShare) {
+        vis = visibility;
+      }
       await createProjectAsset(base, {
         kind,
         displayName: name.trim() || draft.displayName,
@@ -155,25 +160,51 @@ export function SaveProjectAssetDialog({
 
         <fieldset className="mt-3 text-xs text-white/60">
           <legend className="mb-1">保存范围</legend>
-          <label className="mr-4 inline-flex items-center gap-1.5">
-            <input
-              type="radio"
-              checked={scope === "project"}
-              onChange={() => setScope("project")}
-            />
-            本项目
-          </label>
-          <label className="inline-flex items-center gap-1.5">
-            <input
-              type="radio"
-              checked={scope === "library"}
-              onChange={() => setScope("library")}
-            />
-            租户复用库
-          </label>
+          <div className="space-y-1.5">
+            <label className="flex cursor-pointer items-start gap-1.5">
+              <input
+                type="radio"
+                className="mt-0.5"
+                checked={scope === "project"}
+                onChange={() => setScope("project")}
+              />
+              <span>
+                <span className="block text-white/85">本项目</span>
+                <span className="text-[10px] text-white/40">仅当前画布的项目资产可见</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-1.5">
+              <input
+                type="radio"
+                className="mt-0.5"
+                checked={scope === "user"}
+                onChange={() => setScope("user")}
+              />
+              <span>
+                <span className="block text-white/85">我的空间可用</span>
+                <span className="text-[10px] text-white/40">
+                  本人创建的所有画布均可插入，项目资产面板可见
+                </span>
+              </span>
+            </label>
+            {showTeamShare ? (
+              <label className="flex cursor-pointer items-start gap-1.5">
+                <input
+                  type="radio"
+                  className="mt-0.5"
+                  checked={scope === "library"}
+                  onChange={() => setScope("library")}
+                />
+                <span>
+                  <span className="block text-white/85">租户复用库</span>
+                  <span className="text-[10px] text-white/40">团队全员可见可用</span>
+                </span>
+              </label>
+            ) : null}
+          </div>
         </fieldset>
 
-        {showTeamShare ? (
+        {showTeamShare && scope === "project" ? (
           <fieldset className="mt-3 text-xs text-white/60">
             <legend className="mb-1">可见性</legend>
             <label className="mr-4 inline-flex items-center gap-1.5">

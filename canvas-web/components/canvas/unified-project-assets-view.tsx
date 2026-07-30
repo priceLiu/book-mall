@@ -387,6 +387,16 @@ function ProjectAssetGridItem({
         footerMeta={
           <>
             <div className="mb-1 flex min-h-[14px] flex-wrap gap-1">
+              {!asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
+                <span className="rounded bg-violet-500/20 px-1 py-0.5 text-[8px] text-violet-200">
+                  我的空间
+                </span>
+              ) : null}
+              {!asset.sourceProjectId && asset.visibility === "TEAM_PUBLIC" ? (
+                <span className="rounded bg-cyan-500/20 px-1 py-0.5 text-[8px] text-cyan-200">
+                  租户库
+                </span>
+              ) : null}
               {asset.visibility === "TEAM_PUBLIC" ? (
                 <span className="rounded bg-emerald-500/20 px-1 py-0.5 text-[8px] text-emerald-200">
                   团队

@@ -340,6 +340,44 @@ export async function gatewayV1Image2ImageAsync(
   return parseGatewayImageUrlsResponse(r, "image2image-async");
 }
 
+export async function gatewayV1AsrTranscribe(
+  opts: GatewayV1RequestOpts & {
+    body: {
+      fileUrl: string;
+      modelKey?: string;
+    };
+  },
+): Promise<{
+  segments: Array<{ startMs: number; endMs: number; text: string }>;
+  logId: string;
+}> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "dashscope/asr/transcribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(
+      summarizeUpstreamFailMessage(text, r.status) ||
+        `Gateway ASR HTTP ${r.status}`,
+    );
+  }
+  let json: {
+    code?: number;
+    data?: { segments?: Array<{ startMs: number; endMs: number; text: string }> };
+    logId?: string;
+    error?: string;
+  };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error("Gateway ASR 响应非 JSON");
+  }
+  return { segments: json.data?.segments ?? [], logId: json.logId ?? "" };
+}
+
 export function gatewayV1ClientMeta(
   clientSource: GatewayClientSource,
   extra?: Omit<GatewayV1LogMeta, "clientSource"> & { bookUserId?: string },

@@ -24,8 +24,9 @@ export const renderProfileSchema = z.object({
   transition: renderTransitionSchema.default({ type: "xfade", durationSec: 0.6 }),
   subtitle: z
     .object({
-      mode: z.enum(["script", "none"]).default("script"),
+      mode: z.enum(["script", "asr", "none"]).default("script"),
       burnIn: z.boolean().default(false),
+      asrModelKey: z.string().optional(),
     })
     .default({ mode: "script", burnIn: false }),
   audio: z

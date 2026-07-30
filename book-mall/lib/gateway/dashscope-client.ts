@@ -681,3 +681,167 @@ export async function dashscopeCreateImage2ImageTask(opts: {
     },
   });
 }
+
+export const QWEN3_ASR_FLASH_FILETRANS_MODEL = "qwen3-asr-flash-filetrans";
+
+const ASR_TRANSCRIPTION_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcription";
+
+export type DashscopeAsrSentence = {
+  beginMs: number;
+  endMs: number;
+  text: string;
+};
+
+function parseAsrSentencesFromTranscriptionJson(
+  raw: unknown,
+): DashscopeAsrSentence[] {
+  const root = raw as Record<string, unknown> | null;
+  const transcripts = root?.transcripts;
+  if (!Array.isArray(transcripts) || transcripts.length === 0) return [];
+  const first = transcripts[0] as Record<string, unknown>;
+  const sentences = first?.sentences;
+  const out: DashscopeAsrSentence[] = [];
+  if (Array.isArray(sentences)) {
+    for (const s of sentences) {
+      if (!s || typeof s !== "object") continue;
+      const row = s as Record<string, unknown>;
+      const text = typeof row.text === "string" ? row.text.trim() : "";
+      if (!text) continue;
+      const beginMs =
+        typeof row.begin_time === "number"
+          ? row.begin_time
+          : Number(row.begin_time);
+      const endMs =
+        typeof row.end_time === "number" ? row.end_time : Number(row.end_time);
+      if (!Number.isFinite(beginMs) || !Number.isFinite(endMs)) continue;
+      out.push({ beginMs, endMs, text });
+    }
+  }
+  // 无句级时间戳时退回整段 text，由下游按字数切短 cue
+  if (out.length === 0) {
+    const text = typeof first?.text === "string" ? first.text.trim() : "";
+    if (text) {
+      const props = first?.audio_info as Record<string, unknown> | undefined;
+      const durationMs = Number(
+        props?.original_duration_in_milliseconds ??
+          first?.content_duration_in_milliseconds ??
+          0,
+      );
+      out.push({
+        beginMs: 0,
+        endMs: Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 3000,
+        text,
+      });
+    }
+  }
+  return out;
+}
+
+export async function dashscopeCreateAsrFiletransTask(opts: {
+  apiKey: string;
+  fileUrl: string;
+  model?: string;
+  enableWords?: boolean;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const fileUrl = opts.fileUrl.trim();
+  if (!fileUrl) return { ok: false, error: "file_url 不能为空" };
+  const model = opts.model?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL;
+  return dashscopeCreateAsyncTask({
+    apiKey: opts.apiKey,
+    url: ASR_TRANSCRIPTION_URL,
+    body: {
+      model,
+      input: { file_url: fileUrl },
+      parameters: {
+        channel_id: [0],
+        enable_itn: false,
+        enable_words: opts.enableWords ?? false,
+      },
+    },
+  });
+}
+
+export async function dashscopeFetchAsrTranscriptionSentences(opts: {
+  apiKey: string;
+  taskId: string;
+  pollIntervalMs?: number;
+  maxWaitMs?: number;
+}): Promise<
+  | { ok: true; sentences: DashscopeAsrSentence[] }
+  | { ok: false; error: string }
+> {
+  const pollIntervalMs = opts.pollIntervalMs ?? 2000;
+  const maxWaitMs = opts.maxWaitMs ?? 180_000;
+  const started = Date.now();
+
+  while (Date.now() - started < maxWaitMs) {
+    const task = await dashscopeGetTask({
+      apiKey: opts.apiKey,
+      taskId: opts.taskId,
+    });
+    if (!task.ok) return { ok: false, error: task.error };
+
+    const status = task.output.task_status;
+    if (isDashscopeTaskFailed(status)) {
+      const msg =
+        task.output.message?.trim() ||
+        task.output.code?.trim() ||
+        "ASR 任务失败";
+      return { ok: false, error: msg };
+    }
+
+    if (!isDashscopeTaskSuccess(status)) {
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      continue;
+    }
+
+    const output = task.raw as Record<string, unknown> | null;
+    const outObj = output?.output as Record<string, unknown> | undefined;
+    const result = outObj?.result as Record<string, unknown> | undefined;
+    const transcriptionUrl =
+      typeof result?.transcription_url === "string"
+        ? result.transcription_url.trim()
+        : "";
+    if (!transcriptionUrl) {
+      return { ok: false, error: "ASR 任务成功但未返回 transcription_url" };
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(transcriptionUrl, { cache: "no-store" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: `下载 ASR 结果失败：${msg}` };
+    }
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `下载 ASR 结果 HTTP ${res.status}`,
+      };
+    }
+    return {
+      ok: true,
+      sentences: parseAsrSentencesFromTranscriptionJson(json),
+    };
+  }
+
+  return { ok: false, error: "ASR 任务轮询超时" };
+}
+
+export async function dashscopeTranscribePublicFileUrl(opts: {
+  apiKey: string;
+  fileUrl: string;
+  model?: string;
+}): Promise<
+  | { ok: true; sentences: DashscopeAsrSentence[] }
+  | { ok: false; error: string }
+> {
+  const created = await dashscopeCreateAsrFiletransTask(opts);
+  if (!created.ok) return created;
+  return dashscopeFetchAsrTranscriptionSentences({
+    apiKey: opts.apiKey,
+    taskId: created.taskId,
+  });
+}

@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { Eye, Upload, X } from "lucide-react";
 import {
@@ -60,6 +68,8 @@ export type MediaHoverBoxProps = {
   hidePreviewOverlay?: boolean;
   /** 图片 src 加载失败（供 OSS → blob 回退） */
   onImageError?: () => void;
+  /** 图片/封面加载完成后回传 natural 尺寸（供节点外框自适配） */
+  onNaturalSize?: (size: { w: number; h: number }) => void;
 };
 
 /** 悬停 overlay · 仅图标（无黑底药丸、无文案）— 见 design.md §15.2 */
@@ -87,6 +97,7 @@ export function MediaHoverBox({
   previewIconSize = "default",
   hidePreviewOverlay = false,
   onImageError,
+  onNaturalSize,
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -102,9 +113,18 @@ export function MediaHoverBox({
     eagerMedia,
   );
   const mediaReady = mediaActive || alreadyLoaded;
-  const markLoaded = useCallback(() => {
-    markMediaSrcLoaded(src);
-  }, [src]);
+  const markLoaded = useCallback(
+    (e?: SyntheticEvent<HTMLImageElement>) => {
+      markMediaSrcLoaded(src);
+      const el = e?.currentTarget;
+      if (el && onNaturalSize) {
+        const w = el.naturalWidth || 0;
+        const h = el.naturalHeight || 0;
+        if (w >= 1 && h >= 1) onNaturalSize({ w, h });
+      }
+    },
+    [src, onNaturalSize],
+  );
   const kind =
     mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
   const canPreview = !!src;

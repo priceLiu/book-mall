@@ -14,6 +14,7 @@ import {
   PRO2_SCRIPT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { resolveLibtvImageCellSize } from "./libtv-media-node-auto-fit";
 import type { CanvasFlowNode } from "./types";
 
 export const PRO2_MEDIA_GRID_GAP = 28;
@@ -24,9 +25,9 @@ export function pro2MediaGridGap(cellWidth: number): number {
 }
 export const PRO2_MEDIA_GROUP_HEADER = 48;
 /** 组内边距（大留白：空白区即「选中组」可点区域） */
-export const PRO2_MEDIA_GROUP_PAD = 64;
+export const PRO2_MEDIA_GROUP_PAD = 192;
 /** 组右 / 下额外空白，进一步扩大可点选组区域（复刻图 2） */
-export const PRO2_MEDIA_GROUP_EXTRA = 56;
+export const PRO2_MEDIA_GROUP_EXTRA = 168;
 
 /** 分镜图组 · 宫格单元（≈3:2 横版） */
 export const PRO2_FRAME_CELL_WIDTH = 296;
@@ -122,6 +123,14 @@ export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
       width: Math.max(1, Math.round(w)),
       height: Math.max(1, Math.round(h)),
     };
+  }
+  if (
+    data.mediaFit &&
+    (node.type === "story-pro2-image" ||
+      node.type === "sbv1-image" ||
+      node.type === "story-pro2-three-view")
+  ) {
+    return resolveLibtvImageCellSize(node);
   }
   return {
     width: Math.max(cell.width, Math.round(w)),

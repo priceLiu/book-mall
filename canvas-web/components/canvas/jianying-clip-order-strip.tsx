@@ -100,6 +100,16 @@ export function JianyingClipOrderStrip({
               >
                 {slot.label}
               </p>
+              {slot.dialogue?.trim() ? (
+                <p
+                  className="line-clamp-2 px-0.5 text-[9px] leading-snug text-emerald-200/75"
+                  title={slot.dialogue}
+                >
+                  {slot.dialogue}
+                </p>
+              ) : (
+                <p className="px-0.5 text-[9px] text-white/30">无对白</p>
+              )}
               <div className="flex items-center justify-center gap-0.5">
                 <button
                   type="button"

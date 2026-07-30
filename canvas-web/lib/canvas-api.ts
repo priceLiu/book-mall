@@ -311,6 +311,84 @@ export async function getCanvasProject(
   return j.project;
 }
 
+const projectDetailCache = new Map<
+  string,
+  { at: number; data: CanvasProjectDetail }
+>();
+const projectDetailInflight = new Map<
+  string,
+  Promise<CanvasProjectDetail>
+>();
+const PROJECT_DETAIL_CACHE_TTL_MS = 90_000;
+
+function projectCacheKey(base: string, id: string): string {
+  return `${base.replace(/\/$/, "")}:${id}`;
+}
+
+function isProjectDetailCacheFresh(key: string): boolean {
+  const hit = projectDetailCache.get(key);
+  return Boolean(hit && Date.now() - hit.at < PROJECT_DETAIL_CACHE_TTL_MS);
+}
+
+/** 列表 hover / pointerdown 预取 · 进入画布时若命中缓存可秒开 */
+export function prefetchCanvasProject(base: string, id: string): void {
+  if (!base?.trim() || !id?.trim()) return;
+  const key = projectCacheKey(base, id);
+  if (isProjectDetailCacheFresh(key) || projectDetailInflight.has(key)) return;
+  void getCanvasProjectCached(base, id).catch(() => undefined);
+}
+
+/** 列表加载后批量预取（限制并发，避免打满 BFF / DB） */
+export function prefetchCanvasProjects(base: string, ids: string[]): void {
+  if (!base?.trim() || ids.length === 0) return;
+  const pending = ids.filter((id) => {
+    if (!id?.trim()) return false;
+    const key = projectCacheKey(base, id);
+    return !isProjectDetailCacheFresh(key) && !projectDetailInflight.has(key);
+  });
+  if (pending.length === 0) return;
+
+  const maxConcurrent = 3;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < pending.length) {
+      const id = pending[cursor++];
+      await getCanvasProjectCached(base, id).catch(() => undefined);
+    }
+  };
+  for (let i = 0; i < Math.min(maxConcurrent, pending.length); i++) {
+    void worker();
+  }
+}
+
+export async function getCanvasProjectCached(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const key = projectCacheKey(base, id);
+  const hit = projectDetailCache.get(key);
+  if (hit && Date.now() - hit.at < PROJECT_DETAIL_CACHE_TTL_MS) {
+    return hit.data;
+  }
+  const inflight = projectDetailInflight.get(key);
+  if (inflight) return inflight;
+
+  const promise = getCanvasProject(base, id)
+    .then((project) => {
+      projectDetailCache.set(key, { at: Date.now(), data: project });
+      return project;
+    })
+    .finally(() => {
+      projectDetailInflight.delete(key);
+    });
+  projectDetailInflight.set(key, promise);
+  return promise;
+}
+
+export function invalidateCanvasProjectCache(base: string, id: string): void {
+  projectDetailCache.delete(projectCacheKey(base, id));
+}
+
 export type CanvasProjectHistorySummary = {
   id: string;
   projectId: string;
@@ -1533,9 +1611,63 @@ export type MediaRenderScaleMode = "source" | "fit720p" | "fit1080p";
 
 export type MediaRenderProfile = {
   transition?: { type: "xfade"; durationSec: number } | { type: "none" };
-  subtitle?: { mode: "script" | "none"; burnIn?: boolean };
+  subtitle?: { mode: "script" | "asr" | "none"; burnIn?: boolean; asrModelKey?: string };
   video?: { scaleMode?: MediaRenderScaleMode };
 };
+
+const MEDIA_RENDER_FETCH_RETRIES = 4;
+const MEDIA_RENDER_FETCH_RETRY_MS = 1_500;
+
+function isTransientMediaRenderFetchError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /fetch failed|failed to fetch|network|econnreset|etimedout|abort|timeout/i.test(
+    msg,
+  );
+}
+
+function parseMediaRenderApiError(
+  data: { message?: string; error?: string } | null | undefined,
+  status: number,
+): string {
+  const message = data?.message?.trim();
+  if (message) return message;
+  if (data?.error === "book_mall_proxy_failed") {
+    return "主站连接失败，请稍后重试";
+  }
+  if (data?.error === "book_mall_url_missing") {
+    return "未配置主站地址，无法提交剪辑任务";
+  }
+  return `剪辑请求失败 HTTP ${status}`;
+}
+
+async function fetchMediaRenderApi(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MEDIA_RENDER_FETCH_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url, init);
+      if (
+        response.status >= 502 &&
+        response.status <= 504 &&
+        attempt < MEDIA_RENDER_FETCH_RETRIES
+      ) {
+        await sleepMs(MEDIA_RENDER_FETCH_RETRY_MS * attempt);
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastErr = err;
+      if (isTransientMediaRenderFetchError(err) && attempt < MEDIA_RENDER_FETCH_RETRIES) {
+        await sleepMs(MEDIA_RENDER_FETCH_RETRY_MS * attempt);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("fetch failed");
+}
 
 export async function submitMediaRender(
   base: string,
@@ -1551,14 +1683,14 @@ export async function submitMediaRender(
       body: JSON.stringify({ frames: args.frames, profile: args.profile }),
     },
   );
-  const r = await fetch(url, init);
+  const r = await fetchMediaRenderApi(url, init);
   const data = (await r.json().catch(() => ({}))) as {
     job?: MediaRenderJob;
     message?: string;
     error?: string;
   };
   if (!r.ok) {
-    throw new Error(data.message ?? data.error ?? `render failed HTTP ${r.status}`);
+    throw new Error(parseMediaRenderApiError(data, r.status));
   }
   if (!data.job) throw new Error("invalid render response");
   return data.job;
@@ -1577,14 +1709,15 @@ export async function pollMediaRender(
       `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
       { method: "GET" },
     );
-    const r = await fetch(url, init);
+    const r = await fetchMediaRenderApi(url, init);
     const data = (await r.json().catch(() => ({}))) as {
       job?: MediaRenderJob;
       message?: string;
+      error?: string;
     };
     if (r.ok && data.job) return data.job;
-    lastError = data.message ?? `poll failed HTTP ${r.status}`;
-    if (r.status >= 500 && attempt < maxAttempts) {
+    lastError = data.message ?? parseMediaRenderApiError(data, r.status);
+    if ((r.status >= 500 || r.status === 502) && attempt < maxAttempts) {
       await new Promise((resolve) => setTimeout(resolve, 1200 * attempt));
       continue;
     }
@@ -1602,13 +1735,14 @@ export async function retryMediaRenderUpload(
     `/api/canvas/media/render/${encodeURIComponent(jobId)}/retry-upload`,
     { method: "POST" },
   );
-  const r = await fetch(url, init);
+  const r = await fetchMediaRenderApi(url, init);
   const data = (await r.json().catch(() => ({}))) as {
     job?: MediaRenderJob;
     message?: string;
+    error?: string;
   };
   if (!r.ok || !data.job) {
-    throw new Error(data.message ?? `retry upload HTTP ${r.status}`);
+    throw new Error(parseMediaRenderApiError(data, r.status));
   }
   return data.job;
 }
@@ -1625,22 +1759,61 @@ export async function waitMediaRenderJob(
   const intervalMs = opts?.intervalMs ?? 1500;
   const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000;
   const deadline = Date.now() + timeoutMs;
+  let lastJob: MediaRenderJob | null = null;
+  let consecutivePollErrors = 0;
   while (Date.now() < deadline) {
-    const job = await pollMediaRender(base, jobId);
-    opts?.onPoll?.(job);
-    if (
-      job.status === "SUCCEEDED" ||
-      job.status === "FAILED" ||
-      job.status === "EXPIRED"
-    ) {
-      return job;
+    try {
+      const job = await pollMediaRender(base, jobId);
+      lastJob = job;
+      consecutivePollErrors = 0;
+      opts?.onPoll?.(job);
+      if (
+        job.status === "SUCCEEDED" ||
+        job.status === "FAILED" ||
+        job.status === "EXPIRED"
+      ) {
+        return job;
+      }
+      if (job.uploadFailed && job.localDownloadPath) {
+        return job;
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    } catch (e) {
+      consecutivePollErrors += 1;
+      const message = e instanceof Error ? e.message : String(e);
+      if (
+        lastJob?.localDownloadPath &&
+        (lastJob.uploadFailed || consecutivePollErrors >= 3)
+      ) {
+        return {
+          ...lastJob,
+          uploadFailed: true,
+          errorMessage:
+            lastJob.errorMessage ??
+            friendlyMediaRenderPollErrorMessage(message),
+        };
+      }
+      if (consecutivePollErrors >= 8) {
+        throw new Error(friendlyMediaRenderPollErrorMessage(message));
+      }
+      await new Promise((r) => setTimeout(r, intervalMs * consecutivePollErrors));
     }
-    if (job.uploadFailed && job.localDownloadPath) {
-      return job;
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  if (lastJob?.localDownloadPath) {
+    return {
+      ...lastJob,
+      uploadFailed: true,
+      errorMessage: lastJob.errorMessage ?? "云端同步超时，可下载本地成片后重试",
+    };
   }
   throw new Error("云端剪辑超时，请稍后重试");
+}
+
+function friendlyMediaRenderPollErrorMessage(message: string): string {
+  if (/book_mall_proxy|502|503|500|abort|timeout/i.test(message)) {
+    return "进度查询暂时失败，成片若已生成可直接下载；稍后可重试云端同步。";
+  }
+  return message;
 }
 
 export type {

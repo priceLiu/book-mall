@@ -1,8 +1,12 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { resolveLibtvVideoPosterUrl } from "./libtv-video-poster";
+import { parseStoryboardRows } from "./parse-md-tables";
+import { resolveHubStoryboardMd } from "./story-hub-runtime";
+import { normalizeSubtitleBurnInText } from "./subtitle-burn-in";
 import type {
   StoryFrameColumnNodeData,
   StoryFrameRow,
+  StoryScriptHubNodeData,
   StoryVideoColumnNodeData,
   StoryVideoRow,
   StoryWorkspaceIds,
@@ -12,6 +16,11 @@ const LIBTV_VIDEO_SOURCE_TYPES = new Set([
   "sbv1-video-engine",
   "video-engine",
   "ai-video-engine",
+]);
+
+const SCRIPT_HUB_NODE_TYPES = new Set([
+  "story-pro2-script-hub",
+  "story-script-hub",
 ]);
 
 function nodeFlowSortPosition(
@@ -54,9 +63,113 @@ function videoUrlFromConnectedNode(node: CanvasFlowNode): string | undefined {
   );
 }
 
-function dialogueFromConnectedVideoNode(node: CanvasFlowNode): string | undefined {
-  const p = (node.data as { prompt?: string }).prompt?.trim();
-  return p || undefined;
+function dialogueFromConnectedVideoNode(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): string | undefined {
+  const d = node.data as {
+    frameDialogue?: string;
+    prompt?: string;
+    text?: string;
+  };
+  const fromSelf = normalizeSubtitleBurnInText(d.frameDialogue ?? d.text);
+  if (fromSelf) return fromSelf;
+
+  const inImageEdge = edges.find(
+    (e) =>
+      e.target === node.id &&
+      (e.targetHandle === "in_image" ||
+        e.targetHandle?.includes("image") ||
+        e.sourceHandle === "image"),
+  );
+  if (inImageEdge) {
+    const img = nodes.find((n) => n.id === inImageEdge.source);
+    if (img) {
+      const fromImg = normalizeSubtitleBurnInText(
+        (img.data as { frameDialogue?: string }).frameDialogue,
+      );
+      if (fromImg) return fromImg;
+    }
+  }
+
+  const prompt = d.prompt?.trim();
+  if (prompt && prompt.length <= 160) {
+    return normalizeSubtitleBurnInText(prompt) || undefined;
+  }
+  return undefined;
+}
+
+function upstreamImageNode(
+  videoNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): CanvasFlowNode | undefined {
+  const inImageEdge = edges.find(
+    (e) =>
+      e.target === videoNodeId &&
+      (e.targetHandle === "in_image" ||
+        e.targetHandle?.includes("image") ||
+        e.sourceHandle === "image"),
+  );
+  if (!inImageEdge) return undefined;
+  return nodes.find((n) => n.id === inImageEdge.source);
+}
+
+function resolveFrameIndexForVideoNode(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  clipSequence?: number,
+): number | undefined {
+  const d = node.data as { frameIndex?: number };
+  if (typeof d.frameIndex === "number" && d.frameIndex > 0) {
+    return d.frameIndex;
+  }
+  const img = upstreamImageNode(node.id, nodes, edges);
+  if (img) {
+    const fi = (img.data as { frameIndex?: number }).frameIndex;
+    if (typeof fi === "number" && fi > 0) return fi;
+  }
+  if (clipSequence != null && clipSequence > 0) return clipSequence;
+  return undefined;
+}
+
+/** 从脚本中心分镜表按镜号取对白（视频节点未写入 frameDialogue 时的回退） */
+export function dialogueFromScriptHubByFrameIndex(
+  nodes: CanvasFlowNode[],
+  frameIndex: number,
+): string | undefined {
+  if (frameIndex <= 0) return undefined;
+  for (const node of nodes) {
+    if (!SCRIPT_HUB_NODE_TYPES.has(node.type ?? "")) continue;
+    const md = resolveHubStoryboardMd(
+      node.data as unknown as StoryScriptHubNodeData,
+    );
+    const row = parseStoryboardRows(md).find((r) => r.frameIndex === frameIndex);
+    if (!row?.dialogue?.trim()) continue;
+    const text = normalizeSubtitleBurnInText(row.dialogue);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+export function resolveClipDialogue(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  clipSequence?: number,
+): string | undefined {
+  const fromNode = dialogueFromConnectedVideoNode(node, nodes, edges);
+  if (fromNode) return fromNode;
+  const frameIndex = resolveFrameIndexForVideoNode(
+    node,
+    nodes,
+    edges,
+    clipSequence,
+  );
+  if (frameIndex == null) return undefined;
+  return dialogueFromScriptHubByFrameIndex(nodes, frameIndex);
 }
 
 export function clipLabelFromVideoNode(node: CanvasFlowNode): string {
@@ -287,7 +400,7 @@ export function collectJianyingLibtvConnectionSnapshot(
       label: clipLabelFromVideoNode(node),
       videoUrl,
       posterUrl,
-      dialogue: dialogueFromConnectedVideoNode(node),
+      dialogue: resolveClipDialogue(node, nodes, edges, i + 1),
       hasVideo: Boolean(videoUrl),
     });
   });

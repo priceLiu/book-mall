@@ -26,14 +26,14 @@ describe("formatCanvasTaskError", () => {
     ).toBe("生图服务暂时不可用，请稍后重试。");
   });
 
-  it("dev database unreachable mentions VPN", () => {
+  it("dev database unreachable mentions db:ping", () => {
     expect(
       formatCanvasTaskError(
         "FAILED",
         "Can't reach database server at cdb-xxx.tencentcdb.com:24155",
         "nano-banana-pro",
       ),
-    ).toContain("VPN");
+    ).toContain("db:ping");
   });
 
   it("short LLM timeout message", () => {

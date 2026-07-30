@@ -1,5 +1,5 @@
 import { createReadStream } from "fs";
-import { stat } from "fs/promises";
+import { readFile, stat } from "fs/promises";
 
 import {
   createOssClientFrom,
@@ -50,24 +50,12 @@ function publicUrlForKey(cfg: OssEnvConfig, key: string, preferBucket?: boolean)
   return `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${key}`;
 }
 
-const MEDIA_RENDER_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const MEDIA_RENDER_UPLOAD_TIMEOUT_MS = 120_000;
 const MEDIA_RENDER_MULTIPART_THRESHOLD_BYTES = 5 * 1024 * 1024;
-const MEDIA_RENDER_MULTIPART_PART_SIZE = 5 * 1024 * 1024;
-
-type OssMultipartPathClient = {
-  multipartUpload: (
-    name: string,
-    file: string | ReturnType<typeof createReadStream>,
-    options?: {
-      parallel?: number;
-      partSize?: number;
-      timeout?: number;
-      mime?: string;
-      progress?: (ratio: number) => void;
-      headers?: Record<string, string>;
-    },
-  ) => Promise<{ url?: string }>;
-};
+/** 小于此体积走 buffer 上传（与 canvas-oss 同策略，每次重建连接） */
+const MEDIA_RENDER_BUFFER_UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
+const TRANSIENT_OSS_ERROR =
+  /socket disconnected|secure TLS connection|ECONNRESET|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|socket hang up|network|timeout|ConnectionTimeout|RequestTimeout|RequestError/i;
 
 async function uploadBufferToOss(args: {
   cfg: OssEnvConfig;
@@ -180,39 +168,59 @@ async function uploadFilePathToOss(args: {
   preferBucketUrl?: boolean;
   onUploadProgress?: (ratio: number) => void;
 }): Promise<string> {
-  const client = await createOssClientFrom(args.cfg, {
-    timeoutMs: MEDIA_RENDER_UPLOAD_TIMEOUT_MS,
-  });
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
-  const useMultipart = args.bytesOut >= MEDIA_RENDER_MULTIPART_THRESHOLD_BYTES;
+
+  if (args.bytesOut <= MEDIA_RENDER_BUFFER_UPLOAD_MAX_BYTES) {
+    const buf = await readFile(args.filePath);
+    const timeoutMs = MEDIA_RENDER_UPLOAD_TIMEOUT_MS;
+    const sleeps = [0, 800, 2000, 5000];
+    let lastError: unknown = null;
+
+    args.onUploadProgress?.(0.05);
+
+    for (let attempt = 0; attempt < sleeps.length; attempt++) {
+      if (sleeps[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, sleeps[attempt]));
+      }
+      const client = await createOssClientFrom(args.cfg, { timeoutMs });
+      try {
+        await ossUploadBuffer(client, {
+          key: args.key,
+          buf,
+          contentType: ct,
+          useMultipart: false,
+          timeoutMs,
+        });
+        args.onUploadProgress?.(1);
+        return publicUrlForKey(args.cfg, args.key, args.preferBucketUrl);
+      } catch (e) {
+        const raw = e instanceof Error ? e.message : String(e);
+        lastError = e;
+        if (attempt < sleeps.length - 1 && TRANSIENT_OSS_ERROR.test(raw)) {
+          console.warn(
+            `[media-render] buffer upload retry ${attempt + 1}/${sleeps.length - 1}:`,
+            raw.slice(0, 120),
+          );
+          continue;
+        }
+        throw e;
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError ?? "oss upload failed"));
+  }
 
   await withOssRetry("media-render-upload-file", async () => {
-    if (useMultipart) {
-      await (client as unknown as OssMultipartPathClient).multipartUpload(
-        args.key,
-        args.filePath,
-        {
-          parallel: 2,
-          partSize: MEDIA_RENDER_MULTIPART_PART_SIZE,
-          timeout: MEDIA_RENDER_UPLOAD_TIMEOUT_MS,
-          mime: ct,
-          progress: (ratio) => {
-            if (Number.isFinite(ratio) && ratio >= 0) {
-              args.onUploadProgress?.(Math.min(1, ratio));
-            }
-          },
-          headers: {
-            "Content-Type": ct,
-            "x-oss-object-acl": "public-read",
-          },
-        },
-      );
-      return;
-    }
+    const client = await createOssClientFrom(args.cfg, {
+      timeoutMs: MEDIA_RENDER_UPLOAD_TIMEOUT_MS,
+    });
     const stream = createReadStream(args.filePath);
     await client.put(args.key, stream as unknown as Buffer, {
       headers: { "Content-Type": ct },
       ACL: "public-read",
+      timeout: MEDIA_RENDER_UPLOAD_TIMEOUT_MS,
     });
     args.onUploadProgress?.(1);
   });

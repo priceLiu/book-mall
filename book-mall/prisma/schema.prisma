@@ -22,6 +22,13 @@ enum UserRole {
   SUPER_ADMIN // 超级管理员：全部权限 + 终审
 }
 
+/// Gateway 新生成请求 10s 窗口 burst 档位（个人/团队 scope 分别配置）
+enum GenerationSubmitTier {
+  STANDARD // 普通：10 次 / 10s
+  ELEVATED // 中度：15 次 / 10s
+  HEAVY // 重度：burst 可配（默认 25）
+}
+
 // —— NextAuth 适配模型 ——
 model Account {
   id                String  @id @default(cuid())
@@ -150,6 +157,10 @@ model User {
   referralProfile  ReferralProfile? @relation("ReferralProfileOwner")
   /// 分享返佣：作为分享人的历史返佣单
   referralPayouts  ReferralPayout[] @relation("ReferralPayoutOwner")
+
+  /// 个人空间 Gateway 提交 burst 档位（团队项目走 Tenant）
+  generationSubmitTier          GenerationSubmitTier?
+  generationSubmitBurstOverride Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2180,6 +2191,13 @@ model GenerationTrafficState {
   lastDispatchAt    DateTime?
   maxConcurrency    Int      @default(2)
   tokensPerSec      Float    @default(0.5)
+  /// 提交 burst 限流（与 video dispatch 字段独立）
+  submitBurstLimit    Int?
+  submitTier          GenerationSubmitTier?
+  submitWindowSec     Int       @default(10)
+  submitCount         Int       @default(0)
+  submitWindowStartAt DateTime?
+  quotaConfigVersion  Int       @default(0)
   updatedAt         DateTime @updatedAt
 
   @@index([ownerType, ownerId])
@@ -3337,6 +3355,10 @@ model Tenant {
   /// 团队 PLATFORM_CREDIT 自动托管 sk-gw
   gatewayApiKeyId   String?             @unique
   gatewayApiKey     GatewayApiKey?      @relation("TenantGatewayKey", fields: [gatewayApiKeyId], references: [id], onDelete: SetNull)
+
+  /// 团队空间 Gateway 提交 burst 档位
+  generationSubmitTier          GenerationSubmitTier?
+  generationSubmitBurstOverride Int?
 
   members TenantMember[]
   seats   Seat[]

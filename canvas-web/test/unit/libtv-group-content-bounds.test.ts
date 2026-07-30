@@ -27,8 +27,8 @@ describe("computeLibtvGroupContentMinSize", () => {
       },
     ];
     const min = computeLibtvGroupContentMinSize("g1", nodes);
-    expect(min.minWidth).toBeGreaterThanOrEqual(350 + 64 + 64);
-    expect(min.minHeight).toBeGreaterThanOrEqual(350 + 112 + 64);
+    expect(min.minWidth).toBeGreaterThanOrEqual(350 + 192 + 192);
+    expect(min.minHeight).toBeGreaterThanOrEqual(350 + 112 + 192);
   });
 });
 
@@ -76,10 +76,10 @@ describe("computeGroupChildrenAbsBounds", () => {
     const frozen = new Map([["img1", { x: 200, y: 200 }]]);
     const bounds = computeGroupChildrenAbsBounds(frozen, nodes);
     expect(bounds).toEqual({
-      left: 200 - 64,
-      top: 200 - 64 - 48,
-      right: 300 + 64,
-      bottom: 300 + 64,
+      left: 200 - 192,
+      top: 200 - 192 - 48,
+      right: 300 + 192,
+      bottom: 300 + 192,
     });
   });
 

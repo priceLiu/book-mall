@@ -11,6 +11,7 @@ import {
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
 import { absoluteNodePosition, sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { resolveLibtvImageCellSize } from "./libtv-media-node-auto-fit";
 import {
   PRO2_MEDIA_GRID_GAP,
   PRO2_MEDIA_GROUP_EXTRA,
@@ -78,6 +79,9 @@ function sbv1GroupImageCellSize(node: CanvasFlowNode): {
     return { width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
   }
   if (isCanonicalImageNode) {
+    if (Boolean((node.data as { mediaFit?: boolean }).mediaFit)) {
+      return resolveLibtvImageCellSize(node);
+    }
     return { width: SBV1_IMAGE_NODE_WIDTH, height: SBV1_IMAGE_NODE_HEIGHT };
   }
   const style = node.style as { width?: number; height?: number } | undefined;
@@ -486,4 +490,23 @@ export function relayoutSbv1MediaGroup(
   edges: CanvasFlowEdge[],
 ): void {
   setNodes((nodes) => applySbv1MediaGroupRelayout(nodes, edges, groupId));
+}
+
+const sbv1GroupRelayoutTimers = new Map<string, number>();
+
+/** 组内多节点并发 auto-fit 时合并为一次 relayout，避免布局互相覆盖挤在一起 */
+export function scheduleRelayoutSbv1MediaGroup(
+  setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  groupId: string,
+  getEdges: () => CanvasFlowEdge[],
+  delayMs = 180,
+): void {
+  const prev = sbv1GroupRelayoutTimers.get(groupId);
+  if (prev !== undefined) window.clearTimeout(prev);
+  const timer = window.setTimeout(() => {
+    sbv1GroupRelayoutTimers.delete(groupId);
+    const edges = getEdges();
+    setNodes((nodes) => applySbv1MediaGroupRelayout(nodes, edges, groupId));
+  }, delayMs);
+  sbv1GroupRelayoutTimers.set(groupId, timer);
 }

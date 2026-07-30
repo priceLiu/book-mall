@@ -49,7 +49,8 @@ export function reflowPro2CanvasLayout(
 
   const topLevel = next.filter((n) => !n.parentId);
   const free = topLevel.filter((n) => !PRO2_WORKSPACE_TYPES.has(n.type ?? ""));
-  if (!free.length) return sortNodesForReactFlow(next);
+  const loose = free.filter((n) => n.type !== "group");
+  if (!loose.length) return sortNodesForReactFlow(next);
 
   const packStartY =
     topLevel.some((n) => PRO2_WORKSPACE_TYPES.has(n.type ?? ""))
@@ -57,7 +58,7 @@ export function reflowPro2CanvasLayout(
         CANVAS_REFLOW_SECTION_GAP
       : CANVAS_REFLOW_ORIGIN.y;
 
-  const sorted = sortNodesForReflowPack(free);
+  const sorted = sortNodesForReflowPack(loose);
   const positions = packNodesInGrid(
     next,
     sorted.map((n) => n.id),

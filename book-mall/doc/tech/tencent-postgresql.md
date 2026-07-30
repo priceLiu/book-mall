@@ -13,7 +13,7 @@
 pnpm run db:deploy
 ```
 
-确保运行环境能访问 `*.sql.tencentcdb.com`（本机需放行出口或使用 VPN / 同 VPC）。
+确保运行环境能访问 `*.sql.tencentcdb.com` **公网连接池**（安全组放行出口 IP；**不使用 VPN**）。
 
 ## 可选种子数据
 

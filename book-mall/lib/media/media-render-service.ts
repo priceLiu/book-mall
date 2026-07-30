@@ -17,6 +17,7 @@ import {
   mediaRenderExpiresAt,
   validateTimelineLimits,
 } from "@/lib/media/render-limits";
+import { countActiveRenderJobs, supersedeInFlightMediaRenderJobsForProject } from "@/lib/media/media-render-concurrency";
 import {
   parseMediaTimelineV1,
   parseRenderProfile,
@@ -28,6 +29,7 @@ import {
   retryMediaRenderJobUpload,
 } from "@/lib/media/media-render-upload";
 import { hasMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
+import { mediaRenderErrorMessage } from "@/lib/media/media-render-errors";
 
 export type CreateMediaRenderJobInput = {
   userId: string;
@@ -36,15 +38,6 @@ export type CreateMediaRenderJobInput = {
   timeline: MediaTimelineV1;
   profile?: RenderProfile;
 };
-
-export async function countActiveRenderJobs(userId: string): Promise<number> {
-  return prisma.mediaRenderJob.count({
-    where: {
-      userId,
-      status: { in: [MediaRenderJobStatus.PENDING, MediaRenderJobStatus.RUNNING] },
-    },
-  });
-}
 
 export async function createMediaRenderJob(
   input: CreateMediaRenderJobInput,
@@ -55,6 +48,17 @@ export async function createMediaRenderJob(
   const limitErr = validateTimelineLimits(timeline);
   if (limitErr) {
     throw new Error(limitErr.message);
+  }
+
+  const projectId =
+    typeof input.sourceRef?.projectId === "string"
+      ? input.sourceRef.projectId.trim()
+      : "";
+  if (projectId) {
+    await supersedeInFlightMediaRenderJobsForProject({
+      userId: input.userId,
+      projectId,
+    });
   }
 
   const active = await countActiveRenderJobs(input.userId);
@@ -112,7 +116,7 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
       profile,
       onProgress: (pct, label) => {
         if (Date.now() - startedAt > MEDIA_RENDER_JOB_TIMEOUT_SEC * 1000) {
-          throw new Error("剪辑任务超时");
+          throw new Error("剪辑任务超时，请减少分镜数量或降低输出画质后重试");
         }
         void prisma.mediaRenderJob
           .update({
@@ -144,7 +148,7 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
       bytesOut: result.bytesOut,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "剪辑失败";
+    const message = mediaRenderErrorMessage(e);
     await prisma.mediaRenderJob.update({
       where: { id: jobId },
       data: {
@@ -235,12 +239,16 @@ export async function getMediaRenderJobForUser(
   const uploadFailed = Boolean(
     localReady &&
       job.status === MediaRenderJobStatus.RUNNING &&
-      job.progressLabel?.includes("上传失败"),
+      (job.progressLabel?.includes("上传失败") ||
+        job.progressLabel?.includes("云端上传失败") ||
+        /oss|上传|upload/i.test(job.errorMessage ?? "")),
   );
   const posterUrl =
     job.status === MediaRenderJobStatus.SUCCEEDED && job.resultPosterOssUrl
       ? job.resultPosterOssUrl
       : null;
+
+  // 上传仅由剪辑完成 enqueue 或 POST retry-upload 触发；GET 轮询不再续传，避免拖垮 DB/OSS。
 
   return {
     id: job.id,

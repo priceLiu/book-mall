@@ -83,6 +83,22 @@ export function filterStoreBoundNodeChanges(
   return changes.filter((c) => !isRfLocalNodeChange(c));
 }
 
+/** 批次是否含节点删除（须落库，不可因 store→RF 同步 guard 跳过） */
+export function hasNodeRemoveChanges(changes: NodeChange[]): boolean {
+  return changes.some(
+    (c) => c.type === "remove" && "id" in c && typeof c.id === "string",
+  );
+}
+
+export function extractNodeRemoveChanges(
+  changes: NodeChange[],
+): Array<NodeChange & { type: "remove"; id: string }> {
+  return changes.filter(
+    (c): c is NodeChange & { type: "remove"; id: string } =>
+      c.type === "remove" && "id" in c && typeof c.id === "string",
+  );
+}
+
 /** 批次是否全部为 RF 本地变更（选中 + 纯测量），无需写 store */
 export function isCanvasRfLocalOnlyChange(changes: NodeChange[]): boolean {
   return changes.length > 0 && changes.every(isRfLocalNodeChange);

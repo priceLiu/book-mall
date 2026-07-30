@@ -30,7 +30,7 @@ export function prismaConnectionUnavailableMessage(error: unknown): string {
     process.env.NODE_ENV === "development" &&
     /Can't reach database server|P1001|Server has closed the connection/i.test(msg)
   ) {
-    return "数据库不可达（本地开发通常需 VPN 连接腾讯云）。请检查 VPN 后执行 pnpm --dir book-mall db:ping。";
+    return "数据库不可达。请检查 book-mall/.env.local 的 DATABASE_URL（运行时连接池地址，勿用 DIRECT_DATABASE_URL）、腾讯云公网白名单与 pnpm --dir book-mall db:ping。";
   }
   return "系统繁忙，请稍候再试。";
 }

@@ -20,6 +20,21 @@ export const MEDIA_RENDER_MAX_CONCURRENT_PER_USER = envInt(
   "MEDIA_RENDER_MAX_CONCURRENT_PER_USER",
   2,
 );
+/** 长时间停留在 PENDING（未真正开剪）则回收，默认 2 分钟 */
+export const MEDIA_RENDER_STALE_PENDING_SEC = envInt(
+  "MEDIA_RENDER_STALE_PENDING_SEC",
+  120,
+);
+/** 上传阶段长时间无进展则回收，默认 10 分钟 */
+export const MEDIA_RENDER_UPLOAD_STALE_SEC = envInt(
+  "MEDIA_RENDER_UPLOAD_STALE_SEC",
+  600,
+);
+/** 单次 OSS 上传最长等待（multipart 卡住时强制失败并重试） */
+export const MEDIA_RENDER_UPLOAD_ATTEMPT_TIMEOUT_SEC = envInt(
+  "MEDIA_RENDER_UPLOAD_ATTEMPT_TIMEOUT_SEC",
+  180,
+);
 export const MEDIA_RENDER_JOB_TIMEOUT_SEC = envInt(
   "MEDIA_RENDER_JOB_TIMEOUT_SEC",
   900,

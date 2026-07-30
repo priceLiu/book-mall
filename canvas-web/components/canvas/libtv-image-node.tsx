@@ -35,7 +35,12 @@ import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
-import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
+import {
+  computeLibtvMediaNodeSize,
+  isLibtvMediaNodeBoxStale,
+  useLibtvMediaNodeAutoFit,
+} from "@/lib/canvas/libtv-media-node-auto-fit";
+import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
 import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
@@ -282,7 +287,8 @@ export function LibtvImageNode({
     edition === "pro2" && hasImage && !isCharacterThreeView,
   );
 
-  const stageImageFit: "cover" | "contain" = gridSplitActive ? "contain" : "cover";
+  // 矮框阶段用 contain 避免竖图被裁成「只露天空」；外框自适配正确后与 cover 观感接近
+  const stageImageFit: "cover" | "contain" = "contain";
 
   const gridSplitCropCss = d.gridSplitCrop;
 
@@ -290,7 +296,7 @@ export function LibtvImageNode({
     nodeId: id,
     mediaUrl: previewUrl,
     kind: "image",
-    profile: "square-image",
+    profile: "sbv1-media",
     // 本地上传/粘贴时按 blob 立即自适配（blob 探测必成功），避免只等 ossUrl
     // ——OSS 探测偶发慢/失败会让外框停在默认比例，露出深色舞台「边框/投影」。
     // 仅 AI 生成中（非上传）才暂停自适配，避免贴合占位旧图。
@@ -299,6 +305,40 @@ export function LibtvImageNode({
       isCharacterThreeView ||
       (isGenerating && !d.uploading),
   });
+
+  const applyLibtvMediaFit = useCanvasStore((s) => s.applyLibtvMediaFit);
+  const onStageNaturalSize = useCallback(
+    ({ w, h }: { w: number; h: number }) => {
+      if (isCharacterThreeView || !previewUrl?.trim()) return;
+      const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+      if (!node) return;
+      const nextData = {
+        ...((node.data as object) ?? {}),
+        mediaNaturalW: w,
+        mediaNaturalH: h,
+      };
+      const probe = { ...node, data: nextData };
+      if (!isLibtvMediaNodeBoxStale(probe, "sbv1-media")) {
+        // 仅补 natural 元数据
+        if (
+          (node.data as { mediaNaturalW?: number }).mediaNaturalW !== w ||
+          (node.data as { mediaNaturalH?: number }).mediaNaturalH !== h
+        ) {
+          updateNodeData(id, { mediaNaturalW: w, mediaNaturalH: h });
+        }
+        return;
+      }
+      const size = computeLibtvMediaNodeSize(w, h, "sbv1-media");
+      applyLibtvMediaFit(id, size, {
+        mediaFit: true,
+        mediaFitKey: `image|${previewUrl.trim()}|sbv1-media`,
+        mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+        mediaNaturalW: w,
+        mediaNaturalH: h,
+      });
+    },
+    [applyLibtvMediaFit, id, isCharacterThreeView, previewUrl, updateNodeData],
+  );
 
   const defaultNodeLabel = useMemo(() => {
     if (isCharacterThreeView) return "角色";
@@ -663,6 +703,7 @@ export function LibtvImageNode({
           fit={stageImageFit}
           hidePreviewOverlay
           onImageError={onPreviewLoadError}
+          onNaturalSize={onStageNaturalSize}
           className="absolute inset-0"
         />
       );

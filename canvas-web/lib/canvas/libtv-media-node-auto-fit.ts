@@ -2,34 +2,24 @@
 
 import { useEffect, useRef } from "react";
 
+import { LIBTV_MEDIA_FIT_VERSION } from "./libtv-node-chrome";
 import {
-  LIBTV_IMAGE_NODE_HEADER_HEIGHT,
-  LIBTV_MEDIA_AUTO_FIT_LONG_EDGE,
-  LIBTV_MEDIA_FIT_VERSION,
-  LIBTV_VIDEO_NODE_HEADER_HEIGHT,
-} from "./libtv-node-chrome";
+  computeLibtvMediaNodeSize,
+  isLibtvMediaNodeBoxStale,
+  type LibtvMediaAutoFitProfile,
+} from "./libtv-media-node-size";
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
-import { relayoutSbv1MediaGroup } from "./sbv1-media-group-layout";
-import {
-  SBV1_IMAGE_NODE_MIN_HEIGHT,
-  SBV1_IMAGE_NODE_MIN_WIDTH,
-  SBV1_VIDEO_ENGINE_MIN_WIDTH,
-  SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT,
-} from "./sbv1-node-chrome";
-import {
-  PRO2_IMAGE_NODE_MIN_HEIGHT,
-  PRO2_IMAGE_NODE_MIN_WIDTH,
-} from "./story-pro2-node-chrome";
+import { scheduleRelayoutSbv1MediaGroup } from "./sbv1-media-group-layout";
 import { useCanvasStore } from "./store";
 
-export type LibtvMediaAutoFitProfile = "square-image" | "sbv1-video";
-
-export type LibtvMediaNodeSize = {
-  width: number;
-  height: number;
-};
+export type { LibtvMediaAutoFitProfile, LibtvMediaNodeSize } from "./libtv-media-node-size";
+export {
+  computeLibtvMediaNodeSize,
+  isLibtvMediaNodeBoxStale,
+  resolveLibtvImageCellSize,
+} from "./libtv-media-node-size";
 
 export function loadImageNaturalSize(url: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {
@@ -66,73 +56,6 @@ function loadVideoNaturalSize(url: string): Promise<{ w: number; h: number }> {
   });
 }
 
-/** 按媒体宽高比计算 LibTV 媒体卡外框尺寸（含标题栏） */
-export function computeLibtvMediaNodeSize(
-  naturalWidth: number,
-  naturalHeight: number,
-  profile: LibtvMediaAutoFitProfile,
-): LibtvMediaNodeSize {
-  const nw = Math.max(1, naturalWidth);
-  const nh = Math.max(1, naturalHeight);
-  const headerHeight =
-    profile === "sbv1-video"
-      ? LIBTV_VIDEO_NODE_HEADER_HEIGHT
-      : LIBTV_IMAGE_NODE_HEADER_HEIGHT;
-  const minWidth =
-    profile === "sbv1-video"
-      ? SBV1_VIDEO_ENGINE_MIN_WIDTH
-      : profile === "square-image"
-        ? SBV1_IMAGE_NODE_MIN_WIDTH
-        : PRO2_IMAGE_NODE_MIN_WIDTH;
-  const minHeight =
-    profile === "sbv1-video"
-      ? SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT
-      : profile === "square-image"
-        ? SBV1_IMAGE_NODE_MIN_HEIGHT
-        : PRO2_IMAGE_NODE_MIN_HEIGHT;
-
-  if (profile !== "sbv1-video") {
-    const longEdge = Math.max(nw, nh);
-    const scale = LIBTV_MEDIA_AUTO_FIT_LONG_EDGE / longEdge;
-    let width = Math.ceil(nw * scale);
-    let stageHeight = Math.ceil(nh * scale);
-    let height = headerHeight + stageHeight;
-
-    if (width < minWidth) {
-      width = minWidth;
-      stageHeight = Math.ceil(width * (nh / nw));
-      height = headerHeight + stageHeight;
-    }
-    if (height < minHeight) {
-      height = minHeight;
-      stageHeight = Math.max(1, height - headerHeight);
-      width = Math.ceil(stageHeight * (nw / nh));
-    }
-
-    return { width, height };
-  }
-
-  let width = 635;
-  let stageHeight = width * (nh / nw);
-  let height = headerHeight + stageHeight;
-
-  if (height < minHeight) {
-    height = minHeight;
-    stageHeight = Math.max(1, height - headerHeight);
-    width = stageHeight * (nw / nh);
-  }
-  if (width < minWidth) {
-    width = minWidth;
-    stageHeight = width * (nh / nw);
-    height = headerHeight + stageHeight;
-  }
-
-  return {
-    width: Math.ceil(width),
-    height: Math.ceil(height),
-  };
-}
-
 export async function probeLibtvMediaNaturalSize(
   url: string,
   kind: "image" | "video",
@@ -162,6 +85,54 @@ function scheduleIdleWork(work: () => void): () => void {
   return () => window.clearTimeout(id);
 }
 
+function applyFitAndMaybeRelayout(args: {
+  nodeId: string;
+  parentId?: string;
+  profile: LibtvMediaAutoFitProfile;
+  size: { width: number; height: number };
+  fitKey: string;
+  naturalW: number;
+  naturalH: number;
+}) {
+  const applyLibtvMediaFit = useCanvasStore.getState().applyLibtvMediaFit;
+  const setNodes = useCanvasStore.getState().setNodes;
+  applyLibtvMediaFit(args.nodeId, args.size, {
+    mediaFit: true,
+    mediaFitKey: args.fitKey,
+    mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+    mediaNaturalW: args.naturalW,
+    mediaNaturalH: args.naturalH,
+  });
+
+  const state = useCanvasStore.getState();
+  const parentGroup = args.parentId
+    ? state.nodes.find((n) => n.id === args.parentId)
+    : undefined;
+  const parentManualSize = Boolean(
+    (parentGroup?.data as { manualSize?: boolean } | undefined)?.manualSize,
+  );
+  if (
+    !parentManualSize &&
+    args.parentId &&
+    parentGroup &&
+    isSbv1MediaGroup(parentGroup, state.nodes) &&
+    (args.profile === "sbv1-video" || args.profile === "sbv1-media")
+  ) {
+    scheduleRelayoutSbv1MediaGroup(
+      setNodes,
+      args.parentId,
+      () => useCanvasStore.getState().edges,
+    );
+  } else if (
+    !parentManualSize &&
+    args.parentId &&
+    parentGroup &&
+    isPro2StyledGroup(parentGroup, state.nodes)
+  ) {
+    relayoutPro2MediaGroup(setNodes, args.parentId);
+  }
+}
+
 /**
  * LibTV 媒体节点 · 有图/有视频后按真实宽高比自动改节点尺寸。
  * - 空态：保持 NODE_DEFAULT_SIZE / 常量默认尺寸
@@ -176,8 +147,6 @@ export function useLibtvMediaNodeAutoFit({
   profile,
   disabled = false,
 }: UseLibtvMediaNodeAutoFitArgs) {
-  const resizeNode = useCanvasStore((s) => s.resizeNode);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const edges = useCanvasStore((s) => s.edges);
   const parentId = useCanvasStore(
@@ -203,11 +172,12 @@ export function useLibtvMediaNodeAutoFit({
         }
       )?.mediaFitVersion,
   );
-  const skipForSbv1GroupImage = useCanvasStore((s) => {
-    if (kind !== "image" || !parentId) return false;
-    const parentGroup = s.nodes.find((n) => n.id === parentId);
-    return Boolean(parentGroup && isSbv1MediaGroup(parentGroup, s.nodes));
-  });
+  const nodeWidth = useCanvasStore(
+    (s) => s.nodes.find((n) => n.id === nodeId)?.width,
+  );
+  const nodeHeight = useCanvasStore(
+    (s) => s.nodes.find((n) => n.id === nodeId)?.height,
+  );
   /** 分镜图组等 Pro2 媒体组 · 尺寸由组 relayout 决定，禁止 auto-fit 撑破宫格 */
   const skipForPro2GroupImage = useCanvasStore((s) => {
     if (kind !== "image" || !parentId) return false;
@@ -233,10 +203,11 @@ export function useLibtvMediaNodeAutoFit({
   });
 
   const lastFitKey = useRef("");
+  const lastAppliedSize = useRef("");
 
   useEffect(() => {
     const url = mediaUrl?.trim();
-    if (!url || disabled || skipForSbv1GroupImage || skipForPro2GroupImage || skipForHdGridSplitPlaceholder) return;
+    if (!url || disabled || skipForPro2GroupImage || skipForHdGridSplitPlaceholder) return;
 
     const poster = posterUrl?.trim();
     const probeUrl = kind === "video" && poster ? poster : url;
@@ -244,17 +215,55 @@ export function useLibtvMediaNodeAutoFit({
       kind === "video" && poster ? "image" : kind;
     const fitKey = `${probeKind}|${probeUrl}|${profile}`;
 
-    // 旧节点（无版本号或版本落后）即使已 mediaFit，也强制重算一次以贴合新标题栏高度；
-    // 组内节点走组 relayout，不在此处强制重算，避免触发整组重排。
-    const fitVersionStale =
-      !parentId && mediaFitVersion !== LIBTV_MEDIA_FIT_VERSION;
+    const fitVersionStale = mediaFitVersion !== LIBTV_MEDIA_FIT_VERSION;
+    const profileStale = Boolean(
+      mediaFitKey && !mediaFitKey.endsWith(`|${profile}`),
+    );
+    const selfNode = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
+    const boxStale = selfNode
+      ? isLibtvMediaNodeBoxStale(selfNode, profile)
+      : false;
+    const needsRefit = fitVersionStale || profileStale || boxStale;
 
-    // mediaFitKey 须含 probe 源（含 poster），否则封面到达后不会重算 stage 比例
-    if (mediaFit && mediaFitKey === fitKey && !fitVersionStale) {
+    const storedNatural = selfNode?.data as {
+      mediaNaturalW?: number;
+      mediaNaturalH?: number;
+    };
+    if (
+      boxStale &&
+      typeof storedNatural?.mediaNaturalW === "number" &&
+      typeof storedNatural?.mediaNaturalH === "number" &&
+      storedNatural.mediaNaturalW >= 1 &&
+      storedNatural.mediaNaturalH >= 1
+    ) {
+      const size = computeLibtvMediaNodeSize(
+        storedNatural.mediaNaturalW,
+        storedNatural.mediaNaturalH,
+        profile,
+      );
+      const sizeKey = `${size.width}x${size.height}`;
+      if (lastAppliedSize.current !== sizeKey || boxStale) {
+        applyFitAndMaybeRelayout({
+          nodeId,
+          parentId,
+          profile,
+          size,
+          fitKey,
+          naturalW: storedNatural.mediaNaturalW,
+          naturalH: storedNatural.mediaNaturalH,
+        });
+        lastAppliedSize.current = sizeKey;
+      }
       lastFitKey.current = fitKey;
       return;
     }
-    if (lastFitKey.current === fitKey && !fitVersionStale) return;
+
+    // mediaFitKey 须含 probe 源（含 poster），否则封面到达后不会重算 stage 比例
+    if (mediaFit && mediaFitKey === fitKey && !needsRefit) {
+      lastFitKey.current = fitKey;
+      return;
+    }
+    if (lastFitKey.current === fitKey && !needsRefit) return;
 
     let cancelled = false;
 
@@ -264,38 +273,17 @@ export function useLibtvMediaNodeAutoFit({
           const { w, h } = await probeLibtvMediaNaturalSize(probeUrl, probeKind);
           if (cancelled) return;
           const size = computeLibtvMediaNodeSize(w, h, profile);
-          resizeNode(nodeId, size);
-          updateNodeData(nodeId, {
-            mediaFit: true,
-            mediaFitKey: fitKey,
-            mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+          applyFitAndMaybeRelayout({
+            nodeId,
+            parentId,
+            profile,
+            size,
+            fitKey,
+            naturalW: w,
+            naturalH: h,
           });
+          lastAppliedSize.current = `${size.width}x${size.height}`;
           lastFitKey.current = fitKey;
-
-          const state = useCanvasStore.getState();
-          const parentGroup = parentId
-            ? state.nodes.find((n) => n.id === parentId)
-            : undefined;
-          const parentManualSize = Boolean(
-            (parentGroup?.data as { manualSize?: boolean } | undefined)
-              ?.manualSize,
-          );
-          if (
-            !parentManualSize &&
-            parentId &&
-            parentGroup &&
-            isSbv1MediaGroup(parentGroup, state.nodes) &&
-            profile === "sbv1-video"
-          ) {
-            relayoutSbv1MediaGroup(setNodes, parentId, edges);
-          } else if (
-            !parentManualSize &&
-            parentId &&
-            parentGroup &&
-            isPro2StyledGroup(parentGroup, state.nodes)
-          ) {
-            relayoutPro2MediaGroup(setNodes, parentId);
-          }
         } catch {
           // 探测失败时保留当前尺寸
         }
@@ -313,16 +301,15 @@ export function useLibtvMediaNodeAutoFit({
     kind,
     profile,
     disabled,
-    skipForSbv1GroupImage,
     skipForPro2GroupImage,
     skipForHdGridSplitPlaceholder,
     parentId,
     mediaFit,
     mediaFitKey,
     mediaFitVersion,
+    nodeWidth,
+    nodeHeight,
     edges,
-    resizeNode,
-    updateNodeData,
     setNodes,
   ]);
 }

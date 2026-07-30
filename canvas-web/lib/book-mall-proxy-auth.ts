@@ -55,11 +55,17 @@ function isJwtExpired(token: string, skewSec = 30): boolean {
 async function fetchRefreshToken(
   url: string,
   init: RequestInit,
-): Promise<Response> {
+): Promise<Response | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REFRESH_FETCH_TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (name === "AbortError" || /abort/i.test(name)) {
+      return null;
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -89,7 +95,7 @@ async function callBookMallRefreshTokenOnce(
         cache: "no-store",
       },
     );
-    if (r.ok) {
+    if (r?.ok) {
       const data = (await r.json().catch(() => null)) as {
         access_token?: string;
         expires_in?: number;
@@ -119,7 +125,7 @@ async function callBookMallRefreshTokenOnce(
       cache: "no-store",
     },
   );
-  if (!r.ok) return null;
+  if (!r?.ok) return null;
   const data = (await r.json().catch(() => null)) as {
     access_token?: string;
     expires_in?: number;

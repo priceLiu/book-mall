@@ -362,6 +362,18 @@ type CanvasState = {
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
   resizeNode: (id: string, size: { width: number; height: number }) => void;
+  /** 媒体自适配：尺寸与 mediaFit 元数据原子写入 */
+  applyLibtvMediaFit: (
+    id: string,
+    size: { width: number; height: number },
+    fitMeta: {
+      mediaFit: boolean;
+      mediaFitKey: string;
+      mediaFitVersion: number;
+      mediaNaturalW: number;
+      mediaNaturalH: number;
+    },
+  ) => void;
   /** NodeResizer 松手：从 RF 权威几何一次性写入 store（含左/上缘 position） */
   commitNodesGeometryFromRf: (
     patches: Array<{
@@ -1207,6 +1219,37 @@ export const useCanvasStore = create<CanvasState>()(
         );
       },
 
+      /** 媒体自适配：尺寸 + mediaFit 元数据同一次写入，避免中间态被 RF 合回矮框 */
+      applyLibtvMediaFit: (
+        id,
+        size,
+        fitMeta,
+      ) => {
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: state.nodes.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    width: size.width,
+                    height: size.height,
+                    style: {
+                      ...(typeof n.style === "object" && n.style ? n.style : {}),
+                      width: size.width,
+                      height: size.height,
+                    },
+                    data: {
+                      ...n.data,
+                      ...fitMeta,
+                      manualSize: false,
+                    },
+                  }
+                : n,
+            ),
+          }),
+        );
+      },
+
       commitNodesGeometryFromRf: (patches) => {
         if (patches.length === 0) return;
         const byId = new Map(patches.map((p) => [p.id, p]));
@@ -1479,7 +1522,10 @@ export const useCanvasStore = create<CanvasState>()(
           !pro2ShortcutPreset &&
             (pro2Kind || sbv1Styled || (pro2Styled && mediaGridChildrenOnly)),
         );
-        const PADDING = usePro2MediaGrid ? PRO2_MEDIA_GROUP_PAD : 28;
+        const PADDING =
+          usePro2MediaGrid || pro2Styled || sbv1Styled
+            ? PRO2_MEDIA_GROUP_PAD
+            : 84;
         const boxes = children.map((c) => {
           const m = measuredSizes?.[c.id];
           const cell = usePro2MediaGrid

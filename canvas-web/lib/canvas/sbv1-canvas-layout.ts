@@ -29,9 +29,10 @@ export function reflowSbv1Canvas(
   }
 
   const topLevel = next.filter((n) => !n.parentId);
-  if (!topLevel.length) return sortNodesForReactFlow(next);
+  const loose = topLevel.filter((n) => n.type !== "group");
+  if (!loose.length) return sortNodesForReactFlow(next);
 
-  const sorted = sortNodesForReflowPack(topLevel);
+  const sorted = sortNodesForReflowPack(loose);
   const positions = packNodesInGrid(
     next,
     sorted.map((n) => n.id),

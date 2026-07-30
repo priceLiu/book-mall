@@ -4,6 +4,7 @@ import {
   callBookMallRefreshToken,
   decodeJwtSub,
   ensureProxyToolsBearer,
+  type ProxyToolsTokenRefresh,
 } from "@/lib/book-mall-proxy-auth";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,7 @@ async function fetchUpstream(
     headers,
     body,
     cache: "no-store",
+    signal: AbortSignal.timeout(180_000),
   });
 }
 
@@ -86,7 +88,18 @@ async function proxyToBookMall(
       ? undefined
       : await request.arrayBuffer();
 
-  let { bearer, refreshed } = await ensureProxyToolsBearer(request);
+  let { bearer, refreshed } = { bearer: null as string | null, refreshed: null as ProxyToolsTokenRefresh | null };
+  try {
+    ({ bearer, refreshed } = await ensureProxyToolsBearer(request));
+  } catch {
+    return NextResponse.json(
+      {
+        error: "book_mall_proxy_failed",
+        message: "主站鉴权暂时不可用，请稍后重试",
+      },
+      { status: 502 },
+    );
+  }
 
   try {
     let r = await fetchUpstream(request, upstream, bearer, body);
@@ -134,10 +147,15 @@ async function proxyToBookMall(
     });
     return attachRefreshedToolsCookie(jsonRes, refreshed);
   } catch (e: unknown) {
+    const raw = e instanceof Error ? e.message : String(e);
+    const message =
+      /fetch failed|timeout|aborted|econnrefused|enotfound/i.test(raw)
+        ? "主站暂时不可达，请稍后重试"
+        : raw;
     return NextResponse.json(
       {
         error: "book_mall_proxy_failed",
-        message: e instanceof Error ? e.message : String(e),
+        message,
       },
       { status: 502 },
     );

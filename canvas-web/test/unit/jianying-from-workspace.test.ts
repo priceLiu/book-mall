@@ -4,6 +4,7 @@ import {
   collectJianyingFramesForExportNode,
   collectJianyingFramesFromLibtvVideos,
   collectJianyingLibtvConnectionSnapshot,
+  dialogueFromScriptHubByFrameIndex,
   mergeLibtvClipOrderNodeIds,
   moveClipOrderNodeIds,
   sortLibtvVideoNodesDefault,
@@ -65,6 +66,45 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     expect(frames[0]?.dialogue).toBe("镜一");
     expect(frames[1]?.frameIndex).toBe(2);
     expect(frames[1]?.videoUrl).toBe("https://oss/b.mp4");
+  });
+
+  it("falls back to script hub storyboard dialogue by clip sequence", () => {
+    const exportId = "export-1";
+    const storyboardMd = `| 镜号 | 对白 |
+| --- | --- |
+| 1 | 小红：你好 |
+| 2 | 小蓝：再见 |`;
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v1", 100, "https://oss/a.mp4"),
+      videoNode("v2", 200, "https://oss/b.mp4"),
+      {
+        id: "hub",
+        type: "story-pro2-script-hub",
+        position: { x: 0, y: -200 },
+        data: { storyboardMd },
+      },
+      { id: exportId, type: "jianying-export-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      {
+        id: "e1",
+        source: "v1",
+        target: exportId,
+        sourceHandle: "out_video",
+        targetHandle: "in_video",
+      },
+      {
+        id: "e2",
+        source: "v2",
+        target: exportId,
+        sourceHandle: "out_video",
+        targetHandle: "in_video",
+      },
+    ];
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
+    expect(snap.frames[0]?.dialogue).toBe("小红：你好");
+    expect(snap.frames[1]?.dialogue).toBe("小蓝：再见");
+    expect(dialogueFromScriptHubByFrameIndex(nodes, 2)).toBe("小蓝：再见");
   });
 
   it("prefers LibTV edges over workspace columns", () => {
