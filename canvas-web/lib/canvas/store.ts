@@ -254,6 +254,8 @@ type CanvasState = {
    * - `dragHoverGroupId`：拖动节点过程中，鼠标当前悬停在哪个 group 容器内
    */
   connectingFromNodeId: string | null;
+  /** 正在拖线的源 handle id · 拖线中仅该侧 + 保持可见 */
+  connectingFromHandleId: string | null;
   /** 侧栏 + 拖线松手空白处 · 待选菜单（与 connectingFrom 并存） */
   pendingSideConnect: PendingSideConnect | null;
   dragHoverGroupId: string | null;
@@ -272,7 +274,7 @@ type CanvasState = {
   libtvFloatingDockNodeType: string | null;
   /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
   hoveredMediaGroupId: string | null;
-  setConnectingFrom: (id: string | null) => void;
+  setConnectingFrom: (id: string | null, handleId?: string | null) => void;
   setPendingSideConnect: (pending: PendingSideConnect | null) => void;
   clearPendingSideConnect: () => void;
   setDragHoverGroup: (id: string | null) => void;
@@ -495,6 +497,7 @@ export const useCanvasStore = create<CanvasState>()(
       canvasFocusNonce: 0,
       graphRevision: 0,
       connectingFromNodeId: null,
+      connectingFromHandleId: null,
       pendingSideConnect: null,
       dragHoverGroupId: null,
       hoveredMediaGroupId: null,
@@ -505,10 +508,18 @@ export const useCanvasStore = create<CanvasState>()(
       canvasSelectionDragging: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
-      setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
+      setConnectingFrom: (id, handleId = null) =>
+        set({
+          connectingFromNodeId: id,
+          connectingFromHandleId: id ? handleId : null,
+        }),
       setPendingSideConnect: (pending) => set({ pendingSideConnect: pending }),
       clearPendingSideConnect: () =>
-        set({ pendingSideConnect: null, connectingFromNodeId: null }),
+        set({
+          pendingSideConnect: null,
+          connectingFromNodeId: null,
+          connectingFromHandleId: null,
+        }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
       setHoveredMediaGroupId: (id) => set({ hoveredMediaGroupId: id }),
       clearPortalEditorChrome: () =>
@@ -522,6 +533,7 @@ export const useCanvasStore = create<CanvasState>()(
           canvasMarqueeSelecting: false,
           canvasSelectionDragging: false,
           connectingFromNodeId: null,
+          connectingFromHandleId: null,
           pendingSideConnect: null,
         }),
       setCanvasGeometryDragging: (dragging) =>

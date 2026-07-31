@@ -142,12 +142,19 @@ export function Pro2NodeSidePlus({
   const magnetActiveRef = useRef(false);
   const zoom = useStore((s) => s.transform[2]);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  const connectingFromHandleId = useCanvasStore(
+    (s) => s.connectingFromHandleId,
+  );
   /** 仅当拖线来自「其它」节点时才挂入边吸附层：
    * 否则从本节点 + 拖出后原地松手会落在自己的吸附层上，生成一条自连边
    * （边绕到节点背后被遮住，只在左右两侧各露出一小截白线）。 */
   const canvasConnecting = Boolean(
     connectingFromNodeId && connectingFromNodeId !== nodeId,
   );
+  /** 拖线期间只保留正在拖的那一个 +：其余节点与本节点另一侧全部隐藏 */
+  const dotVisible = connectingFromNodeId
+    ? connectingFromNodeId === nodeId && connectingFromHandleId === handleId
+    : visible;
   const gestureRef = useRef<{
     pointerId: number;
     x: number;
@@ -181,11 +188,12 @@ export function Pro2NodeSidePlus({
   }, [nodeId, visible, size, canvasConnecting, updateNodeInternals]);
 
   useEffect(() => {
-    if (!visible) setOpen(false);
-  }, [visible]);
+    if (!dotVisible) setOpen(false);
+  }, [dotVisible]);
 
   useEffect(() => {
-    if (!visible || !magneticFollow || open) {
+    // 拖线期间 + 不再跟随指针，避免与连线预览抢视线
+    if (!dotVisible || connectingFromNodeId || !magneticFollow || open) {
       magnetActiveRef.current = false;
       setMagnetOffset({ x: 0, y: 0 });
       return;
@@ -240,7 +248,15 @@ export function Pro2NodeSidePlus({
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
     };
-  }, [visible, magneticFollow, open, side, hostNodeEl, zoom]);
+  }, [
+    dotVisible,
+    connectingFromNodeId,
+    magneticFollow,
+    open,
+    side,
+    hostNodeEl,
+    zoom,
+  ]);
 
   const openMenu = useCallback(
     (e: { stopPropagation: () => void }) => {
@@ -312,10 +328,10 @@ export function Pro2NodeSidePlus({
           "pro2-node-side-plus-layer pointer-events-none absolute h-0 w-0",
           side === "left" ? "left-0" : "right-0",
           LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
-          !visible && "pointer-events-none opacity-0",
+          !dotVisible && "pointer-events-none opacity-0",
           className,
         )}
-        aria-hidden={!visible}
+        aria-hidden={!dotVisible}
       >
         {canvasConnecting && (side === "left" || side === "right") ? (
           <Handle
@@ -356,8 +372,8 @@ export function Pro2NodeSidePlus({
               lg && "pro2-node-side-plus-dot--lg",
               "flex items-center justify-center rounded-full border border-white/25 bg-[#2a2a2e]",
               "shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
-              visible && "hover:border-violet-400/60 hover:bg-violet-500/25",
-              !visible && "!pointer-events-none !opacity-0",
+              dotVisible && "hover:border-violet-400/60 hover:bg-violet-500/25",
+              !dotVisible && "!pointer-events-none !opacity-0",
             )}
           >
             <Plus

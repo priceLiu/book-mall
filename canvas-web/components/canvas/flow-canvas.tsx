@@ -1402,8 +1402,11 @@ function FlowCanvasInner({
   );
 
   const onConnectStart = useCallback(
-    (_evt: unknown, params: { nodeId?: string | null }) => {
-      setConnectingFrom(params.nodeId ?? null);
+    (
+      _evt: unknown,
+      params: { nodeId?: string | null; handleId?: string | null },
+    ) => {
+      setConnectingFrom(params.nodeId ?? null, params.handleId ?? null);
     },
     [setConnectingFrom],
   );
