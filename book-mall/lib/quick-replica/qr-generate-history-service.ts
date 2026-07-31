@@ -3,8 +3,13 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getKindDef } from "@/lib/quick-replica/qr-kinds";
 import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
+import {
+  hasQrInputSummarySnap,
+  previewImageUrlFromQrDraft,
+  readQrDraftFromInputSummary,
+} from "@/lib/quick-replica/qr-log-draft";
 import { findQrTemplateByLogId } from "@/lib/quick-replica/qr-template-service";
-import type { QrCategory, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
+import type { QrCategory } from "@/lib/quick-replica/qr-types";
 
 export type QrGenerateJobRecord = {
   logId: string;
@@ -17,37 +22,14 @@ export type QrGenerateJobRecord = {
   modelKey: string;
   previewImageUrl?: string;
   outputUrl?: string;
+  /** image | video | audio · 供前端选择预览弹层 */
+  outputMediaType?: "image" | "video" | "audio";
+  /** 旁白等试听弹层展示用 */
+  prompt?: string;
+  voiceId?: string;
   error?: string;
   savedTemplateId?: string;
 };
-
-function readDraftFromInputSummary(inputSummary: unknown): QrWorkspaceDraft | null {
-  if (!inputSummary || typeof inputSummary !== "object") return null;
-  const root = inputSummary as Record<string, unknown>;
-  const snap = root.qrGenerate ?? root.qrMotionSync;
-  if (!snap || typeof snap !== "object") return null;
-  const s = snap as Record<string, unknown>;
-  if (s.draft && typeof s.draft === "object") {
-    return s.draft as QrWorkspaceDraft;
-  }
-  if (typeof s.targetImageUrl === "string") {
-    return {
-      category: "video",
-      kind: "motion-sync",
-      toolKey: "motion-sync",
-      targetImageUrl: String(s.targetImageUrl ?? ""),
-      referenceVideoUrl: String(s.referenceVideoUrl ?? ""),
-      referenceAudioUrl: "",
-      sceneImageUrls: [],
-      prompt: String(s.prompt ?? ""),
-      modelKey: String(s.modelKey ?? ""),
-      mode: typeof s.mode === "string" ? s.mode : undefined,
-      characterOrientation:
-        typeof s.characterOrientation === "string" ? s.characterOrientation : undefined,
-    };
-  }
-  return null;
-}
 
 function mapLogStatus(status: string): QrGenerateJobRecord["status"] {
   if (status === "SUCCEEDED") return "SUCCEEDED";
@@ -68,7 +50,7 @@ export async function listQrGenerateJobRecords(
       inputSummary: { not: Prisma.DbNull },
     },
     orderBy: { submittedAt: "desc" },
-    take: capped,
+    take: capped * 3,
     select: {
       id: true,
       status: true,
@@ -83,14 +65,9 @@ export async function listQrGenerateJobRecords(
 
   const records: QrGenerateJobRecord[] = [];
   for (const row of rows) {
-    const draft = readDraftFromInputSummary(row.inputSummary);
-    const hasQrSnap =
-      row.inputSummary &&
-      typeof row.inputSummary === "object" &&
-      ((row.inputSummary as Record<string, unknown>).qrGenerate ||
-        (row.inputSummary as Record<string, unknown>).qrMotionSync);
-    if (!hasQrSnap) continue;
+    if (!hasQrInputSummarySnap(row.inputSummary)) continue;
 
+    const draft = readQrDraftFromInputSummary(row.inputSummary, row.model);
     const kind = draft?.kind ?? "motion-sync";
     const category = draft?.category ?? "video";
     const title =
@@ -99,6 +76,11 @@ export async function listQrGenerateJobRecords(
 
     const outputFromLog = extractQrJobOutputUrl(row.resultSummary);
     const saved = await findQrTemplateByLogId(row.id);
+    const outputUrl = outputFromLog?.url ?? saved?.output?.url;
+    const outputMediaType =
+      outputFromLog?.mediaType ??
+      saved?.output?.mediaType ??
+      (category === "audio" ? "audio" : category === "image" || category === "character" ? "image" : "video");
 
     records.push({
       logId: row.id,
@@ -109,11 +91,15 @@ export async function listQrGenerateJobRecords(
       kind,
       category,
       modelKey: draft?.modelKey ?? row.model,
-      previewImageUrl: draft?.targetImageUrl?.trim() || undefined,
-      outputUrl: outputFromLog?.url ?? saved?.output?.url,
+      previewImageUrl: previewImageUrlFromQrDraft(draft),
+      outputUrl,
+      outputMediaType,
+      prompt: draft?.prompt?.trim() || undefined,
+      voiceId: draft?.voiceId?.trim() || undefined,
       error: row.status === "FAILED" ? row.failMessage ?? "生成失败" : undefined,
       savedTemplateId: saved?.id,
     });
+    if (records.length >= capped) break;
   }
   return records;
 }

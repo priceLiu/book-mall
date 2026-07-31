@@ -42,6 +42,7 @@ import {
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrCategory, QrTemplateJson, QrWorkspaceDraft } from "@/lib/quick-replica/qr-types";
 import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
+import { readQrDraftFromInputSummary } from "@/lib/quick-replica/qr-log-draft";
 import { resolveQrGenerateThumbnailUrl } from "@/lib/quick-replica/qr-video-thumbnail";
 import { getQrAudioVoiceDef } from "@/lib/quick-replica/qr-audio-catalog";
 import { findMinimaxVoiceById } from "@/lib/quick-replica/minimax-voice-catalog";
@@ -255,37 +256,7 @@ function readGenerateDraftFromLog(log: {
   inputSummary: unknown;
   model: string;
 }): QrWorkspaceDraft | null {
-  if (!log.inputSummary || typeof log.inputSummary !== "object") return null;
-  const root = log.inputSummary as Record<string, unknown>;
-  const snap =
-    root.qrGenerate ??
-    root.qrMotionSync ??
-    root.qrTextToVideo ??
-    root.qrTextToAudio ??
-    root.qrVoiceChanger ??
-    root.qrVoiceClone ??
-    root.qrCreateMusic ??
-    root.qrWorld;
-  if (!snap || typeof snap !== "object") return null;
-  const s = snap as Record<string, unknown>;
-  if (s.draft && typeof s.draft === "object") {
-    return s.draft as QrWorkspaceDraft;
-  }
-  if (typeof s.targetImageUrl === "string") {
-    return {
-      category: "video",
-      kind: "motion-sync",
-      toolKey: "motion-sync",
-      targetImageUrl: String(s.targetImageUrl ?? ""),
-      referenceVideoUrl: String(s.referenceVideoUrl ?? ""),
-      referenceAudioUrl: "",
-      sceneImageUrls: [],
-      prompt: String(s.prompt ?? ""),
-      modelKey: String(s.modelKey ?? log.model),
-      mode: typeof s.mode === "string" ? s.mode : undefined,
-    };
-  }
-  return null;
+  return readQrDraftFromInputSummary(log.inputSummary, log.model);
 }
 
 function extractOutputUrl(log: {

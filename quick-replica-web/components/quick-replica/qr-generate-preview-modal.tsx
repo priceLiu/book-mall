@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   QrAudioGenerateGenerating,
@@ -27,6 +27,8 @@ type Props = {
   logId?: string | null;
   previewImageUrl?: string;
   generateDraft?: QrWorkspaceDraft | null;
+  /** 已在「我的作品」中保存过则关闭时不再提示 */
+  alreadySaved?: boolean;
   onClose: () => void;
   onSaved: (template: NonNullable<QrGenerateJobResult["template"]>) => void;
 };
@@ -36,7 +38,17 @@ function isAudioOutput(
   result: QrGenerateJobResult | null,
   draft: QrWorkspaceDraft | null | undefined,
 ): boolean {
+  if (draft?.category === "audio") return true;
   if (draft && isQrTextToAudioKind(draft)) return true;
+  if (
+    draft?.kind === "create-voiceover" ||
+    draft?.kind === "voice-changer" ||
+    draft?.kind === "create-sfx" ||
+    draft?.kind === "create-music" ||
+    draft?.kind === "voice-clone"
+  ) {
+    return true;
+  }
   if (result?.template?.output?.mediaType === "audio") return true;
   if (outputUrl && /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(outputUrl)) return true;
   return false;
@@ -49,12 +61,25 @@ export function QrGeneratePreviewModal({
   logId,
   previewImageUrl,
   generateDraft,
+  alreadySaved = false,
   onClose,
   onSaved,
 }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveAuthExpired, setSaveAuthExpired] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSaving(false);
+      setSaveError(null);
+      setSaveAuthExpired(false);
+      setSavedLocally(false);
+      setConfirmDiscard(false);
+    }
+  }, [open]);
 
   const outputUrl = result?.outputUrl ?? result?.template?.output?.url;
   const isVideo =
@@ -65,11 +90,19 @@ export function QrGeneratePreviewModal({
   const generating = phase === "generating";
   const failed = phase === "failed";
   const succeeded = phase === "success" && Boolean(outputUrl);
+  const needsSavePrompt =
+    succeeded && Boolean(logId) && !alreadySaved && !savedLocally;
 
-  const title = generating ? "产生中" : failed ? "产生失败" : "产生完成";
+  const title = generating
+    ? "产生中"
+    : failed
+      ? "产生失败"
+      : confirmDiscard
+        ? "尚未保存"
+        : "产生完成";
 
-  const handleSave = async () => {
-    if (!logId) return;
+  const handleSave = async (): Promise<boolean> => {
+    if (!logId) return false;
     setSaving(true);
     setSaveError(null);
     setSaveAuthExpired(false);
@@ -79,9 +112,22 @@ export function QrGeneratePreviewModal({
       const msg = formatQrPlatformError(saved.error);
       setSaveError(msg);
       setSaveAuthExpired(isQrAuthError(saved.error));
+      return false;
+    }
+    setSavedLocally(true);
+    setConfirmDiscard(false);
+    onSaved(saved.template);
+    onClose();
+    return true;
+  };
+
+  const requestClose = () => {
+    if (generating) return;
+    if (needsSavePrompt && !confirmDiscard) {
+      setConfirmDiscard(true);
       return;
     }
-    onSaved(saved.template);
+    setConfirmDiscard(false);
     onClose();
   };
 
@@ -102,7 +148,7 @@ export function QrGeneratePreviewModal({
   return (
     <QrModal
       open={open}
-      onClose={generating ? () => {} : onClose}
+      onClose={generating ? () => {} : requestClose}
       title={audioGenerating ? undefined : title}
       variant={audioGenerating ? "audio-track" : isAudio ? "audio" : "square"}
       hideHeader={audioGenerating}
@@ -147,11 +193,11 @@ export function QrGeneratePreviewModal({
           </p>
         ) : null}
 
-        {succeeded && outputUrl && isAudio && generateDraft ? (
+        {succeeded && outputUrl && isAudio && generateDraft && !confirmDiscard ? (
           <QrAudioGenerateSuccess draft={generateDraft} outputUrl={outputUrl} />
         ) : null}
 
-        {succeeded && outputUrl && !isAudio ? (
+        {succeeded && outputUrl && !isAudio && !confirmDiscard ? (
           <div className="overflow-hidden rounded-xl bg-black">
             {isVideo ? (
               <video
@@ -168,13 +214,22 @@ export function QrGeneratePreviewModal({
           </div>
         ) : null}
 
-        {succeeded && isAudio ? (
+        {confirmDiscard ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-sm text-amber-50">
+            <p className="font-medium text-amber-100">还没有保存到「我的作品」</p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-amber-100/80">
+              关闭后可在侧栏「生成记录」中再次打开本条结果。建议先保存，方便在「我的作品」里复用。
+            </p>
+          </div>
+        ) : null}
+
+        {succeeded && isAudio && !confirmDiscard ? (
           <p className="text-[11px] text-[var(--qr-text-muted)]">
             保存后将写入「我的作品」（含音色与 Prompt）
           </p>
         ) : null}
 
-        {succeeded && !isAudio ? (
+        {succeeded && !isAudio && !confirmDiscard ? (
           <p className="text-sm text-[var(--qr-text-secondary)]">
             预览满意后，可保存至「我的作品」。
           </p>
@@ -203,19 +258,57 @@ export function QrGeneratePreviewModal({
 
         {!generating ? (
           <div className="flex flex-wrap gap-2">
-            {succeeded && logId ? (
-              <button
-                type="button"
-                className="qr-btn-primary disabled:opacity-50"
-                disabled={saving}
-                onClick={() => void handleSave()}
-              >
-                {saving ? "保存中…" : "保存为我的"}
-              </button>
-            ) : null}
-            <button type="button" className="qr-btn-secondary" onClick={onClose}>
-              关闭
-            </button>
+            {confirmDiscard ? (
+              <>
+                <button
+                  type="button"
+                  className="qr-btn-primary disabled:opacity-50"
+                  disabled={saving || !logId}
+                  onClick={() => void handleSave()}
+                >
+                  {saving ? "保存中…" : "保存并关闭"}
+                </button>
+                <button
+                  type="button"
+                  className="qr-btn-secondary"
+                  disabled={saving}
+                  onClick={() => {
+                    setConfirmDiscard(false);
+                    onClose();
+                  }}
+                >
+                  不保存，关闭
+                </button>
+                <button
+                  type="button"
+                  className="qr-btn-secondary"
+                  disabled={saving}
+                  onClick={() => setConfirmDiscard(false)}
+                >
+                  继续预览
+                </button>
+              </>
+            ) : (
+              <>
+                {succeeded && logId ? (
+                  <button
+                    type="button"
+                    className="qr-btn-primary disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => void handleSave()}
+                  >
+                    {saving ? "保存中…" : "保存为我的"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="qr-btn-secondary"
+                  onClick={requestClose}
+                >
+                  关闭
+                </button>
+              </>
+            )}
           </div>
         ) : null}
       </div>

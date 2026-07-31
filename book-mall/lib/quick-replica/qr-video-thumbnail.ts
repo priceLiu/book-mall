@@ -59,11 +59,11 @@ export function pickQrStaticThumbnailCandidate(args: {
 }): string | null {
   if (args.mediaType === "image") {
     const url = args.outputUrl.trim();
-    return url || null;
+    return url && isImageMediaUrl(url) ? url : null;
   }
   if (args.mediaType === "audio") {
     const url = args.draft.targetImageUrl?.trim();
-    return url || null;
+    return url && isImageMediaUrl(url) ? url : null;
   }
   const sceneRef = args.draft.sceneImageUrls.map((u) => u.trim()).find(isImageMediaUrl);
   if (sceneRef) return sceneRef;
@@ -74,8 +74,9 @@ export function pickQrStaticThumbnailCandidate(args: {
 
 /**
  * 生成任务保存为「我的作品」时的列表封面：
- * - 图片输出 → 成片 URL
- * - 视频输出 → 引用图 / 目标图（若为图片）→ ffmpeg 首帧封面 → 成片 URL（兜底）
+ * - 图片输出 → 成片 URL（须为图片）
+ * - 视频输出 → 引用图 / 目标图 → ffmpeg 首帧封面；**禁止**把临时 mp4 写成 thumbnailUrl
+ * - 音频 → 可选封面图；无图则空串（前端用波形卡）
  */
 export async function resolveQrGenerateThumbnailUrl(args: {
   userId: string;
@@ -90,8 +91,13 @@ export async function resolveQrGenerateThumbnailUrl(args: {
   });
   if (staticCandidate) return staticCandidate;
 
-  if (args.mediaType !== "video") {
-    return args.outputUrl.trim();
+  if (args.mediaType === "audio") {
+    return "";
+  }
+
+  if (args.mediaType === "image") {
+    const url = args.outputUrl.trim();
+    return url && isImageMediaUrl(url) ? url : "";
   }
 
   const poster = await extractAndUploadQrVideoPoster({
@@ -100,5 +106,5 @@ export async function resolveQrGenerateThumbnailUrl(args: {
   });
   if (poster) return poster;
 
-  return args.outputUrl.trim();
+  return "";
 }

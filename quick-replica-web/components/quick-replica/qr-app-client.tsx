@@ -85,6 +85,7 @@ export function QrAppClient({
   const [generatePhase, setGeneratePhase] = useState<QrGenerateModalPhase>("generating");
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [generateLogId, setGenerateLogId] = useState<string | null>(null);
+  const [generateAlreadySaved, setGenerateAlreadySaved] = useState(false);
   const [generatePreviewImage, setGeneratePreviewImage] = useState<string | undefined>();
   const [generateDraftSnapshot, setGenerateDraftSnapshot] = useState<QrWorkspaceDraft | null>(
     null,
@@ -569,6 +570,7 @@ export function QrAppClient({
     setGeneratePhase("generating");
     setGenerateResult(null);
     setGenerateLogId(null);
+    setGenerateAlreadySaved(false);
     setGenerateDraftSnapshot(draftToRun);
     setGeneratePreviewImage(
       draftToRun.targetImageUrl.trim() ||
@@ -628,11 +630,15 @@ export function QrAppClient({
       phase: QrGenerateModalPhase;
       result: QrGenerateJobResult;
       previewImageUrl?: string;
+      alreadySaved?: boolean;
+      generateDraft?: QrWorkspaceDraft;
     }) => {
       setGenerateLogId(args.logId);
       setGenerateResult(args.result);
       setGeneratePhase(args.phase);
       setGeneratePreviewImage(args.previewImageUrl);
+      setGenerateAlreadySaved(Boolean(args.alreadySaved));
+      setGenerateDraftSnapshot(args.generateDraft ?? null);
       setGenerateModalOpen(true);
     },
     [],
@@ -975,14 +981,19 @@ export function QrAppClient({
         logId={generateLogId}
         previewImageUrl={generatePreviewImage}
         generateDraft={generateDraftSnapshot}
+        alreadySaved={generateAlreadySaved}
         onClose={() => {
           if (generating) return;
           setGenerateModalOpen(false);
           setGenerateResult(null);
           setGenerateLogId(null);
+          setGenerateAlreadySaved(false);
           setGenerateDraftSnapshot(null);
         }}
-        onSaved={onGenerateSaved}
+        onSaved={(template) => {
+          setGenerateAlreadySaved(true);
+          onGenerateSaved(template);
+        }}
       />
 
       <QrToast message={copyToast} onDismiss={dismissCopyToast} />

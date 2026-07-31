@@ -132,6 +132,9 @@ export type QrGenerateJobRecord = {
   modelKey: string;
   previewImageUrl?: string;
   outputUrl?: string;
+  outputMediaType?: "image" | "video" | "audio";
+  prompt?: string;
+  voiceId?: string;
   error?: string;
   savedTemplateId?: string;
 };

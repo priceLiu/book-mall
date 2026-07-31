@@ -50,4 +50,14 @@ describe("pickQrStaticThumbnailCandidate", () => {
       }),
     ).toBe("https://cdn.example/out.png");
   });
+
+  it("does not treat video output as image thumbnail for image jobs", () => {
+    expect(
+      pickQrStaticThumbnailCandidate({
+        mediaType: "image",
+        outputUrl: "https://cdn.example/out.mp4",
+        draft: baseDraft(),
+      }),
+    ).toBeNull();
+  });
 });

@@ -58,6 +58,20 @@ function resolveGalleryThumbnailUrl(thumbnailUrl: string | undefined): string | 
   return thumb;
 }
 
+/** 封面优先 thumbnail；若为过期临时 mp4 / 空，回退参考图槽位 */
+function resolveTemplatePosterImageUrl(template: QrTemplate): string | undefined {
+  const fromThumb = resolveGalleryThumbnailUrl(template.thumbnailUrl);
+  if (fromThumb) return fromThumb;
+  const slots = template.reference?.slots;
+  const scene = slots?.sceneImages?.find((s) => s.url?.trim() && isImageMediaUrl(s.url));
+  if (scene?.url?.trim()) return scene.url.trim();
+  const target = slots?.targetImage?.url?.trim();
+  if (target && isImageMediaUrl(target)) return target;
+  const character = slots?.characterRefs?.find((s) => s.url?.trim() && isImageMediaUrl(s.url));
+  if (character?.url?.trim()) return character.url.trim();
+  return undefined;
+}
+
 /** 预加载封面；失败时由组件在 hover 时切到 video 首帧 */
 function useQrMasonryPoster(
   templateId: string,
@@ -165,12 +179,13 @@ export function MasonryTemplateCard({
   const showTitle = template.title && !/^图像灵感 \d+$/.test(template.title);
   const previewVideoUrl =
     template.output?.mediaType === "video" ? template.output.url : null;
-  const imageThumbUrl = resolveGalleryThumbnailUrl(template.thumbnailUrl);
+  const imageThumbUrl = resolveTemplatePosterImageUrl(template);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { ready, setReady, posterMode, setPosterMode, aspectRatio } = useQrMasonryPoster(
     template.id,
-    template.thumbnailUrl,
-    previewVideoUrl,
+    imageThumbUrl,
+    // 临时厂商 mp4 常 404：有参考图封面时不要再去拉视频首帧
+    imageThumbUrl ? null : previewVideoUrl,
     visible,
   );
   const useVideoFramePoster = Boolean(
