@@ -58,6 +58,7 @@ import type {
   CanvasFlowNode,
   CanvasNodeType,
 } from "@/lib/canvas/types";
+import { isGroupNode } from "@/lib/canvas/types";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { uploadCanvasImage } from "@/lib/canvas-api";
@@ -1410,6 +1411,17 @@ function FlowCanvasInner({
     },
     [setConnectingFrom],
   );
+
+  /** ≥2 非 group 节点被选中时改由选区批量 + 承接连线，各节点侧栏 + 收起 */
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }: { nodes: { type?: string }[] }) => {
+      const count = selectedNodes.filter(
+        (n) => n.type && !isGroupNode(n.type),
+      ).length;
+      useCanvasStore.getState().setCanvasMultiSelectActive(count >= 2);
+    },
+    [],
+  );
   const onConnectEnd = useCallback<OnConnectEnd>(
     (event, connectionState) => {
       const clientX =
@@ -1941,6 +1953,7 @@ function FlowCanvasInner({
         onMoveStart={onMoveStart}
         onMoveEnd={onMoveEnd}
         onInit={onInit}
+        onSelectionChange={onSelectionChange}
         onSelectionStart={() => {
           useCanvasStore.getState().setCanvasMarqueeSelecting(true);
         }}

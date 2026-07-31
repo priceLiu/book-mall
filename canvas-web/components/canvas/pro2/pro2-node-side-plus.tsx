@@ -24,6 +24,7 @@ import { libtvSidePlusInHandleId } from "@/lib/canvas/libtv-side-plus-in-handle"
 import { LIBTV_NODE_SIDE_PLUS_LAYER_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 
 const DRAG_THRESHOLD_PX = 6;
@@ -151,10 +152,14 @@ export function Pro2NodeSidePlus({
   const canvasConnecting = Boolean(
     connectingFromNodeId && connectingFromNodeId !== nodeId,
   );
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const multiSelectActive = useCanvasStore((s) => s.canvasMultiSelectActive);
+  /** 框选中 / 多选选区存在时，连线交给选区批量 +（Pro2SelectionBatchConnectLayer） */
+  const selectionOwnsPlus = marqueeSelecting || multiSelectActive;
   /** 拖线期间只保留正在拖的那一个 +：其余节点与本节点另一侧全部隐藏 */
   const dotVisible = connectingFromNodeId
     ? connectingFromNodeId === nodeId && connectingFromHandleId === handleId
-    : visible;
+    : visible && !selectionOwnsPlus;
   const gestureRef = useRef<{
     pointerId: number;
     x: number;

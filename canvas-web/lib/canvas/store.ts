@@ -269,6 +269,8 @@ type CanvasState = {
   canvasMarqueeSelecting: boolean;
   /** 多选选区整体拖动中：隐藏单节点 Dock / 顶栏 */
   canvasSelectionDragging: boolean;
+  /** 已选中 ≥2 个非 group 节点：只保留选区批量 +，隐藏各节点侧栏 + */
+  canvasMultiSelectActive: boolean;
   /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
   libtvFloatingDockNodeId: string | null;
   libtvFloatingDockNodeType: string | null;
@@ -286,6 +288,7 @@ type CanvasState = {
   setCanvasViewportMoving: (moving: boolean) => void;
   setCanvasMarqueeSelecting: (selecting: boolean) => void;
   setCanvasSelectionDragging: (dragging: boolean) => void;
+  setCanvasMultiSelectActive: (active: boolean) => void;
   setLibtvFloatingDockSelection: (
     nodeId: string | null,
     nodeType: string | null,
@@ -506,6 +509,7 @@ export const useCanvasStore = create<CanvasState>()(
       canvasViewportMoving: false,
       canvasMarqueeSelecting: false,
       canvasSelectionDragging: false,
+      canvasMultiSelectActive: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
       setConnectingFrom: (id, handleId = null) =>
@@ -546,6 +550,10 @@ export const useCanvasStore = create<CanvasState>()(
         set({ canvasMarqueeSelecting: selecting }),
       setCanvasSelectionDragging: (dragging) =>
         set({ canvasSelectionDragging: dragging }),
+      setCanvasMultiSelectActive: (active) => {
+        if (get().canvasMultiSelectActive === active) return;
+        set({ canvasMultiSelectActive: active });
+      },
       setLibtvFloatingDockSelection: (nodeId, nodeType) =>
         set({
           libtvFloatingDockNodeId: nodeId,
