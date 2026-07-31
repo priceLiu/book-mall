@@ -440,6 +440,10 @@ export async function patchCanvasProject(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
+  projectDetailCache.set(projectCacheKey(base, id), {
+    at: Date.now(),
+    data: j.project,
+  });
   return { project: j.project, historyItem: j.historyItem ?? null };
 }
 
@@ -862,6 +866,8 @@ export async function uploadCanvasImage(
   return uploadCanvasFile(base, ensureCanvasUploadFileMeta(file));
 }
 
+const UPLOAD_FETCH_TIMEOUT_MS = 60_000;
+
 export async function uploadCanvasFile(
   base: string,
   file: File,
@@ -873,7 +879,22 @@ export async function uploadCanvasFile(
     "/api/canvas/uploads",
     { method: "POST", body: form },
   );
-  const r = await fetch(url, init);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    UPLOAD_FETCH_TIMEOUT_MS,
+  );
+  let r: Response;
+  try {
+    r = await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("upload failed: 上传超时，请检查网络后重试");
+    }
+    throw e;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   if (!r.ok) {
     let detail = String(r.status);
     try {

@@ -211,6 +211,55 @@ export async function normalizeCanvasImageFile(file: File): Promise<File> {
   }
 }
 
+/** OSS 上传前压缩：预览仍用原图 blob；不做透明裁边（避免 convertViaCanvas 长时间卡住） */
+export async function compressImageFileForUpload(file: File): Promise<File> {
+  const tagged = ensureCanvasUploadFileMeta(file);
+  if (typeof window === "undefined") return tagged;
+  if (!tagged.size) throw new Error("图片文件为空");
+
+  const SMALL_BYTES = 900_000;
+  const UPLOAD_MAX_EDGE_PX = 4096;
+
+  const bitmap = await createImageBitmap(tagged);
+  try {
+    const maxEdge = Math.max(bitmap.width, bitmap.height);
+    if (
+      isJpegLike(tagged) &&
+      tagged.size <= SMALL_BYTES &&
+      maxEdge <= UPLOAD_MAX_EDGE_PX
+    ) {
+      return tagged;
+    }
+    let outW = bitmap.width;
+    let outH = bitmap.height;
+    if (maxEdge > UPLOAD_MAX_EDGE_PX) {
+      const scale = UPLOAD_MAX_EDGE_PX / maxEdge;
+      outW = Math.max(1, Math.round(bitmap.width * scale));
+      outH = Math.max(1, Math.round(bitmap.height * scale));
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return tagged;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(bitmap, 0, 0, outW, outH);
+    return await canvasToFile(
+      canvas,
+      "image/jpeg",
+      ensureJpegFileName(tagged.name),
+    );
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** @deprecated 使用 compressImageFileForUpload */
+export async function prepareCanvasImageFileForUpload(file: File): Promise<File> {
+  return compressImageFileForUpload(file);
+}
+
 /** 上传前补全文件名 / MIME，便于服务端识别（Windows 空 type） */
 export function ensureCanvasUploadFileMeta(file: File): File {
   const name = file.name.trim() || (isPngLike(file) ? "upload.png" : "upload.jpg");

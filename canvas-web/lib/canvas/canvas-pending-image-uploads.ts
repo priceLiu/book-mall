@@ -1,41 +1,47 @@
-/** 画布粘贴/上传 · OSS 队列（上传链路；落盘走 canvasDelta，失败 fallback 整图 flush） */
+/** 画布粘贴/上传 · OSS 队列（落盘走整图 flush，确保新节点+连线不丢） */
 
-import { buildCanvasUploadPersistDelta } from "./canvas-persist-delta";
 import {
   flushCanvasGraphPersist,
-  persistCanvasGraphDelta,
 } from "./canvas-graph-persist-bridge";
-import { buildCanvasPersistGraph } from "./canvas-persist-snapshot";
 import { useCanvasStore } from "./store";
 
 export const CANVAS_IMAGE_UPLOADS_CHANGED = "canvas:image-uploads-changed";
 
 const pending = new Map<string, Promise<void>>();
-/** OSS 成功、待 delta 落库的节点 id */
-const pendingPersistNodeIds = new Set<string>();
+const uploadGeneration = new Map<string, number>();
+const staleTimers = new Map<string, number>();
 let persistAfterDrainTimer: number | null = null;
+let persistInFlight: Promise<boolean> | null = null;
 
-/** OSS 全部完成后合并一次 delta 落盘，避免每张图触发整图 autosave */
 const PERSIST_AFTER_UPLOAD_DRAIN_MS = 700;
+export const CANVAS_IMAGE_UPLOAD_STALE_MS = 90_000;
 
 function notifyUploadQueueChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(CANVAS_IMAGE_UPLOADS_CHANGED));
 }
 
-async function persistUploadedNodesDelta(): Promise<void> {
-  const nodeIds = [...pendingPersistNodeIds];
-  pendingPersistNodeIds.clear();
-  if (nodeIds.length === 0) return;
-
-  const graph = buildCanvasPersistGraph(useCanvasStore.getState().toGraph);
-  const delta = buildCanvasUploadPersistDelta(nodeIds, graph);
-  if (!delta) return;
-
-  const ok = await persistCanvasGraphDelta(delta);
-  if (!ok) {
-    await flushCanvasGraphPersist(true);
+function clearStaleTimer(nodeId: string): void {
+  const t = staleTimers.get(nodeId);
+  if (t !== undefined) {
+    window.clearTimeout(t);
+    staleTimers.delete(nodeId);
   }
+}
+
+/** OSS 完成后整图落盘（含新粘贴节点、连线、ossUrl） */
+async function persistAfterUploadDrain(): Promise<boolean> {
+  await flushCanvasGraphPersist(true);
+  return true;
+}
+
+function runPersistAfterUploadDrain(): Promise<boolean> {
+  if (!persistInFlight) {
+    persistInFlight = persistAfterUploadDrain().finally(() => {
+      persistInFlight = null;
+    });
+  }
+  return persistInFlight;
 }
 
 function schedulePersistAfterUploadDrain(): void {
@@ -43,41 +49,91 @@ function schedulePersistAfterUploadDrain(): void {
   if (persistAfterDrainTimer !== null) {
     window.clearTimeout(persistAfterDrainTimer);
   }
+  const delay = pending.size > 1 ? PERSIST_AFTER_UPLOAD_DRAIN_MS : 0;
+  if (delay === 0) {
+    void runPersistAfterUploadDrain();
+    return;
+  }
   persistAfterDrainTimer = window.setTimeout(() => {
     persistAfterDrainTimer = null;
     if (pending.size > 0) return;
-    void persistUploadedNodesDelta();
-  }, PERSIST_AFTER_UPLOAD_DRAIN_MS);
+    void runPersistAfterUploadDrain();
+  }, delay);
 }
 
 export function trackCanvasImageUpload(
   nodeId: string,
   promise: Promise<void>,
+  onStale?: () => void,
 ): void {
+  const gen = (uploadGeneration.get(nodeId) ?? 0) + 1;
+  uploadGeneration.set(nodeId, gen);
+  clearStaleTimer(nodeId);
+
   pending.set(nodeId, promise);
   notifyUploadQueueChanged();
-  void promise
-    .then(() => {
-      pendingPersistNodeIds.add(nodeId);
-    })
-    .finally(() => {
-      if (pending.get(nodeId) === promise) {
-        pending.delete(nodeId);
-        notifyUploadQueueChanged();
-        schedulePersistAfterUploadDrain();
-      }
-    });
+
+  staleTimers.set(
+    nodeId,
+    window.setTimeout(() => {
+      if (uploadGeneration.get(nodeId) !== gen) return;
+      if (pending.get(nodeId) !== promise) return;
+      pending.delete(nodeId);
+      clearStaleTimer(nodeId);
+      notifyUploadQueueChanged();
+      onStale?.();
+    }, CANVAS_IMAGE_UPLOAD_STALE_MS),
+  );
+
+  void promise.finally(() => {
+    if (uploadGeneration.get(nodeId) !== gen) return;
+    clearStaleTimer(nodeId);
+    if (pending.get(nodeId) === promise) {
+      pending.delete(nodeId);
+      notifyUploadQueueChanged();
+      schedulePersistAfterUploadDrain();
+    }
+  });
+}
+
+/** 粘贴/上传后立即保存节点骨架（strip blob 后仍有节点结构） */
+export function scheduleCanvasStructurePersistAfterPaste(): void {
+  queueMicrotask(() => {
+    void flushCanvasGraphPersist(true);
+  });
+}
+
+/** 打开画布后：清掉无队列任务的 uploading 标记 */
+export function reconcileStaleCanvasImageUploadFlags(
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const { nodes } = useCanvasStore.getState();
+  for (const node of nodes) {
+    const d = node.data as { uploading?: boolean };
+    if (d.uploading && !pending.has(node.id)) {
+      updateNodeData(node.id, {
+        uploading: false,
+        uploadError: "上次上传未完成，请重新粘贴",
+      });
+    }
+  }
+  if (pending.size === 0) {
+    notifyUploadQueueChanged();
+  }
 }
 
 export function hasPendingCanvasImageUploads(): boolean {
   return pending.size > 0;
 }
 
+export function isCanvasImageUploadPending(nodeId: string): boolean {
+  return pending.has(nodeId);
+}
+
 export function pendingCanvasImageUploadCount(): number {
   return pending.size;
 }
 
-/** 导航离开画布前等待 OSS 落库（超时后仍放行，避免永久卡住） */
 export async function waitForPendingCanvasImageUploads(
   timeoutMs = 60_000,
 ): Promise<void> {
@@ -91,12 +147,11 @@ export async function waitForPendingCanvasImageUploads(
   ]);
 }
 
-/** 离开画布前：若已有 OSS 结果但 delta 尚未发出，立即落盘 */
 export async function flushPendingCanvasImageUploadPersist(): Promise<void> {
   if (persistAfterDrainTimer !== null) {
     window.clearTimeout(persistAfterDrainTimer);
     persistAfterDrainTimer = null;
   }
-  if (pending.size > 0) return;
-  await persistUploadedNodesDelta();
+  await waitForPendingCanvasImageUploads(60_000);
+  await runPersistAfterUploadDrain();
 }

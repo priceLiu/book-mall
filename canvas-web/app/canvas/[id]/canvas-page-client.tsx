@@ -60,6 +60,7 @@ import {
   clearCanvasProjectTasksForbidden,
   getCanvasProject,
   getCanvasProjectCached,
+  invalidateCanvasProjectCache,
   isCanvasApiConflictError,
   listCanvasProjectHistory,
   patchCanvasProject,
@@ -107,6 +108,7 @@ import {
 import { registerCanvasGraphPersistFlush, registerCanvasDeltaPersist } from "@/lib/canvas/canvas-graph-persist-bridge";
 import {
   hasPendingCanvasImageUploads,
+  reconcileStaleCanvasImageUploadFlags,
   waitForPendingCanvasImageUploads,
   flushPendingCanvasImageUploadPersist,
 } from "@/lib/canvas/canvas-pending-image-uploads";
@@ -404,10 +406,11 @@ function Inner({ projectId }: { projectId: string }) {
     generationRecordDeepLinkRef.current = null;
     setProject(null);
     setLoading(true);
-    clearCanvasProjectTasksForbidden(projectId);
-    void (async () => {
-      try {
-        const p = await getCanvasProjectCached(base, projectId);
+        clearCanvasProjectTasksForbidden(projectId);
+        invalidateCanvasProjectCache(base, projectId);
+        void (async () => {
+          try {
+            const p = await getCanvasProjectCached(base, projectId);
         if (cancelled) return;
         const rawCanvas = p.canvas as { nodes?: unknown[] } | null;
         loadedNodeCountRef.current = Array.isArray(rawCanvas?.nodes)
@@ -431,6 +434,7 @@ function Inner({ projectId }: { projectId: string }) {
             useCanvasStore.getState().graphRevision;
         };
         syncLoadedPersistedSnapshot();
+        reconcileStaleCanvasImageUploadFlags(updateNodeData);
         // hydrate 可能 queueMicrotask 二次 finalize，延迟对齐 revision 避免误判已保存
         queueMicrotask(syncLoadedPersistedSnapshot);
         requestAnimationFrame(syncLoadedPersistedSnapshot);
@@ -524,7 +528,9 @@ function Inner({ projectId }: { projectId: string }) {
       const thumbChanged = Boolean(thumb && thumb !== proj.thumbnailUrl);
 
       // strip 后内容与视口无变化 → 跳过 PATCH（仅 revision / transient 字段变了）
+      // force=true（离开画布 / 上传后落盘）时绝不可跳过，否则新粘贴节点可能从未写入 DB
       if (
+        !force &&
         !writeHistory &&
         !thumbChanged &&
         persisted &&
@@ -563,7 +569,7 @@ function Inner({ projectId }: { projectId: string }) {
         };
 
         let patch: AutosavePatch;
-        if (lastGraph && !shouldUseFullCanvasPersist(graph)) {
+        if (lastGraph && !shouldUseFullCanvasPersist(graph) && !force) {
           const delta = buildCanvasPersistDelta(lastGraph, graph);
           if (!delta) {
             lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(snapshot);
@@ -781,6 +787,10 @@ function Inner({ projectId }: { projectId: string }) {
       await runAutosave(true);
     };
 
+    const onPageHide = () => {
+      void flushBeforeLeave();
+    };
+
     const onFlushAutosave = (event: Event) => {
       const immediate = Boolean(
         (event as CustomEvent<{ immediate?: boolean }>).detail?.immediate,
@@ -815,19 +825,20 @@ function Inner({ projectId }: { projectId: string }) {
 
     restartAutosaveInterval();
     window.addEventListener("canvas:flush-autosave", onFlushAutosave);
-    window.addEventListener("pagehide", onFlushAutosave);
+    window.addEventListener("pagehide", onPageHide);
     window.addEventListener("canvas:autosave-interval-changed", onIntervalChanged);
     window.addEventListener("canvas:leave-project", onLeaveProject);
 
     return () => {
-      registerCanvasGraphPersistFlush(null);
-      registerCanvasDeltaPersist(null);
-      void flushBeforeLeave();
+      void flushBeforeLeave().finally(() => {
+        registerCanvasGraphPersistFlush(null);
+        registerCanvasDeltaPersist(null);
+      });
       unsub();
       syncLastPersistedSnapshotRef.current = null;
       isCanvasDirtyRef.current = null;
       window.removeEventListener("canvas:flush-autosave", onFlushAutosave);
-      window.removeEventListener("pagehide", onFlushAutosave);
+      window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener(
         "canvas:autosave-interval-changed",
         onIntervalChanged,
