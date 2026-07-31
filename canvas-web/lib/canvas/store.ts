@@ -919,6 +919,8 @@ export const useCanvasStore = create<CanvasState>()(
         ),
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
+        // 自连边无业务含义，且会绕到节点背后只露出左右两截白线
+        if (connection.source === connection.target) return;
         const state = get();
         const normalized = normalizePro2PlusLeftConnection(
           normalizeSbv1PlusLeftConnection(

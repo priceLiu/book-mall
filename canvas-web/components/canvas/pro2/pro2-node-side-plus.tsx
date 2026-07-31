@@ -141,7 +141,13 @@ export function Pro2NodeSidePlus({
   const handleWrapRef = useRef<HTMLDivElement>(null);
   const magnetActiveRef = useRef(false);
   const zoom = useStore((s) => s.transform[2]);
-  const canvasConnecting = useCanvasStore((s) => Boolean(s.connectingFromNodeId));
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  /** 仅当拖线来自「其它」节点时才挂入边吸附层：
+   * 否则从本节点 + 拖出后原地松手会落在自己的吸附层上，生成一条自连边
+   * （边绕到节点背后被遮住，只在左右两侧各露出一小截白线）。 */
+  const canvasConnecting = Boolean(
+    connectingFromNodeId && connectingFromNodeId !== nodeId,
+  );
   const gestureRef = useRef<{
     pointerId: number;
     x: number;
