@@ -45,9 +45,11 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
   "Doubao-Seedance-1.5-pro": "doubao-seedance-1-5-pro-251215",
   "doubao-seedance-2.0": "doubao-seedance-2-0-260128",
   "Doubao-Seedance-2.0": "doubao-seedance-2-0-260128",
-  /** Seedream 5.0 Lite · Gateway 归口键 → 方舟 endpoint */
+  /** Seedream 5.0 Lite / Pro · Gateway 归口键 → 方舟 images/generations model */
   "doubao-seedream-5-0-lite": "doubao-seedream-5-0-260128",
   "Doubao-Seedream-5.0-lite": "doubao-seedream-5-0-260128",
+  "doubao-seedream-5-0-pro": "doubao-seedream-5-0-pro-260628",
+  "Doubao-Seedream-5.0-pro": "doubao-seedream-5-0-pro-260628",
 };
 
 export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
@@ -160,9 +162,30 @@ export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
 ];
 
+/** 火山方舟 · 图像生成（Seedream） */
+export const VOLCENGINE_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
+  {
+    modelKey: "doubao-seedream-5-0-pro",
+    displayName: "Doubao Seedream 5.0 Pro",
+    role: "IMAGE",
+    description: "火山方舟 · 旗舰文生图/图生图（上游 doubao-seedream-5-0-pro-260628）",
+    paramsSchema: [],
+    defaultParams: {},
+  },
+  {
+    modelKey: "doubao-seedream-5-0-lite",
+    displayName: "Doubao Seedream 5.0 Lite",
+    role: "IMAGE",
+    description: "火山方舟 · 文生图/图生图（上游 doubao-seedream-5-0-260128）",
+    paramsSchema: [],
+    defaultParams: {},
+  },
+];
+
 export const VOLCENGINE_ALL_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   ...VOLCENGINE_CHAT_KNOWN_MODELS,
   ...VOLCENGINE_VIDEO_KNOWN_MODELS,
+  ...VOLCENGINE_IMAGE_KNOWN_MODELS,
 ];
 
 export function resolveVolcengineModelKey(modelKey: string): string {
@@ -172,6 +195,19 @@ export function resolveVolcengineModelKey(modelKey: string): string {
     VOLCENGINE_MODEL_UPSTREAM[raw] ??
     VOLCENGINE_MODEL_UPSTREAM[lower] ??
     raw
+  );
+}
+
+/** Canvas / 电商 · 火山方舟 Seedream 5.0 文生图/图生图 */
+export function isVolcengineSeedreamImageModelKey(modelKey: string): boolean {
+  const m = modelKey.trim().toLowerCase();
+  return (
+    m === "doubao-seedream-5-0-lite" ||
+    m === "doubao-seedream-5-0-260128" ||
+    m === "doubao-seedream-5-0-pro" ||
+    m === "doubao-seedream-5-0-pro-260628" ||
+    (m.includes("doubao-seedream-5") &&
+      (m.includes("lite") || m.includes("pro")))
   );
 }
 

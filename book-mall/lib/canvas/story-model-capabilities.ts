@@ -32,6 +32,8 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "hunyuan-3d-express": ["image_t2i", "image_multi_ref"],
   "google/nano-banana-pro": ["image_t2i", "image_multi_ref"],
   "flux-2-pro": ["image_t2i", "image_multi_ref"],
+  "doubao-seedream-5-0-pro": ["image_t2i", "image_multi_ref"],
+  "doubao-seedream-5-0-lite": ["image_t2i", "image_multi_ref"],
   "seedream-5-lite": ["image_t2i", "image_multi_ref"],
   "seedream-4.5": ["image_t2i", "image_multi_ref"],
   "gpt-image-2": ["image_t2i", "image_multi_ref"],

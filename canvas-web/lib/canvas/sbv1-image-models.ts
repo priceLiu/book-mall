@@ -9,6 +9,8 @@ export const SBV1_IMAGE_MODEL_KEYS = [
   "nano-banana-2",
   "gpt-image-2",
   "google/nano-banana",
+  "doubao-seedream-5-0-pro",
+  "doubao-seedream-5-0-lite",
   "seedream-4.5",
   "seedream-5-lite",
 ] as const;

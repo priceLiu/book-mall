@@ -3,6 +3,7 @@ import type { CanvasModelRole } from "@prisma/client";
 import type { CanvasProviderDto } from "./canvas-provider-service";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { DEEPSEEK_KNOWN_MODELS } from "./providers/deepseek-system";
+import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { VOLCENGINE_ALL_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listPlatformModelsForApp } from "@/lib/platform-model/auto-publish-offerings";
@@ -21,6 +22,7 @@ type KnownMeta = {
 const KNOWN: KnownMeta[] = [
   ...KIE_KNOWN_MODELS,
   ...DEEPSEEK_KNOWN_MODELS,
+  ...BAILIAN_CHAT_KNOWN_MODELS,
   ...BAILIAN_R2V_KNOWN_MODELS,
   ...VOLCENGINE_ALL_KNOWN_MODELS,
 ];

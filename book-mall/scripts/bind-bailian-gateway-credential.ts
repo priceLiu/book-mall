@@ -71,7 +71,12 @@ async function main() {
       }
     }
 
-    for (const modelKey of ["qwen3.7-plus", "qwen3.5-plus", "qwen3-vl-plus"]) {
+    for (const modelKey of [
+      "qwen3.7-plus",
+      "qwen3.6-plus",
+      "qwen3.5-plus",
+      "qwen3-vl-plus",
+    ]) {
       const route = await prisma.gatewayModelRoute.findFirst({
         where: { modelKey, active: true },
         select: { canonicalModelKey: true, providerKind: true },

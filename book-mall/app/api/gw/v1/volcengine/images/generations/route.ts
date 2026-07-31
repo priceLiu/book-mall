@@ -19,6 +19,7 @@ import {
   type VolcengineImageGenerationsParams,
 } from "@/lib/gateway/volcengine-image-generations-proxy";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -43,13 +44,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const model = body.model?.trim() || SEEDREAM_50_LITE;
+  const requested = body.model?.trim() || SEEDREAM_50_LITE;
+  const model = resolveVolcengineModelKey(requested);
   const prompt = body.prompt?.trim() ?? "";
   if (!prompt) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
   }
 
-  routeGatewayModel(model);
+  routeGatewayModel(requested);
 
   const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
   if (!credentialId) {

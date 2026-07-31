@@ -6,6 +6,7 @@
 export const STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS = [
   "qwen3-vl-plus",
   "qwen3.7-plus",
+  "qwen3.6-plus",
   "qwen3.5-plus",
 ] as const;
 

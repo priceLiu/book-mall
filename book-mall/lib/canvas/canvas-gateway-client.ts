@@ -33,6 +33,7 @@ import {
   gatewayV1CreateTask,
   gatewayV1ImageParsing,
   gatewayV1RecordInfo,
+  gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
 import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
 import { resolveCanvasProjectTeamTenantId } from "@/lib/gateway/resolve-canvas-project-team-tenant";
@@ -388,6 +389,52 @@ function pickDashscopeCredentialForCanvas(
     pickCredentialForKind(credentials, "DASHSCOPE") ??
     pickCredentialForKind(credentials, "BAILIAN")
   );
+}
+
+/** Canvas · 火山方舟 Seedream 图像（同步 /images/generations） */
+export async function canvasGwVolcengineImageGenerations(
+  userId: string,
+  opts: {
+    model: string;
+    prompt: string;
+    image?: string;
+    parameters?: Record<string, unknown>;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<{ images: Array<{ url?: string; b64?: string }>; logId: string }> {
+  const auth = await requireGatewayAuth(userId);
+  const model = opts.model.trim();
+  const route = routeGatewayModel(model);
+  if (route.providerKind !== "VOLCENGINE" || route.requestKind !== "IMAGE") {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `模型 ${model} 不是火山方舟图像模型`,
+      400,
+    );
+  }
+  if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定火山方舟凭证",
+      503,
+    );
+  }
+  return gatewayV1VolcengineImageGenerations({
+    apiKeyId: auth.id,
+    body: {
+      model,
+      prompt: opts.prompt,
+      image: opts.image,
+      parameters: opts.parameters,
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
 }
 
 /** Canvas · 百炼可灵 3.0 图像（DashScope 异步；展示在 Gateway · 百炼 Provider） */

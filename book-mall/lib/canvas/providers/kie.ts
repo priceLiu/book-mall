@@ -21,6 +21,7 @@ import {
   isKieCodexChatModel,
   kieCodexResponseToChatCompletions,
 } from "@/lib/gateway/kie-codex-chat";
+import { prepareKieChatMessages } from "@/lib/gateway/kie-chat-media";
 import { buildKieGrokTextToImageCreateArgs } from "@/lib/canvas/kie-grok-builders";
 import { KIE_AUDIO_GATEWAY_MODELS } from "@/lib/gateway/kie-audio-models";
 
@@ -1410,11 +1411,14 @@ export class KieGateway implements CanvasProviderGateway {
   }
 
   async chat(req: CanvasGatewayChatRequest): Promise<CanvasGatewayChatResponse> {
+    // KIE 侧拉取国内 OSS 常失败（Failed to get the file information）；图片内联为 data URL
+    const messages = await prepareKieChatMessages(req.messages);
+
     if (isKieCodexChatModel(req.modelKey)) {
       const url = `${this.baseUrl}/codex/v1/responses`;
       const body = buildKieCodexResponsesBody({
         model: req.modelKey,
-        messages: req.messages,
+        messages,
         reasoning_effort: req.params?.reasoning_effort,
         temperature: req.params?.temperature,
       });
@@ -1477,7 +1481,7 @@ export class KieGateway implements CanvasProviderGateway {
       usage?: CanvasGatewayChatResponse["usage"];
     }> => {
       const body: Record<string, unknown> = {
-        messages: req.messages,
+        messages,
         stream: false,
         include_thoughts: includeThoughts,
       };

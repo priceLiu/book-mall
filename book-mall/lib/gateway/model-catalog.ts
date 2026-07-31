@@ -8,6 +8,7 @@ import { BAILIAN_R2V_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-r2v";
 import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
 import {
   VOLCENGINE_CHAT_KNOWN_MODELS,
+  VOLCENGINE_IMAGE_KNOWN_MODELS,
   VOLCENGINE_VIDEO_KNOWN_MODELS,
 } from "@/lib/gateway/volcengine-chat-models";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
@@ -470,6 +471,9 @@ export function buildGatewayModelCatalog(
       ),
       ...VOLCENGINE_VIDEO_KNOWN_MODELS.map((m) =>
         fromListed(m, "VOLCENGINE", ["Canvas", "Story", "工具站"]),
+      ),
+      ...VOLCENGINE_IMAGE_KNOWN_MODELS.map((m) =>
+        fromListed(m, "VOLCENGINE", ["Canvas", "Story", "工具站", "电商工具箱"]),
       ),
     ]),
   );

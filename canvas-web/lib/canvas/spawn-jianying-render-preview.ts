@@ -33,6 +33,12 @@ type SpawnStore = {
     position: { x: number; y: number },
     data?: Record<string, unknown>,
   ) => string;
+  addNodeInGroup?: (
+    type: CanvasNodeType,
+    groupId: string,
+    relativePosition: { x: number; y: number },
+    data?: Record<string, unknown>,
+  ) => string;
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
@@ -72,7 +78,7 @@ export function spawnJianyingAutoRenderNode(
     replicateVideoEdgesFrom?: string;
   },
 ): string {
-  const { nodes, edges, addNode, setNodes, setEdges } = store;
+  const { nodes, edges, addNode, addNodeInGroup, setNodes, setEdges } = store;
   const anchorNode = nodes.find((n) => n.id === anchorNodeId);
   if (!anchorNode) return "";
 
@@ -85,11 +91,29 @@ export function spawnJianyingAutoRenderNode(
     ? flowPositionAtScreenPoint("jianying-auto-render-pro2", options.atScreen)
     : { x: defaultX, y: defaultY };
 
-  const newId = addNode(
-    "jianying-auto-render-pro2",
-    { x: spawnPos.x, y: spawnPos.y },
-    { label: "自动成片" },
-  );
+  const parentGroup =
+    !options?.atScreen && anchorNode.parentId
+      ? nodes.find((n) => n.id === anchorNode.parentId && n.type === "group")
+      : undefined;
+  const newId =
+    parentGroup && addNodeInGroup
+      ? addNodeInGroup(
+          "jianying-auto-render-pro2",
+          parentGroup.id,
+          {
+            x: Math.max(
+              48,
+              (anchorNode.position?.x ?? 0) + (anchorNode.width ?? selfW) + GAP,
+            ),
+            y: anchorNode.position?.y ?? 48,
+          },
+          { label: "自动成片" },
+        )
+      : addNode(
+          "jianying-auto-render-pro2",
+          { x: spawnPos.x, y: spawnPos.y },
+          { label: "自动成片" },
+        );
   if (!newId) return "";
 
   const replicateFrom = options?.replicateVideoEdgesFrom ?? anchorNodeId;

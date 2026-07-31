@@ -36,6 +36,14 @@ export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     defaultParams: { temperature: 0.7, max_tokens: 8000 },
   },
   {
+    modelKey: "qwen3.6-plus",
+    displayName: "Qwen3.6-Plus",
+    role: "LLM",
+    description: "百炼 · 多模态 · 视频/图片理解 · 反推提示词",
+    paramsSchema: [...LLM_TEMP_SCHEMA],
+    defaultParams: { temperature: 0.7, max_tokens: 8000 },
+  },
+  {
     modelKey: "qwen3.5-plus",
     displayName: "Qwen3.5-Plus",
     role: "LLM",

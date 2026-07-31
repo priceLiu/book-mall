@@ -552,7 +552,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "doubao-seedream-5-0-lite",
     displayName: "Doubao Seedream 5.0 Lite",
-    description: "火山方舟 · 指令式图像编辑（doubao-seedream-5-0-260128）",
+    description: "火山方舟 · 文生图/图生图（doubao-seedream-5-0-260128）",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -564,7 +564,37 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     routes: dedupeRoutes([
       {
         vendor: "volcengine",
+        modelKey: "doubao-seedream-5-0-lite",
+        providerKind: "VOLCENGINE",
+      },
+      {
+        vendor: "volcengine",
         modelKey: "doubao-seedream-5-0-260128",
+        providerKind: "VOLCENGINE",
+      },
+    ]),
+  },
+  {
+    canonicalModelKey: "doubao-seedream-5-0-pro",
+    displayName: "Doubao Seedream 5.0 Pro",
+    description: "火山方舟 · 旗舰文生图/图生图（doubao-seedream-5-0-pro-260628）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 36.5,
+    primaryVendor: "volcengine",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      {
+        vendor: "volcengine",
+        modelKey: "doubao-seedream-5-0-pro",
+        providerKind: "VOLCENGINE",
+      },
+      {
+        vendor: "volcengine",
+        modelKey: "doubao-seedream-5-0-pro-260628",
         providerKind: "VOLCENGINE",
       },
     ]),

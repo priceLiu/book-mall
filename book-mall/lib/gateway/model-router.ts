@@ -234,7 +234,9 @@ export function routeGatewayModel(model: string): RoutedModel {
   if (
     m === "doubao-seedream-5-0-lite" ||
     m === "doubao-seedream-5-0-260128" ||
-    (m.includes("doubao-seedream-5") && m.includes("lite"))
+    m === "doubao-seedream-5-0-pro" ||
+    m === "doubao-seedream-5-0-pro-260628" ||
+    (m.includes("doubao-seedream-5") && (m.includes("lite") || m.includes("pro")))
   ) {
     return { providerKind: "VOLCENGINE", requestKind: "IMAGE" };
   }

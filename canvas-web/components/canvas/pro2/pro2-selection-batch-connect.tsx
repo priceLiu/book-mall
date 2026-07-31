@@ -237,6 +237,8 @@ function Pro2SelectionBatchConnectLayerInner({
     gestureRef.current = null;
   }, []);
 
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
+
   const spawnAtAnchor = useCallback(
     (
       anchor: { x: number; y: number },
@@ -252,14 +254,35 @@ function Pro2SelectionBatchConnectLayerInner({
       if (eligibleSources.length < 2) return;
       const { height } = NODE_DEFAULT_SIZE[nodeType];
       const flow = screenToFlowPosition({ x: anchor.x, y: anchor.y });
-      const newId = addNode(
-        nodeType,
-        {
-          x: flow.x + SPAWN_MENU_OFFSET_X,
-          y: flow.y - height / 2,
-        },
-        data,
-      );
+      const sharedParentId = eligibleSources.every(
+        (n) => n.parentId && n.parentId === eligibleSources[0]?.parentId,
+      )
+        ? eligibleSources[0]?.parentId
+        : undefined;
+      let newId = "";
+      if (nodeType === "jianying-auto-render-pro2" && sharedParentId) {
+        // 批量连线来自同一组：成片节点进组，拖组时一起移动
+        const absXs = eligibleSources.map((n) => n.position.x + (n.width ?? 320));
+        const absYs = eligibleSources.map((n) => n.position.y);
+        newId = addNodeInGroup(
+          nodeType,
+          sharedParentId,
+          {
+            x: Math.max(...absXs) + 48,
+            y: Math.min(...absYs),
+          },
+          data,
+        );
+      } else {
+        newId = addNode(
+          nodeType,
+          {
+            x: flow.x + SPAWN_MENU_OFFSET_X,
+            y: flow.y - height / 2,
+          },
+          data,
+        );
+      }
       if (!newId) return;
       connectBatchToTarget(newId, targetHandle);
       clearPreview();
@@ -270,9 +293,10 @@ function Pro2SelectionBatchConnectLayerInner({
       }
     },
     [
-      eligibleSources.length,
+      eligibleSources,
       screenToFlowPosition,
       addNode,
+      addNodeInGroup,
       connectBatchToTarget,
       clearPreview,
       setNodes,

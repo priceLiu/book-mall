@@ -8,6 +8,7 @@ import {
   resolveLibtvDockEngineModelDisplayName,
 } from "@/lib/canvas/libtv-dock-engine-models";
 import { hideKieVendorLabel, type GatewayModelRole } from "@/lib/canvas/gateway-model-role";
+import { formatGatewayModelTypeLabelLine } from "@/lib/canvas/gateway-model-type-labels";
 import type { CanvasProviderDto, CanvasProviderModelDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
@@ -134,7 +135,10 @@ export function LibtvDockEngineModelPicker({
                     {displayName}
                   </span>
                   <span className="block truncate text-[10px] text-white/40">
-                    {model.modelKey}
+                    {formatGatewayModelTypeLabelLine({
+                      modelKey: model.modelKey,
+                      role: model.role,
+                    })}
                   </span>
                 </span>
                 {selected ? (

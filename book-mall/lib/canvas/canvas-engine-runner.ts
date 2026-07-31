@@ -51,13 +51,18 @@ import {
   canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
   canvasGwTts,
+  canvasGwVolcengineImageGenerations,
 } from "./canvas-gateway-client";
 import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
 import {
   assertCanvasProviderMatchesModelRoute,
   shouldCanvasUseGateway,
 } from "./canvas-gateway-run";
-import { persistCanvasBufferToOss } from "./canvas-oss";
+import {
+  persistCanvasBufferToOss,
+  persistCanvasKieResultToOss,
+} from "./canvas-oss";
+import { isVolcengineSeedreamImageModelKey } from "@/lib/gateway/volcengine-chat-models";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
   buildCanvasRefVideoKieInput,
@@ -524,6 +529,7 @@ export async function runImageEngineNode(
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
   const isKlingImage = isStoryboardKlingImageModel(modelKey);
+  const isVolcengineSeedream = isVolcengineSeedreamImageModelKey(modelKey);
   await shouldCanvasUseGateway(userId, providerId, modelKey);
 
   const inputHash = computeInputHash({
@@ -670,6 +676,81 @@ export async function runImageEngineNode(
               providerKind: "DASHSCOPE",
               dashscopeJobKind: "kling-v3-image",
               ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return { reused: false, task: updated };
+      }
+
+      if (isVolcengineSeedream) {
+        const promptText = clipPrompt(expandedPrompt);
+        const resolution =
+          typeof params.resolution === "string" ? params.resolution.trim() : "";
+        const sizeFromParams =
+          typeof params.size === "string" ? params.size.trim() : "";
+        const size =
+          sizeFromParams ||
+          (resolution === "1K" || resolution === "2K" || resolution === "4K"
+            ? resolution
+            : "2K");
+        const n = Math.min(4, Math.max(1, Number(params.n ?? 1) || 1));
+        const { images, logId } = await canvasGwVolcengineImageGenerations(
+          userId,
+          {
+            model: modelKey,
+            prompt: promptText,
+            image: imageUrls[0],
+            parameters: { size, n, watermark: false },
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: created.id,
+          },
+        );
+        const first = images[0];
+        let ossUrl = "";
+        if (first?.url?.trim()) {
+          ossUrl = await persistCanvasKieResultToOss({
+            ephemeralUrl: first.url.trim(),
+            kind: "node-image",
+            projectId,
+            userId,
+          });
+        } else if (first?.b64?.trim()) {
+          const buf = Buffer.from(first.b64.trim(), "base64");
+          ossUrl = await persistCanvasBufferToOss({
+            buf,
+            contentType: "image/png",
+            kind: "node-image",
+            projectId,
+            userId,
+            ext: "png",
+          });
+        }
+        if (!ossUrl) {
+          throw new Error("火山方舟 Seedream 未返回可用图像");
+        }
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUCCEEDED",
+            ossUrl,
+            submittedAt: new Date(),
+            completedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: logId,
+              providerKind: "VOLCENGINE",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+            resultPayload: {
+              imageCount: images.length,
             } as Prisma.InputJsonValue,
           },
         });

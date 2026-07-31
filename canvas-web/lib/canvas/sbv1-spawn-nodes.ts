@@ -295,11 +295,30 @@ export function spawnSbv1NeighborFromNode(
   }
 
   if (nodeType === "jianying-auto-render-pro2") {
-    const newId = addNode(
-      "jianying-auto-render-pro2",
-      { x, y },
-      { label: "自动成片" },
-    );
+    const { addNodeInGroup } = store;
+    const parentGroup = self.parentId
+      ? nodes.find((n) => n.id === self.parentId && n.type === "group")
+      : undefined;
+    let newId = "";
+    if (parentGroup && !options?.atScreen) {
+      // 锚点在组内：成片节点必须带 parentId，否则拖组时留在画布根级
+      const rel = {
+        x: Math.max(48, (self.position?.x ?? 0) + (self.width ?? 320) + GAP),
+        y: self.position?.y ?? 48,
+      };
+      newId = addNodeInGroup(
+        "jianying-auto-render-pro2",
+        parentGroup.id,
+        rel,
+        { label: "自动成片" },
+      );
+    } else {
+      newId = addNode(
+        "jianying-auto-render-pro2",
+        { x, y },
+        { label: "自动成片" },
+      );
+    }
     if (!newId) return "";
     if (self.type === "sbv1-video-engine" && side === "right") {
       setEdges((prev) => [

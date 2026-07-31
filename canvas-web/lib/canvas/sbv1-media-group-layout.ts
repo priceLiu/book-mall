@@ -310,6 +310,27 @@ export function applySbv1MediaGroupRelayout(
     const reparented = reparentToGroup(linkedEngine, group, next);
     next = next.map((n) => (n.id === reparented.id ? reparented : n));
   }
+  // 组内视频已连到画布根级的「自动成片」时，收进组，避免拖组时成片留在原地
+  const orphanRenders = next.filter(
+    (n) =>
+      n.type === "jianying-auto-render-pro2" &&
+      n.parentId !== groupId &&
+      edges.some(
+        (e) =>
+          e.target === n.id &&
+          e.targetHandle === "in_video" &&
+          next.some(
+            (src) =>
+              src.id === e.source &&
+              src.parentId === groupId &&
+              src.type === "sbv1-video-engine",
+          ),
+      ),
+  );
+  for (const orphan of orphanRenders) {
+    const reparented = reparentToGroup(orphan, group, next);
+    next = next.map((n) => (n.id === reparented.id ? reparented : n));
+  }
 
   const images = sortSbv1GroupChildren(
     next.filter((n) => n.parentId === groupId && isSbv1GroupImageChild(n)),
