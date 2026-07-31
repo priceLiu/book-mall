@@ -35,6 +35,8 @@ export default defineConfig({
       "test/unit/crew-bulletin-node-submit.test.ts",
       "test/unit/canvas-run-session.test.ts",
       "test/unit/canvas-node-changes.test.ts",
+      "test/unit/canvas-persist-snapshot.test.ts",
+      "test/unit/canvas-persist-delta.test.ts",
       "test/unit/pro2-script-studio-migrate.test.ts",
       "test/unit/pro2-text-node-engine-roles.test.ts",
       "test/unit/pro2-video-board-cell-task.test.ts",

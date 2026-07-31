@@ -19,6 +19,11 @@ import {
   pickProjectThumbnailUrl,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
+import {
+  applyCanvasDelta,
+  assertCanvasDeltaBaseUpdatedAt,
+  type CanvasDeltaPatch,
+} from "@/lib/canvas/canvas-delta-merge";
 import { mergePersistedMediaIntoCanvasGraph } from "@/lib/canvas/canvas-persist-merge";
 import { extractManagedOssObjectKey } from "@/lib/oss-delete-object";
 import { readOssEnv } from "@/lib/oss-client";
@@ -37,7 +42,8 @@ export class CanvasProjectError extends Error {
       | "PROVIDER_KEYS_REQUIRED"
       | "GATEWAY_KEY_REQUIRED"
       | "INSUFFICIENT_CREDITS"
-      | "UPSTREAM_ERROR",
+      | "UPSTREAM_ERROR"
+      | "CONFLICT",
     message: string,
     public httpStatus = 400,
   ) {
@@ -244,7 +250,13 @@ export async function getCanvasProjectForUser(
 export async function updateCanvasProjectForUser(
   userId: string,
   projectId: string,
-  patch: { name?: string; description?: string; canvas?: unknown; thumbnailUrl?: string },
+  patch: {
+    name?: string;
+    description?: string;
+    canvas?: unknown;
+    canvasDelta?: CanvasDeltaPatch;
+    thumbnailUrl?: string;
+  },
 ): Promise<CanvasProjectDetail> {
   await assertAccessibleCanvasProject(userId, projectId);
   const p = await prisma.canvasProject.findFirst({
@@ -266,7 +278,20 @@ export async function updateCanvasProjectForUser(
   if (typeof patch.thumbnailUrl === "string") {
     data.thumbnailUrl = patch.thumbnailUrl;
   }
-  if (patch.canvas !== undefined) {
+  if (patch.canvas !== undefined && patch.canvasDelta !== undefined) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "canvas and canvasDelta are mutually exclusive",
+    );
+  }
+  if (patch.canvasDelta !== undefined) {
+    assertCanvasDeltaBaseUpdatedAt(patch.canvasDelta.baseUpdatedAt, p.updatedAt);
+    const mergedCanvas = mergePersistedMediaIntoCanvasGraph(
+      applyCanvasDelta(p.canvas, patch.canvasDelta),
+      p.canvas,
+    );
+    data.canvas = mergedCanvas as Prisma.InputJsonValue;
+  } else if (patch.canvas !== undefined) {
     if (!patch.canvas || typeof patch.canvas !== "object") {
       throw new CanvasProjectError("INVALID_INPUT", "canvas must be object");
     }

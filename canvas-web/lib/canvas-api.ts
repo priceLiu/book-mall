@@ -33,6 +33,11 @@ export function isCanvasApiAccessDeniedError(e: unknown): boolean {
   return /\b403\b/.test(msg) || /\b404\b/.test(msg);
 }
 
+export function isCanvasApiConflictError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /\b409\b/.test(msg) || /\bCONFLICT\b/i.test(msg);
+}
+
 /** @deprecated 使用 isCanvasApiAccessDeniedError */
 export function isCanvasApiNotFoundError(e: unknown): boolean {
   return isCanvasApiAccessDeniedError(e);
@@ -419,6 +424,7 @@ export async function patchCanvasProject(
     name?: string;
     description?: string;
     canvas?: unknown;
+    canvasDelta?: import("@/lib/canvas/canvas-persist-delta").CanvasDeltaPatch;
     thumbnailUrl?: string;
     historySnapshot?: CanvasProjectHistorySnapshotRequest;
   },

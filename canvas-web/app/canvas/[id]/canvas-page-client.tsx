@@ -36,16 +36,31 @@ import {
   useCanvasInflightTaskCount,
 } from "@/lib/canvas/run-queue";
 import { stripRuntimeForTemplate, stripGraphForPersist } from "@/lib/canvas/sanitize";
+import {
+  buildCanvasPersistGraph,
+  isCanvasPersistContentDirty,
+  readCanvasPersistSnapshot,
+  serializeCanvasPersistGraph,
+  type CanvasPersistSnapshot,
+} from "@/lib/canvas/canvas-persist-snapshot";
+import {
+  buildCanvasPersistDelta,
+  parsePersistedCanvasGraph,
+  shouldUseFullCanvasPersist,
+} from "@/lib/canvas/canvas-persist-delta";
 import { stripStoryProUploadedScriptMdForPersist } from "@/lib/canvas/story-pro-upload-script";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import type {
   CanvasContentNodeType,
+  CanvasGraph,
 } from "@/lib/canvas/types";
 import {
   clearCanvasProjectTasksForbidden,
+  getCanvasProject,
   getCanvasProjectCached,
+  isCanvasApiConflictError,
   listCanvasProjectHistory,
   patchCanvasProject,
   saveCanvasTemplate,
@@ -89,6 +104,12 @@ import {
   CANVAS_AUTOSAVE_HISTORY_HEARTBEAT_MS,
   getCanvasAutosaveIntervalMs,
 } from "@/lib/canvas/canvas-autosave-settings";
+import { registerCanvasGraphPersistFlush, registerCanvasDeltaPersist } from "@/lib/canvas/canvas-graph-persist-bridge";
+import {
+  hasPendingCanvasImageUploads,
+  waitForPendingCanvasImageUploads,
+  flushPendingCanvasImageUploadPersist,
+} from "@/lib/canvas/canvas-pending-image-uploads";
 import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
@@ -327,11 +348,10 @@ function Inner({ projectId }: { projectId: string }) {
   const loadedNodeCountRef = useRef(0);
   const canvasReadyRef = useRef(false);
   const generationRecordDeepLinkRef = useRef<string | null>(null);
-  /** 上次成功写入服务端的 graphRevision + viewport，用于判断是否需要自动保存 */
-  const lastPersistedSnapshotRef = useRef<{
-    revision: number;
-    viewport: string;
-  } | null>(null);
+  /** 上次成功 PATCH 返回的 project.updatedAt（canvasDelta 乐观锁） */
+  const lastBaseUpdatedAtRef = useRef<string | undefined>(undefined);
+  /** 上次成功写入服务端的快照（strip 后内容与视口 + revision） */
+  const lastPersistedSnapshotRef = useRef<CanvasPersistSnapshot | null>(null);
   /** hydrate / fitView 落定前跳过自动保存，避免打开项目时 revision 连跳导致「一直保存中」 */
   const canvasHydratingUntilRef = useRef(0);
   const syncLastPersistedSnapshotRef = useRef<(() => void) | null>(null);
@@ -398,18 +418,17 @@ function Inner({ projectId }: { projectId: string }) {
         useCanvasStore.temporal.getState().clear();
         useCanvasStore.temporal.getState().resume();
         setProject(p);
+        lastBaseUpdatedAtRef.current = p.updatedAt;
         setNameDraft(p.name);
         canvasReadyRef.current = true;
         canvasHydratingUntilRef.current = Date.now() + 2000;
         const syncLoadedPersistedSnapshot = () => {
-          const s = useCanvasStore.getState();
-          lastPersistedSnapshotRef.current = {
-            revision: s.graphRevision,
-            viewport: JSON.stringify(s.viewport),
-          };
-          // 刚载入的图不算「待存档编辑」，首条历史从打开项目起算一个间隔
+          lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(
+            useCanvasStore.getState(),
+          );
           historyWrittenAtRef.current = Date.now();
-          historyWrittenRevisionRef.current = s.graphRevision;
+          historyWrittenRevisionRef.current =
+            useCanvasStore.getState().graphRevision;
         };
         syncLoadedPersistedSnapshot();
         // hydrate 可能 queueMicrotask 二次 finalize，延迟对齐 revision 避免误判已保存
@@ -452,21 +471,18 @@ function Inner({ projectId }: { projectId: string }) {
     if (!project || !base || loading) return;
 
     const syncLastPersistedSnapshot = () => {
-      const s = useCanvasStore.getState();
-      lastPersistedSnapshotRef.current = {
-        revision: s.graphRevision,
-        viewport: JSON.stringify(s.viewport),
-      };
+      lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(
+        useCanvasStore.getState(),
+      );
     };
     syncLastPersistedSnapshotRef.current = syncLastPersistedSnapshot;
 
     const isCanvasDirty = () => {
       const persisted = lastPersistedSnapshotRef.current;
       if (!persisted) return true;
-      const s = useCanvasStore.getState();
-      return (
-        s.graphRevision !== persisted.revision ||
-        JSON.stringify(s.viewport) !== persisted.viewport
+      return isCanvasPersistContentDirty(
+        readCanvasPersistSnapshot(useCanvasStore.getState()),
+        persisted,
       );
     };
     isCanvasDirtyRef.current = isCanvasDirty;
@@ -480,7 +496,7 @@ function Inner({ projectId }: { projectId: string }) {
 
     const runAutosave = async (
       force = false,
-      opts: { writeHistory?: boolean } = {},
+      opts: { writeHistory?: boolean; conflictRetry?: boolean } = {},
     ) => {
       let writeHistory = opts.writeHistory ?? false;
       const autosaveIntervalMs = getCanvasAutosaveIntervalMs();
@@ -496,7 +512,27 @@ function Inner({ projectId }: { projectId: string }) {
       const bookBase = autosaveBaseRef.current;
       if (!proj || !bookBase || !canvasReadyRef.current) return;
       if (!force && Date.now() < canvasHydratingUntilRef.current) return;
+      // 图片 OSS 未完成时不落盘：strip 会去掉 blob，存成空节点
+      if (!force && hasPendingCanvasImageUploads()) return;
       if (!force && !isCanvasDirty()) return;
+
+      const snapshot = useCanvasStore.getState();
+      const currentSnap = readCanvasPersistSnapshot(snapshot);
+      const persisted = lastPersistedSnapshotRef.current;
+      const graph = buildCanvasPersistGraph(snapshot.toGraph);
+      const thumb = pickPersistableProjectThumbnailUrl(graph);
+      const thumbChanged = Boolean(thumb && thumb !== proj.thumbnailUrl);
+
+      // strip 后内容与视口无变化 → 跳过 PATCH（仅 revision / transient 字段变了）
+      if (
+        !writeHistory &&
+        !thumbChanged &&
+        persisted &&
+        !isCanvasPersistContentDirty(currentSnap, persisted)
+      ) {
+        lastPersistedSnapshotRef.current = currentSnap;
+        return;
+      }
 
       autosaveInFlightRef.current = true;
       if (autosaveSavingUiTimerRef.current === null) {
@@ -512,15 +548,37 @@ function Inner({ projectId }: { projectId: string }) {
         });
         const snapshot = useCanvasStore.getState();
         const revisionAtSnapshot = snapshot.graphRevision;
-        const graph = stripStoryProUploadedScriptMdForPersist(
-          stripGraphForPersist(snapshot.toGraph()),
-        );
+        const graph = buildCanvasPersistGraph(snapshot.toGraph);
         const thumb = pickPersistableProjectThumbnailUrl(graph);
-        const patch: {
-          canvas: typeof graph;
+        const persistedSnap = lastPersistedSnapshotRef.current;
+        const lastGraph = persistedSnap
+          ? parsePersistedCanvasGraph(persistedSnap.graph)
+          : null;
+
+        type AutosavePatch = {
+          canvas?: typeof graph;
+          canvasDelta?: import("@/lib/canvas/canvas-persist-delta").CanvasDeltaPatch;
           thumbnailUrl?: string;
           historySnapshot?: { source: "autosave"; thumbnailUrl?: string };
-        } = { canvas: graph };
+        };
+
+        let patch: AutosavePatch;
+        if (lastGraph && !shouldUseFullCanvasPersist(graph)) {
+          const delta = buildCanvasPersistDelta(lastGraph, graph);
+          if (!delta) {
+            lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(snapshot);
+            return;
+          }
+          patch = {
+            canvasDelta: {
+              ...delta,
+              baseUpdatedAt: lastBaseUpdatedAtRef.current,
+            },
+          };
+        } else {
+          patch = { canvas: graph };
+        }
+
         if (writeHistory) {
           const shot = await captureCanvasViewportSnapshotUrl(bookBase);
           const historyThumb = resolveCanvasHistoryThumbnailUrl(
@@ -536,12 +594,16 @@ function Inner({ projectId }: { projectId: string }) {
         if (thumb && thumb !== proj.thumbnailUrl) {
           patch.thumbnailUrl = thumb;
         }
-        const { historyItem } = await patchCanvasProject(
+        const { historyItem, project: updatedProject } = await patchCanvasProject(
           bookBase,
           projectId,
           patch,
         );
+        lastBaseUpdatedAtRef.current = updatedProject.updatedAt;
         syncLastPersistedSnapshot();
+        setProject((p) =>
+          p ? { ...p, updatedAt: updatedProject.updatedAt } : p,
+        );
         if (writeHistory) {
           // 失败时只推迟一个间隔重试：不更新 revision，下一轮心跳仍认定「有未存档编辑」
           historyWrittenAtRef.current = Date.now();
@@ -561,6 +623,29 @@ function Inner({ projectId }: { projectId: string }) {
         setLastSavedAt(new Date());
         setSaveError(null);
       } catch (e) {
+        if (isCanvasApiConflictError(e) && !opts.conflictRetry) {
+          try {
+            const fresh = await getCanvasProject(bookBase, projectId);
+            lastBaseUpdatedAtRef.current = fresh.updatedAt;
+            const serverGraph = buildCanvasPersistGraph(
+              fresh.canvas as CanvasGraph,
+            );
+            lastPersistedSnapshotRef.current = {
+              revision: useCanvasStore.getState().graphRevision,
+              viewport: JSON.stringify(
+                serverGraph.viewport ?? { x: 0, y: 0, zoom: 1 },
+              ),
+              graph: serializeCanvasPersistGraph(serverGraph),
+            };
+            setProject((p) =>
+              p ? { ...p, updatedAt: fresh.updatedAt } : p,
+            );
+            await runAutosave(true, { ...opts, conflictRetry: true });
+            return;
+          } catch {
+            /* fall through to generic error */
+          }
+        }
         setSaveError(e instanceof Error ? e.message : "保存失败");
       } finally {
         autosaveInFlightRef.current = false;
@@ -622,10 +707,78 @@ function Inner({ projectId }: { projectId: string }) {
     });
 
     runAutosaveRef.current = runAutosave;
+    registerCanvasGraphPersistFlush(runAutosave);
+    registerCanvasDeltaPersist(async (delta) => {
+      const proj = autosaveProjectRef.current;
+      const bookBase = autosaveBaseRef.current;
+      if (!proj || !bookBase || !canvasReadyRef.current) return false;
+      try {
+        const { project: updatedProject } = await patchCanvasProject(
+          bookBase,
+          projectId,
+          {
+            canvasDelta: {
+              ...delta,
+              baseUpdatedAt: lastBaseUpdatedAtRef.current,
+            },
+          },
+        );
+        lastBaseUpdatedAtRef.current = updatedProject.updatedAt;
+        syncLastPersistedSnapshot();
+        setProject((p) =>
+          p ? { ...p, updatedAt: updatedProject.updatedAt } : p,
+        );
+        setLastSavedAt(new Date());
+        setSaveError(null);
+        return true;
+      } catch (e) {
+        if (isCanvasApiConflictError(e)) {
+          try {
+            const fresh = await getCanvasProject(bookBase, projectId);
+            lastBaseUpdatedAtRef.current = fresh.updatedAt;
+            const serverGraph = buildCanvasPersistGraph(
+              fresh.canvas as CanvasGraph,
+            );
+            lastPersistedSnapshotRef.current = {
+              revision: useCanvasStore.getState().graphRevision,
+              viewport: JSON.stringify(
+                serverGraph.viewport ?? { x: 0, y: 0, zoom: 1 },
+              ),
+              graph: serializeCanvasPersistGraph(serverGraph),
+            };
+            setProject((p) =>
+              p ? { ...p, updatedAt: fresh.updatedAt } : p,
+            );
+            const retry = await patchCanvasProject(bookBase, projectId, {
+              canvasDelta: {
+                ...delta,
+                baseUpdatedAt: lastBaseUpdatedAtRef.current,
+              },
+            });
+            lastBaseUpdatedAtRef.current = retry.project.updatedAt;
+            syncLastPersistedSnapshot();
+            setProject((p) =>
+              p ? { ...p, updatedAt: retry.project.updatedAt } : p,
+            );
+            setLastSavedAt(new Date());
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      }
+    });
 
     const flushAutosaveNow = () => {
       clearAutosaveTimer();
       void runAutosave(true);
+    };
+
+    const flushBeforeLeave = async () => {
+      await waitForPendingCanvasImageUploads(60_000);
+      await flushPendingCanvasImageUploadPersist();
+      await runAutosave(true);
     };
 
     const onFlushAutosave = (event: Event) => {
@@ -656,12 +809,20 @@ function Inner({ projectId }: { projectId: string }) {
       scheduleAutosave();
     };
 
+    const onLeaveProject = () => {
+      void flushBeforeLeave();
+    };
+
     restartAutosaveInterval();
     window.addEventListener("canvas:flush-autosave", onFlushAutosave);
     window.addEventListener("pagehide", onFlushAutosave);
     window.addEventListener("canvas:autosave-interval-changed", onIntervalChanged);
+    window.addEventListener("canvas:leave-project", onLeaveProject);
 
     return () => {
+      registerCanvasGraphPersistFlush(null);
+      registerCanvasDeltaPersist(null);
+      void flushBeforeLeave();
       unsub();
       syncLastPersistedSnapshotRef.current = null;
       isCanvasDirtyRef.current = null;
@@ -671,6 +832,7 @@ function Inner({ projectId }: { projectId: string }) {
         "canvas:autosave-interval-changed",
         onIntervalChanged,
       );
+      window.removeEventListener("canvas:leave-project", onLeaveProject);
       clearAutosaveTimer();
       if (autosaveFlushDebounceRef.current !== null) {
         window.clearTimeout(autosaveFlushDebounceRef.current);
@@ -724,9 +886,8 @@ function Inner({ projectId }: { projectId: string }) {
 
     setSaving(true);
     try {
-      const graph = stripStoryProUploadedScriptMdForPersist(
-        stripGraphForPersist(toGraph()),
-      );
+      await waitForPendingCanvasImageUploads(60_000);
+      const graph = buildCanvasPersistGraph(toGraph);
       const thumb = pickPersistableProjectThumbnailUrl(graph);
       const shot = await captureCanvasViewportSnapshotUrl(base);
       const historyThumb = resolveCanvasHistoryThumbnailUrl(
@@ -753,11 +914,26 @@ function Inner({ projectId }: { projectId: string }) {
       if (thumb && thumb !== project.thumbnailUrl) {
         patch.thumbnailUrl = thumb;
       }
-      const { historyItem } = await patchCanvasProject(base, projectId, patch);
+      const { historyItem, project: updatedProject } = await patchCanvasProject(
+        base,
+        projectId,
+        patch,
+      );
+      lastBaseUpdatedAtRef.current = updatedProject.updatedAt;
       loadedNodeCountRef.current = graph.nodes.length;
       if (patch.thumbnailUrl) {
         setProject((p) =>
-          p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
+          p
+            ? {
+                ...p,
+                thumbnailUrl: patch.thumbnailUrl!,
+                updatedAt: updatedProject.updatedAt,
+              }
+            : p,
+        );
+      } else {
+        setProject((p) =>
+          p ? { ...p, updatedAt: updatedProject.updatedAt } : p,
         );
       }
       setLastSavedAt(new Date());

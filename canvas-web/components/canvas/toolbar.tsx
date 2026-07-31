@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -35,6 +36,14 @@ import {
   CanvasToolbarDropdownTrigger,
   useCanvasToolbarDropdown,
 } from "@/components/canvas/canvas-toolbar-dropdown";
+import { flushCanvasGraphPersist } from "@/lib/canvas/canvas-graph-persist-bridge";
+import {
+  CANVAS_IMAGE_UPLOADS_CHANGED,
+  hasPendingCanvasImageUploads,
+  pendingCanvasImageUploadCount,
+  waitForPendingCanvasImageUploads,
+  flushPendingCanvasImageUploadPersist,
+} from "@/lib/canvas/canvas-pending-image-uploads";
 
 type ToolbarMenuKey = "mine";
 
@@ -87,8 +96,40 @@ export function CanvasToolbar({
   immersive?: boolean;
   onToggleImmersive?: () => void;
 }) {
+  const router = useRouter();
   const mineMenu = useCanvasToolbarDropdown();
   const [openMenu, setOpenMenu] = useState<ToolbarMenuKey | null>(null);
+  const [leavingProject, setLeavingProject] = useState(false);
+  const [imageUploadPending, setImageUploadPending] = useState(false);
+  const [imageUploadCount, setImageUploadCount] = useState(0);
+
+  useEffect(() => {
+    const sync = () => {
+      setImageUploadPending(hasPendingCanvasImageUploads());
+      setImageUploadCount(pendingCanvasImageUploadCount());
+    };
+    sync();
+    window.addEventListener(CANVAS_IMAGE_UPLOADS_CHANGED, sync);
+    return () =>
+      window.removeEventListener(CANVAS_IMAGE_UPLOADS_CHANGED, sync);
+  }, []);
+
+  const onBackToProjects = useCallback(
+    async (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      if (leavingProject) return;
+      setLeavingProject(true);
+      try {
+        await waitForPendingCanvasImageUploads(60_000);
+        await flushPendingCanvasImageUploadPersist();
+        await flushCanvasGraphPersist(true);
+        router.push("/projects");
+      } finally {
+        setLeavingProject(false);
+      }
+    },
+    [leavingProject, router],
+  );
 
   useEffect(() => {
     mineMenu.setOpen(openMenu === "mine");
@@ -218,34 +259,59 @@ export function CanvasToolbar({
             生成中 · {inflightTaskCount} 个任务
           </span>
         ) : null}
-        <span
-          className={cn(
-            "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
-            saving || lastSavedAt || saveError ? CANVAS_SEMANTIC_STATUS_CLASS : "",
-          )}
-          title={saveError ? `保存失败：${saveError}` : undefined}
-        >
-          {saving ? (
-            "保存中…"
-          ) : saveError ? (
-            <span className={cn("truncate", CANVAS_SEMANTIC_ERROR_CLASS)}>
-              保存失败：{saveError}
-            </span>
-          ) : lastSavedAt ? (
-            `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
-          ) : (
-            ""
-          )}
-        </span>
+        {imageUploadPending ? (
+          <span
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-medium text-cyan-100"
+            title="粘贴/上传图片正在写入 OSS"
+          >
+            <Loader2 className="size-3 animate-spin" />
+            图片上传中
+            {imageUploadCount > 1 ? ` · ${imageUploadCount}` : ""}
+          </span>
+        ) : null}
+        {saving || leavingProject ? (
+          <span
+            className={cn(
+              "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
+              CANVAS_SEMANTIC_STATUS_CLASS,
+            )}
+            title="画布数据写入云端"
+          >
+            {leavingProject ? "正在保存并离开…" : "保存中…"}
+          </span>
+        ) : !imageUploadPending && (lastSavedAt || saveError) ? (
+          <span
+            className={cn(
+              "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
+              saveError ? CANVAS_SEMANTIC_ERROR_CLASS : CANVAS_SEMANTIC_STATUS_CLASS,
+            )}
+            title={saveError ? `保存失败：${saveError}` : undefined}
+          >
+            {saveError ? (
+              <>保存失败：{saveError}</>
+            ) : lastSavedAt ? (
+              `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
+            ) : (
+              ""
+            )}
+          </span>
+        ) : null}
       </div>
       <Link
         href="/projects"
+        onClick={(e) => void onBackToProjects(e)}
         className={cn(
           CANVAS_TOOLBAR_BTN_CLASS,
           "justify-self-center whitespace-nowrap",
+          (leavingProject || imageUploadPending) && "opacity-80",
         )}
       >
-        <ArrowLeft className="size-3" /> 回到画布列表
+        {leavingProject ? (
+          <Loader2 className="size-3 animate-spin" />
+        ) : (
+          <ArrowLeft className="size-3" />
+        )}{" "}
+        {leavingProject ? "正在保存图片…" : "回到画布列表"}
       </Link>
       <div
         data-canvas-toolbar-actions
