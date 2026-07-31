@@ -220,7 +220,6 @@ async function uploadFilePathToOss(args: {
     await client.put(args.key, stream as unknown as Buffer, {
       headers: { "Content-Type": ct },
       ACL: "public-read",
-      timeout: MEDIA_RENDER_UPLOAD_TIMEOUT_MS,
     });
     args.onUploadProgress?.(1);
   });
