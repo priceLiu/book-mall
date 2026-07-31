@@ -2,6 +2,7 @@
 
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import { buildPro2ThreeViewNodeData } from "./pro2-spawn-nodes";
+import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
 import {
   pro2MediaChildSize,
   pro2MediaGridLayout,
@@ -9,15 +10,18 @@ import {
   pro2MediaGroupOrigin,
   relayoutPro2MediaGroup,
 } from "./pro2-media-group-layout";
-import { ensurePro2HubToMediaGroupEdge } from "./pro2-hub-media-group-edge";
+import {
+  ensurePro2HubToMediaGroupChildEdges,
+} from "./pro2-hub-media-group-edge";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 
 function characterRowPreview(row: StoryProCharacterRow): {
   ossUrl?: string;
   uploading?: boolean;
   uploadError?: string;
+  runtime?: CanvasNodeRuntime;
 } {
   const rt = row.runtime;
   const url =
@@ -30,7 +34,51 @@ function characterRowPreview(row: StoryProCharacterRow): {
     ossUrl: url,
     uploading,
     uploadError: rt?.failMessage,
+    runtime: rt
+      ? {
+          status: rt.status,
+          taskId: rt.taskId,
+          ossUrl: rt.ossUrl,
+          ephemeralUrl: rt.ephemeralUrl,
+          failCode: rt.failCode,
+          failMessage: rt.failMessage,
+        }
+      : undefined,
   };
+}
+
+/** 同步到组内三视图节点：避免 undefined 覆盖已有 ossUrl */
+export function buildCharacterImageNodeDataPatch(
+  row: StoryProCharacterRow,
+): Record<string, unknown> {
+  const preview = characterRowPreview(row);
+  const dockInput = formatCharacterRowThreeViewPrompt({
+    name: row.name,
+    role: row.role,
+    appearance: row.appearance,
+    personality: row.personality,
+  });
+  const patch: Record<string, unknown> = {
+    label: row.name?.trim() || "角色",
+    dockInput,
+    pro2RowKey: row.key,
+    uploading: Boolean(preview.uploading),
+  };
+  if (preview.ossUrl) {
+    patch.ossUrl = preview.ossUrl;
+    patch.blobUrl = undefined;
+  }
+  if (preview.uploadError?.trim()) {
+    patch.uploadError = preview.uploadError;
+  } else if (!preview.uploading) {
+    patch.uploadError = undefined;
+  }
+  if (preview.runtime) {
+    patch.runtime = preview.runtime;
+  } else if (!preview.uploading) {
+    patch.runtime = undefined;
+  }
+  return patch;
 }
 
 function groupLabel(hubNodeId: string, nodes: CanvasFlowNode[]): string {
@@ -119,10 +167,18 @@ export function ensurePro2CharacterImageGroup(
   const sorted = [...args.rows].sort((a, b) => a.name.localeCompare(b.name, "zh"));
   if (!sorted.length) {
     if (existingGroup?.id && args.setEdges) {
-      ensurePro2HubToMediaGroupEdge(
+      const childIds = args.nodes
+        .filter(
+          (n) =>
+            isCharacterThreeViewChild(n, args.characterColumnId) &&
+            n.parentId === existingGroup.id,
+        )
+        .map((n) => n.id);
+      ensurePro2HubToMediaGroupChildEdges(
         args.setEdges,
         args.hubNodeId,
         existingGroup.id,
+        childIds,
       );
     }
     return existingGroup?.id ?? null;
@@ -141,19 +197,14 @@ export function ensurePro2CharacterImageGroup(
 
   for (let i = 0; i < sorted.length; i++) {
     const row = sorted[i]!;
-    const preview = characterRowPreview(row);
     const label = row.name?.trim() || `角色 ${i + 1}`;
-    const prompt = row.prompt?.trim() || row.appearance?.trim() || "";
     const existing = childNodes.find(
       (n) => (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,
     );
 
     if (existing) {
       args.updateNodeData(existing.id, {
-        label,
-        dockInput: prompt,
-        ...preview,
-        pro2RowKey: row.key,
+        ...buildCharacterImageNodeDataPatch(row),
         pro2HubNodeId: args.hubNodeId,
         pro2ControllerNodeId: args.characterColumnId,
         pro2GroupId: groupId,
@@ -165,9 +216,7 @@ export function ensurePro2CharacterImageGroup(
     const rel = pro2MediaGridLayout(i, cellSize, cols);
     const data = {
       ...buildPro2ThreeViewNodeData({ label }),
-      dockInput: prompt,
-      ...preview,
-      pro2RowKey: row.key,
+      ...buildCharacterImageNodeDataPatch(row),
       pro2HubNodeId: args.hubNodeId,
       pro2ControllerNodeId: args.characterColumnId,
     };
@@ -219,7 +268,12 @@ export function ensurePro2CharacterImageGroup(
   if (groupId) {
     relayoutPro2MediaGroup(args.setNodes, groupId, { resetOrigin: true });
     if (args.setEdges) {
-      ensurePro2HubToMediaGroupEdge(args.setEdges, args.hubNodeId, groupId);
+      ensurePro2HubToMediaGroupChildEdges(
+        args.setEdges,
+        args.hubNodeId,
+        groupId,
+        newChildIds,
+      );
     }
   }
 
@@ -239,12 +293,6 @@ export function syncPro2CharacterImagesFromRows(
         (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,
     );
     if (!img) continue;
-    const preview = characterRowPreview(row);
-    const prompt = row.prompt?.trim() || row.appearance?.trim() || "";
-    updateNodeData(img.id, {
-      label: row.name?.trim() || "角色",
-      dockInput: prompt,
-      ...preview,
-    });
+    updateNodeData(img.id, buildCharacterImageNodeDataPatch(row));
   }
 }

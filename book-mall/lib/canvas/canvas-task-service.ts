@@ -1767,7 +1767,8 @@ export async function runCanvasPollWorker(opts?: {
     if (
       zombies.failedIncomplete > 0 ||
       zombies.requeuedDispatching > 0 ||
-      zombies.displayRecovered > 0
+      zombies.displayRecovered > 0 ||
+      zombies.submitTimeoutRecovered > 0
     ) {
       logKieEvent("info", "[canvas] inflight-zombie-reconcile", zombies);
     }

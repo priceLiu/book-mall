@@ -24,10 +24,10 @@ export function pro2MediaGridGap(cellWidth: number): number {
   return Math.max(PRO2_MEDIA_GRID_GAP, Math.round(cellWidth / 2));
 }
 export const PRO2_MEDIA_GROUP_HEADER = 48;
-/** 组内边距（大留白：空白区即「选中组」可点区域） */
-export const PRO2_MEDIA_GROUP_PAD = 192;
-/** 组右 / 下额外空白，进一步扩大可点选组区域（复刻图 2） */
-export const PRO2_MEDIA_GROUP_EXTRA = 168;
+/** 组内边距（留白即「选中组」可点区域） */
+export const PRO2_MEDIA_GROUP_PAD = 96;
+/** 组右 / 下额外空白，进一步扩大可点选组区域 */
+export const PRO2_MEDIA_GROUP_EXTRA = 84;
 
 /** 分镜图组 · 宫格单元（≈3:2 横版） */
 export const PRO2_FRAME_CELL_WIDTH = 296;
@@ -119,6 +119,19 @@ export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
     style?.height ??
     cell.height;
   if (data.gridSplitFrameCrop && data.mediaFit) {
+    return {
+      width: Math.max(1, Math.round(w)),
+      height: Math.max(1, Math.round(h)),
+    };
+  }
+  const fitKey = (node.data as { mediaFitKey?: string }).mediaFitKey;
+  if ((data as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()) {
+    return {
+      width: Math.max(1, Math.round(w)),
+      height: Math.max(1, Math.round(h)),
+    };
+  }
+  if (fitKey?.startsWith("upload|") || fitKey?.startsWith("image|")) {
     return {
       width: Math.max(1, Math.round(w)),
       height: Math.max(1, Math.round(h)),
@@ -449,11 +462,65 @@ export function applyPro2MediaGroupRelayout(
   return sortNodesForReactFlow(next);
 }
 
+function flowNodeGeometry(n: CanvasFlowNode): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const style = n.style as { width?: number; height?: number } | undefined;
+  return {
+    x: n.position.x,
+    y: n.position.y,
+    w: Math.round(
+      (typeof n.width === "number" ? n.width : undefined) ??
+        style?.width ??
+        0,
+    ),
+    h: Math.round(
+      (typeof n.height === "number" ? n.height : undefined) ??
+        style?.height ??
+        0,
+    ),
+  };
+}
+
+function pro2MediaRelayoutChanged(
+  before: CanvasFlowNode[],
+  after: CanvasFlowNode[],
+  groupId: string,
+): boolean {
+  const ids = new Set<string>([groupId]);
+  for (const n of after) {
+    if (n.parentId === groupId) ids.add(n.id);
+  }
+  for (const id of ids) {
+    const a = before.find((n) => n.id === id);
+    const b = after.find((n) => n.id === id);
+    if (!a || !b) return true;
+    const ga = flowNodeGeometry(a);
+    const gb = flowNodeGeometry(b);
+    if (
+      ga.x !== gb.x ||
+      ga.y !== gb.y ||
+      ga.w !== gb.w ||
+      ga.h !== gb.h
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** 收拢孤儿图片进组、网格重排、组框贴合子节点 */
 export function relayoutPro2MediaGroup(
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
   groupId: string,
   opts?: { resetOrigin?: boolean },
 ): void {
-  setNodes((nodes) => applyPro2MediaGroupRelayout(nodes, groupId, opts));
+  setNodes((nodes) => {
+    const next = applyPro2MediaGroupRelayout(nodes, groupId, opts);
+    if (!pro2MediaRelayoutChanged(nodes, next, groupId)) return nodes;
+    return next;
+  });
 }

@@ -113,6 +113,28 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       }
     }
 
+    const pseudoTimeoutIds = tasks.filter(
+      (t) =>
+        t.status === "FAILED" && t.failCode === "SUBMIT_DISPATCH_TIMEOUT",
+    );
+    if (pseudoTimeoutIds.length > 0) {
+      const { recoverProjectSubmitDispatchTimeoutTasksForRead } = await import(
+        "@/lib/generation/traffic-control/canvas-orphan-gateway-log"
+      );
+      const recovered = await recoverProjectSubmitDispatchTimeoutTasksForRead(
+        pseudoTimeoutIds,
+        Math.min(10, pseudoTimeoutIds.length),
+      );
+      if (recovered > 0) {
+        tasks = await listProjectTasks({
+          userId: guard.user.id,
+          projectId,
+          nodeIds,
+          lightweight: true,
+        });
+      }
+    }
+
     // 有进行中任务：后台 DISPATCHING 超时自愈（30s）+ 轮询推进，不阻塞读响应
     const hasInflight = tasks.some((t) => CANVAS_INFLIGHT_STATUS.has(t.status));
     const needsPreSubmitRecover = tasks.some(

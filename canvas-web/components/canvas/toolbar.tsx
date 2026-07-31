@@ -185,7 +185,7 @@ export function CanvasToolbar({
   return (
     <header
       data-canvas-toolbar
-      className="relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 overflow-hidden border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white"
+      className="relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 overflow-hidden border-b border-white/10 bg-[#181818] px-3 py-2 text-white"
     >
       <div
         data-canvas-toolbar-meta

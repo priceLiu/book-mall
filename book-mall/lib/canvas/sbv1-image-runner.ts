@@ -7,6 +7,7 @@ import {
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 
 function httpsImageUrls(urls: string[]): string[] {
   return urls.filter((u) => typeof u === "string" && /^https?:\/\//.test(u.trim()));
@@ -132,9 +133,13 @@ export async function runSbv1ImageNode(
   const hasRefs = imageUrls.length > 0;
   const stylePrompt = styleRef?.prompt?.trim() ?? "";
   const promptParts = [stylePrompt, promptRaw, ...upstreamText].filter(Boolean);
-  const prompt =
+  let prompt =
     promptParts.join("\n\n") ||
     (hasRefs ? "根据参考图生成或编辑画面" : "");
+
+  if (String(data.pro2MediaRole ?? "") === "scene") {
+    prompt = finalizeStoryPro2SceneImagePrompt(prompt);
+  }
 
   if (!prompt.trim()) {
     throw new CanvasProjectError(

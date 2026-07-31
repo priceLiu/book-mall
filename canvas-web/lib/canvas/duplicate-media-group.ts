@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { duplicateCanvasNodeData } from "./clone-node-data";
 import {
   ensurePro2FrameBoardToVideoBoardEdge,
-  ensurePro2HubToMediaGroupEdge,
+  ensurePro2HubToMediaGroupChildEdges,
 } from "./pro2-hub-media-group-edge";
 import { PRO2_MEDIA_GROUP_EXTRA, PRO2_MEDIA_GROUP_PAD } from "./pro2-media-group-layout";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
@@ -119,12 +119,13 @@ export function duplicateMediaGroupInGraph(
       newGroupId,
     );
   } else if (hubId && nodes.some((n) => n.id === hubId)) {
-    ensurePro2HubToMediaGroupEdge(
+    ensurePro2HubToMediaGroupChildEdges(
       (fn) => {
         nextEdges = fn(nextEdges);
       },
       hubId,
       newGroupId,
+      newChildren.map((c) => c.id),
     );
   }
 

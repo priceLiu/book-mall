@@ -235,8 +235,8 @@
 
 | 能力 | 配置 |
 | --- | --- |
-| 自动保存 | 5 / 15 / 30 分钟 + 1.5s debounce · `canvas-autosave-settings.ts` |
-| 我的历史 | 每项目 15 条 · PATCH 写库 · `canvas:history-updated` |
+| 自动保存 | 1.5s debounce 落盘项目 + 5 / 15 / 30 分钟写历史（30s 心跳按 `graphRevision` 判定）· `canvas-autosave-settings.ts` |
+| 我的历史 | 每项目 15 条 · PATCH 写库 · `canvas:history-updated` · 封面为视口截图（`canvas-viewport-snapshot.ts`） |
 | 沉浸顶栏 | Pro2/sbv1 全屏 · 鼠标顶缘唤出 |
 | 框选工具条 | `Pro2SelectionToolbar`（Pro2 · 与组顶栏同壳层）/ `SelectionToolbar`（通用） |
 

@@ -7,6 +7,8 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDockHidden } from "@/lib/canvas/use-libtv-floating-dock";
 import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
+import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
+import { findPro2FrameImageNodeForRow } from "@/lib/canvas/pro2-spawn-frame-image-group";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
@@ -27,6 +29,7 @@ export function Pro2FrameCellInputDock() {
   const focus = useCanvasStore((s) => s.pro2FrameDockFocus);
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
 
   const selectedFrame = useMemo(() => {
     const picked = rfNodes.filter(
@@ -81,10 +84,18 @@ export function Pro2FrameCellInputDock() {
 
   const onRegenerate = useCallback(() => {
     if (!storeNode || !activeFocus || !row) return;
+    const img = findPro2FrameImageNodeForRow(
+      nodes,
+      storeNode.id,
+      activeFocus.rowKey,
+    );
+    if (img) {
+      optimisticLibtvMediaRunStart(img.id, updateNodeData, setNodeRuntime);
+    }
     batchRunStoryRows(storeNode.id, [activeFocus.rowKey], "frameImage", {
       forceFresh: true,
     });
-  }, [storeNode, activeFocus, row]);
+  }, [storeNode, activeFocus, row, nodes, updateNodeData, setNodeRuntime]);
 
   if (!storeNode || !row || !placement || !activeFocus) return null;
 

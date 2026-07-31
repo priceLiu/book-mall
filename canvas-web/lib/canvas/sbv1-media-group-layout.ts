@@ -79,6 +79,30 @@ function sbv1GroupImageCellSize(node: CanvasFlowNode): {
     return { width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
   }
   if (isCanonicalImageNode) {
+    const fitKey = (node.data as { mediaFitKey?: string }).mediaFitKey;
+    if (
+      Boolean(
+        (node.data as { mediaAspectPreset?: string }).mediaAspectPreset?.trim(),
+      ) ||
+      fitKey?.startsWith("upload|") ||
+      fitKey?.startsWith("image|")
+    ) {
+      const style = node.style as { width?: number; height?: number } | undefined;
+      const w =
+        node.measured?.width ??
+        (typeof node.width === "number" ? node.width : undefined) ??
+        style?.width ??
+        SBV1_IMAGE_NODE_WIDTH;
+      const h =
+        node.measured?.height ??
+        (typeof node.height === "number" ? node.height : undefined) ??
+        style?.height ??
+        SBV1_IMAGE_NODE_HEIGHT;
+      return {
+        width: Math.max(1, Math.round(w)),
+        height: Math.max(1, Math.round(h)),
+      };
+    }
     if (Boolean((node.data as { mediaFit?: boolean }).mediaFit)) {
       return resolveLibtvImageCellSize(node);
     }
@@ -515,12 +539,55 @@ export function applySbv1MediaGroupRelayout(
   return sortNodesForReactFlow(next);
 }
 
+function sbv1MediaRelayoutChanged(
+  before: CanvasFlowNode[],
+  after: CanvasFlowNode[],
+  groupId: string,
+): boolean {
+  const ids = new Set<string>([groupId]);
+  for (const n of after) {
+    if (n.parentId === groupId) ids.add(n.id);
+  }
+  for (const id of ids) {
+    const a = before.find((n) => n.id === id);
+    const b = after.find((n) => n.id === id);
+    if (!a || !b) return true;
+    if (a.position.x !== b.position.x || a.position.y !== b.position.y) {
+      return true;
+    }
+    const aw =
+      (typeof a.width === "number" ? a.width : undefined) ??
+      (a.style as { width?: number } | undefined)?.width ??
+      0;
+    const ah =
+      (typeof a.height === "number" ? a.height : undefined) ??
+      (a.style as { height?: number } | undefined)?.height ??
+      0;
+    const bw =
+      (typeof b.width === "number" ? b.width : undefined) ??
+      (b.style as { width?: number } | undefined)?.width ??
+      0;
+    const bh =
+      (typeof b.height === "number" ? b.height : undefined) ??
+      (b.style as { height?: number } | undefined)?.height ??
+      0;
+    if (Math.round(aw) !== Math.round(bw) || Math.round(ah) !== Math.round(bh)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function relayoutSbv1MediaGroup(
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
   groupId: string,
   edges: CanvasFlowEdge[],
 ): void {
-  setNodes((nodes) => applySbv1MediaGroupRelayout(nodes, edges, groupId));
+  setNodes((nodes) => {
+    const next = applySbv1MediaGroupRelayout(nodes, edges, groupId);
+    if (!sbv1MediaRelayoutChanged(nodes, next, groupId)) return nodes;
+    return next;
+  });
 }
 
 const sbv1GroupRelayoutTimers = new Map<string, number>();
@@ -537,7 +604,11 @@ export function scheduleRelayoutSbv1MediaGroup(
   const timer = window.setTimeout(() => {
     sbv1GroupRelayoutTimers.delete(groupId);
     const edges = getEdges();
-    setNodes((nodes) => applySbv1MediaGroupRelayout(nodes, edges, groupId));
+    setNodes((nodes) => {
+      const next = applySbv1MediaGroupRelayout(nodes, edges, groupId);
+      if (!sbv1MediaRelayoutChanged(nodes, next, groupId)) return nodes;
+      return next;
+    });
   }, delayMs);
   sbv1GroupRelayoutTimers.set(groupId, timer);
 }

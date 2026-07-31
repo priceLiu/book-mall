@@ -140,6 +140,8 @@ import {
   markCanvasProjectTasksPoolForbidden,
 } from "./use-node-task-history";
 import { restoreServerInflightNodeRuntimes } from "./restore-server-inflight-node-runtimes";
+import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
+import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import {
   CANVAS_POLL_IDLE_RECHECK_MS,
   nextPollIntervalMs,
@@ -151,6 +153,18 @@ const INITIAL_FULL_SCAN_DELAY_MS = 300;
 const INITIAL_TICK_DELAY_MS = 200;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
 const FULL_SCAN_EVERY_N_TICKS = 3;
+
+function syncPro2CharacterGroupImagesFromColumnRuntimes(
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  for (const node of nodes) {
+    if (!isAnyStoryCharacterColumnType(node.type ?? "")) continue;
+    const rows = (node.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
+    if (!rows.length) continue;
+    syncPro2CharacterImagesFromRows(nodes, node.id, rows, updateNodeData);
+  }
+}
 
 function canvasStoryRunJobKey(job: CanvasStoryRunJob): string {
   const parts = [job.nodeId];
@@ -2601,6 +2615,10 @@ export function useCanvasRunner(
           setNodeRuntime,
         );
         applyStoryColumnRowTasks(tasks, nodesNow);
+        syncPro2CharacterGroupImagesFromColumnRuntimes(
+          useCanvasStore.getState().nodes,
+          updateNodeData,
+        );
         const skipReconcileNodeIds = new Set<string>();
         for (const key of inflightRef.current) {
           skipReconcileNodeIds.add(key.split(":")[0]!);

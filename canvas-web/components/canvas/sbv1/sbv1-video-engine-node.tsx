@@ -46,6 +46,7 @@ import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
+import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
@@ -417,6 +418,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
   const showToolbar = Boolean(showFloatingToolbar && hasToolbarContent);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
+
+  useLibtvMediaAspectPresetSync(id, d.aspectRatio, !isPro2VideoBoardCell);
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,

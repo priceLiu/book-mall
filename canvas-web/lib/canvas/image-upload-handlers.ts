@@ -1,7 +1,5 @@
 import { useEffect, useRef, type DragEventHandler } from "react";
 
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
-
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
 
 const CLIPBOARD_IMAGE_TYPES = new Set([
@@ -63,17 +61,14 @@ export function allImageFilesFromDataTransfer(
   return out;
 }
 
-/** 剪贴板图片（含 URL 回落）；规范化后供上传/预览 */
+/** 剪贴板图片（含 URL 回落）；返回原始 bytes，预览/上传各自异步处理 */
 export async function resolveClipboardImageFiles(
   dt: DataTransfer | null | undefined,
 ): Promise<File[]> {
   const direct = allImageFilesFromDataTransfer(dt);
-  if (direct.length) {
-    return Promise.all(direct.map((f) => normalizeCanvasImageFile(f)));
-  }
+  if (direct.length) return direct;
   const urlFile = await imageFileFromClipboardUrl(dt);
-  if (!urlFile) return [];
-  return [await normalizeCanvasImageFile(urlFile)];
+  return urlFile ? [urlFile] : [];
 }
 
 /** 从剪贴板或拖放 DataTransfer 中取第一张图片文件 */
@@ -306,10 +301,7 @@ export async function routeClipboardImageToActivePasteSlot(
   }
   const files = allImageFilesFromDataTransfer(dt);
   if (files.length) {
-    const normalized = await Promise.all(
-      files.map((f) => normalizeCanvasImageFile(f)),
-    );
-    return deliverFilesToPasteTarget(target, normalized);
+    return deliverFilesToPasteTarget(target, files);
   }
   const file = await resolveClipboardImageFile(dt);
   if (!file) return false;

@@ -35,6 +35,7 @@ export function CanvasToolbarSidePanelShell({
   return (
     <div
       className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} ${zIndexClass} canvas-toolbar-side-panel-overlay-enter`}
+      data-canvas-snapshot-exclude
       onClick={onClose}
       role="presentation"
     >

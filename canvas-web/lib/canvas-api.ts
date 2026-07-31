@@ -408,6 +408,8 @@ export type CanvasProjectHistoryMeta = {
 export type CanvasProjectHistorySnapshotRequest = {
   source?: "autosave" | "manual";
   label?: string;
+  /** 画布视口截图（OSS）；缺省时服务端回退到项目封面 / 画布内媒体图 */
+  thumbnailUrl?: string;
 };
 
 export async function patchCanvasProject(

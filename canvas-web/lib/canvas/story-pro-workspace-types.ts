@@ -104,6 +104,8 @@ export type StoryProScriptHubNodeData = {
     modelKey?: string;
     params?: Record<string, unknown>;
   };
+  /** 2.0 · 从大纲「视觉风格总纲」解析的全片视觉锚定（生图统一风格） */
+  visualStylePack?: import("./story-pro-visual-style-pack").StoryProVisualStylePack;
   storyboardMd: string;
   /** 2.0 输入坞 · 用户提示词 */
   dockInput?: string;
@@ -179,6 +181,8 @@ export type StoryProCharacterRow = {
   name: string;
   role: string;
   appearance: string;
+  /** 角色表 · 性格 */
+  personality?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];
@@ -192,6 +196,14 @@ export type StoryProSceneRow = {
   key: string;
   name: string;
   description: string;
+  /** 场景辞典 · 环境 */
+  environment?: string;
+  /** 场景辞典 · 时间 */
+  time?: string;
+  /** 场景辞典 · 气氛 */
+  mood?: string;
+  /** 场景辞典 · 生图关键词（中文或英文） */
+  imageKeywords?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];

@@ -118,4 +118,30 @@ describe("crew-bulletin-task-prompts", () => {
     expect(detail).toContain("环境：");
     expect(detail).toContain("教室");
   });
+
+  it("scene dock prompt appends empty establishing-shot constraints", () => {
+    const task: CrewBulletinTask = {
+      id: "scene:hub::王府",
+      kind: "scene",
+      rowKey: "hub::王府",
+      label: "摄政王府外院草地",
+      status: "unclaimed",
+    };
+    const hubData = {
+      sceneRows: [
+        {
+          key: "hub::王府",
+          name: "摄政王府外院草地",
+          environment: "外院草地、石墙",
+          time: "月夜",
+          mood: "静谧",
+          imageKeywords: "moonlit courtyard, ivy stone wall",
+        },
+      ],
+    } as StoryProScriptHubNodeData;
+    const dock = resolveCrewTaskDockInput(task, "hub-1", hubData);
+    expect(dock).toContain("环境：外院草地");
+    expect(dock).toContain("empty scene, no people");
+    expect(dock).toContain("场景空镜约束");
+  });
 });

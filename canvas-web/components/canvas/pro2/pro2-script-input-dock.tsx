@@ -139,10 +139,27 @@ export function Pro2ScriptInputDock() {
     [storeNode, updateNodeData],
   );
 
-  const onSend = useCallback(async () => {
-    if (!storeNode || !hubRfNode) return;
+  const nodeId = storeNode?.id;
 
-    if (!d.providerId?.trim() || !d.modelKey?.trim()) {
+  const onSend = useCallback(async () => {
+    if (!nodeId) return;
+    // 发送钮在 pointerdown 已 flush 草稿；这里从 store 读最新值，避免用到上一帧的空 prompt
+    const snapshot = useCanvasStore.getState();
+    const freshNode = snapshot.nodes.find((n) => n.id === nodeId);
+    if (!freshNode) return;
+    const fd = (freshNode.data ?? {}) as StoryProScriptHubNodeData;
+    const freshInput = fd.dockInput ?? "";
+    const freshRefImages = (fd.dockRefImages ?? []) as StoryRefImage[];
+    const freshNodes = snapshot.nodes;
+    const freshEdges = snapshot.edges;
+    const freshRfNode = {
+      id: nodeId,
+      data: fd,
+      type: "story-pro2-script-hub",
+      position: freshNode.position,
+    } as const;
+
+    if (!fd.providerId?.trim() || !fd.modelKey?.trim()) {
       await alert({
         title: "请选择模型",
         message: "点击左下角模型选择器，选择 LLM 后再发送。",
@@ -151,10 +168,12 @@ export function Pro2ScriptInputDock() {
       return;
     }
 
-    const hasDockInput = Boolean(dockInput.trim());
     const canRun =
-      hasDockInput ||
-      pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges });
+      Boolean(freshInput.trim()) ||
+      pro2HubCanSendScriptPhase(freshRfNode as never, fd, {
+        nodes: freshNodes,
+        edges: freshEdges,
+      });
     if (!canRun) {
       await alert({
         title: "请先提供创意输入",
@@ -166,23 +185,19 @@ export function Pro2ScriptInputDock() {
     }
 
     enqueuePro2ScriptGeneration(
-      storeNode.id,
-      dockInput,
-      dockRefImages,
+      nodeId,
+      freshInput,
+      freshRefImages,
       updateNodeData,
-      { forceFresh: true, nodes, edges, hubData: d, regenerateAll: true },
+      {
+        forceFresh: true,
+        nodes: freshNodes,
+        edges: freshEdges,
+        hubData: fd,
+        regenerateAll: true,
+      },
     );
-  }, [
-    storeNode,
-    hubRfNode,
-    d,
-    dockInput,
-    dockRefImages,
-    nodes,
-    edges,
-    updateNodeData,
-    alert,
-  ]);
+  }, [nodeId, updateNodeData, alert]);
 
   if (!storeNode || !dockActive || !placement) return null;
 

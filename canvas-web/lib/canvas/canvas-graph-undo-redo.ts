@@ -10,6 +10,22 @@ function dispatchGraphUndoRedo(): void {
   window.dispatchEvent(new CustomEvent(CANVAS_GRAPH_UNDO_REDO_EVENT));
 }
 
+/**
+ * 撤销/重做后让 autosave 感知变更。
+ * - 必须在 pause 中写：zundo 的任何新 set 都会清空 futureStates（重做栈）。
+ * - `graphRevision` 会随快照一起回滚，须跳到比回滚前更大的值保持单调；
+ *   否则可能与「已保存的那个 revision」撞号，autosave 误判已保存而丢掉本次撤销。
+ */
+function markGraphChangedWithoutTracking(revisionBefore: number): void {
+  const temporal = useCanvasStore.temporal.getState();
+  const wasTracking = temporal.isTracking;
+  temporal.pause();
+  useCanvasStore.setState((s) => ({
+    graphRevision: Math.max(revisionBefore, s.graphRevision) + 1,
+  }));
+  if (wasTracking) temporal.resume();
+}
+
 /** 撤销：恢复 tracking、执行 undo、强制 RF 与 store 对齐 */
 export function canvasGraphUndo(): boolean {
   const temporal = useCanvasStore.temporal.getState();
@@ -21,8 +37,9 @@ export function canvasGraphUndo(): boolean {
     });
     return false;
   }
+  const revisionBefore = useCanvasStore.getState().graphRevision;
   temporal.undo();
-  useCanvasStore.setState((s) => ({ graphRevision: s.graphRevision + 1 }));
+  markGraphChangedWithoutTracking(revisionBefore);
   dispatchGraphUndoRedo();
   return true;
 }
@@ -38,8 +55,9 @@ export function canvasGraphRedo(): boolean {
     });
     return false;
   }
+  const revisionBefore = useCanvasStore.getState().graphRevision;
   temporal.redo();
-  useCanvasStore.setState((s) => ({ graphRevision: s.graphRevision + 1 }));
+  markGraphChangedWithoutTracking(revisionBefore);
   dispatchGraphUndoRedo();
   return true;
 }

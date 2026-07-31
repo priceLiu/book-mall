@@ -23,6 +23,7 @@ import {
 } from "./parse-md-tables";
 import { pushStoryRevision } from "./story-revision";
 import { promoteEmbeddedPackFromOutline } from "./story-hub-runtime";
+import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
 
 export function applyHubSectionFromTask(
   data: StoryScriptHubNodeData,
@@ -45,6 +46,10 @@ export function applyHubSectionFromTask(
       );
       patch.outlineMd = outlineMd;
       patch.outlineHistory = pushStoryRevision(data.outlineHistory, outlineMd);
+      const stylePack = parseVisualStylePackFromOutline(outlineMd);
+      if (stylePack) {
+        (patch as Record<string, unknown>).visualStylePack = stylePack;
+      }
       if (characterMd !== (data.characterMd ?? "")) {
         patch.characterMd = characterMd;
         patch.characterHistory = pushStoryRevision(

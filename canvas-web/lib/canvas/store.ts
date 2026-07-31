@@ -45,6 +45,10 @@ import {
   sortNodesForReactFlow,
   stripPersistedNodeSelection,
 } from "./normalize-graph-nodes";
+import {
+  maybeApplyLibtvMediaAspectPresetForNewNode,
+  maybeApplyLibtvMediaAspectPresetFromPatch,
+} from "./libtv-media-aspect-preset-apply";
 import { reflowStoryComicFlat } from "./story-comic-layout";
 import { reflowStoryComicColumns } from "./story-comic-columns-layout";
 import {
@@ -137,6 +141,21 @@ function isCanvasDraftDataPatch(
   if (commit === true) return false;
   const keys = Object.keys(patch);
   return keys.length > 0 && keys.every((k) => CANVAS_DRAFT_DATA_FIELDS.has(k));
+}
+
+/**
+ * hydrate 收尾（延后布局 / 视频组修复）跑在 microtask 里，已在调用方 `clear()` 之后，
+ * 不 pause 会让「打开项目后第一次撤销」回到未定稿布局。
+ */
+function runWithUndoTrackingPaused(fn: () => void): void {
+  const temporal = useCanvasStore.temporal.getState();
+  const wasTracking = temporal.isTracking;
+  temporal.pause();
+  try {
+    fn();
+  } finally {
+    if (wasTracking) temporal.resume();
+  }
 }
 
 function withGraphRevision<T extends Record<string, unknown>>(
@@ -377,6 +396,9 @@ type CanvasState = {
       mediaFitVersion: number;
       mediaNaturalW: number;
       mediaNaturalH: number;
+      mediaAspectPreset?: string;
+      mediaAspectPresetSizeVersion?: number;
+      manualSize?: boolean;
     },
   ) => void;
   /** NodeResizer 松手：从 RF 权威几何一次性写入 store（含左/上缘 position） */
@@ -628,7 +650,7 @@ export const useCanvasStore = create<CanvasState>()(
           g.viewport ?? { x: 0, y: 0, zoom: 1 },
         );
 
-        const applyDeferredLayout = () => {
+        const applyDeferredLayoutInner = () => {
           const current = get();
           const laid = finalizeHydratedGraph(current.nodes, current.edges);
           const nodesWithInflight = preserveLocalInflightOnHydrateLayout(
@@ -647,8 +669,13 @@ export const useCanvasStore = create<CanvasState>()(
             }),
           );
           queueMicrotask(() => {
-            runPostHydratePro2VideoBoardRepair(get);
+            runWithUndoTrackingPaused(() => {
+              runPostHydratePro2VideoBoardRepair(get);
+            });
           });
+        };
+        const applyDeferredLayout = () => {
+          runWithUndoTrackingPaused(applyDeferredLayoutInner);
         };
 
         if (nodes.length >= DEFER_HYDRATE_LAYOUT_NODE_COUNT) {
@@ -691,7 +718,9 @@ export const useCanvasStore = create<CanvasState>()(
           }),
         );
         queueMicrotask(() => {
-          runPostHydratePro2VideoBoardRepair(get);
+          runWithUndoTrackingPaused(() => {
+            runPostHydratePro2VideoBoardRepair(get);
+          });
         });
       },
 
@@ -1090,6 +1119,7 @@ export const useCanvasStore = create<CanvasState>()(
             ),
           }),
         );
+        maybeApplyLibtvMediaAspectPresetForNewNode(id, type);
         return id;
       },
 
@@ -1122,6 +1152,7 @@ export const useCanvasStore = create<CanvasState>()(
             nodes: ensureNodeDragHandles(sortNodesForReactFlow([...all, node])),
           }),
         );
+        maybeApplyLibtvMediaAspectPresetForNewNode(id, type);
         return id;
       },
 
@@ -1161,9 +1192,11 @@ export const useCanvasStore = create<CanvasState>()(
           } finally {
             temporal.resume();
           }
+          maybeApplyLibtvMediaAspectPresetFromPatch(id, patch);
           return;
         }
         set((state) => withGraphRevision(state, { nodes }));
+        maybeApplyLibtvMediaAspectPresetFromPatch(id, patch);
       },
 
       setNodeRuntime: (id, runtime) => {
@@ -1247,6 +1280,36 @@ export const useCanvasStore = create<CanvasState>()(
         size,
         fitMeta,
       ) => {
+        const prev = get().nodes.find((n) => n.id === id);
+        if (prev) {
+          const style = prev.style as { width?: number; height?: number } | undefined;
+          const prevW = Math.round(
+            (typeof prev.width === "number" ? prev.width : undefined) ??
+              style?.width ??
+              0,
+          );
+          const prevH = Math.round(
+            (typeof prev.height === "number" ? prev.height : undefined) ??
+              style?.height ??
+              0,
+          );
+          const d = prev.data as Record<string, unknown>;
+          const sizeSame = prevW === size.width && prevH === size.height;
+          const metaSame =
+            d.mediaFit === fitMeta.mediaFit &&
+            d.mediaFitKey === fitMeta.mediaFitKey &&
+            d.mediaFitVersion === fitMeta.mediaFitVersion &&
+            d.mediaNaturalW === fitMeta.mediaNaturalW &&
+            d.mediaNaturalH === fitMeta.mediaNaturalH &&
+            (fitMeta.mediaAspectPreset === undefined ||
+              d.mediaAspectPreset === fitMeta.mediaAspectPreset) &&
+            (fitMeta.mediaAspectPresetSizeVersion === undefined ||
+              d.mediaAspectPresetSizeVersion ===
+                fitMeta.mediaAspectPresetSizeVersion) &&
+            (fitMeta.manualSize === undefined ||
+              d.manualSize === fitMeta.manualSize);
+          if (sizeSame && metaSame) return;
+        }
         set((state) =>
           withGraphRevision(state, {
             nodes: state.nodes.map((n) =>
@@ -2075,7 +2138,13 @@ export const useCanvasStore = create<CanvasState>()(
       partialize: (state) => ({
         nodes: state.nodes,
         edges: state.edges,
+        graphRevision: state.graphRevision,
       }),
+      // zundo 默认「任何 set 都记一帧」：视口平移、连线状态、任务轮询运行态等非图更新
+      // 会把 limit 条历史全部填成同一份图，撤销就点不动了。
+      // graphRevision 只在 withGraphRevision 里 bump（与 autosave 的脏判据同源），
+      // 因此它变了才等于「图真的编辑过」。
+      equality: (past, current) => past.graphRevision === current.graphRevision,
       limit: 50,
     },
   ),

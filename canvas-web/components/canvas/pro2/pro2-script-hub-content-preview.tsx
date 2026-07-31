@@ -32,7 +32,7 @@ const SCENE_COLS = [
   { key: "environment", label: "环境", className: "min-w-[88px]" },
   { key: "time", label: "时间", className: "w-14 whitespace-nowrap" },
   { key: "mood", label: "气氛", className: "min-w-[72px]" },
-  { key: "imageKeywords", label: "AI生图提示词", className: "min-w-[140px]" },
+  { key: "imageKeywords", label: "生图关键词", className: "min-w-[140px]" },
 ] as const;
 
 const CHARACTER_COLS = [

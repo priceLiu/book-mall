@@ -8,8 +8,7 @@ import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import { AlertTriangle, ImageIcon } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { uploadCanvasImage } from "@/lib/canvas-api";
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
+import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import {
@@ -40,6 +39,10 @@ import {
   isLibtvMediaNodeBoxStale,
   useLibtvMediaNodeAutoFit,
 } from "@/lib/canvas/libtv-media-node-auto-fit";
+import {
+  fitLibtvUploadedImageNaturalSize,
+  useLibtvMediaAspectPresetSync,
+} from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
@@ -292,6 +295,12 @@ export function LibtvImageNode({
 
   const gridSplitCropCss = d.gridSplitCrop;
 
+  useLibtvMediaAspectPresetSync(
+    id,
+    (d as { aspectRatio?: string }).aspectRatio,
+    !isCharacterThreeView && !gridSplitCropCss,
+  );
+
   useLibtvMediaNodeAutoFit({
     nodeId: id,
     mediaUrl: previewUrl,
@@ -303,6 +312,7 @@ export function LibtvImageNode({
     disabled:
       !hasImage ||
       isCharacterThreeView ||
+      Boolean(d.uploading) ||
       (isGenerating && !d.uploading),
   });
 
@@ -312,26 +322,38 @@ export function LibtvImageNode({
       if (isCharacterThreeView || !previewUrl?.trim()) return;
       const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
       if (!node) return;
+      if (
+        (node.data as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()
+      ) {
+        return;
+      }
+      const nodeData = node.data as {
+        uploading?: boolean;
+        mediaFit?: boolean;
+        mediaFitKey?: string;
+        mediaNaturalW?: number;
+        mediaNaturalH?: number;
+      };
       const nextData = {
         ...((node.data as object) ?? {}),
         mediaNaturalW: w,
         mediaNaturalH: h,
       };
       const probe = { ...node, data: nextData };
-      if (!isLibtvMediaNodeBoxStale(probe, "sbv1-media")) {
-        // 仅补 natural 元数据
-        if (
-          (node.data as { mediaNaturalW?: number }).mediaNaturalW !== w ||
-          (node.data as { mediaNaturalH?: number }).mediaNaturalH !== h
-        ) {
+      const uploading = Boolean(nodeData.uploading);
+      const needsFit =
+        uploading || isLibtvMediaNodeBoxStale(probe, "sbv1-media");
+      if (!needsFit) {
+        if (nodeData.mediaNaturalW !== w || nodeData.mediaNaturalH !== h) {
           updateNodeData(id, { mediaNaturalW: w, mediaNaturalH: h });
         }
         return;
       }
       const size = computeLibtvMediaNodeSize(w, h, "sbv1-media");
+      const fitPrefix = uploading ? "upload" : "image";
       applyLibtvMediaFit(id, size, {
         mediaFit: true,
-        mediaFitKey: `image|${previewUrl.trim()}|sbv1-media`,
+        mediaFitKey: `${fitPrefix}|${previewUrl.trim()}|sbv1-media`,
         mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
         mediaNaturalW: w,
         mediaNaturalH: h,
@@ -355,7 +377,7 @@ export function LibtvImageNode({
   const onPick = useCallback(() => inputRef.current?.click(), []);
 
   const onFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       if (
         !file ||
         (!file.type.startsWith("image/") &&
@@ -364,44 +386,31 @@ export function LibtvImageNode({
       ) {
         return;
       }
-      let normalized: File;
-      try {
-        normalized = await normalizeCanvasImageFile(file);
-      } catch (e) {
-        await alert({
-          title: "无法读取图片",
-          message: e instanceof Error ? e.message : String(e),
-          variant: "error",
-        });
-        return;
-      }
-      const blobUrl = URL.createObjectURL(normalized);
+      const blobUrl = URL.createObjectURL(file);
       updateNodeData(id, {
         blobUrl,
         ossUrl: undefined,
         uploading: true,
         uploadError: undefined,
-        label: normalized.name.replace(/\.[^.]+$/, "") || "图片",
+        label: file.name.replace(/\.[^.]+$/, "") || "图片",
+        mediaAspectPreset: "",
         ...(edition === "sbv1" ? { imageMode: "upload" as const } : {}),
       });
-      if (!base) {
-        updateNodeData(id, { uploading: false, uploadError: "画布未就绪" });
-        return;
-      }
-      try {
-        const ossUrl = await uploadCanvasImage(base, normalized);
-        updateNodeData(id, { ossUrl, uploading: false });
-      } catch (e) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-        });
-        await alert({
-          title: "上传失败",
-          message: e instanceof Error ? e.message : String(e),
-          variant: "error",
-        });
-      }
+      scheduleCanvasImageUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+        onUploadError: (message) => {
+          void alert({
+            title: "上传失败",
+            message,
+            variant: "error",
+          });
+        },
+      });
+      fitLibtvUploadedImageNaturalSize(id, blobUrl);
     },
     [id, base, updateNodeData, alert, edition],
   );

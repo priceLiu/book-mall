@@ -49,7 +49,7 @@ export function LibtvNodeToolbarPortal({
   return createPortal(
     <LibtvToolbarPortaledContext.Provider value={true}>
       <div
-        className="fixed z-[1500] flex justify-center"
+        className="libtv-node-toolbar-portal fixed z-[1500] flex justify-center"
         style={{
           left: placement.x,
           top: placement.y,

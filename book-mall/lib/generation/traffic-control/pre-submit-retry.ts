@@ -57,7 +57,20 @@ export async function failStoryTaskPreSubmitTimeout(
 export async function failCanvasTaskPreSubmitTimeout(
   taskId: string,
   payload: Record<string, unknown>,
+  opts?: { scopeKey?: string },
 ): Promise<void> {
+  const { tryRecoverCanvasTaskBeforePreSubmitFail } = await import(
+    "./canvas-orphan-gateway-log"
+  );
+  if (
+    await tryRecoverCanvasTaskBeforePreSubmitFail({
+      taskId,
+      payload,
+      scopeKey: opts?.scopeKey,
+    })
+  ) {
+    return;
+  }
   await prisma.canvasGenerationTask.update({
     where: { id: taskId },
     data: {

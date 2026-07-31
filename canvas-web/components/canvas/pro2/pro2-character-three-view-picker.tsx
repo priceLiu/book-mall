@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, SlidersHorizontal, Users, X } from "lucide-react";
+import { Users, X } from "lucide-react";
 import { parseCharacterRows } from "@/lib/canvas/parse-md-tables";
 import {
   pickDefaultPro2ThreeViewImageEngine,
@@ -13,13 +13,21 @@ import {
   sbv1EngineToBatchImage,
 } from "@/lib/canvas/pro2-three-view-engine";
 import { PRO2_DOCK_BORDER, PRO2_DOCK_SHELL_BG } from "@/lib/canvas/story-pro2-node-chrome";
+import {
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
+import {
+  LIBTV_DOCK_TOOLBAR_SCREEN_SCALE,
+  LibtvDockToolbarMetricsContext,
+} from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { cn } from "@/lib/utils";
 import {
-  Sbv1ImageGenerateSettingsModal,
-  sbv1ImageSettingsTriggerLabel,
-} from "../sbv1/sbv1-image-generate-settings-modal";
+  Sbv1ImageDockModelPicker,
+  Sbv1ImageDockParamsPicker,
+} from "../sbv1/sbv1-image-dock-pickers";
 
 export type Pro2CharacterThreeViewResult = {
   characterKeys: string[];
@@ -45,8 +53,6 @@ const GRID_HEAD =
 const GRID_ROW =
   "grid grid-cols-[28px_minmax(72px,0.8fr)_minmax(88px,1fr)_minmax(140px,1.6fr)_minmax(100px,1fr)] gap-x-2 px-3 py-2.5";
 
-const NESTED_SETTINGS_Z = 1300;
-
 /** 生成角色三视图 · 选择角色 + 与 2.0 图片节点一致的模型设置 */
 export function Pro2CharacterThreeViewPicker({
   open,
@@ -58,7 +64,7 @@ export function Pro2CharacterThreeViewPicker({
   const { providers } = useUserProviders();
   const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
   const [settingsData, setSettingsData] = useState<Sbv1ImageNodeData>({
     aspectRatio: "16:9",
     imageQuality: "standard",
@@ -90,21 +96,17 @@ export function Pro2CharacterThreeViewPicker({
         seedBatch,
       ),
     );
-    setSettingsOpen(false);
+    setDockMenu(null);
   }, [open, rows, initialBatchImage, providers]);
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  // 无角色行时不渲染弹层，故也不能锁画布指针，否则出现无弹层的假死
+  const modalActive = open && rows.length > 0;
+  useModalBodyScrollLock(modalActive);
+  useModalEscapeClose(onClose, { active: modalActive });
+
+  const patchSettings = useCallback((patch: Partial<Sbv1ImageNodeData>) => {
+    setSettingsData((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   if (!mounted || !open || !rows.length) return null;
 
@@ -112,7 +114,6 @@ export function Pro2CharacterThreeViewPicker({
   const checked = rows.filter((r) => selected.has(r.name));
   const batchImage = sbv1EngineToBatchImage(settingsData);
   const hasImageModel = Boolean(batchImage);
-  const settingsLabel = sbv1ImageSettingsTriggerLabel(settingsData, providers);
 
   const toggle = (name: string) => {
     setSelected((prev) => {
@@ -229,15 +230,24 @@ export function Pro2CharacterThreeViewPicker({
               <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
                 三视图模型
               </p>
-              <button
-                type="button"
-                className="nodrag flex h-9 w-full max-w-md items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2.5 text-left text-[12px] text-white/75 transition hover:border-white/25 hover:bg-black/40"
-                onClick={() => setSettingsOpen(true)}
+              <LibtvDockToolbarMetricsContext.Provider
+                value={LIBTV_DOCK_TOOLBAR_SCREEN_SCALE}
               >
-                <SlidersHorizontal className="size-3.5 shrink-0 text-white/45" />
-                <span className="min-w-0 flex-1 truncate">{settingsLabel}</span>
-                <ChevronDown className="size-3.5 shrink-0 text-white/45" />
-              </button>
+                <div className="flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-white/10 bg-black/25 px-1 py-1">
+                  <Sbv1ImageDockModelPicker
+                    data={settingsData}
+                    open={dockMenu === "model"}
+                    onOpenChange={(next) => setDockMenu(next ? "model" : null)}
+                    onPatch={patchSettings}
+                  />
+                  <Sbv1ImageDockParamsPicker
+                    data={settingsData}
+                    open={dockMenu === "params"}
+                    onOpenChange={(next) => setDockMenu(next ? "params" : null)}
+                    onPatch={patchSettings}
+                  />
+                </div>
+              </LibtvDockToolbarMetricsContext.Provider>
               {!hasImageModel ? (
                 <p className="mt-1 text-[10px] text-amber-200/90">
                   请先选择 IMAGE 模型后再生成
@@ -271,16 +281,6 @@ export function Pro2CharacterThreeViewPicker({
           </footer>
         </div>
       </div>
-
-      <Sbv1ImageGenerateSettingsModal
-        open={settingsOpen}
-        data={settingsData}
-        modalZIndex={NESTED_SETTINGS_Z}
-        onClose={() => setSettingsOpen(false)}
-        onConfirm={(patch) => {
-          setSettingsData((prev) => ({ ...prev, ...patch }));
-        }}
-      />
     </>,
     document.body,
   );

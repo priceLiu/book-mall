@@ -3,30 +3,48 @@
  * canvas-web/lib/canvas/story-pro2-theme-outline-prompt.ts 须保持同步
  */
 import { STORY_PRO_PACK_OUTPUT_RULES } from "./story-pro-script-pack";
+import { STORY_PRO2_SCENE_PROMPT_VERSION_MARKER } from "./story-pro2-scene-image-prompt";
 
 const STORY_PRO_PLANNER_SYSTEM_PREFIX = `你是影视级 AI 漫剧总策划。输出须结构化、可执行，并考虑 AI 生图/生视频的可行性（优先单人镜头、可控场景数）。`;
 
 /** 大纲「场景视觉辞典 · 生图关键词」与场景段共用 · 纯环境空镜约束 */
-export const STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES = `- **生图关键词（纯环境空镜约束）**：须描述纯物理环境与气氛，供后续场景空镜生图使用
-- ❌ 禁止：角色名/代词（他/她/主角/人物）、人物动作（走来/看向/交谈/转身）、面部表情、特写镜头
+export const STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES = `- **生图关键词（纯环境空镜约束）**：须描述纯物理环境与气氛，供后续 **广角环境建立镜头 / 空镜** 生图使用
+- **构图**：默认远景/全景/建立镜头；❌ 禁止中景/近景/特写以人物为主体的画面、禁止双人互动/肢体接触/对白站位
+- ❌ 禁止：角色名/代词（他/她/主角/人物）、人物动作（走来/看向/交谈/转身/跪地/牵手）、面部表情、人像特写
 - ✅ 只允许：空间结构、建筑材质、光线来源与方向、色彩基调、天气气象、表面质感与纹理、静态置景与道具
-- 正确示例：「挑高工业厂房、破裂天窗、斜射午后光、金色尘埃、锈蚀机械、冷灰色调」
-- 错误示例：「主角走进厂房，皱着眉头环顾四周」`;
+- 若剧本 **明确要求** 该场景参考图含人物，须在生图关键词末尾标注 **【含人物】** 或 **【角色出镜】**；未标注则一律空镜
+- 正确示例：「挑高工业厂房、破裂天窗、斜射午后光、金色尘埃、锈蚀机械、冷灰色调、广角空镜」
+- 错误示例：「摄政王府外院，女子坐于长凳，男子跪地为其穿鞋，月光特写」`;
 
-export const STORY_PRO2_PACK_PROMPT_VERSION = 2;
+/** 大纲「视觉风格总纲」GFM 表 · 与 visualStylePack 解析一致 */
+export const STORY_PRO2_VISUAL_STYLE_TABLE_RULES = `- **视觉风格总纲**须用 GFM 表输出（表头不可改），供全片三视图/场景/分镜/道具生图统一风格：
+
+| 维度 | 内容 |
+|------|------|
+| 故事背景/世界观 | （一句话） |
+| 年代 | （如唐代长安 / 近未来赛博） |
+| 画面风格 | （如电影级写实、国风水墨） |
+| 色调卡 | （主色 + 辅助色 + 禁忌色） |
+| 光影基调 | （如侧光、低饱和、暖金色调） |
+| 英文风格锚定 | （可直接 prepend 到 AI 生图 prompt 的英文短语） |
+
+- 各字段须 **具体可执行**，禁止空泛「高质量」「精美」；后续生图节点将自动读取此表。`;
+
+export const STORY_PRO2_PACK_PROMPT_VERSION = 4;
 
 export function isLegacyStoryPro2HubOutlinePrompt(prompt: string): boolean {
   const t = prompt.trim();
   if (!t) return true;
   if (!t.includes("故事剧本 · 大纲段")) return true;
   if (!t.includes("纯环境空镜约束")) return true;
+  if (!t.includes("英文风格锚定")) return true;
   return false;
 }
 
 export function isLegacyStoryPro2ScenePrompt(prompt: string): boolean {
   const t = prompt.trim();
   if (!t) return true;
-  return !t.includes("纯环境空镜约束");
+  return !t.includes(STORY_PRO2_SCENE_PROMPT_VERSION_MARKER);
 }
 
 export const STORY_PRO2_THEME_OUTLINE_SYSTEM = `${STORY_PRO_PLANNER_SYSTEM_PREFIX}
@@ -38,7 +56,7 @@ ${STORY_PRO_PACK_OUTPUT_RULES}
 # 必须包含的章节（## 标题字面一致）
 
 ## 视觉风格总纲
-一段话说明色彩基调、光影风格、镜头运动偏好、整体美学；并给出推荐画面风格标签（如电影级写实、赛博朋克、国风水墨等）。
+${STORY_PRO2_VISUAL_STYLE_TABLE_RULES}
 
 ## 场景视觉辞典
 GFM 表，表头不可改：
@@ -77,7 +95,8 @@ export const STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT = `# 任务：故事剧本
 ${STORY_PRO_PACK_OUTPUT_RULES}
 
 # 本段须输出的 ## 章节
-## 视觉风格总纲
+## 视觉风格总纲（GFM 表：维度 | 内容，须含故事背景/世界观、年代、画面风格、色调卡、光影基调、英文风格锚定）
+${STORY_PRO2_VISUAL_STYLE_TABLE_RULES}
 ## 场景视觉辞典（GFM 表：场景名 | 环境 | 时间 | 气氛 | 生图关键词）
 ${STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES}
 ## 核心冲突与结构摘要
@@ -124,7 +143,7 @@ export const STORY_PRO2_CHARACTER_PROMPT = `# 任务：角色视觉辞典（AI �
 - 只输出「## 角色视觉辞典」+ 一张表，不要 JSON`;
 
 /** 2.0 脚本节点 · 场景段（根据大纲场景辞典生成 AI 生图提示词） */
-export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI 生图预备）
+export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI 生图预备 · ${STORY_PRO2_SCENE_PROMPT_VERSION_MARKER}）
 
 根据 **已连接的故事大纲** 中的「场景视觉辞典」，为每个场景生成可直接用于 AI 生图的英文提示词。
 
@@ -132,7 +151,8 @@ export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI �
 1. 必须输出 **## 场景视觉提示词** GFM 表，表头列名不可改。
 2. **场景名** 须与大纲「场景视觉辞典 · 场景名」列 **完全一致**，禁止新增、删减或替换场景。
 3. 须根据大纲中的环境、时间、气氛、生图关键词扩写 **AI生图提示词(英文)**；每个场景不少于 40 个英文词。
-4. 不要 JSON；不要用代码块包裹全文。
+4. **场景图默认纯环境空镜**：广角/远景/建立镜头；禁止中近景/特写人物、禁止角色互动叙事画面，除非大纲生图关键词已标注 **【含人物】** 或 **【角色出镜】**。
+5. 不要 JSON；不要用代码块包裹全文。
 
 # 输出格式（表头列名不可改）
 ## 场景视觉提示词
@@ -147,21 +167,24 @@ export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI �
 - 须与大纲场景辞典信息一致，可适度扩写画面细节
 - **【严格约束】本栏只描述纯物理环境和气氛，禁止出现以下内容：**
   - ❌ 禁止出现任何角色名字或代词（如"他"、"她"、"主角"、"人物"）
-  - ❌ 禁止描写人物动作（如"走来"、"看向"、"拿起"、"交谈"、"转身"）
-  - ❌ 禁止描写面部表情、肢体动作或特写镜头
+  - ❌ 禁止描写人物动作（如"走来"、"看向"、"拿起"、"交谈"、"转身"、"跪地"、"穿鞋"）
+  - ❌ 禁止描写面部表情、肢体动作、双人互动，或中景/近景/特写以人物为主体的构图
   - ✅ 只允许描写：空间结构、建筑材质、光线来源与方向、色彩基调、天气气象、表面质感与纹理、环境声音/气味、静态置景与道具
-  - 正确示例："废弃工厂内部，挑高穹顶，午后阳光从破裂天窗斜射而入，空气中漂浮金色尘埃，地面布满锈蚀机械零件，整体呈冷灰色调"
+  - 正确示例："废弃工厂内部，挑高穹顶，午后阳光从破裂天窗斜射而入，空气中漂浮金色尘埃，地面布满锈蚀机械零件，整体呈冷灰色调，广角空镜"
   - 错误示例（含人物）："主角走进废弃工厂，皱着眉头环顾四周，阳光照在他脸上"
+  - 错误示例（叙事互动）："王府外院草地，女子坐于长凳，男子跪地为其穿鞋，月光下对视"
 
 ## AI生图提示词(英文)（每场景必填 · 纯背景空镜约束）
 - 格式：可直接用于 AI 文生图的英文提示词
-- **【严格约束】生成的提示词必须以场景环境为主体，禁止包含人物、人形、面部、特写镜头：**
-  - ❌ 禁止出现与人物相关的词汇：person, people, human, character, figure, face, eye, expression, hand, arm, leg, body, portrait, close-up, walking, standing, sitting, running, looking, wearing
-  - ❌ 禁止出现与人物相关的镜头术语：close-up shot, medium shot, focus on face, character POV
-  - ✅ 必须使用：establishing shot, wide shot, landscape view, empty scene, devoid of people, no characters
+- **【严格约束】生成的提示词必须以场景环境为主体，默认广角建立镜头，禁止包含人物、人形、面部、中近景人物主体：**
+  - ❌ 禁止出现与人物相关的词汇：person, people, human, character, figure, face, eye, expression, hand, arm, leg, body, portrait, couple, interaction, kneeling, sitting together, close-up, medium shot, focus on face, character POV
+  - ❌ 禁止出现与人物相关的镜头术语：close-up shot, medium shot, two-shot, over-the-shoulder, focus on face, character POV
+  - ✅ 必须使用：establishing shot, wide shot, full environment view, landscape view, empty scene, devoid of people, no characters
   - ✅ 必须包含：location（地点）, time of day（时间）, lighting（光线）, weather/climate（天气）, atmosphere（气氛）, key props（关键道具）, composition（构图）, cinematic style（电影风格）
+  - 若且仅若大纲「生图关键词」含 **【含人物】** 或 **【角色出镜】**，才可在英文 prompt 中加入明确的人物描述；否则一律 empty scene
   - 正确示例（纯场景）："abandoned factory interior, tall arched ceiling, afternoon sunlight streaming through broken skylight, golden dust particles floating in the air, rusted mechanical parts scattered on concrete floor, cold gray tone, cinematic wide establishing shot, empty scene, no people"
   - 错误示例（含人物）❌："a young man walking through abandoned factory, looking around with worried expression, sunlight hitting his face, wearing a leather jacket"
+  - 错误示例（互动特写）❌："woman sitting on bench, man kneeling to put shoes on her feet, moonlit courtyard, intimate medium shot"
 
 - 每行对应大纲场景视觉辞典中的一行；行数须一致
 - 只输出「## 场景视觉提示词」+ 一张表，不要 JSON`;

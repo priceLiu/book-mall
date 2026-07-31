@@ -43,6 +43,12 @@ export const LIBTV_MEDIA_FIT_VERSION = 15;
 /** 生成图自适配 · 预览区（stage）长边目标 px（不含标题栏）· 约空态 350 的 2.5 倍 */
 export const LIBTV_MEDIA_AUTO_FIT_LONG_EDGE = 875;
 
+/** 用户在 Dock 选择比例后，系统按比例调整外框的放大倍数（相对 legacy 基准宽） */
+export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE = 2;
+
+/** 与 `LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE` 同步；变更 scale 时 +1，用于一次性迁移旧外框 */
+export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION = 2;
+
 /** @deprecated 旧常量（偏小，会导致留边）。新代码请用按节点类型区分的上面两个。 */
 export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = LIBTV_IMAGE_NODE_HEADER_HEIGHT;
 

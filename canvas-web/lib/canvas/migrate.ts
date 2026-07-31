@@ -22,6 +22,7 @@ import {
   NODE_DEFAULT_SIZE,
 } from "./types";
 import { migratePro2SceneColumnOffCanvas } from "./pro2-spawn-scene-image-group";
+import { migratePro2HubMediaGroupEdgesToChildren } from "./pro2-hub-media-group-edge";
 import { migratePro2TextPurposeAll } from "./pro2-text-purpose";
 import { migrateLegacyPro2ScriptStudioGraph } from "./pro2-script-studio-migrate";
 import { migrateLinkedScriptPackageStarterToMeta } from "./crew-bulletin-graph-anchor";
@@ -185,15 +186,19 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
     ) as unknown as CanvasFlowNode[],
     edges,
   );
+  const migratedEdges = migratePro2HubMediaGroupEdgesToChildren(
+    rawMigrated.nodes,
+    rawMigrated.edges,
+  );
   const nodes = migratePro2TextPurposeAll(
     migrateStoryPromptPackAll(
-      normalizeCanvasNodes(rawMigrated.nodes, rawMigrated.edges),
+      normalizeCanvasNodes(rawMigrated.nodes, migratedEdges),
     ),
-    rawMigrated.edges,
+    migratedEdges,
   );
   const scriptStudioMigrated = migrateLegacyPro2ScriptStudioGraph(
     nodes,
-    rawMigrated.edges,
+    migratedEdges,
     graph.meta,
   );
   const linkedMetaMigrated = migrateLinkedScriptPackageStarterToMeta({

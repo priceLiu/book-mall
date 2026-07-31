@@ -61,8 +61,9 @@ import type {
 import { isGroupNode } from "@/lib/canvas/types";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
-import { uploadCanvasImage } from "@/lib/canvas-api";
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
+import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
+import { fitLibtvUploadedImageNaturalSize } from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { fitGenericImageNodeNaturalSize } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
@@ -1114,30 +1115,48 @@ function FlowCanvasInner({
     return () => window.cancelAnimationFrame(t);
   }, [canvasFocusNonce, canvasFocusNodeId, fitView]);
 
+  /** 历史封面截图前短暂 fitView，避免 pan/zoom 导致 html-to-image 空白 */
+  useEffect(() => {
+    const onPrepare = async () => {
+      const prev = getViewport();
+      try {
+        const nodes = getNodes();
+        if (nodes.length > 0) {
+          await fitView({ padding: 0.12, duration: 0, maxZoom: 1.15 });
+        }
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        window.dispatchEvent(
+          new CustomEvent("canvas:viewport-snapshot-ready", {
+            detail: {
+              restore: () => {
+                rfSetViewport(prev);
+              },
+            },
+          }),
+        );
+      } catch {
+        window.dispatchEvent(
+          new CustomEvent("canvas:viewport-snapshot-ready", {
+            detail: { restore: () => {} },
+          }),
+        );
+      }
+    };
+    window.addEventListener("canvas:prepare-viewport-snapshot", onPrepare);
+    return () =>
+      window.removeEventListener("canvas:prepare-viewport-snapshot", onPrepare);
+  }, [fitView, getNodes, getViewport, rfSetViewport]);
+
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(
-    async (
+    (
       file: File,
       position: { x: number; y: number },
       labelOverride?: string,
     ) => {
-      let normalized = file;
-      try {
-        normalized = await normalizeCanvasImageFile(file);
-      } catch (e) {
-        const imageType: CanvasNodeType = sbv1Canvas
-          ? "sbv1-image"
-          : pro2FloatingInspector
-            ? "story-pro2-image"
-            : "image";
-        const id = addNode(imageType, position, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-          label: labelOverride ?? file.name ?? "粘贴的图片",
-        });
-        return id;
-      }
-      const blobUrl = URL.createObjectURL(normalized);
+      const blobUrl = URL.createObjectURL(file);
       const imageType: CanvasNodeType = sbv1Canvas
         ? "sbv1-image"
         : pro2FloatingInspector
@@ -1146,23 +1165,20 @@ function FlowCanvasInner({
       const id = addNode(imageType, position, {
         blobUrl,
         uploading: true,
-        label: labelOverride ?? normalized.name ?? "粘贴的图片",
+        label: labelOverride ?? file.name ?? "粘贴的图片",
+        ...(sbv1Canvas ? { imageMode: "upload" as const } : {}),
       });
-      if (!base) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: "画布未就绪，请刷新后重试",
-        });
-        return id;
-      }
-      try {
-        const ossUrl = await uploadCanvasImage(base, normalized);
-        updateNodeData(id, { ossUrl, uploading: false });
-      } catch (e) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-        });
+      scheduleCanvasImageUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+      });
+      if (imageType === "image") {
+        queueMicrotask(() => fitGenericImageNodeNaturalSize(id, blobUrl));
+      } else {
+        queueMicrotask(() => fitLibtvUploadedImageNaturalSize(id, blobUrl));
       }
       return id;
     },
@@ -1658,15 +1674,13 @@ function FlowCanvasInner({
           x: event.clientX,
           y: event.clientY,
         });
-        await Promise.all(
-          droppedImages.map((f, i) =>
-            ingestImageFile(
-              f,
-              { x: position.x + i * 28, y: position.y + i * 28 },
-              droppedImages.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
-            ),
-          ),
-        );
+        droppedImages.forEach((f, i) => {
+          ingestImageFile(
+            f,
+            { x: position.x + i * 28, y: position.y + i * 28 },
+            droppedImages.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
+          );
+        });
         return;
       }
       event.preventDefault();
@@ -1695,15 +1709,13 @@ function FlowCanvasInner({
       }
 
       const files = allImageFilesFromDataTransfer(event.dataTransfer);
-      await Promise.all(
-        files.map((f, i) =>
-          ingestImageFile(
-            f,
-            { x: position.x + i * 28, y: position.y + i * 28 },
-            files.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
-          ),
-        ),
-      );
+      files.forEach((f, i) => {
+        ingestImageFile(
+          f,
+          { x: position.x + i * 28, y: position.y + i * 28 },
+          files.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
+        );
+      });
     },
     [addNode, ingestImageFile, screenToFlowPosition],
   );
@@ -1871,15 +1883,13 @@ function FlowCanvasInner({
         const center = rect
           ? screenToFlowPosition({ x: clientX, y: clientY })
           : { x: 240, y: 160 };
-        await Promise.all(
-          imageFiles.map((f, i) =>
-            ingestImageFile(
-              f,
-              { x: center.x + i * 28, y: center.y + i * 28 },
-              imageFiles.length === 1 ? "粘贴的图片" : `粘贴 ${i + 1}`,
-            ),
-          ),
-        );
+        imageFiles.forEach((f, i) => {
+          ingestImageFile(
+            f,
+            { x: center.x + i * 28, y: center.y + i * 28 },
+            imageFiles.length === 1 ? "粘贴的图片" : `粘贴 ${i + 1}`,
+          );
+        });
         return;
       }
 

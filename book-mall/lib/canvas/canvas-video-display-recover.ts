@@ -258,6 +258,7 @@ export async function recoverCanvasVideoTaskDisplay(
       "timeout_poll_error",
       "timeout_gateway_sync",
       "timeout_no_gateway",
+      "SUBMIT_DISPATCH_TIMEOUT",
       "OSS_UPLOAD_FAILED",
       "VOLCENGINE_GATEWAY_POLL_STALL",
       "GATEWAY_TASK_FAILED",
@@ -345,6 +346,20 @@ export async function recoverCanvasVideoTaskDisplay(
         ok: false,
         action: "failed",
         reason: "gateway_legacy_task_unlinked",
+        ...base,
+      };
+    }
+    if (task.failCode === "SUBMIT_DISPATCH_TIMEOUT") {
+      const { recoverCanvasSubmitDispatchTimeoutTask } = await import(
+        "@/lib/generation/traffic-control/canvas-orphan-gateway-log"
+      );
+      if (await recoverCanvasSubmitDispatchTimeoutTask(task.id)) {
+        return recoverCanvasVideoTaskDisplay(task.id);
+      }
+      return {
+        ok: false,
+        action: "failed",
+        reason: "submit_dispatch_timeout_unlinked",
         ...base,
       };
     }
@@ -516,6 +531,7 @@ export async function findCanvasVideoTasksNeedingRecovery(opts?: {
         ...projectFilter,
         OR: [
           { failCode: { startsWith: "timeout" } },
+          { failCode: "SUBMIT_DISPATCH_TIMEOUT" },
           { failCode: "VOLCENGINE_GATEWAY_POLL_STALL" },
           { failCode: "GATEWAY_TASK_FAILED" },
         ],

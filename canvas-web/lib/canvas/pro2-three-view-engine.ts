@@ -85,3 +85,38 @@ export function sbv1PatchToThreeViewNodeData(
     outputCount: patch.outputCount,
   };
 }
+
+/** 批量弹层 / hub batchImage → 与 Dock 一致的 SBV1 设置态 */
+export function pro2BatchImageAsSbv1Settings(
+  batchImage?: {
+    providerId?: string;
+    modelKey?: string;
+    params?: Record<string, unknown>;
+  } | null,
+  defaults?: Partial<Sbv1ImageNodeData>,
+): Sbv1ImageNodeData {
+  return pro2ThreeViewAsSbv1Settings(
+    {
+      aspectRatio: "16:9",
+      imageQuality: "standard",
+      resolution: "2K",
+      outputCount: 1,
+      ...defaults,
+    },
+    batchImage,
+  );
+}
+
+/** batchImage → 组内 story-pro2-image / 三视图节点 engine 字段 */
+export function pro2BatchImageToImageNodePatch(
+  batchImage?: {
+    providerId?: string;
+    modelKey?: string;
+    params?: Record<string, unknown>;
+  } | null,
+): Record<string, unknown> {
+  if (!batchImage?.providerId?.trim() || !batchImage.modelKey?.trim()) {
+    return {};
+  }
+  return sbv1PatchToThreeViewNodeData(pro2BatchImageAsSbv1Settings(batchImage));
+}

@@ -86,7 +86,7 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]">
       <header
-        className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-black/45 backdrop-blur-xl backdrop-saturate-150"
+        className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-[#181818]"
         style={{ height: "var(--canvas-header-h)" }}
       >
         <div className="canvas-page flex h-full items-center gap-2 sm:gap-3">

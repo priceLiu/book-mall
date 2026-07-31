@@ -6,6 +6,7 @@ import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable"
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
+import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream, pro2DockStyleShownAsChip, pro2DockUpstreamLinksForChips } from "@/lib/canvas/pro2-dock-upstream-links";
@@ -51,6 +52,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -186,6 +188,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   const onRegenerate = useCallback(() => {
     if (!storeNode) return;
     if (controllerId && d.pro2RowKey) {
+      optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
       batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
         forceFresh: true,
       });
@@ -193,7 +196,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     }
     // 协作画布 · 无控制列：作为独立生图节点直接生成
     busEnqueueNode(storeNode.id, true);
-  }, [storeNode, controllerId, d.pro2RowKey]);
+  }, [storeNode, controllerId, d.pro2RowKey, updateNodeData, setNodeRuntime]);
 
   const onOpenStyleLibrary = useCallback(() => {
     setPro2StyleLibImageNodeId(nodeId);

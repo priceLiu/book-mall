@@ -43,26 +43,28 @@
 
 ---
 
-## 1. 全屏弹层布局原则（批量 / 嵌套场景保留）
+## 1. 批量 / 嵌套弹层（与 Dock 同款双下拉）
+
+批量弹层内的模型与参数 **必须** 复用 §0 的 Dock 双钮组件，**禁止** 再用 `EnginePicker` 卡片网格或平铺 `LabeledSegment` 段落 —— 同一参数在节点与弹层里应是同一个交互。
 
 | 规则 | 说明 |
 | --- | --- |
-| **模型优先** | 第一块必须是 **模型选择**（`EnginePicker` · `modelsOnly`） |
-| **紧凑** | 标签 `text-[12px] text-white/55` · 段按钮 `px-2 py-1 text-[11px~12px]` · 区块间距 `space-y-3` |
-| **合并行** | 同类短选项尽量同一行 |
-| **不重复** | `modelsOnly` 时禁止弹层内再渲染 `DynamicParamForm` |
-| **弹层宽度** | `max-w-2xl` |
+| **组件** | `Sbv1ImageDockModelPicker` + `Sbv1ImageDockParamsPicker`（视频/LLM/TTS 同理取对应一对） |
+| **容器** | 双钮同一行 `flex flex-wrap items-center gap-0.5`，外层 `rounded-xl border border-white/10 bg-black/25 px-1 py-1` |
+| **互斥** | 宿主持有 `dockMenu: 'model' \| 'params' \| null` |
+| **草稿态** | 弹层用本地 `draft` + `onPatch` 收敛，`确认` 时一次性回传；未选模型禁用 `确认` |
+| **层级** | 弹层内须包 `LibtvToolbarDropdownZProvider zIndex={modalZIndex + 10}`，否则下拉落到弹层背后 |
+| **弹层宽度** | `max-w-lg` |
 
-## 2. 块顺序（视频 · sbv1）
+已接入：`Sbv1ImageGenerateSettingsModal` · `Pro2CharacterThreeViewPicker`（角色三视图批量，直接内联双钮、不再套一层设置弹层）。
 
-1. **模型** — `EnginePicker` · `role="VIDEO"` · `modelsOnly`
-2. **参考模式 + 分辨率** — 720p / 1080p
-3. **比例** · **时长** · **生成音频 + 水印**
+## 2. 参数分组（视频 · sbv1）
 
-## 3. 块顺序（图片 · sbv1）
+参数 Popover 内 `LibtvDockParamGrid` 顺序：**参考模式 + 分辨率** → **比例** → **时长** → **生成音频 + 水印**。
 
-1. **模型** — `EnginePicker` · `role="IMAGE"` · `modelsOnly`
-2. **画质 + 清晰度** · **比例** · **张数 + 格式**
+## 3. 参数分组（图片 · sbv1）
+
+参数 Popover 内 `LibtvDockParamGrid` 顺序：**画质** → **清晰度** → **比例** → **张数** → **格式**。
 
 ## 4. 默认值（视频）
 
@@ -82,5 +84,7 @@
 - [ ] 浮动 Dock 是否为 **模型 + 参数** 双钮？
 - [ ] Popover 是否 `useSbv1ToolbarAnchor` + z ≥ 1100？
 - [ ] 模型列表是否走 Gateway providers？
-- [ ] 全屏弹层（若保留）第一块是否为模型？
+- [ ] 批量弹层是否复用同一对 Dock 双钮（而非 `EnginePicker` 卡片网格）？
+- [ ] 批量弹层是否包了 `LibtvToolbarDropdownZProvider`？
+- [ ] 弹层打开时节点顶栏是否收起（`data-canvas-modal-open` + `useModalBodyScrollLock`）？
 - [ ] Dock 是否对 `MentionsTextarea` 开启 `mentionInlineThumb`？

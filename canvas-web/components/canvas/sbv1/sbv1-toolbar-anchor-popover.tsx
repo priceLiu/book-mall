@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  createContext,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -10,6 +12,26 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useViewport } from "@xyflow/react";
+
+/** Dock 下拉基准层级 · 画布内默认 1600；嵌在全屏弹层里须由宿主抬高 */
+const TOOLBAR_DROPDOWN_BASE_Z = 1600;
+
+const ToolbarDropdownZContext = createContext(TOOLBAR_DROPDOWN_BASE_Z);
+
+/** 在全屏弹层内复用 Dock 模型/参数下拉时包一层，避免下拉落到弹层背后 */
+export function LibtvToolbarDropdownZProvider({
+  zIndex,
+  children,
+}: {
+  zIndex: number;
+  children: ReactNode;
+}) {
+  return (
+    <ToolbarDropdownZContext.Provider value={zIndex}>
+      {children}
+    </ToolbarDropdownZContext.Provider>
+  );
+}
 
 export function useSbv1ToolbarAnchor(isOpen?: boolean): {
   anchorRef: RefObject<HTMLButtonElement>;
@@ -74,6 +96,39 @@ export function Sbv1ToolbarDropdown({
   /** auto 时用于判断向上/向下展开 */
   estimatedHeight?: number;
 }) {
+  const baseZ = useContext(ToolbarDropdownZContext);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const setOpenRef = useRef(setOpen);
+  setOpenRef.current = setOpen;
+
+  /**
+   * 用监听代替全屏遮罩：遮罩会吃掉「关闭下拉」的那一次点击，
+   * 导致选完模型后还要再点一次节点才选中（节点顶栏看起来出不来）。
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && panelRef.current?.contains(target)) return;
+      // 锚点自身的 toggle 交给按钮 onClick，避免关了又立刻开
+      if (
+        rect &&
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        return;
+      }
+      setOpenRef.current(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown, { capture: true });
+    return () =>
+      window.removeEventListener("pointerdown", onPointerDown, {
+        capture: true,
+      });
+  }, [open, rect]);
+
   if (!open || !rect || typeof document === "undefined") return null;
 
   const gap = 6;
@@ -91,26 +146,19 @@ export function Sbv1ToolbarDropdown({
         : undefined;
 
   return createPortal(
-    <>
-      <button
-        type="button"
-        className="fixed inset-0 z-[1600]"
-        aria-label="关闭"
-        onClick={() => setOpen(false)}
-      />
-      <div
-        className={className}
-        style={{
-          position: "fixed",
-          left,
-          top,
-          transform,
-          zIndex: 1601,
-        }}
-      >
-        {children}
-      </div>
-    </>,
+    <div
+      ref={panelRef}
+      className={className}
+      style={{
+        position: "fixed",
+        left,
+        top,
+        transform,
+        zIndex: baseZ + 1,
+      }}
+    >
+      {children}
+    </div>,
     document.body,
   );
 }

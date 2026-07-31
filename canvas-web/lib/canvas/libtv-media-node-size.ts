@@ -124,7 +124,10 @@ export function isLibtvMediaNodeBoxStale(
     mediaNaturalW?: number;
     mediaNaturalH?: number;
     manualSize?: boolean;
+    mediaAspectPreset?: string;
   };
+
+  if (d.mediaAspectPreset?.trim()) return false;
 
   // 优先用节点显式宽高（store），避免 RF measured 滞后掩盖矮框
   const style = node.style as
@@ -164,9 +167,16 @@ export function isLibtvMediaNodeBoxStale(
       (mediaAspect < 0.92 && boxAspect > 1.05) ||
       (mediaAspect > 1.08 && boxAspect < 0.95);
     const tooShort = h < expected.height * 0.88;
+    const tooTall = h > expected.height * 1.12;
+    const widthOff =
+      Math.abs(w - expected.width) > Math.max(12, expected.width * 0.08);
+    const heightOff =
+      Math.abs(h - expected.height) > Math.max(12, expected.height * 0.08);
     // 比例明显错时忽略 manualSize（历史误标会永久锁死矮框）
-    if (d.manualSize && !aspectMismatch && !tooShort) return false;
-    if (tooShort) return true;
+    if (d.manualSize && !aspectMismatch && !tooShort && !widthOff && !heightOff) {
+      return false;
+    }
+    if (tooShort || tooTall || widthOff || heightOff) return true;
     if (
       w >= expected.width * 0.85 &&
       Math.abs(w - expected.width) <= expected.width * 0.12 &&
@@ -181,10 +191,21 @@ export function isLibtvMediaNodeBoxStale(
   if (d.manualSize) return false;
   if (!d.mediaFit) {
     // 有媒体但未 fit，且停在出厂横条 → 视为 stale，强制重算
-    return (
+    if (
       w >= SBV1_VIDEO_ENGINE_MIN_WIDTH * 0.95 &&
       h <= SBV1_VIDEO_ENGINE_HEIGHT + 3
-    );
+    ) {
+      return true;
+    }
+    // 出厂 1:1 方卡（粘贴/上传前的默认外框）
+    if (
+      w >= PRO2_IMAGE_NODE_MIN_WIDTH * 0.9 &&
+      h >= PRO2_IMAGE_NODE_MIN_HEIGHT * 0.9 &&
+      Math.abs(w - h) <= 16
+    ) {
+      return true;
+    }
+    return false;
   }
 
   const stuckAtFactoryDefault =

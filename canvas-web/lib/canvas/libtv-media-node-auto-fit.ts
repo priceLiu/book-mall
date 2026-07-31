@@ -231,6 +231,12 @@ export function useLibtvMediaNodeAutoFit({
     const url = mediaUrl?.trim();
     if (!url || disabled || skipForPro2GroupImage || skipForHdGridSplitPlaceholder) return;
 
+    const selfNodeEarly = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
+    const aspectPreset = (
+      selfNodeEarly?.data as { mediaAspectPreset?: string } | undefined
+    )?.mediaAspectPreset?.trim();
+    if (aspectPreset) return;
+
     const poster = posterUrl?.trim();
     const probeUrl = kind === "video" && poster ? poster : url;
     const probeKind: "image" | "video" =

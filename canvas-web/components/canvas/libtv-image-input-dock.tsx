@@ -29,6 +29,7 @@ import {
   pickDefaultPro2FrameImageEngine,
   PRO2_FRAME_IMAGE_MODEL_KEYS,
 } from "@/lib/canvas/pro2-frame-batch-image";
+import { pro2BatchImageToImageNodePatch } from "@/lib/canvas/pro2-three-view-engine";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   isLibtvFreestandingImageNode,
@@ -41,6 +42,7 @@ import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selec
 import { isLibtvPro2ImageDockNodeType } from "@/lib/canvas/libtv-pro2-image-dock-types";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
+import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { isLibtvMediaGenerating } from "@/components/canvas/libtv-media-generating-state";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import {
@@ -57,6 +59,7 @@ import { Pro2DockRefImages } from "./pro2/pro2-dock-ref-images";
 import { Pro2DockStyleButton } from "./pro2/pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2/pro2-dock-upstream-chips";
 import { Pro2DockUpstreamHeader } from "./pro2/pro2-dock-upstream-header";
+import { Pro2VisualStylePackBar } from "./pro2/pro2-visual-style-pack-bar";
 import {
   Pro2DockToolbar,
   Pro2InputDockShell,
@@ -77,6 +80,29 @@ function placeholderDockLabel(type: string | undefined): string | undefined {
   if (type === "story-pro2-prop") return "描述道具外观与材质；输入 @ 引用风格或场景…";
   if (type === "story-pro2-mood") return "描述氛围、光线与情绪；输入 @ 引用风格…";
   return undefined;
+}
+
+function resolveSceneEngineFromHub(
+  hubNodeId: string | undefined,
+  nodes: CanvasFlowNode[],
+): { providerId: string; modelKey: string; params?: Record<string, unknown> } | null {
+  if (!hubNodeId?.trim()) return null;
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  const batch = (
+    hub?.data as {
+      sceneBatchImage?: {
+        providerId?: string;
+        modelKey?: string;
+        params?: Record<string, unknown>;
+      };
+    }
+  )?.sceneBatchImage;
+  if (!batch?.providerId?.trim() || !batch.modelKey?.trim()) return null;
+  return {
+    providerId: batch.providerId,
+    modelKey: batch.modelKey,
+    params: batch.params ?? {},
+  };
 }
 
 function framePromptPlaceholder(role?: string): string {
@@ -212,6 +238,13 @@ export function LibtvImageInputDock() {
 
   useEffect(() => {
     if (!storeNode || !showModelPicker || engine?.providerId?.trim()) return;
+    if (pro2Data.pro2MediaRole === "scene") {
+      const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, nodes);
+      if (fromHub) {
+        updateNodeData(storeNode.id, pro2BatchImageToImageNodePatch(fromHub));
+        return;
+      }
+    }
     const seed =
       isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
         ? pickDefaultPro2FrameImageEngine(providers)
@@ -230,6 +263,8 @@ export function LibtvImageInputDock() {
     updateNodeData,
     isFrameFreestanding,
     pro2Data.pro2MediaRole,
+    pro2Data.pro2HubNodeId,
+    nodes,
     isFramePipelineCell,
     framePipelineController,
   ]);
@@ -324,16 +359,26 @@ export function LibtvImageInputDock() {
     const controllerId = pro2Data.pro2ControllerNodeId;
     const rowKey = pro2Data.pro2RowKey;
     if (!controllerId || !rowKey || pro2Data.pro2MediaRole !== "frame") return;
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     batchRunStoryRows(controllerId, [rowKey], "frameImage", {
       forceFresh: true,
     });
-  }, [storeNode, isPipelineCell, pro2Data]);
+  }, [storeNode, isPipelineCell, pro2Data, updateNodeData, setNodeRuntime]);
 
   const onRunFreestanding = useCallback(async () => {
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
     if (isRunning) return;
 
     let runEngine = engine;
+    if (!runEngine?.providerId?.trim()) {
+      if (pro2Data.pro2MediaRole === "scene") {
+        const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, nodes);
+        if (fromHub) {
+          runEngine = fromHub;
+          updateNodeData(storeNode.id, pro2BatchImageToImageNodePatch(fromHub));
+        }
+      }
+    }
     if (!runEngine?.providerId?.trim()) {
       const seed =
         pro2Data.pro2MediaRole === "frame"
@@ -391,6 +436,9 @@ export function LibtvImageInputDock() {
     storeNode,
     engine,
     providers,
+    nodes,
+    pro2Data.pro2MediaRole,
+    pro2Data.pro2HubNodeId,
     updateNodeData,
     setNodeRuntime,
     dockInput,
@@ -417,6 +465,19 @@ export function LibtvImageInputDock() {
               modelKey: nextEngine.modelKey,
               params: nextEngine.params ?? {},
             },
+          });
+        }
+        if (
+          patch.aspectRatio !== undefined ||
+          patch.resolution !== undefined ||
+          patch.outputCount !== undefined ||
+          patch.imageQuality !== undefined
+        ) {
+          updateNodeData(storeNode.id, {
+            aspectRatio: merged.aspectRatio,
+            resolution: merged.resolution,
+            outputCount: merged.outputCount,
+            imageQuality: merged.imageQuality,
           });
         }
         return;
@@ -546,6 +607,9 @@ export function LibtvImageInputDock() {
           disabled={isRunning}
           maxImages={12}
         >
+          {isPro2 && pro2Data.pro2HubNodeId ? (
+            <Pro2VisualStylePackBar hubNodeId={pro2Data.pro2HubNodeId} />
+          ) : null}
           <MentionsEditable
             className={cn(
               PRO2_DOCK_TEXTAREA_CLASS,

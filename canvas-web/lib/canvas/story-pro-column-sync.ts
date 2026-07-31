@@ -1,6 +1,6 @@
 "use client";
 
-import { compactGfmTables, parseMdTable, parseStoryboardRows } from "./parse-md-tables";
+import { compactGfmTables, parseMdTable, parseStoryboardRows, resolveMergedSceneVisualDictionaryRows } from "./parse-md-tables";
 import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
@@ -51,6 +51,7 @@ function toProCharacterRows(rows: StoryCharacterRow[]): StoryProCharacterRow[] {
     name: r.name,
     role: r.role,
     appearance: r.appearance,
+    personality: r.personality,
     prompt: r.prompt,
     promptHistory: r.promptHistory,
     runtime: r.runtime,
@@ -188,10 +189,23 @@ function mergeProSceneRows(
     return {
       ...row,
       description: prev.description?.trim() ? prev.description : row.description,
-      prompt:
-        prev.prompt?.trim() && !isFrameScriptPrompt(prev.prompt)
-          ? prev.prompt
-          : row.prompt,
+      environment: prev.environment?.trim() ? prev.environment : row.environment,
+      time: prev.time?.trim() ? prev.time : row.time,
+      mood: prev.mood?.trim() ? prev.mood : row.mood,
+      imageKeywords: prev.imageKeywords?.trim()
+        ? prev.imageKeywords
+        : row.imageKeywords,
+      prompt: (() => {
+        if (isFrameScriptPrompt(prev.prompt ?? "")) return row.prompt;
+        const prevHasKw =
+          Boolean(prev.imageKeywords?.trim()) ||
+          /生图[：:]/.test(prev.prompt ?? "");
+        const rowHasKw =
+          Boolean(row.imageKeywords?.trim()) ||
+          /生图[：:]/.test(row.prompt ?? "");
+        if (prev.prompt?.trim() && prevHasKw && !rowHasKw) return prev.prompt;
+        return row.prompt?.trim() ? row.prompt : prev.prompt ?? row.prompt;
+      })(),
       promptHistory: prev.promptHistory,
       refImages: prev.refImages,
       runtime: prev.runtime,
@@ -296,6 +310,11 @@ function mergeProCharacterRows(
     if (!prev) return row;
     return {
       ...row,
+      role: prev.role?.trim() ? prev.role : row.role,
+      appearance: prev.appearance?.trim() ? prev.appearance : row.appearance,
+      personality: prev.personality?.trim()
+        ? prev.personality
+        : row.personality,
       prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,

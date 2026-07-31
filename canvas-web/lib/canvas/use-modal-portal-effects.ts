@@ -18,9 +18,10 @@ function applyModalScrollLock(): void {
 }
 
 function releaseModalScrollLock(): void {
-  if (modalScrollLockCount <= 0) return;
-  modalScrollLockCount -= 1;
-  if (modalScrollLockCount !== 0) return;
+  // 不提前 return：计数被热更新重置时也要保证标记能清掉，
+  // 否则 html[data-canvas-modal-open] 会永久隐藏节点顶栏。
+  modalScrollLockCount = Math.max(0, modalScrollLockCount - 1);
+  if (modalScrollLockCount > 0) return;
   document.body.style.overflow = savedBodyOverflow;
   document.documentElement.style.overflow = savedHtmlOverflow;
   delete document.documentElement.dataset.canvasModalOpen;

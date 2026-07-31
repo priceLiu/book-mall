@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LayoutGrid, X } from "lucide-react";
 import {
@@ -12,11 +12,26 @@ import {
   pickDefaultPro2FrameImageEngine,
   type Pro2FrameBatchImagePick,
 } from "@/lib/canvas/pro2-frame-batch-image";
+import {
+  pro2BatchImageAsSbv1Settings,
+  sbv1EngineToBatchImage,
+} from "@/lib/canvas/pro2-three-view-engine";
 import { PRO2_DOCK_BORDER, PRO2_DOCK_SHELL_BG } from "@/lib/canvas/story-pro2-node-chrome";
-import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
+import {
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
+import {
+  LIBTV_DOCK_TOOLBAR_SCREEN_SCALE,
+  LibtvDockToolbarMetricsContext,
+} from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { cn } from "@/lib/utils";
-import { EnginePicker } from "../engine-picker";
+import {
+  Sbv1ImageDockModelPicker,
+  Sbv1ImageDockParamsPicker,
+} from "../sbv1/sbv1-image-dock-pickers";
 
 export type Pro2FrameGenerateResult = {
   frameIndices: number[];
@@ -43,7 +58,7 @@ const GRID_HEAD =
 const GRID_ROW =
   "grid grid-cols-[28px_52px_72px_72px_52px_minmax(140px,1.4fr)_minmax(100px,1fr)_minmax(160px,1.6fr)] gap-x-2 px-3 py-2.5";
 
-/** 生成分镜图 · 选择镜号 + IMAGE 模型（可全选） */
+/** 生成分镜图 · 选择镜号 + 与三视图一致的 Dock 模型/参数 */
 export function Pro2FrameGeneratePicker({
   open,
   rows,
@@ -54,9 +69,13 @@ export function Pro2FrameGeneratePicker({
   const { providers } = useUserProviders();
   const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [providerId, setProviderId] = useState("");
-  const [modelKey, setModelKey] = useState("");
-  const [params, setParams] = useState<Record<string, unknown>>({});
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
+  const [settingsData, setSettingsData] = useState<Sbv1ImageNodeData>({
+    aspectRatio: "16:9",
+    imageQuality: "standard",
+    resolution: "2K",
+    outputCount: 1,
+  });
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => a.frameIndex - b.frameIndex),
@@ -77,47 +96,33 @@ export function Pro2FrameGeneratePicker({
     if (openInitRef.current) return;
     openInitRef.current = true;
     setSelected(new Set(sorted.map((r) => r.frameIndex)));
-    const seed =
-      initialBatchImage ??
-      pickDefaultPro2FrameImageEngine(providers) ??
-      null;
-    if (seed) {
-      setProviderId(seed.providerId);
-      setModelKey(seed.modelKey);
-      setParams(seed.params ?? {});
-    }
+    const seedBatch =
+      initialBatchImage ?? pickDefaultPro2FrameImageEngine(providers) ?? null;
+    setSettingsData(
+      pro2BatchImageAsSbv1Settings(seedBatch, {
+        aspectRatio: "16:9",
+        imageQuality: "standard",
+        resolution: "2K",
+        outputCount: 1,
+      }),
+    );
+    setDockMenu(null);
   }, [open, sorted, initialBatchImage, providers]);
 
-  useEffect(() => {
-    if (!open || providerId.trim()) return;
-    const seed =
-      initialBatchImage ??
-      pickDefaultPro2FrameImageEngine(providers) ??
-      null;
-    if (!seed) return;
-    setProviderId(seed.providerId);
-    setModelKey(seed.modelKey);
-    setParams(seed.params ?? {});
-  }, [open, initialBatchImage, providers, providerId]);
+  const modalActive = open && sorted.length > 0;
+  useModalBodyScrollLock(modalActive);
+  useModalEscapeClose(onClose, { active: modalActive });
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  const patchSettings = useCallback((patch: Partial<Sbv1ImageNodeData>) => {
+    setSettingsData((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   if (!mounted || !open || !sorted.length) return null;
 
   const allSelected = selected.size === sorted.length;
   const checked = sorted.filter((r) => selected.has(r.frameIndex));
-  const hasImageModel = Boolean(providerId.trim() && modelKey.trim());
+  const batchImage = sbv1EngineToBatchImage(settingsData);
+  const hasImageModel = Boolean(batchImage);
 
   const toggle = (frameIndex: number) => {
     setSelected((prev) => {
@@ -181,7 +186,12 @@ export function Pro2FrameGeneratePicker({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          <div className={cn(GRID_HEAD, "sticky top-0 z-[1] border-b border-white/[0.06] bg-[#1a1a22]")}>
+          <div
+            className={cn(
+              GRID_HEAD,
+              "sticky top-0 z-[1] border-b border-white/[0.06] bg-[#1a1a22]",
+            )}
+          >
             <span />
             <span>镜号</span>
             <span>景别</span>
@@ -242,20 +252,25 @@ export function Pro2FrameGeneratePicker({
             <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
               分镜图模型
             </p>
-            <div className={cn("nodrag max-w-md", RF_FORM_CONTROL)}>
-              <EnginePicker
-                role="IMAGE"
-                allowedModelKeys={PRO2_FRAME_IMAGE_MODEL_KEYS}
-                providerId={providerId}
-                modelKey={modelKey}
-                params={params}
-                onChange={(next) => {
-                  setProviderId(next.providerId);
-                  setModelKey(next.modelKey);
-                  setParams(next.params);
-                }}
-              />
-            </div>
+            <LibtvDockToolbarMetricsContext.Provider
+              value={LIBTV_DOCK_TOOLBAR_SCREEN_SCALE}
+            >
+              <div className="flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-white/10 bg-black/25 px-1 py-1">
+                <Sbv1ImageDockModelPicker
+                  data={settingsData}
+                  allowedModelKeys={PRO2_FRAME_IMAGE_MODEL_KEYS}
+                  open={dockMenu === "model"}
+                  onOpenChange={(next) => setDockMenu(next ? "model" : null)}
+                  onPatch={patchSettings}
+                />
+                <Sbv1ImageDockParamsPicker
+                  data={settingsData}
+                  open={dockMenu === "params"}
+                  onOpenChange={(next) => setDockMenu(next ? "params" : null)}
+                  onPatch={patchSettings}
+                />
+              </div>
+            </LibtvDockToolbarMetricsContext.Provider>
             {!hasImageModel ? (
               <p className="mt-1 text-[10px] text-amber-200/90">
                 请先选择 IMAGE 模型后再生成
@@ -275,9 +290,10 @@ export function Pro2FrameGeneratePicker({
               disabled={!checked.length || !hasImageModel}
               className="rounded-lg bg-white px-4 py-1.5 text-[12px] font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
               onClick={() => {
+                if (!batchImage) return;
                 onConfirm({
                   frameIndices: checked.map((r) => r.frameIndex),
-                  batchImage: { providerId, modelKey, params },
+                  batchImage,
                 });
                 onClose();
               }}

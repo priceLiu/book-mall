@@ -9,6 +9,7 @@ import {
   parseOutlineBriefCharacters,
   parseStoryboardRows,
   parseSceneVisualDictionaryRows,
+  resolveMergedSceneVisualDictionaryRows,
   resolveSceneDictionaryMarkdown,
   extractCharacterSectionFromOutline,
   type SceneVisualDictionaryRow,
@@ -20,6 +21,7 @@ import {
   type StoryRefImage,
 } from "./story-ref-image";
 import { storyProSceneRowKey } from "./story-pro-scene-asset-catalog";
+import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryCharacterRow,
@@ -30,7 +32,12 @@ import type {
 import type { CanvasFlowNode } from "./types";
 
 function characterRowFromParts(
-  c: { name: string; role: string; appearance: string },
+  c: {
+    name: string;
+    role: string;
+    appearance: string;
+    personality?: string;
+  },
   promptOverride?: string,
 ): StoryCharacterRow {
   return {
@@ -38,6 +45,7 @@ function characterRowFromParts(
     name: c.name,
     role: c.role,
     appearance: c.appearance,
+    personality: c.personality?.trim() || undefined,
     prompt:
       promptOverride?.trim() || formatCharacterRowThreeViewPrompt(c),
   };
@@ -250,7 +258,26 @@ export function buildDefaultSceneRowPrompt(
       ? `画面：${row.description.trim()}`
       : "",
   ].filter(Boolean);
-  return parts.join("\n");
+  return finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+}
+
+/** 场景设计列 / 场景图节点 Dock · 结构化展示 + 生图关键词 */
+export function formatSceneRowDockInput(row: StoryProSceneRow): string {
+  const parts = [
+    row.name.trim() ? `场景：${row.name.trim()}` : "",
+    (row.environment ?? "").trim()
+      ? `环境：${row.environment!.trim()}`
+      : "",
+    (row.time ?? "").trim() ? `时间：${row.time!.trim()}` : "",
+    (row.mood ?? "").trim() ? `气氛：${row.mood!.trim()}` : "",
+    (row.imageKeywords ?? "").trim()
+      ? `生图：${row.imageKeywords!.trim()}`
+      : "",
+    !row.imageKeywords?.trim() && row.description?.trim()
+      ? `画面：${row.description.trim()}`
+      : "",
+  ].filter(Boolean);
+  return finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
 }
 
 /** 分镜脚本格式误入场景列时识别并覆盖 */
@@ -271,20 +298,26 @@ export function buildSceneRowsFromHub(
   scriptHubId: string,
 ): StoryProSceneRow[] {
   const synced = hubDataForColumnSync(d);
-  const dictRows = parseSceneVisualDictionaryRows(
-    resolveSceneDictionaryMarkdown(synced.outlineMd ?? "", synced.sceneMd ?? ""),
+  const dictRows = resolveMergedSceneVisualDictionaryRows(
+    synced.outlineMd ?? "",
+    synced.sceneMd ?? "",
   );
   const hub = scriptHubId.trim();
   const byKey = new Map<string, StoryProSceneRow>();
   for (const r of dictRows) {
     const key = hub ? storyProSceneRowKey(hub, r.name) : r.name;
     if (byKey.has(key)) continue;
-    byKey.set(key, {
+    const row: StoryProSceneRow = {
       key,
       name: r.name,
+      environment: r.environment?.trim() || undefined,
+      time: r.time?.trim() || undefined,
+      mood: r.mood?.trim() || undefined,
+      imageKeywords: r.imageKeywords?.trim() || undefined,
       description: [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
       prompt: buildDefaultSceneRowPrompt(r),
-    });
+    };
+    byKey.set(key, row);
   }
   return Array.from(byKey.values());
 }

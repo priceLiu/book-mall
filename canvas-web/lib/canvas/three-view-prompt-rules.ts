@@ -51,8 +51,19 @@ export function formatCharacterRowThreeViewPrompt(c: {
   name: string;
   role: string;
   appearance: string;
+  personality?: string;
 }): string {
-  return `${THREE_VIEW_ENGINE_PROMPT_DEFAULT}\n\n角色：${c.name}\n定位：${c.role}\n外观：${c.appearance}`;
+  const lines = [
+    THREE_VIEW_ENGINE_PROMPT_DEFAULT,
+    "",
+    `角色：${c.name}`,
+    `定位：${c.role || "—"}`,
+    `外貌/服装：${c.appearance || "—"}`,
+  ];
+  if (c.personality?.trim()) {
+    lines.push(`性格：${c.personality.trim()}`);
+  }
+  return lines.join("\n");
 }
 
 /** 大纲批量创建三视图节点 */
@@ -60,6 +71,16 @@ export function formatBatchThreeViewPrompt(c: {
   name: string;
   role: string;
   appearance: string;
+  personality?: string;
 }): string {
-  return `${THREE_VIEW_ENGINE_PROMPT_DEFAULT}\n\n【角色】${c.name}（${c.role}）\n【外观】${c.appearance}`;
+  const lines = [
+    THREE_VIEW_ENGINE_PROMPT_DEFAULT,
+    "",
+    `【角色】${c.name}（${c.role || "—"}）`,
+    `【外貌/服装】${c.appearance || "—"}`,
+  ];
+  if (c.personality?.trim()) {
+    lines.push(`【性格】${c.personality.trim()}`);
+  }
+  return lines.join("\n");
 }

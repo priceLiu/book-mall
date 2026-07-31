@@ -11,9 +11,9 @@ function nodeMeasuredSize(n: CanvasFlowNode): { w: number; h: number } {
 }
 
 /** 与 pro2-media-group-layout.ts 保持一致 · 避免单测拉入 use client 模块 */
-const LIBTV_GROUP_PAD = 192;
+const LIBTV_GROUP_PAD = 96;
 const LIBTV_GROUP_HEADER = 48;
-const LIBTV_GROUP_EXTRA = 168;
+const LIBTV_GROUP_EXTRA = 84;
 
 export const LIBTV_GROUP_ABSOLUTE_MIN_WIDTH = 220;
 export const LIBTV_GROUP_ABSOLUTE_MIN_HEIGHT = 140;

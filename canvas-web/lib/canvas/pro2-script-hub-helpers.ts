@@ -43,7 +43,6 @@ import {
   pickDefaultPro2SceneImageEngine,
   type Pro2SceneBatchImagePick,
 } from "./pro2-scene-batch-image";
-import { reflowStoryPro2Workspace } from "./story-pro2-workspace-layout";
 import { pro2ThinNodeIsLinked } from "./pro2-thin-node-display-state";
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
 import { ensurePro2VideoBoardGroup } from "./pro2-spawn-video-board-group";
@@ -596,9 +595,6 @@ export function kickoffPro2FrameBoardFromHub(
       .filter((r) => allowed.has(r.frameIndex))
       .map((r) => r.key);
   }
-  const edges = store.edges;
-  store.setNodes((prev) => reflowStoryPro2Workspace(prev, edges));
-
   store = getStore();
   ensurePro2FrameImageGroup({
     frameColumnId: frameColumnId!,
@@ -902,6 +898,7 @@ export function kickoffPro2CharacterThreeViewFromHub(
       name: row.name,
       role: row.role,
       appearance: row.appearance,
+      personality: row.personality,
     }),
   }));
 
@@ -955,9 +952,6 @@ export function kickoffPro2CharacterThreeViewFromHub(
       .filter((r) => allowed.has(r.key) || allowed.has(r.name))
       .map((r) => r.key);
   }
-  const edges = store.edges;
-  store.setNodes((prev) => reflowStoryPro2Workspace(prev, edges));
-
   store = getStore();
   ensurePro2CharacterImageGroup({
     characterColumnId: characterColumnId!,
@@ -1073,9 +1067,6 @@ export function kickoffPro2SceneImageFromHub(
   }
   keys = Array.from(new Set(keys.filter(Boolean)));
 
-  const edges = store.edges;
-  store.setNodes((prev) => reflowStoryPro2Workspace(prev, edges));
-
   store = getStore();
   ensurePro2SceneImageGroup({
     hubNodeId: hubId,
@@ -1100,15 +1091,19 @@ export function kickoffPro2SceneImageFromHub(
   );
 
   if (keys.length) {
-    window.setTimeout(() => {
+    const runBatch = () => {
+      const fresh = getStore();
       batchRunPro2SceneImageNodes(
-        store.nodes,
+        fresh.nodes,
         hubId,
         synced.sceneRows,
         keys,
         { forceFresh: true },
       );
-    }, 0);
+    };
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(runBatch);
+    });
   }
 
   return { hubNodeId: hubId };

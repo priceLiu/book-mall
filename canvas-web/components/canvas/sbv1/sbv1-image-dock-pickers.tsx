@@ -23,7 +23,7 @@ import {
   useSbv1ToolbarAnchor,
 } from "./sbv1-toolbar-anchor-popover";
 import {
-  LIBTV_DOCK_POPOVER_CLASS,
+  LIBTV_DOCK_PARAMS_POPOVER_CLASS,
   LibtvDockParamGrid,
 } from "../libtv-dock-picker-chrome";
 import { LibtvDockEngineModelPicker } from "../libtv-dock-engine-model-picker";
@@ -221,7 +221,7 @@ export function Sbv1ImageDockParamsPicker({
         rect={rect}
         placement="auto"
         estimatedHeight={360}
-        className={LIBTV_DOCK_POPOVER_CLASS}
+        className={LIBTV_DOCK_PARAMS_POPOVER_CLASS}
       >
         <div className="space-y-3 pb-1">
           <LibtvDockParamGrid

@@ -51,6 +51,7 @@ export default defineConfig({
       "test/unit/libtv-group-content-bounds.test.ts",
       "test/unit/libtv-image-grid-split.test.ts",
       "test/unit/libtv-media-node-auto-fit.test.ts",
+      "test/unit/libtv-media-aspect-preset.test.ts",
       "test/unit/libtv-grid-split-hd.test.ts",
       "test/unit/libtv-plain-text-display.test.ts",
       "test/unit/task-pick-preferred.test.ts",

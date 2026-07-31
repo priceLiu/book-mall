@@ -2,6 +2,7 @@ import { resolveHubRowsForCrewBulletin } from "./crew-bulletin-build";
 import type { CrewBulletinTask, CrewTaskKind } from "./crew-bulletin-types";
 import {
   buildDefaultFrameRowPrompt,
+  formatSceneRowDockInput,
 } from "./story-column-sync";
 import type {
   StoryProAudioRow,
@@ -250,24 +251,17 @@ export function findCrewTaskRow(
 }
 
 export function characterCrewTaskDockInput(row: StoryProCharacterRow): string {
-  const prompt = row.prompt?.trim();
-  if (prompt) return prompt;
   return formatCharacterRowThreeViewPrompt({
     name: row.name?.trim() || "角色",
     role: row.role?.trim() || "",
     appearance: row.appearance?.trim() || "",
+    personality: row.personality,
   });
 }
 
 export function sceneCrewTaskDockInput(row: StoryProSceneRow): string {
-  const prompt = row.prompt?.trim();
-  if (prompt) return prompt;
-  const desc = row.description?.trim();
-  if (desc) {
-    return row.name?.trim()
-      ? `场景：${row.name.trim()}\n画面：${desc}`
-      : desc;
-  }
+  const fromRow = formatSceneRowDockInput(row);
+  if (fromRow.trim()) return fromRow;
   return row.name?.trim() || "";
 }
 

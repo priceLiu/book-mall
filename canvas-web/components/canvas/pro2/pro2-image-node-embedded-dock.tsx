@@ -5,6 +5,7 @@ import { ArrowUp, Loader2, MapPin, Upload } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
@@ -59,6 +60,7 @@ export function Pro2ImageNodeEmbeddedDock({
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -142,10 +144,18 @@ export function Pro2ImageNodeEmbeddedDock({
     const controllerId = d.pro2ControllerNodeId;
     const rowKey = d.pro2RowKey;
     if (!controllerId || !rowKey) return;
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     batchRunStoryRowsSequential(controllerId, [rowKey], "frameImage", {
       forceFresh: true,
     });
-  }, [storeNode, mediaRole, d.pro2ControllerNodeId, d.pro2RowKey]);
+  }, [
+    storeNode,
+    mediaRole,
+    d.pro2ControllerNodeId,
+    d.pro2RowKey,
+    updateNodeData,
+    setNodeRuntime,
+  ]);
 
   const onOpenStyleLibrary = useCallback(() => {
     setPro2StyleLibImageNodeId(nodeId);

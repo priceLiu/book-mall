@@ -238,6 +238,22 @@ export function commitStoryRunPendingPatch(
     );
   }
   if (
+    isAnyStoryCharacterColumnType(node.type ?? "") &&
+    Array.isArray(pending.rows) &&
+    ctx?.rowKey
+  ) {
+    syncPro2CharacterImagesFromRows(
+      allNodes.map((n) =>
+        n.id === node.id
+          ? { ...n, data: { ...n.data, rows: pending.rows } }
+          : n,
+      ),
+      node.id,
+      pending.rows as never,
+      updateNodeData,
+    );
+  }
+  if (
     isAnyStoryVideoColumnType(node.type ?? "") &&
     Array.isArray(pending.rows)
   ) {

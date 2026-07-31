@@ -298,7 +298,9 @@ export async function dispatchCanvasImageQueuedTask(
         if (isTransientSystemBusyError(e)) {
           const { payload: retryPayload } = nextDispatchStaleRetryPayload(workingPayload);
           if (isPreSubmitRetryExhausted(retryPayload)) {
-            await failCanvasTaskPreSubmitTimeout(task.id, retryPayload);
+            await failCanvasTaskPreSubmitTimeout(task.id, retryPayload, {
+              scopeKey,
+            });
             return "failed";
           }
           await prisma.canvasGenerationTask.update({
@@ -415,7 +417,9 @@ export async function dispatchCanvasImageQueuedTask(
         taskInputPayload(claimedTask ?? task),
       );
       if (isPreSubmitRetryExhausted(retryPayload)) {
-        await failCanvasTaskPreSubmitTimeout(task.id, retryPayload);
+        await failCanvasTaskPreSubmitTimeout(task.id, retryPayload, {
+          scopeKey,
+        });
         return "failed";
       }
       await deps.revertStuckDispatchingTask(

@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      html-to-image:
+        specifier: ^1.11.13
+        version: 1.11.13
     devDependencies:
       concurrently:
         specifier: ^9.1.2
@@ -56,6 +60,9 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  html-to-image@1.11.13:
+    resolution: {integrity: sha512-cuOPoI7WApyhBElTTb9oqsawRvZ0rHhaHwghRLlTuffoD1B2aDemlCruLeZrUIIdvG7gs9xeELEPm6PhuASqrg==}
 
   is-fullwidth-code-point@3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
@@ -152,6 +159,8 @@ snapshots:
   get-caller-file@2.0.5: {}
 
   has-flag@4.0.0: {}
+
+  html-to-image@1.11.13: {}
 
   is-fullwidth-code-point@3.0.0: {}
 

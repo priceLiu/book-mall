@@ -331,6 +331,11 @@ export function Pro2ScriptHubToolbar({
     collaboration,
   ]);
 
+  const hubSceneRows = useMemo(
+    () => resolvePro2HubSceneRows(hubId, hubData, nodes, edges),
+    [hubId, hubData, nodes, edges],
+  );
+
   return (
     <>
       <div
@@ -482,9 +487,8 @@ export function Pro2ScriptHubToolbar({
       <Pro2SceneImagePicker
         open={scenePickerOpen}
         sceneMd={resolvePro2HubSceneMd(hubData, { nodes, edges, hubId })}
-        sceneRowKeys={resolvePro2HubSceneRows(hubId, hubData, nodes, edges).map(
-          (r) => ({ name: r.name, key: r.key }),
-        )}
+        sceneRows={hubSceneRows}
+        sceneRowKeys={hubSceneRows.map((r) => ({ name: r.name, key: r.key }))}
         initialBatchImage={initialSceneBatchImage}
         onClose={() => setScenePickerOpen(false)}
         onConfirm={runSceneGenerate}

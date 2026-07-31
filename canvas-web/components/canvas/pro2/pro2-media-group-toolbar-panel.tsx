@@ -385,6 +385,7 @@ export function Pro2MediaGroupToolbarPanel({
           name: row.name,
           role: row.role,
           appearance: row.appearance,
+          personality: row.personality,
         }),
       }));
       updateNodeData(controller.id, { rows: refreshedRows });

@@ -23,6 +23,8 @@ export type StoryCharacterRow = {
   name: string;
   role: string;
   appearance: string;
+  /** 角色表 · 性格 */
+  personality?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   runtime?: CanvasNodeRuntime;

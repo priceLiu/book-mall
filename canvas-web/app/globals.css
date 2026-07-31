@@ -28,7 +28,7 @@
 }
 
 :root {
-  --canvas-bg: #141414;
+  --canvas-bg: #191919;
   --canvas-surface: #13131f;
   --canvas-surface-2: #1a1a2b;
   --canvas-border: rgba(255, 255, 255, 0.1);
@@ -255,6 +255,11 @@ html[data-canvas-editor-open] body {
 html[data-canvas-modal-open] .canvas-flow-wrap,
 html[data-canvas-modal-open] .pro2-input-dock {
   pointer-events: none;
+}
+
+/* 节点顶栏 portal 到 body（z-1500），弹层打开时须整条收起而非靠 z 压制 */
+html[data-canvas-modal-open] .libtv-node-toolbar-portal {
+  display: none !important;
 }
 
 /* 拖动对齐辅助线 · 高于普通节点 (15) 与 dragging (1000) */

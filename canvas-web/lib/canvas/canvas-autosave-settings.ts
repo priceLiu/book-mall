@@ -2,6 +2,12 @@
 
 export const CANVAS_AUTOSAVE_DEBOUNCE_MS = 1500;
 
+/**
+ * 历史快照心跳：每 30s 检查「距上次写历史是否已满用户设定的间隔」。
+ * 用心跳而非 `setInterval(间隔)`，避免页面内任何 effect 重挂载都把计时清零。
+ */
+export const CANVAS_AUTOSAVE_HISTORY_HEARTBEAT_MS = 30_000;
+
 /** 与 book-mall `CANVAS_PROJECT_HISTORY_MAX` 一致 · 每项目历史版本环形缓冲上限 */
 export const CANVAS_PROJECT_HISTORY_MAX = 20;
 

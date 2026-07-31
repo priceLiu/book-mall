@@ -9,7 +9,7 @@ import {
   pro2MediaGroupOrigin,
   relayoutPro2MediaGroup,
 } from "./pro2-media-group-layout";
-import { ensurePro2HubToMediaGroupEdge } from "./pro2-hub-media-group-edge";
+import { ensurePro2HubToMediaGroupChildEdges } from "./pro2-hub-media-group-edge";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { isPro2FrameBoardGroup } from "./pro2-resolve-frame-board-group";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
@@ -115,10 +115,20 @@ export function ensurePro2FrameImageGroup(
   const sorted = [...args.rows].sort((a, b) => a.frameIndex - b.frameIndex);
   if (!sorted.length) {
     if (existingGroup?.id && args.setEdges) {
-      ensurePro2HubToMediaGroupEdge(
+      const childIds = args.nodes
+        .filter(
+          (n) =>
+            n.type === "story-pro2-image" &&
+            (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+              args.frameColumnId &&
+            n.parentId === existingGroup!.id,
+        )
+        .map((n) => n.id);
+      ensurePro2HubToMediaGroupChildEdges(
         args.setEdges,
         args.hubNodeId,
         existingGroup.id,
+        childIds,
       );
     }
     return existingGroup?.id ?? null;
@@ -220,11 +230,37 @@ export function ensurePro2FrameImageGroup(
   if (groupId) {
     relayoutPro2MediaGroup(args.setNodes, groupId, { resetOrigin: true });
     if (args.setEdges) {
-      ensurePro2HubToMediaGroupEdge(args.setEdges, args.hubNodeId, groupId);
+      ensurePro2HubToMediaGroupChildEdges(
+        args.setEdges,
+        args.hubNodeId,
+        groupId,
+        newChildIds,
+      );
     }
   }
 
   return groupId ?? null;
+}
+
+/** 分镜列 + rowKey → 组内图片节点（供 Dock 乐观扫光） */
+export function findPro2FrameImageNodeForRow(
+  nodes: CanvasFlowNode[],
+  frameColumnId: string,
+  rowKey: string,
+): CanvasFlowNode | undefined {
+  const syncGroupId = resolveFrameSyncGroupId(nodes, frameColumnId);
+  return nodes.find((n) => {
+    if (n.type !== "story-pro2-image") return false;
+    const d = n.data as {
+      pro2ControllerNodeId?: string;
+      pro2RowKey?: string;
+      pro2GroupId?: string;
+    };
+    if (d.pro2ControllerNodeId !== frameColumnId) return false;
+    if (d.pro2RowKey !== rowKey) return false;
+    if (!syncGroupId) return true;
+    return d.pro2GroupId === syncGroupId;
+  });
 }
 
 /** 分镜列 rows 变更后同步到组内图片节点 */
@@ -234,20 +270,8 @@ export function syncPro2FrameImagesFromRows(
   rows: StoryProFrameRow[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): void {
-  const syncGroupId = resolveFrameSyncGroupId(nodes, frameColumnId);
   for (const row of rows) {
-    const img = nodes.find((n) => {
-      if (n.type !== "story-pro2-image") return false;
-      const d = n.data as {
-        pro2ControllerNodeId?: string;
-        pro2RowKey?: string;
-        pro2GroupId?: string;
-      };
-      if (d.pro2ControllerNodeId !== frameColumnId) return false;
-      if (d.pro2RowKey !== row.key) return false;
-      if (!syncGroupId) return true;
-      return d.pro2GroupId === syncGroupId;
-    });
+    const img = findPro2FrameImageNodeForRow(nodes, frameColumnId, row.key);
     if (!img) continue;
     const preview = frameRowPreview(row);
     updateNodeData(img.id, {

@@ -49,6 +49,7 @@ import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
+import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
@@ -91,6 +92,8 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
     selected: Boolean(selected),
     soleSelected,
   });
+
+  useLibtvMediaAspectPresetSync(id, d.aspectRatio);
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,

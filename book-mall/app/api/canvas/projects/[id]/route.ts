@@ -84,6 +84,13 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
           ? ("manual" as const)
           : ("autosave" as const);
       const labelRaw = (hs as { label?: unknown }).label;
+      // 客户端视口截图优先：项目封面/画布内媒体图只能反映「有没有生成过图」，
+      // 不能反映该版本的画布长什么样
+      const shotRaw = (hs as { thumbnailUrl?: unknown }).thumbnailUrl;
+      const viewportShot =
+        typeof shotRaw === "string" && /^https?:\/\//i.test(shotRaw.trim())
+          ? shotRaw.trim()
+          : "";
       try {
         historyItem = await createCanvasProjectHistoryForUser(
           guard.user.id,
@@ -91,6 +98,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
           {
             canvas: project.canvas,
             thumbnailUrl:
+              viewportShot ||
               project.thumbnailUrl?.trim() ||
               pickProjectThumbnailUrl(project.canvas) ||
               undefined,

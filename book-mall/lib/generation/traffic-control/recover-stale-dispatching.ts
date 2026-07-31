@@ -246,7 +246,9 @@ async function recoverStaleDispatchingOnly(opts?: {
 
     if (isPreSubmitRetryExhausted(payload)) {
       await releaseTrafficSlot(scope.scopeKey);
-      await failCanvasTaskPreSubmitTimeout(t.id, payload);
+      await failCanvasTaskPreSubmitTimeout(t.id, payload, {
+        scopeKey: scope.scopeKey,
+      });
       n++;
       continue;
     }

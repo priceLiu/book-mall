@@ -113,7 +113,7 @@ function linkFromSource(
     return null;
   }
 
-  if (targetType === "story-pro2-script-hub") {
+  if (source.type === "story-pro2-script-hub") {
     const d = source.data as unknown as StoryProScriptHubNodeData;
     const outline = d.outlineMd?.trim();
     if (outline) {
@@ -125,6 +125,7 @@ function linkFromSource(
         sourceNodeId: source.id,
       };
     }
+    return null;
   }
 
   if (source.type === "story-pro2-tag") {
@@ -195,7 +196,11 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
   "three-view-engine",
 ]);
 
-const TEXT_UPSTREAM_SOURCE_TYPES = new Set(["story-pro2-tag", "story-pro2-starter"]);
+const TEXT_UPSTREAM_SOURCE_TYPES = new Set([
+  "story-pro2-tag",
+  "story-pro2-starter",
+  "story-pro2-script-hub",
+]);
 
 function edgeMatchesDockInput(
   edge: CanvasFlowEdge,

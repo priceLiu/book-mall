@@ -69,6 +69,10 @@ import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout
 import { reflowStoryPro2Workspace } from "@/lib/canvas/story-pro2-workspace-layout";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { pickPersistableProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import {
+  captureCanvasViewportSnapshotUrl,
+  resolveCanvasHistoryThumbnailUrl,
+} from "@/lib/canvas/canvas-viewport-snapshot";
 import { cn } from "@/lib/utils";
 import { useCanvasImmersiveMode } from "@/lib/canvas/use-canvas-immersive-mode";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
@@ -80,7 +84,11 @@ import { MyPromptHistoryPanel } from "@/components/canvas/my-prompt-history-pane
 import { SaveProjectAssetDialogHost } from "@/components/canvas/save-project-asset-dialog";
 import { PortraitImportProgressHost } from "@/components/canvas/portrait-import-progress-dialog";
 import { useRegisterProjectAssetCanvasInsert } from "@/lib/canvas/use-register-project-asset-canvas-insert";
-import { CANVAS_AUTOSAVE_DEBOUNCE_MS, getCanvasAutosaveIntervalMs } from "@/lib/canvas/canvas-autosave-settings";
+import {
+  CANVAS_AUTOSAVE_DEBOUNCE_MS,
+  CANVAS_AUTOSAVE_HISTORY_HEARTBEAT_MS,
+  getCanvasAutosaveIntervalMs,
+} from "@/lib/canvas/canvas-autosave-settings";
 import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
@@ -399,6 +407,9 @@ function Inner({ projectId }: { projectId: string }) {
             revision: s.graphRevision,
             viewport: JSON.stringify(s.viewport),
           };
+          // 刚载入的图不算「待存档编辑」，首条历史从打开项目起算一个间隔
+          historyWrittenAtRef.current = Date.now();
+          historyWrittenRevisionRef.current = s.graphRevision;
         };
         syncLoadedPersistedSnapshot();
         // hydrate 可能 queueMicrotask 二次 finalize，延迟对齐 revision 避免误判已保存
@@ -426,6 +437,9 @@ function Inner({ projectId }: { projectId: string }) {
   const autosaveSavingUiTimerRef = useRef<number | null>(null);
   const autosaveInFlightRef = useRef(false);
   const autosavePendingRef = useRef(false);
+  /** 上次写入「自动保存」历史的时间与当时的 graphRevision（跨 effect 重挂载保持） */
+  const historyWrittenAtRef = useRef(Date.now());
+  const historyWrittenRevisionRef = useRef<number | null>(null);
   const autosaveProjectRef = useRef(project);
   const autosaveBaseRef = useRef(base);
   const runAutosaveRef = useRef<(force?: boolean) => Promise<void>>(
@@ -496,17 +510,28 @@ function Inner({ projectId }: { projectId: string }) {
         await new Promise<void>((resolve) => {
           queueMicrotask(() => resolve());
         });
+        const snapshot = useCanvasStore.getState();
+        const revisionAtSnapshot = snapshot.graphRevision;
         const graph = stripStoryProUploadedScriptMdForPersist(
-          stripGraphForPersist(useCanvasStore.getState().toGraph()),
+          stripGraphForPersist(snapshot.toGraph()),
         );
         const thumb = pickPersistableProjectThumbnailUrl(graph);
         const patch: {
           canvas: typeof graph;
           thumbnailUrl?: string;
-          historySnapshot?: { source: "autosave" };
+          historySnapshot?: { source: "autosave"; thumbnailUrl?: string };
         } = { canvas: graph };
         if (writeHistory) {
-          patch.historySnapshot = { source: "autosave" };
+          const shot = await captureCanvasViewportSnapshotUrl(bookBase);
+          const historyThumb = resolveCanvasHistoryThumbnailUrl(
+            shot,
+            graph,
+            proj.thumbnailUrl,
+          );
+          patch.historySnapshot = {
+            source: "autosave",
+            ...(historyThumb ? { thumbnailUrl: historyThumb } : {}),
+          };
         }
         if (thumb && thumb !== proj.thumbnailUrl) {
           patch.thumbnailUrl = thumb;
@@ -517,6 +542,13 @@ function Inner({ projectId }: { projectId: string }) {
           patch,
         );
         syncLastPersistedSnapshot();
+        if (writeHistory) {
+          // 失败时只推迟一个间隔重试：不更新 revision，下一轮心跳仍认定「有未存档编辑」
+          historyWrittenAtRef.current = Date.now();
+          if (historyItem) {
+            historyWrittenRevisionRef.current = revisionAtSnapshot;
+          }
+        }
         if (historyItem) {
           window.dispatchEvent(new CustomEvent("canvas:history-updated"));
         }
@@ -556,19 +588,29 @@ function Inner({ projectId }: { projectId: string }) {
       }, CANVAS_AUTOSAVE_DEBOUNCE_MS);
     };
 
+    // 按用户设置的间隔（如 5 分钟）写入一条历史版本。
+    // 判据是 graphRevision 而非 isCanvasDirty()：1.5s debounce 已把编辑落盘并清掉 dirty，
+    // 用 dirty 判断会让历史几乎永远写不进去（只有恰好在 tick 前 1.5s 内编辑才命中）。
+    const maybeWriteHistorySnapshot = () => {
+      if (!canvasReadyRef.current) return;
+      const intervalMs = getCanvasAutosaveIntervalMs();
+      if (intervalMs <= 0) return;
+      if (Date.now() - historyWrittenAtRef.current < intervalMs) return;
+      const revision = useCanvasStore.getState().graphRevision;
+      if (historyWrittenRevisionRef.current === revision) return;
+      void runAutosave(true, { writeHistory: true });
+    };
+
     const restartAutosaveInterval = () => {
       if (autosaveIntervalRef.current !== null) {
         window.clearInterval(autosaveIntervalRef.current);
         autosaveIntervalRef.current = null;
       }
-      const intervalMs = getCanvasAutosaveIntervalMs();
-      if (intervalMs === 0) return;
-      autosaveIntervalRef.current = window.setInterval(() => {
-        if (!canvasReadyRef.current) return;
-        if (!isCanvasDirty()) return;
-        // 按用户设置的间隔（如 5 分钟）写入一条历史版本
-        void runAutosave(false, { writeHistory: true });
-      }, intervalMs);
+      if (getCanvasAutosaveIntervalMs() <= 0) return;
+      autosaveIntervalRef.current = window.setInterval(
+        maybeWriteHistorySnapshot,
+        CANVAS_AUTOSAVE_HISTORY_HEARTBEAT_MS,
+      );
     };
 
     const unsub = useCanvasStore.subscribe((state, prev) => {
@@ -686,13 +728,27 @@ function Inner({ projectId }: { projectId: string }) {
         stripGraphForPersist(toGraph()),
       );
       const thumb = pickPersistableProjectThumbnailUrl(graph);
+      const shot = await captureCanvasViewportSnapshotUrl(base);
+      const historyThumb = resolveCanvasHistoryThumbnailUrl(
+        shot,
+        graph,
+        project.thumbnailUrl,
+      );
       const patch: {
         canvas: typeof graph;
         thumbnailUrl?: string;
-        historySnapshot: { source: "manual"; label: string };
+        historySnapshot: {
+          source: "manual";
+          label: string;
+          thumbnailUrl?: string;
+        };
       } = {
         canvas: graph,
-        historySnapshot: { source: "manual", label: "手动保存" },
+        historySnapshot: {
+          source: "manual",
+          label: "手动保存",
+          ...(historyThumb ? { thumbnailUrl: historyThumb } : {}),
+        },
       };
       if (thumb && thumb !== project.thumbnailUrl) {
         patch.thumbnailUrl = thumb;

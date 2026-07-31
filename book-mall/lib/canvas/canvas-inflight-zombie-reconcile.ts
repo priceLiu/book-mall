@@ -24,6 +24,7 @@ export type CanvasInflightZombieReconcileSummary = {
   failedIncomplete: number;
   requeuedDispatching: number;
   displayRecovered: number;
+  submitTimeoutRecovered: number;
   textLlmRecovered: number;
   imageKieRecovered: number;
 };
@@ -40,9 +41,30 @@ export async function reconcileCanvasInflightZombies(opts?: {
     failedIncomplete: 0,
     requeuedDispatching: 0,
     displayRecovered: 0,
+    submitTimeoutRecovered: 0,
     textLlmRecovered: 0,
     imageKieRecovered: 0,
   };
+
+  const { recoverCanvasSubmitDispatchTimeoutTask } = await import(
+    "@/lib/generation/traffic-control/canvas-orphan-gateway-log"
+  );
+  const pseudoTimeoutFailed = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "FAILED",
+      failCode: "SUBMIT_DISPATCH_TIMEOUT",
+      updatedAt: { gte: new Date(now - 24 * 60 * 60 * 1000) },
+      ...projectFilter,
+    },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    select: { id: true },
+  });
+  for (const t of pseudoTimeoutFailed) {
+    if (await recoverCanvasSubmitDispatchTimeoutTask(t.id)) {
+      summary.submitTimeoutRecovered += 1;
+    }
+  }
 
   const textSubmitted = await prisma.canvasGenerationTask.findMany({
     where: {

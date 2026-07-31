@@ -185,11 +185,17 @@ export function parseCharacterListFromSection(body: string): Array<{
   name: string;
   role: string;
   appearance: string;
+  personality: string;
 }> {
   const fromTable = parseCharacterRows(body);
   if (fromTable.length) return fromTable;
 
-  const out: Array<{ name: string; role: string; appearance: string }> = [];
+  const out: Array<{
+    name: string;
+    role: string;
+    appearance: string;
+    personality: string;
+  }> = [];
   for (const raw of body.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
@@ -204,6 +210,7 @@ export function parseCharacterListFromSection(body: string): Array<{
       name,
       role: parts[1] ?? "",
       appearance: parts.slice(2).join(" · ") || parts[1] || "（待补充外观）",
+      personality: "",
     });
   }
   return out;
@@ -652,7 +659,7 @@ function extractMarkdownSectionByHeader(
 }
 
 /** 按标题层级（## / ### / #）提取 Markdown 段落 */
-function extractMarkdownSectionByHeaderLevels(
+export function extractMarkdownSectionByHeaderLevels(
   md: string,
   titlePattern: RegExp,
   levels: number[],
@@ -751,18 +758,129 @@ export function extractSceneSectionMd(md: string): string {
   return extractSceneVisualDictionaryFromOutline(md);
 }
 
+function sceneDictRowScore(row: SceneVisualDictionaryRow): number {
+  let score = 0;
+  if (row.environment?.trim()) score += 1;
+  if (row.time?.trim()) score += 1;
+  if (row.mood?.trim()) score += 1;
+  if (row.imageKeywords?.trim()) score += 4;
+  return score;
+}
+
+/** 按场景名合并大纲辞典与场景段扩写表，优先保留非空生图关键词 */
+export function mergeSceneVisualDictionaryRows(
+  primary: SceneVisualDictionaryRow[],
+  secondary: SceneVisualDictionaryRow[],
+): SceneVisualDictionaryRow[] {
+  const byName = new Map<string, SceneVisualDictionaryRow>();
+  const mergePair = (
+    a: SceneVisualDictionaryRow,
+    b: SceneVisualDictionaryRow,
+  ): SceneVisualDictionaryRow => ({
+    name: a.name || b.name,
+    environment: a.environment?.trim() || b.environment?.trim() || "",
+    time: a.time?.trim() || b.time?.trim() || "",
+    mood: a.mood?.trim() || b.mood?.trim() || "",
+    imageKeywords:
+      a.imageKeywords?.trim() || b.imageKeywords?.trim() || "",
+  });
+  for (const row of primary) {
+    if (!row.name.trim()) continue;
+    byName.set(row.name.trim(), row);
+  }
+  for (const row of secondary) {
+    if (!row.name.trim()) continue;
+    const prev = byName.get(row.name.trim());
+    if (!prev) {
+      byName.set(row.name.trim(), row);
+      continue;
+    }
+    const merged = mergePair(prev, row);
+    byName.set(
+      row.name.trim(),
+      sceneDictRowScore(row) > sceneDictRowScore(prev) ? merged : mergePair(row, prev),
+    );
+  }
+  return Array.from(byName.values());
+}
+
+/** 解析 LLM「场景视觉提示词」段（sceneMd） */
+export function parseScenePromptSectionRows(md: string): SceneVisualDictionaryRow[] {
+  const section = extractMarkdownSectionByHeaderLevels(
+    md ?? "",
+    /场景视觉提示词/,
+    [2, 3, 1],
+  );
+  if (!section.trim()) return [];
+  const { rows } = parseMdTable(compactGfmTables(section));
+  const out: SceneVisualDictionaryRow[] = [];
+  for (const r of rows) {
+    const name =
+      pickColumn(r, ["场景名", "场景", "scene name", "scene", "location", "name"]) ||
+      "";
+    if (!name.trim()) continue;
+    const sceneDesc = pickColumn(r, ["场景描述", "描述", "description"]);
+    out.push({
+      name: name.trim(),
+      environment: pickColumn(r, ["环境", "environment", "env"]),
+      time: pickColumn(r, ["时间", "time", "timeofday"]),
+      mood: pickColumn(r, ["气氛", "氛围", "mood", "atmosphere"]),
+      imageKeywords:
+        pickColumn(r, [
+          "AI生图提示词(英文)",
+          "AI生图提示词",
+          "生图关键词",
+          "image prompt",
+          "image keywords",
+          "prompt",
+        ]) || sceneDesc,
+    });
+  }
+  return out;
+}
+
+/** 合并大纲场景辞典 + sceneMd 扩写段，供预览 / 生成场景图弹层使用 */
+export function resolveMergedSceneVisualDictionaryRows(
+  outlineMd: string,
+  sceneMd = "",
+): SceneVisualDictionaryRow[] {
+  const outlineSection =
+    extractSceneVisualDictionaryFromOutline(outlineMd ?? "") ||
+    extractSceneSectionMd(outlineMd ?? "");
+  const fromOutline = outlineSection.trim()
+    ? parseSceneVisualDictionaryRows(outlineSection)
+    : parseSceneVisualDictionaryRows(outlineMd ?? "");
+  const fromSceneMd = parseScenePromptSectionRows(sceneMd);
+  if (!fromOutline.length && !fromSceneMd.length) return [];
+  if (!fromOutline.length) return fromSceneMd;
+  if (!fromSceneMd.length) return fromOutline;
+  return mergeSceneVisualDictionaryRows(fromOutline, fromSceneMd);
+}
+
 /** 优先可解析的 sceneMd，否则从大纲拆出场景辞典 */
 export function resolveSceneDictionaryMarkdown(
   outlineMd: string,
   sceneMd = "",
 ): string {
-  const dedicated = sceneMd.trim();
-  if (dedicated && parseSceneVisualDictionaryRows(dedicated).length > 0) {
+  const merged = resolveMergedSceneVisualDictionaryRows(outlineMd, sceneMd);
+  if (!merged.length) {
+    const dedicated = sceneMd.trim();
+    if (dedicated && parseSceneVisualDictionaryRows(dedicated).length > 0) {
+      return dedicated;
+    }
+    const fromOutline = extractSceneSectionMd(outlineMd);
+    if (fromOutline.trim()) return fromOutline;
     return dedicated;
   }
-  const fromOutline = extractSceneSectionMd(outlineMd);
-  if (fromOutline.trim()) return fromOutline;
-  return dedicated;
+  const header =
+    "| 场景名 | 环境 | 时间 | 气氛 | 生图关键词 |\n|------|------|------|------|------------|\n";
+  const body = merged
+    .map(
+      (r) =>
+        `| ${r.name} | ${r.environment} | ${r.time} | ${r.mood} | ${r.imageKeywords} |`,
+    )
+    .join("\n");
+  return `${header}${body}`;
 }
 
 /** 解析「场景视觉辞典」GFM 表 */

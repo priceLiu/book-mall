@@ -13,20 +13,34 @@ import { cn } from "@/lib/utils";
 /** LibTV 媒体节点是否处于生图/生视频/上传进行中 */
 export function isLibtvMediaGenerating(data: {
   uploading?: unknown;
+  blobUrl?: string;
   runtime?: {
     status?: string;
+    taskId?: string;
     ossUrl?: string;
     ephemeralUrl?: string;
   } | null;
 }): boolean {
   const s = data.runtime?.status;
   const rt = data.runtime;
-  // 终态优先：乐观 UI 可能遗留 uploading=true，勿把已完成节点仍显示为生成中
+  const hasPersistedMedia = Boolean(
+    rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim(),
+  );
+  // 粘贴/本地上传：blob 预览已就绪且无生成任务 → 不挡图，OSS 在后台上传
+  if (data.uploading) {
+    const blob = String(data.blobUrl ?? "").trim();
+    const hasGenTask = Boolean(rt?.taskId?.trim());
+    const genInflight =
+      s === "running" || s === "pending" || s === "queued";
+    if (blob && !hasGenTask && !genInflight) {
+      return false;
+    }
+    if (s === "done" && hasPersistedMedia) return false;
+    return true;
+  }
   if (s === "done" || s === "error" || s === "idle") return false;
-  if (data.uploading) return true;
   if (s === "running" || s === "pending" || s === "queued") return true;
-  // 终态已写回成片但 status 未及时刷新（勿在 pending/running 之前短路，否则重生成无扫光）
-  if (rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim()) return false;
+  if (hasPersistedMedia) return false;
   return false;
 }
 

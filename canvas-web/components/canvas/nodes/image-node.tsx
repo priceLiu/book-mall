@@ -4,7 +4,8 @@ import { useCallback, useRef, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { uploadCanvasImage } from "@/lib/canvas-api";
+import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
+import { fitGenericImageNodeNaturalSize } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { ImageNodeData } from "@/lib/canvas/types";
@@ -25,7 +26,7 @@ export function ImageNode({ id, data, selected }: NodeProps) {
   const onPick = useCallback(() => inputRef.current?.click(), []);
 
   const onFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       if (!file || !file.type.startsWith("image/")) return;
       const blobUrl = URL.createObjectURL(file);
       updateNodeData(id, {
@@ -35,17 +36,34 @@ export function ImageNode({ id, data, selected }: NodeProps) {
         uploadError: undefined,
         label: file.name,
       });
-      try {
-        const ossUrl = await uploadCanvasImage(base, file);
-        updateNodeData(id, { ossUrl, uploading: false });
-      } catch (e) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-        });
-      }
+      scheduleCanvasImageUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+      });
+      fitGenericImageNodeNaturalSize(id, blobUrl);
     },
     [base, id, updateNodeData],
+  );
+
+  const onNaturalSize = useCallback(
+    ({ w, h }: { w: number; h: number }) => {
+      const url = (d.ossUrl ?? d.blobUrl ?? "").trim();
+      if (!url) return;
+      const longEdge = 380;
+      const scale = longEdge / Math.max(w, h);
+      const stageW = Math.max(280, Math.ceil(w * scale));
+      const stageH = Math.max(168, Math.ceil(h * scale));
+      const size = { width: stageW, height: stageH + 96 };
+      useCanvasStore.getState().applyLibtvMediaFit(id, size, {
+        mediaFit: true,
+        mediaNaturalW: w,
+        mediaNaturalH: h,
+      });
+    },
+    [d.blobUrl, d.ossUrl, id],
   );
 
   const [hovered, setHovered] = useState(false);
@@ -63,8 +81,8 @@ export function ImageNode({ id, data, selected }: NodeProps) {
       onPointerLeave={() => setHovered(false)}
     >
     <NodeShell
-      title="图片"
-      subtitle={d.label ?? "本地上传 / 拖入"}
+      title={d.label?.trim() || "图片"}
+      subtitle={d.label ? "本地上传 / 拖入" : undefined}
       selected={selected}
       runtime={d.runtime}
       minWidth={NODE_MEDIA_MIN_WIDTH}
@@ -81,6 +99,7 @@ export function ImageNode({ id, data, selected }: NodeProps) {
             clickToPreview
             alt={d.label ?? "image"}
             fit="contain"
+            onNaturalSize={onNaturalSize}
             placeholder={
               <div className="flex h-full items-center justify-center text-[var(--canvas-muted)]">
                 <ImageIcon className="size-6 opacity-50" />
