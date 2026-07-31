@@ -246,7 +246,9 @@ export async function handlePro2ToolbarAddNodePick(
     if (id) {
       useCanvasStore.getState().updateNodeData(id, { sceneInstanceId: id });
       selectPro2NodeAfterSpawn(setNodes, id);
-      useCanvasStore.getState().openDirector3dDeskEditor(id);
+      queueMicrotask(() => {
+        useCanvasStore.getState().openDirector3dDeskEditor(id);
+      });
     }
     return;
   }
@@ -395,6 +397,7 @@ export async function handlePro2SideAddNodePick(
     nodeType === "story-pro2-script-hub" ||
     nodeType === "story-pro2-three-view" ||
     nodeType === "story-pro2-3d-desk" ||
+    nodeType === "story-pro2-audio" ||
     nodeType === "sbv1-video-engine"
   ) {
     onSpawn(itemId, nodeType ?? spawnType);

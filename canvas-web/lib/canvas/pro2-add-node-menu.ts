@@ -92,7 +92,7 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
   { id: "audio", label: "音频", icon: Music, enabled: true, nodeType: "story-pro2-audio" },
   {
     id: "script",
-    label: "脚本",
+    label: "故事脚本",
     icon: FileText,
     enabled: true,
     badge: "Beta",
@@ -158,7 +158,7 @@ export const PRO2_IMAGE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
       { id: "video", label: "视频", icon: Video, enabled: false },
       {
         id: "script",
-        label: "脚本",
+        label: "故事脚本",
         icon: FileText,
         enabled: false,
         badge: "Beta",
@@ -193,10 +193,16 @@ export const PRO2_STARTER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         enabled: true,
         nodeType: "sbv1-video-engine",
       },
-      { id: "audio", label: "音频", icon: Music, enabled: false },
+      {
+        id: "audio",
+        label: "音频",
+        icon: Music,
+        enabled: true,
+        nodeType: "story-pro2-audio",
+      },
       {
         id: "script",
-        label: "脚本",
+        label: "故事脚本",
         icon: FileText,
         enabled: false,
         badge: "NEW",
@@ -238,7 +244,7 @@ export const PRO2_STYLE_ASSET_RIGHT_MENU: Pro2AddMenuSection[] = [
       { id: "audio", label: "音频", icon: Music, enabled: false },
       {
         id: "script",
-        label: "脚本",
+        label: "故事脚本",
         icon: FileText,
         enabled: false,
         badge: "NEW",

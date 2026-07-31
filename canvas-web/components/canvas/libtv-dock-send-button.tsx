@@ -26,11 +26,16 @@ export function LibtvDockSendButton({
       disabled={disabled || loading}
       title={title}
       className={cn(
-        "nodrag flex shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40",
+        "nodrag relative z-10 flex shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40",
+        "before:absolute before:-inset-2 before:rounded-2xl before:content-['']",
         className,
       )}
       style={{ width: sendBtnPx, height: sendBtnPx }}
-      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
     >
       {loading ? (
         <Loader2

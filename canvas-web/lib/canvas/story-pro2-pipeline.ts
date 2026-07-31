@@ -8,6 +8,7 @@ export const STORY_PRO2_NODE_TYPES = [
   "story-pro2-style-asset",
   "story-pro2-image",
   "story-pro2-three-view",
+  "story-pro2-3d-desk",
   "story-pro2-character",
   "story-pro2-scene",
   "story-pro2-frame",

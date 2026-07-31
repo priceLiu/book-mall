@@ -79,6 +79,8 @@ async function downloadToBuffer(
 }
 
 const MULTIPART_UPLOAD_THRESHOLD_BYTES = 5 * 1024 * 1024;
+/** multipart 失败后改用单次 put 的上限（过大 put 易超时） */
+const PUT_FALLBACK_MAX_BYTES = 20 * 1024 * 1024;
 const LARGE_UPLOAD_TIMEOUT_MS = 600_000;
 
 /** OSS PUT 可重试的瞬时网络错误（TLS 握手断开 / 连接重置 / 超时等） */
@@ -93,26 +95,35 @@ async function uploadBufferToOss(args: {
   /** 百炼等阿里云服务拉取：用 bucket 直链，避免自定义 CDN 域返回异常 */
   preferBucketUrl?: boolean;
 }): Promise<string> {
-  const useMultipart = args.buf.byteLength >= MULTIPART_UPLOAD_THRESHOLD_BYTES;
-  const timeoutMs = useMultipart ? LARGE_UPLOAD_TIMEOUT_MS : 60_000;
+  const preferMultipart = args.buf.byteLength >= MULTIPART_UPLOAD_THRESHOLD_BYTES;
+  const timeoutMs = preferMultipart ? LARGE_UPLOAD_TIMEOUT_MS : 60_000;
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
 
-  // 瞬时网络抖动（如 TLS 握手前 socket 断开）重试；每次重建客户端用全新连接
-  const sleeps = [0, 600, 1800];
+  // 瞬时网络抖动重试；multipart 用 parallel=1 降低并发 TLS 断连；末次可改 put。
+  const sleeps = [0, 600, 1800, 4000];
   let result: { url?: string } | null = null;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < sleeps.length; attempt++) {
     if (sleeps[attempt] > 0) {
       await new Promise((r) => setTimeout(r, sleeps[attempt]));
     }
-    const client = await createOssClientFrom(args.cfg, { timeoutMs });
+    const useMultipart =
+      preferMultipart &&
+      !(
+        attempt === sleeps.length - 1 &&
+        args.buf.byteLength <= PUT_FALLBACK_MAX_BYTES
+      );
+    const client = await createOssClientFrom(args.cfg, {
+      timeoutMs: useMultipart ? timeoutMs : Math.max(timeoutMs, 120_000),
+    });
     try {
       result = await ossUploadBuffer(client, {
         key: args.key,
         buf: args.buf,
         contentType: ct,
         useMultipart,
-        timeoutMs,
+        timeoutMs: useMultipart ? timeoutMs : Math.max(timeoutMs, 120_000),
+        multipartParallel: 1,
       });
       break;
     } catch (e) {
@@ -126,6 +137,14 @@ async function uploadBufferToOss(args: {
       }
       lastError = e;
       if (attempt < sleeps.length - 1 && TRANSIENT_OSS_ERROR.test(raw)) {
+        continue;
+      }
+      if (
+        attempt < sleeps.length - 1 &&
+        preferMultipart &&
+        args.buf.byteLength <= PUT_FALLBACK_MAX_BYTES
+      ) {
+        // multipart 非瞬时错误时仍允许末次 put 兜底
         continue;
       }
       throw e;

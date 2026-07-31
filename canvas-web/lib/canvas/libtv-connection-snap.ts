@@ -99,10 +99,8 @@ function distancePointToSidePlusZone(
   const handleId = side === "left" ? map.left : map.right;
   if (!handleId) return null;
   const box = nodeSnapBox(node, nodes);
-  const cx =
-    side === "left"
-      ? box.left - LIBTV_SIDE_PLUS_LG_RADIUS_FLOW
-      : box.right + LIBTV_SIDE_PLUS_LG_RADIUS_FLOW;
+  /** + 圆心钉在节点左/右边框中线上（见 globals.css · pro2-node-side-plus-handle） */
+  const cx = side === "left" ? box.left : box.right;
   const minY = box.top + SIDE_PLUS_VERTICAL_INSET_FLOW;
   const maxY = box.bottom - SIDE_PLUS_VERTICAL_INSET_FLOW;
   if (maxY <= minY) return null;

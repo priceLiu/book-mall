@@ -27,7 +27,7 @@
 | 壳层 | `LIBTV_NODE_OUTER` → 背景分流见 §1.3 + `LIBTV_CARD_DRAG` |
 | 侧 `+` | `Pro2NodeSidePlus`（单击菜单 · 按住拖线 · 6px 阈值） |
 | 有图顶栏 | `Pro2ImageNodeToolbar` · `passNodeDrag` · `PRO2_IMAGE_NODE_TOOLBAR_*` |
-| 空态 / 错误 | `Pro2MediaNodeEmptyState` / `Pro2MediaNodeErrorState` · **空态须 `passNodeDrag`** |
+| 空态 / 错误 | `Pro2MediaNodeEmptyState` / `Pro2MediaNodeErrorState` · **空态 / 错误态须 `passNodeDrag`** |
 | 预览 | `MediaHoverBox` · 仅 Eye 钮 `nodrag` |
 
 ### 1.2 节点顶栏工具条（唯一壳层）

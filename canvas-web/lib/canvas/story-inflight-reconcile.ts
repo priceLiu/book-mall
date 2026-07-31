@@ -110,10 +110,18 @@ function reconcileHubSection(
   const rt = d[rtKey as keyof StoryScriptHubNodeData] as
     | CanvasNodeRuntime
     | undefined;
-  if (!isInflightStatus(rt?.status)) return;
-  if (rt?.status === "pending" && !rt?.taskId) return;
-
   const scope = { llmSection: section };
+  if (!isInflightStatus(rt?.status)) return;
+  if (rt?.status === "pending" && !rt?.taskId) {
+    const md = hubSectionMd(node, section).trim();
+    if (md && !hasServerInflightForScope(tasks, node.id, scope)) {
+      updateNodeData(node.id, {
+        [rtKey]: clearInflightRuntime({ ...rt, status: "done" }),
+      });
+    }
+    return;
+  }
+
   const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
   if (hasServerInflightForScope(tasks, node.id, scope)) return;
 
@@ -190,6 +198,8 @@ export function reconcileStaleInflightRuntimes(
           break;
         }
         if (!applied) {
+          // 刚点击生成：任务尚未出现在 /tasks 时勿清乐观 pending（与图片节点同一宽限）
+          if (shouldDeferLibtvOrphanReconcile(node.id)) continue;
           updateNodeData(node.id, {
             themeOutlineRuntime: clearInflightRuntime(rt),
           });
@@ -199,7 +209,7 @@ export function reconcileStaleInflightRuntimes(
     }
 
     if (isAnyStoryScriptHubType(node.type ?? "")) {
-      if (skipNodeIds?.has(node.id)) continue;
+      // Hub 按 llmSection 分段 reconcile；勿因队列 skip 整节点（否则会漏写 SUCCEEDED）
       for (const section of ["outline", "character", "scene", "storyboard"] as const) {
         reconcileHubSection(node, section, tasks, updateNodeData, nodes);
       }

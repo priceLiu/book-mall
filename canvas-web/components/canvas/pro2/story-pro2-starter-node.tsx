@@ -373,15 +373,20 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         itemId,
         nodeType,
         { alert },
-        () => {
-          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+        (pickId, pickType) => {
+          const spawnType = resolveLibtvSideSpawnNodeType(pickId, pickType);
+          if (!spawnType) return;
           if (
             spawnType === "story-pro2-three-view" ||
-            spawnType === "sbv1-video-engine"
+            spawnType === "sbv1-video-engine" ||
+            spawnType === "story-pro2-3d-desk" ||
+            spawnType === "story-pro2-image" ||
+            spawnType === "story-pro2-starter" ||
+            spawnType === "story-pro2-audio"
           ) {
             spawnLibtvNeighborFromAnchor(id, side, spawnType, {
-              nodes,
-              edges,
+              nodes: useCanvasStore.getState().nodes,
+              edges: useCanvasStore.getState().edges,
               addNode,
               addNodeInGroup,
               setNodes,
@@ -400,16 +405,8 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
             }
             return;
           }
-          if (itemId === "script" || nodeType === "story-pro2-script-hub") {
+          if (pickId === "script" || pickType === "story-pro2-script-hub") {
             spawnNeighbor("right", "story-pro2-script-hub");
-            return;
-          }
-          if (itemId === "text" || nodeType === "story-pro2-starter") {
-            spawnNeighbor(side, "story-pro2-starter");
-            return;
-          }
-          if (itemId === "image" || nodeType === "story-pro2-image") {
-            spawnNeighbor(side, "story-pro2-image");
           }
         },
       );
@@ -437,26 +434,9 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         position={Position.Left}
         className={cn(
           PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : selected
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none",
-        )}
-      />
-      <Handle
-        id="plus_left"
-        type="source"
-        position={Position.Left}
-        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-      />
-      <Handle
-        id="text"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          "pointer-events-none opacity-0",
+          "libtv-node-inbound-handle",
+          "libtv-node-inbound-text-handle",
+          "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
         )}
       />
 
@@ -593,7 +573,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               ))}
             </ul>
             <p className="mt-2 text-[10px] leading-relaxed text-white/35">
-              在脚本生成器中创作并发布剧本后，可在公告条参与制作任务；本节点也可用于提示词与下游生图/生视频。
+              在故事脚本生成中创作并发布剧本后，可在公告条参与制作任务；本节点也可用于提示词与下游生图/生视频。
             </p>
           </div>
         )}

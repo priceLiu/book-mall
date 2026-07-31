@@ -237,52 +237,13 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             )}
             style={{ top: "50%" }}
           />
-          <Handle
-            id="out_media"
-            type="source"
-            position={Position.Right}
-            className={cn(
-              PRO2_NODE_HANDLE_CLASS,
-              showSidePlus
-                ? "pointer-events-none opacity-0"
-                : selected
-                  ? "opacity-100"
-                  : "pointer-events-none opacity-0",
-            )}
-            style={{ top: "50%" }}
-          />
+          {/* out_media 出边由 Pro2NodeSidePlus 提供 */}
         </>
       ) : null}
 
       {isSbv1Group && !isPro2MediaGroup ? (
-        <Handle
-          id="out_media"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          style={{ top: "50%" }}
-          title={`连线到${SBV1_VIDEO_COMPOSE_LABEL}`}
-        />
-      ) : null}
-
-      {isLibtvMediaGroup ? (
-        <Handle
-          id="plus_left"
-          type="source"
-          position={Position.Left}
-          className={cn(
-            isPro2MediaGroup ? PRO2_NODE_HANDLE_CLASS : SBV1_NODE_HANDLE_CLASS,
-            "pointer-events-none opacity-0",
-          )}
-          style={{ top: "50%" }}
-        />
+        /* sbv1 组 out_media 由 Pro2NodeSidePlus 提供 */
+        null
       ) : null}
 
       {isLibtvMediaGroup ? (

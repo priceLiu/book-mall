@@ -774,30 +774,13 @@ export function LibtvImageNode({
             position={Position.Left}
             className={cn(
               LIBTV_NODE_HANDLE_CLASS,
-              showSidePlus
-                ? "pointer-events-none opacity-0"
-                : selected
-                  ? "opacity-100"
-                  : "pointer-events-none opacity-0",
+              "libtv-node-inbound-handle",
+              "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
             )}
             title="上游参考图"
           />
         ) : null}
-        <Handle
-          id="image"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            LIBTV_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title="连线到下游"
-        />
-
+        {/* 右侧出边由 Pro2NodeSidePlus handleId=image 提供，勿重复声明 Handle */}
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"

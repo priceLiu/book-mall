@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 
 import { isCanvasKieVideoTaskPayload } from "@/lib/canvas/canvas-constants";
 import { patchCanvasProjectNodeMediaFromTask } from "@/lib/canvas/canvas-media-patch";
-import { persistCanvasKieResultToOss } from "@/lib/canvas/canvas-oss";
+import { scheduleCanvasKieImageOssBackfill } from "@/lib/canvas/canvas-oss-backfill";
 import { applyCanvasKieTaskResult } from "@/lib/canvas/canvas-task-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +15,8 @@ import {
   isKieRecordSuccess,
   type KieRecordResponse,
 } from "@/lib/story/kie-client";
+
+export { scheduleCanvasKieImageOssBackfill } from "@/lib/canvas/canvas-oss-backfill";
 
 function normalizeKieRecordState(
   raw: string | undefined,
@@ -166,44 +168,6 @@ async function loadKieGatewayLogForTask(
   return log;
 }
 
-function scheduleKieImageOssBackfill(
-  taskId: string,
-  ephemeralUrl: string,
-  projectId: string,
-): void {
-  void (async () => {
-    try {
-      const ossUrl = await persistCanvasKieResultToOss({
-        ephemeralUrl,
-        kind: "node-image",
-        projectId,
-      });
-      if (!ossUrl?.trim()) return;
-      await prisma.canvasGenerationTask.updateMany({
-        where: { id: taskId, status: "SUCCEEDED" },
-        data: { ossUrl },
-      });
-      const updated = await prisma.canvasGenerationTask.findUnique({
-        where: { id: taskId },
-        select: {
-          id: true,
-          projectId: true,
-          nodeId: true,
-          ossUrl: true,
-          ephemeralUrl: true,
-          completedAt: true,
-          resultPayload: true,
-        },
-      });
-      if (updated?.ossUrl?.trim()) {
-        await patchCanvasProjectNodeMediaFromTask(updated);
-      }
-    } catch {
-      // OSS 中转失败仍可用 ephemeralUrl 预览
-    }
-  })();
-}
-
 /** 读路径快速写回：Gateway 已成功时先写 ephemeralUrl + SUCCEEDED 并 patch 节点，OSS 后台补。 */
 export async function recoverCanvasKieImageFromGatewayForRead(
   taskId: string,
@@ -277,7 +241,7 @@ export async function recoverCanvasKieImageFromGatewayForRead(
     if (updated) {
       await patchCanvasProjectNodeMediaFromTask(updated);
       if (!updated.ossUrl?.trim()) {
-        scheduleKieImageOssBackfill(taskId, ephemeralUrl, updated.projectId);
+        scheduleCanvasKieImageOssBackfill(taskId, ephemeralUrl, updated.projectId);
       }
     }
     return "succeeded";

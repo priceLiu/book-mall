@@ -299,18 +299,38 @@ export function storyApplyTaskResult(
               failMessage: undefined,
             };
 
+  const isStarterTextNode =
+    node.type === "story-pro2-starter" || node.type === "story-pro-starter";
+  const isOutlineTextNode =
+    isStarterTextNode &&
+    isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>);
+  // 轮询偶发缺 storyScope.mediaKind：按节点用途推断，避免 Gateway 已成功但 UI 一直生成中
+  const starterMediaKind =
+    ctx?.mediaKind === "themeOutline" || ctx?.mediaKind === "generalText"
+      ? ctx.mediaKind
+      : isStarterTextNode ||
+          (node.type === "story-pro2-script-hub" &&
+            (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
+              true)
+        ? isOutlineTextNode
+          ? ("themeOutline" as const)
+          : ("generalText" as const)
+        : undefined;
+
   if (
-    (node.type === "story-pro2-starter" ||
-      node.type === "story-pro-starter" ||
-      node.type === "story-pro2-script-hub") &&
-    ctx?.mediaKind === "themeOutline"
+    (isStarterTextNode || node.type === "story-pro2-script-hub") &&
+    starterMediaKind === "themeOutline"
   ) {
     const hubStudio =
       node.type === "story-pro2-script-hub" &&
       (node.data as { scriptStudioMode?: boolean }).scriptStudioMode === true;
+    // 用途不匹配时：进行中可忽略；终态仍写回 runtime，避免卡在「生成中」
     if (
       node.type === "story-pro2-starter" &&
-      !isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
+      !isOutlineTextNode &&
+      task.status !== "SUCCEEDED" &&
+      task.status !== "FAILED" &&
+      task.status !== "CANCELLED"
     ) {
       return;
     }
@@ -323,14 +343,20 @@ export function storyApplyTaskResult(
     if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
     if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
-      if (node.type === "story-pro2-starter") {
+      if (isStarterTextNode) {
         patch.generatedOutlineMd = task.textOutput.trim();
-        patch.pipelineStage = "llm_done";
-        patch.starterMode = "generate";
+        if (isOutlineTextNode) {
+          patch.pipelineStage = "llm_done";
+          patch.starterMode = "generate";
+        }
       }
     }
     updateNodeData(node.id, patch);
-    if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
+    if (
+      task.status === "SUCCEEDED" &&
+      task.textOutput?.trim() &&
+      isOutlineTextNode
+    ) {
       applyScriptStudioThemeOutlineResult(
         node,
         task.textOutput.trim(),
@@ -341,13 +367,12 @@ export function storyApplyTaskResult(
     return;
   }
 
-  if (
-    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
-    ctx?.mediaKind === "generalText"
-  ) {
+  if (isStarterTextNode && starterMediaKind === "generalText") {
     if (
-      node.type === "story-pro2-starter" &&
-      isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
+      isOutlineTextNode &&
+      task.status !== "SUCCEEDED" &&
+      task.status !== "FAILED" &&
+      task.status !== "CANCELLED"
     ) {
       return;
     }
@@ -358,6 +383,10 @@ export function storyApplyTaskResult(
     const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
     if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
       patch.generatedOutlineMd = task.textOutput.trim();
+      if (isOutlineTextNode) {
+        patch.pipelineStage = "llm_done";
+        patch.starterMode = "generate";
+      }
     }
     updateNodeData(node.id, patch);
     return;

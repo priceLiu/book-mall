@@ -11,16 +11,21 @@ import {
   pro2NodeAbsolutePosition,
   pro2NodeBoxSize,
 } from "@/lib/canvas/pro2-selection-bbox";
-
 const NODE_TOOLBAR_HEADER_RESERVED = 56;
 const NODE_TOOLBAR_HEIGHT = 44;
 const NODE_TOOLBAR_GAP = 8;
 
-/** 拖动所属节点时隐藏顶栏（与浮动 Dock 同一规则） */
+/** 拖动所属节点、或全屏详情编辑打开时隐藏顶栏（与浮动 Dock 同一规则） */
 export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
-  return useCanvasStore((s) =>
+  const dragHidden = useCanvasStore((s) =>
     libtvFloatingDockHidden(s.canvasDraggingNodeId, nodeId),
   );
+  const detailOpen = useCanvasStore(
+    (s) =>
+      s.pro2ScriptTableEditorNodeId === nodeId ||
+      s.pro2TextOutlineEditorNodeId === nodeId,
+  );
+  return dragHidden || detailOpen;
 }
 
 /** 节点顶栏 · 屏幕坐标（portal 固定定位，避免组内/相邻节点 z 轴夹住工具条） */

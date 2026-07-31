@@ -666,7 +666,7 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     category: "builtin",
     name: "剧本创作（工业化）",
     description:
-      "小白式主题生成 / 上传原稿翻新 · 10 集/批 · 冻结档案 · 脚本生成器产出分镜脚本。",
+      "小白式主题生成 / 上传原稿翻新 · 10 集/批 · 冻结档案 · 故事脚本生成产出分镜脚本。",
     canvas: STORY_PRO2_SCRIPT_STUDIO,
   },
   {

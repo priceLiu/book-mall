@@ -178,33 +178,11 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             LIBTV_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "opacity-0 pointer-events-none",
+            "libtv-node-inbound-handle",
+            "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
           )}
         />
-        <Handle
-          id="plus_left"
-          type="source"
-          position={Position.Left}
-          className={cn(LIBTV_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-        />
-        <Handle
-          id="image"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            LIBTV_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-        />
-
+        {/* plus_left / image 出边由 Pro2NodeSidePlus 提供 */}
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"

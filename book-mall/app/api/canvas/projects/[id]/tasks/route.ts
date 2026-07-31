@@ -82,7 +82,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     if (textSubmittedIds.length > 0) {
       const recovered = await recoverProjectInflightTextTasksForRead(
         textSubmittedIds,
-        5,
+        Math.min(20, textSubmittedIds.length),
       );
       if (recovered > 0) {
         tasks = await listProjectTasks({

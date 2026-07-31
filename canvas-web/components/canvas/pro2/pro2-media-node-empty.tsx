@@ -30,22 +30,25 @@ export function Pro2MediaNodeEmptyState({
   );
 }
 
-/** 2.0 媒体节点 · 统一暗色错误态 */
+/** 2.0 媒体节点 · 统一暗色错误态（与空态同：整卡可拖，勿盖 nodrag） */
 export function Pro2MediaNodeErrorState({
   icon: Icon,
   title,
   message,
   className,
+  passNodeDrag = true,
 }: {
   icon: LucideIcon;
   title: string;
   message?: string;
   className?: string;
+  passNodeDrag?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "nodrag flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 py-4 text-center",
+        "flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 py-4 text-center",
+        !passNodeDrag && "nodrag",
         className,
       )}
     >

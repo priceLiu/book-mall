@@ -394,7 +394,7 @@ function PhaseActionPanel({
           </pre>
         ) : (
           <p className="mt-2 text-[10px] text-white/40">
-            暂无剧本快照；请从脚本生成器发布后再关联。
+            暂无剧本快照；请从故事脚本生成发布后再关联。
           </p>
         )}
         {published ? (
@@ -602,7 +602,7 @@ function AuthoringPanel({
         )}
             </div>
       <p className="mt-2 text-[10px] text-white/35">
-        发布：请在脚本生成器节点顶栏点击「发布剧本」；发布后可在此参与制作任务。
+        发布：请在故事脚本生成节点顶栏点击「发布剧本」；发布后可在此参与制作任务。
       </p>
               </div>
   );

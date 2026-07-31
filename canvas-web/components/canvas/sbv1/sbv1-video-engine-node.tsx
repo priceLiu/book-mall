@@ -538,11 +538,12 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "libtv-node-inbound-handle",
+            "libtv-node-inbound-text-handle",
             showSidePlus
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
-          style={{ top: "22%" }}
           title="文本 / 提示词输入"
         />
         <Handle
@@ -551,11 +552,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "libtv-node-inbound-handle",
             showSidePlus
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
-          style={{ top: "35%" }}
           title="参考图输入"
         />
         <Handle
@@ -564,28 +565,14 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "libtv-node-inbound-handle",
             showSidePlus
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
-          style={{ top: "68%" }}
           title="动作视频输入（Motion Control）"
         />
-        <Handle
-          id="out_video"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title={`串联下一${SBV1_VIDEO_COMPOSE_LABEL}`}
-        />
-
+        {/* out_video 出边由 Pro2NodeSidePlus 提供 */}
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"

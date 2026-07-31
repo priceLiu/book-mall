@@ -694,7 +694,7 @@ function Inner() {
                       </div>
                     ) : scriptPackages.length === 0 ? (
                       <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-[12px] text-white/50">
-                        暂无已发布剧本。请先在任意 2.0 画布的脚本生成器中发布剧本，或选「空白画布」进入后再关联。
+                        暂无已发布剧本。请先在任意 2.0 画布的故事脚本生成中发布剧本，或选「空白画布」进入后再关联。
                       </p>
                     ) : (
                       <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-1">

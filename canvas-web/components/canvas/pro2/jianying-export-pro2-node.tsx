@@ -129,14 +129,7 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
         )}
         title="各镜视频"
       />
-      <Handle
-        id="plus_left"
-        type="source"
-        position={Position.Left}
-        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-        title="添加上下文"
-      />
-
+      {/* plus_left / out_render 出边由 Pro2NodeSidePlus 提供 */}
       <Pro2NodeSidePlus
         side="left"
         handleId="plus_left"
@@ -154,21 +147,6 @@ export function JianyingExportPro2Node({ id, data, selected }: NodeProps) {
         className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
         sections={JIANYING_EXPORT_RIGHT_ADD_MENU}
         onPick={onRightPick}
-      />
-
-      <Handle
-        id="out_render"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : selected
-              ? "opacity-100"
-              : "pointer-events-none opacity-0",
-        )}
-        title="剪辑成片"
       />
 
       <div className="flex shrink-0 items-center gap-2 px-3 py-2.5">

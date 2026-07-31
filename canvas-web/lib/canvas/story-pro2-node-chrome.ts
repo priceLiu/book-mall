@@ -54,8 +54,8 @@ export const PRO2_TEXT_NODE_MIN_HEIGHT =
 /** React Flow 节点登记默认高度 ≈ 标签行 + 卡片 */
 export const PRO2_TEXT_NODE_HEIGHT = PRO2_TEXT_NODE_CARD_HEIGHT + 28;
 
-/** 2.0 脚本生成器 / 脚本表格节点 */
-export const PRO2_SCRIPT_HUB_NODE_LABEL = "脚本生成器";
+/** 2.0 故事脚本生成 / 脚本表格节点 */
+export const PRO2_SCRIPT_HUB_NODE_LABEL = "故事脚本生成";
 export const PRO2_SCRIPT_NODE_WIDTH = 480;
 export const PRO2_SCRIPT_NODE_MIN_WIDTH = 360;
 export const PRO2_SCRIPT_NODE_CARD_HEIGHT = 300;

@@ -17,7 +17,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -130,6 +130,8 @@ function pro2HubThreeViewStore() {
 }
 
 export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
+  const updateNodeInternals = useUpdateNodeInternals();
+  const outerRef = useRef<HTMLDivElement>(null);
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
@@ -231,6 +233,32 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       !isGenerating,
   );
 
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [
+    id,
+    updateNodeInternals,
+    displayState,
+    showToolbar,
+    showThinTitle,
+    showSidePlus,
+    isGenerating,
+    selected,
+    hasPreviewContent,
+    isLinked,
+    previewTab,
+  ]);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      updateNodeInternals(id);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [id, updateNodeInternals]);
+
   const onGenerateThreeView = useCallback(async () => {
     if (isGenerating) return;
     if (!hasCharacter) {
@@ -261,30 +289,32 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
 
   const onSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
-      // 右侧 + 「三视图」与顶部工具栏「生成角色三视图」对齐：基于角色表生成三视图
-      if (itemId === "three-view" || nodeType === "story-pro2-three-view") {
-        void onGenerateThreeView();
-        return;
-      }
       void handlePro2SideAddNodePick(
         itemId,
         nodeType,
         { alert },
-        () => {
-          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+        async (pickId, pickType) => {
+          const spawnType = resolveLibtvSideSpawnNodeType(pickId, pickType);
           if (!spawnType) return;
-          spawnLibtvNeighborFromAnchor(id, side, spawnType, {
-            nodes,
-            edges,
+          const newId = spawnLibtvNeighborFromAnchor(id, side, spawnType, {
+            nodes: useCanvasStore.getState().nodes,
+            edges: useCanvasStore.getState().edges,
             addNode,
             addNodeInGroup,
             setNodes,
             setEdges,
           });
+          if (!newId) {
+            await alert({
+              title: "无法添加节点",
+              message: "当前画布未能创建该节点，请刷新后重试或检查工作流版本。",
+              variant: "warning",
+            });
+          }
         },
       );
     },
-    [id, nodes, edges, addNode, addNodeInGroup, setNodes, setEdges, alert, onGenerateThreeView],
+    [id, addNode, addNodeInGroup, setNodes, setEdges, alert],
   );
 
   const openEditor = useCallback(() => {
@@ -338,6 +368,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
+      ref={outerRef}
       className={cn(LIBTV_NODE_OUTER_CLASS, LIBTV_CARD_DRAG_CLASS)}
       data-pro2-dock-anchor={id}
       onPointerEnter={onPointerEnter}
@@ -350,32 +381,16 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       />
       {selected ? <Pro2NodeResizeGrip /> : null}
 
+      {/* 左侧入边吸附；plus_left / text 由 Pro2NodeSidePlus 提供，勿重复声明（会露出左右竖条） */}
       <Handle
         id="in_text"
         type="target"
         position={Position.Left}
         className={cn(
           PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : selected
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none",
-        )}
-      />
-      <Handle
-        id="plus_left"
-        type="source"
-        position={Position.Left}
-        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-      />
-      <Handle
-        id="text"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          showSidePlus ? "pointer-events-none opacity-0" : selected ? "opacity-100" : "opacity-0 pointer-events-none",
+          "libtv-node-inbound-handle",
+          "libtv-node-inbound-text-handle",
+          "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
         )}
       />
 

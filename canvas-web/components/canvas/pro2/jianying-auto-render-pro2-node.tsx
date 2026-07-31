@@ -114,14 +114,6 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
           )}
           title="各镜视频"
         />
-        <Handle
-          id="plus_left"
-          type="source"
-          position={Position.Left}
-          className={cn(SBV1_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-          title="接入视频"
-        />
-
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"

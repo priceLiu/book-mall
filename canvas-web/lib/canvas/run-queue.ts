@@ -1003,6 +1003,106 @@ export function useCanvasRunner(
     pumpSequentialRef.current = pumpSequential;
   }, [pumpSequential]);
 
+  /** createTask 返回 SUBMITTED 后立刻拉 /tasks（含读道 TEXT recover），缩短 Gateway 成功与 UI 对齐延迟 */
+  const syncInflightTaskAfterSubmit = useCallback(
+    (nodeId: string, job: QueueItem) => {
+      pollKickRef.current?.();
+      if (!base || !projectId) return;
+
+      const applyTasks = (tasks: CanvasTaskRecord[] | null) => {
+        if (tasks == null) return;
+        ingestCanvasProjectTasks(projectId, tasks);
+        const nodeTasks = tasks.filter((t) => t.nodeId === nodeId);
+        if (!nodeTasks.length) return;
+        const node = useCanvasStore.getState().nodes.find((x) => x.id === nodeId);
+        if (!node) return;
+        const nodes = useCanvasStore.getState().nodes;
+
+        if (isAnyStoryScriptHubType(node.type ?? "")) {
+          for (const section of [
+            "outline",
+            "character",
+            "scene",
+            "storyboard",
+          ] as const) {
+            const scope = { llmSection: section };
+            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            if (!pick) continue;
+            const ctx: CanvasStoryRunJob =
+              jobByTaskRef.current.get(pick.id) ??
+              storyRunContextFromScope(nodeId, scope);
+            storyApplyTaskResult(node, pick, ctx, updateNodeData, nodes);
+          }
+          return;
+        }
+
+        const scope = {
+          rowKey: job.rowKey,
+          mediaKind: job.mediaKind,
+          llmSection: job.llmSection,
+        };
+        const localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
+        const pick =
+          job.rowKey || job.mediaKind || job.llmSection
+            ? pickPreferredCanvasTaskForScope(nodeTasks, scope)
+            : pickPreferredCanvasTask(nodeTasks, { localRuntime: localRt });
+        if (!pick) return;
+
+        if (isStoryWorkspaceNodeType(node.type ?? "")) {
+          storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+          return;
+        }
+        if (isLibtvFreestandingImageNode(node)) {
+          const patch = sbv1ImagePatchFromTask(
+            node.data as unknown as Sbv1ImageNodeData,
+            pick,
+          );
+          if (
+            patch &&
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              patch,
+            )
+          ) {
+            updateNodeData(nodeId, patch);
+          }
+          return;
+        }
+        if (node.type === "sbv1-video-engine") {
+          const patch = sbv1VideoPatchFromTask(pick);
+          if (
+            patch &&
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              patch,
+            )
+          ) {
+            updateNodeData(nodeId, patch);
+          }
+          return;
+        }
+        const patch = runtimePatchFromCanvasTask(pick);
+        if (
+          patch &&
+          shouldApplyCanvasTaskRuntimePatch(localRt, pick, patch, nodeId)
+        ) {
+          setNodeRuntime(nodeId, patch);
+        }
+      };
+
+      void listCanvasProjectTasks(base, projectId, [nodeId])
+        .then(applyTasks)
+        .catch(() => {});
+      window.setTimeout(() => {
+        void listCanvasProjectTasks(base, projectId, [nodeId])
+          .then(applyTasks)
+          .catch(() => {});
+        pollKickRef.current?.();
+      }, 800);
+    },
+    [base, projectId, updateNodeData, setNodeRuntime],
+  );
+
   const runOne = useCallback(
     async (job: QueueItem) => {
       const key = runKey(job);
@@ -1534,45 +1634,28 @@ export function useCanvasRunner(
               setNodeRuntime(nodeId, errorPatch);
             }
           }
-        } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
-          storyApplyTaskResult(
-            nodeNow,
-            r.task,
-            job,
-            updateNodeData,
-            nodesNow,
-          );
-        } else if (
-          applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
-          applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
-          applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
-        ) {
-          /* pending / running */
         } else {
-          setNodeRuntime(nodeId, {
-            status: "running",
-            taskId: r.task.id,
-          });
-          void listCanvasProjectTasks(base, projectId, [nodeId])
-            .then((tasks) => {
-              if (tasks == null) return;
-              const scope =
-                job.rowKey || job.mediaKind || job.llmSection
-                  ? {
-                      rowKey: job.rowKey,
-                      mediaKind: job.mediaKind,
-                      llmSection: job.llmSection,
-                    }
-                  : undefined;
-              const latest = scope
-                ? pickPreferredCanvasTaskForScope(tasks, scope)
-                : pickPreferredCanvasTask(tasks);
-              if (!latest) return;
-              const n = useCanvasStore.getState().nodes.find((x) => x.id === nodeId);
-              if (!n) return;
-              storyApplyTaskResult(n, latest, job, updateNodeData, useCanvasStore.getState().nodes);
-            })
-            .catch(() => {});
+          if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+            storyApplyTaskResult(
+              nodeNow,
+              r.task,
+              job,
+              updateNodeData,
+              nodesNow,
+            );
+          } else if (
+            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
+            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
+            applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
+          ) {
+            /* pending / running */
+          } else {
+            setNodeRuntime(nodeId, {
+              status: "running",
+              taskId: r.task.id,
+            });
+          }
+          syncInflightTaskAfterSubmit(nodeId, job);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -1788,6 +1871,7 @@ export function useCanvasRunner(
       projectId,
       releaseInflightKey,
       setNodeRuntime,
+      syncInflightTaskAfterSubmit,
       updateNodeData,
     ],
   );

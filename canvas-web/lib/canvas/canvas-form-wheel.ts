@@ -26,6 +26,7 @@ export const LIBTV_INPUT_DOCK_SELECTOR = "[data-libtv-input-dock]";
 export const LIBTV_DOCK_SCROLL_SELECTOR = ".pro2-dock-scroll";
 
 function isHorizontalDominantWheel(nativeEvent: WheelEvent): boolean {
+  if (nativeEvent.shiftKey && Math.abs(nativeEvent.deltaY) > 0.5) return true;
   return Math.abs(nativeEvent.deltaX) > Math.abs(nativeEvent.deltaY);
 }
 
@@ -61,6 +62,11 @@ export function isLibtvInputDockWheelTarget(target: EventTarget | null): boolean
 export function isCanvasWheelScrollBlockTarget(target: EventTarget | null): boolean {
   if (isLibtvInputDockWheelTarget(target)) return false;
   if (isCanvasNodeScrollWheelTarget(target)) return false;
+  // 全屏编辑弹层 / 显式原生滚动区：允许 textarea 内滚轮
+  if (target instanceof Element) {
+    if (target.closest(CANVAS_NATIVE_SCROLL_SELECTOR)) return false;
+    if (target.closest('[role="dialog"][aria-modal="true"]')) return false;
+  }
   return isCanvasFormWheelTarget(target);
 }
 

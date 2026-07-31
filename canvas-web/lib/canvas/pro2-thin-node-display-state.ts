@@ -1,6 +1,6 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
-/** LibTV 薄卡（文本 / 脚本生成器）三种展示态 · 见 docs/libtv-node-state-spec.md */
+/** LibTV 薄卡（文本 / 故事脚本生成）三种展示态 · 见 docs/libtv-node-state-spec.md */
 export type LibtvThinNodeDisplayState = "initial" | "connected" | "generated";
 
 export function pro2ThinNodeIsLinked(
@@ -74,7 +74,7 @@ export function pro2StarterLinkedMessage(
   return "已链接上游 · 在下方 Dock 输入后发送";
 }
 
-/** 脚本生成器连线态说明（有边即 connected，不要求 outlineMd 已同步） */
+/** 故事脚本生成连线态说明（有边即 connected，不要求 outlineMd 已同步） */
 export function pro2ScriptHubLinkedMessage(input: {
   edges: CanvasFlowEdge[];
   nodes: CanvasFlowNode[];

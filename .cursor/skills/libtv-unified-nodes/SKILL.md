@@ -34,7 +34,7 @@ description: >-
 | --- | --- |
 | 第二套 Dock / 顶栏 / 侧 `+` / 媒体壳 / 组顶栏 | 见下表 |
 | 内嵌 Dock 占满 stage | `*UsesEmbeddedDock()` **恒 false** |
-| 媒体空态不可拖 | `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
+| 媒体空态/错误态不可拖 | `Pro2MediaNodeEmptyState` / `Pro2MediaNodeErrorState` + **`passNodeDrag`** |
 | 裸 `<select>` 模型列表 | `EnginePicker` |
 | 生图/生视频 loading 仅 Loader2 | `LibtvMediaGeneratingState` |
 | 手写媒体尺寸计算 | `useLibtvMediaNodeAutoFit` · `libtv-media-node-auto-fit.ts` |

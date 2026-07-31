@@ -13,7 +13,7 @@ export function useLibtvDockToolbarMetrics() {
     return {
       fontPx: fontScreen,
       minHeightPx: 48,
-      sendBtnPx: 44,
+      sendBtnPx: 48,
       sendIconPx: 18,
       chevronPx: 18,
       fontScreenPx: fontScreen,

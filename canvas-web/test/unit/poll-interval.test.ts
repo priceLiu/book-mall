@@ -17,8 +17,8 @@ describe("nextPollIntervalMs 自适应轮询间隔", () => {
     expect(nextPollIntervalMs(-1, false)).toBe(0);
   });
 
-  it("1 条在飞 → 3s", () => {
-    expect(nextPollIntervalMs(1, false)).toBe(3_000);
+  it("1 条在飞 → 1.5s", () => {
+    expect(nextPollIntervalMs(1, false)).toBe(1_500);
   });
 
   it("2~3 条在飞 → 5s", () => {

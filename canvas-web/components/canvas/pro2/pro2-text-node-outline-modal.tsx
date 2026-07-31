@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -40,6 +40,7 @@ export function Pro2TextNodeOutlineModal({
   const [savedHint, setSavedHint] = useState(false);
   const skipNextSaveRef = useRef(true);
   const saveTimerRef = useRef<number | null>(null);
+  const plainTaRef = useRef<HTMLTextAreaElement | null>(null);
   const onAutoSaveRef = useRef(onAutoSave);
   onAutoSaveRef.current = onAutoSave;
 
@@ -90,6 +91,15 @@ export function Pro2TextNodeOutlineModal({
     };
   }, [draft, open, value]);
 
+  // 纯文本：按内容增高，由外层 overflow 滚动（避免 rows=24 底部大片空白）
+  useLayoutEffect(() => {
+    if (!open || !plainText) return;
+    const el = plainTaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.max(el.scrollHeight, 320)}px`;
+  }, [draft, open, plainText]);
+
   const flushSave = () => {
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
@@ -109,10 +119,11 @@ export function Pro2TextNodeOutlineModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-[#0c0a14]/92 backdrop-blur-sm"
+      className="fixed inset-0 z-[1600] flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-[#0c0a14]/92 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      data-canvas-block-nav-gesture
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
@@ -140,6 +151,7 @@ export function Pro2TextNodeOutlineModal({
 
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div
+          data-canvas-wheel-scroll
           className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto border-r border-violet-400/10 bg-white`}
         >
           <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-50/95 px-4 py-2.5">
@@ -151,8 +163,8 @@ export function Pro2TextNodeOutlineModal({
           <div className={`box-border min-h-0 min-w-0 w-full max-w-full flex-1 ${DOC_PAD}`}>
             {plainText ? (
               <textarea
+                ref={plainTaRef}
                 className={PLAIN_DOC_TEXT}
-                rows={24}
                 value={draft}
                 spellCheck={false}
                 placeholder="输入提示词或正文…"
@@ -172,6 +184,7 @@ export function Pro2TextNodeOutlineModal({
             </p>
           </div>
           <div
+            data-canvas-wheel-scroll
             className={`${RF_NODE_SCROLL} box-border min-h-0 min-w-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto ${DOC_PAD}`}
           >
             {plainText ? (

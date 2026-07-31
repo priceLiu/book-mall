@@ -3,6 +3,7 @@
 import { handlePro2SideAddNodePick } from "./pro2-add-node-pick";
 import { openPro2StyleLibraryForMediaNode } from "./pro2-open-style-library";
 import {
+  isLibtvSideSpawnNodeType,
   spawnLibtvNeighborFromAnchor,
   type LibtvSideSpawnStore,
 } from "./libtv-side-spawn";
@@ -273,47 +274,15 @@ export async function runLibtvSideConnectPick(
 
   await handlePro2SideAddNodePick(itemId, nodeType, dialogs, () => {
     const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
-    if (
-      spawnType === "story-pro2-three-view" ||
-      spawnType === "sbv1-video-engine"
-    ) {
-      spawnLibtvNeighborFromAnchor(
-        ctx.fromNodeId,
-        side,
-        spawnType,
-        store,
-        spawnOpts,
-      );
-      return;
-    }
-    if (itemId === "script" || nodeType === "story-pro2-script-hub") {
-      spawnLibtvNeighborFromAnchor(
-        ctx.fromNodeId,
-        "right",
-        "story-pro2-script-hub",
-        store,
-        spawnOpts,
-      );
-      return;
-    }
-    if (itemId === "text" || nodeType === "story-pro2-starter") {
-      spawnLibtvNeighborFromAnchor(
-        ctx.fromNodeId,
-        side,
-        "story-pro2-starter",
-        store,
-        spawnOpts,
-      );
-      return;
-    }
-    if (itemId === "image" || nodeType === "story-pro2-image") {
-      spawnLibtvNeighborFromAnchor(
-        ctx.fromNodeId,
-        side,
-        "story-pro2-image",
-        store,
-        spawnOpts,
-      );
-    }
+    if (!spawnType || !isLibtvSideSpawnNodeType(spawnType)) return;
+    spawnLibtvNeighborFromAnchor(
+      ctx.fromNodeId,
+      itemId === "script" || nodeType === "story-pro2-script-hub"
+        ? "right"
+        : side,
+      spawnType,
+      store,
+      spawnOpts,
+    );
   });
 }

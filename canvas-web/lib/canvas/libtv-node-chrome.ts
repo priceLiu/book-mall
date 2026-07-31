@@ -142,6 +142,7 @@ export const LIBTV_DRAG_ANYWHERE_NODE_TYPES = [
   "story-pro2-tag",
   "story-pro2-script-hub",
   "story-pro2-three-view",
+  "story-pro2-3d-desk",
   "story-pro2-style-asset",
   "story-pro2-audio",
   "story-pro2-frame",
@@ -155,8 +156,10 @@ export const LIBTV_NODE_OUTER_CLASS =
 /** 侧栏 + 统一尺寸 / 层级（左右对称 · 不被节点内容遮挡） */
 export const LIBTV_NODE_SIDE_PLUS_SIZE = "lg" as const;
 export const LIBTV_NODE_SIDE_PLUS_LAYER_CLASS = "z-[20060]";
-/** lg 侧 + 半径（flow · 与 globals.css 88px 对齐） */
-export const LIBTV_SIDE_PLUS_LG_RADIUS_FLOW = 44;
+/** lg 侧 + 半径（flow · 与 globals.css 70px 对齐） */
+export const LIBTV_SIDE_PLUS_LG_RADIUS_FLOW = 35;
+/** lg 侧 + 直径（px · 屏上目标；default 薄卡仍为 44） */
+export const LIBTV_SIDE_PLUS_LG_SIZE_PX = 70;
 /** 拖线松手 · 侧 + 额外吸附容差（flow · 含磁吸沿边偏移） */
 export const LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW = 56;
 

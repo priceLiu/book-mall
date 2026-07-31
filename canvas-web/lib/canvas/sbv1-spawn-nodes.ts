@@ -394,6 +394,17 @@ export function spawnSbv1NeighborFromNode(
           targetHandle: "in_text",
         },
       ]);
+    } else if (self.type === "sbv1-video-engine" && side === "right") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${anchorId}-${newId}`,
+          source: anchorId,
+          target: newId,
+          sourceHandle: "out_video",
+          targetHandle: "in_motion_video",
+        },
+      ]);
     } else {
       const edge =
         self.type === "sbv1-image"

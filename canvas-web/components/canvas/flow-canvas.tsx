@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import {
-  Background,
-  BackgroundVariant,
   PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
@@ -2084,20 +2082,6 @@ function FlowCanvasInner({
         connectOnClick={false}
         connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}
       >
-        {/* 淡淡的网格线（大格）+ 细点阵（小格），叠出层次但不抢眼 */}
-        <Background
-          id="canvas-grid-lines"
-          variant={BackgroundVariant.Lines}
-          gap={120}
-          lineWidth={1}
-          color="rgba(255,255,255,0.04)"
-        />
-        <Background
-          id="canvas-grid-dots"
-          gap={24}
-          size={1}
-          color="rgba(255,255,255,0.06)"
-        />
         <CanvasViewportToolbar
           pro2Canvas={pro2FloatingInspector}
           sbv1Canvas={sbv1Canvas}

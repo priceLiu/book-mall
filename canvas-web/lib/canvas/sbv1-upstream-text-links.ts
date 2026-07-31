@@ -105,7 +105,7 @@ export function resolveSbv1UpstreamTextLinks(
           ? fullText.length > 48
             ? `${fullText.slice(0, 48)}…`
             : fullText
-          : "脚本生成器",
+          : "故事脚本生成",
       fullText,
       sourceNodeId: source.id,
       edgeId: edge.id,

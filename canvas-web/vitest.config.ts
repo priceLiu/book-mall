@@ -19,6 +19,7 @@ export default defineConfig({
   test: {
     include: [
       "test/unit/poll-interval.test.ts",
+      "test/unit/story-hub-runtime.test.ts",
       "test/unit/canvas-panel-data-recovery.test.ts",
       "test/unit/script-studio-parse.test.ts",
       "test/unit/script-studio-column-sync.test.ts",

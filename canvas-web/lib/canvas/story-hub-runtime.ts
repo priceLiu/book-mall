@@ -14,7 +14,7 @@ import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-
 export function hubSectionRuntime(
   node: CanvasFlowNode,
   section: StoryLlmSection,
-): { status?: string; textOutput?: string } | undefined {
+): { status?: string; textOutput?: string; taskId?: string } | undefined {
   const d = node.data as unknown as StoryScriptHubNodeData;
   if (section === "outline") return d.outlineRuntime;
   if (section === "character") return d.characterRuntime;
@@ -156,8 +156,12 @@ export function hubSectionIsRunning(
   node: CanvasFlowNode,
   section: StoryLlmSection,
 ): boolean {
-  const st = hubSectionRuntime(node, section)?.status;
-  return st === "running" || st === "pending";
+  const rt = hubSectionRuntime(node, section);
+  const st = rt?.status;
+  if (st === "running") return true;
+  // 批量 enqueue 时各段会先 pending 但尚无 taskId；仅已提交段算「生成中」
+  if (st === "pending" && rt?.taskId) return true;
+  return false;
 }
 
 export function hubDialogueIsReady(storyboardMd: string): boolean {

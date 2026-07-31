@@ -334,7 +334,7 @@ function Pro2ScriptDockFooter({
         />
       </div>
       <div
-        className="flex shrink-0 items-center gap-1.5 text-white/35"
+        className="relative z-20 flex shrink-0 items-center gap-1.5 text-white/35"
         style={{ fontSize: fontPx }}
       >
         <button

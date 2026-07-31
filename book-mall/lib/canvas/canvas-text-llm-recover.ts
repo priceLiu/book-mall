@@ -14,8 +14,22 @@ export function extractChatTextFromGatewaySummary(
   if (typeof s.text === "string" && s.text.trim()) {
     return s.text.trim();
   }
+  if (typeof s.output_text === "string" && s.output_text.trim()) {
+    return s.output_text.trim();
+  }
+  if (typeof s.content === "string" && s.content.trim()) {
+    return s.content.trim();
+  }
   if (s.kind === "chat" && typeof s.text === "string" && s.text.trim()) {
     return s.text.trim();
+  }
+  const nestedData =
+    s.data && typeof s.data === "object"
+      ? (s.data as Record<string, unknown>)
+      : null;
+  if (nestedData) {
+    const nested = extractChatTextFromGatewaySummary(nestedData);
+    if (nested) return nested;
   }
   const normalized = buildGatewayChatResultSummary(summary);
   if (
@@ -25,13 +39,29 @@ export function extractChatTextFromGatewaySummary(
   ) {
     return normalized.text.trim();
   }
+  if (Array.isArray(s.choices)) {
+    for (const c of s.choices) {
+      if (!c || typeof c !== "object") continue;
+      const choice = c as Record<string, unknown>;
+      if (typeof choice.text === "string" && choice.text.trim()) {
+        return choice.text.trim();
+      }
+      const msg = choice.message;
+      if (msg && typeof msg === "object") {
+        const content = (msg as Record<string, unknown>).content;
+        if (typeof content === "string" && content.trim()) {
+          return content.trim();
+        }
+      }
+    }
+  }
   return null;
 }
 
 /** 读路径快速写回：Gateway 已成功但 canvas TEXT 仍 SUBMITTED（限条数，避免拖慢 /tasks）。 */
 export async function recoverProjectInflightTextTasksForRead(
   taskIds: string[],
-  limit = 5,
+  limit = 20,
 ): Promise<number> {
   let recovered = 0;
   for (const taskId of taskIds.slice(0, limit)) {

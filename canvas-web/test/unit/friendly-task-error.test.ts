@@ -26,6 +26,16 @@ describe("formatCanvasTaskError", () => {
     ).toBe("生图服务暂时不可用，请稍后重试。");
   });
 
+  it("OSS upload failure is not labeled as image service down", () => {
+    expect(
+      formatCanvasTaskError(
+        "OSS_UPLOAD_FAILED",
+        "socket disconnected before secure TLS connection was established",
+        "nano-banana-pro",
+      ),
+    ).toContain("保存到云存储失败");
+  });
+
   it("dev database unreachable mentions db:ping", () => {
     expect(
       formatCanvasTaskError(

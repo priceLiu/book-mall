@@ -29,14 +29,16 @@ import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 const DRAG_THRESHOLD_PX = 6;
 const MENU_OFFSET_X = 208;
 const MENU_OFFSET_Y = 12;
-/** 侧 + 水平磁吸：节点外可激活距离（左 + 靠左 / 右 + 靠右） */
-const MAGNET_OUTWARD_PX = 40;
-/** 侧 + 水平磁吸：节点内可激活距离 */
-const MAGNET_INWARD_PX = 28;
-/** 沿边跟随 · 距节点顶/底最小留白 */
-const MAGNET_VERTICAL_INSET_PX = 24;
-/** 相对节点中心最大跟随偏移（flow 坐标） */
-const MAGNET_MAX_OFFSET_FLOW_PX = 120;
+/** 鼠标距节点左右边框 ≤ 此值时 + 吸附并跟随指针（px · 屏幕坐标） */
+const MAGNET_ACTIVATE_PX = 100;
+/** 释放磁吸略宽于激活，避免边界抖动 */
+const MAGNET_RELEASE_PX = 112;
+/** 节点内侧 · 仅贴边此宽度内算「边框带」，更深内部不吸附 */
+const MAGNET_BORDER_INWARD_PX = 8;
+/** 沿边/离边跟随 · 相对节点边框最大偏移（px · 屏幕坐标，再换算 flow） */
+const MAGNET_MAX_OFFSET_SCREEN_PX = 100;
+/** 沿边跟随 · 相对节点中心最大纵向偏移（flow 坐标） */
+const MAGNET_MAX_OFFSET_FLOW_PX = 160;
 
 function sideMenuAnchorFromRect(
   rect: DOMRect,
@@ -54,38 +56,49 @@ function pointerNearSideEdge(
   clientY: number,
   rect: DOMRect,
   side: "left" | "right",
+  thresholdPx: number,
 ): boolean {
-  if (
-    clientY < rect.top + MAGNET_VERTICAL_INSET_PX ||
-    clientY > rect.bottom - MAGNET_VERTICAL_INSET_PX
-  ) {
-    return false;
-  }
+  const inVerticalBand =
+    clientY >= rect.top - thresholdPx && clientY <= rect.bottom + thresholdPx;
+  if (!inVerticalBand) return false;
   if (side === "left") {
+    if (clientX >= rect.left - thresholdPx && clientX < rect.left) return true;
     return (
-      clientX >= rect.left - MAGNET_OUTWARD_PX &&
-      clientX <= rect.left + MAGNET_INWARD_PX
+      clientX >= rect.left &&
+      clientX <= rect.left + MAGNET_BORDER_INWARD_PX
     );
   }
+  if (clientX > rect.right && clientX <= rect.right + thresholdPx) return true;
   return (
-    clientX >= rect.right - MAGNET_INWARD_PX &&
-    clientX <= rect.right + MAGNET_OUTWARD_PX
+    clientX >= rect.right - MAGNET_BORDER_INWARD_PX &&
+    clientX <= rect.right
   );
 }
 
 function computeMagnetOffsetFlow(
+  clientX: number,
   clientY: number,
   rect: DOMRect,
+  side: "left" | "right",
   zoom: number,
-): number {
+): { x: number; y: number } {
+  const z = Math.max(zoom, 0.05);
   const centerY = rect.top + rect.height / 2;
-  const screenDy = clientY - centerY;
-  const maxScreen = Math.min(
-    rect.height * 0.38,
-    MAGNET_MAX_OFFSET_FLOW_PX * Math.max(zoom, 0.05),
+  const maxScreenY = Math.min(
+    rect.height * 0.46,
+    MAGNET_MAX_OFFSET_FLOW_PX * z,
   );
-  const clampedScreen = Math.max(-maxScreen, Math.min(maxScreen, screenDy));
-  return clampedScreen / Math.max(zoom, 0.05);
+  const screenDy = Math.max(-maxScreenY, Math.min(maxScreenY, clientY - centerY));
+
+  /** 相对节点左/右边框：正 = 进入节点内侧，负 = 伸出节点外侧 */
+  const rawScreenX =
+    side === "left" ? clientX - rect.left : rect.right - clientX;
+  const screenDx = Math.max(
+    -MAGNET_MAX_OFFSET_SCREEN_PX,
+    Math.min(MAGNET_MAX_OFFSET_SCREEN_PX, rawScreenX),
+  );
+
+  return { x: screenDx / z, y: screenDy / z };
 }
 
 export type Pro2NodeSidePlusProps = {
@@ -124,9 +137,11 @@ export function Pro2NodeSidePlus({
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
     null,
   );
-  const [magnetOffsetY, setMagnetOffsetY] = useState(0);
+  const [magnetOffset, setMagnetOffset] = useState({ x: 0, y: 0 });
   const handleWrapRef = useRef<HTMLDivElement>(null);
+  const magnetActiveRef = useRef(false);
   const zoom = useStore((s) => s.transform[2]);
+  const canvasConnecting = useCanvasStore((s) => Boolean(s.connectingFromNodeId));
   const gestureRef = useRef<{
     pointerId: number;
     x: number;
@@ -145,18 +160,19 @@ export function Pro2NodeSidePlus({
   }, []);
 
   const captureMenuAnchor = useCallback(() => {
-    const handle = handleWrapRef.current?.querySelector(
-      ".pro2-node-side-plus-handle",
+    const dot = handleWrapRef.current?.querySelector(
+      ".pro2-node-side-plus-dot",
     ) as HTMLElement | null;
-    const rect = handle?.getBoundingClientRect();
+    const rect = dot?.getBoundingClientRect();
     if (!rect) return null;
     return sideMenuAnchorFromRect(rect, side);
   }, [side]);
 
+  /** 磁吸只移动可见圆点，handle 锚点恒在边框上，故不随 magnetOffset 重测 */
   useLayoutEffect(() => {
     if (!nodeId) return;
     updateNodeInternals(nodeId);
-  }, [nodeId, visible, size, magnetOffsetY, updateNodeInternals]);
+  }, [nodeId, visible, size, canvasConnecting, updateNodeInternals]);
 
   useEffect(() => {
     if (!visible) setOpen(false);
@@ -164,21 +180,60 @@ export function Pro2NodeSidePlus({
 
   useEffect(() => {
     if (!visible || !magneticFollow || open) {
-      setMagnetOffsetY(0);
+      magnetActiveRef.current = false;
+      setMagnetOffset({ x: 0, y: 0 });
       return;
     }
     const onPointerMove = (e: PointerEvent) => {
       const host = hostNodeEl();
       if (!host) return;
       const rect = host.getBoundingClientRect();
-      if (!pointerNearSideEdge(e.clientX, e.clientY, rect, side)) {
-        setMagnetOffsetY(0);
+      const activate = pointerNearSideEdge(
+        e.clientX,
+        e.clientY,
+        rect,
+        side,
+        MAGNET_ACTIVATE_PX,
+      );
+      const release = pointerNearSideEdge(
+        e.clientX,
+        e.clientY,
+        rect,
+        side,
+        MAGNET_RELEASE_PX,
+      );
+      if (magnetActiveRef.current) {
+        if (!release) {
+          magnetActiveRef.current = false;
+          setMagnetOffset({ x: 0, y: 0 });
+          return;
+        }
+        setMagnetOffset(
+          computeMagnetOffsetFlow(e.clientX, e.clientY, rect, side, zoom),
+        );
         return;
       }
-      setMagnetOffsetY(computeMagnetOffsetFlow(e.clientY, rect, zoom));
+      if (!activate) {
+        setMagnetOffset({ x: 0, y: 0 });
+        return;
+      }
+      magnetActiveRef.current = true;
+      setMagnetOffset(
+        computeMagnetOffsetFlow(e.clientX, e.clientY, rect, side, zoom),
+      );
+    };
+    const onPointerUp = () => {
+      magnetActiveRef.current = false;
+      setMagnetOffset({ x: 0, y: 0 });
     };
     window.addEventListener("pointermove", onPointerMove, { passive: true });
-    return () => window.removeEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onPointerUp, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
   }, [visible, magneticFollow, open, side, hostNodeEl, zoom]);
 
   const openMenu = useCallback(
@@ -191,7 +246,7 @@ export function Pro2NodeSidePlus({
       useCanvasStore.getState().setCanvasMarqueeSelecting(false);
       const anchor = captureMenuAnchor();
       if (anchor) setMenuAnchor(anchor);
-      setMagnetOffsetY(0);
+      setMagnetOffset({ x: 0, y: 0 });
       setOpen(true);
     },
     [captureMenuAnchor, rfStore],
@@ -230,9 +285,14 @@ export function Pro2NodeSidePlus({
     openMenu(e);
   }, [openMenu]);
 
-  const wrapStyle: CSSProperties = {
-    top: "50%",
-    transform: `translateY(calc(-50% + ${magnetOffsetY}px))`,
+  /** wrap 为 0×0 锚点，原点恒定落在节点左/右边框中点（连线由此出入，勿随磁吸移动） */
+  const wrapStyle: CSSProperties = { top: "50%" };
+
+  /** 磁吸只平移可见圆点：圆与 + 图标一起动，连线锚点不动 */
+  const dotStyle: CSSProperties = {
+    transform: `translate(calc(-50% + ${
+      side === "left" ? magnetOffset.x : -magnetOffset.x
+    }px), calc(-50% + ${magnetOffset.y}px))`,
   };
 
   const lg = size === "lg";
@@ -243,7 +303,7 @@ export function Pro2NodeSidePlus({
         ref={handleWrapRef}
         style={wrapStyle}
         className={cn(
-          "pro2-node-side-plus-layer pointer-events-none absolute top-1/2 w-0",
+          "pro2-node-side-plus-layer pointer-events-none absolute h-0 w-0",
           side === "left" ? "left-0" : "right-0",
           LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
           !visible && "pointer-events-none opacity-0",
@@ -251,7 +311,7 @@ export function Pro2NodeSidePlus({
         )}
         aria-hidden={!visible}
       >
-        {side === "left" || side === "right" ? (
+        {canvasConnecting && (side === "left" || side === "right") ? (
           <Handle
             id={libtvSidePlusInHandleId(handleId)}
             type="target"
@@ -276,11 +336,6 @@ export function Pro2NodeSidePlus({
             RF_NO_DRAG,
             "nopan nokey pro2-node-side-plus-handle",
             lg && "pro2-node-side-plus-handle--lg",
-            "!flex !items-center !justify-center !rounded-full !border !border-white/25 !bg-[#2a2a2e] !p-0 !opacity-100",
-            "!shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
-            visible &&
-              "hover:!border-violet-400/60 hover:!bg-violet-500/25",
-            !visible && "!pointer-events-none !opacity-0",
           )}
           title={
             side === "left"
@@ -288,14 +343,26 @@ export function Pro2NodeSidePlus({
               : "引用生成 · 单击菜单 / 拖拽连线"
           }
         >
-          <Plus
+          <span
+            style={dotStyle}
             className={cn(
-              "pointer-events-none shrink-0 text-white/90",
-              lg ? "size-12" : "size-6",
+              "pro2-node-side-plus-dot",
+              lg && "pro2-node-side-plus-dot--lg",
+              "flex items-center justify-center rounded-full border border-white/25 bg-[#2a2a2e]",
+              "shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
+              visible && "hover:border-violet-400/60 hover:bg-violet-500/25",
+              !visible && "!pointer-events-none !opacity-0",
             )}
-            strokeWidth={2.25}
-            aria-hidden
-          />
+          >
+            <Plus
+              className={cn(
+                "pointer-events-none shrink-0 text-white/90",
+                lg ? "size-10" : "size-6",
+              )}
+              strokeWidth={2.25}
+              aria-hidden
+            />
+          </span>
         </Handle>
       </div>
       <Pro2AddNodePopover

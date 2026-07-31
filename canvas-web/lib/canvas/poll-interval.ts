@@ -8,7 +8,7 @@
  * 策略（对应计划 Phase 4）：
  * - stale（读道降级 / DB 塞车，tasks==null）→ 退避到 15s，给 DB 喘息。
  * - 无在飞 → 0（停）。
- * - 1 条在飞 → 3s。
+ * - 1 条在飞 → 1.5s（Gateway 已成功后尽快对齐 UI）。
  * - 2~3 条 → 5s。
  * - >3 条 → 8s（并发越多越退避，避免 2s 空轮询叠加放大 DB 压力）。
  */
@@ -22,7 +22,7 @@ export function nextPollIntervalMs(
 ): number {
   if (stale) return CANVAS_POLL_STALE_BACKOFF_MS;
   if (inflightCount <= 0) return 0;
-  if (inflightCount === 1) return 3_000;
+  if (inflightCount === 1) return 1_500;
   if (inflightCount <= 3) return 5_000;
   return 8_000;
 }

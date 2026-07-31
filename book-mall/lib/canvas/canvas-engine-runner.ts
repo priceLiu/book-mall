@@ -59,9 +59,9 @@ import {
   shouldCanvasUseGateway,
 } from "./canvas-gateway-run";
 import {
-  persistCanvasBufferToOss,
-  persistCanvasKieResultToOss,
-} from "./canvas-oss";
+  scheduleCanvasBufferOssBackfill,
+  scheduleCanvasKieImageOssBackfill,
+} from "./canvas-oss-backfill";
 import { isVolcengineSeedreamImageModelKey } from "@/lib/gateway/volcengine-chat-models";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
@@ -707,33 +707,17 @@ export async function runImageEngineNode(
           },
         );
         const first = images[0];
-        let ossUrl = "";
-        if (first?.url?.trim()) {
-          ossUrl = await persistCanvasKieResultToOss({
-            ephemeralUrl: first.url.trim(),
-            kind: "node-image",
-            projectId,
-            userId,
-          });
-        } else if (first?.b64?.trim()) {
-          const buf = Buffer.from(first.b64.trim(), "base64");
-          ossUrl = await persistCanvasBufferToOss({
-            buf,
-            contentType: "image/png",
-            kind: "node-image",
-            projectId,
-            userId,
-            ext: "png",
-          });
-        }
-        if (!ossUrl) {
+        const url = first?.url?.trim() ?? "";
+        const b64 = first?.b64?.trim() ?? "";
+        if (!url && !b64) {
           throw new Error("火山方舟 Seedream 未返回可用图像");
         }
+        const ephemeralUrl = url || `data:image/png;base64,${b64}`;
         const updated = await prisma.canvasGenerationTask.update({
           where: { id: created.id },
           data: {
             status: "SUCCEEDED",
-            ossUrl,
+            ephemeralUrl,
             submittedAt: new Date(),
             completedAt: new Date(),
             inputPayload: {
@@ -754,6 +738,24 @@ export async function runImageEngineNode(
             } as Prisma.InputJsonValue,
           },
         });
+        if (url) {
+          scheduleCanvasKieImageOssBackfill(
+            created.id,
+            url,
+            projectId,
+            "node-image",
+          );
+        } else {
+          scheduleCanvasBufferOssBackfill({
+            taskId: created.id,
+            buf: Buffer.from(b64, "base64"),
+            contentType: "image/png",
+            kind: "node-image",
+            projectId,
+            userId,
+            ext: "png",
+          });
+        }
         return { reused: false, task: updated };
       }
 
@@ -2038,22 +2040,24 @@ export async function runTtsEngineNode(
       clientPage: gwClientPage,
       projectId,
     });
-    const ossUrl = await persistCanvasBufferToOss({
+    const ephemeralUrl = `data:${ttsOut.contentType};base64,${ttsOut.buffer.toString("base64")}`;
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUCCEEDED",
+        ephemeralUrl,
+        textOutput: text.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    scheduleCanvasBufferOssBackfill({
+      taskId: created.id,
       buf: ttsOut.buffer,
       contentType: ttsOut.contentType,
       kind: "node-audio",
       projectId,
       userId,
       ext: ttsOut.ext,
-    });
-    const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
-      data: {
-        status: "SUCCEEDED",
-        ossUrl,
-        textOutput: text.slice(0, 500),
-        completedAt: new Date(),
-      },
     });
     return { reused: false, task: updated };
   } catch (e) {

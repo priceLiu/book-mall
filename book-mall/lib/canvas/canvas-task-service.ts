@@ -86,8 +86,6 @@ import {
   buildCanvasTaskHotReadWhere,
   canvasGenerationRecordsDefaultSince,
 } from "./canvas-task-hot-window";
-import { persistCanvasKieResultToOss, persistCanvasVideoResultToOss } from "./canvas-oss";
-import { mergeResultPayloadPoster } from "./video-poster-ffmpeg";
 import {
   canvasGwCreateBailianR2vJob,
   canvasGwCreateKieJob,
@@ -108,6 +106,10 @@ import {
   runCanvasDisplayReconcileWorker,
 } from "@/lib/canvas/canvas-video-display-recover";
 import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
+import {
+  scheduleCanvasKieImageOssBackfill,
+  scheduleCanvasVideoOssBackfill,
+} from "@/lib/canvas/canvas-oss-backfill";
 import { getGenerationPollInnerTimeoutMs } from "@/lib/generation/poll-config";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
@@ -605,35 +607,7 @@ export async function applyCanvasBailianR2vPollResult(
     return;
   }
 
-  let ossUrl: string | null = null;
-  let posterUrl: string | undefined;
-  let ossError: string | null = null;
-  try {
-    const persisted = await persistCanvasVideoResultToOss({
-      ephemeralUrl,
-      projectId: task.projectId,
-    });
-    ossUrl = persisted.videoUrl;
-    posterUrl = persisted.posterUrl;
-  } catch (e) {
-    ossError = e instanceof Error ? e.message : String(e);
-  }
-
-  if (!ossUrl) {
-    await prisma.canvasGenerationTask.update({
-      where: { id: taskId },
-      data: {
-        status: "FAILED",
-        failCode: "OSS_UPLOAD_FAILED",
-        failMessage: ossError ?? "OSS upload failed",
-        ephemeralUrl,
-        resultPayload: polled.raw as Prisma.InputJsonValue,
-        completedAt: new Date(),
-      },
-    });
-    return;
-  }
-
+  // 先上节点再异步落 OSS（与 KIE 图/视频一致）
   await prisma.canvasGenerationTask.updateMany({
     where: {
       id: taskId,
@@ -641,12 +615,8 @@ export async function applyCanvasBailianR2vPollResult(
     },
     data: {
       status: "SUCCEEDED",
-      ossUrl,
       ephemeralUrl,
-      resultPayload: mergeResultPayloadPoster(
-        polled.raw,
-        posterUrl,
-      ) as Prisma.InputJsonValue,
+      resultPayload: polled.raw as Prisma.InputJsonValue,
       completedAt: new Date(),
     },
   });
@@ -662,7 +632,15 @@ export async function applyCanvasBailianR2vPollResult(
       resultPayload: true,
     },
   });
-  if (bailianUpdated) await patchCanvasProjectNodeRuntimeFromTask(bailianUpdated);
+  if (bailianUpdated) {
+    await patchCanvasProjectNodeRuntimeFromTask(bailianUpdated);
+    scheduleCanvasVideoOssBackfill(
+      taskId,
+      ephemeralUrl,
+      bailianUpdated.projectId,
+      polled.raw,
+    );
+  }
 }
 
 export async function applyCanvasDashscopeImagePollResult(
@@ -719,46 +697,19 @@ export async function applyCanvasDashscopeImagePollResult(
     return;
   }
 
-  let ossUrl: string | null = null;
-  let ossError: string | null = null;
-  try {
-    ossUrl = await persistCanvasKieResultToOss({
-      ephemeralUrl,
-      kind: "node-image",
-      projectId: task.projectId,
-    });
-  } catch (e) {
-    ossError = e instanceof Error ? e.message : String(e);
-  }
-
-  if (!ossUrl) {
-    await prisma.canvasGenerationTask.update({
-      where: { id: taskId },
-      data: {
-        status: "FAILED",
-        failCode: "OSS_UPLOAD_FAILED",
-        failMessage: ossError ?? "OSS upload failed",
-        ephemeralUrl,
-        resultPayload: output as unknown as Prisma.InputJsonValue,
-        completedAt: new Date(),
-      },
-    });
-    return;
-  }
-
-  await prisma.canvasGenerationTask.updateMany({
+  const applied = await prisma.canvasGenerationTask.updateMany({
     where: {
       id: taskId,
       status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
     data: {
       status: "SUCCEEDED",
-      ossUrl,
       ephemeralUrl,
       resultPayload: output as unknown as Prisma.InputJsonValue,
       completedAt: new Date(),
     },
   });
+  if (applied.count === 0) return;
   const updated = await prisma.canvasGenerationTask.findUnique({
     where: { id: taskId },
     select: {
@@ -773,16 +724,13 @@ export async function applyCanvasDashscopeImagePollResult(
   });
   if (updated) {
     await patchCanvasProjectNodeRuntimeFromTask(updated);
-    await patchCanvasProjectNodeMediaFromTask({
-      id: task.id,
-      projectId: task.projectId,
-      nodeId: task.nodeId,
-      ossUrl,
-      ephemeralUrl,
-      completedAt: updated.completedAt,
-      resultPayload: updated.resultPayload,
-    });
+    await patchCanvasProjectNodeMediaFromTask(updated);
+    scheduleCanvasKieImageOssBackfill(taskId, ephemeralUrl, updated.projectId);
   }
+  logKieEvent("info", "[canvas] dashscope image succeeded (ephemeral; OSS deferred)", {
+    taskId,
+    ephemeralUrl,
+  });
 }
 
 export async function applyCanvasVolcengineVideoResult(
@@ -827,49 +775,6 @@ export async function applyCanvasVolcengineVideoResult(
     return;
   }
 
-  let ossUrl: string | null = null;
-  let posterUrl: string | undefined;
-  let ossError: string | null = null;
-  try {
-    const persisted = await persistCanvasVideoResultToOss({
-      ephemeralUrl,
-      projectId: task.projectId,
-    });
-    ossUrl = persisted.videoUrl;
-    posterUrl = persisted.posterUrl;
-  } catch (e) {
-    ossError = e instanceof Error ? e.message : String(e);
-  }
-  if (!ossUrl) {
-    await prisma.canvasGenerationTask.update({
-      where: { id: taskId },
-      data: {
-        status: "SUCCEEDED",
-        ephemeralUrl,
-        failCode: null,
-        failMessage: ossError
-          ? `OSS skipped: ${ossError.slice(0, 200)}`
-          : null,
-        completedAt: new Date(),
-      },
-    });
-    const updated = await prisma.canvasGenerationTask.findUnique({
-      where: { id: taskId },
-      select: {
-        id: true,
-        projectId: true,
-        nodeId: true,
-        ossUrl: true,
-        ephemeralUrl: true,
-        completedAt: true,
-        resultPayload: true,
-      },
-    });
-    if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
-    await persistCanvasE2eForTask(taskId).catch(() => undefined);
-    return;
-  }
-
   await prisma.canvasGenerationTask.updateMany({
     where: {
       id: taskId,
@@ -877,9 +782,9 @@ export async function applyCanvasVolcengineVideoResult(
     },
     data: {
       status: "SUCCEEDED",
-      ossUrl,
       ephemeralUrl,
-      resultPayload: mergeResultPayloadPoster(null, posterUrl) as Prisma.InputJsonValue,
+      failCode: null,
+      failMessage: null,
       completedAt: new Date(),
     },
   });
@@ -895,7 +800,10 @@ export async function applyCanvasVolcengineVideoResult(
       resultPayload: true,
     },
   });
-  if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
+  if (updated) {
+    await patchCanvasProjectNodeRuntimeFromTask(updated);
+    scheduleCanvasVideoOssBackfill(taskId, ephemeralUrl, updated.projectId);
+  }
   await persistCanvasE2eForTask(taskId).catch(() => undefined);
 }
 
@@ -945,9 +853,6 @@ export async function applyCanvasKieTaskResult(
       });
       return;
     }
-    let ossUrl: string | null = null;
-    let posterUrl: string | undefined;
-    let ossError: string | null = null;
     const payload = task.inputPayload as { kind?: string } | null;
     const engineKind = payload?.kind ?? "";
     const ossKind =
@@ -957,43 +862,7 @@ export async function applyCanvasKieTaskResult(
           ? "node-audio"
           : "node-image";
     const isVideoOss = ossKind === "node-video";
-    try {
-      if (isVideoOss) {
-        const persisted = await persistCanvasVideoResultToOss({
-          ephemeralUrl,
-          projectId: task.projectId,
-        });
-        ossUrl = persisted.videoUrl;
-        posterUrl = persisted.posterUrl;
-      } else {
-        ossUrl = await persistCanvasKieResultToOss({
-          ephemeralUrl,
-          kind: ossKind,
-          projectId: task.projectId,
-        });
-      }
-    } catch (e) {
-      ossError = e instanceof Error ? e.message : String(e);
-      logKieEvent("error", "[canvas] persistKieResultToOss failed", {
-        taskId,
-        ephemeralUrl,
-        ossError,
-      });
-    }
-    if (!ossUrl) {
-      await prisma.canvasGenerationTask.update({
-        where: { id: taskId },
-        data: {
-          status: "FAILED",
-          failCode: "OSS_UPLOAD_FAILED",
-          failMessage: ossError ?? "OSS upload failed",
-          ephemeralUrl,
-          resultPayload: record as unknown as Prisma.InputJsonValue,
-          completedAt: new Date(),
-        },
-      });
-      return;
-    }
+    // 先 SUCCEEDED + ephemeral 上节点，OSS 异步补写（图/音/视频统一）
     const applied = await prisma.canvasGenerationTask.updateMany({
       where: {
         id: taskId,
@@ -1001,11 +870,8 @@ export async function applyCanvasKieTaskResult(
       },
       data: {
         status: "SUCCEEDED",
-        ossUrl,
         ephemeralUrl,
-        resultPayload: (isVideoOss
-          ? mergeResultPayloadPoster(record, posterUrl)
-          : record) as Prisma.InputJsonValue,
+        resultPayload: record as Prisma.InputJsonValue,
         completedAt: new Date(),
       },
     });
@@ -1025,14 +891,27 @@ export async function applyCanvasKieTaskResult(
     if (updated) {
       if (isVideoOss) {
         await patchCanvasProjectNodeRuntimeFromTask(updated);
+        scheduleCanvasVideoOssBackfill(
+          taskId,
+          ephemeralUrl,
+          updated.projectId,
+          record,
+        );
       } else {
         await patchCanvasProjectNodeMediaFromTask(updated);
+        scheduleCanvasKieImageOssBackfill(
+          taskId,
+          ephemeralUrl,
+          updated.projectId,
+          ossKind === "node-audio" ? "node-audio" : "node-image",
+        );
       }
     }
-    logKieEvent("info", "[canvas] task succeeded", {
+    logKieEvent("info", "[canvas] task succeeded (ephemeral; OSS deferred)", {
       taskId,
       kind: task.kind,
-      ossUrl,
+      ephemeralUrl,
+      isVideoOss,
     });
   } else if (record.state === "fail") {
     const updated = await prisma.canvasGenerationTask.update({
@@ -1122,52 +1001,20 @@ export async function applyCanvasGatewayPollResult(
     return;
   }
 
-  let ossUrl: string | null = null;
-  let ossError: string | null = null;
-  try {
-    ossUrl = await persistCanvasKieResultToOss({
-      ephemeralUrl: imageEphemeral,
-      kind: "node-image",
-      projectId: task.projectId,
-    });
-  } catch (e) {
-    ossError = e instanceof Error ? e.message : String(e);
-    logKieEvent("error", "[canvas] persistGatewayResultToOss failed", {
-      taskId,
-      imageEphemeral,
-      ossError,
-    });
-  }
-
-  if (!ossUrl) {
-    await prisma.canvasGenerationTask.update({
-      where: { id: taskId },
-      data: {
-        status: "FAILED",
-        failCode: "OSS_UPLOAD_FAILED",
-        failMessage: ossError ?? "OSS upload failed",
-        ephemeralUrl: imageEphemeral,
-        resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
-        completedAt: new Date(),
-      },
-    });
-    return;
-  }
-
   await prisma.canvasGenerationTask.update({
     where: { id: taskId },
     data: {
       status: "SUCCEEDED",
-      ossUrl,
       ephemeralUrl: modelUrl ?? imageEphemeral,
       resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
       completedAt: new Date(),
     },
   });
-  logKieEvent("info", "[canvas] gateway task succeeded", {
+  scheduleCanvasKieImageOssBackfill(taskId, imageEphemeral, task.projectId);
+  logKieEvent("info", "[canvas] gateway task succeeded (ephemeral; OSS deferred)", {
     taskId,
     kind: task.kind,
-    ossUrl,
+    imageEphemeral,
     modelUrl,
   });
 }

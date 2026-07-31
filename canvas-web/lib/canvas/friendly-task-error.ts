@@ -215,6 +215,19 @@ export function formatCanvasTaskError(
     return "提交生成超时，请重试";
   }
 
+  // OSS 落库失败 ≠ 厂商生图失败；须先于 network/timeout 启发式，避免误报「生图服务不可用」
+  if (
+    code === "OSS_UPLOAD_FAILED" ||
+    blob.includes("oss_upload_failed") ||
+    blob.includes("persistkieresulttooss") ||
+    (blob.includes("oss") &&
+      (blob.includes("socket disconnected") ||
+        blob.includes("secure tls") ||
+        blob.includes("multipart")))
+  ) {
+    return "图片已生成，但保存到云存储失败。请重新生成；若多次失败请稍后重试。";
+  }
+
   if (
     blob.includes("429") ||
     blob.includes("frequency") ||

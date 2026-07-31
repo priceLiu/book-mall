@@ -80,7 +80,7 @@ export function LibtvEditableNodeTitle({
       ) : (
         <span
           className={cn(
-            "nodrag min-w-0 flex-1 truncate",
+            "min-w-0 flex-1 truncate",
             textClassName ?? "text-[11px] text-white",
           )}
           title={`${displayLabel} · 双击编辑标题`}

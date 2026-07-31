@@ -285,11 +285,14 @@ function Inner({ projectId }: { projectId: string }) {
   }, []);
 
   useEffect(() => {
-    const guard = () => {
-      window.history.pushState({ canvasSwipeGuard: true }, "", window.location.href);
+    if (typeof window === "undefined") return;
+    const url = window.location.href;
+    window.history.replaceState({ canvasPage: projectId, guard: 0 }, "", url);
+    window.history.pushState({ canvasPage: projectId, guard: 1 }, "", url);
+
+    const onPopState = () => {
+      window.history.pushState({ canvasPage: projectId, guard: 1 }, "", url);
     };
-    guard();
-    const onPopState = () => guard();
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [projectId]);
@@ -978,6 +981,7 @@ function Inner({ projectId }: { projectId: string }) {
         ref={canvasEditorRef}
         className="fixed inset-0 z-[200] flex flex-col overflow-hidden bg-[var(--canvas-bg)]"
         data-canvas-editor
+        data-canvas-block-nav-gesture
         style={{ ["--canvas-toolbar-height" as string]: "3rem" }}
       >
         <div

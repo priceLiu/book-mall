@@ -181,6 +181,7 @@ export function Pro2FloatingInspector() {
     storeNode.type === "story-pro2-style-asset" ||
     storeNode.type === "story-pro2-audio" ||
     storeNode.type === "story-pro2-video" ||
+    storeNode.type === "story-pro2-3d-desk" ||
     storeNode.type === "jianying-export-pro2" ||
     storeNode.type === "jianying-auto-render-pro2" ||
     storeNode.type === "group" ||

@@ -22,4 +22,12 @@ describe("extractChatTextFromGatewaySummary", () => {
       }),
     ).toBe("outline body");
   });
+
+  it("reads nested data / choices[].text", () => {
+    expect(
+      extractChatTextFromGatewaySummary({
+        data: { choices: [{ text: "nested text" }] },
+      }),
+    ).toBe("nested text");
+  });
 });

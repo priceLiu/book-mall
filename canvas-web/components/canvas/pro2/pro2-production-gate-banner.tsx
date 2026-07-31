@@ -143,7 +143,7 @@ export function Pro2ProductionGateBanner() {
               </div>
             ) : packages.length === 0 ? (
               <p className="py-4 text-sm text-white/55">
-                暂无已发布剧本。请先在任意 2.0 画布的脚本生成器中发布剧本。
+                暂无已发布剧本。请先在任意 2.0 画布的故事脚本生成中发布剧本。
               </p>
             ) : (
               <ul className="max-h-64 space-y-1 overflow-y-auto">
