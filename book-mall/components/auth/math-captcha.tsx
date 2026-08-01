@@ -55,7 +55,10 @@ export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") handleVerify();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleVerify();
+    }
   }
 
   return (
@@ -77,6 +80,16 @@ export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps)
         disabled={disabled || loading}
         className="w-16 h-8 text-center text-sm"
       />
+      <Button
+        type="button"
+        variant="default"
+        size="sm"
+        className="h-8 shrink-0"
+        onClick={handleVerify}
+        disabled={disabled || loading || !answer.trim()}
+      >
+        确认
+      </Button>
       <Button
         type="button"
         variant="ghost"

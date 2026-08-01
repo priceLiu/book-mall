@@ -5,10 +5,7 @@ import type { PaymentChannel } from "@prisma/client";
 
 import { authOptions } from "@/lib/auth";
 import { createPaymentCheckout } from "@/lib/payments/create-checkout";
-import {
-  canUseAdminInstantCheckout,
-  requirePaymentAdminSession,
-} from "@/lib/payments/session-auth";
+import { canUseAdminInstantCheckout } from "@/lib/payments/session-auth";
 import {
   getWechatPayeeName,
   getWechatPersonalQrUrl,
@@ -67,8 +64,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = parsed.data as Record<string, unknown> & { channel?: PaymentChannel };
-    const channel: PaymentChannel = body.channel === "WECHAT_ENTERPRISE" && isWechatPayConfigured()
+    const channel: PaymentChannel = isWechatPayConfigured()
       ? "WECHAT_ENTERPRISE"
       : "WECHAT_PERSONAL";
 
@@ -79,6 +75,7 @@ export async function POST(request: NextRequest) {
     });
     const snap = checkout.productSnapshot as Record<string, unknown>;
     const adminInstant = canUseAdminInstantCheckout(session.user.role);
+    const isEnterprise = checkout.channel === "WECHAT_ENTERPRISE";
 
     return NextResponse.json({
       checkout: {
@@ -93,8 +90,8 @@ export async function POST(request: NextRequest) {
       },
       wechat: {
         channel: checkout.channel,
-        qrUrl: adminInstant ? null : getWechatPersonalQrUrl(),
-        payeeName: getWechatPayeeName(),
+        qrUrl: isEnterprise || adminInstant ? null : getWechatPersonalQrUrl(),
+        payeeName: isEnterprise ? "" : getWechatPayeeName(),
       },
       adminInstant,
     });

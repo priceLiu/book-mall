@@ -118,7 +118,7 @@ export async function createNativeOrder(params: {
   const amountFen = Math.round(params.amountYuan * 100);
 
   const res = await request<{ code_url: string }>("POST", "/v3/pay/transactions/native", {
-    appid: "", // Native 支付无需 appid
+    appid: cfg.appId,
     mchid: cfg.mchid,
     description: params.description.slice(0, 42), // 微信要求 ≤42 字符
     out_trade_no: params.outTradeNo,
