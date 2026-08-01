@@ -4,6 +4,7 @@ import path from "path";
 export interface WechatPayConfig {
   mchid: string;
   mchName: string;
+  appId: string;
   apiV3Key: string;
   serialNo: string;
   certPath: string;
@@ -18,17 +19,18 @@ export function getWechatPayConfig(): WechatPayConfig {
 
   const mchid = process.env.WECHAT_PAY_MCHID?.trim();
   const mchName = process.env.WECHAT_PAY_MCH_NAME?.trim();
+  const appId = process.env.WECHAT_PAY_APP_ID?.trim();
   const apiV3Key = process.env.WECHAT_PAY_API_V3_KEY?.trim();
   const serialNo = process.env.WECHAT_PAY_SERIAL_NO?.trim();
   const certPath = process.env.WECHAT_PAY_CERT_PATH?.trim();
   const keyPath = process.env.WECHAT_PAY_KEY_PATH?.trim();
   const notifyUrl = process.env.WECHAT_PAY_NOTIFY_URL?.trim();
 
-  if (!mchid || !apiV3Key || !serialNo || !certPath || !keyPath || !notifyUrl) {
-    throw new Error("微信支付配置不完整，请检查 WECHAT_PAY_* 环境变量");
+  if (!mchid || !appId || !apiV3Key || !serialNo || !certPath || !keyPath || !notifyUrl) {
+    throw new Error("微信支付配置不完整，请检查 WECHAT_PAY_* 环境变量（需包含 APP_ID）");
   }
 
-  _config = { mchid, mchName: mchName ?? "", apiV3Key, serialNo, certPath, keyPath, notifyUrl };
+  _config = { mchid, mchName: mchName ?? "", appId, apiV3Key, serialNo, certPath, keyPath, notifyUrl };
   return _config;
 }
 
