@@ -194,7 +194,6 @@ export function Pro2ScriptInputDock() {
         nodes: freshNodes,
         edges: freshEdges,
         hubData: fd,
-        regenerateAll: true,
       },
     );
   }, [nodeId, updateNodeData, alert]);

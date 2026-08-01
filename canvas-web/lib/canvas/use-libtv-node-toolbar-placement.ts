@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useReactFlow } from "@xyflow/react";
 import {
   libtvFloatingDockHidden,
@@ -14,6 +14,21 @@ import {
 const NODE_TOOLBAR_HEADER_RESERVED = 56;
 const NODE_TOOLBAR_HEIGHT = 44;
 const NODE_TOOLBAR_GAP = 8;
+
+export type LibtvNodeToolbarScreenPlacement = {
+  x: number;
+  y: number;
+  place: "above" | "below";
+};
+
+/** pan/zoom 时 placement 短暂为 null 时保留上一帧，避免顶栏卸载（与浮动 Dock 同规则） */
+export function useStableLibtvNodeToolbarScreenPlacement(
+  placement: LibtvNodeToolbarScreenPlacement | null,
+): LibtvNodeToolbarScreenPlacement | null {
+  const lastRef = useRef<LibtvNodeToolbarScreenPlacement | null>(null);
+  if (placement) lastRef.current = placement;
+  return placement ?? lastRef.current;
+}
 
 /** 拖动所属节点、或全屏详情编辑打开时隐藏顶栏（与浮动 Dock 同一规则） */
 export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
@@ -32,15 +47,14 @@ export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
 export function useLibtvNodeToolbarScreenPlacement(
   nodeId: string,
   visible: boolean,
-): { x: number; y: number; place: "above" | "below" } | null {
+): LibtvNodeToolbarScreenPlacement | null {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const flowNode = useCanvasStore((s) => s.nodes.find((n) => n.id === nodeId));
   const allNodes = useCanvasStore((s) => s.nodes);
-  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
-  const viewport = useViewportTransformActive(visible && !viewportMoving);
+  const viewport = useViewportTransformActive(visible);
 
   return useMemo(() => {
-    if (!visible || viewportMoving || !flowNode) return null;
+    if (!visible || !flowNode) return null;
     const internal = getInternalNode(nodeId) as
       | {
           measured?: { width?: number; height?: number };
@@ -78,7 +92,6 @@ export function useLibtvNodeToolbarScreenPlacement(
   }, [
     nodeId,
     visible,
-    viewportMoving,
     viewport,
     getInternalNode,
     flowToScreenPosition,

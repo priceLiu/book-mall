@@ -221,7 +221,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     (s) => s.pro2ScriptTableEditorNodeId === id,
   );
   const showToolbar = Boolean(
-    soleSelected && hasPreviewContent && !isGenerating && !scriptTableEditorOpen,
+    soleSelected && hasPreviewContent && !scriptTableEditorOpen,
   );
   const showThinTitle = displayState !== "generated" || isGenerating;
   const previewTitle =
@@ -413,10 +413,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {soleSelected && !showToolbar ? (
-        <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
-      ) : null}
-
       {showThinTitle ? (
         <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
           <GripVertical className="size-3.5 shrink-0 text-white/30" />
@@ -430,14 +426,18 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         </div>
       ) : null}
 
-      {showToolbar ? (
-        <LibtvNodeToolbarPortal nodeId={id} visible={showToolbar}>
-          <Pro2ScriptHubToolbar
-            hubId={id}
-            hubData={d}
-            tableTitle={tableTitle}
-            onDuplicateNode={onDuplicateNode}
-          />
+      {soleSelected && !scriptTableEditorOpen ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
+          {showToolbar ? (
+            <Pro2ScriptHubToolbar
+              hubId={id}
+              hubData={d}
+              tableTitle={tableTitle}
+              onDuplicateNode={onDuplicateNode}
+            />
+          ) : (
+            <Pro2ThinNodeToolbar onDuplicateNode={onDuplicateNode} />
+          )}
         </LibtvNodeToolbarPortal>
       ) : null}
 

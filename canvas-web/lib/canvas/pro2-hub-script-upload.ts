@@ -81,7 +81,6 @@ export async function ingestPro2HubScriptFile(
         nodes: store.nodes,
         edges: store.edges,
         hubData: nextHub,
-        regenerateAll: true,
       });
     }
     return true;

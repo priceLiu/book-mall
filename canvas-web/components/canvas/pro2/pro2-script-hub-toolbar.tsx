@@ -351,7 +351,7 @@ export function Pro2ScriptHubToolbar({
           type="button"
           className={TOOL_BTN}
           disabled={isGenerating}
-          title="重新生成分镜脚本"
+          title="重新生成角色、场景与分镜脚本（已链接大纲时不重复跑大纲 LLM）"
           onClick={() => void onRegenerate()}
         >
           <RotateCw className="size-3.5" />

@@ -27,7 +27,7 @@ export function downloadPro2ScriptMarkdown(md: string, title: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** 工具栏「重新生成」：重新生成完整脚本（大纲 + 角色 + 脚本表） */
+/** 工具栏「重新生成」：有上游/已落库大纲时只跑角色→场景→分镜；无大纲时含 outline 共四段 */
 export function regeneratePro2ScriptHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
@@ -49,7 +49,7 @@ export function regeneratePro2ScriptHub(
     dockInput,
     dockRefImages,
     updateNodeData,
-    { forceFresh: true, nodes, edges, hubData, regenerateAll: true },
+    { forceFresh: true, nodes, edges, hubData },
   );
   return true;
 }

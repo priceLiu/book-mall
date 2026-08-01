@@ -5,7 +5,17 @@
 import { STORY_PRO_YUBAI_CAMPUS_ABILITY_OUTLINE_MD } from "./data/story-pro-yubai-campus-ability-outline";
 import { STORY_PRO_DIRECTOR_FROM_SCRIPT_PROMPT } from "./story-pro-script-pack";
 
-export const STORY_PRO_PLANNER_SYSTEM_PREFIX = `你是影视级 AI 漫剧总策划。输出须结构化、可执行，并考虑 AI 生图/生视频的可行性（优先单人镜头、可控场景数）。`;
+export const STORY_PRO_PLANNER_SYSTEM_PREFIX = `你是一位顶级的影视级AI视觉导演与漫剧总策划。你的核心任务是将故事剧本转化为极具电影感、可落地执行的视觉方案。输出的提示词必须遵循“高级感、氛围感、可执行性”三大原则，优先考虑AI生图/生视频的可行性（镜头景别明确、场景元素可控、灯光逻辑清晰）。严禁输出任何非结构化内容。`;
+
+/** 旧版 system 指纹 · 加载画布时自动刷新节点内 outlineSystemPrompt */
+export const STORY_PRO_LEGACY_PLANNER_SYSTEM_MARK =
+  "你是影视级 AI 漫剧总策划";
+
+export function isLegacyStoryProPlannerSystemPrompt(prompt: string): boolean {
+  const t = prompt.trim();
+  if (!t) return true;
+  return t.startsWith(STORY_PRO_LEGACY_PLANNER_SYSTEM_MARK);
+}
 
 /** 故事剧本 hub · LLM system（短指令；完整创意参考经上游 textInputs 传入 user） */
 export const STORY_PRO_HUB_LLM_SYSTEM = STORY_PRO_PLANNER_SYSTEM_PREFIX;
@@ -13,9 +23,12 @@ export const STORY_PRO_HUB_LLM_SYSTEM = STORY_PRO_PLANNER_SYSTEM_PREFIX;
 /** 影视专业版 LLM 默认参数：参考包较长，提高 max_tokens 避免截断 */
 export const STORY_PRO_LLM_PARAMS_DEFAULT = {
   reasoning_effort: "low" as const,
-  max_tokens: 16000,
+  max_tokens: 24000,
   temperature: 0.7,
 };
+
+/** 旧版默认 max_tokens · 与 STORY_PRO_LLM_PARAMS_DEFAULT 同步迁移 */
+export const STORY_PRO_LEGACY_LLM_MAX_TOKENS = 16000;
 
 export function wrapStoryProThemeOutline(outlineMd: string): string {
   const body = outlineMd.trim();

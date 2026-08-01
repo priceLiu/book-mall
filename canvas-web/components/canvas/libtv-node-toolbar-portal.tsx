@@ -7,6 +7,7 @@ import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import {
   useLibtvNodeToolbarHidden,
   useLibtvNodeToolbarScreenPlacement,
+  useStableLibtvNodeToolbarScreenPlacement,
 } from "@/lib/canvas/use-libtv-node-toolbar-placement";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import {
@@ -34,7 +35,11 @@ export function LibtvNodeToolbarPortal({
   const mounted = useClientPortalMounted();
   const marqueeSelecting = useCanvasMarqueeSelecting();
   const effectiveVisible = visible && !marqueeSelecting;
-  const placement = useLibtvNodeToolbarScreenPlacement(nodeId, effectiveVisible);
+  const rawPlacement = useLibtvNodeToolbarScreenPlacement(
+    nodeId,
+    effectiveVisible,
+  );
+  const placement = useStableLibtvNodeToolbarScreenPlacement(rawPlacement);
   const hidden = useLibtvNodeToolbarHidden(nodeId);
   const zoom = useStore((s) => s.transform[2]);
   const toolbarScale = computeLibtvPortaledToolbarScale(zoom);

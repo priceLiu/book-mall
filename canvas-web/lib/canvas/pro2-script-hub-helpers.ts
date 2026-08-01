@@ -26,6 +26,10 @@ import { resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection } from "./story-workspace-types";
+import {
+  PRO2_HUB_SECTION_ORDER,
+  resolvePro2HubScriptGenerationSections,
+} from "./pro2-script-generation-sections";
 import type { StoryPro2WorkspaceIds } from "./story-pro2-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { resolveStarterForHub } from "./story-workspace-resolver";
@@ -150,13 +154,7 @@ export function pro2HubHasSceneTable(
   return parseSceneVisualDictionaryRows(resolvePro2HubSceneMd(d, ctx)).length > 0;
 }
 
-/** 2.0 脚本 hub LLM 顺序：大纲 → 角色 → 场景 → 分镜 */
-export const PRO2_HUB_SECTION_ORDER: StoryLlmSection[] = [
-  "outline",
-  "character",
-  "scene",
-  "storyboard",
-];
+export { PRO2_HUB_SECTION_ORDER, resolvePro2HubScriptGenerationSections };
 
 export function resolvePro2HubLinkedStarter(
   nodes: CanvasFlowNode[],
@@ -245,8 +243,6 @@ export function enqueuePro2ScriptGeneration(
     nodes?: CanvasFlowNode[];
     edges?: CanvasFlowEdge[];
     hubData?: StoryProScriptHubNodeData;
-    /** Dock 发送时始终生成全部三段（大纲 + 角色 + 脚本） */
-    regenerateAll?: boolean;
   },
 ): void {
   const nodes = options?.nodes ?? [];
@@ -292,10 +288,7 @@ export function enqueuePro2ScriptGeneration(
     resolvedDockRefs,
   );
 
-  const sections: StoryLlmSection[] =
-    options?.regenerateAll || !effectiveOutline
-      ? [...PRO2_HUB_SECTION_ORDER]
-      : ["character", "scene", "storyboard"];
+  const sections = resolvePro2HubScriptGenerationSections(effectiveOutline);
 
   const patch: Record<string, unknown> = {
     dockInput,

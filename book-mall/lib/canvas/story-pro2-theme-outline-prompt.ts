@@ -5,7 +5,7 @@
 import { STORY_PRO_PACK_OUTPUT_RULES } from "./story-pro-script-pack";
 import { STORY_PRO2_SCENE_PROMPT_VERSION_MARKER } from "./story-pro2-scene-image-prompt";
 
-const STORY_PRO_PLANNER_SYSTEM_PREFIX = `你是影视级 AI 漫剧总策划。输出须结构化、可执行，并考虑 AI 生图/生视频的可行性（优先单人镜头、可控场景数）。`;
+const STORY_PRO_PLANNER_SYSTEM_PREFIX = `你是一位顶级的影视级AI视觉导演与漫剧总策划。你的核心任务是将故事剧本转化为极具电影感、可落地执行的视觉方案。输出的提示词必须遵循“高级感、氛围感、可执行性”三大原则，优先考虑AI生图/生视频的可行性（镜头景别明确、场景元素可控、灯光逻辑清晰）。严禁输出任何非结构化内容。`;
 
 /** 大纲「场景视觉辞典 · 生图关键词」与场景段共用 · 纯环境空镜约束 */
 export const STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES = `- **生图关键词（纯环境空镜约束）**：须描述纯物理环境与气氛，供后续 **广角环境建立镜头 / 空镜** 生图使用
