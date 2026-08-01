@@ -415,10 +415,12 @@ export async function runFfmpegMediaRender(args: {
     }
 
     const durations = probed.map((p) => p.durationSec);
+    const transitionSec =
+      profile.transition.type === "xfade" ? profile.transition.durationSec : 0;
     const totalEstimate =
-      profile.transition.type === "xfade" && probed.length > 1
+      transitionSec > 0 && probed.length > 1
         ? durations.reduce((a, b) => a + b, 0) -
-          profile.transition.durationSec * (probed.length - 1)
+          transitionSec * (probed.length - 1)
         : durations.reduce((a, b) => a + b, 0);
 
     if (totalEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC) {
@@ -453,7 +455,7 @@ export async function runFfmpegMediaRender(args: {
     if (profile.subtitle.mode === "script") {
       srtContent = buildMergedSrt(srtFrames, {
         transitionType: profile.transition.type,
-        transitionSec: profile.transition.durationSec,
+        transitionSec,
       });
     } else if (profile.subtitle.mode === "asr" && profile.subtitle.burnIn) {
       const asrModelKey =
@@ -481,7 +483,7 @@ export async function runFfmpegMediaRender(args: {
       }
       srtContent = buildAsrSubtitleSrt(clipSegments, durations, {
         transitionType: profile.transition.type,
-        transitionSec: profile.transition.durationSec,
+        transitionSec,
       });
     }
     let srtPath: string | undefined;

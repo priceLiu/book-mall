@@ -1,17 +1,13 @@
 /**
  * Canvas 参考生视频 · 百炼 DashScope R2V（华北2 北京）
+ *
+ * Gateway 出站：apiKey 来自 DB 凭证（见 poll-service submitBailianR2vJobForLog），非 process.env。
  */
 import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
 
 const CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
-
-export function getDashScopeApiKey(): string | null {
-  const dash = process.env.DASHSCOPE_API_KEY?.trim();
-  if (dash) return dash;
-  return process.env.QWEN_API_KEY?.trim() || null;
-}
 
 type I2vCreateResponse = {
   output?: { task_id?: string; task_status?: string };

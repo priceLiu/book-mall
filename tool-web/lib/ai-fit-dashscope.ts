@@ -1,9 +1,4 @@
-/**
- * @deprecated Phase D：用户路径已改走 Gateway（forward-gateway-dashscope-server）。仅保留 body 构建 helper 与类型。
- * 下列 dashscopeCreateTryOnTask / dashscopeGetTask 为直连 DashScope 死代码，勿在新功能中调用。
- */
-const SYNTHESIS_URL =
-  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis/";
+/** AI 试衣 · Gateway 轮询 output 解析（创建/查询走 forward-gateway-dashscope-server） */
 
 /** 阿里云 OSS 的 *.aliyuncs.com 同时支持 https；签名仅含 path+query，可安全升级协议。 */
 function upgradeAliyunHttpToHttps(rawUrl: string): string {
@@ -50,65 +45,4 @@ export function dashscopeExtractTaskImageUrl(
   if (oiu) return upgradeAliyunHttpToHttps(oiu);
 
   return undefined;
-}
-
-export async function dashscopeCreateTryOnTask(opts: {
-  apiKey: string;
-  personImageUrl: string;
-  topGarmentUrl?: string;
-  bottomGarmentUrl?: string;
-  model?: string;
-}): Promise<{ taskId: string } | { error: string }> {
-  const model = opts.model ?? "aitryon";
-  const input: Record<string, string> = {
-    person_image_url: opts.personImageUrl,
-  };
-  if (opts.topGarmentUrl) input.top_garment_url = opts.topGarmentUrl;
-  if (opts.bottomGarmentUrl) input.bottom_garment_url = opts.bottomGarmentUrl;
-
-  const res = await fetch(SYNTHESIS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.apiKey}`,
-      "X-DashScope-Async": "enable",
-    },
-    body: JSON.stringify({
-      model,
-      input,
-      parameters: { resolution: -1, restore_face: true },
-    }),
-  });
-
-  const json = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    const msg =
-      typeof json.message === "string"
-        ? json.message
-        : typeof json.code === "string"
-          ? json.code
-          : `HTTP ${res.status}`;
-    return { error: msg };
-  }
-  const output = json.output as Record<string, unknown> | undefined;
-  const taskId =
-    typeof output?.task_id === "string" ? output.task_id : undefined;
-  if (!taskId) {
-    return { error: "未返回 task_id" };
-  }
-  return { taskId };
-}
-
-export async function dashscopeGetTask(opts: {
-  apiKey: string;
-  taskId: string;
-}): Promise<Record<string, unknown>> {
-  const res = await fetch(
-    `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(opts.taskId)}`,
-    {
-      headers: { Authorization: `Bearer ${opts.apiKey}` },
-      cache: "no-store",
-    },
-  );
-  return (await res.json()) as Record<string, unknown>;
 }

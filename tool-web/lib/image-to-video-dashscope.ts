@@ -1,12 +1,6 @@
 /**
- * 阿里云 DashScope · 视频合成（华北2 北京）：图生 i2v、参考生 r2v、文生 t2v
- * 文档：doc/pic-video.md、doc/chanaosheng.md、doc/wen-video.md（HappyHorse 文生 parameters）
+ * 图生/参考/文生视频 · DashScope 请求体构建（创建任务经 Gateway，见 forward-gateway-dashscope-server）
  */
-
-/** @deprecated Phase D：直连 DashScope 死代码；保留 build*VideoBody helper 供 Gateway 路径使用。 */
-const CREATE_URL =
-  "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
-const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
 
 export const HAPPYHORSE_R2V_MODEL = "happyhorse-1.0-r2v";
 
@@ -22,11 +16,9 @@ export type I2vTaskOutput = {
   message?: string;
 };
 
-export type I2vCreateResponse = {
-  output?: { task_id?: string; task_status?: string };
-  code?: string;
-  message?: string;
-  request_id?: string;
+export type DashscopeVideoJobBody = {
+  input: Record<string, unknown>;
+  parameters: Record<string, unknown>;
 };
 
 function parseSeed(raw: string | undefined): number | undefined {
@@ -37,45 +29,6 @@ function parseSeed(raw: string | undefined): number | undefined {
   if (!Number.isFinite(n) || !Number.isInteger(n)) return undefined;
   if (n < 0 || n > 2147483647) return undefined;
   return n;
-}
-
-export type DashscopeVideoJobBody = {
-  input: Record<string, unknown>;
-  parameters: Record<string, unknown>;
-};
-
-async function dashscopePostVideoTask(opts: {
-  apiKey: string;
-  model: string;
-  body: DashscopeVideoJobBody;
-}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
-  const res = await fetch(CREATE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.apiKey}`,
-      "X-DashScope-Async": "enable",
-    },
-    body: JSON.stringify({ model: opts.model, ...opts.body }),
-  });
-
-  const json = (await res.json()) as I2vCreateResponse;
-  if (!res.ok) {
-    return {
-      ok: false,
-      error:
-        typeof json.message === "string"
-          ? json.message
-          : `创建任务失败（HTTP ${res.status}）`,
-    };
-  }
-  const taskId = json.output?.task_id?.trim();
-  if (!taskId) {
-    const msg =
-      typeof json.message === "string" ? json.message : "接口未返回 task_id";
-    return { ok: false, error: msg };
-  }
-  return { ok: true, taskId };
 }
 
 export function buildI2vVideoBody(opts: {
@@ -124,29 +77,6 @@ export function buildI2vVideoBody(opts: {
       parameters,
     },
   };
-}
-
-export async function i2vCreateVideoTask(opts: {
-  apiKey: string;
-  /** DashScope 请求体 model，如 happyhorse-1.0-i2v、wan2.7-i2v-2026-04-25 */
-  model: string;
-  prompt: string;
-  /** 公网 HTTPS URL 或 data:image/...;base64,... */
-  firstFrame: string;
-  resolution: "720P" | "1080P";
-  duration: number;
-  seedStr?: string;
-  watermark?: boolean;
-  /** 与 resolution / duration 等合并；后者可覆盖同名键 */
-  parameterExtras?: Record<string, unknown>;
-}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
-  const model = opts.model.trim();
-  if (!model) return { ok: false, error: "缺少模型名称" };
-
-  const built = buildI2vVideoBody(opts);
-  if (!built.ok) return built;
-
-  return dashscopePostVideoTask({ apiKey: opts.apiKey, model, body: built.body });
 }
 
 function validateImageRef(
@@ -215,45 +145,16 @@ export function buildR2vVideoBody(opts: {
   };
 }
 
-/** HappyHorse 参考生视频（1～9 张 reference_image），异步任务创建 */
-export async function r2vCreateReferenceVideoTask(opts: {
-  apiKey: string;
-  /** DashScope `model`；缺省为 HappyHorse R2V */
-  model?: string;
-  prompt: string;
-  /** 与 media 顺序一致；每项为 HTTPS/HTTP URL 或 data:image/… */
-  referenceImageUrls: string[];
-  resolution: "720P" | "1080P";
-  /** 如 16:9、9:16，见官方文档 */
-  ratio: string;
-  duration: number;
-  seedStr?: string;
-  watermark?: boolean;
-  parameterExtras?: Record<string, unknown>;
-}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
-  const model =
-    typeof opts.model === "string" && opts.model.trim()
-      ? opts.model.trim()
-      : HAPPYHORSE_R2V_MODEL;
-
-  const built = buildR2vVideoBody(opts);
-  if (!built.ok) return built;
-
-  return dashscopePostVideoTask({ apiKey: opts.apiKey, model, body: built.body });
-}
-
 export type T2vVideoBodyOpts = {
   prompt: string;
   parameterExtras?: Record<string, unknown>;
 } & (
   | {
-      /** 万相等：parameters 使用 size + duration（5 或 10） */
       parameterStyle: "wanSize";
       size: string;
       duration: 5 | 10;
     }
   | {
-      /** HappyHorse 等：parameters 使用 resolution、ratio、duration（3～15） */
       parameterStyle: "resolutionRatio";
       resolution: "720P" | "1080P";
       ratio: string;
@@ -262,11 +163,6 @@ export type T2vVideoBodyOpts = {
       watermark?: boolean;
     }
 );
-
-export type T2vCreateVideoTaskOpts = T2vVideoBodyOpts & {
-  apiKey: string;
-  model: string;
-};
 
 export function buildT2vVideoBody(
   opts: T2vVideoBodyOpts,
@@ -298,47 +194,4 @@ export function buildT2vVideoBody(
   }
 
   return { ok: true, body: { input: { prompt }, parameters } };
-}
-
-/** 文生视频（无首帧）：万相走 size，HappyHorse 走 resolution/ratio（见 doc/wen-video.md） */
-export async function t2vCreateVideoTask(
-  opts: T2vCreateVideoTaskOpts,
-): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
-  const model = opts.model.trim();
-  if (!model) return { ok: false, error: "缺少模型名称" };
-
-  const built = buildT2vVideoBody(opts);
-  if (!built.ok) return built;
-
-  return dashscopePostVideoTask({ apiKey: opts.apiKey, model, body: built.body });
-}
-
-export async function i2vGetVideoTask(opts: {
-  apiKey: string;
-  taskId: string;
-}): Promise<
-  | { ok: true; output: I2vTaskOutput; raw: unknown }
-  | { ok: false; error: string }
-> {
-  const taskId = opts.taskId.trim();
-  if (!taskId) return { ok: false, error: "缺少 task_id" };
-
-  const res = await fetch(`${TASK_URL_BASE}/${encodeURIComponent(taskId)}`, {
-    headers: { Authorization: `Bearer ${opts.apiKey}` },
-    cache: "no-store",
-  });
-
-  const raw = await res.json().catch(() => null);
-  const top = raw as Record<string, unknown> | null;
-  const output = top?.output as I2vTaskOutput | undefined;
-
-  if (!res.ok || !output) {
-    const msg =
-      typeof top?.message === "string"
-        ? top.message
-        : `查询任务失败（HTTP ${res.status}）`;
-    return { ok: false, error: msg };
-  }
-
-  return { ok: true, output, raw };
 }

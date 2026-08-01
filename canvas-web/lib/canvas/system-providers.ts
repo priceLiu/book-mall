@@ -18,7 +18,6 @@ import {
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
-export const SYSTEM_BAILIAN_R2V_PROVIDER_ID = "system:bailian-r2v";
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
 export const GATEWAY_MOONSHOT_PROVIDER_ID = "gateway:moonshot";

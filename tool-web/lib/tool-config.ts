@@ -1,10 +1,8 @@
-import { getQwenApiKey } from "@/lib/qwen-env";
-
 /**
- * 工具站自有配置（大模型 Key、兼容网关等）。
+ * 工具站自有配置（OpenAI 兼容网关等）。
  *
- * - **密钥只放在 `.env.local`**（或由宿主注入环境变量），勿提交仓库。
- * - 本模块仅从 `process.env` 读取，供服务端 Route Handler / Server Actions 使用；请勿传给客户端组件。
+ * 百炼 / DashScope 厂商调用统一经主站 Gateway（`forward-gateway-*-server`），
+ * 不在 tool-web 配置 `DASHSCOPE_API_KEY`。
  *
  * 变量名模板见 `config/tool-web.env.example`。
  */
@@ -23,9 +21,4 @@ export function getOpenAiCompatBaseUrl(): string | undefined {
 
 export function getTextToImageModel(): string {
   return process.env.TOOL_WEB_IMAGE_MODEL?.trim() || "gpt-image-1";
-}
-
-/** 文生图等能力是否具备最小配置（OpenAI 兼容或通义 wanx 任一即可）。 */
-export function isTextToImageBackendConfigured(): boolean {
-  return Boolean(getOpenAiCompatApiKey() || getQwenApiKey());
 }
