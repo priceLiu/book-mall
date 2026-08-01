@@ -19,6 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { hasLibtvMediaCanvasNodes } from "@/lib/canvas/libtv-canvas-detect";
+import { flushCanvasTextDrafts } from "@/lib/canvas/flush-text-drafts";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   augmentStoreChangesWithResizePositions,
@@ -1993,6 +1994,7 @@ function FlowCanvasInner({
                   return;
                 }
                 closePaneAddMenu();
+                flushCanvasTextDrafts();
                 const active = document.activeElement;
                 if (active instanceof HTMLElement) {
                   active.blur();

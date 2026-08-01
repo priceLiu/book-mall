@@ -398,7 +398,12 @@ export function LibtvImageInputDock() {
       });
       return;
     }
-    const prompt = dockInput.trim();
+    const freshDockInput =
+      (
+        useCanvasStore.getState().nodes.find((n) => n.id === storeNode.id)
+          ?.data as Sbv1ImageNodeData | undefined
+      )?.dockInput ?? dockInput;
+    const prompt = freshDockInput.trim();
     const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
     const hasRefs =
       hasImage ||

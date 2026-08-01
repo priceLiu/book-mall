@@ -33,6 +33,12 @@ type OfferingRow = {
 const inputCls =
   "rounded border border-[#d9d9d9] px-2 py-1.5 text-sm focus:border-[#1890ff] focus:outline-none";
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "草稿",
+  ACTIVE: "已上架",
+  DEPRECATED: "已下线",
+};
+
 export function PlatformModelsClient() {
   const base = useBookMallBaseUrl();
   const [rows, setRows] = useState<OfferingRow[]>([]);
@@ -177,6 +183,10 @@ export function PlatformModelsClient() {
           <li>点「同步自动上架」刷新候选；系统选净成本最低者。</li>
           <li>候选行点 <b>设为当前</b> 会切换路由并锁定；解锁后可恢复自动选型。</li>
         </ol>
+        <p className="mt-2 text-xs text-[#595959]">
+          <b>DRAFT（草稿）</b>：注册表里有该模型，但尚未成功自动上架——通常因为缺少成本档、毛利护栏未过，或还没点「同步自动上架」。
+          红色 DRAFT 行 id 以 <code className="text-xs">registry:</code> 开头，表示库里还没有 offering 记录。
+        </p>
       </div>
 
       {msg ? <p className="text-sm text-green-700">{msg}</p> : null}
@@ -275,8 +285,15 @@ export function PlatformModelsClient() {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <span className={row.marginWarning ? "text-red-600" : "text-green-700"}>
-                          {row.status}
+                        <span
+                          className={row.marginWarning ? "text-red-600" : "text-green-700"}
+                          title={
+                            row.status === "DRAFT"
+                              ? "未自动上架：补成本档或点「同步自动上架」"
+                              : undefined
+                          }
+                        >
+                          {STATUS_LABEL[row.status] ?? row.status}
                         </span>
                       </td>
                       <td className="px-3 py-2">

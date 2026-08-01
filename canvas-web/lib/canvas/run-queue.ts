@@ -1067,6 +1067,7 @@ export function useCanvasRunner(
           return;
         }
         if (isLibtvFreestandingImageNode(node)) {
+          if (shouldSkipStoryRowTaskApply(localRt, pick, nodeId)) return;
           const patch = sbv1ImagePatchFromTask(
             node.data as unknown as Sbv1ImageNodeData,
             pick,
@@ -1083,6 +1084,7 @@ export function useCanvasRunner(
           return;
         }
         if (node.type === "sbv1-video-engine") {
+          if (shouldSkipStoryRowTaskApply(localRt, pick, nodeId)) return;
           const patch = sbv1VideoPatchFromTask(pick);
           if (
             patch &&

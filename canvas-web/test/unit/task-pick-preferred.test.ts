@@ -58,6 +58,42 @@ describe("pickPreferredCanvasTask", () => {
     );
     expect(pick?.id).toBe("done");
   });
+
+  it("does not pick stale SUCCEEDED when local pending without taskId", () => {
+    const pick = pickPreferredCanvasTask(
+      [
+        task({
+          id: "old",
+          status: "SUCCEEDED",
+          updatedAt: "2026-07-16T10:05:00.000Z",
+          ossUrl: "https://cdn.example/old.png",
+        }),
+      ],
+      { localRuntime: { status: "pending" } },
+    );
+    expect(pick).toBeUndefined();
+  });
+
+  it("prefers server inflight when local pending without taskId", () => {
+    const pick = pickPreferredCanvasTask(
+      [
+        task({
+          id: "old",
+          status: "SUCCEEDED",
+          updatedAt: "2026-07-16T10:05:00.000Z",
+          ossUrl: "https://cdn.example/old.png",
+        }),
+        task({
+          id: "new",
+          status: "SUBMITTED",
+          updatedAt: "2026-07-16T10:11:00.000Z",
+          submittedAt: "2026-07-16T10:11:00.000Z",
+        }),
+      ],
+      { localRuntime: { status: "pending" } },
+    );
+    expect(pick?.id).toBe("new");
+  });
 });
 
 describe("restoreServerInflightNodeRuntimes", () => {

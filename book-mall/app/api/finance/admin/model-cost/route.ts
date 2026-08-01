@@ -16,6 +16,9 @@ import {
   upsertModelCostAction,
 } from "@/app/admin/finance/credit-billing-actions";
 import { autoPublishPlatformOfferings } from "@/lib/platform-model/auto-publish-offerings";
+import { GATEWAY_CANONICAL_REGISTRY } from "@/lib/platform-model/canonical-registry";
+import { previewModelCostRow } from "@/lib/finance/model-cost-preview";
+import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
 
 export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
@@ -29,30 +32,65 @@ export async function GET(request: NextRequest) {
     return financeForbidden(request, "模型成本仅财务管理员可见");
   }
 
-  const [profiles, catalogs] = await Promise.all([
+  const [profiles, catalogs, pricingConfig] = await Promise.all([
     prisma.modelCostProfile.findMany({
       orderBy: [{ canonicalModelKey: "asc" }, { channel: "asc" }],
     }),
     prisma.modelCatalog
       .findMany({ select: { canonicalKey: true, displayName: true }, orderBy: { canonicalKey: "asc" } })
       .catch(() => [] as { canonicalKey: string; displayName: string }[]),
+    loadPricingConfig(),
   ]);
 
+  const costKeys = new Set(profiles.map((p) => p.canonicalModelKey));
+  const registryMissingCost = GATEWAY_CANONICAL_REGISTRY.filter(
+    (c) => !costKeys.has(c.canonicalModelKey),
+  ).map((c) => ({
+    canonicalModelKey: c.canonicalModelKey,
+    displayName: c.displayName,
+    mediaKind: c.mediaKind,
+  }));
+
   return financeJson(request, {
-    profiles: profiles.map((p) => ({
-      id: p.id,
-      vendor: p.vendor,
-      canonicalModelKey: p.canonicalModelKey,
-      channel: p.channel,
-      credentialId: p.credentialId,
-      unit: p.unit,
-      tierRaw: p.tierRaw,
-      listCostYuan: Number(p.listCostYuan),
-      discountRate: Number(p.discountRate),
-      netCostYuan: Number(p.netCostYuan),
-      note: p.note,
-      active: p.active,
-    })),
+    pricingConfig: {
+      creditAnchorYuan: pricingConfig.creditAnchorYuan,
+      defaultMarginM: pricingConfig.defaultMarginM,
+      videoMarginM: pricingConfig.videoMarginM,
+    },
+    registryMissingCost,
+    profiles: profiles.map((p) => {
+      const preview = previewModelCostRow(
+        {
+          canonicalModelKey: p.canonicalModelKey,
+          unit: p.unit,
+          listCostYuan: Number(p.listCostYuan),
+          discountRate: Number(p.discountRate),
+        },
+        pricingConfig,
+      );
+      return {
+        id: p.id,
+        vendor: p.vendor,
+        canonicalModelKey: p.canonicalModelKey,
+        channel: p.channel,
+        credentialId: p.credentialId,
+        unit: p.unit,
+        tierRaw: p.tierRaw,
+        listCostYuan: Number(p.listCostYuan),
+        discountRate: Number(p.discountRate),
+        netCostYuan: Number(p.netCostYuan),
+        note: p.note,
+        active: p.active,
+        mediaKind: preview.mediaKind,
+        mediaKindLabel: preview.mediaKindLabel,
+        displayName: preview.displayName,
+        marginM: preview.marginM,
+        creditsPerUnit: preview.creditsPerUnit,
+        listPriceYuan: preview.listPriceYuan,
+        marginRate: preview.marginRate,
+        marginOk: preview.marginOk,
+      };
+    }),
     catalogKeys: catalogs.map((c) => ({ key: c.canonicalKey, name: c.displayName })),
   });
 }

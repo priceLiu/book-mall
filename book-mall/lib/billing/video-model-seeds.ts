@@ -22,10 +22,10 @@ export const VIDEO_MODEL_SEEDS: VideoModelSeed[] = [
   { canonicalModelKey: "happyhorse-i2v", displayName: "HappyHorse 图生视频 1.0", vendor: "aliyun", tierRaw: "标准", listCostYuan: 0.88, discountRate: 0.1 },
   { canonicalModelKey: "happyhorse-i2v-720p", displayName: "HappyHorse 图生视频 720P", vendor: "aliyun", tierRaw: "720P", listCostYuan: 0.72, discountRate: 0.1 },
   { canonicalModelKey: "happyhorse-i2v-1080p", displayName: "HappyHorse 图生视频 1080P", vendor: "aliyun", tierRaw: "1080P", listCostYuan: 0.95, discountRate: 0.1 },
-  { canonicalModelKey: "wanxiang-video-2.6", displayName: "通义万相 2.6 视频", vendor: "aliyun", tierRaw: "720P", listCostYuan: 0.48, discountRate: 0.1 },
-  { canonicalModelKey: "wanxiang-video-2.6-1080p", displayName: "通义万相 2.6 视频 1080P", vendor: "aliyun", tierRaw: "1080P", listCostYuan: 0.62, discountRate: 0.1 },
-  { canonicalModelKey: "wanxiang-video-2.7", displayName: "通义万相 2.7 视频", vendor: "aliyun", tierRaw: "720P", listCostYuan: 0.52, discountRate: 0.1 },
-  { canonicalModelKey: "wanxiang-video-2.7-1080p", displayName: "通义万相 2.7 视频 1080P", vendor: "aliyun", tierRaw: "1080P", listCostYuan: 0.68, discountRate: 0.1 },
+  { canonicalModelKey: "wanxiang-video-2.6", displayName: "通义万相 2.6 视频", vendor: "aliyun", tierRaw: "720P", listCostYuan: 0.6, discountRate: 0.1 },
+  { canonicalModelKey: "wanxiang-video-2.6-1080p", displayName: "通义万相 2.6 视频 1080P", vendor: "aliyun", tierRaw: "1080P", listCostYuan: 0.7, discountRate: 0.1 },
+  { canonicalModelKey: "wanxiang-video-2.7", displayName: "通义万相 2.7 视频", vendor: "aliyun", tierRaw: "720P", listCostYuan: 0.6, discountRate: 0.1 },
+  { canonicalModelKey: "wanxiang-video-2.7-1080p", displayName: "通义万相 2.7 视频 1080P", vendor: "aliyun", tierRaw: "1080P", listCostYuan: 0.7, discountRate: 0.1 },
   { canonicalModelKey: "wanxiang-t2v", displayName: "通义万相 文生视频", vendor: "aliyun", tierRaw: "标准", listCostYuan: 0.55, discountRate: 0.1 },
   { canonicalModelKey: "wanxiang-i2v", displayName: "通义万相 图生视频", vendor: "aliyun", tierRaw: "标准", listCostYuan: 0.58, discountRate: 0.1 },
   // —— 火山方舟 Seedance 2.0（官方 2026-06：纯生成 46元/百万tokens，约 1元/秒@15s）——
@@ -42,7 +42,7 @@ export const VIDEO_MODEL_SEEDS: VideoModelSeed[] = [
   { canonicalModelKey: "kling-video", displayName: "可灵 视频", vendor: "kie", tierRaw: "标准", listCostYuan: 0.6, discountRate: 0.05 },
   { canonicalModelKey: "kling-video-720p", displayName: "可灵 视频 720P", vendor: "kie", tierRaw: "720P", listCostYuan: 0.48, discountRate: 0.05 },
   { canonicalModelKey: "kling-video-1080p", displayName: "可灵 视频 1080P", vendor: "kie", tierRaw: "1080P", listCostYuan: 0.72, discountRate: 0.05 },
-  { canonicalModelKey: "kling-3.0-video", displayName: "可灵 3.0 视频", vendor: "kie", tierRaw: "标准", listCostYuan: 0.68, discountRate: 0.05 },
+  { canonicalModelKey: "kling-3.0-video", displayName: "可灵 3.0 视频", vendor: "kie", tierRaw: "720P", listCostYuan: 0.49, discountRate: 0.05 },
   { canonicalModelKey: "minimax-video", displayName: "MiniMax 视频", vendor: "kie", tierRaw: "标准", listCostYuan: 0.55, discountRate: 0.05 },
   { canonicalModelKey: "runway-gen3", displayName: "Runway Gen-3", vendor: "kie", tierRaw: "标准", listCostYuan: 0.75, discountRate: 0.05 },
   // —— 腾讯 ——

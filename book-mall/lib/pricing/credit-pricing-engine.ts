@@ -100,7 +100,7 @@ export async function publishModelCreditPrice(input: {
     if (r !== 0) return r;
     const netA = computeNetCost(toNum(a.listCostYuan), toNum(a.discountRate));
     const netB = computeNetCost(toNum(b.listCostYuan), toNum(b.discountRate));
-    return netB - netA;
+    return netA - netB;
   })[0];
 
   const netCostYuan = computeNetCost(toNum(chosen.listCostYuan), toNum(chosen.discountRate));

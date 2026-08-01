@@ -290,6 +290,16 @@ export function pickPreferredCanvasTask(
 
   const localTaskId = opts?.localRuntime?.taskId?.trim();
   const localInflight = isInflightRuntimeStatus(opts?.localRuntime?.status);
+  // 乐观 pending/running 尚无 taskId：只认服务端在途，勿 pick 上一轮 SUCCEEDED
+  if (localInflight && !localTaskId) {
+    const inflight = tasks.filter(
+      (t) =>
+        isServerInflightTaskStatus(t.status) &&
+        !isStaleServerInflightTask(t, tasks),
+    );
+    if (inflight.length) return newestTaskByUpdatedAt(inflight);
+    return undefined;
+  }
   if (localTaskId && localInflight) {
     const bound = tasks.find((t) => t.id === localTaskId);
     if (bound?.status === "SUCCEEDED" && taskHasDisplayableResult(bound)) {
