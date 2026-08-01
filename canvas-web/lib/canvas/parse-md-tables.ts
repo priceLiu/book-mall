@@ -944,7 +944,7 @@ export function extractCharacterSectionFromOutline(md: string): string {
 export function extractStoryboardSectionFromOutline(md: string): string {
   const body = extractMarkdownSectionByHeader(
     md,
-    /分镜脚本|分镜表|镜头序列|分镜设计|镜头规划|镜头设计|分镜|storyboard/i,
+    /分镜脚本|分镜表|镜头序列|分镜设计|镜头规划|镜头设计|storyboard/i,
   );
   if (!body) return "";
   return compactGfmTables(body);
@@ -1040,6 +1040,8 @@ export type StoryboardTableRow = {
   description: string;
   dialogue: string;
   duration: string;
+  /** 9 列 GFM · AI生图提示词(英文) */
+  aiImagePrompt: string;
   aiVideoPrompt: string;
   lipSyncNote: string;
   /** 与 aiVideoPrompt 同步，供列同步 / 批量任务沿用 */
@@ -1129,7 +1131,15 @@ export function enrichStoryboardRowsAiVideoPrompts(
   });
 }
 
-/** 补全空 AI 视频提示词并规范为 8 列 GFM 表 */
+/** 分镜表解析源：优先 ## 分镜脚本 段，避免误读段首「镜数规划」等小表 */
+export function resolveStoryboardMarkdownForParse(md: string): string {
+  const raw = (md ?? "").trim();
+  if (!raw) return raw;
+  const section = extractStoryboardSectionFromOutline(raw);
+  return section || raw;
+}
+
+/** 补全空 AI 视频提示词并规范为 9 列 GFM 表 */
 export function normalizeStoryboardSectionMd(md: string): string {
   const raw = md.trim();
   if (!raw) return raw;
@@ -1152,9 +1162,19 @@ export function ensureStoryboardAiVideoPromptsMd(md: string): string {
   return normalizeStoryboardSectionMd(raw);
 }
 
+function parseStoryboardAiImagePrompt(r: Record<string, string>): string {
+  const raw = pickColumn(r, [
+    "ai生图提示词(英文)",
+    "ai生图提示词",
+    "ai image prompt",
+    "image prompt",
+  ]);
+  return isEmptyStoryboardCell(raw) ? "" : raw;
+}
+
 /** 分镜表 → 按镜号排序的行 */
 export function parseStoryboardRows(md: string): StoryboardTableRow[] {
-  const { rows } = parseMdTable(md);
+  const { rows } = parseMdTable(resolveStoryboardMarkdownForParse(md));
   return rows
     .map((r, i) => {
       const rawIdx =
@@ -1181,7 +1201,13 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
       ]);
       const scene =
         pickColumn(r, ["场景", "scene", "location"]) || r["场景"] || "";
-      const duration = pickColumn(r, ["时长(秒)", "时长", "duration"]);
+      const duration = pickColumn(r, [
+        "时长(秒)",
+        "时长（秒）",
+        "时长",
+        "duration",
+      ]);
+      const aiImagePrompt = parseStoryboardAiImagePrompt(r);
       const description =
         pickColumn(r, ["画面描述", "description", "visual", "画面"]) ||
         r["画面描述"] ||
@@ -1216,6 +1242,7 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
         description,
         dialogue: normalizeDialogueCell(dialogueRaw, description),
         duration,
+        aiImagePrompt,
         aiVideoPrompt,
         lipSyncNote,
         videoPrompt: aiVideoPrompt,
@@ -1313,6 +1340,7 @@ export function formatStoryboardTableMarkdown(
     description: string;
     dialogue: string;
     duration?: string;
+    aiImagePrompt?: string;
     aiVideoPrompt?: string;
     lipSyncNote?: string;
     videoPrompt?: string;
@@ -1323,12 +1351,13 @@ export function formatStoryboardTableMarkdown(
   const usePro = options?.format !== "legacy";
   if (usePro) {
     return [
-      "| 镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI视频提示词(英文) | 口型/配音备注 |",
-      "|------|------|------|----------|------|----------|---------------------|---------------|",
+      "| 镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI生图提示词(英文) | AI视频提示词(英文) | 口型/配音备注 |",
+      "|------|------|------|----------|------|----------|---------------------|---------------------|---------------|",
       ...rows.map((r) => {
-        const ai =
+        const aiImage = r.aiImagePrompt?.trim() ?? "";
+        const aiVideo =
           r.aiVideoPrompt?.trim() || r.videoPrompt?.trim() || "";
-        return `| ${r.frameIndex} | ${escapeMdTableCell(r.shotSize ?? "")} | ${escapeMdTableCell(r.cameraMove ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.duration ?? "")} | ${escapeMdTableCell(ai)} | ${escapeMdTableCell(r.lipSyncNote ?? "")} |`;
+        return `| ${r.frameIndex} | ${escapeMdTableCell(r.shotSize ?? "")} | ${escapeMdTableCell(r.cameraMove ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.duration ?? "")} | ${escapeMdTableCell(aiImage)} | ${escapeMdTableCell(aiVideo)} | ${escapeMdTableCell(r.lipSyncNote ?? "")} |`;
       }),
     ].join("\n");
   }

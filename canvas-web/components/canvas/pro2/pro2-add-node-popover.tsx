@@ -67,7 +67,9 @@ export function Pro2AddNodePopover({
       placement === "above-center"
         ? anchor.y - margin
         : window.innerHeight - anchor.y - margin;
-    setMaxMainHeight(Math.max(180, Math.min(520, available)));
+    setMaxMainHeight(
+      Math.max(180, Math.min(520, available, window.innerHeight * 0.62)),
+    );
   }, [open, anchor?.x, anchor?.y, placement, sections]);
 
   useEffect(() => {
@@ -119,6 +121,8 @@ export function Pro2AddNodePopover({
         left: anchor.x,
         top: anchor.y,
         zIndex: menuZIndex,
+        fontSize: 13,
+        lineHeight: 1.35,
         transform:
           placement === "above-center"
             ? "translate(-50%, -100%)"

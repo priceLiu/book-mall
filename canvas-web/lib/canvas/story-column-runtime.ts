@@ -1,4 +1,5 @@
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
+import { hubSectionCountsAsInflight } from "./story-hub-runtime";
 import {
   isAnyStoryCharacterColumnType,
   isAnyStoryFrameColumnType,
@@ -74,10 +75,10 @@ export function isCanvasInflightStatus(status?: string): boolean {
 
 function hubSectionInflightCount(d: StoryScriptHubNodeData): number {
   let count = 0;
-  if (isCanvasInflightStatus(d.outlineRuntime?.status)) count += 1;
-  if (isCanvasInflightStatus(d.characterRuntime?.status)) count += 1;
-  if (isCanvasInflightStatus(d.sceneRuntime?.status)) count += 1;
-  if (isCanvasInflightStatus(d.storyboardRuntime?.status)) count += 1;
+  if (hubSectionCountsAsInflight(d.outlineRuntime)) count += 1;
+  if (hubSectionCountsAsInflight(d.characterRuntime)) count += 1;
+  if (hubSectionCountsAsInflight(d.sceneRuntime)) count += 1;
+  if (hubSectionCountsAsInflight(d.storyboardRuntime)) count += 1;
   return count;
 }
 

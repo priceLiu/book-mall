@@ -27,6 +27,8 @@ export {
   computeLibtvMediaNodeSize,
   isLibtvMediaNodeBoxStale,
   resolveLibtvImageCellSize,
+  resolveLibtvMediaNodeBoxSize,
+  reconcileLibtvMediaNodeBoxSizes,
 } from "./libtv-media-node-size";
 
 export function loadImageNaturalSize(url: string): Promise<{ w: number; h: number }> {
@@ -224,12 +226,38 @@ export function useLibtvMediaNodeAutoFit({
     );
   });
 
+  const skipForSbv1GroupImage = useCanvasStore((s) => {
+    if (kind !== "image" || !parentId) return false;
+    const self = s.nodes.find((n) => n.id === nodeId);
+    const parentGroup = s.nodes.find((n) => n.id === parentId);
+    if (!parentGroup || !isSbv1MediaGroup(parentGroup, s.nodes)) return false;
+    return (
+      self?.type === "sbv1-image" ||
+      self?.type === "story-pro2-image" ||
+      self?.type === "story-pro2-three-view"
+    );
+  });
+
+  const skipForAutoRenderNode = useCanvasStore((s) => {
+    const self = s.nodes.find((n) => n.id === nodeId);
+    return self?.type === "jianying-auto-render-pro2";
+  });
+
   const lastFitKey = useRef("");
   const lastAppliedSize = useRef("");
 
   useEffect(() => {
     const url = mediaUrl?.trim();
-    if (!url || disabled || skipForPro2GroupImage || skipForHdGridSplitPlaceholder) return;
+    if (
+      !url ||
+      disabled ||
+      skipForPro2GroupImage ||
+      skipForSbv1GroupImage ||
+      skipForHdGridSplitPlaceholder ||
+      skipForAutoRenderNode
+    ) {
+      return;
+    }
 
     const selfNodeEarly = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
     const aspectPreset = (
@@ -330,7 +358,9 @@ export function useLibtvMediaNodeAutoFit({
     profile,
     disabled,
     skipForPro2GroupImage,
+    skipForSbv1GroupImage,
     skipForHdGridSplitPlaceholder,
+    skipForAutoRenderNode,
     parentId,
     mediaFit,
     mediaFitKey,

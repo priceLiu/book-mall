@@ -1,12 +1,14 @@
 /**
- * 画布交通控流任务 · 排队（QUEUED / DISPATCHING）且尚未创建 Gateway 日志。
+ * 画布任务 · 用户已点击生成但 Gateway 日志尚未出现（交通控流排队 + Story LLM 异步窗口）。
  */
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
+  canvasLlmPayloadWhere,
   canvasTrafficPayloadWhere,
   isCanvasImageTrafficKind,
+  isCanvasLlmEngineKind,
   isCanvasVideoTrafficKind,
 } from "@/lib/canvas/canvas-traffic-kind";
 import { readTrafficStartedAtIso } from "@/lib/generation/traffic-control/traffic-timing";
@@ -42,13 +44,16 @@ export function isCanvasPreGatewayLogTask(input: {
 }): boolean {
   const payload = readPayloadRecord(input.inputPayload);
   if (!payload) return false;
-  if (!isCanvasVideoTrafficKind(payload) && !isCanvasImageTrafficKind(payload)) {
-    return false;
-  }
+  const traffic =
+    isCanvasVideoTrafficKind(payload) || isCanvasImageTrafficKind(payload);
+  const llm = isCanvasLlmEngineKind(payload);
+  if (!traffic && !llm) return false;
+
   if (
-    input.status === "QUEUED" ||
-    input.status === "DISPATCHING" ||
-    input.status === "PENDING"
+    traffic &&
+    (input.status === "QUEUED" ||
+      input.status === "DISPATCHING" ||
+      input.status === "PENDING")
   ) {
     return true;
   }
@@ -82,17 +87,27 @@ export function buildCanvasQueueWithoutLogWhere(
   ownerUserIds: string[] | null,
 ): Prisma.CanvasGenerationTaskWhereInput {
   const base: Prisma.CanvasGenerationTaskWhereInput = {
-    ...canvasTrafficPayloadWhere(),
     OR: [
-      { status: { in: [...CANVAS_QUEUE_WITHOUT_LOG_STATUSES] } },
-      { status: "SUBMITTED" },
+      {
+        AND: [
+          canvasTrafficPayloadWhere(),
+          {
+            OR: [
+              { status: { in: [...CANVAS_QUEUE_WITHOUT_LOG_STATUSES] } },
+              { status: "SUBMITTED" },
+            ],
+          },
+        ],
+      },
+      {
+        AND: [canvasLlmPayloadWhere(), { status: "SUBMITTED" }],
+      },
     ],
   };
   if (ownerUserIds === null) return base;
   if (ownerUserIds.length === 0) return { id: "__none__" };
   return {
-    ...base,
-    project: { userId: { in: ownerUserIds } },
+    AND: [base, { project: { userId: { in: ownerUserIds } } }],
   };
 }
 

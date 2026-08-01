@@ -64,7 +64,7 @@
 
 ## 3. 参数分组（图片 · sbv1）
 
-参数 Popover 内 `LibtvDockParamGrid` 顺序：**画质** → **清晰度** → **比例** → **张数** → **格式**。
+参数 Popover（`LibtvDockImageParamsPanel` · **340px** · 图 1）顺序：**画质** → **清晰度** → **比例**（5 列示意网格）→ **生成数量**（1/2/4 张）。格式仍写入 engine params，不在 Popover 展示。
 
 ## 4. 默认值（视频）
 

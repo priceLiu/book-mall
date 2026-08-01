@@ -6,6 +6,7 @@ import { getDispatchStaleRetryMax } from "./constants";
 
 export const SUBMIT_DISPATCH_TIMEOUT_FAIL_CODE = "SUBMIT_DISPATCH_TIMEOUT";
 export const SUBMIT_DISPATCH_TIMEOUT_MESSAGE = "提交生成超时, 请重试";
+export const QUEUE_TIMEOUT_FAIL_CODE = "QUEUE_TIMEOUT";
 
 export function readDispatchStaleRetryCount(
   payload: Record<string, unknown>,
@@ -48,6 +49,23 @@ export async function failStoryTaskPreSubmitTimeout(
       status: "FAILED",
       failCode: SUBMIT_DISPATCH_TIMEOUT_FAIL_CODE,
       failMessage: SUBMIT_DISPATCH_TIMEOUT_MESSAGE,
+      completedAt: new Date(),
+      inputPayload: payload as Prisma.InputJsonValue,
+    },
+  });
+}
+
+export async function failCanvasTaskQueueTimeout(
+  taskId: string,
+  payload: Record<string, unknown>,
+  message: string,
+): Promise<void> {
+  await prisma.canvasGenerationTask.update({
+    where: { id: taskId },
+    data: {
+      status: "CANCELLED",
+      failCode: QUEUE_TIMEOUT_FAIL_CODE,
+      failMessage: message,
       completedAt: new Date(),
       inputPayload: payload as Prisma.InputJsonValue,
     },

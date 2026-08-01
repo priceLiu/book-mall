@@ -40,14 +40,34 @@ export const LIBTV_VIDEO_NODE_HEADER_HEIGHT = 38;
  */
 export const LIBTV_MEDIA_FIT_VERSION = 15;
 
-/** 生成图自适配 · 预览区（stage）长边目标 px（不含标题栏）· 约空态 350 的 2.5 倍 */
-export const LIBTV_MEDIA_AUTO_FIT_LONG_EDGE = 875;
+/** 生成图自适配 · 预览区（stage）长边目标 px（不含标题栏） */
+export const LIBTV_MEDIA_AUTO_FIT_LONG_EDGE = 885;
 
-/** 用户在 Dock 选择比例后，系统按比例调整外框的放大倍数（相对 legacy 基准宽） */
-export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE = 2;
+/**
+ * 画布 zoom=100% · 媒体 stage 标准（不含标题栏 · 真源见 `computeLibtvMediaBoxFromAspect`）
+ * - 16:9 横版：630 × 354
+ * - 9:16 竖版：354 × 630（宽 × stage 高）
+ * - 1:1 方形：354 × 354
+ */
+export const LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH = 630;
+export const LIBTV_MEDIA_STAGE_PORTRAIT_HEIGHT = 630;
+export const LIBTV_MEDIA_STAGE_SQUARE_EDGE = 354;
 
-/** 与 `LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE` 同步；变更 scale 时 +1，用于一次性迁移旧外框 */
-export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION = 2;
+/** 用户在 Dock 选择比例后，系统按比例调整外框的放大倍数（相对 legacy 基准） */
+export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE = 1;
+
+/** 与 `LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE` 同步；变更 scale 或顶边算法时 +1，用于一次性迁移旧外框 */
+export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION = 5;
+
+/**
+ * LibTV 媒体卡 · 三种固定 span（× SCALE 后为画布像素 @ zoom 100%）。
+ * 横版：固定 stage 宽 → 算高；竖版：固定 stage 高 → 算宽；方形：固定边长。
+ */
+export const LIBTV_MEDIA_TOP_EDGE_LANDSCAPE_BASE =
+  LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH;
+export const LIBTV_MEDIA_TOP_EDGE_PORTRAIT_BASE =
+  LIBTV_MEDIA_STAGE_PORTRAIT_HEIGHT;
+export const LIBTV_MEDIA_TOP_EDGE_SQUARE_BASE = LIBTV_MEDIA_STAGE_SQUARE_EDGE;
 
 /** @deprecated 旧常量（偏小，会导致留边）。新代码请用按节点类型区分的上面两个。 */
 export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = LIBTV_IMAGE_NODE_HEADER_HEIGHT;
@@ -56,8 +76,9 @@ export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = LIBTV_IMAGE_NODE_HEADER_HEIGHT;
  * LibTV 方形图片媒体卡默认尺寸（Pro2 图片/风格 · sbv1 图片 · 须一致）
  * 真源：`docs/libtv-unified-node-catalog.md` §1.3
  */
-export const LIBTV_SQUARE_IMAGE_NODE_WIDTH = 350;
-export const LIBTV_SQUARE_IMAGE_NODE_HEIGHT = 350;
+export const LIBTV_SQUARE_IMAGE_NODE_WIDTH = LIBTV_MEDIA_STAGE_SQUARE_EDGE;
+export const LIBTV_SQUARE_IMAGE_NODE_HEIGHT =
+  LIBTV_MEDIA_STAGE_SQUARE_EDGE + LIBTV_IMAGE_NODE_HEADER_HEIGHT;
 export const LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH = 220;
 export const LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT = 220;
 
@@ -169,6 +190,39 @@ export const LIBTV_SIDE_PLUS_LG_SIZE_PX = 70;
 /** 拖线松手 · 侧 + 额外吸附容差（flow · 含磁吸沿边偏移） */
 export const LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW = 56;
 
+/** 侧 + 沿边跟随 / 连线吸附 · 限定在节点竖向中间 1/3（上下各留 1/3） */
+export function libtvSidePlusFollowVerticalBounds(boxHeight: number): {
+  insetFromEdge: number;
+  maxOffsetFromCenter: number;
+} {
+  const h = Math.max(0, boxHeight);
+  return {
+    insetFromEdge: h / 3,
+    maxOffsetFromCenter: h / 6,
+  };
+}
+
+/** 指针是否在侧 + 磁吸带内（纵向仅中间 1/3，避免 Dock 在节点下方仍触发跟随） */
+export function pointerNearSidePlusMagnetEdge(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height">,
+  side: "left" | "right",
+  thresholdPx: number,
+  borderInwardPx = 8,
+): boolean {
+  const { insetFromEdge } = libtvSidePlusFollowVerticalBounds(rect.height);
+  const minY = rect.top + insetFromEdge - thresholdPx;
+  const maxY = rect.bottom - insetFromEdge + thresholdPx;
+  if (clientY < minY || clientY > maxY) return false;
+  if (side === "left") {
+    if (clientX >= rect.left - thresholdPx && clientX < rect.left) return true;
+    return clientX >= rect.left && clientX <= rect.left + borderInwardPx;
+  }
+  if (clientX > rect.right && clientX <= rect.right + thresholdPx) return true;
+  return clientX >= rect.right - borderInwardPx && clientX <= rect.right;
+}
+
 export const LIBTV_NODE_HANDLE_CLASS =
   "!h-2.5 !w-2.5 !border-2 !border-[#141418] !bg-cyan-400";
 
@@ -186,6 +240,9 @@ export const LIBTV_INPUT_DOCK_TOOLBAR_ICON_CLASS =
   "nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40";
 export const LIBTV_INPUT_DOCK_SEND_BTN_CLASS =
   "nodrag flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40";
+/** 输入坞内 textarea · 无边框（字号随画布 zoom · 见 libtvDockPromptFontScreenMetrics） */
+export const LIBTV_INPUT_DOCK_TEXTAREA_CLASS =
+  "nodrag w-full resize-none border-0 bg-transparent text-[length:var(--libtv-dock-prompt-font,15px)] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";
 
 /** LibTV 媒体 stage 生成中扫光 · sbv1 / Pro1 列（cyan） */
 export const LIBTV_MEDIA_GENERATING_CYAN_CLASS =

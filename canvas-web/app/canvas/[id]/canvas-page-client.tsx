@@ -18,6 +18,7 @@ import {
 import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
+import { Pro2ProductionGateToolbarLink } from "@/components/canvas/pro2/pro2-production-gate-banner";
 import { Sbv1CanvasLayout } from "@/components/canvas/sbv1/sbv1-canvas-layout";
 import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
@@ -1302,6 +1303,9 @@ function Inner({ projectId }: { projectId: string }) {
             immersive={showImmersiveChrome ? immersive : false}
             onToggleImmersive={
               showImmersiveChrome ? () => void toggleImmersive() : undefined
+            }
+            centerLeading={
+              isStoryPro2Canvas ? <Pro2ProductionGateToolbarLink /> : undefined
             }
           />
           <GatewayLinkBanner />

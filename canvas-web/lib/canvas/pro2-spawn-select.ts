@@ -1,6 +1,5 @@
 import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
-import { useCanvasStore } from "./store";
 
 /** + 菜单生成节点后选中、聚焦视口并确保 Pro2 整卡可拖 */
 export function selectPro2NodeAfterSpawn(
@@ -14,7 +13,9 @@ export function selectPro2NodeAfterSpawn(
     ),
   );
   queueMicrotask(() => {
-    useCanvasStore.getState().focusCanvasNode(nodeId);
+    void import("./store").then(({ useCanvasStore }) => {
+      useCanvasStore.getState().focusCanvasNode(nodeId);
+    });
   });
 }
 

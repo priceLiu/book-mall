@@ -14,11 +14,12 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { canvasTrafficPayloadWhere } from "@/lib/canvas/canvas-traffic-kind";
 import { prisma } from "@/lib/prisma";
 
-import { getDispatchingStaleSec } from "./constants";
+import { getDispatchingStaleSec, getQueueTimeoutMin } from "./constants";
 import { queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import {
   clearDispatchStaleRetryInPayload,
   failCanvasTaskPreSubmitTimeout,
+  failCanvasTaskQueueTimeout,
   isPreSubmitRetryExhausted,
   nextDispatchStaleRetryPayload,
 } from "./pre-submit-retry";
@@ -151,11 +152,17 @@ async function recoverStaleQueuedCanvasTasks(opts?: {
   limit?: number;
 }): Promise<number> {
   const cutoff = stalePreSubmitCutoff();
+  const queueWallClockCutoff = new Date(
+    Date.now() - getQueueTimeoutMin() * 60_000,
+  );
+  const queueTimeoutMessage = `排队超过 ${getQueueTimeoutMin()} 分钟，请重试`;
   const stale = await prisma.canvasGenerationTask.findMany({
     where: staleQueuedWhere(opts?.projectId, cutoff),
     select: {
       id: true,
       inputPayload: true,
+      queuedAt: true,
+      createdAt: true,
     },
     orderBy: [{ queuedAt: "asc" }, { createdAt: "asc" }],
     take: opts?.limit ?? 20,
@@ -164,6 +171,12 @@ async function recoverStaleQueuedCanvasTasks(opts?: {
   let n = 0;
   for (const t of stale) {
     const payload = taskInputPayload(t);
+    const queuedMs = (t.queuedAt ?? t.createdAt).getTime();
+    if (queuedMs <= queueWallClockCutoff.getTime()) {
+      await failCanvasTaskQueueTimeout(t.id, payload, queueTimeoutMessage);
+      n++;
+      continue;
+    }
     if (isPreSubmitRetryExhausted(payload)) {
       await failCanvasTaskPreSubmitTimeout(t.id, payload);
       n++;

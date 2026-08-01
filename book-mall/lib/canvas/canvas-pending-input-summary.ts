@@ -2,6 +2,7 @@
  * 画布排队合成日志行 · 从 task.inputPayload 推导 Gateway Params（与 createTask inputSummary 对齐）
  */
 import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
+import { isCanvasLlmEngineKind } from "@/lib/canvas/canvas-traffic-kind";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { isBailianR2vGatewayModel } from "@/lib/gateway/model-router";
 
@@ -25,6 +26,16 @@ export function buildCanvasPendingInputSummary(
   if (!modelKey) return null;
   const payload = readPayload(inputPayload);
   const params = (payload.params as Record<string, unknown>) ?? {};
+
+  if (isCanvasLlmEngineKind(payload)) {
+    const prompt = String(payload.prompt ?? "").trim();
+    if (!prompt) return null;
+    return buildGatewayInputSummary(modelKey, {
+      messages: [{ role: "user", content: prompt.slice(0, 800) }],
+      stream: false,
+      ...params,
+    });
+  }
 
   if (
     payload.providerKind === "BAILIAN_R2V" ||

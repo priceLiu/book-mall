@@ -1,9 +1,11 @@
+import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
+import { resolvePro2HubPromptPack } from "./pro2-script-category-presets";
 import type { CanvasFlowNode } from "./types";
 import {
   isLegacyStoryPro2HubOutlinePrompt,
   isLegacyStoryPro2ScenePrompt,
+  isLegacyStoryPro2StoryboardPrompt,
   STORY_PRO2_PACK_PROMPT_VERSION,
-  storyPro2HubDefaultPromptPack,
 } from "./story-pro2-theme-outline-prompt";
 import {
   isLegacyStoryProDirectorPrompt,
@@ -227,16 +229,20 @@ function migrateStoryPro2ScriptHubData(
   const curVer = pro2PromptPackVersion(data);
   const promptOutline = String(data.promptOutline ?? "");
   const promptScene = String(data.promptScene ?? "");
+  const promptStoryboard = String(data.promptStoryboard ?? "");
   const needsHubPrompts =
     curVer < STORY_PRO2_PACK_PROMPT_VERSION ||
     isLegacyStoryPro2HubOutlinePrompt(promptOutline) ||
-    isLegacyStoryPro2ScenePrompt(promptScene);
+    isLegacyStoryPro2ScenePrompt(promptScene) ||
+    isLegacyStoryPro2StoryboardPrompt(promptStoryboard);
 
   if (!needsHubPrompts && curVer >= STORY_PRO2_PACK_PROMPT_VERSION) {
     return null;
   }
 
-  const defaults = storyPro2HubDefaultPromptPack();
+  const defaults = resolvePro2HubPromptPack({
+    scriptCategoryId: data.scriptCategoryId as Pro2ScriptCategoryId | undefined,
+  });
   const merged = {
     ...data,
     ...defaults,

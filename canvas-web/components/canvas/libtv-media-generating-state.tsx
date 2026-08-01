@@ -66,10 +66,12 @@ export function LibtvMediaGeneratingState({
     variant === "violet"
       ? LIBTV_MEDIA_GENERATING_VIOLET_CLASS
       : LIBTV_MEDIA_GENERATING_CYAN_CLASS;
-  const spinClass = storyEditionSpinClass(
-    variant === "violet" ? "pro2" : "pro",
-    "lg",
-  );
+  const edition = variant === "violet" ? "pro2" : "pro";
+  const spinClass = storyEditionSpinClass(edition, "xl");
+  const spinRingClass =
+    variant === "violet"
+      ? "border-violet-400/45 bg-black/55 text-violet-200"
+      : "border-cyan-400/45 bg-black/55 text-cyan-200";
   const labelClass = `text-[11px] font-medium ${CANVAS_SEMANTIC_STATUS_CLASS}`;
 
   return (
@@ -81,7 +83,14 @@ export function LibtvMediaGeneratingState({
       <div className={cn("relative size-full overflow-hidden", shimmerClass)}>
         {children}
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 px-6 py-10 text-center">
-          <RefreshCw className={spinClass} />
+          <span
+            className={cn(
+              "flex size-[4.5rem] items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
+              spinRingClass,
+            )}
+          >
+            <RefreshCw className={spinClass} />
+          </span>
           {label?.trim() ? <span className={labelClass}>{label}</span> : null}
         </div>
       </div>

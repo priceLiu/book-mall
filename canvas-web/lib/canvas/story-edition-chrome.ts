@@ -108,9 +108,10 @@ export function storyEditionVideoOverlayBtnClass(edition: StoryEdition): string 
 
 export function storyEditionSpinClass(
   edition: StoryEdition,
-  size: "sm" | "lg" = "sm",
+  size: "sm" | "lg" | "xl" = "sm",
 ): string {
-  const dim = size === "lg" ? "size-8" : "size-6";
+  const dim =
+    size === "xl" ? "size-12" : size === "lg" ? "size-8" : "size-6";
   if (edition === "pro2") return `${dim} animate-spin text-violet-300`;
   return edition === "pro"
     ? `${dim} animate-spin text-cyan-300`

@@ -4,14 +4,15 @@ import {
   computeLibtvMediaNodeSize,
   isLibtvMediaNodeBoxStale,
 } from "@/lib/canvas/libtv-media-node-size";
+import { computeLibtvMediaAspectPresetSize } from "@/lib/canvas/libtv-media-aspect-preset";
 import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "@/lib/canvas/sbv1-node-chrome";
 
 describe("computeLibtvMediaNodeSize · sbv1-media", () => {
-  it("portrait 9:16 at default width yields tall card", () => {
+  it("portrait 9:16 at 100% uses fixed stage height span", () => {
     const size = computeLibtvMediaNodeSize(1080, 1920, "sbv1-media");
-    expect(size.width).toBe(635);
-    expect(size.height).toBeGreaterThan(900);
-    expect(size.height).toBeGreaterThan(size.width);
+    const preset = computeLibtvMediaAspectPresetSize("9:16", "sbv1-video");
+    expect(size).toEqual(preset);
+    expect(size.width).toBeLessThan(size.height);
   });
 });
 

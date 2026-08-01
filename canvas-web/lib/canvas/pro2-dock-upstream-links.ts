@@ -10,11 +10,24 @@ import {
   pickRuntimeVideoUrl,
 } from "./task-media-url";
 import { storyThemePromptDisplayMd } from "./story-theme-prompt-display";
-import type {
-  StoryProScriptHubNodeData,
-  StoryProStarterNodeData,
-} from "./story-pro-workspace-types";
+import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 import type { StoryPro2TagNodeData } from "./story-pro2-workspace-types";
+
+/** 上游文本/大纲 chip 与 @ 引用展示名 · 优先节点标题 */
+export function resolvePro2StarterDockLinkLabel(
+  d: Pick<
+    StoryProStarterNodeData,
+    "label" | "pro2TextPurpose" | "generatedOutlineMd" | "uploadedScriptMd"
+  >,
+): string {
+  const custom = d.label?.trim();
+  if (custom) return custom;
+  if (d.pro2TextPurpose === "story-outline") return "故事大纲";
+  if (d.generatedOutlineMd?.trim() || d.uploadedScriptMd?.trim()) {
+    return "故事大纲";
+  }
+  return "文本";
+}
 
 export type Pro2DockUpstreamLink = {
   id: string;
@@ -105,7 +118,7 @@ function linkFromSource(
       return {
         id: `up-text-${source.id}`,
         kind: "text",
-        label: "文本",
+        label: resolvePro2StarterDockLinkLabel(d),
         previewMd: theme,
         sourceNodeId: source.id,
       };

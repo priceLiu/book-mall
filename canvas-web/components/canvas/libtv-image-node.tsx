@@ -276,13 +276,9 @@ export function LibtvImageNode({
     showFloatingToolbar &&
       !isCharacterThreeView &&
       !gridSplitActive &&
-      (hasImage ||
-        Boolean(d.dockInput?.trim()) ||
-        Boolean(d.engine?.modelKey?.trim())),
+      hasImage,
   );
-  const showNormalToolbar = Boolean(
-    showFloatingToolbar && !isCharacterThreeView && !gridSplitActive,
-  );
+  const showNormalToolbar = showImageTools;
   const showGridSplitToolbar = Boolean(
     soleSelected && gridSplitActive && !isGenerating,
   );
@@ -811,34 +807,26 @@ export function LibtvImageNode({
 
         {showNormalToolbar ? (
           <LibtvNodeToolbarPortal nodeId={id} visible={showNormalToolbar}>
-            {showImageTools ? (
-              <Pro2ImageNodeToolbar
-                passNodeDrag
-                previewUrl={previewUrl}
-                pro2ImageTools={pro2ImageToolbarExtras}
-                onEditPick={pro2ImageToolbarExtras ? onEditPick : undefined}
-                onMagicPick={pro2ImageToolbarExtras ? onMagicPick : undefined}
-                onGridSplitPick={
-                  pro2ImageToolbarExtras ? onGridSplitPick : undefined
-                }
-                onExpandPreview={() => setPreviewOpen(true)}
-                onSaveAsAsset={() =>
-                  saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
-                }
-                onImportPortrait={
-                  d.ossUrl ? () => void importPortrait() : undefined
-                }
-                portraitImporting={portraitImporting}
-                portraitActive={portraitActive}
-                onDuplicateNode={onDuplicateNode}
-              />
-            ) : (
-              <Pro2ImageNodeToolbar
-                passNodeDrag
-                minimal
-                onDuplicateNode={onDuplicateNode}
-              />
-            )}
+            <Pro2ImageNodeToolbar
+              passNodeDrag
+              previewUrl={previewUrl}
+              pro2ImageTools={pro2ImageToolbarExtras}
+              onEditPick={pro2ImageToolbarExtras ? onEditPick : undefined}
+              onMagicPick={pro2ImageToolbarExtras ? onMagicPick : undefined}
+              onGridSplitPick={
+                pro2ImageToolbarExtras ? onGridSplitPick : undefined
+              }
+              onExpandPreview={() => setPreviewOpen(true)}
+              onSaveAsAsset={() =>
+                saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
+              }
+              onImportPortrait={
+                d.ossUrl ? () => void importPortrait() : undefined
+              }
+              portraitImporting={portraitImporting}
+              portraitActive={portraitActive}
+              onDuplicateNode={onDuplicateNode}
+            />
           </LibtvNodeToolbarPortal>
         ) : null}
 

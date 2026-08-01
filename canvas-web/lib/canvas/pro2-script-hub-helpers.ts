@@ -1,17 +1,20 @@
 "use client";
 
 import {
-  STORY_PRO2_CHARACTER_PROMPT,
-  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
-  STORY_PRO2_SCENE_PROMPT,
-  STORY_PRO2_STORYBOARD_PROMPT,
-} from "./story-pro2-theme-outline-prompt";
+  mergePro2ScriptGenerationPrompt,
+  resolvePro2ScriptCategoryDocBody,
+} from "./pro2-script-category-doc";
+import {
+  resolvePro2HubPromptPack,
+} from "./pro2-script-category-presets";
 import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows, resolveSceneDictionaryMarkdown } from "./parse-md-tables";
 import {
   hubAggregateStatus,
   hubDataForColumnSync,
   hubSectionIsRunning,
   resolveHubStoryboardMd,
+  clearHubSectionRuntimesForForceFresh,
+  hubSectionPendingPatch,
 } from "./story-hub-runtime";
 import { syncStoryProColumnRows } from "./story-pro-column-sync";
 import {
@@ -61,6 +64,7 @@ import {
 } from "./pro2-spawn-scene-image-group";
 import { syncPro2FrameRowsUpstreamRefs } from "./pro2-wire-frame-board-refs";
 import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
+import { useCanvasStore } from "./store";
 export function pro2HubHasScriptTable(d: StoryProScriptHubNodeData): boolean {
   const md = resolveHubStoryboardMd(d);
   return parseStoryboardRows(md).length > 0;
@@ -211,7 +215,27 @@ export function pro2HubIsLinkedOutline(
   return { starterId: linked.starterId, outlineMd: outline };
 }
 
+/** 脚本 hub 是否已链接可用的大纲/主题真源（含 starter 仅有 themeInput） */
+export function pro2ScriptHubHasLinkedOutlineContent(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  hubId: string,
+  d: StoryProScriptHubNodeData,
+): boolean {
+  if (resolvePro2HubEffectiveOutline(nodes, edges, hubId, d).trim()) return true;
+  const linked = resolvePro2HubLinkedStarter(nodes, edges, hubId);
+  if (!linked) return false;
+  const sd = linked.starter.data as unknown as StoryProStarterNodeData;
+  return Boolean(
+    sd.generatedOutlineMd?.trim() ||
+      sd.uploadedScriptMd?.trim() ||
+      (sd.pro2TextPurpose === "story-outline" && sd.themeInput?.trim()),
+  );
+}
+
 export function pro2HubIsGenerating(node: CanvasFlowNode): boolean {
+  const d = node.data as unknown as StoryProScriptHubNodeData;
+  if (d.hubGenerateIntent) return true;
   return hubAggregateStatus(node) === "running";
 }
 
@@ -219,18 +243,23 @@ export function mergePro2DockIntoPrompt(
   base: string,
   dockInput: string,
   refs: StoryRefImage[],
+  categoryDoc?: string,
+  scriptCategoryId?: import("./pro2-script-category-presets").Pro2ScriptCategoryId,
+  outlineMd?: string,
+  themeInput?: string,
+  includeCategoryDoc = true,
 ): string {
-  const parts = [base.trim()];
-  const extra = dockInput.trim();
-  if (extra) parts.push(`## 用户补充\n${extra}`);
-  const refLines = refs
-    .filter((r) => r.url && /^https?:\/\//.test(r.url))
-    .map((r) => `- ${r.label}: ${r.url}`);
-  if (refLines.length) {
-    parts.push(`## 参考图\n${refLines.join("\n")}`);
-  }
-  return parts.join("\n\n");
+  return mergePro2ScriptGenerationPrompt(base, dockInput, refs, {
+    categoryDoc,
+    includeCategoryDoc,
+    scriptCategoryId,
+    outlineMd,
+    themeInput,
+  });
 }
+
+/** 按 hub 剧本类别选择 LLM 段 prompt pack（未设类别 → 默认 v5 pack） */
+export { resolvePro2HubPromptPack } from "./pro2-script-category-presets";
 
 /** 阶段 A：生成专业版脚本（大纲 → 角色 → 分镜脚本表） */
 export function enqueuePro2ScriptGeneration(
@@ -248,76 +277,103 @@ export function enqueuePro2ScriptGeneration(
   const nodes = options?.nodes ?? [];
   const edges = options?.edges ?? [];
   const hubData = options?.hubData;
-  const upstreamLinks =
-    nodes.length > 0
-      ? resolvePro2DockUpstreamLinks(
-          hubId,
-          "story-pro2-script-hub",
-          nodes,
-          edges,
-        )
-      : [];
-  const resolvedDockRefs = resolveDockRefsForRun(
-    dockInput,
-    upstreamLinks,
-    dockRefImages,
-  );
   const effectiveOutline =
     hubData && nodes.length
       ? resolvePro2HubEffectiveOutline(nodes, edges, hubId, hubData)
       : hubData?.outlineMd?.trim() ?? "";
-
-  const dockMergedOutline = mergePro2DockIntoPrompt(
-    STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
-    dockInput,
-    resolvedDockRefs,
-  );
-  const dockMergedCharacter = mergePro2DockIntoPrompt(
-    STORY_PRO2_CHARACTER_PROMPT,
-    dockInput,
-    resolvedDockRefs,
-  );
-  const dockMergedScene = mergePro2DockIntoPrompt(
-    STORY_PRO2_SCENE_PROMPT,
-    dockInput,
-    resolvedDockRefs,
-  );
-  const dockMergedStoryboard = mergePro2DockIntoPrompt(
-    STORY_PRO2_STORYBOARD_PROMPT,
-    dockInput,
-    resolvedDockRefs,
-  );
-
   const sections = resolvePro2HubScriptGenerationSections(effectiveOutline);
+  const firstSection = sections[0];
 
-  const patch: Record<string, unknown> = {
+  // 先写 intent + pending + dock，让节点/Dock 立刻进入「生成中」；v6 大 prompt 合并放到下一帧。
+  // forceFresh 不在此处清空 *Md：保留旧预览作扫光底图，新结果落库时再覆盖，避免空态闪一下。
+  const optimisticPatch: Record<string, unknown> = {
     dockInput,
     dockRefImages,
-    promptOutline: dockMergedOutline,
-    promptCharacter: dockMergedCharacter,
-    promptScene: dockMergedScene,
-    promptStoryboard: dockMergedStoryboard,
+    hubGenerateIntent: true,
+    ...(firstSection ? hubSectionPendingPatch(firstSection) : {}),
   };
   if (effectiveOutline && !hubData?.outlineMd?.trim()) {
-    patch.outlineMd = effectiveOutline;
+    optimisticPatch.outlineMd = effectiveOutline;
   }
-  const pendingRuntime = { status: "pending" as const };
-  if (sections.includes("outline")) {
-    patch.outlineRuntime = pendingRuntime;
+  if (options?.forceFresh) {
+    Object.assign(optimisticPatch, clearHubSectionRuntimesForForceFresh(sections));
+    if (firstSection) {
+      Object.assign(optimisticPatch, hubSectionPendingPatch(firstSection));
+    }
   }
-  if (sections.includes("character")) {
-    patch.characterRuntime = pendingRuntime;
-  }
-  if (sections.includes("scene")) {
-    patch.sceneRuntime = pendingRuntime;
-  }
-  if (sections.includes("storyboard")) {
-    patch.storyboardRuntime = pendingRuntime;
-  }
+  updateNodeData(hubId, optimisticPatch);
 
-  updateNodeData(hubId, patch);
+  const schedulePromptMergeAndRun = () => {
+    const upstreamLinks =
+      nodes.length > 0
+        ? resolvePro2DockUpstreamLinks(
+            hubId,
+            "story-pro2-script-hub",
+            nodes,
+            edges,
+          )
+        : [];
+    const resolvedDockRefs = resolveDockRefsForRun(
+      dockInput,
+      upstreamLinks,
+      dockRefImages,
+    );
+    const themeInput =
+      hubData && nodes.length
+        ? resolvePro2HubThemeInput(nodes, edges, hubId, hubData)
+        : "";
 
-  runStoryHubSectionsSequential(hubId, sections, options);
+    const promptPack = resolvePro2HubPromptPack(hubData);
+    const categoryDoc = resolvePro2ScriptCategoryDocBody(hubData);
+    const categoryId = hubData?.scriptCategoryId;
+    const mergeCtx = {
+      categoryDoc,
+      scriptCategoryId: categoryId,
+      outlineMd: effectiveOutline,
+      themeInput: effectiveOutline ? "" : themeInput,
+    };
+
+    const mergeSectionPrompt = (
+      base: string,
+      includeCategoryDoc: boolean,
+      includeOutlineInPrompt: boolean,
+    ) =>
+      mergePro2DockIntoPrompt(
+        base,
+        dockInput,
+        resolvedDockRefs,
+        includeCategoryDoc ? mergeCtx.categoryDoc : undefined,
+        mergeCtx.scriptCategoryId,
+        includeOutlineInPrompt ? mergeCtx.outlineMd : undefined,
+        includeOutlineInPrompt ? "" : mergeCtx.themeInput,
+        includeCategoryDoc,
+      );
+
+    updateNodeData(hubId, {
+      promptOutline: mergeSectionPrompt(promptPack.promptOutline, true, true),
+      promptCharacter: mergeSectionPrompt(promptPack.promptCharacter, false, false),
+      promptScene: mergeSectionPrompt(promptPack.promptScene, false, false),
+      promptStoryboard: mergeSectionPrompt(
+        promptPack.promptStoryboard,
+        false,
+        false,
+      ),
+      hubGenerateIntent: undefined,
+    });
+
+    runStoryHubSectionsSequential(hubId, sections, options);
+
+    const nodeAfter = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
+    if (!nodeAfter || hubAggregateStatus(nodeAfter) !== "running") {
+      updateNodeData(hubId, { hubGenerateIntent: undefined });
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    requestAnimationFrame(schedulePromptMergeAndRun);
+  } else {
+    schedulePromptMergeAndRun();
+  }
 }
 
 type FrameKickoffStore = {

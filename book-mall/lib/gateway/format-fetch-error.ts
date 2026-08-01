@@ -9,8 +9,26 @@ try {
   /* Node < 17 */
 }
 
-const UPSTREAM_CHAT_TIMEOUT_MS = 180_000;
-const UPSTREAM_CREATE_TASK_TIMEOUT_MS = 120_000;
+const UPSTREAM_CHAT_TIMEOUT_MS = readUpstreamTimeoutMs(
+  "UPSTREAM_CHAT_TIMEOUT_MS",
+  180_000,
+);
+/** Pro2 剧本 / max_tokens≥8k 的长文 CHAT：默认 10min（180s 不足以输出完整 GFM 制作包） */
+const UPSTREAM_STORY_CHAT_TIMEOUT_MS = readUpstreamTimeoutMs(
+  "UPSTREAM_STORY_CHAT_TIMEOUT_MS",
+  600_000,
+);
+const UPSTREAM_CREATE_TASK_TIMEOUT_MS = readUpstreamTimeoutMs(
+  "UPSTREAM_CREATE_TASK_TIMEOUT_MS",
+  120_000,
+);
+/** chat/completions body.max_tokens 达到此值时使用 STORY 超时 */
+export const UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD = 8_000;
+
+function readUpstreamTimeoutMs(name: string, fallback: number): number {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+}
 
 function mergeUpstreamAbortSignal(
   init: RequestInit,
@@ -24,11 +42,37 @@ function mergeUpstreamAbortSignal(
   }
 }
 
-function upstreamTimeoutMs(url: string, init: RequestInit): number {
+/** 供单测与 Canvas 诊断：按 URL + body 解析 upstream fetch 超时。 */
+export function resolveUpstreamChatTimeoutMs(
+  url: string,
+  init: RequestInit,
+): number {
   if (init.method?.toUpperCase() === "POST" && /\/createTask$/i.test(url)) {
     return UPSTREAM_CREATE_TASK_TIMEOUT_MS;
   }
+  const maxTokens = readChatMaxTokensFromBody(init.body);
+  if (
+    typeof maxTokens === "number" &&
+    maxTokens >= UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD
+  ) {
+    return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
+  }
   return UPSTREAM_CHAT_TIMEOUT_MS;
+}
+
+function readChatMaxTokensFromBody(body: BodyInit | null | undefined): number | undefined {
+  if (typeof body !== "string" || !body.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(body) as { max_tokens?: unknown };
+    const mt = parsed.max_tokens;
+    return typeof mt === "number" && Number.isFinite(mt) ? mt : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function upstreamTimeoutMs(url: string, init: RequestInit): number {
+  return resolveUpstreamChatTimeoutMs(url, init);
 }
 
 function formatUpstreamTimeoutMessage(provider: string): string {

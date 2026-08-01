@@ -1,0 +1,39 @@
+/**
+ * 古风甜宠 · 下游生图/生视频提示词规范（写入 GFM 各列时遵循）
+ * 与 docs/古风田宠短剧.md · write_the_prompt 对齐；hub 段 prompt 引用，控制篇幅。
+ */
+import {
+  PRO2_UNIVERSAL_NEGATIVE,
+  STORY_PRO2_VIDEO_PROMPT_RULES,
+} from "./pro2-production-pack-standard";
+
+/** 角色段 · AI生图提示词(英文) 列 + 三视图下游 */
+export const PRO2_GU_FENG_CHARACTER_IMAGE_RULES = `# 古风 · 角色生图规范（写入「AI生图提示词(英文)」列）
+
+- **语言**：表内英文 prompt；本规范中文说明供你理解约束
+- **写法**：导演+造型师简报；自然语言「人物+神态」+ 短语「风格/色调/光线/构图」
+- **严格锁定（最高优先级）**：五官、发型发饰、服装款式与主色须与角色视觉辞典/用户确认形象 **完全一致**；剧本性格、情节氛围 **不得** 改变外观；仅用户明确要求才可局部改
+- **网红脸+写实**：短视频审美——精致立体、高鼻梁、大眼、小脸；同时 **超写实人像**（毛孔、绒毛、电影级光感）；禁止动画/游戏 CG/插画感
+- **古风**：汉服/宫廷/江湖风；主色约占画面 90%，禁止高饱和撞色与现代元素
+- **三视图下游**：白底横排正/侧/背全身，无道具；禁止无关文字
+- **用户固定形象**：若类别参考或角色辞典已给出完整中文三视图简报，下游生图须 **全文采用**，不得因剧本情节改写五官/发型/服装配色`;
+
+/** 场景段 · 生图关键词 / AI生图提示词 */
+export const PRO2_GU_FENG_SCENE_IMAGE_RULES = `# 古风 · 场景生图规范（写入场景辞典·生图关键词 与 场景视觉提示词 表）
+
+- **写实电影感锁定（最高优先级）**：真实建筑与自然材质、电影级自然光（阳光/烛光/晨雾）、影调克制；**禁止** 动画感、游戏 CG、概念插画、过度后期
+- **空镜默认**：广角/建立镜头；无人物 unless 大纲已标 **【含人物】**
+- **英文 prompt 须含**：establishing shot, cinematic lighting, realistic textures, matte film look, 35mm, shallow depth of field
+- **2K 电影级**；主色调与视觉风格总纲·色调卡一致`;
+
+/** 分镜段 · 共享 Seedance + 古风增补 */
+export const PRO2_GU_FENG_VIDEO_SHOT_RULES = `${STORY_PRO2_VIDEO_PROMPT_RULES}
+
+# 古风 · 分镜视频增补（在共享 Seedance 规范之上）
+- **节奏饱满**：每镜时长须用动作/台词/环境动态填满，禁止空等
+- **情感戏**：对视/牵手/表白须写微表情、肢体细节、情绪节拍（如「由紧张渐松弛」）
+- **甜宠高光**：对视/肢体接触高潮可加柔光粉滤镜描述（见视觉风格总纲）
+- **蒙太奇糖点**：3 秒快切镜须在视频列写明「快速剪辑时长 N 秒」与 BGM 音量（如 -15dB）`;
+
+/** 全剧 Negative · 追加至各镜 AI 视频 prompt 末尾 [Negative: …] */
+export const PRO2_GU_FENG_UNIVERSAL_NEGATIVE = PRO2_UNIVERSAL_NEGATIVE;

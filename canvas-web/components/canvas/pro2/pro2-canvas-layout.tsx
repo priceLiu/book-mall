@@ -12,7 +12,6 @@ import {
 import type { StyleLibraryPreset } from "@/lib/canvas/style-library/catalog";
 import { Pro2CanvasToolbar } from "./pro2-canvas-toolbar";
 import { Pro2CrewBulletin } from "./pro2-crew-bulletin";
-import { Pro2ProductionGateBanner } from "./pro2-production-gate-banner";
 import { shouldShowCrewBulletinRail } from "@/lib/canvas/crew-bulletin-context";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -132,7 +131,6 @@ export function Pro2CanvasLayout({
           window.dispatchEvent(new CustomEvent("canvas:open-my-history"));
         }}
       />
-      <Pro2ProductionGateBanner />
       {showCrewBulletin ? <Pro2CrewBulletin /> : null}
       <StyleLibraryModal
         open={styleLibOpen}

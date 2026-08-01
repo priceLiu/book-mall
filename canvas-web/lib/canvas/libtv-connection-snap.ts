@@ -6,6 +6,7 @@ import { libtvSidePlusInHandleId } from "./libtv-side-plus-in-handle";
 import {
   LIBTV_SIDE_PLUS_LG_RADIUS_FLOW,
   LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW,
+  libtvSidePlusFollowVerticalBounds,
 } from "./libtv-node-chrome";
 import type { CanvasFlowNode } from "./types";
 
@@ -84,10 +85,7 @@ type SidePlusSnapHit = {
   dist: number;
 };
 
-/** 与 pro2-node-side-plus · MAGNET_VERTICAL_INSET_PX 对齐 */
-const SIDE_PLUS_VERTICAL_INSET_FLOW = 24;
-
-/** 点到侧 + 吸附带的最短距离（+ 可沿节点竖边磁吸移动） */
+/** 与 pro2-node-side-plus · libtvSidePlusFollowVerticalBounds 对齐 */
 function distancePointToSidePlusZone(
   point: { x: number; y: number },
   node: CanvasFlowNode,
@@ -101,8 +99,10 @@ function distancePointToSidePlusZone(
   const box = nodeSnapBox(node, nodes);
   /** + 圆心钉在节点左/右边框中线上（见 globals.css · pro2-node-side-plus-handle） */
   const cx = side === "left" ? box.left : box.right;
-  const minY = box.top + SIDE_PLUS_VERTICAL_INSET_FLOW;
-  const maxY = box.bottom - SIDE_PLUS_VERTICAL_INSET_FLOW;
+  const boxHeight = box.bottom - box.top;
+  const { insetFromEdge } = libtvSidePlusFollowVerticalBounds(boxHeight);
+  const minY = box.top + insetFromEdge;
+  const maxY = box.bottom - insetFromEdge;
   if (maxY <= minY) return null;
   const clampedY = Math.max(minY, Math.min(maxY, point.y));
   return Math.hypot(point.x - cx, point.y - clampedY);

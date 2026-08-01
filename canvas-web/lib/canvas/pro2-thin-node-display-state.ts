@@ -1,4 +1,6 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import { resolvePro2StarterDockLinkLabel } from "./pro2-dock-upstream-links";
+import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 
 /** LibTV 薄卡（文本 / 故事脚本生成）三种展示态 · 见 docs/libtv-node-state-spec.md */
 export type LibtvThinNodeDisplayState = "initial" | "connected" | "generated";
@@ -74,7 +76,7 @@ export function pro2StarterLinkedMessage(
   return "已链接上游 · 在下方 Dock 输入后发送";
 }
 
-/** 故事脚本生成连线态说明（有边即 connected，不要求 outlineMd 已同步） */
+/** 故事脚本生成连线态说明（有边即 connected；标题随上游节点 label） */
 export function pro2ScriptHubLinkedMessage(input: {
   edges: CanvasFlowEdge[];
   nodes: CanvasFlowNode[];
@@ -88,13 +90,14 @@ export function pro2ScriptHubLinkedMessage(input: {
     };
   }
   const incoming = input.edges.filter((e) => e.target === input.hubId);
-  const fromStarter = incoming.some((e) => {
-    const src = input.nodes.find((n) => n.id === e.source);
-    return src?.type === "story-pro2-starter";
-  });
-  if (fromStarter) {
+  const starter = incoming
+    .map((e) => input.nodes.find((n) => n.id === e.source))
+    .find((n) => n?.type === "story-pro2-starter");
+  if (starter) {
+    const sd = starter.data as unknown as StoryProStarterNodeData;
+    const label = resolvePro2StarterDockLinkLabel(sd);
     return {
-      title: "已链接文本节点",
+      title: `已链接${label}`,
       hint: "在下方 Dock 输入后发送",
     };
   }

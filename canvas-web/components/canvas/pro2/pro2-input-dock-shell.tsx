@@ -200,23 +200,26 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
 export function Pro2DockHeader({
   refRow,
   actionRow,
+  trailingRow,
   compact,
   minHeightPx,
 }: {
   refRow?: ReactNode;
   actionRow?: ReactNode;
+  /** 顶栏最右侧（如提示词模板 chip） */
+  trailingRow?: ReactNode;
   /** 视频 Dock 等 · 更矮顶栏 */
   compact?: boolean;
   minHeightPx?: number;
 }) {
-  if (!refRow && !actionRow) return null;
+  if (!refRow && !actionRow && !trailingRow) return null;
   return (
     <div
       className={cn("nodrag shrink-0 border-b", LIBTV_INPUT_DOCK_DIVIDER)}
     >
       <div
         className={cn(
-          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto overflow-y-hidden",
+          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto overflow-y-visible",
           compact
             ? "gap-1 px-2 py-1"
             : "min-h-[44px] gap-1.5 px-3 py-1.5",
@@ -231,8 +234,13 @@ export function Pro2DockHeader({
               : undefined
         }
       >
-        {refRow}
-        {actionRow}
+        <div className="flex min-w-0 flex-1 flex-nowrap items-start gap-1.5 overflow-x-auto">
+          {refRow}
+          {actionRow}
+        </div>
+        {trailingRow ? (
+          <div className="ml-auto shrink-0 pl-1 pr-12">{trailingRow}</div>
+        ) : null}
       </div>
     </div>
   );

@@ -205,30 +205,22 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           onPick={onSidePick("right")}
         />
 
-        {showFloatingToolbar ? (
-          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
-            {showImageTools ? (
-              <Pro2ImageNodeToolbar
-                passNodeDrag
-                previewUrl={previewUrl}
-                onExpandPreview={() => setPreviewOpen(true)}
-                onSaveAsAsset={() =>
-                  saveAsAsset(
-                    id,
-                    "story-pro2-three-view",
-                    d as unknown as Record<string, unknown>,
-                    "CHARACTER",
-                  )
-                }
-                onDuplicateNode={onDuplicateNode}
-              />
-            ) : (
-              <Pro2ImageNodeToolbar
-                passNodeDrag
-                minimal
-                onDuplicateNode={onDuplicateNode}
-              />
-            )}
+        {showImageTools ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showImageTools}>
+            <Pro2ImageNodeToolbar
+              passNodeDrag
+              previewUrl={previewUrl}
+              onExpandPreview={() => setPreviewOpen(true)}
+              onSaveAsAsset={() =>
+                saveAsAsset(
+                  id,
+                  "story-pro2-three-view",
+                  d as unknown as Record<string, unknown>,
+                  "CHARACTER",
+                )
+              }
+              onDuplicateNode={onDuplicateNode}
+            />
           </LibtvNodeToolbarPortal>
         ) : null}
 

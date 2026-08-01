@@ -84,7 +84,7 @@ import {
   shouldUseSbv1ImageVideoColumnLayout,
 } from "./sbv1-media-group-layout";
 import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
-import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
+import { reflowSbv1Canvas as computeSbv1CanvasReflow, relayoutStaleSbv1MediaGroups } from "./sbv1-canvas-layout";
 import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
 import { duplicateMediaGroupInGraph } from "./duplicate-media-group";
 import { hasStoryComicPipeline } from "./story-comic-layout";
@@ -117,6 +117,9 @@ import {
 } from "./canvas-node-changes";
 import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
+import { libtvMediaNodesNeedViewportReflow } from "./libtv-media-node-size";
+import { libtvCanvasNeedsViewportReflow } from "./libtv-canvas-viewport-reflow";
+import { clampCanvasViewport } from "./canvas-viewport-zoom";
 import { ensureGraphMetaEdition } from "./canvas-layout-mode";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
@@ -176,6 +179,7 @@ function finalizeHydratedGraph(
   const finalized = finalizeStoryMediaGraph(nextNodes, nextEdges);
   nextNodes = applyStoryColumnHeights(finalized.nodes, finalized.edges);
   nextEdges = finalized.edges;
+  nextNodes = relayoutStaleSbv1MediaGroups(nextNodes, nextEdges);
   return {
     nodes: ensureNodeDragHandles(nextNodes),
     edges: nextEdges,
@@ -187,7 +191,7 @@ function hydrateSavedViewport(
   _meta: { edition?: "pro2" | "sbv1" } | null | undefined,
   saved: { x: number; y: number; zoom: number },
 ): { x: number; y: number; zoom: number } {
-  return saved;
+  return clampCanvasViewport(saved);
 }
 
 function runPostHydratePro2VideoBoardRepair(
@@ -257,6 +261,9 @@ type CanvasState = {
   viewport: Viewport;
   /** 递增后触发 React Flow fitView（漫剧重排等） */
   fitViewNonce: number;
+  /** 媒体外框迁移后须 fitView；Pro2 打开时勿恢复旧 pan/zoom */
+  libtvMediaViewportReflowPending: boolean;
+  clearLibtvMediaViewportReflowPending: () => void;
   /** 生成中聚焦某节点（选中 + 平移，不写 undo 栈） */
   runningFocusNodeId: string | null;
   runningFocusNonce: number;
@@ -516,6 +523,9 @@ export const useCanvasStore = create<CanvasState>()(
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       fitViewNonce: 0,
+      libtvMediaViewportReflowPending: false,
+      clearLibtvMediaViewportReflowPending: () =>
+        set({ libtvMediaViewportReflowPending: false }),
       runningFocusNodeId: null,
       runningFocusNonce: 0,
       canvasFocusNodeId: null,
@@ -644,6 +654,10 @@ export const useCanvasStore = create<CanvasState>()(
             ? reconcileStoryPro2Workspace(normalized)
             : reconcileStoryProWorkspace(normalized),
         );
+        const needsMediaViewportReflow = libtvCanvasNeedsViewportReflow(
+          migrated.nodes as CanvasFlowNode[],
+          g.viewport ?? { x: 0, y: 0, zoom: 1 },
+        );
         const hydratedMeta = ensureGraphMetaEdition(nodes, g.meta ?? null);
         const viewport = hydrateSavedViewport(
           hydratedMeta,
@@ -694,6 +708,10 @@ export const useCanvasStore = create<CanvasState>()(
               libtvFloatingDockNodeId: null,
               libtvFloatingDockNodeType: null,
               graphMeta: hydratedMeta ?? null,
+              libtvMediaViewportReflowPending: needsMediaViewportReflow,
+              fitViewNonce: needsMediaViewportReflow
+                ? state.fitViewNonce + 1
+                : state.fitViewNonce,
             }),
           );
           queueMicrotask(applyDeferredLayout);
@@ -715,6 +733,10 @@ export const useCanvasStore = create<CanvasState>()(
             libtvFloatingDockNodeId: null,
             libtvFloatingDockNodeType: null,
             graphMeta: meta ?? null,
+            libtvMediaViewportReflowPending: needsMediaViewportReflow,
+            fitViewNonce: needsMediaViewportReflow
+              ? state.fitViewNonce + 1
+              : state.fitViewNonce,
           }),
         );
         queueMicrotask(() => {
@@ -1963,11 +1985,13 @@ export const useCanvasStore = create<CanvasState>()(
           pro2Kind?: string;
           pro2ShortcutPreset?: boolean;
         };
-        const useMediaRelayout =
-          mode === "auto" &&
+        const sbv1LikeGroup =
           !d.pro2ShortcutPreset &&
           (shouldUseSbv1ImageVideoColumnLayout(group, nodes) ||
-            isSbv1MediaGroup(group, nodes) ||
+            isSbv1MediaGroup(group, nodes));
+        const useMediaRelayout =
+          !d.pro2ShortcutPreset &&
+          (sbv1LikeGroup ||
             isPro2StyledGroup(group, nodes) ||
             Boolean(d.pro2Kind));
 
@@ -1978,6 +2002,7 @@ export const useCanvasStore = create<CanvasState>()(
                 state.nodes,
                 state.edges,
                 groupId,
+                { force: true, mode },
               ),
             }),
           );

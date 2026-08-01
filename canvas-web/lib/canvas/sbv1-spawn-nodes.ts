@@ -25,11 +25,13 @@ import { useCanvasStore } from "./store";
 import { cloneCanvasNodeData } from "./clone-node-data";
 import { PRO2_TEXT_NODE_MIN_WIDTH } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
-import { flowPositionAtScreenPoint } from "./viewport-placement";
+import {
+  resolveJianyingAutoRenderNodeSize,
+  withFlowNodeDimensions,
+} from "./jianying-auto-render-node-size";
 
 const GAP = 48;
 const JIANYING_EXPORT_PRO2_WIDTH = 400;
-const JIANYING_AUTO_RENDER_PRO2_WIDTH = 720;
 
 export function buildSbv1ImageNodeData(
   overrides?: Record<string, unknown>,
@@ -151,7 +153,7 @@ export function spawnSbv1NeighborFromNode(
     atScreen?: { x: number; y: number };
   },
 ): string {
-  const { nodes, addNode, setNodes, setEdges } = store;
+  const { nodes, edges, addNode, setNodes, setEdges } = store;
   const self = nodes.find((n) => n.id === anchorId);
   if (!self) return "";
 
@@ -175,11 +177,19 @@ export function spawnSbv1NeighborFromNode(
     }
   }
 
+  const autoRenderSize =
+    nodeType === "jianying-auto-render-pro2"
+      ? resolveJianyingAutoRenderNodeSize({
+          anchorNode: self,
+          nodes,
+          edges,
+        })
+      : null;
   const newNodeW =
     nodeType === "jianying-export-pro2"
       ? JIANYING_EXPORT_PRO2_WIDTH
       : nodeType === "jianying-auto-render-pro2"
-        ? JIANYING_AUTO_RENDER_PRO2_WIDTH
+        ? autoRenderSize!.width
         : nodeType === "sbv1-video-engine"
           ? SBV1_VIDEO_ENGINE_WIDTH
           : nodeType === "story-pro2-starter"
@@ -301,7 +311,7 @@ export function spawnSbv1NeighborFromNode(
       : undefined;
     let newId = "";
     if (parentGroup && !options?.atScreen) {
-      // 锚点在组内：成片节点必须带 parentId，否则拖组时留在画布根级
+      // 锚点在组内：成片节点必须带 parentId，否则拖组时一起移动
       const rel = {
         x: Math.max(48, (self.position?.x ?? 0) + (self.width ?? 320) + GAP),
         y: self.position?.y ?? 48,
@@ -332,7 +342,31 @@ export function spawnSbv1NeighborFromNode(
         },
       ]);
     }
-    selectSbv1NodeAfterSpawn(setNodes, newId);
+    const size =
+      autoRenderSize ??
+      resolveJianyingAutoRenderNodeSize({
+        anchorNode: self,
+        nodes,
+        edges,
+      });
+    setNodes((prev) =>
+      ensureNodeDragHandles(
+        sortNodesForReactFlow(
+          prev.map((n) =>
+            n.id === newId
+              ? withFlowNodeDimensions(
+                  { ...n, selected: true },
+                  size.width,
+                  size.height,
+                )
+              : { ...n, selected: false },
+          ),
+        ),
+      ),
+    );
+    queueMicrotask(() => {
+      useCanvasStore.getState().focusCanvasNode(newId);
+    });
     return newId;
   }
 

@@ -6,6 +6,7 @@ import type { StoryProThemeSystemPromptTemplateId } from "./story-pro-theme-temp
 import type { StoryTextRevision } from "./story-revision";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryLlmSection } from "./story-workspace-types";
+import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
 
 export type { StoryLlmSection };
 
@@ -107,10 +108,21 @@ export type StoryProScriptHubNodeData = {
   /** 2.0 · 从大纲「视觉风格总纲」解析的全片视觉锚定（生图统一风格） */
   visualStylePack?: import("./story-pro-visual-style-pack").StoryProVisualStylePack;
   storyboardMd: string;
+  /** 点击发送后、段级 pending 写入前：保持「生成中」扫光，避免空态闪一下 */
+  hubGenerateIntent?: boolean;
   /** 2.0 输入坞 · 用户提示词 */
   dockInput?: string;
   /** 2.0 输入坞 · 粘贴的角色/场景等参考图 */
   dockRefImages?: StoryRefImage[];
+  /** 剧本类别 preset（古风甜宠 / 默认剧本大师） */
+  scriptCategoryId?: Pro2ScriptCategoryId;
+  scriptCategoryLabel?: string;
+  /** 顶栏类别参考标题（可编辑 · 仅当前节点） */
+  scriptCategoryDocTitle?: string;
+  /** 顶栏类别参考正文（可编辑 · 发送时并入 LLM · 不写回后台 docs） */
+  scriptCategoryDocBody?: string;
+  /** 顶栏「提示词」chip 当前预览/编辑来源（悬停切换） */
+  scriptPromptViewId?: "category-doc" | "upstream-outline";
   outlineRuntime?: CanvasNodeRuntime;
   characterRuntime?: CanvasNodeRuntime;
   sceneRuntime?: CanvasNodeRuntime;

@@ -42,24 +42,29 @@ const T2V_PARAMS_SCHEMA = [
   },
 ] satisfies CanvasParamSchema;
 
+const HAPPYHORSE_DURATION_SCHEMA = {
+  key: "duration",
+  label: "时长(秒)",
+  type: "number",
+  min: 3,
+  max: 15,
+  step: 1,
+  defaultValue: 5,
+} as const satisfies CanvasParamSchema[number];
+
+const HAPPYHORSE_BASE_SCHEMA = [
+  T2V_PARAMS_SCHEMA[0],
+  T2V_PARAMS_SCHEMA[1],
+  HAPPYHORSE_DURATION_SCHEMA,
+] satisfies CanvasParamSchema;
+
 export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
     modelKey: "happyhorse-1.0-t2v",
     displayName: "HappyHorse-1.0-T2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.0-t2v · text-to-video",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -71,18 +76,7 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     displayName: "HappyHorse-1.1-T2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.1-t2v · text-to-video",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -94,18 +88,7 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     displayName: "HappyHorse-1.1-I2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.1-i2v · image-to-video (first frame)",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -117,18 +100,7 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     displayName: "HappyHorse-1.0-I2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.0-i2v · image-to-video (first frame)",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",

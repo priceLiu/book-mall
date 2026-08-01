@@ -6,9 +6,11 @@ import {
   SBV1_IMAGE_ASPECT_RATIOS,
   SBV1_IMAGE_MODEL_KEYS,
   SBV1_IMAGE_OUTPUT_COUNTS,
+  SBV1_IMAGE_QUALITIES,
   SBV1_IMAGE_RESOLUTIONS,
   buildSbv1ImageEngineParams,
   sbv1ImageAspectRatioLabel,
+  sbv1ImageQualityLabel,
   type Sbv1ImageAspectRatio,
   type Sbv1ImageQuality,
   type Sbv1ImageResolution,
@@ -23,16 +25,18 @@ import {
   useSbv1ToolbarAnchor,
 } from "./sbv1-toolbar-anchor-popover";
 import {
-  LIBTV_DOCK_PARAMS_POPOVER_CLASS,
-  LibtvDockParamGrid,
-} from "../libtv-dock-picker-chrome";
+  LIBTV_DOCK_IMAGE_PARAMS_POPOVER_CLASS,
+  LibtvDockImageParamsPanel,
+} from "../libtv-dock-image-params-panel";
 import { LibtvDockEngineModelPicker } from "../libtv-dock-engine-model-picker";
 
-const QUALITY_OPTIONS: { id: Sbv1ImageQuality; label: string }[] = [
-  { id: "low", label: "低" },
-  { id: "standard", label: "标准" },
-  { id: "high", label: "高" },
-];
+const IMAGE_PARAM_ASPECT_OPTIONS = SBV1_IMAGE_ASPECT_RATIOS.filter(
+  (r) => r.value !== "auto",
+);
+
+const IMAGE_PARAM_COUNT_OPTIONS = SBV1_IMAGE_OUTPUT_COUNTS.filter((n) =>
+  [1, 2, 4].includes(n),
+).map((n) => ({ id: String(n), label: `${n}张` }));
 
 const FORMAT_OPTIONS = ["png", "jpeg", "webp"] as const;
 type OutputFormat = (typeof FORMAT_OPTIONS)[number];
@@ -121,8 +125,7 @@ export function sbv1ImageModelTriggerLabel(
 export function sbv1ImageParamsTriggerLabel(data: Sbv1ImageNodeData): string {
   if (!data.engine?.modelKey?.trim()) return "参数";
   const quality =
-    QUALITY_OPTIONS.find((q) => q.id === (data.imageQuality ?? "standard"))
-      ?.label ?? "标准";
+    sbv1ImageQualityLabel(data.imageQuality ?? "standard") ?? "标准画质";
   const resolution = data.resolution ?? "2K";
   const aspect = sbv1ImageAspectRatioLabel(data.aspectRatio ?? "auto");
   const count = data.outputCount ?? 1;
@@ -196,6 +199,10 @@ export function Sbv1ImageDockParamsPicker({
     () => readOutputFormat(data.engine?.params ?? {}),
     [data.engine?.params],
   );
+  const aspectValue =
+    data.aspectRatio && data.aspectRatio !== "auto"
+      ? data.aspectRatio
+      : "16:9";
 
   return (
     <>
@@ -220,70 +227,51 @@ export function Sbv1ImageDockParamsPicker({
         setOpen={setOpen}
         rect={rect}
         placement="auto"
-        estimatedHeight={360}
-        className={LIBTV_DOCK_PARAMS_POPOVER_CLASS}
+        estimatedHeight={420}
+        className={LIBTV_DOCK_IMAGE_PARAMS_POPOVER_CLASS}
       >
-        <div className="space-y-3 pb-1">
-          <LibtvDockParamGrid
-            label="画质"
-            options={QUALITY_OPTIONS.map((q) => ({ id: q.id, label: q.label }))}
-            value={data.imageQuality ?? "standard"}
-            onChange={(id) =>
-              patchImageSettings(data, onPatch, {
-                imageQuality: id as Sbv1ImageQuality,
-              })
-            }
-          />
-          <LibtvDockParamGrid
-            label="清晰度"
-            options={SBV1_IMAGE_RESOLUTIONS.map((r) => ({
-              id: r.value,
-              label: r.label,
-            }))}
-            value={data.resolution ?? "2K"}
-            onChange={(id) =>
-              patchImageSettings(data, onPatch, {
-                resolution: id as Sbv1ImageResolution,
-              })
-            }
-          />
-          <LibtvDockParamGrid
-            label="比例"
-            options={SBV1_IMAGE_ASPECT_RATIOS.map((r) => ({
-              id: r.value,
-              label: sbv1ImageAspectRatioLabel(r.value),
-            }))}
-            value={data.aspectRatio ?? "auto"}
-            onChange={(id) =>
-              patchImageSettings(data, onPatch, {
-                aspectRatio: id as Sbv1ImageAspectRatio,
-              })
-            }
-          />
-          <LibtvDockParamGrid
-            label="张数"
-            options={SBV1_IMAGE_OUTPUT_COUNTS.map((n) => ({
-              id: String(n),
-              label: String(n),
-            }))}
-            value={String(data.outputCount ?? 1)}
-            onChange={(id) =>
-              patchImageSettings(data, onPatch, {
-                outputCount: Number(id) || 1,
-              })
-            }
-          />
-          <LibtvDockParamGrid
-            label="格式"
-            options={FORMAT_OPTIONS.map((f) => ({ id: f, label: f }))}
-            value={outputFormat}
-            onChange={(id) =>
-              patchImageSettings(data, onPatch, {
-                outputFormat: id as OutputFormat,
-              })
-            }
-          />
-        </div>
+        <LibtvDockImageParamsPanel
+          qualityLabel="画质"
+          qualityOptions={SBV1_IMAGE_QUALITIES.map((q) => ({
+            id: q.value,
+            label: q.label,
+          }))}
+          qualityValue={data.imageQuality ?? "standard"}
+          onQualityChange={(id) =>
+            patchImageSettings(data, onPatch, {
+              imageQuality: id as Sbv1ImageQuality,
+            })
+          }
+          resolutionLabel="清晰度"
+          resolutionOptions={SBV1_IMAGE_RESOLUTIONS.map((r) => ({
+            id: r.value,
+            label: r.label,
+          }))}
+          resolutionValue={data.resolution ?? "2K"}
+          onResolutionChange={(id) =>
+            patchImageSettings(data, onPatch, {
+              resolution: id as Sbv1ImageResolution,
+            })
+          }
+          aspectOptions={IMAGE_PARAM_ASPECT_OPTIONS.map((r) => ({
+            id: r.value,
+            label: r.label,
+          }))}
+          aspectValue={aspectValue}
+          onAspectChange={(id) =>
+            patchImageSettings(data, onPatch, {
+              aspectRatio: id as Sbv1ImageAspectRatio,
+            })
+          }
+          countLabel="生成数量"
+          countOptions={IMAGE_PARAM_COUNT_OPTIONS}
+          countValue={String(data.outputCount ?? 1)}
+          onCountChange={(id) =>
+            patchImageSettings(data, onPatch, {
+              outputCount: Number(id) || 1,
+            })
+          }
+        />
       </Sbv1ToolbarDropdown>
     </>
   );

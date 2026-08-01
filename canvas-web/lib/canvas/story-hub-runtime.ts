@@ -137,16 +137,13 @@ export function hubSectionIsComplete(
   return hubSectionIsReady(node, section);
 }
 
-/** 有内容且未在跑/失败即视为就绪（兼容仅有 Md、无 runtime 的持久化图） */
+/** 段就绪：须有独字段落库且未在跑/失败（大纲嵌入段仅展示，不算 LLM 完成） */
 export function hubSectionIsReady(
   node: CanvasFlowNode,
   section: StoryLlmSection,
 ): boolean {
-  const d = node.data as unknown as StoryScriptHubNodeData;
   const dedicated = hubSectionMd(node, section).trim();
-  const md = dedicated || resolveHubSectionMd(d, section).trim();
-  if (!md) return false;
-  if (!dedicated) return true;
+  if (!dedicated) return false;
   const st = hubSectionRuntime(node, section)?.status;
   if (st === "running" || st === "pending" || st === "error") return false;
   return true;
@@ -159,9 +156,70 @@ export function hubSectionIsRunning(
   const rt = hubSectionRuntime(node, section);
   const st = rt?.status;
   if (st === "running") return true;
-  // 批量 enqueue 时各段会先 pending 但尚无 taskId；仅已提交段算「生成中」
-  if (st === "pending" && rt?.taskId) return true;
+  // pending 含无 taskId：顺序链占位 / 提交前乐观态，须立刻展示「生成中」
+  if (st === "pending") return true;
   return false;
+}
+
+/** 顺序链启动时写入段级 pending（与 storyRunPendingPatch 一致） */
+export function hubSectionPendingPatch(
+  section: StoryLlmSection,
+): Record<string, unknown> {
+  const rt = {
+    status: "pending" as const,
+    failCode: undefined,
+    failMessage: undefined,
+  };
+  if (section === "outline") return { outlineRuntime: rt };
+  if (section === "character") return { characterRuntime: rt };
+  if (section === "scene") return { sceneRuntime: rt };
+  return { storyboardRuntime: rt };
+}
+
+export function hubSectionHasTerminalError(
+  node: CanvasFlowNode,
+  section: StoryLlmSection,
+): boolean {
+  return hubSectionRuntime(node, section)?.status === "error";
+}
+
+/** 顶栏任务计数 / 轮询：仅已提交段算进行中（pending 无 taskId 为顺序链占位） */
+export function hubSectionCountsAsInflight(
+  rt?: { status?: string; taskId?: string },
+): boolean {
+  const st = rt?.status;
+  if (st === "running") return true;
+  if (st === "queued") return true;
+  if (st === "pending" && rt?.taskId?.trim()) return true;
+  return false;
+}
+
+/** forceFresh 重跑前清掉未完成的段 runtime，避免顺序链 activeKey 卡死 */
+export function clearHubSectionRuntimesForForceFresh(
+  sections: readonly StoryLlmSection[],
+): Record<string, undefined> {
+  const patch: Record<string, undefined> = {};
+  for (const section of sections) {
+    if (section === "outline") patch.outlineRuntime = undefined;
+    else if (section === "character") patch.characterRuntime = undefined;
+    else if (section === "scene") patch.sceneRuntime = undefined;
+    else patch.storyboardRuntime = undefined;
+  }
+  return patch;
+}
+
+/** forceFresh 重跑前清空待生成段的独字段，避免 finally 误判为已完成 */
+export function clearHubSectionMdForForceFresh(
+  sections: readonly StoryLlmSection[],
+): Record<string, string> {
+  const patch: Record<string, string> = {};
+  for (const section of sections) {
+    if (section === "outline") patch.outlineMd = "";
+    else if (section === "character") patch.characterMd = "";
+    else if (section === "scene") patch.sceneMd = "";
+    else patch.storyboardMd = "";
+  }
+  return patch;
 }
 
 export function hubDialogueIsReady(storyboardMd: string): boolean {

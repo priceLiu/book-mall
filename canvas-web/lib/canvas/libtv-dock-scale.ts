@@ -10,6 +10,8 @@
  * 通过 viewport 内 inverse-scale 抵消画布 zoom，实现 10%~800% 基本恒定。
  */
 
+import { libtvCanvasUiMaxScreenWidth } from "./libtv-canvas-viewport-reflow";
+
 /** 全局统一放大系数：所有 Dock 在原基准上 +20% */
 export const LIBTV_DOCK_UI_SCALE = 1.2;
 
@@ -117,7 +119,7 @@ export function libtvDockFixedScreenPx(
  * 目标屏宽（固定）：默认 656px（展开不改变宽度）。
  */
 export function computeLibtvDockScreenWidth(_zoom: number, _expanded = false): number {
-  return LIBTV_DOCK_SCREEN_W_BASE;
+  return Math.min(LIBTV_DOCK_SCREEN_W_BASE, libtvCanvasUiMaxScreenWidth());
 }
 
 /**

@@ -17,10 +17,39 @@ export function isCanvasImageTrafficKind(
   return kind === "image-engine" || kind === "three-view-engine";
 }
 
+/** Story / Pro2 文本 LLM（异步 execute，Gateway log 在 chat 发起后才出现） */
+export const CANVAS_LLM_ENGINE_KINDS = [
+  "story-outline-engine",
+  "character-engine",
+  "storyboard-engine",
+  "ai-engine",
+] as const;
+
+export function isCanvasLlmEngineKind(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  return (CANVAS_LLM_ENGINE_KINDS as readonly string[]).includes(kind);
+}
+
 export function isCanvasTrafficKind(
   payload: Record<string, unknown> | null | undefined,
 ): boolean {
-  return isCanvasVideoTrafficKind(payload) || isCanvasImageTrafficKind(payload);
+  return (
+    isCanvasVideoTrafficKind(payload) ||
+    isCanvasImageTrafficKind(payload) ||
+    isCanvasLlmEngineKind(payload)
+  );
+}
+
+/** Prisma where：画布 Story LLM 任务 */
+export function canvasLlmPayloadWhere(): Prisma.CanvasGenerationTaskWhereInput {
+  return {
+    OR: CANVAS_LLM_ENGINE_KINDS.map((kind) => ({
+      inputPayload: { path: ["kind"], equals: kind },
+    })),
+  };
 }
 
 /** Prisma where：画布交通控流任务（视频 + 生图） */

@@ -45,7 +45,10 @@ export function Pro2TextNodeOutlineEditorHost() {
     "";
 
   const nodeLabel = useMemo(() => {
-    if (!node) return "文本节点";
+    if (!node) return "故事大纲";
+    const d = node.data as { pro2TextPurpose?: string; label?: string };
+    if (d.label?.trim()) return d.label.trim();
+    if (d.pro2TextPurpose === "story-outline") return "故事大纲";
     const starters = nodes.filter((n) => n.type === "story-pro2-starter");
     const idx = starters.findIndex((n) => n.id === node.id);
     return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();

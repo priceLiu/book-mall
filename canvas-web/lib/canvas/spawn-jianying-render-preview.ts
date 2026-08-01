@@ -13,14 +13,20 @@ import type {
   CanvasNodeType,
 } from "@/lib/canvas/types";
 import { flowPositionAtScreenPoint } from "@/lib/canvas/viewport-placement";
+import {
+  resolveJianyingAutoRenderNodeSize,
+  withFlowNodeDimensions,
+} from "@/lib/canvas/jianying-auto-render-node-size";
 
 const GAP = 48;
 
-/** 剪辑成片预览节点尺寸：竖屏成片友好（约 9:16） */
+/** 剪辑成片 preview 节点尺寸：竖屏成片友好（约 9:16） */
 const CLIP_PREVIEW_W = 320;
 const CLIP_PREVIEW_H = 560;
 
+/** @deprecated 创建时改从上游视频节点 measured 尺寸推导 */
 export const JIANYING_AUTO_RENDER_DEFAULT_W = 720;
+/** @deprecated 创建时改从上游视频节点 measured 尺寸推导 */
 export const JIANYING_AUTO_RENDER_DEFAULT_H = 840;
 
 export const JIANYING_EXPORT_RENDER_OUT_HANDLE = "out_render";
@@ -84,9 +90,15 @@ export function spawnJianyingAutoRenderNode(
 
   const abs = absoluteNodePosition(anchorNode, nodes);
   const { w: selfW, h: selfH } = nodeMeasuredSize(anchorNode);
+  const autoSize = resolveJianyingAutoRenderNodeSize({
+    anchorNode,
+    nodes,
+    edges,
+    replicateVideoEdgesFrom: options?.replicateVideoEdgesFrom,
+  });
   const defaultX = abs.x + selfW + GAP;
   const defaultY =
-    abs.y + Math.max(0, (selfH - JIANYING_AUTO_RENDER_DEFAULT_H) / 2);
+    abs.y + Math.max(0, (selfH - autoSize.height) / 2);
   const spawnPos = options?.atScreen
     ? flowPositionAtScreenPoint("jianying-auto-render-pro2", options.atScreen)
     : { x: defaultX, y: defaultY };
@@ -126,17 +138,11 @@ export function spawnJianyingAutoRenderNode(
       sortNodesForReactFlow(
         prev.map((n) =>
           n.id === newId
-            ? {
-                ...n,
-                selected: true,
-                width: JIANYING_AUTO_RENDER_DEFAULT_W,
-                height: JIANYING_AUTO_RENDER_DEFAULT_H,
-                style: {
-                  ...n.style,
-                  width: JIANYING_AUTO_RENDER_DEFAULT_W,
-                  height: JIANYING_AUTO_RENDER_DEFAULT_H,
-                },
-              }
+            ? withFlowNodeDimensions(
+                { ...n, selected: true },
+                autoSize.width,
+                autoSize.height,
+              )
             : { ...n, selected: false },
         ),
       ),

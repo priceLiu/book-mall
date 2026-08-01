@@ -32,6 +32,8 @@ export type Pro2DockRefImagesProps = {
   /** 删除 chip 时同步从 prompt 移除 @<refId> */
   promptValue?: string;
   onPromptChange?: (next: string) => void;
+  /** 连续角标偏移（上游 chip + 提示词 chip 数量） */
+  badgeIndexOffset?: number;
   /** 设置后：上传/粘贴会在锚点左侧生成图片节点并连线（多图） */
   spawnAnchor?: { nodeId: string; nodeType: string };
 };
@@ -39,6 +41,7 @@ export type Pro2DockRefImagesProps = {
 function DockRefImageChip({
   refItem,
   index,
+  badgeIndex,
   active,
   disabled,
   onRemove,
@@ -48,6 +51,7 @@ function DockRefImageChip({
 }: {
   refItem: StoryRefImage;
   index: number;
+  badgeIndex: number;
   active: boolean;
   disabled?: boolean;
   onRemove: () => void;
@@ -129,7 +133,7 @@ function DockRefImageChip({
           </div>
         )}
         <DockRefCornerBadge
-          label={String(index + 1)}
+          label={String(badgeIndex)}
           title="移除参考图"
           disabled={disabled}
           onRemove={onRemove}
@@ -158,6 +162,7 @@ export function Pro2DockRefImages({
   activeIds = [],
   promptValue,
   onPromptChange,
+  badgeIndexOffset = 0,
   spawnAnchor,
 }: Pro2DockRefImagesProps) {
   const base = useBookMallBaseUrl();
@@ -259,6 +264,7 @@ export function Pro2DockRefImages({
           key={ref.id}
           refItem={ref}
           index={index}
+          badgeIndex={badgeIndexOffset + index + 1}
           active={activeIds.includes(ref.id)}
           disabled={disabled}
           thumbStyle={thumbStyle}

@@ -108,6 +108,7 @@ import type {
 import { isStoryWorkspaceNodeType } from "./types";
 import {
   hubSectionIsComplete,
+  hubSectionHasTerminalError,
   hubSectionNeedsRun,
   hubSectionRuntime,
 } from "./story-hub-runtime";
@@ -666,6 +667,16 @@ function modelKeyFromCanvasNode(
 /** 独立节点顺序跑（宫格高清等）· 单节点失败不阻断后续 */
 function isIndependentCanvasNodeJob(job: CanvasStoryRunJob): boolean {
   return !job.rowKey && !job.llmSection && !job.mediaKind;
+}
+
+function shouldAdvanceSequentialAfterHubFailure(
+  node: CanvasFlowNode | undefined,
+  job: QueueItem,
+): boolean {
+  if (!node || !job.llmSection || !isAnyStoryScriptHubType(node.type ?? "")) {
+    return false;
+  }
+  return hubSectionHasTerminalError(node, job.llmSection);
 }
 
 function advanceSequentialAfterNodeError(
@@ -1863,7 +1874,11 @@ export function useCanvasRunner(
               storyRowRuntimeStatus(node, job) === "error";
             if (rowErr && job.mediaKind === "sceneRef") {
               finishSequentialStep(key);
-            } else if (rowErr || (node && nodeRuntimeStatus(node) === "error")) {
+            } else if (
+              rowErr ||
+              (node && nodeRuntimeStatus(node) === "error") ||
+              shouldAdvanceSequentialAfterHubFailure(node, job)
+            ) {
               advanceSequentialAfterNodeError(
                 job,
                 key,
@@ -1873,6 +1888,13 @@ export function useCanvasRunner(
             } else {
               finishSequentialStep(key);
             }
+          } else if (shouldAdvanceSequentialAfterHubFailure(node, job)) {
+            advanceSequentialAfterNodeError(
+              job,
+              key,
+              finishSequentialStep,
+              abortSequentialOnError,
+            );
           }
         }
         drainRef.current();
@@ -2078,6 +2100,16 @@ export function useCanvasRunner(
         return true;
       });
 
+      const wantsForceFresh = normalized.some((j) => j.forceFresh);
+      if (wantsForceFresh) {
+        for (const job of deduped) {
+          releaseInflightKey(runKey(job));
+        }
+        if (sequentialRef.current) {
+          sequentialRef.current = null;
+        }
+      }
+
       const runnable = deduped.filter((job) => {
         const key = runKey(job);
         if (inflightRef.current.has(key)) return false;
@@ -2087,7 +2119,11 @@ export function useCanvasRunner(
       if (!runnable.length) return;
 
       const seq = sequentialRef.current;
-      if (seq && (seq.activeKey || seq.cursor < seq.jobs.length)) {
+      if (
+        !wantsForceFresh &&
+        seq &&
+        (seq.activeKey || seq.cursor < seq.jobs.length)
+      ) {
         const existing = new Set([
           ...(seq.activeKey ? [seq.activeKey] : []),
           ...seq.jobs.slice(seq.cursor).map(runKey),
@@ -2116,7 +2152,7 @@ export function useCanvasRunner(
       }
       pumpSequential();
     },
-    [pumpSequential, setNodeRuntime],
+    [pumpSequential, releaseInflightKey, setNodeRuntime],
   );
 
   const enqueueStoryRunRef = useRef(enqueueStoryRun);
@@ -2189,7 +2225,9 @@ export function useCanvasRunner(
       if (!node) return;
       let done = false;
       if (isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
-        done = hubSectionIsComplete(node, job.llmSection);
+        done =
+          hubSectionIsComplete(node, job.llmSection) ||
+          hubSectionHasTerminalError(node, job.llmSection);
       } else if (job.rowKey) {
         done = storyRowRuntimeStatus(node, job) === "done" ||
           storyRowRuntimeStatus(node, job) === "error";
@@ -2210,6 +2248,15 @@ export function useCanvasRunner(
         return;
       }
       if (rowErr || nodeRuntimeStatus(node) === "error") {
+        advanceSequentialAfterNodeError(
+          job,
+          key,
+          finishSequentialStep,
+          abortSequentialOnError,
+        );
+        return;
+      }
+      if (shouldAdvanceSequentialAfterHubFailure(node, job)) {
         advanceSequentialAfterNodeError(
           job,
           key,

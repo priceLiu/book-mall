@@ -8,6 +8,7 @@ import {
   LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES,
   parseAspectRatioToNumbers,
   readNodeAspectRatio,
+  readAspectPresetProfileFromFitKey,
   resolveEffectiveAspectRatioForPreset,
   resolveLibtvMediaAspectPresetProfile,
   shouldSkipLibtvMediaAspectPresetForNaturalMedia,
@@ -15,10 +16,14 @@ import {
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
-import { scheduleRelayoutSbv1MediaGroup } from "./sbv1-media-group-layout";
+import {
+  shouldUseSbv1ImageVideoColumnLayout,
+  scheduleRelayoutSbv1MediaGroup,
+} from "./sbv1-media-group-layout";
 import {
   computeLibtvMediaNodeSize,
   loadImageNaturalSize,
+  resolveLibtvMediaNodeBoxSize,
 } from "./libtv-media-node-auto-fit";
 import { useCanvasStore } from "./store";
 
@@ -27,6 +32,7 @@ export {
   libtvNodeUsesAspectPreset,
   parseAspectRatioToNumbers,
   readNodeAspectRatio,
+  readAspectPresetProfileFromFitKey,
   resolveEffectiveAspectRatioForPreset,
   resolveLibtvMediaAspectPresetProfile,
   shouldSkipLibtvMediaAspectPresetForNaturalMedia,
@@ -38,22 +44,32 @@ function relayoutParentGroupIfNeeded(nodeId: string, parentId?: string): void {
   const state = useCanvasStore.getState();
   const parentGroup = state.nodes.find((n) => n.id === parentId);
   if (!parentGroup) return;
+
+  const setNodes = state.setNodes;
+  const mixedVideoGroup =
+    shouldUseSbv1ImageVideoColumnLayout(parentGroup, state.nodes) ||
+    isSbv1MediaGroup(parentGroup, state.nodes);
+
+  // 图/视频混组：比例同步后强制统一外框（忽略历史 manualSize，否则图永远对不齐视频）
+  // 防抖合并：多节点同时 sync 时只 relayout 一次，避免 Maximum update depth
+  if (mixedVideoGroup) {
+    scheduleRelayoutSbv1MediaGroup(
+      setNodes,
+      parentId,
+      () => useCanvasStore.getState().edges,
+      120,
+      { force: true, mode: "auto" },
+    );
+    return;
+  }
+
   const parentManualSize = Boolean(
     (parentGroup.data as { manualSize?: boolean } | undefined)?.manualSize,
   );
   if (parentManualSize) return;
 
-  const setNodes = state.setNodes;
-  if (isSbv1MediaGroup(parentGroup, state.nodes)) {
-    scheduleRelayoutSbv1MediaGroup(
-      setNodes,
-      parentId,
-      () => useCanvasStore.getState().edges,
-    );
-    return;
-  }
   if (isPro2StyledGroup(parentGroup, state.nodes)) {
-    relayoutPro2MediaGroup(setNodes, parentId, state.nodes);
+    relayoutPro2MediaGroup(setNodes, parentId);
     setNodes((nodes) => expandLibtvGroupToFitChildren(nodes, parentId));
   }
 }
@@ -69,15 +85,14 @@ export function applyLibtvMediaAspectPreset(nodeId: string): void {
     return;
   }
 
-  const profile = resolveLibtvMediaAspectPresetProfile(node);
+  const profile = resolveLibtvMediaAspectPresetProfile(node, state.nodes);
   if (!profile) return;
 
-  const aspectRatio = readNodeAspectRatio(node);
   const effectiveRatio = resolveEffectiveAspectRatioForPreset(
-    aspectRatio,
+    readNodeAspectRatio(node),
     profile,
   );
-  const size = computeLibtvMediaAspectPresetSize(effectiveRatio, profile);
+  const size = resolveLibtvMediaNodeBoxSize(node, state.nodes);
   const nodeW = Math.round(
     (typeof node.width === "number" ? node.width : undefined) ??
       (node.style as { width?: number } | undefined)?.width ??
@@ -91,12 +106,15 @@ export function applyLibtvMediaAspectPreset(nodeId: string): void {
   const d = node.data as {
     mediaAspectPreset?: string;
     mediaAspectPresetSizeVersion?: number;
+    mediaFitKey?: string;
   };
+  const fitKeyProfile = readAspectPresetProfileFromFitKey(d.mediaFitKey);
   if (
     d.mediaAspectPreset === effectiveRatio &&
     d.mediaAspectPresetSizeVersion === LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION &&
     nodeW === size.width &&
-    nodeH === size.height
+    nodeH === size.height &&
+    (!fitKeyProfile || fitKeyProfile === profile)
   ) {
     return;
   }
@@ -232,6 +250,7 @@ export function useLibtvMediaAspectPresetSync(
     const data = node.data as {
       mediaAspectPreset?: string;
       mediaAspectPresetSizeVersion?: number;
+      mediaFitKey?: string;
       blobUrl?: string;
     };
 
@@ -244,14 +263,17 @@ export function useLibtvMediaAspectPresetSync(
       return;
     }
 
-    const profile = resolveLibtvMediaAspectPresetProfile(node);
+    const profile = resolveLibtvMediaAspectPresetProfile(
+      node,
+      useCanvasStore.getState().nodes,
+    );
     if (!profile) return;
 
     const effectiveRatio = resolveEffectiveAspectRatioForPreset(
       readNodeAspectRatio(node),
       profile,
     );
-    const expected = computeLibtvMediaAspectPresetSize(effectiveRatio, profile);
+    const expected = resolveLibtvMediaNodeBoxSize(node, useCanvasStore.getState().nodes);
     const nodeW = Math.round(
       (typeof node.width === "number" ? node.width : undefined) ??
         (node.style as { width?: number } | undefined)?.width ??
@@ -263,12 +285,14 @@ export function useLibtvMediaAspectPresetSync(
         0,
     );
 
+    const fitKeyProfile = readAspectPresetProfileFromFitKey(data.mediaFitKey);
     const presetOk =
       data.mediaAspectPreset === effectiveRatio &&
       data.mediaAspectPresetSizeVersion ===
         LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION &&
       nodeW === expected.width &&
-      nodeH === expected.height;
+      nodeH === expected.height &&
+      (!fitKeyProfile || fitKeyProfile === profile);
 
     if (presetOk) return;
 

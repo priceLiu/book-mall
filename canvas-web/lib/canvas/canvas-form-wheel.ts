@@ -22,6 +22,23 @@ export const CANVAS_NATIVE_SCROLL_SELECTOR = "[data-canvas-wheel-scroll]";
 /** LibTV 浮动 / 内嵌输入坞（prompt · @ 引用等） */
 export const LIBTV_INPUT_DOCK_SELECTOR = "[data-libtv-input-dock]";
 
+/** 脚本 Dock · 提示词模板悬停层（portal 到 body） */
+export const PRO2_SCRIPT_DOCK_POPOVER_SELECTOR = "[data-pro2-script-dock-popover]";
+
+/** 指针在输入坞或 Dock 悬停层上时，节点侧栏 + 停止磁吸跟随 */
+export function pointerBlocksSidePlusMagnet(
+  clientX: number,
+  clientY: number,
+): boolean {
+  if (typeof document === "undefined") return false;
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return false;
+  return Boolean(
+    el.closest(LIBTV_INPUT_DOCK_SELECTOR) ||
+    el.closest(PRO2_SCRIPT_DOCK_POPOVER_SELECTOR),
+  );
+}
+
 /** Dock 正文滚动区（textarea 自动增高，滚动条在此容器） */
 export const LIBTV_DOCK_SCROLL_SELECTOR = ".pro2-dock-scroll";
 

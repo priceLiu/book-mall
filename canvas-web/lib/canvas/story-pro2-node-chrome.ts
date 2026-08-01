@@ -6,6 +6,7 @@ import {
   LIBTV_INPUT_DOCK_BG,
   LIBTV_INPUT_DOCK_BORDER,
   LIBTV_INPUT_DOCK_DIVIDER,
+  LIBTV_INPUT_DOCK_TEXTAREA_CLASS,
   LIBTV_SQUARE_IMAGE_NODE_HEIGHT,
   LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT,
   LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH,
@@ -54,8 +55,8 @@ export const PRO2_TEXT_NODE_MIN_HEIGHT =
 /** React Flow 节点登记默认高度 ≈ 标签行 + 卡片 */
 export const PRO2_TEXT_NODE_HEIGHT = PRO2_TEXT_NODE_CARD_HEIGHT + 28;
 
-/** 2.0 故事脚本生成 / 脚本表格节点 */
-export const PRO2_SCRIPT_HUB_NODE_LABEL = "故事脚本生成";
+/** 2.0 故事剧本生成 / 脚本表格节点 */
+export const PRO2_SCRIPT_HUB_NODE_LABEL = "故事剧本生成";
 export const PRO2_SCRIPT_NODE_WIDTH = 480;
 export const PRO2_SCRIPT_NODE_MIN_WIDTH = 360;
 export const PRO2_SCRIPT_NODE_CARD_HEIGHT = 300;
@@ -206,8 +207,7 @@ export const PRO2_DOCK_TEXTAREA_SCROLL_CLASS =
   "min-h-0 h-full flex-1 overflow-y-auto overscroll-contain";
 
 /** 输入坞内 textarea · 无边框（字号随画布 zoom · 见 libtvDockPromptFontScreenMetrics） */
-export const PRO2_DOCK_TEXTAREA_CLASS =
-  "nodrag w-full resize-none border-0 bg-transparent text-[length:var(--libtv-dock-prompt-font,15px)] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";
+export const PRO2_DOCK_TEXTAREA_CLASS = LIBTV_INPUT_DOCK_TEXTAREA_CLASS;
 
 export const PRO2_SAVE_TO_ASSETS_BTN_CLASS =
   "nodrag w-full rounded border border-violet-400/25 bg-violet-500/8 px-2 py-1.5 text-[11px] text-violet-100 hover:bg-violet-500/15 disabled:opacity-40";

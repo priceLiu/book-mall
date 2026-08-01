@@ -13,7 +13,6 @@ import {
   Position,
   useNodeId,
   useStoreApi,
-  useUpdateNodeInternals,
   useStore,
 } from "@xyflow/react";
 import type { HandleType } from "@xyflow/react";
@@ -21,11 +20,17 @@ import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import { libtvSidePlusInHandleId } from "@/lib/canvas/libtv-side-plus-in-handle";
-import { LIBTV_NODE_SIDE_PLUS_LAYER_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import {
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  libtvSidePlusFollowVerticalBounds,
+  pointerNearSidePlusMagnetEdge,
+} from "@/lib/canvas/libtv-node-chrome";
+import { pointerBlocksSidePlusMagnet } from "@/lib/canvas/canvas-form-wheel";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
+import { useScheduleUpdateNodeInternals } from "@/lib/canvas/use-schedule-update-node-internals";
 
 const DRAG_THRESHOLD_PX = 6;
 const MENU_OFFSET_X = 208;
@@ -38,8 +43,6 @@ const MAGNET_RELEASE_PX = 112;
 const MAGNET_BORDER_INWARD_PX = 8;
 /** 沿边/离边跟随 · 相对节点边框最大偏移（px · 屏幕坐标，再换算 flow） */
 const MAGNET_MAX_OFFSET_SCREEN_PX = 100;
-/** 沿边跟随 · 相对节点中心最大纵向偏移（flow 坐标） */
-const MAGNET_MAX_OFFSET_FLOW_PX = 160;
 
 function sideMenuAnchorFromRect(
   rect: DOMRect,
@@ -59,20 +62,13 @@ function pointerNearSideEdge(
   side: "left" | "right",
   thresholdPx: number,
 ): boolean {
-  const inVerticalBand =
-    clientY >= rect.top - thresholdPx && clientY <= rect.bottom + thresholdPx;
-  if (!inVerticalBand) return false;
-  if (side === "left") {
-    if (clientX >= rect.left - thresholdPx && clientX < rect.left) return true;
-    return (
-      clientX >= rect.left &&
-      clientX <= rect.left + MAGNET_BORDER_INWARD_PX
-    );
-  }
-  if (clientX > rect.right && clientX <= rect.right + thresholdPx) return true;
-  return (
-    clientX >= rect.right - MAGNET_BORDER_INWARD_PX &&
-    clientX <= rect.right
+  return pointerNearSidePlusMagnetEdge(
+    clientX,
+    clientY,
+    rect,
+    side,
+    thresholdPx,
+    MAGNET_BORDER_INWARD_PX,
   );
 }
 
@@ -85,11 +81,11 @@ function computeMagnetOffsetFlow(
 ): { x: number; y: number } {
   const z = Math.max(zoom, 0.05);
   const centerY = rect.top + rect.height / 2;
-  const maxScreenY = Math.min(
-    rect.height * 0.46,
-    MAGNET_MAX_OFFSET_FLOW_PX * z,
+  const { maxOffsetFromCenter } = libtvSidePlusFollowVerticalBounds(rect.height);
+  const screenDy = Math.max(
+    -maxOffsetFromCenter,
+    Math.min(maxOffsetFromCenter, clientY - centerY),
   );
-  const screenDy = Math.max(-maxScreenY, Math.min(maxScreenY, clientY - centerY));
 
   /** 相对节点左/右边框：正 = 进入节点内侧，负 = 伸出节点外侧 */
   const rawScreenX =
@@ -132,7 +128,7 @@ export function Pro2NodeSidePlus({
   size = "lg",
 }: Pro2NodeSidePlusProps) {
   const nodeId = useNodeId();
-  const updateNodeInternals = useUpdateNodeInternals();
+  const scheduleUpdateNodeInternals = useScheduleUpdateNodeInternals(nodeId);
   const rfStore = useStoreApi();
   const [open, setOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
@@ -186,11 +182,17 @@ export function Pro2NodeSidePlus({
     return sideMenuAnchorFromRect(rect, side);
   }, [side]);
 
-  /** 磁吸只移动可见圆点，handle 锚点恒在边框上，故不随 magnetOffset 重测 */
+  /**
+   * 磁吸只移动可见圆点，handle 锚点恒在边框上，故不随 magnetOffset 重测。
+   * 须 rAF 合并 + 去重：全画布多节点同步 updateNodeInternals 会经 RF→zustand 打出
+   * Maximum update depth exceeded。
+   */
   useLayoutEffect(() => {
     if (!nodeId) return;
-    updateNodeInternals(nodeId);
-  }, [nodeId, visible, size, canvasConnecting, updateNodeInternals]);
+    scheduleUpdateNodeInternals(
+      `${dotVisible ? 1 : 0}|${size}|${canvasConnecting ? 1 : 0}`,
+    );
+  }, [nodeId, dotVisible, size, canvasConnecting, scheduleUpdateNodeInternals]);
 
   useEffect(() => {
     if (!dotVisible) setOpen(false);
@@ -204,6 +206,11 @@ export function Pro2NodeSidePlus({
       return;
     }
     const onPointerMove = (e: PointerEvent) => {
+      if (pointerBlocksSidePlusMagnet(e.clientX, e.clientY)) {
+        magnetActiveRef.current = false;
+        setMagnetOffset({ x: 0, y: 0 });
+        return;
+      }
       const host = hostNodeEl();
       if (!host) return;
       const rect = host.getBoundingClientRect();
@@ -283,6 +290,10 @@ export function Pro2NodeSidePlus({
     setOpen(false);
     setMenuAnchor(null);
   }, []);
+
+  useEffect(() => {
+    if (connectingFromNodeId) closeMenu();
+  }, [connectingFromNodeId, closeMenu]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();

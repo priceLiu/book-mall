@@ -31,7 +31,7 @@
 
 | 态 | 节点标题 | 节点内 Stage | 底部 Dock |
 | --- | --- | --- | --- |
-| **initial** | **故事脚本生成** | Logo +「尝试：」三条能力说明（剧本/视频参考/角色 → 分镜脚本）+ 底部引导文案 | `Pro2ScriptInputDock` · 模型 + 剧情输入 + 发送 |
+| **initial** | **故事脚本生成** | Logo +「尝试：」左栏能力快捷 + 右栏 **剧本类别**（古风甜宠 / 默认剧本大师） | `Pro2ScriptInputDock` · 模型 + 剧情输入 + 发送 |
 | **connected** | **故事脚本生成** | Logo + 连线说明（如「已链接文本节点 · 在下方 Dock 输入后发送」） | 上游 Chip + 输入 + 发送 |
 | **generated** | **大纲主题**（来自 `resolvePro2HubTableTitle`） | **大纲 / 角色 / 脚本** Tab（`Pro2ScriptHubViewTabs`）+ GFM 预览；生成中 Loader | 输入 + 发送；选中且已有分镜表时显示 `Pro2ScriptHubToolbar` |
 | **error** | 故事脚本生成 或 主题标题 | 由 section runtime 写入（见 script-hub helpers） | Dock 可重试 |

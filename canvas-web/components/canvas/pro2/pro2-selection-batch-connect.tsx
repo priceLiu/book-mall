@@ -29,6 +29,11 @@ import {
   buildSbv1VideoEngineNodeData,
   selectSbv1NodeAfterSpawn,
 } from "@/lib/canvas/sbv1-spawn-nodes";
+import {
+  resolveJianyingAutoRenderNodeSize,
+  withFlowNodeDimensions,
+} from "@/lib/canvas/jianying-auto-render-node-size";
+import { ensureNodeDragHandles, sortNodesForReactFlow } from "@/lib/canvas/normalize-graph-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { NODE_DEFAULT_SIZE, type CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
@@ -286,6 +291,23 @@ function Pro2SelectionBatchConnectLayerInner({
       if (!newId) return;
       connectBatchToTarget(newId, targetHandle);
       clearPreview();
+      if (nodeType === "jianying-auto-render-pro2") {
+        const size = resolveJianyingAutoRenderNodeSize({
+          sourceNodes: eligibleSources,
+          nodes: useCanvasStore.getState().nodes,
+        });
+        setNodes((prev) =>
+          ensureNodeDragHandles(
+            sortNodesForReactFlow(
+              prev.map((n) =>
+                n.id === newId
+                  ? withFlowNodeDimensions(n, size.width, size.height)
+                  : n,
+              ),
+            ),
+          ),
+        );
+      }
       if (nodeType === "sbv1-video-engine" || nodeType === "sbv1-image") {
         selectSbv1NodeAfterSpawn(setNodes, newId);
       } else {

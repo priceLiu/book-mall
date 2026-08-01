@@ -19,6 +19,7 @@ import { LIBTV_MEDIA_FIT_VERSION } from "./libtv-node-chrome";
 import {
   computeLibtvMediaNodeSize,
   isLibtvMediaNodeBoxStale,
+  reconcileLibtvMediaNodeBoxSizes,
 } from "./libtv-media-node-size";
 
 const GROUP_PADDING = 84;
@@ -992,7 +993,8 @@ export function normalizeCanvasNodes(
   nodes: CanvasFlowNode[],
   edges?: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
-  const withSbv1Fit = resetStaleSbv1MediaFit(nodes);
+  const withUnifiedMediaBox = reconcileLibtvMediaNodeBoxSizes(nodes);
+  const withSbv1Fit = resetStaleSbv1MediaFit(withUnifiedMediaBox);
   const withLlmParams = migrateStoryOutlineLlmParamsAll(withSbv1Fit);
   const withDimensions = ensureExplicitNodeDimensions(withLlmParams);
   const sized = normalizeStoryControlNodeSizes(

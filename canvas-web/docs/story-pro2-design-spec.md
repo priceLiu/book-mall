@@ -242,6 +242,7 @@
 | --- | --- |
 | 职责 | 分镜表 / 角色表 hub；驱动三视图板、分镜图板生成 |
 | 卡片 | 标题 + 内容预览 `Pro2ScriptHubContentPreview`；Tab 视图在检视 / 工具条切换 |
+| 空态 Try | **左栏**：上传剧本 · 文生视频 · 角色（`TRY_ACTIONS`）；**右栏**：「剧本类别」— 古风甜宠短剧剧本 / 默认剧本大师（点击 → 左侧 spawn 文本 + 连线，写入 preset；**不在 Dock 底栏**） |
 | 工具条 | 卡片内 `Pro2ScriptHubToolbar`（生成三视图 / 分镜图 / 打开表编辑器等） |
 | Dock | 唯一选中 → `Pro2ScriptInputDock`；LLM · 表级操作 |
 | 侧 `+` | 同文本节点菜单映射 |

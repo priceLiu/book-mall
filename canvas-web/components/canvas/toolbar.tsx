@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Bookmark,
@@ -71,6 +71,7 @@ export function CanvasToolbar({
   inflightTaskCount = 0,
   immersive = false,
   onToggleImmersive,
+  centerLeading,
 }: {
   projectName: string;
   onProjectNameChange: (name: string) => void;
@@ -95,6 +96,8 @@ export function CanvasToolbar({
   inflightTaskCount?: number;
   immersive?: boolean;
   onToggleImmersive?: () => void;
+  /** 顶栏中部 · 「回到画布列表」左侧（如 Pro2 关联剧本包） */
+  centerLeading?: ReactNode;
 }) {
   const router = useRouter();
   const mineMenu = useCanvasToolbarDropdown();
@@ -297,22 +300,25 @@ export function CanvasToolbar({
           </span>
         ) : null}
       </div>
-      <Link
-        href="/projects"
-        onClick={(e) => void onBackToProjects(e)}
-        className={cn(
-          CANVAS_TOOLBAR_BTN_CLASS,
-          "justify-self-center whitespace-nowrap",
-          (leavingProject || imageUploadPending) && "opacity-80",
-        )}
-      >
-        {leavingProject ? (
-          <Loader2 className="size-3 animate-spin" />
-        ) : (
-          <ArrowLeft className="size-3" />
-        )}{" "}
-        {leavingProject ? "正在保存图片…" : "回到画布列表"}
-      </Link>
+      <div className="flex min-w-0 items-center justify-center gap-2">
+        {centerLeading}
+        <Link
+          href="/projects"
+          onClick={(e) => void onBackToProjects(e)}
+          className={cn(
+            CANVAS_TOOLBAR_BTN_CLASS,
+            "whitespace-nowrap",
+            (leavingProject || imageUploadPending) && "opacity-80",
+          )}
+        >
+          {leavingProject ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <ArrowLeft className="size-3" />
+          )}{" "}
+          {leavingProject ? "正在保存图片…" : "回到画布列表"}
+        </Link>
+      </div>
       <div
         data-canvas-toolbar-actions
         className="flex min-w-0 items-center justify-end gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

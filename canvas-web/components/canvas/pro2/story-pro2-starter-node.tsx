@@ -171,10 +171,11 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   }, [uploadedMd, hasOutline, outlineMd, d.themeInput]);
 
   const nodeLabel = useMemo(() => {
+    if (isStoryOutlineMode) return "故事大纲";
     const starters = nodes.filter((n) => n.type === "story-pro2-starter");
     const idx = starters.findIndex((n) => n.id === id);
     return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
-  }, [nodes, id]);
+  }, [nodes, id, isStoryOutlineMode]);
 
   const leftAddMenuSections = PRO2_STARTER_LEFT_ADD_MENU;
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
@@ -182,6 +183,9 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
   const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
+  const showFloatingToolbar = Boolean(
+    soleSelected && hasCardContent && !isGenerating,
+  );
 
   const openEditor = useCallback(() => {
     if (!hasCardContent || isGenerating) return;
@@ -459,8 +463,8 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {soleSelected ? (
-        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
+      {showFloatingToolbar ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
           <Pro2ThinNodeToolbar
             onSaveAsAsset={() =>
               saveAsAsset(

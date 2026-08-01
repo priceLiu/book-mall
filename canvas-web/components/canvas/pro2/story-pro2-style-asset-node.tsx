@@ -169,7 +169,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {soleSelected ? (
+      {soleSelected && previewUrl ? (
         <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
       ) : null}
 

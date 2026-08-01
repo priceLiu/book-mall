@@ -5,6 +5,9 @@ export const SBV1_VIDEO_COMPOSE_LABEL = "视频";
 
 import {
   LIBTV_CARD_DRAG_CLASS,
+  LIBTV_INPUT_DOCK_BG,
+  LIBTV_INPUT_DOCK_BORDER,
+  LIBTV_INPUT_DOCK_TEXTAREA_CLASS,
   LIBTV_MEDIA_CARD_SHELL_CLASS,
   LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_DRAG_ANYWHERE_NODE_TYPES,
@@ -12,16 +15,12 @@ import {
   LIBTV_NODE_OUTER_CLASS,
   LIBTV_VIDEO_NODE_HEADER_HEIGHT,
 } from "./libtv-node-chrome";
-import {
-  PRO2_DOCK_BORDER,
-  PRO2_DOCK_SHELL_BG,
-  PRO2_DOCK_TEXTAREA_CLASS,
-} from "./story-pro2-node-chrome";
 
-/** 视频合成 · 默认 635×365（宽 stage · 与 Pro2 分镜视频组格解耦） */
-export const SBV1_VIDEO_ENGINE_WIDTH = 635;
-export const SBV1_VIDEO_ENGINE_HEIGHT = 365;
-export const SBV1_VIDEO_ENGINE_MIN_WIDTH = 380;
+/** 视频合成 · 默认 630 宽 · 4:3 stage（与 100% 媒体标准一致） */
+export const SBV1_VIDEO_ENGINE_WIDTH = 630;
+export const SBV1_VIDEO_ENGINE_HEIGHT =
+  LIBTV_VIDEO_NODE_HEADER_HEIGHT + Math.round((SBV1_VIDEO_ENGINE_WIDTH * 3) / 4);
+export const SBV1_VIDEO_ENGINE_MIN_WIDTH = 220;
 /** 拉伸下限 */
 export const SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT = 218;
 /** @deprecated 使用 SBV1_VIDEO_ENGINE_HEIGHT */
@@ -52,10 +51,10 @@ export const SBV1_DOCK_BORDER = "border-white/10";
 export const SBV1_CHAT_INPUT_SHELL_CLASS =
   "nodrag relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-[0_8px_32px_rgba(0,0,0,0.35)]";
 export const SBV1_CHAT_INPUT_SHELL_STYLE = {
-  borderColor: PRO2_DOCK_BORDER,
-  background: PRO2_DOCK_SHELL_BG,
+  borderColor: LIBTV_INPUT_DOCK_BORDER,
+  background: LIBTV_INPUT_DOCK_BG,
 } as const;
-export const SBV1_CHAT_INPUT_TEXTAREA_CLASS = PRO2_DOCK_TEXTAREA_CLASS;
+export const SBV1_CHAT_INPUT_TEXTAREA_CLASS = LIBTV_INPUT_DOCK_TEXTAREA_CLASS;
 
 /** 视频 Dock 正文 · 与顶栏 px-2 对齐，去掉 Pro2 左侧额外 1 字符留白 */
 export const SBV1_VIDEO_DOCK_TEXTAREA_INSET_CLASS =

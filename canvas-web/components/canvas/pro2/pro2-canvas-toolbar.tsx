@@ -170,7 +170,7 @@ export function Pro2CanvasToolbar({
       },
       {
         id: "script",
-        name: "故事脚本生成",
+        name: "故事剧本生成",
         icon: <FileText strokeWidth={1.75} />,
         color: "bg-gradient-to-br from-rose-400 to-red-600",
         onClick: onQuickScript,

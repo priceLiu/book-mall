@@ -88,8 +88,8 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      {soleSelected ? (
-        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
+      {soleSelected && hasBody ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected && hasBody}>
           <div className="flex flex-col items-center gap-2">
             <LibtvMarkdownFormatToolbar
               textareaRef={taRef}

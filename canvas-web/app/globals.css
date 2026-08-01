@@ -229,6 +229,14 @@ html[data-canvas-editor-open] body {
   overflow: hidden;
 }
 
+/** 添加节点菜单 · 屏上固定字号（不受画布 zoom / 系统 text-size-adjust 影响） */
+.pro2-add-menu {
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 [data-canvas-editor] {
   overflow: hidden;
   width: 100%;

@@ -1,6 +1,9 @@
 import {
   LIBTV_IMAGE_NODE_HEADER_HEIGHT,
   LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE,
+  LIBTV_MEDIA_TOP_EDGE_LANDSCAPE_BASE,
+  LIBTV_MEDIA_TOP_EDGE_PORTRAIT_BASE,
+  LIBTV_MEDIA_TOP_EDGE_SQUARE_BASE,
   LIBTV_VIDEO_NODE_HEADER_HEIGHT,
 } from "./libtv-node-chrome";
 import {
@@ -9,7 +12,6 @@ import {
   PRO2_CHARACTER_THREE_VIEW_WIDTH,
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
-  PRO2_IMAGE_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import {
   SBV1_IMAGE_NODE_MIN_HEIGHT,
@@ -20,6 +22,7 @@ import {
 import type { Sbv1ImageAspectRatio } from "./sbv1-image-models";
 import type { Sbv1AspectRatio } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
+import { groupHasSbv1VideoChildren } from "./sbv1-media-group-meta";
 
 export type LibtvMediaAspectPresetProfile =
   | "pro2-image"
@@ -43,6 +46,8 @@ export const LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES = new Set([
   "story-pro2-mood",
 ]);
 
+export type LibtvMediaBoxOrientation = "landscape" | "portrait" | "square";
+
 /** 解析比例字符串为宽高比数值 */
 export function parseAspectRatioToNumbers(ratio: string): {
   w: number;
@@ -60,17 +65,49 @@ export function parseAspectRatioToNumbers(ratio: string): {
   return { w, h };
 }
 
-function sizeFromBaseWidth(args: {
+/** 由宽高比判定横 / 竖 / 方 */
+export function libtvMediaBoxOrientation(
+  aspectW: number,
+  aspectH: number,
+): LibtvMediaBoxOrientation {
+  if (aspectW === aspectH) return "square";
+  if (aspectW > aspectH) return "landscape";
+  return "portrait";
+}
+
+/** 用户在 Dock 选比例后的顶边基准（× scale） */
+function aspectPresetDim(base: number): number {
+  const scale = LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE;
+  if (!Number.isFinite(scale) || scale <= 1) return base;
+  return Math.ceil(base * scale);
+}
+
+/** 三种标准顶边长度之一（全尺寸媒体卡） */
+export function libtvMediaTopEdgeSpan(
+  orientation: LibtvMediaBoxOrientation,
+): number {
+  switch (orientation) {
+    case "landscape":
+      return aspectPresetDim(LIBTV_MEDIA_TOP_EDGE_LANDSCAPE_BASE);
+    case "portrait":
+      return aspectPresetDim(LIBTV_MEDIA_TOP_EDGE_PORTRAIT_BASE);
+    case "square":
+      return aspectPresetDim(LIBTV_MEDIA_TOP_EDGE_SQUARE_BASE);
+  }
+}
+
+/** 横版 / 方形：固定 stage 宽（顶边），按 aspect 算 stage 高与外框总高 */
+export function sizeFromFixedTopEdge(args: {
   aspectW: number;
   aspectH: number;
-  baseWidth: number;
+  topEdgeWidth: number;
   headerHeight: number;
   minWidth: number;
   minHeight: number;
 }): { width: number; height: number } {
-  const { aspectW, aspectH, baseWidth, headerHeight, minWidth, minHeight } =
+  const { aspectW, aspectH, topEdgeWidth, headerHeight, minWidth, minHeight } =
     args;
-  let width = baseWidth;
+  let width = topEdgeWidth;
   let stageH = Math.round(width * (aspectH / aspectW));
   let height = headerHeight + stageH;
 
@@ -89,11 +126,164 @@ function sizeFromBaseWidth(args: {
   return { width: Math.ceil(width), height: Math.ceil(height) };
 }
 
-/** 用户在 Dock 选比例后的基准宽/下限（× `LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE`） */
-function aspectPresetDim(base: number): number {
-  const scale = LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE;
-  if (!Number.isFinite(scale) || scale <= 1) return base;
-  return Math.ceil(base * scale);
+/** 竖版：固定 stage 长边（高），按 aspect 算宽与外框总高 */
+export function sizeFromFixedPortraitStageHeight(args: {
+  aspectW: number;
+  aspectH: number;
+  stageLongEdge: number;
+  headerHeight: number;
+  minWidth: number;
+  minHeight: number;
+}): { width: number; height: number } {
+  const {
+    aspectW,
+    aspectH,
+    stageLongEdge,
+    headerHeight,
+    minWidth,
+    minHeight,
+  } = args;
+  let stageH = stageLongEdge;
+  let width = Math.round(stageH * (aspectW / aspectH));
+  let height = headerHeight + stageH;
+
+  if (width < minWidth) {
+    width = minWidth;
+    stageH = Math.round(width * (aspectH / aspectW));
+    height = headerHeight + stageH;
+  }
+  if (height < minHeight) {
+    height = minHeight;
+    stageH = Math.max(1, height - headerHeight);
+    width = Math.ceil(stageH * (aspectW / aspectH));
+    height = headerHeight + stageH;
+  }
+
+  return { width: Math.ceil(width), height: Math.ceil(height) };
+}
+
+type LibtvMediaBoxPresetOpts = {
+  aspectW: number;
+  aspectH: number;
+  headerHeight: number;
+  minWidth: number;
+  minHeight: number;
+  profile: LibtvMediaAspectPresetProfile;
+};
+
+function resolveLandscapeWidthForProfile(
+  profile: LibtvMediaAspectPresetProfile,
+): number {
+  if (profile === "pro2-frame-cell" || profile === "pro2-video-cell") {
+    return PRO2_FRAME_CELL_WIDTH;
+  }
+  if (profile === "three-view") {
+    return aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_WIDTH);
+  }
+  return libtvMediaTopEdgeSpan("landscape");
+}
+
+function resolvePortraitStageHeightForProfile(
+  profile: LibtvMediaAspectPresetProfile,
+): number {
+  if (profile === "pro2-frame-cell" || profile === "pro2-video-cell") {
+    return PRO2_FRAME_CELL_WIDTH;
+  }
+  if (profile === "three-view") {
+    return Math.round(
+      aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_WIDTH) * (16 / 9),
+    );
+  }
+  return libtvMediaTopEdgeSpan("portrait");
+}
+
+function resolveSquareEdgeForProfile(
+  profile: LibtvMediaAspectPresetProfile,
+): number {
+  if (profile === "pro2-frame-cell" || profile === "pro2-video-cell") {
+    return PRO2_FRAME_CELL_WIDTH;
+  }
+  if (profile === "three-view") {
+    return aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_WIDTH);
+  }
+  return libtvMediaTopEdgeSpan("square");
+}
+
+/**
+ * LibTV 媒体外框 · 唯一尺寸算法（@ zoom 100%）。
+ * 横版固定宽 · 竖版固定 stage 高 · 方形固定边长。
+ */
+export function computeLibtvMediaBoxFromAspect(args: LibtvMediaBoxPresetOpts): {
+  width: number;
+  height: number;
+} {
+  const { aspectW, aspectH, headerHeight, minWidth, minHeight, profile } = args;
+  const orientation = libtvMediaBoxOrientation(aspectW, aspectH);
+
+  if (orientation === "portrait") {
+    return sizeFromFixedPortraitStageHeight({
+      aspectW,
+      aspectH,
+      stageLongEdge: resolvePortraitStageHeightForProfile(profile),
+      headerHeight,
+      minWidth,
+      minHeight,
+    });
+  }
+
+  const topEdgeWidth =
+    orientation === "square"
+      ? resolveSquareEdgeForProfile(profile)
+      : resolveLandscapeWidthForProfile(profile);
+
+  return sizeFromFixedTopEdge({
+    aspectW,
+    aspectH,
+    topEdgeWidth,
+    headerHeight,
+    minWidth,
+    minHeight,
+  });
+}
+
+export function libtvMediaProfileBoxLimits(profile: LibtvMediaAspectPresetProfile): {
+  headerHeight: number;
+  minWidth: number;
+  minHeight: number;
+} {
+  if (profile === "sbv1-video" || profile === "sbv1-image") {
+    return {
+      headerHeight: LIBTV_VIDEO_NODE_HEADER_HEIGHT,
+      minWidth: aspectPresetDim(SBV1_VIDEO_ENGINE_MIN_WIDTH),
+      minHeight: aspectPresetDim(SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT),
+    };
+  }
+  if (profile === "pro2-video-cell") {
+    return {
+      headerHeight: LIBTV_VIDEO_NODE_HEADER_HEIGHT,
+      minWidth: PRO2_FRAME_CELL_MIN_WIDTH,
+      minHeight: PRO2_FRAME_CELL_MIN_HEIGHT,
+    };
+  }
+  if (profile === "pro2-frame-cell") {
+    return {
+      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+      minWidth: PRO2_FRAME_CELL_MIN_WIDTH,
+      minHeight: PRO2_FRAME_CELL_MIN_HEIGHT,
+    };
+  }
+  if (profile === "three-view") {
+    return {
+      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+      minWidth: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH),
+      minHeight: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT),
+    };
+  }
+  return {
+    headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+    minWidth: aspectPresetDim(PRO2_IMAGE_NODE_MIN_WIDTH),
+    minHeight: aspectPresetDim(PRO2_IMAGE_NODE_MIN_HEIGHT),
+  };
 }
 
 /** 按声明比例计算 LibTV 媒体节点外框（含标题栏）· 生成前/选比例后立即应用 */
@@ -102,74 +292,18 @@ export function computeLibtvMediaAspectPresetSize(
   profile: LibtvMediaAspectPresetProfile,
 ): { width: number; height: number } {
   const { w, h } = parseAspectRatioToNumbers(aspectRatio);
-
-  if (profile === "sbv1-video") {
-    return sizeFromBaseWidth({
-      aspectW: w,
-      aspectH: h,
-      baseWidth: aspectPresetDim(635),
-      headerHeight: LIBTV_VIDEO_NODE_HEADER_HEIGHT,
-      minWidth: aspectPresetDim(SBV1_VIDEO_ENGINE_MIN_WIDTH),
-      minHeight: aspectPresetDim(SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT),
-    });
-  }
-
-  if (profile === "sbv1-image") {
-    return sizeFromBaseWidth({
-      aspectW: w,
-      aspectH: h,
-      baseWidth: aspectPresetDim(635),
-      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
-      minWidth: aspectPresetDim(SBV1_IMAGE_NODE_MIN_WIDTH),
-      minHeight: aspectPresetDim(SBV1_IMAGE_NODE_MIN_HEIGHT),
-    });
-  }
-
-  if (profile === "three-view") {
-    return sizeFromBaseWidth({
-      aspectW: w,
-      aspectH: h,
-      baseWidth: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_WIDTH),
-      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
-      minWidth: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH),
-      minHeight: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT),
-    });
-  }
-
-  if (profile === "pro2-frame-cell") {
-    return sizeFromBaseWidth({
-      aspectW: w,
-      aspectH: h,
-      baseWidth: aspectPresetDim(PRO2_FRAME_CELL_WIDTH),
-      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
-      minWidth: aspectPresetDim(PRO2_FRAME_CELL_MIN_WIDTH),
-      minHeight: aspectPresetDim(PRO2_FRAME_CELL_MIN_HEIGHT),
-    });
-  }
-
-  if (profile === "pro2-video-cell") {
-    return sizeFromBaseWidth({
-      aspectW: w,
-      aspectH: h,
-      baseWidth: aspectPresetDim(PRO2_FRAME_CELL_WIDTH),
-      headerHeight: LIBTV_VIDEO_NODE_HEADER_HEIGHT,
-      minWidth: aspectPresetDim(PRO2_FRAME_CELL_MIN_WIDTH),
-      minHeight: aspectPresetDim(PRO2_FRAME_CELL_MIN_HEIGHT),
-    });
-  }
-
-  return sizeFromBaseWidth({
+  const limits = libtvMediaProfileBoxLimits(profile);
+  return computeLibtvMediaBoxFromAspect({
     aspectW: w,
     aspectH: h,
-    baseWidth: aspectPresetDim(PRO2_IMAGE_NODE_WIDTH),
-    headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
-    minWidth: aspectPresetDim(PRO2_IMAGE_NODE_MIN_WIDTH),
-    minHeight: aspectPresetDim(PRO2_IMAGE_NODE_MIN_HEIGHT),
+    profile,
+    ...limits,
   });
 }
 
 export function resolveLibtvMediaAspectPresetProfile(
-  node: Pick<CanvasFlowNode, "type" | "data">,
+  node: Pick<CanvasFlowNode, "type" | "data" | "parentId">,
+  allNodes?: CanvasFlowNode[],
 ): LibtvMediaAspectPresetProfile | null {
   const type = node.type ?? "";
   const d = (node.data ?? {}) as { pro2MediaRole?: string };
@@ -179,12 +313,22 @@ export function resolveLibtvMediaAspectPresetProfile(
   if (type === "sbv1-video-engine") {
     return role === "video" ? "pro2-video-cell" : "sbv1-video";
   }
-  if (type === "sbv1-image") return "sbv1-image";
+  /** sbv1 图片与视频合成须同一 profile，避免 350×2 vs 635×2 分叉 */
+  if (type === "sbv1-image") return "sbv1-video";
   if (
     type === "story-pro2-image" ||
     type === "story-pro2-prop" ||
     type === "story-pro2-mood"
   ) {
+    // 分镜/场景格固定小宫格；其余只要组内已有视频引擎，就与 sbv1-video 外框对齐
+    // （含 pro2Kind=frame-board 混组：此前只认 isSbv1MediaGroup，导致图 700、视频 1270）
+    if (
+      node.parentId &&
+      allNodes &&
+      groupHasSbv1VideoChildren(node.parentId, allNodes)
+    ) {
+      return "sbv1-video";
+    }
     if (role === "frame" || role === "scene") return "pro2-frame-cell";
     return "pro2-image";
   }
@@ -226,7 +370,7 @@ export function resolveEffectiveAspectRatioForPreset(
   ) {
     return "16:9";
   }
-  if (profile === "sbv1-video") return "4:3";
+  if (profile === "sbv1-video" || profile === "sbv1-image") return "4:3";
   return "1:1";
 }
 
@@ -241,6 +385,24 @@ export function libtvNodeUsesAspectPreset(node: {
     (node.data as { mediaAspectPreset?: string } | undefined)?.mediaAspectPreset
       ?.trim(),
   );
+}
+
+export function readAspectPresetProfileFromFitKey(
+  fitKey?: string | null,
+): LibtvMediaAspectPresetProfile | null {
+  if (!fitKey?.startsWith("aspect-preset|")) return null;
+  const profile = fitKey.split("|")[2]?.trim();
+  if (
+    profile === "pro2-image" ||
+    profile === "pro2-frame-cell" ||
+    profile === "pro2-video-cell" ||
+    profile === "three-view" ||
+    profile === "sbv1-image" ||
+    profile === "sbv1-video"
+  ) {
+    return profile;
+  }
+  return null;
 }
 
 /**

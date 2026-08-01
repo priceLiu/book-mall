@@ -64,16 +64,18 @@
 
 **禁止**：媒体 Stage 单独 `bg-black/40`（会盖住 `#262626`）。
 
-**默认尺寸**（真源 `lib/canvas/libtv-node-chrome.ts` · **Pro2 与 sbv1 须 alias，禁止分叉硬编码**）：
+**默认尺寸**（画布 **zoom=100%** · 真源 `lib/canvas/libtv-node-chrome.ts` · `computeLibtvMediaBoxFromAspect`）：
 
-| 节点 / 场景 | 尺寸 | Token |
-| --- | --- | --- |
-| 方形图片媒体（`story-pro2-image` · `story-pro2-style-asset` · **`sbv1-image`**） | **350 × 350** | `LIBTV_SQUARE_IMAGE_NODE_*` · `PRO2_IMAGE_NODE_*` · `SBV1_IMAGE_NODE_*` |
-| Pro2 分镜视频组格 | **350 × 232** | `LIBTV_VIDEO_MEDIA_NODE_*` · `PRO2_VIDEO_CELL_*` |
-| **`sbv1-video-engine` / 视频合成** | **635 × 365** | `SBV1_VIDEO_ENGINE_*`（宽 stage · 不与组格同尺寸） |
-| 组内分镜图格 | **296 × 196** | `PRO2_FRAME_CELL_*` |
+| 节点 / 场景 | stage（预览区） | 整卡外框（含标题栏） | Token |
+| --- | --- | --- | --- |
+| 图片/视频 **16:9** | **630 × 354** | 630 × 392（视频 header 38） | `LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH` |
+| 图片/视频 **9:16** | **354 × 630** | 354 × 668（视频） | `LIBTV_MEDIA_STAGE_PORTRAIT_HEIGHT` |
+| 图片/视频 **1:1** | **354 × 354** | 354 × 398（图 header 44） | `LIBTV_MEDIA_STAGE_SQUARE_EDGE` |
+| 方形空态默认 | 354 × 354 | 354 × 398 | `LIBTV_SQUARE_IMAGE_NODE_*` |
+| Pro2 分镜视频组格 | **296 × 196** stage | — | `PRO2_FRAME_CELL_*` |
+| **`sbv1-video-engine` 空态** | 4:3 @ 630 宽 | **630 × 511** | `SBV1_VIDEO_ENGINE_*` |
 
-**禁止**：sbv1 图片单独定义与 Pro2 不同的默认尺寸；新节点勿用 `libtvMediaNodeHeightForWidth`（4:3 历史 helper）。
+**禁止**：sbv1 图片单独定义与 Pro2 不同的全尺寸媒体外框；新节点勿用 `libtvMediaNodeHeightForWidth`（4:3 历史 helper）。
 
 **媒体到达后自动适配**（空态保持上表默认 · 有图/有视频后按真实宽高比改尺寸）：
 

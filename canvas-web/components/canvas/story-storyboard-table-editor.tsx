@@ -89,6 +89,7 @@ export function StoryStoryboardTableEditor({
         description: "",
         dialogue: "—",
         duration: "",
+        aiImagePrompt: "",
         aiVideoPrompt: "",
         lipSyncNote: "",
         videoPrompt: "",

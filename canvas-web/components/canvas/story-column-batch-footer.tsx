@@ -4,10 +4,9 @@ import {
   storyEditionBatchBtnClass,
   type StoryEdition,
 } from "@/lib/canvas/story-edition-chrome";
+import { STORY_ORANGE_BTN_CLASS } from "@/lib/canvas/story-node-chrome";
 
-/** 漫剧引擎节点底栏主按钮：亮橙实心，禁用时不变暗 */
-export const STORY_ORANGE_BTN_CLASS =
-  "rounded-md bg-[#fb923c] font-medium text-black hover:bg-[#fdba74] disabled:cursor-not-allowed disabled:bg-[#fb923c] disabled:text-black disabled:opacity-100 disabled:hover:bg-[#fb923c]";
+export { STORY_ORANGE_BTN_CLASS };
 
 /** 漫剧三列节点底栏：固定在 NodeShell 底部，不随内容滚动 */
 export function StoryColumnBatchFooter({

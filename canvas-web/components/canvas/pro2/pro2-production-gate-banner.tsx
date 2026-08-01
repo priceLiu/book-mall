@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { AlertTriangle, Link2, Loader2 } from "lucide-react";
+import { Link2, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -10,10 +10,12 @@ import { acquireProjectAssetLease } from "@/lib/canvas-api";
 import { buildCrewBulletinGraphAnchorFromAsset } from "@/lib/canvas/crew-bulletin-graph-anchor";
 import { listPickableScriptPackages } from "@/lib/canvas/list-pickable-script-packages";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
+import { CANVAS_TOOLBAR_BTN_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
+import { cn } from "@/lib/utils";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 
-/** 生产画布 · 关联剧本提示条（非强制阻断） */
-export function Pro2ProductionGateBanner() {
+/** Pro2 顶栏 · 关联剧本包（悬停显示完整说明） */
+export function Pro2ProductionGateToolbarLink() {
   const collaboration = useCrewCollaborationAccess();
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
@@ -117,20 +119,19 @@ export function Pro2ProductionGateBanner() {
 
   return (
     <>
-      <div className="pointer-events-none absolute left-1/2 top-3 z-[56] flex -translate-x-1/2 justify-center px-3">
-        <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-950/90 px-3 py-2 text-[11px] text-amber-100/95 shadow-lg">
-          <AlertTriangle className="size-3.5 shrink-0" />
-          <span className="flex-1">{gate.message}</span>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-md border border-amber-300/30 px-2 py-0.5 text-[10px] hover:bg-amber-500/15"
-            onClick={() => void openPicker()}
-          >
-            <Link2 className="size-3" />
-            关联剧本包
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        className={cn(
+          CANVAS_TOOLBAR_BTN_CLASS,
+          "whitespace-nowrap text-amber-200/90 hover:text-amber-100",
+        )}
+        title={gate.message}
+        aria-label={gate.message ? `关联剧本包 — ${gate.message}` : "关联剧本包"}
+        onClick={() => void openPicker()}
+      >
+        <Link2 className="size-3" />
+        关联剧本包
+      </button>
 
       {pickerOpen ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4">
@@ -178,4 +179,9 @@ export function Pro2ProductionGateBanner() {
       ) : null}
     </>
   );
+}
+
+/** @deprecated 使用顶栏 {@link Pro2ProductionGateToolbarLink} */
+export function Pro2ProductionGateBanner() {
+  return null;
 }

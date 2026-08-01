@@ -1088,12 +1088,20 @@ async function executeStoryLlmEngineTask(
       data: {
         status: "FAILED",
         failCode: code,
-        failMessage: msg.slice(0, 500),
+        failMessage: storyLlmUserFailMessage(msg),
         completedAt: new Date(),
       },
     });
     return { reused: false, task: updated };
   }
+}
+
+function storyLlmUserFailMessage(raw: string): string {
+  const msg = raw.trim();
+  if (/aborted due to timeout|timed out|timeout/i.test(msg)) {
+    return "文本模型生成超时（长剧本/大输出较慢，约需数分钟）。请直接重试；若仍失败可缩短上游剧本或暂时换更快模型。";
+  }
+  return msg.slice(0, 500);
 }
 
 /** Story LLM 引擎 —— 同步 Markdown 文本，不注入海报 system prompt。 */

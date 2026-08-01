@@ -596,21 +596,14 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           onPick={onSidePick("right")}
         />
 
-        {showFloatingToolbar ? (
-          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
-            {showToolbar ? (
-              <LibtvVideoNodeToolbar
-                passNodeDrag
-                previewUrl={videoUrl}
-                onExpandPreview={() => setPreviewOpen(true)}
-                onDuplicateNode={onDuplicateNode}
-              />
-            ) : (
-              <LibtvVideoNodeToolbar
-                passNodeDrag
-                onDuplicateNode={onDuplicateNode}
-              />
-            )}
+        {showToolbar ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showToolbar}>
+            <LibtvVideoNodeToolbar
+              passNodeDrag
+              previewUrl={videoUrl}
+              onExpandPreview={() => setPreviewOpen(true)}
+              onDuplicateNode={onDuplicateNode}
+            />
           </LibtvNodeToolbarPortal>
         ) : null}
 

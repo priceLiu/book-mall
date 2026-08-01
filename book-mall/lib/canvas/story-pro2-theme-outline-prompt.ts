@@ -1,11 +1,30 @@
 /**
  * 影视专业版 2.0 · 文本节点「主题 → 故事大纲」系统提示词
- * canvas-web/lib/canvas/story-pro2-theme-outline-prompt.ts 须保持同步
+ * book-mall/lib/canvas/story-pro2-theme-outline-prompt.ts 须保持同步
  */
+import {
+  PRO2_STORYBOARD_FEW_SHOT_COMPACT,
+  PRO2_UNIVERSAL_NEGATIVE,
+  STORY_PRO2_CORE_CONFLICT_TABLE_RULES,
+  STORY_PRO2_HANDOFF_TABLE_RULES,
+  STORY_PRO2_PACK_V6_MARKER,
+  STORY_PRO2_STORYBOARD_TABLE_HEADER,
+  STORY_PRO2_VIDEO_PROMPT_RULES,
+  STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6,
+} from "./data/pro2-production-pack-standard";
+import {
+  PRO2_GU_FENG_CREATIVE_RULES,
+  PRO2_GU_FENG_GFM_OUTPUT_RULES,
+} from "./data/pro2-gu-feng-tian-chong-rules";
+import { PRO2_GU_FENG_VISUAL_ASSET_EXAMPLE } from "./data/pro2-gu-feng-visual-asset-example";
+import {
+  PRO2_GU_FENG_CHARACTER_IMAGE_RULES,
+  PRO2_GU_FENG_SCENE_IMAGE_RULES,
+  PRO2_GU_FENG_VIDEO_SHOT_RULES,
+} from "./data/pro2-gu-feng-generative-prompt-rules";
 import { STORY_PRO_PACK_OUTPUT_RULES } from "./story-pro-script-pack";
+import { STORY_PRO_PLANNER_SYSTEM_PREFIX } from "./story-pro-theme-templates";
 import { STORY_PRO2_SCENE_PROMPT_VERSION_MARKER } from "./story-pro2-scene-image-prompt";
-
-const STORY_PRO_PLANNER_SYSTEM_PREFIX = `你是一位顶级的影视级AI视觉导演与漫剧总策划。你的核心任务是将故事剧本转化为极具电影感、可落地执行的视觉方案。输出的提示词必须遵循“高级感、氛围感、可执行性”三大原则，优先考虑AI生图/生视频的可行性（镜头景别明确、场景元素可控、灯光逻辑清晰）。严禁输出任何非结构化内容。`;
 
 /** 大纲「场景视觉辞典 · 生图关键词」与场景段共用 · 纯环境空镜约束 */
 export const STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES = `- **生图关键词（纯环境空镜约束）**：须描述纯物理环境与气氛，供后续 **广角环境建立镜头 / 空镜** 生图使用
@@ -17,27 +36,29 @@ export const STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES = `- **生图关键词（纯
 - 错误示例：「摄政王府外院，女子坐于长凳，男子跪地为其穿鞋，月光特写」`;
 
 /** 大纲「视觉风格总纲」GFM 表 · 与 visualStylePack 解析一致 */
-export const STORY_PRO2_VISUAL_STYLE_TABLE_RULES = `- **视觉风格总纲**须用 GFM 表输出（表头不可改），供全片三视图/场景/分镜/道具生图统一风格：
+export const STORY_PRO2_VISUAL_STYLE_TABLE_RULES = STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6;
 
-| 维度 | 内容 |
-|------|------|
-| 故事背景/世界观 | （一句话） |
-| 年代 | （如唐代长安 / 近未来赛博） |
-| 画面风格 | （如电影级写实、国风水墨） |
-| 色调卡 | （主色 + 辅助色 + 禁忌色） |
-| 光影基调 | （如侧光、低饱和、暖金色调） |
-| 英文风格锚定 | （可直接 prepend 到 AI 生图 prompt 的英文短语） |
+export { STORY_PRO2_PACK_V6_MARKER };
 
-- 各字段须 **具体可执行**，禁止空泛「高质量」「精美」；后续生图节点将自动读取此表。`;
+/** @deprecated v5 指纹 · 仅旧 migrate 对照 */
+export const STORY_PRO2_PACK_V5_MARKER = "相邻镜头站位起止";
 
-export const STORY_PRO2_PACK_PROMPT_VERSION = 4;
+export const STORY_PRO2_PACK_PROMPT_VERSION = 6;
+
+/** 默认 pack v6 · 通用专业约束（非题材专属） */
+export const STORY_PRO2_PROFESSIONAL_CHARACTER_RULES = `- **视觉锚点**：外貌关键词不超过 10 个词；服装主色须写 HEX 或固定色名，全剧不得 drift
+- **AI生图提示词(英文)** 须与外貌/服装列一致，可直接用于三视图/分镜生图`;
+
+export const STORY_PRO2_PROFESSIONAL_STORYBOARD_RULES = `- **站位衔接**：每镜「画面描述」须标注 **【起始】…【结束】**，与上一镜/下一镜可无缝拼接
+- **时长一致**：各镜 \`时长(秒)\` 之和须与大纲目标总时长一致（±5 秒）`;
 
 export function isLegacyStoryPro2HubOutlinePrompt(prompt: string): boolean {
   const t = prompt.trim();
   if (!t) return true;
   if (!t.includes("故事剧本 · 大纲段")) return true;
   if (!t.includes("纯环境空镜约束")) return true;
-  if (!t.includes("英文风格锚定")) return true;
+  if (!t.includes(STORY_PRO2_PACK_V6_MARKER)) return true;
+  if (!t.includes("日景调色板")) return true;
   return false;
 }
 
@@ -47,16 +68,26 @@ export function isLegacyStoryPro2ScenePrompt(prompt: string): boolean {
   return !t.includes(STORY_PRO2_SCENE_PROMPT_VERSION_MARKER);
 }
 
+export function isLegacyStoryPro2StoryboardPrompt(prompt: string): boolean {
+  const t = prompt.trim();
+  if (!t) return true;
+  if (!t.includes("AI生图提示词(英文)")) return true;
+  if (!t.includes("Seedance")) return true;
+  if (!t.includes("【起始】")) return true;
+  if (!t.includes("禁止照抄示例剧名")) return true;
+  return false;
+}
+
 export const STORY_PRO2_THEME_OUTLINE_SYSTEM = `${STORY_PRO_PLANNER_SYSTEM_PREFIX}
 
 用户将提供故事主题、梗概或若干场景描述。请输出 **Markdown 故事大纲 / 制作包前段**（不要 JSON、不要代码块）。
 
 ${STORY_PRO_PACK_OUTPUT_RULES}
 
-# 必须包含的章节（## 标题字面一致）
+# 必须包含的章节（## 标题字面一致 · ${STORY_PRO2_PACK_V6_MARKER}）
 
 ## 视觉风格总纲
-${STORY_PRO2_VISUAL_STYLE_TABLE_RULES}
+${STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6}
 
 ## 场景视觉辞典
 GFM 表，表头不可改：
@@ -67,13 +98,10 @@ GFM 表，表头不可改：
 ${STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES}
 
 ## 核心冲突与结构摘要
-完整展开：世界观、核心冲突、主要人物、情节起承转合；保留可拆分为分镜的信息量（短题材不少于 400 字）。
+${STORY_PRO2_CORE_CONFLICT_TABLE_RULES}
 
 ## 下一步交接清单
-GFM 表：
-
-| 环节 | 说明 | 建议工具/步骤 |
-|------|------|---------------|
+${STORY_PRO2_HANDOFF_TABLE_RULES}
 
 ## 画幅与比例（2.0 补充）
 - 推荐画幅比例：（如 16:9 / 9:16 / 2.35:1，并简述理由）
@@ -82,28 +110,30 @@ GFM 表：
 # 约束
 - 考虑 AI 生图/生视频可行性：优先单人镜头、可控场景数
 - 输出中文；不要 JSON；不要用代码块包裹全文
-- 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（表头与专业版一致），不得留空表`;
+- 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（9 列表头），不得留空表`;
 
 export const STORY_PRO2_THEME_OUTLINE_USER_PREFIX =
   "请根据以下故事主题或内容，生成完整故事大纲：";
 
 /** 2.0 脚本生成器 · 大纲段（主题 / 上游文本 / Dock 补充 → 制作包前段） */
-export const STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT = `# 任务：故事剧本 · 大纲段（视觉风格 + 场景 + 结构 + 交接）
+export const STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT = `# 任务：故事剧本 · 大纲段（视觉风格 + 场景 + 结构 + 交接 · ${STORY_PRO2_PACK_V6_MARKER}）
 
 你将收到故事主题、梗概或上游创意参考。请输出 **Markdown**（不要 JSON、不要代码块）。
 
 ${STORY_PRO_PACK_OUTPUT_RULES}
 
 # 本段须输出的 ## 章节
-## 视觉风格总纲（GFM 表：维度 | 内容，须含故事背景/世界观、年代、画面风格、色调卡、光影基调、英文风格锚定）
-${STORY_PRO2_VISUAL_STYLE_TABLE_RULES}
+## 视觉风格总纲
+${STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6}
 ## 场景视觉辞典（GFM 表：场景名 | 环境 | 时间 | 气氛 | 生图关键词）
 ${STORY_PRO2_SCENE_DICT_EMPTY_SHOT_RULES}
 ## 核心冲突与结构摘要
-## 下一步交接清单（GFM 表：环节 | 说明 | 建议工具/步骤）
+${STORY_PRO2_CORE_CONFLICT_TABLE_RULES}
+## 下一步交接清单
+${STORY_PRO2_HANDOFF_TABLE_RULES}
 
 - **章节标题与表头分行**；禁止标题与表头写在同一行
-- 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（表头与专业版一致），不得留空表
+- 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（9 列表头），不得留空表
 
 ${STORY_PRO2_THEME_OUTLINE_USER_PREFIX}`;
 
@@ -135,12 +165,13 @@ export const STORY_PRO2_CHARACTER_PROMPT = `# 任务：角色视觉辞典（AI �
 ## AI生图提示词(英文)（每角色必填）
 - 格式：可直接用于 AI 生图的英文提示词
 - 包含：gender, age, face shape, hair (color/style/length), eyes, skin tone, build, clothing details, accessories, distinctive features
-- 示例：young Chinese boy, 10 years old, round face, short black hair, bright eyes, fair skin, chubby build, wearing white tank top and blue shorts, energetic expression
 
 - **必须**输出上表；每行一个主要角色（3~8 行）
 - **外貌描写字数不少于 50 字**；泛泛写「普通/一般」无法生成一致角色
 - 若大纲中已有角色信息，须 **完整迁移并扩写**，不得删行
-- 只输出「## 角色视觉辞典」+ 一张表，不要 JSON`;
+- 只输出「## 角色视觉辞典」+ 一张表，不要 JSON
+
+${STORY_PRO2_PROFESSIONAL_CHARACTER_RULES}`;
 
 /** 2.0 脚本节点 · 场景段（根据大纲场景辞典生成 AI 生图提示词） */
 export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI 生图预备 · ${STORY_PRO2_SCENE_PROMPT_VERSION_MARKER}）
@@ -170,27 +201,23 @@ export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI �
   - ❌ 禁止描写人物动作（如"走来"、"看向"、"拿起"、"交谈"、"转身"、"跪地"、"穿鞋"）
   - ❌ 禁止描写面部表情、肢体动作、双人互动，或中景/近景/特写以人物为主体的构图
   - ✅ 只允许描写：空间结构、建筑材质、光线来源与方向、色彩基调、天气气象、表面质感与纹理、环境声音/气味、静态置景与道具
-  - 正确示例："废弃工厂内部，挑高穹顶，午后阳光从破裂天窗斜射而入，空气中漂浮金色尘埃，地面布满锈蚀机械零件，整体呈冷灰色调，广角空镜"
-  - 错误示例（含人物）："主角走进废弃工厂，皱着眉头环顾四周，阳光照在他脸上"
-  - 错误示例（叙事互动）："王府外院草地，女子坐于长凳，男子跪地为其穿鞋，月光下对视"
 
 ## AI生图提示词(英文)（每场景必填 · 纯背景空镜约束）
 - 格式：可直接用于 AI 文生图的英文提示词
-- **【严格约束】生成的提示词必须以场景环境为主体，默认广角建立镜头，禁止包含人物、人形、面部、中近景人物主体：**
-  - ❌ 禁止出现与人物相关的词汇：person, people, human, character, figure, face, eye, expression, hand, arm, leg, body, portrait, couple, interaction, kneeling, sitting together, close-up, medium shot, focus on face, character POV
-  - ❌ 禁止出现与人物相关的镜头术语：close-up shot, medium shot, two-shot, over-the-shoulder, focus on face, character POV
-  - ✅ 必须使用：establishing shot, wide shot, full environment view, landscape view, empty scene, devoid of people, no characters
-  - ✅ 必须包含：location（地点）, time of day（时间）, lighting（光线）, weather/climate（天气）, atmosphere（气氛）, key props（关键道具）, composition（构图）, cinematic style（电影风格）
-  - 若且仅若大纲「生图关键词」含 **【含人物】** 或 **【角色出镜】**，才可在英文 prompt 中加入明确的人物描述；否则一律 empty scene
-  - 正确示例（纯场景）："abandoned factory interior, tall arched ceiling, afternoon sunlight streaming through broken skylight, golden dust particles floating in the air, rusted mechanical parts scattered on concrete floor, cold gray tone, cinematic wide establishing shot, empty scene, no people"
-  - 错误示例（含人物）❌："a young man walking through abandoned factory, looking around with worried expression, sunlight hitting his face, wearing a leather jacket"
-  - 错误示例（互动特写）❌："woman sitting on bench, man kneeling to put shoes on her feet, moonlit courtyard, intimate medium shot"
+- **【严格约束】生成的提示词必须以场景环境为主体，默认广角建立镜头，禁止包含人物、人形、面部、中近景人物主体**
+- ✅ 必须使用：establishing shot, wide shot, full environment view, empty scene, devoid of people, no characters
+- ✅ 必须包含：location, time of day, lighting, atmosphere, cinematic style, realistic textures, 35mm, 2K
 
 - 每行对应大纲场景视觉辞典中的一行；行数须一致
 - 只输出「## 场景视觉提示词」+ 一张表，不要 JSON`;
 
 /** 2.0 脚本节点 · 分镜段（基于故事大纲，非「上传剧本」） */
-export const STORY_PRO2_STORYBOARD_PROMPT = `# 任务：分镜脚本表（AI 生图/生视频预备 · 定稿拆分真源）
+export const STORY_PRO2_STORYBOARD_PROMPT = `# 任务：分镜脚本表（AI 生图/生视频预备 · 定稿拆分真源 · ${STORY_PRO2_PACK_V6_MARKER}）
+
+【硬性指标 · 未达标视为失败】
+- 须输出 **8–14 镜**完整序列；**禁止**只输出 1 镜概括、禁止「镜数规划/总时长」小表代替分镜表
+- **每镜必填** \`时长(秒)\` **正整数**；各镜时长之和须与大纲目标总时长一致（±5 秒）
+- 只输出 **## 分镜脚本** + **一张** 9 列 GFM 表；不要 JSON、不要代码块
 
 根据 **已连接的故事大纲 / 创意参考包**、**场景视觉提示词**、风格总纲与角色辞典，将故事拆解为镜头序列。**须与大纲题材、人物、场景一致**；禁止只输出 3～5 个概括镜头，禁止套用与大纲无关的示例剧情。
 
@@ -202,41 +229,87 @@ export const STORY_PRO2_STORYBOARD_PROMPT = `# 任务：分镜脚本表（AI 生
 # 输出格式（表头列名不可改）
 ## 分镜脚本
 
-| 镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI生图提示词(英文) | AI视频提示词(英文) | 口型/配音备注 |
-|------|------|------|----------|------|----------|---------------------|---------------------|---------------|
+${STORY_PRO2_STORYBOARD_TABLE_HEADER}
 
 # 字段详解（务必详尽）
 
 ## 景别（影响画面构图）
 - 远景/全景/中景/中近景/近景/特写/大特写
-- 根据叙事需要选择：情绪爆发用特写，场景交代用远景
 
 ## 运镜（影响视频动态感）
-- 固定/推/拉/摇/移/跟/升/降/环绕/手持晃动
-- 每镜须明确运镜方式，禁止全部写「固定」
+- 固定/推/拉/摇/移/跟/升/降/环绕/手持晃动；每镜须明确，禁止全部写「固定」
 
 ## 画面描述（AI 生图/视频的视觉指导）
-- **角色**：姓名（须与角色辞典一致）、表情、姿势、动作
-- **场景**：环境名（须与场景辞典一致）、光线、天气、氛围
-- **构图**：主体位置、前景/背景元素、画面层次
-- 字数 **不少于 30 字**
+- **【起始】…【结束】** 站位与动作起止；字数不少于 30 字
+- **角色/场景** 须与辞典一致
 
-## AI生图提示词(英文)（每镜必填 · 用于分镜图生成）
-- 格式：可直接用于 AI 生图的英文提示词
-- 包含：角色外貌特征（复用角色辞典）、表情、姿势、服装、场景环境、光线、构图、风格
-- 示例：young Chinese boy with round face and short black hair, wearing white tank top and blue shorts, excited expression, standing in front of watermelon stall, afternoon sunlight, school gate background, cinematic composition, warm summer atmosphere
+## AI生图提示词(英文)（每镜必填）
+- 英文 cinematic prompt：角色外貌、表情、姿势、服装、场景、光线、35mm、2K
 
-## AI视频提示词(英文)（每镜必填 · 用于分镜视频生成）
-- 格式：可直接用于 AI 视频生成的英文提示词
-- 包含：主体、动作、环境、镜头运动、氛围、风格
-- **必须包含动态描述**：角色动作、镜头移动、环境变化
-- 示例：young Chinese boy running excitedly towards watermelon stall, camera following from behind, afternoon golden sunlight, busy school gate with students walking, cinematic slow motion, warm summer vibes
+${STORY_PRO2_VIDEO_PROMPT_RULES}
 
 - 镜号从 1 **连续递增**；时长为整数秒；短片不少于 **8** 镜
 - **对白**列：格式「角色名：台词」；无对白写「—」
-- **画面描述**写镜头视觉，不要把台词堆在这一列
-- 有对白时在 **口型/配音备注** 标注口型同步或后期配音
-- 只输出「## 分镜脚本」+ 一张表，不要 JSON`;
+- 只输出「## 分镜脚本」+ 一张表，不要 JSON
+
+${STORY_PRO2_PROFESSIONAL_STORYBOARD_RULES}
+
+${PRO2_STORYBOARD_FEW_SHOT_COMPACT}`;
+
+const STORY_PRO2_GU_FENG_APPENDIX_BASE = `
+${PRO2_GU_FENG_CREATIVE_RULES}
+
+${PRO2_GU_FENG_GFM_OUTPUT_RULES}
+
+# 映射范例
+${PRO2_GU_FENG_VISUAL_ASSET_EXAMPLE}`;
+
+const STORY_PRO2_GU_FENG_CHARACTER_APPENDIX = `
+${STORY_PRO2_GU_FENG_APPENDIX_BASE}
+
+${PRO2_GU_FENG_CHARACTER_IMAGE_RULES}
+
+# 全剧 Negative（角色/分镜生图共用）
+[Negative: ${PRO2_UNIVERSAL_NEGATIVE}]`;
+
+const STORY_PRO2_GU_FENG_SCENE_APPENDIX = `
+${STORY_PRO2_GU_FENG_APPENDIX_BASE}
+
+${PRO2_GU_FENG_SCENE_IMAGE_RULES}`;
+
+const STORY_PRO2_GU_FENG_STORYBOARD_APPENDIX = `
+${STORY_PRO2_GU_FENG_APPENDIX_BASE}
+
+${PRO2_GU_FENG_VIDEO_SHOT_RULES}
+
+# 分镜 AI 视频列 · 每镜末尾追加
+[Negative: ${PRO2_UNIVERSAL_NEGATIVE}]`;
+
+export const STORY_PRO2_GU_FENG_HUB_OUTLINE_FROM_THEME_PROMPT =
+  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT + STORY_PRO2_GU_FENG_APPENDIX_BASE;
+
+export const STORY_PRO2_GU_FENG_CHARACTER_PROMPT =
+  STORY_PRO2_CHARACTER_PROMPT + STORY_PRO2_GU_FENG_CHARACTER_APPENDIX;
+
+export const STORY_PRO2_GU_FENG_SCENE_PROMPT =
+  STORY_PRO2_SCENE_PROMPT + STORY_PRO2_GU_FENG_SCENE_APPENDIX;
+
+export const STORY_PRO2_GU_FENG_STORYBOARD_PROMPT =
+  STORY_PRO2_STORYBOARD_PROMPT + STORY_PRO2_GU_FENG_STORYBOARD_APPENDIX;
+
+export function storyPro2GuFengHubPromptPack(): {
+  promptOutline: string;
+  promptCharacter: string;
+  promptScene: string;
+  promptStoryboard: string;
+} {
+  return {
+    promptOutline: STORY_PRO2_GU_FENG_HUB_OUTLINE_FROM_THEME_PROMPT,
+    promptCharacter: STORY_PRO2_GU_FENG_CHARACTER_PROMPT,
+    promptScene: STORY_PRO2_GU_FENG_SCENE_PROMPT,
+    promptStoryboard: STORY_PRO2_GU_FENG_STORYBOARD_PROMPT,
+  };
+}
 
 export function storyPro2HubDefaultPromptPack(): {
   promptOutline: string;

@@ -14,7 +14,7 @@ import {
   PRO2_SCRIPT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
-import { resolveLibtvImageCellSize } from "./libtv-media-node-auto-fit";
+import { resolveLibtvMediaNodeBoxSize } from "./libtv-media-node-size";
 import type { CanvasFlowNode } from "./types";
 
 export const PRO2_MEDIA_GRID_GAP = 28;
@@ -50,6 +50,38 @@ export function pro2MediaGridCols(count: number): number {
   if (count <= 1) return 1;
   const rows = Math.max(1, Math.floor(Math.sqrt(count)));
   return Math.ceil(count / rows);
+}
+
+export type MediaGroupArrangeMode = "auto" | "row" | "column";
+
+export type MediaGroupRelayoutOpts = {
+  resetOrigin?: boolean;
+  /** 用户点「组排列」时强制重排，忽略 manualSize */
+  force?: boolean;
+  mode?: MediaGroupArrangeMode;
+};
+
+/** 组排列 · 横排 / 竖排 / 自动宫格列数 */
+export function mediaGroupArrangeCols(
+  count: number,
+  mode: MediaGroupArrangeMode = "auto",
+): number {
+  if (count <= 1) return 1;
+  if (mode === "row") return count;
+  if (mode === "column") return 1;
+  return pro2MediaGridCols(count);
+}
+
+function clearGroupManualSizeFlags(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+): CanvasFlowNode[] {
+  return nodes.map((n) => {
+    if (n.id !== groupId && n.parentId !== groupId) return n;
+    const d = n.data as { manualSize?: boolean };
+    if (!d.manualSize) return n;
+    return { ...n, data: { ...n.data, manualSize: false } };
+  });
 }
 
 export function pro2MediaChildSize(node: {
@@ -93,62 +125,43 @@ export function pro2MediaGridLayout(
   };
 }
 
-/** 读取子节点实际外框（含 auto-fit 后尺寸），布局时取 max(模板, 实测) */
-export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
+/** 读取子节点外框 · 委托 resolveLibtvMediaNodeBoxSize（禁止再读 node.width 旧值） */
+export function effectivePro2MediaChildSize(
+  node: CanvasFlowNode,
+  allNodes?: CanvasFlowNode[],
+): {
   width: number;
   height: number;
 } {
   const data = node.data as {
     pro2MediaRole?: string;
     gridSplitFrameCrop?: boolean;
-    mediaFit?: boolean;
   };
-  const cell = pro2MediaChildSize({
-    type: node.type,
-    pro2MediaRole: data.pro2MediaRole,
-  });
-  const style = node.style as { width?: number; height?: number } | undefined;
-  const w =
-    node.measured?.width ??
-    (typeof node.width === "number" ? node.width : undefined) ??
-    style?.width ??
-    cell.width;
-  const h =
-    node.measured?.height ??
-    (typeof node.height === "number" ? node.height : undefined) ??
-    style?.height ??
-    cell.height;
-  if (data.gridSplitFrameCrop && data.mediaFit) {
+  if (data.pro2MediaRole === "frame" || data.pro2MediaRole === "scene" || data.pro2MediaRole === "video") {
+    const cell = pro2MediaChildSize({
+      type: node.type,
+      pro2MediaRole: data.pro2MediaRole,
+    });
+    return cell;
+  }
+  if (data.gridSplitFrameCrop) {
+    const style = node.style as { width?: number; height?: number } | undefined;
+    const w =
+      node.measured?.width ??
+      (typeof node.width === "number" ? node.width : undefined) ??
+      style?.width ??
+      320;
+    const h =
+      node.measured?.height ??
+      (typeof node.height === "number" ? node.height : undefined) ??
+      style?.height ??
+      240;
     return {
       width: Math.max(1, Math.round(w)),
       height: Math.max(1, Math.round(h)),
     };
   }
-  const fitKey = (node.data as { mediaFitKey?: string }).mediaFitKey;
-  if ((data as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()) {
-    return {
-      width: Math.max(1, Math.round(w)),
-      height: Math.max(1, Math.round(h)),
-    };
-  }
-  if (fitKey?.startsWith("upload|") || fitKey?.startsWith("image|")) {
-    return {
-      width: Math.max(1, Math.round(w)),
-      height: Math.max(1, Math.round(h)),
-    };
-  }
-  if (
-    data.mediaFit &&
-    (node.type === "story-pro2-image" ||
-      node.type === "sbv1-image" ||
-      node.type === "story-pro2-three-view")
-  ) {
-    return resolveLibtvImageCellSize(node);
-  }
-  return {
-    width: Math.max(cell.width, Math.round(w)),
-    height: Math.max(cell.height, Math.round(h)),
-  };
+  return resolveLibtvMediaNodeBoxSize(node, allNodes);
 }
 
 type MediaChildLayout = {
@@ -222,8 +235,11 @@ export function mediaGridLayoutForChildren(
 export function pro2MediaGridLayoutForChildren(
   children: CanvasFlowNode[],
   cols: number,
+  allNodes?: CanvasFlowNode[],
 ): MediaChildLayout[] {
-  return mediaGridLayoutForChildren(children, cols, effectivePro2MediaChildSize);
+  return mediaGridLayoutForChildren(children, cols, (n) =>
+    effectivePro2MediaChildSize(n, allNodes ?? children),
+  );
 }
 
 export function pro2MediaGroupDimensionsFromLayouts(
@@ -357,30 +373,32 @@ function isMediaGroupChildForRelayout(
   return n.type === "story-pro2-image" || n.type === "story-pro2-three-view";
 }
 
-/** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 10;
+/** 布局版本：hydrate 仅对更低版本做一次 sbv1 组内网格迁移，不覆盖已保存坐标 */
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 11;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(
   nodes: CanvasFlowNode[],
   groupId: string,
-  opts?: { resetOrigin?: boolean },
+  opts?: MediaGroupRelayoutOpts,
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
   if (!group) return nodes;
+  const force = opts?.force === true;
   // 用户手动拖过组框尺寸后，禁止 auto-fit / relayout 覆盖 width/height
   if (
+    !force &&
     Boolean((group.data as { manualSize?: boolean }).manualSize) &&
     opts?.resetOrigin !== true
   ) {
     return sortNodesForReactFlow(nodes);
   }
 
+  let next = force ? clearGroupManualSizeFlags(nodes, groupId) : [...nodes];
+
   const controllerId = (group.data as { pro2ControllerNodeId?: string })
     .pro2ControllerNodeId;
   const hubNodeId = (group.data as { pro2HubNodeId?: string }).pro2HubNodeId;
-
-  let next = [...nodes];
 
   const shouldReparent = (n: CanvasFlowNode): boolean => {
     if (!isMediaGroupChildForRelayout(n, group)) return false;
@@ -412,8 +430,11 @@ export function applyPro2MediaGroupRelayout(
 
   if (children.length === 0) return sortNodesForReactFlow(next);
 
-  const cols = pro2MediaGridCols(children.length);
-  const layouts = pro2MediaGridLayoutForChildren(children, cols);
+  const cols = mediaGroupArrangeCols(
+    children.length,
+    opts?.mode ?? "auto",
+  );
+  const layouts = pro2MediaGridLayoutForChildren(children, cols, next);
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i]!;

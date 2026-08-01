@@ -19,6 +19,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { hasLibtvMediaCanvasNodes } from "@/lib/canvas/libtv-canvas-detect";
+import {
+  libtvCanvasReflowFitViewOptions,
+} from "@/lib/canvas/libtv-canvas-viewport-reflow";
+import {
+  CANVAS_VIEWPORT_MAX_ZOOM,
+  CANVAS_VIEWPORT_MIN_ZOOM,
+} from "@/lib/canvas/canvas-viewport-zoom";
 import { flushCanvasTextDrafts } from "@/lib/canvas/flush-text-drafts";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -89,6 +96,7 @@ import {
   buildDragSnapCandidates,
   canvasDragSnapThreshold,
   computeDragSnap,
+  filterNearbySnapCandidates,
   flowViewportRect,
   nodeSnapBox,
   snapGuideKey,
@@ -272,6 +280,15 @@ function FlowCanvasInner({
     }, 300);
   }, []);
 
+  const clearDragSnapGuides = useCallback(() => {
+    if (dragSnapRafRef.current !== null) {
+      cancelAnimationFrame(dragSnapRafRef.current);
+      dragSnapRafRef.current = null;
+    }
+    lastSnapGuideKeyRef.current = "";
+    setSnapGuides([]);
+  }, []);
+
   const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
   const storeOnEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const [rfNodes, setRfNodes, onRfNodesChange] = useNodesState<CanvasFlowNode>(
@@ -332,7 +349,22 @@ function FlowCanvasInner({
     const finishInitialFit = () => {
       initialFitDoneRef.current = true;
     };
-    // Pro2 打开保持 100% 视口，勿 fitView（单节点新建时 fitView 会放大节点）
+    const clearMediaReflowPending = () => {
+      useCanvasStore.getState().clearLibtvMediaViewportReflowPending();
+    };
+    const mediaReflowFit = () =>
+      fitView(libtvCanvasReflowFitViewOptions()).then(() => {
+        syncVp();
+        clearMediaReflowPending();
+      });
+
+    // 媒体外框迁移（如顶边统一算法）后须 fitView；否则旧 pan/zoom 下节点 2× 会溢出屏幕
+    if (isLibtv && state.libtvMediaViewportReflowPending) {
+      void mediaReflowFit().then(finishInitialFit);
+      return;
+    }
+
+    // Pro2 打开保持已保存视口，勿 fitView（单节点新建时 fitView 会放大节点）
     if (isLibtv && pro2FloatingInspector) {
       void rfSetViewport(state.viewport, { duration: 0 }).then(() => {
         syncVp();
@@ -1089,9 +1121,18 @@ function FlowCanvasInner({
   useEffect(() => {
     if (fitViewNonce <= 0) return;
     const syncVp = () => setViewport(getViewport());
+    const clearMediaReflowPending = () => {
+      useCanvasStore.getState().clearLibtvMediaViewportReflowPending();
+    };
+    const pendingMediaReflow =
+      useCanvasStore.getState().libtvMediaViewportReflowPending;
     const runFit = () =>
-      fitView({ padding: 0.12, duration: 0 }).then(() => {
+      fitView({
+        ...libtvCanvasReflowFitViewOptions(),
+        ...(pendingMediaReflow ? {} : { minZoom: CANVAS_VIEWPORT_MIN_ZOOM }),
+      }).then(() => {
         syncVp();
+        if (pendingMediaReflow) clearMediaReflowPending();
       });
     const t = window.requestAnimationFrame(() => {
       void runFit().then(() => {
@@ -1232,6 +1273,10 @@ function FlowCanvasInner({
       }
       setSnapGuides([]);
       lastSnapGuideKeyRef.current = "";
+      if (dragSnapRafRef.current !== null) {
+        cancelAnimationFrame(dragSnapRafRef.current);
+        dragSnapRafRef.current = null;
+      }
       if (enableDragSnapGuides) {
         const all = getNodes() as CanvasFlowNode[];
         const dragging = all.find((n) => n.id === node.id);
@@ -1274,17 +1319,23 @@ function FlowCanvasInner({
       if (dragSnapRafRef.current !== null) return;
       dragSnapRafRef.current = window.requestAnimationFrame(() => {
         dragSnapRafRef.current = null;
+        if (!isNodeDraggingRef.current) return;
         const all = getNodes() as CanvasFlowNode[];
         const dragging = all.find((n) => n.id === node.id);
         if (!dragging) return;
         const dragBox = nodeSnapBox(dragging, all);
+        const nearby = filterNearbySnapCandidates(
+          dragBox,
+          snapOthersRef.current,
+        );
         const guideViewport = resolveGuideViewport();
         const { guides } = computeDragSnap(
           dragBox,
-          snapOthersRef.current,
+          nearby,
           canvasDragSnapThreshold(getZoom()),
           guideViewport,
         );
+        if (!isNodeDraggingRef.current) return;
         const key = snapGuideKey(guides);
         if (key === lastSnapGuideKeyRef.current) return;
         lastSnapGuideKeyRef.current = key;
@@ -1324,7 +1375,7 @@ function FlowCanvasInner({
       setIsNodeDragging(false);
       setCanvasGeometryDragging(false);
       setCanvasDraggingNodeId(null);
-      setSnapGuides([]);
+      clearDragSnapGuides();
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
         dragUndoPausedRef.current = false;
@@ -1354,6 +1405,7 @@ function FlowCanvasInner({
         deferStoreGraphSyncRef.current = false;
         setDragHoverGroup(null);
         flushAutosaveAfterDrag();
+        snapOthersRef.current = [];
         return;
       }
       if (enableDragSnapGuides) {
@@ -1403,8 +1455,10 @@ function FlowCanvasInner({
       deferStoreGraphSyncRef.current = false;
       // 坐标可能在 handleNodesChange(dragging:false) 已写入 store；松手一律立即 flush
       flushAutosaveAfterDrag();
+      snapOthersRef.current = [];
     },
     [
+      clearDragSnapGuides,
       commitFlowPositionsFromRf,
       enableDragSnapGuides,
       findGroupAtPoint,
@@ -2104,8 +2158,8 @@ function FlowCanvasInner({
         zoomActivationKeyCode="Control"
         noWheelClassName="nowheel"
         noDragClassName="nodrag"
-        minZoom={0.02}
-        maxZoom={32}
+        minZoom={CANVAS_VIEWPORT_MIN_ZOOM}
+        maxZoom={CANVAS_VIEWPORT_MAX_ZOOM}
         connectionRadius={160}
         connectOnClick={false}
         connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}

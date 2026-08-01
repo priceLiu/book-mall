@@ -210,6 +210,31 @@ async function cancelQueueTimeouts(projectId?: string): Promise<number> {
   return res.count;
 }
 
+/** 交通控流 IMAGE/VIDEO：QUEUED 超过 QUEUE_TIMEOUT_MIN 则取消（合成 pending 行停止计时） */
+export async function cancelTrafficControlQueueTimeouts(
+  projectId?: string,
+): Promise<number> {
+  const cutoff = new Date(Date.now() - getQueueTimeoutMin() * 60_000);
+  const res = await prisma.canvasGenerationTask.updateMany({
+    where: {
+      status: "QUEUED",
+      ...(projectId ? { projectId } : {}),
+      ...canvasTrafficPayloadWhere(),
+      OR: [
+        { queuedAt: { lt: cutoff } },
+        { queuedAt: null, createdAt: { lt: cutoff } },
+      ],
+    },
+    data: {
+      status: "CANCELLED",
+      failCode: "QUEUE_TIMEOUT",
+      failMessage: `排队超过 ${getQueueTimeoutMin()} 分钟，请重试`,
+      completedAt: new Date(),
+    },
+  });
+  return res.count;
+}
+
 async function recoverStaleDispatching(projectId?: string): Promise<number> {
   const { recoverStalePreSubmitVideoTasks } = await import(
     "./recover-stale-dispatching"
@@ -502,6 +527,16 @@ export async function dispatchQueuedCanvasTasks(opts?: {
     } catch (e) {
       console.warn(
         "[canvas-dispatch] cancelQueueTimeouts failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    try {
+      result.cancelled += await cancelTrafficControlQueueTimeouts(
+        opts?.projectId,
+      );
+    } catch (e) {
+      console.warn(
+        "[canvas-dispatch] cancelTrafficControlQueueTimeouts failed",
         e instanceof Error ? e.message : String(e),
       );
     }

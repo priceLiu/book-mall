@@ -5,6 +5,14 @@ import { MiniMap, Panel, useReactFlow, useViewport } from "@xyflow/react";
 import { LayoutGrid, Map, Minus, Plus, Video } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  CANVAS_VIEWPORT_MAX_ZOOM,
+  CANVAS_VIEWPORT_MAX_ZOOM_PCT,
+  CANVAS_VIEWPORT_MIN_ZOOM,
+  CANVAS_VIEWPORT_MIN_ZOOM_PCT,
+  canvasViewportZoomAtMax,
+  canvasViewportZoomAtMin,
+} from "@/lib/canvas/canvas-viewport-zoom";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
@@ -99,6 +107,8 @@ export function CanvasViewportToolbar({
   }, [edition, reflowPro2, reflowSbv1, reflowComic, autoLayoutNodes, nodes]);
 
   const pct = Math.round(zoom * 100);
+  const atMinZoom = canvasViewportZoomAtMin(zoom);
+  const atMaxZoom = canvasViewportZoomAtMax(zoom);
   const minimapNodeColor =
     edition === "sbv1"
       ? () => "rgba(34,211,238,0.65)"
@@ -183,25 +193,28 @@ export function CanvasViewportToolbar({
           <div className="mx-0.5 h-5 w-px shrink-0 bg-white/10" aria-hidden />
           <button
             type="button"
-            className={viewportBtnClass()}
-            title="缩小"
+            className={cn(viewportBtnClass(), atMinZoom && "cursor-not-allowed opacity-35")}
+            title={atMinZoom ? `已缩至最小 ${CANVAS_VIEWPORT_MIN_ZOOM_PCT}%` : "缩小"}
             aria-label="缩小画布"
+            disabled={atMinZoom}
             onClick={() => zoomOut({ duration: 150 })}
           >
             <Minus className="size-4" strokeWidth={1.75} />
           </button>
           <span
-            className="min-w-[44px] select-none px-0.5 text-center text-[12px] font-medium tabular-nums text-white/90"
+            className="min-w-[52px] select-none px-0.5 text-center text-[12px] font-medium tabular-nums text-white/90"
             aria-live="polite"
             aria-label={`画布缩放 ${pct}%`}
+            title={`缩放范围 ${CANVAS_VIEWPORT_MIN_ZOOM_PCT}%～${CANVAS_VIEWPORT_MAX_ZOOM_PCT}%`}
           >
             {pct}%
           </span>
           <button
             type="button"
-            className={viewportBtnClass()}
-            title="放大"
+            className={cn(viewportBtnClass(), atMaxZoom && "cursor-not-allowed opacity-35")}
+            title={atMaxZoom ? `已放至最大 ${CANVAS_VIEWPORT_MAX_ZOOM_PCT}%` : "放大"}
             aria-label="放大画布"
+            disabled={atMaxZoom}
             onClick={() => zoomIn({ duration: 150 })}
           >
             <Plus className="size-4" strokeWidth={1.75} />

@@ -28,6 +28,10 @@ import {
   type JianyingMediaRenderTransitionKind,
 } from "@/lib/canvas/media-render-in-flight";
 import type { JianyingLibtvClipSlot } from "@/lib/canvas/jianying-from-workspace";
+import {
+  preserveAutoRenderNodeMediaFitPatch,
+  scheduleAutoRenderParentGroupRelayout,
+} from "@/lib/canvas/jianying-auto-render-layout";
 import { cn } from "@/lib/utils";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { JianyingClipOrderStrip } from "./jianying-clip-order-strip";
@@ -210,18 +214,21 @@ export function JianyingMediaRenderActions({
       setDoneUrl(downloadUrl);
       setExpiresAt(expires);
       updateNodeData(nodeId, {
-        videoUrl: downloadUrl,
-        posterUrl,
-        mediaRenderInFlight: null,
-        mediaFit: false,
-        mediaFitKey: undefined,
-        mediaRenderResult: {
-          downloadUrl,
-          expiresAt: expires,
-          completedAt: new Date().toISOString(),
-          ...(posterUrl ? { posterUrl } : {}),
-        },
+        ...preserveAutoRenderNodeMediaFitPatch(nodeId, {
+          videoUrl: downloadUrl,
+          posterUrl,
+          mediaRenderInFlight: null,
+          mediaFit: false,
+          mediaFitKey: undefined,
+          mediaRenderResult: {
+            downloadUrl,
+            expiresAt: expires,
+            completedAt: new Date().toISOString(),
+            ...(posterUrl ? { posterUrl } : {}),
+          },
+        }),
       });
+      scheduleAutoRenderParentGroupRelayout(nodeId);
       if (spawnPreview) {
         const state = useCanvasStore.getState();
         spawnJianyingRenderPreviewNode(nodeId, downloadUrl, {
@@ -252,14 +259,17 @@ export function JianyingMediaRenderActions({
         if (!spawnPreview) {
           // 剪辑完成立刻刷新节点预览；OSS 上传在后台继续，勿等 SUCCEEDED
           updateNodeData(nodeId, {
-            videoUrl: localUrl,
-            mediaRenderResult: null,
-            mediaFit: false,
-            mediaFitKey: undefined,
-            ...(job.posterUrl?.trim()
-              ? { posterUrl: job.posterUrl.trim() }
-              : { posterUrl: undefined }),
+            ...preserveAutoRenderNodeMediaFitPatch(nodeId, {
+              videoUrl: localUrl,
+              mediaRenderResult: null,
+              mediaFit: false,
+              mediaFitKey: undefined,
+              ...(job.posterUrl?.trim()
+                ? { posterUrl: job.posterUrl.trim() }
+                : { posterUrl: undefined }),
+            }),
           });
+          scheduleAutoRenderParentGroupRelayout(nodeId);
         }
         if (job.uploadFailed) {
           setUploadFailed(true);
