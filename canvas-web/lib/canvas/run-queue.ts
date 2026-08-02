@@ -671,7 +671,7 @@ function isIndependentCanvasNodeJob(job: CanvasStoryRunJob): boolean {
 
 function shouldAdvanceSequentialAfterHubFailure(
   node: CanvasFlowNode | undefined,
-  job: QueueItem,
+  job: CanvasStoryRunJob,
 ): boolean {
   if (!node || !job.llmSection || !isAnyStoryScriptHubType(node.type ?? "")) {
     return false;

@@ -5,6 +5,9 @@ import {
   probeServiceUrl,
 } from "@/lib/dev-hub-services";
 import { readDevHeartbeat } from "@/lib/dev-heartbeat";
+import { pollDbFailureStreak } from "@/lib/db-poll-backoff";
+import { getPrismaConnectionLimit } from "@/lib/prisma-pool-config";
+import { getPrismaDbGateSnapshot } from "@/lib/prisma-db-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,5 +46,10 @@ export async function GET() {
     checkedAt: new Date().toISOString(),
     services: serviceResults,
     backgroundTasks: taskResults,
+    database: {
+      connectionLimit: getPrismaConnectionLimit(),
+      pollDbFailureStreak: pollDbFailureStreak(),
+      gate: getPrismaDbGateSnapshot(),
+    },
   });
 }

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "登录",
-  description: "登录快速复制 QuickReplica，按示例快速复制生成视频、图像与场景。",
+  description: "登录快速复刻 QuickReplica，按示例快速复刻生成视频、图像与场景。",
 };
 
 function safeRedirect(raw: string | string[] | undefined): string {

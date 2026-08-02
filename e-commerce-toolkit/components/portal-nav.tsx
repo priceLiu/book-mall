@@ -48,7 +48,7 @@ export function buildPortalNavItems(book: string | null): Array<{
     },
     {
       key: "quick-replica",
-      label: "快速复制",
+      label: "快速复刻",
       href: reEnter(book, "quick-replica", qrOrigin),
     },
     { key: "story", label: "故事版", href: reEnter(book, "story", storyOrigin) },

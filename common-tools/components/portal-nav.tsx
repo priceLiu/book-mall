@@ -38,7 +38,7 @@ export function PortalNav({ current = "common-tools" }: { current?: PortalKey })
     { key: "e-commerce", label: "电商工具箱", href: reEnter(book, "e-commerce", ecomOrigin) },
     {
       key: "quick-replica",
-      label: "快速复制",
+      label: "快速复刻",
       href: reEnter(book, "quick-replica", qrOrigin),
     },
     { key: "story", label: "故事版", href: reEnter(book, "story", storyOrigin) },

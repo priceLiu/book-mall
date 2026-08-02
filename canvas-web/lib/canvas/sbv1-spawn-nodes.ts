@@ -29,6 +29,7 @@ import {
   resolveJianyingAutoRenderNodeSize,
   withFlowNodeDimensions,
 } from "./jianying-auto-render-node-size";
+import { flowPositionAtScreenPoint } from "./viewport-placement";
 
 const GAP = 48;
 const JIANYING_EXPORT_PRO2_WIDTH = 400;

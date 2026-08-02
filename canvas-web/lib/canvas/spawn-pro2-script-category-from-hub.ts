@@ -86,9 +86,9 @@ export function applyPro2ScriptCategoryFromHub(
       (hub.data as { modelKey?: string }).modelKey ??
       pro2ScriptCategoryStarterDefaults().modelKey,
     params: {
-      ...pro2ScriptCategoryStarterDefaults(
+      ...(pro2ScriptCategoryStarterDefaults(
         hub.data as Record<string, unknown>,
-      ).params,
+      ).params as Record<string, unknown>),
       ...((hub.data as { params?: Record<string, unknown> }).params ?? {}),
     },
   });

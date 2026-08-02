@@ -120,7 +120,7 @@ export function QrLoginForm({
       <div>
         <h1 className="text-2xl font-bold">欢迎回来</h1>
         <p className="mt-1 text-sm text-[var(--qr-text-secondary)]">
-          登录快速复制，继续你的创作
+          登录快速复刻，继续你的创作
         </p>
       </div>
 

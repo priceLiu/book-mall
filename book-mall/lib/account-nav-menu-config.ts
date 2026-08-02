@@ -90,7 +90,7 @@ export function buildAccountNavMenuGroups(input: {
     { kind: "action", id: "launch-tools", label: "AI 工具站", icon: Wrench },
     { kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid },
     { kind: "action", id: "launch-ecom", label: "电商工具箱", icon: LayoutGrid },
-    { kind: "action", id: "launch-quick-replica", label: "快速复制", icon: Copy },
+    { kind: "action", id: "launch-quick-replica", label: "快速复刻", icon: Copy },
   ];
 
   const billingItems: AccountNavMenuItem[] = [

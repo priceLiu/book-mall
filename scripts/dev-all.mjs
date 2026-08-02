@@ -106,7 +106,11 @@ if (!existsSync(concurrentlyBin)) {
 const child = spawn(concurrentlyBin, args, {
   cwd: root,
   stdio: "inherit",
-  env: process.env,
+  env: {
+    ...process.env,
+    /** 子进程非交互；poll-loop 等脚本依赖 */
+    CI: process.env.CI ?? "1",
+  },
 });
 
 child.on("exit", (code) => process.exit(code ?? 0));

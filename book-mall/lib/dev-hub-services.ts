@@ -93,7 +93,7 @@ export function getDevHubServices(): DevHubService[] {
     {
       id: "quick-replica",
       label: "quick-replica-web",
-      description: "快速复制 · 模板浏览 + 运动同步",
+      description: "快速复刻 · 模板浏览 + 运动同步",
       url: trimOrigin(
         process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN ??
           process.env.QUICK_REPLICA_PUBLIC_ORIGIN,

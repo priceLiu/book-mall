@@ -7,8 +7,14 @@ import {
   resolvePrismaReplicaUrl,
   getPrismaConnectionLimit,
 } from "@/lib/prisma-pool-config";
+import {
+  acquirePrismaDbSlot,
+  recordPrismaPoolTimeout,
+  releasePrismaDbSlot,
+} from "@/lib/prisma-db-gate";
 
 export { getPrismaConnectionLimit };
+export { getPrismaDbGateSnapshot } from "@/lib/prisma-db-gate";
 
 /**
  * 挂在 globalThis，避免 dev 热更新重复 `new PrismaClient()`。
@@ -78,24 +84,30 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
     query: {
       $allModels: {
         async $allOperations({ args, query }) {
-          let lastErr: unknown;
-          const startedAt = Date.now();
-          for (let attempt = 0; attempt <= DB_RETRY_MAX; attempt++) {
-            try {
-              return await query(args);
-            } catch (e) {
-              lastErr = e;
-              if (
-                !isPrismaConnectionUnavailable(e) ||
-                attempt === DB_RETRY_MAX ||
-                Date.now() - startedAt > DB_RETRY_BUDGET_MS
-              ) {
-                throw e;
+          await acquirePrismaDbSlot();
+          try {
+            let lastErr: unknown;
+            const startedAt = Date.now();
+            for (let attempt = 0; attempt <= DB_RETRY_MAX; attempt++) {
+              try {
+                return await query(args);
+              } catch (e) {
+                lastErr = e;
+                recordPrismaPoolTimeout(e);
+                if (
+                  !isPrismaConnectionUnavailable(e) ||
+                  attempt === DB_RETRY_MAX ||
+                  Date.now() - startedAt > DB_RETRY_BUDGET_MS
+                ) {
+                  throw e;
+                }
+                await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));
               }
-              await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));
             }
+            throw lastErr;
+          } finally {
+            releasePrismaDbSlot();
           }
-          throw lastErr;
         },
       },
     },

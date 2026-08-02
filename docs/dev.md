@@ -64,16 +64,16 @@ pnpm dev:all:story
 pnpm --dir book-mall db:ping
 ```
 
-**推荐**在 `book-mall/.env.local` 的 `DATABASE_URL` query 追加：
+**推荐**在 `book-mall/.env.local` 的 `DATABASE_URL` query 追加（直连 CDB 时可省略 `connection_limit`，代码默认注入 30；经 PgBouncer 建议显式 `15`）：
 
 ```
-connection_limit=10&pool_timeout=30&connect_timeout=15
+pool_timeout=30&connect_timeout=15
 ```
 
 | 场景 | 建议 |
 |------|------|
-| 全量 `pnpm dev:all:story` | `connection_limit=10`，改 URL 后**必须重启** dev:all |
-| 仍频繁 P1001 | `pnpm dev:all:nopoll`，手动单开 poll；或暂时只起 book-mall + canvas |
+| 全量 `pnpm dev:all` | book-mall **不再**硬编码 `PRISMA_CONNECTION_LIMIT=12`；直连默认 30/进程，PgBouncer 默认 15 |
+| 仍频繁 P2024 | `pnpm dev:all:nopoll` 或重启 dev:all；勿在 URL 设过小 `connection_limit`（如 10） |
 | 对账排队任务 | `pnpm --dir book-mall canvas:queued-reconcile` |
 | 洗误标 Gateway log | `pnpm --dir book-mall gateway:repair-insufficient-mislabel -- --apply` |
 

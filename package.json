@@ -5,19 +5,16 @@
   "scripts": {
     "dev:preflight": "node scripts/dev-preflight.mjs",
     "dev:preflight:kill": "node scripts/dev-preflight.mjs --kill",
-    "dev:all": "pnpm dev:preflight && node scripts/dev-all.mjs",
+    "dev:all": "pnpm install --prefer-offline && pnpm dev:preflight && node scripts/dev-all.mjs",
     "dev:all:clean": "pnpm dev:preflight:kill && pnpm dev:all",
     "build:prompt-vendor": "pnpm --dir prompt-optimizer-platform build:vendor",
     "build:prompt-vendor:copy": "node prompt-optimizer-platform/scripts/copy-vendor-dist.mjs --copy-only",
     "dev:all:story": "pnpm dev:all",
-    "dev:all:nopoll": "pnpm dev:preflight && node scripts/dev-all.mjs --no-poll",
+    "dev:all:nopoll": "pnpm install --prefer-offline && pnpm dev:preflight && node scripts/dev-all.mjs --no-poll",
     "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
   },
-  "packageManager": "pnpm@11.1.3+sha512.c85357fe17ca12dd23dd7071822666dfd7e3cb76fe214e3370b5ea2fb34f2a231185509b63e717f3cd0acb38dd3f8d82bcd5e8172400ae678b70ea4fbed0896d",
-  "dependencies": {
-    "html-to-image": "^1.11.13"
-  }
+  "packageManager": "pnpm@11.1.3+sha512.c85357fe17ca12dd23dd7071822666dfd7e3cb76fe214e3370b5ea2fb34f2a231185509b63e717f3cd0acb38dd3f8d82bcd5e8172400ae678b70ea4fbed0896d"
 }

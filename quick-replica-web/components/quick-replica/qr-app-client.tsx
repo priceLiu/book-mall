@@ -11,7 +11,7 @@ import {
 import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
 import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
-import { QrHomeWorksPanel } from "@/components/quick-replica/qr-home-works-panel";
+import { QrHomeHeroPanel } from "@/components/quick-replica/qr-home-hero-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
@@ -41,8 +41,9 @@ import { formatQrPlatformError } from "@/lib/qr-platform-fetch";
 import { PortalNav } from "@/components/portal-nav";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import {
-  QR_HOME_FEED_CACHE_KEY,
-  buildHomeFeedTemplates,
+  buildHomeCategoryCards,
+  type QrHomeCategoryCard,
+  QR_HOME_CARD_CATEGORIES,
 } from "@/lib/qr-home-feed";
 
 type SessionInfo = {
@@ -93,6 +94,10 @@ export function QrAppClient({
   const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [homeCategoryCards, setHomeCategoryCards] = useState<QrHomeCategoryCard[]>(() =>
+    buildHomeCategoryCards({}),
+  );
+  const homeCardsCacheRef = useRef<QrHomeCategoryCard[] | null>(null);
   const [kindsLoading, setKindsLoading] = useState(false);
   const kindsCacheRef = useRef<Map<QrCategory, QrKindBrowseItem[]>>(new Map());
   const templatesCacheRef = useRef<Map<string, QrTemplate[]>>(new Map());
@@ -135,23 +140,20 @@ export function QrAppClient({
   navModeRef.current = navMode;
 
   const loadHomeFeed = useCallback(async (force = false) => {
-    if (!force) {
-      const cached = templatesCacheRef.current.get(QR_HOME_FEED_CACHE_KEY);
-      if (cached) {
-        setTemplates(cached);
-        setTemplatesLoading(false);
-        return;
-      }
-    } else {
-      templatesCacheRef.current.delete(QR_HOME_FEED_CACHE_KEY);
+    if (!force && homeCardsCacheRef.current) {
+      setHomeCategoryCards(homeCardsCacheRef.current);
+      setTemplatesLoading(false);
+      return;
+    }
+    if (force) {
+      homeCardsCacheRef.current = null;
     }
 
     setTemplatesLoading(true);
     const requestNav = "home";
     try {
-      const categories = QR_CATEGORIES.map((c) => c.id);
       const results = await Promise.all(
-        categories.map(async (cat) => {
+        QR_HOME_CARD_CATEGORIES.map(async (cat) => {
           const res = await fetchQrPlatform(
             `/api/book-mall/api/platform/v1/quick-replica/templates?scope=all&category=${encodeURIComponent(cat)}`,
           );
@@ -161,9 +163,12 @@ export function QrAppClient({
         }),
       );
       if (navModeRef.current !== requestNav) return;
-      const feed = buildHomeFeedTemplates(results.flat());
-      templatesCacheRef.current.set(QR_HOME_FEED_CACHE_KEY, feed);
-      setTemplates(feed);
+      const byCategory = Object.fromEntries(
+        QR_HOME_CARD_CATEGORIES.map((cat, index) => [cat, results[index] ?? []]),
+      ) as Partial<Record<QrCategory, QrTemplate[]>>;
+      const cards = buildHomeCategoryCards(byCategory);
+      homeCardsCacheRef.current = cards;
+      setHomeCategoryCards(cards);
     } finally {
       if (navModeRef.current === requestNav) {
         setTemplatesLoading(false);
@@ -328,59 +333,10 @@ export function QrAppClient({
     setSelectedKind(null);
     setPinnedToolKey(null);
     setWorldOmniboxExpanded(false);
-    const cached = templatesCacheRef.current.get(QR_HOME_FEED_CACHE_KEY);
-    setTemplates(cached ?? []);
+    const cached = homeCardsCacheRef.current;
+    setHomeCategoryCards(cached ?? buildHomeCategoryCards({}));
     setTemplatesLoading(!cached);
   };
-
-  const openCategoryWithKind = useCallback(
-    (cat: QrCategory, kind: string, toolKey?: string | null) => {
-      setNavMode("category");
-      setCategory(cat);
-      setPinnedToolKey(toolKey ?? getKindDef(kind)?.toolKey ?? null);
-      setSelectedKind(kind);
-
-      if (cat === "audio") {
-        setMiddleMode("workspace");
-        setDraft(defaultWorkspaceDraft({ category: cat, kind, toolKey: toolKey ?? undefined }));
-      } else if (cat === "world") {
-        setMiddleMode("browse");
-        setWorldOmniboxExpanded(false);
-        setDraft(defaultWorkspaceDraft({ category: cat, kind }));
-      } else {
-        setMiddleMode("browse");
-      }
-
-      const cachedKinds = kindsCacheRef.current.get(cat);
-      setKindItems(cachedKinds ?? []);
-      setKindsLoading(!cachedKinds);
-
-      const cacheKey = qrTemplateCacheKey("all", cat, kind);
-      let cachedTemplates = templatesCacheRef.current.get(cacheKey);
-      if (!cachedTemplates && cat === "video" && kind === "text-to-video") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      if (!cachedTemplates && cat === "image" && kind === "create-image") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      if (!cachedTemplates && cat === "character" && kind === "create-character") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      if (!cachedTemplates && cat === "audio" && kind === "create-voiceover") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      setTemplates(cachedTemplates ?? []);
-      setTemplatesLoading(true);
-    },
-    [],
-  );
-
-  const onSelectHomeWork = useCallback(
-    (t: QrTemplate) => {
-      openCategoryWithKind(t.category, t.kind, t.toolKey ?? getKindDef(t.kind)?.toolKey ?? null);
-    },
-    [openCategoryWithKind],
-  );
 
   const refreshHomeFeed = useCallback(() => {
     if (navModeRef.current !== "home") return;
@@ -765,32 +721,42 @@ export function QrAppClient({
       <header
         className="flex shrink-0 items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
         style={{
-          borderBottom: "1px solid var(--qr-border)",
-          background: "var(--qr-bg-surface)",
+          borderBottom:
+            navMode === "home" ? "none" : "1px solid var(--qr-border)",
+          background:
+            navMode === "home"
+              ? "var(--qr-bg-page)"
+              : "var(--qr-bg-surface)",
         }}
       >
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            className="rounded-lg border p-2 lg:hidden"
-            style={{ borderColor: "var(--qr-border)" }}
-            onClick={() => setSidebarOpen(true)}
-            aria-label="打开菜单"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
+          {navMode !== "home" ? (
+            <button
+              type="button"
+              className="rounded-lg border p-2 lg:hidden"
+              style={{ borderColor: "var(--qr-border)" }}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="打开菜单"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          ) : null}
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 shrink-0" style={{ color: "var(--qr-brand)" }} />
             <span className="font-semibold">QuickReplica</span>
-            <span className="hidden text-xs qr-panel-muted sm:inline">快速复制</span>
+            <span className="hidden text-xs qr-panel-muted sm:inline">快速复刻</span>
           </div>
         </div>
 
         <div className="min-w-0 flex-1" aria-hidden />
 
         <div className="flex shrink-0 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 [&::-webkit-scrollbar]:hidden">
-          <PortalNav current="quick-replica" />
-          <span className="hidden h-4 w-px shrink-0 bg-white/15 sm:block" aria-hidden />
+          {navMode !== "home" ? (
+            <>
+              <PortalNav current="quick-replica" />
+              <span className="hidden h-4 w-px shrink-0 bg-white/15 sm:block" aria-hidden />
+            </>
+          ) : null}
           {bookAccountUrl ? (
             <a
               href={bookAccountUrl}
@@ -820,28 +786,30 @@ export function QrAppClient({
       </header>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <QrSidebar
-          compact={isWorldBrowse}
-          navMode={navMode}
-          category={category}
-          pinnedToolKey={pinnedToolKey}
-          sidebarOpen={sidebarOpen}
-          canManageFeatured={canManageFeatured}
-          onCloseSidebar={() => setSidebarOpen(false)}
-          onHome={onHome}
-          onCategory={onCategory}
-          onMyWorks={onMyWorks}
-          onGenerateHistory={onGenerateHistory}
-          onPinnedTool={onPinnedTool}
-          onAdmin={canManageFeatured ? onAdmin : undefined}
-        />
+        {navMode !== "home" ? (
+          <QrSidebar
+            compact={isWorldBrowse}
+            navMode={navMode}
+            category={category}
+            pinnedToolKey={pinnedToolKey}
+            sidebarOpen={sidebarOpen}
+            canManageFeatured={canManageFeatured}
+            onCloseSidebar={() => setSidebarOpen(false)}
+            onHome={onHome}
+            onCategory={onCategory}
+            onMyWorks={onMyWorks}
+            onGenerateHistory={onGenerateHistory}
+            onPinnedTool={onPinnedTool}
+            onAdmin={canManageFeatured ? onAdmin : undefined}
+          />
+        ) : null}
 
         {navMode === "home" ? (
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <QrHomeWorksPanel
-              templates={templates}
+            <QrHomeHeroPanel
+              cards={homeCategoryCards}
               loading={templatesLoading}
-              onSelectWork={onSelectHomeWork}
+              onCategoryClick={onCategory}
               onRefresh={refreshHomeFeed}
             />
           </main>
@@ -916,6 +884,7 @@ export function QrAppClient({
         )}
       </div>
 
+      {navMode !== "home" ? (
       <nav
         className="flex shrink-0 justify-around px-2 py-2 lg:hidden"
         style={{
@@ -953,6 +922,7 @@ export function QrAppClient({
           );
         })}
       </nav>
+      ) : null}
 
       <QrTemplatePreviewModal
         template={previewTemplate}

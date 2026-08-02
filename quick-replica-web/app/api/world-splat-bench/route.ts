@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   const token = request.cookies.get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json(
-      { error: "未登录", hint: "请先登录快速复制，再打开本测速接口" },
+      { error: "未登录", hint: "请先登录快速复刻，再打开本测速接口" },
       { status: 401 },
     );
   }

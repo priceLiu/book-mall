@@ -244,7 +244,7 @@ export default function AdminQuickReplicaTemplatesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">快速复制 · 模板库</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">快速复刻 · 模板库</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             维护各分类下的公开模板：编辑封面图/视频与提示词，或新增模板。内置模板（JSON）保存时会写入数据库覆盖层，前台即时生效；删除覆盖可恢复内置默认。
           </p>

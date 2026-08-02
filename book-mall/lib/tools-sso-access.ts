@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getGoldMemberAccess } from "@/lib/gold-member";
 import { getMembershipFlags } from "@/lib/membership";
-import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import {
   getMembershipToolAccess,
+  invalidateMembershipToolAccessCache,
 } from "@/lib/membership-tool-access";
 
 export type ToolsSsoEligibility = {
@@ -28,18 +28,47 @@ export type ToolsSsoEligibility = {
   image: string | null;
 };
 
-/** 工具站 SSO：须有效产品线；Admin 前台无 bypass，仅后台有权限。 */
-export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEligibility> {
-  const [user, gold, membership, memberAccess, billingPersona] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true, email: true, phone: true, name: true, image: true },
-    }),
-    getGoldMemberAccess(userId),
-    getMembershipFlags(userId),
-    getMembershipToolAccess(userId),
-    getUserBillingPersona(userId),
-  ]);
+/** introspect / Canvas BFF 热路径：短 TTL 缓存，避免并发占满本进程连接池 */
+const SSO_ELIG_CACHE_TTL_MS = 15_000;
+const ssoEligCache = new Map<
+  string,
+  { value: ToolsSsoEligibility; expiresAt: number }
+>();
+
+/** 订阅/套餐变更后可调用以立即失效（如支付回调、关联 Key 后）。 */
+export function invalidateToolsSsoEligibilityCache(userId?: string): void {
+  if (userId) ssoEligCache.delete(userId);
+  else ssoEligCache.clear();
+  invalidateMembershipToolAccessCache(userId);
+}
+
+async function computeToolsSsoEligibility(
+  userId: string,
+): Promise<ToolsSsoEligibility> {
+  /**
+   * 顺序执行 + 合并 user/billingPersona 查询，降低与 Canvas autosave 等路由
+   * 叠加时的连接池峰值（dev 单进程 limit 有限，Promise.all 曾同时占 5+ 连接）。
+   */
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      role: true,
+      email: true,
+      phone: true,
+      name: true,
+      image: true,
+      billingPersona: true,
+      billingPersonaLockedAt: true,
+    },
+  });
+  const billingPersona = user?.billingPersonaLockedAt
+    ? user.billingPersona
+    : null;
+
+  const memberAccess = await getMembershipToolAccess(userId);
+  const gold = await getGoldMemberAccess(userId);
+  const membership = await getMembershipFlags(userId);
+
   const isAdmin =
     user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const hasMembershipSubscription = membership.hasActiveSubscription;
@@ -75,4 +104,20 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
     name: user?.name ?? null,
     image: user?.image ?? null,
   };
+}
+
+/** 工具站 SSO：须有效产品线；Admin 前台无 bypass，仅后台有权限。 */
+export async function getToolsSsoEligibility(
+  userId: string,
+): Promise<ToolsSsoEligibility> {
+  const nowMs = Date.now();
+  const cached = ssoEligCache.get(userId);
+  if (cached && cached.expiresAt > nowMs) return cached.value;
+
+  const value = await computeToolsSsoEligibility(userId);
+  ssoEligCache.set(userId, {
+    value,
+    expiresAt: nowMs + SSO_ELIG_CACHE_TTL_MS,
+  });
+  return value;
 }

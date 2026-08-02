@@ -387,6 +387,8 @@ export type StoryProUploadedScriptMeta = {
 export type StoryProStarterMode = "upload" | "generate";
 
 export type StoryProStarterNodeData = {
+  /** 节点标题（Pro2 文本节点 · Dock 上游 chip 展示） */
+  label?: string;
   /** upload=上传剧本；generate=主题输入生成大纲（2.0 文本节点） */
   starterMode?: StoryProStarterMode;
   /** 2.0 文本节点 · 用户输入的故事主题 */

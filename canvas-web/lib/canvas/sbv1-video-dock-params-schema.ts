@@ -113,19 +113,21 @@ export function resolutionOptionsFromVideoSchema(
 
 export function normalizeVideoResolutionId(
   raw: unknown,
-  fallback: "720p" | "1080p" = "720p",
+  fallback: "720p" | "1080p" | "2k" | "4k" = "720p",
 ): string {
   if (typeof raw !== "string" || !raw.trim()) return fallback;
   const lower = raw.toLowerCase();
   if (lower === "720p") return "720p";
   if (lower === "1080p") return "1080p";
+  if (lower === "2k") return "2k";
+  if (lower === "4k") return "4k";
   return fallback;
 }
 
 export function resolutionSegmentValue(
   raw: unknown,
   options: { id: string; label: string }[],
-  fallback: "720p" | "1080p" = "720p",
+  fallback: "720p" | "1080p" | "2k" | "4k" = "720p",
 ): string {
   if (typeof raw === "string" && raw.trim()) {
     const exact = options.find((o) => o.id === raw || o.id.toLowerCase() === raw.toLowerCase());

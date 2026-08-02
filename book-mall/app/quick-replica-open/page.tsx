@@ -4,7 +4,7 @@ import { sanitizeAppRedirectPath } from "@/lib/sanitize-app-redirect-path";
 import { QuickReplicaOpenClient } from "./quick-replica-open-client";
 
 export const metadata: Metadata = {
-  title: "正在打开快速复制…",
+  title: "正在打开快速复刻…",
   robots: { index: false, follow: false },
 };
 

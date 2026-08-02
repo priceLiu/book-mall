@@ -278,7 +278,7 @@ export function AccountMenuDropdown({
                     }}
                   >
                     <Copy />
-                    <span>快速复制</span>
+                    <span>快速复刻</span>
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>

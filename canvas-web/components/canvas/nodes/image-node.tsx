@@ -6,6 +6,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
 import { fitGenericImageNodeNaturalSize } from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { ImageNodeData } from "@/lib/canvas/types";
@@ -59,6 +60,8 @@ export function ImageNode({ id, data, selected }: NodeProps) {
       const size = { width: stageW, height: stageH + 96 };
       useCanvasStore.getState().applyLibtvMediaFit(id, size, {
         mediaFit: true,
+        mediaFitKey: `natural|${url}|generic-image`,
+        mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
         mediaNaturalW: w,
         mediaNaturalH: h,
       });

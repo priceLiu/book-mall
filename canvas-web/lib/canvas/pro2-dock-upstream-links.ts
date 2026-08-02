@@ -10,7 +10,10 @@ import {
   pickRuntimeVideoUrl,
 } from "./task-media-url";
 import { storyThemePromptDisplayMd } from "./story-theme-prompt-display";
-import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
+import type {
+  StoryProScriptHubNodeData,
+  StoryProStarterNodeData,
+} from "./story-pro-workspace-types";
 import type { StoryPro2TagNodeData } from "./story-pro2-workspace-types";
 
 /** 上游文本/大纲 chip 与 @ 引用展示名 · 优先节点标题 */

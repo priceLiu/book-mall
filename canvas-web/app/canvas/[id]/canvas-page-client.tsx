@@ -635,7 +635,7 @@ function Inner({ projectId }: { projectId: string }) {
             const fresh = await getCanvasProject(bookBase, projectId);
             lastBaseUpdatedAtRef.current = fresh.updatedAt;
             const serverGraph = buildCanvasPersistGraph(
-              fresh.canvas as CanvasGraph,
+              () => fresh.canvas as CanvasGraph,
             );
             lastPersistedSnapshotRef.current = {
               revision: useCanvasStore.getState().graphRevision,
@@ -744,7 +744,7 @@ function Inner({ projectId }: { projectId: string }) {
             const fresh = await getCanvasProject(bookBase, projectId);
             lastBaseUpdatedAtRef.current = fresh.updatedAt;
             const serverGraph = buildCanvasPersistGraph(
-              fresh.canvas as CanvasGraph,
+              () => fresh.canvas as CanvasGraph,
             );
             lastPersistedSnapshotRef.current = {
               revision: useCanvasStore.getState().graphRevision,

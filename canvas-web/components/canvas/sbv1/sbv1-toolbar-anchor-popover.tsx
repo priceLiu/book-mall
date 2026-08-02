@@ -91,7 +91,7 @@ export function Sbv1ToolbarDropdown({
   rect: DOMRect | null;
   children: ReactNode;
   className?: string;
-  align?: "start" | "center";
+  align?: "start" | "center" | "end";
   placement?: Sbv1ToolbarDropdownPlacement;
   /** auto 时用于判断向上/向下展开 */
   estimatedHeight?: number;
@@ -134,16 +134,24 @@ export function Sbv1ToolbarDropdown({
   const gap = 6;
   const side = resolveToolbarDropdownSide(rect, placement, estimatedHeight);
   const left =
-    align === "center" ? rect.left + rect.width / 2 : rect.left;
+    align === "center"
+      ? rect.left + rect.width / 2
+      : align === "end"
+        ? rect.right
+        : rect.left;
   const top = side === "above" ? rect.top - gap : rect.bottom + gap;
   const transform =
     side === "above"
       ? align === "center"
         ? "translate(-50%, -100%)"
-        : "translateY(-100%)"
+        : align === "end"
+          ? "translate(-100%, -100%)"
+          : "translateY(-100%)"
       : align === "center"
         ? "translate(-50%, 0)"
-        : undefined;
+        : align === "end"
+          ? "translate(-100%, 0)"
+          : undefined;
 
   return createPortal(
     <div
