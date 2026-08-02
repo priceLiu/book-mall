@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { restoreServerInflightNodeRuntimes } from "@/lib/canvas/restore-server-inflight-node-runtimes";
-import { pickPreferredCanvasTask } from "@/lib/canvas/task-pick";
+import { pickPreferredCanvasTask, pickPreferredCanvasTaskForScope } from "@/lib/canvas/task-pick";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 function task(
@@ -93,6 +93,23 @@ describe("pickPreferredCanvasTask", () => {
       { localRuntime: { status: "pending" } },
     );
     expect(pick?.id).toBe("new");
+  });
+
+  it("pickPreferredCanvasTaskForScope forwards local pending runtime", () => {
+    const pick = pickPreferredCanvasTaskForScope(
+      [
+        task({
+          id: "old-char",
+          status: "SUCCEEDED",
+          llmSection: "character",
+          updatedAt: "2026-07-16T10:05:00.000Z",
+          textOutput: "| 角色 | 描述 |",
+        }),
+      ],
+      { llmSection: "character" },
+      { status: "pending" },
+    );
+    expect(pick).toBeUndefined();
   });
 });
 

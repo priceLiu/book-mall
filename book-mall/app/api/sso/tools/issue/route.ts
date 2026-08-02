@@ -2,14 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { issueToolsSsoRedirect } from "@/lib/issue-tools-sso-redirect";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
-/**
- * 主站侧：黄金会员或管理员换取跳转 URL（query 带一次性 code）。
- * 工具站 `/auth/sso/callback` 应用服务端 POST `/api/sso/tools/exchange` 换 token。
- */
-export async function POST(req: Request) {
+/** 主站侧：换取跳转 URL（query 带一次性 code）。 */
+export const POST = withApiDbGuard(async (req) => {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
@@ -42,4 +40,4 @@ export async function POST(req: Request) {
     redirectUrl: result.redirectUrl,
     codeTtlSeconds: result.codeTtlSeconds,
   });
-}
+});

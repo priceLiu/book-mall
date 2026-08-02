@@ -2,19 +2,15 @@ import { NextResponse } from "next/server";
 import { toolsExchangeAuthorized } from "@/lib/sso-tools-env";
 import { verifyCredentialsLogin } from "@/lib/auth/verify-credentials";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 门户无头登录：子应用 BFF（服务端）用 TOOLS_SSO_SERVER_SECRET 调用。
  * 校验手机号 + (密码 | 短信验证码)，成功后签发一次性自动登录票据（autoLoginToken）。
- *
- * 门户前端拿到 token 后整页跳 Book `/portal-signin` 建立 Book 会话，再走既有
- * `re-enter → exchange → callback` 落子应用 tools_token。
- *
- * 注意：本端点 **不做工具准入判定**（登录 != 开通）。准入在生成/网关路径复查。
  */
-export async function POST(req: Request) {
+export const POST = withApiDbGuard(async (req) => {
   if (!toolsExchangeAuthorized(req)) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
@@ -71,4 +67,4 @@ export async function POST(req: Request) {
     autoLoginToken,
     userId: verified.id,
   });
-}
+});

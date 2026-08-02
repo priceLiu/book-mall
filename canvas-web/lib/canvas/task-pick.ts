@@ -4,6 +4,7 @@ import type { CanvasStoryRunJob } from "./canvas-run-bus";
 import type { StoryRunContext } from "./story-workspace-types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import {
+  canvasNodeRunSessionStartedAtMs,
   isCanvasNodeRunSessionActive,
   shouldSkipStaleTerminalWhileLocalInflight,
 } from "./canvas-run-session";
@@ -261,9 +262,11 @@ export function tasksMatchStoryScope(
 export function pickPreferredCanvasTaskForScope(
   tasks: CanvasTaskRecord[],
   scope: CanvasTaskStoryScope,
+  localRuntime?: CanvasNodeRuntime | null,
+  nodeId?: string,
 ): CanvasTaskRecord | undefined {
   const scoped = tasks.filter((t) => tasksMatchStoryScope(t, scope));
-  return pickPreferredCanvasTask(scoped);
+  return pickPreferredCanvasTask(scoped, { localRuntime, nodeId });
 }
 
 export function storyRunContextFromScope(
@@ -284,7 +287,7 @@ export function storyRunContextFromScope(
  */
 export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
-  opts?: { localRuntime?: CanvasNodeRuntime | null },
+  opts?: { localRuntime?: CanvasNodeRuntime | null; nodeId?: string },
 ): CanvasTaskRecord | undefined {
   if (!tasks.length) return undefined;
 
@@ -298,6 +301,29 @@ export function pickPreferredCanvasTask(
         !isStaleServerInflightTask(t, tasks),
     );
     if (inflight.length) return newestTaskByUpdatedAt(inflight);
+    // 在途已结束：认本轮会话内最新终态（Gateway 已返回但本地尚未 bind taskId）
+    const nodeId = opts?.nodeId?.trim();
+    if (nodeId && isCanvasNodeRunSessionActive(nodeId)) {
+      const startedAt = canvasNodeRunSessionStartedAtMs(nodeId);
+      const sessionTerminal = tasks.filter((t) => {
+        if (isServerInflightTaskStatus(t.status)) return false;
+        if (t.status === "SUCCEEDED" && !taskHasDisplayableResult(t)) {
+          return false;
+        }
+        if (
+          t.status !== "SUCCEEDED" &&
+          t.status !== "FAILED" &&
+          t.status !== "CANCELLED"
+        ) {
+          return false;
+        }
+        const pickMs = Date.parse(t.updatedAt || t.createdAt || "");
+        return Number.isFinite(pickMs) && pickMs >= startedAt - 3000;
+      });
+      if (sessionTerminal.length) {
+        return newestTaskByUpdatedAt(sessionTerminal);
+      }
+    }
     return undefined;
   }
   if (localTaskId && localInflight) {

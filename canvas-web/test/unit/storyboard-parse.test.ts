@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
 import {
   STORY_PRO2_STORYBOARD_TABLE_HEADER,
 } from "@/lib/canvas/data/pro2-production-pack-standard";
-import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
+import {
+  parseStoryboardRows,
+  extractStoryboardSectionFromOutline,
+  normalizeStoryboardSectionFromOutline,
+} from "@/lib/canvas/parse-md-tables";
+import {
+  promoteEmbeddedPackFromOutline,
+  resolveHubStoryboardMd,
+} from "@/lib/canvas/story-hub-runtime";
 
 describe("parseStoryboardRows", () => {
   it("parses ## 分镜脚本 section table, not a leading summary table", () => {
@@ -32,5 +41,31 @@ ${STORY_PRO2_STORYBOARD_TABLE_HEADER}
     const rows = parseStoryboardRows(md);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.duration).toBe("5");
+  });
+
+  it("parses multiple rows when cells contain <br> (LLM full-pack)", () => {
+    const md = `${STORY_PRO2_STORYBOARD_TABLE_HEADER}
+| 1 | 远景 | 横摇 | 起始：A。<br>动作：B。<br>终止：C。 | — | 10 | 中文生图1 | 中文视频1 | — |
+| 2 | 中景 | 固定 | 起始：D。<br>终止：E。 | 台词 | 8 | 中文生图2 | 中文视频2 | BGM |`;
+    expect(parseStoryboardRows(md)).toHaveLength(2);
+  });
+
+  it("full-pack task textOutput yields many storyboard rows (regression)", () => {
+    if (!existsSync("/tmp/full-pack.txt")) return;
+    const text = readFileSync("/tmp/full-pack.txt", "utf8");
+    const promoted = promoteEmbeddedPackFromOutline(text, "", "", "");
+    const rows = parseStoryboardRows(promoted.storyboardMd);
+    expect(rows.length).toBeGreaterThan(10);
+    expect(parseStoryboardRows(extractStoryboardSectionFromOutline(text)).length).toBeGreaterThan(10);
+    expect(parseStoryboardRows(normalizeStoryboardSectionFromOutline(text)).length).toBeGreaterThan(10);
+  });
+
+  it("resolveHubStoryboardMd keeps all rows when re-promoting stale hub", () => {
+    if (!existsSync("/tmp/full-pack.txt") || !existsSync("/tmp/hub-data.json"))
+      return;
+    const text = readFileSync("/tmp/full-pack.txt", "utf8");
+    const d = JSON.parse(readFileSync("/tmp/hub-data.json", "utf8"));
+    const resolved = resolveHubStoryboardMd(d);
+    expect(parseStoryboardRows(resolved).length).toBeGreaterThan(10);
   });
 });

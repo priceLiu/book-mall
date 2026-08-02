@@ -33,6 +33,10 @@ function readPositiveInt(raw: string | undefined): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
+export function datasourceUsesPgbouncerFromEnv(): boolean {
+  return datasourceUsesPgbouncer(process.env.DATABASE_URL);
+}
+
 /** 当前进程 effective connection_limit（与 lib/prisma.ts 注入逻辑一致） */
 export function getPrismaConnectionLimit(): number {
   const fromEnv = readPositiveInt(process.env.PRISMA_CONNECTION_LIMIT);

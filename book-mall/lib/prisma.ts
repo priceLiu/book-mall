@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
+import { isPrismaConnectionUnavailable, toDbUnavailableError } from "@/lib/db-unavailable";
 import {
   resolvePrismaDatasourceUrl,
   resolvePrismaReplicaUrl,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/prisma-pool-config";
 import {
   acquirePrismaDbSlot,
+  PrismaPoolBusyError,
   recordPrismaPoolTimeout,
   releasePrismaDbSlot,
 } from "@/lib/prisma-db-gate";
@@ -84,7 +85,21 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
     query: {
       $allModels: {
         async $allOperations({ args, query }) {
-          await acquirePrismaDbSlot();
+          let gateHeld = false;
+          try {
+            await acquirePrismaDbSlot();
+            gateHeld = true;
+          } catch (e) {
+            if (e instanceof PrismaPoolBusyError) {
+              recordPrismaPoolTimeout(e);
+              if (process.env.NODE_ENV === "production") {
+                throw toDbUnavailableError(e);
+              }
+              console.warn("[prisma-db-gate] fail-open in dev:", e.message);
+            } else {
+              throw e;
+            }
+          }
           try {
             let lastErr: unknown;
             const startedAt = Date.now();
@@ -99,6 +114,9 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
                   attempt === DB_RETRY_MAX ||
                   Date.now() - startedAt > DB_RETRY_BUDGET_MS
                 ) {
+                  if (isPrismaConnectionUnavailable(e)) {
+                    throw toDbUnavailableError(e);
+                  }
                   throw e;
                 }
                 await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));
@@ -106,7 +124,7 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
             }
             throw lastErr;
           } finally {
-            releasePrismaDbSlot();
+            if (gateHeld) releasePrismaDbSlot();
           }
         },
       },

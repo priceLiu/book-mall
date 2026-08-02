@@ -74,10 +74,14 @@ pool_timeout=30&connect_timeout=15
 |------|------|
 | 全量 `pnpm dev:all` | book-mall **不再**硬编码 `PRISMA_CONNECTION_LIMIT=12`；直连默认 30/进程，PgBouncer 默认 15 |
 | 仍频繁 P2024 | `pnpm dev:all:nopoll` 或重启 dev:all；勿在 URL 设过小 `connection_limit`（如 10） |
+| Book 页 `PrismaPoolBusyError` | 连接池闸门默认**关闭**；勿设 `PRISMA_DB_GATE=1` 除非刻意压测。改代码后须 **重启 dev:all**（Prisma Client 缓存在 globalThis） |
+| 连接预算自检 | `GET http://localhost:3000/api/dev/health` → `database.budget`（mall + 3×poll 估算 vs 推荐上限） |
 | 对账排队任务 | `pnpm --dir book-mall canvas:queued-reconcile` |
 | 洗误标 Gateway log | `pnpm --dir book-mall gateway:repair-insufficient-mislabel -- --apply` |
 
-poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=3`（dev 经 PgBouncer，给单 worker 留 1~2 条连接余量，避免单连接慢/被回收时整 worker 饿死 → P2024 → 任务漏 poll 到 90min 误超时；worker 身份由 `GENERATION_POLL_WORKER=1` 标记，与连接数无关）。生产 PgBouncer / 连接预算见 `deploy/tencent/pgbouncer/README.md`。
+poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=1`（3 个 worker：story / canvas / gateway）。dev:all 估算总连接 = mall 进程 limit + 3×1；详见 health API `database.budget`。生产 PgBouncer / 连接预算见 `deploy/tencent/pgbouncer/README.md`。
+
+**连接池饱和时的产品行为（2026-08）**：Prisma 重试耗尽 → 统一 `DbUnavailableError`；RSC 有 `app/error.tsx` + account 布局降级；SSO/auth API → 503 `SYSTEM_BUSY`（非 500 红屏）。
 
 Release 全文：`docs/releases/2026-06-db-resilience-r1.md`。
 

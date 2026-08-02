@@ -115,7 +115,11 @@ describe("applyPro2ScriptCategoryFromHub", () => {
         id: starterId,
         type: "story-pro2-starter",
         position: { x: 12, y: 100 },
-        data: { workspaceIds: { scriptHubId: hubId } },
+        data: {
+          workspaceIds: { scriptHubId: hubId },
+          themeInput: "用户已填写的主题内容",
+          label: "故事大纲",
+        },
       } as CanvasFlowNode,
     ];
     const edges: CanvasFlowEdge[] = [
@@ -149,5 +153,13 @@ describe("applyPro2ScriptCategoryFromHub", () => {
       hubId,
       expect.objectContaining({ scriptCategoryId: "default-master" }),
     );
+    expect(updateNodeData).toHaveBeenCalledWith(
+      starterId,
+      expect.not.objectContaining({ themeInput: "" }),
+    );
+    const starterPatchCall = updateNodeData.mock.calls.find(
+      (c) => c[0] === starterId,
+    );
+    expect(starterPatchCall?.[1]).not.toHaveProperty("themeInput");
   });
 });

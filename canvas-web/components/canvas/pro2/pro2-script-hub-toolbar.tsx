@@ -48,7 +48,6 @@ import {
 import {
   resolvePro2FrameBatchImageForHub,
 } from "@/lib/canvas/pro2-frame-batch-image";
-import { hubHasPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import {
   Pro2CharacterThreeViewPicker,
   type Pro2CharacterThreeViewResult,
@@ -122,32 +121,32 @@ export function Pro2ScriptHubToolbar({
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const liveHubNode = nodes.find((n) => n.id === hubId);
+  const liveHubData =
+    (liveHubNode?.data as StoryProScriptHubNodeData | undefined) ?? hubData;
   const [framePickerOpen, setFramePickerOpen] = useState(false);
-  const [framePickerMode, setFramePickerMode] = useState<
-    "first" | "regenerate" | "spawnNew"
-  >("first");
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? "";
 
   const saveAsAsset = useSaveNodeAsAsset();
-  const dockInput = hubData.dockInput ?? "";
-  const dockRefImages = (hubData.dockRefImages ?? []) as StoryRefImage[];
-  const hasTable = pro2HubHasScriptTable(hubData);
-  const hasCharacterTable = pro2HubHasCharacterTable(hubData);
-  const hasSceneTable = pro2HubHasSceneTable(hubData, { nodes, edges, hubId });
-  const linked = pro2HubIsLinkedOutline(nodes, edges, hubId, hubData);
+  const dockInput = liveHubData.dockInput ?? "";
+  const dockRefImages = (liveHubData.dockRefImages ?? []) as StoryRefImage[];
+  const hasTable = pro2HubHasScriptTable(liveHubData);
+  const hasCharacterTable = pro2HubHasCharacterTable(liveHubData);
+  const hasSceneTable = pro2HubHasSceneTable(liveHubData, { nodes, edges, hubId });
+  const linked = pro2HubIsLinkedOutline(nodes, edges, hubId, liveHubData);
   const isGenerating = pro2HubIsGenerating({
     id: hubId,
-    data: hubData,
+    data: liveHubData,
     type: "story-pro2-script-hub",
     position: { x: 0, y: 0 },
   } as never);
 
   const storyboardRows = useMemo(() => {
     if (!hasTable) return [];
-    return parseStoryboardRows(resolveHubStoryboardMd(hubData));
-  }, [hasTable, hubData]);
+    return parseStoryboardRows(resolveHubStoryboardMd(liveHubData));
+  }, [hasTable, liveHubData]);
 
   const initialFrameBatchImage = useMemo(
     () => resolvePro2FrameBatchImageForHub(hubId, nodes, edges),
@@ -164,18 +163,7 @@ export function Pro2ScriptHubToolbar({
     [hubId, nodes, edges],
   );
 
-  const hasFrameBoardGroup = useMemo(
-    () => hubHasPro2FrameBoardGroup(hubId, nodes),
-    [hubId, nodes],
-  );
-
   const runFrameGenerate = (result: Pro2FrameGenerateResult) => {
-    const kickoffOptions =
-      framePickerMode === "spawnNew"
-        ? { spawnNewGroup: true as const }
-        : framePickerMode === "regenerate"
-          ? { forceFresh: true as const }
-          : undefined;
     generatePro2FrameBoardFromHub(
       hubId,
       hubData,
@@ -185,9 +173,8 @@ export function Pro2ScriptHubToolbar({
       pro2HubBatchStore,
       result.frameIndices,
       result.batchImage,
-      kickoffOptions,
+      { spawnNewGroup: true },
     );
-    setFramePickerMode("first");
   };
 
   const runThreeViewGenerate = (result: Pro2CharacterThreeViewResult) => {
@@ -222,7 +209,7 @@ export function Pro2ScriptHubToolbar({
       });
       return;
     }
-    if (!hubData.providerId?.trim() || !hubData.modelKey?.trim()) {
+    if (!liveHubData.providerId?.trim() || !liveHubData.modelKey?.trim()) {
       await alert({
         title: "请选择模型",
         message: "在底部输入坞选择 LLM 模型后再重新生成。",
@@ -232,7 +219,7 @@ export function Pro2ScriptHubToolbar({
     }
     regeneratePro2ScriptHub(
       hubId,
-      hubData,
+      liveHubData,
       nodes,
       edges,
       dockInput,
@@ -241,7 +228,7 @@ export function Pro2ScriptHubToolbar({
     );
   };
 
-  const onGenerateFrames = async (mode: "first" | "regenerate" | "spawnNew") => {
+  const onGenerateFrames = async () => {
     if (isGenerating) return;
     if (!hasTable) {
       await alert({
@@ -252,7 +239,6 @@ export function Pro2ScriptHubToolbar({
       });
       return;
     }
-    setFramePickerMode(mode);
     setFramePickerOpen(true);
   };
 
@@ -363,7 +349,7 @@ export function Pro2ScriptHubToolbar({
           disabled={isGenerating}
           title={
             hasCharacterTable
-              ? "选择角色并生成正/侧/背三视图"
+              ? "选择角色并新建一组三视图（保留已有组，可多次抽卡）"
               : "请先生成含角色设定的分镜脚本"
           }
           onClick={() => void onGenerateThreeView()}
@@ -377,7 +363,7 @@ export function Pro2ScriptHubToolbar({
           disabled={isGenerating}
           title={
             hasSceneTable
-              ? "选择场景并生成场景参考图"
+              ? "选择场景并新建一组场景图（保留已有组，可多次抽卡）"
               : "请先生成含场景设定的分镜脚本"
           }
           onClick={() => void onGenerateScene()}
@@ -385,30 +371,12 @@ export function Pro2ScriptHubToolbar({
           <MapPin className="size-3.5" />
           <span>生成场景图</span>
         </button>
-        {hasFrameBoardGroup ? (
-          <button
-            type="button"
-            className={TOOL_BTN}
-            disabled={isGenerating || !hasTable}
-            title="选择镜号并重新生成当前分镜组（覆盖已有分镜图）"
-            onClick={() => void onGenerateFrames("regenerate")}
-          >
-            <RotateCw className="size-3.5" />
-            <span>重新生成分镜组</span>
-          </button>
-        ) : null}
         <button
           type="button"
           className={TOOL_BTN}
           disabled={isGenerating || !hasTable}
-          title={
-            hasFrameBoardGroup
-              ? "选择镜号并新增一个分镜组（保留已有分镜组）"
-              : "选择镜号并生成分镜图（自动关联角色三视图与场景图）"
-          }
-          onClick={() =>
-            void onGenerateFrames(hasFrameBoardGroup ? "spawnNew" : "first")
-          }
+          title="选择镜号并新建分镜图组（保留已有组，可多次抽卡）"
+          onClick={() => void onGenerateFrames()}
         >
           <LayoutGrid className="size-3.5" />
           <span>生成分镜组</span>
@@ -471,7 +439,6 @@ export function Pro2ScriptHubToolbar({
         initialBatchImage={initialFrameBatchImage}
         onClose={() => {
           setFramePickerOpen(false);
-          setFramePickerMode("first");
         }}
         onConfirm={runFrameGenerate}
       />

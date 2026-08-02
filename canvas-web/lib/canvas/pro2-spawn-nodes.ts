@@ -1,6 +1,7 @@
 "use client";
 
 import { connectScriptHubEdge } from "./pro2-script-hub-connect";
+import { patchPro2StarterOnScriptHubLink } from "./pro2-text-hub-link-sync";
 export { connectScriptHubEdge } from "./pro2-script-hub-connect";
 import {
   STORY_PRO_HUB_LLM_SYSTEM,
@@ -167,7 +168,10 @@ export function spawnPro2ScriptHubFromSource({
       );
       if (updateNodeData) {
         updateNodeData(sourceId, {
-          workspaceIds: { scriptHubId: existing.scriptHubId },
+          ...patchPro2StarterOnScriptHubLink(
+            source.data as import("./pro2-text-hub-link-sync").Pro2StarterLinkData,
+            existing.scriptHubId,
+          ),
         });
       }
       selectPro2NodeAfterSpawn(setNodes, existing.scriptHubId);
@@ -179,7 +183,12 @@ export function spawnPro2ScriptHubFromSource({
   if (!hubId) return "";
   connectScriptHubEdge(setEdges, sourceId, hubId, sourceHandle, targetHandle);
   if (source?.type === "story-pro2-starter" && updateNodeData) {
-    updateNodeData(sourceId, { workspaceIds: { scriptHubId: hubId } });
+    updateNodeData(sourceId, {
+      ...patchPro2StarterOnScriptHubLink(
+        source.data as import("./pro2-text-hub-link-sync").Pro2StarterLinkData,
+        hubId,
+      ),
+    });
   }
   selectPro2NodeAfterSpawn(setNodes, hubId);
   return hubId;

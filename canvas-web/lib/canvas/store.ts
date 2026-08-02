@@ -102,6 +102,7 @@ import {
   migratePro2SceneColumnOffCanvas,
 } from "./pro2-spawn-scene-image-group";
 import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
+import { stripStaleHubGenerateIntent, repairHubEmbeddedPackSections } from "./story-hub-runtime";
 import { repairPro2VideoBoardVisualGroups } from "./pro2-spawn-video-board-group";
 import { canvasNotify } from "./canvas-notify";
 import {
@@ -245,6 +246,14 @@ import {
   validateRefVideoConnection,
 } from "./ref-video-edges";
 import { validatePro2StyleAssetConnection } from "./pro2-style-asset-connect";
+import {
+  applyPro2StarterUnlinkAfterEdgeRemoval,
+  collectPro2StarterUnlinkPatches,
+  findPro2StartersLinkedToHub,
+  isPro2StarterScriptHubEdge,
+  patchPro2StarterOnScriptHubLink,
+  patchPro2StarterOnScriptHubUnlink,
+} from "./pro2-text-hub-link-sync";
 import type { HubPreviewSection } from "./story-hub-runtime";
 
 export type PendingSideConnect = {
@@ -651,7 +660,9 @@ export const useCanvasStore = create<CanvasState>()(
         let normalized = normalizeCanvasNodes(migrated.nodes, edges);
         let nodes = stripPersistedNodeSelection(
           normalized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
-            ? reconcileStoryPro2Workspace(normalized)
+            ? stripStaleHubGenerateIntent(
+                repairHubEmbeddedPackSections(reconcileStoryPro2Workspace(normalized)),
+              )
             : reconcileStoryProWorkspace(normalized),
         );
         const needsMediaViewportReflow = libtvCanvasNeedsViewportReflow(
@@ -773,10 +784,20 @@ export const useCanvasStore = create<CanvasState>()(
           });
         });
       },
-      setEdges: (updater) =>
+      setEdges: (updater) => {
+        const prev = get();
+        const prevEdges = prev.edges;
+        const nextEdges = updater(prevEdges);
+        if (nextEdges === prevEdges) return;
+        const nextNodes = applyPro2StarterUnlinkAfterEdgeRemoval(
+          prev.nodes,
+          prevEdges,
+          nextEdges,
+        );
         set((state) =>
-          withGraphRevision(state, { edges: updater(state.edges) }),
-        ),
+          withGraphRevision(state, { edges: nextEdges, nodes: nextNodes }),
+        );
+      },
       setViewport: (v) => set({ viewport: v }),
 
       focusCanvasNode: (nodeId) => {
@@ -982,12 +1003,40 @@ export const useCanvasStore = create<CanvasState>()(
           return withGraphRevision(state, patch);
         });
       },
-      onEdgesChange: (changes) =>
+      onEdgesChange: (changes) => {
+        const prev = get();
+        const removedStarterHubEdges = changes
+          .filter((c): c is EdgeChange & { type: "remove"; id: string } =>
+            c.type === "remove" && typeof c.id === "string",
+          )
+          .map((c) => prev.edges.find((e) => e.id === c.id))
+          .filter((e): e is CanvasFlowEdge => Boolean(e))
+          .filter((e) => isPro2StarterScriptHubEdge(e, prev.nodes));
+
+        const nextEdges = applyEdgeChanges(changes, prev.edges);
+        let nextNodes = prev.nodes;
+        if (removedStarterHubEdges.length > 0) {
+          const patches = collectPro2StarterUnlinkPatches(
+            removedStarterHubEdges,
+            prev.nodes,
+            nextEdges,
+          );
+          if (patches.size > 0) {
+            nextNodes = prev.nodes.map((n) => {
+              const patch = patches.get(n.id);
+              if (!patch) return n;
+              return {
+                ...n,
+                data: { ...(n.data as Record<string, unknown>), ...patch },
+              };
+            });
+          }
+        }
+
         set((state) =>
-          withGraphRevision(state, {
-            edges: applyEdgeChanges(changes, state.edges),
-          }),
-        ),
+          withGraphRevision(state, { edges: nextEdges, nodes: nextNodes }),
+        );
+      },
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
         // 自连边无业务含义，且会绕到节点背后只露出左右两截白线
@@ -1086,13 +1135,23 @@ export const useCanvasStore = create<CanvasState>()(
 
         const srcNode = state.nodes.find((n) => n.id === normalized.source);
         const tgtNode = state.nodes.find((n) => n.id === normalized.target);
-        if (
-          srcNode?.type === "story-pro2-starter" &&
-          tgtNode?.type === "story-pro2-script-hub"
-        ) {
-          const sd = srcNode.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
+        const starterNode =
+          srcNode?.type === "story-pro2-starter"
+            ? srcNode
+            : tgtNode?.type === "story-pro2-starter"
+              ? tgtNode
+              : null;
+        const hubNode =
+          srcNode?.type === "story-pro2-script-hub"
+            ? srcNode
+            : tgtNode?.type === "story-pro2-script-hub"
+              ? tgtNode
+              : null;
+        if (starterNode && hubNode) {
+          const sd =
+            starterNode.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
           const hubPatch: Record<string, unknown> = {
-            referencedNodeIds: [srcNode.id],
+            referencedNodeIds: [starterNode.id],
           };
           if (sd.providerId?.trim()) hubPatch.providerId = sd.providerId;
           if (sd.modelKey?.trim()) hubPatch.modelKey = sd.modelKey;
@@ -1100,12 +1159,9 @@ export const useCanvasStore = create<CanvasState>()(
           const outline =
             sd.generatedOutlineMd?.trim() || sd.uploadedScriptMd?.trim();
           if (outline) hubPatch.outlineMd = outline;
-          get().updateNodeData(tgtNode.id, hubPatch);
-          get().updateNodeData(srcNode.id, {
-            workspaceIds: {
-              ...(sd.workspaceIds ?? {}),
-              scriptHubId: tgtNode.id,
-            },
+          get().updateNodeData(hubNode.id, hubPatch);
+          get().updateNodeData(starterNode.id, {
+            ...patchPro2StarterOnScriptHubLink(sd, hubNode.id),
           });
         }
 
@@ -1453,14 +1509,43 @@ export const useCanvasStore = create<CanvasState>()(
         if (!validation.allowedIds.includes(id)) {
           return;
         }
-        const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
-        const filtered = get().nodes.filter((n) => n.id !== id);
+        const prevNodes = get().nodes;
+        const prevEdges = get().edges;
+        const removedNode = prevNodes.find((n) => n.id === id);
+        const starterUnlinkPatches = new Map<string, Record<string, unknown>>();
+        if (removedNode?.type === "story-pro2-script-hub") {
+          for (const starterId of findPro2StartersLinkedToHub(
+            id,
+            prevNodes,
+            prevEdges,
+          )) {
+            const starter = prevNodes.find((n) => n.id === starterId);
+            if (!starter || starter.type !== "story-pro2-starter") continue;
+            starterUnlinkPatches.set(
+              starterId,
+              patchPro2StarterOnScriptHubUnlink(
+                starter.data as import("./pro2-text-hub-link-sync").Pro2StarterLinkData,
+              ),
+            );
+          }
+        }
+
+        const edges = prevEdges.filter((e) => e.source !== id && e.target !== id);
+        const filtered = prevNodes.filter((n) => n.id !== id);
         const pruned = pruneMentionsAfterNodeRemoval(filtered, id);
-        const nodes = pruned.some((n) =>
+        let nodes = pruned.map((n) => {
+          const patch = starterUnlinkPatches.get(n.id);
+          if (!patch) return n;
+          return {
+            ...n,
+            data: { ...(n.data as Record<string, unknown>), ...patch },
+          };
+        });
+        nodes = nodes.some((n) =>
           String(n.type ?? "").startsWith("story-pro2-"),
         )
-          ? reconcileStoryPro2Workspace(pruned)
-          : reconcileStoryProWorkspace(pruned);
+          ? reconcileStoryPro2Workspace(nodes)
+          : reconcileStoryProWorkspace(nodes);
         const s = get();
         const clearDockPin =
           s.libtvFloatingDockNodeId === id

@@ -11,6 +11,7 @@ import {
   verifyToolsAccessToken,
   verifyToolsAccessTokenAllowExpired,
 } from "@/lib/tools-sso-token";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ function tokenResponse(result: Awaited<ReturnType<typeof issueToolsAccessTokenFo
  * 3. Authorization: Bearer {未过期 tools JWT} → 续签
  * 4. Authorization: Bearer {已过期但签名有效 tools JWT} → 校验 sessionVersion 后续签
  */
-export async function POST(req: NextRequest) {
+export const POST = withApiDbGuard(async (req: NextRequest) => {
   if (toolsExchangeAuthorized(req)) {
     let userId = "";
     try {
@@ -92,4 +93,4 @@ export async function POST(req: NextRequest) {
   }
 
   return tokenResponse(await issueToolsAccessTokenForUser(expired.sub));
-}
+});

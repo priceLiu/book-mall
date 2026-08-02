@@ -169,8 +169,11 @@ function assignVisualStyleField(
   const v = val.trim();
   if (!d || !v) return;
   if (/背景|世界观/.test(d)) pack.worldBackground = v;
-  else if (/年代|时代/.test(d)) pack.era = v;
-  else if (/画面风格|视觉风格|整体美学|^风格$/.test(d)) pack.visualStyle = v;
+  else if (/年代\/环境|年代|时代|环境定位/.test(d)) {
+    pack.era = pack.era ? `${pack.era}; ${v}` : v;
+  } else if (/摄影风格|镜头/.test(d)) {
+    pack.lighting = pack.lighting ? `${pack.lighting}; ${v}` : v;
+  } else if (/画面风格|视觉风格|整体美学|^风格$/.test(d)) pack.visualStyle = v;
   else if (/色调|配色|色彩/.test(d)) pack.colorPalette = v;
   else if (/光影|照明/.test(d)) pack.lighting = v;
   else if (/画幅|比例/.test(d)) pack.aspectRatioHint = v;
@@ -208,6 +211,46 @@ export function buildVisualStyleAnchorZh(
   return parts.join("；");
 }
 
+/** Dock 顶部 · 全片视觉块（与 Pro2VisualStylePackBar 同源，写入 dockInput 供用户编辑） */
+export function formatVisualStylePackDockSection(
+  pack: StoryProVisualStylePack | null | undefined,
+): string {
+  if (!pack) return "";
+  const zh = buildVisualStyleAnchorZh(pack);
+  const en = pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack);
+  if (!zh && !en) return "";
+  const lines = ["【全片视觉 · 生图统一风格】"];
+  if (zh) lines.push(zh);
+  if (en) lines.push(`[Global visual style] ${en}`);
+  return lines.join("\n");
+}
+
+/** 全片视觉块置于 Dock 顶部（用户可在 textarea 内直接改） */
+export function prependVisualStylePackToDockPrompt(
+  prompt: string,
+  pack: StoryProVisualStylePack | null | undefined,
+): string {
+  const base = prompt.trim();
+  const section = formatVisualStylePackDockSection(pack);
+  if (!section) return base;
+  if (!base) return section;
+  if (base.includes("【全片视觉")) return base;
+  return `${section}\n\n${base}`;
+}
+
+/** 全片视觉块置于 Dock 末尾（LLM 描述与系统约束之后） */
+export function appendVisualStylePackToDockPrompt(
+  prompt: string,
+  pack: StoryProVisualStylePack | null | undefined,
+): string {
+  const base = prompt.trim();
+  const section = formatVisualStylePackDockSection(pack);
+  if (!section) return base;
+  if (base.includes("【全片视觉")) return base;
+  if (!base) return section;
+  return `${base}\n\n${section}`;
+}
+
 /** 追加到场景/三视图/道具 Dock 提示词末尾的全片风格约束 */
 export function appendVisualStylePackToPrompt(
   prompt: string,
@@ -223,4 +266,23 @@ export function appendVisualStylePackToPrompt(
     en ? `\n[Global visual style] ${en}` : "",
   ].filter(Boolean);
   return lines.join("");
+}
+
+/** 从脚本 hub 读取全片视觉 pack（节点 data 优先，否则解析 outline） */
+export function readHubVisualStylePack(
+  hubNodeId: string | undefined,
+  nodes: { id: string; data?: unknown }[],
+): StoryProVisualStylePack | null {
+  if (!hubNodeId?.trim()) return null;
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  if (!hub) return null;
+  const d = (hub.data ?? {}) as {
+    visualStylePack?: StoryProVisualStylePack;
+    outlineMd?: string;
+  };
+  if (d.visualStylePack) return d.visualStylePack;
+  if (d.outlineMd?.trim()) {
+    return parseVisualStylePackFromOutline(d.outlineMd) ?? null;
+  }
+  return null;
 }

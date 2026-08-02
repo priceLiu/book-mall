@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 import { getToolsSsoEligibility } from "@/lib/tools-sso-access";
 import {
   getPlatformAppPublicOrigin,
@@ -75,7 +76,20 @@ export async function issueToolsSsoRedirect(opts: {
   let ssoClientAllowedNavKeys: string[] = [];
 
   if (opts.clientId?.trim()) {
-    const client = await loadActiveSsoClient(opts.clientId);
+    let client;
+    try {
+      client = await loadActiveSsoClient(opts.clientId);
+    } catch (e) {
+      if (isPrismaConnectionUnavailable(e)) {
+        return {
+          ok: false,
+          status: 503,
+          error: "系统繁忙，请稍后重试",
+          code: "TOOLS_SSO_UNAVAILABLE",
+        };
+      }
+      throw e;
+    }
     if (!client) {
       return {
         ok: false,
@@ -107,9 +121,37 @@ export async function issueToolsSsoRedirect(opts: {
     }
   }
 
-  const elig = await getToolsSsoEligibility(opts.userId);
+  let elig;
+  try {
+    elig = await getToolsSsoEligibility(opts.userId);
+  } catch (e) {
+    if (isPrismaConnectionUnavailable(e)) {
+      return {
+        ok: false,
+        status: 503,
+        error: "系统繁忙，请稍后重试",
+        code: "TOOLS_SSO_UNAVAILABLE",
+      };
+    }
+    throw e;
+  }
   const ecomApp = app === "e-commerce";
-  const ecomOk = ecomApp ? await userCanAccessEcommerceToolkit(opts.userId) : false;
+  let ecomOk = false;
+  if (ecomApp) {
+    try {
+      ecomOk = await userCanAccessEcommerceToolkit(opts.userId);
+    } catch (e) {
+      if (isPrismaConnectionUnavailable(e)) {
+        return {
+          ok: false,
+          status: 503,
+          error: "系统繁忙，请稍后重试",
+          code: "TOOLS_SSO_UNAVAILABLE",
+        };
+      }
+      throw e;
+    }
+  }
   const entitled = elig.isAdmin || elig.ok || ecomOk;
   const isThirdParty = Boolean(opts.clientId?.trim());
 
@@ -126,7 +168,20 @@ export async function issueToolsSsoRedirect(opts: {
   }
 
   if (opts.clientId?.trim() && !elig.isAdmin && ssoClientAllowedNavKeys.length > 0) {
-    const resolved = await resolveToolsNavKeysForUser(opts.userId);
+    let resolved;
+    try {
+      resolved = await resolveToolsNavKeysForUser(opts.userId);
+    } catch (e) {
+      if (isPrismaConnectionUnavailable(e)) {
+        return {
+          ok: false,
+          status: 503,
+          error: "系统繁忙，请稍后重试",
+          code: "TOOLS_SSO_UNAVAILABLE",
+        };
+      }
+      throw e;
+    }
     if (!userNavKeysOverlapSsoClient(resolved.keys, ssoClientAllowedNavKeys)) {
       return {
         ok: false,
@@ -149,6 +204,14 @@ export async function issueToolsSsoRedirect(opts: {
       },
     });
   } catch (e) {
+    if (isPrismaConnectionUnavailable(e)) {
+      return {
+        ok: false,
+        status: 503,
+        error: "系统繁忙，请稍后重试",
+        code: "TOOLS_SSO_UNAVAILABLE",
+      };
+    }
     console.error("[issueToolsSsoRedirect] prisma.ssoAuthorizationCode.create", e);
     return {
       ok: false,

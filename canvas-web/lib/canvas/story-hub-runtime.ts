@@ -4,11 +4,14 @@ import {
   stripOutlineEmbeddedPackSections,
   extractCharacterSectionFromOutline,
   extractSceneSectionMd,
+  normalizeOutlineSection,
   normalizeStoryboardSectionFromOutline,
   parseStoryboardRows,
   resolveSceneDictionaryMarkdown,
 } from "./parse-md-tables";
-import type { CanvasFlowNode } from "./types";
+import { storyboardMeetsMinimumShotCount } from "./pro2-storyboard-shot-budget";
+import { storyboardMeetsPackQuality } from "./pro2-pack-readiness";
+import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
 
 export function hubSectionRuntime(
@@ -58,20 +61,121 @@ export function resolveHubSectionMd(
 }
 
 export function resolveHubStoryboardMd(d: StoryScriptHubNodeData): string {
-  return ensureStoryboardAiVideoPromptsMd(
-    resolveHubSectionMd(d, "storyboard"),
-  );
+  const synced = hubDataForColumnSync(d);
+  const storyboard =
+    (synced.storyboardMd ?? "").trim() ||
+    resolveHubSectionMd(synced, "storyboard");
+  return ensureStoryboardAiVideoPromptsMd(storyboard);
 }
 
 /** 将大纲嵌入段拆入 hub 各字段，供 syncColumnsFromHub 使用 */
+export function hubOutlineSourceForEmbeddedPromote(
+  d: StoryScriptHubNodeData,
+): string {
+  const fromRuntime = d.outlineRuntime?.textOutput?.trim();
+  if (fromRuntime && outlineTextHasEmbeddedProductionPack(fromRuntime)) {
+    return fromRuntime;
+  }
+  const fromMd = d.outlineMd?.trim() ?? "";
+  if (outlineTextHasEmbeddedProductionPack(fromMd)) return fromMd;
+  return fromRuntime || fromMd;
+}
+
+/** full-pack 重生成后，子段 runtime 仍绑旧 task 或未从 outline 重拆 */
+export function hubEmbeddedPackSectionsStale(
+  d: StoryScriptHubNodeData,
+): boolean {
+  const outlineTaskId = d.outlineRuntime?.taskId;
+  if (!outlineTaskId || d.outlineRuntime?.status !== "done") return false;
+  const source = hubOutlineSourceForEmbeddedPromote(d);
+  if (!outlineTextHasEmbeddedProductionPack(source)) return false;
+  const sectionTaskIds = [
+    d.characterRuntime?.taskId,
+    d.sceneRuntime?.taskId,
+    d.storyboardRuntime?.taskId,
+  ].filter(Boolean);
+  if (sectionTaskIds.some((id) => id !== outlineTaskId)) return true;
+  return sectionTaskIds.length === 0 && Boolean(d.characterMd?.trim());
+}
+
+function shouldReplaceEmbeddedHubSections(d: StoryScriptHubNodeData): boolean {
+  const source = hubOutlineSourceForEmbeddedPromote(d);
+  if (!outlineTextHasEmbeddedProductionPack(source)) return false;
+  if (hubEmbeddedPackSectionsStale(d)) return true;
+  return !(d.characterMd ?? "").trim();
+}
+
+export function buildHubEmbeddedPackRepairPatch(
+  d: StoryScriptHubNodeData,
+): Partial<StoryScriptHubNodeData> {
+  if (!hubEmbeddedPackSectionsStale(d)) return {};
+  const source = hubOutlineSourceForEmbeddedPromote(d);
+  if (!source.trim()) return {};
+  const promoted = promoteEmbeddedPackFromOutline(source, "", "", "");
+  const { outlineMd, characterMd } = normalizeOutlineSection(
+    promoted.outlineMd,
+    promoted.characterMd,
+  );
+  const taskId = d.outlineRuntime?.taskId;
+  const derivedRuntime: CanvasNodeRuntime | undefined = taskId
+    ? {
+        status: "done",
+        taskId,
+        failCode: undefined,
+        failMessage: undefined,
+      }
+    : undefined;
+  const patch: Partial<StoryScriptHubNodeData> = {};
+  if (outlineMd !== (d.outlineMd ?? "")) patch.outlineMd = outlineMd;
+  if (characterMd !== (d.characterMd ?? "")) {
+    patch.characterMd = characterMd;
+    if (derivedRuntime) patch.characterRuntime = derivedRuntime;
+  }
+  if (
+    promoted.sceneMd.trim() &&
+    promoted.sceneMd !== (d.sceneMd ?? "")
+  ) {
+    patch.sceneMd = promoted.sceneMd;
+    if (derivedRuntime) patch.sceneRuntime = derivedRuntime;
+  }
+  if (
+    promoted.storyboardMd.trim() &&
+    promoted.storyboardMd !== (d.storyboardMd ?? "")
+  ) {
+    patch.storyboardMd = promoted.storyboardMd;
+    if (derivedRuntime) patch.storyboardRuntime = derivedRuntime;
+  }
+  return patch;
+}
+
+export function repairHubEmbeddedPackSections(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return nodes.map((node) => {
+    if (
+      node.type !== "story-pro2-script-hub" &&
+      node.type !== "story-pro-script-hub" &&
+      node.type !== "story-script-hub"
+    ) {
+      return node;
+    }
+    const d = node.data as unknown as StoryScriptHubNodeData;
+    const patch = buildHubEmbeddedPackRepairPatch(d);
+    if (!Object.keys(patch).length) return node;
+    return { ...node, data: { ...node.data, ...patch } };
+  });
+}
+
 export function hubDataForColumnSync(
   d: StoryScriptHubNodeData,
 ): StoryScriptHubNodeData {
+  const outlineSource = hubOutlineSourceForEmbeddedPromote(d);
+  const replaceEmbedded = shouldReplaceEmbeddedHubSections(d);
   const promoted = promoteEmbeddedPackFromOutline(
-    d.outlineMd ?? "",
-    d.characterMd ?? "",
-    d.storyboardMd ?? "",
-    d.sceneMd ?? "",
+    outlineSource,
+    replaceEmbedded ? "" : (d.characterMd ?? ""),
+    replaceEmbedded ? "" : (d.storyboardMd ?? ""),
+    replaceEmbedded ? "" : (d.sceneMd ?? ""),
   );
   return {
     ...d,
@@ -80,6 +184,15 @@ export function hubDataForColumnSync(
     sceneMd: promoted.sceneMd || d.sceneMd || "",
     storyboardMd: promoted.storyboardMd || d.storyboardMd || "",
   };
+}
+
+/** 保存大纲时：将嵌入的制作包段落拆到独立字段，避免其他 Tab 读不到 */
+export function outlineTextHasEmbeddedProductionPack(md: string): boolean {
+  return (
+    /##\s*角色视觉辞典/.test(md) ||
+    /##\s*分镜脚本/.test(md) ||
+    /##\s*场景视觉辞典/.test(md)
+  );
 }
 
 /** 保存大纲时：将嵌入的制作包段落拆到独立字段，避免其他 Tab 读不到 */
@@ -126,6 +239,20 @@ export function hubSectionNeedsRun(
   const md = hubSectionMd(node, section);
   if (rt?.status === "error") return true;
   if (!md.trim()) return true;
+  if (
+    section === "storyboard" &&
+    md.trim() &&
+    rt?.status === "done" &&
+    !forceFresh
+  ) {
+    const d = node.data as unknown as StoryScriptHubNodeData;
+    if (
+      !storyboardMeetsMinimumShotCount(md, d.outlineMd ?? "") ||
+      !storyboardMeetsPackQuality(md, d.outlineMd ?? "")
+    ) {
+      return true;
+    }
+  }
   if (rt?.status === "done" && md.trim()) return false;
   return true;
 }
@@ -146,6 +273,15 @@ export function hubSectionIsReady(
   if (!dedicated) return false;
   const st = hubSectionRuntime(node, section)?.status;
   if (st === "running" || st === "pending" || st === "error") return false;
+  if (section === "storyboard") {
+    const d = node.data as unknown as StoryScriptHubNodeData;
+    if (
+      !storyboardMeetsMinimumShotCount(dedicated, d.outlineMd ?? "") ||
+      !storyboardMeetsPackQuality(dedicated, d.outlineMd ?? "")
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -245,6 +381,43 @@ export function hubAggregateStatus(
     hubDialogueIsReady(resolveHubStoryboardMd(d));
   if (scriptReady) return "done";
   return "idle";
+}
+
+/** 剧本 Hub 是否展示生成中 UI（扫光）；intent 仅入队首帧占位 */
+export function hubShowsGeneratingUi(
+  node: CanvasFlowNode,
+  hubGenerateIntent?: boolean,
+): boolean {
+  const sections = ["outline", "character", "scene", "storyboard"] as const;
+  if (sections.some((s) => hubSectionIsRunning(node, s))) return true;
+  if (!hubGenerateIntent) return false;
+  const anySectionTouched = sections.some((s) => {
+    const st = hubSectionRuntime(node, s)?.status;
+    return st != null && st !== "idle";
+  });
+  return !anySectionTouched;
+}
+
+/** hydrate：清掉不应再扫光却仍落库的 hubGenerateIntent */
+export function stripStaleHubGenerateIntent(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return nodes.map((node) => {
+    if (
+      node.type !== "story-pro2-script-hub" &&
+      node.type !== "story-pro-script-hub" &&
+      node.type !== "story-script-hub"
+    ) {
+      return node;
+    }
+    const d = node.data as { hubGenerateIntent?: boolean };
+    if (!d.hubGenerateIntent) return node;
+    if (hubShowsGeneratingUi(node, true)) return node;
+    return {
+      ...node,
+      data: { ...node.data, hubGenerateIntent: undefined },
+    };
+  });
 }
 
 /** 是否允许「定稿生成工作流」：至少有大纲且大纲段未在跑/失败 */

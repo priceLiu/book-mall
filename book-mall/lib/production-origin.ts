@@ -66,13 +66,19 @@ export function productionHttpsRedirectUrlFromHeaders(
   return `https://${host.toLowerCase()}${pathname}${search}`;
 }
 
-/** 未登录跳转登录页：始终用 canonical HTTPS，避免 http 页 + Secure Cookie 无法登录。 */
+/** 未登录跳转登录页：生产用 canonical HTTPS，避免 http 页 + Secure Cookie 无法登录。 */
 export function buildBookMallLoginRedirectUrl(
   callbackPath: string,
   callbackSearch = "",
 ): string {
-  const login = new URL("/login", PRODUCTION_MAIN_SITE_ORIGIN);
   const cb = callbackPath.startsWith("/") ? callbackPath : `/${callbackPath}`;
+  const loginOrigin =
+    process.env.NODE_ENV === "production"
+      ? PRODUCTION_MAIN_SITE_ORIGIN
+      : (process.env.NEXTAUTH_URL?.trim() ||
+          process.env.BOOK_MALL_ORIGIN?.trim() ||
+          "http://localhost:3000");
+  const login = new URL("/login", loginOrigin);
   login.searchParams.set("callbackUrl", `${cb}${callbackSearch}`);
   return login.toString();
 }

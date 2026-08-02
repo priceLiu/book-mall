@@ -13,7 +13,7 @@ import type {
   StoryProSceneRow,
   StoryProScriptHubNodeData,
 } from "./story-pro-workspace-types";
-import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
+import { resolveCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
 
 export type CrewBulletinRowsContext = ReturnType<
   typeof resolveHubRowsForCrewBulletin
@@ -251,11 +251,12 @@ export function findCrewTaskRow(
 }
 
 export function characterCrewTaskDockInput(row: StoryProCharacterRow): string {
-  return formatCharacterRowThreeViewPrompt({
+  return resolveCharacterRowThreeViewPrompt({
     name: row.name?.trim() || "角色",
     role: row.role?.trim() || "",
     appearance: row.appearance?.trim() || "",
     personality: row.personality,
+    aiImagePrompt: row.aiImagePrompt,
   });
 }
 
@@ -268,6 +269,7 @@ export function sceneCrewTaskDockInput(row: StoryProSceneRow): string {
 export function frameCrewTaskDockInput(row: StoryProFrameRow): string {
   return (
     row.prompt?.trim() ||
+    row.aiImagePrompt?.trim() ||
     buildDefaultFrameRowPrompt(row) ||
     row.videoPrompt?.trim() ||
     row.description?.trim() ||

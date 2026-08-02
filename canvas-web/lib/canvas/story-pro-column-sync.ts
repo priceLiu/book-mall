@@ -29,6 +29,7 @@ import {
   sceneRowKeysEquivalent,
   storyProSceneRowKey,
 } from "./story-pro-scene-asset-catalog";
+import { shouldRebuildPro2CharacterRowPrompt } from "./three-view-prompt-rules";
 
 function normHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, " ");
@@ -52,6 +53,7 @@ function toProCharacterRows(rows: StoryCharacterRow[]): StoryProCharacterRow[] {
     role: r.role,
     appearance: r.appearance,
     personality: r.personality,
+    aiImagePrompt: r.aiImagePrompt,
     prompt: r.prompt,
     promptHistory: r.promptHistory,
     runtime: r.runtime,
@@ -195,6 +197,9 @@ function mergeProSceneRows(
       imageKeywords: prev.imageKeywords?.trim()
         ? prev.imageKeywords
         : row.imageKeywords,
+      negativePrompt: prev.negativePrompt?.trim()
+        ? prev.negativePrompt
+        : row.negativePrompt,
       prompt: (() => {
         if (isFrameScriptPrompt(prev.prompt ?? "")) return row.prompt;
         const prevHasKw =
@@ -240,6 +245,7 @@ function buildProFrameRowsFromMd(
     const difficultyRaw = pickColumn(r, ["ai难度", "难度", "ai difficulty"]);
     const durationSec = durationRaw ? parseInt(durationRaw, 10) : undefined;
     const aiDifficulty = difficultyRaw ? parseInt(difficultyRaw, 10) : undefined;
+    const aiImagePrompt = b.aiImagePrompt?.trim() || undefined;
     const base: StoryFrameRow = syncFrameRowCharacterRefs(
       {
         frameIndex: b.frameIndex,
@@ -249,12 +255,13 @@ function buildProFrameRowsFromMd(
         description: b.description,
         dialogue: b.dialogue,
         videoPrompt: b.videoPrompt,
-        prompt: "",
+        prompt: aiImagePrompt ?? "",
       },
       charCompat,
     );
     return {
       ...base,
+      aiImagePrompt,
       shotNo,
       shotSize: shotSize || base.shotSize || undefined,
       cameraMove: cameraMove || undefined,
@@ -315,7 +322,12 @@ function mergeProCharacterRows(
       personality: prev.personality?.trim()
         ? prev.personality
         : row.personality,
-      prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
+      aiImagePrompt: prev.aiImagePrompt?.trim()
+        ? prev.aiImagePrompt
+        : row.aiImagePrompt,
+      prompt: shouldRebuildPro2CharacterRowPrompt(prev, row)
+        ? row.prompt
+        : prev.prompt?.trim() || row.prompt,
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
       assetId: prev.assetId,

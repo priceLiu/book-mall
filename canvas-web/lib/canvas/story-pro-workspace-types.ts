@@ -195,6 +195,8 @@ export type StoryProCharacterRow = {
   appearance: string;
   /** 角色表 · 性格 */
   personality?: string;
+  /** 角色辞典 · AI生图提示词(英文) */
+  aiImagePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];
@@ -216,6 +218,8 @@ export type StoryProSceneRow = {
   mood?: string;
   /** 场景辞典 · 生图关键词（中文或英文） */
   imageKeywords?: string;
+  /** 场景辞典 · 固定反向提示词 */
+  negativePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];
@@ -288,6 +292,8 @@ export type StoryProFrameRow = {
   description: string;
   dialogue: string;
   videoPrompt: string;
+  /** 分镜表 · AI生图提示词(英文) */
+  aiImagePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];

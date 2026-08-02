@@ -3,6 +3,7 @@ import {
   pro2ScriptCategoryStarterDefaults,
   type Pro2ScriptCategoryId,
 } from "./pro2-script-category-presets";
+import { mergePro2CategoryStarterPatch } from "./pro2-text-hub-link-sync";
 import { buildPro2StarterNodeData } from "./pro2-starter-node-data";
 import { connectScriptHubEdge } from "./pro2-script-hub-connect";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
@@ -68,11 +69,14 @@ export function applyPro2ScriptCategoryFromHub(
     spawnedStarter = true;
   }
 
+  const existingStarterData = linkedStarter?.data as
+    | Record<string, unknown>
+    | undefined;
   store.updateNodeData(starterId, {
-    ...pro2ScriptCategoryStarterDefaults(
-      linkedStarter?.data as Record<string, unknown>,
-    ),
-    ...preset.starterPatch,
+    ...pro2ScriptCategoryStarterDefaults(existingStarterData),
+    ...mergePro2CategoryStarterPatch(existingStarterData, preset.starterPatch, {
+      isNewSpawn: spawnedStarter,
+    }),
     workspaceIds: { scriptHubId: hubId },
   });
 

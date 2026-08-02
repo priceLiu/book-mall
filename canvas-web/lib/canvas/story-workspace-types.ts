@@ -25,6 +25,8 @@ export type StoryCharacterRow = {
   appearance: string;
   /** 角色表 · 性格 */
   personality?: string;
+  /** 角色辞典 · AI生图提示词(英文) */
+  aiImagePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   runtime?: CanvasNodeRuntime;

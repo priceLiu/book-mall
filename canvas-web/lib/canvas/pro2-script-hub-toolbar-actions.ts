@@ -94,15 +94,15 @@ export function generatePro2FrameBoardFromHub(
   >,
 ): boolean {
   if (!pro2HubHasScriptTable(hubData)) return false;
-  const opts: KickoffPro2FrameBoardOptions = {};
+  const opts: KickoffPro2FrameBoardOptions = { spawnNewGroup: true };
   if (selectedFrameIndices?.length) {
     opts.selectedFrameIndices = selectedFrameIndices;
   }
   if (batchImage?.providerId?.trim() && batchImage.modelKey?.trim()) {
     opts.batchImage = batchImage;
   }
-  if (kickoffOptions?.spawnNewGroup) {
-    opts.spawnNewGroup = true;
+  if (kickoffOptions?.spawnNewGroup === false) {
+    opts.spawnNewGroup = false;
   }
   if (kickoffOptions?.forceFresh) {
     opts.forceFresh = true;
@@ -114,7 +114,7 @@ export function generatePro2FrameBoardFromHub(
     dockInput,
     dockRefImages,
     providers,
-    Object.keys(opts).length ? opts : undefined,
+    opts,
   );
   return true;
 }
@@ -156,7 +156,8 @@ export function generatePro2CharacterThreeViewFromHub(
   const opts: {
     characterKeys?: string[];
     batchImage?: Pro2ThreeViewBatchImagePick;
-  } = {};
+    spawnNewGroup: true;
+  } = { spawnNewGroup: true };
   if (selectedCharacterKeys?.length) {
     opts.characterKeys = selectedCharacterKeys;
   }
@@ -169,7 +170,7 @@ export function generatePro2CharacterThreeViewFromHub(
       hubId,
       hubData,
       providers,
-      Object.keys(opts).length ? opts : undefined,
+      opts,
     ) != null
   );
 }
@@ -212,7 +213,8 @@ export function generatePro2SceneImageFromHub(
   const opts: {
     sceneKeys?: string[];
     batchImage?: Pro2SceneBatchImagePick;
-  } = {};
+    spawnNewGroup: true;
+  } = { spawnNewGroup: true };
   if (selectedSceneKeys?.length) {
     opts.sceneKeys = selectedSceneKeys;
   }
@@ -225,7 +227,7 @@ export function generatePro2SceneImageFromHub(
       hubId,
       hubData,
       providers,
-      Object.keys(opts).length ? opts : undefined,
+      opts,
     ) != null
   );
 }

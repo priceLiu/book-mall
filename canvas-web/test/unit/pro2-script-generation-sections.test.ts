@@ -14,11 +14,21 @@ describe("resolvePro2HubScriptGenerationSections", () => {
     );
   });
 
-  it("skips outline LLM when outline already exists (linked or uploaded)", () => {
+  it("skips segmented LLM when outline already exists — single full-pack outline", () => {
     expect(resolvePro2HubScriptGenerationSections("## 第一集\n…")).toEqual([
-      "character",
-      "scene",
-      "storyboard",
+      "outline",
     ]);
+    expect(
+      resolvePro2HubScriptGenerationSections("## 第一集\n…", "default-master"),
+    ).toEqual(["outline"]);
+  });
+
+  it("gu-feng with outline uses single DeepSeek full-pack outline call", () => {
+    expect(
+      resolvePro2HubScriptGenerationSections(
+        "## 第一集\n3分钟",
+        "gu-feng-tian-chong",
+      ),
+    ).toEqual(["outline"]);
   });
 });

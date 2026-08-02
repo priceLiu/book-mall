@@ -1,8 +1,54 @@
 import { PRO2_GU_FENG_CATEGORY_DOC_SOURCE_MD } from "./data/pro2-gu-feng-category-doc-source";
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
+import { buildPro2StoryboardShotBudgetPromptBlock } from "./pro2-storyboard-shot-budget";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryRefImage } from "./story-ref-image";
+import type { StoryLlmSection } from "./story-workspace-types";
+
+/** 古风类别 · 角色/场景/分镜段也嵌入完整类别参考（对齐 DeepSeek 一次性全量 prompt） */
+export function shouldIncludePro2CategoryDocInSection(
+  section: StoryLlmSection,
+  categoryId?: Pro2ScriptCategoryId,
+): boolean {
+  if (section === "outline") return true;
+  return categoryId === "gu-feng-tian-chong";
+}
+
+const PRO2_CATEGORY_DOC_FULL_PACK_FOOTER_RE =
+  /请根据用户提供的[\s\S]*$/;
+
+/** 按 LLM 段裁剪类别参考，避免「完整制作包 / 2 镜样例」与段任务冲突 */
+export function scopePro2CategoryDocForSection(
+  doc: string,
+  section: StoryLlmSection | undefined,
+): string {
+  const raw = doc.trim();
+  if (!raw || !section || section === "outline") return raw;
+
+  let scoped = raw.replace(
+    /###\s*分镜脚本[\s\S]*?(?=\n---|\n##\s|$)/i,
+    section === "storyboard"
+      ? "### 分镜脚本\n\n（正式须 10–14 镜；单镜结构见 system prompt 样例，**禁止只输出 1–2 镜**）\n"
+      : "",
+  );
+
+  const footers: Record<StoryLlmSection, string> = {
+    outline: "",
+    character:
+      "请根据用户提供的 **故事大纲**，**仅输出 ## 角色视觉辞典 + 一张 5 列 GFM 表**；不要输出分镜/场景/视觉风格等其他章节。",
+    scene:
+      "请根据用户提供的 **故事大纲**，**仅输出 ## 场景视觉提示词 + 一张 6 列 GFM 表**；不要输出分镜/角色/视觉风格等其他章节。",
+    storyboard:
+      "请根据用户提供的 **故事大纲、角色设定、场景提示词**，**仅输出 ## 分镜脚本 + 一张 9 列 GFM 表**（10–14 镜，每镜含时长(秒)与【起始】…【结束】）；不要输出其他章节或镜数规划小表。",
+  };
+
+  scoped = scoped.replace(
+    PRO2_CATEGORY_DOC_FULL_PACK_FOOTER_RE,
+    footers[section],
+  );
+  return scoped.trim();
+}
 
 /** 顶栏「提示词」chip · 可切换预览来源 */
 export type Pro2ScriptPromptViewId = "category-doc" | "upstream-outline";
@@ -159,15 +205,25 @@ export function mergePro2ScriptGenerationPrompt(
     scriptCategoryId?: Pro2ScriptCategoryId;
     outlineMd?: string;
     themeInput?: string;
+    llmSection?: StoryLlmSection;
   },
 ): string {
   const parts = [base.trim()];
   const extra = dockInput.trim();
   const categoryId = options?.scriptCategoryId;
   const includeCategoryDoc = options?.includeCategoryDoc !== false;
-  const doc = includeCategoryDoc ? options?.categoryDoc?.trim() : "";
+  const rawDoc = includeCategoryDoc ? options?.categoryDoc?.trim() : "";
+  const doc =
+    rawDoc && options?.llmSection
+      ? scopePro2CategoryDocForSection(rawDoc, options.llmSection)
+      : rawDoc;
   const outline = options?.outlineMd?.trim();
   const theme = options?.themeInput?.trim();
+  const budgetSource = outline || theme;
+
+  if (options?.llmSection === "storyboard" && budgetSource) {
+    parts.push(buildPro2StoryboardShotBudgetPromptBlock(budgetSource));
+  }
 
   if (outline) {
     parts.push(`## 故事大纲\n${outline}`);

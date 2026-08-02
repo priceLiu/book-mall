@@ -7,7 +7,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
-import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import {
   optimisticLibtvMediaRunStart,
@@ -51,7 +51,6 @@ import { Pro2DockMarkButton } from "./pro2-dock-mark-button";
 import { Pro2DockStyleButton } from "./pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 import { pro2ThreeViewNodeUsesEmbeddedDock } from "./pro2-three-view-node-embedded-dock";
-import { Pro2VisualStylePackBar } from "./pro2-visual-style-pack-bar";
 
 /** 2.0 三视图节点 · 底部输入坞（图标区固定 / 正文可滚动） */
 export function Pro2ThreeViewInputDock() {
@@ -223,8 +222,7 @@ export function Pro2ThreeViewInputDock() {
     if (controllerId && d.pro2RowKey) {
       const ctrl = nodes.find((n) => n.id === controllerId);
       if (ctrl) {
-        optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
-        batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
+        batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
           forceFresh: true,
         });
         return;
@@ -375,9 +373,6 @@ export function Pro2ThreeViewInputDock() {
           />
         }
       >
-        {d.pro2HubNodeId ? (
-          <Pro2VisualStylePackBar hubNodeId={d.pro2HubNodeId} />
-        ) : null}
         <MentionsEditable
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,

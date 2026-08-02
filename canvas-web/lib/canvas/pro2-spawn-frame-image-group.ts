@@ -14,6 +14,15 @@ import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { isPro2FrameBoardGroup } from "./pro2-resolve-frame-board-group";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
+import {
+  findPro2FrameImageNodeForRow,
+  resolveFrameSyncGroupId,
+} from "./pro2-group-row-resolve";
+
+export {
+  findPro2FrameImageNodeForRow,
+  resolveFrameSyncGroupId,
+} from "./pro2-group-row-resolve";
 
 function frameRowPreview(row: StoryProFrameRow): {
   ossUrl?: string;
@@ -52,19 +61,6 @@ function groupLabel(
       isPro2FrameBoardGroup(n, nodes),
   ).length;
   return existing > 0 ? `${base} (${existing + 1})` : base;
-}
-
-function resolveFrameSyncGroupId(
-  nodes: CanvasFlowNode[],
-  frameColumnId: string,
-): string | undefined {
-  const frameNode = nodes.find((n) => n.id === frameColumnId);
-  if (!frameNode) return undefined;
-  const d = frameNode.data as {
-    pro2PendingSyncGroupId?: string;
-    pro2VisualGroupId?: string;
-  };
-  return d.pro2PendingSyncGroupId?.trim() || d.pro2VisualGroupId?.trim() || undefined;
 }
 
 export type EnsurePro2FrameImageGroupArgs = {
@@ -137,6 +133,24 @@ export function ensurePro2FrameImageGroup(
   const origin = pro2MediaGroupOrigin(args.nodes, args.hubNodeId);
   let groupId = existingGroup?.id;
 
+  if (spawnNew && !groupId) {
+    const shellId = args.addNode("group", origin, {
+      __t: "group",
+      label: groupLabel(args.hubNodeId, args.nodes, true),
+      color: GROUP_COLOR_PRESETS[1],
+      pro2Kind: "frame-board",
+      pro2HubNodeId: args.hubNodeId,
+      pro2ControllerNodeId: args.frameColumnId,
+    });
+    if (shellId) {
+      groupId = shellId;
+      args.updateNodeData(args.frameColumnId, {
+        pro2PendingSyncGroupId: groupId,
+        hubNodeId: args.hubNodeId,
+      });
+    }
+  }
+
   const childImages = spawnNew
     ? []
     : args.nodes.filter(
@@ -154,9 +168,11 @@ export function ensurePro2FrameImageGroup(
     const row = sorted[i]!;
     const preview = spawnNew ? {} : frameRowPreview(row);
     const label = `镜 ${row.frameIndex}`;
-    const existing = childImages.find(
-      (n) => (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,
-    );
+    const existing = spawnNew
+      ? undefined
+      : childImages.find(
+          (n) => (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,
+        );
 
     if (existing) {
       args.updateNodeData(existing.id, {
@@ -182,6 +198,7 @@ export function ensurePro2FrameImageGroup(
       pro2RowKey: row.key,
       pro2HubNodeId: args.hubNodeId,
       pro2ControllerNodeId: args.frameColumnId,
+      pro2GroupId: groupId,
     };
 
     if (groupId) {
@@ -197,7 +214,15 @@ export function ensurePro2FrameImageGroup(
     }
   }
 
-  if (!newChildIds.length) return groupId ?? null;
+  if (!newChildIds.length) {
+    if (spawnNew && groupId) {
+      args.setNodes((prev) => prev.filter((n) => n.id !== groupId));
+      args.updateNodeData(args.frameColumnId, {
+        pro2PendingSyncGroupId: undefined,
+      });
+    }
+    return spawnNew ? null : groupId ?? null;
+  }
 
   if (!groupId) {
     groupId =
@@ -215,6 +240,13 @@ export function ensurePro2FrameImageGroup(
         pro2ControllerNodeId: args.frameColumnId,
       });
     }
+  } else if (spawnNew) {
+    args.updateNodeData(groupId, {
+      pro2Kind: "frame-board",
+      pro2HubNodeId: args.hubNodeId,
+      pro2ControllerNodeId: args.frameColumnId,
+      label: groupLabel(args.hubNodeId, args.nodes, spawnNew),
+    });
   }
 
   const framePatch: Record<string, unknown> = {
@@ -240,27 +272,6 @@ export function ensurePro2FrameImageGroup(
   }
 
   return groupId ?? null;
-}
-
-/** 分镜列 + rowKey → 组内图片节点（供 Dock 乐观扫光） */
-export function findPro2FrameImageNodeForRow(
-  nodes: CanvasFlowNode[],
-  frameColumnId: string,
-  rowKey: string,
-): CanvasFlowNode | undefined {
-  const syncGroupId = resolveFrameSyncGroupId(nodes, frameColumnId);
-  return nodes.find((n) => {
-    if (n.type !== "story-pro2-image") return false;
-    const d = n.data as {
-      pro2ControllerNodeId?: string;
-      pro2RowKey?: string;
-      pro2GroupId?: string;
-    };
-    if (d.pro2ControllerNodeId !== frameColumnId) return false;
-    if (d.pro2RowKey !== rowKey) return false;
-    if (!syncGroupId) return true;
-    return d.pro2GroupId === syncGroupId;
-  });
 }
 
 /** 分镜列 rows 变更后同步到组内图片节点 */

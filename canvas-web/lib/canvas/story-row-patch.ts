@@ -22,7 +22,10 @@ import {
   parseOutlineBriefCharacters,
 } from "./parse-md-tables";
 import { pushStoryRevision } from "./story-revision";
-import { promoteEmbeddedPackFromOutline } from "./story-hub-runtime";
+import {
+  outlineTextHasEmbeddedProductionPack,
+  promoteEmbeddedPackFromOutline,
+} from "./story-hub-runtime";
 import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
 
 export function applyHubSectionFromTask(
@@ -35,10 +38,12 @@ export function applyHubSectionFromTask(
   if (section === "outline") {
     patch.outlineRuntime = runtime;
     if (textOutput?.trim()) {
+      const replaceEmbedded = outlineTextHasEmbeddedProductionPack(textOutput);
       const promoted = promoteEmbeddedPackFromOutline(
         textOutput,
-        data.characterMd ?? "",
-        data.storyboardMd ?? "",
+        replaceEmbedded ? "" : (data.characterMd ?? ""),
+        replaceEmbedded ? "" : (data.storyboardMd ?? ""),
+        replaceEmbedded ? "" : (data.sceneMd ?? ""),
       );
       const { outlineMd, characterMd } = normalizeOutlineSection(
         promoted.outlineMd,
@@ -50,22 +55,58 @@ export function applyHubSectionFromTask(
       if (stylePack) {
         (patch as Record<string, unknown>).visualStylePack = stylePack;
       }
-      if (characterMd !== (data.characterMd ?? "")) {
+      const derivedSectionRuntime: CanvasNodeRuntime | undefined =
+        replaceEmbedded && runtime.status === "done"
+          ? {
+              status: "done",
+              taskId: runtime.taskId,
+              textOutput: undefined,
+              failCode: undefined,
+              failMessage: undefined,
+            }
+          : undefined;
+      if (
+        replaceEmbedded
+          ? characterMd.trim()
+          : characterMd !== (data.characterMd ?? "")
+      ) {
         patch.characterMd = characterMd;
         patch.characterHistory = pushStoryRevision(
           data.characterHistory,
           characterMd,
         );
+        if (derivedSectionRuntime) {
+          patch.characterRuntime = derivedSectionRuntime;
+        }
+      }
+      if (promoted.sceneMd.trim()) {
+        const sceneChanged =
+          replaceEmbedded || promoted.sceneMd !== (data.sceneMd ?? "");
+        if (sceneChanged) {
+          patch.sceneMd = promoted.sceneMd;
+          patch.sceneHistory = pushStoryRevision(
+            data.sceneHistory,
+            promoted.sceneMd,
+          );
+          if (derivedSectionRuntime) {
+            patch.sceneRuntime = derivedSectionRuntime;
+          }
+        }
       }
       if (
-        promoted.storyboardMd.trim() &&
-        promoted.storyboardMd !== (data.storyboardMd ?? "")
+        replaceEmbedded
+          ? promoted.storyboardMd.trim()
+          : promoted.storyboardMd.trim() &&
+            promoted.storyboardMd !== (data.storyboardMd ?? "")
       ) {
         patch.storyboardMd = promoted.storyboardMd;
         patch.storyboardHistory = pushStoryRevision(
           data.storyboardHistory,
           promoted.storyboardMd,
         );
+        if (derivedSectionRuntime) {
+          patch.storyboardRuntime = derivedSectionRuntime;
+        }
       }
     }
   } else if (section === "character") {

@@ -7,6 +7,7 @@ import {
   PRO2_UNIVERSAL_NEGATIVE,
   STORY_PRO2_CORE_CONFLICT_TABLE_RULES,
   STORY_PRO2_HANDOFF_TABLE_RULES,
+  STORY_PRO2_PACK_LANGUAGE_RULES,
   STORY_PRO2_PACK_V6_MARKER,
   STORY_PRO2_STORYBOARD_TABLE_HEADER,
   STORY_PRO2_VIDEO_PROMPT_RULES,
@@ -43,11 +44,11 @@ export { STORY_PRO2_PACK_V6_MARKER };
 /** @deprecated v5 指纹 · 仅旧 migrate 对照 */
 export const STORY_PRO2_PACK_V5_MARKER = "相邻镜头站位起止";
 
-export const STORY_PRO2_PACK_PROMPT_VERSION = 6;
+export const STORY_PRO2_PACK_PROMPT_VERSION = 9;
 
 /** 默认 pack v6 · 通用专业约束（非题材专属） */
 export const STORY_PRO2_PROFESSIONAL_CHARACTER_RULES = `- **视觉锚点**：外貌关键词不超过 10 个词；服装主色须写 HEX 或固定色名，全剧不得 drift
-- **AI生图提示词(英文)** 须与外貌/服装列一致，可直接用于三视图/分镜生图`;
+- **AI生图提示词(英文)** 列内写 **中文** 生图简报，须与外貌/服装列一致，可直接用于三视图/分镜生图（表头「英文」仅为解析兼容）`;
 
 export const STORY_PRO2_PROFESSIONAL_STORYBOARD_RULES = `- **站位衔接**：每镜「画面描述」须标注 **【起始】…【结束】**，与上一镜/下一镜可无缝拼接
 - **时长一致**：各镜 \`时长(秒)\` 之和须与大纲目标总时长一致（±5 秒）`;
@@ -75,6 +76,7 @@ export function isLegacyStoryPro2StoryboardPrompt(prompt: string): boolean {
   if (!t.includes("Seedance")) return true;
   if (!t.includes("【起始】")) return true;
   if (!t.includes("禁止照抄示例剧名")) return true;
+  if (!t.includes("禁止输出英文生图")) return true;
   return false;
 }
 
@@ -109,7 +111,8 @@ ${STORY_PRO2_HANDOFF_TABLE_RULES}
 
 # 约束
 - 考虑 AI 生图/生视频可行性：优先单人镜头、可控场景数
-- 输出中文；不要 JSON；不要用代码块包裹全文
+- ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}
+- 不要 JSON；不要用代码块包裹全文
 - 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（9 列表头），不得留空表`;
 
 export const STORY_PRO2_THEME_OUTLINE_USER_PREFIX =
@@ -140,6 +143,8 @@ ${STORY_PRO2_THEME_OUTLINE_USER_PREFIX}`;
 /** 2.0 脚本节点 · 角色段（基于故事大纲，非「上传剧本」） */
 export const STORY_PRO2_CHARACTER_PROMPT = `# 任务：角色视觉辞典（AI 生图预备 · 角色一致性基础）
 
+${STORY_PRO2_PACK_LANGUAGE_RULES}
+
 根据 **已连接的故事大纲 / 创意参考包** 与已生成「视觉风格总纲 / 场景辞典」，输出 **## 角色视觉辞典** 段。
 
 【制作包硬性约束 · 缺一不可 · 影响 AI 生图角色一致性】
@@ -163,8 +168,8 @@ export const STORY_PRO2_CHARACTER_PROMPT = `# 任务：角色视觉辞典（AI �
 - **动作习惯**：习惯性姿势、走路方式、手势等
 
 ## AI生图提示词(英文)（每角色必填）
-- 格式：可直接用于 AI 生图的英文提示词
-- 包含：gender, age, face shape, hair (color/style/length), eyes, skin tone, build, clothing details, accessories, distinctive features
+- 格式：可直接用于 AI 生图的 **中文** 提示词（表头含「英文」仅为解析兼容；非必要禁止英文）
+- 包含：性别、年龄、脸型、发型发色、眼型、肤色、体型、服装细节、配饰、标志性特征、光线与镜头（35mm、2K 等）
 
 - **必须**输出上表；每行一个主要角色（3~8 行）
 - **外貌描写字数不少于 50 字**；泛泛写「普通/一般」无法生成一致角色
@@ -176,12 +181,12 @@ ${STORY_PRO2_PROFESSIONAL_CHARACTER_RULES}`;
 /** 2.0 脚本节点 · 场景段（根据大纲场景辞典生成 AI 生图提示词） */
 export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI 生图预备 · ${STORY_PRO2_SCENE_PROMPT_VERSION_MARKER}）
 
-根据 **已连接的故事大纲** 中的「场景视觉辞典」，为每个场景生成可直接用于 AI 生图的英文提示词。
+根据 **已连接的故事大纲** 中的「场景视觉辞典」，为每个场景生成可直接用于 AI 生图的 **中文** 提示词。
 
 【制作包硬性约束 · 缺一不可】
 1. 必须输出 **## 场景视觉提示词** GFM 表，表头列名不可改。
 2. **场景名** 须与大纲「场景视觉辞典 · 场景名」列 **完全一致**，禁止新增、删减或替换场景。
-3. 须根据大纲中的环境、时间、气氛、生图关键词扩写 **AI生图提示词(英文)**；每个场景不少于 40 个英文词。
+3. 须根据大纲中的环境、时间、气氛、生图关键词扩写 **AI生图提示词(英文)**；每个场景不少于 40 个汉字（表头「英文」仅为解析兼容）。
 4. **场景图默认纯环境空镜**：广角/远景/建立镜头；禁止中近景/特写人物、禁止角色互动叙事画面，除非大纲生图关键词已标注 **【含人物】** 或 **【角色出镜】**。
 5. 不要 JSON；不要用代码块包裹全文。
 
@@ -203,16 +208,17 @@ export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI �
   - ✅ 只允许描写：空间结构、建筑材质、光线来源与方向、色彩基调、天气气象、表面质感与纹理、环境声音/气味、静态置景与道具
 
 ## AI生图提示词(英文)（每场景必填 · 纯背景空镜约束）
-- 格式：可直接用于 AI 文生图的英文提示词
+- 格式：可直接用于 AI 文生图的 **中文** 提示词（非必要禁止英文）
 - **【严格约束】生成的提示词必须以场景环境为主体，默认广角建立镜头，禁止包含人物、人形、面部、中近景人物主体**
-- ✅ 必须使用：establishing shot, wide shot, full environment view, empty scene, devoid of people, no characters
-- ✅ 必须包含：location, time of day, lighting, atmosphere, cinematic style, realistic textures, 35mm, 2K
+- ✅ 须包含：地点、时间、光线、气氛、电影级写实质感、35mm、2K、空镜/无人物
 
 - 每行对应大纲场景视觉辞典中的一行；行数须一致
 - 只输出「## 场景视觉提示词」+ 一张表，不要 JSON`;
 
 /** 2.0 脚本节点 · 分镜段（基于故事大纲，非「上传剧本」） */
 export const STORY_PRO2_STORYBOARD_PROMPT = `# 任务：分镜脚本表（AI 生图/生视频预备 · 定稿拆分真源 · ${STORY_PRO2_PACK_V6_MARKER}）
+
+${STORY_PRO2_PACK_LANGUAGE_RULES}
 
 【硬性指标 · 未达标视为失败】
 - 须输出 **8–14 镜**完整序列；**禁止**只输出 1 镜概括、禁止「镜数规划/总时长」小表代替分镜表
@@ -244,7 +250,7 @@ ${STORY_PRO2_STORYBOARD_TABLE_HEADER}
 - **角色/场景** 须与辞典一致
 
 ## AI生图提示词(英文)（每镜必填）
-- 英文 cinematic prompt：角色外貌、表情、姿势、服装、场景、光线、35mm、2K
+- **中文** 电影级生图简报：角色外貌、表情、姿势、服装、场景、光线、35mm、2K（表头「英文」仅为解析兼容；非必要禁止英文）
 
 ${STORY_PRO2_VIDEO_PROMPT_RULES}
 

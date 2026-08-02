@@ -17,6 +17,7 @@ vi.mock("@/lib/prisma-pool-config", () => ({
 
 describe("prisma-db-gate", () => {
   beforeEach(() => {
+    process.env.PRISMA_DB_GATE = "1";
     resetPrismaDbGateForTests();
     vi.useRealTimers();
   });

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 
+import { QrHomeAuthBootstrap } from "@/components/qr-home-auth-bootstrap";
 import { QrAppClient } from "@/components/quick-replica/qr-app-client";
 import { QrLanding } from "@/components/qr-landing";
 import { fetchToolsSession } from "@/lib/tools-introspect";
@@ -28,7 +29,11 @@ export default async function HomePage() {
   const session = await fetchToolsSession(token);
   // 未登录：展示可被搜索引擎收录的公开落地页（独立门户 SEO）。
   if (!session.active) {
-    return <QrLanding />;
+    return (
+      <QrHomeAuthBootstrap>
+        <QrLanding />
+      </QrHomeAuthBootstrap>
+    );
   }
   const intro = session.introspect;
   const canManageFeatured = await fetchCanManageFeatured(token);

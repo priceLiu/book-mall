@@ -17,6 +17,7 @@ import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
 import { getCreditBalance, getPoolBalances } from "@/lib/billing/credit-account-service";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function mergeDiag<T extends Record<string, unknown>>(
  * 观测：`Server-Timing`（jwt_verify / eligibility）；`TOOLS_DIAGNOSTICS=1` 时 JSON 含 `_diag`。
  * 控制台：`NODE_ENV=development` 或 `TOOLS_DIAGNOSTICS=1` 时打印摘要（不含令牌）。
  */
-export async function GET(req: Request) {
+export const GET = withApiDbGuard(async (req) => {
   const tRoute = performance.now();
 
   let jwtSecret: string;
@@ -221,4 +222,4 @@ export async function GET(req: Request) {
 
   const body = diagEnabled ? mergeDiag(payload, { ...baseDiag, phase: "ok" }) : payload;
   return NextResponse.json(body, { headers });
-}
+});

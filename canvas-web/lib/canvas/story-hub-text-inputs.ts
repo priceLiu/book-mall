@@ -1,4 +1,9 @@
 import { parseCharacterRows, prepareMarkdownForPreview } from "./parse-md-tables";
+import {
+  formatPro2FullPackStoryInput,
+  isPro2FullPackRun,
+} from "./pro2-gu-feng-full-pack-run";
+import { buildPro2StoryboardShotBudgetPromptBlock } from "./pro2-storyboard-shot-budget";
 import type { StoryLlmSection } from "./story-workspace-types";
 import type { CanvasFlowNode } from "./types";
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
@@ -20,6 +25,14 @@ export function resolveStoryHubSectionTextInputs(
   }
   const d = node.data as unknown as StoryScriptHubNodeData;
   const out = [...upstreamTextInputs];
+
+  if (section === "outline" && isPro2FullPackRun(d.outlineMd ?? "")) {
+    const story = formatPro2FullPackStoryInput(
+      outlineTextInputMd(d.outlineMd ?? ""),
+    );
+    if (story) out.push(story);
+    return out;
+  }
 
   if (section === "character") {
     const outline = outlineTextInputMd(d.outlineMd ?? "");
@@ -59,6 +72,9 @@ export function resolveStoryHubSectionTextInputs(
       out.push(
         `## 可用角色名（禁止自创新名或替换）\n${names.map((n) => `- ${n}`).join("\n")}`,
       );
+    }
+    if (outline) {
+      out.push(buildPro2StoryboardShotBudgetPromptBlock(outline));
     }
     return out;
   }

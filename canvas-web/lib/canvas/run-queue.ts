@@ -141,6 +141,11 @@ import {
   markCanvasProjectTasksPoolForbidden,
 } from "./use-node-task-history";
 import { restoreServerInflightNodeRuntimes } from "./restore-server-inflight-node-runtimes";
+import {
+  findPro2CharacterThreeViewNodeForRow,
+  findPro2FrameImageNodeForRow,
+  maybeClearHubPendingSceneSyncGroup,
+} from "./pro2-group-row-resolve";
 import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import {
@@ -163,7 +168,9 @@ function syncPro2CharacterGroupImagesFromColumnRuntimes(
     if (!isAnyStoryCharacterColumnType(node.type ?? "")) continue;
     const rows = (node.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
     if (!rows.length) continue;
-    syncPro2CharacterImagesFromRows(nodes, node.id, rows, updateNodeData);
+    syncPro2CharacterImagesFromRows(nodes, node.id, rows, updateNodeData, {
+      inflightOnly: true,
+    });
   }
 }
 
@@ -374,13 +381,19 @@ function promptForDockMentionFilter(
     const rows = (d.rows as { key?: string; prompt?: string }[] | undefined) ?? [];
     const row = rows.find((r) => r.key === rowKey);
     if (row?.prompt) return String(row.prompt);
-    const imageNode = nodes.find(
-      (n) =>
-        (n.type === "story-pro2-image" || n.type === "story-pro2-three-view") &&
-        (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
-          .pro2ControllerNodeId === node.id &&
-        (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
-    );
+    const imageNode =
+      isAnyStoryCharacterColumnType(node.type ?? "")
+        ? findPro2CharacterThreeViewNodeForRow(nodes, node.id, rowKey)
+        : isAnyStoryFrameColumnType(node.type ?? "")
+          ? findPro2FrameImageNodeForRow(nodes, node.id, rowKey)
+          : nodes.find(
+              (n) =>
+                (n.type === "story-pro2-image" ||
+                  n.type === "story-pro2-three-view") &&
+                (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
+                  .pro2ControllerNodeId === node.id &&
+                (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+            );
     if (imageNode) {
       return String(
         (imageNode.data as { dockInput?: string }).dockInput ?? "",
@@ -435,13 +448,19 @@ function mentionCatalogForNode(
   }
 
   if (rowKey && isStoryWorkspaceNodeType(node.type ?? "")) {
-    const imageNode = nodes.find(
-      (n) =>
-        (n.type === "story-pro2-image" || n.type === "story-pro2-three-view") &&
-        (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
-          .pro2ControllerNodeId === node.id &&
-        (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
-    );
+    const imageNode =
+      isAnyStoryCharacterColumnType(node.type ?? "")
+        ? findPro2CharacterThreeViewNodeForRow(nodes, node.id, rowKey)
+        : isAnyStoryFrameColumnType(node.type ?? "")
+          ? findPro2FrameImageNodeForRow(nodes, node.id, rowKey)
+          : nodes.find(
+              (n) =>
+                (n.type === "story-pro2-image" ||
+                  n.type === "story-pro2-three-view") &&
+                (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
+                  .pro2ControllerNodeId === node.id &&
+                (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+            );
     if (imageNode) {
       const d = imageNode.data as {
         dockRefImages?: StoryRefImage[];
@@ -632,9 +651,21 @@ function applySbv1ImageTaskResult(
   );
   if (!patch) return false;
   if (isSameSbv1MediaDataPatch(node.data as Record<string, unknown>, patch)) {
+    maybeClearHubPendingSceneSyncGroup(
+      useCanvasStore.getState().nodes,
+      node.id,
+      updateNodeData,
+    );
     return true;
   }
   updateNodeData(node.id, patch);
+  maybeClearHubPendingSceneSyncGroup(
+    useCanvasStore.getState().nodes.map((n) =>
+      n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
+    ),
+    node.id,
+    updateNodeData,
+  );
   return true;
 }
 
@@ -1051,11 +1082,18 @@ export function useCanvasRunner(
             "storyboard",
           ] as const) {
             const scope = { llmSection: section };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const localRt = hubSectionRuntime(node, section);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              localRt,
+              nodeId,
+            );
             if (!pick) continue;
             const ctx: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
               storyRunContextFromScope(nodeId, scope);
+            if (shouldSkipStoryRowTaskApply(localRt, pick, nodeId)) continue;
             storyApplyTaskResult(node, pick, ctx, updateNodeData, nodes);
           }
           return;
@@ -1954,6 +1992,14 @@ export function useCanvasRunner(
               .themeOutlineRuntime
           : undefined;
       if (outlineRt?.taskId?.trim()) return false;
+      if (
+        node &&
+        isAnyStoryScriptHubType(node.type ?? "") &&
+        job.llmSection
+      ) {
+        const sectionRt = hubSectionRuntime(node, job.llmSection);
+        if (sectionRt?.taskId?.trim()) return false;
+      }
       const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
         ?.runtime;
       if (rt?.taskId?.trim()) return false;
@@ -2010,7 +2056,8 @@ export function useCanvasRunner(
       if (
         node &&
         isAnyStoryScriptHubType(node.type ?? "") &&
-        job.llmSection
+        job.llmSection &&
+        !job.forceFresh
       ) {
         const st = hubSectionRuntime(node, job.llmSection)?.status;
         if (isCanvasInflightStatus(st)) return false;
@@ -2103,7 +2150,10 @@ export function useCanvasRunner(
       const wantsForceFresh = normalized.some((j) => j.forceFresh);
       if (wantsForceFresh) {
         for (const job of deduped) {
-          releaseInflightKey(runKey(job));
+          const key = runKey(job);
+          // 新 forceFresh 顺序链：丢弃旧 deferred，避免 releaseInflightKey 回放 + pump 双提交 Gateway
+          deferredForceFreshRef.current.delete(key);
+          releaseStaleInflightLock(job);
         }
         if (sequentialRef.current) {
           sequentialRef.current = null;
@@ -2112,7 +2162,12 @@ export function useCanvasRunner(
 
       const runnable = deduped.filter((job) => {
         const key = runKey(job);
-        if (inflightRef.current.has(key)) return false;
+        if (inflightRef.current.has(key)) {
+          if (wantsForceFresh) {
+            deferredForceFreshRef.current.set(key, job);
+          }
+          return false;
+        }
         if (queueRef.current.some((q) => runKey(q) === key)) return false;
         return true;
       });
@@ -2143,6 +2198,9 @@ export function useCanvasRunner(
         activeKey: null,
       };
       for (const job of runnable) {
+        markCanvasNodeGenerationStarted(job.nodeId);
+      }
+      for (const job of runnable) {
         setNodeRuntime(job.nodeId, {
           status: "queued",
           taskId: undefined,
@@ -2152,7 +2210,7 @@ export function useCanvasRunner(
       }
       pumpSequential();
     },
-    [pumpSequential, releaseInflightKey, setNodeRuntime],
+    [pumpSequential, releaseStaleInflightLock, setNodeRuntime],
   );
 
   const enqueueStoryRunRef = useRef(enqueueStoryRun);
@@ -2304,15 +2362,18 @@ export function useCanvasRunner(
         if (isAnyStoryScriptHubType(node.type ?? "")) {
           for (const section of ["outline", "character", "scene", "storyboard"] as const) {
             const scope = { llmSection: section };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const localRt = hubSectionRuntime(node, section);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              localRt,
+              node.id,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
               storyRunContextFromScope(node.id, scope);
-            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
-            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
-              releaseInflightKey(runKey(job));
-            }
+            applyRowPick(node, pick, job, localRt);
           }
           continue;
         }
@@ -2521,6 +2582,15 @@ export function useCanvasRunner(
           }
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
+            maybeClearHubPendingSceneSyncGroup(
+              useCanvasStore.getState().nodes.map((n) =>
+                n.id === nodeId
+                  ? { ...n, data: { ...n.data, ...sbv1Patch } }
+                  : n,
+              ),
+              nodeId,
+              updateNodeData,
+            );
             const job = jobByTaskRef.current.get(t.id);
             if (job) {
               releaseInflightKey(runKey(job));

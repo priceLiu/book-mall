@@ -15,6 +15,7 @@ import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
 import { grantWelcomeGift } from "@/lib/billing/welcome-gift";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
+import { tryApiDbUnavailableResponse } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,8 @@ export async function POST(request: Request) {
     if (e instanceof SmsVerificationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
+    const dbResp = tryApiDbUnavailableResponse(e);
+    if (dbResp) return dbResp;
     console.error("[register]", e);
 
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

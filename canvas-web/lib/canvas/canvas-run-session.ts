@@ -29,6 +29,10 @@ export function isCanvasNodeRunSessionActive(nodeId: string): boolean {
   return sessionStartedNodeIds.has(nodeId);
 }
 
+export function canvasNodeRunSessionStartedAtMs(nodeId: string): number {
+  return sessionStartedAtMs.get(nodeId) ?? 0;
+}
+
 /** 本地 pending 尚无 taskId 时 · 勿被 reconcile 误清（runOne / Gateway 提交窗口） */
 const LIBTV_ORPHAN_RECONCILE_GRACE_MS = 120_000;
 

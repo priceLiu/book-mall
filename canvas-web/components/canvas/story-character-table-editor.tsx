@@ -13,12 +13,14 @@ import {
   storyMdThClass,
 } from "@/lib/canvas/story-md-table-chrome";
 import { storyTableTextareaRows } from "@/lib/canvas/story-table-textarea-rows";
+import { STORY_PRO2_UI_CHARACTER_AI_PROMPT_LABEL } from "@/lib/canvas/data/pro2-production-pack-standard";
 
 export type CharacterTableRow = {
   name: string;
   role: string;
   appearance: string;
   personality: string;
+  aiImagePrompt: string;
 };
 
 export function characterRowsFromMd(md: string): CharacterTableRow[] {
@@ -27,6 +29,7 @@ export function characterRowsFromMd(md: string): CharacterTableRow[] {
     role: r.role,
     appearance: r.appearance,
     personality: r.personality ?? "",
+    aiImagePrompt: r.aiImagePrompt ?? "",
   }));
 }
 
@@ -73,6 +76,7 @@ export function StoryCharacterTableEditor({
         role: "",
         appearance: "",
         personality: "",
+        aiImagePrompt: "",
       },
     ]);
   };
@@ -93,14 +97,16 @@ export function StoryCharacterTableEditor({
             <col className="min-w-[140px]" />
             <col className="min-w-[220px]" />
             <col className="min-w-[120px]" />
+            <col className="min-w-[180px]" />
             <col className="w-9" />
           </colgroup>
           <thead>
             <tr>
               <th className={TH}>姓名</th>
               <th className={TH}>身份</th>
-              <th className={TH}>外貌关键词</th>
+              <th className={TH}>外貌/服装/标志性动作</th>
               <th className={TH}>性格</th>
+              <th className={TH}>{STORY_PRO2_UI_CHARACTER_AI_PROMPT_LABEL}</th>
               <th className={`${TH} w-9 px-0`} aria-hidden />
             </tr>
           </thead>
@@ -143,6 +149,17 @@ export function StoryCharacterTableEditor({
                     placeholder="性格、情绪基调"
                     onChange={(e) =>
                       patchRow(index, { personality: e.target.value })
+                    }
+                  />
+                </td>
+                <td className={TD}>
+                  <textarea
+                    className={`${FIELD} px-4 py-2.5 text-[14px] leading-relaxed text-neutral-800`}
+                    rows={storyTableTextareaRows(row.aiImagePrompt, 3, 16)}
+                    value={row.aiImagePrompt}
+                    placeholder="中文生图简报（三视图/分镜直用）"
+                    onChange={(e) =>
+                      patchRow(index, { aiImagePrompt: e.target.value })
                     }
                   />
                 </td>

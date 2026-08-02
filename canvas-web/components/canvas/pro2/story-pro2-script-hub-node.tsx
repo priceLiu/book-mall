@@ -166,7 +166,9 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const [uploadBusy, setUploadBusy] = useState(false);
   const scriptUploadRef = useRef<HTMLInputElement>(null);
 
-  const d = data as unknown as StoryProScriptHubNodeData;
+  // 生成态写在 zustand；RF props 经 mergeStoreNodesIntoRf 可能晚一帧，须读 store 才能立刻扫光
+  const liveHubNode = nodes.find((n) => n.id === id);
+  const d = (liveHubNode?.data ?? data) as unknown as StoryProScriptHubNodeData;
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-script-hub");
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);

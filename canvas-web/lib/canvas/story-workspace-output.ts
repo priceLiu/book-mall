@@ -1,7 +1,10 @@
 "use client";
 
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
-import { batchRunStoryRowsSequential } from "./batch-run-nodes";
+import {
+  batchRunPro2ThreeViewRows,
+  batchRunStoryRowsSequential,
+} from "./batch-run-nodes";
 import {
   pickDefaultStoryImageEngine,
   pickDefaultStoryVideoEngine,
@@ -122,7 +125,7 @@ export function kickoffStoryWorkspaceMediaRuns(
       charKeys.length &&
       charData?.batchImage?.providerId?.trim()
     ) {
-      batchRunStoryRowsSequential(charCol.id, charKeys, "threeView");
+      batchRunPro2ThreeViewRows(charCol.id, charKeys);
     }
     if (
       frameCol &&

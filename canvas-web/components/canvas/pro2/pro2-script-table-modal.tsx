@@ -26,9 +26,9 @@ import {
   canEditStoryboardAsTable,
 } from "../story-storyboard-table-editor";
 import {
-  StoryGenericMdTableEditor,
-  canEditGenericMdTable,
-} from "../story-generic-md-table-editor";
+  StorySceneDictionaryTableEditor,
+  canEditSceneDictionaryAsTable,
+} from "../story-scene-dictionary-table-editor";
 import { StoryOutlineDocumentEditor } from "../story-outline-document-editor";
 import { StoryHubReadonlyPane } from "../story-hub-readonly-pane";
 import { cn } from "@/lib/utils";
@@ -218,7 +218,7 @@ export function Pro2ScriptHubEditorModal({
 
   const canTable =
     tab === "scene"
-      ? canEditGenericMdTable(tableDraft)
+      ? canEditSceneDictionaryAsTable(tableDraft)
       : tab === "character"
         ? canEditCharacterAsTable(tableDraft)
         : tab === "script"
@@ -332,12 +332,12 @@ export function Pro2ScriptHubEditorModal({
                 value={tableDraft}
                 onChange={setTableDraft}
               />
-            ) : (
-              <StoryGenericMdTableEditor
+            ) : tab === "scene" ? (
+              <StorySceneDictionaryTableEditor
                 value={tableDraft}
                 onChange={setTableDraft}
               />
-            )
+            ) : null
           ) : (
             <textarea
               className="nodrag min-h-[60vh] w-full resize-y rounded-lg border border-neutral-200 bg-white p-4 font-mono text-[13px] text-neutral-800"

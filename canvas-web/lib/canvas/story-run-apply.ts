@@ -12,7 +12,7 @@ import {
   syncColumnsFromHub,
   syncDownstreamMediaColumns,
 } from "./story-column-sync";
-import { hubSectionIsReady, hubSectionRuntime } from "./story-hub-runtime";
+import { hubSectionIsReady, hubSectionIsRunning, hubSectionRuntime } from "./story-hub-runtime";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import type {
   StoryLlmSection,
@@ -24,6 +24,7 @@ import { formatCanvasTaskError } from "./friendly-task-error";
 import { applyScriptStudioThemeOutlineResult } from "./script-studio-run-apply";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { shouldSkipStoryRowTaskApply } from "./task-pick";
+import { clearCanvasNodeRunSession } from "./canvas-run-session";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
@@ -416,6 +417,8 @@ export function storyApplyTaskResult(
     ) {
       return;
     }
+    const prevRt = hubSectionRuntime(node, ctx.llmSection);
+    if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const prev = node.data as unknown as StoryScriptHubNodeData;
     const patch = applyHubSectionFromTask(
       prev,
@@ -425,6 +428,21 @@ export function storyApplyTaskResult(
     );
     if (!hubSectionPatchChanged(prev, ctx.llmSection, patch)) return;
     updateNodeData(node.id, patch);
+    if (
+      task.status === "SUCCEEDED" ||
+      task.status === "FAILED" ||
+      task.status === "CANCELLED"
+    ) {
+      updateNodeData(node.id, { hubGenerateIntent: undefined });
+      const mergedNode: CanvasFlowNode = {
+        ...node,
+        data: { ...node.data, ...patch },
+      };
+      const stillRunning = (
+        ["outline", "character", "scene", "storyboard"] as const
+      ).some((s) => hubSectionIsRunning(mergedNode, s));
+      if (!stillRunning) clearCanvasNodeRunSession(node.id);
+    }
     const starter = findStarterByHubId(allNodes, node.id);
     const ws = (
       starter?.data as {
@@ -497,7 +515,20 @@ export function storyApplyTaskResult(
       node.id,
       nextRows as never,
       updateNodeData,
+      { inflightOnly: true },
     );
+    const pendingSyncGroupId = (
+      node.data as { pro2PendingSyncGroupId?: string }
+    ).pro2PendingSyncGroupId?.trim();
+    if (pendingSyncGroupId) {
+      const anyInflight = (nextRows as { runtime?: { status?: string } }[]).some(
+        (r) =>
+          r.runtime?.status === "pending" || r.runtime?.status === "running",
+      );
+      if (!anyInflight) {
+        updateNodeData(node.id, { pro2PendingSyncGroupId: undefined });
+      }
+    }
     const starter = findStarterByHubId(allNodes, node.id);
     const ws = (
       starter?.data as {

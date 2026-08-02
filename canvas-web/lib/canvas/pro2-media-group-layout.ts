@@ -405,9 +405,20 @@ export function applyPro2MediaGroupRelayout(
     if (n.parentId === groupId) return false;
     const d = n.data as { pro2GroupId?: string; pro2ControllerNodeId?: string };
     if (d.pro2GroupId === groupId) return true;
-    return Boolean(
-      controllerId && d.pro2ControllerNodeId === controllerId,
-    );
+    // 多组抽卡：已在其它媒体组内的节点不可被 relayout 吸走
+    if (n.parentId) {
+      const parent = next.find((x) => x.id === n.parentId);
+      if (parent?.type === "group" && groupUsesMediaGrid(parent)) {
+        return false;
+      }
+    }
+    if (d.pro2GroupId?.trim()) {
+      const tagged = next.find((x) => x.id === d.pro2GroupId);
+      if (tagged?.type === "group" && tagged.id !== groupId) {
+        return false;
+      }
+    }
+    return Boolean(controllerId && d.pro2ControllerNodeId === controllerId);
   };
 
   for (const orphan of next.filter(shouldReparent)) {

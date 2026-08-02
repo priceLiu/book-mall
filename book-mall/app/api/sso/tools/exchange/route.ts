@@ -13,15 +13,14 @@ import {
   intersectNavKeysWithSsoClient,
   loadActiveSsoClient,
 } from "@/lib/sso-client-scope";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
- * 准入：管理员直通；普通用户须至少一个有效工具技术服务费周期。JWT `tier` 分别为 `gold` / `admin`（legacy 字段名），载荷含 `tools_nav_keys` 与 `tool_service_periods`。
- * 须在服务端发起；Bearer 为 TOOLS_SSO_SERVER_SECRET。
  */
-export async function POST(req: Request) {
+export const POST = withApiDbGuard(async (req) => {
   if (!toolsExchangeAuthorized(req)) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
@@ -128,4 +127,4 @@ export async function POST(req: Request) {
     token_type: "Bearer",
     token_subtype: issued.tokenSubtype,
   });
-}
+});

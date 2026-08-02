@@ -23,23 +23,24 @@ const STORYBOARD_COLS = [
   { key: "description", label: "画面描述", className: "min-w-[140px]" },
   { key: "dialogue", label: "对白", className: "min-w-[100px]" },
   { key: "duration", label: "时长", className: "w-10 text-center" },
-  { key: "aiVideoPrompt", label: "AI视频提示词", className: "min-w-[120px]" },
+  { key: "aiImagePrompt", label: "AI生图", className: "min-w-[100px]" },
+  { key: "aiVideoPrompt", label: "AI视频", className: "min-w-[120px]" },
   { key: "lipSyncNote", label: "口型/配音", className: "min-w-[80px]" },
 ] as const;
 
 const SCENE_COLS = [
   { key: "name", label: "场景名", className: "w-16 whitespace-nowrap" },
-  { key: "environment", label: "环境", className: "min-w-[88px]" },
-  { key: "time", label: "时间", className: "w-14 whitespace-nowrap" },
-  { key: "mood", label: "气氛", className: "min-w-[72px]" },
+  { key: "envTimeMood", label: "环境/时间/气氛", className: "min-w-[120px]" },
   { key: "imageKeywords", label: "生图关键词", className: "min-w-[140px]" },
+  { key: "negativePrompt", label: "反向提示词", className: "min-w-[100px]" },
 ] as const;
 
 const CHARACTER_COLS = [
   { key: "name", label: "姓名", className: "w-16 whitespace-nowrap" },
   { key: "role", label: "身份", className: "min-w-[88px]" },
-  { key: "appearance", label: "外貌关键词", className: "min-w-[120px]" },
+  { key: "appearance", label: "外貌/服装", className: "min-w-[120px]" },
   { key: "personality", label: "性格", className: "min-w-[80px]" },
+  { key: "aiImagePrompt", label: "AI生图", className: "min-w-[100px]" },
 ] as const;
 
 const TABLE =
@@ -214,15 +215,23 @@ export function Pro2ScriptHubContentPreview({
                     <tr key={`${row.name}-${index}`}>
                       {SCENE_COLS.map((col) => {
                         const text =
-                          String(row[col.key as keyof typeof row] ?? "").trim() ||
-                          "—";
+                          col.key === "envTimeMood"
+                            ? (
+                                row.envTimeMood?.trim() ||
+                                [row.environment, row.time, row.mood]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              ).trim() || "—"
+                            : String(row[col.key as keyof typeof row] ?? "").trim() ||
+                              "—";
                         return (
                           <td key={col.key} className={cn(TD, col.className)}>
                             <p
                               className={cn(
                                 "text-[10px] leading-snug",
                                 col.key === "imageKeywords" ||
-                                  col.key === "environment"
+                                  col.key === "envTimeMood" ||
+                                  col.key === "negativePrompt"
                                   ? "line-clamp-3"
                                   : "",
                               )}
@@ -246,7 +255,9 @@ export function Pro2ScriptHubContentPreview({
                               <p
                                 className={cn(
                                   "text-[10px] leading-snug",
-                                  col.key === "appearance" || col.key === "role"
+                                  col.key === "appearance" ||
+                                    col.key === "role" ||
+                                    col.key === "aiImagePrompt"
                                     ? "line-clamp-3"
                                     : "",
                                 )}
@@ -272,6 +283,7 @@ export function Pro2ScriptHubContentPreview({
                                 className={cn(
                                   "text-[10px] leading-snug",
                                   col.key === "description" ||
+                                    col.key === "aiImagePrompt" ||
                                     col.key === "aiVideoPrompt" ||
                                     col.key === "dialogue"
                                     ? "line-clamp-3"

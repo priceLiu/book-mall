@@ -3,7 +3,14 @@
 import {
   mergePro2ScriptGenerationPrompt,
   resolvePro2ScriptCategoryDocBody,
+  shouldIncludePro2CategoryDocInSection,
 } from "./pro2-script-category-doc";
+import {
+  formatPro2FullPackStoryInput,
+  isPro2FullPackRun,
+  resolvePro2FullPackSystemPrompt,
+  resolvePro2OutlinePromptForRun,
+} from "./pro2-gu-feng-full-pack-run";
 import {
   resolvePro2HubPromptPack,
 } from "./pro2-script-category-presets";
@@ -12,14 +19,16 @@ import {
   hubAggregateStatus,
   hubDataForColumnSync,
   hubSectionIsRunning,
+  hubShowsGeneratingUi,
   resolveHubStoryboardMd,
   clearHubSectionRuntimesForForceFresh,
   hubSectionPendingPatch,
 } from "./story-hub-runtime";
 import { syncStoryProColumnRows } from "./story-pro-column-sync";
+import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import {
   batchRunStoryRows,
-  batchRunStoryRowsSequential,
+  batchRunPro2ThreeViewRows,
   runStoryHubSectionsSequential,
 } from "./batch-run-nodes";
 import { pickDefaultStoryImageEngine } from "./system-providers";
@@ -63,8 +72,11 @@ import {
   syncPro2SceneImagesFromRows,
 } from "./pro2-spawn-scene-image-group";
 import { syncPro2FrameRowsUpstreamRefs } from "./pro2-wire-frame-board-refs";
-import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
-import { useCanvasStore } from "./store";
+import { buildPro2ThreeViewDockPrompt } from "./three-view-prompt-rules";
+import {
+  parseVisualStylePackFromOutline,
+  readHubVisualStylePack,
+} from "./story-pro-visual-style-pack";
 export function pro2HubHasScriptTable(d: StoryProScriptHubNodeData): boolean {
   const md = resolveHubStoryboardMd(d);
   return parseStoryboardRows(md).length > 0;
@@ -235,9 +247,10 @@ export function pro2ScriptHubHasLinkedOutlineContent(
 
 export function pro2HubIsGenerating(node: CanvasFlowNode): boolean {
   const d = node.data as unknown as StoryProScriptHubNodeData;
-  if (d.hubGenerateIntent) return true;
-  return hubAggregateStatus(node) === "running";
+  return hubShowsGeneratingUi(node, d.hubGenerateIntent);
 }
+
+export { stripStaleHubGenerateIntent } from "./story-hub-runtime";
 
 export function mergePro2DockIntoPrompt(
   base: string,
@@ -281,8 +294,15 @@ export function enqueuePro2ScriptGeneration(
     hubData && nodes.length
       ? resolvePro2HubEffectiveOutline(nodes, edges, hubId, hubData)
       : hubData?.outlineMd?.trim() ?? "";
-  const sections = resolvePro2HubScriptGenerationSections(effectiveOutline);
+  const sections = resolvePro2HubScriptGenerationSections(
+    effectiveOutline,
+    hubData?.scriptCategoryId,
+  );
+  const isFullPack = isPro2FullPackRun(effectiveOutline);
   const firstSection = sections[0];
+
+  // 登记会话，避免任务轮询 reconcile 在 Gateway 提交前误清乐观 pending（尤其 forceFresh 保留旧 MD）
+  markCanvasNodeGenerationStarted(hubId);
 
   // 先写 intent + pending + dock，让节点/Dock 立刻进入「生成中」；v6 大 prompt 合并放到下一帧。
   // forceFresh 不在此处清空 *Md：保留旧预览作扫光底图，新结果落库时再覆盖，避免空态闪一下。
@@ -296,10 +316,22 @@ export function enqueuePro2ScriptGeneration(
     optimisticPatch.outlineMd = effectiveOutline;
   }
   if (options?.forceFresh) {
-    Object.assign(optimisticPatch, clearHubSectionRuntimesForForceFresh(sections));
+    const runtimeSectionsToClear = isFullPack
+      ? PRO2_HUB_SECTION_ORDER
+      : sections;
+    Object.assign(
+      optimisticPatch,
+      clearHubSectionRuntimesForForceFresh(runtimeSectionsToClear),
+    );
     if (firstSection) {
       Object.assign(optimisticPatch, hubSectionPendingPatch(firstSection));
     }
+  }
+  const fullPackSystem = hubData
+    ? resolvePro2FullPackSystemPrompt(hubData.scriptCategoryId)
+    : undefined;
+  if (isFullPack && fullPackSystem) {
+    optimisticPatch.outlineSystemPrompt = fullPackSystem;
   }
   updateNodeData(hubId, optimisticPatch);
 
@@ -335,38 +367,56 @@ export function enqueuePro2ScriptGeneration(
 
     const mergeSectionPrompt = (
       base: string,
-      includeCategoryDoc: boolean,
+      section: import("./story-workspace-types").StoryLlmSection,
       includeOutlineInPrompt: boolean,
-    ) =>
-      mergePro2DockIntoPrompt(
-        base,
-        dockInput,
-        resolvedDockRefs,
-        includeCategoryDoc ? mergeCtx.categoryDoc : undefined,
-        mergeCtx.scriptCategoryId,
-        includeOutlineInPrompt ? mergeCtx.outlineMd : undefined,
-        includeOutlineInPrompt ? "" : mergeCtx.themeInput,
-        includeCategoryDoc,
-      );
+    ) => {
+      const includeDoc =
+        shouldIncludePro2CategoryDocInSection(
+          section,
+          mergeCtx.scriptCategoryId,
+        ) && !(isFullPack && section === "outline");
+      return mergePro2ScriptGenerationPrompt(base, dockInput, resolvedDockRefs, {
+        categoryDoc: includeDoc ? mergeCtx.categoryDoc : undefined,
+        includeCategoryDoc: includeDoc,
+        scriptCategoryId: mergeCtx.scriptCategoryId,
+        outlineMd: includeOutlineInPrompt ? mergeCtx.outlineMd : undefined,
+        themeInput: includeOutlineInPrompt ? "" : mergeCtx.themeInput,
+        llmSection: section,
+      });
+    };
+
+    const hubForPrompt = hubData ?? {
+      scriptCategoryId: categoryId,
+      scriptCategoryDocBody: categoryDoc,
+      dockInput,
+    };
 
     updateNodeData(hubId, {
-      promptOutline: mergeSectionPrompt(promptPack.promptOutline, true, true),
-      promptCharacter: mergeSectionPrompt(promptPack.promptCharacter, false, false),
-      promptScene: mergeSectionPrompt(promptPack.promptScene, false, false),
-      promptStoryboard: mergeSectionPrompt(
-        promptPack.promptStoryboard,
-        false,
+      promptOutline: mergeSectionPrompt(
+        resolvePro2OutlinePromptForRun(
+          hubForPrompt,
+          effectiveOutline,
+          promptPack.promptOutline,
+        ),
+        "outline",
+        !isFullPack,
+      ),
+      promptCharacter: mergeSectionPrompt(
+        promptPack.promptCharacter,
+        "character",
         false,
       ),
-      hubGenerateIntent: undefined,
+      promptScene: mergeSectionPrompt(promptPack.promptScene, "scene", false),
+      promptStoryboard: mergeSectionPrompt(
+        promptPack.promptStoryboard,
+        "storyboard",
+        true,
+      ),
     });
 
     runStoryHubSectionsSequential(hubId, sections, options);
-
-    const nodeAfter = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
-    if (!nodeAfter || hubAggregateStatus(nodeAfter) !== "running") {
-      updateNodeData(hubId, { hubGenerateIntent: undefined });
-    }
+    // intent 仅首帧占位；段级 pending/running 接管后清掉，避免 Gateway 完成后仍扫光
+    updateNodeData(hubId, { hubGenerateIntent: undefined });
   };
 
   if (typeof window !== "undefined") {
@@ -656,10 +706,10 @@ export function kickoffPro2FrameBoardFromHub(
     updateNodeData: store.updateNodeData,
     setNodes: store.setNodes,
     setEdges: store.setEdges,
-    spawnNewGroup: options?.spawnNewGroup,
+    spawnNewGroup: options?.spawnNewGroup ?? true,
   });
 
-  if (!options?.spawnNewGroup) {
+  if (!(options?.spawnNewGroup ?? true)) {
     store = getStore();
     store.updateNodeData(frameColumnId!, {
       pro2PendingSyncGroupId: undefined,
@@ -669,7 +719,7 @@ export function kickoffPro2FrameBoardFromHub(
   if (keys.length) {
     window.setTimeout(() => {
       batchRunStoryRows(frameColumnId!, keys, "frameImage", {
-        forceFresh: Boolean(options?.forceFresh || options?.spawnNewGroup),
+        forceFresh: Boolean(options?.forceFresh || (options?.spawnNewGroup ?? true)),
       });
     }, 0);
   }
@@ -892,6 +942,8 @@ type CharacterThreeViewKickoffStore = FrameKickoffStore & {
 export type KickoffPro2CharacterThreeViewOptions = {
   characterKeys?: string[];
   batchImage?: Pro2ThreeViewBatchImagePick;
+  /** 脚本 hub 每次点击默认 true：追加新三视图组 */
+  spawnNewGroup?: boolean;
 };
 
 /** 阶段 B′：spawn 人物设计列、同步角色行、批量生成三视图 */
@@ -941,14 +993,15 @@ export function kickoffPro2CharacterThreeViewFromHub(
     hubId,
   );
 
+  const visualPack =
+    hubData.visualStylePack ??
+    (hubData.outlineMd?.trim()
+      ? parseVisualStylePackFromOutline(hubData.outlineMd)
+      : null);
+
   const refreshedCharacterRows = synced.characterRows.map((row) => ({
     ...row,
-    prompt: formatCharacterRowThreeViewPrompt({
-      name: row.name,
-      role: row.role,
-      appearance: row.appearance,
-      personality: row.personality,
-    }),
+    prompt: buildPro2ThreeViewDockPrompt(row, visualPack),
   }));
 
   store.updateNodeData(characterColumnId, {
@@ -1013,12 +1066,13 @@ export function kickoffPro2CharacterThreeViewFromHub(
     updateNodeData: store.updateNodeData,
     setNodes: store.setNodes,
     setEdges: store.setEdges,
+    spawnNewGroup: options?.spawnNewGroup ?? true,
   });
 
   if (keys.length) {
     window.setTimeout(() => {
-      batchRunStoryRowsSequential(characterColumnId!, keys, "threeView", {
-        forceFresh: true,
+      batchRunPro2ThreeViewRows(characterColumnId!, keys, {
+        forceFresh: Boolean(options?.spawnNewGroup ?? true),
       });
     }, 0);
   }
@@ -1031,6 +1085,8 @@ type SceneImageKickoffStore = UpstreamMediaKickoffStore;
 export type KickoffPro2SceneImageOptions = {
   sceneKeys?: string[];
   batchImage?: Pro2SceneBatchImagePick;
+  /** 脚本 hub 每次点击默认 true：追加新场景图组 */
+  spawnNewGroup?: boolean;
 };
 
 /** 阶段 B″：同步场景行、spawn 场景图组、批量生成场景图（不再 spawn 场景设计列） */
@@ -1130,6 +1186,7 @@ export function kickoffPro2SceneImageFromHub(
     updateNodeData: store.updateNodeData,
     setNodes: store.setNodes,
     setEdges: store.setEdges,
+    spawnNewGroup: options?.spawnNewGroup ?? true,
   });
   store = getStore();
   syncPro2SceneImagesFromRows(
@@ -1147,7 +1204,7 @@ export function kickoffPro2SceneImageFromHub(
         hubId,
         synced.sceneRows,
         keys,
-        { forceFresh: true },
+        { forceFresh: Boolean(options?.spawnNewGroup ?? true) },
       );
     };
     window.requestAnimationFrame(() => {

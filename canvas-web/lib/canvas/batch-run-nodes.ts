@@ -6,6 +6,8 @@ import {
   busEnqueueStoryRun,
   busEnqueueStoryRunsSequential,
 } from "./canvas-run-bus";
+import { optimisticPro2ThreeViewBatchStart } from "./pro2-spawn-character-image-group";
+import { useCanvasStore } from "./store";
 import type { StoryLlmSection } from "./story-workspace-types";
 import { STORY_HUB_SECTION_ORDER } from "./spawn-story-workspace";
 
@@ -79,6 +81,19 @@ export function batchRunStoryRows(
       forceFresh: options?.forceFresh,
     });
   }
+}
+
+/** Pro2 三视图 · 全量 optimistic + 并发入队（勿用 Sequential） */
+export function batchRunPro2ThreeViewRows(
+  columnNodeId: string,
+  rowKeys: string[],
+  options?: { forceFresh?: boolean },
+) {
+  const keys = rowKeys.filter(Boolean);
+  if (!keys.length) return;
+  const { nodes, updateNodeData } = useCanvasStore.getState();
+  optimisticPro2ThreeViewBatchStart(columnNodeId, keys, nodes, updateNodeData);
+  batchRunStoryRows(columnNodeId, keys, "threeView", options);
 }
 
 /** 列节点 · 按行顺序跑 */

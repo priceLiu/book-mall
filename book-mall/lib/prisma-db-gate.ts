@@ -12,15 +12,6 @@ function readPositiveInt(raw: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : fallback;
 }
 
-/** 为 run / SSE / 突发写库预留的连接预算（默认 5） */
-const DB_RESERVE = readPositiveInt(process.env.PRISMA_DB_RESERVE, 5);
-
-/** 等待空闲槽位的上限 ms；超时快速失败，不排队到 pool_timeout */
-const ACQUIRE_TIMEOUT_MS = readPositiveInt(
-  process.env.PRISMA_DB_ACQUIRE_TIMEOUT_MS,
-  3_000,
-);
-
 const CIRCUIT_WINDOW_MS = readPositiveInt(
   process.env.PRISMA_DB_CIRCUIT_WINDOW_MS,
   30_000,
@@ -34,6 +25,25 @@ const CIRCUIT_OPEN_MS = readPositiveInt(
   10_000,
 );
 
+/** 默认关闭；仅 PRISMA_DB_GATE=1|true 时开启（dev:all 多进程下易误伤页面）。 */
+export function isPrismaDbGateEnabled(): boolean {
+  const flag = process.env.PRISMA_DB_GATE?.trim().toLowerCase();
+  return flag === "1" || flag === "true";
+}
+
+function resolveDbReserve(): number {
+  if (!isPrismaDbGateEnabled()) return 0;
+  const fromEnv = readPositiveInt(process.env.PRISMA_DB_RESERVE, NaN);
+  if (Number.isFinite(fromEnv)) return fromEnv;
+  return process.env.NODE_ENV === "development" ? 2 : 5;
+}
+
+function resolveAcquireTimeoutMs(): number {
+  const fromEnv = readPositiveInt(process.env.PRISMA_DB_ACQUIRE_TIMEOUT_MS, NaN);
+  if (Number.isFinite(fromEnv)) return fromEnv;
+  return process.env.NODE_ENV === "development" ? 8_000 : 3_000;
+}
+
 export class PrismaPoolBusyError extends Error {
   readonly code = "PRISMA_POOL_BUSY";
 
@@ -44,6 +54,7 @@ export class PrismaPoolBusyError extends Error {
 }
 
 export type PrismaDbGateSnapshot = {
+  enabled: boolean;
   connectionLimit: number;
   maxInFlight: number;
   inFlight: number;
@@ -68,13 +79,14 @@ type WaitEntry = {
 const waitQueue: WaitEntry[] = [];
 
 export function resolvePrismaDbMaxInFlight(): number {
-  return Math.max(1, getPrismaConnectionLimit() - DB_RESERVE);
+  return Math.max(1, getPrismaConnectionLimit() - resolveDbReserve());
 }
 
 export function getPrismaDbGateSnapshot(): PrismaDbGateSnapshot {
   const now = Date.now();
   prunePoolTimeoutWindow(now);
   return {
+    enabled: isPrismaDbGateEnabled(),
     connectionLimit: getPrismaConnectionLimit(),
     maxInFlight: resolvePrismaDbMaxInFlight(),
     inFlight,
@@ -82,8 +94,8 @@ export function getPrismaDbGateSnapshot(): PrismaDbGateSnapshot {
     circuitOpen: now < circuitOpenUntil,
     circuitOpenUntil: circuitOpenUntil > now ? circuitOpenUntil : null,
     poolTimeoutsInWindow: poolTimeoutTimestamps.length,
-    acquireTimeoutMs: ACQUIRE_TIMEOUT_MS,
-    reserve: DB_RESERVE,
+    acquireTimeoutMs: resolveAcquireTimeoutMs(),
+    reserve: resolveDbReserve(),
   };
 }
 
@@ -133,6 +145,7 @@ function dequeueWaiter(): void {
 }
 
 export async function acquirePrismaDbSlot(): Promise<void> {
+  if (!isPrismaDbGateEnabled()) return;
   const now = Date.now();
   if (now < circuitOpenUntil) {
     throw new PrismaPoolBusyError(
@@ -155,16 +168,17 @@ export async function acquirePrismaDbSlot(): Promise<void> {
         if (idx >= 0) waitQueue.splice(idx, 1);
         reject(
           new PrismaPoolBusyError(
-            `Database connection pool saturated (waited ${ACQUIRE_TIMEOUT_MS}ms)`,
+            `Database connection pool saturated (waited ${resolveAcquireTimeoutMs()}ms)`,
           ),
         );
-      }, ACQUIRE_TIMEOUT_MS),
+      }, resolveAcquireTimeoutMs()),
     };
     waitQueue.push(entry);
   });
 }
 
 export function releasePrismaDbSlot(): void {
+  if (!isPrismaDbGateEnabled()) return;
   inFlight = Math.max(0, inFlight - 1);
   dequeueWaiter();
 }

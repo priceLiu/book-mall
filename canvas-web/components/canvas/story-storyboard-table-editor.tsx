@@ -17,6 +17,10 @@ import {
   storyMdThClass,
 } from "@/lib/canvas/story-md-table-chrome";
 import { storyTableTextareaRows } from "@/lib/canvas/story-table-textarea-rows";
+import {
+  STORY_PRO2_UI_STORYBOARD_AI_IMAGE_LABEL,
+  STORY_PRO2_UI_STORYBOARD_AI_VIDEO_LABEL,
+} from "@/lib/canvas/data/pro2-production-pack-standard";
 
 export function storyboardRowsFromMd(md: string): StoryboardTableRow[] {
   return parseStoryboardRows(md);
@@ -31,7 +35,7 @@ export function canEditStoryboardAsTable(md: string): boolean {
 const FIELD =
   "block w-full min-h-[2.75rem] resize-y border-0 bg-transparent outline-none ring-0 whitespace-pre-wrap break-words placeholder:text-neutral-400 focus:bg-amber-50/50";
 
-/** 专业版 8 列分镜编辑表（与 story-pro-script-pack 表头一致） */
+/** 专业版 9 列分镜编辑表（与 story-pro-script-pack 表头一致） */
 export function StoryStoryboardTableEditor({
   value,
   onChange,
@@ -122,6 +126,7 @@ export function StoryStoryboardTableEditor({
             <col className="min-w-[140px]" />
             <col className="w-[64px]" />
             <col className="min-w-[180px]" />
+            <col className="min-w-[180px]" />
             <col className="min-w-[120px]" />
             <col className="w-9" />
           </colgroup>
@@ -130,11 +135,12 @@ export function StoryStoryboardTableEditor({
               <th className={TH}>镜号</th>
               <th className={TH}>景别</th>
               <th className={TH}>运镜</th>
-              <th className={TH}>画面描述</th>
+              <th className={TH}>画面描述（含起始→终止站位）</th>
               <th className={TH}>对白</th>
               <th className={TH}>时长(秒)</th>
-              <th className={TH}>AI视频提示词</th>
-              <th className={TH}>口型/配音</th>
+              <th className={TH}>{STORY_PRO2_UI_STORYBOARD_AI_IMAGE_LABEL}</th>
+              <th className={TH}>{STORY_PRO2_UI_STORYBOARD_AI_VIDEO_LABEL}</th>
+              <th className={TH}>口型/配音备注</th>
               <th className={`${TH} w-9 px-0`} aria-hidden />
             </tr>
           </thead>
@@ -203,6 +209,16 @@ export function StoryStoryboardTableEditor({
                     value={row.duration}
                     onChange={(e) =>
                       patchRow(index, { duration: e.target.value })
+                    }
+                  />
+                </td>
+                <td className={TD}>
+                  <textarea
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
+                    rows={storyTableTextareaRows(row.aiImagePrompt, 2, 12)}
+                    value={row.aiImagePrompt}
+                    onChange={(e) =>
+                      patchRow(index, { aiImagePrompt: e.target.value })
                     }
                   />
                 </td>

@@ -18,7 +18,9 @@ import { AccountOverviewCards } from "@/components/account/account-overview-card
 import { CreditLotBreakdown } from "@/components/account/credit-lot-breakdown";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
 import { prisma } from "@/lib/prisma";
+import { runDbQuery } from "@/lib/db-query";
 import { getActiveTenantContext } from "@/lib/tenant/context";
+import type { BillingPersona } from "@prisma/client";
 
 export const metadata = {
   title: "概览 — 个人中心",
@@ -52,32 +54,32 @@ function toolsSsoErrBanner(code: string): { title: string; body: string } | null
   }
 }
 
-export default async function AccountPage({
-  searchParams,
-}: {
-  searchParams?: { tools_sso_err?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) redirect("/login");
+type AccountOverviewData = {
+  billingPersona: BillingPersona | null;
+  flags: Awaited<ReturnType<typeof getMembershipFlags>>;
+  memberAccess: Awaited<ReturnType<typeof getMembershipToolAccess>>;
+  poolBalances: Awaited<ReturnType<typeof getPoolBalances>>;
+  usageSummary: Awaited<ReturnType<typeof getAccountUsageSummary>>;
+  packageUsageRows: Awaited<ReturnType<typeof getAccountPackageUsageRows>>;
+  lotBreakdown: Awaited<ReturnType<typeof getLotBreakdown>>;
+  membershipPeriodEnd: Date | null;
+  planPriceLabel: string | null;
+  legacyMonthlyGrantCredits: number | null;
+  isTeamSharedPool: boolean;
+};
 
-  const toolsSsoErr =
-    typeof searchParams?.tools_sso_err === "string"
-      ? searchParams.tools_sso_err.trim()
-      : "";
-  const toolsBanner =
-    toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
-
-  const billingPersona = await getUserBillingPersona(session.user.id);
-  const activeCtx = await getActiveTenantContext(session.user.id);
+async function loadAccountOverview(userId: string): Promise<AccountOverviewData> {
+  const billingPersona = await getUserBillingPersona(userId);
+  const activeCtx = await getActiveTenantContext(userId);
 
   const byokSubPromise =
     billingPersona === "BYOK"
-      ? getActiveByokSubscription({ ownerType: "USER", ownerId: session.user.id })
+      ? getActiveByokSubscription({ ownerType: "USER", ownerId: userId })
       : Promise.resolve(null);
 
   const [flags, memberAccess, byokSub] = await Promise.all([
-    getMembershipFlags(session.user.id),
-    getMembershipToolAccess(session.user.id),
+    getMembershipFlags(userId),
+    getMembershipToolAccess(userId),
     byokSubPromise,
   ]);
 
@@ -93,7 +95,7 @@ export default async function AccountPage({
   ) {
     const teamMember = await prisma.tenantMember.findFirst({
       where: {
-        userId: session.user.id,
+        userId,
         status: "ACTIVE",
         tenant: { type: "TEAM", status: "ACTIVE", planId: { not: null } },
       },
@@ -107,38 +109,42 @@ export default async function AccountPage({
 
   const billingRef = teamBillingRef ?? {
     ownerType: "USER" as const,
-    ownerId: session.user.id,
+    ownerId: userId,
   };
 
-  const [poolBalances, creditAcc, usageSummary, teamTenant, lotBreakdown] = await Promise.all([
-    getPoolBalances(billingRef),
-    prisma.creditAccount.findUnique({
-      where: {
-        ownerType_ownerId: billingRef,
-      },
-      select: { currentPeriodEnd: true, membershipPaidUntil: true, planId: true, monthlyGrantCredits: true },
-    }),
-    getAccountUsageSummary(session.user.id, teamBillingRef ?? undefined),
-    teamBillingRef
-      ? prisma.tenant.findUnique({
-          where: { id: teamBillingRef.ownerId },
-          select: {
-            planId: true,
-            seatLimit: true,
-            interval: true,
-            currentPeriodEnd: true,
-          },
-        })
-      : Promise.resolve(null),
-    getLotBreakdown(billingRef),
-  ]);
+  const [poolBalances, creditAcc, usageSummary, teamTenant, lotBreakdown] =
+    await Promise.all([
+      getPoolBalances(billingRef),
+      prisma.creditAccount.findUnique({
+        where: { ownerType_ownerId: billingRef },
+        select: {
+          currentPeriodEnd: true,
+          membershipPaidUntil: true,
+          planId: true,
+          monthlyGrantCredits: true,
+        },
+      }),
+      getAccountUsageSummary(userId, teamBillingRef ?? undefined),
+      teamBillingRef
+        ? prisma.tenant.findUnique({
+            where: { id: teamBillingRef.ownerId },
+            select: {
+              planId: true,
+              seatLimit: true,
+              interval: true,
+              currentPeriodEnd: true,
+            },
+          })
+        : Promise.resolve(null),
+      getLotBreakdown(billingRef),
+    ]);
 
   const packageUsageRows =
     billingPersona === "BYOK"
-      ? await getAccountPackageUsageRows(session.user.id, byokSub?.scopeKey ?? null)
+      ? await getAccountPackageUsageRows(userId, byokSub?.scopeKey ?? null)
       : billingPersona === "PLATFORM_CREDIT"
         ? await getAccountPlatformCategoryUsageRows(
-            session.user.id,
+            userId,
             teamBillingRef ?? undefined,
           )
         : [];
@@ -184,6 +190,45 @@ export default async function AccountPage({
     byokSub?.periodEnd ??
     null;
 
+  return {
+    billingPersona,
+    flags,
+    memberAccess,
+    poolBalances,
+    usageSummary,
+    packageUsageRows,
+    lotBreakdown,
+    membershipPeriodEnd,
+    planPriceLabel,
+    legacyMonthlyGrantCredits:
+      billingPersona === "BYOK" && creditAcc?.monthlyGrantCredits
+        ? creditAcc.monthlyGrantCredits
+        : null,
+    isTeamSharedPool: Boolean(teamBillingRef),
+  };
+}
+
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: { tools_sso_err?: string };
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
+
+  const toolsSsoErr =
+    typeof searchParams?.tools_sso_err === "string"
+      ? searchParams.tools_sso_err.trim()
+      : "";
+  const toolsBanner =
+    toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
+
+  const overview = await runDbQuery(
+    "AccountPage",
+    () => loadAccountOverview(session.user.id),
+    null,
+  );
+
   return (
     <>
       {toolsBanner ? (
@@ -204,28 +249,35 @@ export default async function AccountPage({
         description="积分、计费身份与套餐状态一览；其它模块请用左侧菜单切换。"
       />
 
-      <AccountOverviewCards
-        generalCredits={poolBalances.general.balance}
-        videoCredits={poolBalances.video.balance}
-        billingPersona={billingPersona}
-        membershipPlanName={memberAccess.planName}
-        membershipPeriodEnd={membershipPeriodEnd}
-        planPriceLabel={planPriceLabel}
-        hasActiveMembership={memberAccess.ok}
-        hasActiveCourseSubscription={flags.hasActiveCourseProductSubscription || flags.hasActiveSubscription}
-        coursePlanName={flags.membershipPlanName}
-        courseSubscriptionEndsAt={flags.subscriptionEndsAt}
-        legacyMonthlyGrantCredits={
-          billingPersona === "BYOK" && creditAcc?.monthlyGrantCredits
-            ? creditAcc.monthlyGrantCredits
-            : null
-        }
-        usageSummary={usageSummary}
-        packageUsageRows={packageUsageRows}
-        isTeamSharedPool={Boolean(teamBillingRef)}
-      />
+      {!overview ? (
+        <p className="text-sm text-muted-foreground">
+          内容加载中，若长时间空白请刷新页面。
+        </p>
+      ) : (
+        <>
+          <AccountOverviewCards
+            generalCredits={overview.poolBalances.general.balance}
+            videoCredits={overview.poolBalances.video.balance}
+            billingPersona={overview.billingPersona}
+            membershipPlanName={overview.memberAccess.planName}
+            membershipPeriodEnd={overview.membershipPeriodEnd}
+            planPriceLabel={overview.planPriceLabel}
+            hasActiveMembership={overview.memberAccess.ok}
+            hasActiveCourseSubscription={
+              overview.flags.hasActiveCourseProductSubscription ||
+              overview.flags.hasActiveSubscription
+            }
+            coursePlanName={overview.flags.membershipPlanName}
+            courseSubscriptionEndsAt={overview.flags.subscriptionEndsAt}
+            legacyMonthlyGrantCredits={overview.legacyMonthlyGrantCredits}
+            usageSummary={overview.usageSummary}
+            packageUsageRows={overview.packageUsageRows}
+            isTeamSharedPool={overview.isTeamSharedPool}
+          />
 
-      <CreditLotBreakdown lots={lotBreakdown} />
+          <CreditLotBreakdown lots={overview.lotBreakdown} />
+        </>
+      )}
 
       {process.env.NODE_ENV === "development" ? (
         <section className="mt-8">

@@ -12,7 +12,7 @@ import {
   storyPro2HubDefaultPromptPack,
 } from "@/lib/canvas/story-pro2-theme-outline-prompt";
 
-describe("pro2 production pack standard v6", () => {
+describe("pro2 production pack standard v7", () => {
   it("parses four full few-shot rows from embedded example", () => {
     const rows = parseStoryboardRows(PRO2_DEFAULT_SHOT_GFM_EXAMPLE);
     expect(rows).toHaveLength(4);
@@ -29,7 +29,14 @@ describe("pro2 production pack standard v6", () => {
     expect(cols).toHaveLength(9);
   });
 
-  it("default and gu-feng packs share Seedance rules and four-shot example", () => {
+  it("compact few-shot has only one example row (avoid 2-shot mimic)", () => {
+    const pack = storyPro2GuFengHubPromptPack();
+    const rows = parseStoryboardRows(pack.promptStoryboard);
+    expect(rows.length).toBeLessThanOrEqual(1);
+    expect(pack.promptStoryboard).toContain("禁止只输出 1–2 镜样例即停");
+  });
+
+  it("default and gu-feng packs share Seedance rules", () => {
     const d = storyPro2HubDefaultPromptPack();
     const g = storyPro2GuFengHubPromptPack();
     expect(d.promptStoryboard).toContain("Seedance");
@@ -41,13 +48,13 @@ describe("pro2 production pack standard v6", () => {
     expect(d.promptOutline).not.toContain("高密度糖点");
   });
 
-  it("migrate preserves gu-feng pack on v6 bump", () => {
+  it("migrate preserves gu-feng pack on v7 bump", () => {
     const migrated = migrateStoryPromptPackNode({
       id: "hub-1",
       type: "story-pro2-script-hub",
       position: { x: 0, y: 0 },
       data: {
-        storyPro2PackPromptVersion: 5,
+        storyPro2PackPromptVersion: 6,
         scriptCategoryId: "gu-feng-tian-chong",
         promptOutline: "legacy outline",
         promptStoryboard: "legacy",

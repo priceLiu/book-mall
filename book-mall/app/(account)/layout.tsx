@@ -12,10 +12,84 @@ import { getReferralEligibility } from "@/lib/referral/referral-service";
 import { AccountShell } from "@/components/account/account-shell";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
 import { SiteAppShell } from "@/components/layout/site-home/site-app-shell";
+import { runDbQuery } from "@/lib/db-query";
 import "../site-home.css";
 
 /** Layout 内查询 Prisma；构建阶段 CI 往往无 DATABASE_URL */
 export const dynamic = "force-dynamic";
+
+type AccountLayoutData = {
+  dbDegraded: boolean;
+  userRecord: {
+    image: string | null;
+    name: string | null;
+    phone: string | null;
+    phoneVerifiedAt: Date | null;
+    billingPersona: import("@prisma/client").BillingPersona | null;
+    billingPersonaLockedAt: Date | null;
+  } | null;
+  hasMembership: boolean;
+  canvasLaunch: Awaited<ReturnType<typeof prepareAccountCanvasLaunch>>;
+  ecomAccess: boolean;
+  referralEligibility: Awaited<ReturnType<typeof getReferralEligibility>>;
+};
+
+const EMPTY_CANVAS_LAUNCH: AccountLayoutData["canvasLaunch"] = {
+  gatewayLinked: false,
+  canvasOriginConfigured: false,
+};
+
+async function loadAccountLayoutData(userId: string): Promise<AccountLayoutData> {
+  return runDbQuery(
+    "AccountGroupLayout",
+    async () => {
+      const userRecord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          image: true,
+          name: true,
+          phone: true,
+          phoneVerifiedAt: true,
+          billingPersona: true,
+          billingPersonaLockedAt: true,
+        },
+      });
+
+      if (!userRecord?.phoneVerifiedAt) {
+        redirect("/onboarding/bind-phone");
+      }
+
+      if (!userRecord?.billingPersonaLockedAt) {
+        redirect("/onboarding/billing-persona");
+      }
+
+      const [hasMembership, canvasLaunch, ecomAccess, referralEligibility] =
+        await Promise.all([
+          userHasMembershipToolAccess(userId),
+          prepareAccountCanvasLaunch(userId),
+          userCanAccessEcommerceToolkit(userId),
+          getReferralEligibility(userId),
+        ]);
+
+      return {
+        dbDegraded: false,
+        userRecord,
+        hasMembership,
+        canvasLaunch,
+        ecomAccess,
+        referralEligibility,
+      };
+    },
+    {
+      dbDegraded: true,
+      userRecord: null,
+      hasMembership: false,
+      canvasLaunch: EMPTY_CANVAS_LAUNCH,
+      ecomAccess: false,
+      referralEligibility: { eligible: false, planLabel: null, reason: null },
+    },
+  );
+}
 
 export default async function AccountGroupLayout({
   children,
@@ -25,63 +99,46 @@ export default async function AccountGroupLayout({
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
 
-  const userRecord = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      image: true,
-      name: true,
-      phone: true,
-      phoneVerifiedAt: true,
-      billingPersona: true,
-      billingPersonaLockedAt: true,
-    },
-  });
+  const layoutData = await loadAccountLayoutData(session.user.id);
+  const { dbDegraded, userRecord, hasMembership, canvasLaunch, ecomAccess, referralEligibility } =
+    layoutData;
 
-  if (!userRecord?.phoneVerifiedAt) {
-    redirect("/onboarding/bind-phone");
+  if (!dbDegraded && userRecord) {
+    if (!userRecord.phoneVerifiedAt) redirect("/onboarding/bind-phone");
+    if (!userRecord.billingPersonaLockedAt) redirect("/onboarding/billing-persona");
   }
-
-  if (!userRecord?.billingPersonaLockedAt) {
-    redirect("/onboarding/billing-persona");
-  }
-
-  const [profile, hasMembership, canvasLaunch, ecomAccess, referralEligibility] =
-    await Promise.all([
-      Promise.resolve(userRecord),
-      userHasMembershipToolAccess(session.user.id),
-      prepareAccountCanvasLaunch(session.user.id),
-      userCanAccessEcommerceToolkit(session.user.id),
-      getReferralEligibility(session.user.id),
-    ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
   const isAdmin = session.user.role === "ADMIN";
-  const canLaunchTools = toolsSsoReady && (isAdmin || hasMembership);
+  const canLaunchTools = !dbDegraded && toolsSsoReady && (isAdmin || hasMembership);
   const canLaunchCanvas = canLaunchTools;
   const { gatewayLinked, canvasOriginConfigured } = canvasLaunch;
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
   const quickReplicaOriginConfigured = Boolean(getQuickReplicaOrigin().startsWith("http"));
   const commonToolsOriginConfigured = Boolean(getCommonToolsOrigin().startsWith("http"));
-  const canLaunchEcommerce = toolsSsoReady && ecomAccess;
+  const canLaunchEcommerce = !dbDegraded && toolsSsoReady && ecomAccess;
   const canLaunchQuickReplica = canLaunchTools;
   const canLaunchCommonTools = canLaunchTools;
 
   const showToolsCta = toolsSsoReady;
-  const appsMenuHint = buildAccountAppsMenuHint({
-    toolsSsoReady,
-    hasToolService: hasMembership,
-    gatewayLinked,
-    canvasOriginConfigured,
-    canLaunchCanvas,
-    ecomAccess,
-    ecomOriginConfigured,
-    quickReplicaOriginConfigured,
-    canLaunchQuickReplica,
-    commonToolsOriginConfigured,
-    canLaunchCommonTools,
-    isAdmin,
-    billingPersona: userRecord.billingPersona,
-  });
+  const billingPersona = userRecord?.billingPersona ?? null;
+  const appsMenuHint = dbDegraded
+    ? null
+    : buildAccountAppsMenuHint({
+        toolsSsoReady,
+        hasToolService: hasMembership,
+        gatewayLinked,
+        canvasOriginConfigured,
+        canLaunchCanvas,
+        ecomAccess,
+        ecomOriginConfigured,
+        quickReplicaOriginConfigured,
+        canLaunchQuickReplica,
+        commonToolsOriginConfigured,
+        canLaunchCommonTools,
+        isAdmin,
+        billingPersona,
+      });
 
   return (
     <SiteAppShell
@@ -90,9 +147,9 @@ export default async function AccountGroupLayout({
     >
       <AccountShell
         profile={{
-          image: profile?.image ?? session.user.image ?? null,
-          name: profile?.name ?? session.user.name ?? null,
-          phone: profile?.phone ?? session.user.phone ?? null,
+          image: userRecord?.image ?? session.user.image ?? null,
+          name: userRecord?.name ?? session.user.name ?? null,
+          phone: userRecord?.phone ?? session.user.phone ?? null,
         }}
         isAdmin={isAdmin}
         showToolsCta={showToolsCta}
@@ -107,8 +164,8 @@ export default async function AccountGroupLayout({
         canLaunchCommonTools={canLaunchCommonTools}
         commonToolsOriginConfigured={commonToolsOriginConfigured}
         appsMenuHint={appsMenuHint}
-        billingPersona={userRecord.billingPersona}
-        showReferral={referralEligibility.eligible}
+        billingPersona={billingPersona}
+        showReferral={!dbDegraded && referralEligibility.eligible}
       >
         {children}
       </AccountShell>

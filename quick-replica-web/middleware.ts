@@ -57,10 +57,10 @@ function buildAuthRedirectUrl(request: NextRequest): URL {
   const redirectPath = request.nextUrl.pathname + request.nextUrl.search || "/";
   const mainOrigin = getMainSiteOrigin();
   if (mainOrigin) {
-    const returnTo = new URL(redirectPath, request.url).toString();
     const reEnter = new URL("/api/sso/tools/re-enter", mainOrigin);
     reEnter.searchParams.set("app", "quick-replica");
-    reEnter.searchParams.set("redirect", returnTo);
+    // 仅传站内路径；完整 URL 会被主站 sanitizeToolsRedirectPath 误判为非法并重定向到 /fitting-room
+    reEnter.searchParams.set("redirect", redirectPath);
     return reEnter;
   }
   const url = new URL("/login", request.url);

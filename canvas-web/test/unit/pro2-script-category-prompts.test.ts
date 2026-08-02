@@ -106,7 +106,24 @@ describe("mergePro2ScriptGenerationPrompt", () => {
     expect(merged).toContain("古风铁律");
   });
 
-  it("omits category doc when includeCategoryDoc is false (storyboard segment)", () => {
+  it("gu-feng storyboard merge includes category doc (DeepSeek parity)", () => {
+    const merged = mergePro2ScriptGenerationPrompt(
+      "base pack",
+      "",
+      [],
+      {
+        scriptCategoryId: "gu-feng-tian-chong",
+        categoryDoc: "古风铁律",
+        outlineMd: "时长 3分钟",
+        includeCategoryDoc: true,
+        llmSection: "storyboard",
+      },
+    );
+    expect(merged).toContain("## 剧本类别参考");
+    expect(merged).toContain("镜数与时长预算");
+  });
+
+  it("omits category doc when includeCategoryDoc is false (default-master storyboard)", () => {
     const merged = mergePro2ScriptGenerationPrompt(
       "base pack",
       "",

@@ -1,6 +1,13 @@
 "use client";
 
-import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
+import {
+  buildPro2ThreeViewDockPrompt,
+  shouldRebuildPro2CharacterRowPrompt,
+} from "./three-view-prompt-rules";
+import {
+  parseVisualStylePackFromOutline,
+  type StoryProVisualStylePack,
+} from "./story-pro-visual-style-pack";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
 import {
   outlineCharacterNamesAlign,
@@ -31,23 +38,43 @@ import type {
 } from "./story-workspace-types";
 import type { CanvasFlowNode } from "./types";
 
+function hubVisualStylePackForCharacterRows(
+  d: StoryScriptHubNodeData,
+): StoryProVisualStylePack | null {
+  const ext = d as {
+    visualStylePack?: StoryProVisualStylePack;
+    outlineMd?: string;
+  };
+  return (
+    ext.visualStylePack ??
+    (ext.outlineMd?.trim()
+      ? parseVisualStylePackFromOutline(ext.outlineMd)
+      : null)
+  );
+}
+
 function characterRowFromParts(
   c: {
     name: string;
     role: string;
     appearance: string;
     personality?: string;
+    aiImagePrompt?: string;
   },
   promptOverride?: string,
+  visualStylePack?: StoryProVisualStylePack | null,
 ): StoryCharacterRow {
+  const aiImagePrompt = c.aiImagePrompt?.trim() || undefined;
   return {
     key: c.name,
     name: c.name,
     role: c.role,
     appearance: c.appearance,
     personality: c.personality?.trim() || undefined,
+    aiImagePrompt,
     prompt:
-      promptOverride?.trim() || formatCharacterRowThreeViewPrompt(c),
+      promptOverride?.trim() ||
+      buildPro2ThreeViewDockPrompt({ ...c, aiImagePrompt }, visualStylePack),
   };
 }
 
@@ -63,18 +90,23 @@ export function buildCharacterRowsFromHub(
   const characterSource =
     (synced.characterMd ?? "").trim() ||
     extractCharacterSectionFromOutline(d.outlineMd ?? "");
+  const visualPack = hubVisualStylePackForCharacterRows(d);
   const fromCharacter = parseCharacterListFromSection(characterSource);
   if (fromCharacter.length > 0) {
-    return fromCharacter.map((c) => characterRowFromParts(c));
+    return fromCharacter.map((c) => characterRowFromParts(c, undefined, visualPack));
   }
   const fromBrief = parseOutlineBriefCharacters(d.outlineMd ?? "");
   if (fromBrief.length > 0) {
     return fromBrief.map((b) =>
-      characterRowFromParts({
-        name: b.name,
-        role: b.role || "",
-        appearance: b.appearance,
-      }),
+      characterRowFromParts(
+        {
+          name: b.name,
+          role: b.role || "",
+          appearance: b.appearance,
+        },
+        undefined,
+        visualPack,
+      ),
     );
   }
   return [];
@@ -219,7 +251,10 @@ export function buildDefaultFrameRowPrompt(frame: {
   description: string;
   dialogue?: string;
   videoPrompt?: string;
+  aiImagePrompt?: string;
 }): string {
+  const fromPack = frame.aiImagePrompt?.trim();
+  if (fromPack) return fromPack;
   return buildFrameRowImagePrompt(frame);
 }
 
@@ -246,38 +281,45 @@ export function isShotSizeSceneLabel(name: string): boolean {
 export function buildDefaultSceneRowPrompt(
   row: SceneVisualDictionaryRow & { description?: string },
 ): string {
+  const envTimeMood =
+    row.envTimeMood?.trim() ||
+    [row.environment, row.time, row.mood].filter(Boolean).join(" · ");
   const parts = [
     row.name.trim() ? `场景：${row.name.trim()}` : "",
-    row.environment?.trim() ? `环境：${row.environment.trim()}` : "",
-    row.time?.trim() ? `时间：${row.time.trim()}` : "",
-    row.mood?.trim() ? `气氛：${row.mood.trim()}` : "",
+    envTimeMood ? `环境/时间/气氛：${envTimeMood}` : "",
     row.imageKeywords?.trim() ? `生图：${row.imageKeywords.trim()}` : "",
-    !row.environment?.trim() &&
+    !envTimeMood &&
     !row.imageKeywords?.trim() &&
     row.description?.trim()
       ? `画面：${row.description.trim()}`
       : "",
   ].filter(Boolean);
-  return finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+  let prompt = finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+  const neg = row.negativePrompt?.trim();
+  if (neg) prompt = `${prompt}\n【反向提示词】${neg}`;
+  return prompt;
 }
 
 /** 场景设计列 / 场景图节点 Dock · 结构化展示 + 生图关键词 */
 export function formatSceneRowDockInput(row: StoryProSceneRow): string {
+  const envTimeMood =
+    [row.environment, row.time, row.mood].filter(Boolean).join(" · ") ||
+    row.description?.trim() ||
+    "";
   const parts = [
     row.name.trim() ? `场景：${row.name.trim()}` : "",
-    (row.environment ?? "").trim()
-      ? `环境：${row.environment!.trim()}`
-      : "",
-    (row.time ?? "").trim() ? `时间：${row.time!.trim()}` : "",
-    (row.mood ?? "").trim() ? `气氛：${row.mood!.trim()}` : "",
+    envTimeMood ? `环境/时间/气氛：${envTimeMood}` : "",
     (row.imageKeywords ?? "").trim()
       ? `生图：${row.imageKeywords!.trim()}`
       : "",
-    !row.imageKeywords?.trim() && row.description?.trim()
+    !row.imageKeywords?.trim() && row.description?.trim() && !envTimeMood
       ? `画面：${row.description.trim()}`
       : "",
   ].filter(Boolean);
-  return finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+  let prompt = finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+  const neg = row.negativePrompt?.trim();
+  if (neg) prompt = `${prompt}\n【反向提示词】${neg}`;
+  return prompt;
 }
 
 /** 分镜脚本格式误入场景列时识别并覆盖 */
@@ -314,7 +356,10 @@ export function buildSceneRowsFromHub(
       time: r.time?.trim() || undefined,
       mood: r.mood?.trim() || undefined,
       imageKeywords: r.imageKeywords?.trim() || undefined,
-      description: [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
+      negativePrompt: r.negativePrompt?.trim() || undefined,
+      description:
+        r.envTimeMood?.trim() ||
+        [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
       prompt: buildDefaultSceneRowPrompt(r),
     };
     byKey.set(key, row);
@@ -353,8 +398,9 @@ export function buildFrameRowsFromMd(
   md: string,
   characterRows: StoryCharacterRow[],
 ): StoryFrameRow[] {
-  return parseStoryboardRows(md).map((r) =>
-    syncFrameRowCharacterRefs(
+  return parseStoryboardRows(md).map((r) => {
+    const aiImagePrompt = r.aiImagePrompt?.trim() || undefined;
+    return syncFrameRowCharacterRefs(
       {
         frameIndex: r.frameIndex,
         key: String(r.frameIndex),
@@ -363,11 +409,11 @@ export function buildFrameRowsFromMd(
         description: r.description,
         dialogue: r.dialogue,
         videoPrompt: r.videoPrompt,
-        prompt: "",
+        prompt: aiImagePrompt ?? "",
       },
       characterRows,
-    ),
-  );
+    );
+  });
 }
 
 export function buildVideoRowsFromFrames(
@@ -443,7 +489,9 @@ export function syncColumnsFromHub(
     if (!prev) return row;
     return {
       ...row,
-      prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
+      prompt: shouldRebuildPro2CharacterRowPrompt(prev, row)
+        ? row.prompt
+        : prev.prompt?.trim() || row.prompt,
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
     };

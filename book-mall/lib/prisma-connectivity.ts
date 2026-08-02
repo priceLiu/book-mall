@@ -1,7 +1,6 @@
-import { Prisma } from "@prisma/client";
+import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 
-/** 数据库短暂不可达（本地连远端 CDB、连接池打满等） */
+/** @deprecated 使用 isPrismaConnectionUnavailable（已含 P1002/P1008/P2024） */
 export function isPrismaConnectivityError(e: unknown): boolean {
-  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return false;
-  return e.code === "P1001" || e.code === "P1002" || e.code === "P1008" || e.code === "P1017";
+  return isPrismaConnectionUnavailable(e);
 }

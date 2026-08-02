@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/sms-verification-service";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { prisma } from "@/lib/prisma";
+import { tryApiDbUnavailableResponse } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,8 @@ export async function POST(request: Request) {
     if (e instanceof SmsVerificationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
+    const dbResp = tryApiDbUnavailableResponse(e);
+    if (dbResp) return dbResp;
     console.error("[sms/send]", e);
     return NextResponse.json({ error: "发送失败，请稍后重试" }, { status: 500 });
   }

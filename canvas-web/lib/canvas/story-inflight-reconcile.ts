@@ -43,6 +43,7 @@ import { pickTaskResultMediaUrl } from "./task-media-url";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import {
   clearCanvasNodeRunSession,
+  isCanvasNodeRunSessionActive,
   shouldDeferLibtvOrphanReconcile,
 } from "./canvas-run-session";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
@@ -112,21 +113,13 @@ function reconcileHubSection(
     | undefined;
   const scope = { llmSection: section };
   if (!isInflightStatus(rt?.status)) return;
-  if (rt?.status === "pending" && !rt?.taskId) {
-    const md = hubSectionMd(node, section).trim();
-    if (md && !hasServerInflightForScope(tasks, node.id, scope)) {
-      updateNodeData(node.id, {
-        [rtKey]: clearInflightRuntime({ ...rt, status: "done" }),
-      });
-    }
-    return;
-  }
 
   const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
   if (hasServerInflightForScope(tasks, node.id, scope)) return;
 
-  const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+  const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope, rt, node.id);
   if (pick) {
+    if (shouldSkipStoryRowTaskApply(rt, pick, node.id)) return;
     storyApplyTaskResult(
       node,
       pick,
@@ -134,6 +127,23 @@ function reconcileHubSection(
       updateNodeData,
       allNodes,
     );
+    return;
+  }
+
+  if (rt?.status === "pending" && !rt?.taskId) {
+    // 无服务端任务可对齐：保留旧 MD 扫光底图，勿误判 done；但上方 pick 已在会话内写回 SUCCEEDED
+    if (
+      shouldDeferLibtvOrphanReconcile(node.id) ||
+      isCanvasNodeRunSessionActive(node.id)
+    ) {
+      return;
+    }
+    const md = hubSectionMd(node, section).trim();
+    if (md) {
+      updateNodeData(node.id, {
+        [rtKey]: clearInflightRuntime({ ...rt, status: "done" }),
+      });
+    }
     return;
   }
 
