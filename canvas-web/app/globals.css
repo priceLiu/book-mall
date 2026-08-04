@@ -342,12 +342,18 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 
 /*
  * 连线 / 节点容器均勿建 stacking context，否则边的 svg zIndex 无法与节点交错：
- * 组框 z=5 < 连线 z=12 < 媒体子节点 z=22（zIndexMode=manual + defaultEdgeOptions）
- * 连线须低于节点，否则穿过节点的边会画在卡片上方（露出横贯节点的白线）
+ * 组框 z=5 · 连线 z=12 · 媒体子节点 z=22 · 选中子节点 z=1201
+ * 连线在节点间隙与组底色上可见，但不压住卡片本体
  */
 .canvas-flow-wrap .react-flow__edges,
 .canvas-flow-wrap .react-flow__nodes {
   z-index: auto !important;
+}
+.canvas-flow-wrap .react-flow__edges svg {
+  z-index: 12 !important;
+}
+.canvas-flow-wrap .react-flow__edges svg:has(.canvas-edge-node-gap) {
+  z-index: 12 !important;
 }
 /* 非 group 节点默认在连线之上 */
 .canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {

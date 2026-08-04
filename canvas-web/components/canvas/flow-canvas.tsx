@@ -87,6 +87,11 @@ import {
   mergeStoreNodesIntoRf,
 } from "@/lib/canvas/canvas-rf-sync";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
+import {
+  CANVAS_EDGE_Z_NODE_GAP,
+  canvasEdgeLayerClassName,
+  resolveLibtvCanvasEdgeZIndex,
+} from "@/lib/canvas/canvas-edge-layer-z";
 import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
 import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
 import {
@@ -186,7 +191,7 @@ const edgeTypes = {
   default: DeletableEdge,
 } as const;
 
-/** 连线 zIndex：高于组框(5)、低于媒体子节点(22) · 须配合 zIndexMode="manual" */
+/** 连线 zIndex：组内 24 · 跨组 4 · 画布外 12 · 须配合 zIndexMode="manual" */
 const CANVAS_EDGE_Z_INDEX = 12;
 const CANVAS_DEFAULT_EDGE_OPTIONS = { zIndex: CANVAS_EDGE_Z_INDEX } as const;
 
@@ -1650,24 +1655,31 @@ function FlowCanvasInner({
 
   const edgesWithLayerZ = useMemo(
     () =>
-      rfEdges.map((e) => ({
-        ...e,
-        zIndex: Math.max(
-          typeof e.zIndex === "number" ? e.zIndex : 0,
-          CANVAS_EDGE_Z_INDEX,
-        ),
-      })),
-    [rfEdges],
+      rfEdges.map((e) => {
+        const z = libtvCanvas
+          ? resolveLibtvCanvasEdgeZIndex(e, storeNodes, focusEdgeIds)
+          : CANVAS_EDGE_Z_INDEX;
+        const layerClass = libtvCanvas ? canvasEdgeLayerClassName(z) : undefined;
+        const className = layerClass
+          ? `${e.className ?? ""} ${layerClass}`.trim()
+          : e.className;
+        return {
+          ...e,
+          className,
+          zIndex: Math.max(typeof e.zIndex === "number" ? e.zIndex : 0, z),
+        };
+      }),
+    [rfEdges, libtvCanvas, storeNodes, focusEdgeIds],
   );
 
   const decoratedEdges = useMemo(() => {
     if (!focusEdgeIds) return edgesWithLayerZ;
     let changed = false;
-    const next = rfEdges.map((e) => {
+    const next = edgesWithLayerZ.map((e) => {
       if (focusEdgeIds.has(e.target)) {
         const className = `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim();
         if (
-          e.zIndex === CANVAS_EDGE_Z_INDEX &&
+          e.zIndex === CANVAS_EDGE_Z_NODE_GAP &&
           className === e.className &&
           e.style?.stroke === "#60a5fa"
         ) {
@@ -1676,7 +1688,7 @@ function FlowCanvasInner({
         changed = true;
         return {
           ...e,
-          zIndex: CANVAS_EDGE_Z_INDEX,
+          zIndex: CANVAS_EDGE_Z_NODE_GAP,
           className,
           style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 1.5 },
         };
@@ -1685,7 +1697,7 @@ function FlowCanvasInner({
         const className =
           `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim();
         if (
-          e.zIndex === CANVAS_EDGE_Z_INDEX &&
+          e.zIndex === CANVAS_EDGE_Z_NODE_GAP &&
           className === e.className &&
           e.style?.stroke === "#238636"
         ) {
@@ -1694,7 +1706,7 @@ function FlowCanvasInner({
         changed = true;
         return {
           ...e,
-          zIndex: CANVAS_EDGE_Z_INDEX,
+          zIndex: CANVAS_EDGE_Z_NODE_GAP,
           className,
           style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: 1.5 },
         };

@@ -187,6 +187,21 @@ export const LIBTV_NODE_SIDE_PLUS_LAYER_CLASS = "z-[20060]";
 export const LIBTV_SIDE_PLUS_LG_RADIUS_FLOW = 35;
 /** lg 侧 + 直径（px · 屏上目标；default 薄卡仍为 44） */
 export const LIBTV_SIDE_PLUS_LG_SIZE_PX = 70;
+/** default 侧 + 直径（px · flow 100%） */
+export const LIBTV_SIDE_PLUS_DEFAULT_SIZE_PX = 44;
+
+/** 侧 + 屏上直径 · 随画布 zoom 缩放（与 viewport 内 + 圆一致） */
+export function libtvSidePlusScreenDiameter(
+  zoom: number,
+  size: typeof LIBTV_NODE_SIDE_PLUS_SIZE = LIBTV_NODE_SIDE_PLUS_SIZE,
+): number {
+  const base =
+    size === "lg"
+      ? LIBTV_SIDE_PLUS_LG_SIZE_PX
+      : LIBTV_SIDE_PLUS_DEFAULT_SIZE_PX;
+  const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  return base * z;
+}
 /** 拖线松手 · 侧 + 额外吸附容差（flow · 含磁吸沿边偏移） */
 export const LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW = 56;
 
