@@ -111,6 +111,31 @@ describe("pickPreferredCanvasTask", () => {
     );
     expect(pick).toBeUndefined();
   });
+
+  it("prefers bound FAILED over older SUCCEEDED when local row still pending", () => {
+    const pick = pickPreferredCanvasTaskForScope(
+      [
+        task({
+          id: "old-ok",
+          status: "SUCCEEDED",
+          updatedAt: "2026-08-02T15:21:18.000Z",
+          ossUrl: "https://cdn.example/old.png",
+          storyScope: { rowKey: "沈知意", mediaKind: "threeView" },
+        }),
+        task({
+          id: "new-fail",
+          status: "FAILED",
+          updatedAt: "2026-08-02T15:29:55.000Z",
+          failMessage: "prompt too long",
+          storyScope: { rowKey: "沈知意", mediaKind: "threeView" },
+        }),
+      ],
+      { rowKey: "沈知意", mediaKind: "threeView" },
+      { status: "pending", taskId: "new-fail" },
+      "n_XJ1uOoTH",
+    );
+    expect(pick?.id).toBe("new-fail");
+  });
 });
 
 describe("restoreServerInflightNodeRuntimes", () => {

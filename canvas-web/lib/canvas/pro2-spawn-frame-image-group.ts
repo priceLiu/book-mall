@@ -18,6 +18,7 @@ import {
   findPro2FrameImageNodeForRow,
   resolveFrameSyncGroupId,
 } from "./pro2-group-row-resolve";
+import { filterPro2RowsForSpawn } from "./pro2-media-row-spawn";
 
 export {
   findPro2FrameImageNodeForRow,
@@ -88,6 +89,8 @@ export type EnsurePro2FrameImageGroupArgs = {
   setEdges?: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
   /** 已有分镜组时追加新组（不覆盖主组） */
   spawnNewGroup?: boolean;
+  /** 仅 spawn 这些 rowKey 对应节点 */
+  rowKeys?: string[];
 };
 
 /** 为分镜列生成/更新「组 + N 个图片子节点」视觉层 */
@@ -108,7 +111,9 @@ export function ensurePro2FrameImageGroup(
             args.frameColumnId,
       );
 
-  const sorted = [...args.rows].sort((a, b) => a.frameIndex - b.frameIndex);
+  const sorted = [...filterPro2RowsForSpawn(args.rows, args.rowKeys)].sort(
+    (a, b) => a.frameIndex - b.frameIndex,
+  );
   if (!sorted.length) {
     if (existingGroup?.id && args.setEdges) {
       const childIds = args.nodes

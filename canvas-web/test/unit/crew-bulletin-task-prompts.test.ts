@@ -18,6 +18,7 @@ describe("crew-bulletin-task-prompts", () => {
     const synced = syncStoryProColumnRows(hubData, {}, "hub-1");
     const rowKey = synced.characterRows[0]?.key;
     expect(rowKey).toBeTruthy();
+    expect(synced.characterRows[0]?.prompt?.trim() || "").toBe("");
 
     const task: CrewBulletinTask = {
       id: `character:${rowKey}`,

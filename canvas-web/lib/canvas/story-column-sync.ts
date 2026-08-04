@@ -28,6 +28,9 @@ import {
   type StoryRefImage,
 } from "./story-ref-image";
 import { storyProSceneRowKey } from "./story-pro-scene-asset-catalog";
+import {
+  isAnyStoryScriptHubType,
+} from "./story-workspace-resolver";
 import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
@@ -72,9 +75,7 @@ function characterRowFromParts(
     appearance: c.appearance,
     personality: c.personality?.trim() || undefined,
     aiImagePrompt,
-    prompt:
-      promptOverride?.trim() ||
-      buildPro2ThreeViewDockPrompt({ ...c, aiImagePrompt }, visualStylePack),
+    prompt: promptOverride?.trim() || "",
   };
 }
 
@@ -360,7 +361,7 @@ export function buildSceneRowsFromHub(
       description:
         r.envTimeMood?.trim() ||
         [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
-      prompt: buildDefaultSceneRowPrompt(r),
+      prompt: "",
     };
     byKey.set(key, row);
   }
@@ -474,7 +475,7 @@ export function syncColumnsFromHub(
   };
 } | null {
   const hub = nodes.find((n) => n.id === hubId);
-  if (!hub || hub.type !== "story-script-hub") return null;
+  if (!hub || !isAnyStoryScriptHubType(hub.type ?? "")) return null;
   const d = hubDataForColumnSync(hub.data as unknown as StoryScriptHubNodeData);
   const charRows = buildCharacterRowsFromHub(d);
   const existingChar = (
@@ -490,8 +491,8 @@ export function syncColumnsFromHub(
     return {
       ...row,
       prompt: shouldRebuildPro2CharacterRowPrompt(prev, row)
-        ? row.prompt
-        : prev.prompt?.trim() || row.prompt,
+        ? ""
+        : prev.prompt?.trim() || "",
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
     };

@@ -6,7 +6,7 @@ import {
   busEnqueueStoryRun,
   busEnqueueStoryRunsSequential,
 } from "./canvas-run-bus";
-import { optimisticPro2ThreeViewBatchStart } from "./pro2-spawn-character-image-group";
+import { optimisticPro2ThreeViewBatchStart, clearStalePro2ThreeViewInflight } from "./pro2-spawn-character-image-group";
 import { useCanvasStore } from "./store";
 import type { StoryLlmSection } from "./story-workspace-types";
 import { STORY_HUB_SECTION_ORDER } from "./spawn-story-workspace";
@@ -92,7 +92,37 @@ export function batchRunPro2ThreeViewRows(
   const keys = rowKeys.filter(Boolean);
   if (!keys.length) return;
   const { nodes, updateNodeData } = useCanvasStore.getState();
-  optimisticPro2ThreeViewBatchStart(columnNodeId, keys, nodes, updateNodeData);
+  clearStalePro2ThreeViewInflight(columnNodeId, keys, nodes, updateNodeData);
+  const nodesAfterClear = useCanvasStore.getState().nodes;
+  if (options?.forceFresh) {
+    const col = nodesAfterClear.find((n) => n.id === columnNodeId);
+    const rows =
+      (col?.data as { rows?: import("./story-pro-workspace-types").StoryProCharacterRow[] })
+        .rows ?? [];
+    const allowed = new Set(keys);
+    const cleared = rows.map((r) =>
+      allowed.has(r.key) ? { ...r, runtime: undefined } : r,
+    );
+    updateNodeData(columnNodeId, { rows: cleared });
+    const nodesAfter = nodesAfterClear.map((n) =>
+      n.id === columnNodeId
+        ? { ...n, data: { ...n.data, rows: cleared } }
+        : n,
+    );
+    optimisticPro2ThreeViewBatchStart(
+      columnNodeId,
+      keys,
+      nodesAfter,
+      updateNodeData,
+    );
+  } else {
+    optimisticPro2ThreeViewBatchStart(
+      columnNodeId,
+      keys,
+      nodesAfterClear,
+      updateNodeData,
+    );
+  }
   batchRunStoryRows(columnNodeId, keys, "threeView", options);
 }
 

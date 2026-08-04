@@ -30,7 +30,10 @@ import {
   batchRunPro2SceneImageNodes,
   readPro2SceneRowsForHub,
 } from "@/lib/canvas/pro2-spawn-scene-image-group";
-import { buildPro2ThreeViewDockPrompt } from "@/lib/canvas/three-view-prompt-rules";
+import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
+import {
+  applyPro2CharacterMediaPromptsForKeys,
+} from "@/lib/canvas/pro2-lazy-media-prompts";
 import { readHubVisualStylePack } from "@/lib/canvas/story-pro-visual-style-pack";
 import type {
   StoryProCharacterRow,
@@ -395,11 +398,21 @@ export function Pro2MediaGroupToolbarPanel({
       const keys =
         rowKeys.length > 0 ? rowKeys : rows.map((r) => r.key);
       updateNodeData(controller.id, { pro2PendingSyncGroupId: groupId });
-      const visualPack = readHubVisualStylePack(hubNodeId, nodes);
-      const refreshedRows = rows.map((row) => ({
-        ...row,
-        prompt: buildPro2ThreeViewDockPrompt(row, visualPack),
-      }));
+      syncPro2CharacterColumnAndThreeViewDocksFromHub(
+        nodes,
+        hubNodeId,
+        updateNodeData,
+      );
+      const nodesAfter = useCanvasStore.getState().nodes;
+      const colAfter = nodesAfter.find((n) => n.id === controller.id);
+      const rowsAfter =
+        (colAfter?.data as { rows?: StoryProCharacterRow[] }).rows ?? rows;
+      const visualPack = readHubVisualStylePack(hubNodeId, nodesAfter);
+      const refreshedRows = applyPro2CharacterMediaPromptsForKeys(
+        rowsAfter,
+        keys,
+        visualPack,
+      );
       updateNodeData(controller.id, { rows: refreshedRows });
       batchRunPro2ThreeViewRows(controller.id, keys, { forceFresh: true });
       return;

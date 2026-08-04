@@ -65,14 +65,21 @@ export function computePro2MultiSelectionBbox(
       | undefined;
 
     if (internal) {
+      const measuredW = internal.measured?.width;
+      const measuredH = internal.measured?.height;
+      const fallback = pro2NodeBoxSize(node);
       const w =
-        internal.measured?.width ??
-        (typeof internal.width === "number" ? internal.width : undefined) ??
-        pro2NodeBoxSize(node).w;
+        typeof measuredW === "number" && measuredW > 0
+          ? measuredW
+          : typeof internal.width === "number" && internal.width > 0
+            ? internal.width
+            : fallback.w;
       const h =
-        internal.measured?.height ??
-        (typeof internal.height === "number" ? internal.height : undefined) ??
-        pro2NodeBoxSize(node).h;
+        typeof measuredH === "number" && measuredH > 0
+          ? measuredH
+          : typeof internal.height === "number" && internal.height > 0
+            ? internal.height
+            : fallback.h;
       const pos =
         internal.internals?.positionAbsolute ??
         internal.position ??

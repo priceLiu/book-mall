@@ -72,7 +72,11 @@ import {
   syncPro2SceneImagesFromRows,
 } from "./pro2-spawn-scene-image-group";
 import { syncPro2FrameRowsUpstreamRefs } from "./pro2-wire-frame-board-refs";
-import { buildPro2ThreeViewDockPrompt } from "./three-view-prompt-rules";
+import {
+  applyPro2CharacterMediaPromptsForKeys,
+  applyPro2FrameMediaPromptsForIndices,
+  applyPro2SceneMediaPromptsForKeys,
+} from "./pro2-lazy-media-prompts";
 import {
   parseVisualStylePackFromOutline,
   readHubVisualStylePack,
@@ -625,22 +629,28 @@ export function kickoffPro2FrameBoardFromHub(
     (r) => r.url && /^https?:\/\//.test(r.url),
   );
 
-  const frameRowsBase = synced.frameRows.map((row) => {
-    const promptBase = row.prompt?.trim() || "";
-    const withDock = dockNote
-      ? `${promptBase}\n\n用户补充：${dockNote}`.trim()
-      : promptBase;
-    return {
-      ...row,
-      prompt: withDock,
-      refImages: refUrls.length
+  const picked = options?.selectedFrameIndices?.filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  const pickedIndices =
+    picked?.length && picked.length > 0
+      ? picked
+      : synced.frameRows.map((r) => r.frameIndex);
+
+  const frameRowsWithPrompts = applyPro2FrameMediaPromptsForIndices(
+    synced.frameRows,
+    pickedIndices,
+    dockNote,
+  ).map((row) => ({
+    ...row,
+    refImages:
+      pickedIndices.includes(row.frameIndex) && refUrls.length
         ? [...(row.refImages ?? []), ...refUrls]
         : row.refImages,
-    };
-  });
+  }));
 
   const frameRows = syncPro2FrameRowsUpstreamRefs(
-    frameRowsBase,
+    frameRowsWithPrompts,
     upstream.characterRows,
     upstream.sceneRows,
   );
@@ -685,9 +695,6 @@ export function kickoffPro2FrameBoardFromHub(
   }
 
   let keys = frameRows.map((r) => r.key);
-  const picked = options?.selectedFrameIndices?.filter(
-    (n) => Number.isFinite(n) && n > 0,
-  );
   if (picked?.length) {
     const allowed = new Set(picked);
     keys = frameRows
@@ -699,6 +706,7 @@ export function kickoffPro2FrameBoardFromHub(
     frameColumnId: frameColumnId!,
     hubNodeId: hubId,
     rows: frameRows,
+    rowKeys: keys.length ? keys : undefined,
     nodes: store.nodes,
     addNode: store.addNode,
     addNodeInGroup: store.addNodeInGroup,
@@ -999,13 +1007,23 @@ export function kickoffPro2CharacterThreeViewFromHub(
       ? parseVisualStylePackFromOutline(hubData.outlineMd)
       : null);
 
-  const refreshedCharacterRows = synced.characterRows.map((row) => ({
-    ...row,
-    prompt: buildPro2ThreeViewDockPrompt(row, visualPack),
-  }));
+  let keys = synced.characterRows.map((r) => r.key);
+  const picked = options?.characterKeys?.filter((k) => k.trim());
+  if (picked?.length) {
+    const allowed = new Set(picked);
+    keys = synced.characterRows
+      .filter((r) => allowed.has(r.key) || allowed.has(r.name))
+      .map((r) => r.key);
+  }
+
+  const columnRows = applyPro2CharacterMediaPromptsForKeys(
+    synced.characterRows,
+    keys,
+    visualPack,
+  );
 
   store.updateNodeData(characterColumnId, {
-    rows: refreshedCharacterRows,
+    rows: columnRows,
     hubNodeId: hubId,
   });
   store = getStore();
@@ -1046,19 +1064,12 @@ export function kickoffPro2CharacterThreeViewFromHub(
     }
   }
 
-  let keys = refreshedCharacterRows.map((r) => r.key);
-  const picked = options?.characterKeys?.filter((k) => k.trim());
-  if (picked?.length) {
-    const allowed = new Set(picked);
-    keys = refreshedCharacterRows
-      .filter((r) => allowed.has(r.key) || allowed.has(r.name))
-      .map((r) => r.key);
-  }
   store = getStore();
   ensurePro2CharacterImageGroup({
     characterColumnId: characterColumnId!,
     hubNodeId: hubId,
-    rows: refreshedCharacterRows,
+    rows: columnRows,
+    rowKeys: keys.length ? keys : undefined,
     nodes: store.nodes,
     addNode: store.addNode,
     addNodeInGroup: store.addNodeInGroup,
@@ -1124,9 +1135,6 @@ export function kickoffPro2SceneImageFromHub(
     hubId,
   );
 
-  store.updateNodeData(hubId, { sceneRows: synced.sceneRows });
-  store = getStore();
-
   const batchFromPicker = options?.batchImage;
   if (batchFromPicker?.providerId?.trim() && batchFromPicker.modelKey?.trim()) {
     store.updateNodeData(hubId, {
@@ -1172,10 +1180,19 @@ export function kickoffPro2SceneImageFromHub(
   }
   keys = Array.from(new Set(keys.filter(Boolean)));
 
+  const visualPack = readHubVisualStylePack(hubId, store.nodes);
+  const sceneRowsForHub = applyPro2SceneMediaPromptsForKeys(
+    synced.sceneRows,
+    keys,
+    visualPack,
+  );
+
+  store.updateNodeData(hubId, { sceneRows: sceneRowsForHub });
   store = getStore();
   ensurePro2SceneImageGroup({
     hubNodeId: hubId,
-    rows: synced.sceneRows,
+    rows: sceneRowsForHub,
+    rowKeys: keys.length ? keys : undefined,
     nodes: store.nodes,
     edges: store.edges,
     starterNodeId: starter.id,
@@ -1192,7 +1209,7 @@ export function kickoffPro2SceneImageFromHub(
   syncPro2SceneImagesFromRows(
     store.nodes,
     hubId,
-    synced.sceneRows,
+    sceneRowsForHub,
     store.updateNodeData,
   );
 
@@ -1202,7 +1219,7 @@ export function kickoffPro2SceneImageFromHub(
       batchRunPro2SceneImageNodes(
         fresh.nodes,
         hubId,
-        synced.sceneRows,
+        sceneRowsForHub,
         keys,
         { forceFresh: Boolean(options?.spawnNewGroup ?? true) },
       );

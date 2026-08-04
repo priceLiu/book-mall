@@ -146,7 +146,7 @@ import {
   findPro2FrameImageNodeForRow,
   maybeClearHubPendingSceneSyncGroup,
 } from "./pro2-group-row-resolve";
-import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
+import { syncPro2CharacterImagesFromRows, reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-spawn-character-image-group";
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import {
   CANVAS_POLL_IDLE_RECHECK_MS,
@@ -171,6 +171,7 @@ function syncPro2CharacterGroupImagesFromColumnRuntimes(
     syncPro2CharacterImagesFromRows(nodes, node.id, rows, updateNodeData, {
       inflightOnly: true,
     });
+    reconcilePro2ThreeViewNodesWithColumnRows(nodes, node.id, updateNodeData);
   }
 }
 
@@ -1104,10 +1105,32 @@ export function useCanvasRunner(
           mediaKind: job.mediaKind,
           llmSection: job.llmSection,
         };
-        const localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
+        let localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
+        if (job.rowKey) {
+          const rows =
+            (
+              node.data as {
+                rows?: {
+                  key: string;
+                  runtime?: CanvasNodeRuntime;
+                  videoRuntime?: CanvasNodeRuntime;
+                  ttsRuntime?: CanvasNodeRuntime;
+                }[];
+              }
+            ).rows ?? [];
+          const row = rows.find((r) => r.key === job.rowKey);
+          if (row) {
+            localRt =
+              job.mediaKind === "video"
+                ? row.videoRuntime
+                : job.mediaKind === "tts"
+                  ? row.ttsRuntime
+                  : row.runtime;
+          }
+        }
         const pick =
           job.rowKey || job.mediaKind || job.llmSection
-            ? pickPreferredCanvasTaskForScope(nodeTasks, scope)
+            ? pickPreferredCanvasTaskForScope(nodeTasks, scope, localRt, nodeId)
             : pickPreferredCanvasTask(nodeTasks, { localRuntime: localRt });
         if (!pick) return;
 
@@ -2380,10 +2403,15 @@ export function useCanvasRunner(
 
         if (isAnyStorySceneColumnType(node.type ?? "")) {
           const rows =
-            (node.data as { rows?: { key: string }[] }).rows ?? [];
+            (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] }).rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "sceneRef" as const };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              row.runtime,
+              node.id,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
@@ -2405,7 +2433,12 @@ export function useCanvasRunner(
               .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "threeView" };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              row.runtime,
+              node.id,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
@@ -2421,7 +2454,12 @@ export function useCanvasRunner(
               .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "frameImage" };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              row.runtime,
+              node.id,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??

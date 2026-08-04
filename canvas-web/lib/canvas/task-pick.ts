@@ -328,15 +328,20 @@ export function pickPreferredCanvasTask(
   }
   if (localTaskId && localInflight) {
     const bound = tasks.find((t) => t.id === localTaskId);
-    if (bound?.status === "SUCCEEDED" && taskHasDisplayableResult(bound)) {
-      return bound;
-    }
-    if (
-      bound &&
-      isServerInflightTaskStatus(bound.status) &&
-      !isStaleServerInflightTask(bound, tasks)
-    ) {
-      return bound;
+    if (bound) {
+      if (bound.status === "SUCCEEDED" && taskHasDisplayableResult(bound)) {
+        return bound;
+      }
+      if (
+        isServerInflightTaskStatus(bound.status) &&
+        !isStaleServerInflightTask(bound, tasks)
+      ) {
+        return bound;
+      }
+      // 本轮 batch 已失败/取消：须写回终态，勿被更早 SUCCEEDED 挡住（否则行级 pending 永不消失）
+      if (bound.status === "FAILED" || bound.status === "CANCELLED") {
+        return bound;
+      }
     }
   }
 
@@ -383,6 +388,18 @@ export function pickStoryRowApplyTask(
   if (!scoped.length) return undefined;
 
   const localTaskId = localRuntime?.taskId?.trim();
+  const bound = localTaskId
+    ? scoped.find((t) => t.id === localTaskId)
+    : undefined;
+  if (
+    bound &&
+    localRuntime &&
+    isInflightRuntimeStatus(localRuntime.status) &&
+    (bound.status === "FAILED" || bound.status === "CANCELLED")
+  ) {
+    return bound;
+  }
+
   const localInflight =
     localTaskId && isInflightRuntimeStatus(localRuntime?.status)
       ? scoped.find(

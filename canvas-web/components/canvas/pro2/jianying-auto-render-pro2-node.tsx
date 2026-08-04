@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { Clapperboard, Maximize2, Play } from "lucide-react";
@@ -38,12 +38,6 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
-  const setNodes = useCanvasStore((s) => s.setNodes);
-  const setEdges = useCanvasStore((s) => s.setEdges);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const renderInFlight = isMediaRenderJobInflight(d.mediaRenderInFlight);
@@ -73,17 +67,20 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     disabled: ffmpegPhase || !hasVideo,
   });
 
-  const spawnStore = useMemo(
-    () => ({ nodes, edges, addNode, addNodeInGroup, setNodes, setEdges }),
-    [nodes, edges, addNode, addNodeInGroup, setNodes, setEdges],
-  );
-
   const onLeftPick = useCallback(
     (itemId: string, nodeType?: string) => {
       if (itemId !== "video" && nodeType !== "sbv1-video-engine") return;
-      spawnSbv1NeighborFromNode(id, "left", "sbv1-video-engine", spawnStore);
+      const s = useCanvasStore.getState();
+      spawnSbv1NeighborFromNode(id, "left", "sbv1-video-engine", {
+        nodes: s.nodes,
+        edges: s.edges,
+        addNode: s.addNode,
+        addNodeInGroup: s.addNodeInGroup,
+        setNodes: s.setNodes,
+        setEdges: s.setEdges,
+      });
     },
-    [id, spawnStore],
+    [id],
   );
 
   const borderStyle = libtvNodeBorderStyle({

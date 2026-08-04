@@ -22,6 +22,7 @@ import {
 } from "@/lib/canvas/libtv-node-chrome";
 import { useLibtvDockWheelScroll } from "@/lib/canvas/use-libtv-dock-wheel-scroll";
 import { RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { CANVAS_RF_VIEWPORT_READY_EVENT } from "@/lib/canvas/canvas-rf-sync";
 import { cn } from "@/lib/utils";
 
 export type Pro2InputDockShellProps = {
@@ -53,7 +54,22 @@ function useReactFlowViewportEl(): HTMLElement | null {
       document.querySelector(
         ".canvas-flow-wrap .react-flow__viewport",
       ) as HTMLElement | null;
-    setEl(pick());
+    const found = pick();
+    if (found) {
+      setEl(found);
+      return;
+    }
+    const onReady = () => {
+      const next = pick();
+      if (next) setEl(next);
+    };
+    window.addEventListener(CANVAS_RF_VIEWPORT_READY_EVENT, onReady);
+    const observer = new MutationObserver(onReady);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      window.removeEventListener(CANVAS_RF_VIEWPORT_READY_EVENT, onReady);
+      observer.disconnect();
+    };
   }, []);
   return el;
 }

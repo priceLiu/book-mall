@@ -26,7 +26,9 @@ import { pickTaskResultMediaUrl } from "./task-media-url";
 import { shouldSkipStoryRowTaskApply } from "./task-pick";
 import { clearCanvasNodeRunSession } from "./canvas-run-session";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
-import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
+import {
+  syncPro2CharacterImagesFromRows,
+} from "./pro2-spawn-character-image-group";
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
 import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
@@ -455,26 +457,35 @@ export function storyApplyTaskResult(
       }
     )?.workspaceIds;
     if (ws?.scriptHubId === node.id && task.textOutput) {
+      const nodesAfterHub = allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
+      );
+      const mergedHubData = {
+        ...node.data,
+        ...patch,
+      } as import("./story-pro-workspace-types").StoryProScriptHubNodeData;
+
       if (
         ws.characterColumnId &&
         ws.frameColumnId &&
         ws.videoColumnId
       ) {
         const synced = syncColumnsFromHub(
-          allNodes.map((n) =>
-            n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
-          ),
+          nodesAfterHub,
           node.id,
           ws.characterColumnId,
           ws.frameColumnId,
           ws.videoColumnId,
         );
         if (synced) {
-          updateNodeData(ws.characterColumnId, synced.characterPatch);
+          if (node.type !== "story-pro2-script-hub") {
+            updateNodeData(ws.characterColumnId, synced.characterPatch);
+          }
           updateNodeData(ws.frameColumnId, synced.framePatch);
           updateNodeData(ws.videoColumnId, synced.videoPatch);
         }
       }
+
       if (starter && starter.data) {
         const stage = (starter.data as { pipelineStage?: string }).pipelineStage;
         if (stage === "finalized") {

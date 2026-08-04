@@ -8,6 +8,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
+import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import {
   optimisticLibtvMediaRunStart,
@@ -220,6 +221,14 @@ export function Pro2ThreeViewInputDock() {
     if (!storeNode || isRunning) return;
 
     if (controllerId && d.pro2RowKey) {
+      const hubId = d.pro2HubNodeId?.trim();
+      if (hubId) {
+        syncPro2CharacterColumnAndThreeViewDocksFromHub(
+          nodes,
+          hubId,
+          updateNodeData,
+        );
+      }
       const ctrl = nodes.find((n) => n.id === controllerId);
       if (ctrl) {
         batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
@@ -299,6 +308,7 @@ export function Pro2ThreeViewInputDock() {
     isRunning,
     controllerId,
     d.pro2RowKey,
+    d.pro2HubNodeId,
     nodes,
     updateNodeData,
     setNodeRuntime,

@@ -3,6 +3,8 @@ import { ensureNodeDragHandles } from "./normalize-graph-nodes";
 
 /** 仅更新 RF 本地选中（不写 zustand），供 focusCanvasNode / 打组后选中新组 */
 export const CANVAS_RF_SELECT_NODE_EVENT = "canvas:rf-select-node";
+/** React Flow 已挂载 · 浮动 Dock 可 portal 到 viewport */
+export const CANVAS_RF_VIEWPORT_READY_EVENT = "canvas:rf-viewport-ready";
 
 export function dispatchCanvasRfSelectNode(nodeId: string): void {
   if (typeof window === "undefined") return;

@@ -83,8 +83,10 @@ import {
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import {
   CANVAS_RF_SELECT_NODE_EVENT,
+  CANVAS_RF_VIEWPORT_READY_EVENT,
   mergeStoreNodesIntoRf,
 } from "@/lib/canvas/canvas-rf-sync";
+import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
 import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
 import {
@@ -1059,8 +1061,18 @@ function FlowCanvasInner({
 
   const handleEdgesChange = useCallback(
     (changes: Parameters<typeof storeOnEdgesChange>[0]) => {
-      onRfEdgesChange(changes);
-      storeOnEdgesChange(changes);
+      if (syncingGraphFromStoreRef.current) {
+        return;
+      }
+      const { edges, nodes } = useCanvasStore.getState();
+      const { changes: safeChanges } = filterSpuriousRfEdgeRemoves(
+        changes,
+        edges,
+        nodes,
+      );
+      if (!safeChanges.length) return;
+      onRfEdgesChange(safeChanges);
+      storeOnEdgesChange(safeChanges);
     },
     [onRfEdgesChange, storeOnEdgesChange],
   );
@@ -1089,6 +1101,7 @@ function FlowCanvasInner({
     rfReadyRef.current = true;
     initialFitDoneRef.current = false;
     applyInitialViewport();
+    window.dispatchEvent(new Event(CANVAS_RF_VIEWPORT_READY_EVENT));
   }, [applyInitialViewport]);
 
   /** hydrate 后节点才到位 · onInit 时可能仍为空，此处补一次 LibTV 初视口 */
@@ -1686,16 +1699,11 @@ function FlowCanvasInner({
           style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: 1.5 },
         };
       }
-      const opacity = (e.style as { opacity?: number } | undefined)?.opacity;
-      if (opacity === 0.18) return e;
-      changed = true;
-      return {
-        ...e,
-        style: { ...(e.style ?? {}), opacity: 0.18 },
-      };
+      // 勿批量压低非关联连线 opacity — 单选时全图 SVG 重绘导致明显屏闪
+      return e;
     });
     return changed ? next : edgesWithLayerZ;
-  }, [edgesWithLayerZ, focusEdgeIds]);
+  }, [edgesWithLayerZ, focusEdgeIds, rfEdges]);
 
   const onlyRenderVisible =
     forceOnlyRenderVisible || libtvCanvas || rfNodes.length >= 8;
@@ -2061,9 +2069,12 @@ function FlowCanvasInner({
                 if (pro2FloatingInspector) {
                   useCanvasStore.getState().setPro2FrameDockFocus(null);
                 }
-                setRfNodes((prev) =>
-                  prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
-                );
+                setRfNodes((prev) => {
+                  if (!prev.some((n) => n.selected)) return prev;
+                  return prev.map((n) =>
+                    n.selected ? { ...n, selected: false } : n,
+                  );
+                });
                 window.dispatchEvent(new CustomEvent("canvas:pro2-pane-click"));
               }
             : undefined
@@ -2092,9 +2103,6 @@ function FlowCanvasInner({
                   );
                   return;
                 }
-                setRfNodes((prev) =>
-                  prev.map((n) => ({ ...n, selected: n.id === node.id })),
-                );
                 useCanvasStore.getState().setLibtvFloatingDockSelection(
                   node.id,
                   node.type ?? null,

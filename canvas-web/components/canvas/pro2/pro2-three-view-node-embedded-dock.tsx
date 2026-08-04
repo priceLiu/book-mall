@@ -5,6 +5,7 @@ import { ArrowUp, ChevronDown, Loader2, MapPin, SlidersHorizontal } from "lucide
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
+import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -187,6 +188,14 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   const onRegenerate = useCallback(() => {
     if (!storeNode) return;
     if (controllerId && d.pro2RowKey) {
+      const hubId = d.pro2HubNodeId?.trim();
+      if (hubId) {
+        syncPro2CharacterColumnAndThreeViewDocksFromHub(
+          nodes,
+          hubId,
+          updateNodeData,
+        );
+      }
       batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
         forceFresh: true,
       });
@@ -194,7 +203,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     }
     // 协作画布 · 无控制列：作为独立生图节点直接生成
     busEnqueueNode(storeNode.id, true);
-  }, [storeNode, controllerId, d.pro2RowKey, updateNodeData, setNodeRuntime]);
+  }, [storeNode, controllerId, d.pro2RowKey, d.pro2HubNodeId, nodes, updateNodeData]);
 
   const onOpenStyleLibrary = useCallback(() => {
     setPro2StyleLibImageNodeId(nodeId);

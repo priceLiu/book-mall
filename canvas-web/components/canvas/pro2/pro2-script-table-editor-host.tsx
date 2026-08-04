@@ -18,6 +18,7 @@ import {
   resolvePro2HubCharacterMd,
   resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
+import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
 import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
 import {
@@ -175,8 +176,26 @@ export function Pro2ScriptTableEditorHost() {
         characterMd: md,
         characterHistory: history,
       });
+      const nodesNow = useCanvasStore.getState().nodes.map((n) =>
+        n.id === node.id
+          ? {
+              ...n,
+              data: { ...n.data, characterMd: md, characterHistory: history },
+            }
+          : n,
+      );
+      syncPro2CharacterColumnAndThreeViewDocksFromHub(
+        nodesNow,
+        node.id,
+        updateNodeData,
+        {
+          ...d,
+          characterMd: md,
+          characterHistory: history,
+        },
+      );
     },
-    [node, d.characterHistory, updateNodeData],
+    [node, d, updateNodeData],
   );
 
   if (!editorNodeId) return null;

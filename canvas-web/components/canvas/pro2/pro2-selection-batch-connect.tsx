@@ -17,7 +17,7 @@ import {
   nodesEligibleForBatchOut,
   type BatchConnectMode,
 } from "@/lib/canvas/pro2-batch-connect";
-import { batchConnectSelectionClientBox } from "@/lib/canvas/batch-connect-preview-anchors";
+import { batchConnectSelectionScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
   computePro2MultiSelectionBbox,
   pro2SelectedNonGroupIds,
@@ -127,26 +127,23 @@ function Pro2SelectionBatchConnectLayerInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, getInternalNode, rfNodes, storeNodes, viewport]);
 
-  const clientBox = useMemo(() => {
+  const screenBox = useMemo(() => {
     void viewport;
-    return batchConnectSelectionClientBox(selectedIds);
-  }, [selectedIds, viewport]);
-
-  const flowScreenBox = useMemo(() => {
-    if (!bbox) return null;
-    const tl = flowToScreenPosition({ x: bbox.x, y: bbox.y });
-    const br = flowToScreenPosition({ x: bbox.x2, y: bbox.y2 });
-    return {
-      left: tl.x,
-      top: tl.y,
-      width: br.x - tl.x,
-      height: br.y - tl.y,
-      right: br.x,
-      midY: (tl.y + br.y) / 2,
-    };
-  }, [bbox, flowToScreenPosition, viewport]);
-
-  const screenBox = clientBox ?? flowScreenBox;
+    const pool = (rfNodes.length ? rfNodes : storeNodes) as CanvasFlowNode[];
+    return batchConnectSelectionScreenBox(
+      selectedIds,
+      pool,
+      flowToScreenPosition,
+      getInternalNode,
+    );
+  }, [
+    selectedIds,
+    viewport,
+    rfNodes,
+    storeNodes,
+    flowToScreenPosition,
+    getInternalNode,
+  ]);
 
   const [dragging, setDragging] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
@@ -568,11 +565,8 @@ function Pro2SelectionBatchConnectLayerInner({
 
   const boxLeft = layoutBox.left;
   const boxTop = layoutBox.top;
-  const boxWidth = layoutBox.right - layoutBox.left;
-  const boxHeight =
-    "bottom" in layoutBox
-      ? layoutBox.bottom - layoutBox.top
-      : layoutBox.height;
+  const boxWidth = layoutBox.width;
+  const boxHeight = layoutBox.height;
   const plusLeft = layoutBox.right + 4;
   const plusTop = layoutBox.midY;
 

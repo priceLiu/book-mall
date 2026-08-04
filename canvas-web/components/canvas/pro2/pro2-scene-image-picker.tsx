@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, X } from "lucide-react";
 import type { StoryProSceneRow } from "@/lib/canvas/story-pro-workspace-types";
@@ -119,8 +119,15 @@ export function Pro2SceneImagePicker({
     setMounted(true);
   }, []);
 
+  const openInitRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      openInitRef.current = false;
+      return;
+    }
+    if (openInitRef.current) return;
+    openInitRef.current = true;
     setSelected(new Set(rows.map((r) => r.key)));
     const seedBatch =
       initialBatchImage ?? pickDefaultPro2SceneImageEngine(providers) ?? null;

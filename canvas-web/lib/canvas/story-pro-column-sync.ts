@@ -5,15 +5,14 @@ import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
   buildFrameRowScriptPrompt,
-  buildDefaultSceneRowPrompt,
   buildSceneRowsFromHub,
   buildVideoRowsFromFrames,
   isFrameScriptPrompt,
   isShotSizeSceneLabel,
   patchVideoRowsFromFrameRows,
-  sanitizeLegacyFramePrompt,
   syncFrameRowCharacterRefs,
 } from "./story-column-sync";
+import { preservePro2MediaRowPrompt } from "./pro2-media-row-spawn";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
 import type {
   StoryProCharacterRow,
@@ -29,7 +28,6 @@ import {
   sceneRowKeysEquivalent,
   storyProSceneRowKey,
 } from "./story-pro-scene-asset-catalog";
-import { shouldRebuildPro2CharacterRowPrompt } from "./three-view-prompt-rules";
 
 function normHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, " ");
@@ -114,14 +112,7 @@ function buildSceneRowsFromStoryboardFallback(
       key: storyProSceneRowKey(scriptHubId, name),
       name,
       description: f.description?.trim() || "",
-      prompt: buildDefaultSceneRowPrompt({
-        name,
-        environment: "",
-        time: "",
-        mood: "",
-        imageKeywords: "",
-        description: f.description?.trim() || "",
-      }),
+      prompt: "",
     });
   }
   return Array.from(byName.values());
@@ -200,17 +191,7 @@ function mergeProSceneRows(
       negativePrompt: prev.negativePrompt?.trim()
         ? prev.negativePrompt
         : row.negativePrompt,
-      prompt: (() => {
-        if (isFrameScriptPrompt(prev.prompt ?? "")) return row.prompt;
-        const prevHasKw =
-          Boolean(prev.imageKeywords?.trim()) ||
-          /生图[：:]/.test(prev.prompt ?? "");
-        const rowHasKw =
-          Boolean(row.imageKeywords?.trim()) ||
-          /生图[：:]/.test(row.prompt ?? "");
-        if (prev.prompt?.trim() && prevHasKw && !rowHasKw) return prev.prompt;
-        return row.prompt?.trim() ? row.prompt : prev.prompt ?? row.prompt;
-      })(),
+      prompt: preservePro2MediaRowPrompt(prev, row, "scene"),
       promptHistory: prev.promptHistory,
       refImages: prev.refImages,
       runtime: prev.runtime,
@@ -255,7 +236,7 @@ function buildProFrameRowsFromMd(
         description: b.description,
         dialogue: b.dialogue,
         videoPrompt: b.videoPrompt,
-        prompt: aiImagePrompt ?? "",
+        prompt: "",
       },
       charCompat,
     );
@@ -284,10 +265,7 @@ function mergeProFrameRows(
     if (!prev) return row;
     return {
       ...row,
-      prompt: prev.prompt?.trim()
-        ? sanitizeLegacyFramePrompt(prev.prompt) ||
-          buildDefaultFrameRowPrompt(row)
-        : row.prompt,
+      prompt: preservePro2MediaRowPrompt(prev, row, "frame"),
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
       refImages: prev.refImages,
@@ -317,17 +295,7 @@ function mergeProCharacterRows(
     if (!prev) return row;
     return {
       ...row,
-      role: prev.role?.trim() ? prev.role : row.role,
-      appearance: prev.appearance?.trim() ? prev.appearance : row.appearance,
-      personality: prev.personality?.trim()
-        ? prev.personality
-        : row.personality,
-      aiImagePrompt: prev.aiImagePrompt?.trim()
-        ? prev.aiImagePrompt
-        : row.aiImagePrompt,
-      prompt: shouldRebuildPro2CharacterRowPrompt(prev, row)
-        ? row.prompt
-        : prev.prompt?.trim() || row.prompt,
+      prompt: preservePro2MediaRowPrompt(prev, row, "character"),
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
       assetId: prev.assetId,
@@ -379,7 +347,7 @@ export type StoryProColumnSyncExisting = Partial<{
   videoRows: StoryProVideoRow[];
 }>;
 
-/** 从 script hub 文案拆分角色 / 场景 / 分镜 / 视频行（不触发媒体 run） */
+/** 从 script hub 文案拆分角色 / 场景 / 分镜 / 视频行（仅表字段；媒体 prompt 在用户点「生成」时按选中项组装） */
 export function syncStoryProColumnRows(
   hubData: StoryProScriptHubNodeData,
   existing?: StoryProColumnSyncExisting,

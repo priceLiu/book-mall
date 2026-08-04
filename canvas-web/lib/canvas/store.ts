@@ -233,6 +233,7 @@ function runPostHydratePro2VideoBoardRepair(
   repairPro2VideoBoardVisualGroups(get);
 }
 import { validateStoryPipelineDeletion } from "./story-pipeline-delete-guard";
+import { filterSpuriousRfEdgeRemoves } from "./canvas-edge-change-guard";
 import { pruneMentionsAfterNodeRemoval } from "./strip-dock-mentions";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
@@ -1005,7 +1006,11 @@ export const useCanvasStore = create<CanvasState>()(
       },
       onEdgesChange: (changes) => {
         const prev = get();
-        const removedStarterHubEdges = changes
+        const { changes: safeChanges, blockedRemoves } =
+          filterSpuriousRfEdgeRemoves(changes, prev.edges, prev.nodes);
+        if (blockedRemoves || !safeChanges.length) return;
+
+        const removedStarterHubEdges = safeChanges
           .filter((c): c is EdgeChange & { type: "remove"; id: string } =>
             c.type === "remove" && typeof c.id === "string",
           )
@@ -1013,7 +1018,7 @@ export const useCanvasStore = create<CanvasState>()(
           .filter((e): e is CanvasFlowEdge => Boolean(e))
           .filter((e) => isPro2StarterScriptHubEdge(e, prev.nodes));
 
-        const nextEdges = applyEdgeChanges(changes, prev.edges);
+        const nextEdges = applyEdgeChanges(safeChanges, prev.edges);
         let nextNodes = prev.nodes;
         if (removedStarterHubEdges.length > 0) {
           const patches = collectPro2StarterUnlinkPatches(

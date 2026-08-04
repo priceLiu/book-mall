@@ -21,6 +21,7 @@ import { busEnqueueStoryRunsSequential } from "./canvas-run-bus";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 import { formatSceneRowDockInput } from "./story-column-sync";
+import { filterPro2RowsForSpawn } from "./pro2-media-row-spawn";
 import {
   appendVisualStylePackToDockPrompt,
   parseVisualStylePackFromOutline,
@@ -366,6 +367,8 @@ export type EnsurePro2SceneImageGroupArgs = {
   edges?: CanvasFlowEdge[];
   /** 已有场景图组时追加新组（不覆盖旧组） */
   spawnNewGroup?: boolean;
+  /** 仅 spawn 这些 rowKey 对应节点 */
+  rowKeys?: string[];
 };
 
 function resolveSceneSyncGroupId(
@@ -412,7 +415,9 @@ export function ensurePro2SceneImageGroup(
     }
   }
 
-  const sorted = [...args.rows].sort((a, b) => a.name.localeCompare(b.name, "zh"));
+  const sorted = [...filterPro2RowsForSpawn(args.rows, args.rowKeys)].sort(
+    (a, b) => a.name.localeCompare(b.name, "zh"),
+  );
   const enginePatch = sceneEnginePatchFromHub(args.hubNodeId, args.nodes);
   if (!sorted.length) {
     if (existingGroup?.id && args.setEdges) {

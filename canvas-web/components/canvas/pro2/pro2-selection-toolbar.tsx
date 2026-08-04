@@ -15,6 +15,7 @@ import {
   computePro2MultiSelectionBbox,
   pro2SelectedNonGroupIds,
 } from "@/lib/canvas/pro2-selection-bbox";
+import { batchConnectSelectionScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -118,7 +119,40 @@ export function Pro2SelectionToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, getInternalNode, rfNodes, storeNodes, viewport]);
 
+  const screenBox = useMemo(() => {
+    void viewport;
+    const pool = (rfNodes.length ? rfNodes : storeNodes) as CanvasFlowNode[];
+    return batchConnectSelectionScreenBox(
+      selectedIds,
+      pool,
+      flowToScreenPosition,
+      getInternalNode,
+    );
+  }, [
+    selectedIds,
+    viewport,
+    rfNodes,
+    storeNodes,
+    flowToScreenPosition,
+    getInternalNode,
+  ]);
+
   const placement = useMemo(() => {
+    if (screenBox) {
+      const midX = (screenBox.left + screenBox.right) / 2;
+      if (screenBox.top - TOOLBAR_HEIGHT - GAP < HEADER_RESERVED) {
+        return {
+          x: midX,
+          y: screenBox.bottom + GAP,
+          place: "below" as const,
+        };
+      }
+      return {
+        x: midX,
+        y: screenBox.top - GAP,
+        place: "above" as const,
+      };
+    }
     if (!bbox) return null;
     const cx = (bbox.x + bbox.x2) / 2;
     const top = flowToScreenPosition({ x: cx, y: bbox.y });
@@ -127,7 +161,7 @@ export function Pro2SelectionToolbar({
       return { x: bottom.x, y: bottom.y + GAP, place: "below" as const };
     }
     return { x: top.x, y: top.y - GAP, place: "above" as const };
-  }, [bbox, flowToScreenPosition, viewport]);
+  }, [bbox, screenBox, flowToScreenPosition, viewport]);
 
   if (marqueeSelecting || viewportMoving || !placement || selectedIds.length < 2) {
     return null;

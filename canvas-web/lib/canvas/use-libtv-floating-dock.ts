@@ -2,7 +2,10 @@
 
 import { useMemo, useRef } from "react";
 import { useNodes } from "@xyflow/react";
-import { resolveLibtvFloatingDockSelection } from "./libtv-floating-dock-selection";
+import {
+  countLibtvSelectedNonGroupNodes,
+  resolveLibtvFloatingDockSelection,
+} from "./libtv-floating-dock-selection";
 import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 import { useCanvasStore } from "./store";
 import { libtvDetailEditorOpenForNode } from "./libtv-detail-editor-open";
@@ -24,6 +27,8 @@ type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
   const marqueeSelecting = useCanvasMarqueeSelecting();
+  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
+  const pinnedType = useCanvasStore((s) => s.libtvFloatingDockNodeType);
 
   const rfGlobal = useMemo(
     () => resolveLibtvFloatingDockSelection(rfNodes),
@@ -31,14 +36,17 @@ export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   );
 
   if (marqueeSelecting) return null;
+  if (countLibtvSelectedNonGroupNodes(rfNodes) >= 2) return null;
 
-  // RF 已无选中时 Dock 必须收起；勿回退 pin（否则点空白常需两次才关）
-  if (!rfGlobal) return null;
-
-  if (libtvDetailEditorOpenForNode(rfGlobal.nodeId)) return null;
-
-  if (rfGlobal.nodeType !== nodeType) return null;
-  return rfGlobal.nodeId;
+  const nodeId =
+    rfGlobal?.nodeType === nodeType
+      ? rfGlobal.nodeId
+      : pinnedType === nodeType && pinnedId
+        ? pinnedId
+        : null;
+  if (!nodeId) return null;
+  if (libtvDetailEditorOpenForNode(nodeId)) return null;
+  return nodeId;
 }
 
 /**

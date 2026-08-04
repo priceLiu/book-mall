@@ -193,7 +193,12 @@ export function reconcileStaleInflightRuntimes(
         if (serverInflight) continue;
         let applied = false;
         for (const scope of scopes) {
-          const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+          const pick = pickPreferredCanvasTaskForScope(
+            nodeTasks,
+            scope,
+            rt,
+            node.id,
+          );
           if (!pick) continue;
           if (!shouldSkipStoryRowTaskApply(rt, pick, node.id)) {
             storyApplyTaskResult(
@@ -236,7 +241,12 @@ export function reconcileStaleInflightRuntimes(
         const scope = { rowKey: row.key, mediaKind: "threeView" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
-        const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+        const pick = pickPreferredCanvasTaskForScope(
+          nodeTasks,
+          scope,
+          row.runtime,
+          node.id,
+        );
         if (pick) {
           if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
             storyApplyTaskResult(
@@ -269,7 +279,12 @@ export function reconcileStaleInflightRuntimes(
         const scope = { rowKey: row.key, mediaKind: "sceneRef" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
-        const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+        const pick = pickPreferredCanvasTaskForScope(
+          nodeTasks,
+          scope,
+          row.runtime,
+          node.id,
+        );
         if (pick) {
           if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
             storyApplyTaskResult(
@@ -314,7 +329,12 @@ export function reconcileStaleInflightRuntimes(
         const scope = { rowKey: row.key, mediaKind: "frameImage" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
-        const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+        const pick = pickPreferredCanvasTaskForScope(
+          nodeTasks,
+          scope,
+          row.runtime,
+          node.id,
+        );
         if (pick) {
           if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
             storyApplyTaskResult(
@@ -356,7 +376,12 @@ export function reconcileStaleInflightRuntimes(
           const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
 
           if (rt?.status === "error" && hasServerInflightForScope(tasks, node.id, scope)) {
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              rt,
+              node.id,
+            );
             if (pick && isServerInflightTaskStatus(pick.status)) {
               storyApplyTaskResult(
                 node,
