@@ -147,6 +147,7 @@ import {
   maybeClearHubPendingSceneSyncGroup,
 } from "./pro2-group-row-resolve";
 import { syncPro2CharacterImagesFromRows, reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-spawn-character-image-group";
+import { characterRowsNeedingThreeViewNodeSync } from "./pro2-group-row-resolve";
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import {
   CANVAS_POLL_IDLE_RECHECK_MS,
@@ -168,9 +169,16 @@ function syncPro2CharacterGroupImagesFromColumnRuntimes(
     if (!isAnyStoryCharacterColumnType(node.type ?? "")) continue;
     const rows = (node.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
     if (!rows.length) continue;
-    syncPro2CharacterImagesFromRows(nodes, node.id, rows, updateNodeData, {
-      inflightOnly: true,
-    });
+    const rowsToSync = characterRowsNeedingThreeViewNodeSync(rows);
+    if (rowsToSync.length) {
+      syncPro2CharacterImagesFromRows(
+        nodes,
+        node.id,
+        rowsToSync,
+        updateNodeData,
+        { inflightOnly: true },
+      );
+    }
     reconcilePro2ThreeViewNodesWithColumnRows(nodes, node.id, updateNodeData);
   }
 }
@@ -1129,9 +1137,11 @@ export function useCanvasRunner(
           }
         }
         const pick =
-          job.rowKey || job.mediaKind || job.llmSection
-            ? pickPreferredCanvasTaskForScope(nodeTasks, scope, localRt, nodeId)
-            : pickPreferredCanvasTask(nodeTasks, { localRuntime: localRt });
+          job.rowKey && (job.mediaKind || job.llmSection)
+            ? pickStoryRowApplyTask(nodeTasks, scope, localRt)
+            : job.rowKey || job.mediaKind || job.llmSection
+              ? pickPreferredCanvasTaskForScope(nodeTasks, scope, localRt, nodeId)
+              : pickPreferredCanvasTask(nodeTasks, { localRuntime: localRt, nodeId });
         if (!pick) return;
 
         if (isStoryWorkspaceNodeType(node.type ?? "")) {
@@ -1289,6 +1299,14 @@ export function useCanvasRunner(
           resolveTextInputs(state.nodes, state.edges, nodeId),
         );
         let mergedTextInputs = textInputs;
+        if (
+          job.rowKey &&
+          (job.mediaKind === "threeView" ||
+            job.mediaKind === "sceneRef" ||
+            job.mediaKind === "frameImage")
+        ) {
+          mergedTextInputs = [];
+        }
 
         const data = node.data as Record<string, unknown>;
         let runData = isLibtvFreestandingImageNode(node)
@@ -2406,11 +2424,10 @@ export function useCanvasRunner(
             (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] }).rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "sceneRef" as const };
-            const pick = pickPreferredCanvasTaskForScope(
+            const pick = pickStoryRowApplyTask(
               nodeTasks,
               scope,
               row.runtime,
-              node.id,
             );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
@@ -2433,11 +2450,10 @@ export function useCanvasRunner(
               .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "threeView" };
-            const pick = pickPreferredCanvasTaskForScope(
+            const pick = pickStoryRowApplyTask(
               nodeTasks,
               scope,
               row.runtime,
-              node.id,
             );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
@@ -2454,11 +2470,10 @@ export function useCanvasRunner(
               .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "frameImage" };
-            const pick = pickPreferredCanvasTaskForScope(
+            const pick = pickStoryRowApplyTask(
               nodeTasks,
               scope,
               row.runtime,
-              node.id,
             );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
@@ -2788,11 +2803,6 @@ export function useCanvasRunner(
         }
         for (const key of taskByNodeRef.current.keys()) {
           skipReconcileNodeIds.add(key.split(":")[0]!);
-        }
-        for (const id of collectCanvasInflightNodeIds(
-          useCanvasStore.getState().nodes,
-        )) {
-          skipReconcileNodeIds.add(id);
         }
         reconcileStaleInflightRuntimes(
           useCanvasStore.getState().nodes,

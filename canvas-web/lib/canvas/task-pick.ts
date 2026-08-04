@@ -127,17 +127,56 @@ export function shouldSkipStoryRowTaskApply(
   pick: CanvasTaskRecord,
   nodeId?: string,
 ): boolean {
+  const localTaskId = localRuntime?.taskId?.trim();
+  // 已绑定任务进入终态：必须写回（Gateway 已成功但 UI 仍扫光）
+  if (localTaskId && pick.id === localTaskId) {
+    if (
+      pick.status === "SUCCEEDED" ||
+      pick.status === "FAILED" ||
+      pick.status === "CANCELLED"
+    ) {
+      return false;
+    }
+  }
+  if (pick.status === "SUCCEEDED" && taskHasDisplayableResult(pick)) {
+    const localSt = localRuntime?.status;
+    if (
+      localSt === "pending" ||
+      localSt === "running" ||
+      localSt === "queued"
+    ) {
+      if (!localTaskId) {
+        if (!nodeId || !isCanvasNodeRunSessionActive(nodeId)) return false;
+        const startedAt = canvasNodeRunSessionStartedAtMs(nodeId);
+        const pickMs = Date.parse(
+          pick.completedAt ?? pick.updatedAt ?? pick.createdAt ?? "",
+        );
+        if (Number.isFinite(pickMs) && pickMs >= startedAt - 3000) {
+          return false;
+        }
+      } else if (pick.id === localTaskId) {
+        return false;
+      }
+    }
+  }
+
   if (
     nodeId &&
     isCanvasNodeRunSessionActive(nodeId) &&
-    !localRuntime?.taskId?.trim() &&
+    !localTaskId &&
     localRuntime?.status === "error"
   ) {
     return true;
   }
 
   const localSt = localRuntime?.status;
-  if (localSt !== "pending" && localSt !== "running") return false;
+  if (
+    localSt !== "pending" &&
+    localSt !== "running" &&
+    localSt !== "queued"
+  ) {
+    return false;
+  }
   if (isServerInflightTaskStatus(pick.status)) {
     if (nodeId) {
       return shouldSkipStaleTerminalWhileLocalInflight(nodeId, localRuntime, pick);
@@ -298,7 +337,8 @@ export function pickPreferredCanvasTask(
     const inflight = tasks.filter(
       (t) =>
         isServerInflightTaskStatus(t.status) &&
-        !isStaleServerInflightTask(t, tasks),
+        !isStaleServerInflightTask(t, tasks) &&
+        !isAbandonedCanvasInflightTask(t),
     );
     if (inflight.length) return newestTaskByUpdatedAt(inflight);
     // 在途已结束：认本轮会话内最新终态（Gateway 已返回但本地尚未 bind taskId）
@@ -334,7 +374,8 @@ export function pickPreferredCanvasTask(
       }
       if (
         isServerInflightTaskStatus(bound.status) &&
-        !isStaleServerInflightTask(bound, tasks)
+        !isStaleServerInflightTask(bound, tasks) &&
+        !isAbandonedCanvasInflightTask(bound)
       ) {
         return bound;
       }
@@ -348,7 +389,8 @@ export function pickPreferredCanvasTask(
   const inflight = tasks.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
-      !isStaleServerInflightTask(t, tasks),
+      !isStaleServerInflightTask(t, tasks) &&
+      !isAbandonedCanvasInflightTask(t),
   );
   if (inflight.length) return newestTaskByUpdatedAt(inflight);
 
@@ -361,7 +403,7 @@ export function pickPreferredCanvasTask(
 }
 
 function isInflightRuntimeStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return status === "queued" || status === "pending" || status === "running";
 }
 
 /** 行级 scope · 最新成功成片（展示 URL，不受后续失败重试覆盖） */
@@ -411,12 +453,14 @@ export function pickStoryRowApplyTask(
   const inflight = scoped.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
-      !isStaleServerInflightTask(t, scoped),
+      !isStaleServerInflightTask(t, scoped) &&
+      !isAbandonedCanvasInflightTask(t),
   );
 
   if (
     localInflight &&
-    !isStaleServerInflightTask(localInflight, scoped)
+    !isStaleServerInflightTask(localInflight, scoped) &&
+    !isAbandonedCanvasInflightTask(localInflight)
   ) {
     return localInflight;
   }

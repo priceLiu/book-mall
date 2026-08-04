@@ -508,8 +508,11 @@ export async function runImageEngineNode(
     }
   }
 
-  // 上游 textInputs（含 ai-engine 输出）+ 节点 prompt 拼接
-  const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
+  // 三视图 row.prompt 已在 Pro2 Dock 组装完毕，禁止再拼 hub 大纲/分镜 markdown
+  const upstreamText =
+    engineKind === "three-view-engine"
+      ? []
+      : (node.textInputs ?? []).filter((s) => s && s.trim());
   const expandedPrompt = expandMentionsText(
     [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
     node,

@@ -7,11 +7,18 @@ export type StoryProStyleAnchorInput = {
   negativePrompt?: string | null;
 };
 
+/** Dock / row.prompt 已含全片视觉块时勿重复 prepend */
+export function promptHasEmbeddedStoryProStyleAnchor(prompt: string): boolean {
+  const t = prompt.trim();
+  if (!t) return false;
+  return t.includes("【全片视觉") || t.includes("【全局视觉风格") || t.includes("[Global visual style]");
+}
+
 export function prependStoryProStyleAnchor(
   prompt: string,
   style: StoryProStyleAnchorInput | null | undefined,
 ): string {
-  if (!style) return prompt;
+  if (!style || promptHasEmbeddedStoryProStyleAnchor(prompt)) return prompt.trim();
   const anchorEn = style.styleAnchorEn?.trim() ?? "";
   const anchorZh = style.styleAnchorZh?.trim() ?? "";
   const negative = style.negativePrompt?.trim() ?? "";

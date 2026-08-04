@@ -354,7 +354,7 @@ export async function runStoryProCharacterRow(
 ): Promise<RunEngineNodeResult> {
   const rows = (args.node.data?.rows as StoryRow[]) ?? [];
   const row = pickRow(rows, args.rowKey);
-  const rawPrompt = String(row.prompt ?? "");
+  const rawPrompt = String(row.prompt ?? "").trim();
   const prompt = prependStoryProStyleAnchor(rawPrompt, args.styleAnchor);
   const assetRefUrls = await resolveCharacterRowAssetRefUrls(
     args.userId,

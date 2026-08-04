@@ -21,10 +21,14 @@ import {
   shouldSkipStoryRowTaskApply,
   isServerInflightTaskStatus,
   isStaleServerInflightTask,
+  isAbandonedCanvasInflightTask,
 } from "./task-pick";
 import { storyApplyTaskResult } from "./story-run-apply";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
 import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
+import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
+import { reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-group-row-resolve";
+import { useCanvasStore } from "./store";
 import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryLlmSection,
@@ -50,7 +54,7 @@ import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { isStoryWorkspaceNodeType } from "./types";
 
 function isInflightStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return status === "queued" || status === "pending" || status === "running";
 }
 
 function hasServerInflightForScope(
@@ -63,7 +67,8 @@ function hasServerInflightForScope(
     (t) =>
       tasksMatchStoryScope(t, scope) &&
       isServerInflightTaskStatus(t.status) &&
-      !isStaleServerInflightTask(t, nodeTasks),
+      !isStaleServerInflightTask(t, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(t),
   );
 }
 
@@ -148,7 +153,12 @@ function reconcileHubSection(
   }
 
   if (rt?.taskId && !nodeTasks.some((t) => t.id === rt.taskId)) {
-    return;
+    if (
+      shouldDeferLibtvOrphanReconcile(node.id) ||
+      isCanvasNodeRunSessionActive(node.id)
+    ) {
+      return;
+    }
   }
 
   const md = hubSectionMd(node, section);
@@ -241,11 +251,10 @@ export function reconcileStaleInflightRuntimes(
         const scope = { rowKey: row.key, mediaKind: "threeView" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
-        const pick = pickPreferredCanvasTaskForScope(
+        const pick = pickStoryRowApplyTask(
           nodeTasks,
           scope,
           row.runtime,
-          node.id,
         );
         if (pick) {
           if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
@@ -256,8 +265,24 @@ export function reconcileStaleInflightRuntimes(
               updateNodeData,
               nodes,
             );
+          } else if (!hasServerInflightForScope(tasks, node.id, scope)) {
+            changed = true;
+            return {
+              ...row,
+              runtime: clearInflightRuntime(row.runtime),
+            };
           }
           return row;
+        }
+        if (
+          rowHasMediaResult(row.runtime) &&
+          !hasServerInflightForScope(tasks, node.id, scope)
+        ) {
+          changed = true;
+          return {
+            ...row,
+            runtime: clearInflightRuntime(row.runtime),
+          };
         }
         changed = true;
         return {
@@ -265,7 +290,25 @@ export function reconcileStaleInflightRuntimes(
           runtime: clearInflightRuntime(row.runtime),
         };
       });
-      if (changed) updateNodeData(node.id, { rows: nextRows });
+      if (changed) {
+        updateNodeData(node.id, { rows: nextRows });
+        const nodesAfter = nodes.map((n) =>
+          n.id === node.id
+            ? { ...n, data: { ...n.data, rows: nextRows } }
+            : n,
+        );
+        syncPro2CharacterImagesFromRows(
+          nodesAfter,
+          node.id,
+          nextRows as never,
+          updateNodeData,
+        );
+        reconcilePro2ThreeViewNodesWithColumnRows(
+          nodesAfter,
+          node.id,
+          updateNodeData,
+        );
+      }
       continue;
     }
 
@@ -279,11 +322,10 @@ export function reconcileStaleInflightRuntimes(
         const scope = { rowKey: row.key, mediaKind: "sceneRef" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
-        const pick = pickPreferredCanvasTaskForScope(
+        const pick = pickStoryRowApplyTask(
           nodeTasks,
           scope,
           row.runtime,
-          node.id,
         );
         if (pick) {
           if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
@@ -329,11 +371,10 @@ export function reconcileStaleInflightRuntimes(
         const scope = { rowKey: row.key, mediaKind: "frameImage" };
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
-        const pick = pickPreferredCanvasTaskForScope(
+        const pick = pickStoryRowApplyTask(
           nodeTasks,
           scope,
           row.runtime,
-          node.id,
         );
         if (pick) {
           if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
@@ -503,7 +544,12 @@ export function reconcileStaleInflightRuntimes(
 
     // 刚提交：本地已绑定 taskId，列表可能尚未返回该任务
     if (rt.taskId && !nodeTasks.some((t) => t.id === rt.taskId)) {
-      continue;
+      if (
+        shouldDeferLibtvOrphanReconcile(node.id) ||
+        isCanvasNodeRunSessionActive(node.id)
+      ) {
+        continue;
+      }
     }
 
     const pick = pickPreferredCanvasTask(nodeTasks, { localRuntime: rt });
@@ -560,6 +606,17 @@ export function reconcileStaleInflightRuntimes(
         failMessage:
           "生成未完成（服务端无进行中的任务）。请重试；若仍失败请查看 Gateway 状态或联系管理员。",
       });
+    }
+  }
+
+  const freshNodes = useCanvasStore.getState().nodes;
+  for (const node of freshNodes) {
+    if (isAnyStoryCharacterColumnType(node.type ?? "")) {
+      reconcilePro2ThreeViewNodesWithColumnRows(
+        freshNodes,
+        node.id,
+        updateNodeData,
+      );
     }
   }
 }

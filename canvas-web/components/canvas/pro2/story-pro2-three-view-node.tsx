@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position, useNodes } from "@xyflow/react";
-import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
+import { Handle, Position } from "@xyflow/react";
+import { AlertTriangle, GripVertical, ImageIcon } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -29,16 +29,12 @@ import {
   LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
-import {
-  PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT,
-  PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH,
-} from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ThreeViewNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-library";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "../media-hover-box";
-import { LibtvNodeHeaderPreviewButton } from "../libtv-node-header-preview-button";
 import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import {
@@ -51,6 +47,11 @@ import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-sel
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
+import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
+import {
+  libtvRuntimeErrorAlertTitle,
+  useLibtvRuntimeErrorAlert,
+} from "@/lib/canvas/libtv-runtime-error-alert";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import {
@@ -62,7 +63,6 @@ import {
 export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
-  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -77,12 +77,35 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as StoryPro2ThreeViewNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
-  const self = nodes.find((n) => n.id === id);
-  const insideGroup = Boolean(self?.parentId);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const isGenerating = isLibtvMediaGenerating(d);
-  const hasError = Boolean(d.uploadError?.trim());
+  const hasRuntimeError = d.runtime?.status === "error";
+  const hasUploadError = Boolean(d.uploadError?.trim()) && !isGenerating;
+  const hasError = hasRuntimeError || hasUploadError;
+  const errorMessage = hasRuntimeError
+    ? d.runtime?.failMessage?.trim() || "生成失败"
+    : d.uploadError?.trim() || "生成失败";
+  useLibtvRuntimeErrorAlert({
+    nodeId: id,
+    status: d.runtime?.status,
+    taskId: d.runtime?.taskId,
+    failCode: d.runtime?.failCode,
+    failMessage: d.runtime?.failMessage,
+    dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    enabled: !isMislabeledVendorSuccessError(
+      d.runtime?.failCode,
+      d.runtime?.failMessage,
+    ),
+    onAlert: ({ message, failCode }) => {
+      void alert({
+        title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),
+        message,
+        variant: "error",
+        dismissOnly: true,
+      });
+    },
+  });
   const label = d.label?.trim() || "角色";
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
   const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
@@ -170,7 +193,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   return (
     <>
       <div
-        className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
+        className={cn(LIBTV_NODE_OUTER_CLASS, LIBTV_CARD_DRAG_CLASS, "image-paste-host flex flex-col")}
         data-pro2-dock-anchor={id}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
@@ -224,6 +247,17 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           </LibtvNodeToolbarPortal>
         ) : null}
 
+        <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
+          <GripVertical className="size-3.5 shrink-0 text-white/30" />
+          <ImageIcon className="size-3.5 shrink-0 text-violet-300" />
+          <LibtvEditableNodeTitle
+            nodeId={id}
+            defaultLabel="角色"
+            textClassName="text-[11px] text-white"
+          />
+          <Pro2CrewTaskStatusBadge nodeId={id} />
+        </div>
+
         <div
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
@@ -236,28 +270,6 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             edition: "pro2",
           })}
         >
-          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <ImageIcon className="size-3.5 shrink-0 text-violet-300" />
-              <LibtvEditableNodeTitle
-                nodeId={id}
-                defaultLabel="角色"
-                textClassName="text-xs font-medium text-white"
-              />
-            </div>
-            <Pro2CrewTaskStatusBadge nodeId={id} />
-            <div className="relative z-[1] flex shrink-0 items-center gap-2">
-              {!isGenerating ? (
-                <LibtvNodeHeaderPreviewButton
-                  visible={hasImage}
-                  onClick={() => setPreviewOpen(true)}
-                />
-              ) : (
-                <Loader2 className="size-3.5 animate-spin text-violet-300" />
-              )}
-            </div>
-          </div>
-
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
               <LibtvMediaGeneratingState variant="violet" />
@@ -274,7 +286,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
               <Pro2MediaNodeErrorState
                 icon={AlertTriangle}
                 title="生成失败"
-                message={d.uploadError}
+                message={errorMessage}
               />
             ) : showEmbeddedDock ? (
               <Pro2ThreeViewNodeEmbeddedDock nodeId={id} />

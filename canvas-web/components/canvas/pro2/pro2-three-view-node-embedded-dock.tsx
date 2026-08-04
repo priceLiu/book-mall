@@ -5,8 +5,10 @@ import { ArrowUp, ChevronDown, Loader2, MapPin, SlidersHorizontal } from "lucide
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
-import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
+import { commitPro2ThreeViewRowPromptFromDock } from "@/lib/canvas/pro2-lazy-media-prompts";
+import { scopePro2CharacterSyncGroupForThreeViewNode } from "@/lib/canvas/pro2-group-row-resolve";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
+import { isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream, pro2DockStyleShownAsChip, pro2DockUpstreamLinksForChips } from "@/lib/canvas/pro2-dock-upstream-links";
@@ -65,7 +67,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   );
   const d = (storeNode?.data ?? {}) as StoryPro2ThreeViewNodeData;
   const dockInput = d.dockInput ?? "";
-  const isRunning = Boolean(d.uploading);
+  const isRunning = isLibtvMediaGenerating(d);
   const controllerId = d.pro2ControllerNodeId;
 
   const controller = useMemo(() => {
@@ -186,16 +188,28 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
   );
 
   const onRegenerate = useCallback(() => {
-    if (!storeNode) return;
+    if (!storeNode || isRunning) return;
     if (controllerId && d.pro2RowKey) {
-      const hubId = d.pro2HubNodeId?.trim();
-      if (hubId) {
-        syncPro2CharacterColumnAndThreeViewDocksFromHub(
-          nodes,
-          hubId,
-          updateNodeData,
-        );
-      }
+      const prompt = dockInput.trim();
+      if (!prompt) return;
+      const nodesNow = useCanvasStore.getState().nodes;
+      commitPro2ThreeViewRowPromptFromDock(
+        controllerId,
+        d.pro2RowKey,
+        prompt,
+        nodesNow,
+        updateNodeData,
+      );
+      scopePro2CharacterSyncGroupForThreeViewNode(
+        controllerId,
+        storeNode.id,
+        nodesNow,
+        updateNodeData,
+      );
+      updateNodeData(storeNode.id, {
+        dockInput: prompt,
+        uploadError: undefined,
+      });
       batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
         forceFresh: true,
       });
@@ -203,7 +217,14 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     }
     // 协作画布 · 无控制列：作为独立生图节点直接生成
     busEnqueueNode(storeNode.id, true);
-  }, [storeNode, controllerId, d.pro2RowKey, d.pro2HubNodeId, nodes, updateNodeData]);
+  }, [
+    storeNode,
+    isRunning,
+    controllerId,
+    d.pro2RowKey,
+    dockInput,
+    updateNodeData,
+  ]);
 
   const onOpenStyleLibrary = useCallback(() => {
     setPro2StyleLibImageNodeId(nodeId);

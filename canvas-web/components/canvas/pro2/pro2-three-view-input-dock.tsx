@@ -8,8 +8,9 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
-import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
+import { commitPro2ThreeViewRowPromptFromDock } from "@/lib/canvas/pro2-lazy-media-prompts";
+import { scopePro2CharacterSyncGroupForThreeViewNode } from "@/lib/canvas/pro2-group-row-resolve";
 import {
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
@@ -52,6 +53,7 @@ import { Pro2DockMarkButton } from "./pro2-dock-mark-button";
 import { Pro2DockStyleButton } from "./pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 import { pro2ThreeViewNodeUsesEmbeddedDock } from "./pro2-three-view-node-embedded-dock";
+import { isLibtvMediaGenerating } from "../libtv-media-generating-state";
 
 /** 2.0 三视图节点 · 底部输入坞（图标区固定 / 正文可滚动） */
 export function Pro2ThreeViewInputDock() {
@@ -87,7 +89,7 @@ export function Pro2ThreeViewInputDock() {
 
   const d = (storeNode?.data ?? {}) as StoryPro2ThreeViewNodeData;
   const dockInput = d.dockInput ?? "";
-  const isRunning = Boolean(d.uploading);
+  const isRunning = isLibtvMediaGenerating(d);
   const controllerId = d.pro2ControllerNodeId;
 
   const controller = useMemo(() => {
@@ -221,21 +223,42 @@ export function Pro2ThreeViewInputDock() {
     if (!storeNode || isRunning) return;
 
     if (controllerId && d.pro2RowKey) {
-      const hubId = d.pro2HubNodeId?.trim();
-      if (hubId) {
-        syncPro2CharacterColumnAndThreeViewDocksFromHub(
-          nodes,
-          hubId,
-          updateNodeData,
-        );
-      }
-      const ctrl = nodes.find((n) => n.id === controllerId);
-      if (ctrl) {
-        batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
-          forceFresh: true,
+      const prompt = dockInput.trim();
+      const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+      const hasRefs =
+        upstreamLinks.some((l) => l.previewUrl) ||
+        Boolean(settingsData.dockStyleRef?.imageUrl) ||
+        Boolean(linkedStyle);
+      if (!prompt && !hasRefs) {
+        await alert({
+          title: "请输入提示词",
+          message: "请填写角色外观描述，或连接风格/参考图后再生成。",
+          variant: "warning",
         });
         return;
       }
+      const nodesNow = useCanvasStore.getState().nodes;
+      commitPro2ThreeViewRowPromptFromDock(
+        controllerId,
+        d.pro2RowKey,
+        prompt,
+        nodesNow,
+        updateNodeData,
+      );
+      scopePro2CharacterSyncGroupForThreeViewNode(
+        controllerId,
+        storeNode.id,
+        nodesNow,
+        updateNodeData,
+      );
+      updateNodeData(storeNode.id, {
+        dockInput: prompt,
+        uploadError: undefined,
+      });
+      batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
+        forceFresh: true,
+      });
+      return;
     }
 
     let runEngine = settingsData.engine;
@@ -308,16 +331,14 @@ export function Pro2ThreeViewInputDock() {
     isRunning,
     controllerId,
     d.pro2RowKey,
-    d.pro2HubNodeId,
-    nodes,
-    updateNodeData,
-    setNodeRuntime,
-    settingsData,
-    providers,
     dockInput,
     upstreamLinks,
+    settingsData.dockStyleRef,
+    updateNodeData,
     alert,
     base,
+    providers,
+    setNodeRuntime,
   ]);
 
   const onOpenStyleLibrary = useCallback(() => {

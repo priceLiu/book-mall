@@ -1,4 +1,5 @@
-import type { CanvasFlowNode } from "./types";
+import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
+import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 
 export function resolveCharacterSyncGroupId(
   nodes: CanvasFlowNode[],
@@ -31,6 +32,109 @@ function isCharacterThreeViewChild(
   );
 }
 
+function isThreeViewRowInflight(rt?: CanvasNodeRuntime): boolean {
+  const s = rt?.status;
+  return s === "pending" || s === "running" || s === "queued";
+}
+
+/** Dock 单格再生成 · 将 pending sync 指向当前三视图所在组（否则扫光/sync 会落到旧组） */
+export function scopePro2CharacterSyncGroupForThreeViewNode(
+  characterColumnId: string,
+  threeViewNodeId: string,
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): string | undefined {
+  const tv = nodes.find((n) => n.id === threeViewNodeId);
+  if (!tv) return undefined;
+  const groupId =
+    tv.parentId?.trim() ||
+    (tv.data as { pro2GroupId?: string }).pro2GroupId?.trim();
+  if (!groupId) return undefined;
+  updateNodeData(characterColumnId, { pro2PendingSyncGroupId: groupId });
+  return groupId;
+}
+
+/** 单格/批量再生成前：仅清组内「节点扫光但列行已非 in-flight」残留，不取消其它角色行 */
+export function clearOrphanPro2ThreeViewInflightInGroup(
+  characterColumnId: string,
+  activeRowKeys: string[],
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const allowed = new Set(activeRowKeys.filter(Boolean));
+  const col = nodes.find((n) => n.id === characterColumnId);
+  if (!col) return;
+  const rows = (col.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
+  const rowByKey = new Map(rows.map((r) => [r.key, r]));
+  const syncGroupId = resolveCharacterSyncGroupId(nodes, characterColumnId);
+  if (!syncGroupId) return;
+
+  for (const n of nodes) {
+    if (!isCharacterThreeViewChild(n, characterColumnId)) continue;
+    const groupId =
+      n.parentId?.trim() ||
+      (n.data as { pro2GroupId?: string }).pro2GroupId?.trim();
+    if (groupId !== syncGroupId) continue;
+    const rowKey = (n.data as { pro2RowKey?: string }).pro2RowKey?.trim();
+    if (!rowKey || allowed.has(rowKey)) continue;
+
+    const row = rowByKey.get(rowKey);
+    const nodeData = n.data as {
+      uploading?: boolean;
+      runtime?: CanvasNodeRuntime;
+    };
+    const rowInflight = isThreeViewRowInflight(row?.runtime);
+    const nodeInflight =
+      Boolean(nodeData.uploading) ||
+      isThreeViewRowInflight(nodeData.runtime);
+    if (!nodeInflight || rowInflight) continue;
+
+    updateNodeData(n.id, {
+      uploading: false,
+      runtime: undefined,
+      uploadError: undefined,
+    });
+  }
+}
+
+function threeViewNodeSyncPatchFromRow(
+  row: StoryProCharacterRow,
+): Record<string, unknown> {
+  const rt = row.runtime;
+  const url = rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim();
+  const uploading =
+    rt?.status === "running" ||
+    rt?.status === "pending" ||
+    rt?.status === "queued";
+  const patch: Record<string, unknown> = {
+    uploading,
+  };
+  if (url) {
+    patch.ossUrl = url;
+    patch.blobUrl = undefined;
+  }
+  if (uploading || isThreeViewRowInflight(rt)) {
+    patch.uploadError = undefined;
+  } else if (rt?.failMessage?.trim()) {
+    patch.uploadError = rt.failMessage;
+  } else {
+    patch.uploadError = undefined;
+  }
+  if (rt) {
+    patch.runtime = {
+      status: rt.status,
+      taskId: rt.taskId,
+      ossUrl: rt.ossUrl,
+      ephemeralUrl: rt.ephemeralUrl,
+      failCode: rt.failCode,
+      failMessage: rt.failMessage,
+    };
+  } else if (!uploading) {
+    patch.runtime = undefined;
+  }
+  return patch;
+}
+
 /** 角色列 rowKey → 组内三视图节点（多组抽卡时按 pending/visual 组定位） */
 export function findPro2CharacterThreeViewNodeForRow(
   nodes: CanvasFlowNode[],
@@ -47,6 +151,76 @@ export function findPro2CharacterThreeViewNodeForRow(
       (n.data as { pro2GroupId?: string }).pro2GroupId === syncGroupId
     );
   });
+}
+
+/** 轮询 · 列上已无 in-flight 时，清掉三视图节点残留扫光（保留行级 error / done 预览） */
+export function reconcilePro2ThreeViewNodesWithColumnRows(
+  nodes: CanvasFlowNode[],
+  characterColumnId: string,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const col = nodes.find((n) => n.id === characterColumnId);
+  if (!col) return;
+  const rows = (col.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
+  const rowByKey = new Map(rows.map((r) => [r.key, r]));
+  const inflightKeys = new Set(
+    rows
+      .filter((r) => isThreeViewRowInflight(r.runtime))
+      .map((r) => r.key),
+  );
+  const syncGroupId = resolveCharacterSyncGroupId(nodes, characterColumnId);
+
+  for (const n of nodes) {
+    if (
+      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId !==
+      characterColumnId
+    ) {
+      continue;
+    }
+    if (n.type !== "story-pro2-three-view") {
+      if (
+        n.type === "story-pro2-image" &&
+        (n.data as { pro2MediaRole?: string }).pro2MediaRole ===
+          "character-three-view"
+      ) {
+        // fall through
+      } else {
+        continue;
+      }
+    }
+    const rowKey = (n.data as { pro2RowKey?: string }).pro2RowKey?.trim();
+    if (!rowKey || inflightKeys.has(rowKey)) continue;
+
+    const groupId =
+      n.parentId?.trim() ||
+      (n.data as { pro2GroupId?: string }).pro2GroupId?.trim();
+    const row = rowByKey.get(rowKey);
+    const inSyncGroup = !syncGroupId || groupId === syncGroupId;
+
+    if (
+      inSyncGroup &&
+      (row?.runtime?.status === "error" || row?.runtime?.status === "done")
+    ) {
+      updateNodeData(n.id, threeViewNodeSyncPatchFromRow(row));
+      continue;
+    }
+
+    const nodeData = n.data as {
+      uploading?: boolean;
+      runtime?: CanvasNodeRuntime;
+    };
+    if (
+      !nodeData.uploading &&
+      !isThreeViewRowInflight(nodeData.runtime)
+    ) {
+      continue;
+    }
+    updateNodeData(n.id, {
+      uploading: false,
+      runtime: undefined,
+      uploadError: undefined,
+    });
+  }
 }
 
 export function resolveFrameSyncGroupId(
@@ -126,4 +300,20 @@ export function maybeClearHubPendingSceneSyncGroup(
   if (!anyInflight) {
     updateNodeData(hub.id, { pro2PendingSyncSceneGroupId: undefined });
   }
+}
+
+/** 角色列行有 runtime 时须同步到组内三视图节点（轮询增量 sync） */
+export function characterRowsNeedingThreeViewNodeSync(
+  rows: StoryProCharacterRow[],
+): StoryProCharacterRow[] {
+  return rows.filter((r) => {
+    const s = r.runtime?.status;
+    return (
+      s === "pending" ||
+      s === "running" ||
+      s === "queued" ||
+      s === "error" ||
+      s === "done"
+    );
+  });
 }

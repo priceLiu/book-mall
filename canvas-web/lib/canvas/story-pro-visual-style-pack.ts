@@ -211,6 +211,105 @@ export function buildVisualStyleAnchorZh(
   return parts.join("；");
 }
 
+const THREE_VIEW_DEFAULT_LIGHTING =
+  "自然日光感，主光源来自右后方的侧逆光，辅光来自左前方柔和补光，以清晰呈现面部细节。拒绝平光。";
+
+const THREE_VIEW_DEFAULT_LENS =
+  "模拟 35mm 焦距，光圈 f/2.8 的浅景深，带有轻微电影颗粒感";
+
+function threeViewVisualStyleTitle(pack: StoryProVisualStylePack): string {
+  const label =
+    pack.visualStyle?.trim() ||
+    pack.styleAnchorZh?.trim()?.slice(0, 24) ||
+    "写实摄影风";
+  return `【全局视觉风格 - ${label.slice(0, 48)}】`;
+}
+
+function resolveThreeViewLensEffect(pack: StoryProVisualStylePack): string {
+  const combined = [
+    pack.lighting,
+    pack.styleAnchorZh,
+    pack.visualStyle,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (/35mm|50mm|85mm|f\/\d|浅景深|镜头/i.test(combined)) {
+    const m = combined.match(
+      /(?:模拟\s*)?\d+mm[^。\n]*(?:f\/[\d.]+[^。\n]*)?|(?:浅景深|镜头)[^。\n]*/i,
+    );
+    if (m?.[0]?.trim()) return m[0].trim().replace(/^[，,；;]\s*/, "");
+  }
+  return THREE_VIEW_DEFAULT_LENS;
+}
+
+/** 三视图专用 · 全局视觉块（置于【角色设定】之后） */
+export function formatThreeViewVisualStyleSection(
+  pack: StoryProVisualStylePack | null | undefined,
+): string {
+  if (!pack) return "";
+  const hasContent = Boolean(
+    pack.visualStyle?.trim() ||
+      pack.lighting?.trim() ||
+      pack.colorPalette?.trim() ||
+      pack.era?.trim() ||
+      pack.worldBackground?.trim() ||
+      pack.styleAnchorZh?.trim() ||
+      pack.styleAnchorEn?.trim(),
+  );
+  if (!hasContent) return "";
+
+  const lines: string[] = [threeViewVisualStyleTitle(pack)];
+
+  if (pack.visualStyle?.trim()) {
+    const style = pack.visualStyle.trim();
+    const positioning = /拒绝|禁止|二维|插画|动漫/.test(style)
+      ? style
+      : `${style}；拒绝二维插画或动漫风格`;
+    lines.push(`- 风格定位：${positioning}`);
+  } else {
+    lines.push(
+      "- 风格定位：照片级写实，电影感真人拍摄风格，拒绝二维插画或动漫风格",
+    );
+  }
+
+  lines.push(
+    `- 光线设定：${pack.lighting?.trim() || THREE_VIEW_DEFAULT_LIGHTING}`,
+  );
+  lines.push(`- 镜头效果：${resolveThreeViewLensEffect(pack)}`);
+
+  if (pack.colorPalette?.trim()) {
+    lines.push(`- 色调方向：${pack.colorPalette.trim()}`);
+  }
+
+  const eraMood = [pack.era?.trim(), pack.worldBackground?.trim()]
+    .filter(Boolean)
+    .join("，");
+  if (eraMood) {
+    lines.push(
+      `- 时代气氛：参考${eraMood}美学，但背景为纯白，因此通过光影和色调传递氛围，不绘制实际场景。`,
+    );
+  }
+
+  lines.push(
+    "- 环境光适配：由于背景纯白，所有材质（丝绸、金属、皮肤）应反射柔和的白色环境光，呈现摄影棚质感，高光自然不溢出。",
+  );
+
+  const en = pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack);
+  if (en) lines.push(`[Global visual style] ${en}`);
+
+  return lines.join("\n");
+}
+
+/** prompt 是否已嵌入全片/全局视觉块 */
+export function promptHasEmbeddedVisualStyleBlock(prompt: string): boolean {
+  const t = prompt.trim();
+  return (
+    t.includes("【全局视觉风格") ||
+    t.includes("【全片视觉") ||
+    t.includes("[Global visual style]")
+  );
+}
+
 /** Dock 顶部 · 全片视觉块（与 Pro2VisualStylePackBar 同源，写入 dockInput 供用户编辑） */
 export function formatVisualStylePackDockSection(
   pack: StoryProVisualStylePack | null | undefined,
@@ -234,11 +333,11 @@ export function prependVisualStylePackToDockPrompt(
   const section = formatVisualStylePackDockSection(pack);
   if (!section) return base;
   if (!base) return section;
-  if (base.includes("【全片视觉")) return base;
+  if (base.includes("【全片视觉") || base.includes("【全局视觉风格")) return base;
   return `${section}\n\n${base}`;
 }
 
-/** 全片视觉块置于 Dock 末尾（LLM 描述与系统约束之后） */
+/** 全片视觉块置于 Dock 末尾（场景图等 · 三视图请用 assembleThreeViewPrompt） */
 export function appendVisualStylePackToDockPrompt(
   prompt: string,
   pack: StoryProVisualStylePack | null | undefined,
@@ -246,7 +345,7 @@ export function appendVisualStylePackToDockPrompt(
   const base = prompt.trim();
   const section = formatVisualStylePackDockSection(pack);
   if (!section) return base;
-  if (base.includes("【全片视觉")) return base;
+  if (promptHasEmbeddedVisualStyleBlock(base)) return base;
   if (!base) return section;
   return `${base}\n\n${section}`;
 }

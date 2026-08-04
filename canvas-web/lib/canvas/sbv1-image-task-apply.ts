@@ -26,14 +26,18 @@ export function sbv1ImagePatchFromTask(
 ): Record<string, unknown> | null {
   const mediaUrl = pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined;
 
-  if (task.status === "SUCCEEDED" && mediaUrl) {
+  if (task.status === "SUCCEEDED") {
     const hadImage = Boolean(prev.ossUrl?.trim() || prev.blobUrl?.trim());
     return {
-      ossUrl: mediaUrl,
-      blobUrl: undefined,
+      ...(mediaUrl
+        ? {
+            ossUrl: mediaUrl,
+            blobUrl: undefined,
+            imageMode: hadImage ? "img2img" : "txt2img",
+          }
+        : {}),
       uploading: false,
       uploadError: undefined,
-      imageMode: hadImage ? "img2img" : "txt2img",
       runtime: {
         status: "done",
         taskId: task.id,

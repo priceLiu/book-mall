@@ -22,7 +22,10 @@ import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types"
 import { GROUP_COLOR_PRESETS } from "./types";
 import {
   findPro2CharacterThreeViewNodeForRow,
+  clearOrphanPro2ThreeViewInflightInGroup,
+  reconcilePro2ThreeViewNodesWithColumnRows,
   resolveCharacterSyncGroupId,
+  characterRowsNeedingThreeViewNodeSync,
 } from "./pro2-group-row-resolve";
 import { filterPro2RowsForSpawn } from "./pro2-media-row-spawn";
 import { hubDataForColumnSync } from "./story-hub-runtime";
@@ -86,11 +89,6 @@ export function syncPro2CharacterColumnAndThreeViewDocksFromHub(
   return true;
 }
 
-export {
-  findPro2CharacterThreeViewNodeForRow,
-  resolveCharacterSyncGroupId,
-} from "./pro2-group-row-resolve";
-
 function characterRowPreview(row: StoryProCharacterRow): {
   ossUrl?: string;
   uploading?: boolean;
@@ -103,7 +101,9 @@ function characterRowPreview(row: StoryProCharacterRow): {
     rt?.ossUrl ||
     rt?.ephemeralUrl;
   const uploading =
-    rt?.status === "running" || rt?.status === "pending";
+    rt?.status === "running" ||
+    rt?.status === "pending" ||
+    rt?.status === "queued";
   return {
     ossUrl: url,
     uploading,
@@ -177,9 +177,11 @@ export function buildCharacterImageNodeInflightPatch(
     patch.ossUrl = preview.ossUrl;
     patch.blobUrl = undefined;
   }
-  if (preview.uploadError?.trim()) {
+  if (preview.uploading || isThreeViewRowInflight(preview.runtime)) {
+    patch.uploadError = undefined;
+  } else if (preview.uploadError?.trim()) {
     patch.uploadError = preview.uploadError;
-  } else if (!preview.uploading) {
+  } else {
     patch.uploadError = undefined;
   }
   if (preview.runtime) {
@@ -206,113 +208,19 @@ function isThreeViewRowInflight(rt?: CanvasNodeRuntime): boolean {
   return s === "pending" || s === "running" || s === "queued";
 }
 
-/** 清除角色列 / 组内三视图节点上残留的生成中态（非本次 batch 的行一并清掉） */
+/** @deprecated 使用 clearOrphanPro2ThreeViewInflightInGroup */
 export function clearStalePro2ThreeViewInflight(
   characterColumnId: string,
   activeRowKeys: string[],
   nodes: CanvasFlowNode[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): void {
-  const allowed = new Set(activeRowKeys.filter(Boolean));
-  const col = nodes.find((n) => n.id === characterColumnId);
-  if (!col) return;
-  const rows = (col.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
-  const nextRows = rows.map((r) =>
-    isThreeViewRowInflight(r.runtime) ? { ...r, runtime: undefined } : r,
-  );
-  updateNodeData(characterColumnId, { rows: nextRows });
-  const nodesAfter = nodes.map((n) =>
-    n.id === characterColumnId
-      ? { ...n, data: { ...n.data, rows: nextRows } }
-      : n,
-  );
-  syncPro2CharacterImagesFromRows(
-    nodesAfter,
+  clearOrphanPro2ThreeViewInflightInGroup(
     characterColumnId,
-    nextRows,
+    activeRowKeys,
+    nodes,
     updateNodeData,
-    { inflightOnly: true },
   );
-  const syncGroupId = resolveCharacterSyncGroupId(nodesAfter, characterColumnId);
-  if (!syncGroupId) return;
-  for (const n of nodesAfter) {
-    if (
-      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId !==
-      characterColumnId
-    ) {
-      continue;
-    }
-    if (n.type !== "story-pro2-three-view") continue;
-    const groupId =
-      n.parentId?.trim() ||
-      (n.data as { pro2GroupId?: string }).pro2GroupId?.trim();
-    if (groupId !== syncGroupId) continue;
-    const rowKey = (n.data as { pro2RowKey?: string }).pro2RowKey?.trim();
-    if (!rowKey || allowed.has(rowKey)) continue;
-    const nodeData = n.data as {
-      uploading?: boolean;
-      runtime?: CanvasNodeRuntime;
-    };
-    if (
-      !nodeData.uploading &&
-      !isThreeViewRowInflight(nodeData.runtime)
-    ) {
-      continue;
-    }
-    updateNodeData(n.id, {
-      uploading: false,
-      runtime: undefined,
-      uploadError: undefined,
-    });
-  }
-}
-
-/** 轮询 · 列上已无 in-flight 时，清掉组内三视图节点残留扫光 */
-export function reconcilePro2ThreeViewNodesWithColumnRows(
-  nodes: CanvasFlowNode[],
-  characterColumnId: string,
-  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
-): void {
-  const col = nodes.find((n) => n.id === characterColumnId);
-  if (!col) return;
-  const rows = (col.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
-  const inflightKeys = new Set(
-    rows
-      .filter((r) => isThreeViewRowInflight(r.runtime))
-      .map((r) => r.key),
-  );
-  const syncGroupId = resolveCharacterSyncGroupId(nodes, characterColumnId);
-  if (!syncGroupId) return;
-  for (const n of nodes) {
-    if (
-      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId !==
-      characterColumnId
-    ) {
-      continue;
-    }
-    if (n.type !== "story-pro2-three-view") continue;
-    const groupId =
-      n.parentId?.trim() ||
-      (n.data as { pro2GroupId?: string }).pro2GroupId?.trim();
-    if (groupId !== syncGroupId) continue;
-    const rowKey = (n.data as { pro2RowKey?: string }).pro2RowKey?.trim();
-    if (!rowKey || inflightKeys.has(rowKey)) continue;
-    const nodeData = n.data as {
-      uploading?: boolean;
-      runtime?: CanvasNodeRuntime;
-    };
-    if (
-      !nodeData.uploading &&
-      !isThreeViewRowInflight(nodeData.runtime)
-    ) {
-      continue;
-    }
-    updateNodeData(n.id, {
-      uploading: false,
-      runtime: undefined,
-      uploadError: undefined,
-    });
-  }
 }
 
 /** 批量三视图 · 入队前立刻标记全部角色行 + 组内节点为生成中（并发跑图） */

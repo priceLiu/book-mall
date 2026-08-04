@@ -1,23 +1,44 @@
 /**
  * 三视图 · 写入生图 prompt 与 LLM 角色外观约束
  * canvas-web/lib/canvas/three-view-prompt-rules.ts 须与本文件语义保持同步
- * book-mall 无 story-pro-visual-style-pack · buildPro2ThreeViewDockPrompt 不 append 全片视觉块
+ * book-mall 无 story-pro-visual-style-pack · 内联 formatThreeViewVisualStyleSection
  */
 
-/** 三视图生图系统约束（始终置于角色描述之后） */
-export const THREE_VIEW_SYSTEM_SUFFIX_ZH = `【三视图 · 系统约束】
-生成角色标准三视图 turnaround sheet：同一张图内从左到右并排展示 **恰好三个** 视角——正面、侧面、背面各一个，清晰人设原画稿，三视角角色比例与服饰完全一致；禁止重复视角、禁止分格边框与文字标注
+/** 三视图全局视觉 · 最小输入（与 StoryProVisualStylePack 字段兼容） */
+export type ThreeViewVisualStyleInput = {
+  worldBackground?: string;
+  era?: string;
+  visualStyle?: string;
+  colorPalette?: string;
+  lighting?: string;
+  styleAnchorZh?: string;
+  styleAnchorEn?: string;
+};
 
-体型、服饰、发型、配色、立绘规格须与角色设定一致
+export const THREE_VIEW_TASK_ZH = `【任务】
+生成主角的标准三视图设计稿。`;
 
-横排白底；正/侧/背各一全身立绘；双臂自然下垂，禁止手触脸/挡脸、禁止手持或夹持物件；仅可穿戴服饰与饰品；纯白底，禁止场景与包袋`;
+export const THREE_VIEW_HARD_CONSTRAINTS_ZH = `【硬性约束 - 必须遵守】
+- 仅生成一张图，横向构图，从左到右依次排列 **恰好三个** 全身视角：正面、侧面、背面。
+- 三个视角的角色比例、服饰、发型、配色必须完全一致。
+- 禁止重复视角；禁止出现分格线、边框、文字标注或网格。
+- 背景为纯白色（纯白底，无渐变，无场景，无道具）。
+- 角色直立站姿，双臂自然下垂于身体两侧。
+- 双手不得触碰面部、遮挡面部，也不得手持或夹带任何物品。
+- 只允许穿戴服饰和饰品，不得出现包袋或随身物件。
+- 面部表情保持中立（无表情、无笑容），以符合标准三视图的设计规范。`;
 
-/** 一行英文补强（置于中文系统约束之后） */
+export const THREE_VIEW_SYSTEM_PREFIX_ZH = `${THREE_VIEW_TASK_ZH}
+
+${THREE_VIEW_HARD_CONSTRAINTS_ZH}`;
+
+/** @deprecated 兼容旧引用 */
+export const THREE_VIEW_SYSTEM_SUFFIX_ZH = THREE_VIEW_SYSTEM_PREFIX_ZH;
+
+export const THREE_VIEW_IMAGE_RULES_ZH = THREE_VIEW_SYSTEM_PREFIX_ZH;
+
 export const THREE_VIEW_TURNAROUND_REQUIREMENT_EN =
   "White-bg turnaround: front, side, back full-body only; no props in hands, no labels or panel borders.";
-
-/** @deprecated 兼容旧引用 · 等同精简系统约束 */
-export const THREE_VIEW_IMAGE_RULES_ZH = THREE_VIEW_SYSTEM_SUFFIX_ZH;
 
 export const THREE_VIEW_ENGINE_PROMPT_INTRO_ZH =
   "生成角色标准三视图 turnaround sheet：正/侧/背各一，人设原画稿，三视角比例与服饰一致";
@@ -25,12 +46,10 @@ export const THREE_VIEW_ENGINE_PROMPT_INTRO_ZH =
 export const THREE_VIEW_ENGINE_PROMPT_STYLE_ZH =
   "体型、服饰、发型、配色须与角色设定一致";
 
-/** 三视图引擎节点 · 默认占位 */
-export const THREE_VIEW_ENGINE_PROMPT_DEFAULT = THREE_VIEW_SYSTEM_SUFFIX_ZH;
+export const THREE_VIEW_ENGINE_PROMPT_DEFAULT = THREE_VIEW_SYSTEM_PREFIX_ZH;
 
-/** LLM 写角色「外观 / 外貌」列时的约束（中文，嵌入 character-engine prompt） */
 export const THREE_VIEW_APPEARANCE_LLM_RULE_ZH =
-  "仅写角色外观与穿戴服饰/饰品；不含场景、画风与道具；禁止背包/手提物、禁止手持或挡脸动作（下游三视图为白底正/侧/背 turnaround）";
+  "采用 bullet 列表（以「- 」开头）写角色造型：推荐字段含年龄与身份、发型、面容、服饰、配饰/肩甲、整体材质；仅写外观与穿戴服饰/饰品，不含场景、摄影画风、光线与道具；禁止性格与情节氛围；禁止背包/手提物、禁止手持或挡脸（下游三视图为白底正/侧/背 turnaround）";
 
 const LEGACY_THREE_VIEW_IMAGE_RULES_ZH = `【视角数量 · 硬性要求】
 - 整张图 **仅三个** 视角：正面、侧面、背面各 **恰好一个**，从左到右等距排列
@@ -57,25 +76,146 @@ const LEGACY_THREE_VIEW_IMAGE_RULES_ZH = `【视角数量 · 硬性要求】
 
 【限制项】可佩戴与服装搭配的饰品、首饰、眼镜等；**禁止**背包、手提包、单肩包、斜挎包及任何背/提在身上的包袋`;
 
+const LEGACY_THREE_VIEW_SYSTEM_SUFFIX_ZH = `【三视图 · 系统约束】
+生成角色标准三视图 turnaround sheet：同一张图内从左到右并排展示 **恰好三个** 视角——正面、侧面、背面各一个，清晰人设原画稿，三视角角色比例与服饰完全一致；禁止重复视角、禁止分格边框与文字标注
+
+体型、服饰、发型、配色、立绘规格须与角色设定一致
+
+横排白底；正/侧/背各一全身立绘；双臂自然下垂，禁止手触脸/挡脸、禁止手持或夹持物件；仅可穿戴服饰与饰品；纯白底，禁止场景与包袋`;
+
 const LEGACY_THREE_VIEW_TURNAROUND_REQUIREMENT_EN = `MANDATORY: Pure white background (#FFFFFF). One horizontal character turnaround reference sheet with exactly three full-body views left-to-right: front view, side view, back view — same character, identical outfit and body proportions. No scene background, no ground shadow, no props in hands, no text labels, no panel borders or split frames.`;
 
 const LEGACY_THREE_VIEW_INTRO_LONG_ZH =
   "生成角色标准三视图 turnaround sheet：同一张图内从左到右并排展示 **恰好三个** 视角——正面、侧面、背面各一个";
 
+const THREE_VIEW_DEFAULT_LIGHTING =
+  "自然日光感，主光源来自右后方的侧逆光，辅光来自左前方柔和补光，以清晰呈现面部细节。拒绝平光。";
+
+const THREE_VIEW_DEFAULT_LENS =
+  "模拟 35mm 焦距，光圈 f/2.8 的浅景深，带有轻微电影颗粒感";
+
 function normalizePromptCompareText(text: string): string {
   return text.replace(/\s+/g, "").toLowerCase();
 }
 
-function hasThreeViewTurnaroundRules(text: string): boolean {
-  return (
-    text.includes("【三视图 · 系统约束】") ||
-    text.includes(THREE_VIEW_ENGINE_PROMPT_INTRO_ZH) ||
-    text.includes(LEGACY_THREE_VIEW_INTRO_LONG_ZH) ||
-    text.includes("【视角数量 · 硬性要求】") ||
-    /正面.*侧面.*背面|三视图|turnaround sheet|three full-body views/i.test(
-      text,
-    )
+function looksLikeBulletList(text: string): boolean {
+  return /(?:^|\n)\s*-\s+\S/m.test(text.trim());
+}
+
+function normalizeAppearanceToBullets(text: string): string {
+  const t = text.trim();
+  if (!t) return "";
+  if (looksLikeBulletList(t)) {
+    return t
+      .split("\n")
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return "";
+        if (/^[-*•]\s/.test(trimmed)) {
+          return trimmed.startsWith("-") ? trimmed : `- ${trimmed.replace(/^[-*•]\s*/, "")}`;
+        }
+        return `- ${trimmed}`;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return t
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => (p.startsWith("- ") ? p : `- ${p}`))
+    .join("\n");
+}
+
+function buildVisualStyleAnchorEn(pack: ThreeViewVisualStyleInput): string {
+  const parts = [
+    pack.visualStyle?.trim(),
+    pack.era?.trim() ? `era: ${pack.era.trim()}` : "",
+    pack.colorPalette?.trim() ? `color palette: ${pack.colorPalette.trim()}` : "",
+    pack.lighting?.trim() ? `lighting: ${pack.lighting.trim()}` : "",
+    pack.worldBackground?.trim()
+      ? `setting: ${pack.worldBackground.trim()}`
+      : "",
+  ].filter(Boolean);
+  return parts.join(", ");
+}
+
+function resolveThreeViewLensEffect(pack: ThreeViewVisualStyleInput): string {
+  const combined = [
+    pack.lighting,
+    pack.styleAnchorZh,
+    pack.visualStyle,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (/35mm|50mm|85mm|f\/\d|浅景深|镜头/i.test(combined)) {
+    const m = combined.match(
+      /(?:模拟\s*)?\d+mm[^。\n]*(?:f\/[\d.]+[^。\n]*)?|(?:浅景深|镜头)[^。\n]*/i,
+    );
+    if (m?.[0]?.trim()) return m[0].trim().replace(/^[，,；;]\s*/, "");
+  }
+  return THREE_VIEW_DEFAULT_LENS;
+}
+
+export function formatThreeViewVisualStyleSection(
+  pack: ThreeViewVisualStyleInput | null | undefined,
+): string {
+  if (!pack) return "";
+  const hasContent = Boolean(
+    pack.visualStyle?.trim() ||
+      pack.lighting?.trim() ||
+      pack.colorPalette?.trim() ||
+      pack.era?.trim() ||
+      pack.worldBackground?.trim() ||
+      pack.styleAnchorZh?.trim() ||
+      pack.styleAnchorEn?.trim(),
   );
+  if (!hasContent) return "";
+
+  const label =
+    pack.visualStyle?.trim() ||
+    pack.styleAnchorZh?.trim()?.slice(0, 24) ||
+    "写实摄影风";
+  const lines: string[] = [`【全局视觉风格 - ${label.slice(0, 48)}】`];
+
+  if (pack.visualStyle?.trim()) {
+    const style = pack.visualStyle.trim();
+    const positioning = /拒绝|禁止|二维|插画|动漫/.test(style)
+      ? style
+      : `${style}；拒绝二维插画或动漫风格`;
+    lines.push(`- 风格定位：${positioning}`);
+  } else {
+    lines.push(
+      "- 风格定位：照片级写实，电影感真人拍摄风格，拒绝二维插画或动漫风格",
+    );
+  }
+
+  lines.push(
+    `- 光线设定：${pack.lighting?.trim() || THREE_VIEW_DEFAULT_LIGHTING}`,
+  );
+  lines.push(`- 镜头效果：${resolveThreeViewLensEffect(pack)}`);
+
+  if (pack.colorPalette?.trim()) {
+    lines.push(`- 色调方向：${pack.colorPalette.trim()}`);
+  }
+
+  const eraMood = [pack.era?.trim(), pack.worldBackground?.trim()]
+    .filter(Boolean)
+    .join("，");
+  if (eraMood) {
+    lines.push(
+      `- 时代气氛：参考${eraMood}美学，但背景为纯白，因此通过光影和色调传递氛围，不绘制实际场景。`,
+    );
+  }
+
+  lines.push(
+    "- 环境光适配：由于背景纯白，所有材质（丝绸、金属、皮肤）应反射柔和的白色环境光，呈现摄影棚质感，高光自然不溢出。",
+  );
+
+  const en = pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack);
+  if (en) lines.push(`[Global visual style] ${en}`);
+
+  return lines.join("\n");
 }
 
 export function buildThreeViewCharacterBody(c: {
@@ -85,20 +225,27 @@ export function buildThreeViewCharacterBody(c: {
   personality?: string;
   aiImagePrompt?: string;
 }): string {
-  const lines: string[] = [];
-  if (c.name?.trim()) lines.push(`角色：${c.name.trim()}`);
-  if (c.role?.trim()) lines.push(`定位：${c.role.trim()}`);
+  const name = c.name?.trim() || "未命名角色";
+  const role = c.role?.trim() || "角色";
+  const header = `【角色设定：${name} - ${role}】`;
+
   const appearance = c.appearance?.trim();
-  if (appearance) lines.push(`外貌/服装/标志性动作：${appearance}`);
-  if (c.personality?.trim()) lines.push(`性格：${c.personality.trim()}`);
   const ai = c.aiImagePrompt?.trim();
+  const parts: string[] = [];
+
+  if (appearance) {
+    parts.push(normalizeAppearanceToBullets(appearance));
+  }
   if (
     ai &&
     normalizePromptCompareText(ai) !== normalizePromptCompareText(appearance ?? "")
   ) {
-    lines.push(`AI生图：${ai}`);
+    parts.push(normalizeAppearanceToBullets(ai));
   }
-  return lines.join("\n");
+
+  const body = parts.filter(Boolean).join("\n");
+  if (!body) return "";
+  return `${header}\n${body}`;
 }
 
 export type Pro2CharacterTablePromptFields = {
@@ -112,13 +259,9 @@ export type Pro2CharacterTablePromptFields = {
 export function pro2CharacterTablePromptFingerprint(
   row: Pro2CharacterTablePromptFields,
 ): string {
-  return [
-    row.name,
-    row.role,
-    row.appearance,
-    row.personality ?? "",
-    row.aiImagePrompt ?? "",
-  ].join("\x1e");
+  return [row.name, row.role, row.appearance, row.aiImagePrompt ?? ""].join(
+    "\x1e",
+  );
 }
 
 export function shouldRebuildPro2CharacterRowPrompt(
@@ -132,6 +275,19 @@ export function shouldRebuildPro2CharacterRowPrompt(
   );
 }
 
+export function assembleThreeViewPrompt(
+  characterBody: string,
+  visualStylePack?: ThreeViewVisualStyleInput | null,
+): string {
+  const parts: string[] = [THREE_VIEW_SYSTEM_PREFIX_ZH.trim()];
+  const character = stripThreeViewSystemBlocks(characterBody).trim();
+  if (character) parts.push(character);
+  const visual = formatThreeViewVisualStyleSection(visualStylePack ?? undefined);
+  if (visual) parts.push(visual);
+  parts.push(THREE_VIEW_TURNAROUND_REQUIREMENT_EN);
+  return parts.join("\n\n");
+}
+
 export function stripThreeViewSystemBlocks(text: string): string {
   let t = text.trim();
   if (!t) return "";
@@ -139,7 +295,10 @@ export function stripThreeViewSystemBlocks(text: string): string {
   const blocks = [
     LEGACY_THREE_VIEW_IMAGE_RULES_ZH,
     LEGACY_THREE_VIEW_TURNAROUND_REQUIREMENT_EN,
-    THREE_VIEW_SYSTEM_SUFFIX_ZH,
+    LEGACY_THREE_VIEW_SYSTEM_SUFFIX_ZH,
+    THREE_VIEW_SYSTEM_PREFIX_ZH,
+    THREE_VIEW_HARD_CONSTRAINTS_ZH,
+    THREE_VIEW_TASK_ZH,
     THREE_VIEW_TURNAROUND_REQUIREMENT_EN,
     THREE_VIEW_ENGINE_PROMPT_INTRO_ZH,
     THREE_VIEW_ENGINE_PROMPT_STYLE_ZH,
@@ -152,8 +311,14 @@ export function stripThreeViewSystemBlocks(text: string): string {
     }
   }
 
+  t = t.replace(/【全局视觉风格[^\n]*】[\s\S]*?(?=\n\n(?:White-bg|\[Global)|$)/g, "").trim();
   t = t.replace(/【角色外观 · 中文描述 · 须与下列一致】\n?/g, "").trim();
   t = t.replace(/【角色外观 · 英文描述 · 须与下列一致】\n?/g, "").trim();
+  t = t.replace(/^角色：[^\n]*\n?/gm, "").trim();
+  t = t.replace(/^定位：[^\n]*\n?/gm, "").trim();
+  t = t.replace(/^外貌\/服装[^\n]*：[^\n]*\n?/gm, "").trim();
+  t = t.replace(/^性格：[^\n]*\n?/gm, "").trim();
+  t = t.replace(/^AI生图：[^\n]*\n?/gm, "").trim();
   t = t.replace(
     /^生成角色标准三视图 turnaround sheet：[\s\S]*?禁止分格边框与文字标注\n?/m,
     "",
@@ -164,21 +329,30 @@ export function stripThreeViewSystemBlocks(text: string): string {
 }
 
 export function appendThreeViewSystemConstraints(body: string): string {
-  const content = stripThreeViewSystemBlocks(body);
-  const suffix = `${THREE_VIEW_SYSTEM_SUFFIX_ZH}\n${THREE_VIEW_TURNAROUND_REQUIREMENT_EN}`;
-  if (!content) return suffix;
-  if (content.includes("【三视图 · 系统约束】")) {
-    const stripped = stripThreeViewSystemBlocks(content);
-    if (!stripped) return suffix;
-    return `${stripped}\n\n${suffix}`;
-  }
-  return `${content}\n\n${suffix}`;
+  return assembleThreeViewPrompt(body, null);
 }
 
-export function normalizeThreeViewDockPrompt(prompt: string): string {
+export function normalizeThreeViewDockPrompt(
+  prompt: string,
+  visualStylePack?: ThreeViewVisualStyleInput | null,
+): string {
   const trimmed = prompt.trim();
-  if (!trimmed) return appendThreeViewSystemConstraints("");
-  return appendThreeViewSystemConstraints(trimmed);
+  if (!trimmed) return assembleThreeViewPrompt("", visualStylePack ?? null);
+
+  const legacyMatch = trimmed.match(/^角色：([^\n]+)/m);
+  if (legacyMatch && !trimmed.includes("【角色设定：")) {
+    const name = legacyMatch[1]?.trim() || "未命名角色";
+    const role = trimmed.match(/^定位：([^\n]+)/m)?.[1]?.trim() || "角色";
+    const appearance =
+      trimmed.match(/^外貌\/服装[^\n]*：([^\n]+)/m)?.[1]?.trim() || "";
+    return assembleThreeViewPrompt(
+      buildThreeViewCharacterBody({ name, role, appearance }),
+      visualStylePack ?? null,
+    );
+  }
+
+  const character = stripThreeViewSystemBlocks(trimmed);
+  return assembleThreeViewPrompt(character, visualStylePack ?? null);
 }
 
 export function formatThreeViewPromptFromCharacterDescription(
@@ -190,36 +364,46 @@ export function formatThreeViewPromptFromCharacterDescription(
     personality?: string;
     aiImagePrompt?: string;
   },
+  visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
-  return appendThreeViewSystemConstraints(
+  return assembleThreeViewPrompt(
     buildThreeViewCharacterBody({
       ...c,
       aiImagePrompt: characterDescription.trim() || c.aiImagePrompt,
     }),
+    visualStylePack ?? null,
   );
 }
 
-export function formatCharacterRowThreeViewPrompt(c: {
-  name: string;
-  role: string;
-  appearance: string;
-  personality?: string;
-  aiImagePrompt?: string;
-}): string {
-  return appendThreeViewSystemConstraints(buildThreeViewCharacterBody(c));
+export function formatCharacterRowThreeViewPrompt(
+  c: {
+    name: string;
+    role: string;
+    appearance: string;
+    personality?: string;
+    aiImagePrompt?: string;
+  },
+  visualStylePack?: ThreeViewVisualStyleInput | null,
+): string {
+  return assembleThreeViewPrompt(
+    buildThreeViewCharacterBody(c),
+    visualStylePack ?? null,
+  );
 }
 
-export function resolveCharacterRowThreeViewPrompt(c: {
-  name: string;
-  role: string;
-  appearance: string;
-  personality?: string;
-  aiImagePrompt?: string;
-}): string {
-  return formatCharacterRowThreeViewPrompt(c);
+export function resolveCharacterRowThreeViewPrompt(
+  c: {
+    name: string;
+    role: string;
+    appearance: string;
+    personality?: string;
+    aiImagePrompt?: string;
+  },
+  visualStylePack?: ThreeViewVisualStyleInput | null,
+): string {
+  return formatCharacterRowThreeViewPrompt(c, visualStylePack ?? null);
 }
 
-/** Pro2 三视图 Dock · 始终以角色表字段为准 */
 export function buildPro2ThreeViewDockPrompt(
   row: {
     name: string;
@@ -229,17 +413,26 @@ export function buildPro2ThreeViewDockPrompt(
     aiImagePrompt?: string;
     prompt?: string;
   },
-  _visualStylePack?: unknown,
+  visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
-  return appendThreeViewSystemConstraints(buildThreeViewCharacterBody(row));
+  return assembleThreeViewPrompt(
+    buildThreeViewCharacterBody(row),
+    visualStylePack ?? undefined,
+  );
 }
 
-export function formatBatchThreeViewPrompt(c: {
-  name: string;
-  role: string;
-  appearance: string;
-  personality?: string;
-  aiImagePrompt?: string;
-}): string {
-  return appendThreeViewSystemConstraints(buildThreeViewCharacterBody(c));
+export function formatBatchThreeViewPrompt(
+  c: {
+    name: string;
+    role: string;
+    appearance: string;
+    personality?: string;
+    aiImagePrompt?: string;
+  },
+  visualStylePack?: ThreeViewVisualStyleInput | null,
+): string {
+  return assembleThreeViewPrompt(
+    buildThreeViewCharacterBody(c),
+    visualStylePack ?? null,
+  );
 }

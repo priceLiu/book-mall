@@ -3,6 +3,7 @@ import type {
   StoryProFrameRow,
   StoryProSceneRow,
 } from "./story-pro-workspace-types";
+import type { CanvasFlowNode } from "./types";
 import type { StoryProVisualStylePack } from "./story-pro-visual-style-pack";
 import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 import { buildPro2ThreeViewDockPrompt } from "./three-view-prompt-rules";
@@ -71,6 +72,28 @@ export function buildPro2SceneMediaPrompt(
 /** 分镜图 · 仅对用户选中的分镜行组装 prompt */
 export function buildPro2FrameMediaPrompt(row: StoryProFrameRow): string {
   return buildFrameRowMediaPrompt(row);
+}
+
+/** Dock 编辑后 · 写入角色列 row.prompt（后端 threeView 跑图读此字段） */
+export function commitPro2ThreeViewRowPromptFromDock(
+  characterColumnId: string,
+  rowKey: string,
+  prompt: string,
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): boolean {
+  const key = rowKey.trim();
+  if (!key) return false;
+  const col = nodes.find((n) => n.id === characterColumnId);
+  if (!col) return false;
+  const rows = (col.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
+  const trimmed = prompt.trim();
+  updateNodeData(characterColumnId, {
+    rows: rows.map((row) =>
+      row.key === key ? { ...row, prompt: trimmed } : row,
+    ),
+  });
+  return true;
 }
 
 export function applyPro2CharacterMediaPromptsForKeys(

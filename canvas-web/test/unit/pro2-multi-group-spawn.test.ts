@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  clearOrphanPro2ThreeViewInflightInGroup,
   findPro2CharacterThreeViewNodeForRow,
   findPro2FrameImageNodeForRow,
   maybeClearHubPendingSceneSyncGroup,
+  reconcilePro2ThreeViewNodesWithColumnRows,
+  scopePro2CharacterSyncGroupForThreeViewNode,
 } from "@/lib/canvas/pro2-group-row-resolve";
+import { countCanvasInflightWork } from "@/lib/canvas/story-column-runtime";
+import { pickStoryRowApplyTask } from "@/lib/canvas/task-pick";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 function charColumn(id: string, pendingGroupId?: string): CanvasFlowNode {
@@ -36,6 +41,82 @@ function threeViewNode(
     },
   };
 }
+
+describe("clearOrphanPro2ThreeViewInflightInGroup", () => {
+  it("does not clear column runtime for other rows still generating", () => {
+    const columnId = "col-char";
+    const groupId = "grp-1";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-character",
+        position: { x: 0, y: 0 },
+        data: {
+          pro2PendingSyncGroupId: groupId,
+          rows: [
+            {
+              key: "a",
+              name: "甲",
+              role: "主角",
+              appearance: "红袍",
+              runtime: { status: "running" },
+            },
+            {
+              key: "b",
+              name: "乙",
+              role: "配角",
+              appearance: "蓝衣",
+              runtime: { status: "pending" },
+            },
+          ],
+        },
+      },
+      threeViewNode("tv-a", columnId, "a", groupId),
+      {
+        ...threeViewNode("tv-b", columnId, "b", groupId),
+        data: {
+          ...threeViewNode("tv-b", columnId, "b", groupId).data,
+          uploading: true,
+          runtime: { status: "pending" },
+        },
+      },
+    ];
+    const updateNodeData = vi.fn();
+    clearOrphanPro2ThreeViewInflightInGroup(
+      columnId,
+      ["a"],
+      nodes,
+      updateNodeData,
+    );
+    expect(updateNodeData).not.toHaveBeenCalledWith(columnId, expect.anything());
+    expect(updateNodeData).not.toHaveBeenCalledWith(
+      "tv-b",
+      expect.objectContaining({ uploading: false }),
+    );
+  });
+});
+
+describe("scopePro2CharacterSyncGroupForThreeViewNode", () => {
+  it("sets pending sync group to the three-view node parent group", () => {
+    const columnId = "col-char";
+    const groupId = "grp-new";
+    const nodes: CanvasFlowNode[] = [
+      charColumn(columnId),
+      threeViewNode("tv-1", columnId, "hero", groupId),
+    ];
+    const updateNodeData = vi.fn();
+    const scoped = scopePro2CharacterSyncGroupForThreeViewNode(
+      columnId,
+      "tv-1",
+      nodes,
+      updateNodeData,
+    );
+    expect(scoped).toBe(groupId);
+    expect(updateNodeData).toHaveBeenCalledWith(columnId, {
+      pro2PendingSyncGroupId: groupId,
+    });
+  });
+});
 
 describe("findPro2CharacterThreeViewNodeForRow", () => {
   it("returns node in pending sync group when multiple groups exist", () => {
@@ -108,6 +189,63 @@ describe("findPro2FrameImageNodeForRow", () => {
   });
 });
 
+describe("reconcilePro2ThreeViewNodesWithColumnRows", () => {
+  it("re-applies row error instead of clearing stale inflight on the node", () => {
+    const columnId = "col-char";
+    const groupId = "grp-1";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-character",
+        position: { x: 0, y: 0 },
+        data: {
+          pro2PendingSyncGroupId: groupId,
+          rows: [
+            {
+              key: "hero",
+              name: "主角",
+              runtime: {
+                status: "error",
+                failCode: "REQUEST_FAILED",
+                failMessage: "生图服务暂时不可用，请稍后重试。",
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: "tv-1",
+        type: "story-pro2-three-view",
+        parentId: groupId,
+        position: { x: 0, y: 0 },
+        data: {
+          pro2ControllerNodeId: columnId,
+          pro2RowKey: "hero",
+          pro2GroupId: groupId,
+          uploading: true,
+          runtime: { status: "pending" },
+        },
+      },
+    ];
+    const updateNodeData = vi.fn();
+    reconcilePro2ThreeViewNodesWithColumnRows(nodes, columnId, updateNodeData);
+    expect(updateNodeData).toHaveBeenCalledWith("tv-1", {
+      uploading: false,
+      uploadError: "生图服务暂时不可用，请稍后重试。",
+      runtime: {
+        status: "error",
+        failCode: "REQUEST_FAILED",
+        failMessage: "生图服务暂时不可用，请稍后重试。",
+      },
+    });
+    expect(updateNodeData).not.toHaveBeenCalledWith("tv-1", {
+      uploading: false,
+      runtime: undefined,
+      uploadError: undefined,
+    });
+  });
+});
+
 describe("maybeClearHubPendingSceneSyncGroup", () => {
   it("clears hub pending when last scene image in group completes", () => {
     const hubId = "hub-1";
@@ -177,5 +315,157 @@ describe("maybeClearHubPendingSceneSyncGroup", () => {
     const updateNodeData = vi.fn();
     maybeClearHubPendingSceneSyncGroup(nodes, "s-done", updateNodeData);
     expect(updateNodeData).not.toHaveBeenCalled();
+  });
+});
+
+describe("countCanvasInflightWork · character rows", () => {
+  it("does not count stale column pending when group node already shows result", () => {
+    const columnId = "col-char";
+    const groupId = "grp-1";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-character",
+        position: { x: 0, y: 0 },
+        data: {
+          pro2PendingSyncGroupId: groupId,
+          rows: [
+            {
+              key: "hero",
+              name: "主角",
+              runtime: {
+                status: "pending",
+                ossUrl: "https://cdn.example/hero.png",
+              },
+            },
+            {
+              key: "rival",
+              name: "反派",
+              runtime: {
+                status: "pending",
+                ossUrl: "https://cdn.example/rival.png",
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: "tv-hero",
+        type: "story-pro2-three-view",
+        parentId: groupId,
+        position: { x: 0, y: 0 },
+        data: {
+          pro2ControllerNodeId: columnId,
+          pro2RowKey: "hero",
+          pro2GroupId: groupId,
+          ossUrl: "https://cdn.example/hero.png",
+          runtime: { status: "done", ossUrl: "https://cdn.example/hero.png" },
+        },
+      },
+      {
+        id: "tv-rival",
+        type: "story-pro2-three-view",
+        parentId: groupId,
+        position: { x: 0, y: 0 },
+        data: {
+          pro2ControllerNodeId: columnId,
+          pro2RowKey: "rival",
+          pro2GroupId: groupId,
+          ossUrl: "https://cdn.example/rival.png",
+          runtime: { status: "done", ossUrl: "https://cdn.example/rival.png" },
+        },
+      },
+    ];
+
+    expect(countCanvasInflightWork(nodes)).toBe(0);
+  });
+
+  it("counts active batch regen when group node is still generating", () => {
+    const columnId = "col-char";
+    const groupId = "grp-1";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-character",
+        position: { x: 0, y: 0 },
+        data: {
+          pro2PendingSyncGroupId: groupId,
+          rows: [
+            {
+              key: "hero",
+              name: "主角",
+              runtime: {
+                status: "pending",
+                ossUrl: "https://cdn.example/hero-old.png",
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: "tv-hero",
+        type: "story-pro2-three-view",
+        parentId: groupId,
+        position: { x: 0, y: 0 },
+        data: {
+          pro2ControllerNodeId: columnId,
+          pro2RowKey: "hero",
+          pro2GroupId: groupId,
+          ossUrl: "https://cdn.example/hero-old.png",
+          uploading: true,
+          runtime: { status: "pending", taskId: "task-1" },
+        },
+      },
+    ];
+
+    expect(countCanvasInflightWork(nodes)).toBe(1);
+  });
+});
+
+describe("pickStoryRowApplyTask · threeView", () => {
+  it("prefers newer SUCCEEDED over stale SUBMITTED when row is still pending", () => {
+    const pick = pickStoryRowApplyTask(
+      [
+        {
+          id: "stale-submitted",
+          nodeId: "col",
+          kind: "IMAGE",
+          status: "SUBMITTED",
+          model: "test",
+          ossUrl: null,
+          ephemeralUrl: null,
+          textOutput: null,
+          failCode: null,
+          failMessage: null,
+          submittedAt: "2026-08-02T15:20:00.000Z",
+          completedAt: null,
+          createdAt: "2026-08-02T15:20:00.000Z",
+          updatedAt: "2026-08-02T15:25:00.000Z",
+          kieTaskId: null,
+          storyScope: { rowKey: "hero", mediaKind: "threeView" },
+        },
+        {
+          id: "fresh-done",
+          nodeId: "col",
+          kind: "IMAGE",
+          status: "SUCCEEDED",
+          model: "test",
+          ossUrl: "https://cdn.example/hero.png",
+          ephemeralUrl: null,
+          textOutput: null,
+          failCode: null,
+          failMessage: null,
+          submittedAt: "2026-08-02T15:21:00.000Z",
+          completedAt: "2026-08-02T15:29:00.000Z",
+          createdAt: "2026-08-02T15:21:00.000Z",
+          updatedAt: "2026-08-02T15:29:00.000Z",
+          kieTaskId: null,
+          storyScope: { rowKey: "hero", mediaKind: "threeView" },
+        },
+      ],
+      { rowKey: "hero", mediaKind: "threeView" },
+      { status: "pending" },
+    );
+    expect(pick?.id).toBe("fresh-done");
   });
 });

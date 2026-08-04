@@ -57,7 +57,9 @@ export function shouldSkipStaleTerminalWhileLocalInflight(
   pick: CanvasTaskRecord,
 ): boolean {
   const localSt = localRuntime?.status;
-  if (localSt !== "pending" && localSt !== "running") return false;
+  if (localSt !== "pending" && localSt !== "running" && localSt !== "queued") {
+    return false;
+  }
   if (
     !isServerInflightTaskStatus(pick.status) &&
     !isTerminalTaskStatus(pick.status)

@@ -29,11 +29,16 @@ import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import {
   syncPro2CharacterImagesFromRows,
 } from "./pro2-spawn-character-image-group";
+import { reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-group-row-resolve";
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
 import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
 import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
-import type { StoryProFrameRow, StoryProSceneRow } from "./story-pro-workspace-types";
+import type {
+  StoryProCharacterRow,
+  StoryProFrameRow,
+  StoryProSceneRow,
+} from "./story-pro-workspace-types";
 import {
   findStarterByHubId,
   isAnyStoryCharacterColumnType,
@@ -245,16 +250,22 @@ export function commitStoryRunPendingPatch(
     Array.isArray(pending.rows) &&
     ctx?.rowKey
   ) {
-    syncPro2CharacterImagesFromRows(
-      allNodes.map((n) =>
-        n.id === node.id
-          ? { ...n, data: { ...n.data, rows: pending.rows } }
-          : n,
-      ),
-      node.id,
-      pending.rows as never,
-      updateNodeData,
+    const touched = (pending.rows as StoryProCharacterRow[]).find(
+      (r) => r.key === ctx.rowKey,
     );
+    if (touched) {
+      syncPro2CharacterImagesFromRows(
+        allNodes.map((n) =>
+          n.id === node.id
+            ? { ...n, data: { ...n.data, rows: pending.rows } }
+            : n,
+        ),
+        node.id,
+        [touched],
+        updateNodeData,
+        { inflightOnly: true },
+      );
+    }
   }
   if (
     isAnyStoryVideoColumnType(node.type ?? "") &&
@@ -519,25 +530,44 @@ export function storyApplyTaskResult(
       runtime,
     );
     updateNodeData(node.id, { rows: nextRows });
-    syncPro2CharacterImagesFromRows(
-      allNodes.map((n) =>
-        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
-      ),
-      node.id,
-      nextRows as never,
-      updateNodeData,
-      { inflightOnly: true },
+    const touched = (nextRows as StoryProCharacterRow[]).find(
+      (r) => r.key === ctx.rowKey,
     );
+    if (touched) {
+      const nodesAfter = allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
+      );
+      syncPro2CharacterImagesFromRows(
+        nodesAfter,
+        node.id,
+        [touched],
+        updateNodeData,
+        { inflightOnly: true },
+      );
+      if (runtime.status === "done" || runtime.status === "error") {
+        reconcilePro2ThreeViewNodesWithColumnRows(
+          nodesAfter,
+          node.id,
+          updateNodeData,
+        );
+        clearCanvasNodeRunSession(node.id);
+      }
+    }
     const pendingSyncGroupId = (
       node.data as { pro2PendingSyncGroupId?: string }
     ).pro2PendingSyncGroupId?.trim();
     if (pendingSyncGroupId) {
       const anyInflight = (nextRows as { runtime?: { status?: string } }[]).some(
         (r) =>
-          r.runtime?.status === "pending" || r.runtime?.status === "running",
+          r.runtime?.status === "pending" ||
+          r.runtime?.status === "running" ||
+          r.runtime?.status === "queued",
       );
       if (!anyInflight) {
-        updateNodeData(node.id, { pro2PendingSyncGroupId: undefined });
+        updateNodeData(node.id, {
+          pro2PendingSyncGroupId: undefined,
+          pro2VisualGroupId: pendingSyncGroupId,
+        });
       }
     }
     const starter = findStarterByHubId(allNodes, node.id);

@@ -1,5 +1,6 @@
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
 import { hubSectionCountsAsInflight } from "./story-hub-runtime";
+import { findPro2CharacterThreeViewNodeForRow } from "./pro2-group-row-resolve";
 import {
   isAnyStoryCharacterColumnType,
   isAnyStoryFrameColumnType,
@@ -12,14 +13,31 @@ import type {
   CanvasNodeRuntime,
   CanvasNodeRunStatus,
 } from "./types";
-import { isLibtvFreestandingImageNode } from "./libtv-image-node-run";
+
+function libtvNodeHasUploadingFlag(node: CanvasFlowNode): boolean {
+  if (node.type === "sbv1-video-engine") {
+    return Boolean((node.data as { uploading?: boolean }).uploading);
+  }
+  if (
+    node.type === "sbv1-image" ||
+    node.type === "story-pro2-three-view" ||
+    node.type === "story-pro2-image"
+  ) {
+    return Boolean((node.data as { uploading?: boolean }).uploading);
+  }
+  return false;
+}
 
 type RowRuntimeSlice = {
   status?: CanvasNodeRunStatus;
   failMessage?: string;
+  ossUrl?: string;
+  ephemeralUrl?: string;
+  taskId?: string;
 };
 
 type StoryMediaRow = {
+  key?: string;
   runtime?: RowRuntimeSlice;
   videoRuntime?: RowRuntimeSlice;
   ttsRuntime?: RowRuntimeSlice;
@@ -86,19 +104,123 @@ function hubHasInflightWork(d: StoryScriptHubNodeData): boolean {
   return hubSectionInflightCount(d) > 0;
 }
 
+function rowRuntimeHasPersistedMedia(rt?: RowRuntimeSlice): boolean {
+  return Boolean(rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim());
+}
+
+/** 与 LibTV 节点扫光一致：组内节点未生成中则顶栏也不计对应列行 */
+function libtvMediaNodeLooksGenerating(data: {
+  uploading?: boolean;
+  blobUrl?: string;
+  ossUrl?: string;
+  runtime?: RowRuntimeSlice;
+}): boolean {
+  const s = data.runtime?.status;
+  const rt = data.runtime;
+  if (data.uploading) {
+    const blob = String(data.blobUrl ?? "").trim();
+    const hasGenTask = Boolean(rt?.taskId?.trim());
+    const genInflight =
+      s === "running" || s === "pending" || s === "queued";
+    if (blob && !hasGenTask && !genInflight) return false;
+    if (s === "done" && rowRuntimeHasPersistedMedia(rt)) return false;
+    return true;
+  }
+  if (s === "done" || s === "error" || s === "idle") return false;
+  if (s === "running" || s === "pending" || s === "queued") return true;
+  if (rowRuntimeHasPersistedMedia(rt)) return false;
+  return false;
+}
+
+function characterRowCountsAsInflight(
+  row: StoryMediaRow,
+  columnId: string,
+  nodes: CanvasFlowNode[],
+): boolean {
+  if (!isCanvasInflightStatus(row.runtime?.status)) return false;
+  const rowKey = row.key?.trim();
+  if (rowKey) {
+    const tv = findPro2CharacterThreeViewNodeForRow(nodes, columnId, rowKey);
+    if (tv) {
+      return libtvMediaNodeLooksGenerating(
+        tv.data as {
+          uploading?: boolean;
+          blobUrl?: string;
+          ossUrl?: string;
+          runtime?: RowRuntimeSlice;
+        },
+      );
+    }
+  }
+  if (rowRuntimeHasPersistedMedia(row.runtime)) {
+    if (row.runtime?.taskId?.trim() || row.runtime?.status === "running") {
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+
 /** 单节点是否仍有进行中的生成（含漫剧列行级 / 文案段 runtime） */
-function storyImageColumnInflightCount(node: CanvasFlowNode): number {
+function storyImageColumnInflightCount(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+): number {
   const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
+  if (isAnyStoryCharacterColumnType(node.type ?? "")) {
+    return rows.filter((r) => characterRowCountsAsInflight(r, node.id, nodes))
+      .length;
+  }
   return rows.filter((r) => isCanvasInflightStatus(r.runtime?.status)).length;
 }
 
-export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
+/** 三视图节点顶栏计数：列行已计或列行已非 in-flight 时不重复计孤儿 node.runtime */
+function pro2ThreeViewNodeCountsAsInflight(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+): boolean {
+  const rt = (node.data as { runtime?: { status?: string } }).runtime?.status;
+  if (!isCanvasInflightStatus(rt)) return false;
+
+  const d = node.data as {
+    pro2ControllerNodeId?: string;
+    pro2RowKey?: string;
+    uploading?: boolean;
+  };
+  const controllerId = d.pro2ControllerNodeId?.trim();
+  const rowKey = d.pro2RowKey?.trim();
+  if (!controllerId || !rowKey) {
+    return isCanvasInflightStatus(rt) || Boolean(d.uploading);
+  }
+
+  const col = nodes.find((n) => n.id === controllerId);
+  const row = (col?.data as { rows?: StoryMediaRow[] }).rows?.find(
+    (r) => r.key === rowKey,
+  );
+  if (row && characterRowCountsAsInflight(row, controllerId, nodes)) {
+    return false;
+  }
+  return libtvMediaNodeLooksGenerating(
+    node.data as {
+      uploading?: boolean;
+      blobUrl?: string;
+      ossUrl?: string;
+      runtime?: RowRuntimeSlice;
+    },
+  );
+}
+
+export function canvasNodeHasInflightWork(
+  node: CanvasFlowNode,
+  allNodes?: CanvasFlowNode[],
+): boolean {
+  const nodes = allNodes ?? [node];
   if (
     isAnyStoryCharacterColumnType(node.type ?? "") ||
     isAnyStorySceneColumnType(node.type ?? "") ||
     isAnyStoryFrameColumnType(node.type ?? "")
   ) {
-    return storyImageColumnInflightCount(node) > 0;
+    return storyImageColumnInflightCount(node, nodes) > 0;
   }
   if (isAnyStoryVideoColumnType(node.type ?? "")) {
     const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
@@ -118,20 +240,14 @@ export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
     ).themeOutlineRuntime?.status;
     if (isCanvasInflightStatus(rt)) return true;
   }
-  if (
-    isLibtvFreestandingImageNode(node) ||
-    node.type === "sbv1-video-engine"
-  ) {
-    const d = node.data as { uploading?: boolean; runtime?: { status?: string } };
-    if (d.uploading) return true;
-  }
+  if (libtvNodeHasUploadingFlag(node)) return true;
   const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
   return isCanvasInflightStatus(top);
 }
 
 /** 仍有进行中生成的节点 id（供任务轮询使用） */
 export function collectCanvasInflightNodeIds(nodes: CanvasFlowNode[]): string[] {
-  return nodes.filter(canvasNodeHasInflightWork).map((n) => n.id);
+  return nodes.filter((n) => canvasNodeHasInflightWork(n, nodes)).map((n) => n.id);
 }
 
 /** 本地 error 但服务端可能已有新 SUBMITTED 任务（重试后前台未同步） */
@@ -167,7 +283,7 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
       isAnyStorySceneColumnType(node.type ?? "") ||
       isAnyStoryFrameColumnType(node.type ?? "")
     ) {
-      count += storyImageColumnInflightCount(node);
+      count += storyImageColumnInflightCount(node, nodes);
       continue;
     }
     if (isAnyStoryVideoColumnType(node.type ?? "")) {
@@ -189,6 +305,10 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
         node.data as { themeOutlineRuntime?: { status?: string } }
       ).themeOutlineRuntime?.status;
       if (isCanvasInflightStatus(rt)) count += 1;
+      continue;
+    }
+    if (node.type === "story-pro2-three-view") {
+      if (pro2ThreeViewNodeCountsAsInflight(node, nodes)) count += 1;
       continue;
     }
     const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
