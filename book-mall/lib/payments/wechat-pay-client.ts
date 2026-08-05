@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import crypto from "crypto";
 import { getWechatPayConfig, readPrivateKey } from "./wechat-pay-config";
 
@@ -25,6 +27,21 @@ function authorization(method: string, urlPath: string, body: string): string {
   );
 }
 
+// ─── 微信支付公钥（用于验签响应和回调） ──────────────────
+
+let _pubKeyCache: string | null = null;
+
+function readWechatPayPublicKey(): string {
+  if (_pubKeyCache) return _pubKeyCache;
+  const cfg = getWechatPayConfig();
+  const resolved = path.resolve(cfg.pubKeyPath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`微信支付公钥文件不存在: ${resolved}`);
+  }
+  _pubKeyCache = fs.readFileSync(resolved, "utf8");
+  return _pubKeyCache;
+}
+
 // ─── HTTP 请求 ──────────────────────────────────────────
 
 interface ApiResponse<T = unknown> {
@@ -46,6 +63,7 @@ async function request<T = unknown>(
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "Accept-Language": "zh-CN",
       Authorization: authorization(method, urlPath, bodyStr),
       "User-Agent": "AI-Mall/1.0",
     },
@@ -78,31 +96,18 @@ async function request<T = unknown>(
 
 function verifyResponseSignature(headers: Record<string, string>, body: string): void {
   const sig = headers["wechatpay-signature"];
-  if (!sig) return; // 部分接口无签名头
+  if (!sig) return;
 
   const timestamp = headers["wechatpay-timestamp"];
   const nonce = headers["wechatpay-nonce"];
-  const serial = headers["wechatpay-serial"];
 
-  if (!timestamp || !nonce || !serial) return;
+  if (!timestamp || !nonce) return;
 
   const message = `${timestamp}\n${nonce}\n${body}\n`;
-  const cert = loadWechatPlatformCert(serial);
+  const pubKey = readWechatPayPublicKey();
 
-  const ok = crypto.createVerify("RSA-SHA256").update(message).verify(cert, sig, "base64");
+  const ok = crypto.createVerify("RSA-SHA256").update(message).verify(pubKey, sig, "base64");
   if (!ok) throw new Error("微信支付响应验签失败");
-}
-
-// ─── 平台证书缓存 ───────────────────────────────────────
-
-let _platformCerts: Map<string, string> | null = null;
-
-function loadWechatPlatformCert(serial: string): string {
-  // 简化实现：先信任（生产环境应下载平台证书并缓存）
-  // 完整实现需调用 /v3/certificates 接口下载微信平台证书
-  const certPath = getWechatPayConfig().certPath;
-  const cert = require("fs").readFileSync(certPath, "utf8");
-  return cert;
 }
 
 // ─── API 接口 ───────────────────────────────────────────
@@ -120,7 +125,7 @@ export async function createNativeOrder(params: {
   const res = await request<{ code_url: string }>("POST", "/v3/pay/transactions/native", {
     appid: cfg.appId,
     mchid: cfg.mchid,
-    description: params.description.slice(0, 42), // 微信要求 ≤42 字符
+    description: params.description.slice(0, 42),
     out_trade_no: params.outTradeNo,
     notify_url: params.notifyUrl || cfg.notifyUrl,
     amount: {
@@ -139,12 +144,12 @@ export async function queryOrder(outTradeNo: string): Promise<{
   tradeStateDesc: string;
 }> {
   const cfg = getWechatPayConfig();
-  const path = `/v3/pay/transactions/out-trade-no/${outTradeNo}?mchid=${cfg.mchid}`;
+  const urlPath = `/v3/pay/transactions/out-trade-no/${outTradeNo}?mchid=${cfg.mchid}`;
   const res = await request<{
     trade_state: string;
     transaction_id?: string;
     trade_state_desc: string;
-  }>("GET", path);
+  }>("GET", urlPath);
 
   return {
     tradeState: res.body.trade_state,
@@ -213,8 +218,9 @@ export function verifyNotifySignature(
   nonce: string,
   body: string,
   signature: string,
+  _serial?: string,
 ): boolean {
   const message = `${timestamp}\n${nonce}\n${body}\n`;
-  const cert = loadWechatPlatformCert("");
-  return crypto.createVerify("RSA-SHA256").update(message).verify(cert, signature, "base64");
+  const pubKey = readWechatPayPublicKey();
+  return crypto.createVerify("RSA-SHA256").update(message).verify(pubKey, signature, "base64");
 }

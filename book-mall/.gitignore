@@ -19,6 +19,8 @@
 # misc
 .DS_Store
 *.pem
+# 例外：微信支付公钥（用于验签，可安全提交）
+!certs/wechat_pay_pub_key.pem
 
 # debug
 npm-debug.log*
@@ -27,8 +29,9 @@ yarn-error.log*
 
 # local env files
 .env*.local
-# 微信支付证书（含私钥，严禁提交）
-certs/
+# 微信支付商户私钥（严禁提交）
+certs/apiclient_cert.pem
+certs/apiclient_key.pem
 
 # vercel
 .vercel
