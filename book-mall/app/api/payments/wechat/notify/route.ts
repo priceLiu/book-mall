@@ -33,9 +33,10 @@ export async function POST(request: Request) {
   const timestamp = request.headers.get("wechatpay-timestamp") ?? "";
   const nonce = request.headers.get("wechatpay-nonce") ?? "";
   const signature = request.headers.get("wechatpay-signature") ?? "";
+  const serial = request.headers.get("wechatpay-serial") ?? "";
 
   // 验签
-  if (!verifyNotifySignature(timestamp, nonce, body, signature)) {
+  if (!(await verifyNotifySignature(timestamp, nonce, body, signature, serial))) {
     console.error("[wechat/notify] 签名验证失败");
     return new NextResponse("SIGNATURE_ERROR", { status: 401 });
   }
@@ -79,20 +80,14 @@ export async function POST(request: Request) {
       return new NextResponse("OK", { status: 200 }); // 已处理，幂等返回
     }
 
-    // 更新 checkout 为已支付
-    await prisma.paymentCheckout.update({
-      where: { id: checkout.id },
-      data: {
-        status: "PAID",
-        confirmMode: "ADMIN_INSTANT",
-        adminNote: `微信支付回调: ${transaction.transaction_id}`,
-        paidAt: transaction.success_time ? new Date(transaction.success_time) : new Date(),
-      },
-    });
-
-    // 执行履约（发放积分/会员等）
+    // 执行履约（发放积分/会员等）—— fulfillPaymentCheckout 内部会在事务中更新状态
     const { fulfillPaymentCheckout } = await import("@/lib/payments/fulfill-checkout");
-    await fulfillPaymentCheckout(checkout.id);
+    await fulfillPaymentCheckout({
+      checkoutId: checkout.id,
+      confirmMode: "ADMIN_INSTANT",
+      confirmedByUserId: checkout.userId,
+      adminNote: `微信支付回调: ${transaction.transaction_id}`,
+    });
 
     console.log(`[wechat/notify] 支付成功: ${outTradeNo} → ${transaction.transaction_id}`);
   } catch (e) {
