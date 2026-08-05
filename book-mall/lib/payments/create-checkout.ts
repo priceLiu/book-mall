@@ -182,8 +182,16 @@ export async function createPaymentCheckout(input: {
             : productKind.startsWith("MEMBERSHIP_")
               ? snap?.planId === productSnapshot.planId
               : false;
-      if (sameProduct) {
+      // 同商品且同金额才复用，金额变化（如调价）则取消旧单建新单
+      if (sameProduct && Number(existingPending.amountYuan) === amountYuan) {
         return existingPending;
+      }
+      // 同商品但金额不同，取消旧订单
+      if (sameProduct) {
+        await tx.paymentCheckout.update({
+          where: { id: existingPending.id },
+          data: { status: "CANCELLED" },
+        });
       }
     }
 
