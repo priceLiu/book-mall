@@ -14,7 +14,8 @@ interface MathCaptchaProps {
 
 /**
  * 加减法图片验证码组件。
- * 用户输入答案后自动验证（600ms 防抖），无需点确认按钮。
+ * 用户输入答案后自动验证（300ms 防抖），验证通过后自动触发 onVerify 回调。
+ * 无需点确认按钮，无需回车。
  */
 export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps) {
   const [question, setQuestion] = useState("");
@@ -55,8 +56,11 @@ export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps)
     };
   }, []);
 
-  function doVerify() {
-    const num = parseInt(answer, 10);
+  /**
+   * 验证答案。接收当前输入值，避免闭包捕获旧 state。
+   */
+  function doVerify(currentValue: string) {
+    const num = parseInt(currentValue, 10);
     if (isNaN(num)) {
       setError("请输入数字答案");
       return;
@@ -87,8 +91,8 @@ export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps)
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (val.length > 0) {
-      // 600ms 防抖后自动验证
-      debounceRef.current = setTimeout(() => doVerify(), 600);
+      // 300ms 防抖后自动验证，直接传值避免闭包陷阱
+      debounceRef.current = setTimeout(() => doVerify(val), 300);
     }
   }
 
@@ -100,9 +104,9 @@ export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps)
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
-        if (!verifiedRef.current && answer.length > 0) {
-          doVerify();
-        }
+      }
+      if (!verifiedRef.current && answer.length > 0) {
+        doVerify(answer);
       }
     }
   }
