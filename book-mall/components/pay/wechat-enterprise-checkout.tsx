@@ -18,10 +18,18 @@ export function WechatEnterpriseCheckout({ checkoutId, amountYuan, description, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 防止重复调用 create-order（React StrictMode 双调用 / 组件重渲染）
+  const creatingRef = useRef(false);
+  const createdRef = useRef(false);
 
   // 创建支付订单
   useEffect(() => {
+    // 已创建过或正在创建中则跳过，避免 FREQUENCY_LIMITED
+    if (createdRef.current || creatingRef.current) return;
+    creatingRef.current = true;
+
     async function create() {
       try {
         const res = await fetch("/api/payments/wechat/create-order", {
@@ -32,6 +40,7 @@ export function WechatEnterpriseCheckout({ checkoutId, amountYuan, description, 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "创建支付订单失败");
         setCodeUrl(data.codeUrl);
+        createdRef.current = true;
 
         // 生成二维码图片
         const qr = await QRCode.toDataURL(data.codeUrl, {
@@ -44,10 +53,12 @@ export function WechatEnterpriseCheckout({ checkoutId, amountYuan, description, 
         setError(e instanceof Error ? e.message : "创建支付订单失败");
       } finally {
         setLoading(false);
+        creatingRef.current = false;
       }
     }
     create();
-  }, [checkoutId, amountYuan, description]);
+    // retryKey 用于手动重试时重新触发 effect
+  }, [checkoutId, amountYuan, description, retryKey]);
 
   // 轮询支付状态
   useEffect(() => {
@@ -86,7 +97,16 @@ export function WechatEnterpriseCheckout({ checkoutId, amountYuan, description, 
       <div className="flex flex-col items-center justify-center py-12 gap-4">
         <XCircle className="h-8 w-8 text-destructive" />
         <p className="text-sm text-destructive">{error}</p>
-        <Button variant="outline" onClick={() => window.location.reload()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            createdRef.current = false;
+            creatingRef.current = false;
+            setRetryKey((k) => k + 1);
+          }}
+        >
           重试
         </Button>
       </div>

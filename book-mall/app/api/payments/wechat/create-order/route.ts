@@ -14,6 +14,15 @@ const bodySchema = z.object({
   description: z.string().min(1).max(42),
 });
 
+// ─── code_url 内存缓存（避免 FREQUENCY_LIMITED） ─────────
+// 微信 Native 支付 code_url 有效期 2 小时，同一 out_trade_no 重复创建会报错
+interface CachedCodeUrl {
+  codeUrl: string;
+  expiresAt: number;
+}
+const codeUrlCache = new Map<string, CachedCodeUrl>();
+const CODE_URL_TTL_MS = 2 * 60 * 60 * 1000; // 2 小时
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -47,13 +56,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "订单状态不允许支付" }, { status: 400 });
     }
 
-    const { codeUrl } = await createNativeOrder({
-      outTradeNo: checkout.outTradeNo,
-      description,
-      amountYuan,
-    });
+    // 1. 检查内存缓存：同一 out_trade_no 的 code_url 在 2 小时内有效
+    const cached = codeUrlCache.get(checkout.outTradeNo);
+    if (cached && Date.now() < cached.expiresAt) {
+      return NextResponse.json({ codeUrl: cached.codeUrl });
+    }
 
-    return NextResponse.json({ codeUrl });
+    // 2. 调用微信 API 创建订单
+    try {
+      const { codeUrl } = await createNativeOrder({
+        outTradeNo: checkout.outTradeNo,
+        description,
+        amountYuan,
+      });
+
+      // 缓存 code_url
+      codeUrlCache.set(checkout.outTradeNo, {
+        codeUrl,
+        expiresAt: Date.now() + CODE_URL_TTL_MS,
+      });
+
+      // 清理过期缓存条目
+      if (codeUrlCache.size > 200) {
+        const now = Date.now();
+        for (const [key, val] of codeUrlCache) {
+          if (now >= val.expiresAt) codeUrlCache.delete(key);
+        }
+      }
+
+      return NextResponse.json({ codeUrl });
+    } catch (e) {
+      // 如果是频率限制错误，尝试返回缓存（可能刚被另一个请求创建）
+      if (e instanceof Error && e.message.includes("FREQUENCY_LIMITED")) {
+        const retryCached = codeUrlCache.get(checkout.outTradeNo);
+        if (retryCached) {
+          return NextResponse.json({ codeUrl: retryCached.codeUrl });
+        }
+      }
+      throw e;
+    }
   } catch (e) {
     console.error("[wechat/create-order]", e);
     const msg = e instanceof Error ? e.message : "创建支付订单失败";
