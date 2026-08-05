@@ -9,6 +9,7 @@ export interface WechatPayConfig {
   serialNo: string;
   certPath: string;
   keyPath: string;
+  pubKeyPath: string;
   notifyUrl: string;
 }
 
@@ -24,13 +25,14 @@ export function getWechatPayConfig(): WechatPayConfig {
   const serialNo = process.env.WECHAT_PAY_SERIAL_NO?.trim();
   const certPath = process.env.WECHAT_PAY_CERT_PATH?.trim();
   const keyPath = process.env.WECHAT_PAY_KEY_PATH?.trim();
+  const pubKeyPath = process.env.WECHAT_PAY_PUB_KEY_PATH?.trim() || "certs/wechat_pay_pub_key.pem";
   const notifyUrl = process.env.WECHAT_PAY_NOTIFY_URL?.trim();
 
   if (!mchid || !appId || !apiV3Key || !serialNo || !certPath || !keyPath || !notifyUrl) {
     throw new Error("微信支付配置不完整，请检查 WECHAT_PAY_* 环境变量（需包含 APP_ID）");
   }
 
-  _config = { mchid, mchName: mchName ?? "", appId, apiV3Key, serialNo, certPath, keyPath, notifyUrl };
+  _config = { mchid, mchName: mchName ?? "", appId, apiV3Key, serialNo, certPath, keyPath, pubKeyPath, notifyUrl };
   return _config;
 }
 
