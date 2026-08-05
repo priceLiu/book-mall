@@ -29,19 +29,15 @@ export async function GET(request: Request) {
 
     const result = await queryOrder(checkout.outTradeNo);
 
-    // 如果微信侧已支付但本地还没更新，主动更新
+    // 如果微信侧已支付但本地还没履约，执行履约（发放积分等）
     if (result.tradeState === "SUCCESS" && checkout.status !== "PAID") {
-      await prisma.paymentCheckout.update({
-        where: { id: checkout.id },
-        data: {
-          status: "PAID",
-          confirmMode: "ADMIN_INSTANT",
-          adminNote: `主动查询确认: ${result.transactionId}`,
-          paidAt: new Date(),
-        },
-      });
       const { fulfillPaymentCheckout } = await import("@/lib/payments/fulfill-checkout");
-      await fulfillPaymentCheckout(checkout.id);
+      await fulfillPaymentCheckout({
+        checkoutId: checkout.id,
+        confirmMode: "ADMIN_INSTANT",
+        confirmedByUserId: session.user.id,
+        adminNote: `微信支付查询确认: ${result.transactionId}`,
+      });
     }
 
     return NextResponse.json({
