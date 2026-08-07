@@ -625,7 +625,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
           </div>
         )}
         {isGenerating ? (
-          <LibtvMediaGeneratingState variant="violet" className="z-10" />
+          <LibtvMediaGeneratingState variant="violet" className="z-10" cancelNodeId={id} />
         ) : null}
       </div>
       </div>

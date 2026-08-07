@@ -591,7 +591,7 @@ function Pro2SelectionBatchConnectLayerInner({
   return (
     <>
       <div
-        className="pointer-events-none fixed z-[2090] rounded-sm border border-dashed border-white/40"
+        className="pointer-events-none fixed z-[1500] rounded-sm border border-dashed border-white/40"
         style={{
           left: boxLeft,
           top: boxTop,

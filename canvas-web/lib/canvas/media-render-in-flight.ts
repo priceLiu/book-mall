@@ -52,6 +52,15 @@ export function clearMediaRenderPollDismiss(nodeId: string) {
 }
 
 export function friendlyMediaRenderError(message: string): string {
+  if (/401|UNAUTHORIZED|工具站登录|无效或过期的工具令牌|重新连接主站/i.test(message)) {
+    return "登录连接已断开，请稍候重试；若仍失败请刷新页面或重新连接主站账号。";
+  }
+  if (/aborted|abort/i.test(message)) {
+    return "提交剪辑超时，请稍后重试；若多次失败请检查 book-mall 是否正常运行。";
+  }
+  if (/已被同一项目的新剪辑任务取代/i.test(message)) {
+    return "请勿重复提交剪辑；当前任务仍在进行，请等待完成。";
+  }
   if (/Gateway API Key|GATEWAY_KEY_REQUIRED/i.test(message)) {
     return "须先关联 Gateway API Key 方可使用语音识别烧字幕。";
   }
@@ -95,6 +104,54 @@ export function isMediaRenderJobInflight(
 ): boolean {
   if (!inFlight?.jobId?.trim()) return false;
   return inFlight.status === "PENDING" || inFlight.status === "RUNNING";
+}
+
+/** 画布任一节点的自动剪辑进行中 → tasks 轮询应退避，避免与 FFmpeg/保存抢 DB */
+export function hasAnyMediaRenderInFlight(
+  nodes: ReadonlyArray<{ data?: Record<string, unknown> }>,
+): boolean {
+  return nodes.some((n) =>
+    isMediaRenderJobInflight(
+      n.data?.mediaRenderInFlight as JianyingMediaRenderInFlight | null | undefined,
+    ),
+  );
+}
+
+export function isTransientMediaRenderPollError(message: string): boolean {
+  return (
+    /连接中断|进度查询暂时失败|failed to fetch|book_mall_proxy|502|503|504|ECONNRESET|ETIMEDOUT|abort|timeout/i.test(
+      message,
+    ) && !/下载分镜视频失败|语音识别失败|积分冻结|Gateway API Key/i.test(message)
+  );
+}
+
+/** 提交占位 / 无效 inFlight（历史落盘 bug） */
+export function isStaleMediaRenderInFlight(
+  inFlight: JianyingMediaRenderInFlight | null | undefined,
+): boolean {
+  if (!inFlight) return false;
+  const jobId = inFlight.jobId?.trim() ?? "";
+  return !jobId || jobId === "pending";
+}
+
+/** hydrate：清掉落盘残留的 pending，避免永远卡在「提交任务」 */
+export function clearStaleMediaRenderInFlightInNodes<
+  T extends { data?: Record<string, unknown> },
+>(nodes: T[]): T[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    const inflight = n.data?.mediaRenderInFlight as
+      | JianyingMediaRenderInFlight
+      | null
+      | undefined;
+    if (!isStaleMediaRenderInFlight(inflight)) return n;
+    changed = true;
+    return {
+      ...n,
+      data: { ...(n.data ?? {}), mediaRenderInFlight: null },
+    };
+  });
+  return changed ? next : nodes;
 }
 
 export async function pollMediaRenderJobUntilDone(args: {

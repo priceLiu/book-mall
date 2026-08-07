@@ -29,6 +29,7 @@ import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import { LazyViewportImage, LazyViewportVideo } from "../lazy-viewport-media";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { useMediaRenderCancel } from "@/lib/canvas/use-media-render-cancel";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 
@@ -55,6 +56,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     renderInFlight &&
     (Boolean(d.mediaRenderInFlight?.progressLabel?.trim()) || !hasVideo);
   const title = d.label?.trim() || "自动成片";
+  const { requestCancel: requestMediaRenderCancel } = useMediaRenderCancel(id);
   const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
   const stageVideoFitClass = "object-contain";
 
@@ -154,7 +156,10 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             style={{ backgroundColor: LIBTV_INPUT_DOCK_BG }}
           >
             {ffmpegPhase ? (
-              <LibtvMediaGeneratingState variant="cyan" />
+              <LibtvMediaGeneratingState
+                variant="cyan"
+                onCancel={() => void requestMediaRenderCancel()}
+              />
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
                 {posterUrl ? (

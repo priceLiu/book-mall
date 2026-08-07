@@ -70,6 +70,7 @@ export function useLibtvRuntimeErrorBanner(opts: {
       opts.hasMedia ||
       opts.status !== "error" ||
       !msg ||
+      opts.failCode?.trim() === "USER_CANCELLED" ||
       isMislabeledVendorSuccessError(opts.failCode, msg) ||
       msg.includes("视频已生成但未写入节点")
     ) {

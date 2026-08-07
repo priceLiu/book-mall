@@ -43,6 +43,7 @@ import {
 import {
   findPromotableCanvasGatewayLog,
   promoteCanvasTaskFromGatewayLog,
+  resolveCanvasGatewaySubmitCollision,
 } from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
 import { getDispatchSubmitTimeoutMs } from "@/lib/generation/traffic-control/constants";
 
@@ -338,6 +339,17 @@ export async function dispatchCanvasImageQueuedTask(
           syncGatewaySubmit: true,
         });
       }
+      return "skipped";
+    }
+
+    const collision = await resolveCanvasGatewaySubmitCollision({
+      taskId: task.id,
+      payload: taskInputPayload(claimedTask!),
+      scopeKey,
+    });
+    if (collision === "dispatched") return "dispatched";
+    if (collision === "in_flight") {
+      await deps.releaseTrafficSlot(scopeKey);
       return "skipped";
     }
 

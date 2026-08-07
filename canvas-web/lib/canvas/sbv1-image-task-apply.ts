@@ -3,7 +3,12 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasNodeRuntime } from "./types";
+import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
 import { formatCanvasTaskError } from "./friendly-task-error";
+import { isCanvasManagedOssUrl } from "./canvas-managed-oss-url";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 
 function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
@@ -24,14 +29,15 @@ export function sbv1ImagePatchFromTask(
   prev: Sbv1ImageNodeData,
   task: CanvasTaskRecord,
 ): Record<string, unknown> | null {
-  const mediaUrl = pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined;
-
   if (task.status === "SUCCEEDED") {
     const hadImage = Boolean(prev.ossUrl?.trim() || prev.blobUrl?.trim());
+    const taskOss = task.ossUrl?.trim();
+    const managedOss = isCanvasManagedOssUrl(taskOss) ? taskOss : undefined;
+    const runtimeOss = managedOss ?? taskOss ?? undefined;
     return {
-      ...(mediaUrl
+      ...(managedOss
         ? {
-            ossUrl: mediaUrl,
+            ossUrl: managedOss,
             blobUrl: undefined,
             imageMode: hadImage ? "img2img" : "txt2img",
           }
@@ -41,7 +47,7 @@ export function sbv1ImagePatchFromTask(
       runtime: {
         status: "done",
         taskId: task.id,
-        ossUrl: mediaUrl,
+        ossUrl: runtimeOss,
         ephemeralUrl: task.ephemeralUrl ?? undefined,
         failCode: undefined,
         failMessage: undefined,
@@ -50,6 +56,13 @@ export function sbv1ImagePatchFromTask(
   }
 
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return {
+        uploading: false,
+        uploadError: undefined,
+        runtime: canvasIdleRuntimeAfterUserCancel(task.id),
+      };
+    }
     return {
       uploading: false,
       uploadError: undefined,
@@ -122,6 +135,13 @@ export function sbv1VideoPatchFromTask(
   }
 
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return {
+        uploading: false,
+        uploadError: undefined,
+        runtime: canvasIdleRuntimeAfterUserCancel(task.id),
+      };
+    }
     return {
       uploading: false,
       uploadError: undefined,

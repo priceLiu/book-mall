@@ -16,6 +16,33 @@ describe("isGatewayImageModelKey", () => {
 });
 
 describe("formatCanvasTaskError", () => {
+  it("maps auth failures to re-login hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "401 UNAUTHORIZED",
+        "happyhorse-1.1-t2v",
+      ),
+    ).toBe("登录状态已过期，请刷新页面或重新连接主站账号后再生成。");
+  });
+
+  it("maps db/proxy overload to system busy (not model unavailable)", () => {
+    expect(
+      formatCanvasTaskError(
+        "SYSTEM_BUSY",
+        "503 服务繁忙，请稍后再试",
+        "happyhorse-1.1-t2v",
+      ),
+    ).toContain("系统繁忙或主站连接异常");
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "503 DATABASE_UNAVAILABLE",
+        "happyhorse-1.1-t2v",
+      ),
+    ).toContain("系统繁忙或主站连接异常");
+  });
+
   it("short image timeout message without Gemini hint", () => {
     expect(
       formatCanvasTaskError(

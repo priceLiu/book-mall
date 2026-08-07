@@ -2,6 +2,10 @@
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { CanvasNodeRuntime } from "./types";
+import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
@@ -46,6 +50,13 @@ export function libtvAudioPatchFromTask(
   }
 
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return {
+        uploading: false,
+        uploadError: undefined,
+        runtime: canvasIdleRuntimeAfterUserCancel(task.id),
+      };
+    }
     return {
       uploading: false,
       uploadError: undefined,

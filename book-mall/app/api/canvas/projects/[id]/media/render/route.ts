@@ -1,4 +1,6 @@
-import { MediaRenderSourceApp } from "@prisma/client";
+import {
+  MediaRenderSourceApp,
+} from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 
 import {
@@ -12,6 +14,7 @@ import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { CanvasProjectError, getCanvasProjectForUser } from "@/lib/canvas/canvas-project-service";
 import { fromCanvasJianyingFrames } from "@/lib/media/timeline-adapters";
 import {
+  buildPendingMediaRenderJobDto,
   createMediaRenderJob,
   enqueueMediaRenderJob,
   getMediaRenderJobForUser,
@@ -48,15 +51,35 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     await getCanvasProjectForUser(guard.user.id, projectId);
     const timeline = fromCanvasJianyingFrames(frames);
     const profile = parseRenderProfile(body.body.profile);
+    const replaceInFlight = body.body.replaceInFlight === true;
     const job = await createMediaRenderJob({
       userId: guard.user.id,
       sourceApp: MediaRenderSourceApp.canvas,
       sourceRef: { projectId },
       timeline,
       profile,
+      replaceInFlight,
     });
-    enqueueMediaRenderJob(job.id);
+    if (!job.reusedExisting) {
+      enqueueMediaRenderJob(job.id);
+      return NextResponse.json(
+        {
+          job: buildPendingMediaRenderJobDto({
+            id: job.id,
+            userId: guard.user.id,
+            expiresAt: job.expiresAt,
+          }),
+        },
+        { headers: jsonHeaders(request) },
+      );
+    }
     const dto = await getMediaRenderJobForUser(job.id, guard.user.id);
+    if (!dto) {
+      return NextResponse.json(
+        { error: "NOT_FOUND", message: "剪辑任务不存在" },
+        { status: 404, headers: jsonHeaders(request) },
+      );
+    }
     return NextResponse.json({ job: dto }, { headers: jsonHeaders(request) });
   } catch (err) {
     if (err instanceof CanvasProjectError) {

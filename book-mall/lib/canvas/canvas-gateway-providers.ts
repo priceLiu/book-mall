@@ -348,21 +348,37 @@ export async function listGatewayVirtualProvidersForUser(
   return out;
 }
 
+export type ListCanvasProvidersOpts = {
+  /**
+   * 跳过 identity/platform-key ensure（会打多轮 DB）。
+   * 画布打开时的列表请求应设 true，避免连接池紧张时拖到 180s。
+   */
+  skipEnsure?: boolean;
+};
+
 /** Canvas / Story 模型列表：平台代付 = 上架模型 + Gateway 虚拟 Provider（含 sbv1 火山 VIDEO） */
-export async function listCanvasProvidersForUser(userId: string): Promise<CanvasProviderDto[]> {
-  try {
-    await ensureBookUserGatewayIdentitySynced(userId);
-  } catch (e) {
-    console.warn("[listCanvasProvidersForUser] gateway identity sync failed", e);
+export async function listCanvasProvidersForUser(
+  userId: string,
+  opts?: ListCanvasProvidersOpts,
+): Promise<CanvasProviderDto[]> {
+  const skipEnsure = opts?.skipEnsure === true;
+  if (!skipEnsure) {
+    try {
+      await ensureBookUserGatewayIdentitySynced(userId);
+    } catch (e) {
+      console.warn("[listCanvasProvidersForUser] gateway identity sync failed", e);
+    }
   }
 
   const persona = await getUserBillingPersona(userId);
 
   if (persona === "PLATFORM_CREDIT") {
-    try {
-      await ensurePlatformManagedKeyForUser(userId);
-    } catch (e) {
-      console.warn("[listCanvasProvidersForUser] platform key ensure failed", e);
+    if (!skipEnsure) {
+      try {
+        await ensurePlatformManagedKeyForUser(userId);
+      } catch (e) {
+        console.warn("[listCanvasProvidersForUser] platform key ensure failed", e);
+      }
     }
     const [offerings, gateway] = await Promise.all([
       listPlatformOfferingProvidersForUser(userId),

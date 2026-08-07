@@ -52,6 +52,7 @@ import { clearDispatchStaleRetryInPayload } from "./pre-submit-retry";
 import {
   findPromotableCanvasGatewayLog,
   promoteCanvasTaskFromGatewayLog,
+  resolveCanvasGatewaySubmitCollision,
 } from "./canvas-orphan-gateway-log";
 
 function taskInputPayload(
@@ -372,6 +373,21 @@ async function dispatchOneCanvasQueuedTask(
 
     // 幂等守卫：若上一次提交「超时但其实成功」，已存在带本 task.id 的厂商日志 →
     // 直接 promote 成 SUBMITTED，绝不重复 createTask（避免重复扣费 + 假性失败）。
+    const collision = await resolveCanvasGatewaySubmitCollision({
+      taskId: task.id,
+      payload: taskInputPayload(claimedTask!),
+      scopeKey: scope.scopeKey,
+    });
+    if (collision === "dispatched") return "dispatched";
+    if (collision === "in_flight") {
+      console.warn(
+        "[canvas-dispatch] skip duplicate submit; gateway log in flight",
+        task.id.slice(0, 12),
+      );
+      await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
+
     const orphan = await findPromotableCanvasGatewayLog(task.id);
     if (orphan) {
       const promoted = await promoteCanvasTaskFromGatewayLog({

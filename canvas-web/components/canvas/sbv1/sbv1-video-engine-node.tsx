@@ -656,6 +656,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               <LibtvMediaGeneratingState
                 variant={isPro2VideoBoardCell ? "violet" : "cyan"}
                 tone={isBackground ? "background" : "active"}
+                cancelNodeId={id}
               >
                 {hasVideo ? (
                   posterUrl?.trim() ? (

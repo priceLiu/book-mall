@@ -1,3 +1,8 @@
+import { createWriteStream } from "fs";
+import { Transform } from "stream";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
+
 import { mkdtemp, rm, stat, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -36,16 +41,40 @@ async function fetchToFile(
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const res = await fetch(url, {
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(180_000),
       });
       if (!res.ok) {
         throw new Error(`下载失败 HTTP ${res.status}: ${url}`);
       }
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.byteLength > maxBytes) {
+      const contentLength = Number(res.headers.get("content-length") ?? "0");
+      if (contentLength > maxBytes) {
         throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
       }
-      await writeFile(dest, buf);
+      const body = res.body;
+      if (!body) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.byteLength > maxBytes) {
+          throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
+        }
+        await writeFile(dest, buf);
+        return;
+      }
+      let received = 0;
+      const limiter = new Transform({
+        transform(chunk: Buffer, _enc, cb) {
+          received += chunk.length;
+          if (received > maxBytes) {
+            cb(new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`));
+            return;
+          }
+          cb(null, chunk);
+        },
+      });
+      await pipeline(
+        Readable.fromWeb(body as import("stream/web").ReadableStream),
+        limiter,
+        createWriteStream(dest),
+      );
       return;
     } catch (err) {
       lastErr = err;

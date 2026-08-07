@@ -27,6 +27,7 @@ export type Pro2CharacterBoardCellProps = {
   row: StoryProCharacterRow;
   focused?: boolean;
   onSelect?: () => void;
+  cancelScope?: import("@/lib/canvas/canvas-run-bus").CanvasCancelGenerationJob;
 };
 
 /** 人物设计板单格（与分镜图板图 4 同构） */
@@ -34,6 +35,7 @@ export function Pro2CharacterBoardCell({
   row,
   focused,
   onSelect,
+  cancelScope,
 }: Pro2CharacterBoardCellProps) {
   const url = threeViewUrl(row);
   const st = pro2CharacterCellStatus(row);
@@ -91,7 +93,11 @@ export function Pro2CharacterBoardCell({
         </div>
       ) : st === "running" ? (
         <div className="relative min-h-[160px] flex-1">
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState
+            variant="violet"
+            cancelNodeId={cancelScope?.nodeId}
+            cancelScope={cancelScope}
+          />
         </div>
       ) : st === "error" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">

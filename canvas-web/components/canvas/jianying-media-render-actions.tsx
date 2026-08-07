@@ -11,10 +11,15 @@ import {
   type JianyingExportFrame,
   type MediaRenderJob,
   type MediaRenderScaleMode,
+  cancelMediaRenderJob,
   resolveMediaRenderDownloadUrl,
   retryMediaRenderUpload,
   submitMediaRender,
 } from "@/lib/canvas-api";
+import {
+  MEDIA_RENDER_CANCEL_CONFIRM_MESSAGE,
+  MEDIA_RENDER_CANCEL_CONFIRM_TITLE,
+} from "@/lib/canvas/canvas-generation-cancel-messages";
 import {
   clearMediaRenderPollDismiss,
   dismissMediaRenderPoll,
@@ -22,6 +27,8 @@ import {
   isMediaRenderJobInflight,
   isMediaRenderJobPolling,
   isMediaRenderPollDismissed,
+  isStaleMediaRenderInFlight,
+  isTransientMediaRenderPollError,
   pollMediaRenderJobUntilDone,
   renderStatusLabel,
   type JianyingMediaRenderInFlight,
@@ -138,6 +145,7 @@ export function JianyingMediaRenderActions({
   const [uploadFailed, setUploadFailed] = useState(false);
   const [syncDismissed, setSyncDismissed] = useState(false);
   const [retrySyncPending, setRetrySyncPending] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [busy, setBusy] = useState(() => isMediaRenderJobInflight(inFlight));
 
   const settingsRef = useRef({
@@ -148,6 +156,11 @@ export function JianyingMediaRenderActions({
     subtitleMode,
   });
   const downloadableRef = useRef<string | null>(doneUrl);
+  const doneUrlRef = useRef<string | null>(doneUrl);
+  const progressRef = useRef<number | null>(
+    isMediaRenderJobInflight(inFlight) ? inFlight?.progress ?? 0 : null,
+  );
+  const submittingRef = useRef(false);
   const syncDismissedRef = useRef(false);
   /** 停止等待后仍保留 jobId，供「重试云端同步」；不写回 inFlight 以免恢复轮询 */
   const stoppedJobIdRef = useRef<string | null>(null);
@@ -158,6 +171,8 @@ export function JianyingMediaRenderActions({
     burnIn,
     subtitleMode,
   };
+  doneUrlRef.current = doneUrl;
+  progressRef.current = progress;
 
   const videoFrames = frames.filter((f) => f.videoUrl);
   const canRender = Boolean(base && projectId && videoFrames.length >= 1);
@@ -165,7 +180,11 @@ export function JianyingMediaRenderActions({
 
   const patchInFlight = useCallback(
     (patch: JianyingMediaRenderInFlight | null) => {
-      updateNodeData(nodeId, { mediaRenderInFlight: patch });
+      updateNodeData(
+        nodeId,
+        { mediaRenderInFlight: patch },
+        { sessionOnly: true },
+      );
     },
     [nodeId, updateNodeData],
   );
@@ -173,6 +192,21 @@ export function JianyingMediaRenderActions({
   useEffect(() => {
     syncDismissedRef.current = syncDismissed;
   }, [syncDismissed]);
+
+  useEffect(() => {
+    const onExternalCancel = (ev: Event) => {
+      const e = ev as CustomEvent<{ nodeId?: string }>;
+      if (e.detail?.nodeId !== nodeId) return;
+      setBusy(false);
+      setProgress(null);
+      setStepLabel(null);
+      setSyncDismissed(false);
+      syncDismissedRef.current = false;
+    };
+    window.addEventListener("canvas:media-render-cancelled", onExternalCancel);
+    return () =>
+      window.removeEventListener("canvas:media-render-cancelled", onExternalCancel);
+  }, [nodeId]);
 
   useEffect(() => {
     if (isMediaRenderJobInflight(inFlight)) {
@@ -249,7 +283,7 @@ export function JianyingMediaRenderActions({
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
       const dismissed = syncDismissedRef.current;
       if (!dismissed) {
-        setProgress(job.progress);
+        setProgress((prev) => Math.max(prev ?? 0, job.progress));
       }
       const localUrl = base ? resolveMediaRenderDownloadUrl(base, job) : null;
       const localReady = Boolean(localUrl && job.localDownloadPath?.trim());
@@ -284,7 +318,13 @@ export function JianyingMediaRenderActions({
           setStepLabel(renderStatusLabel(job));
         }
       } else if (!dismissed) {
-        setStepLabel(renderStatusLabel(job));
+        const nextLabel = renderStatusLabel(job);
+        const cur = progressRef.current ?? 0;
+        if (cur > 5 && /排队/.test(nextLabel) && job.status === "PENDING") {
+          setStepLabel((prev) => prev ?? nextLabel);
+        } else {
+          setStepLabel(nextLabel);
+        }
       }
       if (job.status === "PENDING" || job.status === "RUNNING") {
         const settings = settingsRef.current;
@@ -381,6 +421,18 @@ export function JianyingMediaRenderActions({
     [applyJobProgress, base, finishJob, nodeId],
   );
 
+  // 历史落盘 bug：jobId=pending 会永远卡在「提交任务」且无法轮询（只清一次，勿清掉本次提交占位）
+  const clearedStalePendingRef = useRef(false);
+  useEffect(() => {
+    if (clearedStalePendingRef.current) return;
+    if (!isStaleMediaRenderInFlight(inFlight)) return;
+    clearedStalePendingRef.current = true;
+    patchInFlight(null);
+    setBusy(false);
+    setProgress(null);
+    setStepLabel(null);
+  }, [inFlight, patchInFlight]);
+
   useEffect(() => {
     if (!base || !isMediaRenderJobInflight(inFlight)) return;
     const jobId = inFlight!.jobId.trim();
@@ -405,16 +457,23 @@ export function JianyingMediaRenderActions({
       })
       .catch((e) => {
         if (cancelled || isMediaRenderPollDismissed(nodeId, jobId)) return;
-        const message = friendlyMediaRenderError(
-          e instanceof Error ? e.message : String(e),
-        );
-        if (downloadableRef.current || doneUrl) {
+        const raw = e instanceof Error ? e.message : String(e);
+        const message = friendlyMediaRenderError(raw);
+        if (isTransientMediaRenderPollError(message)) {
+          setStepLabel("连接中断，正在重试…");
+          window.setTimeout(() => {
+            if (cancelled || isMediaRenderPollDismissed(nodeId, jobId)) return;
+            void runTrackedJob(jobId).catch(() => undefined);
+          }, 5000);
+          return;
+        }
+        if (downloadableRef.current || doneUrlRef.current) {
           setUploadFailed(true);
           setStepLabel("云端同步中断，可重试");
           patchInFlight({
             jobId,
             status: "RUNNING",
-            progress: inFlight?.progress ?? progress ?? 90,
+            progress: progressRef.current ?? 90,
             progressLabel: null,
             errorMessage: message,
             ...settingsRef.current,
@@ -424,8 +483,8 @@ export function JianyingMediaRenderActions({
         patchInFlight({
           jobId,
           status: "FAILED",
-          progress: inFlight?.progress ?? 0,
-          progressLabel: inFlight?.progressLabel ?? null,
+          progress: progressRef.current ?? 0,
+          progressLabel: null,
           errorMessage: message,
           ...settingsRef.current,
         });
@@ -440,6 +499,7 @@ export function JianyingMediaRenderActions({
     return () => {
       cancelled = true;
     };
+    // 仅在 job 身份变化时重启轮询；勿把 progress 放进 deps（会每秒 cancel 风暴）
   }, [
     base,
     inFlight?.jobId,
@@ -447,14 +507,28 @@ export function JianyingMediaRenderActions({
     nodeId,
     patchInFlight,
     runTrackedJob,
-    inFlight?.progress,
-    inFlight?.progressLabel,
-    doneUrl,
-    progress,
     showRenderError,
   ]);
 
+  // 剪辑轮询被 tasks 风暴挤占连接池时会假死：watchdog 检测并重启
+  useEffect(() => {
+    if (!base || !busy) return;
+    const jobId = inFlight?.jobId?.trim();
+    if (!jobId || jobId === "pending") return;
+    if (isMediaRenderPollDismissed(nodeId, jobId)) return;
+
+    const watchdog = window.setInterval(() => {
+      if (submittingRef.current) return;
+      if (isMediaRenderPollDismissed(nodeId, jobId)) return;
+      if (isMediaRenderJobPolling(nodeId, jobId)) return;
+      void runTrackedJob(jobId).catch(() => undefined);
+    }, 10_000);
+
+    return () => window.clearInterval(watchdog);
+  }, [base, busy, inFlight?.jobId, nodeId, runTrackedJob]);
+
   const onRender = async () => {
+    if (submittingRef.current) return;
     if (busy && !syncDismissed) {
       await dialogs.alert({
         title: "请稍候",
@@ -498,6 +572,8 @@ export function JianyingMediaRenderActions({
       return;
     }
 
+    submittingRef.current = true;
+    setSubmitting(true);
     clearMediaRenderPollDismiss(nodeId);
     stoppedJobIdRef.current = null;
     setUploadFailed(false);
@@ -508,19 +584,28 @@ export function JianyingMediaRenderActions({
     setExpiresAt(null);
     setProgress(0);
     setStepLabel("提交任务…");
-    // 立刻写入 inFlight（progressLabel 非空 → 节点扫光）；旧成片保留作底，本地成片就绪后再替换
-    updateNodeData(nodeId, {
-      mediaRenderInFlight: {
-        jobId: "pending",
-        status: "PENDING",
-        progress: 0,
-        progressLabel: "提交任务…",
-        transitionKind,
-        transitionSec,
-        scaleMode,
-        burnIn,
-        subtitleMode,
+    // 不在此处 refresh：BFF 代理会静默续签；introspect 在 DB 拥堵时可达 5～13s，会假死在「提交任务」
+    // 会话态占位（已从落盘剥离）；仅用于节点扫光与 Dock 进度
+    updateNodeData(
+      nodeId,
+      {
+        mediaRenderInFlight: {
+          jobId: "pending",
+          status: "PENDING",
+          progress: 0,
+          progressLabel: "提交任务…",
+          transitionKind,
+          transitionSec,
+          scaleMode,
+          burnIn,
+          subtitleMode,
+        },
       },
+      { sessionOnly: true },
+    );
+    // 让「提交中…」先绘制，再发 POST（避免 3s 内按钮无反馈）
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
     });
     try {
       const transition =
@@ -538,22 +623,32 @@ export function JianyingMediaRenderActions({
           video: { scaleMode },
         },
       });
+      submittingRef.current = false;
+      setSubmitting(false);
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
+      // 立刻换成真实 jobId，避免一直停在 pending
       applyJobProgress(job);
+      setStepLabel(renderStatusLabel(job));
+      setProgress((prev) => Math.max(prev ?? 0, job.progress));
       const outcome = await runTrackedJob(job.id);
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
       if (outcome === "failed") {
         await showRenderError("云端剪辑失败，请稍后重试；若多次失败请刷新页面后再试。");
       }
     } catch (e) {
-      if (syncDismissedRef.current) return;
+      if (syncDismissedRef.current) {
+        patchInFlight(null);
+        return;
+      }
       const message = friendlyMediaRenderError(
         e instanceof Error ? e.message : String(e),
       );
       patchInFlight(null);
       await showRenderError(message);
     } finally {
-      if (!syncDismissedRef.current) setBusy(false);
+      submittingRef.current = false;
+      setSubmitting(false);
+      setBusy(false);
     }
   };
 
@@ -619,23 +714,39 @@ export function JianyingMediaRenderActions({
     }
   };
 
-  const ffmpegBusy = busy && !doneUrl;
+  const ffmpegBusy = (busy && !doneUrl) || submitting;
   const backgroundSync =
     Boolean(doneUrl) &&
     isMediaRenderJobInflight(inFlight) &&
     !uploadFailed &&
     !syncDismissed;
-  const settingsLocked = ffmpegBusy;
+  const settingsLocked = ffmpegBusy || submitting;
   const retryJobId =
     inFlight?.jobId?.trim() || stoppedJobIdRef.current?.trim() || "";
   const showRetryUpload =
     Boolean(retryJobId) &&
     Boolean(doneUrl) &&
     (uploadFailed || backgroundSync || syncDismissed);
-  const showProgress = (ffmpegBusy || backgroundSync) && !syncDismissed;
+  const showProgress =
+    (ffmpegBusy || backgroundSync || submitting) && !syncDismissed;
 
-  const onStopBackgroundSync = () => {
+  const onStopBackgroundSync = async () => {
+    if (
+      !(await dialogs.confirm({
+        title: MEDIA_RENDER_CANCEL_CONFIRM_TITLE,
+        message: MEDIA_RENDER_CANCEL_CONFIRM_MESSAGE,
+      }))
+    ) {
+      return;
+    }
     const jobId = inFlight?.jobId?.trim() || null;
+    if (jobId && jobId !== "pending" && base?.trim()) {
+      try {
+        await cancelMediaRenderJob(base, jobId);
+      } catch {
+        /* 本地仍停止等待 */
+      }
+    }
     if (jobId) {
       dismissMediaRenderPoll(nodeId, jobId);
       stoppedJobIdRef.current = jobId;
@@ -646,7 +757,32 @@ export function JianyingMediaRenderActions({
     syncDismissedRef.current = true;
     setProgress(null);
     setStepLabel(null);
-    // 清空进行中标记，避免恢复轮询把 Dock 锁死 / 弹失败框
+    patchInFlight(null);
+  };
+
+  const onStopFfmpeg = async () => {
+    if (
+      !(await dialogs.confirm({
+        title: MEDIA_RENDER_CANCEL_CONFIRM_TITLE,
+        message: MEDIA_RENDER_CANCEL_CONFIRM_MESSAGE,
+      }))
+    ) {
+      return;
+    }
+    const jobId = inFlight?.jobId?.trim() || null;
+    if (jobId && jobId !== "pending" && base?.trim()) {
+      try {
+        await cancelMediaRenderJob(base, jobId);
+      } catch {
+        /* 本地仍停止等待 */
+      }
+    }
+    if (jobId) dismissMediaRenderPoll(nodeId, jobId);
+    setBusy(false);
+    setProgress(null);
+    setStepLabel(null);
+    setSyncDismissed(true);
+    syncDismissedRef.current = true;
     patchInFlight(null);
   };
 
@@ -672,6 +808,19 @@ export function JianyingMediaRenderActions({
           style={{ width: `${Math.max(2, progress ?? 0)}%` }}
         />
       </div>
+      {ffmpegBusy ? (
+        <button
+          type="button"
+          className="nodrag self-end rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/75 transition hover:bg-white/10"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            void onStopFfmpeg();
+          }}
+        >
+          中止剪辑
+        </button>
+      ) : null}
     </div>
   ) : null;
 
@@ -691,7 +840,11 @@ export function JianyingMediaRenderActions({
       }}
     >
       <Clapperboard className="size-4 shrink-0" />
-      {ffmpegBusy ? "剪辑中…" : "自动剪辑成片（MP4）"}
+      {submitting
+        ? "提交中…"
+        : ffmpegBusy
+          ? "剪辑中…"
+          : "自动剪辑成片（MP4）"}
     </button>
   );
 
@@ -721,7 +874,7 @@ export function JianyingMediaRenderActions({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
-          onStopBackgroundSync();
+          void onStopBackgroundSync();
         }}
       >
         停止等待

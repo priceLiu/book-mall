@@ -30,6 +30,7 @@ export type Pro2FrameBoardCellProps = {
   focused?: boolean;
   onSelect: () => void;
   cellId?: string;
+  cancelScope?: import("@/lib/canvas/canvas-run-bus").CanvasCancelGenerationJob;
 };
 
 /** 分镜图板单格（图 4：大图 + 完整失败信息 + TaskID） */
@@ -38,6 +39,7 @@ export function Pro2FrameBoardCell({
   focused,
   onSelect,
   cellId,
+  cancelScope,
 }: Pro2FrameBoardCellProps) {
   const url = frameImageUrl(row);
   const st = pro2FrameCellStatus(row);
@@ -89,7 +91,11 @@ export function Pro2FrameBoardCell({
         </div>
       ) : st === "running" ? (
         <div className="relative min-h-[160px] flex-1">
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState
+            variant="violet"
+            cancelNodeId={cancelScope?.nodeId}
+            cancelScope={cancelScope}
+          />
         </div>
       ) : st === "error" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">

@@ -27,6 +27,7 @@ import {
   CANVAS_VIEWPORT_MIN_ZOOM,
 } from "@/lib/canvas/canvas-viewport-zoom";
 import { flushCanvasTextDrafts } from "@/lib/canvas/flush-text-drafts";
+import { CANVAS_COMMIT_NODE_POSITIONS_EVENT } from "@/lib/canvas/canvas-commit-node-positions";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   augmentStoreChangesWithResizePositions,
@@ -591,7 +592,10 @@ function FlowCanvasInner({
   useEffect(() => {
     const unsub = useCanvasStore.subscribe((state, prev) => {
       if (state.nodes !== prev.nodes) {
-        if (deferStoreGraphSyncRef.current) {
+        if (
+          deferStoreGraphSyncRef.current ||
+          state.canvasGeometryDragging
+        ) {
           // 拖动/组缩放中：禁止 store→RF 盖布局（避免子节点被旧相对坐标重绘乱动）
           // 仅结构变化（增删/换父）时强制对齐
           const structural =
@@ -607,6 +611,7 @@ function FlowCanvasInner({
         setRfNodes((rf) =>
           mergeStoreNodesIntoRf(rf, state.nodes, {
             preserveRfSelection: true,
+            preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
           }),
         );
       }
@@ -629,6 +634,7 @@ function FlowCanvasInner({
       setRfNodes((rf) =>
         mergeStoreNodesIntoRf(rf, s.nodes, {
           preserveRfSelection: false,
+          preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
         }),
       );
       setRfEdges(s.edges);
@@ -680,13 +686,13 @@ function FlowCanvasInner({
       if (!isNodeDraggingRef.current) {
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
+        flushAutosaveAfterDrag();
       }
       if (viewportTimerRef.current !== null) {
         window.clearTimeout(viewportTimerRef.current);
         viewportTimerRef.current = null;
       }
       setViewport(vp);
-      flushAutosaveAfterDrag();
     },
     [
       setViewport,
@@ -962,9 +968,8 @@ function FlowCanvasInner({
           isCanvasPositionCommitOnly(storeChanges) ||
           isCanvasDimensionCommitOnly(storeChanges, manualIdsForDefer)
         ) {
-          deferStoreGraphSyncRef.current = false;
-          setCanvasGeometryDragging(false);
-          setCanvasDraggingNodeId(null);
+          // 坐标提交延后到 onNodeDragStop；须保持 dragging + defer 直至 RF 坐标落库
+          deferStoreGraphSyncRef.current = true;
           if (libtvCanvas && rfChanges.some((c) => c.type === "select")) {
             syncLibtvFloatingDockPinFromRf();
           }
@@ -1175,40 +1180,6 @@ function FlowCanvasInner({
     return () => window.cancelAnimationFrame(t);
   }, [canvasFocusNonce, canvasFocusNodeId, fitView]);
 
-  /** 历史封面截图前短暂 fitView，避免 pan/zoom 导致 html-to-image 空白 */
-  useEffect(() => {
-    const onPrepare = async () => {
-      const prev = getViewport();
-      try {
-        const nodes = getNodes();
-        if (nodes.length > 0) {
-          await fitView({ padding: 0.12, duration: 0, maxZoom: 1.15 });
-        }
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-        });
-        window.dispatchEvent(
-          new CustomEvent("canvas:viewport-snapshot-ready", {
-            detail: {
-              restore: () => {
-                rfSetViewport(prev);
-              },
-            },
-          }),
-        );
-      } catch {
-        window.dispatchEvent(
-          new CustomEvent("canvas:viewport-snapshot-ready", {
-            detail: { restore: () => {} },
-          }),
-        );
-      }
-    };
-    window.addEventListener("canvas:prepare-viewport-snapshot", onPrepare);
-    return () =>
-      window.removeEventListener("canvas:prepare-viewport-snapshot", onPrepare);
-  }, [fitView, getNodes, getViewport, rfSetViewport]);
-
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(
     (
@@ -1276,6 +1247,7 @@ function FlowCanvasInner({
   const onNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: { id: string; type?: string }) => {
       isNodeDraggingRef.current = true;
+      deferStoreGraphSyncRef.current = true;
       setIsNodeDragging(true);
       setCanvasGeometryDragging(true);
       setCanvasDraggingNodeId(node.id);
@@ -1387,17 +1359,37 @@ function FlowCanvasInner({
     return true;
   }, [getNodes]);
 
+  useEffect(() => {
+    const onCommitPositions = () => {
+      commitFlowPositionsFromRf();
+    };
+    window.addEventListener(
+      CANVAS_COMMIT_NODE_POSITIONS_EVENT,
+      onCommitPositions,
+    );
+    return () =>
+      window.removeEventListener(
+        CANVAS_COMMIT_NODE_POSITIONS_EVENT,
+        onCommitPositions,
+      );
+  }, [commitFlowPositionsFromRf]);
+
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
       isNodeDraggingRef.current = false;
       setIsNodeDragging(false);
-      setCanvasGeometryDragging(false);
-      setCanvasDraggingNodeId(null);
       clearDragSnapGuides();
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
         dragUndoPausedRef.current = false;
       }
+      const finishDragSession = () => {
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        flushAutosaveAfterDrag();
+        snapOthersRef.current = [];
+      };
       if (node.type === "group") {
         if (enableDragSnapGuides) {
           const all = getNodes() as CanvasFlowNode[];
@@ -1420,10 +1412,8 @@ function FlowCanvasInner({
           }
         }
         commitFlowPositionsFromRf();
-        deferStoreGraphSyncRef.current = false;
         setDragHoverGroup(null);
-        flushAutosaveAfterDrag();
-        snapOthersRef.current = [];
+        finishDragSession();
         return;
       }
       if (enableDragSnapGuides) {
@@ -1470,10 +1460,7 @@ function FlowCanvasInner({
         }
         libtvMultiNodeDragRef.current = false;
       }
-      deferStoreGraphSyncRef.current = false;
-      // 坐标可能在 handleNodesChange(dragging:false) 已写入 store；松手一律立即 flush
-      flushAutosaveAfterDrag();
-      snapOthersRef.current = [];
+      finishDragSession();
     },
     [
       clearDragSnapGuides,

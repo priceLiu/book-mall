@@ -36,11 +36,12 @@
 
 API 契约详见 [`book-mall/doc/tech/canvas-delta-patch.md`](../../book-mall/doc/tech/canvas-delta-patch.md)。
 
-## 乐观锁与 409
+## 乐观锁（软放行）
 
-- 客户端保存 `lastBaseUpdatedAt`（上次 PATCH 响应的 `project.updatedAt`）。
-- 每次 `canvasDelta` 携带 `baseUpdatedAt`；服务端 mismatch → **409**。
-- 客户端：GET 项目 → 用服务端 canvas 刷新 `lastPersistedSnapshot` → 重试一次 PATCH。
+- 客户端仍携带 `baseUpdatedAt`（上次 PATCH 的 `project.updatedAt`），便于观测。
+- **服务端不再因 mismatch 硬 409**：任务成片 / OSS backfill 也会 bump `updatedAt`，硬锁会导致增量 autosave 失败风暴（「以前整图保存没事、上增量后坏」的根因）。
+- mismatch 时在**最新** DB canvas 上 `applyDelta`，再经 `mergePersistedMediaIntoCanvasGraph` 防媒体被抹掉。
+- 客户端：autosave **串行**（禁止双 PATCH）；保存中退避 tasks 轮询。
 
 ## 实施进度
 

@@ -214,16 +214,24 @@ export function applyCanvasDelta(
   return next;
 }
 
+/**
+ * 增量乐观锁 · 软校验。
+ *
+ * 历史硬 409：任务成片写回 / OSS backfill 也会 bump `updatedAt`，与客户端
+ * autosave 的 baseUpdatedAt 冲突 → 409 风暴 / 保存超时（增量上线后回归）。
+ * 现改为：仍在最新 DB canvas 上 applyDelta + mergePersistedMedia，不抛 CONFLICT。
+ * 多标签页互踩时 last-write-wins（与整图 PATCH 一致）；媒体由 merge 防降级。
+ */
 export function assertCanvasDeltaBaseUpdatedAt(
   expected: string | undefined,
   actual: Date,
 ): void {
   if (!expected) return;
-  if (actual.toISOString() !== expected) {
-    throw new CanvasProjectError(
-      "CONFLICT",
-      "canvas project was modified elsewhere",
-      409,
+  const actualIso = actual.toISOString();
+  if (actualIso !== expected) {
+    console.warn(
+      "[canvasDelta] baseUpdatedAt stale (soft); apply on latest canvas",
+      { expected, actual: actualIso },
     );
   }
 }

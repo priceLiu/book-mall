@@ -564,6 +564,27 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       ],
     );
 
+    const onMouseDown = (e: MouseEvent<HTMLTextAreaElement>) => {
+      if (disabled || popoverOpen) return;
+      const el = innerRef.current;
+      if (!el) return;
+      const index = getTextareaIndexFromClientPoint(
+        el,
+        e.clientX,
+        e.clientY,
+      );
+      const hit = findMentionRangeAtDisplayIndex(
+        displayValue,
+        index,
+        mentionables,
+      );
+      if (!hit) return;
+      e.preventDefault();
+      el.focus();
+      el.setSelectionRange(hit.start, hit.end);
+      pendingCaretRef.current = hit.end;
+    };
+
     const onMouseMove = useCallback(
       (e: MouseEvent<HTMLTextAreaElement>) => {
         if (!hoverPreviewEnabled) return;
@@ -677,6 +698,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
               onBlur?.();
             }}
             onMouseMove={onMouseMove}
+            onMouseDown={onMouseDown}
             onMouseLeave={onMouseLeave}
             autoFocus={autoFocus}
             rows={stretchInParent ? 1 : rows}

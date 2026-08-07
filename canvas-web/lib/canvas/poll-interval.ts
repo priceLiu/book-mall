@@ -12,17 +12,23 @@
  * - 2~3 条 → 5s。
  * - >3 条 → 8s（并发越多越退避，避免 2s 空轮询叠加放大 DB 压力）。
  */
-export const CANVAS_POLL_STALE_BACKOFF_MS = 15_000;
+export const CANVAS_POLL_STALE_BACKOFF_MS = 20_000;
 /** 暂停态下的「空转再探」节拍（不打 DB，仅检测是否出现新在飞任务后唤醒轮询） */
-export const CANVAS_POLL_IDLE_RECHECK_MS = 6_000;
+export const CANVAS_POLL_IDLE_RECHECK_MS = 8_000;
+
+/** 自动剪辑进行中：tasks 轮询退避，给 DB/保存/FFmpeg 与浏览器连接池让路 */
+export const CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS = 20_000;
 
 export function nextPollIntervalMs(
   inflightCount: number,
   stale: boolean,
+  mediaRenderActive = false,
 ): number {
+  if (mediaRenderActive) return CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS;
   if (stale) return CANVAS_POLL_STALE_BACKOFF_MS;
   if (inflightCount <= 0) return 0;
-  if (inflightCount === 1) return 1_500;
-  if (inflightCount <= 3) return 5_000;
-  return 8_000;
+  // 略拉长间隔：connection_limit 过小时 1.5s 空轮询会与保存/剪辑抢池
+  if (inflightCount === 1) return 2_500;
+  if (inflightCount <= 3) return 6_000;
+  return 10_000;
 }

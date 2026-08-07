@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CANVAS_TOOLBAR_BTN_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
+import { CanvasToolbarTooltip } from "@/components/canvas/canvas-toolbar-tooltip";
 
 export function useCanvasToolbarDropdown(): {
   anchorRef: RefObject<HTMLButtonElement>;
@@ -55,28 +56,35 @@ export function CanvasToolbarDropdownTrigger({
   open,
   anchorRef,
   onClick,
+  tooltip,
 }: {
   label: string;
   open: boolean;
   anchorRef: RefObject<HTMLButtonElement>;
   onClick: () => void;
+  tooltip?: string;
 }) {
+  const title = tooltip ?? label;
   return (
     <button
       ref={anchorRef}
       type="button"
       onClick={onClick}
+      title={title}
       className={cn(
         CANVAS_TOOLBAR_BTN_CLASS,
+        "group/canvas-tb-tip relative",
         open && "border-white/30 bg-white/5",
       )}
       aria-expanded={open}
       aria-haspopup="menu"
+      aria-label={title}
     >
       {label}
       <ChevronDown
         className={cn("size-3 opacity-60 transition", open && "rotate-180")}
       />
+      {tooltip ? <CanvasToolbarTooltip label={label} hint={tooltip} /> : null}
     </button>
   );
 }

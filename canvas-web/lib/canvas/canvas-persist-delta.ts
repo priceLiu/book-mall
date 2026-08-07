@@ -16,11 +16,19 @@ export type CanvasDeltaPatch = {
 /** 超过此节点数时 autosave 仍走整图 PATCH（避免 diff CPU） */
 export const CANVAS_DELTA_MAX_NODES = 500;
 
+/**
+ * autosave 是否走 canvasDelta。
+ * false：恢复增量上线前的整图 PATCH（可靠）。
+ * 服务端软锁落地并验证稳定后，再改回 true。
+ */
+export const CANVAS_AUTOSAVE_USE_DELTA = false;
+
 function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
 export function shouldUseFullCanvasPersist(graph: CanvasGraph): boolean {
+  if (!CANVAS_AUTOSAVE_USE_DELTA) return true;
   return graph.nodes.length > CANVAS_DELTA_MAX_NODES;
 }
 

@@ -18,8 +18,11 @@ export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   try {
-    const gatewayProviders = await listCanvasProvidersForUser(guard.user.id);
-    const gatewayLink = await getGatewayLinkStatusForUser(guard.user.id);
+    // skipEnsure：打开画布时勿跑 identity sync（连接池紧张时曾拖到 180s → BFF 502）
+    const [gatewayProviders, gatewayLink] = await Promise.all([
+      listCanvasProvidersForUser(guard.user.id, { skipEnsure: true }),
+      getGatewayLinkStatusForUser(guard.user.id),
+    ]);
     return NextResponse.json(
       { providers: gatewayProviders, gatewayLink },
       { headers: jsonHeaders(request) },

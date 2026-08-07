@@ -9,6 +9,8 @@ import {
 } from "@/lib/canvas/libtv-node-chrome";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { storyEditionSpinClass } from "@/lib/canvas/story-edition-chrome";
+import type { CanvasCancelGenerationJob } from "@/lib/canvas/canvas-run-bus";
+import { useCanvasGenerationCancel } from "@/lib/canvas/use-canvas-generation-cancel";
 import { cn } from "@/lib/utils";
 
 /** LibTV 媒体节点是否处于生图/生视频/上传进行中 */
@@ -25,6 +27,11 @@ export function isLibtvMediaGenerating(data: {
   return libtvMediaLooksGenerating(data);
 }
 
+export type LibtvMediaGeneratingCancelScope = Omit<
+  CanvasCancelGenerationJob,
+  "nodeId"
+>;
+
 /** LibTV 媒体 stage · 生成中（外框扫光 + 中央 RefreshCw），见 design.md §15 */
 export function LibtvMediaGeneratingState({
   label,
@@ -32,6 +39,9 @@ export function LibtvMediaGeneratingState({
   tone = "active",
   className,
   children,
+  cancelNodeId,
+  cancelScope,
+  onCancel,
 }: {
   /** 留空则仅显示扫光 + 旋转图标，不渲染文字（避免「排队中…」等影响心情的提示） */
   label?: string;
@@ -42,7 +52,17 @@ export function LibtvMediaGeneratingState({
   className?: string;
   /** 可选：上传中半透明底图等 */
   children?: ReactNode;
+  /** 传入则显示「中止」按钮（须 confirm 扣费提示） */
+  cancelNodeId?: string;
+  cancelScope?: LibtvMediaGeneratingCancelScope;
+  onCancel?: () => void;
 }) {
+  const { requestCancel } = useCanvasGenerationCancel(
+    cancelNodeId ?? "",
+    cancelScope,
+  );
+  const showCancel = Boolean(onCancel || cancelNodeId?.trim());
+
   const shimmerClass =
     variant === "violet"
       ? LIBTV_MEDIA_GENERATING_VIOLET_CLASS
@@ -54,6 +74,16 @@ export function LibtvMediaGeneratingState({
       ? "border-violet-400/45 bg-black/55 text-violet-200"
       : "border-cyan-400/45 bg-black/55 text-cyan-200";
   const labelClass = `text-[11px] font-medium ${CANVAS_SEMANTIC_STATUS_CLASS}`;
+
+  const handleCancel = () => {
+    if (onCancel) {
+      void onCancel();
+      return;
+    }
+    if (cancelNodeId?.trim()) {
+      void requestCancel();
+    }
+  };
 
   return (
     <div className={cn("absolute inset-0", className)}>
@@ -73,6 +103,25 @@ export function LibtvMediaGeneratingState({
             <RefreshCw className={spinClass} />
           </span>
           {label?.trim() ? <span className={labelClass}>{label}</span> : null}
+          {showCancel ? (
+            <button
+              type="button"
+              className={cn(
+                "nodrag mt-1 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition",
+                variant === "violet"
+                  ? "border-violet-400/35 bg-violet-950/40 text-violet-100 hover:bg-violet-900/50"
+                  : "border-cyan-400/35 bg-cyan-950/40 text-cyan-100 hover:bg-cyan-900/50",
+                tone === "background" && "opacity-90",
+              )}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCancel();
+              }}
+            >
+              中止
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

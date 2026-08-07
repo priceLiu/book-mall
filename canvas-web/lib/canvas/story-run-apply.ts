@@ -21,6 +21,10 @@ import type {
 } from "./story-workspace-types";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
+import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
 import { applyScriptStudioThemeOutlineResult } from "./script-studio-run-apply";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { shouldSkipStoryRowTaskApply } from "./task-pick";
@@ -196,6 +200,128 @@ export function storyRunPendingPatch(
   return null;
 }
 
+/** 用户中止 · 清除 pending/running 行态或段级 runtime（与 storyRunPendingPatch 对称） */
+export function storyRunCancelPatch(
+  node: CanvasFlowNode,
+  ctx?: StoryRunContext,
+  taskId?: string,
+): Record<string, unknown> | null {
+  const idle = canvasIdleRuntimeAfterUserCancel(taskId);
+  if (
+    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    (ctx?.mediaKind === "generalText" || ctx?.mediaKind === "themeOutline")
+  ) {
+    return { themeOutlineRuntime: idle };
+  }
+  if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
+    if (ctx.llmSection === "outline") return { outlineRuntime: idle };
+    if (ctx.llmSection === "character") return { characterRuntime: idle };
+    if (ctx.llmSection === "scene") return { sceneRuntime: idle };
+    return { storyboardRuntime: idle };
+  }
+  if (isAnyStorySceneColumnType(node.type ?? "") && ctx?.rowKey) {
+    const rows = (node.data as { rows?: StoryProSceneRow[] }).rows;
+    if (!rows) return null;
+    return { rows: applySceneRowRuntime(rows, ctx.rowKey, idle) };
+  }
+  if (isAnyStoryCharacterColumnType(node.type ?? "") && ctx?.rowKey) {
+    const rows = (node.data as { rows?: { key: string }[] }).rows;
+    if (!rows) return null;
+    return {
+      rows: applyCharacterRowRuntime(rows as never, ctx.rowKey, idle),
+    };
+  }
+  if (isAnyStoryFrameColumnType(node.type ?? "") && ctx?.rowKey) {
+    const rows = (node.data as { rows?: { key: string }[] }).rows;
+    if (!rows) return null;
+    return {
+      rows: applyFrameRowRuntime(rows as never, ctx.rowKey, idle),
+    };
+  }
+  if (isAnyStoryVideoColumnType(node.type ?? "") && ctx?.rowKey && ctx.mediaKind) {
+    const rows = (node.data as { rows?: { key: string }[] }).rows;
+    if (!rows) return null;
+    return {
+      rows: applyVideoRowRuntime(
+        rows as never,
+        ctx.rowKey,
+        ctx.mediaKind === "tts" ? "tts" : "video",
+        idle,
+      ),
+    };
+  }
+  if (node.type === "sbv1-image") {
+    return {
+      uploading: false,
+      uploadError: undefined,
+      runtime: idle,
+    };
+  }
+  return null;
+}
+
+export function commitStoryRunCancelLocal(
+  node: CanvasFlowNode,
+  ctx: StoryRunContext | undefined,
+  allNodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  taskId?: string,
+): boolean {
+  const patch = storyRunCancelPatch(node, ctx, taskId);
+  if (!patch) return false;
+  if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
+    updateNodeData(node.id, { ...patch, hubGenerateIntent: undefined });
+    return true;
+  }
+  updateNodeData(node.id, patch);
+  if (
+    isAnyStoryCharacterColumnType(node.type ?? "") &&
+    ctx?.rowKey &&
+    Array.isArray(patch.rows)
+  ) {
+    const touched = (patch.rows as StoryProCharacterRow[]).find(
+      (r) => r.key === ctx.rowKey,
+    );
+    if (touched) {
+      syncPro2CharacterImagesFromRows(
+        allNodes.map((n) =>
+          n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
+        ),
+        node.id,
+        [touched],
+        updateNodeData,
+        { inflightOnly: true },
+      );
+    }
+  }
+  if (
+    isAnyStoryFrameColumnType(node.type ?? "") &&
+    Array.isArray(patch.rows) &&
+    ctx?.rowKey
+  ) {
+    syncPro2FrameImagesFromRows(
+      allNodes,
+      node.id,
+      patch.rows as StoryProFrameRow[],
+      updateNodeData,
+    );
+  }
+  if (
+    isAnyStoryVideoColumnType(node.type ?? "") &&
+    Array.isArray(patch.rows)
+  ) {
+    syncPro2VideoBoardFromRows(
+      allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
+      ),
+      node.id,
+      patch.rows as never,
+      updateNodeData,
+    );
+  }
+  return true;
+}
+
 function syncPro2SceneColumnVisuals(
   node: CanvasFlowNode,
   nextRows: StoryProSceneRow[],
@@ -315,19 +441,32 @@ export function storyApplyTaskResult(
               task.model,
             ),
           }
-        : task.status === "SUBMITTED"
-          ? {
-              status: "running",
-              taskId: task.id,
-              failCode: undefined,
-              failMessage: undefined,
-            }
-          : {
-              status: "pending",
-              taskId: task.id,
-              failCode: undefined,
-              failMessage: undefined,
-            };
+        : task.status === "CANCELLED"
+          ? isUserCancelledCanvasTask(task)
+            ? canvasIdleRuntimeAfterUserCancel(task.id)
+            : {
+                status: "error",
+                taskId: task.id,
+                failCode: task.failCode ?? "CANCELLED",
+                failMessage: formatCanvasTaskError(
+                  task.failCode,
+                  task.failMessage,
+                  task.model,
+                ),
+              }
+          : task.status === "SUBMITTED"
+            ? {
+                status: "running",
+                taskId: task.id,
+                failCode: undefined,
+                failMessage: undefined,
+              }
+            : {
+                status: "pending",
+                taskId: task.id,
+                failCode: undefined,
+                failMessage: undefined,
+              };
 
   const isStarterTextNode =
     node.type === "story-pro2-starter" || node.type === "story-pro-starter";

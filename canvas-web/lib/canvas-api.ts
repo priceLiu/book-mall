@@ -7,8 +7,10 @@ import {
   refreshCanvasToolsSessionClient,
 } from "@/lib/canvas-tools-session-client";
 import { ensureCanvasUploadFileMeta } from "@/lib/canvas/normalize-canvas-image-file";
+import { recordCanvasApiTransfer } from "@/lib/canvas/use-canvas-network-status";
 import {
   isTransientDbApiError,
+  isTransientNetworkFetchError,
   sleepMs,
   transientDbRetryDelayMs,
 } from "@/lib/fetch-with-db-retry";
@@ -36,6 +38,13 @@ export function isCanvasApiAccessDeniedError(e: unknown): boolean {
 export function isCanvasApiConflictError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
   return /\b409\b/.test(msg) || /\bCONFLICT\b/i.test(msg);
+}
+
+/** 409 响应 message 中嵌入的服务端 updatedAt（见 book-mall canvas-delta-merge） */
+export function parseCanvasConflictUpdatedAt(e: unknown): string | undefined {
+  const msg = e instanceof Error ? e.message : String(e);
+  const m = /\|(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\b/.exec(msg);
+  return m?.[1];
 }
 
 /** @deprecated 使用 isCanvasApiAccessDeniedError */
@@ -135,14 +144,23 @@ export type CanvasTaskRecord = {
 export function formatCanvasApiError(raw: string): string {
   const t = raw.trim();
   if (!t) return "加载失败，请稍后重试";
+  if (t.includes("save_wait_timeout")) {
+    return "上一轮保存尚未结束，本次未再发起请求。请稍候或点手动保存。";
+  }
+  if (t.includes("save_timeout")) {
+    return "主站保存响应超时（非浏览器网络断开）。多半是任务轮询占满连接，请稍后重试。";
+  }
+  if (/operation was aborted|The user aborted|AbortError/i.test(t)) {
+    return "主站保存请求已取消（超时保护，非网络断开）。请稍后重试。";
+  }
   if (t.includes("DATABASE_UNAVAILABLE") || t.includes("503")) {
     return "服务繁忙，请稍后再试";
   }
   if (t.includes("401") || t.includes("UNAUTHORIZED")) {
-    return "登录已失效，请重新连接主站账号。";
+    return "登录连接已断开，正在自动重连；若操作仍失败请点「重新连接」。";
   }
   if (t.includes("缺少 Bearer Token") || t.includes("无效或过期的工具令牌")) {
-    return "工具站登录令牌缺失或已过期，请刷新页面或重新从主站进入画布。";
+    return "登录连接已断开，请刷新页面或重新从主站进入画布。";
   }
   if (t.includes("INTERNAL_ERROR")) {
     return "服务器处理失败，请稍后重试；若持续出现请查看 book-mall 终端日志。";
@@ -152,6 +170,9 @@ export function formatCanvasApiError(raw: string): string {
   }
   if (t.includes("book_mall_proxy_failed") || t.includes("ECONNREFUSED")) {
     return "无法连接主站 book-mall（:3000）。请确认已运行 pnpm dev:all，且 book-mall 进程正常。";
+  }
+  if (isTransientNetworkFetchError(t)) {
+    return "无法连接主站 book-mall（:3000）或请求被中断。请确认 pnpm dev:all 正常，而非出口网络故障。";
   }
   if (/<!DOCTYPE html>/i.test(t) || /<html[\s>]/i.test(t)) {
     if (/\b404\b/.test(t)) {
@@ -197,8 +218,35 @@ async function call<T>(
   let sessionRefreshAttempted = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const r = await fetch(url, i);
-    const raw = await r.text();
+    if (i.signal?.aborted) {
+      throw new Error("The operation was aborted");
+    }
+    let r: Response;
+    let raw: string;
+    const startedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    try {
+      r = await fetch(url, i);
+      raw = await r.text();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (i.signal?.aborted) {
+        throw new Error(msg || "The operation was aborted");
+      }
+      if (attempt < maxAttempts - 1 && isTransientNetworkFetchError(msg)) {
+        await sleepMs(transientDbRetryDelayMs(attempt));
+        continue;
+      }
+      throw new Error(msg);
+    }
+    const elapsedMs =
+      (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+      startedAt;
+    const bodyBytes =
+      typeof i.body === "string"
+        ? new TextEncoder().encode(i.body).length
+        : 0;
+    recordCanvasApiTransfer(bodyBytes + raw.length, elapsedMs);
     if (!r.ok) {
       const msg = sanitizeCanvasApiErrorBody(r.status, raw);
       if (
@@ -207,7 +255,7 @@ async function call<T>(
         isCanvasToolsSessionUnauthorized(msg, r.status)
       ) {
         sessionRefreshAttempted = true;
-        const refreshed = await refreshCanvasToolsSessionClient();
+        const refreshed = await refreshCanvasToolsSessionClient({ silent: true });
         if (refreshed) continue;
       }
       if (
@@ -314,6 +362,18 @@ export async function getCanvasProject(
     `/api/canvas/projects/${id}`,
   );
   return j.project;
+}
+
+/** 仅拉 updatedAt（乐观锁对齐），避免全量 canvas JSON 打满连接池 */
+export async function getCanvasProjectUpdatedAt(
+  base: string,
+  id: string,
+): Promise<string> {
+  const j = await call<{ updatedAt: string }>(
+    base,
+    `/api/canvas/projects/${id}/updated-at`,
+  );
+  return j.updatedAt;
 }
 
 const projectDetailCache = new Map<
@@ -428,6 +488,7 @@ export async function patchCanvasProject(
     thumbnailUrl?: string;
     historySnapshot?: CanvasProjectHistorySnapshotRequest;
   },
+  opts?: { signal?: AbortSignal },
 ): Promise<{
   project: CanvasProjectDetail;
   historyItem: CanvasProjectHistorySummary | null;
@@ -439,6 +500,7 @@ export async function patchCanvasProject(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
+    signal: opts?.signal,
   });
   projectDetailCache.set(projectCacheKey(base, id), {
     at: Date.now(),
@@ -794,6 +856,19 @@ export async function deleteCanvasTask(
     base,
     `/api/canvas/projects/${projectId}/tasks/${taskId}`,
     { method: "DELETE" },
+  );
+}
+
+/** 用户主动中止进行中的生成任务（服务端可能已完成并计费）。 */
+export async function cancelCanvasGenerationTask(
+  base: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ ok: true; alreadyTerminal: boolean }> {
+  return call<{ ok: true; alreadyTerminal: boolean }>(
+    base,
+    `/api/canvas/projects/${projectId}/tasks/${taskId}/cancel`,
+    { method: "POST" },
   );
 }
 
@@ -1646,6 +1721,7 @@ export type MediaRenderProfile = {
 
 const MEDIA_RENDER_FETCH_RETRIES = 4;
 const MEDIA_RENDER_FETCH_RETRY_MS = 1_500;
+const MEDIA_RENDER_FETCH_TIMEOUT_MS = 120_000;
 
 function isTransientMediaRenderFetchError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -1673,10 +1749,33 @@ async function fetchMediaRenderApi(
   url: string,
   init: RequestInit,
 ): Promise<Response> {
+  let sessionRefreshAttempted = false;
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MEDIA_RENDER_FETCH_RETRIES; attempt++) {
     try {
-      const response = await fetch(url, init);
+      const controller = new AbortController();
+      const timer = setTimeout(
+        () => controller.abort(),
+        MEDIA_RENDER_FETCH_TIMEOUT_MS,
+      );
+      let response: Response;
+      try {
+        response = await fetch(url, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (
+        response.status === 401 &&
+        !sessionRefreshAttempted &&
+        typeof window !== "undefined"
+      ) {
+        sessionRefreshAttempted = true;
+        const refreshed = await refreshCanvasToolsSessionClient({ silent: true });
+        if (refreshed) {
+          attempt -= 1;
+          continue;
+        }
+      }
       if (
         response.status >= 502 &&
         response.status <= 504 &&
@@ -1776,6 +1875,29 @@ export async function retryMediaRenderUpload(
   return data.job;
 }
 
+/** 用户主动中止进行中的云端剪辑（FFmpeg 可能仍在跑）。 */
+export async function cancelMediaRenderJob(
+  base: string,
+  jobId: string,
+): Promise<{ ok: true; alreadyTerminal: boolean }> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+  const r = await fetchMediaRenderApi(url, init);
+  const data = (await r.json().catch(() => ({}))) as {
+    ok?: boolean;
+    alreadyTerminal?: boolean;
+    message?: string;
+    error?: string;
+  };
+  if (!r.ok) {
+    throw new Error(parseMediaRenderApiError(data, r.status));
+  }
+  return { ok: true, alreadyTerminal: Boolean(data.alreadyTerminal) };
+}
+
 export async function waitMediaRenderJob(
   base: string,
   jobId: string,
@@ -1785,12 +1907,14 @@ export async function waitMediaRenderJob(
     onPoll?: (job: MediaRenderJob) => void;
   },
 ): Promise<MediaRenderJob> {
-  const intervalMs = opts?.intervalMs ?? 1500;
+  // 默认 2.5s：DB 紧张时 1.5s 轮询会与 tasks/保存叠压
+  let intervalMs = opts?.intervalMs ?? 2500;
   const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000;
   const deadline = Date.now() + timeoutMs;
   let lastJob: MediaRenderJob | null = null;
   let consecutivePollErrors = 0;
   while (Date.now() < deadline) {
+    const pollStarted = Date.now();
     try {
       const job = await pollMediaRender(base, jobId);
       lastJob = job;
@@ -1806,9 +1930,14 @@ export async function waitMediaRenderJob(
       if (job.uploadFailed && job.localDownloadPath) {
         return job;
       }
+      const pollMs = Date.now() - pollStarted;
+      if (pollMs > 4000) {
+        intervalMs = Math.min(8000, Math.max(intervalMs, Math.floor(pollMs * 0.8)));
+      }
       await new Promise((r) => setTimeout(r, intervalMs));
     } catch (e) {
       consecutivePollErrors += 1;
+      intervalMs = Math.min(8000, intervalMs + 1000);
       const message = e instanceof Error ? e.message : String(e);
       if (
         lastJob?.localDownloadPath &&
@@ -1822,10 +1951,30 @@ export async function waitMediaRenderJob(
             friendlyMediaRenderPollErrorMessage(message),
         };
       }
-      if (consecutivePollErrors >= 8) {
+      if (consecutivePollErrors >= 24) {
         throw new Error(friendlyMediaRenderPollErrorMessage(message));
       }
-      await new Promise((r) => setTimeout(r, intervalMs * consecutivePollErrors));
+      const backoffMs = Math.min(
+        20_000,
+        intervalMs * Math.min(consecutivePollErrors, 6),
+      );
+      opts?.onPoll?.({
+        ...(lastJob ?? {
+          id: jobId,
+          status: "RUNNING" as const,
+          progress: 0,
+          progressLabel: "连接中断，正在重试…",
+          downloadUrl: null,
+          localDownloadPath: null,
+          uploadFailed: false,
+          posterUrl: null,
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+          errorMessage: null,
+        }),
+        progressLabel:
+          lastJob?.progressLabel?.trim() || "连接中断，正在重试…",
+      });
+      await new Promise((r) => setTimeout(r, backoffMs));
     }
   }
   if (lastJob?.localDownloadPath) {

@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
-  CanvasToolsSessionBanner,
   CanvasToolsSessionProvider,
 } from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -28,6 +27,7 @@ import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel"
 import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
 import { useCanvasTaskEventStream } from "@/lib/canvas/use-canvas-task-event-stream";
 import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
+import { hasAnyMediaRenderInFlight } from "@/lib/canvas/media-render-in-flight";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
@@ -60,17 +60,20 @@ import type {
 } from "@/lib/canvas/types";
 import {
   clearCanvasProjectTasksForbidden,
-  getCanvasProject,
   getCanvasProjectCached,
   invalidateCanvasProjectCache,
   isCanvasApiConflictError,
+  parseCanvasConflictUpdatedAt,
+  formatCanvasApiError,
+  getCanvasProjectUpdatedAt,
   listCanvasProjectHistory,
   patchCanvasProject,
   saveCanvasTemplate,
   type CanvasCharacterRecord,
   type CanvasProjectDetail,
 } from "@/lib/canvas-api";
-import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
+import { refreshCanvasToolsSessionClient, isCanvasToolsSessionUnauthorized } from "@/lib/canvas-tools-session-client";
+import { isTransientNetworkFetchError, isTransientDbApiError } from "@/lib/fetch-with-db-retry";
 import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { prefetchUserProviders } from "@/lib/canvas/use-user-providers";
@@ -107,7 +110,13 @@ import {
   CANVAS_AUTOSAVE_HISTORY_HEARTBEAT_MS,
   getCanvasAutosaveIntervalMs,
 } from "@/lib/canvas/canvas-autosave-settings";
-import { registerCanvasGraphPersistFlush, registerCanvasDeltaPersist } from "@/lib/canvas/canvas-graph-persist-bridge";
+import { registerCanvasGraphPersistFlush, registerCanvasGraphDirtyCheck, registerCanvasDeltaPersist, registerCanvasProjectVersionSync, setCanvasSaveInFlight } from "@/lib/canvas/canvas-graph-persist-bridge";
+import { flushCanvasNodePositions } from "@/lib/canvas/canvas-commit-node-positions";
+import {
+  canvasSavePhaseLabel,
+  formatCanvasSaveStepError,
+  type CanvasSavePhase,
+} from "@/lib/canvas/canvas-save-phase";
 import {
   hasPendingCanvasImageUploads,
   reconcileStaleCanvasImageUploadFlags,
@@ -261,10 +270,21 @@ function Inner({ projectId }: { projectId: string }) {
   const [nameDraft, setNameDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  useCanvasTaskEventStream(base, projectId, !loading);
   const inflightTaskCount = useCanvasInflightTaskCount();
-  useCanvasTaskSse(base, projectId, inflightTaskCount, !loading);
+  const mediaRenderActive = useCanvasStore((s) =>
+    hasAnyMediaRenderInFlight(s.nodes),
+  );
+  const inflightTaskCountRef = useRef(inflightTaskCount);
+  const mediaRenderActiveRef = useRef(mediaRenderActive);
+  inflightTaskCountRef.current = inflightTaskCount;
+  mediaRenderActiveRef.current = mediaRenderActive;
+  const taskSyncEnabled = !loading && !mediaRenderActive;
+  useCanvasTaskEventStream(base, projectId, taskSyncEnabled);
+  useCanvasTaskSse(base, projectId, inflightTaskCount, taskSyncEnabled);
   const [saving, setSaving] = useState(false);
+  const [savePhase, setSavePhase] = useState<CanvasSavePhase>("idle");
+  const [saveRetryAttempt, setSaveRetryAttempt] = useState(0);
+  const saveGenerationRef = useRef(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
@@ -320,19 +340,6 @@ function Inner({ projectId }: { projectId: string }) {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = window.location.href;
-    window.history.replaceState({ canvasPage: projectId, guard: 0 }, "", url);
-    window.history.pushState({ canvasPage: projectId, guard: 1 }, "", url);
-
-    const onPopState = () => {
-      window.history.pushState({ canvasPage: projectId, guard: 1 }, "", url);
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [projectId]);
-
-  useEffect(() => {
     const open = () => {
       closeAllToolbarPanels();
       setStyleLibraryOpen(true);
@@ -362,22 +369,32 @@ function Inner({ projectId }: { projectId: string }) {
   const canvasHydratingUntilRef = useRef(0);
   const syncLastPersistedSnapshotRef = useRef<(() => void) | null>(null);
   const isCanvasDirtyRef = useRef<(() => boolean) | null>(null);
+  const autosaveStartedAtRef = useRef(0);
+  const savePhaseRef = useRef<CanvasSavePhase>("idle");
+  /** 保存硬失败后冷却，避免 dirty 状态下「增量/重试」死循环 */
+  const autosaveFailCooldownUntilRef = useRef(0);
 
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow;
     const prevBodyOverflow = document.body.style.overflow;
     const prevHtmlOverscrollX = document.documentElement.style.overscrollBehaviorX;
     const prevBodyOverscrollX = document.body.style.overscrollBehaviorX;
+    const prevHtmlOverscrollY = document.documentElement.style.overscrollBehaviorY;
+    const prevBodyOverscrollY = document.body.style.overscrollBehaviorY;
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
     document.documentElement.style.overscrollBehaviorX = "none";
     document.body.style.overscrollBehaviorX = "none";
+    document.documentElement.style.overscrollBehaviorY = "none";
+    document.body.style.overscrollBehaviorY = "none";
     document.documentElement.dataset.canvasEditorOpen = "true";
     return () => {
       document.documentElement.style.overflow = prevHtmlOverflow;
       document.body.style.overflow = prevBodyOverflow;
       document.documentElement.style.overscrollBehaviorX = prevHtmlOverscrollX;
       document.body.style.overscrollBehaviorX = prevBodyOverscrollX;
+      document.documentElement.style.overscrollBehaviorY = prevHtmlOverscrollY;
+      document.body.style.overscrollBehaviorY = prevBodyOverscrollY;
       delete document.documentElement.dataset.canvasEditorOpen;
     };
   }, []);
@@ -462,6 +479,26 @@ function Inner({ projectId }: { projectId: string }) {
   const autosaveSavingUiTimerRef = useRef<number | null>(null);
   const autosaveInFlightRef = useRef(false);
   const autosavePendingRef = useRef(false);
+  const autosaveIdleWaitersRef = useRef<Array<() => void>>([]);
+
+  const resolveAutosaveIdleWaiters = () => {
+    const waiters = autosaveIdleWaitersRef.current;
+    autosaveIdleWaitersRef.current = [];
+    for (const resolve of waiters) resolve();
+  };
+
+  const waitForAutosaveIdle = (): Promise<void> => {
+    if (!autosaveInFlightRef.current) return Promise.resolve();
+    return new Promise((resolve) => {
+      autosaveIdleWaitersRef.current.push(resolve);
+    });
+  };
+
+  const CANVAS_AUTOSAVE_IDLE_WAIT_MS = 12_000;
+  /** DB/连接池紧张时 PATCH 可能较慢；超时后 abort fetch，避免连接泄漏与 UI 长期「保存中」 */
+  /** 正常 PATCH 约 300–600ms；整图+连接争用时放宽，避免误杀 */
+  const CANVAS_AUTOSAVE_PATCH_TIMEOUT_MS = 45_000;
+  const CANVAS_AUTOSAVE_FAIL_COOLDOWN_MS = 20_000;
   /** 上次写入「自动保存」历史的时间与当时的 graphRevision（跨 effect 重挂载保持） */
   const historyWrittenAtRef = useRef(Date.now());
   const historyWrittenRevisionRef = useRef<number | null>(null);
@@ -502,7 +539,14 @@ function Inner({ projectId }: { projectId: string }) {
 
     const runAutosave = async (
       force = false,
-      opts: { writeHistory?: boolean; conflictRetry?: boolean } = {},
+      opts: {
+        writeHistory?: boolean;
+        conflictRetry?: boolean;
+        authRetry?: boolean;
+        networkRetryCount?: number;
+        /** 离开页等：冷却期内仍尝试落盘 */
+        bypassCooldown?: boolean;
+      } = {},
     ) => {
       let writeHistory = opts.writeHistory ?? false;
       const autosaveIntervalMs = getCanvasAutosaveIntervalMs();
@@ -510,17 +554,67 @@ function Inner({ projectId }: { projectId: string }) {
       if (autosaveIntervalMs <= 0) {
         writeHistory = false;
       }
-      if (autosaveInFlightRef.current) {
+      if (
+        writeHistory &&
+        (inflightTaskCountRef.current > 0 || mediaRenderActiveRef.current)
+      ) {
+        writeHistory = false;
+      }
+      if (useCanvasStore.getState().canvasGeometryDragging) {
         autosavePendingRef.current = true;
         return;
+      }
+      if (
+        !force &&
+        (inflightTaskCountRef.current > 0 || mediaRenderActiveRef.current)
+      ) {
+        autosavePendingRef.current = true;
+        return;
+      }
+      if (autosaveInFlightRef.current) {
+        if (force) {
+          try {
+            await Promise.race([
+              waitForAutosaveIdle(),
+              new Promise<void>((_, reject) => {
+                window.setTimeout(
+                  () => reject(new Error("save_wait_timeout")),
+                  CANVAS_AUTOSAVE_IDLE_WAIT_MS,
+                );
+              }),
+            ]);
+          } catch {
+            /* 前一保存仍在飞：排队，禁止双 PATCH（增量上线后双请求会互相踩） */
+            autosavePendingRef.current = true;
+            return;
+          }
+          if (autosaveInFlightRef.current) {
+            autosavePendingRef.current = true;
+            return;
+          }
+        } else {
+          autosavePendingRef.current = true;
+          return;
+        }
       }
       const proj = autosaveProjectRef.current;
       const bookBase = autosaveBaseRef.current;
       if (!proj || !bookBase || !canvasReadyRef.current) return;
       if (!force && Date.now() < canvasHydratingUntilRef.current) return;
+      // 硬失败冷却期内：跳过一切自动/强制落盘（含任务完成后 flush），避免死循环
+      if (
+        Date.now() < autosaveFailCooldownUntilRef.current &&
+        (opts.networkRetryCount ?? 0) === 0 &&
+        !opts.conflictRetry &&
+        !opts.authRetry &&
+        !opts.bypassCooldown
+      ) {
+        return;
+      }
       // 图片 OSS 未完成时不落盘：strip 会去掉 blob，存成空节点
       if (!force && hasPendingCanvasImageUploads()) return;
       if (!force && !isCanvasDirty()) return;
+      if (force && !isCanvasDirty() && !hasPendingCanvasImageUploads()) return;
 
       const snapshot = useCanvasStore.getState();
       const currentSnap = readCanvasPersistSnapshot(snapshot);
@@ -543,13 +637,33 @@ function Inner({ projectId }: { projectId: string }) {
       }
 
       autosaveInFlightRef.current = true;
-      if (autosaveSavingUiTimerRef.current === null) {
-        autosaveSavingUiTimerRef.current = window.setTimeout(() => {
-          autosaveSavingUiTimerRef.current = null;
-          setSaving(true);
-        }, 450);
+      setCanvasSaveInFlight(true);
+      autosaveStartedAtRef.current = Date.now();
+      const saveGen = ++saveGenerationRef.current;
+      setSaveError(null);
+      setSaveRetryAttempt(0);
+      const setPhase = (phase: CanvasSavePhase, retry = 0) => {
+        if (saveGen !== saveGenerationRef.current) return;
+        savePhaseRef.current = phase;
+        setSavePhase(phase);
+        setSaveRetryAttempt(retry);
+        if (phase !== "idle" && phase !== "done") setSaving(true);
+      };
+      if ((opts.networkRetryCount ?? 0) > 0) {
+        setPhase("retry", (opts.networkRetryCount ?? 0) + 1);
       }
+      if (autosaveSavingUiTimerRef.current !== null) {
+        window.clearTimeout(autosaveSavingUiTimerRef.current);
+        autosaveSavingUiTimerRef.current = null;
+      }
+      let saveMarkedDone = false;
       try {
+        setPhase("commit_layout");
+        flushCanvasNodePositions();
+        await new Promise<void>((resolve) => {
+          queueMicrotask(() => resolve());
+        });
+        setPhase("flush_drafts");
         window.dispatchEvent(new CustomEvent("canvas:flush-text-drafts"));
         await new Promise<void>((resolve) => {
           queueMicrotask(() => resolve());
@@ -571,7 +685,7 @@ function Inner({ projectId }: { projectId: string }) {
         };
 
         let patch: AutosavePatch;
-        if (lastGraph && !shouldUseFullCanvasPersist(graph) && !force) {
+        if (lastGraph && !shouldUseFullCanvasPersist(graph)) {
           const delta = buildCanvasPersistDelta(lastGraph, graph);
           if (!delta) {
             lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(snapshot);
@@ -588,7 +702,13 @@ function Inner({ projectId }: { projectId: string }) {
         }
 
         if (writeHistory) {
-          const shot = await captureCanvasViewportSnapshotUrl(bookBase);
+          setPhase("history_thumb");
+          const shot = await Promise.race([
+            captureCanvasViewportSnapshotUrl(bookBase),
+            new Promise<string>((resolve) => {
+              window.setTimeout(() => resolve(""), 4_000);
+            }),
+          ]);
           const historyThumb = resolveCanvasHistoryThumbnailUrl(
             shot,
             graph,
@@ -602,11 +722,23 @@ function Inner({ projectId }: { projectId: string }) {
         if (thumb && thumb !== proj.thumbnailUrl) {
           patch.thumbnailUrl = thumb;
         }
-        const { historyItem, project: updatedProject } = await patchCanvasProject(
-          bookBase,
-          projectId,
-          patch,
-        );
+        setPhase(patch.canvasDelta ? "patch_delta" : "patch_full");
+        const patchAbort = new AbortController();
+        let patchTimer: ReturnType<typeof setTimeout> | undefined;
+        const patchResult = await Promise.race([
+          patchCanvasProject(bookBase, projectId, patch, {
+            signal: patchAbort.signal,
+          }),
+          new Promise<never>((_, reject) => {
+            patchTimer = window.setTimeout(() => {
+              patchAbort.abort();
+              reject(new Error("save_timeout"));
+            }, CANVAS_AUTOSAVE_PATCH_TIMEOUT_MS);
+          }),
+        ]).finally(() => {
+          if (patchTimer !== undefined) window.clearTimeout(patchTimer);
+        });
+        const { historyItem, project: updatedProject } = patchResult;
         lastBaseUpdatedAtRef.current = updatedProject.updatedAt;
         syncLastPersistedSnapshot();
         setProject((p) =>
@@ -630,42 +762,98 @@ function Inner({ projectId }: { projectId: string }) {
         }
         setLastSavedAt(new Date());
         setSaveError(null);
+        autosaveFailCooldownUntilRef.current = 0;
+        if (saveGen === saveGenerationRef.current) {
+          saveMarkedDone = true;
+          setSavePhase("done");
+          window.setTimeout(() => {
+            if (saveGen === saveGenerationRef.current) {
+              setSavePhase("idle");
+              setSaving(false);
+            }
+          }, 1200);
+        }
       } catch (e) {
+        if (saveGen !== saveGenerationRef.current) return;
         if (isCanvasApiConflictError(e) && !opts.conflictRetry) {
           try {
-            const fresh = await getCanvasProject(bookBase, projectId);
-            lastBaseUpdatedAtRef.current = fresh.updatedAt;
-            const serverGraph = buildCanvasPersistGraph(
-              () => fresh.canvas as CanvasGraph,
-            );
-            lastPersistedSnapshotRef.current = {
-              revision: useCanvasStore.getState().graphRevision,
-              viewport: JSON.stringify(
-                serverGraph.viewport ?? { x: 0, y: 0, zoom: 1 },
-              ),
-              graph: serializeCanvasPersistGraph(serverGraph),
-            };
-            setProject((p) =>
-              p ? { ...p, updatedAt: fresh.updatedAt } : p,
-            );
+            setPhase("sync_version");
+            const fromErr = parseCanvasConflictUpdatedAt(e);
+            const updatedAt =
+              fromErr ??
+              (await getCanvasProjectUpdatedAt(bookBase, projectId));
+            lastBaseUpdatedAtRef.current = updatedAt;
+            setProject((p) => (p ? { ...p, updatedAt } : p));
             await runAutosave(true, { ...opts, conflictRetry: true });
             return;
           } catch {
             /* fall through to generic error */
           }
         }
-        setSaveError(e instanceof Error ? e.message : "保存失败");
-      } finally {
-        autosaveInFlightRef.current = false;
-        if (autosaveSavingUiTimerRef.current !== null) {
-          window.clearTimeout(autosaveSavingUiTimerRef.current);
-          autosaveSavingUiTimerRef.current = null;
+        const errMsg = e instanceof Error ? e.message : "保存失败";
+        if (!opts.authRetry && isCanvasToolsSessionUnauthorized(errMsg)) {
+          const refreshed = await refreshCanvasToolsSessionClient({ silent: true });
+          if (refreshed) {
+            await runAutosave(force, { ...opts, authRetry: true });
+            return;
+          }
         }
-        setSaving(false);
-        if (autosavePendingRef.current) {
+        const networkRetryCount = opts.networkRetryCount ?? 0;
+        // call() 内已有短暂重试；外层最多再 1 次，避免「重试中」循环刷屏
+        const maxNetworkRetries = 1;
+        const retryableSaveError =
+          isTransientNetworkFetchError(errMsg) ||
+          /\b(502|503|429)\b/.test(errMsg) ||
+          isTransientDbApiError(
+            Number((/\b(\d{3})\b/.exec(errMsg) ?? [])[1]) || 0,
+            errMsg,
+          );
+        if (networkRetryCount < maxNetworkRetries && retryableSaveError) {
+          setPhase("retry", networkRetryCount + 1);
+          await new Promise((r) =>
+            window.setTimeout(r, 2000 * (networkRetryCount + 1)),
+          );
+          await runAutosave(force, {
+            ...opts,
+            networkRetryCount: networkRetryCount + 1,
+          });
+          return;
+        }
+        if (saveGen === saveGenerationRef.current) {
+          autosaveFailCooldownUntilRef.current =
+            Date.now() + CANVAS_AUTOSAVE_FAIL_COOLDOWN_MS;
           autosavePendingRef.current = false;
-          if (isCanvasDirty()) {
-            void runAutosave(force, opts);
+          setSaveError(
+            formatCanvasSaveStepError(savePhaseRef.current, errMsg),
+          );
+          setSavePhase("idle");
+          savePhaseRef.current = "idle";
+          setSaving(false);
+        }
+      } finally {
+        // 仅「当前世代」收尾：避免旧 save 清掉新 save 的 inFlight
+        if (saveGen === saveGenerationRef.current) {
+          autosaveInFlightRef.current = false;
+          setCanvasSaveInFlight(false);
+          resolveAutosaveIdleWaiters();
+          if (autosaveSavingUiTimerRef.current !== null) {
+            window.clearTimeout(autosaveSavingUiTimerRef.current);
+            autosaveSavingUiTimerRef.current = null;
+          }
+          if (!saveMarkedDone) {
+            setSaving(false);
+            setSavePhase("idle");
+            savePhaseRef.current = "idle";
+            // 失败后禁止 pending 立刻再开一轮（死循环源）
+            autosavePendingRef.current = false;
+          } else if (autosavePendingRef.current) {
+            autosavePendingRef.current = false;
+            if (
+              isCanvasDirty() &&
+              Date.now() >= autosaveFailCooldownUntilRef.current
+            ) {
+              void runAutosave(false);
+            }
           }
         }
       }
@@ -674,6 +862,7 @@ function Inner({ projectId }: { projectId: string }) {
     const scheduleAutosave = () => {
       if (!canvasReadyRef.current) return;
       if (!isCanvasDirty()) return;
+      if (Date.now() < autosaveFailCooldownUntilRef.current) return;
       clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;
@@ -714,8 +903,30 @@ function Inner({ projectId }: { projectId: string }) {
       scheduleAutosave();
     });
 
+    const unsubDragEnd = useCanvasStore.subscribe((state, prev) => {
+      if (prev.canvasGeometryDragging && !state.canvasGeometryDragging) {
+        if (autosavePendingRef.current) {
+          autosavePendingRef.current = false;
+          void runAutosave(true);
+        }
+      }
+    });
+
     runAutosaveRef.current = runAutosave;
     registerCanvasGraphPersistFlush(runAutosave);
+    registerCanvasGraphDirtyCheck(isCanvasDirty);
+    registerCanvasProjectVersionSync(async () => {
+      const bookBase = autosaveBaseRef.current;
+      if (!bookBase || !canvasReadyRef.current) return null;
+      try {
+        const updatedAt = await getCanvasProjectUpdatedAt(bookBase, projectId);
+        lastBaseUpdatedAtRef.current = updatedAt;
+        setProject((p) => (p ? { ...p, updatedAt } : p));
+        return updatedAt;
+      } catch {
+        return null;
+      }
+    });
     registerCanvasDeltaPersist(async (delta) => {
       const proj = autosaveProjectRef.current;
       const bookBase = autosaveBaseRef.current;
@@ -742,21 +953,12 @@ function Inner({ projectId }: { projectId: string }) {
       } catch (e) {
         if (isCanvasApiConflictError(e)) {
           try {
-            const fresh = await getCanvasProject(bookBase, projectId);
-            lastBaseUpdatedAtRef.current = fresh.updatedAt;
-            const serverGraph = buildCanvasPersistGraph(
-              () => fresh.canvas as CanvasGraph,
-            );
-            lastPersistedSnapshotRef.current = {
-              revision: useCanvasStore.getState().graphRevision,
-              viewport: JSON.stringify(
-                serverGraph.viewport ?? { x: 0, y: 0, zoom: 1 },
-              ),
-              graph: serializeCanvasPersistGraph(serverGraph),
-            };
-            setProject((p) =>
-              p ? { ...p, updatedAt: fresh.updatedAt } : p,
-            );
+            const fromErr = parseCanvasConflictUpdatedAt(e);
+            const updatedAt =
+              fromErr ??
+              (await getCanvasProjectUpdatedAt(bookBase, projectId));
+            lastBaseUpdatedAtRef.current = updatedAt;
+            setProject((p) => (p ? { ...p, updatedAt } : p));
             const retry = await patchCanvasProject(bookBase, projectId, {
               canvasDelta: {
                 ...delta,
@@ -786,7 +988,7 @@ function Inner({ projectId }: { projectId: string }) {
     const flushBeforeLeave = async () => {
       await waitForPendingCanvasImageUploads(60_000);
       await flushPendingCanvasImageUploadPersist();
-      await runAutosave(true);
+      await runAutosave(true, { bypassCooldown: true });
     };
 
     const onPageHide = () => {
@@ -834,9 +1036,12 @@ function Inner({ projectId }: { projectId: string }) {
     return () => {
       void flushBeforeLeave().finally(() => {
         registerCanvasGraphPersistFlush(null);
+        registerCanvasGraphDirtyCheck(null);
         registerCanvasDeltaPersist(null);
+        registerCanvasProjectVersionSync(null);
       });
       unsub();
+      unsubDragEnd();
       syncLastPersistedSnapshotRef.current = null;
       isCanvasDirtyRef.current = null;
       window.removeEventListener("canvas:flush-autosave", onFlushAutosave);
@@ -865,6 +1070,14 @@ function Inner({ projectId }: { projectId: string }) {
       }
     };
   }, [project, base, projectId, loading]);
+
+  /** 生成/剪辑结束后补跑被推迟的 autosave */
+  useEffect(() => {
+    if (loading || inflightTaskCount > 0 || mediaRenderActive) return;
+    if (!autosavePendingRef.current) return;
+    autosavePendingRef.current = false;
+    void runAutosaveRef.current(false);
+  }, [inflightTaskCount, mediaRenderActive, loading]);
 
   const undo = useCallback(() => {
     canvasGraphUndo();
@@ -897,11 +1110,29 @@ function Inner({ projectId }: { projectId: string }) {
       /* 元数据失败不阻断保存 */
     }
 
+    const saveGen = ++saveGenerationRef.current;
+    setSaveError(null);
     setSaving(true);
+    savePhaseRef.current = "wait_uploads";
+    setSavePhase("wait_uploads");
     try {
       await waitForPendingCanvasImageUploads(60_000);
+      savePhaseRef.current = "commit_layout";
+      setSavePhase("commit_layout");
+      flushCanvasNodePositions();
+      await new Promise<void>((resolve) => {
+        queueMicrotask(() => resolve());
+      });
+      savePhaseRef.current = "flush_drafts";
+      setSavePhase("flush_drafts");
+      window.dispatchEvent(new CustomEvent("canvas:flush-text-drafts"));
+      await new Promise<void>((resolve) => {
+        queueMicrotask(() => resolve());
+      });
       const graph = buildCanvasPersistGraph(toGraph);
       const thumb = pickPersistableProjectThumbnailUrl(graph);
+      savePhaseRef.current = "history_thumb";
+      setSavePhase("history_thumb");
       const shot = await captureCanvasViewportSnapshotUrl(base);
       const historyThumb = resolveCanvasHistoryThumbnailUrl(
         shot,
@@ -927,6 +1158,8 @@ function Inner({ projectId }: { projectId: string }) {
       if (thumb && thumb !== project.thumbnailUrl) {
         patch.thumbnailUrl = thumb;
       }
+      savePhaseRef.current = "patch_full";
+      setSavePhase("patch_full");
       const { historyItem, project: updatedProject } = await patchCanvasProject(
         base,
         projectId,
@@ -957,10 +1190,23 @@ function Inner({ projectId }: { projectId: string }) {
       } else {
         setSaveError("项目已保存，但写入「我的历史」失败，请稍后重试。");
       }
+      if (saveGen === saveGenerationRef.current) {
+        setSavePhase("done");
+        window.setTimeout(() => {
+          if (saveGen === saveGenerationRef.current) {
+            setSavePhase("idle");
+            setSaving(false);
+          }
+        }, 1200);
+      }
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "保存失败");
-    } finally {
-      setSaving(false);
+      if (saveGen === saveGenerationRef.current) {
+        const errMsg = e instanceof Error ? e.message : "保存失败";
+        setSaveError(formatCanvasSaveStepError(savePhaseRef.current, errMsg));
+        savePhaseRef.current = "idle";
+        setSavePhase("idle");
+        setSaving(false);
+      }
     }
   }, [base, project, projectId, toGraph, dialogs]);
 
@@ -1233,7 +1479,7 @@ function Inner({ projectId }: { projectId: string }) {
           ref={toolbarShellRef}
           data-canvas-toolbar-shell
           className={cn(
-            "z-[300] w-full min-w-0 max-w-full shrink-0 overflow-x-hidden bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
+            "z-[300] w-full min-w-0 max-w-full shrink-0 overflow-visible bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
             showImmersiveChrome && immersive
               ? cn(
                   "fixed left-0 right-0 top-0",
@@ -1247,10 +1493,11 @@ function Inner({ projectId }: { projectId: string }) {
             onProjectNameChange={setNameDraft}
             onProjectNameCommit={() => void commitProjectName()}
             saving={saving}
+            savePhase={savePhase}
+            saveRetryAttempt={saveRetryAttempt}
             saveError={saveError}
             lastSavedAt={lastSavedAt}
             onSave={() => void manualSave()}
-            onUndo={undo}
             onOpenMyTemplates={() => {
               closeAllToolbarPanels();
               setMyTemplatesOpen(true);
@@ -1310,7 +1557,6 @@ function Inner({ projectId }: { projectId: string }) {
             }
           />
           <GatewayLinkBanner />
-          <CanvasToolsSessionBanner />
         </div>
       <MyCanvasHistoryPanel
         open={myHistoryOpen}

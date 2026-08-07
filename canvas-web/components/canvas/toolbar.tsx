@@ -18,8 +18,9 @@ import {
   Save,
   Share2,
   Sparkles,
-  Undo2,
   UserRound,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CANVAS_PROJECT_HISTORY_MAX } from "@/lib/canvas/canvas-autosave-settings";
@@ -28,14 +29,22 @@ import {
   CANVAS_SEMANTIC_STATUS_CLASS,
   CANVAS_SEMANTIC_TITLE_CLASS,
   CANVAS_TOOLBAR_BTN_CLASS,
-  CANVAS_PRIMARY_BTN_SM_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
+import {
+  formatCanvasNetworkStatusLabel,
+  useCanvasNetworkStatus,
+} from "@/lib/canvas/use-canvas-network-status";
 import {
   CanvasToolbarDropdownItem,
   CanvasToolbarDropdownMenu,
   CanvasToolbarDropdownTrigger,
   useCanvasToolbarDropdown,
 } from "@/components/canvas/canvas-toolbar-dropdown";
+import { CanvasToolbarIconButton } from "@/components/canvas/canvas-toolbar-icon-button";
+import {
+  canvasSavePhaseLabel,
+  type CanvasSavePhase,
+} from "@/lib/canvas/canvas-save-phase";
 import { flushCanvasGraphPersist } from "@/lib/canvas/canvas-graph-persist-bridge";
 import {
   CANVAS_IMAGE_UPLOADS_CHANGED,
@@ -52,10 +61,11 @@ export function CanvasToolbar({
   onProjectNameChange,
   onProjectNameCommit,
   saving,
+  savePhase = "idle",
+  saveRetryAttempt = 0,
   saveError,
   lastSavedAt,
   onSave,
-  onUndo,
   onSaveTemplate,
   onShareTemplate,
   onOpenMyTemplates,
@@ -77,10 +87,11 @@ export function CanvasToolbar({
   onProjectNameChange: (name: string) => void;
   onProjectNameCommit: () => void;
   saving: boolean;
+  savePhase?: CanvasSavePhase;
+  saveRetryAttempt?: number;
   saveError: string | null;
   lastSavedAt: Date | null;
   onSave: () => void;
-  onUndo: () => void;
   onSaveTemplate?: () => void;
   onShareTemplate?: () => void;
   onOpenMyTemplates?: () => void;
@@ -100,11 +111,18 @@ export function CanvasToolbar({
   centerLeading?: ReactNode;
 }) {
   const router = useRouter();
-  const mineMenu = useCanvasToolbarDropdown();
   const [openMenu, setOpenMenu] = useState<ToolbarMenuKey | null>(null);
   const [leavingProject, setLeavingProject] = useState(false);
   const [imageUploadPending, setImageUploadPending] = useState(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
+  const saveBusy =
+    leavingProject || saving || (savePhase !== "idle" && savePhase !== "done");
+  const saveStatusLabel =
+    canvasSavePhaseLabel(savePhase, saveRetryAttempt) ||
+    (saveBusy ? "保存中…" : "");
+  const network = useCanvasNetworkStatus();
+  const networkLabel = formatCanvasNetworkStatusLabel(network);
+  const mineMenu = useCanvasToolbarDropdown();
 
   useEffect(() => {
     const sync = () => {
@@ -229,7 +247,7 @@ export function CanvasToolbar({
   return (
     <header
       data-canvas-toolbar
-      className="relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 overflow-hidden border-b border-white/10 bg-[#181818] px-3 py-2 text-white"
+      className="relative z-[200] grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 overflow-visible border-b border-white/10 bg-[#181818] px-3 py-2 text-white"
     >
       <div
         data-canvas-toolbar-meta
@@ -262,6 +280,26 @@ export function CanvasToolbar({
             生成中 · {inflightTaskCount} 个任务
           </span>
         ) : null}
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium",
+            network.online
+              ? "bg-emerald-500/15 text-emerald-100"
+              : "bg-red-500/20 text-red-200",
+          )}
+          title={
+            network.online
+              ? `浏览器在线状态：${networkLabel}（不代表 book-mall 保存是否畅通）`
+              : "浏览器离线，保存与生成可能失败"
+          }
+        >
+          {network.online ? (
+            <Wifi className="size-3" />
+          ) : (
+            <WifiOff className="size-3" />
+          )}
+          <span className="hidden sm:inline">{networkLabel}</span>
+        </span>
         {imageUploadPending ? (
           <span
             className="inline-flex shrink-0 items-center gap-1 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-medium text-cyan-100"
@@ -272,26 +310,26 @@ export function CanvasToolbar({
             {imageUploadCount > 1 ? ` · ${imageUploadCount}` : ""}
           </span>
         ) : null}
-        {saving || leavingProject ? (
+        {saveBusy ? (
           <span
             className={cn(
-              "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
+              "hidden min-w-0 max-w-[min(280px,32vw)] shrink truncate text-[11px] lg:inline",
               CANVAS_SEMANTIC_STATUS_CLASS,
             )}
             title="画布数据写入云端"
           >
-            {leavingProject ? "正在保存并离开…" : "保存中…"}
+            {leavingProject ? "正在保存并离开…" : saveStatusLabel}
           </span>
-        ) : !imageUploadPending && (lastSavedAt || saveError) ? (
+        ) : !saveBusy && !imageUploadPending && (lastSavedAt || saveError) ? (
           <span
             className={cn(
               "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
               saveError ? CANVAS_SEMANTIC_ERROR_CLASS : CANVAS_SEMANTIC_STATUS_CLASS,
             )}
-            title={saveError ? `保存失败：${saveError}` : undefined}
+            title={saveError ?? undefined}
           >
             {saveError ? (
-              <>保存失败：{saveError}</>
+              <>{saveError}</>
             ) : lastSavedAt ? (
               `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
             ) : (
@@ -321,29 +359,26 @@ export function CanvasToolbar({
       </div>
       <div
         data-canvas-toolbar-actions
-        className="flex min-w-0 items-center justify-end gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-w-0 items-center justify-end gap-1.5 overflow-visible"
       >
-        <button type="button" onClick={onUndo} className={CANVAS_TOOLBAR_BTN_CLASS}>
-          <Undo2 className="size-3" /> 撤销
-        </button>
-        <button
-          type="button"
+        <CanvasToolbarIconButton
+          label="保存"
+          hint="手动保存到「我的历史」"
           onClick={onSave}
-          disabled={saving}
-          className={cn(CANVAS_TOOLBAR_BTN_CLASS, "disabled:opacity-50")}
+          disabled={saveBusy}
         >
-          {saving ? (
-            <Loader2 className="size-3 animate-spin" />
+          {saveBusy ? (
+            <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Save className="size-3" />
+            <Save className="size-3.5" />
           )}
-          保存
-        </button>
+        </CanvasToolbarIconButton>
 
         {mineItems.length > 0 ? (
           <>
             <CanvasToolbarDropdownTrigger
               label="我的"
+              tooltip="模板、历史、生成记录、视频库等"
               open={openMenu === "mine"}
               anchorRef={mineMenu.anchorRef}
               onClick={() => toggleMenu("mine")}
@@ -369,15 +404,13 @@ export function CanvasToolbar({
         ) : null}
 
         {onOpenProjectCharacterAssets ? (
-          <button
-            type="button"
+          <CanvasToolbarIconButton
+            label="项目资产"
+            hint="查看本项目角色与场景资产库"
             onClick={onOpenProjectCharacterAssets}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="查看本项目角色与场景资产库"
           >
-            <UserRound className="size-3" />
-            项目资产
-          </button>
+            <UserRound className="size-3.5" />
+          </CanvasToolbarIconButton>
         ) : null}
         {onOpenStyleLibrary ? (
           <button
@@ -402,44 +435,40 @@ export function CanvasToolbar({
           </button>
         ) : null}
         {onSaveTemplate ? (
-          <button
-            type="button"
+          <CanvasToolbarIconButton
+            label="存为模板"
+            hint="将当前画布保存到我的模板"
             onClick={onSaveTemplate}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
           >
-            <BookmarkPlus className="size-3" />
-            存为模板
-          </button>
+            <BookmarkPlus className="size-3.5" />
+          </CanvasToolbarIconButton>
         ) : null}
         {onShareTemplate ? (
-          <button
-            type="button"
+          <CanvasToolbarIconButton
+            label="分享到社区"
+            hint="将当前画布分享到社区模板"
             onClick={onShareTemplate}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="将当前画布分享到社区模板"
           >
-            <Share2 className="size-3" />
-            分享到社区
-          </button>
+            <Share2 className="size-3.5" />
+          </CanvasToolbarIconButton>
         ) : null}
         {onToggleImmersive ? (
-          <button
-            type="button"
-            onClick={onToggleImmersive}
-            className={CANVAS_PRIMARY_BTN_SM_CLASS}
-            title={
+          <CanvasToolbarIconButton
+            label={immersive ? "退出全屏" : "全屏"}
+            hint={
               immersive
-                ? "退出全屏（Esc）"
-                : "全屏编辑：隐藏顶栏，鼠标移到屏幕顶部可唤出"
+                ? "Esc 也可退出"
+                : "隐藏顶栏，鼠标移到屏幕顶部可唤出"
             }
+            onClick={onToggleImmersive}
+            className="border-transparent bg-[var(--canvas-accent)] text-white hover:border-transparent hover:bg-[var(--canvas-accent-soft)]"
           >
             {immersive ? (
-              <Minimize2 className="size-3" />
+              <Minimize2 className="size-3.5" />
             ) : (
-              <Maximize2 className="size-3" />
+              <Maximize2 className="size-3.5" />
             )}
-            {immersive ? "退出全屏" : "全屏"}
-          </button>
+          </CanvasToolbarIconButton>
         ) : null}
       </div>
     </header>

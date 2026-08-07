@@ -124,18 +124,10 @@ describe("assertCanvasDeltaBaseUpdatedAt", () => {
     ).not.toThrow();
   });
 
-  it("不匹配时抛 409 CONFLICT", () => {
+  it("不匹配时软放行（不抛 409，避免媒体写回与 autosave 冲突）", () => {
     const d = new Date("2026-07-31T12:00:00.000Z");
-    try {
-      assertCanvasDeltaBaseUpdatedAt(
-        "2026-07-31T11:00:00.000Z",
-        d,
-      );
-      expect.fail("should throw");
-    } catch (e) {
-      expect(e).toBeInstanceOf(CanvasProjectError);
-      expect((e as CanvasProjectError).code).toBe("CONFLICT");
-      expect((e as CanvasProjectError).httpStatus).toBe(409);
-    }
+    expect(() =>
+      assertCanvasDeltaBaseUpdatedAt("2026-07-31T11:00:00.000Z", d),
+    ).not.toThrow();
   });
 });

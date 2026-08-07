@@ -13,6 +13,8 @@ const TRANSIENT_KEYS = [
   "uploading",
   "uploadError",
   "activeTaskId",
+  /** 云端剪辑进度 · 会话态；落盘会导致 pending 卡死且每次进度更新触发空保存风暴 */
+  "mediaRenderInFlight",
 ] as const;
 
 function stripTransientRuntime(

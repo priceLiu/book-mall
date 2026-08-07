@@ -26,6 +26,7 @@ export type Pro2VideoBoardCellProps = {
   focused?: boolean;
   onSelect: () => void;
   cellId?: string;
+  cancelScope?: import("@/lib/canvas/canvas-run-bus").CanvasCancelGenerationJob;
 };
 
 /** 分镜视频板单格（对齐分镜图组 · 图 3/4） */
@@ -34,6 +35,7 @@ export function Pro2VideoBoardCell({
   focused,
   onSelect,
   cellId,
+  cancelScope,
 }: Pro2VideoBoardCellProps) {
   const url = videoUrl(row);
   const st = pro2VideoCellStatus(row);
@@ -88,7 +90,11 @@ export function Pro2VideoBoardCell({
         </div>
       ) : st === "running" ? (
         <div className="relative min-h-[160px] flex-1">
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState
+            variant="violet"
+            cancelNodeId={cancelScope?.nodeId}
+            cancelScope={cancelScope}
+          />
         </div>
       ) : st === "error" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">

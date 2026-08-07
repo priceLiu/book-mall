@@ -4,6 +4,10 @@ import type { CanvasStoryRunJob } from "./canvas-run-bus";
 import type { StoryRunContext } from "./story-workspace-types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
+import {
   canvasNodeRunSessionStartedAtMs,
   isCanvasNodeRunSessionActive,
   shouldSkipStaleTerminalWhileLocalInflight,
@@ -249,6 +253,9 @@ export function runtimePatchFromCanvasTask(
     };
   }
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return canvasIdleRuntimeAfterUserCancel(task.id);
+    }
     return {
       status: "error",
       taskId: task.id,

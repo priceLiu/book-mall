@@ -272,7 +272,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
         >
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
-              <LibtvMediaGeneratingState variant="violet" />
+              <LibtvMediaGeneratingState variant="violet" cancelNodeId={id} />
             ) : hasImage ? (
               <MediaHoverBox
                 src={previewUrl}

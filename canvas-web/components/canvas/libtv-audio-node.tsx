@@ -204,7 +204,7 @@ export function LibtvAudioNode({
 
   const renderStage = () => {
     if (isGenerating) {
-      return <LibtvMediaGeneratingState variant="violet" />;
+      return <LibtvMediaGeneratingState variant="violet" cancelNodeId={id} />;
     }
     if (hasAudio && previewUrl) {
       return (

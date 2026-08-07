@@ -29,8 +29,41 @@ function projectIdFromSourceRef(sourceRef: unknown): string | null {
   return typeof projectId === "string" && projectId.trim() ? projectId.trim() : null;
 }
 
+export async function findActiveMediaRenderJobForProject(args: {
+  userId: string;
+  projectId: string;
+}): Promise<{ id: string; expiresAt: Date } | null> {
+  const jobs = await prisma.mediaRenderJob.findMany({
+    where: {
+      userId: args.userId,
+      sourceApp: MediaRenderSourceApp.canvas,
+      status: {
+        in: [MediaRenderJobStatus.PENDING, MediaRenderJobStatus.RUNNING],
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      expiresAt: true,
+      sourceRef: true,
+      status: true,
+      progress: true,
+      progressLabel: true,
+    },
+  });
+
+  for (const job of jobs) {
+    if (projectIdFromSourceRef(job.sourceRef) !== args.projectId) continue;
+    if (isMediaRenderConcurrencySlot(job)) {
+      return { id: job.id, expiresAt: job.expiresAt };
+    }
+  }
+  return null;
+}
+
 /**
  * 同一画布项目再次提交时，取消仍在进行中的旧任务，避免重复点击占满并发。
+ * 仅在客户端显式 replaceInFlight 时调用；默认改走 findActiveMediaRenderJobForProject 复用。
  */
 export async function supersedeInFlightMediaRenderJobsForProject(args: {
   userId: string;
@@ -110,8 +143,14 @@ export async function reclaimStaleMediaRenderJobsForUser(
   return result.count;
 }
 
-export async function countActiveRenderJobs(userId: string): Promise<number> {
-  await reclaimStaleMediaRenderJobsForUser(userId);
+export async function countActiveRenderJobs(
+  userId: string,
+  opts?: { reclaim?: boolean },
+): Promise<number> {
+  // 提交路径勿默认 reclaim（updateMany 在连接池紧张时会拖死「提交任务」）
+  if (opts?.reclaim !== false) {
+    await reclaimStaleMediaRenderJobsForUser(userId);
+  }
 
   const rows = await prisma.mediaRenderJob.findMany({
     where: {

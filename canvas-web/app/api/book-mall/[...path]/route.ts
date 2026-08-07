@@ -101,6 +101,16 @@ async function proxyToBookMall(
     );
   }
 
+  if (!bearer) {
+    return NextResponse.json(
+      {
+        error: "UNAUTHORIZED",
+        message: "登录连接已断开，请稍后重试或重新连接主站账号",
+      },
+      { status: 401 },
+    );
+  }
+
   try {
     let r = await fetchUpstream(request, upstream, bearer, body);
 

@@ -511,7 +511,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           />
         ) : null}
         {isGenerating ? (
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState variant="violet" cancelNodeId={id} />
         ) : displayState === "generated" ? (
           <div
             className={cn(

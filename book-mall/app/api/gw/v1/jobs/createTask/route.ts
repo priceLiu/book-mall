@@ -34,9 +34,12 @@ import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
 import { buildSubmitFailureFinalizePayload } from "@/lib/gateway/gateway-submit-error-policy";
 import { prisma } from "@/lib/prisma";
+import { extractVendorRequestIdFromText } from "@/lib/gateway/vendor-request-id";
 import {
-  extractVendorRequestIdFromText,
-} from "@/lib/gateway/vendor-request-id";
+  acquireGatewayStoryTaskCreateLock,
+  dedupeGatewayCreateByStoryTaskId,
+  releaseGatewayStoryTaskCreateLock,
+} from "@/lib/gateway/gateway-v1-story-task-dedup";
 
 export const dynamic = "force-dynamic";
 
@@ -225,6 +228,27 @@ export async function POST(request: NextRequest) {
         };
       })()
     : (body.input ?? {});
+
+  const storyTaskId = logMeta.storyTaskId?.trim();
+  if (storyTaskId) {
+    await acquireGatewayStoryTaskCreateLock(storyTaskId);
+  }
+  try {
+    if (storyTaskId) {
+      const hit = await dedupeGatewayCreateByStoryTaskId(storyTaskId, {
+        waitMs: 0,
+      });
+      if (hit !== "not_found" && hit !== "in_progress") {
+        return NextResponse.json({
+          code: 200,
+          data: {
+            taskId: hit.taskId,
+            logId: hit.logId,
+            providerKind: effectiveRoute.providerKind,
+          },
+        });
+      }
+    }
 
   let log;
   try {
@@ -487,5 +511,10 @@ export async function POST(request: NextRequest) {
       await finalizeRequestLog(log.id, finalizePayload).catch(() => undefined);
     }
     return NextResponse.json({ error: msg }, { status: 502 });
+  }
+  } finally {
+    if (storyTaskId) {
+      await releaseGatewayStoryTaskCreateLock(storyTaskId);
+    }
   }
 }

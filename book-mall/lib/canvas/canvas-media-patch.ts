@@ -8,6 +8,7 @@ import {
   patchCanvasJsonNodeRuntime,
   type CanvasNodeRuntimePatch,
 } from "@/lib/canvas/canvas-volcengine-recover";
+import { isCanvasManagedOssUrl } from "@/lib/canvas/canvas-managed-oss-url";
 import { prisma } from "@/lib/prisma";
 
 export const CANVAS_IMAGE_MEDIA_NODE_TYPES = new Set([
@@ -71,6 +72,7 @@ export function patchCanvasJsonNodeMedia(
   let next = patchCanvasJsonNodeRuntime(canvas, nodeId, runtime);
   if (!CANVAS_IMAGE_MEDIA_NODE_TYPES.has(nodeType ?? "")) return next;
   if (!next || typeof next !== "object") return next;
+  const dataOssUrl = isCanvasManagedOssUrl(mediaUrl) ? mediaUrl : undefined;
   const c = next as {
     nodes?: Array<{ id: string; data?: Record<string, unknown> }>;
   };
@@ -83,10 +85,17 @@ export function patchCanvasJsonNodeMedia(
             ...n,
             data: {
               ...(n.data ?? {}),
-              ossUrl: mediaUrl,
-              blobUrl: undefined,
-              uploading: false,
-              uploadError: undefined,
+              ...(dataOssUrl
+                ? {
+                    ossUrl: dataOssUrl,
+                    blobUrl: undefined,
+                    uploading: false,
+                    uploadError: undefined,
+                  }
+                : {
+                    uploading: false,
+                    uploadError: undefined,
+                  }),
             },
           }
         : n,
@@ -148,6 +157,10 @@ export async function patchCanvasProjectNodeMediaFromTask(
   if (!node) return false;
 
   const nodeType = opts?.nodeType ?? node.type;
+  // 节点已展示本任务成片 → 跳过整图写回，避免无谓 bump updatedAt 与增量 autosave 抢写
+  if (canvasNodeShowsPersistedMedia(canvas, task.nodeId, task.id)) {
+    return false;
+  }
   const existingTaskId = node.data?.runtime?.taskId?.trim();
   const existingStatus = node.data?.runtime?.status;
   if (

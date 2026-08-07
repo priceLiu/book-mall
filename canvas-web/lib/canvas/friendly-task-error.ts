@@ -189,6 +189,27 @@ export function resolveLibtvRunFailureCode(rawMessage: string): string {
   ) {
     return "INSUFFICIENT_CREDITS";
   }
+  if (
+    msg.includes("503") ||
+    blob.includes("database_unavailable") ||
+    blob.includes("系统繁忙") ||
+    blob.includes("book_mall_proxy_failed") ||
+    blob.includes("主站鉴权暂时不可用") ||
+    blob.includes("主站暂时不可达") ||
+    blob.includes("connection pool") ||
+    blob.includes("timed out fetching a new connection")
+  ) {
+    return "SYSTEM_BUSY";
+  }
+  if (
+    msg.includes("401") ||
+    blob.includes("unauthorized") ||
+    msg.includes("缺少 Bearer Token") ||
+    msg.includes("无效或过期的工具令牌") ||
+    msg.includes("工具站登录令牌")
+  ) {
+    return "UNAUTHORIZED";
+  }
   return "REQUEST_FAILED";
 }
 
@@ -198,9 +219,22 @@ export function formatCanvasTaskError(
   failMessage?: string | null,
   modelKey?: string | null,
 ): string {
-  const msg = extractVendorErrorMessage(failMessage ?? "");
   const code = (failCode ?? "").trim();
+  if (code === "USER_CANCELLED") {
+    return "用户已中止生成";
+  }
+  const msg = extractVendorErrorMessage(failMessage ?? "");
   const blob = `${code} ${msg} ${failMessage ?? ""}`.toLowerCase();
+
+  if (
+    blob.includes("401") ||
+    blob.includes("unauthorized") ||
+    msg.includes("登录已失效") ||
+    msg.includes("工具站登录令牌") ||
+    msg.includes("重新连接主站账号")
+  ) {
+    return "登录状态已过期，请刷新页面或重新连接主站账号后再生成。";
+  }
 
   if (isMislabeledVendorSuccessError(code, msg)) {
     return "视频已生成但未写入节点，请刷新画布或重新打开项目后重试。";
@@ -312,10 +346,7 @@ export function formatCanvasTaskError(
     return sanitizeGatewayTechnicalMessage(msg) ?? "火山方舟视频生成失败";
   }
 
-  if (
-    isMislabeledInsufficientCredits({ failCode: code, failMessage: msg }) ||
-    (code === "SYSTEM_BUSY" && blob.includes("系统繁忙"))
-  ) {
+  if (isMislabeledInsufficientCredits({ failCode: code, failMessage: msg })) {
     return "系统繁忙，请稍后重试。";
   }
 
@@ -414,6 +445,18 @@ export function formatCanvasTaskError(
   }
 
   if (
+    code === "SYSTEM_BUSY" ||
+    blob.includes("503") ||
+    blob.includes("database_unavailable") ||
+    blob.includes("book_mall_proxy_failed") ||
+    blob.includes("主站鉴权暂时不可用") ||
+    blob.includes("主站暂时不可达") ||
+    blob.includes("econnrefused")
+  ) {
+    return "系统繁忙或主站连接异常，请稍后重试；若工具栏同时显示「保存失败」，请先确认 book-mall 与数据库连接正常。";
+  }
+
+  if (
     blob.includes("gateway 内部链路") ||
     blob.includes("api 连接超时") ||
     blob.includes("api 请求失败")
@@ -427,8 +470,12 @@ export function formatCanvasTaskError(
     blob.includes("network") ||
     blob.includes("aborterror") ||
     blob.includes("aborted") ||
-    blob.includes("timeout") ||
-    blob.includes("timed out")
+    (blob.includes("timeout") &&
+      !blob.includes("connection pool") &&
+      !blob.includes("timed out fetching a new connection")) ||
+    (blob.includes("timed out") &&
+      !blob.includes("connection pool") &&
+      !blob.includes("timed out fetching a new connection"))
   ) {
     return networkFailureMessage(modelKey);
   }

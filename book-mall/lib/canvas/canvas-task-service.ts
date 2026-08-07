@@ -1949,6 +1949,8 @@ export async function runCanvasPollWorker(opts?: {
                 ? { prompt_extend: params.prompt_extend !== false }
                 : undefined,
             clientPage: resolveCanvasTaskClientPage(task.projectId, payload),
+            projectId: task.projectId,
+            canvasTaskId: task.id,
           }),
           new Promise<never>((_, reject) =>
             setTimeout(
@@ -2252,6 +2254,49 @@ export async function runCanvasCleanupWorker(): Promise<{
     }
   }
   return out;
+}
+
+// —— User cancel ——
+
+export const CANVAS_USER_CANCELLED_FAIL_CODE = "USER_CANCELLED";
+const CANVAS_USER_CANCELLED_MESSAGE = "用户已中止生成";
+
+/** 用户主动中止进行中的生成任务（不删 OSS；厂商侧可能已完成并计费）。 */
+export async function cancelCanvasGenerationTask(args: {
+  userId: string;
+  projectId: string;
+  taskId: string;
+}): Promise<{ ok: true; alreadyTerminal: boolean }> {
+  await assertAccessibleCanvasProject(args.userId, args.projectId);
+  const task = await prisma.canvasGenerationTask.findFirst({
+    where: {
+      id: args.taskId,
+      projectId: args.projectId,
+      deletedAt: null,
+    },
+    select: { id: true, status: true },
+  });
+  if (!task) {
+    throw new CanvasProjectError("NOT_FOUND", "task not found", 404);
+  }
+  if (
+    task.status === "SUCCEEDED" ||
+    task.status === "FAILED" ||
+    task.status === "CANCELLED"
+  ) {
+    return { ok: true, alreadyTerminal: true };
+  }
+  await prisma.canvasGenerationTask.update({
+    where: { id: args.taskId },
+    data: {
+      status: "CANCELLED",
+      failCode: CANVAS_USER_CANCELLED_FAIL_CODE,
+      failMessage: CANVAS_USER_CANCELLED_MESSAGE,
+      completedAt: new Date(),
+    },
+  });
+  void notifyCanvasTaskSnapshotChanged(args.projectId);
+  return { ok: true, alreadyTerminal: false };
 }
 
 // —— Soft delete for stage 4 ——

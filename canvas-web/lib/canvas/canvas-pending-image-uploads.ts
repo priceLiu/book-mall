@@ -1,8 +1,6 @@
-/** 画布粘贴/上传 · OSS 队列（落盘走整图 flush，确保新节点+连线不丢） */
+/** 画布粘贴/上传 · OSS 队列（落盘走增量 flush，避免整图 PATCH 与服务端媒体写回冲突） */
 
-import {
-  flushCanvasGraphPersist,
-} from "./canvas-graph-persist-bridge";
+import { flushCanvasGraphPersist } from "./canvas-graph-persist-bridge";
 import { useCanvasStore } from "./store";
 
 export const CANVAS_IMAGE_UPLOADS_CHANGED = "canvas:image-uploads-changed";
@@ -11,6 +9,7 @@ const pending = new Map<string, Promise<void>>();
 const uploadGeneration = new Map<string, number>();
 const staleTimers = new Map<string, number>();
 let persistAfterDrainTimer: number | null = null;
+let structurePersistTimer: number | null = null;
 let persistInFlight: Promise<boolean> | null = null;
 
 const PERSIST_AFTER_UPLOAD_DRAIN_MS = 700;
@@ -29,9 +28,9 @@ function clearStaleTimer(nodeId: string): void {
   }
 }
 
-/** OSS 完成后整图落盘（含新粘贴节点、连线、ossUrl） */
+/** OSS 完成后增量落盘（遇 409 由 autosave 轻量对齐版本） */
 async function persistAfterUploadDrain(): Promise<boolean> {
-  await flushCanvasGraphPersist(true);
+  await flushCanvasGraphPersist(false);
   return true;
 }
 
@@ -96,11 +95,15 @@ export function trackCanvasImageUpload(
   });
 }
 
-/** 粘贴/上传后立即保存节点骨架（strip blob 后仍有节点结构） */
+/** 粘贴/上传后 debounce 落盘节点骨架（增量 PATCH，非 force 整图） */
 export function scheduleCanvasStructurePersistAfterPaste(): void {
-  queueMicrotask(() => {
-    void flushCanvasGraphPersist(true);
-  });
+  if (structurePersistTimer !== null) {
+    window.clearTimeout(structurePersistTimer);
+  }
+  structurePersistTimer = window.setTimeout(() => {
+    structurePersistTimer = null;
+    void flushCanvasGraphPersist(false);
+  }, 600);
 }
 
 /** 打开画布后：清掉无队列任务的 uploading 标记 */

@@ -9,7 +9,6 @@ import type { CanvasGraph } from "@/lib/canvas/types";
 /** 截图长边上限：历史列表只用小图，缩到 720 足够且省 OSS 空间 */
 const SNAPSHOT_MAX_WIDTH = 720;
 const SNAPSHOT_TIMEOUT_MS = 12000;
-const SNAPSHOT_PREPARE_TIMEOUT_MS = 4000;
 const SNAPSHOT_FALLBACK_BG = "#191919";
 /** 跨域图片取不到像素时的占位（1x1 透明），避免整张截图失败 */
 const TRANSPARENT_PIXEL =
@@ -65,29 +64,13 @@ type SnapshotPrepareResult = {
   restore: () => void;
 };
 
-/** 截图前 fitView 一次，避免 pan/zoom 导致 html-to-image 截到空白 */
+/** 截图前仅等两帧渲染，**不** fitView（fitView 会导致保存时画布先放大再跳回） */
 async function prepareViewportForSnapshot(): Promise<SnapshotPrepareResult> {
   if (typeof window === "undefined") return { restore: () => {} };
-
-  return (
-    (await withTimeout(
-      new Promise<SnapshotPrepareResult>((resolve) => {
-        const onReady = (event: Event) => {
-          window.removeEventListener(
-            "canvas:viewport-snapshot-ready",
-            onReady,
-          );
-          const detail = (event as CustomEvent<SnapshotPrepareResult>).detail;
-          resolve(detail ?? { restore: () => {} });
-        };
-        window.addEventListener("canvas:viewport-snapshot-ready", onReady, {
-          once: true,
-        });
-        window.dispatchEvent(new CustomEvent("canvas:prepare-viewport-snapshot"));
-      }),
-      SNAPSHOT_PREPARE_TIMEOUT_MS,
-    )) ?? { restore: () => {} }
-  );
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+  return { restore: () => {} };
 }
 
 /** 判定截图是否几乎只有背景色（React Flow transform 失败时常出现） */

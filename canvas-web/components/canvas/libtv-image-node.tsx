@@ -28,6 +28,7 @@ import { isPortraitNodeActive } from "@/lib/canvas/portrait-node-data";
 import { useImportPortraitToLibrary } from "@/lib/canvas/use-import-portrait-to-library";
 import {
   libtvMediaPreviewCanFallbackToBlob,
+  libtvMediaPreviewCanFallbackToEphemeral,
   resolveLibtvMediaPreviewUrl,
 } from "@/lib/canvas/libtv-media-preview-url";
 import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
@@ -172,12 +173,14 @@ export function LibtvImageNode({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [livenessOpen, setLivenessOpen] = useState(false);
   const [preferBlobPreview, setPreferBlobPreview] = useState(false);
+  const [preferEphemeralPreview, setPreferEphemeralPreview] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? undefined;
 
   const d = data as unknown as LibtvImageNodeData;
   useEffect(() => {
     setPreferBlobPreview(false);
-  }, [d.ossUrl, d.blobUrl, d.uploading]);
+    setPreferEphemeralPreview(false);
+  }, [d.ossUrl, d.blobUrl, d.uploading, d.runtime?.ephemeralUrl]);
 
   const previewUrl = useMemo(() => {
     const gridSource = String(
@@ -187,22 +190,36 @@ export function LibtvImageNode({
     return resolveLibtvMediaPreviewUrl({
       ossUrl: d.ossUrl,
       blobUrl: d.blobUrl,
+      ephemeralUrl: d.runtime?.ephemeralUrl,
       uploading: d.uploading,
       preferBlob: preferBlobPreview,
+      preferEphemeral: preferEphemeralPreview,
     });
   }, [
     d.gridSplitCrop,
     (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl,
     d.ossUrl,
     d.blobUrl,
+    d.runtime?.ephemeralUrl,
     d.uploading,
     preferBlobPreview,
+    preferEphemeralPreview,
   ]);
   const onPreviewLoadError = useCallback(() => {
+    if (
+      !preferEphemeralPreview &&
+      libtvMediaPreviewCanFallbackToEphemeral({
+        ossUrl: d.ossUrl,
+        ephemeralUrl: d.runtime?.ephemeralUrl,
+      })
+    ) {
+      setPreferEphemeralPreview(true);
+      return;
+    }
     if (libtvMediaPreviewCanFallbackToBlob(d)) {
       setPreferBlobPreview(true);
     }
-  }, [d]);
+  }, [d, preferEphemeralPreview]);
   const saveAsAsset = useSaveNodeAsAsset();
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
@@ -601,7 +618,7 @@ export function LibtvImageNode({
     if (isCharacterThreeView) {
       if (isGenerating) {
         return (
-          <LibtvMediaGeneratingState variant={chrome.generating} />
+          <LibtvMediaGeneratingState variant={chrome.generating} cancelNodeId={id} />
         );
       }
       if (hasImage) {
@@ -654,7 +671,7 @@ export function LibtvImageNode({
           />
         ) : null;
       return (
-        <LibtvMediaGeneratingState variant={chrome.generating}>
+        <LibtvMediaGeneratingState variant={chrome.generating} cancelNodeId={id}>
           {cropPreview}
         </LibtvMediaGeneratingState>
       );

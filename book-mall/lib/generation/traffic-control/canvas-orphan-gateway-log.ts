@@ -34,6 +34,32 @@ const REVIVABLE_CANVAS_TASK_STATUSES: Prisma.CanvasGenerationTaskWhereInput[] = 
   },
 ];
 
+export type CanvasGatewayLogRef = {
+  logId: string;
+  externalTaskId: string | null;
+  status: string;
+};
+
+/** 任意非 FAILED 的 storyTaskId 关联日志（含 vendor taskId 尚未写入的 RUNNING）。 */
+export async function findExistingCanvasGatewayLogForTask(
+  taskId: string,
+): Promise<CanvasGatewayLogRef | null> {
+  const log = await prisma.gatewayRequestLog.findFirst({
+    where: {
+      storyTaskId: taskId,
+      status: { not: "FAILED" },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, externalTaskId: true, status: true },
+  });
+  if (!log) return null;
+  return {
+    logId: log.id,
+    externalTaskId: log.externalTaskId?.trim() ?? null,
+    status: log.status,
+  };
+}
+
 /** 找此 canvas 任务「已建厂商任务但未回写」的孤儿日志（externalTaskId 已就绪、非 FAILED）。 */
 export async function findPromotableCanvasGatewayLog(
   taskId: string,
@@ -44,12 +70,37 @@ export async function findPromotableCanvasGatewayLog(
       status: { not: "FAILED" },
       externalTaskId: { not: null },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
     select: { id: true, externalTaskId: true },
   });
   const ext = log?.externalTaskId?.trim();
   if (!log || !ext) return null;
   return { logId: log.id, externalTaskId: ext };
+}
+
+/**
+ * dispatch 提交前：已有 Gateway 日志则 promote 或判定「首次提交仍在途」，绝不重复 createTask。
+ */
+export async function resolveCanvasGatewaySubmitCollision(args: {
+  taskId: string;
+  payload: Record<string, unknown>;
+  scopeKey: string;
+}): Promise<"proceed" | "dispatched" | "in_flight"> {
+  const existing = await findExistingCanvasGatewayLogForTask(args.taskId);
+  if (!existing) return "proceed";
+
+  if (existing.externalTaskId) {
+    const promoted = await promoteCanvasTaskFromGatewayLog({
+      taskId: args.taskId,
+      payload: args.payload,
+      logId: existing.logId,
+      externalTaskId: existing.externalTaskId,
+      scopeKey: args.scopeKey,
+    });
+    return promoted ? "dispatched" : "in_flight";
+  }
+
+  return "in_flight";
 }
 
 /** 找 canvas 任务关联的 Gateway 日志（含仅有 logId、厂商 taskId 尚未写入的 RUNNING）。 */

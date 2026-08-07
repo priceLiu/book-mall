@@ -27,9 +27,10 @@ function applyRfSelectionPreserved(
 export function mergeStoreNodesIntoRf(
   rfNodes: CanvasFlowNode[],
   storeNodes: CanvasFlowNode[],
-  opts?: { preserveRfSelection?: boolean },
+  opts?: { preserveRfSelection?: boolean; preserveRfPositions?: boolean },
 ): CanvasFlowNode[] {
   const preserveRfSelection = opts?.preserveRfSelection ?? false;
+  const preserveRfPositions = opts?.preserveRfPositions ?? false;
   if (rfNodes.length !== storeNodes.length) {
     const next = ensureNodeDragHandles(storeNodes);
     return preserveRfSelection
@@ -70,7 +71,7 @@ export function mergeStoreNodesIntoRf(
       type: sn.type,
       data: sn.data,
       selected,
-      position: sn.position,
+      position: preserveRfPositions ? rf.position : sn.position,
       width: sn.width,
       height: sn.height,
       zIndex: sn.zIndex,

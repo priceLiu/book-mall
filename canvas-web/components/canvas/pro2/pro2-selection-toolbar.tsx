@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useReactFlow } from "@xyflow/react";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
@@ -70,6 +70,17 @@ export function Pro2SelectionToolbar({
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupName, setGroupName] = useState("未命名分组");
   const [groupColor, setGroupColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
+
+  useEffect(() => {
+    if (!groupOpen) {
+      delete document.documentElement.dataset.canvasToolbarPopoverOpen;
+      return;
+    }
+    document.documentElement.dataset.canvasToolbarPopoverOpen = "true";
+    return () => {
+      delete document.documentElement.dataset.canvasToolbarPopoverOpen;
+    };
+  }, [groupOpen]);
 
   const selectedIds = useMemo(
     () => pro2SelectedNonGroupIds(rfNodes),
@@ -326,8 +337,9 @@ export function Pro2SelectionToolbar({
           </button>
           {groupOpen ? (
             <div
+              data-pro2-selection-toolbar-popover
               className={cn(
-                "absolute right-0 top-[calc(100%+8px)] z-[1] w-[240px]",
+                "absolute right-0 top-[calc(100%+8px)] z-[9999] w-[240px]",
                 PRO2_IMAGE_NODE_TOOLBAR_POPOVER_CLASS,
               )}
               onMouseDown={(e) => e.stopPropagation()}

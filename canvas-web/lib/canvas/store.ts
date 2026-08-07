@@ -37,6 +37,7 @@ import {
 } from "./clone-node-data";
 import { migrateGraphV1ToV2 } from "./migrate";
 import { clearOrphanLibtvMediaInflightInNodes } from "./libtv-image-node-run";
+import { clearStaleMediaRenderInFlightInNodes } from "./media-render-in-flight";
 import {
   detachChildrenOfRemovedGroups,
   ensureNodeDragHandles,
@@ -223,7 +224,7 @@ function runPostHydratePro2VideoBoardRepair(
     updateNodeData: (
       id: string,
       patch: Record<string, unknown>,
-      options?: { commit?: boolean },
+      options?: { commit?: boolean; sessionOnly?: boolean },
     ) => void;
     setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
     setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
@@ -398,7 +399,7 @@ type CanvasState = {
   updateNodeData: (
     id: string,
     patch: Record<string, unknown>,
-    options?: { commit?: boolean },
+    options?: { commit?: boolean; sessionOnly?: boolean },
   ) => void;
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
@@ -649,7 +650,9 @@ export const useCanvasStore = create<CanvasState>()(
           Array.isArray(g0.nodes) && g0.nodes.length
             ? {
                 ...g0,
-                nodes: clearOrphanLibtvMediaInflightInNodes(g0.nodes),
+                nodes: clearStaleMediaRenderInFlightInNodes(
+                  clearOrphanLibtvMediaInflightInNodes(g0.nodes),
+                ),
               }
             : g0;
         let edges = g.edges as CanvasFlowEdge[];
@@ -1265,6 +1268,11 @@ export const useCanvasStore = create<CanvasState>()(
               edges,
             );
           }
+        }
+        if (options?.sessionOnly) {
+          set({ nodes });
+          maybeApplyLibtvMediaAspectPresetFromPatch(id, patch);
+          return;
         }
         if (isCanvasDraftDataPatch(patch, options?.commit)) {
           const temporal = useCanvasStore.temporal.getState();

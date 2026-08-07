@@ -4,12 +4,15 @@ import { useCallback, useEffect, useRef } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   isCanvasApiAccessDeniedError,
+  cancelCanvasGenerationTask,
   listCanvasProjectTasks,
   markCanvasProjectTasksForbidden,
   runCanvasNode,
   type CanvasTaskRecord,
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
+import { flushCanvasGraphPersistBounded } from "./canvas-graph-persist-bridge";
+import { isCanvasSaveInFlight } from "./canvas-project-version-sync";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "./resolve-sbv1-video-engine-inputs";
@@ -61,6 +64,7 @@ import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { formatCanvasTaskError, resolveLibtvRunFailureCode } from "./friendly-task-error";
 import { maybeNotifyCanvasCreditsSettled, markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import { clearCanvasNodeRunSession } from "./canvas-run-session";
+import { canvasIdleRuntimeAfterUserCancel } from "./canvas-generation-cancel-messages";
 import {
   isCanvasTaskTerminalStatus,
   notifyCanvasTaskPanelSync,
@@ -68,6 +72,7 @@ import {
 } from "./canvas-panel-sync-events";
 import {
   registerCanvasRunBus,
+  type CanvasCancelGenerationJob,
   type CanvasStoryRunJob,
   unregisterCanvasRunBus,
 } from "./canvas-run-bus";
@@ -80,6 +85,7 @@ import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
 import { resolveStoryHubSectionTextInputs } from "./story-hub-text-inputs";
 import { resolveStoryProStarterScriptInput } from "./story-pro-starter-text";
 import {
+  commitStoryRunCancelLocal,
   commitStoryRunPendingPatch,
   storyApplyTaskResult,
 } from "./story-run-apply";
@@ -153,8 +159,10 @@ import { characterRowsNeedingThreeViewNodeSync } from "./pro2-group-row-resolve"
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import {
   CANVAS_POLL_IDLE_RECHECK_MS,
+  CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS,
   nextPollIntervalMs,
 } from "./poll-interval";
+import { hasAnyMediaRenderInFlight } from "./media-render-in-flight";
 
 /** 打开画布后尽快全量任务扫描，刷新后恢复服务端在飞任务（原 5s 会导致生成态短暂消失） */
 const INITIAL_FULL_SCAN_DELAY_MS = 300;
@@ -877,6 +885,8 @@ export function useCanvasRunner(
         created: opts?.created,
       });
       if (opts?.flushAutosave && task.status === "SUCCEEDED") {
+        // 不在此全量/轻量拉项目：连接池紧张时会刷 Failed to fetch 红屏；
+        // 保存遇 409 时由 autosave 自行轻量对齐 updatedAt。
         window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
       }
     },
@@ -1609,6 +1619,9 @@ export function useCanvasRunner(
           return;
         }
 
+        // 生成前尽量落盘；最多等 8s，避免 PATCH 挂死阻塞「生成」与「保存中」UI
+        await flushCanvasGraphPersistBounded(8_000, true);
+
         const r = await runCanvasNode(base, projectId, nodeId, {
           node: {
             type: node.type ?? "image-engine",
@@ -2269,6 +2282,117 @@ export function useCanvasRunner(
     enqueueStoryRunsSequentialRef.current = enqueueStoryRunsSequential;
   }, [enqueueStoryRunsSequential]);
 
+  const resolveCancelTaskId = useCallback(
+    (job: CanvasCancelGenerationJob, node?: CanvasFlowNode): string | undefined => {
+      const explicit = job.taskId?.trim();
+      if (explicit) return explicit;
+      const key = runKey(job);
+      const fromRef =
+        taskByNodeRef.current.get(key) ??
+        taskByNodeRef.current.get(job.nodeId);
+      if (fromRef?.trim()) return fromRef.trim();
+      if (!node) return undefined;
+      if (job.llmSection && isAnyStoryScriptHubType(node.type ?? "")) {
+        return hubSectionRuntime(node, job.llmSection)?.taskId?.trim() || undefined;
+      }
+      if (job.rowKey) {
+        const rows = (
+          node.data as {
+            rows?: {
+              key: string;
+              runtime?: CanvasNodeRuntime;
+              videoRuntime?: CanvasNodeRuntime;
+              ttsRuntime?: CanvasNodeRuntime;
+            }[];
+          }
+        ).rows;
+        const row = rows?.find((r) => r.key === job.rowKey);
+        if (job.mediaKind === "tts") return row?.ttsRuntime?.taskId?.trim();
+        if (job.mediaKind === "video") return row?.videoRuntime?.taskId?.trim();
+        return row?.runtime?.taskId?.trim();
+      }
+      if (node.type === "story-pro2-starter" || node.type === "story-pro-starter") {
+        return (
+          node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
+        ).themeOutlineRuntime?.taskId?.trim();
+      }
+      return (node.data as { runtime?: CanvasNodeRuntime }).runtime?.taskId?.trim();
+    },
+    [],
+  );
+
+  const cancelCanvasGeneration = useCallback(
+    (job: CanvasCancelGenerationJob): boolean => {
+      if (!projectId) return false;
+      const nodesNow = useCanvasStore.getState().nodes;
+      const node = nodesNow.find((n) => n.id === job.nodeId);
+      const queueJob = job as QueueItem;
+      const key = runKey(queueJob);
+
+      queueRef.current = queueRef.current.filter((q) => runKey(q) !== key);
+      releaseInflightKey(key);
+      releaseInflightKey(job.nodeId);
+
+      const taskId = resolveCancelTaskId(job, node);
+      if (node) {
+        if (
+          !commitStoryRunCancelLocal(
+            node,
+            queueJob,
+            nodesNow,
+            updateNodeData,
+            taskId,
+          )
+        ) {
+          setNodeRuntime(job.nodeId, canvasIdleRuntimeAfterUserCancel(taskId));
+          if (
+            isLibtvFreestandingImageNode(node) ||
+            node.type === "story-pro2-three-view" ||
+            node.type === "story-pro2-audio"
+          ) {
+            updateNodeData(job.nodeId, {
+              uploading: false,
+              uploadError: undefined,
+            });
+          }
+        }
+      }
+
+      detachNodeTaskRefs(queueJob);
+      clearCanvasNodeRunSession(job.nodeId);
+      abortSequentialOnError(key);
+
+      if (taskId) {
+        void cancelCanvasGenerationTask(base, projectId, taskId)
+          .then(() => {
+            emitTaskPanelSync({ id: taskId, status: "CANCELLED" });
+          })
+          .catch(() => {
+            /* 本地已清态；服务端取消失败不阻塞 UI */
+          });
+      }
+
+      pollKickRef.current?.();
+      return true;
+    },
+    [
+      abortSequentialOnError,
+      base,
+      detachNodeTaskRefs,
+      emitTaskPanelSync,
+      projectId,
+      releaseInflightKey,
+      resolveCancelTaskId,
+      setNodeRuntime,
+      updateNodeData,
+    ],
+  );
+
+  const cancelCanvasGenerationRef = useRef(cancelCanvasGeneration);
+  useEffect(() => {
+    cancelCanvasGenerationRef.current = cancelCanvasGeneration;
+  }, [cancelCanvasGeneration]);
+
   useEffect(() => {
     registerCanvasRunBus({
       enqueueNode: (nodeId, forceFresh) =>
@@ -2278,6 +2402,7 @@ export function useCanvasRunner(
         enqueueNodesSequentialRef.current(nodeIds, opts?.forceFresh),
       enqueueStoryRunsSequential: (jobs, opts) =>
         enqueueStoryRunsSequentialRef.current(jobs, opts?.forceFresh),
+      cancelGeneration: (job) => cancelCanvasGenerationRef.current(job),
     });
     return () => unregisterCanvasRunBus();
   }, []);
@@ -2292,6 +2417,16 @@ export function useCanvasRunner(
     window.addEventListener("canvas:run-node", handler);
     return () => window.removeEventListener("canvas:run-node", handler);
   }, [enqueueStoryRun]);
+
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const e = ev as CustomEvent<CanvasCancelGenerationJob>;
+      if (!e.detail?.nodeId) return;
+      cancelCanvasGeneration(e.detail);
+    };
+    window.addEventListener("canvas:cancel-generation", handler);
+    return () => window.removeEventListener("canvas:cancel-generation", handler);
+  }, [cancelCanvasGeneration]);
 
   useEffect(() => {
     const handler = (ev: Event) => {
@@ -2377,6 +2512,10 @@ export function useCanvasRunner(
     let pollStopped = false;
     let loopTimer = 0;
     let tickCount = 0;
+    /** 防止 pollKick 叠出并行 loop（否则 tasks 会打满浏览器连接，PATCH 排队超时） */
+    let pollLoopRunning = false;
+    let pollKickPending = false;
+    let pollKickPendingFullScan = false;
     /** 上一次轮询是否读道降级（tasks==null）；用于自适应退避到 15s */
     let lastPollStale = false;
     const serverInflightRef = { current: false };
@@ -2592,7 +2731,9 @@ export function useCanvasRunner(
       boundTaskId ??= taskByNodeRef.current.get(nodeId);
       const localTaskId = localRt?.taskId?.trim();
       const isTerminal =
-        t.status === "SUCCEEDED" || t.status === "FAILED";
+        t.status === "SUCCEEDED" ||
+        t.status === "FAILED" ||
+        t.status === "CANCELLED";
       const isCurrentTaskTerminal =
         jobByTaskRef.current.has(t.id) ||
         (localTaskId != null && localTaskId === t.id) ||
@@ -2636,7 +2777,7 @@ export function useCanvasRunner(
             updateNodeData(nodeId, sbv1Patch);
           }
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
-          if (st === "done" || st === "error") {
+          if (st === "done" || st === "error" || st === "idle") {
             maybeClearHubPendingSceneSyncGroup(
               useCanvasStore.getState().nodes.map((n) =>
                 n.id === nodeId
@@ -2676,7 +2817,7 @@ export function useCanvasRunner(
           ) {
             updateNodeData(nodeId, fallbackPatch);
           }
-          if (patch.status === "done" || patch.status === "error") {
+          if (patch.status === "done" || patch.status === "error" || patch.status === "idle") {
             const job = jobByTaskRef.current.get(t.id);
             if (job) {
               releaseInflightKey(runKey(job));
@@ -2730,7 +2871,7 @@ export function useCanvasRunner(
             );
           }
         }
-        if (patch.status === "done" || patch.status === "error") {
+        if (patch.status === "done" || patch.status === "error" || patch.status === "idle") {
           const job = jobByTaskRef.current.get(t.id);
           if (job) {
             releaseInflightKey(runKey(job));
@@ -2748,6 +2889,8 @@ export function useCanvasRunner(
 
     const tick = async (forceFullScan = false) => {
       if (cancelled || pollStopped) return;
+      // 保存占连接时跳过本轮 DB 拉取，给 PATCH 让路
+      if (isCanvasSaveInFlight()) return;
       tickCount++;
       const periodicFullScan =
         !forceFullScan && tickCount % FULL_SCAN_EVERY_N_TICKS === 0;
@@ -2861,19 +3004,72 @@ export function useCanvasRunner(
     // 无在飞时暂停 DB 轮询，只保留廉价的「空转再探」节拍唤醒。
     const scheduleNext = () => {
       if (cancelled || pollStopped) return;
-      const ms = nextPollIntervalMs(currentInflightCount(), lastPollStale);
+      if (pollKickPending) {
+        const full = pollKickPendingFullScan;
+        pollKickPending = false;
+        pollKickPendingFullScan = false;
+        loopTimer = window.setTimeout(() => void loop(full), 0);
+        return;
+      }
+      const mediaRenderActive = hasAnyMediaRenderInFlight(
+        useCanvasStore.getState().nodes,
+      );
+      // 保存进行中：拉长轮询，避免与 PATCH 抢 DB / 浏览器连接
+      if (isCanvasSaveInFlight()) {
+        const delay = CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS;
+        loopTimer = window.setTimeout(() => void loop(), delay);
+        return;
+      }
+      const ms = nextPollIntervalMs(
+        currentInflightCount(),
+        lastPollStale,
+        mediaRenderActive,
+      );
       const delay = ms > 0 ? ms : CANVAS_POLL_IDLE_RECHECK_MS;
       loopTimer = window.setTimeout(() => void loop(), delay);
     };
 
     const loop = async (forceFullScan = false) => {
       if (cancelled || pollStopped) return;
-      await tick(forceFullScan);
+      if (pollLoopRunning) {
+        pollKickPending = true;
+        if (forceFullScan) pollKickPendingFullScan = true;
+        return;
+      }
+      pollLoopRunning = true;
+      try {
+        await tick(forceFullScan);
+      } finally {
+        pollLoopRunning = false;
+      }
+      if (cancelled || pollStopped) return;
       scheduleNext();
     };
 
+    let mediaRenderPollKickEarliest = 0;
     pollKickRef.current = () => {
       if (cancelled || pollStopped) return;
+      // 保存中：只记 pending，不立刻开新 GET
+      if (isCanvasSaveInFlight()) {
+        pollKickPending = true;
+        return;
+      }
+      if (pollLoopRunning) {
+        pollKickPending = true;
+        return;
+      }
+      if (hasAnyMediaRenderInFlight(useCanvasStore.getState().nodes)) {
+        const now = Date.now();
+        if (now < mediaRenderPollKickEarliest) return;
+        mediaRenderPollKickEarliest =
+          now + CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS;
+        if (loopTimer) window.clearTimeout(loopTimer);
+        loopTimer = window.setTimeout(
+          () => void loop(false),
+          CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS,
+        );
+        return;
+      }
       if (loopTimer) window.clearTimeout(loopTimer);
       void loop(false);
     };

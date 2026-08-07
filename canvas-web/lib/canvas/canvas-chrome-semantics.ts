@@ -40,6 +40,10 @@ export const CANVAS_PRIMARY_BTN_SM_CLASS =
 export const CANVAS_TOOLBAR_BTN_CLASS =
   "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/85 hover:border-white/30 hover:text-white";
 
+/** 顶栏纯图标按钮（悬停 title 展示文案） */
+export const CANVAS_TOOLBAR_ICON_BTN_CLASS =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/85 hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50";
+
 /** 侧栏标题行 */
 export const CANVAS_PANEL_HEADER_BORDER_CLASS = "border-white/10";
 export const CANVAS_PANEL_HEADER_ICON_CLASS = "size-4 text-white/70";

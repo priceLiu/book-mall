@@ -243,11 +243,16 @@ html[data-canvas-editor-open] body {
   max-width: 100dvw;
 }
 
-/* 顶栏壳层：宽度锁在视口内，按钮区在壳内横向滚动 */
+/* 顶栏壳层：宽度锁在视口内；纵向 overflow 可见以便悬停提示 */
 [data-canvas-toolbar-shell] {
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+[data-canvas-toolbar] {
+  overflow: visible !important;
 }
 
 [data-canvas-toolbar-actions] {
@@ -257,6 +262,17 @@ html[data-canvas-editor-open] body {
 
 [data-canvas-toolbar-actions] > * {
   flex-shrink: 0;
+}
+
+/* 框选打组 / 顶栏弹层打开时：隐藏 RF 虚线框，避免盖住组名输入 */
+html[data-canvas-toolbar-popover-open] .react-flow__nodesselection-rect,
+html[data-canvas-toolbar-popover-open] .react-flow__selection {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html[data-canvas-toolbar-popover-open] [data-pro2-selection-toolbar-popover] {
+  z-index: 9999;
 }
 
 /* 弹层打开时暂停画布指针交互，避免背后 hover / pan 触发重绘导致 backdrop 闪烁 */

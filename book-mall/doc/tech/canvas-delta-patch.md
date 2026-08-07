@@ -51,7 +51,9 @@ type CanvasDeltaPatch = {
 ## 服务端行为
 
 1. 读取 DB 现有 `CanvasProject.canvas` JSON。
-2. 若提供 `baseUpdatedAt` 且与行 `updatedAt` 不一致 → **`409 CONFLICT`**。
+2. 若提供 `baseUpdatedAt` 且与行 `updatedAt` 不一致 → **软放行**（打 warn，仍在最新 canvas 上合并）。  
+   不再硬 409：任务成片 / OSS backfill 也会 bump `updatedAt`，硬锁会导致增量 autosave 失败风暴。  
+   媒体防降级依赖步骤 4；多标签页与整图 PATCH 同为 last-write-wins。
 3. `applyCanvasDelta(existing, delta)` 合并：
    - 节点/边按 `id` upsert；`data` **深合并**（partial delta 不抹掉其它字段）。
    - `removeNodeIds` 同时移除关联边。
@@ -68,8 +70,9 @@ type CanvasDeltaPatch = {
 | HTTP | code | 场景 |
 |------|------|------|
 | 400 | `INVALID_INPUT` | 空 delta、新节点缺 `type`、canvas+delta 同传 |
-| 409 | `CONFLICT` | `baseUpdatedAt` 不匹配 |
 | 404 | `NOT_FOUND` | 项目不存在或无权限 |
+
+（`baseUpdatedAt` 不匹配不再返回 409；见上文「软放行」。）
 
 ## 实现位置
 
