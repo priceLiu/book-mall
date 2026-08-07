@@ -1,8 +1,9 @@
 import type { CanvasFlowNode } from "./types";
 import { isGroupNode } from "./types";
-import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 import { useMemo } from "react";
 import { useNodes } from "@xyflow/react";
+import { useCanvasStore } from "./store";
+import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 
 /** LibTV 浮动 Dock · 唯一选中节点（排除 group） */
 export function resolveLibtvFloatingDockSelection(
@@ -29,6 +30,20 @@ export function countLibtvSelectedNonGroupNodes(
     count += 1;
   }
   return count;
+}
+
+/** 框选进行中或多选 ≥2：禁止任何单节点浮动 Dock */
+export function useLibtvShouldSuppressFloatingDock(): boolean {
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const multiSelectActive = useCanvasStore((s) => s.canvasMultiSelectActive);
+  const rfNodes = useNodes();
+  return useMemo(
+    () =>
+      marqueeSelecting ||
+      multiSelectActive ||
+      countLibtvSelectedNonGroupNodes(rfNodes) >= 2,
+    [marqueeSelecting, multiSelectActive, rfNodes],
+  );
 }
 
 /** 节点是否为当前唯一选中（框选进行中恒为 false） */

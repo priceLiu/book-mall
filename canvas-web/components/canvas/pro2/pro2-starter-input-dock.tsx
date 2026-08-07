@@ -10,6 +10,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -58,6 +59,7 @@ export function Pro2StarterInputDock() {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-starter");
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const storeNode = useMemo(() => {
     if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
@@ -361,7 +363,7 @@ export function Pro2StarterInputDock() {
     updateNodeData,
   });
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (suppressDock || !storeNode || !dockActive || !placement) return null;
 
   return (
     <Pro2InputDockShell

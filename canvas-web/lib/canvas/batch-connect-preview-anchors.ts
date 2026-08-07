@@ -101,7 +101,7 @@ export function batchConnectSelectionClientBox(
     const el = findNodeElement(id);
     if (!el) continue;
     const r = el.getBoundingClientRect();
-    if (r.width > 0 || r.height > 0) rects.push(r);
+    if (Number.isFinite(r.left) && Number.isFinite(r.top)) rects.push(r);
   }
   if (!rects.length) return null;
   const left = Math.min(...rects.map((r) => r.left));
@@ -151,13 +151,24 @@ export function batchConnectSelectionScreenBox(
 ): BatchConnectScreenBox | null {
   if (nodeIds.length < 2) return null;
 
-  const client = batchConnectSelectionClientBox(nodeIds);
   const bbox = computePro2MultiSelectionBbox(
     nodeIds,
     allNodes,
     getInternalNode ?? (() => undefined),
   );
   const flow = bbox ? screenBoxFromFlowBbox(bbox, flowToScreenPosition) : null;
+  const client = batchConnectSelectionClientBox(nodeIds);
+
+  /** 缩小画布时 DOM 矩形常不可靠 · 有 flow 包围盒则优先采用 */
+  if (flow && !client) return flow;
+  if (flow && client) {
+    const clientArea = Math.max(
+      0,
+      (client.right - client.left) * (client.bottom - client.top),
+    );
+    const flowArea = Math.max(0, flow.width * flow.height);
+    if (clientArea < 4 && flowArea >= 4) return flow;
+  }
 
   if (client && flow) {
     return {

@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
+import {
+  useLibtvFloatingDock,
+  useLibtvSoleSelectedNodeId,
+} from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { commitPro2ThreeViewRowPromptFromDock } from "@/lib/canvas/pro2-lazy-media-prompts";
@@ -57,7 +60,6 @@ import { isLibtvMediaGenerating } from "../libtv-media-generating-state";
 
 /** 2.0 三视图节点 · 底部输入坞（图标区固定 / 正文可滚动） */
 export function Pro2ThreeViewInputDock() {
-  const rfNodes = useNodes();
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
@@ -71,19 +73,14 @@ export function Pro2ThreeViewInputDock() {
 
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
-  const selected = useMemo(() => {
-    const picked = rfNodes.filter(
-      (n) => n.selected && n.type === "story-pro2-three-view",
-    );
-    return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
+  /** 框选 / 多选 ≥2 时由 useLibtvSoleSelectedNodeId 返回 null，禁止单节点 Dock */
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
+  const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-three-view");
 
   const storeNode = useMemo(() => {
-    if (!selected) return null;
-    return nodes.find((n) => n.id === selected.id) ?? null;
-  }, [selected, nodes]);
-
-  const dockNodeId = selected?.id ?? storeNode?.id ?? null;
+    if (!dockNodeId) return null;
+    return nodes.find((n) => n.id === dockNodeId) ?? null;
+  }, [dockNodeId, nodes]);
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 
@@ -347,7 +344,7 @@ export function Pro2ThreeViewInputDock() {
     window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
   }, [storeNode, setPro2StyleLibImageNodeId]);
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (suppressDock || !storeNode || !dockActive || !placement) return null;
   if (
     pro2ThreeViewNodeUsesEmbeddedDock(d, {
       selected: true,

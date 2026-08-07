@@ -1494,7 +1494,12 @@ function FlowCanvasInner({
       const count = selectedNodes.filter(
         (n) => n.type && !isGroupNode(n.type),
       ).length;
-      useCanvasStore.getState().setCanvasMultiSelectActive(count >= 2);
+      const store = useCanvasStore.getState();
+      store.setCanvasMultiSelectActive(count >= 2);
+      if (count >= 2) {
+        store.setLibtvFloatingDockSelection(null, null);
+        store.setPro2FrameDockFocus(null);
+      }
     },
     [],
   );
@@ -2027,7 +2032,10 @@ function FlowCanvasInner({
         onInit={onInit}
         onSelectionChange={onSelectionChange}
         onSelectionStart={() => {
-          useCanvasStore.getState().setCanvasMarqueeSelecting(true);
+          const store = useCanvasStore.getState();
+          store.setCanvasMarqueeSelecting(true);
+          store.setLibtvFloatingDockSelection(null, null);
+          store.setPro2FrameDockFocus(null);
         }}
         onSelectionDragStart={() => {
           useCanvasStore.getState().setCanvasSelectionDragging(true);

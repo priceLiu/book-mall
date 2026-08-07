@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type MouseEvent, type PointerEvent } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { Clapperboard, Maximize2, Play } from "lucide-react";
@@ -85,6 +85,11 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     [id],
   );
 
+  const openPreview = useCallback((e: MouseEvent | PointerEvent) => {
+    e.stopPropagation();
+    setPreviewOpen(true);
+  }, []);
+
   const borderStyle = libtvNodeBorderStyle({
     selected: !!selected,
     hovered: hovered && !selected,
@@ -94,7 +99,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   return (
     <>
       <div
-        className={cn(SBV1_NODE_OUTER_CLASS, SBV1_CARD_DRAG_CLASS)}
+        className={SBV1_NODE_OUTER_CLASS}
         data-sbv1-dock-anchor={id}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
@@ -141,9 +146,10 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                 type="button"
                 className={cn(
                   RF_NO_DRAG,
-                  "flex size-7 shrink-0 items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
+                  "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
                 )}
-                onClick={() => setPreviewOpen(true)}
+                onPointerDown={openPreview}
+                onClick={openPreview}
                 title="全屏预览"
               >
                 <Maximize2 className="size-3.5" />
@@ -182,20 +188,21 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                     rootMargin="280px"
                   />
                 )}
-                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                  <button
-                    type="button"
-                    aria-label="播放成片"
-                    title="播放成片"
-                    className="nodrag pointer-events-auto flex size-20 items-center justify-center rounded-full border border-white/25 bg-black/60 shadow-lg transition-transform group-hover/video:scale-105"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPreviewOpen(true);
-                    }}
-                  >
+                <button
+                  type="button"
+                  aria-label="播放成片"
+                  title="播放成片"
+                  className={cn(
+                    RF_NO_DRAG,
+                    "absolute inset-0 z-10 flex cursor-pointer items-center justify-center",
+                  )}
+                  onPointerDown={openPreview}
+                  onClick={openPreview}
+                >
+                  <span className="pointer-events-none flex size-20 items-center justify-center rounded-full border border-white/25 bg-black/60 shadow-lg transition-transform group-hover/video:scale-105">
                     <Play className="ml-1 size-10 fill-white text-white" />
-                  </button>
-                </div>
+                  </span>
+                </button>
               </div>
             ) : (
               <div className="flex h-full min-h-[400px] items-center justify-center px-4 text-center text-[12px] text-white/40">

@@ -17,10 +17,12 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 
 /** 2.0 · 自动成片浮动 Dock（800×560 · 恒定屏上尺寸） */
 export function JianyingAutoRenderFloatingDock() {
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("jianying-auto-render-pro2");
 
   const nodeExists = useCanvasStore(
@@ -35,7 +37,7 @@ export function JianyingAutoRenderFloatingDock() {
     JIANYING_AUTO_RENDER_DOCK_PLACEMENT_OPTS,
   );
 
-  if (!dockNodeId || !nodeExists || !placement) return null;
+  if (suppressDock || !dockNodeId || !nodeExists || !placement) return null;
 
   return (
     <JianyingAutoRenderFloatingDockBody

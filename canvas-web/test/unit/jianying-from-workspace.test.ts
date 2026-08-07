@@ -246,6 +246,31 @@ describe("pro2-batch-connect", () => {
     expect(edges.every((e) => e.targetHandle === "in_video")).toBe(true);
   });
 
+  it("classifies mixed media pipeline (three-view + prop + mood)", () => {
+    const mixed: CanvasFlowNode[] = [
+      { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
+      { id: "tv", type: "story-pro2-three-view", position: { x: 100, y: 0 }, data: {} },
+      { id: "p1", type: "story-pro2-prop", position: { x: 200, y: 0 }, data: {} },
+    ];
+    expect(classifyBatchConnectMode(mixed)).toBe("media-pipeline");
+  });
+
+  it("classifies mixed image + text as media pipeline", () => {
+    const mixed: CanvasFlowNode[] = [
+      { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
+      { id: "t1", type: "story-pro2-starter", position: { x: 100, y: 0 }, data: {} },
+    ];
+    expect(classifyBatchConnectMode(mixed)).toBe("media-pipeline");
+  });
+
+  it("classifies text-only selection as media pipeline", () => {
+    const texts: CanvasFlowNode[] = [
+      { id: "t1", type: "story-pro2-starter", position: { x: 0, y: 0 }, data: {} },
+      { id: "t2", type: "story-pro2-script-hub", position: { x: 100, y: 0 }, data: {} },
+    ];
+    expect(classifyBatchConnectMode(texts)).toBe("media-pipeline");
+  });
+
   it("classifies image vs video batch modes", () => {
     const imgs: CanvasFlowNode[] = [
       { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
@@ -255,9 +280,29 @@ describe("pro2-batch-connect", () => {
       { id: "v1", type: "sbv1-video-engine", position: { x: 0, y: 0 }, data: {} },
       { id: "v2", type: "sbv1-video-engine", position: { x: 100, y: 0 }, data: {} },
     ];
-    expect(classifyBatchConnectMode(imgs)).toBe("image-pipeline");
+    expect(classifyBatchConnectMode(imgs)).toBe("media-pipeline");
     expect(classifyBatchConnectMode(vids)).toBe("video-export");
     expect(classifyBatchConnectMode([...imgs, ...vids])).toBeNull();
+  });
+
+  it("builds per-source handles for mixed text + image to video engine", () => {
+    const vidId = "vid-1";
+    const nodes: CanvasFlowNode[] = [
+      { id: "i1", type: "story-pro2-image", position: { x: 0, y: 0 }, data: {} },
+      { id: "t1", type: "story-pro2-starter", position: { x: 200, y: 0 }, data: {} },
+      { id: vidId, type: "sbv1-video-engine", position: { x: 500, y: 0 }, data: {} },
+    ];
+    const edges = buildBatchConnectEdges(
+      nodes.filter((n) => n.id !== vidId),
+      vidId,
+      nodes,
+      [],
+    );
+    expect(edges).toHaveLength(2);
+    const imageEdge = edges.find((e) => e.source === "i1");
+    const textEdge = edges.find((e) => e.source === "t1");
+    expect(imageEdge?.targetHandle).toBe("in_ref");
+    expect(textEdge?.targetHandle).toBe("in_text");
   });
 
   it("builds batch image edges to video engine in_ref", () => {

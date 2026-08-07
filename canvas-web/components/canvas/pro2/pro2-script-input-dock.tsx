@@ -6,6 +6,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
@@ -65,6 +66,7 @@ export function Pro2ScriptInputDock() {
   const setNodes = useCanvasStore((s) => s.setNodes);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-script-hub");
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const storeNode = useMemo(() => {
     if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
@@ -258,7 +260,7 @@ export function Pro2ScriptInputDock() {
     );
   }, [nodeId, updateNodeData, alert, isGenerating]);
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (suppressDock || !storeNode || !dockActive || !placement) return null;
 
   const placeholder =
     d.scriptCategoryId === "custom-prompt"

@@ -29,11 +29,13 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { SBV1_VIDEO_DOCK_PLACEMENT_OPTS } from "@/lib/canvas/sbv1-video-dock-placement";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
 
 /** 分镜视频 1.0 · 视频引擎浮动输入坞（选中节点时显示在节点下方） */
 export function Sbv1VideoEngineFloatingDock() {
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("sbv1-video-engine");
 
   const nodeExists = useCanvasStore(
@@ -48,7 +50,7 @@ export function Sbv1VideoEngineFloatingDock() {
     SBV1_VIDEO_DOCK_PLACEMENT_OPTS,
   );
 
-  if (!dockNodeId || !nodeExists || !placement) return null;
+  if (suppressDock || !dockNodeId || !nodeExists || !placement) return null;
 
   return (
     <Sbv1VideoEngineFloatingDockBody

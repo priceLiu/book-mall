@@ -18,7 +18,9 @@ import {
   spawnSbv1NeighborFromNode,
 } from "./sbv1-spawn-nodes";
 import { sideConnectSideFromHandle } from "./libtv-side-connect-menu";
+import { nodeBatchOutHandle } from "./pro2-batch-connect";
 import type { Pro2AddNodePickDialogs } from "./pro2-add-node-pick";
+import type { CanvasFlowNode } from "./types";
 import { useCanvasStore } from "./store";
 
 export type SideConnectPickContext = {
@@ -285,4 +287,30 @@ export async function runLibtvSideConnectPick(
       spawnOpts,
     );
   });
+}
+
+/** 框选批量 + · 菜单项对每个源节点各走一遍侧栏连线逻辑 */
+export async function runLibtvBatchSideConnectPick(
+  sources: CanvasFlowNode[],
+  screenAnchor: { x: number; y: number },
+  itemId: string,
+  nodeType: string | undefined,
+  store: LibtvSideSpawnStore,
+  dialogs: Pro2AddNodePickDialogs,
+): Promise<void> {
+  for (const source of sources) {
+    const handleId = nodeBatchOutHandle(source);
+    if (!handleId) continue;
+    await runLibtvSideConnectPick(
+      {
+        fromNodeId: source.id,
+        fromHandleId: handleId,
+        screenAnchor,
+      },
+      itemId,
+      nodeType,
+      store,
+      dialogs,
+    );
+  }
 }

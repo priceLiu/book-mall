@@ -30,6 +30,9 @@ export const SIDE_PLUS_BY_TYPE: Record<
   "jianying-auto-render-pro2": { left: "plus_left" },
   group: { left: "plus_left", right: "out_media" },
   "story-pro2-style-asset": { left: "plus_left", right: "style" },
+  "story-pro2-prop": { left: "plus_left", right: "image" },
+  "story-pro2-mood": { left: "plus_left", right: "image" },
+  "story-pro2-audio": { left: "plus_left", right: "image" },
 };
 
 export function sideConnectSideFromHandle(handleId: string): "left" | "right" {
@@ -75,6 +78,12 @@ export function resolveLibtvSideConnectMenu(
       return side === "left"
         ? PRO2_IMAGE_LEFT_ADD_MENU
         : PRO2_STYLE_ASSET_RIGHT_MENU;
+    case "story-pro2-prop":
+    case "story-pro2-mood":
+    case "story-pro2-audio":
+      return side === "left"
+        ? PRO2_IMAGE_LEFT_ADD_MENU
+        : PRO2_RIGHT_ADD_MENU;
     case "sbv1-image":
       return side === "left"
         ? SBV1_IMAGE_LEFT_ADD_MENU

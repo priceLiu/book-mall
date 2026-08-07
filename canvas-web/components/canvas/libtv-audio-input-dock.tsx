@@ -12,6 +12,7 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
@@ -52,6 +53,7 @@ export function LibtvAudioInputDock() {
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-audio");
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const storeNode = useMemo(() => {
     if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
@@ -160,7 +162,7 @@ export function LibtvAudioInputDock() {
     setNodeRuntime,
   ]);
 
-  if (!storeNode || !placement) return null;
+  if (suppressDock || !storeNode || !placement) return null;
 
   const canSend = dockInput.trim().length > 0 && !isRunning;
 

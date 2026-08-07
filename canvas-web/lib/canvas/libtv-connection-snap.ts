@@ -9,6 +9,10 @@ import {
   libtvSidePlusFollowVerticalBounds,
 } from "./libtv-node-chrome";
 import type { CanvasFlowNode } from "./types";
+import {
+  isBatchConnectSnapTarget,
+  type BatchConnectMode,
+} from "./pro2-batch-connect";
 
 /** 拖线松手时 · 节点 type → 默认 target / source handle */
 export const DEFAULT_HANDLE_BY_TYPE: Record<
@@ -21,6 +25,10 @@ export const DEFAULT_HANDLE_BY_TYPE: Record<
   "jianying-auto-render-pro2": { target: "in_video" },
   "story-pro2-image": { target: "in_image", source: "image" },
   "story-pro2-three-view": { target: "in_image", source: "image" },
+  "story-pro2-style-asset": { target: "in_image", source: "style" },
+  "story-pro2-prop": { target: "in_image", source: "image" },
+  "story-pro2-mood": { target: "in_image", source: "image" },
+  "story-pro2-audio": { target: "in_image", source: "image" },
   "story-pro2-starter": { target: "in_text", source: "text" },
   "story-pro2-script-hub": { target: "in_text", source: "text" },
   "story-pro2-frame": { target: "in_text" },
@@ -183,22 +191,14 @@ export function findBatchConnectSnapTarget(
   nodes: CanvasFlowNode[],
   flowPoint: { x: number; y: number },
   excludeIds: string[],
-  mode: "video-export" | "image-pipeline" = "video-export",
+  mode: BatchConnectMode = "video-export",
 ): CanvasFlowNode | null {
   const exclude = new Set(excludeIds);
   let nearest: { node: CanvasFlowNode; dist: number } | null = null;
 
   for (const n of nodes) {
     if (exclude.has(n.id)) continue;
-    const matches =
-      mode === "video-export"
-        ? n.type === "jianying-export-pro2" ||
-          n.type === "jianying-auto-render-pro2"
-        : n.type === "sbv1-video-engine" ||
-          n.type === "sbv1-image" ||
-          n.type === "story-pro2-image" ||
-          n.type === "story-pro2-three-view";
-    if (!matches) continue;
+    if (!isBatchConnectSnapTarget(n, mode)) continue;
     const box = nodeSnapBox(n, nodes);
     const dist = distancePointToRect(flowPoint, box);
     if (

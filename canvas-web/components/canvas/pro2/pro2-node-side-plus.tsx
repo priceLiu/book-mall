@@ -12,6 +12,7 @@ import {
   Handle,
   Position,
   useNodeId,
+  useNodes,
   useStoreApi,
   useStore,
 } from "@xyflow/react";
@@ -29,6 +30,7 @@ import { pointerBlocksSidePlusMagnet } from "@/lib/canvas/canvas-form-wheel";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
+import { countLibtvSelectedNonGroupNodes } from "@/lib/canvas/libtv-floating-dock-selection";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 import { useScheduleUpdateNodeInternals } from "@/lib/canvas/use-schedule-update-node-internals";
 
@@ -148,10 +150,14 @@ export function Pro2NodeSidePlus({
   const canvasConnecting = Boolean(
     connectingFromNodeId && connectingFromNodeId !== nodeId,
   );
+  const rfNodes = useNodes();
   const marqueeSelecting = useCanvasMarqueeSelecting();
   const multiSelectActive = useCanvasStore((s) => s.canvasMultiSelectActive);
   /** 框选中 / 多选选区存在时，连线交给选区批量 +（Pro2SelectionBatchConnectLayer） */
-  const selectionOwnsPlus = marqueeSelecting || multiSelectActive;
+  const selectionOwnsPlus =
+    marqueeSelecting ||
+    multiSelectActive ||
+    countLibtvSelectedNonGroupNodes(rfNodes) >= 2;
   /** 拖线期间只保留正在拖的那一个 +：其余节点与本节点另一侧全部隐藏 */
   const dotVisible = connectingFromNodeId
     ? connectingFromNodeId === nodeId && connectingFromHandleId === handleId

@@ -4,6 +4,8 @@ import { useCallback, useMemo } from "react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { countLibtvSelectedNonGroupNodes } from "@/lib/canvas/libtv-floating-dock-selection";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { useLibtvFloatingDockHidden } from "@/lib/canvas/use-libtv-floating-dock";
 import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
@@ -30,13 +32,17 @@ export function Pro2FrameCellInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const multiSelectActive = useCanvasStore((s) => s.canvasMultiSelectActive);
 
   const selectedFrame = useMemo(() => {
+    if (marqueeSelecting || multiSelectActive) return null;
+    if (countLibtvSelectedNonGroupNodes(rfNodes) >= 2) return null;
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-frame",
     );
     return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
+  }, [rfNodes, marqueeSelecting, multiSelectActive]);
 
   const dockNodeId = selectedFrame?.id ?? null;
   const dockHidden = useLibtvFloatingDockHidden(dockNodeId);
