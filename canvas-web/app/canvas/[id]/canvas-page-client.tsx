@@ -9,6 +9,7 @@ import {
 } from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
+import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import {
   canvasGraphRedo,
@@ -730,13 +731,13 @@ function Inner({ projectId }: { projectId: string }) {
             signal: patchAbort.signal,
           }),
           new Promise<never>((_, reject) => {
-            patchTimer = window.setTimeout(() => {
+            patchTimer = setTimeout(() => {
               patchAbort.abort();
               reject(new Error("save_timeout"));
             }, CANVAS_AUTOSAVE_PATCH_TIMEOUT_MS);
           }),
         ]).finally(() => {
-          if (patchTimer !== undefined) window.clearTimeout(patchTimer);
+          if (patchTimer !== undefined) clearTimeout(patchTimer);
         });
         const { historyItem, project: updatedProject } = patchResult;
         lastBaseUpdatedAtRef.current = updatedProject.updatedAt;
