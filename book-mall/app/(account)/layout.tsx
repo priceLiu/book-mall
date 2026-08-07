@@ -40,7 +40,7 @@ const EMPTY_CANVAS_LAUNCH: AccountLayoutData["canvasLaunch"] = {
 };
 
 async function loadAccountLayoutData(userId: string): Promise<AccountLayoutData> {
-  return runDbQuery(
+  return runDbQuery<AccountLayoutData>(
     "AccountGroupLayout",
     async () => {
       const userRecord = await prisma.user.findUnique({

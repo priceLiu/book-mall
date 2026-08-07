@@ -146,8 +146,9 @@ import {
   findPro2CharacterThreeViewNodeForRow,
   findPro2FrameImageNodeForRow,
   maybeClearHubPendingSceneSyncGroup,
+  reconcilePro2ThreeViewNodesWithColumnRows,
 } from "./pro2-group-row-resolve";
-import { syncPro2CharacterImagesFromRows, reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-spawn-character-image-group";
+import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
 import { characterRowsNeedingThreeViewNodeSync } from "./pro2-group-row-resolve";
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
 import {

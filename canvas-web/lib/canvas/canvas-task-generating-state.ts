@@ -40,7 +40,7 @@ export function isCanvasInflightRunStatus(status?: string): boolean {
 }
 
 export function rowRuntimeHasPersistedMedia(
-  rt?: CanvasGeneratingMediaRuntime,
+  rt?: CanvasGeneratingMediaRuntime | null,
 ): boolean {
   return Boolean(rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim());
 }

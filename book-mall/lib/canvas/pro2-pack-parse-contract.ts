@@ -54,7 +54,10 @@ export function resolveUserScriptPromptTemplate(
   if (docBody) return docBody;
   if (custom) return custom;
   if (categoryId === "gu-feng-tian-chong") {
-    return defaultPro2ScriptCategoryDocBody("gu-feng-tian-chong");
+    return (
+      defaultPro2ScriptCategoryDocBody("gu-feng-tian-chong") ??
+      STORY_PRO_DIRECTOR_FROM_SCRIPT_PROMPT
+    );
   }
   return STORY_PRO_DIRECTOR_FROM_SCRIPT_PROMPT;
 }

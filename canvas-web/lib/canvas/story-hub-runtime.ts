@@ -17,7 +17,7 @@ import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-
 export function hubSectionRuntime(
   node: CanvasFlowNode,
   section: StoryLlmSection,
-): { status?: string; textOutput?: string; taskId?: string } | undefined {
+): CanvasNodeRuntime | undefined {
   const d = node.data as unknown as StoryScriptHubNodeData;
   if (section === "outline") return d.outlineRuntime;
   if (section === "character") return d.characterRuntime;

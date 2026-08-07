@@ -4,8 +4,9 @@ type GuardEdge = {
   id: string;
   source: string;
   target: string;
-  sourceHandle?: string;
-  targetHandle?: string;
+  /** React Flow Edge allows null when handle is unset. */
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
 };
 
 type GuardNode = {

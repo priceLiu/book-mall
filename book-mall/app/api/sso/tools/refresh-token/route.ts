@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSessionVersion } from "@/lib/auth-session-version";
@@ -38,7 +38,7 @@ function tokenResponse(result: Awaited<ReturnType<typeof issueToolsAccessTokenFo
  * 3. Authorization: Bearer {未过期 tools JWT} → 续签
  * 4. Authorization: Bearer {已过期但签名有效 tools JWT} → 校验 sessionVersion 后续签
  */
-export const POST = withApiDbGuard(async (req: NextRequest) => {
+export const POST = withApiDbGuard(async (req) => {
   if (toolsExchangeAuthorized(req)) {
     let userId = "";
     try {

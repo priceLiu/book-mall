@@ -51,6 +51,17 @@ export const THREE_VIEW_ENGINE_PROMPT_DEFAULT = THREE_VIEW_SYSTEM_PREFIX_ZH;
 export const THREE_VIEW_APPEARANCE_LLM_RULE_ZH =
   "采用 bullet 列表（以「- 」开头）写角色造型：推荐字段含年龄与身份、发型、面容、服饰、配饰/肩甲、整体材质；仅写外观与穿戴服饰/饰品，不含场景、摄影画风、光线与道具；禁止性格与情节氛围；禁止背包/手提物、禁止手持或挡脸（下游三视图为白底正/侧/背 turnaround）";
 
+/** 漫剧角色头像 · 落库 imagePrompt（不含 [STYLE]，KIE 调用时实时拼接） */
+export function buildCharacterImagePrompt(appearance: string): string {
+  const body = appearance.trim();
+  return [
+    `[CHARACTER] ${body}`,
+    `[COMPOSITION] full body / half body portrait, neutral pose, looking at viewer`,
+    `[BACKGROUND] pure white background, no scene, no props, no text`,
+    `[QUALITY] high detail, crisp lines, consistent character design for series use`,
+  ].join("\n");
+}
+
 const LEGACY_THREE_VIEW_IMAGE_RULES_ZH = `【视角数量 · 硬性要求】
 - 整张图 **仅三个** 视角：正面、侧面、背面各 **恰好一个**，从左到右等距排列
 - **禁止**重复同一视角（例如两个正面、两个侧面）；**禁止**第四个视角或多余人物副本

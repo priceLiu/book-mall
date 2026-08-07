@@ -382,6 +382,7 @@ export function Pro2MediaGroupToolbarPanel({
   const onRegenerateAll = () => {
     if (!controller) return;
     if (kind === "character-board") {
+      if (!hubNodeId) return;
       const rows = readRows<StoryProCharacterRow>(controller);
       if (!rows.length) return;
       const rowKeys = nodes
