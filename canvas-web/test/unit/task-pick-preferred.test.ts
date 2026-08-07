@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { restoreServerInflightNodeRuntimes } from "@/lib/canvas/restore-server-inflight-node-runtimes";
-import { pickPreferredCanvasTask, pickPreferredCanvasTaskForScope } from "@/lib/canvas/task-pick";
+import { pickPreferredCanvasTask, pickPreferredCanvasTaskForScope, pickStoryRowApplyTask, shouldSkipStoryRowTaskApply } from "@/lib/canvas/task-pick";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
+
+const now = Date.now();
+const minsAgo = (m: number) => new Date(now - m * 60_000).toISOString();
 
 function task(
   partial: Partial<CanvasTaskRecord> & Pick<CanvasTaskRecord, "id" | "status">,
@@ -11,8 +14,8 @@ function task(
   return {
     nodeId: "node-1",
     model: "happyhorse-1.0-r2v",
-    createdAt: "2026-07-16T10:00:00.000Z",
-    updatedAt: "2026-07-16T10:00:00.000Z",
+    createdAt: minsAgo(30),
+    updatedAt: minsAgo(5),
     ...partial,
   } as CanvasTaskRecord;
 }
@@ -23,13 +26,13 @@ describe("pickPreferredCanvasTask", () => {
       task({
         id: "ok",
         status: "SUCCEEDED",
-        updatedAt: "2026-07-16T10:05:00.000Z",
+        updatedAt: minsAgo(10),
         ossUrl: "https://cdn.example/ok.mp4",
       }),
       task({
         id: "fail",
         status: "FAILED",
-        updatedAt: "2026-07-16T10:10:00.000Z",
+        updatedAt: minsAgo(2),
         failCode: "timeout_poll_error",
         failMessage: "gateway recordInfo timeout",
       }),
@@ -43,15 +46,15 @@ describe("pickPreferredCanvasTask", () => {
         task({
           id: "done",
           status: "SUCCEEDED",
-          updatedAt: "2026-07-16T10:05:00.000Z",
-          completedAt: "2026-07-16T10:05:00.000Z",
+          updatedAt: minsAgo(10),
+          completedAt: minsAgo(10),
           ossUrl: "https://cdn.example/ok.png",
         }),
         task({
           id: "other",
           status: "SUBMITTED",
-          updatedAt: "2026-07-16T10:11:00.000Z",
-          submittedAt: "2026-07-16T10:11:00.000Z",
+          updatedAt: minsAgo(1),
+          submittedAt: minsAgo(1),
         }),
       ],
       { localRuntime: { status: "running", taskId: "done" } },
@@ -65,7 +68,7 @@ describe("pickPreferredCanvasTask", () => {
         task({
           id: "old",
           status: "SUCCEEDED",
-          updatedAt: "2026-07-16T10:05:00.000Z",
+          updatedAt: minsAgo(20),
           ossUrl: "https://cdn.example/old.png",
         }),
       ],
@@ -80,14 +83,14 @@ describe("pickPreferredCanvasTask", () => {
         task({
           id: "old",
           status: "SUCCEEDED",
-          updatedAt: "2026-07-16T10:05:00.000Z",
+          updatedAt: minsAgo(20),
           ossUrl: "https://cdn.example/old.png",
         }),
         task({
           id: "new",
           status: "SUBMITTED",
-          updatedAt: "2026-07-16T10:11:00.000Z",
-          submittedAt: "2026-07-16T10:11:00.000Z",
+          updatedAt: minsAgo(1),
+          submittedAt: minsAgo(1),
         }),
       ],
       { localRuntime: { status: "pending" } },
@@ -102,7 +105,7 @@ describe("pickPreferredCanvasTask", () => {
           id: "old-char",
           status: "SUCCEEDED",
           llmSection: "character",
-          updatedAt: "2026-07-16T10:05:00.000Z",
+          updatedAt: minsAgo(15),
           textOutput: "| 角色 | 描述 |",
         }),
       ],
@@ -118,14 +121,14 @@ describe("pickPreferredCanvasTask", () => {
         task({
           id: "old-ok",
           status: "SUCCEEDED",
-          updatedAt: "2026-08-02T15:21:18.000Z",
+          updatedAt: minsAgo(12),
           ossUrl: "https://cdn.example/old.png",
           storyScope: { rowKey: "沈知意", mediaKind: "threeView" },
         }),
         task({
           id: "new-fail",
           status: "FAILED",
-          updatedAt: "2026-08-02T15:29:55.000Z",
+          updatedAt: minsAgo(2),
           failMessage: "prompt too long",
           storyScope: { rowKey: "沈知意", mediaKind: "threeView" },
         }),
@@ -135,6 +138,50 @@ describe("pickPreferredCanvasTask", () => {
       "n_XJ1uOoTH",
     );
     expect(pick?.id).toBe("new-fail");
+  });
+});
+
+describe("shouldSkipStoryRowTaskApply", () => {
+  it("does not skip SUCCEEDED without preview URL when local pending without taskId", () => {
+    expect(
+      shouldSkipStoryRowTaskApply(
+        { status: "pending" },
+        task({
+          id: "done-no-url",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(1),
+          completedAt: minsAgo(1),
+        }),
+        "node-1",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("pickStoryRowApplyTask", () => {
+  it("prefers SUCCEEDED over bound stale SUBMITTED in same scope", () => {
+    const pick = pickStoryRowApplyTask(
+      [
+        task({
+          id: "stale-sub",
+          status: "SUBMITTED",
+          updatedAt: minsAgo(2),
+          submittedAt: minsAgo(2),
+          storyScope: { rowKey: "hero", mediaKind: "threeView" },
+        }),
+        task({
+          id: "done",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(1),
+          completedAt: minsAgo(1),
+          ossUrl: "https://cdn.example/hero.png",
+          storyScope: { rowKey: "hero", mediaKind: "threeView" },
+        }),
+      ],
+      { rowKey: "hero", mediaKind: "threeView" },
+      { status: "running", taskId: "stale-sub" },
+    );
+    expect(pick?.id).toBe("done");
   });
 });
 
@@ -154,7 +201,7 @@ describe("restoreServerInflightNodeRuntimes", () => {
           id: "task-1",
           nodeId: "video-1",
           status: "SUBMITTED",
-          submittedAt: "2026-07-16T10:11:00.000Z",
+          submittedAt: minsAgo(1),
         }),
       ],
       updateNodeData,

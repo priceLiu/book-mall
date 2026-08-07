@@ -64,6 +64,7 @@ import { clearCanvasNodeRunSession } from "./canvas-run-session";
 import {
   isCanvasTaskTerminalStatus,
   notifyCanvasTaskPanelSync,
+  subscribeCanvasTasksChanged,
 } from "./canvas-panel-sync-events";
 import {
   registerCanvasRunBus,
@@ -2876,6 +2877,10 @@ export function useCanvasRunner(
       void loop(false);
     };
 
+    const unsubTasksChanged = subscribeCanvasTasksChanged(projectId, () => {
+      pollKickRef.current?.();
+    });
+
     const initialDelay =
       inflightRef.current.size > 0 ||
       queueRef.current.length > 0 ||
@@ -2896,6 +2901,7 @@ export function useCanvasRunner(
     );
     return () => {
       cancelled = true;
+      unsubTasksChanged();
       pollKickRef.current = null;
       if (loopTimer) window.clearTimeout(loopTimer);
       window.clearTimeout(initialTickTimer);

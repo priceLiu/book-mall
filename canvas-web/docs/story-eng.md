@@ -41,6 +41,7 @@
 | 列同步 | `lib/canvas/story-column-sync.ts` |
 | 任务落库到行 | `lib/canvas/story-run-apply.ts` |
 | 运行队列 | `lib/canvas/run-queue.ts`、`lib/canvas/canvas-run-bus.ts` |
+| **任务完成同步** | [`canvas-task-completion-sync.md`](./canvas-task-completion-sync.md) · `lib/canvas/canvas-task-generating-state.ts` |
 | book-mall run | `book-mall/lib/canvas/story-workspace-runner.ts` |
 | 节点 UI | `components/canvas/nodes/story-*-*.tsx` |
 | 布局 | `lib/canvas/story-comic-workspace-layout.ts` |

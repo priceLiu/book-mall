@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
+import { libtvMediaLooksGenerating } from "@/lib/canvas/canvas-task-generating-state";
 import {
   LIBTV_MEDIA_GENERATING_CYAN_CLASS,
   LIBTV_MEDIA_GENERATING_VIOLET_CLASS,
@@ -21,27 +22,7 @@ export function isLibtvMediaGenerating(data: {
     ephemeralUrl?: string;
   } | null;
 }): boolean {
-  const s = data.runtime?.status;
-  const rt = data.runtime;
-  const hasPersistedMedia = Boolean(
-    rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim(),
-  );
-  // 粘贴/本地上传：blob 预览已就绪且无生成任务 → 不挡图，OSS 在后台上传
-  if (data.uploading) {
-    const blob = String(data.blobUrl ?? "").trim();
-    const hasGenTask = Boolean(rt?.taskId?.trim());
-    const genInflight =
-      s === "running" || s === "pending" || s === "queued";
-    if (blob && !hasGenTask && !genInflight) {
-      return false;
-    }
-    if (s === "done" && hasPersistedMedia) return false;
-    return true;
-  }
-  if (s === "done" || s === "error" || s === "idle") return false;
-  if (s === "running" || s === "pending" || s === "queued") return true;
-  if (hasPersistedMedia) return false;
-  return false;
+  return libtvMediaLooksGenerating(data);
 }
 
 /** LibTV 媒体 stage · 生成中（外框扫光 + 中央 RefreshCw），见 design.md §15 */

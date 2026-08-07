@@ -1,6 +1,10 @@
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
 import { hubSectionCountsAsInflight } from "./story-hub-runtime";
-import { findPro2CharacterThreeViewNodeForRow } from "./pro2-group-row-resolve";
+import {
+  characterRowCountsAsInflight,
+  isCanvasInflightRunStatus,
+  pro2ThreeViewNodeCountsAsInflight,
+} from "./canvas-task-generating-state";
 import {
   isAnyStoryCharacterColumnType,
   isAnyStoryFrameColumnType,
@@ -87,8 +91,9 @@ export function storyColumnIsGenerating(runtime: CanvasNodeRuntime): boolean {
   return runtime.status === "running" || runtime.status === "pending";
 }
 
+/** @deprecated 使用 canvas-task-generating-state.isCanvasInflightRunStatus */
 export function isCanvasInflightStatus(status?: string): boolean {
-  return status === "queued" || status === "pending" || status === "running";
+  return isCanvasInflightRunStatus(status);
 }
 
 function hubSectionInflightCount(d: StoryScriptHubNodeData): number {
@@ -104,63 +109,6 @@ function hubHasInflightWork(d: StoryScriptHubNodeData): boolean {
   return hubSectionInflightCount(d) > 0;
 }
 
-function rowRuntimeHasPersistedMedia(rt?: RowRuntimeSlice): boolean {
-  return Boolean(rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim());
-}
-
-/** 与 LibTV 节点扫光一致：组内节点未生成中则顶栏也不计对应列行 */
-function libtvMediaNodeLooksGenerating(data: {
-  uploading?: boolean;
-  blobUrl?: string;
-  ossUrl?: string;
-  runtime?: RowRuntimeSlice;
-}): boolean {
-  const s = data.runtime?.status;
-  const rt = data.runtime;
-  if (data.uploading) {
-    const blob = String(data.blobUrl ?? "").trim();
-    const hasGenTask = Boolean(rt?.taskId?.trim());
-    const genInflight =
-      s === "running" || s === "pending" || s === "queued";
-    if (blob && !hasGenTask && !genInflight) return false;
-    if (s === "done" && rowRuntimeHasPersistedMedia(rt)) return false;
-    return true;
-  }
-  if (s === "done" || s === "error" || s === "idle") return false;
-  if (s === "running" || s === "pending" || s === "queued") return true;
-  if (rowRuntimeHasPersistedMedia(rt)) return false;
-  return false;
-}
-
-function characterRowCountsAsInflight(
-  row: StoryMediaRow,
-  columnId: string,
-  nodes: CanvasFlowNode[],
-): boolean {
-  if (!isCanvasInflightStatus(row.runtime?.status)) return false;
-  const rowKey = row.key?.trim();
-  if (rowKey) {
-    const tv = findPro2CharacterThreeViewNodeForRow(nodes, columnId, rowKey);
-    if (tv) {
-      return libtvMediaNodeLooksGenerating(
-        tv.data as {
-          uploading?: boolean;
-          blobUrl?: string;
-          ossUrl?: string;
-          runtime?: RowRuntimeSlice;
-        },
-      );
-    }
-  }
-  if (rowRuntimeHasPersistedMedia(row.runtime)) {
-    if (row.runtime?.taskId?.trim() || row.runtime?.status === "running") {
-      return true;
-    }
-    return false;
-  }
-  return true;
-}
-
 /** 单节点是否仍有进行中的生成（含漫剧列行级 / 文案段 runtime） */
 function storyImageColumnInflightCount(
   node: CanvasFlowNode,
@@ -171,43 +119,8 @@ function storyImageColumnInflightCount(
     return rows.filter((r) => characterRowCountsAsInflight(r, node.id, nodes))
       .length;
   }
-  return rows.filter((r) => isCanvasInflightStatus(r.runtime?.status)).length;
-}
-
-/** 三视图节点顶栏计数：列行已计或列行已非 in-flight 时不重复计孤儿 node.runtime */
-function pro2ThreeViewNodeCountsAsInflight(
-  node: CanvasFlowNode,
-  nodes: CanvasFlowNode[],
-): boolean {
-  const rt = (node.data as { runtime?: { status?: string } }).runtime?.status;
-  if (!isCanvasInflightStatus(rt)) return false;
-
-  const d = node.data as {
-    pro2ControllerNodeId?: string;
-    pro2RowKey?: string;
-    uploading?: boolean;
-  };
-  const controllerId = d.pro2ControllerNodeId?.trim();
-  const rowKey = d.pro2RowKey?.trim();
-  if (!controllerId || !rowKey) {
-    return isCanvasInflightStatus(rt) || Boolean(d.uploading);
-  }
-
-  const col = nodes.find((n) => n.id === controllerId);
-  const row = (col?.data as { rows?: StoryMediaRow[] }).rows?.find(
-    (r) => r.key === rowKey,
-  );
-  if (row && characterRowCountsAsInflight(row, controllerId, nodes)) {
-    return false;
-  }
-  return libtvMediaNodeLooksGenerating(
-    node.data as {
-      uploading?: boolean;
-      blobUrl?: string;
-      ossUrl?: string;
-      runtime?: RowRuntimeSlice;
-    },
-  );
+  return rows.filter((r) => isCanvasInflightRunStatus(r.runtime?.status))
+    .length;
 }
 
 export function canvasNodeHasInflightWork(
@@ -226,8 +139,8 @@ export function canvasNodeHasInflightWork(
     const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
     return rows.some(
       (r) =>
-        isCanvasInflightStatus(r.videoRuntime?.status) ||
-        isCanvasInflightStatus(r.ttsRuntime?.status),
+        isCanvasInflightRunStatus(r.videoRuntime?.status) ||
+        isCanvasInflightRunStatus(r.ttsRuntime?.status),
     );
   }
   if (isAnyStoryScriptHubType(node.type ?? "")) {
@@ -238,11 +151,11 @@ export function canvasNodeHasInflightWork(
     const rt = (
       node.data as { themeOutlineRuntime?: { status?: string } }
     ).themeOutlineRuntime?.status;
-    if (isCanvasInflightStatus(rt)) return true;
+    if (isCanvasInflightRunStatus(rt)) return true;
   }
   if (libtvNodeHasUploadingFlag(node)) return true;
   const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
-  return isCanvasInflightStatus(top);
+  return isCanvasInflightRunStatus(top);
 }
 
 /** 仍有进行中生成的节点 id（供任务轮询使用） */
@@ -290,8 +203,8 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
       const rows =
         (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
       for (const r of rows) {
-        if (isCanvasInflightStatus(r.videoRuntime?.status)) count += 1;
-        if (isCanvasInflightStatus(r.ttsRuntime?.status)) count += 1;
+        if (isCanvasInflightRunStatus(r.videoRuntime?.status)) count += 1;
+        if (isCanvasInflightRunStatus(r.ttsRuntime?.status)) count += 1;
       }
       continue;
     }
@@ -304,7 +217,7 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
       const rt = (
         node.data as { themeOutlineRuntime?: { status?: string } }
       ).themeOutlineRuntime?.status;
-      if (isCanvasInflightStatus(rt)) count += 1;
+      if (isCanvasInflightRunStatus(rt)) count += 1;
       continue;
     }
     if (node.type === "story-pro2-three-view") {
@@ -312,7 +225,12 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
       continue;
     }
     const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
-    if (isCanvasInflightStatus(top)) count += 1;
+    if (isCanvasInflightRunStatus(top)) count += 1;
   }
   return count;
 }
+
+export {
+  characterRowCountsAsInflight,
+  pro2ThreeViewNodeCountsAsInflight,
+} from "./canvas-task-generating-state";

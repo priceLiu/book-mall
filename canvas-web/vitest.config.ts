@@ -12,9 +12,18 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   resolve: {
-    alias: {
-      "@": fileURLToPath(new URL(".", import.meta.url)),
-    },
+    alias: [
+      {
+        find: "@/components/canvas/canvas-credits-toast-host",
+        replacement: fileURLToPath(
+          new URL("./test/mocks/canvas-credits-toast-host.ts", import.meta.url),
+        ),
+      },
+      {
+        find: "@",
+        replacement: fileURLToPath(new URL(".", import.meta.url)),
+      },
+    ],
   },
   test: {
     include: [
@@ -55,6 +64,7 @@ export default defineConfig({
       "test/unit/pro2-storyboard-shot-budget.test.ts",
       "test/unit/spawn-pro2-script-category.test.ts",
       "test/unit/pro2-multi-group-spawn.test.ts",
+      "test/unit/canvas-task-generating-state.test.ts",
       "test/unit/pro2-character-spawn-filter.test.ts",
       "test/unit/pro2-lazy-media-prompts.test.ts",
       "test/unit/pro2-text-hub-link-sync.test.ts",

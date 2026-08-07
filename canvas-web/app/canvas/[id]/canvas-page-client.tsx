@@ -27,6 +27,7 @@ import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel"
 import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel";
 import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
 import { useCanvasTaskEventStream } from "@/lib/canvas/use-canvas-task-event-stream";
+import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
@@ -261,6 +262,8 @@ function Inner({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   useCanvasTaskEventStream(base, projectId, !loading);
+  const inflightTaskCount = useCanvasInflightTaskCount();
+  useCanvasTaskSse(base, projectId, inflightTaskCount, !loading);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -359,8 +362,6 @@ function Inner({ projectId }: { projectId: string }) {
   const canvasHydratingUntilRef = useRef(0);
   const syncLastPersistedSnapshotRef = useRef<(() => void) | null>(null);
   const isCanvasDirtyRef = useRef<(() => boolean) | null>(null);
-
-  const inflightTaskCount = useCanvasInflightTaskCount();
 
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow;

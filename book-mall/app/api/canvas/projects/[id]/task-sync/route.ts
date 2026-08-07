@@ -7,6 +7,7 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
+import { touchCanvasActiveProject } from "@/lib/canvas/canvas-active-project";
 import { getCanvasProjectTaskSyncSnapshot } from "@/lib/canvas/canvas-task-event-stream";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,6 +30,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   } catch (err) {
     return canvasErrorToResponse(request, err);
   }
+
+  touchCanvasActiveProject(projectId);
 
   try {
     const snap = await getCanvasProjectTaskSyncSnapshot(projectId);

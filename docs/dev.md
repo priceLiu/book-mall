@@ -170,6 +170,15 @@ Agent 约束见 `.cursor/rules/prompt-optimizer-platform-build.mdc`。
 
 功能需求详见 `canvas-web/docs/canvas-portal-product-requirements.md`。
 
+### Canvas 任务完成同步（可选 env）
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `CANVAS_ACTIVE_OPPORTUNISTIC_POLL_MS` | 3000 | 用户正在看画布时，读路径 opportunistic poll 最短间隔 |
+| `CANVAS_IDLE_OPPORTUNISTIC_POLL_MS` | 8000 | 非活跃项目 opportunistic poll 最短间隔 |
+
+详见 [`canvas-web/docs/canvas-task-completion-sync.md`](../canvas-web/docs/canvas-task-completion-sync.md)。
+
 ## QuickReplica · MiniMax 音色同步
 
 MiniMax 系统音色与试听 MP3 经离线脚本写入 OSS，并生成 `book-mall/content/quick-replica/minimax-voice-catalog.json` 供 Platform API 分页读取。

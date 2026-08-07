@@ -13,9 +13,10 @@ import {
   CANVAS_TASK_SSE_IDLE_POLL_MS,
   CANVAS_TASK_SSE_POLL_MS,
   getCanvasProjectTaskSyncSnapshot,
-  isCanvasTaskSseEnabled,
+  registerCanvasTaskSseClient,
   resolveCanvasTaskSsePollDelayMs,
 } from "@/lib/canvas/canvas-task-event-stream";
+import { touchCanvasActiveProject } from "@/lib/canvas/canvas-active-project";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -38,9 +39,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     return canvasErrorToResponse(request, err);
   }
 
-  if (!isCanvasTaskSseEnabled()) {
-    return new Response("SSE disabled", { status: 503 });
-  }
+  touchCanvasActiveProject(projectId);
 
   const encoder = new TextEncoder();
   let closed = false;
@@ -50,6 +49,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   let pollDelayMs = CANVAS_TASK_SSE_IDLE_POLL_MS;
   let pollFailures = 0;
   let dbBackoffUntil = 0;
+  let unregisterSse: (() => void) | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -112,6 +112,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         pollMs: CANVAS_TASK_SSE_POLL_MS,
         idlePollMs: CANVAS_TASK_SSE_IDLE_POLL_MS,
       });
+      unregisterSse = registerCanvasTaskSseClient(projectId, send);
       void poll();
 
       heartbeatTimer = setInterval(() => {
@@ -120,6 +121,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     },
     cancel() {
       closed = true;
+      unregisterSse?.();
+      unregisterSse = null;
       if (pollTimer) clearTimeout(pollTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
     },
@@ -127,6 +130,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
   request.signal.addEventListener("abort", () => {
     closed = true;
+    unregisterSse?.();
+    unregisterSse = null;
     if (pollTimer) clearTimeout(pollTimer);
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   });

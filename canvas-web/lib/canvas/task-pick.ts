@@ -188,19 +188,21 @@ export function shouldSkipStoryRowTaskApply(
   }
   if (localRuntime?.taskId) {
     if (pick.id === localRuntime.taskId) return false;
-  } else {
-    // 无 taskId：历史终态一律跳过，避免刚点生成时闪回旧结果
     return (
       pick.status === "SUCCEEDED" ||
       pick.status === "FAILED" ||
       pick.status === "CANCELLED"
     );
   }
-  return (
+  // 无 taskId + 本地仍扫光：终态必须写回（含 OSS 未就绪、无 preview URL 的 SUCCEEDED）
+  if (
     pick.status === "SUCCEEDED" ||
     pick.status === "FAILED" ||
     pick.status === "CANCELLED"
-  );
+  ) {
+    return false;
+  }
+  return false;
 }
 
 /** 任务终态写回 node.runtime 前 · 用户已关闭的错误勿重复弹出 */
@@ -472,7 +474,7 @@ export function pickStoryRowApplyTask(
       succeeded &&
       pick.status === "SUBMITTED" &&
       pick.id !== succeeded.id &&
-      !localInflight
+      (!localInflight || localInflight.id === pick.id)
     ) {
       return succeeded;
     }

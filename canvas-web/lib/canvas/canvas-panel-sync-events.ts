@@ -69,5 +69,27 @@ export function subscribeCanvasPromptHistoryChanged(
     window.removeEventListener(CANVAS_PROMPT_HISTORY_CHANGED, onEvent);
 }
 
+/** 任务指纹 / SSE tasks-changed → run-queue pollKick（不限侧栏） */
+export function emitCanvasTasksChanged(projectId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(CANVAS_TASKS_CHANGED, {
+      detail: { projectId } satisfies CanvasTaskPanelSyncDetail,
+    }),
+  );
+}
+
+export function subscribeCanvasTasksChanged(
+  projectId: string,
+  handler: () => void,
+): () => void {
+  const onEvent = (e: Event) => {
+    const detail = (e as CustomEvent<CanvasTaskPanelSyncDetail>).detail;
+    if (detail?.projectId === projectId) handler();
+  };
+  window.addEventListener(CANVAS_TASKS_CHANGED, onEvent);
+  return () => window.removeEventListener(CANVAS_TASKS_CHANGED, onEvent);
+}
+
 export const GENERATION_RECORDS_CACHE_PREFIX = GENERATION_RECORDS_PREFIX;
 export const PROMPT_HISTORY_CACHE_PREFIX = PROMPT_HISTORY_PREFIX;

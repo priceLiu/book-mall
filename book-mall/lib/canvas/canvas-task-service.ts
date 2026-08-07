@@ -17,6 +17,8 @@ import type {
   Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveOpportunisticPollMinGapMs } from "@/lib/canvas/canvas-active-project";
+import { notifyCanvasTaskSnapshotChanged } from "@/lib/canvas/canvas-task-event-stream";
 import {
   promptArchiveFieldsForTask,
   syncTaskPromptArchiveById,
@@ -851,6 +853,7 @@ export async function applyCanvasKieTaskResult(
           completedAt: new Date(),
         },
       });
+      void notifyCanvasTaskSnapshotChanged(task.projectId);
       return;
     }
     const payload = task.inputPayload as { kind?: string } | null;
@@ -913,6 +916,7 @@ export async function applyCanvasKieTaskResult(
       ephemeralUrl,
       isVideoOss,
     });
+    void notifyCanvasTaskSnapshotChanged(task.projectId);
   } else if (record.state === "fail") {
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: taskId },
@@ -931,6 +935,7 @@ export async function applyCanvasKieTaskResult(
       failCode: record.failCode,
       failMsg: record.failMsg,
     });
+    void notifyCanvasTaskSnapshotChanged(task.projectId);
   }
 }
 
@@ -1031,14 +1036,14 @@ export async function applyCanvasGatewayPollResult(
  */
 let opportunisticPollInFlight = false;
 const lastOpportunisticPollByProject = new Map<string, number>();
-const OPPORTUNISTIC_POLL_MIN_GAP_MS = 8000;
 
 /** 单飞 + 每项目节流的 fire-and-forget 轮询（内部用，不做开关判断） */
 function kickCanvasPollSingleFlight(projectId: string): void {
   if (process.env.CANVAS_DISABLE_OPPORTUNISTIC_POLL === "1") return;
   const now = Date.now();
+  const minGap = resolveOpportunisticPollMinGapMs(projectId);
   const last = lastOpportunisticPollByProject.get(projectId) ?? 0;
-  if (now - last < OPPORTUNISTIC_POLL_MIN_GAP_MS) return;
+  if (now - last < minGap) return;
   // 全局单飞：已有后台轮询在跑就直接跳过，绝不并发抢连接
   if (opportunisticPollInFlight) return;
   lastOpportunisticPollByProject.set(projectId, now);
@@ -1575,6 +1580,16 @@ type SubmittedPollDelta = {
   timedOut: number;
 };
 
+function finishSubmittedPollDelta(
+  task: SubmittedCanvasPollTask,
+  delta: SubmittedPollDelta,
+): SubmittedPollDelta {
+  if (delta.succeeded > 0 || delta.failed > 0 || delta.timedOut > 0) {
+    void notifyCanvasTaskSnapshotChanged(task.projectId);
+  }
+  return delta;
+}
+
 /** 推进单条 SUBMITTED 任务（供并行 poll worker 调用）。 */
 async function advanceOneSubmittedCanvasTask(
   task: SubmittedCanvasPollTask,
@@ -1601,11 +1616,11 @@ async function advanceOneSubmittedCanvasTask(
       const outcome = await pollOneSubmittedCanvasTask(task);
       if (outcome === "succeeded") {
         delta.succeeded = 1;
-        return delta;
+        return finishSubmittedPollDelta(task, delta);
       }
       if (outcome === "failed") {
         delta.failed = 1;
-        return delta;
+        return finishSubmittedPollDelta(task, delta);
       }
     } catch (e) {
       finalPollError = e instanceof Error ? e.message : String(e);
@@ -1621,11 +1636,11 @@ async function advanceOneSubmittedCanvasTask(
     });
     if (afterFinalPoll?.status === "SUCCEEDED") {
       delta.succeeded = 1;
-      return delta;
+      return finishSubmittedPollDelta(task, delta);
     }
     if (afterFinalPoll?.status === "FAILED") {
       delta.failed = 1;
-      return delta;
+      return finishSubmittedPollDelta(task, delta);
     }
 
     const diagnosis = await probeCanvasSubmittedTaskAtTimeout({
@@ -1663,7 +1678,7 @@ async function advanceOneSubmittedCanvasTask(
           vendorStatus: diagnosis.vendorStatus,
         });
         delta.succeeded = 1;
-        return delta;
+        return finishSubmittedPollDelta(task, delta);
       }
     }
 
@@ -1709,7 +1724,7 @@ async function advanceOneSubmittedCanvasTask(
       });
     }
     delta.timedOut = 1;
-    return delta;
+    return finishSubmittedPollDelta(task, delta);
   }
 
   try {
@@ -1731,7 +1746,7 @@ async function advanceOneSubmittedCanvasTask(
       },
     });
   }
-  return delta;
+  return finishSubmittedPollDelta(task, delta);
 }
 
 /** 全局交通对账（RUNNING 超时释放 + 槽位计数纠偏）最小间隔，避免每 10s 都扫全表 */

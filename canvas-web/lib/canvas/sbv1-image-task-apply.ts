@@ -186,6 +186,7 @@ export function isSameSbv1MediaDataPatch(
   current: Record<string, unknown> | undefined,
   patch: Record<string, unknown>,
 ): boolean {
+  if (needsForceLibtvMediaPatchApply(current, patch)) return false;
   for (const key of Object.keys(patch)) {
     if (!SBV1_MEDIA_PATCH_KEYS.has(key)) return false;
   }
@@ -217,4 +218,25 @@ export function isSameSbv1MediaDataPatch(
     (prev.ephemeralUrl ?? "") === (nextRt.ephemeralUrl ?? "") &&
     (prev.posterUrl ?? "") === (nextRt.posterUrl ?? "")
   );
+}
+
+/** 本地仍扫光但 patch 已是终态 → 强制写回（避免 isSame 误吞 uploading:false） */
+export function needsForceLibtvMediaPatchApply(
+  current: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): boolean {
+  const cur = current ?? {};
+  const rt = cur.runtime as CanvasNodeRuntime | undefined;
+  const nextRt = patch.runtime as CanvasNodeRuntime | undefined;
+  const stillGenerating =
+    Boolean(cur.uploading) ||
+    rt?.status === "pending" ||
+    rt?.status === "running" ||
+    rt?.status === "queued";
+  const terminalPatch =
+    patch.uploading === false ||
+    nextRt?.status === "done" ||
+    nextRt?.status === "error" ||
+    nextRt?.status === "idle";
+  return stillGenerating && terminalPatch;
 }

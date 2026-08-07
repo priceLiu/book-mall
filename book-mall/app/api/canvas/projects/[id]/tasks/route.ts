@@ -9,6 +9,7 @@ import {
   listProjectTasks,
   scheduleOpportunisticCanvasPoll,
 } from "@/lib/canvas/canvas-task-service";
+import { touchCanvasActiveProject } from "@/lib/canvas/canvas-active-project";
 import { recoverProjectInflightKieImageTasksForRead } from "@/lib/canvas/canvas-kie-image-recover";
 import { recoverProjectInflightTextTasksForRead } from "@/lib/canvas/canvas-text-llm-recover";
 import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   const { id: projectId } = await ctx.params;
+  touchCanvasActiveProject(projectId);
   const url = new URL(request.url);
   const nodeIdsParam = url.searchParams.get("nodeIds");
   const nodeIds = nodeIdsParam

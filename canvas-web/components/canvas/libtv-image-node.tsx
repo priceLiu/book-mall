@@ -5,7 +5,7 @@ import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
-import { AlertTriangle, ImageIcon } from "lucide-react";
+import { AlertTriangle, GripVertical, ImageIcon } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
@@ -44,6 +44,7 @@ import {
   useLibtvMediaAspectPresetSync,
 } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
+import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
 import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
@@ -766,7 +767,12 @@ export function LibtvImageNode({
   return (
     <>
       <div
-        className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
+        className={cn(
+          LIBTV_NODE_OUTER_CLASS,
+          edition === "pro2" && LIBTV_CARD_DRAG_CLASS,
+          edition === "pro2" && "flex flex-col",
+          "image-paste-host",
+        )}
         data-image-paste-host={id}
         data-pro2-dock-anchor={id}
         onPointerEnter={onPointerEnter}
@@ -843,6 +849,21 @@ export function LibtvImageNode({
           </LibtvNodeToolbarPortal>
         ) : null}
 
+        {edition === "pro2" ? (
+          <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
+            <GripVertical className="size-3.5 shrink-0 text-white/30" />
+            <ImageIcon className="size-3.5 shrink-0 text-violet-300" />
+            <LibtvEditableNodeTitle
+              nodeId={id}
+              defaultLabel={defaultNodeLabel}
+              textClassName="text-[11px] text-white"
+            />
+            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} />
+            ) : null}
+          </div>
+        ) : null}
+
         <div
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
@@ -855,51 +876,53 @@ export function LibtvImageNode({
             edition,
           })}
         >
-          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <button
-                type="button"
-                className={cn(
-                  "nodrag flex shrink-0 items-center rounded-md transition",
-                  !hasImage &&
-                    !isGenerating &&
-                    !isCharacterThreeView &&
-                    "cursor-pointer hover:bg-white/[0.06]",
-                )}
-                title={
-                  !hasImage && !isGenerating && !isCharacterThreeView
-                    ? "双击上传图片"
-                    : undefined
-                }
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (!hasImage && !isGenerating && !isCharacterThreeView) {
-                    onPick();
+          {edition === "sbv1" ? (
+            <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "nodrag flex shrink-0 items-center rounded-md transition",
+                    !hasImage &&
+                      !isGenerating &&
+                      !isCharacterThreeView &&
+                      "cursor-pointer hover:bg-white/[0.06]",
+                  )}
+                  title={
+                    !hasImage && !isGenerating && !isCharacterThreeView
+                      ? "双击上传图片"
+                      : undefined
                   }
-                }}
-              >
-                <ImageIcon className={cn("size-3.5 shrink-0", chrome.icon)} />
-              </button>
-              <LibtvEditableNodeTitle
-                nodeId={id}
-                defaultLabel={defaultNodeLabel}
-                textClassName="text-xs font-medium text-white"
-              />
-            </div>
-            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
-              <Pro2CrewTaskStatusBadge nodeId={id} />
-            ) : null}
-            <div className="relative z-[1] flex shrink-0 items-center gap-2">
-              {!isGenerating ? (
-                <LibtvNodeHeaderActions
-                  portraitActive={portraitActive}
-                  portraitImporting={portraitImporting}
-                  showPreview={hasImage}
-                  onPreview={() => setPreviewOpen(true)}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (!hasImage && !isGenerating && !isCharacterThreeView) {
+                      onPick();
+                    }
+                  }}
+                >
+                  <ImageIcon className={cn("size-3.5 shrink-0", chrome.icon)} />
+                </button>
+                <LibtvEditableNodeTitle
+                  nodeId={id}
+                  defaultLabel={defaultNodeLabel}
+                  textClassName="text-xs font-medium text-white"
                 />
+              </div>
+              {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+                <Pro2CrewTaskStatusBadge nodeId={id} />
               ) : null}
+              <div className="relative z-[1] flex shrink-0 items-center gap-2">
+                {!isGenerating ? (
+                  <LibtvNodeHeaderActions
+                    portraitActive={portraitActive}
+                    portraitImporting={portraitImporting}
+                    showPreview={hasImage}
+                    onPreview={() => setPreviewOpen(true)}
+                  />
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative flex min-h-0 flex-col")}>
             {renderStage()}
