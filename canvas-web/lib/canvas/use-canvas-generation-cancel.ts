@@ -91,18 +91,18 @@ function cancelJobsForNode(node: CanvasFlowNode): CanvasCancelGenerationJob[] {
   }
 
   if (
-    node.type === "story-pro2-character-board" ||
-    node.type === "story-pro2-frame-board" ||
-    node.type === "story-pro2-video-board"
+    node.type === "story-pro2-character" ||
+    node.type === "story-pro2-frame" ||
+    node.type === "story-pro2-video"
   ) {
     const d = node.data as {
       hubNodeId?: string;
       rows?: { key: string; runtime?: { status?: string; taskId?: string } }[];
     };
     const mediaKind =
-      node.type === "story-pro2-character-board"
+      node.type === "story-pro2-character"
         ? ("threeView" as const)
-        : node.type === "story-pro2-frame-board"
+        : node.type === "story-pro2-frame"
           ? ("frameImage" as const)
           : ("video" as const);
     const nodes = useCanvasStore.getState().nodes;
