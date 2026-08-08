@@ -26,12 +26,17 @@ export function libtvDockSegmentButtonClass(
 }
 
 /** Pro2 / LibTV Dock · 模型列表项（无彩色边框 / hover） */
-export function libtvDockModelItemClassName(selected: boolean): string {
+export function libtvDockModelItemClassName(
+  selected: boolean,
+  disabled = false,
+): string {
   return cn(
     "flex w-full items-center gap-2 rounded-lg border px-2.5 py-2.5 text-left transition",
-    selected
-      ? "border-transparent bg-white/[0.10] text-white"
-      : "border-transparent text-white/80 hover:bg-white/[0.04]",
+    disabled
+      ? "cursor-not-allowed border-transparent text-white/35 opacity-50"
+      : selected
+        ? "border-transparent bg-white/[0.10] text-white"
+        : "border-transparent text-white/80 hover:bg-white/[0.04]",
   );
 }
 

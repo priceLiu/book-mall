@@ -5,7 +5,6 @@ import {
   ArrowUp,
   ImageIcon,
   Loader2,
-  Zap,
 } from "lucide-react";
 import {
   type MentionableItem,
@@ -34,6 +33,7 @@ import {
   resolveSbv1VariantIdFromEngine,
 } from "@/lib/canvas/sbv1-video-models";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
+import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-label";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
@@ -48,10 +48,12 @@ import {
   type CanvasPortraitNodeFields,
 } from "@/lib/canvas/portrait-node-data";
 import { resolvePro2VideoBoardCellDefaultPrompt } from "@/lib/canvas/pro2-video-board-dock-links";
+import { pickRuntimeVideoUrl } from "@/lib/canvas/task-media-url";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import {
+  buildDashscopeVideoModelRefSyncPatch,
   dockInputModeToPatch,
   getSbv1VideoDockModeChips,
   resolveSbv1DockInputMode,
@@ -108,6 +110,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     logoIconPx,
   } = useLibtvDockRefThumbMetrics();
   const chipFontPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
+  const modeChipFontPx = Math.max(10, chipFontPx - 4);
   const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
   const creditsFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
   const sendBtnPx = 44;
@@ -126,16 +129,43 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       const src = canvasNodes.find((n) => n.id === e.source);
       if (!src || src.type !== "sbv1-video-engine") continue;
       const url = String(
-        (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
-          .runtime?.ossUrl ??
-          (src.data as { runtime?: { ephemeralUrl?: string } }).runtime
-            ?.ephemeralUrl ??
-          "",
+        pickRuntimeVideoUrl(
+          (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
+            .runtime,
+        ) ?? "",
       ).trim();
       if (/^https?:\/\//.test(url)) return true;
     }
     return false;
   }, [isHdVideo, nodeId, canvasEdges, canvasNodes]);
+
+  const hdMotionVideoLinks = useMemo((): Sbv1UpstreamRefLink[] => {
+    if (!isHdVideo) return [];
+    const links: Sbv1UpstreamRefLink[] = [];
+    for (const e of canvasEdges) {
+      if (e.target !== nodeId || e.targetHandle !== "in_motion_video") continue;
+      const src = canvasNodes.find((n) => n.id === e.source);
+      if (!src || src.type !== "sbv1-video-engine") continue;
+      const previewUrl = pickRuntimeVideoUrl(
+        (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
+          .runtime,
+      );
+      links.push({
+        id: `sbv1-motion-${src.id}`,
+        index: links.length + 1,
+        label: "上游视频",
+        previewUrl,
+        sourceNodeId: src.id,
+        edgeId: e.id,
+      });
+    }
+    return links;
+  }, [isHdVideo, nodeId, canvasEdges, canvasNodes]);
+
+  const dockRefLinks = useMemo(() => {
+    if (!isHdVideo) return upstreamLinks;
+    return [...hdMotionVideoLinks, ...upstreamLinks];
+  }, [isHdVideo, hdMotionVideoLinks, upstreamLinks]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
@@ -190,6 +220,12 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const selectedModel = getSbv1VolcengineModelById(variantId, providers);
   const modelKey =
     data.engine?.modelKey?.trim() || selectedModel.engine.modelKey;
+  const isVolcSeedance =
+    /seedance|doubao-seedance/i.test(modelKey);
+  const previewVariantId = isVolcSeedance ? variantId : undefined;
+  const previewResolution = String(
+    data.resolution ?? data.engine?.params?.resolution ?? "720P",
+  );
   const multiShots = data.engine?.params?.multi_shots === true;
   const dockChips = useMemo(
     () =>
@@ -224,6 +260,20 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   }, [upstreamTextLinks, extraDockUpstreamLinks]);
 
   useEffect(() => {
+    if (isHdVideo) return;
+    const patch = buildDashscopeVideoModelRefSyncPatch(data, upstreamLinks.length);
+    if (patch) onPatch(patch);
+  }, [
+    isHdVideo,
+    upstreamLinks.length,
+    data.engine?.modelKey,
+    data.engine?.providerId,
+    data.engine?.params,
+    onPatch,
+    data,
+  ]);
+
+  useEffect(() => {
     if (isHdVideo || !dockChips.length) return;
     if (
       !data.dockInputMode ||
@@ -238,7 +288,13 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     activeDockMode,
     onPatch,
   ]);
-  const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
+  const estCredits = useModelCreditsPreview(
+    modelKey,
+    billableDurationSec,
+    previewVariantId,
+    undefined,
+    previewResolution,
+  );
 
   const hasRefs = upstreamLinks.some((l) => l.previewUrl);
   const hasPrompt = Boolean(livePrompt.trim());
@@ -358,7 +414,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       return (
         <div className="flex min-w-0 items-center gap-1">
           {[0, 1].map((slotIndex) => {
-            const link = upstreamLinks[slotIndex];
+            const link = dockRefLinks[slotIndex];
             const corner = refThumbCorner(slotIndex, 2) ?? "参考";
             if (link) {
               const sourceNode = canvasNodes.find((n) => n.id === link.sourceNodeId);
@@ -397,16 +453,19 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       );
     }
 
-    if (upstreamLinks.length === 0) return null;
+    if (dockRefLinks.length === 0) return null;
 
     return (
       <div className="hide-scroll-bar flex min-w-0 items-center gap-1.5 overflow-x-auto">
-        {upstreamLinks.map((link, index) => {
+        {dockRefLinks.map((link, index) => {
           const sourceNode = canvasNodes.find((n) => n.id === link.sourceNodeId);
           const importState = portraitImportUiState(
             sourceNode?.data as CanvasPortraitNodeFields | undefined,
           );
-          const corner = refThumbCorner(index, upstreamLinks.length);
+          const corner =
+            link.id.startsWith("sbv1-motion-")
+              ? "视频"
+              : refThumbCorner(index, dockRefLinks.length);
           return (
             <DockUpstreamRefPreviewCard
               key={link.id}
@@ -430,7 +489,16 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   })();
 
   const dockHeader = (() => {
-    if (isHdVideo) return null;
+    if (isHdVideo) {
+      if (!refThumbnails) return null;
+      return (
+        <Pro2DockHeader
+          compact
+          minHeightPx={headerMinHeightPx}
+          refRow={refThumbnails}
+        />
+      );
+    }
     const hasModeBar = dockChips.length > 0;
     const hasRefRow = textDockLinks.length > 0 || refThumbnails;
     if (!hasModeBar && !hasRefRow) return null;
@@ -442,7 +510,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             chips={dockChips}
             activeMode={activeDockMode}
             disabled={isGenerating}
-            chipFontPx={chipFontPx}
+            chipFontPx={modeChipFontPx}
             chipMinHeightPx={chipMinHeightPx}
             onSelect={(mode) => onPatch(dockInputModeToPatch(mode))}
           />
@@ -483,7 +551,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             {activeModeLabel ? (
               <span
                 className="nodrag shrink-0 rounded-full border border-white/10 px-2.5 py-1 font-medium text-white/55"
-                style={{ fontSize: Math.max(10, chipFontPx - 1) }}
+                style={{ fontSize: Math.max(10, chipFontPx - 3) }}
               >
                 {activeModeLabel}
               </span>
@@ -492,6 +560,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               data={data}
               disabled={isGenerating}
               onPatch={onPatch}
+              refLinkCount={upstreamLinks.length}
               open={dockMenu === "model"}
               onOpenChange={(next) => setDockMenu(next ? "model" : null)}
             />
@@ -512,19 +581,15 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         className="flex shrink-0 items-center gap-1.5 text-white/80"
         style={{ fontSize: dockTextFontPx }}
       >
-        {estCredits?.credits != null ? (
-          <span
-            className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
-            style={{ fontSize: creditsFontPx }}
-            title={`${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`}
-          >
-            <Zap
-              className="fill-amber-300/90 text-amber-300/90"
-              style={{ width: 14, height: 14 }}
-            />
-            {estCredits.credits}
-          </span>
-        ) : null}
+        <LibtvDockCreditsLabel
+          credits={estCredits?.credits}
+          fontPx={creditsFontPx}
+          title={
+            estCredits?.credits != null
+              ? `${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`
+              : undefined
+          }
+        />
         <button
           type="button"
           disabled={!canSend}
@@ -590,7 +655,9 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             >
               {hasMotionVideo
                 ? "已连接上游视频，选择参数后点击生成"
-                : "请从左侧连接上游视频节点，或在视频节点右侧 + 选择「高清视频」"}
+                : upstreamLinks.length > 0
+                  ? "已连接参考图；高清视频需连接上游视频节点后再生成"
+                  : "请从左侧连接上游视频节点，或在视频节点右侧 + 选择「高清视频」"}
             </div>
           ) : (
             <MentionsEditable

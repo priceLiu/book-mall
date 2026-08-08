@@ -77,3 +77,48 @@ export function resolveBillableVideoSecondsFromLog(log: {
   const hints = parseVideoPricingHints(log.inputSummary);
   return videoBillableSeconds(hints.durationSec);
 }
+
+function resultRecord(resultSummary: unknown): Record<string, unknown> | null {
+  if (!resultSummary || typeof resultSummary !== "object" || Array.isArray(resultSummary)) {
+    return null;
+  }
+  return resultSummary as Record<string, unknown>;
+}
+
+/** ASR：从 resultSummary.audioDurationSec 或 input 解析音频秒数。 */
+export function resolveBillableAudioSecondsFromLog(
+  log: { model?: string | null; inputSummary?: unknown },
+  resultSummary?: unknown,
+): number | null {
+  const model = (log.model ?? "").trim().toLowerCase();
+  if (!model.includes("asr") && !model.includes("qwen3-asr")) {
+    const input = inputRecord(log.inputSummary);
+    const canonical = typeof input?.canonicalModelKey === "string" ? input.canonicalModelKey : "";
+    if (!canonical.includes("asr")) return null;
+  }
+  const result = resultRecord(resultSummary);
+  const fromResult = positiveInt(result?.audioDurationSec);
+  if (fromResult != null) return fromResult;
+  const input = inputRecord(log.inputSummary);
+  return positiveInt(input?.audioDurationSec) ?? positiveInt(input?.durationSec);
+}
+
+export function parseWan30InputVideoSec(inputSummary: unknown): number | null {
+  const input = inputRecord(inputSummary);
+  if (!input) return null;
+  return (
+    positiveInt(input.inputVideoSec) ??
+    positiveInt(input.input_duration) ??
+    positiveInt(input.inputDuration)
+  );
+}
+
+export function parseWan30OutputVideoSec(resultSummary: unknown): number | null {
+  const result = resultRecord(resultSummary);
+  if (!result) return null;
+  return (
+    positiveInt(result.outputVideoSec) ??
+    positiveInt(result.durationSec) ??
+    positiveInt(result.videoDurationSec)
+  );
+}

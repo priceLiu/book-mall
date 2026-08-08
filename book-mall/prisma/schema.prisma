@@ -2823,6 +2823,10 @@ model ModelCostProfile {
   unit              CreditCostUnit
   tierRaw           String? // 720P / 1080P / 1K 等
   listCostYuan      Decimal        @db.Decimal(16, 8) // 厂商挂牌成本
+  /// LLM 分价：输入侧 元/千 token（= 元/百万 ÷ 1000）
+  inputListCostYuan Decimal?       @db.Decimal(16, 8)
+  /// LLM 分价：输出侧 元/千 token
+  outputListCostYuan Decimal?      @db.Decimal(16, 8)
   discountRate      Decimal        @default("0") @db.Decimal(6, 4) // 渠道折扣 0~1（0.6=六折省）
   netCostYuan       Decimal        @db.Decimal(16, 8) // 派生：listCostYuan × (1 - discountRate)
   effectiveFrom     DateTime       @default(now())
@@ -2848,6 +2852,11 @@ model ModelCreditPrice {
   marginM           Decimal        @db.Decimal(6, 3) // 取价时的系数 M
   listPriceYuan     Decimal        @db.Decimal(16, 6) // 挂牌价 = netCost × M
   creditsPerUnit    Int // 积分/次（或 /秒、/张、/千token）
+  /// LLM 分价：输入/输出 积分/千 token
+  inputCreditsPerKToken  Int?
+  outputCreditsPerKToken Int?
+  inputListPriceYuan     Decimal?   @db.Decimal(16, 8)
+  outputListPriceYuan    Decimal?   @db.Decimal(16, 8)
   baseMarginRate    Decimal        @db.Decimal(6, 4) // 标准锚定下毛利率
   formulaSnapshot   Json // 公式与中间值快照，供后台查阅
   active            Boolean        @default(true)

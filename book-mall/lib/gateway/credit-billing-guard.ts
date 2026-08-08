@@ -94,6 +94,10 @@ export interface CostSnapshot {
   creditsPerUnit: number | null;
   /** 单位挂牌价（元/秒、元/张、元/千token），逐档积分换算用 */
   listPriceYuan: number | null;
+  inputCreditsPerKToken?: number | null;
+  outputCreditsPerKToken?: number | null;
+  inputListPriceYuan?: number | null;
+  outputListPriceYuan?: number | null;
   unit: CreditCostUnit | null;
   vendor: string;
 }
@@ -135,6 +139,10 @@ export async function resolveCostSnapshot(canonicalModelKey: string): Promise<Co
     marginRate,
     creditsPerUnit,
     listPriceYuan: price?.listPriceYuan != null ? num(price.listPriceYuan) : null,
+    inputCreditsPerKToken: price?.inputCreditsPerKToken ?? null,
+    outputCreditsPerKToken: price?.outputCreditsPerKToken ?? null,
+    inputListPriceYuan: price?.inputListPriceYuan != null ? num(price.inputListPriceYuan) : null,
+    outputListPriceYuan: price?.outputListPriceYuan != null ? num(price.outputListPriceYuan) : null,
     unit: price?.unit ?? chosen.unit ?? null,
     vendor: chosen.vendor,
   };

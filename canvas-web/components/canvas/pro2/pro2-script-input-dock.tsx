@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Languages, Zap } from "lucide-react";
+import { Languages } from "lucide-react";
+import { Pro2LlmDockCreditsBadge } from "./pro2-llm-dock-credits-badge";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -443,16 +444,7 @@ function Pro2ScriptDockFooter({
         >
           <Languages style={{ width: sendIconPx, height: sendIconPx }} />
         </button>
-        <button
-          type="button"
-          className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
-          style={{ fontSize: fontPx }}
-          title="消耗（预留）"
-          disabled
-        >
-          <Zap style={{ width: sendIconPx, height: sendIconPx }} />
-          <span>1</span>
-        </button>
+        <Pro2LlmDockCreditsBadge modelKey={modelKey} fontPx={fontPx} />
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isGenerating}

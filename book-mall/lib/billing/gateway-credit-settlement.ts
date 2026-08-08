@@ -14,9 +14,13 @@ import { prisma } from "@/lib/prisma";
 import type { CostSnapshot } from "@/lib/gateway/credit-billing-guard";
 import { resolveCostSnapshot, resolveBillingCanonicalKey } from "@/lib/gateway/credit-billing-guard";
 import {
+  audioBillableSeconds,
+  computeChargeCreditsFromSnapshot,
+  computeLlmSplitChargeCredits,
   computeTierCredits,
   isVideoBillingUnit,
   videoBillableSeconds,
+  wan30BillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
 import {
   consumeCredits,
@@ -133,23 +137,57 @@ function isVideoLog(log: { requestKind?: string | null }, unit?: CreditCostUnit 
   return log.requestKind === "VIDEO" || isVideoBillingUnit(unit ?? null);
 }
 
-/**
- * 逐档积分换算（方案 B-refined）：
- *   有档位单价快照 → credits = round(单位挂牌价 × 单位数 ÷ 档位单价)
- *   无快照（兼容旧账户） → 回退 creditsPerUnit × 单位数（锚定口径）
- */
 export function computeChargeCredits(input: {
-  snapshot: Pick<CostSnapshot, "listPriceYuan" | "creditsPerUnit">;
+  snapshot: Pick<
+    CostSnapshot,
+    | "listPriceYuan"
+    | "creditsPerUnit"
+    | "inputCreditsPerKToken"
+    | "outputCreditsPerKToken"
+    | "inputListPriceYuan"
+    | "outputListPriceYuan"
+  >;
   units: number;
   pricePerCreditYuan: number | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  unit?: CreditCostUnit | null;
 }): number {
-  const units = Math.max(1, input.units);
-  const list = input.snapshot.listPriceYuan;
-  if (input.pricePerCreditYuan && input.pricePerCreditYuan > 0 && list && list > 0) {
-    return computeTierCredits(list * units, input.pricePerCreditYuan);
+  if (input.unit === "PER_KTOKEN") {
+    return computeLlmSplitChargeCredits({
+      inputCreditsPerKToken: input.snapshot.inputCreditsPerKToken,
+      outputCreditsPerKToken: input.snapshot.outputCreditsPerKToken,
+      inputListPriceYuan: input.snapshot.inputListPriceYuan,
+      outputListPriceYuan: input.snapshot.outputListPriceYuan,
+      creditsPerUnit: input.snapshot.creditsPerUnit,
+      listPriceYuan: input.snapshot.listPriceYuan,
+      promptTokens: input.promptTokens,
+      completionTokens: input.completionTokens,
+      totalTokens: input.totalTokens,
+      pricePerCreditYuan: input.pricePerCreditYuan,
+    });
   }
-  const cpu = input.snapshot.creditsPerUnit ?? 0;
-  return Math.max(0, Math.round(cpu * units));
+  return computeChargeCreditsFromSnapshot({
+    listPriceYuan: input.snapshot.listPriceYuan,
+    creditsPerUnit: input.snapshot.creditsPerUnit,
+    units: input.units,
+    pricePerCreditYuan: input.pricePerCreditYuan,
+  });
+}
+
+const ASR_CANONICAL_KEYS = new Set(["qwen3-asr-flash-filetrans", "qwen3-asr-flash"]);
+const WAN30_MODEL_KEYS = new Set(["wan3.0-video"]);
+
+function isAsrCanonical(key: string | null | undefined): boolean {
+  if (!key) return false;
+  return ASR_CANONICAL_KEYS.has(key) || key.startsWith("qwen3-asr");
+}
+
+function isWan30Model(modelKey: string | null | undefined, canonical: string | null | undefined): boolean {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  const c = (canonical ?? "").trim().toLowerCase();
+  return WAN30_MODEL_KEYS.has(m) || WAN30_MODEL_KEYS.has(c) || m.startsWith("wan3.0");
 }
 
 /** 解析某条日志的计费归属：团队共享池 or 个人账户。 */
@@ -206,22 +244,42 @@ function platformConsumeDescription(
   return `${catLabel}${modelPart}${page} × ${units}`;
 }
 
-/** 计费单位数量：视频按秒、图片按张、LLM 按千 token。 */
+/** 计费单位数量：视频按秒、图片按张、LLM 按千 token、ASR 按音频秒。 */
 export function billableUnitCount(
   unit: CreditCostUnit | null,
   metrics: {
     durationSec?: number | null;
     images?: number | null;
     totalTokens?: number | null;
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    isVideo?: boolean;
+    isAsr?: boolean;
+    isWan30?: boolean;
+    inputVideoSec?: number | null;
+    outputVideoSec?: number | null;
   },
 ): number {
   switch (unit) {
     case "PER_SEC":
-      // 财务 2.0：视频按秒计费，封顶 15s（业务恒传 15）
+      if (metrics.isWan30) {
+        return wan30BillableSeconds(metrics.inputVideoSec, metrics.outputVideoSec ?? metrics.durationSec);
+      }
+      if (metrics.isAsr || metrics.isVideo === false) {
+        return audioBillableSeconds(metrics.durationSec ?? null);
+      }
       return videoBillableSeconds(metrics.durationSec ?? null);
     case "PER_IMAGE":
       return Math.max(1, Math.round(metrics.images ?? 1));
     case "PER_KTOKEN":
+      if (
+        (metrics.promptTokens != null && metrics.promptTokens > 0) ||
+        (metrics.completionTokens != null && metrics.completionTokens > 0)
+      ) {
+        const inK = Math.ceil((metrics.promptTokens ?? 0) / 1000);
+        const outK = Math.ceil((metrics.completionTokens ?? 0) / 1000);
+        return Math.max(1, inK + outK);
+      }
       return Math.max(1, Math.ceil((metrics.totalTokens ?? 0) / 1000));
     default:
       return 1;
@@ -239,6 +297,9 @@ export async function settleSucceededGatewayLog(input: {
     durationSec?: number | null;
     images?: number | null;
     totalTokens?: number | null;
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    inputVideoSec?: number | null;
   };
 }): Promise<number> {
   if (!creditBillingEnabled()) return 0;
@@ -262,11 +323,21 @@ export async function settleSucceededGatewayLog(input: {
   if (!snap) return 0;
 
   const pools = await getPoolBalances(target.ref);
-  const units = billableUnitCount(snap.unit, input.metrics);
+  const unitMetrics = {
+    ...input.metrics,
+    isVideo: isVideoLog(input.log, snap?.unit ?? null),
+    isAsr: isAsrCanonical(snap?.canonicalModelKey ?? input.log.canonicalModelKey),
+    isWan30: isWan30Model(input.log.model, snap?.canonicalModelKey ?? input.log.canonicalModelKey),
+  };
+  const units = billableUnitCount(snap.unit, unitMetrics);
   const credits = computeChargeCredits({
     snapshot: snap,
     units,
     pricePerCreditYuan: pools.pricePerCreditYuan,
+    promptTokens: input.metrics.promptTokens,
+    completionTokens: input.metrics.completionTokens,
+    totalTokens: input.metrics.totalTokens,
+    unit: snap.unit,
   });
   if (credits === 0) {
     await recordBillingSettlement({

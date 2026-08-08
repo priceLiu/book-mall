@@ -23,6 +23,7 @@ import {
   defaultSbv1DockInputModeForModel,
   dockInputModeToPatch,
   getSbv1VideoModelRefCaps,
+  resolveSbv1VideoModelRefLinkBlock,
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { getSbv1VideoModelTypeLabels } from "@/lib/canvas/story-model-capabilities";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
@@ -221,12 +222,15 @@ export function Sbv1VideoDockModelPicker({
   onPatch,
   open: controlledOpen,
   onOpenChange,
+  refLinkCount = 0,
 }: {
   data: Sbv1VideoEngineNodeData;
   disabled?: boolean;
   onPatch: (patch: Partial<Sbv1VideoEngineNodeData>) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** 已连接参考图数量 · 有图时禁用百炼 T2V */
+  refLinkCount?: number;
 }) {
   const { providers } = useUserProviders();
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
@@ -330,12 +334,21 @@ export function Sbv1VideoDockModelPicker({
               model.displayName || model.modelKey,
             );
             const typeLabels = getSbv1VideoModelTypeLabels(model.modelKey);
+            const refBlock = resolveSbv1VideoModelRefLinkBlock({
+              modelKey: model.modelKey,
+              refLinkCount,
+            });
             return (
               <button
                 key={`${providerId}:${model.modelKey}`}
                 type="button"
-                className={libtvDockModelItemClassName(selected)}
-                onClick={() => onSelect(providerId, model)}
+                disabled={refBlock.blocked}
+                title={refBlock.reason}
+                className={libtvDockModelItemClassName(selected, refBlock.blocked)}
+                onClick={() => {
+                  if (refBlock.blocked) return;
+                  onSelect(providerId, model);
+                }}
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.06] text-[10px] font-semibold text-white/70">
                   {displayName.slice(0, 1)}

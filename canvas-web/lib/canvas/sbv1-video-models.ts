@@ -7,7 +7,10 @@
  */
 
 import type { CanvasEnginePick } from "./types";
-import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "./system-providers";
+import {
+  GATEWAY_BAILIAN_PROVIDER_ID,
+  GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+} from "./system-providers";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import type { Sbv1AspectRatio } from "./sbv1-workspace-types";
 
@@ -99,11 +102,31 @@ export const SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS = [
 ] as string[];
 
 const SBV1_DEFAULT_VIDEO_PRESET_ID = "seedance-2-720p-audio-real";
+const SBV1_DEFAULT_HAPPYHORSE_MODEL_KEY = "happyhorse-1.1-t2v";
 
-/** sbv1 视频合成 · 默认 Gateway 引擎（文本节点 VIDEO 槽与 sbv1-video-engine 对齐） */
+/** sbv1 视频合成 · 默认 Gateway 引擎（HappyHorse 1.1 T2V · 720P · 16:9） */
 export function pickDefaultSbv1VideoEngine(
   providers: CanvasProviderDto[],
 ): CanvasEnginePick | null {
+  const bailian = providers.find(
+    (p) => p.active && p.id === GATEWAY_BAILIAN_PROVIDER_ID,
+  );
+  if (bailian) {
+    const hh = bailian.models.find(
+      (m) =>
+        m.role === "VIDEO" &&
+        m.enabled &&
+        m.modelKey === SBV1_DEFAULT_HAPPYHORSE_MODEL_KEY,
+    );
+    if (hh) {
+      return {
+        providerId: bailian.id,
+        modelKey: hh.modelKey,
+        params: { ratio: "16:9", resolution: "720P", duration: 15 },
+      };
+    }
+  }
+
   const provider = providers.find(
     (p) => p.active && p.id === GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
   );

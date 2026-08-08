@@ -8,6 +8,7 @@ import {
 } from "./ref-video-models";
 import {
   STORY_LLM_MODEL_KEYS,
+  STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
   STORY_PRO_VIDEO_MODEL_KEYS,
   STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
@@ -211,10 +212,22 @@ function findVideoOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 漫剧分镜视频 · 默认 Gateway · 火山方舟 Seedance 2.0，其次 KIE */
+/** 漫剧分镜视频 · 默认 Gateway · HappyHorse 1.1 T2V，其次火山 Seedance / KIE */
 export function pickDefaultStoryVideoEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
+  const bailian =
+    findProviderByKind(providers, "ALI_BAILIAN") ??
+    activeCanvasProviders(providers).find(
+      (p) => p.id === GATEWAY_BAILIAN_PROVIDER_ID,
+    );
+  if (bailian) {
+    for (const key of STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS) {
+      const hit = findVideoOnProvider(bailian, key);
+      if (hit) return hit;
+    }
+  }
+
   const volc = activeCanvasProviders(providers).find(
     (p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID,
   );

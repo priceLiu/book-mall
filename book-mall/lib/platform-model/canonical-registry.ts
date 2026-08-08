@@ -82,11 +82,12 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     requestKind: "CHAT",
     appTags: [...CHAT_APPS],
     sortOrder: 12,
-    primaryVendor: "moonshot",
+    primaryVendor: "aliyun",
     billingKind: "PER_1K_TOKENS",
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
-      { vendor: "moonshot", modelKey: "kimi-k3", providerKind: "MOONSHOT" },
+      { vendor: "aliyun", modelKey: "kimi/kimi-k3", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "kimi-k3", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -454,6 +455,38 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/秒",
     routes: dedupeRoutes([
       { vendor: "kie", modelKey: "kling/ai-avatar-pro", providerKind: "KIE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "wan3.0-video",
+    displayName: "Wan 3.0 Video",
+    description: "万相 3.0 · 输入+输出视频秒数计费",
+    mediaKind: "IMAGE_TO_VIDEO",
+    role: "VIDEO",
+    requestKind: "VIDEO",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 31,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "wan3.0-video", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "qwen3-asr-flash-filetrans",
+    displayName: "Qwen3 ASR Flash Filetrans",
+    description: "百炼 · 文件/URL 语音转写",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "OTHER",
+    appTags: [...CHAT_APPS],
+    sortOrder: 18,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒（音频）",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen3-asr-flash-filetrans", providerKind: "DASHSCOPE" },
     ]),
   },
   {

@@ -249,6 +249,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   dashVideo("wan2.7-i2v-2026-04-25", 61),
   dashVideo("wan2.7-t2v", 62),
   dashVideo("wan2.7-t2v-2026-04-25", 63),
+  dashVideo("wan3.0-video", 631),
   dashVideo("wan2.5-i2v-preview", 64),
   dashVideo("wan2.5-t2v-preview", 65),
   dashVideo("pixverse-c1-it2v", 66),

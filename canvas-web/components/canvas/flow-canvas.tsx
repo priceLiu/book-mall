@@ -126,6 +126,7 @@ import {
 } from "@/lib/canvas/image-upload-handlers";
 import { memoizedNodeTypes } from "./memoized-node-types";
 import { CanvasViewportToolbar } from "./canvas-viewport-toolbar";
+import { CanvasCreditsBalancePanel } from "./canvas-credits-balance-panel";
 import { CanvasBackgroundVideoPanel } from "./canvas-background-video-panel";
 import { SelectionToolbar } from "./selection-toolbar";
 import { Pro2FloatingInspector } from "./pro2/pro2-floating-inspector";
@@ -2183,6 +2184,7 @@ function FlowCanvasInner({
           pro2Canvas={pro2FloatingInspector}
           sbv1Canvas={sbv1Canvas}
         />
+        <CanvasCreditsBalancePanel />
         {pro2FloatingInspector || sbv1Canvas ? (
           <>
             {pro2FloatingInspector ? <Pro2SelectionToolbar rfNodes={rfNodes} /> : null}

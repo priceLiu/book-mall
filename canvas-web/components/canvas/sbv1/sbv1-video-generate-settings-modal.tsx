@@ -75,6 +75,7 @@ const SBV1_DOCK_EXTRA_VIDEO_MODEL_KEYS = [
   "wan2.7-r2v",
   "wan2.6-t2v",
   "wan2.7-t2v",
+  "wan3.0-video",
 ] as const;
 
 const SBV1_DOCK_VIDEO_PROVIDER_IDS = [

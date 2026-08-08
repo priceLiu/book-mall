@@ -27,6 +27,9 @@ type CostRow = {
   unit: string;
   tierRaw: string | null;
   listCostYuan: number;
+  inputListCostYuan?: number | null;
+  outputListCostYuan?: number | null;
+  officialSampleYuan?: number;
   discountRate: number;
   netCostYuan: number;
   note: string | null;
@@ -36,6 +39,10 @@ type CostRow = {
   displayName: string | null;
   marginM: number;
   creditsPerUnit: number;
+  inputCreditsPerKToken?: number | null;
+  outputCreditsPerKToken?: number | null;
+  samplePlatformCredits?: number;
+  samplePlatformYuan?: number;
   listPriceYuan: number;
   marginRate: number;
   marginOk: boolean;
@@ -405,11 +412,14 @@ export function ModelCostClient() {
                     <th className="px-3 py-2">模型</th>
                     <th className="px-3 py-2">厂商/渠道</th>
                     <th className="px-3 py-2">单位</th>
-                    <th className="px-3 py-2 text-right">挂牌</th>
+                    <th className="px-3 py-2 text-right">官方价</th>
+                    <th className="px-3 py-2 text-right">官方应扣</th>
+                    <th className="px-3 py-2 text-right">平台积分</th>
+                    <th className="px-3 py-2 text-right">平台换算价</th>
+                    <th className="px-3 py-2 text-right">样例扣积分</th>
+                    <th className="px-3 py-2 text-right">样例扣费</th>
                     <th className="px-3 py-2 text-right">折扣</th>
                     <th className="px-3 py-2 text-right">净成本</th>
-                    <th className="px-3 py-2 text-right">积分/单位</th>
-                    <th className="px-3 py-2 text-right">挂牌价</th>
                     <th className="px-3 py-2 text-right">毛利</th>
                     <th className="px-3 py-2">状态</th>
                     <th className="px-3 py-2 text-right">操作</th>
@@ -433,11 +443,22 @@ export function ModelCostClient() {
                         <span className="rounded bg-[#f0f0f0] px-1 text-xs">{CHANNEL_LABEL[p.channel] ?? p.channel}</span>
                       </td>
                       <td className="px-3 py-2">{UNIT_LABEL[p.unit] ?? p.unit}</td>
-                      <td className="px-3 py-2 text-right">¥{p.listCostYuan.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {p.inputListCostYuan != null && p.outputListCostYuan != null
+                          ? `in ${p.inputListCostYuan.toFixed(4)} / out ${p.outputListCostYuan.toFixed(4)}`
+                          : `¥${p.listCostYuan.toFixed(4)}`}
+                      </td>
+                      <td className="px-3 py-2 text-right">¥{(p.officialSampleYuan ?? p.listCostYuan).toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-[#1890ff]">
+                        {p.inputCreditsPerKToken != null
+                          ? `${p.inputCreditsPerKToken}/${p.outputCreditsPerKToken ?? "-"}`
+                          : p.creditsPerUnit}
+                      </td>
+                      <td className="px-3 py-2 text-right">¥{p.listPriceYuan.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right">{p.samplePlatformCredits ?? p.creditsPerUnit}</td>
+                      <td className="px-3 py-2 text-right">¥{(p.samplePlatformYuan ?? 0).toFixed(2)}</td>
                       <td className="px-3 py-2 text-right">{(p.discountRate * 100).toFixed(0)}%</td>
                       <td className="px-3 py-2 text-right font-medium">¥{p.netCostYuan.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right font-medium text-[#1890ff]">{p.creditsPerUnit}</td>
-                      <td className="px-3 py-2 text-right">¥{p.listPriceYuan.toFixed(4)}</td>
                       <td className="px-3 py-2 text-right">
                         <span className={p.marginOk ? "text-green-700" : "font-medium text-red-600"}>
                           {(p.marginRate * 100).toFixed(1)}%

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     return financeForbidden(request, "模型成本仅财务管理员可见");
   }
 
-  const [profiles, catalogs, pricingConfig] = await Promise.all([
+  const [profiles, catalogs, pricingConfig, creditPrices] = await Promise.all([
     prisma.modelCostProfile.findMany({
       orderBy: [{ canonicalModelKey: "asc" }, { channel: "asc" }],
     }),
@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
       .findMany({ select: { canonicalKey: true, displayName: true }, orderBy: { canonicalKey: "asc" } })
       .catch(() => [] as { canonicalKey: string; displayName: string }[]),
     loadPricingConfig(),
+    prisma.modelCreditPrice.findMany({ where: { active: true } }),
   ]);
+  const creditByCanonical = new Map(creditPrices.map((p) => [p.canonicalModelKey, p]));
 
   const costKeys = new Set(profiles.map((p) => p.canonicalModelKey));
   const registryMissingCost = GATEWAY_CANONICAL_REGISTRY.filter(
@@ -68,6 +70,22 @@ export async function GET(request: NextRequest) {
         },
         pricingConfig,
       );
+      const published = creditByCanonical.get(p.canonicalModelKey);
+      const inCost = p.inputListCostYuan != null ? Number(p.inputListCostYuan) : Number(p.listCostYuan);
+      const outCost = p.outputListCostYuan != null ? Number(p.outputListCostYuan) : null;
+      let officialSampleYuan = Number(p.listCostYuan);
+      if (p.unit === "PER_KTOKEN") {
+        officialSampleYuan = inCost * 4 + (outCost ?? inCost) * 2;
+      } else if (p.unit === "PER_SEC") {
+        officialSampleYuan = Number(p.listCostYuan) * (p.canonicalModelKey.includes("asr") ? 15 : 15);
+      } else if (p.unit === "PER_IMAGE") {
+        officialSampleYuan = Number(p.listCostYuan);
+      }
+      const samplePlatformCredits =
+        p.unit === "PER_KTOKEN" && published?.inputCreditsPerKToken
+          ? published.inputCreditsPerKToken * 4 + (published.outputCreditsPerKToken ?? 0) * 2
+          : published?.creditsPerUnit ?? preview.creditsPerUnit;
+      const samplePlatformYuan = samplePlatformCredits * pricingConfig.creditAnchorYuan;
       return {
         id: p.id,
         vendor: p.vendor,
@@ -77,6 +95,9 @@ export async function GET(request: NextRequest) {
         unit: p.unit,
         tierRaw: p.tierRaw,
         listCostYuan: Number(p.listCostYuan),
+        inputListCostYuan: p.inputListCostYuan != null ? Number(p.inputListCostYuan) : null,
+        outputListCostYuan: p.outputListCostYuan != null ? Number(p.outputListCostYuan) : null,
+        officialSampleYuan,
         discountRate: Number(p.discountRate),
         netCostYuan: Number(p.netCostYuan),
         note: p.note,
@@ -86,7 +107,11 @@ export async function GET(request: NextRequest) {
         displayName: preview.displayName,
         marginM: preview.marginM,
         creditsPerUnit: preview.creditsPerUnit,
-        listPriceYuan: preview.listPriceYuan,
+        inputCreditsPerKToken: published?.inputCreditsPerKToken ?? null,
+        outputCreditsPerKToken: published?.outputCreditsPerKToken ?? null,
+        samplePlatformCredits,
+        samplePlatformYuan,
+        listPriceYuan: published ? Number(published.listPriceYuan) : preview.listPriceYuan,
         marginRate: preview.marginRate,
         marginOk: preview.marginOk,
       };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
+import { ArrowUp, Languages, Loader2 } from "lucide-react";
 import {
   VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
@@ -47,7 +47,7 @@ import {
   pro2TextNodeLlmNeedsVision,
 } from "@/lib/canvas/pro2-text-node-engine-roles";
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
-import { isPro2SunoModelKey } from "@/lib/canvas/kie-audio-models";
+import { Pro2LlmDockCreditsBadge } from "./pro2-llm-dock-credits-badge";
 
 /** 2.0 文本节点 · 底部输入坞 */
 export function Pro2StarterInputDock() {
@@ -424,16 +424,10 @@ export function Pro2StarterInputDock() {
                   >
                     <Languages style={{ width: sendIconPx, height: sendIconPx }} />
                   </button>
-                  <button
-                    type="button"
-                    className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
-                    style={{ fontSize: dockTextFontPx }}
-                    title="消耗（预留）"
-                    disabled
-                  >
-                    <Zap style={{ width: sendIconPx, height: sendIconPx }} />
-                    <span>1</span>
-                  </button>
+                  <Pro2LlmDockCreditsBadge
+                    modelKey={d.modelKey}
+                    fontPx={dockTextFontPx}
+                  />
                 </>
               ) : null}
               <button

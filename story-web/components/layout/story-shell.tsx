@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Clapperboard, Loader2 } from "lucide-react";
 import { STORY_NAV_ITEMS } from "@/lib/site-config";
 import { PortalNav } from "@/components/portal-nav";
+import { StoryCreditBalanceChip } from "@/components/platform-credit-balance-chip";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { cn } from "@/lib/utils";
 import {
@@ -142,6 +143,8 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
           <div className="hidden md:block">
             <PortalNav current="story" />
           </div>
+
+          <StoryCreditBalanceChip />
 
           <ShellAuthSlot />
         </div>

@@ -44,7 +44,12 @@ import {
 } from "./gateway-token-metrics";
 import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-registry";
 import { gatewayFetch } from "./format-fetch-error";
-import { resolveBillableImageCountFromLog } from "./log-billing-metrics";
+import {
+  parseWan30InputVideoSec,
+  parseWan30OutputVideoSec,
+  resolveBillableAudioSecondsFromLog,
+  resolveBillableImageCountFromLog,
+} from "./log-billing-metrics";
 import { inferGatewayFailCode } from "./log-fail-code";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
@@ -444,9 +449,17 @@ export async function finalizeRequestLog(
           log: settledLog,
           snapshot: costSnapshot,
           metrics: {
-            durationSec: videoHints.durationSec,
+            durationSec:
+              resolveBillableAudioSecondsFromLog(settledLog, patch.resultSummary) ??
+              videoHints.durationSec,
             totalTokens: tokenMetrics.totalTokens ?? undefined,
+            promptTokens: tokenMetrics.promptTokens ?? undefined,
+            completionTokens: tokenMetrics.completionTokens ?? undefined,
             images: resolveBillableImageCountFromLog(settledLog),
+            inputVideoSec: parseWan30InputVideoSec(settledLog.inputSummary),
+            outputVideoSec:
+              videoHints.durationSec ??
+              parseWan30OutputVideoSec(patch.resultSummary),
           },
         });
       } else if (patch.status === "FAILED") {

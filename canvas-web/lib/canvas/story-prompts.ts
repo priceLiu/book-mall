@@ -271,10 +271,13 @@ export const STORY_VIDEO_MODEL_KEYS = [
 
 /** 影视专业版 · 百炼参考生视频（Gateway · 百炼，非 KIE 直连） */
 export const STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS = [
+  "happyhorse-1.1-t2v",
+  "happyhorse-1.1-r2v",
   "happyhorse-1.0-r2v",
   "wan2.7-r2v",
   "wan2.6-r2v",
   "wan2.6-r2v-flash",
+  "wan3.0-video",
 ] as const;
 
 /** 影视专业版 · 火山方舟 Seedance 图生视频（Gateway · VOLCENGINE） */

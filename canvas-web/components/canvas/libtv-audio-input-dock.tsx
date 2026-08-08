@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Zap } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { ENGINE_PICKER_EMPTY_PARAMS } from "@/components/canvas/engine-picker";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -26,6 +25,7 @@ import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "./libtv-dock-send-button";
+import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
   pickDefaultPro2TtsEngine,
@@ -205,12 +205,10 @@ export function LibtvAudioInputDock() {
               }}
             />
           </div>
-          <span className="ml-auto flex items-center gap-2 text-white/40">
-            <Zap className="size-3.5" />
-            <span style={{ fontSize: fontPx }}>
-              {estCredits?.creditsLabel ?? estCredits?.credits ?? "—"}
-            </span>
-          </span>
+          <LibtvDockCreditsLabel
+            credits={estCredits?.credits}
+            fontPx={fontPx}
+          />
           <LibtvDockSendButton
             disabled={!canSend}
             loading={isRunning}

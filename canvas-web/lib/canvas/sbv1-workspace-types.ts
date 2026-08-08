@@ -6,7 +6,7 @@ import type {
 import { buildSbv1ImageEngineParams } from "./sbv1-image-models";
 import type { StoryRefImage } from "./story-ref-image";
 import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
-import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "./system-providers";
+import { GATEWAY_BAILIAN_PROVIDER_ID } from "./system-providers";
 
 export type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 
@@ -77,7 +77,7 @@ export type Sbv1VideoEngineNodeData = {
   dockInput?: string;
   creationType: Sbv1CreationType;
   referenceMode: Sbv1ReferenceMode;
-  jimengModelId: string;
+  jimengModelId?: string;
   /** Gateway 展示变体 id（优先于 jimengModelId） */
   volcengineVariantId?: string;
   engine: CanvasEnginePick;
@@ -106,14 +106,12 @@ export const SBV1_DEFAULT_VIDEO_ENGINE_DATA: Sbv1VideoEngineNodeData = {
   prompt: "",
   creationType: "video",
   referenceMode: "omni",
-  jimengModelId: "seedance-2-720p-audio-real",
-  volcengineVariantId: "seedance-2-720p-audio-real",
   engine: {
-    providerId: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
-    modelKey: "doubao-seedance-2.0",
-    params: { resolution: "720p", generate_audio: true, duration: 15 },
+    providerId: GATEWAY_BAILIAN_PROVIDER_ID,
+    modelKey: "happyhorse-1.1-t2v",
+    params: { ratio: "16:9", resolution: "720P", duration: 15 },
   },
-  aspectRatio: "4:3",
+  aspectRatio: "16:9",
   durationSec: 15,
   resolution: "720p",
   refSlots: [],

@@ -81,7 +81,7 @@ import {
   buildDashscopeSbv1T2vVideoBody,
   isDashscopeHappyhorseImageToVideoModel,
   isDashscopeSbv1TextToVideoModel,
-  upgradeDashscopeT2vModelWhenRefsPresent,
+  resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
 import {
   parseTopazFrameInterpolation,
@@ -1276,11 +1276,14 @@ export async function runVideoEngineNode(
       )
     : imageInputs.slice(1);
   const lastFrameImageUrl = String(data.lastFrameImageUrl ?? "").trim();
-  modelKey = upgradeDashscopeT2vModelWhenRefsPresent(modelKey, [
+  const t2vRefMismatch = resolveDashscopeT2vRefMismatchMessage(modelKey, [
     mainFrameImageUrl,
     ...(lastFrameImageUrl ? [lastFrameImageUrl] : []),
     ...referenceImageUrls,
   ]);
+  if (t2vRefMismatch) {
+    throw new CanvasProjectError("INVALID_INPUT", t2vRefMismatch);
+  }
   const forceReferenceMode = data.forceReferenceMode === true;
   const portraitAssetRefs = normalizePortraitAssetRefs(
     node.portraitAssetRefs ?? data.portraitAssetRefs,

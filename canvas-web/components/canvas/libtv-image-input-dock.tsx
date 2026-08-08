@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Zap } from "lucide-react";
+import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -689,19 +689,15 @@ function LibtvImageDockFooter({
         <div className="min-w-0 flex-1" />
       ) : null}
       <div className="flex shrink-0 items-center gap-1.5">
-        {!isPipelineCell && estCredits?.credits != null ? (
-          <span
-            className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
-            style={{ fontSize: fontPx }}
-            title={`${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`}
-          >
-            <Zap
-              className="fill-amber-300/90 text-amber-300/90"
-              style={{ width: sendIconPx, height: sendIconPx }}
-            />
-            {estCredits.credits}
-          </span>
-        ) : null}
+        <LibtvDockCreditsLabel
+          credits={estCredits?.credits}
+          fontPx={fontPx}
+          title={
+            estCredits?.credits != null
+              ? `${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`
+              : undefined
+          }
+        />
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isRunning}

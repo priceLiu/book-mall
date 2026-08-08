@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Zap } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type CanvasToastKind = "credits" | "success";
@@ -58,14 +58,12 @@ export function CanvasCreditsToastHost() {
             "flex items-center gap-2 rounded-xl border bg-[#1a1a1a]/97 px-3 py-2 text-sm shadow-lg",
             t.kind === "success"
               ? "border-violet-400/35 text-violet-50"
-              : "border-amber-400/30 text-amber-100",
+              : "border-yellow-400/30 text-yellow-300",
           )}
         >
           {t.kind === "success" ? (
             <CheckCircle2 className="size-4 shrink-0 text-violet-300/90" />
-          ) : (
-            <Zap className="size-4 shrink-0 fill-amber-300/90 text-amber-300/90" />
-          )}
+          ) : null}
           <span>{t.message}</span>
         </div>
       ))}

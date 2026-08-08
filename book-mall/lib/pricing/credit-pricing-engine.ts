@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 
 import { computeCreditPrice,
   computeNetCost,
+  computeSplitTokenCreditPrice,
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
   DEFAULT_MIN_MARGIN_GUARD,
@@ -116,6 +117,74 @@ export async function publishModelCreditPrice(input: {
     minMarginGuard: config.minMarginGuard,
     videoMinMarginGuard: config.videoMinMarginGuard,
   });
+
+  const inList = toNum(chosen.inputListCostYuan);
+  const outList = toNum(chosen.outputListCostYuan);
+  const hasTokenSplit =
+    chosen.unit === "PER_KTOKEN" && inList > 0 && outList > 0;
+
+  if (hasTokenSplit) {
+    const split = computeSplitTokenCreditPrice({
+      inputListCostYuan: inList,
+      outputListCostYuan: outList,
+      discountRate: toNum(chosen.discountRate),
+      marginM,
+      anchorYuan: config.creditAnchorYuan,
+    });
+    if (!marginPassesGuard(split.baseMarginRate, minGuard)) {
+      throw new MarginGuardError(split.baseMarginRate, minGuard, input.canonicalModelKey);
+    }
+    const snapshot = { ...split.formulaSnapshot, publishedAt: new Date().toISOString() };
+    const saved = await prisma.modelCreditPrice.upsert({
+      where: { canonicalModelKey: input.canonicalModelKey },
+      create: {
+        canonicalModelKey: input.canonicalModelKey,
+        displayName: input.displayName,
+        vendor: chosen.vendor,
+        unit: chosen.unit,
+        tierRaw: chosen.tierRaw,
+        netCostYuan: split.netCostYuan,
+        marginM,
+        listPriceYuan: split.inputListPriceYuan,
+        creditsPerUnit: split.inputCreditsPerKToken,
+        inputCreditsPerKToken: split.inputCreditsPerKToken,
+        outputCreditsPerKToken: split.outputCreditsPerKToken,
+        inputListPriceYuan: split.inputListPriceYuan,
+        outputListPriceYuan: split.outputListPriceYuan,
+        baseMarginRate: split.baseMarginRate,
+        formulaSnapshot: snapshot,
+        active: true,
+        publishedBy: input.publishedBy,
+      },
+      update: {
+        displayName: input.displayName,
+        vendor: chosen.vendor,
+        unit: chosen.unit,
+        tierRaw: chosen.tierRaw,
+        netCostYuan: split.netCostYuan,
+        marginM,
+        listPriceYuan: split.inputListPriceYuan,
+        creditsPerUnit: split.inputCreditsPerKToken,
+        inputCreditsPerKToken: split.inputCreditsPerKToken,
+        outputCreditsPerKToken: split.outputCreditsPerKToken,
+        inputListPriceYuan: split.inputListPriceYuan,
+        outputListPriceYuan: split.outputListPriceYuan,
+        baseMarginRate: split.baseMarginRate,
+        formulaSnapshot: snapshot,
+        active: true,
+        publishedAt: new Date(),
+        publishedBy: input.publishedBy,
+      },
+    });
+    return {
+      canonicalModelKey: saved.canonicalModelKey,
+      creditsPerUnit: saved.creditsPerUnit,
+      listPriceYuan: toNum(saved.listPriceYuan),
+      baseMarginRate: toNum(saved.baseMarginRate),
+      netCostYuan: toNum(saved.netCostYuan),
+    };
+  }
+
   const comp = computeCreditPrice({
     listCostYuan: toNum(chosen.listCostYuan),
     discountRate: toNum(chosen.discountRate),

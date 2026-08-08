@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { MiniMap, Panel, useReactFlow, useViewport } from "@xyflow/react";
 import { LayoutGrid, Map, Minus, Plus, Video } from "lucide-react";
 
@@ -39,7 +39,54 @@ function viewportBtnClass(active?: boolean) {
   );
 }
 
-/** 画布右下角：画面整理 · 小地图 · 缩放比例 */
+const VIEWPORT_TOOLTIP_CLASS =
+  "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-[5000] -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#0d0d12] px-2.5 py-1 text-[11px] leading-snug text-white opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.55)] transition-opacity duration-150 group-hover/viewport-tip:opacity-100 group-focus-visible/viewport-tip:opacity-100";
+
+function ViewportToolbarTip({ label }: { label: string }) {
+  return (
+    <span role="tooltip" className={VIEWPORT_TOOLTIP_CLASS}>
+      {label}
+    </span>
+  );
+}
+
+function ViewportToolbarButton({
+  active,
+  disabled,
+  label,
+  ariaLabel,
+  ariaPressed,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  label: string;
+  ariaLabel: string;
+  ariaPressed?: boolean;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "group/viewport-tip relative",
+        viewportBtnClass(active),
+        disabled && "cursor-not-allowed opacity-35",
+      )}
+      aria-label={ariaLabel}
+      aria-pressed={ariaPressed}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+      <ViewportToolbarTip label={label} />
+    </button>
+  );
+}
+
+/** 画布左下角：画面整理 · 小地图 · 缩放比例 */
 export const CANVAS_BACKGROUND_VIDEO_PANEL_TOGGLE_EVENT =
   "canvas:background-video-panel-toggle";
 export const CANVAS_BACKGROUND_VIDEO_TASK_COUNT_EVENT =
@@ -114,13 +161,6 @@ export function CanvasViewportToolbar({
       ? () => "rgba(34,211,238,0.65)"
       : () => "rgba(167,139,250,0.6)";
 
-  const organizeHint =
-    edition === "pro2" || edition === "sbv1"
-      ? "重排工作区节点与媒体组"
-      : edition === "comic"
-        ? "按漫剧工作流重新排列"
-        : "按连接关系自动整理";
-
   return (
     <>
       {minimapOpen ? (
@@ -129,46 +169,36 @@ export function CanvasViewportToolbar({
           zoomable
           nodeColor={minimapNodeColor}
           maskColor="rgba(11,11,20,0.82)"
-          className="!bottom-[3.75rem] !right-4 !bg-[var(--canvas-surface)] !border !border-white/10 !rounded-lg !shadow-xl"
+          className="!bottom-[3.75rem] !left-4 !bg-[var(--canvas-surface)] !border !border-white/10 !rounded-lg !shadow-xl"
         />
       ) : null}
-      <Panel position="bottom-right" className="!m-0 !mb-4 !mr-4">
+      <Panel position="bottom-left" className="!m-0 !mb-4 !ml-4">
         <div
           className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/98 px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className={viewportBtnClass()}
-            title={`画面整理 — ${organizeHint}`}
-            aria-label={`画面整理 — ${organizeHint}`}
+          <ViewportToolbarButton
+            label="重排画布"
+            ariaLabel="重排画布"
             onClick={onOrganize}
           >
             <LayoutGrid className="size-4" strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            className={viewportBtnClass(minimapOpen)}
-            title={minimapOpen ? "隐藏小地图" : "显示小地图"}
-            aria-label={minimapOpen ? "隐藏小地图" : "显示小地图"}
+          </ViewportToolbarButton>
+          <ViewportToolbarButton
+            active={minimapOpen}
+            label="小地图"
+            ariaLabel={minimapOpen ? "隐藏小地图" : "显示小地图"}
+            ariaPressed={minimapOpen}
             onClick={() => setMinimapOpen((open) => !open)}
           >
             <Map className="size-4" strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            className={cn(
-              viewportBtnClass(bgVideoOpen || bgVideoCount > 0),
-              bgVideoCount > 0 && !bgVideoOpen && "text-orange-200",
-            )}
-            title={
-              bgVideoCount > 0
-                ? `后台视频 · ${bgVideoCount} 个任务`
-                : "后台视频 — 长视频持续生成与恢复"
-            }
-            aria-label="后台视频"
-            aria-pressed={bgVideoOpen}
+          </ViewportToolbarButton>
+          <ViewportToolbarButton
+            active={bgVideoOpen || bgVideoCount > 0}
+            label="后台任务"
+            ariaLabel="后台任务"
+            ariaPressed={bgVideoOpen}
             onClick={() => {
               setBgVideoOpen((open) => {
                 const next = !open;
@@ -181,7 +211,12 @@ export function CanvasViewportToolbar({
               });
             }}
           >
-            <span className="relative">
+            <span
+              className={cn(
+                "relative",
+                bgVideoCount > 0 && !bgVideoOpen && "text-orange-200",
+              )}
+            >
               <Video className="size-4" strokeWidth={1.75} />
               {bgVideoCount > 0 ? (
                 <span className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">
@@ -189,18 +224,16 @@ export function CanvasViewportToolbar({
                 </span>
               ) : null}
             </span>
-          </button>
+          </ViewportToolbarButton>
           <div className="mx-0.5 h-5 w-px shrink-0 bg-white/10" aria-hidden />
-          <button
-            type="button"
-            className={cn(viewportBtnClass(), atMinZoom && "cursor-not-allowed opacity-35")}
-            title={atMinZoom ? `已缩至最小 ${CANVAS_VIEWPORT_MIN_ZOOM_PCT}%` : "缩小"}
-            aria-label="缩小画布"
+          <ViewportToolbarButton
             disabled={atMinZoom}
+            label="缩小"
+            ariaLabel="缩小画布"
             onClick={() => zoomOut({ duration: 150 })}
           >
             <Minus className="size-4" strokeWidth={1.75} />
-          </button>
+          </ViewportToolbarButton>
           <span
             className="min-w-[52px] select-none px-0.5 text-center text-[12px] font-medium tabular-nums text-white/90"
             aria-live="polite"
@@ -209,16 +242,14 @@ export function CanvasViewportToolbar({
           >
             {pct}%
           </span>
-          <button
-            type="button"
-            className={cn(viewportBtnClass(), atMaxZoom && "cursor-not-allowed opacity-35")}
-            title={atMaxZoom ? `已放至最大 ${CANVAS_VIEWPORT_MAX_ZOOM_PCT}%` : "放大"}
-            aria-label="放大画布"
+          <ViewportToolbarButton
             disabled={atMaxZoom}
+            label="放大"
+            ariaLabel="放大画布"
             onClick={() => zoomIn({ duration: 150 })}
           >
             <Plus className="size-4" strokeWidth={1.75} />
-          </button>
+          </ViewportToolbarButton>
         </div>
       </Panel>
     </>

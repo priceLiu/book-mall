@@ -62,6 +62,7 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "wan2.6-t2v": ["video_t2v"],
   "wan2.7-t2v": ["video_t2v"],
   "wan2.7-t2v-2026-04-25": ["video_t2v"],
+  "wan3.0-video": ["video_t2v"],
 };
 
 const VIDEO_CAPABILITY_LABELS: Record<
@@ -101,6 +102,7 @@ function inferCapabilities(modelKey: string): StoryModelCapability[] {
     k.includes("kling") ||
     k.includes("veo") ||
     k.includes("wan2.") ||
+    k.includes("wan3.0") ||
     k.includes("happyhorse");
 
   if (isVideo) {

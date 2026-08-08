@@ -38,10 +38,7 @@ import {
   MAX_SSO_REENTER_ATTEMPTS,
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
-import {
-  introspectSessionRevoked,
-  SESSION_KICKED_MESSAGE,
-} from "@/lib/session-revoked";
+import { ToolCreditBalanceChip } from "@/components/platform-credit-balance-chip";
 
 const SESSION_POLL_MS = 60_000;
 
@@ -644,6 +641,8 @@ export function ToolShellClient({
             </button>
 
             <div className="tool-topbar-fill" />
+
+            <ToolCreditBalanceChip />
 
             <div className="tool-user">
               {userSlot}

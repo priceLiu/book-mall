@@ -13,6 +13,7 @@ import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types"
 import {
   getSbv1VideoDockModeChips,
   resolveSbv1DockInputMode,
+  resolveSbv1VideoModelRefRunWarning,
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { isSbv1HdVideoNode } from "@/lib/canvas/sbv1-hd-video-params";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
@@ -218,6 +219,23 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
+    const refCount =
+      resolved.imageInputs.length + resolved.portraitAssetRefs.length;
+    const refWarning = resolveSbv1VideoModelRefRunWarning({
+      modelKey,
+      refCount,
+      providerId: latestData.engine?.providerId,
+      multiShots: latestData.engine?.params?.multi_shots === true,
+    });
+    if (refWarning) {
+      revertPending();
+      await alert({
+        title: refWarning.title,
+        message: refWarning.message,
+        variant: "warning",
+      });
+      return;
+    }
     if (
       !isSbv1HdVideoNode(latestData) &&
       latestData.referenceMode === "first_last" &&
@@ -261,7 +279,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
         variant: "warning",
       });
     }
-  }, [nodeId, base, alert, updateNodeData, setNodeRuntime]);
+  }, [nodeId, base, alert, updateNodeData, setNodeRuntime, hasVideo]);
 
   return (
     <Sbv1VideoEngineChatInput

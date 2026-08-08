@@ -58,6 +58,30 @@ const HAPPYHORSE_BASE_SCHEMA = [
   HAPPYHORSE_DURATION_SCHEMA,
 ] satisfies CanvasParamSchema;
 
+const WAN30_PARAMS_SCHEMA = [
+  T2V_PARAMS_SCHEMA[0],
+  {
+    key: "resolution",
+    label: "清晰度",
+    type: "select",
+    options: [
+      { value: "480P", label: "480P" },
+      { value: "720P", label: "720P" },
+      { value: "1080P", label: "1080P" },
+    ],
+    defaultValue: "720P",
+  },
+  {
+    key: "duration",
+    label: "时长(秒)",
+    type: "number",
+    min: 3,
+    max: 30,
+    step: 1,
+    defaultValue: 15,
+  },
+] satisfies CanvasParamSchema;
+
 export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
     modelKey: "happyhorse-1.0-t2v",
@@ -131,6 +155,18 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
       resolution: "720P",
       duration: 5,
       prompt_extend: true,
+    },
+  },
+  {
+    modelKey: "wan3.0-video",
+    displayName: "Wan 3.0 Video",
+    role: "VIDEO",
+    description: "DashScope wan3.0-video · 万相 3.0 文生视频（480P/720P/1080P · 最长 30s）",
+    paramsSchema: WAN30_PARAMS_SCHEMA,
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 15,
     },
   },
 ];

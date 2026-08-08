@@ -4,6 +4,7 @@ import {
   QWEN3_ASR_FLASH_FILETRANS_MODEL,
   dashscopeTranscribePublicFileUrl,
   isDashscopeAsrNoSpeechOutcome,
+  type DashscopeAsrSentence,
 } from "@/lib/gateway/dashscope-client";
 import {
   isGatewayAuthResponse,
@@ -21,6 +22,12 @@ import {
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 
 export const dynamic = "force-dynamic";
+
+function audioDurationSecFromSentences(sentences: DashscopeAsrSentence[]): number {
+  if (sentences.length === 0) return 1;
+  const maxMs = Math.max(...sentences.map((s) => s.endMs));
+  return Math.max(1, Math.ceil(maxMs / 1000));
+}
 
 export async function POST(request: NextRequest) {
   const authOrResp = await requireGatewayV1Auth(request);
@@ -69,6 +76,7 @@ export async function POST(request: NextRequest) {
       clientSource,
       inputSummary: buildGatewayInputSummary(model, {
         fileUrl,
+        canonicalModelKey: "qwen3-asr-flash-filetrans",
       }),
       ...logMetaToRequestLogFields(logMeta),
     });
@@ -116,10 +124,11 @@ export async function POST(request: NextRequest) {
       endMs: s.endMs,
       text: s.text,
     }));
+    const audioDurationSec = audioDurationSecFromSentences(result.sentences);
     await finalizeRequestLog(log.id, {
       status: "SUCCEEDED",
       durationMs: Date.now() - started,
-      resultSummary: { segmentCount: segments.length },
+      resultSummary: { segmentCount: segments.length, audioDurationSec },
       model,
     });
     return NextResponse.json({

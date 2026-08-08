@@ -6,6 +6,7 @@ export const DASHSCOPE_SBV1_WAN_T2V_MODEL_KEYS = [
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
+  "wan3.0-video",
 ] as const;
 
 export const DASHSCOPE_HAPPYHORSE_T2V_MODEL_KEYS = [
@@ -26,6 +27,10 @@ export const DASHSCOPE_SBV1_T2V_MODEL_KEYS = [
 export type DashscopeSbv1T2vModelKey =
   (typeof DASHSCOPE_SBV1_T2V_MODEL_KEYS)[number];
 
+export function isDashscopeWan30VideoModel(modelKey: string): boolean {
+  return modelKey.trim() === "wan3.0-video";
+}
+
 export function isDashscopeHappyhorseTextToVideoModel(modelKey: string): boolean {
   return (DASHSCOPE_HAPPYHORSE_T2V_MODEL_KEYS as readonly string[]).includes(
     modelKey.trim(),
@@ -44,7 +49,7 @@ export function isDashscopeSbv1TextToVideoModel(modelKey: string): boolean {
   );
 }
 
-/** 文生视频模型 · 有参考图时自动升级为对应 R2V（百炼 media） */
+/** 文生视频模型 · 对应参考生视频 R2V（百炼 media） */
 const DASHSCOPE_SBV1_T2V_TO_R2V: Record<string, string> = {
   "happyhorse-1.0-t2v": "happyhorse-1.0-r2v",
   "happyhorse-1.1-t2v": "happyhorse-1.1-r2v",
@@ -57,16 +62,18 @@ export function dashscopeSbv1T2vModelToR2v(modelKey: string): string | null {
   return DASHSCOPE_SBV1_T2V_TO_R2V[modelKey.trim()] ?? null;
 }
 
-/** 用户选了 T2V 但连了参考图 → 走 R2V API，保留 HappyHorse / 万相同系列 */
-export function upgradeDashscopeT2vModelWhenRefsPresent(
+/** T2V + 参考图时不自动升 R2V；返回用户可读错误文案，无冲突则 null */
+export function resolveDashscopeT2vRefMismatchMessage(
   modelKey: string,
   referenceImageUrls: readonly string[],
-): string {
+): string | null {
   const trimmed = modelKey.trim();
-  if (!isDashscopeSbv1TextToVideoModel(trimmed)) return trimmed;
-  const hasRefs = referenceImageUrls.some((u) => u.trim().length > 0);
-  if (!hasRefs) return trimmed;
-  return dashscopeSbv1T2vModelToR2v(trimmed) ?? trimmed;
+  if (!isDashscopeSbv1TextToVideoModel(trimmed)) return null;
+  const refCount = referenceImageUrls.filter((u) => u.trim().length > 0).length;
+  if (refCount <= 0) return null;
+  const r2vKey = dashscopeSbv1T2vModelToR2v(trimmed);
+  const r2vHint = r2vKey ? `「${r2vKey}」` : "参考生视频（R2V）模型";
+  return `文生视频模型「${trimmed}」不支持参考图（已添加 ${refCount} 张）。请在模型列表中选择 ${r2vHint}，或移除参考图后再生成。`;
 }
 
 const T2V_ASPECT_TO_SIZE: Record<string, readonly [string, string]> = {
@@ -85,8 +92,37 @@ function t2vAspectRatioToSize(
   return resolution === "1080P" ? pair[1] : pair[0];
 }
 
-function parseResolution(raw: string): "720P" | "1080P" {
-  return /^720/i.test(raw.trim()) ? "720P" : "1080P";
+function parseResolution(raw: string): "480P" | "720P" | "1080P" {
+  const t = raw.trim().toUpperCase();
+  if (t.startsWith("480")) return "480P";
+  if (t.startsWith("1080")) return "1080P";
+  return "720P";
+}
+
+export function buildDashscopeWan30VideoBody(opts: {
+  prompt: string;
+  aspectRatio: string;
+  resolution: string;
+  durationSec: number;
+  seed?: number;
+  watermark?: boolean;
+}): { input: { prompt: string }; parameters: Record<string, unknown> } {
+  const prompt = opts.prompt.trim();
+  if (!prompt) throw new Error("prompt required for text-to-video");
+  const duration = Math.min(30, Math.max(3, Math.floor(opts.durationSec)));
+  const parameters: Record<string, unknown> = {
+    resolution: parseResolution(opts.resolution),
+    ratio: opts.aspectRatio.trim() || "16:9",
+    duration,
+    watermark: opts.watermark === true,
+  };
+  if (opts.seed != null && Number.isInteger(opts.seed)) {
+    parameters.seed = opts.seed;
+  }
+  return {
+    input: { prompt },
+    parameters,
+  };
 }
 
 export function buildDashscopeHappyhorseT2vVideoBody(opts: {
@@ -158,6 +194,9 @@ export function buildDashscopeSbv1T2vVideoBody(opts: {
   watermark?: boolean;
 }): { input: Record<string, unknown>; parameters: Record<string, unknown> } {
   const modelKey = opts.modelKey?.trim() ?? "";
+  if (isDashscopeWan30VideoModel(modelKey)) {
+    return buildDashscopeWan30VideoBody(opts);
+  }
   if (isDashscopeHappyhorseTextToVideoModel(modelKey)) {
     return buildDashscopeHappyhorseT2vVideoBody(opts);
   }

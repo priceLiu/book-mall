@@ -1,11 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
-  canvasErrorToResponse,
   corsOptionsResponse,
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { refreshProviderModelsForUser } from "@/lib/canvas/canvas-provider-service";
 import { isSystemProviderId } from "@/lib/canvas/canvas-system-provider";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -14,6 +12,7 @@ export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
 }
 
+/** Gateway-only：禁止 BYOK 本地刷新模型清单。 */
 export async function POST(request: NextRequest, ctx: Ctx) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
@@ -24,13 +23,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       { status: 403, headers: jsonHeaders(request) },
     );
   }
-  try {
-    const provider = await refreshProviderModelsForUser(guard.user.id, id);
-    return NextResponse.json(
-      { provider },
-      { headers: jsonHeaders(request) },
-    );
-  } catch (err) {
-    return canvasErrorToResponse(request, err);
-  }
+  return NextResponse.json(
+    {
+      error: "FORBIDDEN",
+      message: "模型清单由 Gateway 登记，不支持本地 BYOK 刷新；请在 Gateway 控制台管理",
+    },
+    { status: 403, headers: jsonHeaders(request) },
+  );
 }

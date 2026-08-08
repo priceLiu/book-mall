@@ -8,6 +8,7 @@ import { CANVAS_BUILTIN_MODELS } from "../lib/canvas/canvas-constants";
 import { GATEWAY_CANONICAL_REGISTRY } from "../lib/platform-model/canonical-registry";
 import { STORY_DEFAULT_PRIMARY_MODEL_KEYS } from "../lib/story/story-constants";
 import { FITTING_ROOM_AI_FIT_DEFAULT_SCHEME_A_MODEL_KEY } from "../lib/tool-billable-price";
+import { collectGatewayAliyunRoutes } from "../lib/pricing/collect-gateway-aliyun-routes";
 import { prisma } from "../lib/prisma";
 
 /** 代码/价目里常见、但未必在 canonical-registry 的 modelKey */
@@ -32,6 +33,7 @@ const EXTRA_INVOKE_MODEL_KEYS = [
   "wan2.7-i2v-2026-04-25",
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
+  "wan3.0-video",
   "wan2.5-i2v-preview",
   "wan2.5-t2v-preview",
   "pixverse-c1-it2v",
@@ -155,15 +157,30 @@ async function main() {
     "seedance-2.0-fast-720p-real",
     "seedance-pro-1080p",
   ];
-  const publishedPrices = new Set(
+  const allPublishedPrices = new Set(
     (
       await prisma.modelCreditPrice.findMany({
-        where: { active: true, canonicalModelKey: { in: sbv1Canonicals } },
+        where: { active: true },
         select: { canonicalModelKey: true },
       })
     ).map((p) => p.canonicalModelKey),
   );
-  const missingPrices = sbv1Canonicals.filter((k) => !publishedPrices.has(k));
+  const bailianCanonicals = new Set(
+    collectGatewayAliyunRoutes().map((r) => r.canonicalModelKey),
+  );
+  const missingCreditPrices = [...bailianCanonicals].filter((k) => !allPublishedPrices.has(k));
+  if (missingCreditPrices.length > 0) {
+    console.error(`\n✗ 百炼/DashScope canonical 未发布 ModelCreditPrice（${missingCreditPrices.length}）：`);
+    for (const k of missingCreditPrices.sort()) console.error(`  - ${k}`);
+    console.error("\n修复：pnpm pricing:import-ali-md-scoped");
+    process.exit(1);
+  }
+  console.log("✓ 百炼/DashScope canonical 均已发布 ModelCreditPrice。");
+
+  const sbv1Published = new Set(
+    sbv1Canonicals.filter((k) => allPublishedPrices.has(k)),
+  );
+  const missingPrices = sbv1Canonicals.filter((k) => !sbv1Published.has(k));
   if (missingPrices.length > 0) {
     console.error(`\n✗ sbv1 视频分档未发布 ModelCreditPrice（${missingPrices.length}）：`);
     for (const k of missingPrices) console.error(`  - ${k}`);

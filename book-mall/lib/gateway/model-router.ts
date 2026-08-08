@@ -33,7 +33,6 @@ const DEEPSEEK_MODELS = new Set([
 ]);
 
 const MOONSHOT_MODELS = new Set([
-  "kimi-k3",
   "kimi-k2.6",
   "kimi-k2.5",
   "kimi-k2.7-code",
@@ -96,6 +95,7 @@ const DASHSCOPE_VIDEO_PREFIXES = [
   "happyhorse-1.1-",
   "happyhorse-1-0-",
   "wan2.",
+  "wan3.",
   "pixverse-",
 ];
 
@@ -178,6 +178,10 @@ export function routeGatewayModel(model: string): RoutedModel {
 
   if (DEEPSEEK_MODELS.has(m) || m.startsWith("deepseek")) {
     return { providerKind: "DEEPSEEK", requestKind: "CHAT" };
+  }
+
+  if (m === "kimi/kimi-k3" || m === "kimi-k3") {
+    return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
   if (
@@ -556,6 +560,7 @@ export function resolveBailianChatModelKey(modelKey: string): string {
   const raw = modelKey.trim();
   const aliases: Record<string, string> = {
     "MiniMax-M2.7": "MiniMax/MiniMax-M2.7",
+    "kimi-k3": "kimi/kimi-k3",
   };
   return aliases[raw] ?? raw;
 }

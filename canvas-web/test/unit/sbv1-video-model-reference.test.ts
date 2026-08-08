@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDashscopeVideoModelRefSyncPatch,
   getSbv1VideoModelRefCaps,
+  resolveDashscopeVideoModelForRefLinks,
+  resolveSbv1VideoModelRefLinkBlock,
+  resolveSbv1VideoModelRefRunWarning,
   sbv1DockRefCornerLabel,
   clampSbv1ReferenceMode,
 } from "@/lib/canvas/sbv1-video-model-reference";
@@ -56,5 +60,75 @@ describe("sbv1-video-model-reference", () => {
   it("clampSbv1ReferenceMode falls back to omni", () => {
     const caps = getSbv1VideoModelRefCaps("happyhorse/image-to-video");
     expect(clampSbv1ReferenceMode("first_last", caps)).toBe("omni");
+  });
+
+  it("resolveSbv1VideoModelRefRunWarning for T2V with refs", () => {
+    const w = resolveSbv1VideoModelRefRunWarning({
+      modelKey: "happyhorse-1.1-t2v",
+      refCount: 2,
+    });
+    expect(w?.title).toBe("请切换为参考生视频模型");
+    expect(w?.message).toContain("happyhorse-1.1-r2v");
+    expect(w?.message).not.toContain("自动");
+  });
+
+  it("resolveSbv1VideoModelRefRunWarning null without refs", () => {
+    expect(
+      resolveSbv1VideoModelRefRunWarning({
+        modelKey: "happyhorse-1.1-t2v",
+        refCount: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it("resolveSbv1VideoModelRefRunWarning for single i2v over limit", () => {
+    const w = resolveSbv1VideoModelRefRunWarning({
+      modelKey: "happyhorse-1.1-i2v",
+      refCount: 3,
+    });
+    expect(w?.title).toBe("参考图超出模型上限");
+  });
+
+  it("resolveDashscopeVideoModelForRefLinks T2V→R2V with refs", () => {
+    expect(
+      resolveDashscopeVideoModelForRefLinks("happyhorse-1.1-t2v", 2),
+    ).toBe("happyhorse-1.1-r2v");
+  });
+
+  it("resolveDashscopeVideoModelForRefLinks R2V→T2V without refs", () => {
+    expect(
+      resolveDashscopeVideoModelForRefLinks("happyhorse-1.1-r2v", 0),
+    ).toBe("happyhorse-1.1-t2v");
+  });
+
+  it("buildDashscopeVideoModelRefSyncPatch switches model + dock mode", () => {
+    const patch = buildDashscopeVideoModelRefSyncPatch(
+      {
+        engine: {
+          providerId: "gateway:bailian-dashscope-t2v",
+          modelKey: "happyhorse-1.1-t2v",
+          params: { resolution: "720P" },
+        },
+        dockInputMode: "t2v",
+      },
+      1,
+    );
+    expect(patch?.engine?.modelKey).toBe("happyhorse-1.1-r2v");
+    expect(patch?.dockInputMode).toBe("omni");
+  });
+
+  it("resolveSbv1VideoModelRefLinkBlock disables T2V when refs connected", () => {
+    expect(
+      resolveSbv1VideoModelRefLinkBlock({
+        modelKey: "happyhorse-1.1-t2v",
+        refLinkCount: 2,
+      }).blocked,
+    ).toBe(true);
+    expect(
+      resolveSbv1VideoModelRefLinkBlock({
+        modelKey: "happyhorse-1.1-r2v",
+        refLinkCount: 2,
+      }).blocked,
+    ).toBe(false);
   });
 });

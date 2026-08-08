@@ -41,8 +41,10 @@ import type {
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "../libtv-dock-send-button";
+import { LibtvDockCreditsLabel } from "../libtv-dock-credits-label";
 import {
   Sbv1ImageDockModelPicker,
   Sbv1ImageDockParamsPicker,
@@ -439,6 +441,10 @@ function Pro2ThreeViewDockFooter({
   onConfirmSettings: (patch: Partial<Sbv1ImageNodeData>) => void;
   onRegenerate: () => void;
 }) {
+  const modelKey = settingsData.engine?.modelKey?.trim() ?? "";
+  const resolution = String(settingsData.resolution ?? "2K");
+  const estCredits = useModelCreditsPreview(modelKey, 0, undefined, 1, resolution);
+
   return (
     <Pro2DockToolbar className="gap-2">
       <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
@@ -457,6 +463,8 @@ function Pro2ThreeViewDockFooter({
           onPatch={onConfirmSettings}
         />
       </div>
+      <div className="min-w-0 flex-1" />
+      <LibtvDockCreditsLabel credits={estCredits?.credits} />
       <LibtvDockSendButton
         disabled={!canRegenerate}
         loading={isRunning}
