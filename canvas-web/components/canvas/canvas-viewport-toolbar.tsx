@@ -86,7 +86,7 @@ function ViewportToolbarButton({
   );
 }
 
-/** 画布左下角：画面整理 · 小地图 · 缩放比例 */
+/** 画布右下角：画面整理 · 小地图 · 缩放比例 */
 export const CANVAS_BACKGROUND_VIDEO_PANEL_TOGGLE_EVENT =
   "canvas:background-video-panel-toggle";
 export const CANVAS_BACKGROUND_VIDEO_TASK_COUNT_EVENT =
@@ -169,10 +169,10 @@ export function CanvasViewportToolbar({
           zoomable
           nodeColor={minimapNodeColor}
           maskColor="rgba(11,11,20,0.82)"
-          className="!bottom-[3.75rem] !left-4 !bg-[var(--canvas-surface)] !border !border-white/10 !rounded-lg !shadow-xl"
+          className="!bottom-[3.75rem] !right-4 !left-auto !bg-[var(--canvas-surface)] !border !border-white/10 !rounded-lg !shadow-xl"
         />
       ) : null}
-      <Panel position="bottom-left" className="!m-0 !mb-4 !ml-4">
+      <Panel position="bottom-right" className="!m-0 !mb-4 !mr-4">
         <div
           className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/98 px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
           onMouseDown={(e) => e.stopPropagation()}

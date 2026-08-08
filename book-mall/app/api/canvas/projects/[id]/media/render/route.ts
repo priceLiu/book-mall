@@ -12,6 +12,8 @@ import {
 } from "@/lib/canvas/api-helpers";
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { CanvasProjectError, getCanvasProjectForUser } from "@/lib/canvas/canvas-project-service";
+import { mapBillingFailureForGatewayLog } from "@/lib/billing/billing-failure-map";
+import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
 import { fromCanvasJianyingFrames } from "@/lib/media/timeline-adapters";
 import {
   buildPendingMediaRenderJobDto,
@@ -89,6 +91,13 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json(
         { error: err.code, message: err.userMessage },
         { status: 503, headers: jsonHeaders(request) },
+      );
+    }
+    if (err instanceof InsufficientCreditsError) {
+      const mapped = mapBillingFailureForGatewayLog(err);
+      return NextResponse.json(
+        { error: mapped.failCode, message: mapped.failMessage },
+        { status: 402, headers: jsonHeaders(request) },
       );
     }
     const message = mediaRenderErrorMessage(err);

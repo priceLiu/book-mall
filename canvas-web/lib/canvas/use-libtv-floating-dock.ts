@@ -21,14 +21,11 @@ type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]
 /**
  * LibTV 浮动 Dock · 某类型节点的选中 id（全局单选互斥）
  *
- * 仅当「当前全局选中 / 钉选」即该 nodeType 时才返回 id；禁止按类型各自匹配 RF selected
- * （否则选中图片节点时视频仍 selected → 视频 Dock 不消失）。
+ * 仅当 React Flow 全局唯一选中节点类型匹配时才返回 id（不靠 store pin 单独挂 Dock）。
  */
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
   const marqueeSelecting = useCanvasMarqueeSelecting();
-  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
-  const pinnedType = useCanvasStore((s) => s.libtvFloatingDockNodeType);
 
   const rfGlobal = useMemo(
     () => resolveLibtvFloatingDockSelection(rfNodes),
@@ -37,13 +34,9 @@ export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
 
   if (marqueeSelecting) return null;
   if (countLibtvSelectedNonGroupNodes(rfNodes) >= 2) return null;
+  if (!rfGlobal || rfGlobal.nodeType !== nodeType) return null;
 
-  const nodeId =
-    rfGlobal?.nodeType === nodeType
-      ? rfGlobal.nodeId
-      : pinnedType === nodeType && pinnedId
-        ? pinnedId
-        : null;
+  const nodeId = rfGlobal.nodeId;
   if (!nodeId) return null;
   if (libtvDetailEditorOpenForNode(nodeId)) return null;
   return nodeId;

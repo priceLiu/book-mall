@@ -36,6 +36,7 @@ import {
   formatCanvasNetworkSpeedLabel,
   useCanvasNetworkStatus,
 } from "@/lib/canvas/use-canvas-network-status";
+import { useCanvasCreditBalance } from "@/lib/canvas/use-canvas-credit-balance";
 import {
   CanvasToolbarDropdownItem,
   CanvasToolbarDropdownMenu,
@@ -125,7 +126,11 @@ export function CanvasToolbar({
   const network = useCanvasNetworkStatus();
   const networkConnectionLabel = formatCanvasNetworkConnectionLabel(network);
   const networkSpeedLabel = formatCanvasNetworkSpeedLabel(network);
+  const creditPools = useCanvasCreditBalance();
   const mineMenu = useCanvasToolbarDropdown();
+
+  const formatCreditBalance = (n: number | null) =>
+    n == null ? "—" : n.toLocaleString("zh-CN");
 
   useEffect(() => {
     const sync = () => {
@@ -274,6 +279,22 @@ export function CanvasToolbar({
           title="点击编辑画布名称"
           aria-label="画布名称"
         />
+        <Link
+          href="/projects"
+          onClick={(e) => void onBackToProjects(e)}
+          className={cn(
+            CANVAS_TOOLBAR_BTN_CLASS,
+            "hidden shrink-0 whitespace-nowrap sm:inline-flex",
+            (leavingProject || imageUploadPending) && "opacity-80",
+          )}
+        >
+          {leavingProject ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <ArrowLeft className="size-3" />
+          )}{" "}
+          {leavingProject ? "正在保存图片…" : "回到画布列表"}
+        </Link>
         {inflightTaskCount > 0 ? (
           <span
             className={CANVAS_TOOLBAR_META_CHIP_CLASS}
@@ -323,22 +344,6 @@ export function CanvasToolbar({
       </div>
       <div className="flex min-w-0 items-center justify-center gap-2">
         {centerLeading}
-        <Link
-          href="/projects"
-          onClick={(e) => void onBackToProjects(e)}
-          className={cn(
-            CANVAS_TOOLBAR_BTN_CLASS,
-            "whitespace-nowrap",
-            (leavingProject || imageUploadPending) && "opacity-80",
-          )}
-        >
-          {leavingProject ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            <ArrowLeft className="size-3" />
-          )}{" "}
-          {leavingProject ? "正在保存图片…" : "回到画布列表"}
-        </Link>
       </div>
       <div
         data-canvas-toolbar-actions
@@ -366,6 +371,31 @@ export function CanvasToolbar({
           {networkSpeedLabel ? (
             <span className="shrink-0 tabular-nums">{networkSpeedLabel}</span>
           ) : null}
+        </span>
+
+        <span
+          className={cn(
+            CANVAS_TOOLBAR_META_CHIP_CLASS,
+            "hidden min-w-0 truncate lg:inline-flex",
+          )}
+          title="剩余积分（文本池 / 视频池）"
+          aria-live="polite"
+        >
+          <span className="text-white/50">剩余积分</span>
+          <span className="mx-1 text-white/25" aria-hidden>
+            ·
+          </span>
+          <span className="text-white/55">文本</span>
+          <span className="ml-1 tabular-nums font-medium text-white/90">
+            {formatCreditBalance(creditPools.general)}
+          </span>
+          <span className="mx-1.5 text-white/20" aria-hidden>
+            |
+          </span>
+          <span className="text-white/55">视频</span>
+          <span className="ml-1 tabular-nums font-medium text-white/90">
+            {formatCreditBalance(creditPools.video)}
+          </span>
         </span>
 
         <CanvasToolbarIconButton

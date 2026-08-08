@@ -14,6 +14,7 @@ import {
 } from "@/lib/gateway/dashscope-client";
 import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
 import { gatewayV1AsrTranscribe, gatewayV1ClientMeta } from "@/lib/gateway/gateway-v1-http-client";
+import { MEDIA_RENDER_ASR_CLIENT_PAGE } from "@/lib/media/media-render-credits";
 
 export type AsrSegment = {
   startMs: number;
@@ -42,7 +43,10 @@ export async function transcribeClipViaGateway(args: {
         fileUrl: args.fileUrl,
         modelKey: args.modelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL,
       },
-      meta: gatewayV1ClientMeta("CANVAS", { bookUserId: args.userId }),
+      meta: gatewayV1ClientMeta("CANVAS", {
+        bookUserId: args.userId,
+        clientPage: MEDIA_RENDER_ASR_CLIENT_PAGE,
+      }),
     });
     return segments;
   } catch (e) {

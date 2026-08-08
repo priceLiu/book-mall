@@ -1,0 +1,28 @@
+# 自动成片 · 积分扣费（固定档）
+
+## 规则
+
+| 场景 | 扣积分 |
+|---|---:|
+| 自动剪辑成片（FFmpeg 合片 / 转场 / 脚本字幕） | **20** |
+| 上述 + **烧录字幕 · ASR 识别** | **20 + 10 = 30** |
+
+- 扣费池：**GENERAL**（通用积分池）。
+- 提交 job 时 `consumeCredits`，`idempotencyKey = media_render:{jobId}`。
+- 任务 **FAILED**（含用户中止）全额 **REFUND**。
+- ASR Gateway 调用带 `clientPage = media-render-asr`，**不再**对 ASR 日志二次按秒扣积分（附加 10 分已含 ASR）。
+
+## 唯一实现
+
+- 常量与计算：`book-mall/lib/media/media-render-credits.ts`
+- 画布 Dock 预览：`canvas-web/lib/canvas/media-render-credits.ts`（须与上表同步）
+- 落库：`createMediaRenderJob` 创建后扣费；`processMediaRenderJob` / `cancelMediaRenderJobForUser` 失败路径返还
+
+## UI
+
+- Dock「自动剪辑成片」钮左侧：`≈ N积分`（20 或 30），柠檬黄 `LibtvDockCreditsLabel`
+
+## 禁止
+
+- 按 ASR 音频秒数 PER_SEC 估算自动成片总价（ASR 仅作 Gateway 调用，用户价固定 +10）
+- 自动成片 0 积分（除非产品另行改本 rule）

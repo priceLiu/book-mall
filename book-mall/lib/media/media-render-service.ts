@@ -37,6 +37,10 @@ import {
   hasMediaRenderLocalOutput,
 } from "@/lib/media/media-render-local-output";
 import { mediaRenderErrorMessage } from "@/lib/media/media-render-errors";
+import {
+  chargeMediaRenderJobCredits,
+  refundMediaRenderJobCredits,
+} from "@/lib/media/media-render-credits";
 
 export type CreateMediaRenderJobInput = {
   userId: string;
@@ -107,6 +111,17 @@ export async function createMediaRenderJob(
     },
     select: { id: true, expiresAt: true },
   });
+  try {
+    await chargeMediaRenderJobCredits({
+      ref: { ownerType: "USER", ownerId: input.userId },
+      jobId: job.id,
+      profile,
+      actorUserId: input.userId,
+    });
+  } catch (e) {
+    await prisma.mediaRenderJob.delete({ where: { id: job.id } }).catch(() => undefined);
+    throw e;
+  }
   return { id: job.id, expiresAt: job.expiresAt, reusedExisting: false };
 }
 
@@ -182,6 +197,11 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
         completedAt: new Date(),
       },
     });
+    await refundMediaRenderJobCredits({
+      ref: { ownerType: "USER", ownerId: job.userId },
+      jobId,
+      profile,
+    }).catch(() => undefined);
   }
 }
 
@@ -457,7 +477,7 @@ export async function cancelMediaRenderJobForUser(
 ): Promise<{ ok: true; alreadyTerminal: boolean }> {
   const job = await prisma.mediaRenderJob.findFirst({
     where: { id: jobId, userId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, profileJson: true },
   });
   if (!job) {
     throw new Error("剪辑任务不存在");
@@ -469,6 +489,7 @@ export async function cancelMediaRenderJobForUser(
   ) {
     return { ok: true, alreadyTerminal: true };
   }
+  const profile = parseRenderProfile(job.profileJson);
   await prisma.mediaRenderJob.update({
     where: { id: jobId },
     data: {
@@ -478,5 +499,10 @@ export async function cancelMediaRenderJobForUser(
       completedAt: new Date(),
     },
   });
+  await refundMediaRenderJobCredits({
+    ref: { ownerType: "USER", ownerId: userId },
+    jobId,
+    profile,
+  }).catch(() => undefined);
   return { ok: true, alreadyTerminal: false };
 }

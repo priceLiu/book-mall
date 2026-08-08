@@ -45,7 +45,8 @@ import {
 } from "@/lib/canvas/media-render-session-url";
 import { cn } from "@/lib/utils";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
-import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
+import { computeMediaRenderCreditsPreview } from "@/lib/canvas/media-render-credits";
+import { dispatchPlatformCreditsBalanceRefresh } from "@/lib/canvas/canvas-credits-balance-events";
 import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { JianyingClipOrderStrip } from "./jianying-clip-order-strip";
 
@@ -184,20 +185,20 @@ export function JianyingMediaRenderActions({
   const canRender = Boolean(base && projectId && videoFrames.length >= 1);
   const isDock = layout === "dock";
 
-  /** ASR 烧字幕：逐镜 Gateway 识别，按输入音频秒数 PER_SEC 计费 */
-  const asrBillableSec = useMemo(() => {
-    if (!burnIn || subtitleMode !== "asr" || videoFrames.length === 0) return 0;
-    return videoFrames.reduce((sum, f) => {
-      const d = f.durationSec;
-      const sec = d != null && d > 0 ? Math.round(d) : 15;
-      return sum + Math.max(1, sec);
-    }, 0);
-  }, [burnIn, subtitleMode, videoFrames]);
-
-  const asrCreditsPreview = useModelCreditsPreview(
-    asrBillableSec > 0 ? "qwen3-asr-flash-filetrans" : "",
-    asrBillableSec,
+  const renderCreditsEstimate = useMemo(
+    () => computeMediaRenderCreditsPreview({ burnIn, subtitleMode }),
+    [burnIn, subtitleMode],
   );
+
+  const renderCreditsTitle = useMemo(() => {
+    if (burnIn && subtitleMode === "asr") {
+      return "自动成片 20 积分 + ASR 识别 10 积分";
+    }
+    if (burnIn && subtitleMode === "script") {
+      return "自动成片 20 积分（脚本字幕不另收费）";
+    }
+    return "自动成片 20 积分";
+  }, [burnIn, subtitleMode]);
 
   const patchInFlight = useCallback(
     (patch: JianyingMediaRenderInFlight | null) => {
@@ -725,6 +726,7 @@ export function JianyingMediaRenderActions({
           video: { scaleMode },
         },
       });
+      dispatchPlatformCreditsBalanceRefresh();
       submittingRef.current = false;
       setSubmitting(false);
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
@@ -950,18 +952,13 @@ export function JianyingMediaRenderActions({
     </button>
   );
 
-  const renderCreditsLabel =
-    burnIn && subtitleMode === "asr" && asrBillableSec > 0 ? (
-      <LibtvDockCreditsLabel
-        credits={asrCreditsPreview?.credits}
-        fontPx={isDock ? 13 : 12}
-        title={
-          asrCreditsPreview?.credits != null
-            ? `ASR 识别 · ${videoFrames.length} 镜 · 约 ${asrBillableSec}s · qwen3-asr-flash-filetrans`
-            : "ASR 识别积分预估"
-        }
-      />
-    ) : null;
+  const renderCreditsLabel = (
+    <LibtvDockCreditsLabel
+      credits={renderCreditsEstimate}
+      fontPx={isDock ? 13 : 12}
+      title={renderCreditsTitle}
+    />
+  );
 
   const renderBtnRow = (
     <div

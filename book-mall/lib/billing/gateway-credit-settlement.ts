@@ -303,6 +303,7 @@ export async function settleSucceededGatewayLog(input: {
   };
 }): Promise<number> {
   if (!creditBillingEnabled()) return 0;
+  if (input.log.clientPage === "media-render-asr") return 0;
   if (input.log.billingMode === "BYOK") {
     const r = await settleByokOverage(input.log);
     return r?.creditsCharged ?? 0;
