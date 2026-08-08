@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, Download } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -45,6 +45,8 @@ import {
 } from "@/lib/canvas/media-render-session-url";
 import { cn } from "@/lib/utils";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
+import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
+import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { JianyingClipOrderStrip } from "./jianying-clip-order-strip";
 
 type Props = {
@@ -181,6 +183,21 @@ export function JianyingMediaRenderActions({
   const videoFrames = frames.filter((f) => f.videoUrl);
   const canRender = Boolean(base && projectId && videoFrames.length >= 1);
   const isDock = layout === "dock";
+
+  /** ASR 烧字幕：逐镜 Gateway 识别，按输入音频秒数 PER_SEC 计费 */
+  const asrBillableSec = useMemo(() => {
+    if (!burnIn || subtitleMode !== "asr" || videoFrames.length === 0) return 0;
+    return videoFrames.reduce((sum, f) => {
+      const d = f.durationSec;
+      const sec = d != null && d > 0 ? Math.round(d) : 15;
+      return sum + Math.max(1, sec);
+    }, 0);
+  }, [burnIn, subtitleMode, videoFrames]);
+
+  const asrCreditsPreview = useModelCreditsPreview(
+    asrBillableSec > 0 ? "qwen3-asr-flash-filetrans" : "",
+    asrBillableSec,
+  );
 
   const patchInFlight = useCallback(
     (patch: JianyingMediaRenderInFlight | null) => {
@@ -933,6 +950,31 @@ export function JianyingMediaRenderActions({
     </button>
   );
 
+  const renderCreditsLabel =
+    burnIn && subtitleMode === "asr" && asrBillableSec > 0 ? (
+      <LibtvDockCreditsLabel
+        credits={asrCreditsPreview?.credits}
+        fontPx={isDock ? 13 : 12}
+        title={
+          asrCreditsPreview?.credits != null
+            ? `ASR 识别 · ${videoFrames.length} 镜 · 约 ${asrBillableSec}s · qwen3-asr-flash-filetrans`
+            : "ASR 识别积分预估"
+        }
+      />
+    ) : null;
+
+  const renderBtnRow = (
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        isDock ? "shrink-0" : "w-full",
+      )}
+    >
+      {renderCreditsLabel}
+      {renderBtn}
+    </div>
+  );
+
   const retryUploadBtn = showRetryUpload ? (
     <button
       type="button"
@@ -1123,7 +1165,7 @@ export function JianyingMediaRenderActions({
             <div className="w-full shrink-0 text-center">{expiryHint}</div>
           ) : null}
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {renderBtn}
+            {renderBtnRow}
             {downloadBtn}
             {retryUploadBtn}
             {stopSyncBtn}
@@ -1180,7 +1222,7 @@ export function JianyingMediaRenderActions({
         </select>
       </label>
       {burnInControls}
-      {renderBtn}
+      {renderBtnRow}
       {progressBlock}
       {expiryHint}
       {downloadBtn}
