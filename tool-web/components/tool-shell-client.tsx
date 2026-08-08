@@ -38,6 +38,7 @@ import {
   MAX_SSO_REENTER_ATTEMPTS,
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
+import { introspectSessionRevoked } from "@/lib/session-revoked";
 import { ToolCreditBalanceChip } from "@/components/platform-credit-balance-chip";
 
 const SESSION_POLL_MS = 60_000;

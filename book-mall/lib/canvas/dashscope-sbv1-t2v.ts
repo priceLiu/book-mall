@@ -204,11 +204,12 @@ export function buildDashscopeSbv1T2vVideoBody(opts: {
   const prompt = opts.prompt.trim();
   if (!prompt) throw new Error("prompt required for text-to-video");
   const res = parseResolution(opts.resolution);
+  const sizeRes: "720P" | "1080P" = res === "1080P" ? "1080P" : "720P";
   const dur: 5 | 10 = opts.durationSec <= 7 ? 5 : 10;
   return {
     input: { prompt },
     parameters: {
-      size: t2vAspectRatioToSize(opts.aspectRatio, res),
+      size: t2vAspectRatioToSize(opts.aspectRatio, sizeRes),
       duration: dur,
       prompt_extend: opts.promptExtend !== false,
     },

@@ -25,6 +25,7 @@ import {
 import { isPro2StarterTextGenerating } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
+import { isPro2SunoModelKey } from "@/lib/canvas/kie-audio-models";
 import {
   useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
