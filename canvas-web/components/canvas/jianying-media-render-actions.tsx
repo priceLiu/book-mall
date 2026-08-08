@@ -39,6 +39,10 @@ import {
   preserveAutoRenderNodeMediaFitPatch,
   scheduleAutoRenderParentGroupRelayout,
 } from "@/lib/canvas/jianying-auto-render-layout";
+import {
+  isMediaRenderSessionLocalUrl,
+  resolveMediaRenderLocalDownloadUrl,
+} from "@/lib/canvas/media-render-session-url";
 import { cn } from "@/lib/utils";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { JianyingClipOrderStrip } from "./jianying-clip-order-strip";
@@ -243,29 +247,61 @@ export function JianyingMediaRenderActions({
   }, [persisted?.downloadUrl, persisted?.expiresAt]);
 
   const persistResult = useCallback(
-    (downloadUrl: string, expires: string, poster?: string | null) => {
+    (
+      ossDownloadUrl: string,
+      expires: string,
+      poster?: string | null,
+      jobId?: string,
+    ) => {
       const posterUrl = poster?.trim() || undefined;
-      setDoneUrl(downloadUrl);
+      const currentVideoUrl = (
+        useCanvasStore.getState().nodes.find((n) => n.id === nodeId)?.data as
+          | { videoUrl?: string }
+          | undefined
+      )?.videoUrl?.trim();
+      const keepSessionPreview =
+        !spawnPreview &&
+        isMediaRenderSessionLocalUrl(currentVideoUrl, jobId);
+
       setExpiresAt(expires);
+      setDoneUrl(ossDownloadUrl);
+      downloadableRef.current = ossDownloadUrl;
+
+      const mediaRenderResult: JianyingMediaRenderResult = {
+        downloadUrl: ossDownloadUrl,
+        expiresAt: expires,
+        completedAt: new Date().toISOString(),
+        ...(posterUrl ? { posterUrl } : {}),
+      };
+
       updateNodeData(nodeId, {
         ...preserveAutoRenderNodeMediaFitPatch(nodeId, {
-          videoUrl: downloadUrl,
-          posterUrl,
+          ...(keepSessionPreview
+            ? {}
+            : {
+                videoUrl: ossDownloadUrl,
+                ...(posterUrl ? { posterUrl } : {}),
+              }),
           mediaRenderInFlight: null,
           mediaFit: false,
           mediaFitKey: undefined,
-          mediaRenderResult: {
-            downloadUrl,
-            expiresAt: expires,
-            completedAt: new Date().toISOString(),
-            ...(posterUrl ? { posterUrl } : {}),
-          },
+          mediaRenderResult,
         }),
       });
+      if (keepSessionPreview && currentVideoUrl) {
+        updateNodeData(
+          nodeId,
+          preserveAutoRenderNodeMediaFitPatch(nodeId, {
+            videoUrl: currentVideoUrl,
+            mediaRenderInFlight: null,
+          }),
+          { sessionOnly: true },
+        );
+      }
       scheduleAutoRenderParentGroupRelayout(nodeId);
       if (spawnPreview) {
         const state = useCanvasStore.getState();
-        spawnJianyingRenderPreviewNode(nodeId, downloadUrl, {
+        spawnJianyingRenderPreviewNode(nodeId, ossDownloadUrl, {
           nodes: state.nodes,
           edges: state.edges,
           addNode,
@@ -285,26 +321,65 @@ export function JianyingMediaRenderActions({
       if (!dismissed) {
         setProgress((prev) => Math.max(prev ?? 0, job.progress));
       }
-      const localUrl = base ? resolveMediaRenderDownloadUrl(base, job) : null;
-      const localReady = Boolean(localUrl && job.localDownloadPath?.trim());
-      if (localUrl) {
-        setDoneUrl(localUrl);
-        downloadableRef.current = localUrl;
-        if (!spawnPreview) {
-          // 剪辑完成立刻刷新节点预览；OSS 上传在后台继续，勿等 SUCCEEDED
-          updateNodeData(nodeId, {
-            ...preserveAutoRenderNodeMediaFitPatch(nodeId, {
-              videoUrl: localUrl,
+      const ossUrl = job.downloadUrl?.trim() || null;
+      const sessionPreviewUrl =
+        base && job.localDownloadPath?.trim()
+          ? resolveMediaRenderLocalDownloadUrl(base, job)
+          : null;
+      const localReady = Boolean(sessionPreviewUrl);
+      const currentVideoUrl = (
+        useCanvasStore.getState().nodes.find((n) => n.id === nodeId)?.data as
+          | { videoUrl?: string }
+          | undefined
+      )?.videoUrl?.trim();
+      const keepSessionPreview =
+        !spawnPreview &&
+        isMediaRenderSessionLocalUrl(currentVideoUrl, job.id);
+
+      const dockUrl =
+        sessionPreviewUrl ??
+        ossUrl ??
+        (base ? resolveMediaRenderDownloadUrl(base, job) : null);
+      if (dockUrl) {
+        if (job.status === "SUCCEEDED" && ossUrl) {
+          setDoneUrl(ossUrl);
+          downloadableRef.current = ossUrl;
+        } else {
+          setDoneUrl(dockUrl);
+          downloadableRef.current = dockUrl;
+        }
+      }
+
+      if (!spawnPreview && (sessionPreviewUrl || ossUrl)) {
+        if (sessionPreviewUrl && !keepSessionPreview) {
+          updateNodeData(
+            nodeId,
+            preserveAutoRenderNodeMediaFitPatch(nodeId, {
+              videoUrl: sessionPreviewUrl,
               mediaRenderResult: null,
+              mediaFit: false,
+              mediaFitKey: undefined,
+            }),
+            { sessionOnly: true },
+          );
+          scheduleAutoRenderParentGroupRelayout(nodeId);
+        } else if (ossUrl && !sessionPreviewUrl && !keepSessionPreview) {
+          updateNodeData(
+            nodeId,
+            preserveAutoRenderNodeMediaFitPatch(nodeId, {
+              videoUrl: ossUrl,
               mediaFit: false,
               mediaFitKey: undefined,
               ...(job.posterUrl?.trim()
                 ? { posterUrl: job.posterUrl.trim() }
-                : { posterUrl: undefined }),
+                : {}),
             }),
-          });
+          );
           scheduleAutoRenderParentGroupRelayout(nodeId);
         }
+      }
+
+      if (sessionPreviewUrl || ossUrl) {
         if (job.uploadFailed) {
           setUploadFailed(true);
           if (!dismissed) setStepLabel("剪辑完成，云端同步失败");
@@ -349,9 +424,15 @@ export function JianyingMediaRenderActions({
   );
 
   const finishJob = useCallback(
-    async (finalJob: MediaRenderJob): Promise<"succeeded" | "upload_failed" | "failed"> => {
+    async (
+      finalJob: MediaRenderJob,
+    ): Promise<
+      | { outcome: "succeeded" }
+      | { outcome: "upload_failed" }
+      | { outcome: "failed"; errorMessage: string }
+    > => {
       if (isMediaRenderPollDismissed(nodeId, finalJob.id)) {
-        return "upload_failed";
+        return { outcome: "upload_failed" };
       }
       const downloadUrl = base
         ? resolveMediaRenderDownloadUrl(base, finalJob)
@@ -362,12 +443,18 @@ export function JianyingMediaRenderActions({
         setProgress(finalJob.progress);
         setStepLabel("剪辑完成，云端同步失败");
         if (!spawnPreview) {
-          updateNodeData(nodeId, {
-            videoUrl: downloadUrl,
-            ...(finalJob.posterUrl?.trim()
-              ? { posterUrl: finalJob.posterUrl.trim() }
-              : {}),
-          });
+          const cur = (
+            useCanvasStore.getState().nodes.find((n) => n.id === nodeId)
+              ?.data as { videoUrl?: string } | undefined
+          )?.videoUrl?.trim();
+          if (!isMediaRenderSessionLocalUrl(cur, finalJob.id)) {
+            updateNodeData(nodeId, {
+              videoUrl: downloadUrl,
+              ...(finalJob.posterUrl?.trim()
+                ? { posterUrl: finalJob.posterUrl.trim() }
+                : {}),
+            });
+          }
         }
         patchInFlight({
           jobId: finalJob.id,
@@ -377,7 +464,7 @@ export function JianyingMediaRenderActions({
           errorMessage: finalJob.errorMessage ?? "云端上传失败，可重试",
           ...settingsRef.current,
         });
-        return "upload_failed";
+        return { outcome: "upload_failed" };
       }
       if (finalJob.status !== "SUCCEEDED" || !downloadUrl) {
         const message = friendlyMediaRenderError(
@@ -391,18 +478,18 @@ export function JianyingMediaRenderActions({
           errorMessage: message,
           ...settingsRef.current,
         });
-        return "failed";
+        return { outcome: "failed", errorMessage: message };
       }
       persistResult(
         downloadUrl,
         finalJob.expiresAt,
         finalJob.posterUrl,
+        finalJob.id,
       );
-      downloadableRef.current = downloadUrl;
       setProgress(100);
       setStepLabel("剪辑完成");
       setUploadFailed(false);
-      return "succeeded";
+      return { outcome: "succeeded" };
     },
     [base, nodeId, patchInFlight, persistResult, spawnPreview, updateNodeData],
   );
@@ -449,10 +536,8 @@ export function JianyingMediaRenderActions({
     void runTrackedJob(jobId)
       .then((outcome) => {
         if (cancelled || isMediaRenderPollDismissed(nodeId, jobId)) return;
-        if (outcome === "failed" && !downloadableRef.current) {
-          void showRenderError(
-            "云端剪辑失败，请稍后重试；若多次失败请刷新页面后再试。",
-          );
+        if (outcome.outcome === "failed" && !downloadableRef.current) {
+          void showRenderError(outcome.errorMessage);
         }
       })
       .catch((e) => {
@@ -632,8 +717,8 @@ export function JianyingMediaRenderActions({
       setProgress((prev) => Math.max(prev ?? 0, job.progress));
       const outcome = await runTrackedJob(job.id);
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
-      if (outcome === "failed") {
-        await showRenderError("云端剪辑失败，请稍后重试；若多次失败请刷新页面后再试。");
+      if (outcome.outcome === "failed") {
+        await showRenderError(outcome.errorMessage);
       }
     } catch (e) {
       if (syncDismissedRef.current) {
@@ -695,11 +780,11 @@ export function JianyingMediaRenderActions({
       applyJobProgress(job);
       const outcome = await runTrackedJob(jobId);
       if (isMediaRenderPollDismissed(nodeId, jobId)) return;
-      if (outcome === "upload_failed") {
+      if (outcome.outcome === "upload_failed") {
         setUploadFailed(true);
         setStepLabel("云端同步失败，可重试");
-      } else if (outcome === "failed") {
-        await showRenderError("云端同步失败，请稍后重试。");
+      } else if (outcome.outcome === "failed") {
+        await showRenderError(outcome.errorMessage);
       }
     } catch (e) {
       if (isMediaRenderPollDismissed(nodeId, jobId)) return;

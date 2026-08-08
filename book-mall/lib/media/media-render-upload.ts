@@ -2,7 +2,6 @@ import { MediaRenderJobStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
-  cleanupMediaRenderLocalOutput,
   hasMediaRenderLocalOutput,
   mediaRenderLocalOutputPath,
 } from "@/lib/media/media-render-local-output";
@@ -182,7 +181,7 @@ async function runMediaRenderJobUpload(args: {
         });
 
         await onMediaRenderJobSucceeded(updated).catch(() => undefined);
-        await cleanupMediaRenderLocalOutput(args.jobId);
+        // 方案 1：OSS 成功后保留本地成片至 job 过期，供会话内 BFF 播放不换源
         return;
       } catch (e) {
         lastError = e instanceof Error ? e.message : String(e);

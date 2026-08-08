@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
+import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -55,6 +57,7 @@ export function Pro2SelectionToolbar({
 }: {
   rfNodes: CanvasFlowNode[];
 }) {
+  const mounted = useClientPortalMounted();
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { flowToScreenPosition, getInternalNode, setNodes: rfSetNodes } =
@@ -178,6 +181,8 @@ export function Pro2SelectionToolbar({
     return null;
   }
 
+  if (!mounted) return null;
+
   const onSaveToAssets = async () => {
     if (!saveableThreeViews.length) {
       await alert({
@@ -278,9 +283,9 @@ export function Pro2SelectionToolbar({
     setGroupOpen(false);
   };
 
-  return (
+  return createPortal(
     <div
-      className="pointer-events-auto fixed z-[1600]"
+      className="pointer-events-auto fixed z-[2050]"
       style={{
         left: placement.x,
         top: placement.y,
@@ -399,6 +404,7 @@ export function Pro2SelectionToolbar({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

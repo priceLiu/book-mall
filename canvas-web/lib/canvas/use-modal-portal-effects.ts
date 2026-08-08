@@ -36,6 +36,25 @@ export function useClientPortalMounted(): boolean {
   return mounted;
 }
 
+/** 节点/框选工具条 Popover 打开（`data-canvas-toolbar-popover-open`） */
+export function useCanvasToolbarPopoverOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => {
+      setOpen(root.dataset.canvasToolbarPopoverOpen === "true");
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["data-canvas-toolbar-popover-open"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return open;
+}
+
 /**
  * 弹层打开期间锁定 body 滚动，并标记 `data-canvas-modal-open` 暂停画布指针事件。
  * 仅依赖 `active`，避免父组件每帧传入新 `onClose` 导致 overflow 反复切换 → 整页闪烁/抖动。

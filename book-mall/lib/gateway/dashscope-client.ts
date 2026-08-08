@@ -125,6 +125,20 @@ export function isDashscopeTaskFailed(status: string | undefined): boolean {
   return s === "FAILED" || s === "CANCELED" || s === "UNKNOWN";
 }
 
+/** ASR 任务成功但无有效语音片段 · 按空字幕继续剪辑 */
+export function isDashscopeAsrNoSpeechOutcome(
+  status: string | undefined,
+  code?: string | null,
+  message?: string | null,
+): boolean {
+  const blob = `${status ?? ""} ${code ?? ""} ${message ?? ""}`.toUpperCase();
+  return (
+    blob.includes("NO_VALID_FRAGMENT") ||
+    blob.includes("NO_SPEECH") ||
+    blob.includes("NO_VALID_AUDIO")
+  );
+}
+
 export async function dashscopeGetTask(opts: {
   apiKey: string;
   taskId: string;
@@ -783,11 +797,17 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
     if (!task.ok) return { ok: false, error: task.error };
 
     const status = task.output.task_status;
+    if (isDashscopeAsrNoSpeechOutcome(status, task.output.code, task.output.message)) {
+      return { ok: true, sentences: [] };
+    }
     if (isDashscopeTaskFailed(status)) {
       const msg =
         task.output.message?.trim() ||
         task.output.code?.trim() ||
         "ASR 任务失败";
+      if (isDashscopeAsrNoSpeechOutcome(status, task.output.code, msg)) {
+        return { ok: true, sentences: [] };
+      }
       return { ok: false, error: msg };
     }
 
@@ -804,7 +824,7 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
         ? result.transcription_url.trim()
         : "";
     if (!transcriptionUrl) {
-      return { ok: false, error: "ASR 任务成功但未返回 transcription_url" };
+      return { ok: true, sentences: [] };
     }
 
     let res: Response;

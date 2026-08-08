@@ -26,12 +26,14 @@ import { cn } from "@/lib/utils";
 import { CANVAS_PROJECT_HISTORY_MAX } from "@/lib/canvas/canvas-autosave-settings";
 import {
   CANVAS_SEMANTIC_ERROR_CLASS,
-  CANVAS_SEMANTIC_STATUS_CLASS,
   CANVAS_SEMANTIC_TITLE_CLASS,
+  CANVAS_TOOLBAR_META_CHIP_CLASS,
+  CANVAS_TOOLBAR_META_TEXT_CLASS,
   CANVAS_TOOLBAR_BTN_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
 import {
-  formatCanvasNetworkStatusLabel,
+  formatCanvasNetworkConnectionLabel,
+  formatCanvasNetworkSpeedLabel,
   useCanvasNetworkStatus,
 } from "@/lib/canvas/use-canvas-network-status";
 import {
@@ -121,7 +123,8 @@ export function CanvasToolbar({
     canvasSavePhaseLabel(savePhase, saveRetryAttempt) ||
     (saveBusy ? "保存中…" : "");
   const network = useCanvasNetworkStatus();
-  const networkLabel = formatCanvasNetworkStatusLabel(network);
+  const networkConnectionLabel = formatCanvasNetworkConnectionLabel(network);
+  const networkSpeedLabel = formatCanvasNetworkSpeedLabel(network);
   const mineMenu = useCanvasToolbarDropdown();
 
   useEffect(() => {
@@ -273,36 +276,16 @@ export function CanvasToolbar({
         />
         {inflightTaskCount > 0 ? (
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-orange-500/20 px-2 py-0.5 text-[10px] font-medium text-orange-200"
+            className={CANVAS_TOOLBAR_META_CHIP_CLASS}
             title="画布上有任务正在生成"
           >
             <Loader2 className="size-3 animate-spin" />
             生成中 · {inflightTaskCount} 个任务
           </span>
         ) : null}
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium",
-            network.online
-              ? "bg-emerald-500/15 text-emerald-100"
-              : "bg-red-500/20 text-red-200",
-          )}
-          title={
-            network.online
-              ? `浏览器在线状态：${networkLabel}（不代表 book-mall 保存是否畅通）`
-              : "浏览器离线，保存与生成可能失败"
-          }
-        >
-          {network.online ? (
-            <Wifi className="size-3" />
-          ) : (
-            <WifiOff className="size-3" />
-          )}
-          <span className="hidden sm:inline">{networkLabel}</span>
-        </span>
         {imageUploadPending ? (
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-medium text-cyan-100"
+            className={CANVAS_TOOLBAR_META_CHIP_CLASS}
             title="粘贴/上传图片正在写入 OSS"
           >
             <Loader2 className="size-3 animate-spin" />
@@ -313,8 +296,8 @@ export function CanvasToolbar({
         {saveBusy ? (
           <span
             className={cn(
-              "hidden min-w-0 max-w-[min(280px,32vw)] shrink truncate text-[11px] lg:inline",
-              CANVAS_SEMANTIC_STATUS_CLASS,
+              "hidden min-w-0 max-w-[min(280px,32vw)] shrink truncate lg:inline",
+              CANVAS_TOOLBAR_META_TEXT_CLASS,
             )}
             title="画布数据写入云端"
           >
@@ -323,8 +306,8 @@ export function CanvasToolbar({
         ) : !saveBusy && !imageUploadPending && (lastSavedAt || saveError) ? (
           <span
             className={cn(
-              "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate text-[11px] lg:inline",
-              saveError ? CANVAS_SEMANTIC_ERROR_CLASS : CANVAS_SEMANTIC_STATUS_CLASS,
+              "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate lg:inline",
+              saveError ? CANVAS_SEMANTIC_ERROR_CLASS : CANVAS_TOOLBAR_META_TEXT_CLASS,
             )}
             title={saveError ?? undefined}
           >
@@ -361,6 +344,30 @@ export function CanvasToolbar({
         data-canvas-toolbar-actions
         className="flex min-w-0 items-center justify-end gap-1.5 overflow-visible"
       >
+        <span
+          className={cn(
+            CANVAS_TOOLBAR_META_CHIP_CLASS,
+            "hidden min-w-[8rem] justify-between gap-2 sm:inline-flex",
+          )}
+          title={
+            network.online
+              ? `网络：${networkConnectionLabel}${networkSpeedLabel ? ` · ${networkSpeedLabel}` : ""}（不代表 book-mall 保存是否畅通）`
+              : "浏览器离线，保存与生成可能失败"
+          }
+        >
+          <span className="inline-flex min-w-0 items-center gap-1">
+            {network.online ? (
+              <Wifi className="size-3 shrink-0" />
+            ) : (
+              <WifiOff className="size-3 shrink-0" />
+            )}
+            <span className="truncate">{networkConnectionLabel}</span>
+          </span>
+          {networkSpeedLabel ? (
+            <span className="shrink-0 tabular-nums">{networkSpeedLabel}</span>
+          ) : null}
+        </span>
+
         <CanvasToolbarIconButton
           label="保存"
           hint="手动保存到「我的历史」"

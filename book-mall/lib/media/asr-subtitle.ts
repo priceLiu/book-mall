@@ -9,6 +9,7 @@ import {
 } from "@/lib/media/subtitle-burn-in";
 import {
   QWEN3_ASR_FLASH_FILETRANS_MODEL,
+  isDashscopeAsrNoSpeechOutcome,
   type DashscopeAsrSentence,
 } from "@/lib/gateway/dashscope-client";
 import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
@@ -34,15 +35,23 @@ export async function transcribeClipViaGateway(args: {
   if (!auth?.id) {
     throw new Error("未关联 Gateway API Key，无法使用语音识别烧字幕");
   }
-  const { segments } = await gatewayV1AsrTranscribe({
-    apiKeyId: auth.id,
-    body: {
-      fileUrl: args.fileUrl,
-      modelKey: args.modelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL,
-    },
-    meta: gatewayV1ClientMeta("CANVAS", { bookUserId: args.userId }),
-  });
-  return segments;
+  try {
+    const { segments } = await gatewayV1AsrTranscribe({
+      apiKeyId: auth.id,
+      body: {
+        fileUrl: args.fileUrl,
+        modelKey: args.modelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL,
+      },
+      meta: gatewayV1ClientMeta("CANVAS", { bookUserId: args.userId }),
+    });
+    return segments;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (isDashscopeAsrNoSpeechOutcome(undefined, msg, msg)) {
+      return [];
+    }
+    throw e;
+  }
 }
 
 /**

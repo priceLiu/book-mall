@@ -498,17 +498,35 @@ export async function runFfmpegMediaRender(args: {
           66 + Math.round((i / Math.max(timeline.clips.length, 1)) * 4),
           `识别第 ${i + 1}/${timeline.clips.length} 镜台词…`,
         );
+        let segments: Array<{ startMs: number; endMs: number; text: string }> =
+          [];
         try {
-          const segments = await transcribeClipViaGateway({
+          segments = await transcribeClipViaGateway({
             userId: args.userId,
             fileUrl: clip.videoUrl,
             modelKey: asrModelKey,
           });
-          clipSegments.push(segments);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          throw new Error(`第 ${i + 1} 镜语音识别失败：${msg}`);
+          if (/Gateway API Key|未关联 Gateway/i.test(msg)) {
+            throw e;
+          }
+          segments = [];
         }
+        if (segments.length === 0 && clip.subtitle?.trim()) {
+          const durMs = Math.max(
+            500,
+            Math.round((durations[i] ?? 3) * 1000),
+          );
+          segments = [
+            {
+              startMs: 0,
+              endMs: durMs,
+              text: clip.subtitle.trim(),
+            },
+          ];
+        }
+        clipSegments.push(segments);
       }
       srtContent = buildAsrSubtitleSrt(clipSegments, durations, {
         transitionType: profile.transition.type,

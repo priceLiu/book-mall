@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
 import { Plus, Clapperboard, Download } from "lucide-react";
 
-import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
+import { useClientPortalMounted, useCanvasToolbarPopoverOpen } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { findBatchConnectSnapTarget } from "@/lib/canvas/libtv-connection-snap";
@@ -80,6 +80,7 @@ function Pro2SelectionBatchConnectLayerInner({
   const { flowToScreenPosition, screenToFlowPosition, getInternalNode } =
     useReactFlow();
   const marqueeSelecting = useCanvasMarqueeSelecting();
+  const toolbarPopoverOpen = useCanvasToolbarPopoverOpen();
   const storeNodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
@@ -575,16 +576,18 @@ function Pro2SelectionBatchConnectLayerInner({
 
   return (
     <>
-      <div
-        className="pointer-events-none fixed z-[1500] rounded-sm border border-dashed border-white/40"
-        style={{
-          left: boxLeft,
-          top: boxTop,
-          width: boxWidth,
-          height: boxHeight,
-        }}
-        aria-hidden
-      />
+      {!toolbarPopoverOpen ? (
+        <div
+          className="pointer-events-none fixed z-[1500] rounded-sm border border-dashed border-white/40"
+          style={{
+            left: boxLeft,
+            top: boxTop,
+            width: boxWidth,
+            height: boxHeight,
+          }}
+          aria-hidden
+        />
+      ) : null}
 
       {showPreviewLines ? (
         <BatchConnectPreviewLines

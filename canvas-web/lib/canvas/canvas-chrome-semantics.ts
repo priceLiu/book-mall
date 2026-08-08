@@ -7,6 +7,13 @@ export const CANVAS_SEMANTIC_TITLE_CLASS = "text-white";
 
 export const CANVAS_SEMANTIC_STATUS_CLASS = "text-orange-300/90";
 
+/** 顶栏状态 chip · 统一浅灰字 */
+export const CANVAS_TOOLBAR_META_CHIP_CLASS =
+  "inline-flex shrink-0 items-center gap-1 rounded-md bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/55";
+
+/** 顶栏保存 / 状态文案 · 浅灰 */
+export const CANVAS_TOOLBAR_META_TEXT_CLASS = "text-[11px] text-white/55";
+
 export const CANVAS_SEMANTIC_ERROR_CLASS = "text-red-400/90";
 
 export const CANVAS_SEMANTIC_ERROR_SOFT_CLASS = "text-red-300/95";

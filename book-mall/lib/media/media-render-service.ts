@@ -32,7 +32,10 @@ import {
   enqueueMediaRenderJobUpload,
   retryMediaRenderJobUpload,
 } from "@/lib/media/media-render-upload";
-import { hasMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
+import {
+  cleanupMediaRenderLocalOutput,
+  hasMediaRenderLocalOutput,
+} from "@/lib/media/media-render-local-output";
 import { mediaRenderErrorMessage } from "@/lib/media/media-render-errors";
 
 export type CreateMediaRenderJobInput = {
@@ -358,6 +361,7 @@ export async function expireDueMediaRenderJobs(limit = 50): Promise<number> {
   for (const row of due) {
     if (row.resultOssUrl) {
       await expireMediaRenderJob(row.id, row.resultOssUrl);
+      await cleanupMediaRenderLocalOutput(row.id).catch(() => undefined);
     }
   }
   return due.length;

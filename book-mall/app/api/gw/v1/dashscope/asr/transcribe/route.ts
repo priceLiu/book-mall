@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   QWEN3_ASR_FLASH_FILETRANS_MODEL,
   dashscopeTranscribePublicFileUrl,
+  isDashscopeAsrNoSpeechOutcome,
 } from "@/lib/gateway/dashscope-client";
 import {
   isGatewayAuthResponse,
@@ -88,6 +89,20 @@ export async function POST(request: NextRequest) {
       model,
     });
     if (!result.ok) {
+      if (isDashscopeAsrNoSpeechOutcome(undefined, result.error, result.error)) {
+        await finalizeRequestLog(log.id, {
+          status: "SUCCEEDED",
+          durationMs: Date.now() - started,
+          resultSummary: { segmentCount: 0, noSpeech: true },
+          model,
+        });
+        return NextResponse.json({
+          code: 200,
+          data: { segments: [] },
+          logId: log.id,
+          providerKind: "DASHSCOPE",
+        });
+      }
       await finalizeRequestLog(log.id, {
         status: "FAILED",
         durationMs: Date.now() - started,

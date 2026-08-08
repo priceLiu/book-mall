@@ -61,6 +61,9 @@ export function friendlyMediaRenderError(message: string): string {
   if (/已被同一项目的新剪辑任务取代/i.test(message)) {
     return "请勿重复提交剪辑；当前任务仍在进行，请等待完成。";
   }
+  if (/语音识别失败/i.test(message)) {
+    return message;
+  }
   if (/Gateway API Key|GATEWAY_KEY_REQUIRED/i.test(message)) {
     return "须先关联 Gateway API Key 方可使用语音识别烧字幕。";
   }

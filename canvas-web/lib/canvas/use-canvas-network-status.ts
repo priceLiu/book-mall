@@ -64,17 +64,44 @@ function averageThroughputKbps(): number | null {
 
 export function formatCanvasNetworkStatusLabel(status: CanvasNetworkStatus): string {
   if (!status.online) return "离线";
-  const parts: string[] = ["在线"];
+  const parts: string[] = [];
   if (status.effectiveType) parts.push(status.effectiveType.toUpperCase());
+  if (status.rttMs != null && status.rttMs > 0) {
+    parts.push(`RTT ${Math.round(status.rttMs)}ms`);
+  }
   if (status.downlinkMbps != null && status.downlinkMbps > 0) {
     parts.push(`${status.downlinkMbps.toFixed(1)} Mbps`);
   } else if (status.throughputKbps != null && status.throughputKbps > 0) {
     parts.push(`${status.throughputKbps.toFixed(0)} KB/s`);
   }
+  return parts.join(" · ") || "—";
+}
+
+/** 顶栏网络 · 连接类型 / RTT（不含网速） */
+export function formatCanvasNetworkConnectionLabel(
+  status: CanvasNetworkStatus,
+): string {
+  if (!status.online) return "离线";
+  const parts: string[] = [];
+  if (status.effectiveType) parts.push(status.effectiveType.toUpperCase());
   if (status.rttMs != null && status.rttMs > 0) {
     parts.push(`RTT ${Math.round(status.rttMs)}ms`);
   }
-  return parts.join(" · ");
+  return parts.join(" · ") || "—";
+}
+
+/** 顶栏网络 · 网速（右侧展示） */
+export function formatCanvasNetworkSpeedLabel(
+  status: CanvasNetworkStatus,
+): string | null {
+  if (!status.online) return null;
+  if (status.downlinkMbps != null && status.downlinkMbps > 0) {
+    return `${status.downlinkMbps.toFixed(1)} Mbps`;
+  }
+  if (status.throughputKbps != null && status.throughputKbps > 0) {
+    return `${status.throughputKbps.toFixed(0)} KB/s`;
+  }
+  return null;
 }
 
 export function useCanvasNetworkStatus(): CanvasNetworkStatus {
