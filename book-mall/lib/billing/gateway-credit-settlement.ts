@@ -300,6 +300,7 @@ export async function settleSucceededGatewayLog(input: {
     promptTokens?: number | null;
     completionTokens?: number | null;
     inputVideoSec?: number | null;
+    outputVideoSec?: number | null;
   };
 }): Promise<number> {
   if (!creditBillingEnabled()) return 0;
