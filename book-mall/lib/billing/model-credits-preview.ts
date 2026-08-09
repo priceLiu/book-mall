@@ -4,7 +4,10 @@
 import type { CreditCostUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { resolveCanonicalModelKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
+import {
+  resolveBillingCanonicalKey,
+  resolveCostSnapshot,
+} from "@/lib/gateway/credit-billing-guard";
 import {
   audioBillableSeconds,
   computeLlmSplitChargeCredits,
@@ -114,10 +117,10 @@ async function resolvePreviewCanonical(input: CreditsPreviewInput): Promise<stri
   );
   if (fromNano) return fromNano;
 
-  const fromKey = await resolveCanonicalModelKey(input.modelKey);
-  if (fromKey === "lib-nano-pro") {
-    return libNanoProCanonicalFromModelKey(input.modelKey, input.resolution);
-  }
+  const fromKey = await resolveBillingCanonicalKey({
+    modelKey: input.modelKey,
+    inputSummary: input.resolution ? { resolution: input.resolution } : undefined,
+  });
   if (fromKey) return fromKey;
 
   return sbv1VideoCanonicalFromParams({ modelKey: input.modelKey });

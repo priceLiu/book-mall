@@ -5,6 +5,21 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch, financeApiPost } from "@/lib/finance-viewer";
 
+type CandidateRow = {
+  id: string;
+  vendor: string;
+  modelKey: string;
+  listCostYuan: number;
+  netCostYuan: number;
+  unitLabel: string | null;
+  creditsPerUnit: number | null;
+  marginRate: number | null;
+  marginOk: boolean;
+  costMissing: boolean;
+  isRecommended: boolean;
+  isActiveRoute: boolean;
+};
+
 type OfferingRow = {
   id: string;
   canonicalModelKey: string;
@@ -20,14 +35,14 @@ type OfferingRow = {
   estimatedMargin: number | null;
   marginWarning: boolean;
   appTags: string[];
-  candidates: Array<{
-    id: string;
-    vendor: string;
-    modelKey: string;
-    netCostYuan: number;
-    marginOk: boolean;
-    isActiveRoute: boolean;
-  }>;
+  candidates: CandidateRow[];
+  recommendedVendor: string | null;
+  recommendedModelKey: string | null;
+  recommendedNetCostYuan: number | null;
+  recommendedUnitLabel: string | null;
+  activeMatchesRecommended: boolean;
+  activeNetCostYuan: number | null;
+  activeUnitLabel: string | null;
 };
 
 const inputCls =
@@ -38,6 +53,18 @@ const STATUS_LABEL: Record<string, string> = {
   ACTIVE: "已上架",
   DEPRECATED: "已下线",
 };
+
+function formatCostYuan(amount: number | null, unitLabel: string | null): string {
+  if (amount == null) return "—";
+  const unit = unitLabel ? `/${unitLabel.replace(/^元\//, "")}` : "";
+  return `¥${amount.toFixed(4)}${unit}`;
+}
+
+function formatMargin(c: CandidateRow): string {
+  if (c.costMissing) return "缺成本";
+  if (c.marginRate == null) return c.marginOk ? "OK" : "不达标";
+  return `${(c.marginRate * 100).toFixed(1)}%${c.marginOk ? "" : " · 不达标"}`;
+}
 
 export function PlatformModelsClient() {
   const base = useBookMallBaseUrl();
@@ -164,7 +191,7 @@ export function PlatformModelsClient() {
         <div>
           <h1 className="text-xl font-semibold">Gateway 模型上架</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            每个逻辑模型（canonical）一行；候选 = 同模型多厂商路由。毛利达标时默认最低净成本；换厂商请展开 →「设为当前」。
+            每个逻辑模型（canonical）一行；候选 = 同模型多厂商路由。推荐 = 毛利达标前提下净成本最低的厂商路由。
           </p>
         </div>
         <button
@@ -180,8 +207,8 @@ export function PlatformModelsClient() {
         <p className="font-medium">同模型多厂商路由</p>
         <ol className="mt-1 list-decimal pl-5 text-[#595959]">
           <li>先在「模型成本」维护各厂商成本档（毛利须达标）。</li>
-          <li>点「同步自动上架」刷新候选；系统选净成本最低者。</li>
-          <li>候选行点 <b>设为当前</b> 会切换路由并锁定；解锁后可恢复自动选型。</li>
+          <li>点「同步自动上架」刷新候选；系统选净成本最低者（与「推荐」标记一致）。</li>
+          <li>展开候选可对比挂牌成本、净成本、积分/单位；点「设为当前」会切换路由并锁定。</li>
         </ol>
         <p className="mt-2 text-xs text-[#595959]">
           <b>DRAFT（草稿）</b>：注册表里有该模型，但尚未成功自动上架——通常因为缺少成本档、毛利护栏未过，或还没点「同步自动上架」。
@@ -250,7 +277,7 @@ export function PlatformModelsClient() {
         <section key={groupLabel} className="rounded-lg border bg-white">
           <header className="border-b px-4 py-3 font-medium">{groupLabel}</header>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="w-full min-w-[1100px] text-sm">
               <thead>
                 <tr className="border-b bg-[#fafafa] text-left text-muted-foreground">
                   <th className="px-3 py-2">canonical</th>
@@ -258,8 +285,10 @@ export function PlatformModelsClient() {
                   <th className="px-3 py-2">应用 tag</th>
                   <th className="px-3 py-2">当前 vendor</th>
                   <th className="px-3 py-2">modelKey</th>
+                  <th className="px-3 py-2">净成本</th>
                   <th className="px-3 py-2">积分/单位</th>
                   <th className="px-3 py-2">毛利</th>
+                  <th className="px-3 py-2">推荐</th>
                   <th className="px-3 py-2">状态</th>
                   <th className="px-3 py-2">锁定</th>
                   <th className="px-3 py-2">候选</th>
@@ -274,6 +303,9 @@ export function PlatformModelsClient() {
                       <td className="px-3 py-2 text-xs">{row.appTags.join(", ") || "—"}</td>
                       <td className="px-3 py-2">{row.activeVendor ?? "—"}</td>
                       <td className="px-3 py-2 font-mono text-xs">{row.activeModelKey ?? "—"}</td>
+                      <td className="px-3 py-2 text-xs">
+                        {formatCostYuan(row.activeNetCostYuan, row.activeUnitLabel)}
+                      </td>
                       <td className="px-3 py-2">{row.publishedCreditsPerUnit ?? "—"}</td>
                       <td className="px-3 py-2">
                         {row.estimatedMargin != null ? (
@@ -282,6 +314,26 @@ export function PlatformModelsClient() {
                           </span>
                         ) : (
                           "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {row.candidates.length <= 1 ? (
+                          "—"
+                        ) : row.activeMatchesRecommended ? (
+                          <span className="text-green-700">已选推荐</span>
+                        ) : row.recommendedVendor ? (
+                          <span
+                            className="text-amber-700"
+                            title={`${row.recommendedModelKey ?? ""}`}
+                          >
+                            推荐: {row.recommendedVendor} ·{" "}
+                            {formatCostYuan(
+                              row.recommendedNetCostYuan,
+                              row.recommendedUnitLabel,
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-[#8c8c8c]">无达标候选</span>
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -322,48 +374,85 @@ export function PlatformModelsClient() {
                     </tr>
                     {expandedId === row.id && row.candidates.length > 0 ? (
                       <tr className="bg-[#fafafa]">
-                        <td colSpan={10} className="px-3 py-3">
+                        <td colSpan={12} className="px-3 py-3">
                           <p className="mb-2 text-xs font-medium text-[#595959]">
-                            同模型多厂商候选（点「设为当前」切换路由）
+                            同模型多厂商候选（推荐 = 毛利达标且净成本最低）
                           </p>
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="text-left text-[#8c8c8c]">
+                                <th className="py-1">推荐</th>
                                 <th className="py-1">厂商</th>
                                 <th className="py-1">modelKey</th>
+                                <th className="py-1 text-right">挂牌成本</th>
                                 <th className="py-1 text-right">净成本</th>
+                                <th className="py-1">计费单位</th>
+                                <th className="py-1 text-right">积分/单位</th>
                                 <th className="py-1">毛利</th>
                                 <th className="py-1 text-right">操作</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {row.candidates.map((c) => (
-                                <tr key={c.id} className="border-t border-[#f0f0f0]">
-                                  <td className="py-1.5">{c.vendor}</td>
-                                  <td className="py-1.5 font-mono">{c.modelKey}</td>
-                                  <td className="py-1.5 text-right">¥{c.netCostYuan.toFixed(4)}</td>
-                                  <td className="py-1.5">{c.marginOk ? "OK" : "不达标"}</td>
-                                  <td className="py-1.5 text-right">
-                                    {c.isActiveRoute ? (
-                                      <span className="font-medium text-[#1890ff]">当前路由</span>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        disabled={
-                                          !c.marginOk ||
-                                          row.id.startsWith("registry:") ||
-                                          c.id.startsWith("registry:") ||
-                                          busyId === `${row.id}:${c.id}`
-                                        }
-                                        className="text-[#1890ff] hover:underline disabled:text-[#bfbfbf] disabled:no-underline"
-                                        onClick={() => void switchRoute(row, c.id)}
-                                      >
-                                        设为当前
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
+                              {row.candidates.map((c) => {
+                                const creditsHint =
+                                  c.creditsPerUnit != null &&
+                                  row.publishedCreditsPerUnit != null &&
+                                  c.creditsPerUnit !== row.publishedCreditsPerUnit
+                                    ? `切换后积分/单位：${c.creditsPerUnit}（当前 ${row.publishedCreditsPerUnit}）`
+                                    : c.creditsPerUnit != null
+                                      ? `积分/单位：${c.creditsPerUnit}`
+                                      : undefined;
+                                return (
+                                  <tr
+                                    key={c.id}
+                                    className={`border-t border-[#f0f0f0] ${c.isRecommended ? "bg-[#f6ffed]" : ""}`}
+                                  >
+                                    <td className="py-1.5">
+                                      {c.isRecommended ? (
+                                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-800">
+                                          推荐
+                                        </span>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </td>
+                                    <td className="py-1.5">{c.vendor}</td>
+                                    <td className="py-1.5 font-mono">{c.modelKey}</td>
+                                    <td className="py-1.5 text-right">
+                                      {c.costMissing ? "—" : `¥${c.listCostYuan.toFixed(4)}`}
+                                    </td>
+                                    <td className="py-1.5 text-right">
+                                      {c.costMissing ? "—" : `¥${c.netCostYuan.toFixed(4)}`}
+                                    </td>
+                                    <td className="py-1.5">{c.unitLabel ?? "—"}</td>
+                                    <td className="py-1.5 text-right">
+                                      {c.creditsPerUnit ?? "—"}
+                                    </td>
+                                    <td className="py-1.5">{formatMargin(c)}</td>
+                                    <td className="py-1.5 text-right">
+                                      {c.isActiveRoute ? (
+                                        <span className="font-medium text-[#1890ff]">当前路由</span>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          disabled={
+                                            !c.marginOk ||
+                                            c.costMissing ||
+                                            row.id.startsWith("registry:") ||
+                                            c.id.startsWith("registry:") ||
+                                            busyId === `${row.id}:${c.id}`
+                                          }
+                                          title={creditsHint}
+                                          className="text-[#1890ff] hover:underline disabled:text-[#bfbfbf] disabled:no-underline"
+                                          onClick={() => void switchRoute(row, c.id)}
+                                        >
+                                          设为当前
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </td>

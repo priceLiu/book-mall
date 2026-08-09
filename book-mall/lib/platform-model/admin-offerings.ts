@@ -1,4 +1,4 @@
-import type { AppModelOfferingStatus, ModelMediaKind } from "@prisma/client";
+import type { AppModelOfferingStatus, GatewayProviderKind, ModelMediaKind } from "@prisma/client";
 
 import {
   computeCreditPrice,
@@ -13,13 +13,25 @@ import {
   GATEWAY_CANONICAL_REGISTRY,
   PLATFORM_MEDIA_KIND_LABEL,
   canonicalByKey,
+  type CanonicalRouteDef,
 } from "@/lib/platform-model/canonical-registry";
+import {
+  buildProfileLookup,
+  enrichCandidateFromProfile,
+  finalizeEnrichedCandidates,
+  resolveCostCanonicalKey,
+  summarizeOfferingRecommendation,
+  type EnrichedOfferingCandidate,
+  type OfferingCandidateInput,
+} from "@/lib/platform-model/offering-candidate-preview";
 
 function toNum(v: unknown): number {
   if (v == null) return 0;
   const n = typeof v === "number" ? v : Number(v.toString());
   return Number.isFinite(n) ? n : 0;
 }
+
+export type PlatformOfferingCandidateRow = EnrichedOfferingCandidate;
 
 export type PlatformOfferingAdminRow = {
   id: string;
@@ -38,20 +50,49 @@ export type PlatformOfferingAdminRow = {
   estimatedMargin: number | null;
   marginWarning: boolean;
   appTags: string[];
-  candidates: Array<{
-    id: string;
-    vendor: string;
-    canonicalModelKey: string;
-    modelKey: string;
-    netCostYuan: number;
-    marginOk: boolean;
-    isActiveRoute: boolean;
-  }>;
+  candidates: PlatformOfferingCandidateRow[];
   registered: boolean;
+  recommendedCandidateId: string | null;
+  recommendedVendor: string | null;
+  recommendedModelKey: string | null;
+  recommendedNetCostYuan: number | null;
+  recommendedUnitLabel: string | null;
+  activeMatchesRecommended: boolean;
+  activeNetCostYuan: number | null;
+  activeUnitLabel: string | null;
 };
 
+function enrichOfferingCandidates(
+  inputs: OfferingCandidateInput[],
+  profileLookup: ReturnType<typeof buildProfileLookup>,
+  config: Awaited<ReturnType<typeof loadPricingConfig>>,
+): PlatformOfferingCandidateRow[] {
+  const enriched = inputs.map((c) =>
+    enrichCandidateFromProfile(
+      c,
+      profileLookup.get(`${resolveCostCanonicalKey(c.canonicalModelKey)}|${c.vendor}`),
+      config,
+    ),
+  );
+  return finalizeEnrichedCandidates(enriched);
+}
+
+function buildRegistryCandidates(
+  canonicalModelKey: string,
+  routes: CanonicalRouteDef[],
+): OfferingCandidateInput[] {
+  return routes.map((c, i) => ({
+    id: `registry:${canonicalModelKey}:${i}`,
+    vendor: c.vendor,
+    canonicalModelKey,
+    modelKey: c.modelKey,
+    providerKind: c.providerKind,
+    isActiveRoute: false,
+  }));
+}
+
 export async function listPlatformOfferingsForAdmin(): Promise<PlatformOfferingAdminRow[]> {
-  const [rows, catalogs] = await Promise.all([
+  const [rows, catalogs, config] = await Promise.all([
     prisma.appModelOffering.findMany({
       where: { status: { not: "DEPRECATED" } },
       include: {
@@ -67,17 +108,45 @@ export async function listPlatformOfferingsForAdmin(): Promise<PlatformOfferingA
         appTags: true,
       },
     }),
+    loadPricingConfig(),
   ]);
+
+  const costCanonicalKeys = new Set<string>();
+  for (const def of GATEWAY_CANONICAL_REGISTRY) {
+    costCanonicalKeys.add(resolveCostCanonicalKey(def.canonicalModelKey));
+  }
+
+  const profiles = await prisma.modelCostProfile.findMany({
+    where: {
+      canonicalModelKey: { in: [...costCanonicalKeys] },
+      active: true,
+    },
+  });
+  const profileLookup = buildProfileLookup(profiles);
 
   const catalogMap = new Map(catalogs.map((c) => [c.canonicalKey, c]));
   const registryKeys = new Set(GATEWAY_CANONICAL_REGISTRY.map((c) => c.canonicalModelKey));
 
-  const mapped = rows.map((r) => {
+  const mapped: PlatformOfferingAdminRow[] = rows.map((r) => {
     const cat = catalogMap.get(r.canonicalModelKey);
     const def = canonicalByKey(r.canonicalModelKey);
     const mediaKind = cat?.mediaKind ?? def?.mediaKind ?? null;
-    const activeCandidate = r.candidates.find((c) => c.isActiveRoute);
     const estimatedMargin = r.estimatedMargin != null ? toNum(r.estimatedMargin) : null;
+
+    const candidateInputs: OfferingCandidateInput[] = r.candidates
+      .filter((c) => c.canonicalModelKey === r.canonicalModelKey)
+      .map((c) => ({
+        id: c.id,
+        vendor: c.vendor,
+        canonicalModelKey: c.canonicalModelKey,
+        modelKey: c.modelKey,
+        providerKind: c.providerKind,
+        isActiveRoute: c.isActiveRoute,
+      }));
+
+    const candidates = enrichOfferingCandidates(candidateInputs, profileLookup, config);
+    const activeCandidate = candidates.find((c) => c.isActiveRoute);
+    const rec = summarizeOfferingRecommendation(candidates);
 
     return {
       id: r.id,
@@ -90,29 +159,25 @@ export async function listPlatformOfferingsForAdmin(): Promise<PlatformOfferingA
       routeLocked: r.routeLocked,
       activeVendor: activeCandidate?.vendor ?? r.activeVendor,
       activeCanonicalKey: r.activeCanonicalKey,
-      activeProviderKind: r.activeProviderKind,
+      activeProviderKind: r.activeProviderKind as GatewayProviderKind | null,
       activeModelKey: r.activeModelKey,
       publishedCreditsPerUnit: r.publishedCreditsPerUnit,
       estimatedMargin,
       marginWarning: r.status === "DRAFT" || (estimatedMargin != null && estimatedMargin < 0.5),
       appTags: cat?.appTags ?? def?.appTags ?? [],
-      candidates: r.candidates
-        .filter((c) => c.canonicalModelKey === r.canonicalModelKey)
-        .map((c) => ({
-          id: c.id,
-          vendor: c.vendor,
-          canonicalModelKey: c.canonicalModelKey,
-          modelKey: c.modelKey,
-          netCostYuan: toNum(c.netCostYuan),
-          marginOk: c.marginOk,
-          isActiveRoute: c.isActiveRoute,
-        })),
+      candidates,
       registered: registryKeys.has(r.canonicalModelKey),
+      ...rec,
     };
   });
 
   for (const def of GATEWAY_CANONICAL_REGISTRY) {
     if (mapped.some((m) => m.canonicalModelKey === def.canonicalModelKey)) continue;
+
+    const candidateInputs = buildRegistryCandidates(def.canonicalModelKey, def.routes);
+    const candidates = enrichOfferingCandidates(candidateInputs, profileLookup, config);
+    const rec = summarizeOfferingRecommendation(candidates);
+
     mapped.push({
       id: `registry:${def.canonicalModelKey}`,
       canonicalModelKey: def.canonicalModelKey,
@@ -130,16 +195,9 @@ export async function listPlatformOfferingsForAdmin(): Promise<PlatformOfferingA
       estimatedMargin: null,
       marginWarning: true,
       appTags: def.appTags,
-      candidates: def.routes.map((c, i) => ({
-        id: `registry:${def.canonicalModelKey}:${i}`,
-        vendor: c.vendor,
-        canonicalModelKey: def.canonicalModelKey,
-        modelKey: c.modelKey,
-        netCostYuan: 0,
-        marginOk: false,
-        isActiveRoute: false,
-      })),
+      candidates,
       registered: true,
+      ...rec,
     });
   }
 
@@ -180,16 +238,17 @@ export async function setPlatformOfferingActiveCandidate(input: {
     throw new Error("候选必须与上架模型为同一 canonical");
   }
 
+  const costKey = resolveCostCanonicalKey(candidate.canonicalModelKey);
   const profile = await prisma.modelCostProfile.findFirst({
     where: {
-      canonicalModelKey: candidate.canonicalModelKey,
+      canonicalModelKey: costKey,
       vendor: candidate.vendor,
       active: true,
     },
     orderBy: { netCostYuan: "asc" },
   });
   if (!profile) {
-    throw new Error(`未找到 ${candidate.vendor}/${candidate.canonicalModelKey} 的有效成本档`);
+    throw new Error(`未找到 ${candidate.vendor}/${costKey} 的有效成本档`);
   }
 
   const config = await loadPricingConfig();
@@ -210,7 +269,7 @@ export async function setPlatformOfferingActiveCandidate(input: {
   }
 
   await publishModelCreditPrice({
-    canonicalModelKey: candidate.canonicalModelKey,
+    canonicalModelKey: costKey,
     displayName: offering.displayName,
     publishedBy: input.actorUserId,
   });

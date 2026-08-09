@@ -10,6 +10,7 @@ import type { CreditCostUnit, GatewayProviderKind } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
+import { resolveKnownGatewayModelRegistration } from "@/lib/gateway/model-registry";
 import { resolveSbv1BillingCanonicalFromInputSummary } from "@/lib/gateway/log-pricing-hints";
 import { canonicalKeyForAlias } from "@/lib/model-catalog/resolve";
 import {
@@ -65,8 +66,33 @@ export async function resolveCanonicalModelKey(modelKey: string): Promise<string
   return null;
 }
 
+function resolutionFromInputSummary(inputSummary: unknown): string | null {
+  if (!inputSummary || typeof inputSummary !== "object" || Array.isArray(inputSummary)) {
+    return null;
+  }
+  const o = inputSummary as Record<string, unknown>;
+  const direct = o.resolution ?? o.imageResolution ?? o.outputResolution;
+  return typeof direct === "string" ? direct : null;
+}
+
+function finalizeBillingCanonical(
+  canonicalModelKey: string,
+  modelKey: string,
+  inputSummary?: unknown,
+): string {
+  if (canonicalModelKey === "lib-nano-pro") {
+    return (
+      libNanoProCanonicalFromModelKey(
+        modelKey,
+        resolutionFromInputSummary(inputSummary),
+      ) ?? "lib-nano-pro-2k"
+    );
+  }
+  return canonicalModelKey;
+}
+
 /**
- * 计费归口：sbv1 分档 variant → tier canonical；否则 modelKey 别名。
+ * 计费归口：sbv1 分档 variant → tier canonical；否则 modelKey 别名 / Gateway 注册表。
  */
 export async function resolveBillingCanonicalKey(input: {
   modelKey: string;
@@ -78,13 +104,23 @@ export async function resolveBillingCanonicalKey(input: {
   );
   if (fromSbv1) return fromSbv1;
 
+  const fromNano = libNanoProCanonicalFromModelKey(
+    input.modelKey,
+    resolutionFromInputSummary(inputSummary),
+  );
+  if (fromNano) return fromNano;
+
   const canonical = await resolveCanonicalModelKey(input.modelKey);
-  if (canonical === "lib-nano-pro") {
-    return (
-      libNanoProCanonicalFromModelKey(input.modelKey, null) ?? "lib-nano-pro-2k"
-    );
+  if (canonical) {
+    return finalizeBillingCanonical(canonical, input.modelKey, input.inputSummary);
   }
-  return canonical;
+
+  const reg = resolveKnownGatewayModelRegistration(input.modelKey);
+  if (reg) {
+    return finalizeBillingCanonical(reg.canonicalModelKey, input.modelKey, input.inputSummary);
+  }
+
+  return null;
 }
 
 export interface CostSnapshot {
@@ -177,7 +213,7 @@ export async function checkCredentialModelBinding(input: {
   enforceCostProfile?: boolean; // 平台 Key 模式传 true
 }): Promise<BindingCheckResult> {
   const vendor = vendorForProviderKind(input.providerKind);
-  const canonical = await resolveCanonicalModelKey(input.modelKey);
+  const canonical = await resolveBillingCanonicalKey({ modelKey: input.modelKey });
 
   if (!canonical) {
     return {
