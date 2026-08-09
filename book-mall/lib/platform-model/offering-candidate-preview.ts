@@ -39,7 +39,6 @@ const UNIT_LABEL: Record<CreditCostUnit, string> = {
   PER_SEC: "元/秒",
   PER_IMAGE: "元/张",
   PER_KTOKEN: "元/千 tokens",
-  PER_CALL: "元/次",
 };
 
 function toNum(v: unknown): number {
