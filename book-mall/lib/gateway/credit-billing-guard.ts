@@ -106,7 +106,7 @@ export async function resolveBillingCanonicalKey(input: {
 
   const fromNano = libNanoProCanonicalFromModelKey(
     input.modelKey,
-    resolutionFromInputSummary(inputSummary),
+    resolutionFromInputSummary(input.inputSummary),
   );
   if (fromNano) return fromNano;
 
