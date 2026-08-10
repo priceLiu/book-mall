@@ -61,6 +61,15 @@ export function StoryboardDeliverableReviewDialog({
           </DialogHeader>
 
           <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+            {snapshot.deliverableMarkdown ? (
+              <section>
+                <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">剧本 / 策划稿</h3>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] p-3 text-xs leading-relaxed text-[#1d1d1f]">
+                  {snapshot.deliverableMarkdown}
+                </pre>
+              </section>
+            ) : null}
+
             <section>
               <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">场景图</h3>
               <div className="flex flex-wrap gap-4">

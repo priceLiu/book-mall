@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
     "@xyflow/react": "^12.3.5",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",

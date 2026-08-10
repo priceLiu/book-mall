@@ -719,17 +719,16 @@ export function QrAppClient({
   return (
     <div className="flex h-dvh flex-col overflow-hidden" style={{ background: "var(--qr-bg-page)" }}>
       <header
-        className="flex shrink-0 items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
+        className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:px-4 sm:py-3"
         style={{
-          borderBottom:
-            navMode === "home" ? "none" : "1px solid var(--qr-border)",
+          borderBottom: "1px solid var(--qr-border)",
           background:
             navMode === "home"
               ? "var(--qr-bg-page)"
               : "var(--qr-bg-surface)",
         }}
       >
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {navMode !== "home" ? (
             <button
               type="button"
@@ -741,22 +740,18 @@ export function QrAppClient({
               <Menu className="h-4 w-4" />
             </button>
           ) : null}
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Sparkles className="h-5 w-5 shrink-0" style={{ color: "var(--qr-brand)" }} />
-            <span className="font-semibold">QuickReplica</span>
+            <span className="truncate font-semibold">QuickReplica</span>
             <span className="hidden text-xs qr-panel-muted sm:inline">快速复刻</span>
           </div>
         </div>
 
-        <div className="min-w-0 flex-1" aria-hidden />
+        <div className="order-3 flex w-full min-w-0 justify-center overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:order-none md:w-auto md:flex-1 [&::-webkit-scrollbar]:hidden">
+          <PortalNav current="quick-replica" />
+        </div>
 
-        <div className="flex shrink-0 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 [&::-webkit-scrollbar]:hidden">
-          {navMode !== "home" ? (
-            <>
-              <PortalNav current="quick-replica" />
-              <span className="hidden h-4 w-px shrink-0 bg-white/15 sm:block" aria-hidden />
-            </>
-          ) : null}
+        <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto sm:gap-3">
           {bookAccountUrl ? (
             <a
               href={bookAccountUrl}

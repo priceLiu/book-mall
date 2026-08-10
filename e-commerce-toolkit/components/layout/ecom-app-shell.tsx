@@ -113,7 +113,7 @@ export function EcomAppShell({
         className="hidden h-full md:flex"
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-[var(--ecom-parchment)] shadow-inner">
-        <EcomPortalTopBar authed={loggedIn} />
+        <EcomPortalTopBar authed={loggedIn} bookOrigin={bookOrigin} />
         <EcomMobileBar />
         <EcomAuthBanner />
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>

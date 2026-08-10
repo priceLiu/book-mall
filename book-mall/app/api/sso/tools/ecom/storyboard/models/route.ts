@@ -9,6 +9,7 @@ import {
   registryRowsToEcomModels,
 } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { listModelsForApp } from "@/lib/gateway/model-registry";
+import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export async function GET(req: Request) {
   }
 
   const persona = await getUserBillingPersona(auth.userId);
+  await ensureGatewayCanonicalRegistrySynced();
 
   if (persona === "PLATFORM_CREDIT") {
     const [chatModels, imageModels, videoModels] = await Promise.all([

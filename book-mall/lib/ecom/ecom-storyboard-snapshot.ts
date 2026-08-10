@@ -10,6 +10,8 @@ export type StoryboardDeliverableSnapshot = {
   productName?: string;
   productHighlight?: string;
   projectKeywords?: string;
+  /** 策划定稿 Markdown（剧本 / 话术） */
+  deliverableMarkdown?: string;
   sheet: StoryboardSheet;
   references: StoryboardReference[];
   sheetPngUrl?: string;
@@ -34,6 +36,7 @@ export function buildStoryboardDeliverableSnapshot(opts: {
   productName?: string;
   productHighlight?: string;
   projectKeywords?: string;
+  deliverableMarkdown?: string | null;
 }): StoryboardDeliverableSnapshot {
   const panelVideos = opts.sheet.panels
     .filter((p) => Boolean(p.videoUrl?.trim()))
@@ -46,6 +49,7 @@ export function buildStoryboardDeliverableSnapshot(opts: {
     productHighlight:
       opts.productHighlight ?? opts.sheet.overview.productHighlight ?? undefined,
     projectKeywords: opts.projectKeywords,
+    deliverableMarkdown: opts.deliverableMarkdown?.trim() || undefined,
     sheet: opts.sheet,
     references: opts.references,
     sheetPngUrl: opts.sheetPngUrl?.trim() || undefined,
@@ -146,6 +150,7 @@ export async function persistStoryboardDeliverableSnapshot(opts: {
       project.sheet.overview.productHighlight ??
       (typeof deliverable?.params?.卖点 === "string" ? deliverable.params.卖点 : undefined),
     projectKeywords: pickProjectKeywords(project.meta as Record<string, unknown> | null),
+    deliverableMarkdown: project.meta?.deliverableMarkdown,
   });
 
   await saveStoryboardDeliverableSnapshot(opts.projectId, snapshot);

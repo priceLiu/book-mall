@@ -10,22 +10,67 @@ import type {
   StoryboardSheet,
 } from "@/lib/storyboard-types";
 
-export async function fetchStoryboardModels(): Promise<{
+const MODELS_CACHE_KEY = "ecom-storyboard-models-cache";
+const MODELS_CACHE_MS = 5 * 60 * 1000;
+
+type StoryboardModelsPayload = {
   chatModels: StoryboardGatewayModel[];
   imageModels: StoryboardGatewayModel[];
   videoModels: StoryboardGatewayModel[];
-}> {
+};
+
+export async function fetchStoryboardModels(): Promise<StoryboardModelsPayload> {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = sessionStorage.getItem(MODELS_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { at?: number; data?: StoryboardModelsPayload };
+        if (
+          parsed.data &&
+          typeof parsed.at === "number" &&
+          Date.now() - parsed.at < MODELS_CACHE_MS
+        ) {
+          return parsed.data;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/models");
-  return {
+  const result: StoryboardModelsPayload = {
     chatModels: (data.chatModels as StoryboardGatewayModel[]) ?? [],
     imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
     videoModels: (data.videoModels as StoryboardGatewayModel[]) ?? [],
   };
+
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(
+        MODELS_CACHE_KEY,
+        JSON.stringify({ at: Date.now(), data: result }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return result;
 }
 
 export async function listStoryboardProjects(): Promise<StoryboardProject[]> {
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/projects");
   return (data.items as StoryboardProject[]) ?? [];
+}
+
+export async function listStoryboardProjectSummaries(): Promise<
+  Array<{ id: string; title: string | null; updatedAt: string }>
+> {
+  const data = await ecomBookFetch(
+    "api/sso/tools/ecom/storyboard/projects?summary=1",
+  );
+  return (data.items as Array<{ id: string; title: string | null; updatedAt: string }>) ?? [];
 }
 
 export async function createStoryboardProject(opts?: {
@@ -378,6 +423,22 @@ export async function saveStoryboardDeliverableSnapshot(
     snapshot: data.snapshot,
     project: data.project as StoryboardProject,
   };
+}
+
+/** 一键复用：打开已有项目或从历史快照创建新项目 */
+export async function reuseStoryboardProject(
+  projectId: string,
+  savedAt?: string,
+): Promise<StoryboardProject> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/reuse`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(savedAt ? { savedAt } : {}),
+    },
+  );
+  return data.project as StoryboardProject;
 }
 
 export type MediaRenderJobDto = {

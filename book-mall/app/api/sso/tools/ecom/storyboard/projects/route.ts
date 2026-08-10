@@ -4,6 +4,7 @@ import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   createEcomStoryboardProject,
   listEcomStoryboardProjects,
+  listEcomStoryboardProjectSummaries,
 } from "@/lib/ecom/ecom-storyboard-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -16,6 +17,11 @@ export async function GET(req: Request) {
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
+    const url = new URL(req.url);
+    if (url.searchParams.get("summary") === "1") {
+      const items = await listEcomStoryboardProjectSummaries(auth.userId);
+      return NextResponse.json({ items });
+    }
     const items = await listEcomStoryboardProjects(auth.userId);
     return NextResponse.json({ items });
   } catch (e) {

@@ -69,6 +69,8 @@ export type StoryboardDeliverableSnapshot = {
   productName?: string;
   productHighlight?: string;
   projectKeywords?: string;
+  /** 策划定稿 Markdown（剧本 / 话术） */
+  deliverableMarkdown?: string;
   sheet: StoryboardSheet;
   references: StoryboardReference[];
   sheetPngUrl?: string;

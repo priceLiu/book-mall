@@ -4,14 +4,15 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
-import { ChevronRight, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronDown, ChevronRight, LogOut, PanelLeftClose } from "lucide-react";
 import { buildEcomLoginUrl } from "@/lib/ecom-auth";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
 import {
   buildEcomSidebarNavItems,
-  type EcomSidebarNavItem,
+  type EcomSidebarNavGroup,
+  type EcomSidebarNavLink,
 } from "@/lib/ecom-sidebar-nav";
+import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance-chip";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { cn } from "@/lib/utils";
 
@@ -32,13 +33,138 @@ const itemVariants = {
   },
 };
 
+function NavLinkRow({
+  item,
+  active,
+  nested,
+  onNavigate,
+}: {
+  item: EcomSidebarNavLink;
+  active: boolean;
+  nested?: boolean;
+  onNavigate: () => void;
+}) {
+  const Icon = item.icon;
+  const className = cn(
+    "group flex items-center rounded-md text-sm font-medium transition-colors",
+    nested ? "py-2 pl-9 pr-3 text-[13px]" : "px-3 py-2.5",
+    active
+      ? "bg-white/10 text-white"
+      : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100",
+  );
+
+  const inner = (
+    <>
+      <span
+        className={cn(
+          "flex shrink-0 items-center justify-center opacity-90",
+          nested ? "mr-2.5 h-4 w-4" : "mr-3 h-5 w-5",
+        )}
+      >
+        <Icon className="h-full w-full" />
+      </span>
+      <span className="truncate">{item.label}</span>
+      {!nested ? (
+        <ChevronRight className="ml-auto h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-70" />
+      ) : null}
+    </>
+  );
+
+  if (item.external) {
+    return (
+      <motion.a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        variants={itemVariants}
+        className={className}
+        onClick={onNavigate}
+      >
+        {inner}
+      </motion.a>
+    );
+  }
+
+  return (
+    <motion.div variants={itemVariants}>
+      <Link href={item.href} className={className} onClick={onNavigate}>
+        {inner}
+      </Link>
+    </motion.div>
+  );
+}
+
+function NavGroupBlock({
+  group,
+  pathname,
+  onNavigate,
+}: {
+  group: EcomSidebarNavGroup;
+  pathname: string;
+  onNavigate: () => void;
+}) {
+  function childActive(href: string) {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  const hasActiveChild = group.children.some((c) => childActive(c.href));
+  const [open, setOpen] = React.useState(hasActiveChild);
+
+  React.useEffect(() => {
+    if (hasActiveChild) setOpen(true);
+  }, [hasActiveChild]);
+
+  const GroupIcon = group.icon;
+
+  return (
+    <motion.div variants={itemVariants} className="space-y-0.5">
+      <button
+        type="button"
+        className={cn(
+          "flex w-full items-center rounded-md px-3 py-2.5 text-sm font-semibold transition-colors",
+          hasActiveChild
+            ? "text-white"
+            : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100",
+        )}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center opacity-90">
+          <GroupIcon className="h-full w-full" />
+        </span>
+        <span className="truncate">{group.label}</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto h-4 w-4 shrink-0 text-zinc-500 transition-transform",
+            open ? "rotate-0" : "-rotate-90",
+          )}
+        />
+      </button>
+      {open ? (
+        <div className="space-y-0.5 pb-1">
+          {group.children.map((child) => (
+            <NavLinkRow
+              key={child.href}
+              item={child}
+              active={childActive(child.href)}
+              nested
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      ) : null}
+    </motion.div>
+  );
+}
+
 function NavRow({
   item,
   active,
   collapsed,
   onNavigate,
 }: {
-  item: EcomSidebarNavItem & { href: string; label: string; icon: LucideIcon };
+  item: EcomSidebarNavLink;
   active: boolean;
   collapsed: boolean;
   onNavigate: () => void;
@@ -143,24 +269,29 @@ export function EcomProfileSidebar({
       aria-label="电商工具箱导航"
     >
       {collapsed ? (
-        <div className="flex flex-col items-center gap-3 py-2">
+        <div className="relative flex h-full flex-col items-center py-3">
           <button
             type="button"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0071e3] text-sm font-bold text-white shadow-md transition-transform hover:scale-105"
+            className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0071e3] text-sm font-bold text-white shadow-md transition hover:scale-105"
             title="展开菜单"
             aria-label="展开菜单"
             onClick={expandNav}
           >
             商
           </button>
+          {user ? (
+            <div className="mt-3 w-full px-1">
+              <EcomCreditsBalanceChip collapsed />
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={expandNav}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+            className="absolute -right-px top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 translate-x-full items-center justify-center rounded-r-lg border border-l-0 border-zinc-700/90 bg-[#141416] text-zinc-500 shadow-md transition hover:border-zinc-600 hover:text-white"
             title="展开菜单"
             aria-label="展开菜单"
           >
-            <PanelLeftOpen className="h-5 w-5" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       ) : (
@@ -193,6 +324,12 @@ export function EcomProfileSidebar({
             </button>
           </motion.div>
 
+          {user ? (
+            <motion.div variants={itemVariants} className="px-1 pb-2">
+              <EcomCreditsBalanceChip />
+            </motion.div>
+          ) : null}
+
           <motion.div
             variants={itemVariants}
             className="my-3 border-t border-zinc-800"
@@ -205,20 +342,21 @@ export function EcomProfileSidebar({
           >
             {navItems.map((item, index) => (
               <React.Fragment key={`nav-${index}`}>
-                {item.isSeparator ? (
+                {item.type === "separator" ? (
                   <motion.div variants={itemVariants} className="h-4" aria-hidden />
                 ) : null}
-                {item.href && item.label && item.icon ? (
+                {item.type === "link" ? (
                   <NavRow
-                    item={
-                      item as EcomSidebarNavItem & {
-                        href: string;
-                        label: string;
-                        icon: LucideIcon;
-                      }
-                    }
+                    item={item}
                     active={isActive(item.href)}
                     collapsed={false}
+                    onNavigate={collapseNav}
+                  />
+                ) : null}
+                {item.type === "group" ? (
+                  <NavGroupBlock
+                    group={item}
+                    pathname={pathname}
                     onNavigate={collapseNav}
                   />
                 ) : null}

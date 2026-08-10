@@ -11,6 +11,7 @@ function ossHostPatterns() {
 
 const nextConfig = {
   output: "standalone",
+  transpilePackages: ["@private/federated-portal-nav"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.aliyuncs.com", pathname: "/**" },

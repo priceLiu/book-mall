@@ -120,12 +120,17 @@ function rowToDto(
     updatedAt: Date;
   },
   videoOssUrl?: string | null,
+  opts?: { stripSnapshotHistory?: boolean },
 ): EcomStoryboardProjectDto {
   let sheet: StoryboardSheet | null = null;
   const parsed = storyboardSheetSchema.safeParse(row.sheet);
   if (parsed.success) sheet = parseStoryboardSheet(parsed.data);
 
-  const meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  let meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  if (opts?.stripSnapshotHistory && meta && typeof meta === "object") {
+    const { deliverableSnapshotHistory: _history, ...rest } = meta as Record<string, unknown>;
+    meta = rest as EcomStoryboardProjectDto["meta"];
+  }
 
   return {
     id: row.id,
@@ -156,6 +161,29 @@ export async function listEcomStoryboardProjects(
     take: 50,
   });
   return rows.map((row) => rowToDto(row));
+}
+
+export type EcomStoryboardProjectSummary = {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+};
+
+/** 轻量列表：初始化工作室时只取 id，避免拉全量 chatHistory */
+export async function listEcomStoryboardProjectSummaries(
+  userId: string,
+): Promise<EcomStoryboardProjectSummary[]> {
+  const rows = await prisma.ecomStoryboardProject.findMany({
+    where: { userId, module: ECOM_STORYBOARD_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: { id: true, title: true, updatedAt: true },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    updatedAt: row.updatedAt.toISOString(),
+  }));
 }
 
 export async function createEcomStoryboardProject(
@@ -199,6 +227,7 @@ async function loadVideoOssUrlMap(
 export async function getEcomStoryboardProject(
   userId: string,
   projectId: string,
+  opts?: { stripSnapshotHistory?: boolean },
 ): Promise<EcomStoryboardProjectDto | null> {
   let row = await prisma.ecomStoryboardProject.findFirst({
     where: { id: projectId, userId },
@@ -223,7 +252,11 @@ export async function getEcomStoryboardProject(
   }
 
   const videoMap = await loadVideoOssUrlMap(userId, [row.videoAssetId]);
-  return rowToDto(row, row.videoAssetId ? videoMap.get(row.videoAssetId) ?? null : null);
+  return rowToDto(
+    row,
+    row.videoAssetId ? videoMap.get(row.videoAssetId) ?? null : null,
+    opts,
+  );
 }
 
 export async function updateEcomStoryboardProject(

@@ -1,6 +1,5 @@
 "use client";
 
-import html2canvas from "html2canvas";
 import { useCallback, useEffect, useState } from "react";
 
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
@@ -23,7 +22,7 @@ import {
   createStoryboardProject,
   fetchStoryboardModels,
   getStoryboardProject,
-  listStoryboardProjects,
+  listStoryboardProjectSummaries,
   removeStoryboardRef,
   updateStoryboardProject,
   uploadStoryboardRef,
@@ -37,6 +36,18 @@ import type {
 } from "@/lib/storyboard-types";
 
 const PROJECT_STORAGE_KEY = "ecom-storyboard-active-project";
+
+async function resolveFallbackStoryboardProject(): Promise<{
+  id: string;
+  project?: StoryboardProject;
+}> {
+  const summaries = await listStoryboardProjectSummaries();
+  if (summaries.length > 0) {
+    return { id: summaries[0]!.id };
+  }
+  const created = await createStoryboardProject({ title: "微剧故事版" });
+  return { id: created.id, project: created };
+}
 
 export function StoryboardStudio() {
   const { alert, doubleConfirm } = useDialogs();
@@ -77,11 +88,10 @@ export function StoryboardStudio() {
   const [generateFullVideoToken, setGenerateFullVideoToken] = useState(0);
   const [mergePanelVideosToken, setMergePanelVideosToken] = useState(0);
 
-  const reload = useCallback(async (id: string) => {
-    const p = await getStoryboardProject(id);
+  const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
     if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, id);
+      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
     const d =
       typeof p.settings?.durationSec === "number" ? p.settings.durationSec : 15;
@@ -135,23 +145,30 @@ export function StoryboardStudio() {
         createdAt: p.updatedAt,
       });
     } else if (p.videoAssetId) {
-      try {
-        const assets = await listAssets("storyboard-micro-drama");
-        const found = assets.find((a) => a.id === p.videoAssetId);
-        setVideoAsset(found ?? null);
-      } catch {
-        setVideoAsset(null);
-      }
+      void listAssets("storyboard-micro-drama")
+        .then((assets) => {
+          const found = assets.find((a) => a.id === p.videoAssetId);
+          setVideoAsset(found ?? null);
+        })
+        .catch(() => setVideoAsset(null));
     } else {
       setVideoAsset(null);
     }
   }, []);
 
+  const reload = useCallback(
+    async (id: string, initial?: StoryboardProject) => {
+      const p = initial ?? (await getStoryboardProject(id));
+      applyProject(p);
+    },
+    [applyProject],
+  );
+
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const models = await fetchStoryboardModels();
+
+    void fetchStoryboardModels()
+      .then((models) => {
         if (cancelled) return;
         setChatModels(models.chatModels);
         setImageModels(models.imageModels);
@@ -171,35 +188,32 @@ export function StoryboardStudio() {
             prev.videoModelKey,
           ),
         }));
+      })
+      .catch(() => {
+        /* 模型列表后台加载，不阻塞工作室 */
+      });
 
+    (async () => {
+      try {
         const savedId =
           typeof window !== "undefined"
             ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
             : null;
-        let projectId: string | null = savedId;
 
-        if (projectId) {
+        let resolved: { id: string; project?: StoryboardProject };
+        if (savedId) {
           try {
-            await getStoryboardProject(projectId);
+            const p = await getStoryboardProject(savedId);
+            resolved = { id: p.id, project: p };
           } catch {
-            projectId = null;
+            resolved = await resolveFallbackStoryboardProject();
           }
-        }
-
-        if (!projectId) {
-          const items = await listStoryboardProjects();
-          if (items.length > 0) {
-            projectId = items[0]!.id;
-          }
-        }
-
-        if (!projectId) {
-          const created = await createStoryboardProject({ title: "微剧故事版" });
-          projectId = created.id;
+        } else {
+          resolved = await resolveFallbackStoryboardProject();
         }
 
         if (cancelled) return;
-        await reload(projectId);
+        await reload(resolved.id, resolved.project);
       } catch (e) {
         if (!cancelled) {
           if (isEcomUnauthorizedError(e)) {
@@ -216,6 +230,7 @@ export function StoryboardStudio() {
         if (!cancelled) setLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -255,6 +270,7 @@ export function StoryboardStudio() {
       ),
     );
     await new Promise((r) => setTimeout(r, 300));
+    const { default: html2canvas } = await import("html2canvas");
     const canvas = await html2canvas(el, {
       scale: 2,
       useCORS: true,
