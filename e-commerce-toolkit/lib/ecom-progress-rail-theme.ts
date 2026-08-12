@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 /** 工作台竖向进度轨 — 浅色，撑满列高 */
 export const ECOM_PROGRESS_RAIL_SHELL =
-  "flex h-full min-h-0 w-[4.75rem] shrink-0 flex-col items-center gap-0.5 overflow-y-auto ecom-scrollbar-thin border-r border-[var(--ecom-rail-border)] bg-[var(--ecom-rail-bg)] py-3";
+  "flex h-full min-h-0 w-[4.75rem] shrink-0 flex-col items-center gap-0.5 overflow-x-hidden overflow-y-auto ecom-scrollbar-overlay border-r border-[var(--ecom-rail-border)] bg-[var(--ecom-rail-bg)] py-3";
 
 export type ProgressRailStepState = "done" | "active" | "pending" | "skipped";
 

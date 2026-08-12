@@ -34,7 +34,7 @@ export function EcomWorkspaceLayout({
   const hasAssistant = Boolean(assistant) && !fullWidth;
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col md:flex-row">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden md:flex-row">
       <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden md:h-full">
         <main
           className={cn(
@@ -53,10 +53,10 @@ export function EcomWorkspaceLayout({
       {hasAssistant ? (
         <aside
           className={cn(
-            "flex w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] transition-[width,max-width] duration-200 ease-out md:h-full md:border-l md:border-t-0",
+            "flex w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] md:h-full md:border-l md:border-t-0",
             assistantWide
-              ? "md:w-[44%] md:min-w-[320px] md:max-w-[640px]"
-              : "md:w-[30%] md:min-w-[260px] md:max-w-[400px]",
+              ? "md:w-[520px] md:min-w-[520px] md:max-w-[520px]"
+              : "md:w-[380px] md:min-w-[380px] md:max-w-[380px]",
           )}
         >
           {assistantHeader ? (
