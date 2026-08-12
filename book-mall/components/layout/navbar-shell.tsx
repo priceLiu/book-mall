@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ProductMegaMenuContent } from "@/components/layout/product-mega-menu";
+import { buildBookPortalNavItems } from "@/lib/portal-nav";
 import {
   Sheet,
   SheetContent,
@@ -74,10 +75,7 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
-  const isProductPath =
-    pathname.startsWith("/products/") ||
-    pathname === "/courses" ||
-    pathname.startsWith("/courses/");
+  const isProductPath = productMenuOpen;
 
   const notchAnchorValue = React.useMemo(() => {
     if (isProductPath || productMenuOpen) return NAV_PRODUCT_VALUE;
@@ -159,30 +157,17 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
 
               <div className="flex flex-col gap-2">
                 <p className="px-2 text-xs font-medium text-muted-foreground">产品</p>
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  asChild
-                  variant="ghost"
-                  className="justify-start text-base"
-                >
-                  <Link href="/products/ai-apps">AI 应用</Link>
-                </Button>
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  asChild
-                  variant="ghost"
-                  className="justify-start text-base"
-                >
-                  <Link href="/products/ai-courses">AI 课程</Link>
-                </Button>
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  asChild
-                  variant="ghost"
-                  className="justify-start text-base"
-                >
-                  <Link href="/courses">AI 学堂</Link>
-                </Button>
+                {buildBookPortalNavItems().map((item) => (
+                  <Button
+                    key={item.key}
+                    onClick={() => setIsOpen(false)}
+                    asChild
+                    variant="ghost"
+                    className="justify-start text-base"
+                  >
+                    <a href={item.href}>{item.label}</a>
+                  </Button>
+                ))}
               </div>
               <Separator className="my-2" />
               <div className="flex flex-col gap-2">

@@ -11,7 +11,8 @@
     "build:prompt-vendor:copy": "node prompt-optimizer-platform/scripts/copy-vendor-dist.mjs --copy-only",
     "dev:all:story": "pnpm dev:all",
     "dev:all:nopoll": "pnpm install --prefer-offline && pnpm dev:preflight && node scripts/dev-all.mjs --no-poll",
-    "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs"
+    "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs",
+    "build:publisher-artifacts": "node scripts/build-publisher-download-artifacts.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

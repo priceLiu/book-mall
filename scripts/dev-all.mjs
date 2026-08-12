@@ -22,6 +22,7 @@ const WEB_APPS = [
   { name: "ecom", dir: "e-commerce-toolkit", color: "blueBright" },
   { name: "director", dir: "director-web", color: "greenBright" },
   { name: "common", dir: "common-tools", color: "cyanBright" },
+  { name: "publisher", dir: "publisher-web", color: "magentaBright" },
 ];
 
 const POLL_LOOPS = [
@@ -57,7 +58,7 @@ function printBanner() {
   >>> Gateway BYOK: http://localhost:3005
   >>> 子站: book-mall :3000  tool-web :3001  finance-web :3002  story-web :3003
          canvas-web :3004  gateway-web :3005  prompt-optimizer :3006  e-commerce-toolkit :3007
-         quick-replica-web :3008  director-web :3009  common-tools :3010
+         quick-replica-web :3008  director-web :3009  common-tools :3010  publisher-web :3011
 ${withPoll ? "  >>> 后台 poll-loop 已启动；/dev 页可看心跳。\n" : "  >>> 未启动 poll-loop（--no-poll）；KIE 任务可能一直停留在生成中。\n"}`);
 }
 

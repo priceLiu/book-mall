@@ -27,6 +27,7 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assets, setAssets] = useState<EcomAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(true);
   const [billingMode, setBillingMode] = useState<EcomBillingMode | null>(null);
   const [estimatePts, setEstimatePts] = useState<number | null>(null);
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
@@ -34,18 +35,23 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   );
 
   const load = useCallback(async () => {
-    const [items, mode] = await Promise.all([
-      listAssets(module.id),
-      fetchBillingMode(),
-    ]);
-    setAssets(items);
-    setBillingMode(mode);
-    if (mode === "PLATFORM_METERED") {
-      const pts = await fetchBillableEstimate(
-        module.toolKey,
-        module.action,
-      ).catch(() => null);
-      setEstimatePts(pts);
+    setAssetsLoading(true);
+    try {
+      const [items, mode] = await Promise.all([
+        listAssets(module.id),
+        fetchBillingMode(),
+      ]);
+      setAssets(items);
+      setBillingMode(mode);
+      if (mode === "PLATFORM_METERED") {
+        const pts = await fetchBillableEstimate(
+          module.toolKey,
+          module.action,
+        ).catch(() => null);
+        setEstimatePts(pts);
+      }
+    } finally {
+      setAssetsLoading(false);
     }
   }, [module]);
 
@@ -142,17 +148,17 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
           </>
         }
         assistant={
-          <div className="flex h-full flex-col p-4">
+          <div className="flex h-full flex-col bg-[var(--ecom-assistant-surface)] p-4">
             <label className="text-sm font-semibold text-[#1d1d1f]">创作描述</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={8}
-              className="mt-2 min-h-0 flex-1 resize-none rounded-xl border border-[#d2d2d7] bg-white p-3 text-sm outline-none focus:border-[#0071e3]"
+              className="mt-2 min-h-0 flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] p-3 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3]"
               placeholder="描述商品、风格、镜头与卖点…"
             />
             {error ? (
-              <p className="mt-2 text-sm text-red-600">{error}</p>
+              <p className="mt-2 text-sm text-red-400">{error}</p>
             ) : null}
             <div className="mt-4">
               <EcomButtonPrimary
@@ -171,7 +177,9 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
       >
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
           <h2 className="text-xl font-semibold text-[#1d1d1f]">本模块资产</h2>
-          {assets.length === 0 ? (
+          {assetsLoading ? (
+            <p className="mt-4 text-sm text-[#6e6e73]">加载中…</p>
+          ) : assets.length === 0 ? (
             <p className="mt-4 text-sm text-[#6e6e73]">
               暂无作品，生成后将显示在这里。
             </p>

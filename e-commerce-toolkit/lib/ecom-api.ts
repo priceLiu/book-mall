@@ -58,6 +58,11 @@ export async function listAssets(module?: string): Promise<EcomAsset[]> {
   return (data.items as EcomAsset[]) ?? [];
 }
 
+export async function fetchAssetById(id: string): Promise<EcomAsset | null> {
+  const data = await bookFetch(`api/sso/tools/ecom/assets?id=${encodeURIComponent(id)}`);
+  return (data.item as EcomAsset | undefined) ?? null;
+}
+
 export async function deleteAsset(id: string): Promise<void> {
   await bookFetch(`api/sso/tools/ecom/assets?id=${encodeURIComponent(id)}`, {
     method: "DELETE",

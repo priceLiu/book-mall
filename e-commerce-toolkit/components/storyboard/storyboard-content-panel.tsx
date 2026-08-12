@@ -787,11 +787,13 @@ export function StoryboardContentPanel({
         className="mx-6 mb-2"
         active={vidBusy}
         title="整图成片生成中"
+        surface="content"
         detail={`Gateway 视频任务进行中，通常需 3–8 分钟。${videoTaskStartedAt ? `已等待 ${formatTaskElapsed(videoTaskStartedAt)}` : ""}${videoPollCount > 0 ? ` · 轮询 ${videoPollCount} 次` : ""}。请勿重复提交。`}
       />
       <StoryboardTaskStatus
         className="mx-6 mb-2"
         active={Boolean(imgBusy || regeneratingPanel != null)}
+        surface="content"
         title={
           regeneratingPanel != null ? `镜头 ${regeneratingPanel} 分镜图生成中` : "分镜图生成中"
         }
@@ -800,11 +802,12 @@ export function StoryboardContentPanel({
       <StoryboardTaskStatus
         className="mx-6 mb-2"
         active={mergeBusy}
+        surface="content"
         title="合并分镜视频中"
         detail="云端合成各镜头视频（含转场），通常需 1–5 分钟…"
       />
 
-      <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-6">
         {streaming ? (
           <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#0071e3]/10 px-4 py-3 text-sm text-[#0071e3]">
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,6 +1,6 @@
 # 腾讯云部署说明
 
-本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、**`finance-web/Dockerfile`**、**`story-web/Dockerfile`**、**`canvas-web/Dockerfile`**、**`gateway-web/Dockerfile`**、**`prompt-optimizer-platform/Dockerfile`**、**`e-commerce-toolkit/Dockerfile`**、**`quick-replica-web/Dockerfile`**、**`director-web/Dockerfile`**、**`common-tools/Dockerfile`**（Next.js `standalone` 镜像；prompt 与 director 含上游 vendor 多阶段构建）。  
+本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、…、**`common-tools/Dockerfile`**、**`publisher-web/Dockerfile`**（Next.js `standalone` 镜像；prompt 与 director 含上游 vendor 多阶段构建）。  
 在腾讯云 **自动构建、自动部署** 的场景下，你 **不必** 在自己电脑上执行 `docker compose`，也不必 SSH 上服务器敲命令——流水线会在每次推送后构建镜像并发布。
 
 > **第一次开服务 / 重建服务**：直接看 **[`cloudbase-build-guide.md`](./cloudbase-build-guide.md)**（控制台逐步流程、字段对照、环境变量、验收清单、故障排查）。本文档保留为概览。

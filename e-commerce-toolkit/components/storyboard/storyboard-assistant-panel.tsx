@@ -629,18 +629,18 @@ export function StoryboardAssistantPanel({
   const freeTextEnabled = awaitingSellpoint || awaitingCustomScene;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#fafafa]">
-      <div className="flex items-center justify-between gap-2 border-b border-[#e8e8ed] px-4 py-3">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-[#1d1d1f]">创作助手</p>
-          <p className="text-[10px] text-[#86868b]">
+          <p className="text-[10px] text-[#6e6e73]">
             {chatModels.find((m) => m.modelKey === settings.chatModelKey)?.displayName ??
               "助手模型"}
           </p>
         </div>
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d2d2d7] bg-white text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)] hover:text-[var(--ecom-primary-on-dark)]"
           title="影片参数"
           onClick={() => onOpenSettings?.()}
         >
@@ -656,7 +656,7 @@ export function StoryboardAssistantPanel({
 
       <div
         ref={scrollRef}
-        className="ecom-scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
+        className="ecom-scrollbar-overlay min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-scroll overscroll-y-contain px-4 py-4 [overflow-anchor:none]"
       >
         {displayMessages.map((m) => {
           const body =
@@ -672,8 +672,8 @@ export function StoryboardAssistantPanel({
               className={cn(
                 "max-w-[95%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
                 m.role === "user"
-                  ? "ml-auto border border-[#d2d2d7] bg-[#f5f5f7] text-[#1d1d1f]"
-                  : "bg-white text-[#1d1d1f] shadow-sm ring-1 ring-[#e8e8ed]",
+                  ? "ml-auto border border-[var(--ecom-assistant-bubble-user-border)] bg-[var(--ecom-assistant-bubble-user-bg)] text-[#1d1d1f]"
+                  : "bg-[var(--ecom-assistant-bubble-bot-bg)] text-[#1d1d1f] shadow-sm ring-1 ring-[var(--ecom-assistant-bubble-bot-ring)]",
               )}
             >
               <pre className="whitespace-pre-wrap font-sans">{body}</pre>
@@ -690,9 +690,9 @@ export function StoryboardAssistantPanel({
         })}
       </div>
 
-      <div className="border-t border-[#e8e8ed] p-4">
+      <div className="border-t border-[var(--ecom-assistant-border)] p-4">
         <textarea
-          className="mb-3 w-full resize-none rounded-xl border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7] disabled:text-[#86868b]"
+          className="mb-3 w-full resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={2}
           placeholder={
             awaitingCustomScene

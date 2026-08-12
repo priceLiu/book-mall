@@ -3,7 +3,13 @@
 import { Check, Minus } from "lucide-react";
 
 import type { StoryboardProject } from "@/lib/storyboard-types";
-import { cn } from "@/lib/utils";
+import {
+  ECOM_PROGRESS_RAIL_SHELL,
+  progressRailStepButtonClass,
+  progressRailStepDotClass,
+  progressRailStepLabelClass,
+  type ProgressRailStepState,
+} from "@/lib/ecom-progress-rail-theme";
 
 export type StoryboardStepId =
   | "plan"
@@ -108,10 +114,7 @@ export function StoryboardProgressRail({ project, hasVideo, onStepClick }: Props
   const states = resolveStepState(project, Boolean(hasVideo));
 
   return (
-    <nav
-      className="flex w-[4.75rem] shrink-0 flex-col items-center gap-0.5 border-r border-[#e8e8ed] bg-white py-3"
-      aria-label="创作进度"
-    >
+    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="创作进度">
       {STEPS.map((step) => {
         const state = states[step.id];
         return (
@@ -119,23 +122,10 @@ export function StoryboardProgressRail({ project, hasVideo, onStepClick }: Props
             key={step.id}
             type="button"
             onClick={() => onStepClick?.(step.id)}
-            className={cn(
-              "relative flex w-full flex-col items-center gap-0.5 px-0.5 py-1.5 text-center transition-colors",
-              state === "active" && "text-[#1d1d1f]",
-              (state === "done" || state === "skipped") && "text-[#1d1d1f]",
-              state === "pending" && "text-[#86868b]",
-            )}
+            className={progressRailStepButtonClass(state as ProgressRailStepState)}
             title={step.label}
           >
-            <span
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold",
-                state === "active" && "bg-[#e8e8ed] ring-2 ring-[#1d1d1f]",
-                state === "done" && "bg-[#1d1d1f] text-white",
-                state === "skipped" && "border border-[#d2d2d7] bg-[#f5f5f7] text-[#86868b]",
-                state === "pending" && "border border-[#e8e8ed] bg-white text-[#86868b]",
-              )}
-            >
+            <span className={progressRailStepDotClass(state as ProgressRailStepState)}>
               {state === "done" ? (
                 <Check className="h-3 w-3" strokeWidth={3} />
               ) : state === "skipped" ? (
@@ -144,7 +134,9 @@ export function StoryboardProgressRail({ project, hasVideo, onStepClick }: Props
                 step.label.slice(0, 1)
               )}
             </span>
-            <span className="text-[9px] font-bold leading-tight">{step.label}</span>
+            <span className={progressRailStepLabelClass(state as ProgressRailStepState)}>
+              {step.label}
+            </span>
           </button>
         );
       })}

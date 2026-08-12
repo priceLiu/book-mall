@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight, LogOut, PanelLeftClose } from "lucide-react";
 import { buildEcomLoginUrl } from "@/lib/ecom-auth";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
@@ -16,41 +15,22 @@ import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { cn } from "@/lib/utils";
 
-const sidebarVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, x: -16 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { type: "spring" as const, stiffness: 100, damping: 15 },
-  },
-};
-
 function NavLinkRow({
   item,
   active,
   nested,
-  onNavigate,
 }: {
   item: EcomSidebarNavLink;
   active: boolean;
   nested?: boolean;
-  onNavigate: () => void;
 }) {
   const Icon = item.icon;
   const className = cn(
     "group flex items-center rounded-md text-sm font-medium transition-colors",
     nested ? "py-2 pl-9 pr-3 text-[13px]" : "px-3 py-2.5",
     active
-      ? "bg-white/10 text-white"
-      : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100",
+      ? "bg-[var(--ecom-chrome-hover)] text-[var(--ecom-chrome-text)]"
+      : "text-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]",
   );
 
   const inner = (
@@ -72,43 +52,39 @@ function NavLinkRow({
 
   if (item.external) {
     return (
-      <motion.a
+      <a
         href={item.href}
         target="_blank"
         rel="noopener noreferrer"
-        variants={itemVariants}
         className={className}
-        onClick={onNavigate}
       >
         {inner}
-      </motion.a>
+      </a>
     );
   }
 
   return (
-    <motion.div variants={itemVariants}>
-      <Link href={item.href} className={className} onClick={onNavigate}>
-        {inner}
-      </Link>
-    </motion.div>
+    <Link href={item.href} prefetch={false} className={className}>
+      {inner}
+    </Link>
   );
 }
 
 function NavGroupBlock({
   group,
   pathname,
-  onNavigate,
 }: {
   group: EcomSidebarNavGroup;
   pathname: string;
-  onNavigate: () => void;
 }) {
-  function childActive(href: string) {
+  function childActive(item: EcomSidebarNavLink) {
+    if (item.activeAlways) return true;
+    const href = item.href;
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  const hasActiveChild = group.children.some((c) => childActive(c.href));
+  const hasActiveChild = group.children.some((c) => childActive(c));
   const [open, setOpen] = React.useState(hasActiveChild);
 
   React.useEffect(() => {
@@ -118,14 +94,14 @@ function NavGroupBlock({
   const GroupIcon = group.icon;
 
   return (
-    <motion.div variants={itemVariants} className="space-y-0.5">
+    <div className="space-y-0.5">
       <button
         type="button"
         className={cn(
           "flex w-full items-center rounded-md px-3 py-2.5 text-sm font-semibold transition-colors",
           hasActiveChild
-            ? "text-white"
-            : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100",
+            ? "text-[var(--ecom-chrome-text)]"
+            : "text-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]",
         )}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -136,7 +112,7 @@ function NavGroupBlock({
         <span className="truncate">{group.label}</span>
         <ChevronDown
           className={cn(
-            "ml-auto h-4 w-4 shrink-0 text-zinc-500 transition-transform",
+            "ml-auto h-4 w-4 shrink-0 text-[var(--ecom-chrome-text-subtle)] transition-transform duration-150",
             open ? "rotate-0" : "-rotate-90",
           )}
         />
@@ -145,16 +121,15 @@ function NavGroupBlock({
         <div className="space-y-0.5 pb-1">
           {group.children.map((child) => (
             <NavLinkRow
-              key={child.href}
+              key={`${child.label}-${child.href}`}
               item={child}
-              active={childActive(child.href)}
+              active={childActive(child)}
               nested
-              onNavigate={onNavigate}
             />
           ))}
         </div>
       ) : null}
-    </motion.div>
+    </div>
   );
 }
 
@@ -162,20 +137,18 @@ function NavRow({
   item,
   active,
   collapsed,
-  onNavigate,
 }: {
   item: EcomSidebarNavLink;
   active: boolean;
   collapsed: boolean;
-  onNavigate: () => void;
 }) {
   const Icon = item.icon;
   const className = cn(
     "group flex items-center rounded-md text-sm font-medium transition-colors",
     collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
     active
-      ? "bg-white/10 text-white"
-      : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100",
+      ? "bg-[var(--ecom-chrome-hover)] text-[var(--ecom-chrome-text)]"
+      : "text-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]",
   );
 
   const inner = collapsed ? (
@@ -194,31 +167,22 @@ function NavRow({
 
   if (item.external) {
     return (
-      <motion.a
+      <a
         href={item.href}
         target="_blank"
         rel="noopener noreferrer"
-        variants={itemVariants}
         className={className}
         title={title}
-        onClick={onNavigate}
       >
         {inner}
-      </motion.a>
+      </a>
     );
   }
 
   return (
-    <motion.div variants={itemVariants}>
-      <Link
-        href={item.href}
-        className={className}
-        title={title}
-        onClick={onNavigate}
-      >
-        {inner}
-      </Link>
-    </motion.div>
+    <Link href={item.href} prefetch className={className} title={title}>
+      {inner}
+    </Link>
   );
 }
 
@@ -241,7 +205,9 @@ export function EcomProfileSidebar({
     [bookOrigin],
   );
 
-  function isActive(href: string) {
+  function isActive(item: EcomSidebarNavLink) {
+    if (item.activeAlways) return true;
+    const href = item.href;
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(`${href}/`);
   }
@@ -257,15 +223,12 @@ export function EcomProfileSidebar({
   const expandNav = () => onCollapsedChange?.(false);
 
   return (
-    <motion.aside
+    <aside
       className={cn(
-        "relative flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-300 ease-out",
+        "relative flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-200 ease-out",
         collapsed ? "w-14 p-2" : "w-[17.5rem] p-4",
         className,
       )}
-      initial="hidden"
-      animate="visible"
-      variants={sidebarVariants}
       aria-label="电商工具箱导航"
     >
       {collapsed ? (
@@ -287,7 +250,7 @@ export function EcomProfileSidebar({
           <button
             type="button"
             onClick={expandNav}
-            className="absolute -right-px top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 translate-x-full items-center justify-center rounded-r-lg border border-l-0 border-zinc-700/90 bg-[#141416] text-zinc-500 shadow-md transition hover:border-zinc-600 hover:text-white"
+            className="absolute -right-px top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 translate-x-full items-center justify-center rounded-r-lg border border-l-0 border-[var(--ecom-chrome-border)] bg-[var(--ecom-chrome-bg)] text-[var(--ecom-chrome-text-muted)] shadow-md transition hover:border-[var(--ecom-chrome-text-muted)] hover:text-[var(--ecom-chrome-text)]"
             title="展开菜单"
             aria-label="展开菜单"
           >
@@ -296,12 +259,12 @@ export function EcomProfileSidebar({
         </div>
       ) : (
         <>
-          <motion.div variants={itemVariants} className="flex items-center gap-3 p-2">
+          <div className="flex items-center gap-3 p-2">
             <Link
               href="/"
+              prefetch
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0071e3] text-base font-bold text-white"
               title="电商工具箱"
-              onClick={collapseNav}
             >
               商
             </Link>
@@ -309,32 +272,28 @@ export function EcomProfileSidebar({
               <p className="truncate text-lg font-semibold leading-tight">
                 {user?.name ?? "未登录"}
               </p>
-              <p className="truncate text-sm text-zinc-500">
+              <p className="truncate text-sm text-[var(--ecom-chrome-text-muted)]">
                 {user?.phone ?? user?.email ?? "请从主站 SSO 登录"}
               </p>
             </div>
             <button
               type="button"
               onClick={collapseNav}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]"
               title="收起菜单"
               aria-label="收起菜单"
             >
               <PanelLeftClose className="h-4 w-4" />
             </button>
-          </motion.div>
+          </div>
 
           {user ? (
-            <motion.div variants={itemVariants} className="px-1 pb-2">
+            <div className="px-1 pb-2">
               <EcomCreditsBalanceChip />
-            </motion.div>
+            </div>
           ) : null}
 
-          <motion.div
-            variants={itemVariants}
-            className="my-3 border-t border-zinc-800"
-            aria-hidden
-          />
+          <div className="my-3 border-t border-[var(--ecom-chrome-border-subtle)]" aria-hidden />
 
           <nav
             className="ecom-scrollbar-thin min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1"
@@ -342,29 +301,18 @@ export function EcomProfileSidebar({
           >
             {navItems.map((item, index) => (
               <React.Fragment key={`nav-${index}`}>
-                {item.type === "separator" ? (
-                  <motion.div variants={itemVariants} className="h-4" aria-hidden />
-                ) : null}
+                {item.type === "separator" ? <div className="h-4" aria-hidden /> : null}
                 {item.type === "link" ? (
-                  <NavRow
-                    item={item}
-                    active={isActive(item.href)}
-                    collapsed={false}
-                    onNavigate={collapseNav}
-                  />
+                  <NavRow item={item} active={isActive(item)} collapsed={false} />
                 ) : null}
                 {item.type === "group" ? (
-                  <NavGroupBlock
-                    group={item}
-                    pathname={pathname}
-                    onNavigate={collapseNav}
-                  />
+                  <NavGroupBlock group={item} pathname={pathname} />
                 ) : null}
               </React.Fragment>
             ))}
           </nav>
 
-          <motion.div variants={itemVariants} className="mt-3 border-t border-zinc-800 pt-3">
+          <div className="mt-3 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">
             {!user ? (
               <a
                 href={buildEcomLoginUrl(pathname || "/")}
@@ -383,10 +331,9 @@ export function EcomProfileSidebar({
               </span>
               <span>退出登录</span>
             </button>
-          </motion.div>
+          </div>
         </>
       )}
-
-    </motion.aside>
+    </aside>
   );
 }

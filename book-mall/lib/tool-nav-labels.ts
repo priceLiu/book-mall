@@ -12,4 +12,5 @@ export const TOOL_NAV_LABEL: Record<string, string> = {
   "app-history": "费用与计费说明",
   "e-commerce-toolkit": "电商工具箱",
   "common-tools": "常用工具",
+  "social-publisher": "一键发布",
 };

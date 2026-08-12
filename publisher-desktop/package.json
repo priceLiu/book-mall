@@ -1,0 +1,22 @@
+{
+  "name": "publisher-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && electron .",
+    "build": "tsc",
+    "start": "electron .",
+    "package:mac": "node ../scripts/build-publisher-download-artifacts.mjs"
+  },
+  "dependencies": {
+    "@private/publisher-client": "file:../shared/publisher-client",
+    "@private/publisher-sync-core": "file:../shared/publisher-sync-core"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "electron": "^33.2.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^5"
+  }
+}

@@ -4,6 +4,7 @@ export type PortalKey =
   | "canvas"
   | "e-commerce"
   | "quick-replica"
+  | "publisher"
   | "story"
   | "tool";
 
@@ -25,12 +26,16 @@ function reEnter(
   return `${book.replace(/\/$/, "")}/api/sso/tools/re-enter?${params.toString()}`;
 }
 
-/** 构建六站入口（Book SSO re-enter） */
+/** 构建各子站入口（Book SSO re-enter） */
 export function buildPortalNavItems(bookOrigin: string | null): PortalNavItem[] {
   const canvasOrigin = process.env.NEXT_PUBLIC_CANVAS_WEB_ORIGIN?.trim() || null;
   const qrOrigin = process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN?.trim() || null;
   const ecomOrigin = process.env.NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN?.trim() || null;
   const storyOrigin = process.env.NEXT_PUBLIC_STORY_WEB_ORIGIN?.trim() || null;
+  const publisherOrigin =
+    process.env.NEXT_PUBLIC_PUBLISHER_WEB_ORIGIN?.trim() ||
+    process.env.PUBLISHER_WEB_PUBLIC_ORIGIN?.trim() ||
+    null;
   const commonToolsOrigin =
     process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN?.trim() ||
     process.env.COMMON_TOOLS_PUBLIC_ORIGIN?.trim() ||
@@ -53,6 +58,11 @@ export function buildPortalNavItems(bookOrigin: string | null): PortalNavItem[] 
       key: "quick-replica",
       label: "快速复刻",
       href: reEnter(bookOrigin, "quick-replica", qrOrigin),
+    },
+    {
+      key: "publisher",
+      label: "一键发布",
+      href: reEnter(bookOrigin, "publisher", publisherOrigin),
     },
     { key: "story", label: "故事版", href: reEnter(bookOrigin, "story", storyOrigin) },
     {

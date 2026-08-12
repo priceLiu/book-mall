@@ -144,6 +144,22 @@ export async function uploadStoryboardRef(
   return data.reference as StoryboardReference;
 }
 
+/** 把「我的资产」里的图挂为参考图（服务端会按厂商像素区间归一化） */
+export async function attachStoryboardRefsFromAssets(
+  projectId: string,
+  opts: { assetIds: string[]; role: StoryboardReference["role"] },
+): Promise<StoryboardProject> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/references/attach`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    },
+  );
+  return data.project as StoryboardProject;
+}
+
 export async function streamStoryboardChat(opts: {
   projectId: string;
   messages: StoryboardChatMessage[];

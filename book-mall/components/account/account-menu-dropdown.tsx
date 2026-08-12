@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   Receipt,
+  Send,
   Settings,
   ShoppingBag,
   Sparkles,
@@ -40,6 +41,7 @@ import {
   openCanvasAppInNewTab,
   openCommonToolsAppInNewTab,
   openEcomAppInNewTab,
+  openPublisherAppInNewTab,
   openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
@@ -81,6 +83,7 @@ export function AccountMenuDropdown({
   quickReplicaOriginConfigured,
   canLaunchCommonTools,
   commonToolsOriginConfigured,
+  publisherOriginConfigured,
   billingPersona,
 }: {
   profileLabel: string;
@@ -96,6 +99,7 @@ export function AccountMenuDropdown({
   quickReplicaOriginConfigured: boolean;
   canLaunchCommonTools: boolean;
   commonToolsOriginConfigured: boolean;
+  publisherOriginConfigured: boolean;
   billingPersona: BillingPersona | null;
 }) {
   const pathname = usePathname();
@@ -119,6 +123,8 @@ export function AccountMenuDropdown({
     gatewayLinked,
   });
 
+  const publisherReady = canLaunchTools && publisherOriginConfigured;
+
   async function handleAppLaunch(actionId: string, launch: () => void | Promise<unknown>) {
     if (isAppLaunchAction(actionId)) {
       const blocked = resolveAppLaunchBlockedRedirect({
@@ -134,6 +140,8 @@ export function AccountMenuDropdown({
         canLaunchQuickReplica,
         quickReplicaOriginConfigured,
         quickReplicaReady,
+        publisherOriginConfigured,
+        publisherReady,
         billingPersona,
         gatewayLinked,
       });
@@ -279,6 +287,17 @@ export function AccountMenuDropdown({
                   >
                     <Copy />
                     <span>快速复刻</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      void handleAppLaunch("launch-publisher", () =>
+                        openPublisherAppInNewTab("/"),
+                      );
+                    }}
+                  >
+                    <Send />
+                    <span>一键发布</span>
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>

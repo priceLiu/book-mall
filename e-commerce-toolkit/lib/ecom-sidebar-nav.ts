@@ -3,18 +3,26 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Clapperboard,
+  Copy,
   Film,
-  Home,
-  ImageIcon,
+  Hammer,
   LayoutGrid,
   Megaphone,
   Package,
+  Rocket,
   Settings,
   Shirt,
   ShoppingBag,
+  UserCircle,
   Sparkles,
   Target,
+  Wrench,
+  Boxes,
 } from "lucide-react";
+import {
+  buildPortalNavItems,
+  type PortalKey,
+} from "@private/federated-portal-nav";
 import { ECOM_MODULES } from "@/lib/modules/registry";
 
 export type EcomSidebarNavLink = {
@@ -23,6 +31,8 @@ export type EcomSidebarNavLink = {
   href: string;
   icon: LucideIcon;
   external?: boolean;
+  /** 本应用内门户项（如电商工具箱）始终高亮 */
+  activeAlways?: boolean;
 };
 
 export type EcomSidebarNavGroup = {
@@ -59,8 +69,7 @@ function sep(): { type: "separator" } {
 }
 
 function imageModuleIcon(id: string): LucideIcon {
-  if (id === "main-image") return ImageIcon;
-  if (id === "detail-page") return LayoutGrid;
+  if (id === "product-creation") return LayoutGrid;
   return Shirt;
 }
 
@@ -82,8 +91,30 @@ const MARKETING_ECOM_VIDEO_IDS = new Set([
   "video-voiceover",
 ]);
 
-/** 侧栏导航：电商 / 营销 分组 + registry 对齐 */
+const PORTAL_ICONS: Record<PortalKey, LucideIcon> = {
+  "common-tools": Wrench,
+  canvas: LayoutGrid,
+  "e-commerce": ShoppingBag,
+  "quick-replica": Copy,
+  publisher: Rocket,
+  story: Clapperboard,
+  tool: Hammer,
+};
+
+/** 侧栏导航：跨门户一级菜单 + 本应用模块 */
 export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem[] {
+  const portalLinks: EcomSidebarNavLink[] = buildPortalNavItems(bookOrigin)
+    .filter(
+      (item): item is typeof item & { href: string } =>
+        Boolean(item.href) && item.key !== "e-commerce",
+    )
+    .map((item) => ({
+      type: "link" as const,
+      label: item.label,
+      href: item.href,
+      icon: PORTAL_ICONS[item.key],
+      external: true,
+    }));
   const imageMods = ECOM_MODULES.filter(
     (m) => m.kind === "image" && m.href.startsWith("/ecom/"),
   );
@@ -123,11 +154,11 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
   );
 
   return [
-    link("工作台", "/", Home),
-    link("我的资产", "/library", Package),
-    sep(),
+    link("个人中心", `${bookOrigin}/account`, UserCircle, { external: true }),
     group("电商", ShoppingBag, ecomChildren),
     group("营销", Target, marketingChildren),
+    group("应用", Boxes, portalLinks),
+    link("我的资产", "/library", Package),
     sep(),
     link("计费与账户", `${bookOrigin}/account`, Settings, { external: true }),
   ];

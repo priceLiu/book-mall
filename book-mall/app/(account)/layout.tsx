@@ -6,7 +6,7 @@ import { userHasMembershipToolAccess } from "@/lib/membership-tool-access";
 import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import { prepareAccountCanvasLaunch } from "@/lib/account-canvas-launch";
 import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
-import { getEcommerceWebOrigin, getCommonToolsOrigin, getQuickReplicaOrigin } from "@/lib/app-web-origins";
+import { getEcommerceWebOrigin, getCommonToolsOrigin, getQuickReplicaOrigin, getPublisherWebOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { getReferralEligibility } from "@/lib/referral/referral-service";
 import { AccountShell } from "@/components/account/account-shell";
@@ -116,6 +116,7 @@ export default async function AccountGroupLayout({
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
   const quickReplicaOriginConfigured = Boolean(getQuickReplicaOrigin().startsWith("http"));
   const commonToolsOriginConfigured = Boolean(getCommonToolsOrigin().startsWith("http"));
+  const publisherOriginConfigured = Boolean(getPublisherWebOrigin().startsWith("http"));
   const canLaunchEcommerce = !dbDegraded && toolsSsoReady && ecomAccess;
   const canLaunchQuickReplica = canLaunchTools;
   const canLaunchCommonTools = canLaunchTools;
@@ -163,6 +164,7 @@ export default async function AccountGroupLayout({
         quickReplicaOriginConfigured={quickReplicaOriginConfigured}
         canLaunchCommonTools={canLaunchCommonTools}
         commonToolsOriginConfigured={commonToolsOriginConfigured}
+        publisherOriginConfigured={publisherOriginConfigured}
         appsMenuHint={appsMenuHint}
         billingPersona={billingPersona}
         showReferral={!dbDegraded && referralEligibility.eligible}

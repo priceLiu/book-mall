@@ -16,6 +16,8 @@ export function resolveAppLaunchBlockedRedirect(input: {
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
   quickReplicaReady: boolean;
+  publisherOriginConfigured: boolean;
+  publisherReady: boolean;
   billingPersona: BillingPersona | null;
   gatewayLinked: boolean;
 }): string | null {
@@ -65,6 +67,10 @@ export function resolveAppLaunchBlockedRedirect(input: {
     return input.quickReplicaReady ? null : ACCOUNT_APP_SUBSCRIBE_HREF;
   }
 
+  if (actionId === "launch-publisher") {
+    return input.publisherReady ? null : ACCOUNT_APP_SUBSCRIBE_HREF;
+  }
+
   return null;
 }
 
@@ -74,6 +80,7 @@ export function isAppLaunchAction(id: string): boolean {
     id === "launch-tools" ||
     id === "launch-canvas" ||
     id === "launch-ecom" ||
-    id === "launch-quick-replica"
+    id === "launch-quick-replica" ||
+    id === "launch-publisher"
   );
 }

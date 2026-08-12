@@ -150,6 +150,18 @@ export function getDevHubServices(): DevHubService[] {
       port: 3010,
       openable: true,
     },
+    {
+      id: "publisher",
+      label: "publisher-web",
+      description: "一键发布 · 小红书/抖音/微博/B站/公众号多平台分发",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_PUBLISHER_WEB_ORIGIN ??
+          process.env.PUBLISHER_WEB_PUBLIC_ORIGIN,
+        "http://localhost:3011",
+      ),
+      port: 3011,
+      openable: true,
+    },
   ];
 }
 

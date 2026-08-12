@@ -19,11 +19,12 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
-          "var(--font-inter)",
           "system-ui",
           "-apple-system",
           "BlinkMacSystemFont",
           "Segoe UI",
+          "PingFang SC",
+          "Hiragino Sans GB",
           "Noto Sans SC",
           "sans-serif",
         ],

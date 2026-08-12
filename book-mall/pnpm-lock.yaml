@@ -23,6 +23,9 @@ importers:
       '@prisma/client':
         specifier: ^6.3.1
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      '@private/federated-portal-nav':
+        specifier: file:../shared/federated-portal-nav
+        version: file:../shared/federated-portal-nav(react@18.3.1)
       '@radix-ui/react-accordion':
         specifier: ^1.1.2
         version: 1.2.12(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -719,6 +722,11 @@ packages:
 
   '@prisma/get-platform@6.19.3':
     resolution: {integrity: sha512-xFj1VcJ1N3MKooOQAGO0W5tsd0W2QzIvW7DD7c/8H14Zmp4jseeWAITm+w2LLoLrlhoHdPPh0NMZ8mfL6puoHA==}
+
+  '@private/federated-portal-nav@file:../shared/federated-portal-nav':
+    resolution: {directory: ../shared/federated-portal-nav, type: directory}
+    peerDependencies:
+      react: ^18
 
   '@radix-ui/number@1.1.1':
     resolution: {integrity: sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g==}
@@ -5057,6 +5065,10 @@ snapshots:
   '@prisma/get-platform@6.19.3':
     dependencies:
       '@prisma/debug': 6.19.3
+
+  '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
 
   '@radix-ui/number@1.1.1': {}
 

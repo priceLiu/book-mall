@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSessionVersion } from "@/lib/auth-session-version";
+import { isToolsTokenSessionValid } from "@/lib/tools-token-session-valid";
 import { issueToolsAccessTokenForUser } from "@/lib/issue-tools-access-token-for-user";
 import {
   requireToolsJwtSecret,
@@ -83,8 +83,12 @@ export const POST = withApiDbGuard(async (req) => {
   }
 
   if (typeof expired.sv === "number") {
-    const currentSv = await getSessionVersion(expired.sub);
-    if (currentSv !== expired.sv) {
+    const valid = await isToolsTokenSessionValid({
+      userId: expired.sub,
+      tokenVersion: expired.sv,
+      deviceType: expired.device_type ?? null,
+    });
+    if (!valid) {
       return NextResponse.json(
         { error: "会话已在别处登录，请重新连接主站账号", code: "SESSION_REVOKED" },
         { status: 401 },

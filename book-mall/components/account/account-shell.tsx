@@ -18,6 +18,7 @@ export function AccountShell({
   quickReplicaOriginConfigured,
   canLaunchCommonTools,
   commonToolsOriginConfigured,
+  publisherOriginConfigured,
   appsMenuHint,
   billingPersona,
   showReferral,
@@ -37,6 +38,7 @@ export function AccountShell({
   quickReplicaOriginConfigured: boolean;
   canLaunchCommonTools: boolean;
   commonToolsOriginConfigured: boolean;
+  publisherOriginConfigured: boolean;
   appsMenuHint: string | null;
   billingPersona: import("@prisma/client").BillingPersona | null;
   children: React.ReactNode;
@@ -55,6 +57,7 @@ export function AccountShell({
     quickReplicaOriginConfigured,
     canLaunchCommonTools,
     commonToolsOriginConfigured,
+    publisherOriginConfigured,
     appsMenuHint,
     billingPersona,
     showReferral,

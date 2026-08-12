@@ -70,7 +70,7 @@ export function buildAccountAppsMenuHint(input: {
 
   if (!input.canvasOriginConfigured || !input.ecomOriginConfigured || !input.quickReplicaOriginConfigured || !input.commonToolsOriginConfigured) {
     return process.env.NODE_ENV === "development"
-      ? "应用未显示：检查 CANVAS_WEB_ORIGIN / ECOMMERCE_PUBLIC_ORIGIN / QUICK_REPLICA_PUBLIC_ORIGIN / COMMON_TOOLS_PUBLIC_ORIGIN 环境变量。"
+      ? "应用未显示：检查 CANVAS_WEB_ORIGIN / ECOMMERCE_PUBLIC_ORIGIN / QUICK_REPLICA_PUBLIC_ORIGIN / COMMON_TOOLS_PUBLIC_ORIGIN / PUBLISHER_WEB_PUBLIC_ORIGIN 环境变量。"
       : null;
   }
 

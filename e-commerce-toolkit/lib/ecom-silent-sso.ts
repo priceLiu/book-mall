@@ -7,7 +7,10 @@ import {
   MAX_ECOM_SSO_REENTER_ATTEMPTS,
   readEcomSsoReenterAttempts,
 } from "@/lib/ecom-sso-reenter-attempts";
-import { refreshEcomToolsSessionClient } from "@/lib/ecom-tools-session-client";
+import {
+  fetchEcomToolsSessionLite,
+  refreshEcomToolsSessionClient,
+} from "@/lib/ecom-tools-session-client";
 
 const REFRESH_COOLDOWN_MS = 45_000;
 let lastRefreshAt = 0;
@@ -106,22 +109,13 @@ export type EcomToolsSessionInfo = {
   tokenExpiresAt?: number | null;
 };
 
-/** 查询工具站会话；token 将过期时返回 expiresAt（秒级时间戳） */
+/** 查询工具站会话（lite：不阻塞 introspect） */
 export async function fetchEcomToolsSession(): Promise<EcomToolsSessionInfo> {
-  const res = await fetch("/api/tools-session", {
-    credentials: "include",
-    cache: "no-store",
-  });
-  const data = (await res.json().catch(() => ({}))) as {
-    hasCookie?: boolean;
-    active?: boolean;
-    tokenExpiresAt?: number | null;
-  };
+  const data = await fetchEcomToolsSessionLite();
   return {
-    hasCookie: Boolean(data.hasCookie),
-    active: Boolean(data.active),
-    tokenExpiresAt:
-      typeof data.tokenExpiresAt === "number" ? data.tokenExpiresAt : null,
+    hasCookie: data.hasCookie,
+    active: data.active,
+    tokenExpiresAt: data.tokenExpiresAt ?? null,
   };
 }
 

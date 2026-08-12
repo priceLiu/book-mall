@@ -29,7 +29,7 @@ type Props = {
 
 /** 助手气泡内快捷按钮统一样式，见 .cursor/rules/ecom-storyboard-assistant-choices.mdc */
 export const STORYBOARD_ASSISTANT_CHOICE_CLASS =
-  "rounded-full border border-[#d2d2d7] bg-[#f5f5f7] px-3 py-1.5 text-xs font-medium text-[#1d1d1f] transition-colors hover:border-[#86868b] hover:bg-[#ebebed] disabled:opacity-50";
+  "rounded-full border border-[var(--ecom-assistant-choice-border)] bg-[var(--ecom-assistant-choice-bg)] px-3 py-1.5 text-xs font-medium text-[#1d1d1f] transition-colors hover:border-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-assistant-choice-hover-bg)] disabled:opacity-50";
 
 export function StoryboardAssistantChoices({
   project,
@@ -65,7 +65,7 @@ export function StoryboardAssistantChoices({
             : "请选择（无需输入）：";
 
   return (
-    <div className={cn(compact ? "mt-3 border-t border-[#e8e8ed] pt-3" : "px-4 pb-2")}>
+    <div className={cn(compact ? "mt-3 border-t border-[var(--ecom-assistant-border)] pt-3" : "px-4 pb-2")}>
       {!compact ? (
         <p className="mb-2 px-0 text-xs text-[#6e6e73]">{stepLabel}</p>
       ) : (

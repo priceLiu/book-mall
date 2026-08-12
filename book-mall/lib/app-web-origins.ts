@@ -71,6 +71,24 @@ export function getCommonToolsOrigin(): string {
   );
 }
 
+export function getPublisherWebOrigin(): string {
+  const origin = trimOrigin(
+    process.env.NEXT_PUBLIC_PUBLISHER_WEB_ORIGIN ??
+      process.env.PUBLISHER_WEB_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://publish.ai-code8.com"
+      : "http://localhost:3011",
+  );
+  /** 本地常见误配：把 director-web (:3009) 写成 publisher */
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (origin.includes(":3009") || origin.includes("director.ai-code8.com"))
+  ) {
+    return "http://localhost:3011";
+  }
+  return origin;
+}
+
 export function buildAppWebUrl(origin: string, path: string): string {
   const base = origin.replace(/\/$/, "");
   if (!path || path === "/") return `${base}/`;

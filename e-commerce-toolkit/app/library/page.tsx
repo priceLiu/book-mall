@@ -11,6 +11,7 @@ import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
+import { EcomPublishDialog } from "@/components/publish/ecom-publish-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { deleteAsset, type EcomAsset } from "@/lib/ecom-api";
 import {
@@ -115,6 +116,12 @@ export default function LibraryPage() {
         assistantHeader={
           <>
             <h1 className="text-lg font-semibold text-[#1d1d1f]">我的资产</h1>
+            <div className="mt-2">
+              <EcomPublishDialog
+                content="从电商工具箱发起的示例发布：请在资产详情中选择具体文案后使用。"
+                triggerLabel="一键发布（示例）"
+              />
+            </div>
             <p className="text-xs text-[#6e6e73]">
               {loading
                 ? "加载中…"

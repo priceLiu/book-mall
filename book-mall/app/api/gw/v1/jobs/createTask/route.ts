@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
 
   const isBailianR2v = isBailianR2vModel;
   const b = body.bailian ?? {};
+  const dsForLog = body.dashscope as Record<string, unknown> | undefined;
   const inputForLog: Record<string, unknown> = isBailianR2v
     ? (() => {
         const prompt = String(b.prompt ?? body.input?.prompt ?? "").trim();
@@ -227,7 +228,18 @@ export async function POST(request: NextRequest) {
           referenceImageUrls,
         };
       })()
-    : (body.input ?? {});
+    : dsForLog && typeof dsForLog === "object"
+      ? {
+          jobKind: dsForLog.jobKind,
+          prompt: dsForLog.prompt,
+          content: dsForLog.content,
+          size: dsForLog.size,
+          n: dsForLog.n,
+          aspectRatio: dsForLog.aspectRatio,
+          resolution: dsForLog.resolution,
+          contentOrder: dsForLog.contentOrder,
+        }
+      : (body.input ?? {});
 
   const storyTaskId = logMeta.storyTaskId?.trim();
   if (storyTaskId) {

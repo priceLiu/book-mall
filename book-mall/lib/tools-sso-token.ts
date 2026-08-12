@@ -50,8 +50,14 @@ export function signToolsAccessToken(opts: {
     name?: string | null;
     image?: string | null;
   };
-  /** 单会话挤下线：与 User.sessionVersion 一致 */
+  /** 单会话挤下线：与 User.sessionVersion 或 UserDeviceSessionVersion 一致 */
   sessionVersion?: number;
+  /** 客户端设备上下文（扩展 / 桌面） */
+  deviceContext?: {
+    deviceType: "WEB" | "EXTENSION" | "DESKTOP";
+    deviceId: string;
+    deviceSessionVersion: number;
+  };
 }): string {
   const header = base64UrlEncodeJson({ alg: "HS256", typ: "JWT" });
   const now = Math.floor(Date.now() / 1000);
@@ -112,6 +118,12 @@ export function signToolsAccessToken(opts: {
   ) {
     payloadObj.sv = Math.trunc(opts.sessionVersion);
   }
+  if (opts.deviceContext) {
+    payloadObj.dt = opts.deviceContext.deviceType;
+    const did = trimClaim(opts.deviceContext.deviceId, 64);
+    if (did) payloadObj.did = did;
+    payloadObj.sv = Math.trunc(opts.deviceContext.deviceSessionVersion);
+  }
 
   const payload = base64UrlEncodeJson(payloadObj);
   const data = `${header}.${payload}`;
@@ -143,6 +155,10 @@ export type VerifiedToolsToken = {
   seat_id?: string;
   /** 单会话挤下线：JWT 字段 sv */
   sv?: number;
+  /** 客户端设备类型 */
+  device_type?: "WEB" | "EXTENSION" | "DESKTOP";
+  /** 客户端设备 id */
+  device_id?: string;
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | "member" | null {
@@ -273,6 +289,13 @@ function parseVerifiedToolsToken(
 
   const sv = pickSessionVersion(payloadRaw.sv);
   if (sv != null) out.sv = sv;
+
+  const dt = payloadRaw.dt;
+  if (dt === "WEB" || dt === "EXTENSION" || dt === "DESKTOP") {
+    out.device_type = dt;
+  }
+  const did = pickClaim(payloadRaw.did, 64);
+  if (did) out.device_id = did;
 
   return out;
 }

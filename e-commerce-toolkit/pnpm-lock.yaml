@@ -11,6 +11,9 @@ importers:
       '@private/federated-portal-nav':
         specifier: file:../shared/federated-portal-nav
         version: file:../shared/federated-portal-nav(react@18.3.1)
+      '@private/publisher-client':
+        specifier: file:../shared/publisher-client
+        version: file:../shared/publisher-client
       '@radix-ui/react-dialog':
         specifier: ^1.0.5
         version: 1.1.15(@types/react-dom@18.3.7(@types/react@18.3.30))(@types/react@18.3.30)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -221,6 +224,9 @@ packages:
     resolution: {directory: ../shared/federated-portal-nav, type: directory}
     peerDependencies:
       react: ^18
+
+  '@private/publisher-client@file:../shared/publisher-client':
+    resolution: {directory: ../shared/publisher-client, type: directory}
 
   '@radix-ui/primitive@1.1.3':
     resolution: {integrity: sha512-JTF99U/6XIjCBo0wqkU5sK10glYe27MRRsfwoiq5zzOEZLHU3A3KCMa5X/azekYRCJ0HlwI0crAXS/5dEHTzDg==}
@@ -2179,6 +2185,8 @@ snapshots:
   '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
     dependencies:
       react: 18.3.1
+
+  '@private/publisher-client@file:../shared/publisher-client': {}
 
   '@radix-ui/primitive@1.1.3': {}
 

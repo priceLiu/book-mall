@@ -89,6 +89,8 @@ model User {
   walletRefundRequests             WalletRefundRequest[]
   subscriptionRefundRequests       SubscriptionRefundRequest[]
   ssoAuthorizationCodes            SsoAuthorizationCode[]
+  clientDevices                    ClientDevice[]
+  userDeviceSessionVersions        UserDeviceSessionVersion[]
   toolUsageEvents                  ToolUsageEvent[]
   aiFitCustomModels                AiFitCustomModel[]
   aiFitGarmentUploads              AiFitGarmentUpload[]
@@ -119,6 +121,7 @@ model User {
   toolServicePeriods               UserToolServicePeriod[]
   ecomAssets                       EcomAsset[]
   ecomStoryboardProjects           EcomStoryboardProject[]
+  ecomProductDesignProjects        EcomProductDesignProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
   qrTemplates                      QrTemplate[]
@@ -540,6 +543,35 @@ model EcomStoryboardProject {
   sheetHtmlUrl String?
   videoAssetId String?
   meta         Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 电商产品创作项目（主图 + 详情页 9 步流水线）
+model EcomProductDesignProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("product-creation")
+  status      String  @default("draft")
+  platform    String?
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  design      Json?
+  meta        Json?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
   tenantId    String?
@@ -1408,6 +1440,52 @@ model SsoAuthorizationCode {
 
   @@index([expiresAt])
   @@index([clientId])
+}
+
+/// 客户端设备类型（单会话挤下线按类型维度）
+enum ClientDeviceType {
+  WEB
+  EXTENSION
+  DESKTOP
+}
+
+/// 客户端长效凭证设备（扩展 / 桌面 / 网页客户端）
+model ClientDevice {
+  id               String           @id @default(cuid())
+  userId           String
+  deviceType       ClientDeviceType
+  deviceName       String?
+  refreshTokenHash String           @unique
+  expiresAt        DateTime
+  lastSeenAt       DateTime         @default(now())
+  revokedAt        DateTime?
+  /// 该设备签发 JWT 时的 sessionVersion（同类型再登录时旧设备失效）
+  sessionVersion   Int              @default(0)
+  userAgent        String?          @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, deviceType])
+  @@index([expiresAt])
+}
+
+/// 按设备类型的会话版本（同类型挤下线，跨类型互不影响）
+model UserDeviceSessionVersion {
+  id             String           @id @default(cuid())
+  userId         String
+  deviceType     ClientDeviceType
+  sessionVersion Int              @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, deviceType])
+  @@index([userId])
 }
 
 /// Phase F：第三方 Platform SSO 客户端注册

@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { PLATFORM_CREDITS_BALANCE_REFRESH_EVENT } from "@/lib/ecom-credits-balance-events";
+import { fetchEcomToolsSessionFull } from "@/lib/ecom-tools-session-client";
 
 export type EcomCreditPools = {
   general: number | null;
   video: number | null;
 };
 
-const POLL_MS = 30_000;
+const POLL_MS = 60_000;
+const INITIAL_DELAY_MS = 800;
 
 function parseCreditPools(introspect: unknown): EcomCreditPools {
   if (!introspect || typeof introspect !== "object") {
@@ -40,15 +42,8 @@ export function useEcomCreditBalance(): EcomCreditPools {
 
   const refresh = useCallback(async () => {
     try {
-      const r = await fetch("/api/tools-session", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const raw = (await r.json().catch(() => null)) as {
-        active?: boolean;
-        introspect?: unknown;
-      } | null;
-      if (!raw?.active) return;
+      const raw = await fetchEcomToolsSessionFull();
+      if (!raw.active) return;
       setPools(parseCreditPools(raw.introspect));
     } catch {
       /* 静默 */
@@ -56,16 +51,15 @@ export function useEcomCreditBalance(): EcomCreditPools {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), INITIAL_DELAY_MS);
     const onRefresh = () => void refresh();
     const timer = window.setInterval(() => void refresh(), POLL_MS);
     window.addEventListener(PLATFORM_CREDITS_BALANCE_REFRESH_EVENT, onRefresh);
-    window.addEventListener("focus", onRefresh);
     window.addEventListener("ecom:tools-session-refreshed", onRefresh);
     return () => {
+      window.clearTimeout(initial);
       window.clearInterval(timer);
       window.removeEventListener(PLATFORM_CREDITS_BALANCE_REFRESH_EVENT, onRefresh);
-      window.removeEventListener("focus", onRefresh);
       window.removeEventListener("ecom:tools-session-refreshed", onRefresh);
     };
   }, [refresh]);

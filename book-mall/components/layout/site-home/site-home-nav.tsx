@@ -8,9 +8,9 @@ import { useState } from "react";
 import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 import { cn } from "@/lib/utils";
 import {
-  SITE_HOME_PRODUCT_OPTIONS,
   SiteHomeProductNav,
 } from "@/components/layout/site-home/site-home-product-nav";
+import { buildBookPortalNavItems } from "@/lib/portal-nav";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,16 +127,15 @@ export function SiteHomeNav({
                   </SheetHeader>
                   <div className="mt-6 flex flex-col gap-1">
                     <p className="px-3 text-xs font-medium text-muted-foreground">产品</p>
-                    {SITE_HOME_PRODUCT_OPTIONS.map((item) => (
-                      <button
-                        key={item.href}
-                        type="button"
+                    {buildBookPortalNavItems().map((item) => (
+                      <a
+                        key={item.key}
+                        href={item.href}
                         className="site-home-nav-sheet-item flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-muted"
-                        onClick={() => navigate(item.href)}
+                        onClick={() => setOpen(false)}
                       >
-                        <span>{item.label}</span>
-                        <span className="text-xs font-normal text-muted-foreground">{item.description}</span>
-                      </button>
+                        {item.label}
+                      </a>
                     ))}
                     <div className="my-2 border-t border-border/60" />
                     {centerNavLinks.map((item) => (

@@ -19,6 +19,7 @@ import {
 } from "@/components/storyboard/storyboard-settings-dialog";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import {
+  attachStoryboardRefsFromAssets,
   createStoryboardProject,
   fetchStoryboardModels,
   getStoryboardProject,
@@ -312,6 +313,26 @@ export function StoryboardStudio() {
     }
   }
 
+  async function handleAttachAssets(
+    assetIds: string[],
+    role: StoryboardReference["role"],
+  ) {
+    if (!project) return;
+    setRefBusy(true);
+    try {
+      await attachStoryboardRefsFromAssets(project.id, { assetIds, role });
+      await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "添加失败",
+        message: e instanceof Error ? e.message : "无法从资产添加参考图",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
   async function handleRefRemove(refId: string) {
     if (!project) return;
     const ref = project.references.find((r) => r.id === refId);
@@ -373,6 +394,7 @@ export function StoryboardStudio() {
               <EcomButtonSecondary
                 size="sm"
                 type="button"
+                dark
                 disabled={loading || refBusy}
                 onClick={() => void handleNewProject()}
               >
@@ -384,6 +406,7 @@ export function StoryboardStudio() {
                 references={project.references}
                 onUpload={handleRefUpload}
                 onRemove={handleRefRemove}
+                onAttachAssets={handleAttachAssets}
                 busy={refBusy}
                 activeRole={uploadRole}
                 onActiveRoleChange={setUploadRole}

@@ -24,6 +24,7 @@ flowchart TB
     QR["quick-replica-web :3008"]
     DR["director-web :3009 3D导演台"]
     CT["common-tools :3010 常用工具"]
+    PW["publisher-web :3011 一键发布"]
   end
 
   subgraph bg ["Async / Background"]
@@ -34,9 +35,9 @@ flowchart TB
   VEND["Vendor APIs<br/>Bailian / DashScope / KIE / Volcengine / DeepSeek / Hunyuan"]
 
   U --> BM
-  U --> TW & FW & SW & CW & GWC & PO & EC & QR & DR & CT
+  U --> TW & FW & SW & CW & GWC & PO & EC & QR & DR & CT & PW
 
-  TW & CW & SW & PO & EC & QR & DR & CT -->|"Book SSO tools_token"| BM
+  TW & CW & SW & PO & EC & QR & DR & CT & PW -->|"Book SSO tools_token"| BM
   TW & CW & SW & PO & EC & QR & CT -->|"introspect / gateway proxy"| BM
   DR -.->|"iframe embed + screenshot postMessage"| CW
   BM -->|"gateway-v1-http-client"| GWAPI

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FocusEvent } from "react";
 
 import {
   extractImageFileFromClipboard,
+  extractImageFilesFromClipboard,
   extractImageFilesFromDataTransfer,
   validateImageFile,
 } from "@/lib/image-upload-utils";
@@ -15,14 +16,23 @@ type Options = {
   onError?: (title: string, message: string) => void;
 };
 
+/**
+ * 图片拖放 / 粘贴热区（对齐 QuickReplica QrImageUploadZone）：
+ * 鼠标悬停、焦点在区内、或 activeElement 在区内时，Ctrl+V / ⌘V 可粘贴图片。
+ */
 export function useImageDropPaste({
   enabled = true,
   multiple = false,
   onFiles,
   onError,
 }: Options) {
+  const zoneRef = useRef<HTMLDivElement>(null);
+  const onFilesRef = useRef(onFiles);
+  onFilesRef.current = onFiles;
+
   const [dragOver, setDragOver] = useState(false);
-  const [pasteActive, setPasteActive] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   const ingestFiles = useCallback(
     async (raw: File[]) => {
@@ -37,24 +47,40 @@ export function useImageDropPaste({
         accepted.push(file);
         if (!multiple) break;
       }
-      if (accepted.length > 0) await onFiles(accepted);
+      if (accepted.length > 0) await onFilesRef.current(accepted);
     },
-    [enabled, multiple, onFiles, onError],
+    [enabled, multiple, onError],
   );
 
+  const isPasteTargetActive = useCallback(() => {
+    const zone = zoneRef.current;
+    if (!zone) return false;
+    const active = document.activeElement;
+    return (
+      hovered || focused || (active != null && zone.contains(active as Node))
+    );
+  }, [hovered, focused]);
+
   useEffect(() => {
-    if (!enabled || !pasteActive) return;
+    if (!enabled) return;
 
     function onPaste(e: ClipboardEvent) {
-      const file = extractImageFileFromClipboard(e.clipboardData);
-      if (!file) return;
+      if (!isPasteTargetActive()) return;
+
+      const files = extractImageFilesFromClipboard(e);
+      const file =
+        files[0] ??
+        (e.clipboardData ? extractImageFileFromClipboard(e.clipboardData) : null);
+      const batch = files.length > 0 ? files : file ? [file] : [];
+      if (batch.length === 0) return;
+
       e.preventDefault();
-      void ingestFiles([file]);
+      void ingestFiles(multiple ? batch : batch.slice(0, 1));
     }
 
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [enabled, pasteActive, ingestFiles]);
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [enabled, ingestFiles, isPasteTargetActive, multiple]);
 
   const onDragOver = useCallback(
     (e: DragEvent) => {
@@ -62,14 +88,15 @@ export function useImageDropPaste({
       e.preventDefault();
       e.stopPropagation();
       setDragOver(true);
-      setPasteActive(true);
     },
     [enabled],
   );
 
   const onDragLeave = useCallback((e: DragEvent) => {
     e.preventDefault();
-    setDragOver(false);
+    if (!zoneRef.current?.contains(e.relatedTarget as Node)) {
+      setDragOver(false);
+    }
   }, []);
 
   const onDrop = useCallback(
@@ -83,26 +110,29 @@ export function useImageDropPaste({
     [enabled, ingestFiles],
   );
 
-  const bindPasteTarget = useCallback(() => {
-    setPasteActive(true);
-  }, []);
-
-  const unbindPasteTarget = useCallback(() => {
-    setPasteActive(false);
-    setDragOver(false);
+  const focusZone = useCallback(() => {
+    zoneRef.current?.focus({ preventScroll: true });
   }, []);
 
   return {
+    zoneRef,
     dragOver,
-    pasteActive,
+    pasteReady: hovered || focused,
+    focusZone,
     dropZoneProps: {
+      ref: zoneRef,
+      tabIndex: enabled ? 0 : undefined,
+      onMouseEnter: () => setHovered(true),
+      onMouseLeave: () => setHovered(false),
+      onFocus: () => setFocused(true),
+      onBlur: (e: FocusEvent<HTMLDivElement>) => {
+        if (!zoneRef.current?.contains(e.relatedTarget as Node)) {
+          setFocused(false);
+        }
+      },
       onDragOver,
       onDragLeave,
       onDrop,
-      onMouseEnter: bindPasteTarget,
-      onMouseLeave: unbindPasteTarget,
-      onFocus: bindPasteTarget,
-      onBlur: unbindPasteTarget,
     },
   };
 }

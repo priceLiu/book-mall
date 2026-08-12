@@ -1,11 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
-
+import { usePathname } from "next/navigation";
+import { dispatchEcomCreditsBalanceRefresh } from "@/lib/ecom-credits-balance-events";
 import { EcomAuthBanner } from "@/components/auth/ecom-auth-banner";
 import { EcomMobileBar } from "@/components/layout/ecom-mobile-bar";
-import { EcomPortalTopBar } from "@/components/layout/ecom-portal-top-bar";
 import { EcomProfileSidebar } from "@/components/layout/ecom-profile-sidebar";
 import {
   attemptEcomColdStartSso,
@@ -30,7 +29,6 @@ export function EcomAppShell({
   bookOrigin: string;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [navCollapsed, setNavCollapsed] = React.useState(false);
 
@@ -73,12 +71,12 @@ export function EcomAppShell({
   React.useEffect(() => {
     const onRefreshed = () => {
       clearEcomSsoReenterAttempts();
-      router.refresh();
+      dispatchEcomCreditsBalanceRefresh();
     };
     window.addEventListener("ecom:tools-session-refreshed", onRefreshed);
     return () =>
       window.removeEventListener("ecom:tools-session-refreshed", onRefreshed);
-  }, [router]);
+  }, []);
 
   // 已登录时定时静默续期；失败时不踢到登录页，下一轮心跳再试
   const loggedIn = Boolean(user);
@@ -112,9 +110,8 @@ export function EcomAppShell({
         onCollapsedChange={setCollapsed}
         className="hidden h-full md:flex"
       />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-[var(--ecom-parchment)] shadow-inner">
-        <EcomPortalTopBar authed={loggedIn} bookOrigin={bookOrigin} />
-        <EcomMobileBar />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-inner">
+        <EcomMobileBar bookOrigin={bookOrigin} />
         <EcomAuthBanner />
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
       </div>

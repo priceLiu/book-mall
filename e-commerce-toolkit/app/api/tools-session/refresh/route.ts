@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { fetchEcomToolsSessionWithIntrospect } from "@/lib/ecom-tools-introspect";
+import { shouldRefreshToolsJwt } from "@/lib/tools-jwt-exp";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
@@ -23,19 +25,6 @@ function decodeJwtSub(token: string): string | null {
   } catch {
     return null;
   }
-}
-
-async function introspectToken(
-  origin: string,
-  token: string,
-): Promise<boolean> {
-  const res = await fetch(`${origin.replace(/\/$/, "")}/api/sso/tools/introspect`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return false;
-  const data = (await res.json().catch(() => null)) as { active?: boolean } | null;
-  return Boolean(data?.active);
 }
 
 async function refreshFromBookMall(
@@ -105,11 +94,10 @@ async function refreshFromBookMall(
 /** POST：静默续签 tools_token 并写 Cookie（对齐 canvas-web / tool-web） */
 export async function POST(request: NextRequest) {
   const existing = cookies().get("tools_token")?.value?.trim() ?? null;
-  const origin = getMainSiteOrigin();
 
-  if (existing && origin) {
-    const active = await introspectToken(origin, existing);
-    if (active) {
+  if (existing && !shouldRefreshToolsJwt(existing)) {
+    const session = await fetchEcomToolsSessionWithIntrospect(existing);
+    if (session.active) {
       return NextResponse.json({ active: true, refreshed: false });
     }
   }
@@ -122,13 +110,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const verify =
-    origin != null
-      ? await introspectToken(origin, refreshed.token)
-      : false;
-
   const res = NextResponse.json({
-    active: verify,
+    active: true,
     refreshed: true,
     hasCookie: true,
   });

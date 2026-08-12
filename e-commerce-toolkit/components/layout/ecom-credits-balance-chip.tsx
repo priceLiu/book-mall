@@ -16,36 +16,36 @@ export function EcomCreditsBalanceChip({ collapsed }: { collapsed?: boolean }) {
   if (collapsed) {
     return (
       <div
-        className="flex flex-col items-center gap-0.5 py-1 text-[10px] leading-tight text-zinc-500"
+        className="flex flex-col items-center gap-0.5 py-1 text-[10px] leading-tight text-[var(--ecom-chrome-text-muted)]"
         title={`剩余积分 · 文本 ${formatBalance(general)} · 视频 ${formatBalance(video)}`}
         aria-live="polite"
       >
-        <span className="tabular-nums font-medium text-zinc-300">{formatBalance(general)}</span>
-        <span className="text-zinc-600">|</span>
-        <span className="tabular-nums font-medium text-zinc-300">{formatBalance(video)}</span>
+        <span className="tabular-nums font-medium text-[var(--ecom-chrome-text)]">{formatBalance(general)}</span>
+        <span className="text-[var(--ecom-chrome-border)]">|</span>
+        <span className="tabular-nums font-medium text-[var(--ecom-chrome-text)]">{formatBalance(video)}</span>
       </div>
     );
   }
 
   return (
     <div
-      className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px] leading-snug text-zinc-400"
+      className="rounded-lg border border-[var(--ecom-chrome-border)] bg-[var(--ecom-chrome-surface)] px-3 py-2 text-[12px] leading-snug text-[var(--ecom-chrome-text-muted)]"
       aria-live="polite"
       title="剩余积分 · 文本池与视频池"
     >
-      <span className="text-zinc-500">剩余积分</span>
-      <span className="mx-1.5 text-zinc-700" aria-hidden>
+      <span className="text-[var(--ecom-chrome-text-subtle)]">剩余积分</span>
+      <span className="mx-1.5 text-[var(--ecom-chrome-border)]" aria-hidden>
         ·
       </span>
-      <span className="text-zinc-500">文本</span>
-      <span className="ml-1 tabular-nums font-medium text-zinc-200">
+      <span className="text-[var(--ecom-chrome-text-subtle)]">文本</span>
+      <span className="ml-1 tabular-nums font-medium text-[var(--ecom-chrome-text)]">
         {formatBalance(general)}
       </span>
-      <span className="mx-2 text-zinc-700" aria-hidden>
+      <span className="mx-2 text-[var(--ecom-chrome-border)]" aria-hidden>
         |
       </span>
-      <span className="text-zinc-500">视频</span>
-      <span className="ml-1 tabular-nums font-medium text-zinc-200">
+      <span className="text-[var(--ecom-chrome-text-subtle)]">视频</span>
+      <span className="ml-1 tabular-nums font-medium text-[var(--ecom-chrome-text)]">
         {formatBalance(video)}
       </span>
     </div>

@@ -62,6 +62,23 @@ export function extractImageFileFromClipboard(
   return null;
 }
 
+/** 从剪贴板事件提取图片 File（支持多图粘贴，对齐 QuickReplica） */
+export function extractImageFilesFromClipboard(
+  event: ClipboardEvent | React.ClipboardEvent,
+): File[] {
+  const data = "clipboardData" in event ? event.clipboardData : null;
+  if (!data?.items?.length) return [];
+
+  const files: File[] = [];
+  for (const item of Array.from(data.items)) {
+    if (item.kind !== "file") continue;
+    if (!item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (file) files.push(file);
+  }
+  return files;
+}
+
 export async function filesToDataUrls(
   files: File[],
   opts?: { max?: number; onError?: (err: ImageUploadError) => void },

@@ -5,6 +5,7 @@
 :root {
   --ecom-primary: #0066cc;
   --ecom-primary-focus: #0071e3;
+  --ecom-primary-on-dark: #2997ff;
   /* 按钮规范：design/BUTTON.md */
   --ecom-btn-fill: var(--ecom-primary);
   --ecom-btn-on-fill: #ffffff;
@@ -15,6 +16,45 @@
   --ecom-tile: #272729;
   --ecom-hairline: #e0e0e0;
   --ecom-muted: #7a7a7a;
+
+  /* 左侧导航深色壳（顶栏黑底见 ecom-portal-top-bar） */
+  --ecom-chrome-bg: #141416;
+  --ecom-chrome-border: rgba(255, 255, 255, 0.12);
+  --ecom-chrome-border-subtle: rgba(255, 255, 255, 0.08);
+  --ecom-chrome-text: #f5f5f7;
+  --ecom-chrome-text-muted: #a1a1a6;
+  --ecom-chrome-text-subtle: #86868b;
+  --ecom-chrome-surface: rgba(255, 255, 255, 0.06);
+  --ecom-chrome-surface-raised: rgba(255, 255, 255, 0.1);
+  --ecom-chrome-hover: rgba(255, 255, 255, 0.08);
+  --ecom-chrome-accent: #0071e3;
+
+  /* 工作台主内容 / 助手 / 进度轨 — 白底 */
+  --ecom-workspace-bg: #ffffff;
+  --ecom-rail-bg: #ffffff;
+  --ecom-rail-border: #e8e8ed;
+  --ecom-rail-label: #1d1d1f;
+  --ecom-rail-label-muted: #86868b;
+  --ecom-rail-accent: #0071e3;
+  --ecom-rail-dot-active-bg: #e8e8ed;
+  --ecom-rail-dot-pending-border: #e8e8ed;
+  --ecom-rail-dot-skipped-bg: #ffffff;
+
+  --ecom-assistant-bg: #ffffff;
+  --ecom-assistant-surface: #ffffff;
+  --ecom-assistant-border: #e8e8ed;
+  --ecom-assistant-bubble-user-bg: #ffffff;
+  --ecom-assistant-bubble-user-border: #e8e8ed;
+  --ecom-assistant-bubble-bot-bg: #ffffff;
+  --ecom-assistant-bubble-bot-ring: #e8e8ed;
+  --ecom-assistant-input-bg: #ffffff;
+  --ecom-assistant-input-border: #e8e8ed;
+  --ecom-assistant-choice-bg: #ffffff;
+  --ecom-assistant-choice-border: #d2d2d7;
+  --ecom-assistant-choice-hover-bg: #ffffff;
+
+  --ecom-content-highlight: #f0f6ff;
+  --ecom-content-selected-bg: #f0f6ff;
 }
 
 html,
@@ -24,7 +64,7 @@ body {
 
 body {
   color: var(--ecom-ink);
-  background: var(--ecom-parchment);
+  background: #0c0c0e;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -32,10 +72,11 @@ body {
   box-shadow: rgba(0, 0, 0, 0.22) 3px 5px 30px 0;
 }
 
-/** 侧栏 / 可滚动区：细滚动条 */
+/** 侧栏 / 可滚动区：细滚动条（预留 gutter，避免 hover 时滚动条显隐导致宽度抖动） */
 .ecom-scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+  scrollbar-gutter: stable;
 }
 
 .ecom-scrollbar-thin::-webkit-scrollbar {
@@ -48,10 +89,77 @@ body {
 }
 
 .ecom-scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.16);
   border-radius: 999px;
 }
 
 .ecom-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+/** 助手聊天区等：可滚动但不显示滚动条，避免侧栏宽度随 scrollbar 显隐抖动 */
+.ecom-scrollbar-overlay {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ecom-scrollbar-overlay::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes ecom-media-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.ecom-media-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.ecom-media-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 60%
+  );
+  animation: ecom-media-shimmer 1.35s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ecom-upload-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: #e8e8ed;
+  overflow: hidden;
+}
+
+.ecom-upload-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0071e3, #2997ff);
+  transition: width 0.2s ease;
+}
+
+.ecom-upload-progress-indeterminate > span {
+  width: 40% !important;
+  animation: ecom-upload-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes ecom-upload-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
 }

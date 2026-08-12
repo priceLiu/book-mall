@@ -19,6 +19,7 @@ import {
   openCanvasAppInNewTab,
   openCommonToolsAppInNewTab,
   openEcomAppInNewTab,
+  openPublisherAppInNewTab,
   openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
@@ -157,6 +158,7 @@ export function AccountNavMenu({
   quickReplicaOriginConfigured,
   canLaunchCommonTools,
   commonToolsOriginConfigured,
+  publisherOriginConfigured,
   appsMenuHint,
   billingPersona,
   showReferral = false,
@@ -177,6 +179,7 @@ export function AccountNavMenu({
   quickReplicaOriginConfigured: boolean;
   canLaunchCommonTools: boolean;
   commonToolsOriginConfigured: boolean;
+  publisherOriginConfigured: boolean;
   appsMenuHint: string | null;
   placement?: "sidebar" | "drawer";
 }) {
@@ -216,6 +219,7 @@ export function AccountNavMenu({
     billingPersona,
     gatewayLinked,
   });
+  const publisherReady = canLaunchTools && publisherOriginConfigured;
 
   const groups = useMemo(
     () =>
@@ -247,6 +251,8 @@ export function AccountNavMenu({
         canLaunchQuickReplica,
         quickReplicaOriginConfigured,
         quickReplicaReady,
+        publisherOriginConfigured,
+        publisherReady,
         billingPersona,
         gatewayLinked,
       });
@@ -274,6 +280,10 @@ export function AccountNavMenu({
     }
     if (id === "launch-quick-replica") {
       openQuickReplicaAppInNewTab("/");
+      return;
+    }
+    if (id === "launch-publisher") {
+      openPublisherAppInNewTab("/");
     }
   }
 

@@ -30,6 +30,7 @@ const PORTS = [
   { port: 3008, label: "quick-replica-web" },
   { port: 3009, label: "director-web" },
   { port: 3010, label: "common-tools" },
+  { port: 3011, label: "publisher-web" },
 ];
 
 function listListenersOnPort(port) {

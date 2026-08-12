@@ -15,6 +15,7 @@ export const TOOL_SUITE_NAV_KEYS = [
   "app-history",
   "e-commerce-toolkit",
   "common-tools",
+  "social-publisher",
 ] as const;
 
 export type ToolSuiteNavKey = (typeof TOOL_SUITE_NAV_KEYS)[number];

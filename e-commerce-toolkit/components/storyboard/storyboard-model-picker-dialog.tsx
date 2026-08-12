@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Cpu, Image as ImageIcon, Video } from "lucide-react";
+import { Check, Cpu, Image as ImageIcon, Loader2, Video } from "lucide-react";
 
 import {
   Dialog,
@@ -42,6 +42,24 @@ type Props = {
   onAspectRatioChange?: (v: StoryboardVideoAspectRatio) => void;
   imageSize?: StoryboardWanxSize;
   onImageSizeChange?: (v: StoryboardWanxSize) => void;
+  /** 尺寸由平台规则决定时（电商产品创作），以只读行替代尺寸下拉 */
+  lockedImageSizeLabel?: string;
+  /** 只读参数行标题，默认「输出比例」 */
+  lockedFieldLabel?: string;
+  /** 覆盖弹层标题（如视觉分析模型） */
+  dialogTitle?: string;
+  /** 覆盖弹层副标题 */
+  dialogDescription?: string;
+  /** 覆盖确认按钮文案 */
+  confirmLabel?: string;
+  /** 覆盖底部左侧提示 */
+  footerHint?: string;
+  /** 覆盖 DialogContent 容器 class */
+  contentClassName?: string;
+  /** 模型已确认、任务进行中：弹层内展示进度态 */
+  running?: boolean;
+  runningTitle?: string;
+  runningDetail?: string;
   durationSec?: number;
   onDurationChange?: (v: number) => void;
   videoResolution?: StoryboardVideoResolution;
@@ -189,6 +207,16 @@ export function StoryboardModelPickerDialog({
   onAspectRatioChange,
   imageSize = "720*1280",
   onImageSizeChange,
+  lockedImageSizeLabel,
+  lockedFieldLabel = "输出比例",
+  dialogTitle,
+  dialogDescription,
+  confirmLabel,
+  footerHint,
+  contentClassName,
+  running = false,
+  runningTitle,
+  runningDetail,
   durationSec = 10,
   onDurationChange,
   videoResolution = "1080p",
@@ -202,7 +230,17 @@ export function StoryboardModelPickerDialog({
   videoPromptExtend = true,
   onVideoPromptExtendChange,
 }: Props) {
-  const action = mode === "image" ? "开始生图" : "开始生成";
+  const action = confirmLabel ?? (mode === "image" ? "开始生图" : "开始生成");
+  const subtitle =
+    dialogDescription ??
+    (mode === "image"
+      ? "选择生图模型并调整尺寸，用于生成分镜图。"
+      : "图生视频模型（多图参考整图成片），需对应 Gateway Provider。");
+  const footerLeftHint =
+    footerHint ??
+    (confirming || running
+      ? "任务进行中，请稍候…"
+      : "选好模型与参数后开始生成。");
   const isBailianR2v = mode === "video" && isStoryboardBailianR2vModel(value);
   const isKling30 = mode === "video" && isStoryboardKling30KieVideoModel(value);
   const showImageSize = mode === "image";
@@ -239,19 +277,38 @@ export function StoryboardModelPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
+      <DialogContent
+        className={cn(
+          "flex max-h-[88vh] max-w-3xl flex-col gap-0 overflow-hidden p-0",
+          contentClassName,
+        )}
+      >
+        <DialogHeader className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-[15px]">
             <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
-            {pickerTitle(mode, panelIndex, videoTarget)}
+            {dialogTitle ?? pickerTitle(mode, panelIndex, videoTarget)}
           </DialogTitle>
-          <p className="text-[12px] text-[#86868b]">
-            {mode === "image"
-              ? "选择生图模型并调整尺寸，用于生成分镜图。"
-              : "图生视频模型（多图参考整图成片），需对应 Gateway Provider。"}
-          </p>
+          <p className="text-[12px] text-[#86868b]">{subtitle}</p>
         </DialogHeader>
 
+        {running ? (
+          <div className="flex min-h-[min(36dvh,280px)] flex-1 flex-col items-center justify-center gap-4 px-5 py-10">
+            <Loader2 className="h-9 w-9 animate-spin text-[var(--ecom-primary)]" />
+            <div className="max-w-md text-center">
+              <p className="text-sm font-medium text-[#1d1d1f]">
+                {runningTitle ?? "处理中…"}
+              </p>
+              {runningDetail ? (
+                <p className="mt-1.5 text-xs leading-relaxed text-[#86868b]">
+                  {runningDetail}
+                </p>
+              ) : null}
+            </div>
+            <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full max-w-xs">
+              <span />
+            </div>
+          </div>
+        ) : (
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {groups.length === 0 ? (
             <div className="grid place-items-center px-4 py-10 text-center text-sm text-[#86868b]">
@@ -295,7 +352,16 @@ export function StoryboardModelPickerDialog({
                 </p>
 
                 <div className="space-y-4">
-                  {showImageSize ? (
+                  {showImageSize && lockedImageSizeLabel ? (
+                    <div className="space-y-1.5">
+                      <span className="text-xs font-medium text-[#6e6e73]">{lockedFieldLabel}</span>
+                      <p className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#1d1d1f]">
+                        {lockedImageSizeLabel}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {showImageSize && !lockedImageSizeLabel ? (
                     <label className="block space-y-1.5">
                       <span className="text-xs font-medium text-[#6e6e73]">输出分辨率（尺寸）</span>
                       <select
@@ -437,18 +503,28 @@ export function StoryboardModelPickerDialog({
             </div>
           )}
         </div>
+        )}
 
-        <DialogFooter className="items-center justify-between border-t border-[#f0f0f2] px-5 py-3 sm:justify-between">
-          <span className="text-[11px] text-[#86868b]">
-            {confirming ? "生成在后台进行，可直接关闭此窗口。" : "选好模型与参数后开始生成。"}
-          </span>
+        <DialogFooter className="shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3 sm:justify-between">
+          <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
           <div className="flex items-center gap-2">
-            <EcomButtonSecondary type="button" size="sm" onClick={() => onOpenChange(false)}>
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              disabled={running}
+            >
               {confirming ? "关闭" : "取消"}
             </EcomButtonSecondary>
-            <EcomButtonPrimary type="button" size="sm" onClick={onConfirm} disabled={confirming}>
-              {confirming ? "生成中…" : action}
-            </EcomButtonPrimary>
+            {!running ? (
+              <EcomButtonPrimary type="button" size="sm" onClick={onConfirm} disabled={confirming}>
+                {confirming ? "生成中…" : action}
+              </EcomButtonPrimary>
+            ) : (
+              <EcomButtonPrimary type="button" size="sm" disabled>
+                {action}…
+              </EcomButtonPrimary>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>

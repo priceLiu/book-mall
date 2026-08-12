@@ -28,24 +28,14 @@ export function ecomToolKey(module: string, action: string): string {
 
 export const ECOM_MODULES: EcomModuleDef[] = [
   {
-    id: "main-image",
-    title: "电商主图",
-    tagline: "高转化主图，一键生成多尺寸",
-    href: "/ecom/main-image",
+    id: "product-creation",
+    title: "电商产品创作",
+    tagline: "主图 + 详情页 9 步串行生成",
+    href: "/ecom/product-creation",
     kind: "image",
     toolKey: "ecom-toolkit__main-image",
     action: "generate",
     tile: "light",
-  },
-  {
-    id: "detail-page",
-    title: "电商详情页",
-    tagline: "长图详情与文案分屏生成",
-    href: "/ecom/detail-page",
-    kind: "image",
-    toolKey: "ecom-toolkit__detail-page",
-    action: "panel",
-    tile: "parchment",
   },
   {
     id: "model-shot",

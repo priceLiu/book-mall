@@ -20,7 +20,6 @@ export function EcomPortalTopBar({ authed = true, bookOrigin = null }: Props) {
           <span className="truncate text-sm font-semibold text-white/90">电商工具箱</span>
         </div>
 
-        {/* 左/右固定宽 + 中间 flex-1，避免 ml-auto 把导航挤成 0 宽（与 canvas 顶栏同思路） */}
         <div className="flex min-h-[2rem] min-w-0 flex-1 items-center justify-center overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <PortalNav
             current="e-commerce"

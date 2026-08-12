@@ -8,6 +8,8 @@ import {
   Key,
   LayoutGrid,
   LogOut,
+  MonitorSmartphone,
+  Send,
   Settings,
   Shield,
   Sparkles,
@@ -91,6 +93,7 @@ export function buildAccountNavMenuGroups(input: {
     { kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid },
     { kind: "action", id: "launch-ecom", label: "电商工具箱", icon: LayoutGrid },
     { kind: "action", id: "launch-quick-replica", label: "快速复刻", icon: Copy },
+    { kind: "action", id: "launch-publisher", label: "一键发布", icon: Send },
   ];
 
   const billingItems: AccountNavMenuItem[] = [
@@ -162,6 +165,7 @@ export function buildAccountNavMenuGroups(input: {
   const accountItems: AccountNavMenuItem[] = [
     { kind: "link", href: "/account", label: "概览", icon: User, exact: true },
     { kind: "link", href: "/account/security", label: "账户与安全", icon: Shield, exact: true },
+    { kind: "link", href: "/account/devices", label: "已登录设备", icon: MonitorSmartphone, exact: true },
   ];
 
   if (isByok) {
