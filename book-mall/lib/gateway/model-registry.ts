@@ -15,6 +15,12 @@ import {
   GATEWAY_CANONICAL_REGISTRY,
 } from "@/lib/platform-model/canonical-registry";
 import { prisma } from "@/lib/prisma";
+import {
+  getCachedActiveRoutes,
+  getCachedModelsForApp,
+  setCachedActiveRoutes,
+  setCachedModelsForApp,
+} from "@/lib/gateway/model-list-cache";
 import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
 import {
   gatewayRouteDisplayName,
@@ -212,7 +218,7 @@ export function resolveKnownGatewayModelRegistration(modelKey: string): {
   }
 }
 
-export async function listActiveRoutes(): Promise<
+export async function listActiveRoutesUncached(): Promise<
   Array<{
     route: {
       id: string;
@@ -270,7 +276,20 @@ export async function listActiveRoutes(): Promise<
   }));
 }
 
+export async function listActiveRoutes(): Promise<
+  Awaited<ReturnType<typeof listActiveRoutesUncached>>
+> {
+  const cached = getCachedActiveRoutes();
+  if (cached) return cached;
+  const routes = await listActiveRoutesUncached();
+  setCachedActiveRoutes(routes);
+  return routes;
+}
+
 export async function listModelsForApp(input: ListModelsForAppInput): Promise<RegistryModelRow[]> {
+  const cached = getCachedModelsForApp(input);
+  if (cached) return cached;
+
   await ensureGatewayCanonicalRegistrySynced();
   const appTag = input.appTag.trim().toLowerCase();
   const routes = await listActiveRoutes();
@@ -321,7 +340,9 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
         platformOffering: false,
       });
     }
-    return out.sort((a, b) => a.displayName.localeCompare(b.displayName, "zh"));
+    const outSorted = out.sort((a, b) => a.displayName.localeCompare(b.displayName, "zh"));
+    setCachedModelsForApp(input, outSorted);
+    return outSorted;
   }
 
   const rows: RegistryModelRow[] = [];
@@ -354,7 +375,9 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
     });
   }
 
-  return dedupeByCanonical(rows);
+  const result = dedupeByCanonical(rows);
+  setCachedModelsForApp(input, result);
+  return result;
 }
 
 /** Gateway 控制台全量目录（按 provider 分组）。 */

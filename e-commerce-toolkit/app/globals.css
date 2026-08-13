@@ -137,6 +137,30 @@ body {
   pointer-events: none;
 }
 
+/* 电商工具箱 · 生图/生视频生成中扫光（对齐 canvas .canvas-story-media-generating-pro） */
+.ecom-media-generating-sweep {
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0, 113, 227, 0.55),
+    0 0 16px rgba(0, 113, 227, 0.35);
+}
+
+.ecom-media-generating-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(0, 113, 227, 0.22) 50%,
+    transparent 65%
+  );
+  animation: ecom-media-shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .ecom-upload-progress {
   height: 4px;
   border-radius: 999px;

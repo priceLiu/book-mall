@@ -147,6 +147,13 @@ export async function suggestProductDesignBrief(opts: {
   const imageUrls = refs.map((r) => r.ossUrl);
   const hasStyle = filterProductDesignReferencesByRole(project.references, ["main-style"]).length > 0;
 
+  const promptText = [
+    "请根据产品实拍图推断以下字段的候选项。",
+    hasStyle
+      ? "已附带主图风格参考，可结合风格推断目标人群与视觉方向。"
+      : "用户未上传风格参考，请主要依据产品外观推断。",
+  ].join("\n");
+
   const userParts: CanvasChatContentPart[] = [
     ...imageUrls.map(
       (url): CanvasChatContentPart => ({
@@ -154,15 +161,7 @@ export async function suggestProductDesignBrief(opts: {
         image_url: { url },
       }),
     ),
-    {
-      type: "text",
-      text: [
-        "请根据产品实拍图推断以下字段的候选项。",
-        hasStyle
-          ? "已附带主图风格参考，可结合风格推断目标人群与视觉方向。"
-          : "用户未上传风格参考，请主要依据产品外观推断。",
-      ].join("\n"),
-    },
+    { type: "text", text: promptText },
   ];
 
   const raw = await drainEcomGwChat(opts.userId, {
@@ -171,7 +170,7 @@ export async function suggestProductDesignBrief(opts: {
       { role: "system", content: BRIEF_SUGGEST_SYSTEM },
       {
         role: "user",
-        content: userParts.length === 1 ? userParts[0]!.text : userParts,
+        content: imageUrls.length === 0 ? promptText : userParts,
       },
     ],
     clientPage: ecomClientPage(

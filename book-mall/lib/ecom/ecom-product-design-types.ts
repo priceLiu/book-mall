@@ -2,11 +2,43 @@ import { z } from "zod";
 
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 
+/** 旧项目遗留的 module 值（拆分主图/详情页入口之前建的项目），主图入口列表需兼容 */
 export const ECOM_PRODUCT_DESIGN_MODULE = "product-creation";
 
 /** 出图沿用既有资产 module，保证「我的资产」分组与计价行不变 */
 export const ECOM_MAIN_IMAGE_MODULE = "main-image";
 export const ECOM_DETAIL_PAGE_MODULE = "detail-page";
+
+/**
+ * 项目行 module（EcomProductDesignProject.module）。
+ * 与上面的 EcomAsset 分组同名但落在不同表：这里决定项目属于哪条产线（主图 / 详情页）。
+ */
+export const ECOM_PROJECT_MODULE_MAIN = "main-image";
+export const ECOM_PROJECT_MODULE_DETAIL = "detail-page";
+export const ECOM_PROJECT_MODULE_LEGACY = ECOM_PRODUCT_DESIGN_MODULE;
+
+export type EcomProjectModule =
+  | typeof ECOM_PROJECT_MODULE_MAIN
+  | typeof ECOM_PROJECT_MODULE_DETAIL;
+
+/** 请求入参归一：非法值一律回落主图产线 */
+export function normalizeEcomProjectModule(input: unknown): EcomProjectModule {
+  return input === ECOM_PROJECT_MODULE_DETAIL
+    ? ECOM_PROJECT_MODULE_DETAIL
+    : ECOM_PROJECT_MODULE_MAIN;
+}
+
+/** 产线由项目 module 决定，运行中不可切换；旧值 product-creation 归主图产线 */
+export function resolveProjectTrack(module: string): "main" | "detail" {
+  return module === ECOM_PROJECT_MODULE_DETAIL ? "detail" : "main";
+}
+
+/** 主图入口要同时列出旧值项目，详情页入口只认新值 */
+export function projectModuleQueryValues(module: EcomProjectModule): string[] {
+  return module === ECOM_PROJECT_MODULE_DETAIL
+    ? [ECOM_PROJECT_MODULE_DETAIL]
+    : [ECOM_PROJECT_MODULE_MAIN, ECOM_PROJECT_MODULE_LEGACY];
+}
 
 export const ECOM_MAIN_IMAGE_TOOL_KEY = "ecom-toolkit__main-image";
 export const ECOM_MAIN_IMAGE_ACTION = "generate";
@@ -58,6 +90,36 @@ const visualBriefEntrySchema = z.object({
 
 const ratioSchema = z.enum(["1:1", "3:4", "4:5", "16:9"]);
 
+export const productContextSchema = z.object({
+  productName: z.string().optional(),
+  productCategory: z.string().optional(),
+  sellingPoints: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  visualTone: z.string().optional(),
+  targetUserGroup: z.string().optional(),
+});
+
+export const imageGenPlanItemSchema = z.object({
+  index: z.number().int().positive(),
+  title: z.string().min(1),
+  purpose: z.string().optional(),
+  prompt: z.string().min(1),
+  copySnapshot: z.record(z.unknown()).optional(),
+});
+
+export const imageGenPlanSchema = z.object({
+  target: z.enum(["main", "detail"]),
+  source: z.enum(["interactive", "reference-decompose", "reference-intent"]),
+  status: z.enum(["draft", "confirmed"]),
+  productContext: productContextSchema.optional(),
+  sharedVisualBrief: z.string().optional(),
+  items: z.array(imageGenPlanItemSchema).min(1),
+});
+
+export type ProductContext = z.infer<typeof productContextSchema>;
+export type ImageGenPlanItem = z.infer<typeof imageGenPlanItemSchema>;
+export type ImageGenPlan = z.infer<typeof imageGenPlanSchema>;
+
 const mainImageLayersSchema = z.object({
   topHint: z.string().optional(),
   title: z.string().min(1),
@@ -82,15 +144,52 @@ export const productDesignSchema = z.object({
     .array(
       z.object({
         no: z.number().int().positive(),
-        name: z.string().min(1),
+        name: z.preprocess(
+          (val) => {
+            const s = String(val ?? "").trim();
+            return s || "未命名方案";
+          },
+          z.string().min(1),
+        ),
         angle: z.string().default(""),
         painPoint: z.string().default(""),
         outcome: z.string().default(""),
         mood: z.string().default(""),
+        rows: z
+          .array(
+            z.object({
+              label: z.string().default(""),
+              content: z.string().default(""),
+            }),
+          )
+          .default([]),
       }),
     )
     .default([]),
   selectedPlanNo: z.number().int().positive().optional(),
+  buyingReasonBrief: z
+    .object({
+      intro: z.string().default(""),
+      matrix: z
+        .array(
+          z.object({
+            sellingPoint: z.string().default(""),
+            physicalDesc: z.string().default(""),
+            reason: z.string().default(""),
+            emotionalValue: z.string().default(""),
+          }),
+        )
+        .default([]),
+      table: z
+        .object({
+          headers: z.array(z.string()).default([]),
+          rows: z.array(z.array(z.string())).default([]),
+        })
+        .optional(),
+      displayMarkdown: z.string().optional(),
+      userEdited: z.boolean().optional(),
+    })
+    .optional(),
   buyingReasons: z.array(z.string()).default([]),
   mainImages: z
     .array(
@@ -108,6 +207,8 @@ export const productDesignSchema = z.object({
         imageUrl: z.string().optional(),
         assetId: z.string().optional(),
         genPrompt: z.string().optional(),
+        /** 用户手改过 genPrompt：重新拆解时不覆盖 */
+        promptEdited: z.boolean().optional(),
       }),
     )
     .default([]),
@@ -136,6 +237,8 @@ export const productDesignSchema = z.object({
         imageUrl: z.string().optional(),
         assetId: z.string().optional(),
         genPrompt: z.string().optional(),
+        /** 用户手改过 genPrompt：重新拆解时不覆盖 */
+        promptEdited: z.boolean().optional(),
       }),
     )
     .default([]),
@@ -143,6 +246,12 @@ export const productDesignSchema = z.object({
     .object({
       main: visualBriefEntrySchema.optional(),
       detail: visualBriefEntrySchema.optional(),
+    })
+    .optional(),
+  imageGenPlans: z
+    .object({
+      main: imageGenPlanSchema.optional(),
+      detail: imageGenPlanSchema.optional(),
     })
     .optional(),
 });
@@ -159,9 +268,12 @@ export type ProductDesignSettings = {
   detailPageCount?: number;
   mainImageRatio?: EcomImageRatio;
   detailPageRatio?: EcomImageRatio;
-  mainImageGenMode?: "copy" | "reference-prompt";
+  mainImageGenMode?: "copy" | "reference-decompose" | "reference-prompt" | "reference";
   mainImageCustomPrompt?: string;
-  detailPageGenMode?: "copy" | "reference-decompose";
+  detailPageGenMode?: "copy" | "reference-decompose" | "reference-prompt";
+  detailPageCustomPrompt?: string;
+  /** 批量出图并发（1–5，默认走账户上限或 2） */
+  imageGenConcurrency?: number;
 };
 
 export const PRODUCT_DESIGN_STEPS = [
@@ -301,6 +413,32 @@ function normalizeDesignPatch(raw: Record<string, unknown>): Record<string, unkn
     });
   }
 
+  if (Array.isArray(out.marketingPlans)) {
+    const normalized: ProductDesign["marketingPlans"] = [];
+    for (const p of out.marketingPlans) {
+      if (normalized.length >= 3) break;
+      if (!p || typeof p !== "object") continue;
+      const row = p as Record<string, unknown>;
+      const idx = normalized.length + 1;
+      const rawName = String(row.name ?? "").trim();
+      normalized.push({
+        no: idx,
+        name: rawName.slice(0, 80) || `方案 ${idx}`,
+        angle: String(row.angle ?? "").trim(),
+        painPoint: String(row.painPoint ?? "").trim(),
+        outcome: String(row.outcome ?? "").trim(),
+        mood: String(row.mood ?? "").trim(),
+        rows: Array.isArray(row.rows)
+          ? (row.rows as Array<{ label?: unknown; content?: unknown }>).map((r) => ({
+              label: String(r.label ?? "").trim(),
+              content: String(r.content ?? "").trim(),
+            }))
+          : [],
+      });
+    }
+    out.marketingPlans = normalized;
+  }
+
   return out;
 }
 
@@ -348,30 +486,71 @@ export function mergeProductDesign(
   const base = prev ?? emptyProductDesign();
   const next: ProductDesign = { ...base, ...patch };
 
-  if (patch.mainImages) {
-    next.mainImages = patch.mainImages.map((item) => {
-      const old = base.mainImages.find((m) => m.index === item.index);
-      return {
-        ...item,
-        imageUrl: item.imageUrl ?? old?.imageUrl,
-        assetId: item.assetId ?? old?.assetId,
-        genPrompt: item.genPrompt ?? old?.genPrompt,
-      };
-    });
+  if ("selectedPlanNo" in patch && patch.selectedPlanNo == null) {
+    delete next.selectedPlanNo;
   }
-  if (patch.detailPages) {
-    next.detailPages = patch.detailPages.map((item) => {
-      const old = base.detailPages.find((d) => d.index === item.index);
-      return {
+
+  if (patch.mainImages !== undefined) {
+    if (patch.mainImages.length === 0) {
+      next.mainImages = [];
+    } else {
+    const byIndex = new Map(base.mainImages.map((m) => [m.index, m]));
+    for (const item of patch.mainImages) {
+      const old = byIndex.get(item.index);
+      byIndex.set(item.index, {
+        ...(old ?? item),
         ...item,
         imageUrl: item.imageUrl ?? old?.imageUrl,
         assetId: item.assetId ?? old?.assetId,
         genPrompt: item.genPrompt ?? old?.genPrompt,
-      };
-    });
+        promptEdited: item.promptEdited ?? old?.promptEdited,
+      });
+    }
+    next.mainImages = [...byIndex.values()].sort((a, b) => a.index - b.index);
+    }
+  }
+  if (patch.detailPages !== undefined) {
+    if (patch.detailPages.length === 0) {
+      next.detailPages = [];
+    } else {
+    const byIndex = new Map(base.detailPages.map((d) => [d.index, d]));
+    for (const item of patch.detailPages) {
+      const old = byIndex.get(item.index);
+      byIndex.set(item.index, {
+        ...(old ?? item),
+        ...item,
+        imageUrl: item.imageUrl ?? old?.imageUrl,
+        assetId: item.assetId ?? old?.assetId,
+        genPrompt: item.genPrompt ?? old?.genPrompt,
+        promptEdited: item.promptEdited ?? old?.promptEdited,
+      });
+    }
+    next.detailPages = [...byIndex.values()].sort((a, b) => a.index - b.index);
+    }
+  }
+  if (patch.buyingReasonBrief !== undefined) {
+    next.buyingReasonBrief = patch.buyingReasonBrief;
+  }
+  if (patch.buyingReasons !== undefined) {
+    next.buyingReasons = patch.buyingReasons.length === 0 ? [] : patch.buyingReasons;
+  }
+  if (patch.detailOutline !== undefined) {
+    next.detailOutline = patch.detailOutline.length === 0 ? [] : patch.detailOutline;
+  }
+  if (patch.marketingPlans !== undefined) {
+    next.marketingPlans =
+      patch.marketingPlans.length === 0 ? [] : patch.marketingPlans;
   }
   if (patch.visualBrief === undefined && base.visualBrief) {
     next.visualBrief = base.visualBrief;
+  }
+  if (patch.imageGenPlans) {
+    next.imageGenPlans = {
+      ...(base.imageGenPlans ?? {}),
+      ...patch.imageGenPlans,
+    };
+  } else if (base.imageGenPlans) {
+    next.imageGenPlans = base.imageGenPlans;
   }
 
   return productDesignSchema.parse(next);

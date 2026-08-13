@@ -11,6 +11,9 @@ importers:
       '@private/federated-portal-nav':
         specifier: file:../shared/federated-portal-nav
         version: file:../shared/federated-portal-nav(react@18.3.1)
+      '@private/platform-assistant':
+        specifier: file:../shared/platform-assistant
+        version: file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@sparkjsdev/spark':
         specifier: ^2.1.0
         version: 2.1.0(three@0.180.0)
@@ -227,6 +230,12 @@ packages:
     resolution: {directory: ../shared/federated-portal-nav, type: directory}
     peerDependencies:
       react: ^18
+
+  '@private/platform-assistant@file:../shared/platform-assistant':
+    resolution: {directory: ../shared/platform-assistant, type: directory}
+    peerDependencies:
+      react: ^18
+      react-dom: ^18
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -1981,6 +1990,11 @@ snapshots:
   '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
     dependencies:
       react: 18.3.1
+
+  '@private/platform-assistant@file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@rtsao/scc@1.1.0': {}
 

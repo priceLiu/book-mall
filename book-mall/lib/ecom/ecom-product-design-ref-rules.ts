@@ -29,6 +29,43 @@ export function getImageGenMaxRefs(modelKey: string): number {
 
 const STYLE_ROLE_MAX = PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX;
 
+/** 风格图再多也给商品实拍留出的位置，避免商品本体被截断掉 */
+const PRODUCT_REF_RESERVED_SLOTS = 2;
+
+/**
+ * 参考图送入模型的统一顺序：有风格参考时「风格在前、商品在后」，否则只有商品。
+ *
+ * 视觉分析、生图下发与前端 @图片N 编号（buildProductDesignPromptMentionRefs）
+ * 必须共用这一个顺序。任何一处不一致，用户写的「图片4 是我的商品」都会指到别的图，
+ * 模型就会照着风格参考里的商品出图。
+ */
+export function orderRefsForModel<T>(
+  product: T[],
+  style: T[],
+  max: number,
+): { ordered: T[]; styleFirst: boolean; productCount: number; styleCount: number } {
+  if (max <= 0) {
+    return { ordered: [], styleFirst: false, productCount: 0, styleCount: 0 };
+  }
+  if (style.length === 0) {
+    const ordered = product.slice(0, max);
+    return { ordered, styleFirst: false, productCount: ordered.length, styleCount: 0 };
+  }
+  const productTake =
+    product.length > 0 ? Math.min(product.length, PRODUCT_REF_RESERVED_SLOTS) : 0;
+  const styleTake = Math.min(style.length, Math.max(0, max - productTake));
+  const ordered = [
+    ...style.slice(0, styleTake),
+    ...product.slice(0, Math.max(0, max - styleTake)),
+  ].slice(0, max);
+  return {
+    ordered,
+    styleFirst: true,
+    styleCount: styleTake,
+    productCount: ordered.length - styleTake,
+  };
+}
+
 export function getMaxRefsForRole(
   role: ProductDesignReferenceRole,
   opts?: { visionModelKey?: string; imageModelKey?: string },

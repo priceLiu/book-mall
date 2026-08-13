@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import { PlatformAssistant } from "@private/platform-assistant";
 import { dispatchEcomCreditsBalanceRefresh } from "@/lib/ecom-credits-balance-events";
 import { EcomAuthBanner } from "@/components/auth/ecom-auth-banner";
 import { EcomMobileBar } from "@/components/layout/ecom-mobile-bar";
@@ -115,6 +116,7 @@ export function EcomAppShell({
         <EcomAuthBanner />
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
       </div>
+      <PlatformAssistant title="AI 小智" />
     </div>
   );
 }

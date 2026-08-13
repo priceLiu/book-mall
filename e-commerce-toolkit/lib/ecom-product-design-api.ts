@@ -5,13 +5,19 @@ import { ecomBookFetch } from "@/lib/ecom-book-fetch";
 import type {
   EcomImageRatio,
   EcomPlatformSpec,
+  EcomProjectModule,
+  ImageGenPlan,
+  ImageGenPlanItem,
+  ProductContext,
   ProductDesign,
   ProductDesignBrief,
   ProductDesignChatMessage,
+  ProductDesignDesignPatch,
   ProductDesignProject,
   ProductDesignProjectSummary,
   ProductDesignReference,
   ProductDesignSettings,
+  ProductDesignStrategyImport,
   ProductDesignVisualBriefEntry,
 } from "@/lib/product-design-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -19,15 +25,17 @@ import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 const BASE = "api/sso/tools/ecom/product-design";
 const SPECS_CACHE_KEY = "ecom-product-design-platform-specs";
 const MODELS_CACHE_KEY = "ecom-product-design-models-cache";
-const CACHE_MS = 5 * 60 * 1000;
+const SPECS_CACHE_MS = 5 * 60 * 1000;
+/** 模型清单：localStorage 持久化，减少每次打开工作台都拉 Gateway */
+const MODELS_CACHE_MS = 30 * 60 * 1000;
 
-function readCache<T>(key: string): T | null {
+function readCache<T>(key: string, ttlMs: number, storage: Storage = sessionStorage): T | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { at?: number; data?: T };
-    if (parsed.data && typeof parsed.at === "number" && Date.now() - parsed.at < CACHE_MS) {
+    if (parsed.data && typeof parsed.at === "number" && Date.now() - parsed.at < ttlMs) {
       return parsed.data;
     }
   } catch {
@@ -36,13 +44,29 @@ function readCache<T>(key: string): T | null {
   return null;
 }
 
-function writeCache<T>(key: string, data: T): void {
+function writeCache<T>(
+  key: string,
+  data: T,
+  storage: Storage = sessionStorage,
+): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data }));
+    storage.setItem(key, JSON.stringify({ at: Date.now(), data }));
   } catch {
     /* ignore */
   }
+}
+
+function isEmptyModelsPayload(data: {
+  chatModels: StoryboardGatewayModel[];
+  visionModels: StoryboardGatewayModel[];
+  imageModels: StoryboardGatewayModel[];
+}): boolean {
+  return (
+    data.chatModels.length === 0 &&
+    data.visionModels.length === 0 &&
+    data.imageModels.length === 0
+  );
 }
 
 export async function fetchPlatformSpecs(): Promise<{
@@ -51,6 +75,7 @@ export async function fetchPlatformSpecs(): Promise<{
 }> {
   const cached = readCache<{ specs: EcomPlatformSpec[]; defaultPlatform: string }>(
     SPECS_CACHE_KEY,
+    SPECS_CACHE_MS,
   );
   if (cached) return cached;
 
@@ -63,30 +88,60 @@ export async function fetchPlatformSpecs(): Promise<{
   return result;
 }
 
-export async function fetchProductDesignModels(): Promise<{
+export function invalidateProductDesignModelsCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(MODELS_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function fetchProductDesignModels(opts?: {
+  force?: boolean;
+}): Promise<{
   chatModels: StoryboardGatewayModel[];
   visionModels: StoryboardGatewayModel[];
   imageModels: StoryboardGatewayModel[];
+  imageGenConcurrencyLimit: number;
 }> {
-  const cached = readCache<{
-    chatModels: StoryboardGatewayModel[];
-    visionModels: StoryboardGatewayModel[];
-    imageModels: StoryboardGatewayModel[];
-  }>(MODELS_CACHE_KEY);
-  if (cached) return cached;
+  if (!opts?.force) {
+    const cached = readCache<{
+      chatModels: StoryboardGatewayModel[];
+      visionModels: StoryboardGatewayModel[];
+      imageModels: StoryboardGatewayModel[];
+      imageGenConcurrencyLimit: number;
+    }>(MODELS_CACHE_KEY, MODELS_CACHE_MS, localStorage);
+    if (cached && !isEmptyModelsPayload(cached)) return cached;
+  }
 
   const data = await ecomBookFetch(`${BASE}/models`);
   const result = {
     chatModels: (data.chatModels as StoryboardGatewayModel[]) ?? [],
     visionModels: (data.visionModels as StoryboardGatewayModel[]) ?? [],
     imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
+    imageGenConcurrencyLimit:
+      typeof data.imageGenConcurrencyLimit === "number"
+        ? data.imageGenConcurrencyLimit
+        : 2,
   };
-  writeCache(MODELS_CACHE_KEY, result);
+  if (!isEmptyModelsPayload(result)) {
+    writeCache(MODELS_CACHE_KEY, result, localStorage);
+  }
   return result;
 }
 
-export async function listProductDesignProjects(): Promise<ProductDesignProjectSummary[]> {
-  const data = await ecomBookFetch(`${BASE}/projects`);
+/**
+ * detailed 会额外读取 brief / references / design 三个 JSON 列，仅项目选择器需要；
+ * 只为拿最近项目 id 时保持默认的轻量查询。
+ */
+export async function listProductDesignProjects(
+  module: EcomProjectModule = "main-image",
+  opts?: { detailed?: boolean },
+): Promise<ProductDesignProjectSummary[]> {
+  const qs = new URLSearchParams({ module });
+  if (opts?.detailed) qs.set("detailed", "1");
+  const data = await ecomBookFetch(`${BASE}/projects?${qs.toString()}`);
   return (data.items as ProductDesignProjectSummary[]) ?? [];
 }
 
@@ -94,6 +149,9 @@ export async function createProductDesignProject(opts?: {
   title?: string;
   platform?: string;
   brief?: ProductDesignBrief;
+  module?: EcomProjectModule;
+  /** 从已有主图项目导入 Step0–3 策略与产品图 */
+  importFrom?: ProductDesignStrategyImport;
 }): Promise<ProductDesignProject> {
   const data = await ecomBookFetch(`${BASE}/projects`, {
     method: "POST",
@@ -119,7 +177,7 @@ export async function updateProductDesignProject(
     references: ProductDesignReference[];
     chatHistory: ProductDesignChatMessage[];
     design: ProductDesign | null;
-    designPatch: Partial<ProductDesign>;
+    designPatch: ProductDesignDesignPatch;
     meta: Record<string, unknown>;
   }>,
 ): Promise<ProductDesignProject> {
@@ -209,6 +267,7 @@ export async function generateProductDesignImages(
     indexes?: number[];
     modelKey?: string;
     ratio?: EcomImageRatio;
+    concurrency?: number;
   },
 ): Promise<{
   project: ProductDesignProject;
@@ -244,8 +303,21 @@ export async function generateProductDesignImages(
     /* 非 JSON 响应 */
   }
   if (!res.ok) {
+    const code = typeof data.error === "string" ? data.error : "";
+    const detail = typeof data.detail === "string" ? data.detail : "";
+    if (code === "upstream_fetch_failed") {
+      throw new Error(
+        "与主站连接中断（出图可能仍在后台进行）。请稍候刷新页面查看已生成部分，未完成张数可逐张重试。",
+      );
+    }
     throw new Error(
-      typeof data.error === "string" ? data.error : `请求失败 (${res.status})`,
+      code && code !== "error"
+        ? detail
+          ? `${code}：${detail}`
+          : code
+        : typeof data.error === "string"
+          ? data.error
+          : `请求失败 (${res.status})`,
     );
   }
   return {
@@ -339,4 +411,139 @@ export async function createStoryboardFromAssets(opts: {
     },
   );
   return { projectId: (data.project as { id: string }).id };
+}
+
+export async function decomposeProductDesignImagePlan(
+  projectId: string,
+  opts: {
+    target: "main" | "detail";
+    modelKey?: string;
+    intentPrompt?: string;
+    source?: "reference-decompose" | "reference-intent";
+  },
+): Promise<{ plan: ImageGenPlan; project: ProductDesignProject }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/image/plan/decompose`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    plan: data.plan as ImageGenPlan,
+    project: data.project as ProductDesignProject,
+  };
+}
+
+export async function deriveProductDesignImagePlan(
+  projectId: string,
+  opts: { target: "main" | "detail" },
+): Promise<{ plan: ImageGenPlan; project: ProductDesignProject }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/image/plan/derive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    plan: data.plan as ImageGenPlan,
+    project: data.project as ProductDesignProject,
+  };
+}
+
+export async function patchProductDesignImagePlan(
+  projectId: string,
+  opts: {
+    target: "main" | "detail";
+    productContext?: ProductContext;
+    sharedVisualBrief?: string;
+    items?: ImageGenPlanItem[];
+  },
+): Promise<{ plan: ImageGenPlan; project: ProductDesignProject }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/image/plan`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    plan: data.plan as ImageGenPlan,
+    project: data.project as ProductDesignProject,
+  };
+}
+
+export async function confirmProductDesignImagePlan(
+  projectId: string,
+  opts: { target: "main" | "detail" },
+): Promise<{ plan: ImageGenPlan; project: ProductDesignProject }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/image/plan/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    plan: data.plan as ImageGenPlan,
+    project: data.project as ProductDesignProject,
+  };
+}
+
+/** 下载分类 ZIP 交付包（文案 + 主图 + 详情 + 参考图） */
+async function downloadProductDesignZip(
+  projectId: string,
+  opts?: { mode?: "export" | "save"; productName?: string },
+): Promise<void> {
+  const qs = new URLSearchParams();
+  if (opts?.mode === "save") qs.set("mode", "save");
+  if (opts?.productName?.trim()) qs.set("productName", opts.productName.trim());
+  const query = qs.toString();
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/book-mall/${BASE}/projects/${projectId}/export${query ? `?${query}` : ""}`,
+      { method: "GET", credentials: "include" },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(msg === "fetch failed" ? "与服务器连接中断，请稍后重试。" : msg);
+  }
+  if (res.status === 401) throw new EcomUnauthorizedError("未登录");
+  if (!res.ok) {
+    let message = opts?.mode === "save" ? "保存失败" : `导出失败 (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (typeof data.error === "string") message = data.error;
+    } catch {
+      /* 非 JSON */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+  const plainMatch = disposition.match(/filename="([^"]+)"/i);
+  const filename = utf8Match
+    ? decodeURIComponent(utf8Match[1]!)
+    : plainMatch
+      ? plainMatch[1]!
+      : opts?.mode === "save"
+        ? "product-save.zip"
+        : "product-design-export.zip";
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadProductDesignExportZip(projectId: string): Promise<void> {
+  await downloadProductDesignZip(projectId, { mode: "export" });
+}
+
+/** 一键保存：ZIP 文件名 = 产品名_时间戳（服务端生成时间戳以保证唯一） */
+export async function saveProductDesignProjectZip(
+  projectId: string,
+  productName: string,
+): Promise<void> {
+  const trimmed = productName.trim();
+  if (!trimmed) throw new Error("请填写产品名");
+  await downloadProductDesignZip(projectId, { mode: "save", productName: trimmed });
 }

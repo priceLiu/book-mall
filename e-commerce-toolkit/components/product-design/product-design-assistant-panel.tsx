@@ -9,74 +9,140 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import {
   streamProductDesignChat,
-  suggestProductDesignBrief,
   syncProductDesign,
+  suggestProductDesignBrief,
   updateProductDesignProject,
   getProductDesignProject,
 } from "@/lib/ecom-product-design-api";
+import {
+  buildProductDesignNextStepCommand,
+  choicePrompt,
+  CONFIRM_BRIEF_MULTI_CHOICE,
+  CONFIRM_TRUST_BADGE_CHOICE,
+  CUSTOM_INPUT_CHOICE,
+  DETAIL_COUNT_CHOICE_PREFIX,
+  DETAIL_INTERACTIVE_CHOICE,
+  DETAIL_REF_PROMPT_WORKFLOW_CHOICE,
+  inferAssistantChoices,
+  inferAssistantMessageStep,
+  isBriefSuggestionsPending,
+  INTERACTIVE_WORKFLOW_CHOICE,
+  isBriefMultiToggleOption,
+  isBriefAiSuggestionChoice,
+  isPrimaryBriefAction,
+  isTrustBadgeOption,
+  MAIN_COUNT_CHOICE_PREFIX,
+  MAIN_REF_PROMPT_WORKFLOW_CHOICE,
+  marketingPlanChoiceLabel,
+  needsBriefCollection,
+  nextBriefField,
+  nextStepChoiceHint,
+  NO_TRUST_BADGE_CHOICE,
+  parseCountChoice,
+  parseMarketingPlanChoice,
+  parsePlatformChoice,
+  productDesignAssistantAnchorId,
+  PRODUCT_DESIGN_STEPS,
+  REGENERATE_MARKETING_PLANS_CHOICE,
+  BRIEF_AI_INFER_CHOICE,
+  BRIEF_MANUAL_INPUT_CHOICE,
+  REUSE_STRATEGY_CHOICE,
+  RECOLLECT_STRATEGY_CHOICE,
+  workflowPathToGenMode,
+  REVISE_CHOICE,
+  REVISE_DIMENSION_CHOICES,
+  NEXT_STEP_CHOICE,
+  resolveActiveTrack,
+  type DetailWorkflowPath,
+  type MainWorkflowPath,
+  type ProductDesignStepId,
+  type ProductionTrack,
+} from "@/lib/product-design-workflow";
+import { resolveMarketingPlansForDisplay } from "@/lib/product-design-marketing-parse";
+import { toAssistantChatContent } from "@/lib/product-design-assistant-display";
 import type {
   EcomPlatformSpec,
   ProductDesignBrief,
   ProductDesignChatMessage,
   ProductDesignProject,
 } from "@/lib/product-design-types";
-import {
-  ANALYZE_DETAIL_DECOMPOSE_CHOICE,
-  bootstrapFastMainDesignPatch,
-  buildProductDesignNextStepCommand,
-  choicePrompt,
-  CONFIRM_BRIEF_MULTI_CHOICE,
-  CONFIRM_TRUST_BADGE_CHOICE,
-  CUSTOM_INPUT_CHOICE,
-  defaultMainImageRefPrompt,
-  DETAIL_COUNT_CHOICE_PREFIX,
-  DETAIL_DECOMPOSE_CHOICE,
-  DETAIL_INTERACTIVE_CHOICE,
-  formatBriefMultiValue,
-  ENTER_DETAIL_PAGE_CHOICE,
-  GENERATE_DETAIL_IMAGES_CHOICE,
-  GENERATE_MAIN_IMAGES_CHOICE,
-  hasDetailStyleRef,
-  inferProductDesignChoices,
-  INTERACTIVE_WORKFLOW_CHOICE,
-  isBriefMultiToggleOption,
-  isFastMainPath,
-  isPrimaryBriefAction,
-  isReviseDimensionChoice,
-  isTrustBadgeOption,
-  MAIN_COUNT_CHOICE_PREFIX,
-  MAIN_REF_PROMPT_WORKFLOW_CHOICE,
-  NO_TRUST_BADGE_CHOICE,
-  nextBriefField,
-  parseCountChoice,
-  parseMarketingPlanChoice,
-  parseMarketingPlansFromMarkdown,
-  parsePlatformChoice,
-  productDesignAssistantAnchorId,
-  inferAssistantMessageStep,
-  PRODUCT_DESIGN_STEPS,
-  REVISE_CHOICE,
-  REVISE_DIMENSION_CHOICES,
-  NEXT_STEP_CHOICE,
-  REGENERATE_MARKETING_PLANS_CHOICE,
-  SKIP_STYLE_REF_CHOICE,
-  type ProductDesignStepId,
-} from "@/lib/product-design-workflow";
-import { hasProductRef } from "@/lib/product-design-ref-rules";
-import { toAssistantChatContent } from "@/lib/product-design-assistant-display";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 
-const WELCOME: ProductDesignChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content: `你好，我是【电商商品视觉全链路设计 Agent】。
+type ProjectPatch = Parameters<typeof updateProductDesignProject>[1];
 
-我会按 9 步产出一整套「主图 + 详情页」的定稿文案与配图。
-
-**请先上传产品实拍主图（必传）** → 可选上传风格参考图 → 选择上架平台 → 点选产品信息，尽量无需打字。`,
-  createdAt: new Date().toISOString(),
+type OptimisticProjectPatch = {
+  platform?: string;
+  settings?: ProductDesignProject["settings"];
+  brief?: ProductDesignBrief;
+  meta?: Record<string, unknown>;
 };
+
+function mergeOptimisticPatch(
+  prev: OptimisticProjectPatch | null,
+  patch: ProjectPatch,
+  project: ProductDesignProject,
+): OptimisticProjectPatch {
+  return {
+    platform: patch.platform ?? prev?.platform,
+    settings: patch.settings
+      ? { ...(prev?.settings ?? project.settings), ...patch.settings }
+      : prev?.settings,
+    brief: patch.brief
+      ? ({ ...(prev?.brief ?? project.brief ?? {}), ...patch.brief } as ProductDesignBrief)
+      : prev?.brief,
+    meta: patch.meta ? { ...(prev?.meta ?? {}), ...patch.meta } : prev?.meta,
+  };
+}
+
+function optimisticPatchSynced(
+  project: ProductDesignProject,
+  optimistic: OptimisticProjectPatch,
+): boolean {
+  if (optimistic.platform !== undefined && project.platform !== optimistic.platform) {
+    return false;
+  }
+  if (optimistic.settings) {
+    for (const [k, v] of Object.entries(optimistic.settings)) {
+      if (project.settings?.[k as keyof ProductDesignProject["settings"]] !== v) {
+        return false;
+      }
+    }
+  }
+  if (optimistic.brief) {
+    for (const [k, v] of Object.entries(optimistic.brief)) {
+      if (project.brief?.[k as keyof ProductDesignBrief] !== v) {
+        return false;
+      }
+    }
+  }
+  if (optimistic.meta) {
+    for (const [k, v] of Object.entries(optimistic.meta)) {
+      if (project.meta?.[k] !== v) return false;
+    }
+  }
+  return true;
+}
+
+function welcomeMessage(track: ProductionTrack): ProductDesignChatMessage {
+  const scope =
+    track === "detail"
+      ? "本工作台只做 **产品详情页**。若已在「电商产品主图创作」做过同一款产品，可点顶部「从主图项目导入」带入 Step0–3 的策略层，不必重填。"
+      : "本工作台只做 **产品主图**。主图出齐后，中间工作区会出现入口，一键把策略层带去「电商产品详情页创作」。";
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: `你好，我是【电商商品视觉全链路设计 Agent】。
+
+${scope}可选择 **助手流程（Step by step）** 或 **参考图 + Prompt**。
+
+**本栏**：过程、结论与全部点选交互（制作方式、平台/张数、信息采集、方案、下一步 / 修改当前步）。  
+**中间工作区**：上传产品图与参考图（参考可选）、展示结论供铅笔修改、出图与 Prompt 计划。
+
+请先在中间工作区上传 **产品实拍图（必传）**；上传完成后在本栏点选制作方式。`,
+    createdAt: new Date().toISOString(),
+  };
+}
 
 const REVISE_PROMPTS: Record<(typeof REVISE_DIMENSION_CHOICES)[number], string> = {
   "修改：核心目标人群": "请根据当前 Step1 拆解，重新分析并更新【核心目标人群】相关结论，输出完整 Step1 报告。",
@@ -95,14 +161,16 @@ type Props = {
   onStreamingChange?: (streaming: boolean) => void;
   onRequestGenerateMainImages?: () => void;
   onRequestGenerateDetailImages?: () => void;
-  enterDetailPageToken?: number;
-  analyzeDetailDecomposeToken?: number;
-  mainWorkflowChoice?: "interactive" | "reference-prompt" | null;
-  mainWorkflowChoiceToken?: number;
+  startStep1Token?: number;
+  startDetailOutlineToken?: number;
+  regenerateMarketingPlansToken?: number;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
   focusStepId?: ProductDesignStepId | null;
   onFocusStep?: (stepId: ProductDesignStepId) => void;
+  onChooseDetailWorkflow?: (mode: DetailWorkflowPath) => void;
+  onBriefComplete?: () => void;
+  onRegenerateMarketingPlans?: () => void;
 };
 
 export function ProductDesignAssistantPanel({
@@ -115,61 +183,55 @@ export function ProductDesignAssistantPanel({
   onStreamingChange,
   onRequestGenerateMainImages,
   onRequestGenerateDetailImages,
-  enterDetailPageToken = 0,
-  analyzeDetailDecomposeToken = 0,
-  mainWorkflowChoice = null,
-  mainWorkflowChoiceToken = 0,
+  startStep1Token = 0,
+  startDetailOutlineToken = 0,
+  regenerateMarketingPlansToken = 0,
   composerWide = false,
   onComposerWideChange,
   focusStepId = null,
   onFocusStep,
+  onChooseDetailWorkflow,
+  onBriefComplete,
+  onRegenerateMarketingPlans,
 }: Props) {
   const projectId = project.id;
   const chatHistory = project.chatHistory;
+  const track = resolveActiveTrack(project);
   const [messages, setMessages] = useState<ProductDesignChatMessage[]>(
-    chatHistory.length ? chatHistory : [WELCOME],
+    chatHistory.length ? chatHistory : [welcomeMessage(track)],
   );
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
-  const [suggestingBrief, setSuggestingBrief] = useState(false);
-  const [briefMultiDraft, setBriefMultiDraft] = useState<string[]>([]);
-  const [customInputField, setCustomInputField] = useState<string | null>(null);
-  const [optimisticMeta, setOptimisticMeta] = useState<Record<string, unknown> | null>(null);
+  const [optimisticPatch, setOptimisticPatch] = useState<OptimisticProjectPatch | null>(null);
   const [choiceBusy, setChoiceBusy] = useState(false);
+  const [briefSuggesting, setBriefSuggesting] = useState(false);
+  const [briefMultiDraft, setBriefMultiDraft] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
 
+  // 只在切换项目时重置输入与乐观态；消息本身由下方 chatHistory 副作用负责填充
   useEffect(() => {
-    setMessages(chatHistory.length ? chatHistory : [WELCOME]);
     setInput("");
-    setBriefMultiDraft([]);
-    setCustomInputField(null);
-    setOptimisticMeta(null);
+    setOptimisticPatch(null);
   }, [projectId]);
 
   useEffect(() => {
-    if (!optimisticMeta) return;
-    const merged = { ...(project.meta ?? {}), ...optimisticMeta };
-    let matched = true;
-    for (const [k, v] of Object.entries(optimisticMeta)) {
-      if (project.meta?.[k] !== v) {
-        matched = false;
-        break;
-      }
+    if (!optimisticPatch) return;
+    if (optimisticPatchSynced(project, optimisticPatch)) {
+      setOptimisticPatch(null);
     }
-    if (matched) setOptimisticMeta(null);
-  }, [project.meta, optimisticMeta]);
+  }, [project, optimisticPatch]);
 
   useEffect(() => {
     if (streaming) return;
     if (chatHistory.length) setMessages(chatHistory);
-    else setMessages([WELCOME]);
-  }, [chatHistory, streaming]);
+    else setMessages([welcomeMessage(track)]);
+  }, [chatHistory, streaming, track]);
 
   useEffect(() => {
-    onStreamingChange?.(streaming);
-  }, [streaming, onStreamingChange]);
+    onStreamingChange?.(streaming || briefSuggesting);
+  }, [streaming, briefSuggesting, onStreamingChange]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -211,71 +273,41 @@ export function ProductDesignAssistantPanel({
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [focusStepId, messages, streamText, streaming]);
 
+  useEffect(() => {
+    setBriefMultiDraft([]);
+  }, [projectId, nextBriefField(project.brief)?.key]);
+
+  useEffect(() => {
+    if (!needsBriefCollection(project)) setBriefSuggesting(false);
+  }, [project]);
+
   const effectiveProject = useMemo<ProductDesignProject>(
     () => ({
       ...project,
-      meta: optimisticMeta ? { ...(project.meta ?? {}), ...optimisticMeta } : project.meta,
+      platform: optimisticPatch?.platform ?? project.platform,
+      settings: { ...project.settings, ...optimisticPatch?.settings },
+      brief: optimisticPatch?.brief ?? project.brief,
+      meta: optimisticPatch?.meta
+        ? { ...(project.meta ?? {}), ...optimisticPatch.meta }
+        : project.meta,
       chatHistory: messages.filter(
         (m) => m.id !== "welcome" && m.id !== "streaming" && !m.id.startsWith("err-"),
       ),
     }),
-    [project, messages, optimisticMeta],
+    [project, messages, optimisticPatch],
   );
 
+  const briefInferBusy =
+    briefSuggesting || isBriefSuggestionsPending(effectiveProject);
   const choices =
-    streaming || suggestingBrief || choiceBusy
+    streaming || choiceBusy || briefInferBusy
       ? []
-      : inferProductDesignChoices(effectiveProject, specs);
-  const marketingChoices = choices.filter((c) => parseMarketingPlanChoice(c) != null);
-  const navChoices = choices.filter((c) => parseMarketingPlanChoice(c) == null);
+      : inferAssistantChoices(effectiveProject, specs);
   const prompt = choicePrompt(effectiveProject, specs);
-  const pendingField = nextBriefField(project.brief);
-  const setupDone =
-    hasProductRef(project.references) && Boolean(project.meta?.countsConfirmed);
-
-  const briefCustomActive =
-    pendingField != null &&
-    customInputField === pendingField.key &&
-    (pendingField.freeText || pendingField.aiInferrable);
-
-  useEffect(() => {
-    setBriefMultiDraft([]);
-  }, [pendingField?.key]);
-
-  useEffect(() => {
-    if (!setupDone || !pendingField?.aiInferrable) return;
-    if (project.meta?.briefSuggestionsLoaded) return;
-    let cancelled = false;
-    setSuggestingBrief(true);
-    void suggestProductDesignBrief(projectId, { modelKey: visionModelKey })
-      .then(async () => {
-        if (!cancelled) await onProjectChange();
-      })
-      .catch(() => {
-        /* 推断失败时仍可用自己输入 */
-      })
-      .finally(() => {
-        if (!cancelled) setSuggestingBrief(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    setupDone,
-    pendingField?.key,
-    pendingField?.aiInferrable,
-    project.meta?.briefSuggestionsLoaded,
-    projectId,
-    visionModelKey,
-    onProjectChange,
-  ]);
+  const pendingBriefField = nextBriefField(effectiveProject.brief);
 
   const appendLocal = useCallback(
-    async (
-      userText: string,
-      assistantText: string,
-      patch?: Parameters<typeof updateProductDesignProject>[1],
-    ) => {
+    async (userText: string, assistantText: string, patch?: ProjectPatch) => {
       const now = new Date().toISOString();
       const next: ProductDesignChatMessage[] = [
         ...messages.filter((m) => m.id !== "welcome"),
@@ -287,15 +319,44 @@ export function ProductDesignAssistantPanel({
           createdAt: now,
         },
       ];
-      setMessages(next);
-      if (patch?.meta) {
-        setOptimisticMeta((prev) => ({ ...(prev ?? {}), ...patch.meta }));
+      if (patch) {
+        setOptimisticPatch((prev) => mergeOptimisticPatch(prev, patch, project));
       }
+      setMessages(next);
       await updateProductDesignProject(projectId, { ...patch, chatHistory: next });
       await onProjectChange();
       return next;
     },
-    [messages, projectId, onProjectChange],
+    [messages, project, projectId, onProjectChange],
+  );
+
+  const saveBriefFromChat = useCallback(
+    async (stored: string | string[]) => {
+      const field = nextBriefField(effectiveProject.brief);
+      if (!field) return;
+      const briefPatch = { [field.key]: stored } as ProductDesignBrief;
+      const mergedBrief = {
+        ...(effectiveProject.brief ?? {}),
+        ...briefPatch,
+      } as ProductDesignBrief;
+      setBriefMultiDraft([]);
+      if (!nextBriefField(mergedBrief)) {
+        onBriefComplete?.();
+        await appendLocal(
+          Array.isArray(stored) ? stored.join("、") : stored,
+          "信息采集已完成。结论已同步到中间工作区，可随时修改；确认无误后点 **下一步** 开始平台拆解。",
+          { brief: briefPatch },
+        );
+        return;
+      }
+      const nextField = nextBriefField(mergedBrief)!;
+      await appendLocal(
+        Array.isArray(stored) ? stored.join("、") : stored,
+        `${nextField.prompt}\n\n（已填项会同步到中间工作区，可用铅笔修改）`,
+        { brief: briefPatch },
+      );
+    },
+    [appendLocal, effectiveProject.brief, onBriefComplete],
   );
 
   const runLlm = useCallback(
@@ -314,7 +375,6 @@ export function ProductDesignAssistantPanel({
         },
       ];
       setInput("");
-      setCustomInputField(null);
       setMessages(base);
       stickToBottomRef.current = true;
       setStreaming(true);
@@ -363,229 +423,223 @@ export function ProductDesignAssistantPanel({
     [streaming, messages, projectId, chatModelKey, onProjectChange],
   );
 
-  const submitBriefValue = useCallback(
-    async (value: string) => {
-      const field = nextBriefField(project.brief);
-      if (!field) return;
-      let stored: string | string[] = value.trim();
-      if (field.multiSelect) {
-        const items = value
-          .split(/\n+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
-        stored = items.length ? items : [value.trim()];
-      }
-      const label = formatBriefMultiValue(stored);
-      const brief: ProductDesignBrief = { [field.key]: stored };
-      const remaining = nextBriefField({ ...project.brief, ...brief });
-      const reply = remaining
-        ? `已记录${field.label}：${label}\n${remaining.prompt}`
-        : `已记录${field.label}：${label}\n信息齐了，我这就开始 Step1 平台合规与产品深度拆解。`;
-      setInput("");
-      setCustomInputField(null);
-      setBriefMultiDraft([]);
-      const next = await appendLocal(label, reply, { brief });
-      if (!remaining) {
-        const spec = specs.find((s) => s.code === project.platform);
-        await runLlm(
-          `参数已确认 | 平台：${spec?.label ?? project.platform}。请执行 Step1 平台合规与产品深度拆解。`,
-          next,
-        );
-      }
-    },
-    [project.brief, project.platform, specs, appendLocal, runLlm],
-  );
-
-  const submitBriefMulti = useCallback(
-    async (selected: string[]) => {
-      if (!selected.length) return;
-      const field = nextBriefField(project.brief);
-      if (!field?.multiSelect) return;
-
-      let stored: string[] = selected;
-      if (field.key === "hasTrustBadge") {
-        stored = selected.includes(NO_TRUST_BADGE_CHOICE) || selected.includes("暂无背书")
-          ? [NO_TRUST_BADGE_CHOICE]
-          : selected;
-      }
-
-      const brief: ProductDesignBrief = { [field.key]: stored };
-      const remaining = nextBriefField({ ...project.brief, ...brief });
-      const label = formatBriefMultiValue(stored);
-      const reply = remaining
-        ? `已记录${field.label}：${label}\n${remaining.prompt}`
-        : `已记录${field.label}：${label}\n信息齐了，我这就开始 Step1 平台合规与产品深度拆解。`;
-      setBriefMultiDraft([]);
-      const next = await appendLocal(`${field.label}：${label}`, reply, { brief });
-      if (!remaining) {
-        const spec = specs.find((s) => s.code === project.platform);
-        await runLlm(
-          `参数已确认 | 平台：${spec?.label ?? project.platform}。请执行 Step1 平台合规与产品深度拆解。`,
-          next,
-        );
-      }
-    },
-    [project.brief, project.platform, specs, appendLocal, runLlm],
-  );
-
-  async function ensureMarketingPlansInProject(): Promise<ProductDesignProject> {
-    if ((project.design?.marketingPlans.length ?? 0) > 0) return project;
-    try {
-      const synced = await syncProductDesign(projectId);
-      if ((synced.design?.marketingPlans.length ?? 0) > 0) {
-        await onProjectChange();
-        return synced;
-      }
-    } catch {
-      /* fallback parse */
-    }
-    const lastAssistant = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant" && m.id !== "welcome");
-    if (lastAssistant?.content) {
-      const plans = parseMarketingPlansFromMarkdown(lastAssistant.content);
-      if (plans.length) {
-        await updateProductDesignProject(projectId, { designPatch: { marketingPlans: plans } });
-        await onProjectChange();
-        return {
-          ...project,
-          design: {
-            marketingPlans: plans,
-            buyingReasons: project.design?.buyingReasons ?? [],
-            mainImages: project.design?.mainImages ?? [],
-            detailOutline: project.design?.detailOutline ?? [],
-            detailPages: project.design?.detailPages ?? [],
-            analysis: project.design?.analysis,
-            selectedPlanNo: project.design?.selectedPlanNo,
-            visualBrief: project.design?.visualBrief,
-          },
-        };
-      }
-    }
-    return project;
+  async function handleChooseMainWorkflowFromChat(mode: MainWorkflowPath) {
+    const isInteractive = mode === "interactive";
+    const userText = isInteractive
+      ? INTERACTIVE_WORKFLOW_CHOICE
+      : MAIN_REF_PROMPT_WORKFLOW_CHOICE;
+    const assistantText = isInteractive
+      ? "好的，请点选下方上架平台。确认平台后再选主图数量，并完成信息采集；结论会同步到中间工作区供修改。"
+      : "请在中间工作区选择平台、填写 Prompt（参考图可选），进入 Prompt 计划后拆解并确认。";
+    await appendLocal(userText, assistantText, {
+      meta: {
+        mainWorkflowPath: mode,
+        setupPhase: "platform",
+        platformConfirmed: false,
+        mainCountConfirmed: false,
+        countsConfirmed: false,
+      },
+      settings: { mainImageGenMode: workflowPathToGenMode(mode) },
+    });
+    if (!isInteractive) onFocusStep?.("main-image");
   }
 
-  const enterDetailRef = useRef(enterDetailPageToken);
-  const analyzeDetailRef = useRef(analyzeDetailDecomposeToken);
-  const mainWorkflowChoiceRef = useRef(mainWorkflowChoiceToken);
-
-  async function handleChoice(text: string) {
-    if (choiceBusy) return;
-    setChoiceBusy(true);
-    try {
-      await handleChoiceInner(text);
-    } finally {
-      setChoiceBusy(false);
+  /** Step0 读图推断：仅在用户点选「AI 拆解」后才发起视觉调用 */
+  async function handleBriefInferModeChoice(mode: "ai" | "manual") {
+    const field = nextBriefField(effectiveProject.brief);
+    if (mode === "manual") {
+      await appendLocal(
+        BRIEF_MANUAL_INPUT_CHOICE,
+        field
+          ? `好的，全部手动填写。${field.prompt}`
+          : "好的，全部手动填写。",
+        { meta: { briefInferMode: "manual" } },
+      );
+      return;
     }
+
+    setBriefSuggesting(true);
+    try {
+      await appendLocal(
+        BRIEF_AI_INFER_CHOICE,
+        "正在读取产品图，推断产品名、目标人群、核心痛点与核心优势…",
+        { meta: { briefInferMode: "ai" } },
+      );
+      await suggestProductDesignBrief(projectId, { modelKey: visionModelKey });
+      await onProjectChange();
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: "assistant",
+          content: `读图推断失败：${e instanceof Error ? e.message : String(e)}。可点「手动输入」继续。`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      await updateProductDesignProject(projectId, {
+        meta: { briefInferMode: "manual" },
+      });
+      await onProjectChange();
+    } finally {
+      setBriefSuggesting(false);
+    }
+  }
+
+  /** 详情产线：沿用主图阶段已产出的 Step0–3 策略层，或重新采集 */
+  async function handleStrategyReuseChoice(reuse: boolean) {
+    if (reuse) {
+      await appendLocal(
+        REUSE_STRATEGY_CHOICE,
+        "已沿用现有策略层（信息采集、平台拆解、营销方案、购买理由）。点 **下一步** 开始 Step7 详情页架构规划。",
+        { meta: { strategyReuse: "reuse" } },
+      );
+      return;
+    }
+    await appendLocal(
+      RECOLLECT_STRATEGY_CHOICE,
+      "好的。请在中间工作区用铅笔修改 Step0–3 的策略层内容（营销方案名不可改，其余字段均可编辑），改完回到本栏点 **下一步** 开始 Step7。",
+      { meta: { strategyReuse: "edit" } },
+    );
+    onFocusStep?.("marketing");
   }
 
   async function handleChoiceInner(text: string) {
-    if (text === SKIP_STYLE_REF_CHOICE) {
-      await appendLocal(text, "好的，请选择上架平台：", {
-        meta: { setupPhase: "platform", styleRefSkipped: true, mainWorkflowPath: "interactive" },
-      });
-      return;
-    }
-
     if (text === INTERACTIVE_WORKFLOW_CHOICE) {
-      await appendLocal(text, "好的，请选择上架平台：", {
-        meta: { mainWorkflowPath: "interactive", setupPhase: "platform" },
-        settings: { mainImageGenMode: "copy" },
-      });
+      await handleChooseMainWorkflowFromChat("interactive");
       return;
     }
-
     if (text === MAIN_REF_PROMPT_WORKFLOW_CHOICE) {
-      await appendLocal(text, "好的，请选择上架平台与主图张数：", {
-        meta: { mainWorkflowPath: "reference-prompt", setupPhase: "platform" },
-        settings: { mainImageGenMode: "reference-prompt" },
-      });
+      await handleChooseMainWorkflowFromChat("prompt");
       return;
     }
-
     if (text === DETAIL_INTERACTIVE_CHOICE) {
-      await appendLocal(text, "将进入 Step7 详情页架构规划。", {
-        meta: { detailWorkflowPath: "interactive" },
-        settings: { detailPageGenMode: "copy" },
-      });
-      onFocusStep?.("detail-outline");
-      const cmd = buildProductDesignNextStepCommand({
-        ...project,
-        meta: { ...project.meta, detailWorkflowPath: "interactive" },
-      });
-      if (cmd) await runLlm(cmd.prompt);
+      onChooseDetailWorkflow?.("interactive");
+      return;
+    }
+    if (text === DETAIL_REF_PROMPT_WORKFLOW_CHOICE) {
+      onChooseDetailWorkflow?.("prompt");
+      return;
+    }
+    if (text === BRIEF_AI_INFER_CHOICE) {
+      await handleBriefInferModeChoice("ai");
+      return;
+    }
+    if (text === BRIEF_MANUAL_INPUT_CHOICE) {
+      await handleBriefInferModeChoice("manual");
+      return;
+    }
+    if (text === REUSE_STRATEGY_CHOICE || text === RECOLLECT_STRATEGY_CHOICE) {
+      await handleStrategyReuseChoice(text === REUSE_STRATEGY_CHOICE);
       return;
     }
 
-    if (text === DETAIL_DECOMPOSE_CHOICE) {
+    const platformSpec = parsePlatformChoice(text, specs);
+    if (platformSpec) {
       await appendLocal(
         text,
-        "请在中间工作区上传详情页参考长图（detail-style），然后点「分析并拆解详情页」。",
+        `已选择【${platformSpec.label}】。请点选下方主图张数。`,
         {
-          meta: { detailWorkflowPath: "reference-decompose" },
-          settings: { detailPageGenMode: "reference-decompose" },
+          platform: platformSpec.code,
+          settings: {
+            mainImageCount: platformSpec.mainImage.recommended,
+            detailPageCount: platformSpec.detailPage.recommended,
+            mainImageRatio: platformSpec.mainImage.ratio,
+            detailPageRatio: platformSpec.detailPage.ratio,
+          },
+          meta: {
+            setupPhase: "done",
+            platformConfirmed: true,
+            mainCountConfirmed: false,
+            countsConfirmed: false,
+          },
         },
       );
-      onFocusStep?.("detail-image");
       return;
     }
 
-    if (text === ANALYZE_DETAIL_DECOMPOSE_CHOICE) {
-      if (!hasDetailStyleRef(project.references)) {
-        await appendLocal(text, "请先在中间工作区上传详情页参考长图（detail-style），再点「分析并拆解详情页」。", {});
-        return;
-      }
-      await runLlm(
-        `【详情页拆解模式】请阅读已上传的详情页风格参考图（detail-style），结合产品信息与已生成主图，拆解为 ${project.resolved.detailPageCount} 屏：先输出 detailOutline（每屏 mission / doubtResolved / titleDirection / tag），再输出 detailPages（每屏 title / body / purpose / layoutHint）。须包含 product-design JSON 补丁。`,
+    const mainCount = parseCountChoice(text, MAIN_COUNT_CHOICE_PREFIX);
+    if (mainCount != null) {
+      const field = nextBriefField(effectiveProject.brief);
+      await appendLocal(
+        text,
+        field
+          ? `${field.prompt}\n\n（完成后结论同步到中间工作区，可铅笔修改）`
+          : "参数已确认。点 **下一步** 开始平台拆解。",
+        {
+          settings: { mainImageCount: mainCount },
+          meta: { mainCountConfirmed: true },
+        },
       );
       return;
     }
 
-    if (text === ENTER_DETAIL_PAGE_CHOICE && !project.meta?.detailWorkflowPath) {
-      await appendLocal(text, "请选择详情页制作方式：", {});
+    const detailCount = parseCountChoice(text, DETAIL_COUNT_CHOICE_PREFIX);
+    if (detailCount != null) {
+      await appendLocal(
+        text,
+        "详情屏数已确认。请点选下方详情页制作方式。",
+        {
+          settings: { detailPageCount: detailCount },
+          meta: { countsConfirmed: true, setupPhase: "done" },
+        },
+      );
       return;
     }
 
-    if (text === CUSTOM_INPUT_CHOICE && pendingField) {
-      setCustomInputField(pendingField.key);
+    if (text === REGENERATE_MARKETING_PLANS_CHOICE) {
+      onRegenerateMarketingPlans?.();
       return;
     }
 
-    if (text === CONFIRM_TRUST_BADGE_CHOICE || text === CONFIRM_BRIEF_MULTI_CHOICE) {
-      await submitBriefMulti(briefMultiDraft);
+    if (text === CUSTOM_INPUT_CHOICE) {
+      await appendLocal(
+        text,
+        "请在下方输入框填写内容后发送；也可在中间工作区点「自己输入」。",
+        {},
+      );
       return;
     }
 
-    if (text === NO_TRUST_BADGE_CHOICE && pendingField?.key === "hasTrustBadge") {
-      await submitBriefMulti([NO_TRUST_BADGE_CHOICE]);
+    if (pendingBriefField && isPrimaryBriefAction(text)) {
+      const stored =
+        pendingBriefField.key === "hasTrustBadge" &&
+        briefMultiDraft.includes(NO_TRUST_BADGE_CHOICE)
+          ? [NO_TRUST_BADGE_CHOICE]
+          : briefMultiDraft;
+      if (stored.length === 0) {
+        await appendLocal(text, "请至少选择一项，或点「自己输入」。", {});
+        return;
+      }
+      await saveBriefFromChat(stored);
       return;
     }
 
-    if (isTrustBadgeOption(text) && pendingField?.key === "hasTrustBadge") {
-      setBriefMultiDraft((prev) => {
-        const withoutNone = prev.filter((x) => x !== NO_TRUST_BADGE_CHOICE && x !== "暂无背书");
-        return withoutNone.includes(text)
-          ? withoutNone.filter((x) => x !== text)
-          : [...withoutNone, text];
-      });
-      return;
-    }
-
-    if (isBriefMultiToggleOption(effectiveProject, text) && pendingField?.multiSelect) {
+    if (pendingBriefField && isBriefMultiToggleOption(effectiveProject, text)) {
       setBriefMultiDraft((prev) =>
         prev.includes(text) ? prev.filter((x) => x !== text) : [...prev, text],
       );
       return;
     }
 
-    if (text === REGENERATE_MARKETING_PLANS_CHOICE) {
-      await updateProductDesignProject(projectId, {
-        designPatch: { marketingPlans: [], selectedPlanNo: undefined },
-      });
-      await onProjectChange();
-      await runLlm(
-        "三套营销方案都不合适。请结合当前 Step1 拆解与用户产品信息，重新生成 Step2 三套差异化营销方案（须输出 product-design JSON 或 Markdown 表格）。",
-      );
+    if (pendingBriefField && isBriefAiSuggestionChoice(effectiveProject, text)) {
+      await saveBriefFromChat(text);
+      return;
+    }
+
+    if (
+      pendingBriefField &&
+      (pendingBriefField.options?.includes(text) ||
+        isTrustBadgeOption(text) ||
+        text === NO_TRUST_BADGE_CHOICE)
+    ) {
+      if (pendingBriefField.multiSelect) {
+        setBriefMultiDraft((prev) =>
+          prev.includes(text) ? prev.filter((x) => x !== text) : [...prev, text],
+        );
+        return;
+      }
+      await saveBriefFromChat(text);
       return;
     }
 
@@ -606,7 +660,7 @@ export function ProductDesignAssistantPanel({
       return;
     }
 
-    if (text === NEXT_STEP_CHOICE || text === ENTER_DETAIL_PAGE_CHOICE) {
+    if (text === NEXT_STEP_CHOICE) {
       let projectForStep: ProductDesignProject = effectiveProject;
       try {
         await syncProductDesign(projectId);
@@ -622,6 +676,19 @@ export function ProductDesignAssistantPanel({
         await runLlm(cmd.prompt);
         return;
       }
+      const hint =
+        nextStepChoiceHint(projectForStep) ??
+        "请先完成下方点选或必要操作，再点「下一步」。";
+      await appendLocal(text, hint, {});
+      if (needsBriefCollection(projectForStep)) {
+        onFocusStep?.("brief");
+      } else if (
+        projectForStep.design?.mainImages.every((m) => m.imageUrl) &&
+        !projectForStep.meta?.detailWorkflowPath
+      ) {
+        onFocusStep?.("main-image");
+      }
+      return;
     }
 
     if (isReviseDimensionChoice(text)) {
@@ -631,132 +698,24 @@ export function ProductDesignAssistantPanel({
       return;
     }
 
-    if (!hasProductRef(project.references)) return;
-
-    if (text === GENERATE_MAIN_IMAGES_CHOICE) {
-      onRequestGenerateMainImages?.();
-      return;
-    }
-    if (text === GENERATE_DETAIL_IMAGES_CHOICE) {
-      onRequestGenerateDetailImages?.();
-      return;
-    }
-
-    const spec = parsePlatformChoice(text, specs);
-    if (spec) {
-      await appendLocal(
-        text,
-        `已选择【${spec.label}】。\n${spec.note}\n\n${spec.label} 主图建议 ${spec.mainImage.recommended} 张，请确认张数：`,
-        {
-          platform: spec.code,
-          settings: {
-            mainImageCount: spec.mainImage.recommended,
-            detailPageCount: spec.detailPage.recommended,
-            mainImageRatio: spec.mainImage.ratio,
-            detailPageRatio: spec.detailPage.ratio,
-          },
-          meta: {
-            setupPhase: "done",
-            platformConfirmed: true,
-            mainCountConfirmed: false,
-            countsConfirmed: false,
-          },
-        },
-      );
-      return;
-    }
-
-    const mainCount = parseCountChoice(text, MAIN_COUNT_CHOICE_PREFIX);
-    if (mainCount != null) {
-      const current = specs.find((s) => s.code === project.platform);
-      if (isFastMainPath(project)) {
-        const detailCount = current?.detailPage.recommended ?? 8;
-        const draftProject: ProductDesignProject = {
-          ...project,
-          settings: {
-            ...project.settings,
-            mainImageCount: mainCount,
-            detailPageCount: detailCount,
-            mainImageGenMode: "reference-prompt",
-          },
-          resolved: {
-            ...project.resolved,
-            mainImageCount: mainCount,
-            detailPageCount: detailCount,
-          },
-        };
-        const customPrompt = defaultMainImageRefPrompt(draftProject);
-        await appendLocal(
-          text,
-          `主图 ${mainCount} 张。已跳过 Step1–4，请在中间工作区确认 Prompt 并出主图。`,
-          {
-            settings: {
-              mainImageCount: mainCount,
-              detailPageCount: detailCount,
-              mainImageGenMode: "reference-prompt",
-              mainImageCustomPrompt: customPrompt,
-            },
-            meta: {
-              mainCountConfirmed: true,
-              countsConfirmed: true,
-              setupPhase: "done",
-              briefSkipped: true,
-            },
-            designPatch: bootstrapFastMainDesignPatch(mainCount),
-          },
-        );
-        onFocusStep?.("main-image");
-        await onProjectChange();
-        return;
-      }
-      await appendLocal(
-        text,
-        `主图定为 ${mainCount} 张。\n请确认详情页屏数（建议 ${current?.detailPage.recommended ?? 8} 屏）：`,
-        { settings: { mainImageCount: mainCount }, meta: { mainCountConfirmed: true } },
-      );
-      return;
-    }
-
-    const detailCount = parseCountChoice(text, DETAIL_COUNT_CHOICE_PREFIX);
-    if (detailCount != null) {
-      const field = nextBriefField(project.brief);
-      await appendLocal(
-        text,
-        `详情页定为 ${detailCount} 屏。\n${field?.prompt ?? "接下来开始产品拆解。"}`,
-        {
-          settings: { detailPageCount: detailCount },
-          meta: { countsConfirmed: true },
-        },
-      );
-      return;
-    }
-
-    const field = nextBriefField(project.brief);
-    if (field?.options?.includes(text) && !field.multiSelect) {
-      await submitBriefValue(text);
-      return;
-    }
-
-    if (field?.aiInferrable && !field.multiSelect) {
-      const suggestions =
-        (project.meta?.briefSuggestions as Record<string, string[]> | undefined)?.[
-          field.key
-        ] ?? [];
-      if (suggestions.includes(text)) {
-        await submitBriefValue(text);
-        return;
-      }
-    }
-
     const planNo = parseMarketingPlanChoice(text);
     if (planNo != null) {
-      const hydrated = await ensureMarketingPlansInProject();
-      const plan = hydrated.design?.marketingPlans.find((p) => p.no === planNo);
-      if (plan) {
+      // 方案一经选定即锁定，不接受改选
+      if (project.design?.selectedPlanNo != null) {
         await appendLocal(
           text,
-          `已选定【方案 ${planNo} · ${plan.name}】。\n接下来我会按此方案产出购买理由；你也可在右侧直接改文案。\n点击【下一步】继续 Step3。`,
-          { designPatch: { marketingPlans: hydrated.design!.marketingPlans, selectedPlanNo: planNo } },
+          `方案 ${project.design.selectedPlanNo} 已锁定，不能更换。方案内容可在中间工作区编辑；点【下一步】继续。`,
+          {},
+        );
+        return;
+      }
+      const plans = resolveMarketingPlansForDisplay(project);
+      const plan = plans.find((p) => p.no === planNo);
+      if (plan) {
+        await appendLocal(
+          marketingPlanChoiceLabel(planNo),
+          `已选定【方案 ${planNo} · ${plan.name}】（锁定，不可更换）。\n结论已同步到中间工作区，方案内容仍可编辑。\n点击【下一步】继续 Step3。`,
+          { designPatch: { selectedPlanNo: planNo } },
         );
         return;
       }
@@ -765,40 +724,64 @@ export function ProductDesignAssistantPanel({
     await runLlm(text);
   }
 
-  useEffect(() => {
-    if (enterDetailPageToken === enterDetailRef.current) return;
-    enterDetailRef.current = enterDetailPageToken;
-    if (enterDetailPageToken > 0) {
-      void handleChoice(ENTER_DETAIL_PAGE_CHOICE);
+  function isReviseDimensionChoice(
+    text: string,
+  ): text is (typeof REVISE_DIMENSION_CHOICES)[number] {
+    return (REVISE_DIMENSION_CHOICES as readonly string[]).includes(text);
+  }
+
+  const startStep1Ref = useRef(startStep1Token);
+  const startDetailOutlineRef = useRef(startDetailOutlineToken);
+  const regenerateMarketingRef = useRef(regenerateMarketingPlansToken);
+
+  async function handleChoice(text: string) {
+    if (choiceBusy) return;
+    setChoiceBusy(true);
+    try {
+      await handleChoiceInner(text);
+    } finally {
+      setChoiceBusy(false);
     }
-  }, [enterDetailPageToken]);
+  }
 
   useEffect(() => {
-    if (analyzeDetailDecomposeToken === analyzeDetailRef.current) return;
-    analyzeDetailRef.current = analyzeDetailDecomposeToken;
-    if (analyzeDetailDecomposeToken > 0) {
-      void handleChoice(ANALYZE_DETAIL_DECOMPOSE_CHOICE);
-    }
-  }, [analyzeDetailDecomposeToken]);
-
-  useEffect(() => {
-    if (mainWorkflowChoiceToken === mainWorkflowChoiceRef.current) return;
-    mainWorkflowChoiceRef.current = mainWorkflowChoiceToken;
-    if (mainWorkflowChoiceToken <= 0 || !mainWorkflowChoice) return;
-    void handleChoice(
-      mainWorkflowChoice === "interactive"
-        ? INTERACTIVE_WORKFLOW_CHOICE
-        : MAIN_REF_PROMPT_WORKFLOW_CHOICE,
+    if (startStep1Token === startStep1Ref.current) return;
+    startStep1Ref.current = startStep1Token;
+    if (startStep1Token <= 0) return;
+    const spec = specs.find((s) => s.code === project.platform);
+    void runLlm(
+      `参数已确认 | 平台：${spec?.label ?? project.platform}。请执行 Step1 平台合规与产品深度拆解。`,
     );
-  }, [mainWorkflowChoiceToken, mainWorkflowChoice]);
+  }, [startStep1Token]);
+
+  useEffect(() => {
+    if (startDetailOutlineToken === startDetailOutlineRef.current) return;
+    startDetailOutlineRef.current = startDetailOutlineToken;
+    if (startDetailOutlineToken <= 0) return;
+    const detailCount = project.resolved.detailPageCount;
+    void runLlm(
+      `主图已全部生成完毕。【下一步】请执行 Step7：${detailCount} 屏详情页销售逻辑框架（详情页架构规划）。只输出结构大纲，不写逐屏正文；须输出 detailOutline 共 ${detailCount} 条。`,
+    );
+  }, [startDetailOutlineToken]);
+
+  useEffect(() => {
+    if (regenerateMarketingPlansToken === regenerateMarketingRef.current) return;
+    regenerateMarketingRef.current = regenerateMarketingPlansToken;
+    if (regenerateMarketingPlansToken <= 0) return;
+    void (async () => {
+      await updateProductDesignProject(projectId, {
+        designPatch: { marketingPlans: [], selectedPlanNo: undefined },
+      });
+      await onProjectChange();
+      await runLlm(
+        "三套营销方案都不合适。请结合当前 Step1 拆解与用户产品信息，重新生成 Step2 三套差异化营销方案（须输出 product-design JSON 或 Markdown 表格）。",
+      );
+    })();
+  }, [regenerateMarketingPlansToken]);
 
   function handleSend() {
     const text = input.trim();
     if (!text || streaming) return;
-    if (pendingField && setupDone && briefCustomActive) {
-      void submitBriefValue(text);
-      return;
-    }
     void runLlm(text);
   }
 
@@ -827,17 +810,8 @@ export function ProductDesignAssistantPanel({
     return last;
   }, [displayMessages]);
 
-  const inputDisabled =
-    streaming ||
-    suggestingBrief ||
-    (!setupDone && !briefCustomActive) ||
-    Boolean(
-      pendingField &&
-        !briefCustomActive &&
-        (pendingField.options || pendingField.aiInferrable || pendingField.multiSelect),
-    );
-
-  const showThinking = streaming || suggestingBrief || choiceBusy;
+  const inputDisabled = streaming || choiceBusy || briefInferBusy;
+  const showThinking = streaming || choiceBusy;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
@@ -883,95 +857,86 @@ export function ProductDesignAssistantPanel({
               ) : (
                 <p className="whitespace-pre-wrap font-sans">{body}</p>
               )}
-              {isLastAssistant && (marketingChoices.length > 0 || navChoices.length > 0) ? (
+              {isLastAssistant && (briefInferBusy || choices.length > 0) ? (
                 <div className="mt-3 border-t border-[var(--ecom-assistant-border)] pt-3">
-                  <p className="mb-2 text-[11px] text-[#6e6e73]">{prompt}</p>
-                  {marketingChoices.length > 0 ? (
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      {marketingChoices.map((c) => (
-                        <EcomButtonPrimary
-                          key={c}
-                          size="sm"
-                          type="button"
-                          disabled={streaming || suggestingBrief || choiceBusy}
-                          className="!max-w-none shrink-0"
-                          onClick={() => void handleChoice(c)}
-                        >
-                          {c}
-                        </EcomButtonPrimary>
-                      ))}
+                  {briefInferBusy ? (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-[#6e6e73]">
+                        正在根据产品图推断{pendingBriefField?.label ?? "候选项"}…
+                      </p>
+                      <div
+                        className="ecom-upload-progress ecom-upload-progress-indeterminate"
+                        role="progressbar"
+                        aria-valuetext="推断中"
+                      >
+                        <span />
+                      </div>
+                      <p className="text-[10px] text-[#86868b]">
+                        视觉模型分析中，通常需 10～30 秒；完成后会展示可点选候选项。
+                      </p>
                     </div>
-                  ) : null}
-                  {navChoices.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {navChoices.map((c) => {
-                      const isMultiToggle =
-                        (pendingField?.multiSelect &&
-                          (isTrustBadgeOption(c) || isBriefMultiToggleOption(effectiveProject, c))) ||
-                        false;
-                      const selected = isMultiToggle && briefMultiDraft.includes(c);
-                      if (
-                        isPrimaryBriefAction(c) ||
-                        c === ENTER_DETAIL_PAGE_CHOICE ||
-                        c === GENERATE_MAIN_IMAGES_CHOICE ||
-                        c === GENERATE_DETAIL_IMAGES_CHOICE
-                      ) {
-                        return (
-                          <EcomButtonPrimary
-                            key={c}
-                            size="sm"
-                            type="button"
-                            disabled={streaming || suggestingBrief || choiceBusy}
-                            className="!max-w-none shrink-0"
-                            onClick={() => void handleChoice(c)}
-                          >
-                            {c}
-                          </EcomButtonPrimary>
-                        );
-                      }
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          disabled={streaming || suggestingBrief || choiceBusy}
-                          className={cn(
-                            STORYBOARD_ASSISTANT_CHOICE_CLASS,
-                            selected &&
-                              "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[#1d1d1f]",
-                          )}
-                          onClick={() => void handleChoice(c)}
-                        >
-                          {c}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  ) : null}
+                  ) : (
+                    <>
+                      <p className="mb-2 text-[11px] text-[#6e6e73]">{prompt}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {choices.map((c) =>
+                          c === NEXT_STEP_CHOICE ||
+                          c === CONFIRM_BRIEF_MULTI_CHOICE ||
+                          c === CONFIRM_TRUST_BADGE_CHOICE ? (
+                            <EcomButtonPrimary
+                              key={c}
+                              size="sm"
+                              type="button"
+                              disabled={streaming || choiceBusy}
+                              className="!max-w-none shrink-0"
+                              onClick={() => void handleChoice(c)}
+                            >
+                              {c}
+                            </EcomButtonPrimary>
+                          ) : (
+                            <button
+                              key={c}
+                              type="button"
+                              disabled={streaming || choiceBusy}
+                              className={cn(
+                                STORYBOARD_ASSISTANT_CHOICE_CLASS,
+                                pendingBriefField?.multiSelect &&
+                                  briefMultiDraft.includes(c) &&
+                                  "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]",
+                              )}
+                              onClick={() => void handleChoice(c)}
+                            >
+                              {c}
+                            </button>
+                          ),
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
           );
         })}
+        {showThinking ? (
+          <StoryboardTaskStatus
+            active
+            title={choiceBusy ? "处理选择" : "思考中"}
+            detail={
+              choiceBusy
+                ? "正在进入下一步…"
+                : "助手正在输出本步内容，完成后自动同步到中间工作区…"
+            }
+          />
+        ) : null}
       </div>
 
-      <div className="border-t border-[var(--ecom-assistant-border)] p-4">
-        <StoryboardTaskStatus
-          active={showThinking}
-          title={choiceBusy ? "处理选择" : suggestingBrief ? "推断选项中" : "思考中"}
-          detail={
-            choiceBusy
-              ? "正在保存你的选择并进入下一步…"
-              : suggestingBrief
-                ? "正在根据产品主图推断候选项…"
-                : "助手正在输出本步内容，完成后自动同步到右侧工作区…"
-          }
-        />
-
+      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] p-4">
         <div className="mb-2 flex items-center justify-end">
           <button
             type="button"
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-[#6e6e73] transition hover:bg-[var(--ecom-chrome-hover)] hover:text-[#1d1d1f]"
-            title={composerWide ? "收窄助手栏" : "展宽助手栏"}
+            title={composerWide ? "收窄助手栏" : "展开助手栏至半屏"}
             onClick={() => onComposerWideChange?.(!composerWide)}
           >
             {composerWide ? (
@@ -979,23 +944,13 @@ export function ProductDesignAssistantPanel({
             ) : (
               <PanelRightOpen className="h-3.5 w-3.5" />
             )}
-            {composerWide ? "收窄" : "展宽"}
+            {composerWide ? "收窄" : "半屏展开"}
           </button>
         </div>
         <textarea
-          className="mb-3 min-h-[7.5rem] w-full resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
-          rows={6}
-          placeholder={
-            suggestingBrief
-              ? "正在根据主图推断选项，请稍候…"
-              : !setupDone
-                ? "请先完成上方上传与平台选择…"
-                : briefCustomActive
-                  ? (pendingField?.placeholder ?? "请输入…")
-                  : pendingField
-                    ? "请点选上方选项；需要自定义时再点「自己输入」"
-                    : "补充说明或让我修改某一步…"
-          }
+          className="mb-3 min-h-[4.5rem] w-full resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          rows={3}
+          placeholder="补充说明或让我修改某一步…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={inputDisabled}

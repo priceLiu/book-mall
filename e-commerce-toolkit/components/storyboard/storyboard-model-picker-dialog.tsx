@@ -54,6 +54,12 @@ type Props = {
   confirmLabel?: string;
   /** 覆盖底部左侧提示 */
   footerHint?: string;
+  /** 模型列表加载中（弹层已开但清单尚未返回） */
+  modelsLoading?: boolean;
+  /** 无模型时的补充说明 */
+  modelsEmptyHint?: string;
+  /** 无模型时点击重试 */
+  onRetryLoadModels?: () => void | Promise<void>;
   /** 覆盖 DialogContent 容器 class */
   contentClassName?: string;
   /** 模型已确认、任务进行中：弹层内展示进度态 */
@@ -213,6 +219,9 @@ export function StoryboardModelPickerDialog({
   dialogDescription,
   confirmLabel,
   footerHint,
+  modelsLoading = false,
+  modelsEmptyHint,
+  onRetryLoadModels,
   contentClassName,
   running = false,
   runningTitle,
@@ -310,9 +319,26 @@ export function StoryboardModelPickerDialog({
           </div>
         ) : (
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {groups.length === 0 ? (
-            <div className="grid place-items-center px-4 py-10 text-center text-sm text-[#86868b]">
-              暂无可用{mode === "image" ? "生图" : "视频"}模型，请先在 Gateway 绑定凭证。
+          {modelsLoading && models.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--ecom-primary)]" />
+              <p className="text-sm text-[#6e6e73]">正在加载 Gateway 生图模型…</p>
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[#86868b]">
+              <p>
+                {modelsEmptyHint ??
+                  `暂无可用${mode === "image" ? "生图" : "视频"}模型，请先在 Gateway 绑定凭证。`}
+              </p>
+              {onRetryLoadModels ? (
+                <EcomButtonSecondary
+                  size="sm"
+                  type="button"
+                  onClick={() => void onRetryLoadModels()}
+                >
+                  重新加载模型
+                </EcomButtonSecondary>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-5">

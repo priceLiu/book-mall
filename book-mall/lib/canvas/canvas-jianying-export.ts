@@ -1,7 +1,7 @@
 /**
  * 剪映导出：分镜包 ZIP（A）与剪映草稿 ZIP（B · Mac）。
  */
-import archiver from "archiver";
+import { createZipArchive } from "@/lib/zip/create-zip-archive";
 import { Readable } from "node:stream";
 import {
   normalizeSubtitleBurnInText,
@@ -95,7 +95,7 @@ export async function buildStoryBundleZip(
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const archive = archiver("zip", { zlib: { level: 6 } });
+    const archive = createZipArchive();
     archive.on("data", (c: Buffer) => chunks.push(c));
     archive.on("error", reject);
     archive.on("end", () => resolve(Buffer.concat(chunks)));
@@ -152,7 +152,7 @@ export async function buildJianyingDraftZip(
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const archive = archiver("zip", { zlib: { level: 6 } });
+    const archive = createZipArchive();
     archive.on("data", (c: Buffer) => chunks.push(c));
     archive.on("error", reject);
     archive.on("end", () => resolve(Buffer.concat(chunks)));

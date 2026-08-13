@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { getShellUser } from "@/lib/session.server";
 import { getMainSiteOrigin } from "@/lib/site-origin";
+import { PlatformAssistant } from "@private/platform-assistant";
 
 import "./globals.css";
 
@@ -31,6 +32,7 @@ export default async function RootLayout({
           <AppShell user={user} bookOrigin={bookOrigin}>
             {children}
           </AppShell>
+          <PlatformAssistant title="AI 小智" />
         </DialogProvider>
       </body>
     </html>

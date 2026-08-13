@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default function RootLayout({
         }}
       >
         {children}
+        <PlatformAssistant title="AI 小智" />
       </body>
     </html>
   );

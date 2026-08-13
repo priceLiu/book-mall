@@ -40,6 +40,10 @@ export async function POST(req: Request, ctx: Ctx) {
   const ratio = RATIOS.includes(body.ratio as EcomImageRatio)
     ? (body.ratio as EcomImageRatio)
     : undefined;
+  const concurrency =
+    typeof body.concurrency === "number" && body.concurrency >= 1
+      ? Math.min(5, Math.round(body.concurrency))
+      : undefined;
 
   try {
     const result = await generateProductDesignImages({
@@ -49,6 +53,7 @@ export async function POST(req: Request, ctx: Ctx) {
       indexes,
       modelKey,
       ratio,
+      concurrency,
     });
     const project = await getProductDesignProject(auth.userId, id);
     return NextResponse.json({

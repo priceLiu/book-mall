@@ -11,6 +11,7 @@
     "pricing:extract-price-md": "npx --yes tsx scripts/pricing-extract-price-md.ts"
   },
   "dependencies": {
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "@radix-ui/react-slot": "^1.1.2",
     "ali-oss": "^6.23.0",
     "class-variance-authority": "^0.7.1",

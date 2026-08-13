@@ -29,13 +29,23 @@ export function ecomToolKey(module: string, action: string): string {
 export const ECOM_MODULES: EcomModuleDef[] = [
   {
     id: "product-creation",
-    title: "电商产品创作",
-    tagline: "主图 + 详情页 9 步串行生成",
+    title: "电商产品主图创作",
+    tagline: "卖点策略 + 主图文案与配图",
     href: "/ecom/product-creation",
     kind: "image",
     toolKey: "ecom-toolkit__main-image",
     action: "generate",
     tile: "light",
+  },
+  {
+    id: "detail-page-creation",
+    title: "电商产品详情页创作",
+    tagline: "详情页架构 + 分屏文案与配图",
+    href: "/ecom/detail-page-creation",
+    kind: "image",
+    toolKey: "ecom-toolkit__detail-page",
+    action: "panel",
+    tile: "dark",
   },
   {
     id: "model-shot",

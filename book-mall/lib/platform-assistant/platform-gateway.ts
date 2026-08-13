@@ -1,0 +1,178 @@
+/**
+ * 平台 AI 导览助手 · 平台代付 Gateway 出口。
+ * 用 Platform Admin Key 直接调 Gateway（chat / embeddings），不依赖用户个人 sk-gw、不校验订阅。
+ */
+import { findPlatformAdminApiKey } from "@/lib/gateway/platform-credential-pool";
+import { resolveGatewayApiKeyById } from "@/lib/gateway/api-key-service";
+import { routeGatewayModel } from "@/lib/gateway/model-router";
+import {
+  forwardEmbeddings,
+  pickCredentialForKind,
+} from "@/lib/gateway/proxy-common";
+import {
+  gatewayV1ChatCompletionsStream,
+  gatewayV1Embeddings,
+  gatewayV1ClientMeta,
+} from "@/lib/gateway/gateway-v1-http-client";
+
+export class PlatformAssistantGatewayError extends Error {
+  constructor(
+    message: string,
+    readonly httpStatus = 502,
+  ) {
+    super(message);
+    this.name = "PlatformAssistantGatewayError";
+  }
+}
+
+async function resolvePlatformApiKeyId(): Promise<string> {
+  const key = await findPlatformAdminApiKey();
+  if (!key?.id) {
+    throw new PlatformAssistantGatewayError(
+      "平台 Gateway Key 未就绪，导览助手暂不可用",
+      503,
+    );
+  }
+  return key.id;
+}
+
+/** 平台代付：文本向量（RAG 检索 / 入库共用）。返回 float[] 数组，与 input 顺序一致。 */
+export async function platformEmbedTexts(
+  inputs: string[],
+  opts: { model: string; dimensions?: number; clientPage?: string; timeoutMs?: number },
+): Promise<number[][]> {
+  if (inputs.length === 0) return [];
+  const apiKeyId = await resolvePlatformApiKeyId();
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    input: inputs,
+  };
+  if (opts.dimensions) body.dimensions = opts.dimensions;
+
+  // 上限超时：避免内部链路（book-mall → Gateway → DashScope）socket 挂死时无限等待
+  let signal: AbortSignal | undefined;
+  try {
+    signal = AbortSignal.timeout(opts.timeoutMs ?? 45_000);
+  } catch {
+    signal = undefined;
+  }
+
+  const res = await gatewayV1Embeddings({
+    apiKeyId,
+    body,
+    signal,
+    meta: gatewayV1ClientMeta("TOOL", {
+      clientPage: opts.clientPage ?? "platform-assistant/embed",
+    }),
+  });
+  if (res.status < 200 || res.status >= 300) {
+    throw new PlatformAssistantGatewayError(
+      `embedding 失败 (HTTP ${res.status}): ${res.text.slice(0, 400)}`,
+      502,
+    );
+  }
+  return parseEmbeddingResponse(res.text, inputs);
+}
+
+function parseEmbeddingResponse(
+  text: string,
+  inputs: string[],
+): number[][] {
+  let parsed: { data?: { embedding?: number[]; index?: number }[] };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new PlatformAssistantGatewayError("embedding 响应非 JSON", 502);
+  }
+  const rows = parsed.data ?? [];
+  const out: number[][] = new Array(inputs.length);
+  rows.forEach((row, i) => {
+    const idx = typeof row.index === "number" ? row.index : i;
+    out[idx] = Array.isArray(row.embedding) ? row.embedding : [];
+  });
+  return out;
+}
+
+/**
+ * 入库脚本专用：进程内直调 forwardEmbeddings，不经 book-mall HTTP 自调用。
+ * 避免 dev 编译/路由 404 导致 `pnpm assistant:index` 失败。
+ */
+export async function platformEmbedTextsInProcess(
+  inputs: string[],
+  opts: { model: string; dimensions?: number },
+): Promise<number[][]> {
+  if (inputs.length === 0) return [];
+  const key = await findPlatformAdminApiKey();
+  if (!key?.id) {
+    throw new PlatformAssistantGatewayError(
+      "平台 Gateway Key 未就绪，导览助手暂不可用",
+      503,
+    );
+  }
+  const auth = await resolveGatewayApiKeyById(key.id);
+  if (!auth) {
+    throw new PlatformAssistantGatewayError("平台 Gateway Key 无效", 503);
+  }
+
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    input: inputs,
+  };
+  if (opts.dimensions) body.dimensions = opts.dimensions;
+
+  const route = routeGatewayModel(opts.model);
+  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
+  if (!credentialId) {
+    throw new PlatformAssistantGatewayError(
+      `平台凭证未绑定 ${route.providerKind}`,
+      503,
+    );
+  }
+
+  const result = await forwardEmbeddings({
+    credentialId,
+    providerKind: route.providerKind,
+    body,
+  });
+  if (result.status < 200 || result.status >= 300) {
+    throw new PlatformAssistantGatewayError(
+      `embedding 失败 (HTTP ${result.status}): ${result.text.slice(0, 400)}`,
+      502,
+    );
+  }
+  return parseEmbeddingResponse(result.text, inputs);
+}
+
+/** 平台代付：DeepSeek 流式对话，返回可直接透传的 SSE ReadableStream。 */
+export async function platformChatStream(opts: {
+  model: string;
+  messages: { role: string; content: string }[];
+  maxTokens?: number;
+  temperature?: number;
+  clientPage?: string;
+}): Promise<{ status: number; body: ReadableStream<Uint8Array> }> {
+  const apiKeyId = await resolvePlatformApiKeyId();
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages: opts.messages,
+    stream: true,
+    stream_options: { include_usage: true },
+    max_tokens: opts.maxTokens ?? 1024,
+    temperature: opts.temperature ?? 0.4,
+  };
+  const res = await gatewayV1ChatCompletionsStream({
+    apiKeyId,
+    body,
+    meta: gatewayV1ClientMeta("TOOL", {
+      clientPage: opts.clientPage ?? "platform-assistant/chat",
+    }),
+  });
+  if (!res.body || res.status >= 300) {
+    const errText = res.body ? await new Response(res.body).text() : `HTTP ${res.status}`;
+    throw new PlatformAssistantGatewayError(
+      `对话失败 (HTTP ${res.status}): ${errText.slice(0, 200)}`,
+      502,
+    );
+  }
+  return { status: res.status, body: res.body };
+}

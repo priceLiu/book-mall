@@ -9,7 +9,10 @@ import {
   type ProductDesignReference,
   type ProductDesignVisualBriefEntry,
 } from "@/lib/ecom/ecom-product-design-types";
-import { getVisionMaxInputImages } from "@/lib/ecom/ecom-product-design-ref-rules";
+import {
+  getVisionMaxInputImages,
+  orderRefsForModel,
+} from "@/lib/ecom/ecom-product-design-ref-rules";
 import {
   getProductDesignProject,
   updateProductDesignProject,
@@ -64,7 +67,7 @@ function buildCopyContext(target: ProductDesignVisionTarget, design: ProductDesi
   return `详情文案：\n${lines.join("\n")}`;
 }
 
-async function drainEcomGwChat(
+export async function drainEcomGwChat(
   userId: string,
   opts: {
     modelKey: string;
@@ -128,26 +131,19 @@ function parseVisionJson(text: string): Omit<ProductDesignVisualBriefEntry, "mod
   };
 }
 
+/**
+ * 顺序由 orderRefsForModel 统一决定，与生图下发和前端 @图片N 编号一致；
+ * 调用方不再自选顺序，否则同一批图在分析与出图两步会拿到不同编号。
+ */
 export function refsForVisionAnalysis(
   references: ProductDesignReference[],
   target: ProductDesignVisionTarget,
   modelKey: string,
-  order: "product-first" | "style-first" = "product-first",
 ): ProductDesignReference[] {
   const product = filterProductDesignReferencesByRole(references, ["product"]);
   const styleRole = target === "main" ? "main-style" : "detail-style";
   const style = filterProductDesignReferencesByRole(references, [styleRole]);
-  const max = getVisionMaxInputImages(modelKey);
-  if (order === "style-first") {
-    const productTake = product.length > 0 ? Math.min(product.length, 2) : 0;
-    const styleTake = Math.min(style.length, Math.max(0, max - productTake));
-    return [...style.slice(0, styleTake), ...product.slice(0, max - styleTake)].slice(
-      0,
-      max,
-    );
-  }
-  const ordered = [...product, ...style];
-  return ordered.slice(0, max);
+  return orderRefsForModel(product, style, getVisionMaxInputImages(modelKey)).ordered;
 }
 
 export async function analyzeProductDesignReferences(opts: {
@@ -177,13 +173,7 @@ export async function analyzeProductDesignReferences(opts: {
     ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
   assertStoryLlmVisionModel(modelKey, "视觉分析");
 
-  const refOrder = referenceStyle ? "style-first" : "product-first";
-  const refs = refsForVisionAnalysis(
-    project.references,
-    opts.target,
-    modelKey,
-    refOrder,
-  );
+  const refs = refsForVisionAnalysis(project.references, opts.target, modelKey);
   const imageUrls = refs.map((r) => r.ossUrl);
   const styleRole = opts.target === "main" ? "main-style" : "detail-style";
   const fingerprint = productDesignRefFingerprint(project.references, [
@@ -218,7 +208,10 @@ export async function analyzeProductDesignReferences(opts: {
 
   const copyCtx =
     design && !referenceStyle ? buildCopyContext(opts.target, design) : "";
-  const customPrompt = project.settings.mainImageCustomPrompt?.trim();
+  const customPrompt =
+    opts.target === "main"
+      ? project.settings.mainImageCustomPrompt?.trim()
+      : project.settings.detailPageCustomPrompt?.trim();
   const userParts: CanvasChatContentPart[] = [
     ...imageUrls.map(
       (url): CanvasChatContentPart => ({
@@ -262,7 +255,9 @@ export async function analyzeProductDesignReferences(opts: {
       },
       {
         role: "user",
-        content: userParts.length === 1 ? userParts[0]!.text : userParts,
+        content: userParts.length === 1 && userParts[0]?.type === "text"
+          ? userParts[0].text
+          : userParts,
       },
     ],
     clientPage: ecomClientPage(opts.userId, opts.projectId, toolKey),

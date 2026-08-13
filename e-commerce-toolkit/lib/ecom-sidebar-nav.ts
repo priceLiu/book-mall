@@ -10,6 +10,7 @@ import {
   Megaphone,
   Package,
   Rocket,
+  ScrollText,
   Settings,
   Shirt,
   ShoppingBag,
@@ -70,6 +71,7 @@ function sep(): { type: "separator" } {
 
 function imageModuleIcon(id: string): LucideIcon {
   if (id === "product-creation") return LayoutGrid;
+  if (id === "detail-page-creation") return ScrollText;
   return Shirt;
 }
 

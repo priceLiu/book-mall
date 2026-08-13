@@ -37,7 +37,7 @@ function formatAnalysisChatMarkdown(
   if (analysis.forbiddenWords.length) {
     lines.push("", "### 需规避表述", analysis.forbiddenWords.join("、"));
   }
-  lines.push("", "结构化内容已同步到中间工作区，可直接编辑；确认后点 **下一步**。");
+  lines.push("", "结论已同步到中间工作区可编辑；确认后点 **下一步**。");
   return lines.join("\n");
 }
 
@@ -45,7 +45,7 @@ function formatMainImagesChatMarkdown(items: ProductDesign["mainImages"]): strin
   const lines: string[] = [
     `## Step4 · 主图分层文案（${items.length} 张定稿）`,
     "",
-    "各张主图分层文案已写入中间工作区；确认后点 **下一步** 进入详情页架构。",
+    "结论已同步到中间工作区可编辑；确认后点 **下一步** 进入详情页架构。出图在中间工作区进行。",
     "",
   ];
   for (const item of items) {

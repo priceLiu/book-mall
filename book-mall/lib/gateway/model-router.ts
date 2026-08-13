@@ -120,6 +120,11 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "VOLCENGINE", requestKind: "VIDEO" };
   }
 
+  // 文本向量（平台 AI 导览助手 RAG）：百炼 text-embedding-v* 走 OpenAI 兼容 /v1/embeddings
+  if (m.startsWith("text-embedding-v") || m === "text-embedding") {
+    return { providerKind: "BAILIAN", requestKind: "OTHER" };
+  }
+
   if (HUNYUAN_MODELS.has(m) || m.startsWith("hunyuan-3d")) {
     return { providerKind: "HUNYUAN", requestKind: "IMAGE" };
   }

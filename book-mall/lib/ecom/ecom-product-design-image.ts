@@ -17,13 +17,17 @@ import {
   ECOM_MAIN_IMAGE_ACTION,
   ECOM_MAIN_IMAGE_MODULE,
   ECOM_MAIN_IMAGE_TOOL_KEY,
+  mergeProductDesign,
+  type ImageGenPlan,
   type ProductDesign,
   type ProductDesignDetailPage,
   type ProductDesignMainImage,
   type ProductDesignReference,
 } from "@/lib/ecom/ecom-product-design-types";
-import { getImageGenMaxRefs } from "@/lib/ecom/ecom-product-design-ref-rules";
-import { isVisualBriefStale } from "@/lib/ecom/ecom-product-design-vision";
+import {
+  getImageGenMaxRefs,
+  orderRefsForModel,
+} from "@/lib/ecom/ecom-product-design-ref-rules";
 import {
   getProductDesignProject,
   updateProductDesignProject,
@@ -46,6 +50,8 @@ import {
   ecomGwPollDashscope,
   ecomGwPollKie,
 } from "@/lib/gateway/ecom-tool-gateway-client";
+import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
 import { prisma } from "@/lib/prisma";
 
 export type ProductDesignImageTarget = "main" | "detail";
@@ -130,14 +136,12 @@ const SHARED_VISUAL_RULES = [
   "严格使用给定文案，不删减、不改写、不新增语句",
 ];
 
-function buildMainImagePrompt(opts: {
+export function buildMainImagePrompt(opts: {
   item: ProductDesignMainImage;
   design: ProductDesign;
   platformLabel: string;
   ratio: EcomImageRatio;
   hasRefs: boolean;
-  productRefCount?: number;
-  styleRefCount?: number;
   visualBrief?: string;
 }): string {
   const { item, design } = opts;
@@ -152,19 +156,8 @@ function buildMainImagePrompt(opts: {
   if (opts.visualBrief?.trim()) {
     lines.push("视觉分析指令（须严格遵循）：", opts.visualBrief.trim(), "");
   }
-  if (opts.hasRefs && (opts.productRefCount ?? 0) > 0) {
-    lines.push(
-      "参考图说明（硬性要求）：",
-      `- 参考图第 1–${opts.productRefCount} 张为商品实拍，画面中必须清晰展示该商品本体（穿着或陈列），不得生成纯文字海报而无商品`,
-      "- 商品颜色、版型、材质须与商品实拍参考一致，不得替换为其他款式",
-      ...(opts.styleRefCount
-        ? [
-            `- 参考图第 ${(opts.productRefCount ?? 0) + 1} 张起为店铺风格参考，须学习其光线、背景、构图与模特气质`,
-          ]
-        : []),
-      "",
-    );
-  }
+  // 参考图图例不在这里拼：统一由 appendRefLegend 加到最终 Prompt 末尾，
+  // 保证「计划/用户自定义 Prompt」这条路径也带上，且槽位里不出现图例文字
   lines.push("画面文案（按层级从上到下排布）：");
   if (layers.topHint) lines.push(`- 顶部引导小字：${layers.topHint}`);
   lines.push(`- 核心主标题：${layers.title || `主图 ${item.index}`}`);
@@ -191,45 +184,7 @@ function buildMainImagePrompt(opts: {
   return lines.join("\n");
 }
 
-/** 用户自定义 Prompt + 多张参考图（不依赖 Step4 分层文案） */
-function buildReferenceDrivenMainPrompt(opts: {
-  item: ProductDesignMainImage;
-  platformLabel: string;
-  ratio: EcomImageRatio;
-  customPrompt: string;
-  visualBrief?: string;
-  productRefCount: number;
-  styleRefCount: number;
-}): string {
-  const lines: string[] = [
-    `生成 ${opts.ratio} 比例电商主图，适配【${opts.platformLabel}】。`,
-    `本图：主图 ${opts.item.index} · ${opts.item.purpose || "商品主图"}`,
-    "",
-    "用户指令（最高优先级）：",
-    opts.customPrompt.trim(),
-    "",
-  ];
-  if (opts.visualBrief?.trim()) {
-    lines.push("视觉分析补充：", opts.visualBrief.trim(), "");
-  }
-  if (opts.productRefCount > 0 || opts.styleRefCount > 0) {
-    lines.push(
-      "参考图约束：",
-      ...(opts.styleRefCount > 0
-        ? [`- @图片1–${opts.styleRefCount} 为店铺风格参考（与上传区 @ 序号一致）`]
-        : []),
-      ...(opts.productRefCount > 0
-        ? [
-            `- @图片${opts.styleRefCount + 1}${opts.productRefCount > 1 ? `–${opts.styleRefCount + opts.productRefCount}` : ""} 为商品实拍，必须清晰呈现商品本体`,
-          ]
-        : []),
-      "- 生图时将商品实拍参考置于模型输入优先位置，风格参考用于学习光线/场景/构图",
-    );
-  }
-  return lines.join("\n");
-}
-
-function buildDetailPagePrompt(opts: {
+export function buildDetailPagePrompt(opts: {
   item: ProductDesignDetailPage;
   design: ProductDesign;
   platformLabel: string;
@@ -365,7 +320,12 @@ function refUrlsFor(
   references: ProductDesignReference[],
   target: ProductDesignImageTarget,
   modelKey: string,
-): { urls: string[]; productCount: number; styleCount: number } {
+): {
+  urls: string[];
+  productCount: number;
+  styleCount: number;
+  styleFirst: boolean;
+} {
   const product = filterProductDesignReferencesByRole(references, ["product"]).map(
     (r) => r.ossUrl,
   );
@@ -373,11 +333,64 @@ function refUrlsFor(
   const style = filterProductDesignReferencesByRole(references, [styleRole]).map(
     (r) => r.ossUrl,
   );
-  const max = getImageGenMaxRefs(modelKey);
-  const urls = [...product, ...style].slice(0, max);
-  const productCount = Math.min(product.length, urls.length);
-  const styleCount = Math.max(0, urls.length - productCount);
-  return { urls, productCount, styleCount };
+  const packed = orderRefsForModel(product, style, getImageGenMaxRefs(modelKey));
+  return {
+    urls: packed.ordered,
+    productCount: packed.productCount,
+    styleCount: packed.styleCount,
+    styleFirst: packed.styleFirst,
+  };
+}
+
+/**
+ * 给生图模型的参考图图例，说明第几张是什么、哪张才是商品本体。
+ *
+ * 必须挂在**每一条** Prompt 上。计划拆解或用户自定义的 Prompt 里只会写「@图片2」这类编号，
+ * 模型没有图例就不知道哪张是商品，会直接照着风格参考里的商品出图。
+ */
+function appendRefLegend(
+  prompt: string,
+  opts: {
+    target: ProductDesignImageTarget;
+    productCount: number;
+    styleCount: number;
+    styleFirst: boolean;
+    /** 主图基准图在参考图里的位次（1 起），无则不写 */
+    baselineAt?: number;
+  },
+): string {
+  if (opts.productCount <= 0 && opts.styleCount <= 0) return prompt;
+  const range = (from: number, count: number) =>
+    count === 1 ? `第 ${from} 张` : `第 ${from}–${from + count - 1} 张`;
+  const styleLabel = opts.target === "main" ? "店铺风格参考" : "详情页风格参考";
+  const productFrom = opts.styleFirst ? opts.styleCount + 1 : 1;
+  const styleFrom = opts.styleFirst ? 1 : opts.productCount + 1;
+
+  const styleLine = opts.styleCount
+    ? `- 参考图${range(styleFrom, opts.styleCount)}为${styleLabel}（即 Prompt 中的「图片${styleFrom}」起）：只学习其排版、光线、背景、构图与模特气质，严禁照搬其中出现的商品`
+    : null;
+  const productLine = opts.productCount
+    ? `- 参考图${range(productFrom, opts.productCount)}为商品实拍（即 Prompt 中的「图片${productFrom}」起）：成图里的商品必须是这张图中的商品本体`
+    : null;
+
+  const legend = [
+    "",
+    "参考图说明（硬性要求，优先级高于上文）：",
+    ...(opts.styleFirst ? [styleLine, productLine] : [productLine, styleLine]).filter(
+      (l): l is string => Boolean(l),
+    ),
+    ...(opts.productCount
+      ? [
+          "- 商品的颜色、版型、材质、印花与结构细节须与商品实拍完全一致，不得替换成风格参考里的款式",
+          "- 画面中必须清晰展示该商品本体（穿着或陈列），不得生成没有商品的纯文字海报",
+        ]
+      : []),
+    ...(opts.baselineAt
+      ? [`- 参考图第 ${opts.baselineAt} 张为本套主图成品，仅作整店视觉基准，不改变商品本身`]
+      : []),
+  ].join("\n");
+
+  return `${prompt.trimEnd()}\n${legend}`;
 }
 
 export type GenerateProductDesignImagesResult = {
@@ -398,6 +411,8 @@ export async function generateProductDesignImages(opts: {
   modelKey?: string;
   /** 覆盖平台默认比例 */
   ratio?: EcomImageRatio;
+  /** 覆盖批量出图并发（1–5） */
+  concurrency?: number;
 }): Promise<GenerateProductDesignImagesResult> {
   await assertEcomToolkitGatewayAccess(opts.userId);
 
@@ -409,20 +424,7 @@ export async function generateProductDesignImages(opts: {
   const design = project.design;
   if (!design) throw new Error("请先让助手产出文案，再生成图片");
 
-  const useRefPrompt =
-    opts.target === "main" &&
-    project.settings.mainImageGenMode === "reference-prompt" &&
-    Boolean(project.settings.mainImageCustomPrompt?.trim());
-
-  if (!useRefPrompt && isVisualBriefStale(design, opts.target, project.references)) {
-    throw new Error("参考图或文案已变更，请先重新执行视觉分析");
-  }
-  const visualEntry =
-    opts.target === "main" ? design.visualBrief?.main : design.visualBrief?.detail;
-  const visualBriefText = visualEntry?.derivedPrompt;
-  if (!visualBriefText?.trim() && !useRefPrompt) {
-    throw new Error("请先完成视觉分析，再生成图片");
-  }
+  const imageGenPlan: ImageGenPlan | undefined = design.imageGenPlans?.[opts.target];
 
   const spec = getEcomPlatformSpec(project.platform);
   const modelKey =
@@ -456,108 +458,216 @@ export async function generateProductDesignImages(opts: {
   const failures: GenerateProductDesignImagesResult["failures"] = [];
   let generated = 0;
 
-  for (const target of wanted) {
-    const isMain = opts.target === "main";
-    const item = isMain
-      ? mainImages.find((m) => m.index === target.index)
-      : detailPages.find((d) => d.index === target.index);
-    if (!item) continue;
+  const concurrency = await resolveEcomImageGenConcurrency(
+    opts.userId,
+    project.settings,
+    opts.concurrency,
+  );
 
-    const prompt = isMain
-      ? useRefPrompt
-        ? buildReferenceDrivenMainPrompt({
-            item: item as ProductDesignMainImage,
-            platformLabel: spec.label,
-            ratio,
-            customPrompt: project.settings.mainImageCustomPrompt!.trim(),
-            visualBrief: visualBriefText,
-            productRefCount: refPack.productCount,
-            styleRefCount: refPack.styleCount,
-          })
-        : buildMainImagePrompt({
+  let stateLock = Promise.resolve();
+  const withStateLock = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const prev = stateLock;
+    let release!: () => void;
+    stateLock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  };
+
+  const persistSlotImage = async (
+    isMain: boolean,
+    index: number,
+    patch: Partial<ProductDesignMainImage | ProductDesignDetailPage>,
+    status: "generating" | "main_ready" | "completed",
+  ) => {
+    await withStateLock(async () => {
+      const fresh = await getProductDesignProject(opts.userId, opts.projectId);
+      if (!fresh?.design) return;
+      const designPatch: Partial<ProductDesign> = isMain
+        ? {
+            mainImages: fresh.design.mainImages.map((m) =>
+              m.index === index ? { ...m, ...patch } : m,
+            ),
+          }
+        : {
+            detailPages: fresh.design.detailPages.map((d) =>
+              d.index === index ? { ...d, ...patch } : d,
+            ),
+          };
+      const merged = mergeProductDesign(fresh.design, designPatch);
+      const mainDone =
+        merged.mainImages.length > 0 && merged.mainImages.every((m) => m.imageUrl);
+      const detailDone =
+        merged.detailPages.length > 0 && merged.detailPages.every((d) => d.imageUrl);
+      await updateProductDesignProject(opts.userId, opts.projectId, {
+        designPatch,
+        status:
+          status === "generating"
+            ? mainDone && detailDone
+              ? "completed"
+              : mainDone
+                ? "main_ready"
+                : "generating"
+            : status,
+        settings: { imageModelKey: modelKey },
+      });
+    });
+  };
+
+  await updateProductDesignProject(opts.userId, opts.projectId, {
+    status: "generating",
+    settings: { imageModelKey: modelKey },
+  });
+
+  await mapWithConcurrency(
+    wanted,
+    async (target) => {
+      const isMain = opts.target === "main";
+      const item = isMain
+        ? mainImages.find((m) => m.index === target.index)
+        : detailPages.find((d) => d.index === target.index);
+      if (!item) return;
+
+      const planItem = imageGenPlan?.items.find((p) => p.index === target.index);
+      const slotItem = isMain
+        ? (item as ProductDesignMainImage)
+        : (item as ProductDesignDetailPage);
+      let prompt =
+        slotItem.genPrompt?.trim() ||
+        planItem?.prompt?.trim() ||
+        "";
+      if (!prompt) {
+        if (isMain) {
+          prompt = buildMainImagePrompt({
             item: item as ProductDesignMainImage,
             design,
             platformLabel: spec.label,
             ratio,
             hasRefs: refImageUrls.length > 0,
-            productRefCount: refPack.productCount,
-            styleRefCount: refPack.styleCount,
-            visualBrief: visualBriefText,
-          })
-      : buildDetailPagePrompt({
-          item: item as ProductDesignDetailPage,
-          design,
-          platformLabel: spec.label,
+            visualBrief:
+              design.visualBrief?.main?.derivedPrompt ??
+              imageGenPlan?.sharedVisualBrief,
+          });
+        } else {
+          prompt = buildDetailPagePrompt({
+            item: item as ProductDesignDetailPage,
+            design,
+            platformLabel: spec.label,
+            ratio,
+            hasRefs: refImageUrls.length > 0,
+            baselineImageUrl,
+            visualBrief:
+              design.visualBrief?.detail?.derivedPrompt ??
+              imageGenPlan?.sharedVisualBrief,
+          });
+        }
+      }
+      if (!prompt.trim()) {
+        failures.push({ index: target.index, message: "缺少生图 Prompt" });
+        return;
+      }
+
+      // 主图基准挂在末尾：前插会把 Prompt 里的「图片N」整体后移一位，指错参考图
+      const refsMax = getImageGenMaxRefs(modelKey);
+      const refs =
+        !isMain && baselineImageUrl
+          ? [...refImageUrls, baselineImageUrl].slice(0, refsMax)
+          : refImageUrls;
+      const baselineAt =
+        !isMain && baselineImageUrl && refs.length > refImageUrls.length
+          ? refs.length
+          : undefined;
+
+      prompt = appendRefLegend(prompt, {
+        target: opts.target,
+        productCount: refPack.productCount,
+        styleCount: refPack.styleCount,
+        styleFirst: refPack.styleFirst,
+        baselineAt,
+      });
+
+      try {
+        const ossUrl = await generateOneImage({
+          userId: opts.userId,
+          projectId: opts.projectId,
+          modelKey,
+          prompt,
           ratio,
-          hasRefs: refImageUrls.length > 0,
-          baselineImageUrl,
-          visualBrief: visualBriefText,
+          refImageUrls: refs,
+          toolKey: isMain
+            ? `${ECOM_MAIN_IMAGE_TOOL_KEY}__${ECOM_MAIN_IMAGE_ACTION}`
+            : `${ECOM_DETAIL_PAGE_TOOL_KEY}__${ECOM_DETAIL_PAGE_ACTION}`,
         });
 
-    const refsMax = getImageGenMaxRefs(modelKey);
-    const refs =
-      !isMain && baselineImageUrl
-        ? [baselineImageUrl, ...refImageUrls].slice(0, refsMax)
-        : refImageUrls;
-
-    try {
-      const ossUrl = await generateOneImage({
-        userId: opts.userId,
-        projectId: opts.projectId,
-        modelKey,
-        prompt,
-        ratio,
-        refImageUrls: refs,
-        toolKey: isMain
-          ? `${ECOM_MAIN_IMAGE_TOOL_KEY}__${ECOM_MAIN_IMAGE_ACTION}`
-          : `${ECOM_DETAIL_PAGE_TOOL_KEY}__${ECOM_DETAIL_PAGE_ACTION}`,
-      });
-
-      const asset = await prisma.ecomAsset.create({
-        data: {
-          userId: opts.userId,
-          module: isMain ? ECOM_MAIN_IMAGE_MODULE : ECOM_DETAIL_PAGE_MODULE,
-          kind: "image",
-          title: (isMain
-            ? `${(item as ProductDesignMainImage).layers?.title ?? "主图"} · 主图${item.index}`
-            : `${(item as ProductDesignDetailPage).title ?? "详情"} · 第${item.index}屏`
-          ).slice(0, 80),
-          prompt,
-          ossUrl,
-          thumbnailUrl: ossUrl,
-          meta: {
-            projectId: opts.projectId,
-            source: "product-creation",
-            kind: isMain ? "main_image" : "detail_page",
-            index: item.index,
-            platform: spec.code,
-            ratio,
-            modelKey,
+        const asset = await prisma.ecomAsset.create({
+          data: {
+            userId: opts.userId,
+            module: isMain ? ECOM_MAIN_IMAGE_MODULE : ECOM_DETAIL_PAGE_MODULE,
+            kind: "image",
+            title: (isMain
+              ? `${(item as ProductDesignMainImage).layers?.title ?? "主图"} · 主图${item.index}`
+              : `${(item as ProductDesignDetailPage).title ?? "详情"} · 第${item.index}屏`
+            ).slice(0, 80),
+            prompt,
+            ossUrl,
+            thumbnailUrl: ossUrl,
+            meta: {
+              projectId: opts.projectId,
+              source: "product-creation",
+              kind: isMain ? "main_image" : "detail_page",
+              index: item.index,
+              platform: spec.code,
+              ratio,
+              modelKey,
+            },
           },
-        },
-      });
+        });
 
-      if (isMain) {
-        mainImages = mainImages.map((m) =>
-          m.index === item.index
-            ? { ...m, imageUrl: ossUrl, assetId: asset.id, genPrompt: prompt }
-            : m,
+        await withStateLock(async () => {
+          if (isMain) {
+            mainImages = mainImages.map((m) =>
+              m.index === item.index
+                ? { ...m, imageUrl: ossUrl, assetId: asset.id, genPrompt: prompt }
+                : m,
+            );
+          } else {
+            detailPages = detailPages.map((d) =>
+              d.index === item.index
+                ? { ...d, imageUrl: ossUrl, assetId: asset.id, genPrompt: prompt }
+                : d,
+            );
+          }
+          generated += 1;
+        });
+        const mainDone = mainImages.length > 0 && mainImages.every((m) => m.imageUrl);
+        const detailDone =
+          detailPages.length > 0 && detailPages.every((d) => d.imageUrl);
+        await persistSlotImage(
+          isMain,
+          item.index,
+          {
+            imageUrl: ossUrl,
+            assetId: asset.id,
+            genPrompt: prompt,
+          },
+          mainDone && detailDone ? "completed" : mainDone ? "main_ready" : "generating",
         );
-      } else {
-        detailPages = detailPages.map((d) =>
-          d.index === item.index
-            ? { ...d, imageUrl: ossUrl, assetId: asset.id, genPrompt: prompt }
-            : d,
-        );
+      } catch (e) {
+        await withStateLock(async () => {
+          failures.push({
+            index: item.index,
+            message: e instanceof Error ? e.message : "生成失败",
+          });
+        });
       }
-      generated += 1;
-    } catch (e) {
-      failures.push({
-        index: item.index,
-        message: e instanceof Error ? e.message : "生成失败",
-      });
-    }
-  }
+    },
+    concurrency,
+  );
 
   const nextDesign: ProductDesign = { ...design, mainImages, detailPages };
   const mainDone = mainImages.length > 0 && mainImages.every((m) => m.imageUrl);

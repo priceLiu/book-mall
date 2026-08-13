@@ -9,7 +9,7 @@ import {
   registryRowsToEcomModels,
 } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { listModelsForApp } from "@/lib/gateway/model-registry";
-import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
+import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,6 @@ export async function GET(req: Request) {
 
   const rawPersona = await getUserBillingPersona(auth.userId);
   const persona = rawPersona === "PLATFORM_CREDIT" ? "PLATFORM_CREDIT" : "BYOK";
-  await ensureGatewayCanonicalRegistrySynced();
 
   const boundKinds =
     persona === "PLATFORM_CREDIT"
@@ -39,12 +38,14 @@ export async function GET(req: Request) {
 
   const chatRows = registryRowsToEcomModels(chatModels);
   const visionModels = chatRows.filter((m) => isStoryLlmVisionModel(m.modelKey));
+  const imageGenConcurrencyLimit = await resolveEcomImageGenConcurrency(auth.userId, {});
 
   return NextResponse.json({
     chatModels: chatRows,
     visionModels,
     imageModels: registryRowsToEcomModels(imageModels),
     platformOffering: persona === "PLATFORM_CREDIT",
+    imageGenConcurrencyLimit,
     defaults: {
       chat: ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
       vision:

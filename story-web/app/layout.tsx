@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import { BookMallBaseUrlProvider } from "@/components/book-mall-base-url-provider";
 import { StoryShell } from "@/components/layout/story-shell";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default function RootLayout({
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
           <StoryShell>{children}</StoryShell>
         </BookMallBaseUrlProvider>
+        <PlatformAssistant title="AI 小智" accentColor="#b4884d" />
       </body>
     </html>
   );

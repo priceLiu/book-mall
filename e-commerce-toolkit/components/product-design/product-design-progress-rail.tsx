@@ -11,6 +11,8 @@ import {
 } from "@/lib/ecom-progress-rail-theme";
 import {
   PRODUCT_DESIGN_STEPS,
+  isStepInTrack,
+  resolveActiveTrack,
   resolveProductDesignStepStates,
   type ProductDesignStepId,
 } from "@/lib/product-design-workflow";
@@ -22,10 +24,15 @@ type Props = {
 
 export function ProductDesignProgressRail({ project, onStepClick }: Props) {
   const states = resolveProductDesignStepStates(project);
+  const track = resolveActiveTrack(project);
+  const steps = PRODUCT_DESIGN_STEPS.filter((s) => isStepInTrack(s.id, track));
 
   return (
-    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="创作进度（点击跳转到对应区块）">
-      {PRODUCT_DESIGN_STEPS.map((step) => {
+    <nav
+      className={ECOM_PROGRESS_RAIL_SHELL}
+      aria-label={`${track === "detail" ? "详情页" : "主图"}创作进度（点击跳转到对应区块）`}
+    >
+      {steps.map((step) => {
         const state = states[step.id];
         return (
           <button

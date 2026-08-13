@@ -11,6 +11,9 @@ importers:
       '@private/federated-portal-nav':
         specifier: file:../shared/federated-portal-nav
         version: file:../shared/federated-portal-nav(react@18.3.1)
+      '@private/platform-assistant':
+        specifier: file:../shared/platform-assistant
+        version: file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@radix-ui/react-dialog':
         specifier: ^1.0.5
         version: 1.1.23(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -216,6 +219,12 @@ packages:
     resolution: {directory: ../shared/federated-portal-nav, type: directory}
     peerDependencies:
       react: ^18
+
+  '@private/platform-assistant@file:../shared/platform-assistant':
+    resolution: {directory: ../shared/platform-assistant, type: directory}
+    peerDependencies:
+      react: ^18
+      react-dom: ^18
 
   '@radix-ui/primitive@1.1.7':
     resolution: {integrity: sha512-rqWnm76nYT8HoNNqEjpgJ7Pw/DrBj5iBTrmEPo6HTX5+VJyBNOqTdv4g89G63HuR5g0AaENoAcH7Is5fF2kZ8Q==}
@@ -2136,6 +2145,11 @@ snapshots:
   '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
     dependencies:
       react: 18.3.1
+
+  '@private/platform-assistant@file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@radix-ui/primitive@1.1.7': {}
 

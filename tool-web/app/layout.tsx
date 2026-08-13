@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToolShell } from "@/components/tool-shell";
+import { PlatformAssistant } from "@private/platform-assistant";
 
 export const metadata: Metadata = {
   title: "AI 工具站",
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <ToolShell>{children}</ToolShell>
+        <PlatformAssistant chatEndpoint="/api/platform-assistant/chat" title="AI 小智" />
       </body>
     </html>
   );

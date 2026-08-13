@@ -105,7 +105,7 @@ export function EcomRefImageThumb({
         {onRemove ? (
           <button
             type="button"
-            className="absolute right-0.5 top-0.5 z-10 rounded-full bg-black/65 p-0.5 text-white opacity-100 transition group-hover:opacity-100"
+            className="absolute right-0.5 top-0.5 z-[1] rounded-full bg-black/65 p-0.5 text-white opacity-100 transition group-hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               onRemove();

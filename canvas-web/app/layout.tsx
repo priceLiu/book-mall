@@ -4,6 +4,7 @@ import { CanvasAuthGate } from "@/components/auth/canvas-auth-gate";
 import { CanvasShell } from "@/components/layout/canvas-shell";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export default function RootLayout({
             </CanvasAuthGate>
           </DialogProvider>
         </BookMallBaseUrlProvider>
+        <PlatformAssistant title="AI 小智" accentColor="#7c5cff" />
       </body>
     </html>
   );

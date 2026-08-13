@@ -378,6 +378,22 @@ export async function gatewayV1AsrTranscribe(
   return { segments: json.data?.segments ?? [], logId: json.logId ?? "" };
 }
 
+/** OpenAI 兼容 /v1/embeddings（平台 AI 导览助手 RAG）。 */
+export async function gatewayV1Embeddings(
+  opts: GatewayV1RequestOpts & { body: Record<string, unknown>; signal?: AbortSignal },
+): Promise<{ status: number; text: string; logId?: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "embeddings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+    signal: opts.signal,
+  });
+  const text = await r.text();
+  const logId = r.headers.get("x-gateway-log-id") ?? undefined;
+  return { text, status: r.status, logId };
+}
+
 export function gatewayV1ClientMeta(
   clientSource: GatewayClientSource,
   extra?: Omit<GatewayV1LogMeta, "clientSource"> & { bookUserId?: string },

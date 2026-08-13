@@ -16,11 +16,19 @@ function ossHostPatterns() {
 
 const nextConfig = {
   output: "standalone",
-  transpilePackages: ["@private/federated-portal-nav", "@private/publisher-client"],
+  transpilePackages: [
+    "@private/federated-portal-nav",
+    "@private/publisher-client",
+    "@private/platform-assistant",
+  ],
   webpack: (config) => {
     config.resolve.alias["@private/publisher-client"] = path.join(
       __dirname,
       "../shared/publisher-client",
+    );
+    config.resolve.alias["@private/platform-assistant"] = path.join(
+      __dirname,
+      "../shared/platform-assistant",
     );
     return config;
   },

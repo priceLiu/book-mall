@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        {children}
+        <PlatformAssistant
+          title="AI 小智"
+          userSessionEndpoint="/api/book-mall/api/sso/tools/introspect"
+        />
+      </body>
     </html>
   );
 }

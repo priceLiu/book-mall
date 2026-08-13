@@ -650,6 +650,39 @@ export async function forwardChatCompletions(opts: {
     : new Error(String(lastErr ?? "chat/completions failed"));
 }
 
+/** OpenAI 兼容 /v1/embeddings 转发（平台 AI 导览助手 RAG；当前 BAILIAN 兼容模式）。 */
+export async function forwardEmbeddings(opts: {
+  credentialId: string;
+  providerKind: GatewayProviderKind;
+  body: Record<string, unknown>;
+  baseUrlOverride?: string | null;
+}): Promise<{ status: number; text: string; durationMs: number }> {
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+
+  const base = resolveOpenAiCompatibleBaseUrl(
+    cred.providerKind,
+    opts.baseUrlOverride || cred.baseUrl,
+  );
+  const url = `${base}/embeddings`;
+
+  const started = Date.now();
+  const r = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cred.apiKey}`,
+      },
+      body: JSON.stringify(opts.body),
+    },
+    { hop: "upstream", providerKind: cred.providerKind },
+  );
+  const text = await r.text();
+  return { status: r.status, text, durationMs: Date.now() - started };
+}
+
 export async function forwardChatCompletionsStream(opts: {
   credentialId: string;
   providerKind: GatewayProviderKind;

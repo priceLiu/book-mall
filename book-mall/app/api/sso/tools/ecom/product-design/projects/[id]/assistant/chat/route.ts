@@ -14,11 +14,12 @@ import {
   ECOM_DETAIL_PAGE_TOOL_KEY,
   extractProductDesignJson,
   filterProductDesignReferencesByRole,
+  resolveProjectTrack,
   sanitizeProductDesignChatMessages,
   type ProductDesignChatMessage,
   type ProductDesignReference,
 } from "@/lib/ecom/ecom-product-design-types";
-import { parseMarketingPlansFromMarkdown } from "@/lib/ecom/ecom-product-design-marketing-parse";
+import { prepareProductDesignPatch } from "@/lib/ecom/ecom-product-design-marketing-parse";
 import { toAssistantChatContent } from "@/lib/ecom/ecom-product-design-display";
 import { getVisionMaxInputImages } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
@@ -33,11 +34,30 @@ export const maxDuration = 300;
 type Ctx = { params: Promise<{ id: string }> };
 
 /** 去掉机器可读围栏，气泡只展示面向用户的 Markdown */
-function chatRefImageUrls(references: ProductDesignReference[], modelKey: string): string[] {
+function chatRefImageUrls(
+  references: ProductDesignReference[],
+  modelKey: string,
+  track: "main" | "detail",
+): string[] {
   const product = filterProductDesignReferencesByRole(references, ["product"]);
-  const style = filterProductDesignReferencesByRole(references, ["main-style"]);
+  const style = filterProductDesignReferencesByRole(references, [
+    track === "detail" ? "detail-style" : "main-style",
+  ]);
   const max = getVisionMaxInputImages(modelKey);
   return [...product, ...style].slice(0, max).map((r) => r.ossUrl);
+}
+
+/** Prompt 驱动分支（含存量 reference-decompose / reference）不采集 Brief */
+function isBriefSkippedForPrompt(
+  meta: Record<string, unknown> | null | undefined,
+  track: "main" | "detail",
+): boolean {
+  if (meta?.briefSkipped) return true;
+  if (track === "detail") {
+    return meta?.detailWorkflowPath !== "interactive";
+  }
+  const path = meta?.mainWorkflowPath;
+  return typeof path === "string" && path.length > 0 && path !== "interactive";
 }
 
 function buildGwTurns(
@@ -95,6 +115,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ? body.modelKey.trim()
       : project.settings.chatModelKey?.trim() || ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
 
+  const activeTrack = resolveProjectTrack(project.module);
   const systemPrompt = buildProductDesignSystemPrompt({
     spec: getEcomPlatformSpec(project.platform),
     mainImageCount: project.resolved.mainImageCount,
@@ -103,11 +124,15 @@ export async function POST(req: Request, ctx: Ctx) {
     detailPageRatio: project.resolved.detailPageRatio,
     brief: project.brief,
     hasProductRef: project.references.some((r) => r.role === "product"),
+    briefSkipped: isBriefSkippedForPrompt(project.meta, activeTrack),
+    mainWorkflowPath: (project.meta?.mainWorkflowPath as string | null) ?? null,
+    design: project.design,
+    activeTrack,
   });
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const refUrls = chatRefImageUrls(project.references, modelKey);
+    const refUrls = chatRefImageUrls(project.references, modelKey, activeTrack);
     const gwTurns = buildGwTurns(turns, refUrls);
     const gw = await ecomGwChatStream(auth.userId, {
       modelKey,
@@ -173,13 +198,11 @@ export async function POST(req: Request, ctx: Ctx) {
           ];
 
           const patch: ProductDesignPatch = { chatHistory: history };
-          const designPatch =
-            extractProductDesignJson(fullText) ??
-            (() => {
-              const plans = parseMarketingPlansFromMarkdown(fullText);
-              return plans.length ? { marketingPlans: plans } : null;
-            })();
-          if (designPatch) {
+          const jsonPatch = extractProductDesignJson(fullText);
+          const designPatch = prepareProductDesignPatch(project.design, jsonPatch ?? {}, {
+            markdownText: fullText,
+          });
+          if (Object.keys(designPatch).length > 0) {
             patch.designPatch = designPatch;
             patch.status = designPatch.detailPages?.length
               ? "detail_ready"

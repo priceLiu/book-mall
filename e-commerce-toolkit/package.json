@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "@private/publisher-client": "file:../shared/publisher-client",
     "@radix-ui/react-dialog": "^1.0.5",
     "clsx": "^2.1.1",

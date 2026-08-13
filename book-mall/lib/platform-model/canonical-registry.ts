@@ -51,6 +51,17 @@ function dedupeRoutes(list: CanonicalRouteDef[]): CanonicalRouteDef[] {
   return out;
 }
 
+function dedupeCanonicals(list: CanonicalModelDef[]): CanonicalModelDef[] {
+  const seen = new Set<string>();
+  const out: CanonicalModelDef[] = [];
+  for (const def of list) {
+    if (seen.has(def.canonicalModelKey)) continue;
+    seen.add(def.canonicalModelKey);
+    out.push(def);
+  }
+  return out;
+}
+
 import { LEGACY_INVOKE_MODEL_REGISTRY } from "@/lib/platform-model/legacy-invoke-registry";
 
 /** Gateway 统一 canonical 注册表（seed + 自动上架数据源）。 */
@@ -714,10 +725,15 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
 ];
 
-export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
+/**
+ * 核心表在前：与 legacy 表 canonicalModelKey 撞车时以核心定义为准。
+ * 必须去重——下游按 `count(canonicalKey in keys) >= keys.length` 判断 DB 是否已同步，
+ * 重复项会让该条件永远不成立，导致每次请求都触发全量 upsert。
+ */
+export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = dedupeCanonicals([
   ...CORE_GATEWAY_CANONICAL_REGISTRY,
   ...LEGACY_INVOKE_MODEL_REGISTRY,
-];
+]);
 
 /** 四媒介槽默认 canonical（无用户选模时 fallback）。 */
 export const PLATFORM_MEDIA_DEFAULTS: Record<ModelMediaKind, string> = {

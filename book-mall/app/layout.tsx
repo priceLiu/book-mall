@@ -3,6 +3,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
+import { PlatformAssistant } from "@private/platform-assistant";
 
 export const metadata: Metadata = {
   title: "AI-code8.com - 智选AI, 一人公司, 创业老板必备",
@@ -27,6 +28,11 @@ export default function RootLayout({
             {children}
           </ThemeProvider>
         </AuthSessionProvider>
+        <PlatformAssistant
+          chatEndpoint="/api/platform-assistant/chat"
+          userSessionEndpoint="/api/auth/session"
+          title="AI 小智"
+        />
       </body>
     </html>
   );

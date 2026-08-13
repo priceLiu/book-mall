@@ -3557,3 +3557,24 @@ model QrKindFeatured {
   updatedByUser   User     @relation("QrKindFeaturedUpdater", fields: [updatedByUserId], references: [id], onDelete: Cascade)
   updatedAt       DateTime @updatedAt
 }
+
+/// 平台 AI 导览助手 · 白名单文档切块（RAG 知识库）
+/// embedding 列由迁移以原生 `vector(dim)` 添加，Prisma 不识别该类型，检索走 $queryRaw。
+model PlatformDocChunk {
+  id          String   @id @default(cuid())
+  /// 相对仓库根的源文件路径，如 "book-mall/doc/product/00-overview.md"
+  source      String
+  /// functional | operational | intro
+  category    String
+  /// 所属标题层级路径（用于回答时引用来源）
+  heading     String
+  content     String   @db.Text
+  tokens      Int      @default(0)
+  /// 内容哈希，用于增量 upsert 去重
+  contentHash String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, heading, contentHash])
+  @@index([category])
+}

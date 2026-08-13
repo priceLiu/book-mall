@@ -14,12 +14,12 @@ type Props = {
   contentClassName?: string;
   /** 无助手时内容占满 */
   fullWidth?: boolean;
-  /** 助手栏加宽（输入区聚焦或手动展开） */
+  /** 助手栏展开至工作区半宽（输入区聚焦或手动展开） */
   assistantWide?: boolean;
 };
 
 /**
- * 电商工具箱工作区：内容（~70%）+ 可选进度轨 + 助手（~30%，最右）。
+ * 电商工具箱工作区：内容 + 可选进度轨 + 助手（默认 ~380px；展开时占工作区 50%）。
  * 站点侧栏仍在 EcomAppShell 最左侧。
  */
 export function EcomWorkspaceLayout({
@@ -55,7 +55,7 @@ export function EcomWorkspaceLayout({
           className={cn(
             "flex w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] md:h-full md:border-l md:border-t-0",
             assistantWide
-              ? "md:w-[520px] md:min-w-[520px] md:max-w-[520px]"
+              ? "md:w-1/2 md:min-w-0 md:max-w-[50%]"
               : "md:w-[380px] md:min-w-[380px] md:max-w-[380px]",
           )}
         >
@@ -64,7 +64,7 @@ export function EcomWorkspaceLayout({
               {assistantHeader}
             </div>
           ) : null}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden max-h-[min(42vh,360px)] md:max-h-none">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {assistant}
           </div>
         </aside>

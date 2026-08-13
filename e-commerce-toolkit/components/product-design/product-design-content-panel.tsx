@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Download, Eye, FileText, Film, ImageIcon, RefreshCw, Sparkles } from "lucide-react";
+import { Download, Eye, FileText, Film, ImageIcon, RefreshCw, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -12,28 +12,56 @@ import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-but
 import {
   analyzeProductDesignReferences,
   createStoryboardFromAssets,
+  decomposeProductDesignImagePlan,
+  downloadProductDesignExportZip,
   generateProductDesignImages,
   getProductDesignProject,
+  saveProductDesignProjectZip,
   syncProductDesign,
   updateProductDesignProject,
 } from "@/lib/ecom-product-design-api";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { ProductDesignRefUploader } from "@/components/product-design/product-design-ref-uploader";
-import { buildProductDesignMarkdown } from "@/lib/product-design-markdown";
+import { ProductDesignGenSlotWorkspace } from "@/components/product-design/product-design-gen-slot-workspace";
 import { fetchAssetById } from "@/lib/ecom-api";
 import type {
   EcomPlatformSpec,
   ProductDesign,
+  ProductDesignBrief,
   ProductDesignDetailPage,
   ProductDesignMainImage,
   ProductDesignProject,
   ProductDesignReferenceRole,
 } from "@/lib/product-design-types";
-import { marketingPlanChoiceLabel, productDesignStepAnchorId, PRODUCT_DESIGN_STEPS, type ProductDesignStepId, defaultMainImageRefPrompt, ENTER_DETAIL_PAGE_CHOICE, appendMainImageSlots, PRODUCT_DESIGN_MAIN_IMAGE_SLOTS_MAX, ANALYZE_DETAIL_DECOMPOSE_CHOICE, hasDetailStyleRef, isFastDetailPath, INTERACTIVE_WORKFLOW_CHOICE, MAIN_REF_PROMPT_WORKFLOW_CHOICE, resolveSetupPhase } from "@/lib/product-design-workflow";
+import {
+  productDesignStepAnchorId,
+  PRODUCT_DESIGN_STEPS,
+  type ProductDesignStepId,
+  type DetailWorkflowPath,
+  resolveActiveTrack,
+  isStepInTrack,
+  defaultMainImageRefPrompt,
+  defaultDetailPageRefPrompt,
+  appendMainImageSlots,
+  PRODUCT_DESIGN_MAIN_IMAGE_SLOTS_MAX,
+  isFastDetailPath,
+  isFastDetailPromptPath,
+  isFastDetailSetupPending,
+  isFastMainPath,
+  isFastMainPromptPath,
+  isReferenceImagePath,
+  isFastMainSetupPending,
+  MAIN_IMAGE_BATCH_COUNT_CHOICES,
+  resolveMainImageBatchCount,
+  needsBriefCollection,
+  briefComplete,
+  shouldSkipBrief,
+} from "@/lib/product-design-workflow";
 import { buildProductDesignPromptMentionRefs } from "@/lib/product-design-mention-refs";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
-import { getMaxRefsForRoleAtInvokeClient, PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX } from "@/lib/product-design-ref-rules";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import { getMaxRefsForRoleAtInvokeClient, hasProductRef, PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX } from "@/lib/product-design-ref-rules";
+import { ProductDesignGalleryPreviewDialog, type ProductDesignGalleryPreviewItem } from "@/components/product-design/product-design-gallery-preview-dialog";
+import { ProductDesignSaveDialog } from "@/components/product-design/product-design-save-dialog";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 import {
@@ -41,6 +69,32 @@ import {
   productDesignRatioFrameClass,
 } from "@/lib/product-design-ratio-display";
 import { ProductDesignEditableField } from "@/components/product-design/product-design-editable-field";
+import { ProductDesignMarketingPlanTable } from "@/components/product-design/product-design-marketing-plan-table";
+import {
+  marketingPlansLookLikeMisParsedMatrix,
+  resolveMarketingPlansForDisplay,
+  syncLegacyFieldsFromRows,
+} from "@/lib/product-design-marketing-parse";
+import { ProductDesignBuyingReasonMatrixTable } from "@/components/product-design/product-design-buying-reason-matrix-table";
+import { ProductDesignBriefSummaryPanel } from "@/components/product-design/product-design-brief-summary-panel";
+import { ProductDesignMainCopyPanel } from "@/components/product-design/product-design-main-copy-panel";
+import { ProductDesignDetailOutlineTable } from "@/components/product-design/product-design-detail-outline-table";
+import {
+  buildBuyingReasonBriefPatch,
+  deriveBuyingReasonsFromBrief,
+  hasBuyingReasonBriefContent,
+  isStep3ReadyForDownstream,
+  isStep3Unlocked,
+  isValidStep3Table,
+  resolveBuyingReasonForDisplay,
+  resolveBuyingReasonTable,
+} from "@/lib/product-design-buying-reason-parse";
+import {
+  resolveDetailOutlineForDisplay,
+  resolveMainImagesForDisplay,
+  resolveAnalysisForDisplay,
+  hasValidAnalysis,
+} from "@/lib/product-design-step-sync-parse";
 
 import {
   Dialog,
@@ -52,6 +106,10 @@ import {
 
 const STORYBOARD_PROJECT_STORAGE_KEY = "ecom-storyboard-active-project";
 
+/** 中间区各步统一说明：结果定稿面（推进交互在会话区） */
+const MIDDLE_WORKSPACE_EDIT_HINT =
+  "此处仅展示本步结论，可铅笔编辑保存。点选与「下一步」请在右侧会话区完成。";
+
 /** 电商产品创作 · 宽弹层：宽约 2/3 屏宽，高约 1/2 屏高，内容区可滚动 */
 const PRODUCT_DESIGN_WIDE_DIALOG_CLASS =
   "flex h-[min(50dvh,640px)] max-h-[min(90dvh,720px)] w-[min(66.67vw,calc(100vw-2rem))] max-w-none flex-col overflow-hidden";
@@ -62,17 +120,23 @@ const PRODUCT_DESIGN_PROMPT_DIALOG_CLASS = cn(
   "gap-4",
 );
 
+type GenPipelinePurpose = "plan-decompose" | "visual-review" | "generate";
+
 type GenPipeline = {
   target: "main" | "detail";
   indexes?: number[];
+  purpose: GenPipelinePurpose;
   step: "vision-model" | "analyzing" | "review" | "image-model";
   draftVisionKey: string;
   draftSummary: string;
   draftPrompt: string;
+  decomposeSource?: "reference-decompose" | "reference-intent";
+  intentPrompt?: string;
 };
 
 type Props = {
   project: ProductDesignProject;
+  specs: EcomPlatformSpec[];
   spec: EcomPlatformSpec | null;
   visionModels: StoryboardGatewayModel[];
   visionModelKey: string;
@@ -85,19 +149,60 @@ type Props = {
     opts: { label: string; role: ProductDesignReferenceRole },
   ) => Promise<void>;
   onRefRemove: (refId: string) => void | Promise<void>;
+  onAttachAssets?: (
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) => Promise<void>;
   refBusy?: boolean;
+  uploadingRole?: ProductDesignReferenceRole | null;
+  uploadProgress?: number | null;
+  onNewProject?: () => void | Promise<void>;
+  /** 详情页入口：打开「从已有主图项目导入」选择器 */
+  onImportFromMainProject?: () => void;
+  /** 主图入口：主图出完后引导新建详情页项目并带走策略 */
+  onContinueToDetailPages?: () => void;
   onProjectChange: () => void | Promise<void>;
   streaming?: boolean;
   generateMainImagesToken?: number;
   generateDetailImagesToken?: number;
-  onEnterDetailPage?: () => void;
-  onAnalyzeDetailDecompose?: () => void;
-  onChooseMainWorkflow?: (mode: "interactive" | "reference-prompt") => void;
+  onBriefComplete?: () => void;
+  onChooseDetailWorkflow?: (mode: DetailWorkflowPath) => void;
+  onRegenerateMarketingPlans?: () => void;
   focusStepId?: ProductDesignStepId | null;
+  /** 模型列表仍在拉取（打开选模弹层前预加载） */
+  modelsLoading?: boolean;
+  /** 模型拉取失败时的说明 */
+  modelsLoadError?: string | null;
+  onRefreshModels?: () => void | Promise<void>;
 };
+
+function productDesignImagePickerCopy(
+  target: "main" | "detail",
+  indexes: number[] | undefined,
+  ratioLabel: string,
+): { title: string; description: string; footerHint: string } {
+  const count = indexes?.length ?? 0;
+  const single = count === 1;
+  if (target === "main") {
+    return {
+      title: single ? "生成产品主图" : "生成全部的产品主图",
+      description: single
+        ? `选择生图模型；输出比例 ${ratioLabel} 由平台规则决定。`
+        : `选择生图模型并批量出主图；输出比例 ${ratioLabel} 由平台规则决定。`,
+      footerHint: "选好模型后开始出图。",
+    };
+  }
+  return {
+    title: single ? "生成详情屏" : "生成全部的详情屏",
+    description: single
+      ? `选择生图模型；输出比例 ${ratioLabel} 由平台规则决定。`
+      : `选择生图模型并批量出详情屏；输出比例 ${ratioLabel} 由平台规则决定。`,
+    footerHint: "选好模型后开始出图。",
+  };
+}
 
 export function ProductDesignContentPanel({
   project,
+  specs,
   spec,
   visionModels,
   visionModelKey,
@@ -107,45 +212,122 @@ export function ProductDesignContentPanel({
   onImageModelChange,
   onRefUpload,
   onRefRemove,
+  onAttachAssets,
   refBusy,
+  uploadingRole = null,
+  uploadProgress = null,
+  onNewProject,
+  onImportFromMainProject,
+  onContinueToDetailPages,
   onProjectChange,
   streaming,
   generateMainImagesToken = 0,
   generateDetailImagesToken = 0,
-  onEnterDetailPage,
-  onAnalyzeDetailDecompose,
-  onChooseMainWorkflow,
+  onBriefComplete,
+  onChooseDetailWorkflow,
+  onRegenerateMarketingPlans,
   focusStepId = null,
+  modelsLoading = false,
+  modelsLoadError = null,
+  onRefreshModels,
 }: Props) {
   const router = useRouter();
   const { alert, confirm } = useDialogs();
   const design = project.design;
   const scrollRootRef = useRef<HTMLDivElement>(null);
+  const activeTrack = resolveActiveTrack(project);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [imagePickerSubmitting, setImagePickerSubmitting] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [genPipeline, setGenPipeline] = useState<GenPipeline | null>(null);
+
+  const imagePickerCopy = useMemo(() => {
+    if (!genPipeline || genPipeline.step !== "image-model") return null;
+    const ratio =
+      genPipeline.target === "detail"
+        ? project.resolved.detailPageRatio
+        : project.resolved.mainImageRatio;
+    return productDesignImagePickerCopy(genPipeline.target, genPipeline.indexes, ratio);
+  }, [genPipeline, project.resolved.detailPageRatio, project.resolved.mainImageRatio]);
+
+  useEffect(() => {
+    if (genPipeline?.step !== "image-model") return;
+    if (imageModels.length > 0 || modelsLoading) return;
+    void onRefreshModels?.();
+  }, [genPipeline?.step, imageModels.length, modelsLoading, onRefreshModels]);
+
+  useEffect(() => {
+    if (genPipeline?.step !== "image-model") setImagePickerSubmitting(false);
+  }, [genPipeline?.step]);
   const [generatingTarget, setGeneratingTarget] = useState<{
     target: "main" | "detail";
     indexes?: number[];
   } | null>(null);
-  const [mainGenMode, setMainGenMode] = useState<"copy" | "reference-prompt">(
+  const [mainGenMode, setMainGenMode] = useState<
+    "copy" | "reference-decompose" | "reference-prompt" | "reference"
+  >(
     project.settings.mainImageGenMode ?? "copy",
   );
   const [mainCustomPrompt, setMainCustomPrompt] = useState(
     project.settings.mainImageCustomPrompt ?? "",
   );
+  const [detailCustomPrompt, setDetailCustomPrompt] = useState(
+    project.settings.detailPageCustomPrompt ?? "",
+  );
+  const genPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setMainGenMode(project.settings.mainImageGenMode ?? "copy");
     setMainCustomPrompt(project.settings.mainImageCustomPrompt ?? "");
-  }, [project.id, project.settings.mainImageGenMode, project.settings.mainImageCustomPrompt]);
+    setDetailCustomPrompt(project.settings.detailPageCustomPrompt ?? "");
+  }, [project.id, project.settings.mainImageGenMode, project.settings.mainImageCustomPrompt, project.settings.detailPageCustomPrompt]);
+
+  useEffect(
+    () => () => {
+      if (genPollRef.current) clearInterval(genPollRef.current);
+    },
+    [],
+  );
+
+  const stopGenPoll = useCallback(() => {
+    if (genPollRef.current) {
+      clearInterval(genPollRef.current);
+      genPollRef.current = null;
+    }
+  }, []);
+
+  const startGenPoll = useCallback(
+    (target: "main" | "detail", indexes?: number[]) => {
+      stopGenPoll();
+      genPollRef.current = setInterval(() => {
+        void getProductDesignProject(project.id)
+          .then((refreshed) => {
+            void onProjectChange();
+            const items =
+              target === "main"
+                ? refreshed.design?.mainImages
+                : refreshed.design?.detailPages;
+            if (!items?.length) return;
+            const pending = (indexes?.length ? indexes : items.map((i) => i.index)).filter(
+              (idx) => !items.find((i) => i.index === idx)?.imageUrl,
+            );
+            if (pending.length === 0) stopGenPoll();
+          })
+          .catch(() => undefined);
+      }, 2500);
+    },
+    [onProjectChange, project.id, stopGenPoll],
+  );
+
   const [draftVisionKey, setDraftVisionKey] = useState(visionModelKey);
   const [draftModelKey, setDraftModelKey] = useState(imageModelKey);
-  const [appendBatchSize, setAppendBatchSize] = useState(5);
-  const [imagePreview, setImagePreview] = useState<{
-    url: string;
-    title: string;
-    ratio: string;
+  const [mainGenBatchCount, setMainGenBatchCount] = useState(() =>
+    resolveMainImageBatchCount(project.settings.mainImageCount),
+  );
+  const [galleryPreview, setGalleryPreview] = useState<{
+    items: ProductDesignGalleryPreviewItem[];
+    initialIndex: number;
   } | null>(null);
   const [promptPreview, setPromptPreview] = useState<{
     title: string;
@@ -154,6 +336,9 @@ export function ProductDesignContentPanel({
 
   useEffect(() => setDraftVisionKey(visionModelKey), [visionModelKey]);
   useEffect(() => setDraftModelKey(imageModelKey), [imageModelKey]);
+  useEffect(() => {
+    setMainGenBatchCount(resolveMainImageBatchCount(project.settings.mainImageCount));
+  }, [project.id, project.settings.mainImageCount]);
 
   useEffect(() => {
     if (!focusStepId) return;
@@ -183,16 +368,251 @@ export function ProductDesignContentPanel({
     [project.id, onProjectChange],
   );
 
-  const selectMarketingPlan = useCallback(
-    async (planNo: number) => {
-      if (design?.selectedPlanNo === planNo) return;
-      await patchDesign({ selectedPlanNo: planNo });
+  const patchBrief = useCallback(
+    async (briefPatch: Partial<ProductDesignBrief>) => {
+      const nextBrief = { ...(project.brief ?? {}), ...briefPatch };
+      await updateProductDesignProject(project.id, {
+        brief: nextBrief,
+      });
+      await onProjectChange();
+      if (
+        briefComplete(nextBrief) &&
+        !shouldSkipBrief(project) &&
+        !hasValidAnalysis(resolveAnalysisForDisplay(project))
+      ) {
+        onBriefComplete?.();
+      }
     },
-    [design?.selectedPlanNo, patchDesign],
+    [onBriefComplete, onProjectChange, project],
   );
 
+  const marketingPlansDisplay = useMemo(
+    () => resolveMarketingPlansForDisplay(project),
+    [project],
+  );
+
+  const marketingPlansSyncKeyRef = useRef("");
+  useEffect(() => {
+    if (marketingPlansDisplay.length === 0) return;
+    const storedMisparse = marketingPlansLookLikeMisParsedMatrix(
+      project.design?.marketingPlans ?? [],
+    );
+    if (project.design?.selectedPlanNo != null && !storedMisparse) return;
+    const nextKey = JSON.stringify(marketingPlansDisplay);
+    if (marketingPlansSyncKeyRef.current === nextKey) return;
+    const storedKey = JSON.stringify(project.design?.marketingPlans ?? []);
+    if (storedKey === nextKey) {
+      marketingPlansSyncKeyRef.current = nextKey;
+      return;
+    }
+    marketingPlansSyncKeyRef.current = nextKey;
+    void patchDesign({ marketingPlans: marketingPlansDisplay });
+  }, [marketingPlansDisplay, patchDesign, project.design?.marketingPlans, project.design?.selectedPlanNo]);
+
+  const buyingReasonDisplay = useMemo(
+    () => resolveBuyingReasonForDisplay(project),
+    [project],
+  );
+
+  const buyingReasonSyncKeyRef = useRef("");
+  useEffect(() => {
+    if (!isStep3Unlocked(project)) return;
+    if (!buyingReasonDisplay.hasContent) return;
+    if (project.design?.buyingReasonBrief?.userEdited) return;
+    const nextKey = JSON.stringify({
+      brief: buyingReasonDisplay.brief,
+      reasons: buyingReasonDisplay.reasons,
+    });
+    if (buyingReasonSyncKeyRef.current === nextKey) return;
+    const storedKey = JSON.stringify({
+      brief: project.design?.buyingReasonBrief ?? null,
+      reasons: project.design?.buyingReasons ?? [],
+    });
+    if (storedKey === nextKey) {
+      buyingReasonSyncKeyRef.current = nextKey;
+      return;
+    }
+    buyingReasonSyncKeyRef.current = nextKey;
+    const reasons =
+      buyingReasonDisplay.reasons.length > 0
+        ? buyingReasonDisplay.reasons
+        : deriveBuyingReasonsFromBrief(buyingReasonDisplay.brief);
+    void patchDesign({
+      buyingReasonBrief: buyingReasonDisplay.brief ?? undefined,
+      buyingReasons: reasons,
+    });
+  }, [
+    buyingReasonDisplay,
+    patchDesign,
+    project,
+    project.design?.buyingReasonBrief,
+    project.design?.buyingReasons,
+    project.design?.selectedPlanNo,
+    project.chatHistory,
+  ]);
+
+  const mainImagesDisplay = useMemo(
+    () => resolveMainImagesForDisplay(project),
+    [project],
+  );
+
+  const detailOutlineDisplay = useMemo(
+    () => resolveDetailOutlineForDisplay(project),
+    [project],
+  );
+
+  const analysisDisplay = useMemo(
+    () => resolveAnalysisForDisplay(project),
+    [project],
+  );
+
+  const analysisSyncKeyRef = useRef("");
+  useEffect(() => {
+    if (!analysisDisplay) return;
+    const nextKey = JSON.stringify(analysisDisplay);
+    if (analysisSyncKeyRef.current === nextKey) return;
+    const storedKey = JSON.stringify(project.design?.analysis ?? null);
+    if (storedKey === nextKey) {
+      analysisSyncKeyRef.current = nextKey;
+      return;
+    }
+    analysisSyncKeyRef.current = nextKey;
+    void patchDesign({ analysis: analysisDisplay });
+  }, [analysisDisplay, patchDesign, project.design?.analysis]);
+
+  const saveMainImageItem = useCallback(
+    async (
+      index: number,
+      updater: (prev: ProductDesignMainImage) => ProductDesignMainImage,
+    ) => {
+      const base =
+        (design?.mainImages?.length ?? 0) > 0
+          ? [...design!.mainImages]
+          : [...mainImagesDisplay];
+      const pos = base.findIndex((m) => m.index === index);
+      const prev =
+        pos >= 0 ? base[pos]! : mainImagesDisplay.find((m) => m.index === index);
+      if (!prev) return;
+      const updated = updater(prev);
+      if (pos >= 0) base[pos] = updated;
+      else base.push(updated);
+      base.sort((a, b) => a.index - b.index);
+      await patchDesign({ mainImages: base });
+    },
+    [design, mainImagesDisplay, patchDesign],
+  );
+
+  const mainImagesSyncKeyRef = useRef("");
+  useEffect(() => {
+    if (!isStep3ReadyForDownstream(project)) return;
+    if (mainImagesDisplay.length === 0) return;
+    const nextKey = JSON.stringify(
+      mainImagesDisplay.map((m) => ({
+        index: m.index,
+        purpose: m.purpose,
+        layers: m.layers,
+        emphasis: m.emphasis,
+      })),
+    );
+    if (mainImagesSyncKeyRef.current === nextKey) return;
+    const storedKey = JSON.stringify(
+      (project.design?.mainImages ?? []).map((m) => ({
+        index: m.index,
+        purpose: m.purpose,
+        layers: m.layers,
+        emphasis: m.emphasis,
+      })),
+    );
+    if (storedKey === nextKey) {
+      mainImagesSyncKeyRef.current = nextKey;
+      return;
+    }
+    mainImagesSyncKeyRef.current = nextKey;
+    void patchDesign({ mainImages: mainImagesDisplay });
+  }, [mainImagesDisplay, patchDesign, project, project.design?.mainImages]);
+
+  const detailOutlineSyncKeyRef = useRef("");
+  useEffect(() => {
+    if (!isStep3ReadyForDownstream(project)) return;
+    if (mainImagesDisplay.length === 0 && (project.design?.mainImages?.length ?? 0) === 0) return;
+    if (detailOutlineDisplay.length === 0) return;
+    const nextKey = JSON.stringify(detailOutlineDisplay);
+    if (detailOutlineSyncKeyRef.current === nextKey) return;
+    const storedKey = JSON.stringify(project.design?.detailOutline ?? []);
+    if (storedKey === nextKey) {
+      detailOutlineSyncKeyRef.current = nextKey;
+      return;
+    }
+    detailOutlineSyncKeyRef.current = nextKey;
+    void patchDesign({ detailOutline: detailOutlineDisplay });
+  }, [
+    detailOutlineDisplay,
+    mainImagesDisplay.length,
+    patchDesign,
+    project.design?.detailOutline,
+    project.design?.selectedPlanNo,
+  ]);
+
+  const staleDownstreamClearedRef = useRef(false);
+  const prematureStep3ClearedRef = useRef(false);
+  useEffect(() => {
+    const d = project.design;
+    if (!d) return;
+
+    // 快速分支（参考图 + 自定义 Prompt）本就跳过 Step2 选方案，
+    // selectedPlanNo 恒为空，不能据此判定下游内容是解析残留
+    const planExpected = !isFastMainPath(project) && !isFastDetailPath(project);
+
+    if (planExpected && d.selectedPlanNo == null) {
+      prematureStep3ClearedRef.current = false;
+      // 已出图的槽位一律保留：出图消耗过额度，不能当作脏数据抹掉
+      const hasGenerated =
+        (d.mainImages ?? []).some((m) => m.imageUrl) ||
+        (d.detailPages ?? []).some((p) => p.imageUrl);
+      const hasStale =
+        Boolean(d.buyingReasonBrief) ||
+        (d.buyingReasons?.length ?? 0) > 0 ||
+        (d.detailOutline?.length ?? 0) > 0 ||
+        (!hasGenerated &&
+          ((d.mainImages?.length ?? 0) > 0 || (d.detailPages?.length ?? 0) > 0));
+      if (!hasStale || staleDownstreamClearedRef.current) return;
+      staleDownstreamClearedRef.current = true;
+      void patchDesign({
+        buyingReasonBrief: undefined,
+        buyingReasons: [],
+        detailOutline: [],
+        ...(hasGenerated ? {} : { mainImages: [], detailPages: [] }),
+      });
+      return;
+    }
+
+    staleDownstreamClearedRef.current = false;
+
+    const invalidBrief =
+      d.buyingReasonBrief &&
+      !isValidStep3Table(resolveBuyingReasonTable(d.buyingReasonBrief));
+    if (invalidBrief && !prematureStep3ClearedRef.current) {
+      prematureStep3ClearedRef.current = true;
+      void patchDesign({
+        buyingReasonBrief: undefined,
+        buyingReasons: [],
+      });
+    }
+  }, [
+    patchDesign,
+    project,
+    project.design,
+    project.design?.buyingReasonBrief,
+    project.design?.buyingReasons,
+    project.design?.detailOutline,
+    project.design?.detailPages,
+    project.design?.mainImages,
+    project.design?.selectedPlanNo,
+    project.chatHistory,
+  ]);
+
   const saveMainGenSettings = useCallback(
-    async (mode: "copy" | "reference-prompt", customPrompt: string) => {
+    async (mode: "copy" | "reference-decompose" | "reference-prompt" | "reference", customPrompt: string) => {
       await updateProductDesignProject(project.id, {
         settings: {
           mainImageGenMode: mode,
@@ -207,54 +627,103 @@ export function ProductDesignContentPanel({
   const runGenerate = useCallback(
     async (target: "main" | "detail", indexes?: number[], modelKey?: string) => {
       const label = target === "main" ? "主图" : "详情屏";
-      setGeneratingTarget({ target, indexes });
+      const items = target === "main" ? design?.mainImages : design?.detailPages;
+      if (!items?.length) return;
+
+      const wantedIndexes =
+        indexes && indexes.length > 0
+          ? indexes
+          : items.filter((i) => !i.imageUrl).map((i) => i.index);
+      if (wantedIndexes.length === 0) return;
+
+      const mk = modelKey ?? imageModelKey;
+      const ratio =
+        target === "main"
+          ? project.resolved.mainImageRatio
+          : project.resolved.detailPageRatio;
+
+      const countBefore = items.filter((i) =>
+        wantedIndexes.includes(i.index) ? Boolean(i.imageUrl) : false,
+      ).length;
+
+      setGeneratingTarget({ target, indexes: wantedIndexes });
       setBusy(
-        indexes?.length === 1
-          ? `${label}第 ${indexes[0]} 张生成中`
-          : `${label}生成中`,
+        wantedIndexes.length === 1
+          ? `${label}第 ${wantedIndexes[0]} 张生成中`
+          : `${label}生成中（0/${wantedIndexes.length}）`,
       );
+      startGenPoll(target, wantedIndexes);
+
+      const failures: Array<{ index: number; message: string }> = [];
+      let generated = 0;
       try {
         const result = await generateProductDesignImages(project.id, {
           target,
-          indexes,
-          modelKey: modelKey ?? imageModelKey,
-          ratio:
-            target === "main"
-              ? project.resolved.mainImageRatio
-              : project.resolved.detailPageRatio,
+          indexes: wantedIndexes,
+          modelKey: mk,
+          ratio,
         });
+        generated = result.generated;
+        failures.push(...result.failures);
+      } catch (e) {
+        for (const index of wantedIndexes) {
+          failures.push({
+            index,
+            message: e instanceof Error ? e.message : "生成失败",
+          });
+        }
+      } finally {
+        stopGenPoll();
         await onProjectChange();
-        if (result.failures.length > 0) {
+      }
+
+      const refreshed = await getProductDesignProject(project.id);
+      const afterItems =
+        target === "main"
+          ? refreshed.design?.mainImages ?? []
+          : refreshed.design?.detailPages ?? [];
+      const newlyDone = wantedIndexes.filter((idx) =>
+        Boolean(afterItems.find((i) => i.index === idx)?.imageUrl),
+      ).length;
+
+      if (failures.length > 0) {
+        if (newlyDone > countBefore) {
           await alert({
-            title: `${result.generated} 张成功，${result.failures.length} 张失败`,
-            message: result.failures
-              .map((f) => `第 ${f.index} 张：${f.message}`)
-              .join("\n"),
+            title: `${newlyDone - countBefore} 张已生成，${failures.length} 张失败`,
+            message: failures.map((f) => `第 ${f.index} 张：${f.message}`).join("\n"),
             variant: "error",
           });
-        } else if (target === "main") {
-          const refreshed = await getProductDesignProject(project.id);
-          const mains = refreshed?.design?.mainImages ?? design?.mainImages ?? [];
-          if (mains.length > 0 && mains.every((m) => m.imageUrl)) {
-            await alert({
-              title: "主图生成完成",
-              message:
-                "全部主图已生成。请在右侧助手点「进入详情页制作」，开始规划详情页架构与分屏文案。",
-            });
-          }
+        } else {
+          await alert({
+            title: `${label}生成失败`,
+            message: failures.map((f) => `第 ${f.index} 张：${f.message}`).join("\n"),
+            variant: "error",
+          });
         }
-      } catch (e) {
-        await alert({
-          title: `${label}生成失败`,
-          message: e instanceof Error ? e.message : "未知错误",
-          variant: "error",
-        });
-      } finally {
-        setBusy(null);
-        setGeneratingTarget(null);
+      } else if (target === "main") {
+        const mains = afterItems;
+        if (mains.length > 0 && mains.every((m) => m.imageUrl)) {
+          await alert({
+            title: "主图生成完成",
+            message: "全部主图已生成。请在中间工作区选择详情页制作方式，继续详情页流程。",
+          });
+        }
       }
+
+      setBusy(null);
+      setGeneratingTarget(null);
     },
-    [project.id, project.resolved, imageModelKey, design?.mainImages, onProjectChange, alert],
+    [
+      design?.mainImages,
+      design?.detailPages,
+      project.id,
+      project.resolved,
+      imageModelKey,
+      onProjectChange,
+      alert,
+      startGenPoll,
+      stopGenPoll,
+    ],
   );
 
   const cardGeneratingFor = useCallback(
@@ -266,6 +735,50 @@ export function ProductDesignContentPanel({
     [generatingTarget],
   );
 
+  const openMainSlotPreview = useCallback(
+    (index: number) => {
+      if (!design) return;
+      const item = design.mainImages.find((m) => m.index === index);
+      if (!item?.imageUrl) return;
+      const items: ProductDesignGalleryPreviewItem[] = design.mainImages
+        .filter((m) => m.imageUrl)
+        .map((m) => ({
+          url: m.imageUrl!,
+          title: `主图 ${m.index} · ${m.layers.title}`,
+          ratio: project.resolved.mainImageRatio,
+          downloadFilename: `主图-${m.index}-${m.layers.title.slice(0, 12)}.png`,
+        }));
+      const initialIndex = items.findIndex((g) => g.url === item.imageUrl);
+      setGalleryPreview({
+        items,
+        initialIndex: initialIndex >= 0 ? initialIndex : 0,
+      });
+    },
+    [design, project.resolved.mainImageRatio],
+  );
+
+  const openDetailSlotPreview = useCallback(
+    (index: number) => {
+      if (!design) return;
+      const item = design.detailPages.find((d) => d.index === index);
+      if (!item?.imageUrl) return;
+      const items: ProductDesignGalleryPreviewItem[] = design.detailPages
+        .filter((d) => d.imageUrl)
+        .map((d) => ({
+          url: d.imageUrl!,
+          title: `第 ${d.index} 屏 · ${d.title}`,
+          ratio: project.resolved.detailPageRatio,
+          downloadFilename: `详情-${d.index}-${d.title.slice(0, 12)}.png`,
+        }));
+      const initialIndex = items.findIndex((g) => g.url === item.imageUrl);
+      setGalleryPreview({
+        items,
+        initialIndex: initialIndex >= 0 ? initialIndex : 0,
+      });
+    },
+    [design, project.resolved.detailPageRatio],
+  );
+
   const startGeneratePipeline = useCallback(
     async (target: "main" | "detail", indexes?: number[]) => {
       if (
@@ -275,16 +788,100 @@ export function ProductDesignContentPanel({
       ) {
         await saveMainGenSettings(mainGenMode, mainCustomPrompt);
       }
+      if (
+        target === "detail" &&
+        project.settings.detailPageGenMode === "reference-prompt" &&
+        detailCustomPrompt.trim()
+      ) {
+        await updateProductDesignProject(project.id, {
+          settings: { detailPageCustomPrompt: detailCustomPrompt.trim() },
+        });
+      }
       setGenPipeline({
         target,
         indexes,
-        step: "vision-model",
+        purpose: "generate",
+        step: "image-model",
         draftVisionKey: visionModelKey,
         draftSummary: "",
         draftPrompt: "",
       });
     },
-    [mainGenMode, mainCustomPrompt, saveMainGenSettings, visionModelKey],
+    [
+      mainGenMode,
+      mainCustomPrompt,
+      saveMainGenSettings,
+      visionModelKey,
+      detailCustomPrompt,
+      project.settings.detailPageGenMode,
+    ],
+  );
+
+  const startAnalyzeForPlan = useCallback(
+    async (opts: {
+      target: "main" | "detail";
+      decomposeSource: "reference-decompose" | "reference-intent";
+      intentPrompt?: string;
+    }) => {
+      if (opts.target === "main" && isFastMainPromptPath(project) && mainCustomPrompt.trim()) {
+        await saveMainGenSettings("reference-prompt", mainCustomPrompt);
+      }
+      if (
+        opts.target === "detail" &&
+        isFastDetailPromptPath(project) &&
+        detailCustomPrompt.trim()
+      ) {
+        await updateProductDesignProject(project.id, {
+          settings: { detailPageCustomPrompt: detailCustomPrompt.trim() },
+        });
+      }
+      setGenPipeline({
+        target: opts.target,
+        purpose: "plan-decompose",
+        step: "vision-model",
+        draftVisionKey: visionModelKey,
+        draftSummary: "",
+        draftPrompt: "",
+        decomposeSource: opts.decomposeSource,
+        intentPrompt: opts.intentPrompt?.trim() || undefined,
+      });
+    },
+    [
+      project,
+      mainCustomPrompt,
+      detailCustomPrompt,
+      saveMainGenSettings,
+      visionModelKey,
+    ],
+  );
+
+  const runPlanDecompose = useCallback(
+    async (pipeline: GenPipeline) => {
+      const label = pipeline.target === "main" ? "主图" : "详情页";
+      setBusy(`正在分析${label}参考并拆解 Prompt…`);
+      setGenPipeline({ ...pipeline, step: "analyzing" });
+      try {
+        onVisionModelChange(pipeline.draftVisionKey);
+        await decomposeProductDesignImagePlan(project.id, {
+          target: pipeline.target,
+          modelKey: pipeline.draftVisionKey,
+          intentPrompt: pipeline.intentPrompt,
+          source: pipeline.decomposeSource,
+        });
+        await onProjectChange();
+        setGenPipeline(null);
+      } catch (e) {
+        await alert({
+          title: "分析拆解失败",
+          message: e instanceof Error ? e.message : "未知错误",
+          variant: "error",
+        });
+        setGenPipeline(null);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [project.id, onVisionModelChange, onProjectChange, alert],
   );
 
   const runVisionAnalyze = useCallback(
@@ -298,7 +895,9 @@ export function ProductDesignContentPanel({
           target: pipeline.target,
           modelKey: pipeline.draftVisionKey,
           analysisMode:
-            pipeline.target === "main" && mainGenMode === "reference-prompt"
+            (pipeline.target === "main" && mainGenMode === "reference-prompt") ||
+            (pipeline.target === "detail" &&
+              project.settings.detailPageGenMode === "reference-prompt")
               ? "reference-style"
               : "copy",
         });
@@ -320,7 +919,7 @@ export function ProductDesignContentPanel({
         setBusy(null);
       }
     },
-    [project.id, onVisionModelChange, onProjectChange, alert, mainGenMode],
+    [project.id, onVisionModelChange, onProjectChange, alert, mainGenMode, project.settings.detailPageGenMode],
   );
 
   const confirmVisualReview = useCallback(
@@ -346,45 +945,40 @@ export function ProductDesignContentPanel({
     [design?.visualBrief, patchDesign],
   );
 
-  const requestBatch = useCallback(
-    async (target: "main" | "detail") => {
-      const items = target === "main" ? design?.mainImages : design?.detailPages;
-      if (!items?.length) {
-        await alert({
-          title: "无法生成",
-          message: target === "main" ? "还没有主图槽位，请先追加或完成 Step4。" : "还没有详情屏文案。",
-          variant: "error",
-        });
-        return;
-      }
-      const pending = items.filter((i) => !i.imageUrl);
-      const regenerateAll = pending.length === 0;
-      const indexes = regenerateAll
-        ? items.map((i) => i.index)
-        : pending.map((i) => i.index);
-      const label = target === "main" ? "主图" : "详情屏";
+  const requestMainGenerate = useCallback(
+    async (indexes: number[]) => {
+      if (!design || indexes.length <= 0) return;
+
       const ok = await confirm({
-        title: regenerateAll ? `重新生成全部${label}` : `生成全部${label}`,
-        message: regenerateAll
-          ? `将全部 ${indexes.length} 张${label}重新出图（会覆盖现有图片）。将先分析参考图再出图，预计需要几分钟。是否继续？`
-          : `将先分析参考图生成视觉 Prompt，再出图 ${indexes.length} 张，预计需要几分钟。是否继续？`,
+        title: `生成 ${indexes.length} 张主图`,
+        message: `将出图 ${indexes.length} 张主图，预计需要几分钟。是否继续？`,
       });
       if (!ok) return;
-      if (
-        target === "main" &&
-        mainGenMode === "reference-prompt" &&
-        !mainCustomPrompt.trim()
-      ) {
+
+      void startGeneratePipeline("main", indexes);
+    },
+    [design, confirm, startGeneratePipeline],
+  );
+
+  const requestDetailGenerate = useCallback(
+    async (indexes: number[]) => {
+      const items = design?.detailPages;
+      if (!items?.length || indexes.length === 0) {
         await alert({
-          title: "请先填写自定义 Prompt",
-          message: "参考图模式下需在「参考图 + 自定义 Prompt」文本框中描述生成意图。",
+          title: "无法生成",
+          message: "还没有详情屏条目。",
           variant: "error",
         });
         return;
       }
-      void startGeneratePipeline(target, indexes);
+      const ok = await confirm({
+        title: `生成 ${indexes.length} 张详情屏`,
+        message: `将出图 ${indexes.length} 张详情屏，预计需要几分钟。是否继续？`,
+      });
+      if (!ok) return;
+      void startGeneratePipeline("detail", indexes);
     },
-    [design, alert, confirm, startGeneratePipeline, mainGenMode, mainCustomPrompt],
+    [design?.detailPages, alert, confirm, startGeneratePipeline],
   );
 
   // 助手侧点「生成全部主图 / 详情屏」时通过递增 token 触发
@@ -393,34 +987,213 @@ export function ProductDesignContentPanel({
   useEffect(() => {
     if (generateMainImagesToken === mainTokenRef.current) return;
     mainTokenRef.current = generateMainImagesToken;
-    void requestBatch("main");
-  }, [generateMainImagesToken, requestBatch]);
+    const indexes =
+      design?.mainImages
+        .filter((m) => !m.imageUrl)
+        .slice(0, mainGenBatchCount)
+        .map((m) => m.index) ??
+      [];
+    if (indexes.length === 0 && design?.mainImages.length) {
+      void requestMainGenerate(
+        design.mainImages.slice(0, mainGenBatchCount).map((m) => m.index),
+      );
+    } else if (indexes.length > 0) {
+      void requestMainGenerate(indexes);
+    }
+  }, [generateMainImagesToken, requestMainGenerate, mainGenBatchCount, design?.mainImages]);
   useEffect(() => {
     if (generateDetailImagesToken === detailTokenRef.current) return;
     detailTokenRef.current = generateDetailImagesToken;
-    void requestBatch("detail");
-  }, [generateDetailImagesToken, requestBatch]);
+    const items = design?.detailPages ?? [];
+    const pending = items.filter((i) => !i.imageUrl);
+    const indexes =
+      pending.length > 0 ? pending.map((i) => i.index) : items.map((i) => i.index);
+    if (indexes.length > 0) void requestDetailGenerate(indexes);
+  }, [generateDetailImagesToken, requestDetailGenerate, design?.detailPages]);
 
   const allMainImagesDone =
     Boolean(design?.mainImages.length) &&
     design!.mainImages.every((m) => m.imageUrl);
 
-  const showEnterDetailBanner =
-    allMainImagesDone &&
-    !project.meta?.detailWorkflowPath &&
-    (design?.detailOutline.length ?? 0) === 0;
+  const mainImageDoneCount =
+    design?.mainImages.filter((m) => m.imageUrl).length ?? 0;
+  const mainImageTotal = design?.mainImages.length ?? 0;
+  const mainPendingCount =
+    design?.mainImages.filter((m) => !m.imageUrl).length ?? 0;
+  const mainNeedAppend = Math.max(0, mainGenBatchCount - mainPendingCount);
+  const mainGenerateBlocked =
+    mainImageTotal + mainNeedAppend > PRODUCT_DESIGN_MAIN_IMAGE_SLOTS_MAX;
 
-  const showDetailDecomposeWorkspace =
-    allMainImagesDone &&
-    isFastDetailPath(project) &&
-    (design?.detailPages.length ?? 0) === 0;
+  const mainTrack = activeTrack === "main";
+  const detailTrack = activeTrack === "detail";
+  const mainImagesAllGenerated = mainImageTotal > 0 && mainPendingCount === 0;
 
-  const setupPhase = resolveSetupPhase(project);
-  const showMainWorkflowChoice =
-    setupPhase === "workflow-choice" && !project.meta?.mainWorkflowPath;
+  const showReferenceMainPlan =
+    mainTrack && isReferenceImagePath(project) && Boolean(project.meta?.platformConfirmed);
+
+  const showDetailPlanWorkspace =
+    detailTrack && isFastDetailPath(project) && Boolean(project.meta?.detailWorkflowPath);
+
+  const showFastMainSetup = mainTrack && isFastMainSetupPending(project);
+  const showFastDetailSetup = detailTrack && isFastDetailSetupPending(project);
+  const showBriefSetup = needsBriefCollection(project);
+
+  const fastMainSpec =
+    specs.find((s) => s.code === project.platform) ??
+    spec ??
+    specs[0] ??
+    null;
+
+  const confirmFastMainSetup = useCallback(async () => {
+    if (!fastMainSpec) {
+      await alert({
+        title: "请先选择平台",
+        message: "快速主图需先选定上架平台。",
+        variant: "error",
+      });
+      return;
+    }
+    const detailCount =
+      project.settings.detailPageCount ?? fastMainSpec.detailPage.recommended;
+    const prompt =
+      mainCustomPrompt.trim() ||
+      defaultMainImageRefPrompt({
+        ...project,
+        platform: fastMainSpec.code,
+        settings: {
+          ...project.settings,
+          mainImageGenMode: "reference-prompt",
+        },
+      });
+    setBusy("正在初始化…");
+    try {
+      await updateProductDesignProject(project.id, {
+        platform: fastMainSpec.code,
+        settings: {
+          detailPageCount: detailCount,
+          mainImageGenMode: "reference-prompt",
+          ...(prompt ? { mainImageCustomPrompt: prompt } : {}),
+          mainImageRatio: fastMainSpec.mainImage.ratio,
+          detailPageRatio: fastMainSpec.detailPage.ratio,
+        },
+        meta: {
+          mainWorkflowPath: "prompt",
+          platformConfirmed: true,
+          countsConfirmed: true,
+          setupPhase: "done",
+          briefSkipped: true,
+        },
+      });
+      setMainGenMode("reference-prompt");
+      if (prompt) setMainCustomPrompt(prompt);
+      await onProjectChange();
+    } finally {
+      setBusy(null);
+    }
+  }, [alert, fastMainSpec, mainCustomPrompt, onProjectChange, project]);
+
+  const confirmFastDetailSetup = useCallback(async () => {
+    const detailSpec = spec ?? specs[0];
+    if (!detailSpec) return;
+    const prompt =
+      detailCustomPrompt.trim() ||
+      defaultDetailPageRefPrompt({
+        ...project,
+        settings: {
+          ...project.settings,
+          detailPageGenMode: "reference-prompt",
+        },
+      });
+    setBusy("正在初始化…");
+    try {
+      await updateProductDesignProject(project.id, {
+        settings: {
+          detailPageGenMode: "reference-prompt",
+          detailPageCustomPrompt: prompt,
+          detailPageRatio: detailSpec.detailPage.ratio,
+        },
+        meta: {
+          detailWorkflowPath: "prompt",
+        },
+      });
+      setDetailCustomPrompt(prompt);
+      await onProjectChange();
+    } finally {
+      setBusy(null);
+    }
+  }, [spec, specs, detailCustomPrompt, onProjectChange, project]);
+
+  const requestMainPlanAnalyze = useCallback(async () => {
+    if (!project.meta?.platformConfirmed) {
+      await confirmFastMainSetup();
+    }
+    await startAnalyzeForPlan({
+      target: "main",
+      decomposeSource: mainCustomPrompt.trim() ? "reference-intent" : "reference-decompose",
+      intentPrompt: mainCustomPrompt.trim() || undefined,
+    });
+  }, [
+    project,
+    confirmFastMainSetup,
+    startAnalyzeForPlan,
+    mainCustomPrompt,
+  ]);
+
+  const requestDetailPlanAnalyze = useCallback(async () => {
+    if (!project.meta?.detailWorkflowPath && isFastDetailPromptPath(project)) {
+      await confirmFastDetailSetup();
+    }
+    await startAnalyzeForPlan({
+      target: "detail",
+      decomposeSource: detailCustomPrompt.trim() ? "reference-intent" : "reference-decompose",
+      intentPrompt: detailCustomPrompt.trim() || undefined,
+    });
+  }, [
+    project,
+    confirmFastDetailSetup,
+    startAnalyzeForPlan,
+    detailCustomPrompt,
+  ]);
+
+  const handleFastMainAnalyze = useCallback(async () => {
+    if (!project.platform && !fastMainSpec) {
+      await alert({
+        title: "请先选择平台",
+        message: "请先选定上架平台后再分析。",
+        variant: "error",
+      });
+      return;
+    }
+    await requestMainPlanAnalyze();
+  }, [project.platform, fastMainSpec, alert, requestMainPlanAnalyze]);
+
+  const handleFastDetailAnalyze = useCallback(async () => {
+    await requestDetailPlanAnalyze();
+  }, [requestDetailPlanAnalyze]);
+
+  const selectFastMainPlatform = useCallback(
+    async (nextSpec: EcomPlatformSpec) => {
+      const recommended = nextSpec.mainImage.recommended;
+      await updateProductDesignProject(project.id, {
+        platform: nextSpec.code,
+        settings: {
+          mainImageCount: recommended,
+          detailPageCount: nextSpec.detailPage.recommended,
+          mainImageRatio: nextSpec.mainImage.ratio,
+          detailPageRatio: nextSpec.detailPage.ratio,
+        },
+      });
+      await onProjectChange();
+    },
+    [onProjectChange, project.id],
+  );
 
   const promptMentionRefs = useMemo(
     () => buildProductDesignPromptMentionRefs(project, "main"),
+    [project.references],
+  );
+  const detailPromptMentionRefs = useMemo(
+    () => buildProductDesignPromptMentionRefs(project, "detail"),
     [project.references],
   );
 
@@ -428,27 +1201,6 @@ export function ProductDesignContentPanel({
     visionModelKey,
     imageModelKey,
   });
-
-  const appendMainImages = useCallback(
-    async (addCount: number) => {
-      if (!design) return;
-      const next = appendMainImageSlots(design, addCount);
-      if (next.length === design.mainImages.length) {
-        await alert({
-          title: "已达上限",
-          message: `主图槽位最多 ${PRODUCT_DESIGN_MAIN_IMAGE_SLOTS_MAX} 张。`,
-          variant: "error",
-        });
-        return;
-      }
-      const added = next.length - design.mainImages.length;
-      await updateProductDesignProject(project.id, {
-        settings: { mainImageCount: next.length },
-      });
-      await patchDesign({ mainImages: next });
-    },
-    [design, alert, project.id, patchDesign],
-  );
 
   async function handleViewGenPrompt(opts: {
     title: string;
@@ -523,16 +1275,41 @@ export function ProductDesignContentPanel({
     }
   }
 
-  function handleExport() {
-    const markdown = buildProductDesignMarkdown(project, spec);
-    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.title ?? "电商产品创作"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function handleExportZip() {
+    setBusy("正在打包交付包…");
+    try {
+      await downloadProductDesignExportZip(project.id);
+    } catch (e) {
+      await alert({
+        title: "导出失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
   }
+
+  async function handleSaveZip(productName: string) {
+    setBusy("正在保存…");
+    try {
+      await saveProductDesignProjectZip(project.id, productName);
+      setSaveDialogOpen(false);
+    } catch (e) {
+      await alert({
+        title: "保存失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const defaultSaveProductName =
+    (typeof project.brief?.productName === "string" && project.brief.productName.trim()) ||
+    project.title?.trim() ||
+    "";
 
   const mainAssetIds = (design?.mainImages ?? [])
     .map((m) => m.assetId)
@@ -550,23 +1327,58 @@ export function ProductDesignContentPanel({
         ref={scrollRootRef}
         className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]"
       >
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-[#e8e8ed] bg-white px-5 py-3">
+      <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-[#1d1d1f]">
-            {project.title ?? "电商产品创作"}
+            {project.title ??
+              (activeTrack === "detail" ? "电商产品详情页创作" : "电商产品主图创作")}
           </h2>
           <p className="text-[11px] text-[#6e6e73]">
-            {spec?.label ?? project.platform} · 主图 {project.resolved.mainImageCount} 张（
-            {project.resolved.mainImageRatio}） · 详情 {project.resolved.detailPageCount} 屏（
-            {project.resolved.detailPageRatio}）
+            {spec
+              ? `${spec.label} · ${activeTrack === "detail" ? "产品详情页" : "产品主图"}`
+              : activeTrack === "detail"
+                ? "产品详情页"
+                : "产品主图"}
+            {spec ? (
+              <>
+                {" "}
+                ·{" "}
+                {activeTrack === "detail"
+                  ? `详情 ${project.resolved.detailPageCount} 屏（${project.resolved.detailPageRatio}）`
+                  : `主图 ${project.resolved.mainImageCount} 张（${project.resolved.mainImageRatio}）`}
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onNewProject ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              dark
+              disabled={Boolean(busy) || Boolean(refBusy) || streaming}
+              onClick={() => void onNewProject()}
+            >
+              新建
+            </EcomButtonSecondary>
+          ) : null}
+          {onImportFromMainProject ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              dark
+              disabled={Boolean(busy) || Boolean(refBusy) || streaming}
+              onClick={() => onImportFromMainProject()}
+            >
+              从主图项目导入
+            </EcomButtonSecondary>
+          ) : null}
           <EcomButtonSecondary
             size="sm"
             type="button"
             dark
-            disabled={Boolean(busy) || streaming}
+            disabled={streaming || (Boolean(busy) && !generatingTarget)}
             onClick={() => void handleResync()}
           >
             <RefreshCw className="h-3.5 w-3.5 shrink-0" />
@@ -576,8 +1388,18 @@ export function ProductDesignContentPanel({
             size="sm"
             type="button"
             dark
-            disabled={!design}
-            onClick={handleExport}
+            disabled={!design || Boolean(busy)}
+            onClick={() => setSaveDialogOpen(true)}
+          >
+            <Save className="h-3.5 w-3.5 shrink-0" />
+            保存
+          </EcomButtonSecondary>
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            dark
+            disabled={!design || Boolean(busy)}
+            onClick={() => void handleExportZip()}
           >
             <Download className="h-3.5 w-3.5 shrink-0" />
             导出交付包
@@ -593,7 +1415,40 @@ export function ProductDesignContentPanel({
             去做视频
           </EcomButtonSecondary>
         </div>
+        </div>
       </header>
+
+      <section className="border-b border-[#e8e8ed] px-5 py-4">
+        <ProductDesignRefUploader
+          role="product"
+          required
+          references={project.references}
+          visionModelKey={visionModelKey}
+          imageModelKey={imageModelKey}
+          onUpload={onRefUpload}
+          onRemove={onRefRemove}
+          onAttachAssets={onAttachAssets}
+          busy={Boolean(refBusy) && uploadingRole !== "main-style"}
+          uploadProgress={uploadingRole === "product" ? uploadProgress : null}
+        />
+        <div className="mt-3">
+          <ProductDesignRefUploader
+            role={detailTrack ? "detail-style" : "main-style"}
+            references={project.references}
+            visionModelKey={visionModelKey}
+            imageModelKey={imageModelKey}
+            onUpload={onRefUpload}
+            onRemove={onRefRemove}
+            onAttachAssets={onAttachAssets}
+            busy={Boolean(refBusy) && uploadingRole !== "product"}
+            uploadProgress={
+              uploadingRole === (detailTrack ? "detail-style" : "main-style")
+                ? uploadProgress
+                : null
+            }
+          />
+        </div>
+      </section>
 
       <StoryboardTaskStatus
         active={Boolean(busy)}
@@ -602,49 +1457,295 @@ export function ProductDesignContentPanel({
         surface="chrome"
       />
 
-      {!design && !showMainWorkflowChoice ? (
-        <div id="pdt-step-top" className="grid scroll-mt-20 place-items-center px-6 py-24 text-center">
-          <Sparkles className="mb-3 h-8 w-8 text-[#86868b]" />
-          <p className="text-sm text-[#6e6e73]">
-            在右侧完成平台与产品信息后，助手将按 9 步逐段产出内容，结果会实时显示在左侧。
-          </p>
+      {showFastMainSetup && isFastMainPath(project) ? (
+        <div
+          id={productDesignStepAnchorId("main-image")}
+          className="scroll-mt-20 px-5 py-8"
+        >
+          <Section title="主图 · 参考图 + Prompt">
+            <p className="mb-4 text-[11px] leading-relaxed text-[#6e6e73]">
+              跳过 Step1–4：选择平台、填写 Prompt（参考图可选）后点击「分析」，确认 Prompt 计划再出图。
+            </p>
+            <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">1. 选择平台</p>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {specs.map((s) => (
+                <button
+                  key={s.code}
+                  type="button"
+                  disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-[11px] transition-colors",
+                    project.platform === s.code
+                      ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[#1d1d1f]"
+                      : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]",
+                  )}
+                  onClick={() => void selectFastMainPlatform(s)}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            {fastMainSpec ? (
+              <>
+                <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+                  2. Prompt（可 @ 参考图）
+                </p>
+                <ProductDesignPromptMentionTextarea
+                  value={
+                    mainCustomPrompt.trim() ||
+                    defaultMainImageRefPrompt({
+                      ...project,
+                      platform: fastMainSpec.code,
+                      settings: {
+                        ...project.settings,
+                        mainImageGenMode: "reference-prompt",
+                      },
+                    })
+                  }
+                  referenceImages={promptMentionRefs}
+                  disabled={Boolean(busy)}
+                  onChange={setMainCustomPrompt}
+                />
+              </>
+            ) : null}
+            {project.platform ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <EcomButtonPrimary
+                  size="sm"
+                  type="button"
+                  disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                  onClick={() => void handleFastMainAnalyze()}
+                >
+                  分析
+                </EcomButtonPrimary>
+              </div>
+            ) : null}
+          </Section>
         </div>
       ) : null}
 
-      {showMainWorkflowChoice ? (
-        <div id="pdt-step-top" className="scroll-mt-20 px-5 py-8">
-          <Section title="主图制作方式">
+      {showReferenceMainPlan && !showFastMainSetup ? (
+        <div className="px-5 py-4">
+          <ProductDesignGenSlotWorkspace
+            project={project}
+            target="main"
+            ratio={project.resolved.mainImageRatio}
+            title="主图 · Prompt 与出图"
+            disabled={streaming || (Boolean(busy) && !generatingTarget)}
+            mode="decompose"
+            onProjectChange={onProjectChange}
+            onRequestAnalyze={() => void requestMainPlanAnalyze()}
+            onGenerate={(indexes) => void requestMainGenerate(indexes)}
+            cardGeneratingFor={(index) => cardGeneratingFor("main", index)}
+            onPreview={openMainSlotPreview}
+            onDownload={(index) => {
+              const item = project.design?.mainImages.find((m) => m.index === index);
+              if (!item?.imageUrl) return;
+              downloadImageFile(
+                item.imageUrl,
+                `主图-${item.index}-${item.layers.title.slice(0, 12)}.png`,
+              );
+            }}
+            onGoToVideo={(index) => {
+              const item = project.design?.mainImages.find((m) => m.index === index);
+              void handleGoToVideo(
+                item?.assetId ? [item.assetId] : [],
+                `${item?.layers.title ?? "主图"} · 主图视频`,
+              );
+            }}
+            beforeSlots={
+              isFastMainPromptPath(project) ? (
+                <div className="mb-4">
+                  <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+                    意图 Prompt（可 @ 参考图）
+                  </p>
+                  <ProductDesignPromptMentionTextarea
+                    value={
+                      mainCustomPrompt.trim() ||
+                      defaultMainImageRefPrompt({
+                        ...project,
+                        settings: {
+                          ...project.settings,
+                          mainImageGenMode: "reference-prompt",
+                        },
+                      })
+                    }
+                    referenceImages={promptMentionRefs}
+                    disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                    onChange={setMainCustomPrompt}
+                  />
+                </div>
+              ) : null
+            }
+          />
+        </div>
+      ) : null}
+
+      {showFastDetailSetup ? (
+        <div
+          id={productDesignStepAnchorId("detail-image")}
+          className="scroll-mt-20 px-5 py-8"
+        >
+          <Section title="参考图快速出图 · 详情页">
             <p className="mb-4 text-[11px] leading-relaxed text-[#6e6e73]">
-              已上传产品图与风格参考。请选择主图流程：完整 9 步助手，或跳过 Step1–4 直接用参考图 +
-              自定义 Prompt 快速出主图。
+              跳过 Step7–8：在页面顶部上传 detail-style 参考长图，填写意图 Prompt（可选），点击「分析」拆解为 N 屏
+              Prompt 计划并确认后出图。
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
+            <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+              意图 Prompt（可选，可 @ 参考图）
+            </p>
+            <ProductDesignPromptMentionTextarea
+              value={
+                detailCustomPrompt.trim() ||
+                defaultDetailPageRefPrompt(project)
+              }
+              referenceImages={detailPromptMentionRefs}
+              disabled={streaming || (Boolean(busy) && !generatingTarget)}
+              onChange={setDetailCustomPrompt}
+              minHeightClass="min-h-[7rem]"
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <EcomButtonPrimary
+                size="sm"
                 type="button"
-                disabled={Boolean(busy) || streaming}
-                className="rounded-xl border border-[#e8e8ed] bg-white px-4 py-4 text-left transition-colors hover:border-[var(--ecom-chrome-accent)] hover:bg-[var(--ecom-content-selected-bg)] disabled:opacity-50"
-                onClick={() => onChooseMainWorkflow?.("interactive")}
+                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                onClick={() => void handleFastDetailAnalyze()}
               >
-                <p className="text-sm font-semibold text-[#1d1d1f]">
-                  {INTERACTIVE_WORKFLOW_CHOICE}
-                </p>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-[#6e6e73]">
-                  平台拆解 → 营销方案 → 购买理由 → 主图文案 → 出图，与原有流程一致。
-                </p>
-              </button>
-              <button
-                type="button"
-                disabled={Boolean(busy) || streaming}
-                className="rounded-xl border border-[#e8e8ed] bg-white px-4 py-4 text-left transition-colors hover:border-[var(--ecom-chrome-accent)] hover:bg-[var(--ecom-content-selected-bg)] disabled:opacity-50"
-                onClick={() => onChooseMainWorkflow?.("reference-prompt")}
-              >
-                <p className="text-sm font-semibold text-[#1d1d1f]">
-                  {MAIN_REF_PROMPT_WORKFLOW_CHOICE}
-                </p>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-[#6e6e73]">
-                  选平台与张数后，在中间工作区确认 Prompt（可 @ 参考图），视觉分析后直接出主图。
-                </p>
-              </button>
+                分析
+              </EcomButtonPrimary>
+            </div>
+          </Section>
+        </div>
+      ) : null}
+
+      {showDetailPlanWorkspace && !showFastDetailSetup ? (
+        <div className="px-5 py-4">
+          <ProductDesignGenSlotWorkspace
+            project={project}
+            target="detail"
+            ratio={project.resolved.detailPageRatio}
+            title="详情页 · Prompt 与出图"
+            disabled={streaming || (Boolean(busy) && !generatingTarget)}
+            mode="decompose"
+            onProjectChange={onProjectChange}
+            onRequestAnalyze={() => void requestDetailPlanAnalyze()}
+            onGenerate={(indexes) => void requestDetailGenerate(indexes)}
+            cardGeneratingFor={(index) => cardGeneratingFor("detail", index)}
+            onPreview={openDetailSlotPreview}
+            onDownload={(index) => {
+              const item = project.design?.detailPages.find((d) => d.index === index);
+              if (!item?.imageUrl) return;
+              downloadImageFile(
+                item.imageUrl,
+                `详情-${item.index}-${item.title.slice(0, 12)}.png`,
+              );
+            }}
+            beforeSlots={
+              <>
+                {isFastDetailPromptPath(project) ? (
+                  <div className="mb-4">
+                    <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+                      意图 Prompt（可选，可 @ 参考图）
+                    </p>
+                    <ProductDesignPromptMentionTextarea
+                      value={detailCustomPrompt.trim() || defaultDetailPageRefPrompt(project)}
+                      referenceImages={detailPromptMentionRefs}
+                      disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                      onChange={setDetailCustomPrompt}
+                      minHeightClass="min-h-[7rem]"
+                    />
+                  </div>
+                ) : null}
+              </>
+            }
+          />
+        </div>
+      ) : null}
+
+      {!showBriefSetup &&
+      !shouldSkipBrief(project) &&
+      briefComplete(project.brief) &&
+      project.brief ? (
+        <div className="px-5 pt-5">
+          <Section id="pdt-step-brief" title="Step0 · 产品信息采集">
+            <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+              {MIDDLE_WORKSPACE_EDIT_HINT} 采集点选在会话区完成。
+            </p>
+            <ProductDesignBriefSummaryPanel
+              brief={project.brief}
+              onSaveField={(key, value) => patchBrief({ [key]: value })}
+            />
+          </Section>
+        </div>
+      ) : null}
+
+      {analysisDisplay ? (
+        <div className="space-y-6 px-5 py-5">
+          <Section id="pdt-step-analysis" title="Step1 · 平台合规与产品拆解">
+            <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+              {MIDDLE_WORKSPACE_EDIT_HINT}
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <EditableFactList
+                title="表层痛点"
+                items={analysisDisplay.surfacePainPoints}
+                onSave={(items) =>
+                  patchDesign({
+                    analysis: { ...analysisDisplay, surfacePainPoints: items },
+                  })
+                }
+              />
+              <EditableFactList
+                title="深层需求"
+                items={analysisDisplay.deepNeeds}
+                onSave={(items) =>
+                  patchDesign({
+                    analysis: { ...analysisDisplay, deepNeeds: items },
+                  })
+                }
+              />
+              <EditableFactList
+                title="差异化竞争力"
+                items={analysisDisplay.differentiators}
+                onSave={(items) =>
+                  patchDesign({
+                    analysis: { ...analysisDisplay, differentiators: items },
+                  })
+                }
+              />
+              <EditableFactList
+                title="需规避表述"
+                items={analysisDisplay.forbiddenWords}
+                onSave={(items) =>
+                  patchDesign({
+                    analysis: { ...analysisDisplay, forbiddenWords: items },
+                  })
+                }
+              />
+            </div>
+            <div className="mt-3 space-y-2">
+              <ProductDesignEditableField
+                label="视觉调性"
+                value={analysisDisplay.visualTone}
+                multiline
+                rows={2}
+                onSave={(v) =>
+                  patchDesign({
+                    analysis: { ...analysisDisplay, visualTone: v },
+                  })
+                }
+              />
+              <ProductDesignEditableField
+                label="平台策略说明"
+                value={analysisDisplay.platformNotes}
+                multiline
+                rows={3}
+                onSave={(v) =>
+                  patchDesign({
+                    analysis: { ...analysisDisplay, platformNotes: v },
+                  })
+                }
+              />
             </div>
           </Section>
         </div>
@@ -653,282 +1754,126 @@ export function ProductDesignContentPanel({
       {design ? (
         <div className="space-y-6 px-5 py-5">
           <div id="pdt-step-top" className="scroll-mt-20" aria-hidden />
-          {design.analysis ? (
-            <Section id="pdt-step-analysis" title="Step1 · 平台合规与产品拆解">
-              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
-                可直接修改下方内容，保存后自动写入项目；确认无误后在助手区点「下一步」。
-              </p>
-              <div className="grid gap-3 md:grid-cols-2">
-                <EditableFactList
-                  title="表层痛点"
-                  items={design.analysis.surfacePainPoints}
-                  onSave={(items) =>
-                    patchDesign({
-                      analysis: { ...design.analysis!, surfacePainPoints: items },
-                    })
-                  }
-                />
-                <EditableFactList
-                  title="深层需求"
-                  items={design.analysis.deepNeeds}
-                  onSave={(items) =>
-                    patchDesign({
-                      analysis: { ...design.analysis!, deepNeeds: items },
-                    })
-                  }
-                />
-                <EditableFactList
-                  title="差异化竞争力"
-                  items={design.analysis.differentiators}
-                  onSave={(items) =>
-                    patchDesign({
-                      analysis: { ...design.analysis!, differentiators: items },
-                    })
-                  }
-                />
-                <EditableFactList
-                  title="需规避表述"
-                  items={design.analysis.forbiddenWords}
-                  onSave={(items) =>
-                    patchDesign({
-                      analysis: { ...design.analysis!, forbiddenWords: items },
-                    })
-                  }
-                />
-              </div>
-              <div className="mt-3 space-y-2">
-                <ProductDesignEditableField
-                  label="视觉调性"
-                  value={design.analysis.visualTone}
-                  multiline
-                  rows={2}
-                  onSave={(v) =>
-                    patchDesign({
-                      analysis: { ...design.analysis!, visualTone: v },
-                    })
-                  }
-                />
-                <ProductDesignEditableField
-                  label="平台策略说明"
-                  value={design.analysis.platformNotes}
-                  multiline
-                  rows={3}
-                  onSave={(v) =>
-                    patchDesign({
-                      analysis: { ...design.analysis!, platformNotes: v },
-                    })
-                  }
-                />
-              </div>
-            </Section>
-          ) : null}
 
-          {design.marketingPlans.length > 0 ? (
+          {marketingPlansDisplay.length > 0 ? (
             <Section
               id="pdt-step-marketing"
-              title="Step2 · 三套营销方案"
+              title={
+                design.selectedPlanNo != null
+                  ? `Step2 · 已选营销方案（方案 ${design.selectedPlanNo}）`
+                  : marketingPlansDisplay.length >= 3
+                    ? "Step2 · 三套营销方案（待选用）"
+                    : `Step2 · ${marketingPlansDisplay.length} 套营销方案（待选用）`
+              }
               action={
                 design.selectedPlanNo == null ? (
-                  <span className="text-[10px] text-[#86868b]">
-                    请选一套后继续 Step3
-                  </span>
+                  marketingPlansDisplay.length < 3 ? (
+                    <span className="text-[10px] font-medium text-amber-700">
+                      仅解析到 {marketingPlansDisplay.length} 套，请在会话区重新生成或点「重新解析」
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[#86868b]">
+                      请在会话区点选「方案 1 / 2 / 3」
+                    </span>
+                  )
                 ) : (
                   <span className="text-[10px] font-medium text-[var(--ecom-primary-on-dark)]">
-                    已选方案 {design.selectedPlanNo}
+                    已选方案 {design.selectedPlanNo} · 已锁定
                   </span>
                 )
               }
             >
+              {design.selectedPlanNo == null ? (
+                <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+                  三套方案已生成并同步。请仅在右侧会话区点选「方案 1 / 2 / 3」；选定后本区展示已选方案并可铅笔编辑。
+                </p>
+              ) : (
+                <>
+                  <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+                    {MIDDLE_WORKSPACE_EDIT_HINT} 方案一经选定不可更换；方案名只读，其余字段可编辑。
+                  </p>
+                  {(() => {
+                    const selectedPlan = marketingPlansDisplay.find(
+                      (p) => p.no === design.selectedPlanNo,
+                    );
+                    if (!selectedPlan) return null;
+                    return (
+                      <div className="max-w-2xl">
+                        <ProductDesignMarketingPlanTable
+                          plan={selectedPlan}
+                          selected
+                          onSaveRows={(rows) =>
+                            patchDesign({
+                              marketingPlans: marketingPlansDisplay.map((p) =>
+                                p.no === selectedPlan.no
+                                  ? syncLegacyFieldsFromRows({ ...p, rows })
+                                  : p,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </Section>
+          ) : null}
+
+          {buyingReasonDisplay.hasContent && design.selectedPlanNo != null ? (
+            <Section id="pdt-step-reasons" title="Step3 · 卖点转用户购买理由">
               <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
-                点击「选用方案 N」或在右侧助手点「方案 1 / 2 / 3」；铅笔图标可就地改文案，保存后出图会使用修改版。
+                {MIDDLE_WORKSPACE_EDIT_HINT}
               </p>
-              <div className="grid gap-3 md:grid-cols-3">
-                {design.marketingPlans.map((plan) => (
-                  <article
-                    key={plan.no}
-                    className={cn(
-                      "flex flex-col rounded-xl border p-3",
-                      design.selectedPlanNo === plan.no
-                        ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]"
-                        : "border-[#e8e8ed] bg-white",
-                    )}
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <p className="text-xs font-semibold text-[#1d1d1f]">
-                        方案{plan.no} · {plan.name}
-                      </p>
-                      {design.selectedPlanNo === plan.no ? (
-                        <span className="shrink-0 text-[10px] font-medium text-[var(--ecom-primary-on-dark)]">
-                          已选用
-                        </span>
-                      ) : (
-                        <EcomButtonPrimary
-                          size="sm"
-                          type="button"
-                          className="h-6 shrink-0 px-2 text-[10px]"
-                          onClick={() => void selectMarketingPlan(plan.no)}
-                        >
-                          {marketingPlanChoiceLabel(plan.no)}
-                        </EcomButtonPrimary>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <ProductDesignEditableField
-                        label="切入角度"
-                        value={plan.angle}
-                        onSave={(v) =>
-                          patchDesign({
-                            marketingPlans: design.marketingPlans.map((p) =>
-                              p.no === plan.no ? { ...p, angle: v } : p,
-                            ),
-                          })
-                        }
-                      />
-                      <ProductDesignEditableField
-                        label="击中痛点"
-                        value={plan.painPoint}
-                        onSave={(v) =>
-                          patchDesign({
-                            marketingPlans: design.marketingPlans.map((p) =>
-                              p.no === plan.no ? { ...p, painPoint: v } : p,
-                            ),
-                          })
-                        }
-                      />
-                      <ProductDesignEditableField
-                        label="用户收获"
-                        value={plan.outcome}
-                        onSave={(v) =>
-                          patchDesign({
-                            marketingPlans: design.marketingPlans.map((p) =>
-                              p.no === plan.no ? { ...p, outcome: v } : p,
-                            ),
-                          })
-                        }
-                      />
-                      <ProductDesignEditableField
-                        label="视觉情绪"
-                        value={plan.mood}
-                        onSave={(v) =>
-                          patchDesign({
-                            marketingPlans: design.marketingPlans.map((p) =>
-                              p.no === plan.no ? { ...p, mood: v } : p,
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                  </article>
-                ))}
-              </div>
+              {buyingReasonDisplay.table ? (
+                <ProductDesignBuyingReasonMatrixTable
+                  intro={buyingReasonDisplay.intro}
+                  table={buyingReasonDisplay.table}
+                  onSaveTable={async (table) => {
+                    const brief = buildBuyingReasonBriefPatch(
+                      project.design?.buyingReasonBrief,
+                      table,
+                      buyingReasonDisplay.intro,
+                    );
+                    const reasons = deriveBuyingReasonsFromBrief(brief);
+                    await patchDesign({
+                      buyingReasonBrief: brief,
+                      buyingReasons: reasons,
+                    });
+                  }}
+                />
+              ) : (
+                <ul className="space-y-2">
+                  {buyingReasonDisplay.reasons.map((reason, i) => (
+                    <li
+                      key={i}
+                      className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#424245]"
+                    >
+                      {reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Section>
           ) : null}
 
-          {design.buyingReasons.length > 0 ? (
-            <Section id="pdt-step-reasons" title="Step3 · 购买理由">
-              <p className="mb-2 text-[11px] text-[#6e6e73]">
-                悬停条目点铅笔可修改，保存后立即生效。
+          {mainTrack && mainImagesDisplay.length > 0 && !isReferenceImagePath(project) ? (
+            <Section id="pdt-step-main-copy" title="Step4 · 主图分层定稿文案">
+              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+                {MIDDLE_WORKSPACE_EDIT_HINT}
               </p>
-              <ul className="space-y-2">
-                {design.buyingReasons.map((reason, i) => (
-                  <li
-                    key={i}
-                    className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2"
-                  >
-                    <ProductDesignEditableField
-                      value={reason}
-                      multiline
-                      rows={2}
-                      onSave={(v) =>
-                        patchDesign({
-                          buyingReasons: design.buyingReasons.map((r, idx) =>
-                            idx === i ? v : r,
-                          ),
-                        })
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
+              <ProductDesignMainCopyPanel
+                items={mainImagesDisplay}
+                onSaveItem={saveMainImageItem}
+              />
             </Section>
           ) : null}
 
-          {design.mainImages.length > 0 ? (
+          {mainTrack && design.mainImages.length > 0 && !isReferenceImagePath(project) ? (
             <Section
               id="pdt-step-main"
-              title={`Step4-5 · 主图（${design.mainImages.filter((m) => m.imageUrl).length}/${design.mainImages.length}）`}
-              action={
-                <div className="flex flex-wrap items-center gap-2">
-                  {spec ? (
-                    <div className="flex items-center gap-1.5">
-                      <label className="flex items-center gap-1 text-[10px] text-[#6e6e73]">
-                        追加
-                        <select
-                          className="h-7 rounded-lg border border-[#e8e8ed] bg-white px-2 text-[11px] text-[#1d1d1f]"
-                          value={appendBatchSize}
-                          disabled={Boolean(busy)}
-                          onChange={(e) =>
-                            setAppendBatchSize(Number.parseInt(e.target.value, 10))
-                          }
-                        >
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                        张
-                      </label>
-                      <EcomButtonSecondary
-                        size="sm"
-                        type="button"
-                        dark
-                        disabled={
-                          Boolean(busy) ||
-                          design.mainImages.length >= PRODUCT_DESIGN_MAIN_IMAGE_SLOTS_MAX
-                        }
-                        className="h-7 px-2 text-[10px]"
-                        onClick={() => void appendMainImages(appendBatchSize)}
-                      >
-                        追加槽位
-                      </EcomButtonSecondary>
-                      <span className="text-[10px] text-[#86868b]">
-                        共 {design.mainImages.length} 张
-                      </span>
-                    </div>
-                  ) : null}
-                  <EcomButtonPrimary
-                    size="sm"
-                    type="button"
-                    disabled={Boolean(busy)}
-                    onClick={() => void requestBatch("main")}
-                  >
-                    <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-                    生成全部主图
-                  </EcomButtonPrimary>
-                </div>
-              }
+              title={`Step5 · 主图出图（${design.mainImages.filter((m) => m.imageUrl).length}/${design.mainImages.length}）`}
             >
-              {showEnterDetailBanner ? (
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#0071e3]/25 bg-[#0071e3]/5 px-3 py-2.5">
-                  <p className="text-[11px] leading-relaxed text-[#1d1d1f]">
-                    主图已全部生成。下一步请规划详情页架构与分屏文案。
-                  </p>
-                  <EcomButtonPrimary
-                    size="sm"
-                    type="button"
-                    disabled={Boolean(busy) || streaming}
-                    className="shrink-0"
-                    onClick={() => onEnterDetailPage?.()}
-                  >
-                    {ENTER_DETAIL_PAGE_CHOICE}
-                  </EcomButtonPrimary>
-                </div>
-              ) : null}
-              <p className="mb-3 rounded-lg bg-white px-3 py-2 text-[11px] leading-relaxed text-[#6e6e73]">
-                Step4 助手产出分层文案（右侧可改）。Step5 点击「生成」将先经 Gateway
-                视觉模型分析产品图与可选风格参考，再按分析 Prompt 出图。
-              </p>
               <div className="mb-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3">
                 <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">主图出图模式</p>
                 <div className="mb-2 flex flex-wrap gap-2">
@@ -969,12 +1914,6 @@ export function ProductDesignContentPanel({
                 </div>
                 {mainGenMode === "reference-prompt" ? (
                   <div className="space-y-2">
-                    <p className="text-[10px] leading-relaxed text-[#86868b]">
-                      流程：先视觉分析 {promptMentionRefs.length} 张参考（姿势/光影/场景/色调）→
-                      确认 Prompt → 出图。输入 <code className="text-[#1d1d1f]">@</code>{" "}
-                      引用参考图（风格在前、产品在后，最多上传 {PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX}{" "}
-                      张风格参考；单次分析/出图按模型上限约 {visionInvokeMax} 张）。
-                    </p>
                     <ProductDesignPromptMentionTextarea
                       value={mainCustomPrompt}
                       referenceImages={promptMentionRefs}
@@ -984,222 +1923,98 @@ export function ProductDesignContentPanel({
                         void saveMainGenSettings(mainGenMode, mainCustomPrompt)
                       }
                     />
-                    <button
-                      type="button"
-                      className="text-[10px] text-[var(--ecom-primary-on-dark)] hover:underline"
-                      onClick={() => {
-                        const next = defaultMainImageRefPrompt(project);
-                        setMainCustomPrompt(next);
-                        void saveMainGenSettings(mainGenMode, next);
-                      }}
-                    >
-                      按当前参考图填充模板
-                    </button>
                   </div>
                 ) : null}
               </div>
-              <ProductDesignRefUploader
-                role="main-style"
-                references={project.references}
-                visionModelKey={visionModelKey}
-                imageModelKey={imageModelKey}
-                onUpload={onRefUpload}
-                onRemove={onRefRemove}
-                busy={refBusy}
-                className="mb-3"
+              <ProductDesignGenSlotWorkspace
+                project={project}
+                target="main"
+                ratio={project.resolved.mainImageRatio}
+                title="主图 · Prompt 与出图"
+                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                mode="derive"
+                onProjectChange={onProjectChange}
+                onGenerate={(indexes) => void requestMainGenerate(indexes)}
+                cardGeneratingFor={(index) => cardGeneratingFor("main", index)}
+                onPreview={openMainSlotPreview}
+                onDownload={(index) => {
+                  const item = design.mainImages.find((m) => m.index === index);
+                  if (!item?.imageUrl) return;
+                  downloadImageFile(
+                    item.imageUrl,
+                    `主图-${item.index}-${item.layers.title.slice(0, 12)}.png`,
+                  );
+                }}
+                onGoToVideo={(index) => {
+                  const item = design.mainImages.find((m) => m.index === index);
+                  if (!item) return;
+                  void handleGoToVideo(
+                    item.assetId ? [item.assetId] : [],
+                    `${item.layers.title} · 主图视频`,
+                  );
+                }}
               />
-              {design.visualBrief?.main ? (
-                <div className="mb-3 rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-[11px] text-[#6e6e73]">
-                  <p className="font-semibold text-[#1d1d1f]">上次视觉分析摘要</p>
-                  <p className="mt-1 whitespace-pre-wrap">{design.visualBrief.main.summary}</p>
-                </div>
-              ) : null}
-              <div className="grid min-w-0 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {design.mainImages.map((item) => (
-                  <MainImageCard
-                    key={item.index}
-                    item={item}
-                    ratio={project.resolved.mainImageRatio}
-                    busy={Boolean(busy)}
-                    generating={cardGeneratingFor("main", item.index)}
-                    onGenerate={() => void startGeneratePipeline("main", [item.index])}
-                    onGoToVideo={() =>
-                      void handleGoToVideo(
-                        item.assetId ? [item.assetId] : [],
-                        `${item.layers.title} · 主图视频`,
-                      )
-                    }
-                    onPreview={() =>
-                      item.imageUrl &&
-                      setImagePreview({
-                        url: item.imageUrl,
-                        title: `主图 ${item.index} · ${item.layers.title}`,
-                        ratio: project.resolved.mainImageRatio,
-                      })
-                    }
-                    onDownload={() => {
-                      if (!item.imageUrl) return;
-                      downloadImageFile(
-                        item.imageUrl,
-                        `主图-${item.index}-${item.layers.title.slice(0, 12)}.png`,
-                      );
-                    }}
-                    onViewPrompt={() =>
-                      void handleViewGenPrompt({
-                        title: `主图 ${item.index} · 生图 Prompt`,
-                        genPrompt: item.genPrompt,
-                        assetId: item.assetId,
-                      })
-                    }
-                  />
-                ))}
-              </div>
             </Section>
           ) : null}
 
-          {showDetailDecomposeWorkspace ? (
-            <Section id="pdt-step-detail-decompose" title="详情页 · 参考拆解">
-              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
-                上传竞品或目标风格的详情页长图参考，AI 将拆解为{" "}
-                {project.resolved.detailPageCount} 屏架构与分屏文案，再逐屏出图。
+          {mainTrack && onContinueToDetailPages && mainImagesAllGenerated ? (
+            <section className="mx-5 mb-4 rounded-xl border border-[#e8e8ed] bg-[#f9f9fb] p-4">
+              <h3 className="text-[13px] font-semibold text-[#1d1d1f]">
+                主图已出齐，继续做详情页？
+              </h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
+                会新建一个详情页项目，并把 Step0–3 的策略层、产品图与主图成品一起带过去，
+                不需要重新填一遍。带过去的内容之后仍可修改。
               </p>
-              <ProductDesignRefUploader
-                role="detail-style"
-                references={project.references}
-                visionModelKey={visionModelKey}
-                imageModelKey={imageModelKey}
-                onUpload={onRefUpload}
-                onRemove={onRefRemove}
-                busy={refBusy}
-                className="mb-3"
-              />
               <EcomButtonPrimary
                 size="sm"
                 type="button"
-                disabled={
-                  Boolean(busy) ||
-                  streaming ||
-                  !hasDetailStyleRef(project.references)
-                }
-                onClick={() => onAnalyzeDetailDecompose?.()}
+                className="mt-3"
+                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                onClick={() => onContinueToDetailPages()}
               >
-                <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                {ANALYZE_DETAIL_DECOMPOSE_CHOICE}
+                去做详情页
               </EcomButtonPrimary>
-              {!hasDetailStyleRef(project.references) ? (
-                <p className="mt-2 text-[10px] text-[#86868b]">
-                  请先上传至少 1 张详情页参考图（detail-style）。
-                </p>
-              ) : null}
-            </Section>
+            </section>
           ) : null}
 
-          {design.detailOutline.length > 0 ? (
+          {detailTrack && detailOutlineDisplay.length > 0 ? (
             <Section id="pdt-step-detail-outline" title="Step7 · 详情页架构">
-              <ol className="space-y-1.5">
-                {design.detailOutline.map((row) => (
-                  <li
-                    key={row.index}
-                    className="flex gap-3 rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-xs"
-                  >
-                    <span className="font-semibold text-[#1d1d1f]">第{row.index}屏</span>
-                    <span className="flex-1 text-[#6e6e73]">
-                      {row.mission}
-                      {row.doubtResolved ? ` · 解答：${row.doubtResolved}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+                {MIDDLE_WORKSPACE_EDIT_HINT}
+              </p>
+              <ProductDesignDetailOutlineTable
+                rows={detailOutlineDisplay}
+                onSaveRows={(rows) => patchDesign({ detailOutline: rows })}
+              />
             </Section>
           ) : null}
 
-          {design.detailPages.length > 0 ? (
+          {detailTrack && design.detailPages.length > 0 && !isFastDetailPath(project) ? (
             <Section
               id="pdt-step-detail"
               title={`Step8-9 · 详情屏（${design.detailPages.filter((d) => d.imageUrl).length}/${design.detailPages.length}）`}
-              action={
-                <EcomButtonPrimary
-                  size="sm"
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void requestBatch("detail")}
-                >
-                  <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-                  生成全部详情屏
-                </EcomButtonPrimary>
-              }
             >
-              <ProductDesignRefUploader
-                role="detail-style"
-                references={project.references}
-                visionModelKey={visionModelKey}
-                imageModelKey={imageModelKey}
-                onUpload={onRefUpload}
-                onRemove={onRefRemove}
-                busy={refBusy}
-                className="mb-3"
+              <ProductDesignGenSlotWorkspace
+                project={project}
+                target="detail"
+                ratio={project.resolved.detailPageRatio}
+                title="详情屏 · Prompt 与出图"
+                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                mode="derive"
+                onProjectChange={onProjectChange}
+                onGenerate={(indexes) => void requestDetailGenerate(indexes)}
+                cardGeneratingFor={(index) => cardGeneratingFor("detail", index)}
+                onPreview={openDetailSlotPreview}
+                onDownload={(index) => {
+                  const item = design.detailPages.find((d) => d.index === index);
+                  if (!item?.imageUrl) return;
+                  downloadImageFile(
+                    item.imageUrl,
+                    `详情-${item.index}-${item.title.slice(0, 12)}.png`,
+                  );
+                }}
               />
-              {design.visualBrief?.detail ? (
-                <div className="mb-3 rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-[11px] text-[#6e6e73]">
-                  <p className="font-semibold text-[#1d1d1f]">上次视觉分析摘要</p>
-                  <p className="mt-1 whitespace-pre-wrap">{design.visualBrief.detail.summary}</p>
-                </div>
-              ) : null}
-              <div className="grid min-w-0 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {design.detailPages.map((item) => (
-                  <DetailPageCard
-                    key={item.index}
-                    item={item}
-                    ratio={project.resolved.detailPageRatio}
-                    busy={Boolean(busy)}
-                    generating={cardGeneratingFor("detail", item.index)}
-                    onGenerate={() => void startGeneratePipeline("detail", [item.index])}
-                    onPreview={() =>
-                      item.imageUrl &&
-                      setImagePreview({
-                        url: item.imageUrl,
-                        title: `第 ${item.index} 屏 · ${item.title}`,
-                        ratio: project.resolved.detailPageRatio,
-                      })
-                    }
-                    onDownload={() => {
-                      if (!item.imageUrl) return;
-                      downloadImageFile(
-                        item.imageUrl,
-                        `详情-${item.index}-${item.title.slice(0, 12)}.png`,
-                      );
-                    }}
-                    onViewPrompt={() =>
-                      void handleViewGenPrompt({
-                        title: `第 ${item.index} 屏 · 生图 Prompt`,
-                        genPrompt: item.genPrompt,
-                        assetId: item.assetId,
-                      })
-                    }
-                    onPatchTitle={(title) =>
-                      patchDesign({
-                        detailPages: design.detailPages.map((d) =>
-                          d.index === item.index ? { ...d, title } : d,
-                        ),
-                      })
-                    }
-                    onPatchPurpose={(purpose) =>
-                      patchDesign({
-                        detailPages: design.detailPages.map((d) =>
-                          d.index === item.index ? { ...d, purpose } : d,
-                        ),
-                      })
-                    }
-                    onPatchBody={(body) =>
-                      patchDesign({
-                        detailPages: design.detailPages.map((d) =>
-                          d.index === item.index ? { ...d, body } : d,
-                        ),
-                      })
-                    }
-                  />
-                ))}
-              </div>
             </Section>
           ) : null}
         </div>
@@ -1228,14 +2043,20 @@ export function ProductDesignContentPanel({
           if (!open) setGenPipeline(null);
         }}
         mode="image"
-        dialogTitle="视觉分析"
-        dialogDescription="选择 Gateway 视觉模型，分析产品图与风格参考（姿势、光影、场景、色调）。"
+        dialogTitle={
+          genPipeline?.purpose === "plan-decompose" ? "视觉分析 · 拆解 Prompt" : "视觉分析"
+        }
+        dialogDescription={
+          genPipeline?.purpose === "plan-decompose"
+            ? "选择 Gateway 视觉模型，阅读产品图与风格参考，拆解为 N 条生图 Prompt。"
+            : "选择 Gateway 视觉模型，分析产品图与风格参考（姿势、光影、场景、色调）。"
+        }
         confirmLabel="开始分析"
         footerHint="选好模型后点击开始分析。"
         contentClassName={cn(PRODUCT_DESIGN_WIDE_DIALOG_CLASS, "gap-0 p-0")}
         running={genPipeline?.step === "analyzing"}
-        runningTitle="视觉分析中"
-        runningDetail="Gateway 视觉模型正在阅读产品图与风格参考，生成出图 Prompt…"
+        runningTitle="分析中"
+        runningDetail={undefined}
         models={visionModels.length ? visionModels : imageModels}
         value={draftVisionKey}
         onChange={setDraftVisionKey}
@@ -1245,7 +2066,11 @@ export function ProductDesignContentPanel({
         onConfirm={() => {
           if (!genPipeline) return;
           const next = { ...genPipeline, draftVisionKey };
-          void runVisionAnalyze(next);
+          if (next.purpose === "plan-decompose") {
+            void runPlanDecompose(next);
+          } else {
+            void runVisionAnalyze(next);
+          }
         }}
       />
 
@@ -1310,7 +2135,16 @@ export function ProductDesignContentPanel({
           if (!open) setGenPipeline(null);
         }}
         mode="image"
+        dialogTitle={imagePickerCopy?.title}
+        dialogDescription={imagePickerCopy?.description}
+        footerHint={imagePickerCopy?.footerHint}
         models={imageModels}
+        modelsLoading={modelsLoading}
+        modelsEmptyHint={
+          modelsLoadError ??
+          "暂无可用生图模型。平台代付用户请联系管理员在 Gateway 上架 IMAGE 模型；自付用户请先在 Gateway 绑定厂商凭证。"
+        }
+        onRetryLoadModels={onRefreshModels}
         value={draftModelKey}
         onChange={setDraftModelKey}
         lockedImageSizeLabel={
@@ -1318,26 +2152,34 @@ export function ProductDesignContentPanel({
             ? `${project.resolved.detailPageRatio}（由 ${spec?.label ?? "平台"} 规则决定）`
             : `${project.resolved.mainImageRatio}（由 ${spec?.label ?? "平台"} 规则决定）`
         }
-        confirming={Boolean(busy)}
+        confirming={imagePickerSubmitting}
         onConfirm={() => {
           const req = genPipeline;
+          if (!req || imagePickerSubmitting) return;
+          setImagePickerSubmitting(true);
           setGenPipeline(null);
-          if (!req) return;
           onImageModelChange(draftModelKey);
-          void runGenerate(req.target, req.indexes, draftModelKey);
+          void runGenerate(req.target, req.indexes, draftModelKey).finally(() => {
+            setImagePickerSubmitting(false);
+          });
         }}
       />
 
-      <EcomImagePreviewDialog
-        src={imagePreview?.url ?? ""}
-        open={Boolean(imagePreview)}
+      <ProductDesignSaveDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultProductName={defaultSaveProductName}
+        busy={Boolean(busy)}
+        onConfirm={handleSaveZip}
+      />
+
+      <ProductDesignGalleryPreviewDialog
+        items={galleryPreview?.items ?? []}
+        initialIndex={galleryPreview?.initialIndex ?? 0}
+        open={Boolean(galleryPreview?.items.length)}
         onOpenChange={(open) => {
-          if (!open) setImagePreview(null);
+          if (!open) setGalleryPreview(null);
         }}
-        title={imagePreview?.title ?? "图片预览"}
-        aspectRatio={imagePreview?.ratio}
-        objectFit="contain"
-        fullscreen
       />
 
       <Dialog
@@ -1538,7 +2380,19 @@ function ProductDesignCardImage({
       style={{ aspectRatio: productDesignCssAspectRatio(ratio) }}
     >
       {generating ? (
-        <EcomMediaGeneratingBusy className="absolute inset-0 h-full w-full bg-white" />
+        <>
+          {src ? (
+            <Image
+              src={src}
+              alt={alt}
+              fill
+              sizes="(max-width: 768px) 50vw, 33vw"
+              className="object-contain object-center"
+              unoptimized
+            />
+          ) : null}
+          <EcomMediaGeneratingBusy className="absolute inset-0 h-full w-full" />
+        </>
       ) : src ? (
         <Image
           src={src}
@@ -1668,7 +2522,7 @@ function DetailPageCard({
   onPatchBody: (body: string[]) => void | Promise<void>;
 }) {
   return (
-    <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white">
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white">
       <ProductDesignCardImage
         ratio={ratio}
         src={item.imageUrl}
@@ -1690,7 +2544,7 @@ function DetailPageCard({
           />
         }
       />
-      <div className="space-y-1.5 p-3">
+      <div className="flex flex-1 flex-col space-y-1.5 p-3">
         <ProductDesignEditableField
           label="屏标题"
           value={item.title}
@@ -1715,15 +2569,17 @@ function DetailPageCard({
             )
           }
         />
-        <EcomButtonPrimary
-          size="sm"
-          type="button"
-          disabled={busy}
-          className="mt-1 h-7 !max-w-none w-full px-2 text-[11px]"
-          onClick={onGenerate}
-        >
-          {item.imageUrl ? "重新生成" : "生成"}
-        </EcomButtonPrimary>
+        <div className="mt-auto pt-2">
+          <EcomButtonPrimary
+            size="sm"
+            type="button"
+            disabled={busy}
+            className="h-7 !max-w-none w-full px-2 text-[11px]"
+            onClick={onGenerate}
+          >
+            {item.imageUrl ? "重新生成" : "生成"}
+          </EcomButtonPrimary>
+        </div>
       </div>
     </article>
   );

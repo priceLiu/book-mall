@@ -4,6 +4,7 @@ import {
   GATEWAY_CANONICAL_REGISTRY,
   PLATFORM_MEDIA_DEFAULTS,
 } from "@/lib/platform-model/canonical-registry";
+import { invalidateGatewayModelListCache } from "@/lib/gateway/model-list-cache";
 import { prisma } from "@/lib/prisma";
 
 function billingKind(
@@ -132,6 +133,9 @@ export async function syncGatewayCanonicalRegistryToDb(): Promise<{
     }
   }
 
+  // 落库完成后再失效：否则并发读会把同步前的行重新写回缓存
+  invalidateGatewayModelListCache();
+
   return {
     canonicalCount: GATEWAY_CANONICAL_REGISTRY.length,
     mediaDefaultCount: Object.keys(PLATFORM_MEDIA_DEFAULTS).length,
@@ -139,13 +143,27 @@ export async function syncGatewayCanonicalRegistryToDb(): Promise<{
 }
 
 let syncInFlight: Promise<void> | null = null;
+let nextSyncAllowedAt = 0;
+
+/** 全量 upsert 约 380 次串行往返，冷却期内不重复触发，避免打爆连接池 */
+const SYNC_COOLDOWN_MS = 10 * 60 * 1000;
 
 /**
  * 代码注册表有新增 canonical 时自动补齐 DB，避免 Gateway 模型管理页缺项。
  * 仅在检测到缺失 canonical 时执行全量 upsert（幂等）。
  */
 export async function ensureGatewayCanonicalRegistrySynced(): Promise<void> {
-  const registryKeys = GATEWAY_CANONICAL_REGISTRY.map((d) => d.canonicalModelKey);
+  if (syncInFlight) {
+    await syncInFlight;
+    return;
+  }
+  if (Date.now() < nextSyncAllowedAt) return;
+
+  // 按去重后的 key 比对：count() 每个 canonicalKey 最多计一行，
+  // 用带重复项的数组长度做阈值会让条件永远不成立。
+  const registryKeys = [
+    ...new Set(GATEWAY_CANONICAL_REGISTRY.map((d) => d.canonicalModelKey)),
+  ];
   const dbCount = await prisma.modelCatalog.count({
     where: {
       canonicalKey: { in: registryKeys },
@@ -155,12 +173,12 @@ export async function ensureGatewayCanonicalRegistrySynced(): Promise<void> {
   });
   if (dbCount >= registryKeys.length) return;
 
-  if (!syncInFlight) {
-    syncInFlight = syncGatewayCanonicalRegistryToDb()
-      .then(() => undefined)
-      .finally(() => {
-        syncInFlight = null;
-      });
-  }
+  // 无论同步成功与否都进入冷却：失败或仍未补齐时按冷却周期重试，不是每请求重试
+  nextSyncAllowedAt = Date.now() + SYNC_COOLDOWN_MS;
+  syncInFlight = syncGatewayCanonicalRegistryToDb()
+    .then(() => undefined)
+    .finally(() => {
+      syncInFlight = null;
+    });
   await syncInFlight;
 }

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "@private/publisher-client": "file:../shared/publisher-client",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
