@@ -24,6 +24,10 @@ import {
   updateProductDesignProject,
 } from "@/lib/ecom/ecom-product-design-service";
 import {
+  buildSemanticMentionRefs,
+  refLegendLines,
+} from "@/lib/ecom/ecom-product-design-mention-tokens";
+import {
   drainEcomGwChat,
   refsForVisionAnalysis,
   type ProductDesignVisionTarget,
@@ -94,25 +98,16 @@ items 长度即详情屏数，index 从 1 递增。
 商品锁定（最高优先级）：商品实拍里的商品才是本次要卖的商品。详情页风格参考只提供版式、模块节奏与调性，
 其中出现的商品与本次无关。每条 prompt 都要写明商品的颜色/版型/材质以商品实拍为准，并注明「不得替换为风格参考中的款式」。`;
 
-/**
- * 按实际送入的顺序逐张点名，而不是笼统说「先风格后商品」。
- * 拆解出的 prompt 里会写「图片N」，编号说不清模型就会把商品认到风格参考上。
- */
-function refLegendNote(refs: ProductDesignReference[]): string {
+function refLegendNote(
+  refs: ProductDesignReference[],
+  target: "main" | "detail",
+): string {
   if (refs.length === 0) return "";
-  const lines = refs.map((r, i) => {
-    const role =
-      r.role === "product"
-        ? "商品实拍（本次要卖的商品本体）"
-        : r.role === "main-style"
-          ? "主图风格参考（只学风格，其中的商品不是本次要卖的）"
-          : "详情页风格参考（只学排版与风格，其中的商品不是本次要卖的）";
-    return `- 图片${i + 1}：${role}`;
-  });
+  const lines = refLegendLines(refs, target);
   return [
-    "参考图清单（prompt 里引用「图片N」时须按此编号）：",
+    "参考图清单（prompt 里请用 @产品实拍N / @参考图N / @模特N，或兼容旧 @图片N）：",
     ...lines,
-    "硬性要求：每条 prompt 都必须把商品锁定到「商品实拍」那张，明确写出商品的颜色/版型/材质以其为准；严禁把风格参考里出现的商品当成本次商品来描述。",
+    "硬性要求：每条 prompt 都必须把商品锁定到 @产品实拍1（或对应商品实拍 token），明确写出商品的颜色/版型/材质以其为准；严禁把风格/模特参考里的商品当成本次商品。",
   ].join("\n");
 }
 
@@ -392,7 +387,7 @@ export async function decomposeImageGenPlan(opts: {
         intent ? `用户意图（须融入每条 prompt）：\n${intent}` : "",
         customPrompt && !intent ? `用户自定义 Prompt（须融入每条 prompt）：\n${customPrompt}` : "",
         project.brief?.productName ? `产品名：${String(project.brief.productName)}` : "",
-        refLegendNote(refs),
+        refLegendNote(refs, target),
       ]
         .filter(Boolean)
         .join("\n\n"),

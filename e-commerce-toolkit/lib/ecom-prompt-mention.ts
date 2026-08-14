@@ -1,15 +1,30 @@
-/** @图片N 引用 token（与自定义 Prompt 模板一致） */
-export const ECOM_IMAGE_REF_TOKEN_RE = /@图片(\d+)/g;
+import {
+  findMentionRefByLegacyIndex,
+  findMentionRefByToken,
+  mentionTokenDisplay,
+  SEMANTIC_REF_TOKEN_RE,
+  type SemanticMentionRef,
+} from "@/lib/product-design-mention-tokens";
+
+export { SEMANTIC_REF_TOKEN_RE };
+
+/** @deprecated 兼容旧模板；新代码请用语义 token */
+export const ECOM_IMAGE_REF_TOKEN_RE = SEMANTIC_REF_TOKEN_RE;
 
 export type EcomPromptImageRef = {
   url: string;
-  /** 1-based，@图片 N */
+  /** 全局序号（兼容旧 @图片N） */
   index: number;
+  /** 语义 token：@产品实拍1 / @参考图1 / @模特1 */
+  token: string;
+  kind?: "product" | "style" | "model";
+  kindIndex?: number;
   label: string;
   role: "product" | "main-style" | "detail-style" | string;
 };
 
 export const ECOM_IMAGE_REF_BADGE_ATTR = "data-ecom-image-ref";
+export const ECOM_IMAGE_REF_TOKEN_ATTR = "data-ecom-image-ref-token";
 
 function appendTextWithBreaks(target: DocumentFragment, text: string): void {
   const parts = text.split("\n");
@@ -20,12 +35,16 @@ function appendTextWithBreaks(target: DocumentFragment, text: string): void {
 }
 
 export function createEcomImageRefBadge(
-  index: number,
   item: EcomPromptImageRef | undefined,
+  legacyIndex?: number,
 ): HTMLElement {
   const badge = document.createElement("span");
   badge.contentEditable = "false";
-  badge.setAttribute(ECOM_IMAGE_REF_BADGE_ATTR, String(index));
+  const token =
+    item?.token ??
+    (legacyIndex && legacyIndex > 0 ? `@图片${legacyIndex}` : "@图片?");
+  badge.setAttribute(ECOM_IMAGE_REF_TOKEN_ATTR, token);
+  if (item?.index) badge.setAttribute(ECOM_IMAGE_REF_BADGE_ATTR, String(item.index));
   badge.setAttribute("draggable", "false");
   badge.className =
     "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 select-none items-center gap-1 rounded-lg border border-[#0071e3]/35 bg-[#f0f6ff] px-1 py-[1px] text-[1em] leading-none text-[#1d1d1f]";
@@ -44,33 +63,78 @@ export function createEcomImageRefBadge(
 
   const label = document.createElement("span");
   label.className = "min-w-0 truncate text-[0.92em]";
-  label.textContent = `图片 ${index}`;
+  label.textContent = mentionTokenDisplay(token);
   badge.appendChild(label);
 
   return badge;
 }
 
+function resolveBadgeItem(
+  refs: EcomPromptImageRef[],
+  semantic: SemanticMentionRef[],
+  m: RegExpExecArray,
+): EcomPromptImageRef | undefined {
+  const legacy = m[2] ? Number.parseInt(m[2], 10) : NaN;
+  if (Number.isFinite(legacy) && legacy > 0) {
+    const sem = findMentionRefByLegacyIndex(semantic, legacy);
+    if (sem) {
+      return refs.find((r) => r.index === sem.index) ?? {
+        index: sem.index,
+        token: sem.token,
+        kind: sem.kind,
+        kindIndex: sem.kindIndex,
+        url: sem.url,
+        label: sem.label,
+        role: sem.role,
+      };
+    }
+    return refs.find((r) => r.index === legacy);
+  }
+  const fullToken = m[0]!;
+  const sem = findMentionRefByToken(semantic, fullToken);
+  if (sem) {
+    return refs.find((r) => r.index === sem.index) ?? {
+      index: sem.index,
+      token: sem.token,
+      kind: sem.kind,
+      kindIndex: sem.kindIndex,
+      url: sem.url,
+      label: sem.label,
+      role: sem.role,
+    };
+  }
+  return refs.find((r) => r.token === fullToken);
+}
+
 export function buildPromptEditableFragment(
   value: string,
   refs: EcomPromptImageRef[],
+  semantic?: SemanticMentionRef[],
 ): DocumentFragment {
   const frag = document.createDocumentFragment();
   if (!value) return frag;
 
-  const byIndex = new Map(refs.map((r) => [r.index, r] as const));
-  const re = new RegExp(ECOM_IMAGE_REF_TOKEN_RE.source, "g");
+  const sem =
+    semantic ??
+    refs.map((r) => ({
+      index: r.index,
+      token: r.token,
+      kind: r.kind ?? "style",
+      kindIndex: r.kindIndex ?? r.index,
+      url: r.url,
+      label: r.label,
+      role: r.role,
+    }));
+
+  const re = new RegExp(SEMANTIC_REF_TOKEN_RE.source, "g");
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(value)) !== null) {
     if (m.index > last) {
       appendTextWithBreaks(frag, value.slice(last, m.index));
     }
-    const n = Number.parseInt(m[1] ?? "", 10);
-    if (Number.isFinite(n) && n > 0) {
-      frag.appendChild(createEcomImageRefBadge(n, byIndex.get(n)));
-    } else {
-      appendTextWithBreaks(frag, m[0]!);
-    }
+    const item = resolveBadgeItem(refs, sem, m);
+    frag.appendChild(createEcomImageRefBadge(item, item?.index));
     last = re.lastIndex;
   }
   if (last < value.length) {
@@ -90,6 +154,11 @@ export function serializePromptEditable(root: HTMLElement): string {
       }
       if (child.nodeType !== Node.ELEMENT_NODE) continue;
       const el = child as HTMLElement;
+      const token = el.getAttribute(ECOM_IMAGE_REF_TOKEN_ATTR);
+      if (token) {
+        out += token.startsWith("@") ? token : `@${token}`;
+        continue;
+      }
       const idx = el.getAttribute(ECOM_IMAGE_REF_BADGE_ATTR);
       if (idx) {
         const n = Number.parseInt(idx, 10);
@@ -118,8 +187,11 @@ export function serializePromptEditable(root: HTMLElement): string {
 function isInsideImageRefBadge(node: Node): boolean {
   return (
     (node.nodeType === Node.ELEMENT_NODE &&
-      (node as Element).hasAttribute(ECOM_IMAGE_REF_BADGE_ATTR)) ||
-    node.parentElement?.closest(`[${ECOM_IMAGE_REF_BADGE_ATTR}]`) != null
+      ((node as Element).hasAttribute(ECOM_IMAGE_REF_BADGE_ATTR) ||
+        (node as Element).hasAttribute(ECOM_IMAGE_REF_TOKEN_ATTR))) ||
+    node.parentElement?.closest(
+      `[${ECOM_IMAGE_REF_BADGE_ATTR}], [${ECOM_IMAGE_REF_TOKEN_ATTR}]`,
+    ) != null
   );
 }
 

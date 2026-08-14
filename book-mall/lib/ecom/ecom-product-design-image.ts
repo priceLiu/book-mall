@@ -28,6 +28,7 @@ import {
   getImageGenMaxRefs,
   orderRefsForModel,
 } from "@/lib/ecom/ecom-product-design-ref-rules";
+import { refLegendLines } from "@/lib/ecom/ecom-product-design-mention-tokens";
 import {
   getProductDesignProject,
   updateProductDesignProject,
@@ -355,11 +356,31 @@ function appendRefLegend(
     productCount: number;
     styleCount: number;
     styleFirst: boolean;
-    /** 主图基准图在参考图里的位次（1 起），无则不写 */
     baselineAt?: number;
+    references?: ProductDesignReference[];
   },
 ): string {
   if (opts.productCount <= 0 && opts.styleCount <= 0) return prompt;
+
+  if (opts.references?.length) {
+    const lines = refLegendLines(opts.references, opts.target);
+    const legend = [
+      "",
+      "参考图说明（硬性要求，优先级高于上文；Prompt 可用 @产品实拍N / @参考图N / @模特N，或兼容旧 @图片N）：",
+      ...lines,
+      ...(opts.productCount
+        ? [
+            "- 商品的颜色、版型、材质、印花与结构细节须与商品实拍完全一致，不得替换成风格参考里的款式",
+            "- 画面中必须清晰展示该商品本体（穿着或陈列），不得生成没有商品的纯文字海报",
+          ]
+        : []),
+      ...(opts.baselineAt
+        ? [`- 参考图第 ${opts.baselineAt} 张为本套主图成品，仅作整店视觉基准，不改变商品本身`]
+        : []),
+    ].join("\n");
+    return `${prompt.trimEnd()}\n${legend}`;
+  }
+
   const range = (from: number, count: number) =>
     count === 1 ? `第 ${from} 张` : `第 ${from}–${from + count - 1} 张`;
   const styleLabel = opts.target === "main" ? "店铺风格参考" : "详情页风格参考";
@@ -367,10 +388,10 @@ function appendRefLegend(
   const styleFrom = opts.styleFirst ? 1 : opts.productCount + 1;
 
   const styleLine = opts.styleCount
-    ? `- 参考图${range(styleFrom, opts.styleCount)}为${styleLabel}（即 Prompt 中的「图片${styleFrom}」起）：只学习其排版、光线、背景、构图与模特气质，严禁照搬其中出现的商品`
+    ? `- 参考图${range(styleFrom, opts.styleCount)}为${styleLabel}：只学习其排版、光线、背景、构图与模特气质，严禁照搬其中出现的商品`
     : null;
   const productLine = opts.productCount
-    ? `- 参考图${range(productFrom, opts.productCount)}为商品实拍（即 Prompt 中的「图片${productFrom}」起）：成图里的商品必须是这张图中的商品本体`
+    ? `- 参考图${range(productFrom, opts.productCount)}为商品实拍：成图里的商品必须是这张图中的商品本体`
     : null;
 
   const legend = [
@@ -589,6 +610,7 @@ export async function generateProductDesignImages(opts: {
         styleCount: refPack.styleCount,
         styleFirst: refPack.styleFirst,
         baselineAt,
+        references: project.references,
       });
 
       try {
@@ -618,6 +640,11 @@ export async function generateProductDesignImages(opts: {
             thumbnailUrl: ossUrl,
             meta: {
               projectId: opts.projectId,
+              projectName:
+                (typeof project.brief?.productName === "string" &&
+                  project.brief.productName.trim()) ||
+                project.title?.trim() ||
+                undefined,
               source: "product-creation",
               kind: isMain ? "main_image" : "detail_page",
               index: item.index,

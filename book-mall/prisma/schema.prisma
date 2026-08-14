@@ -122,6 +122,7 @@ model User {
   ecomAssets                       EcomAsset[]
   ecomStoryboardProjects           EcomStoryboardProject[]
   ecomProductDesignProjects        EcomProductDesignProject[]
+  ecomSeedVideoProjects            EcomSeedVideoProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
   qrTemplates                      QrTemplate[]
@@ -545,6 +546,34 @@ model EcomStoryboardProject {
   meta         Json?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 图片生种草视频项目（Skill 策划 + 成片）
+model EcomSeedVideoProject {
+  id           String  @id @default(cuid())
+  userId       String
+  title        String?
+  module       String  @default("seed-video")
+  status       String  @default("draft")
+  brief        Json?
+  settings     Json?
+  references   Json?
+  chatHistory  Json?
+  plan         Json?
+  videoAssetId String?
+  meta         Json?
+
   tenantId    String?
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)

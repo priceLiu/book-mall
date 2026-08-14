@@ -55,10 +55,12 @@ export function EcomVideoThumb({
   src,
   className,
   onClick,
+  onLoadedData,
 }: {
   src: string;
   className?: string;
   onClick?: () => void;
+  onLoadedData?: () => void;
 }) {
   const Tag = onClick ? "button" : "div";
   return (
@@ -77,6 +79,7 @@ export function EcomVideoThumb({
         playsInline
         preload="metadata"
         className="h-full w-full object-cover"
+        onLoadedData={onLoadedData}
       />
     </Tag>
   );

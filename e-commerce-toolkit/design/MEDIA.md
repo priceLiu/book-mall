@@ -2,9 +2,80 @@
 
 > 母规范：`SYSTEM.md` §8。视频见 `VIDEO.md`。
 
+## 资产库列表布局
+
+### 分类层级（面包屑）
+
+资产须按 **大类 → 模块 → 项目名** 展示，示例：
+
+```text
+电商 / 电商主图 / 灰紫冲锋衣_20250814-120000
+```
+
+| 层级 | 来源 |
+|------|------|
+| 大类 | `image` → 电商；`video` → 视频；`brand` → 品牌 |
+| 模块 | `main-image` → 电商主图；`detail-page` → 电商详情页；等 |
+| 项目名 | 出图时写入 `EcomAsset.meta.projectName`，或关联 `projectId` 查 Brief / 工作流快照标题；无则「未命名项目」 |
+
+同一项目名下的图片/视频 **归为一组**，组内用统一网格排布。
+
+### 网格密度（强制）
+
+资产库、各模块「本模块资产」结果区：
+
+```tsx
+import {
+  EcomMediaLibraryTile,
+  ECOM_LIBRARY_MEDIA_GRID_CLASS,
+} from "@/components/media/ecom-media-library-tile";
+
+<ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
+  {/* 一行 5 张（md+）；小屏 3～4 列 */}
+</ul>
+```
+
+- **禁止** 大卡片（原 `aspect-square` 占 1/3 屏宽、`rounded-[18px]` + 底部文字栏）
+- 缩略图：`aspect-square` + `rounded-lg` + `border-[#e8e8ed]`
+- 间距：`gap-2`
+
+## 悬停操作（图片 / 视频 · 强制）
+
+**所有** 资产库与模块结果区的图片、视频缩略图，悬停须显示 **纯图标** 操作层，**禁止** 「预览」「下载」等文字按钮。
+
+| 操作 | 图标 | 说明 |
+|------|------|------|
+| 预览 | `Eye` | 图片 → `EcomImagePreviewDialog`；视频 → `EcomVideoPreviewDialog` |
+| 下载 | `Download` | `downloadMediaUrl()`（`lib/ecom-media-download.ts`） |
+| 删除 | `Trash2` | 可选；须 `doubleConfirm`（含 OSS 说明） |
+
+### 唯一组件
+
+```tsx
+<EcomMediaLibraryTile
+  kind="image" | "video"
+  src={ossUrl}
+  thumbnailSrc={thumbnailUrl}
+  onPreview={() => …}
+  onDownload={() => void downloadMediaUrl(url, filename)}
+  onDelete={() => …}  // 可选
+/>
+```
+
+悬停层样式：
+
+```tsx
+"absolute inset-0 flex items-center justify-center gap-2"
+"bg-black/0 opacity-0 group-hover:bg-black/45 group-hover:opacity-100"
+// 按钮：h-8 w-8 rounded-full bg-white/95 shadow-md
+// 图标：Eye / Download / Trash2，h-4 w-4
+```
+
+**禁止** 在缩略图下方用文字链接触发预览/下载。
+
 ## 缩略图槽位
 
-### 标准方 thumb（资产库、步骤结果、参考图条）
+### 标准方 thumb（参考图条、助手栏等 · 非资产库网格）
 
 ```tsx
 <div className="relative h-24 w-24 overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]">
@@ -90,17 +161,18 @@
 
 辅助：`text-[10px] text-[#86868b]`「鼠标移入分类后粘贴」
 
-## 卡片浮层操作图标
+## 卡片浮层操作图标（生图槽位 / 分镜结果）
 
 悬停在结果图上的圆形按钮：
 
 | 用途 | 样式 |
 |------|------|
 | 重新生成 | `rounded-full bg-black/55 text-white shadow` + `RefreshCw` |
-| 预览/播放 | `rounded-full bg-white/95 text-[#1d1d1f] shadow` + 对应图标 |
+| 预览/播放 | `rounded-full bg-white/95 text-[#1d1d1f] shadow` + `Eye` / 播放图标 |
+| 下载 | `rounded-full bg-white/95 text-[#1d1d1f] shadow` + `Download` |
 | 主行动（生成视频） | `rounded-full bg-[#1d1d1f] text-white shadow` |
 
-尺寸：`h-8 w-8` 或 `h-9 w-9`，图标 `h-3.5~4 w-3.5~4`。
+尺寸：`h-8 w-8`，图标 `h-4 w-4`。**禁止** 浮层内文字标签。
 
 ## 完整分镜图 / 导出预览
 
@@ -121,6 +193,100 @@
 
 ## 禁止
 
+- 资产库用大卡片 + 底部「删除」文字链（须 `EcomMediaLibraryTile` + 悬停图标）
 - 缩略槽内拉伸变形（须 `object-cover` 或 `object-contain` 明确选型）
 - 上传区仅用纯文字链接、无 `Plus` 与边框块
 - 参考图删除单次确认即调 API
+- 预览/下载用 `window.open` 或未封装的弹层
+
+## 懒加载与加载态（强制）
+
+> 交互参考 **QuickReplica** 画廊（`qr-world-browse-panel` · `qr-skeleton` · `qr-world-load-progress`）；电商工具箱为 **浅色变体**。
+
+### 适用页面
+
+凡 **图片 / 视频列表或网格**（模特库、模板区、我的资产、模块结果区、资产 picker 等），须遵守本节。
+
+### 1. 缩略图（单张）
+
+统一走 **`EcomMediaLibraryTile`**（或在其之上封装业务角标，如 `EcomTemplateGalleryTile`）：
+
+- 视口外：**不请求**媒体；显示 **`ecom-skeleton`** 占位
+- 进入视口后：`loading="lazy"` 加载；**加载完成前** skeleton 覆盖
+- **OSS 列表缩略**：有 **`thumbUrl`**（导入预生成 `-thumb.webp`）时 **直接用它**；否则 `buildEcomOssThumbUrl`（模特库等 · 宽 480 WebP 动态处理）
+- **预览弹层**：`EcomImagePreviewDialog` — 固定画框（如 `aspectRatio="3:4"`）→ 先 `thumbSrc` / 动态缩略 → 原图 `src` 加载后 **500ms crossfade**；失败保留缩略图
+- 实现：`useIntersectionVisible` + `onLoad` / `onLoadedData`；处理失败时回退原 URL
+
+```tsx
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
+
+<EcomMediaLibraryTile kind="image" src={ossUrl} alt={title} onPreview={…} />
+// 非方图：aspectClass="aspect-[3/4]"
+```
+
+**禁止** 列表内裸 `<Image src={ossUrl}>` 拉全尺寸原图。
+
+### 2. 滚动分页（画廊 / 长列表）
+
+条目数 **> 36**（或可预见超过一屏）时 **必须** 滚动分批渲染，禁止一次性 mount 全部 DOM。
+
+| 能力 | 用法 |
+|------|------|
+| 分页 Hook | `useEcomScrollPagination({ total, resetKey, pageSize? })` |
+| 底部加载态 | `EcomScrollLoadFooter`（sentinel + 加载中骨架行 + indeterminate 进度条） |
+| 首屏 / 接口 loading | `EcomMediaSkeletonGrid` |
+
+```tsx
+const { scrollRef, sentinelRef, visibleCount, hasMore, loadingMore, pageSize } =
+  useEcomScrollPagination({ total: items.length, resetKey: filterKey });
+
+<div ref={scrollRef} className="… overflow-y-auto …">
+  <ul>{items.slice(0, visibleCount).map(…)}</ul>
+  <EcomScrollLoadFooter
+    sentinelRef={sentinelRef}
+    hasMore={hasMore}
+    loadingMore={loadingMore}
+    gridClass={GRID_CLASS}
+    skeletonAspect="square" // 或 "3/4"
+    skeletonCount={Math.min(pageSize, items.length - visibleCount)}
+  />
+</div>
+```
+
+**加载中须同时满足：**
+
+1. 底部 **骨架卡片行**（`EcomMediaSkeletonGrid` / `ecom-skeleton`）
+2. **Indeterminate 进度条**（`ecom-upload-progress ecom-upload-progress-indeterminate`）
+3. 文案「加载中…」；顶栏计数含「正在加载… X / Y」
+4. `aria-live="polite"` + `aria-busy={loadingMore}`
+
+空闲时底部显示「向下滚动加载更多…」。
+
+### 3. 模板区 · 预生成缩略图（导入）
+
+模板区 **须** 在导入时用 **sharp** 生成独立 `-thumb.webp` 上传 OSS，Catalog 存 **`thumbUrl` + `ossUrl`**（原图）。列表只请求 `thumbUrl`，避免 OSS 动态处理费用与全图流量。
+
+```bash
+cd book-mall && pnpm ecom:import-template-gallery          # 原图 + 缩略图
+pnpm ecom:import-template-gallery:thumbs                   # 仅为已有 ossUrl 补 thumb
+pnpm ecom:import-template-gallery --skip-existing          # 跳过 oss+thumb 均已存在的行
+```
+
+实现：`book-mall/lib/ecom/ecom-gallery-thumb.ts` · `uploadEcomTemplateGalleryThumb` · key `{id}-thumb.webp`。
+
+**模特库** 可继续仅用 `buildEcomOssThumbUrl` 动态缩略，不必预生成。
+
+### 4. 首屏 / 接口等待
+
+远程拉取列表时 **禁止** 仅文字「加载中…」；须 `EcomMediaSkeletonGrid`（或同等骨架），网格密度与正式列表一致。
+
+### 5. CSS
+
+- 占位：`ecom-skeleton`（`globals.css`，浅色 shimmer）
+- 进度：`ecom-upload-progress-indeterminate`
+
+### Code Review
+
+- 长画廊无 `useEcomScrollPagination` → 驳回
+- 滚动加载无 skeleton + 进度条 → 驳回
+- 缩略图无 `EcomMediaLibraryTile` / 无 skeleton → 驳回

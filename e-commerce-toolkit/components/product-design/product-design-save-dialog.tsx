@@ -33,7 +33,7 @@ type Props = {
   onConfirm: (productName: string) => void | Promise<void>;
 };
 
-/** 保存交付包：产品名可改，时间戳由服务端在下载时自动追加 */
+/** 保存工作流镜像到资产库：产品名可改，时间戳由服务端自动追加 */
 export function ProductDesignSaveDialog({
   open,
   onOpenChange,
@@ -48,18 +48,19 @@ export function ProductDesignSaveDialog({
     if (open) setName(defaultProductName);
   }, [open, defaultProductName]);
 
-  const filenamePreview = useMemo(() => {
+  const titlePreview = useMemo(() => {
     const base = sanitizeSaveName(name.trim() || "产品");
-    return `${base}_${timestampPreview}.zip`;
+    return `${base}_${timestampPreview}`;
   }, [name, timestampPreview]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md gap-4">
         <DialogHeader>
-          <DialogTitle>保存交付包</DialogTitle>
+          <DialogTitle>保存到资产库</DialogTitle>
           <DialogDescription>
-            将打包文案、主图、详情屏与参考图。文件名中的时间戳在保存时自动生成，保证唯一。
+            将完整工作流（Brief、参考图、文案、Prompt 计划与设置）镜像保存到「我的资产」对应类目。
+            可在资产库一键复用：复制流程后换图即可再出图。
           </DialogDescription>
         </DialogHeader>
         <label className="block space-y-1.5">
@@ -80,7 +81,7 @@ export function ProductDesignSaveDialog({
           />
         </label>
         <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 font-mono text-[11px] text-[#6e6e73]">
-          文件名预览：{filenamePreview}
+          资产库标题预览：{titlePreview}
           <span className="mt-1 block text-[10px] text-[#86868b]">
             实际时间戳以点击保存时的服务器时间为准
           </span>

@@ -13,11 +13,13 @@ export function EcomVideoPreviewDialog({
   open,
   onOpenChange,
   title = "视频预览",
+  poster,
 }: {
   src: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title?: string;
+  poster?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -25,7 +27,7 @@ export function EcomVideoPreviewDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <EcomVideoPlayer src={src} autoPlay className="w-full" />
+        <EcomVideoPlayer src={src} poster={poster} autoPlay className="w-full" />
       </DialogContent>
     </Dialog>
   );

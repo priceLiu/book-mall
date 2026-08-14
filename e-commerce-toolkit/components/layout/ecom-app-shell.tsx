@@ -13,7 +13,9 @@ import {
   ensureEcomSessionFresh,
 } from "@/lib/ecom-silent-sso";
 import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
+import { cn } from "@/lib/utils";
 
 const NAV_COLLAPSED_KEY = "ecom-nav-collapsed";
 /** 心跳间隔：令牌默认 10 分钟，60s 检查可在过期前静默续期 */
@@ -102,19 +104,40 @@ export function EcomAppShell({
     };
   }, [loggedIn, bookOrigin]);
 
+  React.useEffect(() => {
+    unlockEcomDocumentInteraction();
+  }, [pathname]);
+
+  React.useEffect(() => {
+    return () => {
+      unlockEcomDocumentInteraction();
+    };
+  }, []);
+
+  const sidebarInset = navCollapsed
+    ? "md:grid-cols-[3.5rem_minmax(0,1fr)]"
+    : "md:grid-cols-[17.5rem_minmax(0,1fr)]";
+
   return (
-    <div className="flex h-dvh gap-3 overflow-hidden bg-[#0c0c0e] p-3 md:gap-4 md:p-5">
-      <EcomProfileSidebar
-        user={user}
-        bookOrigin={bookOrigin}
-        collapsed={navCollapsed}
-        onCollapsedChange={setCollapsed}
-        className="hidden h-full md:flex"
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-inner">
-        <EcomMobileBar bookOrigin={bookOrigin} />
-        <EcomAuthBanner />
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+    <div className="relative h-dvh overflow-hidden bg-[#0c0c0e] p-3 md:p-5">
+      <div
+        className={cn(
+          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:gap-4",
+          sidebarInset,
+        )}
+      >
+        <EcomProfileSidebar
+          user={user}
+          bookOrigin={bookOrigin}
+          collapsed={navCollapsed}
+          onCollapsedChange={setCollapsed}
+          className="relative z-[200] hidden h-full max-h-full md:flex"
+        />
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-inner">
+          <EcomMobileBar bookOrigin={bookOrigin} />
+          <EcomAuthBanner />
+          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        </div>
       </div>
       <PlatformAssistant title="AI 小智" />
     </div>

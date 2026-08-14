@@ -40,6 +40,7 @@ function sessionFromVerifiedJwt(
       session_source: "jwt_fallback",
       sub: verified.sub,
       tier: verified.tier,
+      tools_role: verified.tier === "admin" ? "admin" : "member",
     },
     introspectStatus: 200,
     tokenExpiresAt: verified.exp,

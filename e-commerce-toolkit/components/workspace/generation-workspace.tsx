@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomMediaLibraryTile,
+  ECOM_LIBRARY_MEDIA_GRID_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
-import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import type { EcomModuleDef } from "@/lib/modules/registry";
 import {
@@ -19,7 +22,7 @@ import {
   type EcomAsset,
   type EcomBillingMode,
 } from "@/lib/ecom-api";
-import { cn } from "@/lib/utils";
+import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
 
 export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   const { confirm, doubleConfirm, alert } = useDialogs();
@@ -31,6 +34,9 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   const [billingMode, setBillingMode] = useState<EcomBillingMode | null>(null);
   const [estimatePts, setEstimatePts] = useState<number | null>(null);
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
+    null,
+  );
+  const [previewImage, setPreviewImage] = useState<{ src: string; title?: string } | null>(
     null,
   );
 
@@ -184,45 +190,35 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
               暂无作品，生成后将显示在这里。
             </p>
           ) : (
-            <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {assets.map((a) => (
-                <li
-                  key={a.id}
-                  className="overflow-hidden rounded-[18px] border border-[#e8e8ed] bg-white"
-                >
-                  <div className="relative aspect-square bg-[#f5f5f7]">
-                    {a.kind === "image" ? (
-                      <Image
-                        src={a.thumbnailUrl ?? a.ossUrl}
-                        alt={a.title ?? ""}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <EcomVideoThumb
-                        src={a.ossUrl}
-                        onClick={() =>
-                          setPreviewVideo({
-                            src: a.ossUrl,
-                            title: a.title ?? undefined,
-                          })
-                        }
-                      />
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2 p-4">
-                    <span className="truncate text-sm">{a.title ?? "未命名"}</span>
-                    <button
-                      type="button"
-                      className={cn("shrink-0 text-sm text-red-600")}
-                      onClick={() => handleDelete(a)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </li>
-              ))}
+            <ul className={`mt-6 ${ECOM_LIBRARY_MEDIA_GRID_CLASS}`}>
+              {assets.map((a) => {
+                const isVideo = a.kind === "video";
+                return (
+                  <li key={a.id}>
+                    <EcomMediaLibraryTile
+                      kind={isVideo ? "video" : "image"}
+                      src={a.ossUrl}
+                      thumbnailSrc={a.thumbnailUrl}
+                      alt={a.title ?? ""}
+                      onPreview={() =>
+                        isVideo
+                          ? setPreviewVideo({ src: a.ossUrl, title: a.title ?? undefined })
+                          : setPreviewImage({
+                              src: a.thumbnailUrl ?? a.ossUrl,
+                              title: a.title ?? undefined,
+                            })
+                      }
+                      onDownload={() =>
+                        void downloadMediaUrl(
+                          a.ossUrl,
+                          mediaDownloadFilename(a.title, a.kind, a.ossUrl),
+                        )
+                      }
+                      onDelete={() => void handleDelete(a)}
+                    />
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -235,6 +231,17 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
           open
           onOpenChange={(open) => {
             if (!open) setPreviewVideo(null);
+          }}
+        />
+      ) : null}
+
+      {previewImage ? (
+        <EcomImagePreviewDialog
+          src={previewImage.src}
+          title={previewImage.title}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPreviewImage(null);
           }}
         />
       ) : null}

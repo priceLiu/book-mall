@@ -142,6 +142,35 @@ export function buildStyleLibraryOssKey(id: string, ext: string): string {
   return `canvas/style-library/${safeId}.${safeExt}`;
 }
 
+/** 电商工具箱 · 平台模特库（固定 key，便于增量覆盖上传） */
+export function buildEcomModelLibraryOssKey(id: string, ext: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `ecom/model-library/${safeId}.${safeExt}`;
+}
+
+/** 电商工具箱 · 模板区案例图（固定 key，按 category 分子目录） */
+export function buildEcomTemplateGalleryOssKey(
+  category: string,
+  id: string,
+  ext: string,
+): string {
+  const safeCat = category.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `ecom/template-gallery/${safeCat}/${safeId}.${safeExt}`;
+}
+
+/** 电商工具箱 · 模板区列表缩略图（sharp 预生成 WebP） */
+export function buildEcomTemplateGalleryThumbOssKey(
+  category: string,
+  id: string,
+): string {
+  const safeCat = category.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/template-gallery/${safeCat}/${safeId}-thumb.webp`;
+}
+
 /** QuickReplica 内置模板预览图（固定 key） */
 export function buildQuickReplicaBuiltinOssKey(id: string, ext: string): string {
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");

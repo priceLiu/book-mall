@@ -21,6 +21,10 @@
 - 弹层预览可传 `autoPlay`
 - 缩略图槽位：**禁止** 带 `controls` 的 `<video>`；点击后弹层必须用 `EcomVideoPlayer`
 
+## 资产库 / 列表缩略
+
+视频缩略须走 `EcomMediaLibraryTile`（`kind="video"`），悬停显示 **Eye / Download** 纯图标，禁止文字按钮。详见 `MEDIA.md` §悬停操作。
+
 ## 禁止
 
 - 自定义 seek 条、hover 才出现的控制条

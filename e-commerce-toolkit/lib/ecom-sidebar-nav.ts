@@ -5,8 +5,10 @@ import {
   Clapperboard,
   Copy,
   Film,
+  Video,
   Hammer,
   LayoutGrid,
+  LayoutTemplate,
   Megaphone,
   Package,
   Rocket,
@@ -15,6 +17,7 @@ import {
   Shirt,
   ShoppingBag,
   UserCircle,
+  Users,
   Sparkles,
   Target,
   Wrench,
@@ -69,9 +72,20 @@ function sep(): { type: "separator" } {
   return { type: "separator" };
 }
 
+/** 同一 href 只保留一项，避免 React key 冲突导致侧栏导航异常 */
+function dedupeNavLinks(items: EcomSidebarNavLink[]): EcomSidebarNavLink[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.href)) return false;
+    seen.add(item.href);
+    return true;
+  });
+}
+
 function imageModuleIcon(id: string): LucideIcon {
   if (id === "product-creation") return LayoutGrid;
   if (id === "detail-page-creation") return ScrollText;
+  if (id === "seed-video") return Video;
   return Shirt;
 }
 
@@ -124,13 +138,29 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
     (m) =>
       m.kind === "video" &&
       m.href.startsWith("/ecom/") &&
+      m.id !== "seed-video" &&
       !MARKETING_ECOM_VIDEO_IDS.has(m.id),
   );
 
-  const ecomChildren: EcomSidebarNavLink[] = [
-    ...imageMods.map((m) => link(m.title, m.href, imageModuleIcon(m.id))),
+  const seedVideoMod = ECOM_MODULES.find((m) => m.id === "seed-video");
+  const imageModLinks = imageMods.map((m) => link(m.title, m.href, imageModuleIcon(m.id)));
+  const detailIdx = imageModLinks.findIndex((l) => l.href === "/ecom/detail-page-creation");
+  if (seedVideoMod && detailIdx >= 0) {
+    imageModLinks.splice(
+      detailIdx + 1,
+      0,
+      link(seedVideoMod.title, seedVideoMod.href, Video),
+    );
+  } else if (seedVideoMod) {
+    imageModLinks.push(link(seedVideoMod.title, seedVideoMod.href, Video));
+  }
+
+  const ecomChildren: EcomSidebarNavLink[] = dedupeNavLinks([
+    ...imageModLinks,
+    link("模特库", "/ecom/model-library", Users),
+    link("模板区", "/ecom/template-gallery", LayoutTemplate),
     ...videoMods.map((m) => link(m.title, m.href, videoModuleIcon(m.id))),
-  ];
+  ]);
 
   const marketingOrder = [
     "storyboard-micro-drama",

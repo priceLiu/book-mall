@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -17,6 +18,7 @@ import {
   EcomDialogCancelButton,
   EcomDialogPrimaryButton,
 } from "@/components/ui/dialog";
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 
 type ConfirmOpts = {
   title: string;
@@ -105,6 +107,12 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     () => ({ confirm, alert, doubleConfirm }),
     [confirm, alert, doubleConfirm],
   );
+
+  useEffect(() => {
+    if (!modal) {
+      unlockEcomDocumentInteraction();
+    }
+  }, [modal]);
 
   function closeConfirm(ok: boolean) {
     if (modal?.kind === "confirm") {

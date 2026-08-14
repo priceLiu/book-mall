@@ -44,7 +44,11 @@ export async function ecomBookFetch(path: string, init?: RequestInit) {
   if (!res.ok) {
     const err =
       typeof data.error === "string" ? data.error : `请求失败 (${res.status})`;
-    throw new Error(err);
+    const detail =
+      typeof data.detail === "string" && data.detail.trim()
+        ? `: ${data.detail.trim()}`
+        : "";
+    throw new Error(`${err}${detail}`);
   }
   return data;
 }

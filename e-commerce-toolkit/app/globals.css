@@ -189,3 +189,19 @@ body {
     transform: translateX(320%);
   }
 }
+
+/** 媒体缩略图 / 画廊懒加载占位（对齐 QuickReplica qr-skeleton · 浅色变体） */
+.ecom-skeleton {
+  background: linear-gradient(90deg, #ececee 0%, #f5f5f7 50%, #ececee 100%);
+  background-size: 200% 100%;
+  animation: ecom-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes ecom-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

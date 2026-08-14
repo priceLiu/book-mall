@@ -14,6 +14,9 @@ import {
   buildQuickReplicaBuiltinSplatOssKey,
   buildMinimaxVoicePreviewOssKey,
   buildStyleLibraryOssKey,
+  buildEcomModelLibraryOssKey,
+  buildEcomTemplateGalleryOssKey,
+  buildEcomTemplateGalleryThumbOssKey,
   type CanvasOssKind,
 } from "./canvas-constants";
 import {
@@ -326,6 +329,98 @@ export async function uploadStyleLibraryPreview(args: {
     key,
     buf: args.buf,
     contentType: args.contentType,
+  });
+}
+
+/** 电商工具箱 · 平台模特库（固定 OSS key）。 */
+export async function uploadEcomModelLibraryPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomModelLibraryOssKey(args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+function isOssNotFoundError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /NoSuchKey|404|not exist|Not Found/i.test(msg);
+}
+
+/** 检查 OSS 对象是否已存在（用于导入同名跳过）。 */
+export async function ossObjectExists(key: string): Promise<boolean> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  try {
+    const client = await createOssClientFrom(cfgRaw);
+    await client.head(key);
+    return true;
+  } catch (e) {
+    if (isOssNotFoundError(e)) return false;
+    throw e;
+  }
+}
+
+/** 由 OSS key 推导公网 URL（catalog 跳过上传时补 URL）。 */
+export function ossPublicUrlForKeyFromEnv(key: string): string {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
+  if (base) return `${base}/${key}`;
+  return `https://${cfgRaw.bucket}.${cfgRaw.region}.aliyuncs.com/${key}`;
+}
+
+/** 电商工具箱 · 模板区案例图（固定 OSS key）。 */
+export async function uploadEcomTemplateGalleryPreview(args: {
+  category: string;
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTemplateGalleryOssKey(args.category, args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+/** 电商工具箱 · 模板区预生成缩略图（{id}-thumb.webp）。 */
+export async function uploadEcomTemplateGalleryThumb(args: {
+  category: string;
+  id: string;
+  buf: Buffer;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTemplateGalleryThumbOssKey(args.category, args.id);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: "image/webp",
   });
 }
 

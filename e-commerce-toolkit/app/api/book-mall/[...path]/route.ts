@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 
 export const dynamic = "force-dynamic";
-/** 分镜图/视频生成经 book-mall 同步轮询，须长于默认 60s */
-export const maxDuration = 300;
+/** 大图 fetch + 双次 OSS 上传，须长于默认 60s / BFF 300s */
+export const maxDuration = 600;
 
 /** SSE / 纯文本流式接口须透传 body，不可 buffer 成一次性响应 */
 function shouldStreamProxyResponse(contentType: string, path: string): boolean {
@@ -38,6 +38,7 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       headers,
       body,
       cache: "no-store",
+      signal: AbortSignal.timeout(590_000),
     });
     const respContentType = r.headers.get("content-type") ?? "application/json";
     if (shouldStreamProxyResponse(respContentType, path) && r.body) {

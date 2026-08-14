@@ -538,12 +538,46 @@ export async function downloadProductDesignExportZip(projectId: string): Promise
   await downloadProductDesignZip(projectId, { mode: "export" });
 }
 
-/** 一键保存：ZIP 文件名 = 产品名_时间戳（服务端生成时间戳以保证唯一） */
+export type ProductDesignWorkflowSnapshot = {
+  savedAt: string;
+  title: string;
+  productName?: string;
+  module: string;
+  platform: string;
+};
+
+/** 保存完整工作流镜像到资产库（电商主图 / 详情页类目） */
+export async function saveProductDesignWorkflow(
+  projectId: string,
+  productName: string,
+): Promise<ProductDesignWorkflowSnapshot> {
+  const trimmed = productName.trim();
+  if (!trimmed) throw new Error("请填写产品名");
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/save`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productName: trimmed }),
+  });
+  return data.snapshot as ProductDesignWorkflowSnapshot;
+}
+
+/** 从资产库快照一键复用（复制流程，去掉成图） */
+export async function reuseProductDesignProject(
+  projectId: string,
+  savedAt: string,
+): Promise<ProductDesignProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/reuse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ savedAt }),
+  });
+  return data.project as ProductDesignProject;
+}
+
+/** @deprecated 请使用 saveProductDesignWorkflow 保存到资产库 */
 export async function saveProductDesignProjectZip(
   projectId: string,
   productName: string,
 ): Promise<void> {
-  const trimmed = productName.trim();
-  if (!trimmed) throw new Error("请填写产品名");
-  await downloadProductDesignZip(projectId, { mode: "save", productName: trimmed });
+  await saveProductDesignWorkflow(projectId, productName);
 }

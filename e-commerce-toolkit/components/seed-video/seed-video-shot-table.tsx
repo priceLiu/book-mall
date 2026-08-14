@@ -1,0 +1,98 @@
+"use client";
+
+import type { SeedVideoReference, SeedVideoShot } from "@/lib/seed-video-types";
+
+type Props = {
+  shots: SeedVideoShot[];
+  references: SeedVideoReference[];
+  onChange: (shots: SeedVideoShot[]) => void;
+  disabled?: boolean;
+};
+
+export function SeedVideoShotTable({ shots, references, onChange, disabled }: Props) {
+  function patchShot(index: number, patch: Partial<SeedVideoShot>) {
+    onChange(
+      shots.map((s) => (s.index === index ? { ...s, ...patch } : s)),
+    );
+  }
+
+  function refUrl(refImageId: string): string | undefined {
+    return references.find((r) => r.id === refImageId)?.ossUrl;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+      <table className="min-w-full text-left text-xs">
+        <thead className="bg-[#f5f5f7] text-[#6e6e73]">
+          <tr>
+            <th className="px-3 py-2 font-medium">镜号</th>
+            <th className="px-3 py-2 font-medium">时间</th>
+            <th className="px-3 py-2 font-medium">参考图</th>
+            <th className="px-3 py-2 font-medium min-w-[120px]">画面描述</th>
+            <th className="px-3 py-2 font-medium min-w-[180px]">视频 Prompt</th>
+            <th className="px-3 py-2 font-medium min-w-[140px]">口播</th>
+            <th className="px-3 py-2 font-medium">状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shots.map((shot) => {
+            const thumb = refUrl(shot.refImageId);
+            return (
+              <tr key={shot.index} className="border-t border-[#e8e8ed] align-top">
+                <td className="px-3 py-2 font-medium text-[#1d1d1f]">{shot.index}</td>
+                <td className="px-3 py-2 text-[#6e6e73]">{shot.timeSlice}</td>
+                <td className="px-3 py-2">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thumb}
+                      alt={shot.refImageLabel}
+                      className="h-12 w-12 rounded-lg border border-[#e8e8ed] object-cover"
+                    />
+                  ) : (
+                    <span className="text-[#86868b]">{shot.refImageLabel || "—"}</span>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  <textarea
+                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                    value={shot.sceneDescription}
+                    disabled={disabled}
+                    onChange={(e) => patchShot(shot.index, { sceneDescription: e.target.value })}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <textarea
+                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                    value={shot.videoPrompt}
+                    disabled={disabled}
+                    onChange={(e) => patchShot(shot.index, { videoPrompt: e.target.value })}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <textarea
+                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                    value={shot.voiceover}
+                    disabled={disabled}
+                    onChange={(e) => patchShot(shot.index, { voiceover: e.target.value })}
+                  />
+                </td>
+                <td className="px-3 py-2 text-[#6e6e73]">
+                  {shot.videoUrl && shot.ttsUrl ? (
+                    <span className="text-[#34c759]">就绪</span>
+                  ) : shot.videoUrl ? (
+                    <span>视频 OK</span>
+                  ) : shot.ttsUrl ? (
+                    <span>TTS OK</span>
+                  ) : (
+                    <span>待生成</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

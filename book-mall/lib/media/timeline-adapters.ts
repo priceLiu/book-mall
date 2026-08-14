@@ -1,5 +1,6 @@
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
+import type { SeedVideoShot } from "@/lib/ecom/ecom-seed-video-types";
 import type { MediaTimelineV1 } from "@/lib/media/timeline-types";
 
 /** 画布剪映导出帧 → Timeline v1 */
@@ -33,6 +34,21 @@ export function fromEcomStoryboardSheet(sheet: StoryboardSheet): MediaTimelineV1
         p.durationHintSec && p.durationHintSec > 0
           ? p.durationHintSec
           : undefined,
+    }));
+  return { version: 1, clips };
+}
+
+/** 种草视频逐镜 → Timeline v1 */
+export function fromEcomSeedVideoPlan(shots: SeedVideoShot[]): MediaTimelineV1 {
+  const sorted = shots.slice().sort((a, b) => a.index - b.index);
+  const clips = sorted
+    .filter((s) => Boolean(s.videoUrl?.trim() && /^https?:\/\//.test(s.videoUrl!.trim())))
+    .map((s, i) => ({
+      order: i,
+      videoUrl: s.videoUrl!.trim(),
+      audioUrl: s.ttsUrl?.trim() || undefined,
+      subtitle: s.voiceover?.trim() || undefined,
+      durationSec: s.durationSec > 0 ? s.durationSec : undefined,
     }));
   return { version: 1, clips };
 }

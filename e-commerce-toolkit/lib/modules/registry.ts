@@ -48,6 +48,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "dark",
   },
   {
+    id: "seed-video",
+    title: "图片生种草视频",
+    tagline: "素材策划 + 30s 种草短视频成片",
+    href: "/ecom/seed-video",
+    kind: "video",
+    toolKey: "ecom-toolkit__seed-video",
+    action: "generate",
+    tile: "dark",
+  },
+  {
     id: "model-shot",
     title: "服装模特图",
     tagline: "上身展示与试衣效果",

@@ -16,7 +16,7 @@ import {
   downloadProductDesignExportZip,
   generateProductDesignImages,
   getProductDesignProject,
-  saveProductDesignProjectZip,
+  saveProductDesignWorkflow,
   syncProductDesign,
   updateProductDesignProject,
 } from "@/lib/ecom-product-design-api";
@@ -1290,11 +1290,15 @@ export function ProductDesignContentPanel({
     }
   }
 
-  async function handleSaveZip(productName: string) {
-    setBusy("正在保存…");
+  async function handleSaveWorkflow(productName: string) {
+    setBusy("正在保存到资产库…");
     try {
-      await saveProductDesignProjectZip(project.id, productName);
+      const snapshot = await saveProductDesignWorkflow(project.id, productName);
       setSaveDialogOpen(false);
+      await alert({
+        title: "已保存到资产库",
+        message: `「${snapshot.title}」已保存。可在「我的资产」对应类目下一键复用。`,
+      });
     } catch (e) {
       await alert({
         title: "保存失败",
@@ -2170,7 +2174,7 @@ export function ProductDesignContentPanel({
         onOpenChange={setSaveDialogOpen}
         defaultProductName={defaultSaveProductName}
         busy={Boolean(busy)}
-        onConfirm={handleSaveZip}
+        onConfirm={handleSaveWorkflow}
       />
 
       <ProductDesignGalleryPreviewDialog

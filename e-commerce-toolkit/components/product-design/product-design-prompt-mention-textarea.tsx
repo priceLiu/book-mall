@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 
 import {
   buildPromptEditableFragment,
@@ -28,15 +29,17 @@ type PickerPosition = { left: number; top: number; width: number };
 const PICKER_GAP = 8;
 const PICKER_Z = 5000;
 const PICKER_EST_HEIGHT = 280;
+const PICKER_MAX_WIDTH = 420;
 
 function filterImageRefs(items: EcomPromptImageRef[], query: string): EcomPromptImageRef[] {
   if (!query) return items;
   const q = query.toLowerCase();
-  return items.filter(({ index, label }) => {
+  return items.filter(({ index, label, token }) => {
     const n = String(index);
     return (
       n.startsWith(q) ||
       label.toLowerCase().includes(q) ||
+      token.toLowerCase().includes(q) ||
       `图片${n}`.includes(q) ||
       `图${n}`.includes(q)
     );
@@ -44,7 +47,10 @@ function filterImageRefs(items: EcomPromptImageRef[], query: string): EcomPrompt
 }
 
 function resolvePickerPosition(anchorRect: DOMRect, pickerHeight: number): PickerPosition {
-  const width = Math.min(Math.max(anchorRect.width, 280), window.innerWidth - 24);
+  const width = Math.min(
+    PICKER_MAX_WIDTH,
+    Math.max(280, Math.min(anchorRect.width, window.innerWidth - 24)),
+  );
   let left = Math.min(Math.max(12, anchorRect.left), window.innerWidth - width - 12);
   const spaceBelow = window.innerHeight - anchorRect.bottom - PICKER_GAP;
   const spaceAbove = anchorRect.top - PICKER_GAP;
@@ -75,6 +81,7 @@ export function ProductDesignPromptMentionTextarea({
   className,
   minHeightClass = "min-h-[7rem]",
 }: Props) {
+  const pathname = usePathname();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -203,7 +210,7 @@ export function ProductDesignPromptMentionTextarea({
       }
       closePopover();
       const item = refsRef.current.find((r) => r.index === imageIndex);
-      const badge = createEcomImageRefBadge(imageIndex, item);
+      const badge = createEcomImageRefBadge(item, imageIndex);
       const space = document.createTextNode("\u00a0");
       const frag = document.createDocumentFragment();
       frag.appendChild(badge);
@@ -258,6 +265,10 @@ export function ProductDesignPromptMentionTextarea({
       window.removeEventListener("scroll", onReflow, true);
     };
   }, [popoverOpen, syncPickerPosition, filteredImages.length, referenceImages.length]);
+
+  useEffect(() => {
+    closePopover();
+  }, [closePopover, pathname]);
 
   useEffect(() => {
     if (!popoverOpen) return;
@@ -316,7 +327,7 @@ export function ProductDesignPromptMentionTextarea({
   const pickerPanel = popoverOpen ? (
     <div
       ref={pickerRef}
-      className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg"
+      className="pointer-events-none overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg"
       style={{
         position: "fixed",
         left: pickerPos?.left ?? -9999,
@@ -335,7 +346,7 @@ export function ProductDesignPromptMentionTextarea({
       ) : filteredImages.length === 0 ? (
         <p className="px-4 py-3 text-xs text-[#86868b]">没有匹配的参考图</p>
       ) : (
-        <ul className="max-h-[260px] overflow-y-auto p-2">
+        <ul className="pointer-events-auto max-h-[260px] overflow-y-auto p-2">
           {filteredImages.map((item, listIndex) => {
             const active = listIndex === popoverIndex;
             return (
@@ -358,7 +369,7 @@ export function ProductDesignPromptMentionTextarea({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-[#1d1d1f]">
-                      @图片{item.index} · {mentionRefRoleLabel(item.role)}
+                      {item.token} · {mentionRefRoleLabel(item.role, item.kind)}
                     </span>
                     <span className="block truncate text-xs text-[#86868b]">{item.label}</span>
                   </span>
@@ -381,7 +392,7 @@ export function ProductDesignPromptMentionTextarea({
               type="button"
               disabled={disabled}
               className="inline-flex items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3]/35 hover:bg-[#f0f6ff] disabled:opacity-50"
-              onClick={() => insertAtCursor(`@图片${item.index} `)}
+              onClick={() => insertAtCursor(`${item.token} `)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -389,7 +400,7 @@ export function ProductDesignPromptMentionTextarea({
                 alt=""
                 className="h-4 w-4 rounded object-cover"
               />
-              图片{item.index}
+              {item.token.replace(/^@/, "")}
             </button>
           ))}
         </div>

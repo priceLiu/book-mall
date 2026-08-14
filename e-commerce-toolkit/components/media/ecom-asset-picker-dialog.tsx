@@ -1,7 +1,6 @@
 "use client";
 
-import Image from "next/image";
-import { Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -11,6 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomMediaLibraryTile,
+  ECOM_LIBRARY_MEDIA_GRID_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import { cn } from "@/lib/utils";
@@ -44,6 +48,7 @@ export function EcomAssetPickerDialog({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -92,6 +97,7 @@ export function EcomAssetPickerDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
@@ -132,32 +138,21 @@ export function EcomAssetPickerDialog({
               该分组下还没有图片资产。
             </p>
           ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            <div className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
               {assets.map((asset) => {
                 const active = selected.includes(asset.id);
                 return (
-                  <button
+                  <EcomMediaLibraryTile
                     key={asset.id}
-                    type="button"
-                    onClick={() => toggle(asset.id)}
-                    className={cn(
-                      "group relative aspect-square overflow-hidden rounded-xl border-2 bg-[#f5f5f7] transition-colors",
-                      active ? "border-[#0071e3]" : "border-transparent hover:border-[#d2d2d7]",
-                    )}
-                  >
-                    <Image
-                      src={asset.thumbnailUrl ?? asset.ossUrl}
-                      alt={asset.title ?? "资产图"}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                    {active ? (
-                      <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-[#0071e3] text-white">
-                        <Check className="h-3 w-3" strokeWidth={3} />
-                      </span>
-                    ) : null}
-                  </button>
+                    kind="image"
+                    src={asset.thumbnailUrl ?? asset.ossUrl}
+                    alt={asset.title ?? "资产图"}
+                    selected={active}
+                    onSelect={() => toggle(asset.id)}
+                    onPreview={() =>
+                      setPreviewSrc(asset.thumbnailUrl ?? asset.ossUrl)
+                    }
+                  />
                 );
               })}
             </div>
@@ -179,5 +174,16 @@ export function EcomAssetPickerDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {previewSrc ? (
+      <EcomImagePreviewDialog
+        src={previewSrc}
+        open
+        onOpenChange={(open) => {
+          if (!open) setPreviewSrc(null);
+        }}
+      />
+    ) : null}
+  </>
   );
 }

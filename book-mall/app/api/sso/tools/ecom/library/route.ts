@@ -15,7 +15,10 @@ export async function GET(req: Request) {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const sections = await listEcomLibrarySections(auth.userId);
     const totalAssets = sections.reduce((n, s) => n + s.assets.length, 0);
-    const totalBundles = sections.reduce((n, s) => n + s.storyboardBundles.length, 0);
+    const totalBundles = sections.reduce(
+      (n, s) => n + s.storyboardBundles.length + s.productDesignBundles.length,
+      0,
+    );
     return NextResponse.json({ sections, totalAssets, totalBundles });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";

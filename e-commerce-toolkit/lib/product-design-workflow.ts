@@ -282,11 +282,11 @@ export function defaultDetailPageRefPrompt(project: ProductDesignProject): strin
   const refs = buildProductDesignPromptMentionRefs(project, "detail");
   const styleRefs = refs.filter((r) => r.role === "detail-style");
   const productRefs = refs.filter((r) => r.role === "product");
-  const styleTags = styleRefs.map((r) => `@图片${r.index}`).join("");
-  const productTags = productRefs.map((r) => `@图片${r.index}`).join("");
+  const styleTags = styleRefs.map((r) => r.token).join("");
+  const productTags = productRefs.map((r) => r.token).join("");
   const count = project.resolved.detailPageCount;
   if (styleRefs.length === 0) {
-    return `我的商品是${productTags || "@图片1"}，请参考${project.platform}平台详情页规范，生成 ${count} 屏连贯的详情页海报（每屏一屏一主题），保持商品款式一致。`;
+    return `我的商品是${productTags || "@产品实拍1"}，请参考${project.platform}平台详情页规范，生成 ${count} 屏连贯的详情页海报（每屏一屏一主题），保持商品款式一致。`;
   }
   return `详情页整体风格参考${styleTags}，请学习其版式、模块节奏与视觉层次；商品为${productTags}。请生成 ${count} 屏风格一致的详情页各屏海报。`;
 }
@@ -1141,10 +1141,10 @@ export function defaultMainImageRefPrompt(project: ProductDesignProject): string
   const refs = buildProductDesignPromptMentionRefs(project, "main");
   const styleRefs = refs.filter((r) => r.role === "main-style");
   const productRefs = refs.filter((r) => r.role === "product");
-  const styleTags = styleRefs.map((r) => `@图片${r.index}`).join("");
-  const productTags = productRefs.map((r) => `@图片${r.index}`).join("");
+  const styleTags = styleRefs.map((r) => r.token).join("");
+  const productTags = productRefs.map((r) => r.token).join("");
   if (styleRefs.length === 0) {
-    return `我的商品是${productTags || "@图片1"}，请生成可用于${project.platform}平台店铺主图的模特展示图，保持商品款式与颜色一致，使用最佳生图引擎。`;
+    return `我的商品是${productTags || "@产品实拍1"}，请生成可用于${project.platform}平台店铺主图的模特展示图，保持商品款式与颜色一致，使用最佳生图引擎。`;
   }
   return `我店铺的主图风格是${styleTags}，请学习这组图的整体风格（模特、配饰、光线、背景、构图等），后续给到衣服要生成风格一致可用于店铺的模特图。我的商品是${productTags}，请基于上述风格生成一套${project.platform}平台主图物料（多张不同姿势），使用最佳引擎。`;
 }

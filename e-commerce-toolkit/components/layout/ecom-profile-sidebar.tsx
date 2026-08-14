@@ -15,6 +15,30 @@ import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { cn } from "@/lib/utils";
 
+function navTargetActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function shouldUseNativeNav(event: React.MouseEvent<HTMLAnchorElement>): boolean {
+  return (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  );
+}
+
+function navigateSidebarHref(
+  event: React.MouseEvent<HTMLAnchorElement>,
+  href: string,
+) {
+  if (shouldUseNativeNav(event)) return;
+  event.preventDefault();
+  window.location.assign(href);
+}
+
 function NavLinkRow({
   item,
   active,
@@ -26,7 +50,7 @@ function NavLinkRow({
 }) {
   const Icon = item.icon;
   const className = cn(
-    "group flex items-center rounded-md text-sm font-medium transition-colors",
+    "group relative z-[1] flex items-center rounded-md text-sm font-medium transition-colors",
     nested ? "py-2 pl-9 pr-3 text-[13px]" : "px-3 py-2.5",
     active
       ? "bg-[var(--ecom-chrome-hover)] text-[var(--ecom-chrome-text)]"
@@ -64,9 +88,13 @@ function NavLinkRow({
   }
 
   return (
-    <Link href={item.href} prefetch={false} className={className}>
+    <a
+      href={item.href}
+      className={className}
+      onClick={(event) => navigateSidebarHref(event, item.href)}
+    >
       {inner}
-    </Link>
+    </a>
   );
 }
 
@@ -79,9 +107,7 @@ function NavGroupBlock({
 }) {
   function childActive(item: EcomSidebarNavLink) {
     if (item.activeAlways) return true;
-    const href = item.href;
-    if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return navTargetActive(pathname, item.href);
   }
 
   const hasActiveChild = group.children.some((c) => childActive(c));
@@ -121,7 +147,7 @@ function NavGroupBlock({
         <div className="space-y-0.5 pb-1">
           {group.children.map((child) => (
             <NavLinkRow
-              key={`${child.label}-${child.href}`}
+              key={child.href}
               item={child}
               active={childActive(child)}
               nested
@@ -144,7 +170,7 @@ function NavRow({
 }) {
   const Icon = item.icon;
   const className = cn(
-    "group flex items-center rounded-md text-sm font-medium transition-colors",
+    "group relative z-[1] flex items-center rounded-md text-sm font-medium transition-colors",
     collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
     active
       ? "bg-[var(--ecom-chrome-hover)] text-[var(--ecom-chrome-text)]"
@@ -180,9 +206,14 @@ function NavRow({
   }
 
   return (
-    <Link href={item.href} prefetch className={className} title={title}>
+    <a
+      href={item.href}
+      className={className}
+      title={title}
+      onClick={(event) => navigateSidebarHref(event, item.href)}
+    >
       {inner}
-    </Link>
+    </a>
   );
 }
 
@@ -207,9 +238,7 @@ export function EcomProfileSidebar({
 
   function isActive(item: EcomSidebarNavLink) {
     if (item.activeAlways) return true;
-    const href = item.href;
-    if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return navTargetActive(pathname, item.href);
   }
 
   function signOut() {
@@ -225,7 +254,7 @@ export function EcomProfileSidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-200 ease-out",
+        "pointer-events-auto relative isolate z-[200] flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-200 ease-out",
         collapsed ? "w-14 p-2" : "w-[17.5rem] p-4",
         className,
       )}
@@ -296,7 +325,7 @@ export function EcomProfileSidebar({
           <div className="my-3 border-t border-[var(--ecom-chrome-border-subtle)]" aria-hidden />
 
           <nav
-            className="ecom-scrollbar-thin min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1"
+            className="ecom-scrollbar-thin pointer-events-auto relative z-[1] min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1"
             role="navigation"
           >
             {navItems.map((item, index) => (

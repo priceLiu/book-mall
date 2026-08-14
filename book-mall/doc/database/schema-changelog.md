@@ -232,6 +232,15 @@
 
 ---
 
+## 2026-08-14 — 我的 AI 空间（设计稿 · 待迁移）
+
+- **产品文档**：[`doc/product/我的AI空间.md`](../product/我的AI空间.md)
+- **计划新表**（尚未 `prisma migrate`）：`AiSpacePin`、`AiSpaceAudioAsset`、`AiSpaceVideoMaterial`、`DigitalHuman`、`AiSpaceComposeTask`
+- **原则**：Pin 仅指针；数字人/音频为 **Book 真源**，全应用引用 ID；删源 cascade Pin / 删素材检测跨应用引用
+- **应用**：评审通过后单独迁移目录 + `pnpm db:apply-pending`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

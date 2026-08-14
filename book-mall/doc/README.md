@@ -24,6 +24,7 @@
 | [**13-tool-service-fee-and-wallet.md**](./product/13-tool-service-fee-and-wallet.md) | **工具技术服务费与钱包**（月费 + Gateway BYOK，退役按次扣点） |
 | [**14-tenant-team-design.md**](./product/14-tenant-team-design.md) | **租户/团队体系完整设计**（租户/席位/RBAC/资源共享/财务对账/使用明细/单会话；待评审） |
 | [**15-team-usage-manual.md**](./product/15-team-usage-manual.md) | **团队/公司版使用手册**（开通/成员席位/公共私有库/账单对账/BYOK/FAQ） |
+| [**我的AI空间.md**](./product/我的AI空间.md) | **我的 AI 空间**（个人中心跨应用 Pin、数字人/音频/视频库、合成创作台） |
 | [**prompt-optimizer-platform.md**](./product/prompt-optimizer-platform.md) | **提示词优化器**（上游 Vue 接入、Gateway 断直连、工具月费） |
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。
