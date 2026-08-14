@@ -64,7 +64,7 @@ flowchart LR
 4. 置顶工具（如运动同步）→ 直达 workspace + 对应 `toolKey`/`kind`。
 5. **我的作品** → 右栏 `scope=my`；中栏空态引导。
 6. 中栏 **产生** → `POST …/jobs/generate` → 轮询 → 预览弹层 → 写入 `QrTemplate` 并 prepend 右栏。
-7. 财务/超管可在预览弹层 **设为分类示例**（`QrKindFeatured`）；解析顺序：DB 推荐 → 内置 → public 用户模板。
+7. 财务/超管在 Book **模板管理**（`/admin/templates?tab=quick-replica`）维护官方模板与 **分类示例**（`QrKindFeatured`）；QR 侧栏仅外链，预览弹层无写操作。解析顺序：DB 推荐 → 内置 → public 用户模板。
 
 ## 4. 分类与 kind 枚举
 
@@ -173,6 +173,8 @@ interface QrTemplate {
 | GET | `/jobs/:logId` | 轮询 `GatewayRequestLog` 状态与结果 URL |
 
 子站 BFF：`/api/book-mall/api/platform/v1/quick-replica/*`
+
+运营写接口已迁到 Book Session：`/api/admin/quick-replica/*`（`requireFinanceAdminApi`）。不再提供 `/api/platform/v1/quick-replica/admin/**`。管理 UI 仅 Book `/admin/templates?tab=quick-replica`。
 
 ## 7. Gateway 与日志
 

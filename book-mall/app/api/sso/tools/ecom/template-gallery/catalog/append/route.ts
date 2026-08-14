@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   appendTemplateGalleryEntries,
+  upsertTemplateGalleryEntry,
   type EcomTemplateGalleryEntry,
 } from "@/lib/ecom/ecom-template-gallery-service";
 import { getToolsSsoEligibility } from "@/lib/tools-sso-access";
@@ -36,6 +37,9 @@ export async function POST(req: Request) {
   }
 
   try {
+    for (const entry of entries) {
+      await upsertTemplateGalleryEntry(entry);
+    }
     const catalog = appendTemplateGalleryEntries(entries);
     return NextResponse.json({ ok: true, total: catalog.templates.length });
   } catch (e) {

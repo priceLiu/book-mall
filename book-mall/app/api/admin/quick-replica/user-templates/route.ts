@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
   deleteAdminUserQrTemplate,
   listAdminUserQrTemplates,
 } from "@/lib/quick-replica/qr-template-service";
-import { requireQuickReplicaFinanceAdmin } from "@/lib/quick-replica/qr-platform-auth";
 import type { QrCategory } from "@/lib/quick-replica/qr-types";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ function parseCategory(raw: string | null): QrCategory | null {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireQuickReplicaFinanceAdmin(request);
+  const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
   const url = new URL(request.url);
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = await requireQuickReplicaFinanceAdmin(request);
+  const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
   const url = new URL(request.url);

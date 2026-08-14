@@ -3587,6 +3587,47 @@ model QrKindFeatured {
   updatedAt       DateTime @updatedAt
 }
 
+/// 电商工具箱 · 平台模板区 catalog（运营在 Book 模板管理维护）
+model EcomTemplateCatalogEntry {
+  id              String    @id
+  category        String
+  mediaKind       String
+  title           String
+  hot             Boolean   @default(false)
+  ossUrl          String
+  thumbUrl        String
+  coverUrl        String?
+  mainImageUrl    String?
+  referenceImages Json?
+  promptText      String?   @db.Text
+  negativePrompt  String?   @db.Text
+  defaultModelKey String?
+  defaultParams   Json?
+  posterUrl       String?
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([category, mediaKind, deletedAt])
+  @@index([sortOrder])
+}
+
+/// 电商工具箱 · 平台模特库
+model EcomModelLibraryEntry {
+  id        String    @id
+  name      String
+  gender    String
+  age       String
+  ossUrl    String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([gender, age, deletedAt])
+}
+
 /// 平台 AI 导览助手 · 白名单文档切块（RAG 知识库）
 /// embedding 列由迁移以原生 `vector(dim)` 添加，Prisma 不识别该类型，检索走 $queryRaw。
 model PlatformDocChunk {

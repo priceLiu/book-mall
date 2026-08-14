@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 
 import { uploadEcomModelLibraryPreview } from "../lib/canvas/canvas-oss";
+import { upsertModelLibraryEntry } from "../lib/ecom/ecom-model-library-service";
 
 const ROOT = resolve(__dirname, "..", "..");
 const MODEL_HTML = resolve(ROOT, "book-mall", "tmp", "model.html");
@@ -222,6 +223,16 @@ async function main() {
   if (!dryRun) {
     writeFileSync(CATALOG_JSON, JSON.stringify({ models }, null, 2) + "\n");
     console.log(`[import-model-library] wrote ${CATALOG_JSON}`);
+    let dbOk = 0;
+    for (const entry of models) {
+      try {
+        await upsertModelLibraryEntry(entry);
+        dbOk += 1;
+      } catch (e) {
+        console.warn(`[warn] db upsert ${entry.id}`, e);
+      }
+    }
+    console.log(`[import-model-library] db upserted ${dbOk}/${models.length}`);
   }
 
   console.log(

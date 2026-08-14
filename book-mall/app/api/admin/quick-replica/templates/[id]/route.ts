@@ -37,7 +37,12 @@ export async function PUT(request: Request, ctx: RouteContext) {
   const category = parseCategory(body.category);
   const kind = typeof body.kind === "string" ? body.kind.trim() : "";
   const title = typeof body.title === "string" ? body.title.trim() : "";
-  const thumbnailUrl = typeof body.thumbnailUrl === "string" ? body.thumbnailUrl.trim() : "";
+  const thumbnailUrlRaw =
+    typeof body.thumbnailUrl === "string" ? body.thumbnailUrl.trim() : "";
+  const mediaUrl = typeof body.mediaUrl === "string" ? body.mediaUrl.trim() : "";
+  const targetImageUrl =
+    typeof body.targetImageUrl === "string" ? body.targetImageUrl.trim() : "";
+  const thumbnailUrl = thumbnailUrlRaw || mediaUrl || targetImageUrl;
   const promptText = typeof body.promptText === "string" ? body.promptText.trim() : "";
   const dbId = typeof body.dbId === "string" ? body.dbId.trim() : null;
   const catalogBuiltinId =

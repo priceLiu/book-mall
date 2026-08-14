@@ -13,12 +13,10 @@ import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-gene
 type Props = {
   template: QrTemplate | null;
   open: boolean;
-  canManageFeatured: boolean;
   onClose: () => void;
   onCopy: (template: QrTemplate) => void;
   allowDelete?: boolean;
   onDelete?: (template: QrTemplate) => void;
-  onFeaturedUpdated?: () => void;
 };
 
 function resolveAspectRatioLabel(template: QrTemplate): string {
@@ -57,14 +55,11 @@ function resolvePreviewMedia(template: QrTemplate): {
 export function QrTemplatePreviewModal({
   template,
   open,
-  canManageFeatured,
   onClose,
   onCopy,
   allowDelete = false,
   onDelete,
-  onFeaturedUpdated,
 }: Props) {
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [copyToast, setCopyToast] = useState<string | null>(null);
@@ -115,56 +110,6 @@ export function QrTemplatePreviewModal({
       showResult("复制成功");
     } else {
       showResult("复制失败，请手动复制");
-    }
-  };
-
-  const setFeatured = async (makePublic: boolean) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/book-mall/api/platform/v1/quick-replica/admin/kinds/${encodeURIComponent(template.kind)}/featured`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            templateId: template.id,
-            templateSource: template.source,
-            makePublic,
-          }),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "设置失败");
-      }
-      setMessage("已设为分类示例");
-      onFeaturedUpdated?.();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "设置失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clearFeatured = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/book-mall/api/platform/v1/quick-replica/admin/kinds/${encodeURIComponent(template.kind)}/featured`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "清除失败");
-      }
-      setMessage("已清除分类示例");
-      onFeaturedUpdated?.();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "清除失败");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -287,30 +232,6 @@ export function QrTemplatePreviewModal({
             ) : null}
 
             {message ? <p className="text-xs text-[var(--qr-text-muted)]">{message}</p> : null}
-
-            {canManageFeatured ? (
-              <div className="border-t pt-3" style={{ borderColor: "var(--qr-border)" }}>
-                <div className="mb-2 text-xs text-[var(--qr-text-muted)]">管理员</div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className="qr-btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
-                    onClick={() => void setFeatured(template.source === "user")}
-                  >
-                    设为分类示例
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className="qr-btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
-                    onClick={() => void clearFeatured()}
-                  >
-                    清除推荐
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <div className="shrink-0 space-y-2 p-5" style={{ borderTop: "1px solid var(--qr-border)" }}>

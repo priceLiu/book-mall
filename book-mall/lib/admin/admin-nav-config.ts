@@ -103,7 +103,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         { label: "生成频率配额", href: "/admin/generation-quota" },
         { label: "工具管理", href: "/admin/tool-apps/manage" },
         { label: "资源库（图/视频）", href: "/admin/tool-libraries" },
-        { label: "快速复刻模板", href: "/admin/quick-replica/templates" },
+        { label: "模板管理", href: "/admin/templates" },
         { label: "工具站跳转测试", href: "/admin/tools-sso-test" },
       ],
     },

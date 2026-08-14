@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
@@ -8,6 +8,7 @@ import { EcomMediaLibraryTile } from "@/components/media/ecom-media-library-tile
 import { EcomScrollLoadFooter } from "@/components/media/ecom-scroll-load-footer";
 import { useEcomScrollPagination } from "@/lib/use-ecom-scroll-pagination";
 import { listEcomModelLibraryEntries } from "@/lib/ecom-model-library/catalog";
+import { fetchEcomModelLibraryCatalog } from "@/lib/ecom-model-library-api";
 import {
   ECOM_MODEL_AGE_LABEL,
   ECOM_MODEL_GENDER_LABEL,
@@ -69,12 +70,24 @@ function sortModelsForDisplay(
 }
 
 export default function ModelLibraryPage() {
-  const allModels = useMemo(() => listEcomModelLibraryEntries(), []);
+  const [allModels, setAllModels] = useState<EcomModelLibraryEntry[]>(() =>
+    listEcomModelLibraryEntries(),
+  );
   const [gender, setGender] = useState<GenderFilter>(ALL);
   const [age, setAge] = useState<AgeFilter>(ALL);
   const [preview, setPreview] = useState<{ src: string; title?: string } | null>(
     null,
   );
+
+  useEffect(() => {
+    void fetchEcomModelLibraryCatalog()
+      .then((c) => {
+        if (c.models.length) setAllModels(c.models);
+      })
+      .catch(() => {
+        /* keep static */
+      });
+  }, []);
 
   const models = useMemo(
     () => sortModelsForDisplay(filterModels(allModels, gender, age), gender),

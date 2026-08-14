@@ -26,6 +26,51 @@ export type AdminTemplateFormInput = {
 
 export const ADMIN_SCENE_IMAGE_MAX = 9;
 
+export function supportsAdminSceneImages(form: {
+  category: string;
+  kind: string;
+  toolKey?: string;
+}): boolean {
+  if (isMotionSyncKind(form.kind, form.toolKey)) return false;
+  if (form.category === "character") return false;
+  return form.category === "video" || form.category === "world";
+}
+
+/** 角色库编辑已有条目：只改标题/提示词 */
+export function isCharacterCatalogEdit(form: {
+  category: string;
+  source: string;
+  dbId: string | null;
+  catalogBuiltinId: string | null;
+}): boolean {
+  if (form.category !== "character") return false;
+  if (form.source === "new" && !form.dbId && !form.catalogBuiltinId) return false;
+  return true;
+}
+
+export function extractAudioFieldsFromReference(reference?: QrTemplateJson["reference"]): {
+  modelKey: string;
+  voiceId: string;
+  audioStyleTag: string;
+  voiceSpeed: number;
+  voiceStability: number;
+  voiceSimilarityBoost: number;
+  voiceStyleExaggeration: number;
+} {
+  const params = reference?.model.params ?? {};
+  const num = (v: unknown, fallback: number) =>
+    typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  return {
+    modelKey: reference?.model.modelKey ?? "",
+    voiceId: typeof params.voice_id === "string" ? params.voice_id : "male-qn-qingse",
+    audioStyleTag: typeof params.style_tag === "string" ? params.style_tag : "ad-teaser",
+    voiceSpeed: num(params.speed, 1),
+    voiceStability: num(params.stability, 0.5),
+    voiceSimilarityBoost: num(params.similarity_boost, 0.75),
+    voiceStyleExaggeration: num(params.style_exaggeration, 0),
+  };
+}
+
 export function isMotionSyncKind(kind: string, toolKey?: string): boolean {
   return kind === "motion-sync" || toolKey === "motion-sync";
 }

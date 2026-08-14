@@ -9,7 +9,6 @@ import {
   type QrGenerateModalPhase,
 } from "@/components/quick-replica/qr-generate-preview-modal";
 import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
-import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
 import { QrHomeHeroPanel } from "@/components/quick-replica/qr-home-hero-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
@@ -292,7 +291,7 @@ export function QrAppClient({
   );
 
   useEffect(() => {
-    if (navMode !== "category" && navMode !== "my-works" && navMode !== "admin") return;
+    if (navMode !== "category" && navMode !== "my-works") return;
     for (const cat of QR_CATEGORIES) {
       prefetchTemplateList(qrTemplateCacheKey("all", cat.id), { category: cat.id });
     }
@@ -316,10 +315,6 @@ export function QrAppClient({
   }, [navMode, category, prefetchTemplateList]);
 
   const galleryTitleSuffix = useMemo(() => {
-    if (navMode === "admin") {
-      if (selectedKind === "motion-sync") return "运动同步";
-      return "推荐模板";
-    }
     if (navMode === "my-works") return "我的作品";
     if (navMode === "generate-history") return "我的作品";
     if (selectedKind) return getKindDef(selectedKind)?.label ?? selectedKind;
@@ -385,39 +380,6 @@ export function QrAppClient({
     setSelectedKind(null);
     setPinnedToolKey(null);
   };
-
-  const onAdmin = () => {
-    setNavMode("admin");
-    setMiddleMode("browse");
-    setSelectedKind(null);
-    setPinnedToolKey(null);
-    setCategory("video");
-    const cacheKey = qrTemplateCacheKey("all", "video");
-    setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
-    setTemplatesLoading(true);
-  };
-
-  const refreshTemplateCaches = useCallback(() => {
-    templatesCacheRef.current.clear();
-    kindsCacheRef.current.clear();
-    void loadTemplates();
-    void loadKinds();
-  }, [loadKinds, loadTemplates]);
-
-  const handleAdminScopeChange = useCallback(
-    (scope: { category: QrCategory; kind: string | null }) => {
-      setCategory(scope.category);
-      setSelectedKind(scope.kind);
-      const cacheKey = qrTemplateCacheKey(
-        "all",
-        scope.category,
-        scope.kind ?? undefined,
-      );
-      setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
-      setTemplatesLoading(true);
-    },
-    [],
-  );
 
   const onPinnedTool = (toolKey: string, cat: QrCategory, kind: string) => {
     setNavMode("pinned-tool");
@@ -510,7 +472,7 @@ export function QrAppClient({
     setMiddleMode("workspace");
     if (t.category) setCategory(t.category);
     setSelectedKind(t.kind);
-    if (navMode === "home" || navMode === "admin") {
+    if (navMode === "home") {
       setNavMode("category");
     }
     setCopyToast(
@@ -624,15 +586,6 @@ export function QrAppClient({
   }, []);
 
   const middlePanel = (() => {
-    if (navMode === "admin") {
-      return (
-        <QrAdminPanel
-          bookMallAdminUrl={bookMallAdminUrl}
-          onTemplatesChanged={refreshTemplateCaches}
-          onScopeChange={handleAdminScopeChange}
-        />
-      );
-    }
     if (middleMode === "welcome") {
       return (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center">
@@ -795,7 +748,7 @@ export function QrAppClient({
             onMyWorks={onMyWorks}
             onGenerateHistory={onGenerateHistory}
             onPinnedTool={onPinnedTool}
-            onAdmin={canManageFeatured ? onAdmin : undefined}
+            bookMallAdminUrl={bookMallAdminUrl}
           />
         ) : null}
 
@@ -922,7 +875,6 @@ export function QrAppClient({
       <QrTemplatePreviewModal
         template={previewTemplate}
         open={previewTemplate !== null}
-        canManageFeatured={canManageFeatured}
         onClose={() => setPreviewTemplate(null)}
         onCopy={onCopyTemplate}
         allowDelete={navMode === "my-works" || navMode === "generate-history"}
@@ -931,12 +883,6 @@ export function QrAppClient({
             ? (t) => void handleDeleteTemplate(t)
             : undefined
         }
-        onFeaturedUpdated={() => {
-          kindsCacheRef.current.delete(category);
-          invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
-          void loadKinds();
-          void loadTemplates();
-        }}
       />
 
       <QrGeneratePreviewModal

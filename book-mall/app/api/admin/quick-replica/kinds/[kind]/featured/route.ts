@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
   clearKindFeatured,
   setKindFeaturedTemplate,
 } from "@/lib/quick-replica/qr-kind-featured-service";
-import { requireQuickReplicaFinanceAdmin } from "@/lib/quick-replica/qr-platform-auth";
 
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ kind: string }> };
 
 export async function PUT(request: Request, ctx: RouteContext) {
-  const auth = await requireQuickReplicaFinanceAdmin(request);
+  const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
   const { kind } = await ctx.params;
@@ -50,7 +50,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
 }
 
 export async function DELETE(_request: Request, ctx: RouteContext) {
-  const auth = await requireQuickReplicaFinanceAdmin(_request);
+  const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
   const { kind } = await ctx.params;

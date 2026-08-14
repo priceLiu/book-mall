@@ -39,7 +39,7 @@ export default async function HomePage() {
   const canManageFeatured = await fetchCanManageFeatured(token);
   const mainOrigin = getMainSiteOrigin();
   const bookMallAdminUrl = mainOrigin
-    ? `${mainOrigin}/admin/quick-replica/templates`
+    ? `${mainOrigin}/admin/templates?tab=quick-replica`
     : null;
 
   return (

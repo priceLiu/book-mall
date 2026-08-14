@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 
+import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
   readQrAudioPromptTemplates,
   writeQrAudioPromptTemplates,
+  type QrAudioPromptTemplateKind,
   type QrAudioPromptTemplateLibrary,
 } from "@/lib/quick-replica/qr-audio-prompt-templates";
-import { requireQuickReplicaFinanceAdmin } from "@/lib/quick-replica/qr-platform-auth";
 
 export const dynamic = "force-dynamic";
+
+const KINDS: QrAudioPromptTemplateKind[] = [
+  "create-voiceover",
+  "voice-changer",
+  "create-sfx",
+  "create-music",
+];
 
 function parseLibrary(body: unknown): QrAudioPromptTemplateLibrary | null {
   if (!body || typeof body !== "object") return null;
@@ -21,7 +29,7 @@ function normalizeFromBody(raw: unknown): QrAudioPromptTemplateLibrary {
   const lib = readQrAudioPromptTemplates();
   if (!raw || typeof raw !== "object") return lib;
   const root = raw as Record<string, unknown>;
-  for (const kind of ["create-voiceover", "voice-changer"] as const) {
+  for (const kind of KINDS) {
     const list = root[kind];
     if (!Array.isArray(list)) continue;
     lib[kind] = list
@@ -39,14 +47,14 @@ function normalizeFromBody(raw: unknown): QrAudioPromptTemplateLibrary {
   return lib;
 }
 
-export async function GET(request: Request) {
-  const auth = await requireQuickReplicaFinanceAdmin(request);
+export async function GET() {
+  const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
   return NextResponse.json({ templates: readQrAudioPromptTemplates() });
 }
 
 export async function PUT(request: Request) {
-  const auth = await requireQuickReplicaFinanceAdmin(request);
+  const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
   let body: unknown;

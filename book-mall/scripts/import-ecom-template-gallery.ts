@@ -21,6 +21,7 @@ import { buildEcomGalleryThumbWebp } from "../lib/ecom/ecom-gallery-thumb";
 import {
   appendTemplateGalleryEntries,
   readTemplateGalleryCatalog,
+  upsertTemplateGalleryEntry,
   writeTemplateGalleryCatalog,
   type EcomTemplateGalleryEntry,
 } from "../lib/ecom/ecom-template-gallery-service";
@@ -181,7 +182,12 @@ let catalogWriteChain = Promise.resolve();
 
 function appendCatalogEntry(entry: EcomTemplateGalleryEntry): void {
   catalogWriteChain = catalogWriteChain
-    .then(() => {
+    .then(async () => {
+      try {
+        await upsertTemplateGalleryEntry(entry);
+      } catch (e) {
+        console.warn(`[warn] db upsert ${entry.id}`, e);
+      }
       appendTemplateGalleryEntries([entry]);
     })
     .catch((e) => {

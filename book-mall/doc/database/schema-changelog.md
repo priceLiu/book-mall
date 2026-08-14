@@ -232,6 +232,19 @@
 
 ---
 
+## 2026-08-15 — 电商模板区 / 模特库 catalog（Prisma）
+
+- **迁移目录**：`prisma/migrations/20260815010000_ecom_template_and_model_catalog/`
+- **新表**：
+  - `EcomTemplateCatalogEntry`——电商工具箱模板区运营 catalog。保留原 `id/category/mediaKind/title/hot/ossUrl/thumbUrl`，并扩展封面/主图/参考图/prompt/负向词/默认模型与参数/海报/排序；`deletedAt` 软删。
+  - `EcomModelLibraryEntry`——模特库（`name/gender/age/ossUrl/sortOrder` + 软删）。
+- **种子**：`pnpm ecom:seed-catalog` 从 `e-commerce-toolkit` 的 `catalog.json` upsert；JSON / CLI 仅作种子与导入备份，运行时用户 GET 优先读库。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **管理入口**：Book `/admin/templates?tab=ecom`。
+- **回滚**：开发环境可 `DROP TABLE "EcomTemplateCatalogEntry","EcomModelLibraryEntry";`；生产严禁直接回滚。
+
+---
+
 ## 2026-08-14 — 我的 AI 空间（设计稿 · 待迁移）
 
 - **产品文档**：[`doc/product/我的AI空间.md`](../product/我的AI空间.md)

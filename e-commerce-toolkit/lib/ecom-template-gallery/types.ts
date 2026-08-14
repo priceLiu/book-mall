@@ -19,6 +19,12 @@ export type EcomTemplateGalleryEntry = {
   ossUrl: string;
   /** 列表缩略图（sharp 预生成 -thumb.webp） */
   thumbUrl: string;
+  coverUrl?: string | null;
+  mainImageUrl?: string | null;
+  referenceImages?: Array<{ url: string; label?: string }>;
+  promptText?: string | null;
+  defaultModelKey?: string | null;
+  posterUrl?: string | null;
 };
 
 export type EcomTemplateGalleryCatalog = {

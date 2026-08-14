@@ -25,8 +25,7 @@ export type QrNavMode =
   | "category"
   | "my-works"
   | "generate-history"
-  | "pinned-tool"
-  | "admin";
+  | "pinned-tool";
 
 const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
   video: Video,
@@ -49,7 +48,7 @@ type Props = {
   onMyWorks: () => void;
   onGenerateHistory?: () => void;
   onPinnedTool: (toolKey: string, category: QrCategory, kind: string) => void;
-  onAdmin?: () => void;
+  bookMallAdminUrl?: string | null;
 };
 
 export function QrSidebar({
@@ -65,7 +64,7 @@ export function QrSidebar({
   onMyWorks,
   onGenerateHistory,
   onPinnedTool,
-  onAdmin,
+  bookMallAdminUrl = null,
 }: Props) {
   return (
     <>
@@ -165,29 +164,24 @@ export function QrSidebar({
         </div>
 
         <div className="mt-auto space-y-1 pt-4">
-          {canManageFeatured && onAdmin ? (
+          {canManageFeatured && bookMallAdminUrl ? (
             <>
               {compact ? null : (
                 <div className="mb-2 text-xs uppercase tracking-wide qr-panel-muted">管理</div>
               )}
-              <button
-                type="button"
-                title="管理后台"
-                onClick={() => {
-                  onAdmin();
-                  onCloseSidebar();
-                }}
+              <a
+                href={bookMallAdminUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="模板管理"
+                onClick={() => onCloseSidebar()}
                 className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
                   compact ? "justify-center px-1.5" : ""
-                } ${
-                  navMode === "admin"
-                    ? "qr-nav-active"
-                    : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
-                }`}
+                } text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]`}
               >
                 <Settings2 className="h-4 w-4 shrink-0" />
-                {compact ? null : "管理后台"}
-              </button>
+                {compact ? null : "模板管理"}
+              </a>
             </>
           ) : null}
           <button
