@@ -358,19 +358,32 @@ function isOssNotFoundError(e: unknown): boolean {
 }
 
 /** 检查 OSS 对象是否已存在（用于导入同名跳过）。 */
+/** head 探测与 PUT 一样会遇到 TLS 握手重置；不重试会把整条导入打成 500 */
+const OSS_HEAD_RETRY_SLEEPS = [0, 500, 1500, 3500];
+
 export async function ossObjectExists(key: string): Promise<boolean> {
   const cfgRaw = readOssEnv();
   if ("error" in cfgRaw) {
     throw new Error(cfgRaw.error);
   }
-  try {
-    const client = await createOssClientFrom(cfgRaw);
-    await client.head(key);
-    return true;
-  } catch (e) {
-    if (isOssNotFoundError(e)) return false;
-    throw e;
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < OSS_HEAD_RETRY_SLEEPS.length; attempt++) {
+    if (OSS_HEAD_RETRY_SLEEPS[attempt] > 0) {
+      await new Promise((r) => setTimeout(r, OSS_HEAD_RETRY_SLEEPS[attempt]));
+    }
+    try {
+      const client = await createOssClientFrom(cfgRaw);
+      await client.head(key);
+      return true;
+    } catch (e) {
+      if (isOssNotFoundError(e)) return false;
+      lastError = e;
+      const raw = e instanceof Error ? e.message : String(e);
+      if (!TRANSIENT_OSS_ERROR.test(raw)) throw e;
+    }
   }
+  throw lastError;
 }
 
 /** 由 OSS key 推导公网 URL（catalog 跳过上传时补 URL）。 */

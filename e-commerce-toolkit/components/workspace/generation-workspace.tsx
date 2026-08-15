@@ -18,7 +18,9 @@ import {
   fetchBillingMode,
   generateImage,
   generateVideo,
+  isAssetPinnedInAiSpace,
   listAssets,
+  pinAssetToAiSpace,
   type EcomAsset,
   type EcomBillingMode,
 } from "@/lib/ecom-api";
@@ -39,6 +41,7 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   const [previewImage, setPreviewImage] = useState<{ src: string; title?: string } | null>(
     null,
   );
+  const [pinnedAssetIds, setPinnedAssetIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setAssetsLoading(true);
@@ -101,6 +104,23 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
     }
   }
 
+  async function handlePin(asset: EcomAsset) {
+    try {
+      await pinAssetToAiSpace(asset.id);
+      setPinnedAssetIds((prev) => new Set(prev).add(asset.id));
+      await alert({
+        title: "已展示到 AI 空间",
+        message: "可在「个人中心 → 我的 AI 空间」查看与布置。空间只保存指向，不复制文件。",
+      });
+    } catch (e) {
+      await alert({
+        title: "展示失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
   async function handleDelete(asset: EcomAsset) {
     const label = asset.title ?? "本条资产";
     if (
@@ -112,13 +132,15 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
     ) {
       return;
     }
+    const pinned = await isAssetPinnedInAiSpace(asset.id);
     if (
       !(await doubleConfirm({
         title: "再次确认",
         message: "此操作不可恢复。",
         secondTitle: "不可恢复",
-        secondMessage:
-          "删除后库记录将移除；若文件在云端存储（OSS）将尝试一并删除。",
+        secondMessage: pinned
+          ? "删除后库记录将移除；若文件在云端存储（OSS）将尝试一并删除。该作品已展示在「我的 AI 空间」，个人空间展示将一并移除。"
+          : "删除后库记录将移除；若文件在云端存储（OSS）将尝试一并删除。",
         confirmLabel: "确认删除",
       }))
     ) {
@@ -215,6 +237,8 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
                         )
                       }
                       onDelete={() => void handleDelete(a)}
+                      onPinToAiSpace={() => void handlePin(a)}
+                      pinnedToAiSpace={pinnedAssetIds.has(a.id)}
                     />
                   </li>
                 );

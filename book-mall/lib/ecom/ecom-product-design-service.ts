@@ -333,7 +333,7 @@ export async function createProductDesignProject(
     importFrom?: ProductDesignStrategyImport;
   },
 ): Promise<EcomProductDesignProjectDto> {
-  const module = opts?.module ?? ECOM_PROJECT_MODULE_MAIN;
+  const projectModule = opts?.module ?? ECOM_PROJECT_MODULE_MAIN;
   const snapshot = opts?.importFrom
     ? await readStrategySnapshot(userId, opts.importFrom)
     : null;
@@ -350,8 +350,8 @@ export async function createProductDesignProject(
   const row = await productDesignProjects().create({
     data: {
       userId,
-      module,
-      title: opts?.title?.trim().slice(0, 120) || defaultProjectTitle(module),
+      module: projectModule,
+      title: opts?.title?.trim().slice(0, 120) || defaultProjectTitle(projectModule),
       platform: spec.code,
       brief: brief as Prisma.InputJsonValue,
       references: (snapshot?.references ?? []) as unknown as Prisma.InputJsonValue,

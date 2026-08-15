@@ -21,7 +21,10 @@ import {
   listEcomTemplateGalleryEntriesStatic,
   mergeTemplateGalleryEntries,
 } from "@/lib/ecom-template-gallery/catalog";
-import { fetchEcomTemplateGalleryCatalog } from "@/lib/ecom-template-gallery-api";
+import {
+  fetchEcomTemplateGalleryCatalog,
+  fetchEcomTemplateGalleryCategorySummary,
+} from "@/lib/ecom-template-gallery-api";
 import {
   loadEcomTemplateGalleryViewState,
   saveEcomTemplateGalleryViewState,
@@ -30,8 +33,10 @@ import { useEcomTemplateImportAccess } from "@/lib/ecom-tools-admin.client";
 import {
   ECOM_TEMPLATE_CATEGORY_META,
   isTemplateCategoryAvailable,
+  summaryRowFor,
   templateGalleryHasMediaKind,
   type EcomTemplateCategory,
+  type EcomTemplateCategorySummaryRow,
   type EcomTemplateMediaKind,
   type EcomTemplateGalleryEntry,
 } from "@/lib/ecom-template-gallery/types";
@@ -65,6 +70,11 @@ function TemplateGalleryPageInner() {
   const [allTemplates, setAllTemplates] = useState<EcomTemplateGalleryEntry[]>(
     () => listEcomTemplateGalleryEntriesStatic(),
   );
+  const [summary, setSummary] = useState<EcomTemplateCategorySummaryRow[]>([]);
+  /** 概览来自数据库时才可据以判定「该分类为空」 */
+  const [catalogAuthoritative, setCatalogAuthoritative] = useState(false);
+  const [loadingCategory, setLoadingCategory] = useState(true);
+  const loadedCategoriesRef = useRef<Set<EcomTemplateCategory>>(new Set());
   const [category, setCategory] = useState<EcomTemplateCategory>("accessories");
   const [media, setMedia] = useState<MediaFilter>("image");
   const [importOpen, setImportOpen] = useState(false);
@@ -79,16 +89,26 @@ function TemplateGalleryPageInner() {
     poster?: string;
   } | null>(null);
 
-  const refetchCatalog = useCallback(async () => {
-    try {
-      const remote = await fetchEcomTemplateGalleryCatalog();
-      setAllTemplates((prev) =>
-        mergeTemplateGalleryEntries(prev, remote.templates ?? []),
-      );
-    } catch {
-      /* 保留已有列表 */
-    }
-  }, []);
+  /** 只拉当前分类；已拉过的分类不重复请求 */
+  const loadCategory = useCallback(
+    async (target: EcomTemplateCategory, force = false) => {
+      if (!force && loadedCategoriesRef.current.has(target)) return;
+      setLoadingCategory(true);
+      try {
+        const { catalog, source } =
+          await fetchEcomTemplateGalleryCatalog(target);
+        setAllTemplates((prev) =>
+          mergeTemplateGalleryEntries(prev, catalog.templates ?? []),
+        );
+        if (source === "remote") loadedCategoriesRef.current.add(target);
+      } catch {
+        /* 保留已有列表 */
+      } finally {
+        setLoadingCategory(false);
+      }
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     const saved = loadEcomTemplateGalleryViewState();
@@ -98,8 +118,21 @@ function TemplateGalleryPageInner() {
   }, []);
 
   useEffect(() => {
-    void refetchCatalog();
-  }, [refetchCatalog]);
+    let cancelled = false;
+    void (async () => {
+      const loaded = await fetchEcomTemplateGalleryCategorySummary();
+      if (cancelled || !loaded) return;
+      setSummary(loaded.categories);
+      setCatalogAuthoritative(loaded.source === "remote");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    void loadCategory(category);
+  }, [category, loadCategory]);
 
   useEffect(() => {
     setOnEntryUploaded((entry) => {
@@ -112,9 +145,22 @@ function TemplateGalleryPageInner() {
     saveEcomTemplateGalleryViewState({ category, media });
   }, [category, media]);
 
-  const categoryAvailable = isTemplateCategoryAvailable(category, allTemplates);
-  const hasVideos = templateGalleryHasMediaKind(allTemplates, category, "video");
-  const hasImages = templateGalleryHasMediaKind(allTemplates, category, "image");
+  /** 概览与已加载条目取并集：概览负责未加载的分类，已加载条目让新导入立刻生效 */
+  const categoryHasEntries = useCallback(
+    (target: EcomTemplateCategory) =>
+      (summaryRowFor(summary, target)?.total ?? 0) > 0 ||
+      isTemplateCategoryAvailable(target, allTemplates),
+    [summary, allTemplates],
+  );
+
+  const categoryAvailable = categoryHasEntries(category) || !catalogAuthoritative;
+  const currentSummary = summaryRowFor(summary, category);
+  const hasVideos =
+    (currentSummary?.video ?? 0) > 0 ||
+    templateGalleryHasMediaKind(allTemplates, category, "video");
+  const hasImages =
+    (currentSummary?.image ?? 0) > 0 ||
+    templateGalleryHasMediaKind(allTemplates, category, "image");
 
   const mediaOptions: Array<{
     value: MediaFilter;
@@ -194,7 +240,8 @@ function TemplateGalleryPageInner() {
     const root = scrollRef.current;
     if (!root) return;
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    // window.setTimeout 返回 number；勿用 ReturnType<typeof setTimeout>（会取到 @types/node 的 Timeout）
+    let timer: number | undefined;
     const onScroll = () => {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
@@ -241,7 +288,9 @@ function TemplateGalleryPageInner() {
 
               <div className="flex flex-wrap gap-2">
                 {ECOM_TEMPLATE_CATEGORY_META.map((cat) => {
-                  const available = isTemplateCategoryAvailable(cat.id, allTemplates);
+                  // 权威概览未到手前不能断言分类为空，否则新导入的分类会被误标「敬请期待」
+                  const available =
+                    categoryHasEntries(cat.id) || !catalogAuthoritative;
                   return (
                     <button
                       key={cat.id}
@@ -311,7 +360,9 @@ function TemplateGalleryPageInner() {
                 {!categoryAvailable
                   ? `${categoryMeta?.label ?? ""} 案例筹备中，敬请期待。`
                   : templates.length === 0
-                    ? "暂无案例。"
+                    ? loadingCategory
+                      ? "清单加载中…"
+                      : "暂无案例。"
                     : hasMore
                       ? loadingMore
                         ? `正在加载… ${loaded} / ${templates.length} 个案例`

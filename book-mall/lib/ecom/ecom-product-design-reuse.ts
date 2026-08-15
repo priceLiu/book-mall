@@ -38,7 +38,7 @@ export async function createProductDesignProjectFromSnapshot(
   userId: string,
   snap: ProductDesignWorkflowSnapshot,
 ): Promise<EcomProductDesignProjectDto> {
-  const module = normalizeEcomProjectModule(snap.module);
+  const projectModule = normalizeEcomProjectModule(snap.module);
   const spec = getEcomPlatformSpec(snap.platform);
   const clamped = clampPlatformCounts(snap.platform, snap.settings);
   const design = stripGeneratedOutputs(snap.design);
@@ -47,7 +47,7 @@ export async function createProductDesignProjectFromSnapshot(
   const row = await prisma.ecomProductDesignProject.create({
     data: {
       userId,
-      module,
+      module: projectModule,
       title: snap.title.slice(0, 120),
       platform: spec.code,
       status: "draft",

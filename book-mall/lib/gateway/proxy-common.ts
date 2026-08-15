@@ -33,6 +33,10 @@ import {
 } from "./kie-codex-chat";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
 import {
+  forwardCosyVoiceTtsSpeech,
+  isCosyVoiceTtsModel,
+} from "./cosyvoice-tts-proxy";
+import {
   forwardMinimaxT2a,
   isMinimaxSpeechRouteModel,
 } from "./minimax-speech-proxy";
@@ -757,6 +761,10 @@ export async function forwardAudioSpeech(opts: {
   const model = String(opts.body.model ?? "").trim();
   if (isQwenTtsModel(model)) {
     return forwardQwenTtsSpeech(opts);
+  }
+
+  if (isCosyVoiceTtsModel(model)) {
+    return forwardCosyVoiceTtsSpeech(opts);
   }
 
   if (isMinimaxSpeechRouteModel(model) || opts.providerKind === "MINIMAX") {

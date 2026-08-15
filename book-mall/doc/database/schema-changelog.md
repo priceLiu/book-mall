@@ -245,12 +245,20 @@
 
 ---
 
-## 2026-08-14 — 我的 AI 空间（设计稿 · 待迁移）
+## 2026-08-15 — 我的 AI 空间（已落库）
 
+- **迁移目录**：`prisma/migrations/20260815020000_ai_space/`
 - **产品文档**：[`doc/product/我的AI空间.md`](../product/我的AI空间.md)
-- **计划新表**（尚未 `prisma migrate`）：`AiSpacePin`、`AiSpaceAudioAsset`、`AiSpaceVideoMaterial`、`DigitalHuman`、`AiSpaceComposeTask`
-- **原则**：Pin 仅指针；数字人/音频为 **Book 真源**，全应用引用 ID；删源 cascade Pin / 删素材检测跨应用引用
-- **应用**：评审通过后单独迁移目录 + `pnpm db:apply-pending`
+- **新表**：
+  - `AiSpacePin`——作品墙指针。只存 `{ sourceApp, sourceType, sourceId, sortOrder, caption }`，`@@unique([userId, sourceType, sourceId])`；**禁止**缓存 `prompt` / `ossUrl` / `thumbnailUrl`，展示字段读时 resolve 源记录。
+  - `AiSpaceDigitalHuman`——数字人形象库（Book 真源，全应用引用 id）。含 `avatarImageUrl` / `status`（`active` | `inactive` | `detect_failed`）；尺寸与 `wan2.2-s2v-detect` 预检结果存 `meta`（`width` / `height` / `detect.{checkPass,humanoid,message,checkedAt,imageUrl}`），换图后 `imageUrl` 不匹配即视为未检测，**无需迁移**。
+  - `AiSpaceAudioAsset`——统一音频库（Book 真源）。`sourceType` 覆盖 `upload` / `tts` / `voice_clone` / `voice_changer` / `sound_effect` / `music`；`durationSec` 由 ffprobe 探测，合成台 20 秒门禁依赖该字段。
+  - `AiSpaceVideoMaterial`——视频创作库，只存 **用户上传** 与 **合成成片**（`sourceKind = upload | compose_output`）；各应用已发布视频经 `AiSpacePin(kind=video)` 引用展示，不复制。
+  - `AiSpaceComposeTask`——数字人口播合成任务。状态 `pending → generating_human → composing → completed`（失败 `failed`），串联 Gateway `wan2.2-s2v` 与 `MediaRenderJob`。
+- **原则**：Pin 仅指针；数字人/音频为 **Book 真源**，全应用引用 ID；删源 cascade Pin（`cascadeDeletePinsBySource`）；删素材前经 `/api/platform/v1/ai-space/refs/check` 检测跨应用引用。
+- **非 schema 同批变更**：`MediaTimelineV1` 新增可选 `composite`（背景 / 音轨 / overlay / 字幕），走 `render-ffmpeg.runCompositeRender`；`MediaRenderJob.sourceApp` 复用 `api`，未新增枚举值。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **回滚**：开发环境可 `DROP TABLE "AiSpaceComposeTask","AiSpaceVideoMaterial","AiSpaceAudioAsset","AiSpaceDigitalHuman","AiSpacePin";`；生产严禁直接回滚。
 
 ---
 

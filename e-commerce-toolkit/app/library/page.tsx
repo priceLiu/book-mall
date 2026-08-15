@@ -16,7 +16,12 @@ import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
 import { EcomPublishDialog } from "@/components/publish/ecom-publish-dialog";
-import { deleteAsset, type EcomAsset } from "@/lib/ecom-api";
+import {
+  deleteAsset,
+  isAssetPinnedInAiSpace,
+  pinAssetToAiSpace,
+  type EcomAsset,
+} from "@/lib/ecom-api";
 import { reuseProductDesignProject } from "@/lib/ecom-product-design-api";
 import {
   listLibrarySections,
@@ -79,6 +84,7 @@ export default function LibraryPage() {
   const [reviewSnapshot, setReviewSnapshot] =
     useState<StoryboardDeliverableSnapshot | null>(null);
   const [reuseBusy, setReuseBusy] = useState<string | null>(null);
+  const [pinnedAssetIds, setPinnedAssetIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     listLibrarySections()
@@ -104,14 +110,33 @@ export default function LibraryPage() {
     }));
   }, [sections]);
 
+  async function onPinAsset(a: EcomAsset) {
+    try {
+      await pinAssetToAiSpace(a.id);
+      setPinnedAssetIds((prev) => new Set(prev).add(a.id));
+      await alert({
+        title: "已展示到 AI 空间",
+        message: "可在「个人中心 → 我的 AI 空间」查看与布置。空间只保存指向，不复制文件。",
+      });
+    } catch (e) {
+      await alert({
+        title: "展示失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
   async function onDeleteAsset(a: EcomAsset) {
+    const pinned = await isAssetPinnedInAiSpace(a.id);
     if (
       !(await doubleConfirm({
         title: "删除资产",
         message: `确定删除「${a.title ?? "未命名"}」？`,
         secondTitle: "不可恢复",
-        secondMessage:
-          "删除后库记录将移除；若文件在云端存储（OSS）将尝试一并删除。",
+        secondMessage: pinned
+          ? "删除后库记录将移除；若文件在云端存储（OSS）将尝试一并删除。该作品已展示在「我的 AI 空间」，个人空间展示将一并移除。"
+          : "删除后库记录将移除；若文件在云端存储（OSS）将尝试一并删除。",
         confirmLabel: "确认删除",
       }))
     ) {
@@ -119,6 +144,12 @@ export default function LibraryPage() {
     }
     try {
       await deleteAsset(a.id);
+      setPinnedAssetIds((prev) => {
+        if (!prev.has(a.id)) return prev;
+        const next = new Set(prev);
+        next.delete(a.id);
+        return next;
+      });
       setSections((prev) =>
         prev
           .map((section) => {
@@ -185,11 +216,11 @@ export default function LibraryPage() {
     setReuseBusy(key);
     try {
       const project = await reuseProductDesignProject(bundle.projectId, bundle.savedAt);
-      const module = (project.module === "detail-page" ? "detail-page" : "main-image") as EcomProjectModule;
+      const targetModule = (project.module === "detail-page" ? "detail-page" : "main-image") as EcomProjectModule;
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(productDesignStorageKey(module), project.id);
+        sessionStorage.setItem(productDesignStorageKey(targetModule), project.id);
       }
-      router.push(productDesignStudioPath(module));
+      router.push(productDesignStudioPath(targetModule));
     } catch (e) {
       await alert({
         title: "复用失败",
@@ -245,6 +276,8 @@ export default function LibraryPage() {
                       section={section}
                       reuseBusy={reuseBusy}
                       onDeleteAsset={onDeleteAsset}
+                      onPinAsset={onPinAsset}
+                      pinnedAssetIds={pinnedAssetIds}
                       onPreviewImage={(src, title) => setPreviewImage({ src, title })}
                       onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
                       onReviewStoryboardBundle={(snap) => setReviewSnapshot(snap)}
@@ -300,6 +333,8 @@ function LibrarySectionBlock({
   section,
   reuseBusy,
   onDeleteAsset,
+  onPinAsset,
+  pinnedAssetIds,
   onPreviewImage,
   onPreviewVideo,
   onReviewStoryboardBundle,
@@ -310,6 +345,8 @@ function LibrarySectionBlock({
   section: EcomLibrarySection;
   reuseBusy: string | null;
   onDeleteAsset: (a: EcomAsset) => void;
+  onPinAsset: (a: EcomAsset) => void;
+  pinnedAssetIds: Set<string>;
   onPreviewImage: (src: string, title?: string) => void;
   onPreviewVideo: (src: string, title?: string) => void;
   onReviewStoryboardBundle: (snap: StoryboardDeliverableSnapshot) => void;
@@ -341,6 +378,8 @@ function LibrarySectionBlock({
           group={group}
           reuseBusy={reuseBusy}
           onDeleteAsset={onDeleteAsset}
+          onPinAsset={onPinAsset}
+          pinnedAssetIds={pinnedAssetIds}
           onPreviewImage={onPreviewImage}
           onPreviewVideo={onPreviewVideo}
           onOpenSeedVideoProject={onOpenSeedVideoProject}
@@ -455,6 +494,8 @@ function AssetProjectGroup({
   group,
   reuseBusy,
   onDeleteAsset,
+  onPinAsset,
+  pinnedAssetIds,
   onPreviewImage,
   onPreviewVideo,
   onOpenSeedVideoProject,
@@ -465,6 +506,8 @@ function AssetProjectGroup({
   group: EcomLibraryAssetGroup;
   reuseBusy: string | null;
   onDeleteAsset: (a: EcomAsset) => void;
+  onPinAsset: (a: EcomAsset) => void;
+  pinnedAssetIds: Set<string>;
   onPreviewImage: (src: string, title?: string) => void;
   onPreviewVideo: (src: string, title?: string) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
@@ -515,6 +558,8 @@ function AssetProjectGroup({
                   )
                 }
                 onDelete={() => void onDeleteAsset(a)}
+                onPinToAiSpace={() => void onPinAsset(a)}
+                pinnedToAiSpace={pinnedAssetIds.has(a.id)}
               />
             </li>
           );

@@ -20,6 +20,7 @@ import {
   buildVisibleAssetWhere,
   type AssetAccessError,
 } from "@/lib/tenant/asset-sharing-service";
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 
 const MAX_URL_LEN = 8192;
 const MAX_PROMPT_LEN = 8000;
@@ -400,6 +401,7 @@ export async function deleteCanvasVideoLibraryItem(
     );
   }
 
+  await cascadeDeletePinsBySource("i2v_library", row.id);
   await prisma.imageToVideoLibraryItem.delete({ where: { id: row.id } });
   return { ok: true, ossDeleted: oss.deleted };
 }

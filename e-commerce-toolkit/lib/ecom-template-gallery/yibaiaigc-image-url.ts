@@ -7,6 +7,21 @@ export function isYibaiAigcImageUrl(url: string): boolean {
   return /^https:\/\/image\.yibaiaigc\.com\//i.test(base);
 }
 
+/**
+ * 视频列表页保存下来的 HTML 里 `<video src>` 为空（hover 时才由前端填充），
+ * 但视频与封面图同名、仅扩展名不同，故由封面 URL 推导。
+ */
+export function deriveVideoUrlFromCoverUrl(
+  coverUrl: string,
+  ext = "mp4",
+): string {
+  const base = (coverUrl.split("?")[0] ?? "").trim();
+  if (!base) return "";
+  return /\.[^./]+$/.test(base)
+    ? base.replace(/\.[^./]+$/, `.${ext}`)
+    : `${base}.${ext}`;
+}
+
 export function splitYibaiAigcImageUrl(rawUrl: string): {
   originalUrl: string;
   thumbSourceUrl: string;

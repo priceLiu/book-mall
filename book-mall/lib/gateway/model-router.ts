@@ -84,7 +84,18 @@ export function isBailianR2vGatewayModel(model: string): boolean {
   return BAILIAN_R2V.has(model.trim().toLowerCase());
 }
 
-const TTS_MODELS = new Set(["tts-1", "tts-1-hd", "qwen3-tts"]);
+const TTS_MODELS = new Set([
+  "tts-1",
+  "tts-1-hd",
+  "qwen3-tts",
+  "cosyvoice-v2",
+  "cosyvoice-v3-flash",
+  "cosyvoice-v3-plus",
+  "cosyvoice-v3.5-flash",
+  "cosyvoice-v3.5-plus",
+  "qwen-audio-3.0-tts-flash",
+  "qwen-audio-3.0-tts-plus",
+]);
 
 const TRYON_PREFIXES = ["aitryon"];
 
@@ -133,7 +144,12 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "VOLCENGINE", requestKind: "OTHER" };
   }
 
-  if (TTS_MODELS.has(m) || m.startsWith("tts-")) {
+  if (
+    TTS_MODELS.has(m) ||
+    m.startsWith("tts-") ||
+    m.startsWith("cosyvoice-") ||
+    m.startsWith("qwen-audio-3.0-tts")
+  ) {
     return { providerKind: "BAILIAN", requestKind: "TTS" };
   }
 

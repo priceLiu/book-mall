@@ -7,7 +7,8 @@
 | 组件 | 路径 | 用途 |
 |------|------|------|
 | `EcomVideoPlayer` | `components/media/ecom-video-player.tsx` | 可交互播放（`controls` + `playsInline` + `preload="metadata"`） |
-| `EcomVideoThumb` | 同上 | 列表/卡片缩略（`muted`、无 `controls`） |
+| `EcomVideoThumb` | 同上 | 列表/卡片缩略取帧（`muted`、无 `controls`）；仅在**无封面图**时使用 |
+| `EcomVideoHoverPreview` | 同上 | 列表卡片**悬停自动播放**（`muted` + `loop`、无 `controls`），悬停时才挂载 |
 | `EcomVideoPreviewDialog` | `components/media/ecom-video-preview-dialog.tsx` | 点击缩略后弹层全屏预览 |
 
 ## 结构（与 Canvas 一致）
@@ -24,6 +25,8 @@
 ## 资产库 / 列表缩略
 
 视频缩略须走 `EcomMediaLibraryTile`（`kind="video"`），悬停显示 **Eye / Download** 纯图标，禁止文字按钮。详见 `MEDIA.md` §悬停操作。
+
+有封面图时静态只渲染封面，**悬停才播放**（`EcomVideoHoverPreview`）；见 `MEDIA.md` §视频缩略：封面 + 悬停自动播放。
 
 ## 禁止
 

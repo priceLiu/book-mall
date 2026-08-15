@@ -127,6 +127,11 @@ model User {
   mediaStorageGrants               UserMediaStorageGrant[]
   qrTemplates                      QrTemplate[]
   qrKindFeaturedUpdates            QrKindFeatured[] @relation("QrKindFeaturedUpdater")
+  aiSpacePins                      AiSpacePin[]
+  aiSpaceDigitalHumans             AiSpaceDigitalHuman[]
+  aiSpaceAudioAssets               AiSpaceAudioAsset[]
+  aiSpaceVideoMaterials            AiSpaceVideoMaterial[]
+  aiSpaceComposeTasks              AiSpaceComposeTask[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -3626,6 +3631,167 @@ model EcomModelLibraryEntry {
   updatedAt DateTime  @updatedAt
 
   @@index([gender, age, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// 我的 AI 空间（doc/product/我的AI空间.md）
+// ---------------------------------------------------------------------------
+
+/// 作品墙「展示」指针。**只存指向**，禁止存 prompt / ossUrl / thumbnailUrl 等业务副本；
+/// 展示字段读时按 sourceType 批量 resolve 源记录。删源须 cascade 删 Pin。
+model AiSpacePin {
+  id     String @id @default(cuid())
+  userId String
+
+  /// 来源应用 navKey，如 ecom / tool / canvas / story / quick-replica / ai-space
+  sourceApp  String
+  /// 源记录类型，见 lib/ai-space/ai-space-pin-types.ts 的 AiSpacePinSourceType
+  sourceType String
+  /// 源记录主键
+  sourceId   String
+
+  /// 用户在空间内的排列顺序（升序）
+  sortOrder Int     @default(0)
+  /// 用户自定义展示标题（可空，空则用源记录标题）
+  caption   String? @db.VarChar(200)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sourceType, sourceId])
+  @@index([userId, sortOrder, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+/// 数字人形象库（Book 平台真源，全应用经 digitalHumanId 引用）
+model AiSpaceDigitalHuman {
+  id     String @id @default(cuid())
+  userId String
+
+  name           String @db.VarChar(120)
+  avatarImageUrl String @db.Text
+  /// active | inactive | detect_failed
+  status         String @default("active")
+  /// 形象检测结果、原图尺寸等
+  meta           Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([tenantId, visibility, createdAt])
+}
+
+/// 平台统一音频资产（Book 真源）。QuickReplica 生成音频同步写入，不双存 OSS。
+model AiSpaceAudioAsset {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String @db.VarChar(160)
+  /// upload | tts | voice_clone | voice_changer | sound_effect | music
+  sourceType  String
+  audioUrl    String @db.Text
+  /// 秒；ffprobe 探测失败时为 0（合成台 20s 门禁依赖此字段）
+  durationSec Float  @default(0)
+  textScript  String? @db.Text
+
+  /// 溯源：quick-replica | ai-space
+  originApp String?
+  /// qrTemplateId / gatewayRequestLogId / qr job id
+  originRef String?
+  meta      Json?
+
+  /// 资产共享（租户体系）
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([tenantId, visibility, createdAt])
+  @@index([originApp, originRef])
+}
+
+/// 视频创作库自有记录。各应用视频 **不** 落本表（一律经 AiSpacePin 引用）；
+/// 本表只存用户真正拥有的新文件：upload（自拍）与 compose_output（合成成片）。
+model AiSpaceVideoMaterial {
+  id     String @id @default(cuid())
+  userId String
+
+  name String @db.VarChar(160)
+  /// product | outfit | lifestyle | upload | compose
+  category String @default("upload")
+  videoUrl String @db.Text
+  durationSec Float @default(0)
+  /// upload | compose_output
+  sourceKind  String @default("upload")
+  /// compose_output 时回指 AiSpaceComposeTask
+  composeTaskId String?
+  meta          Json?
+
+  /// 资产共享（租户体系）
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, category, createdAt])
+  @@index([tenantId, visibility, createdAt])
+  @@index([composeTaskId])
+}
+
+/// 数字人口播合成任务：S2V（Gateway，厂商并发 1）→ MediaRenderJob 画中画合成
+model AiSpaceComposeTask {
+  id     String @id @default(cuid())
+  userId String
+
+  digitalHumanId String
+  audioAssetId   String
+  /// 可空 = 不叠背景，直接输出口播视频
+  videoMaterialId String?
+
+  /// pending | generating_human | composing | completed | failed
+  status String @default("pending")
+
+  /// Gateway 侧 S2V 请求日志与厂商任务 id（排障用）
+  gatewayLogId  String?
+  gatewayTaskId String?
+
+  /// 阿里云 24h 临时结果转存后的 OSS 地址
+  tempHumanVideoUrl String? @db.Text
+  /// 复用 MediaRenderJob 做 composite 渲染
+  mediaRenderJobId  String?
+  finalVideoUrl     String? @db.Text
+  errorMessage      String? @db.Text
+  /// overlay 参数快照（缩放 / 位置 / 字幕开关）
+  options           Json?
+
+  tenantId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 /// 平台 AI 导览助手 · 白名单文档切块（RAG 知识库）

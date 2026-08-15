@@ -12,7 +12,9 @@ import styles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
 import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
+  CONFIRM_DELETE_LIBRARY_OSS_SECOND_PINNED_ZH,
 } from "@/lib/confirm-destructive-twice";
+import { isPinnedInAiSpace, pinToAiSpace } from "@/lib/ai-space-client";
 import { cn } from "@/lib/utils";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 
@@ -76,6 +78,7 @@ export function ImageToVideoLibraryClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
   const [promptTip, setPromptTip] = useState<PromptTooltipState | null>(null);
 
@@ -148,10 +151,13 @@ export function ImageToVideoLibraryClient() {
 
   const handleDelete = useCallback(
     async (id: string) => {
+      const pinned = await isPinnedInAiSpace("i2v_library", id);
       if (
         !confirmDestructiveTwice(
           "从「我的视频库」删除本条？将从列表移除并尝试删除云端 OSS 中的对应视频文件。",
-          CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
+          pinned
+            ? CONFIRM_DELETE_LIBRARY_OSS_SECOND_PINNED_ZH
+            : CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
         )
       )
         return;
@@ -165,6 +171,12 @@ export function ImageToVideoLibraryClient() {
           return;
         }
         setItems((prev) => prev.filter((x) => x.id !== id));
+        setPinnedIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         setQuota((q) =>
           q ? { ...q, used: Math.max(0, q.used - 1) } : q,
         );
@@ -176,6 +188,19 @@ export function ImageToVideoLibraryClient() {
     },
     [],
   );
+
+  const handlePin = useCallback(async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await pinToAiSpace("i2v_library", id);
+      setPinnedIds((prev) => new Set(prev).add(id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "展示到 AI 空间失败");
+    } finally {
+      setBusyId(null);
+    }
+  }, []);
 
   const handleToggleVisibility = useCallback(
     async (item: ImageToVideoLibraryItem) => {
@@ -425,6 +450,15 @@ export function ImageToVideoLibraryClient() {
                         {item.visibility === "TEAM_PUBLIC" ? "收回私有" : "设为公共"}
                       </button>
                     ) : null}
+                    <button
+                      type="button"
+                      className={styles.btnPreview}
+                      onClick={() => void handlePin(item.id)}
+                      disabled={busyId === item.id || pinnedIds.has(item.id)}
+                      title="在个人中心「我的 AI 空间」布置展示；空间只保存指向，不复制文件"
+                    >
+                      {pinnedIds.has(item.id) ? "已在 AI 空间" : "展示到 AI 空间"}
+                    </button>
                     <button
                       type="button"
                       className={styles.btnDelete}

@@ -5,7 +5,13 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useEcomTemplateImport } from "@/components/template-gallery/ecom-template-import-provider";
-import { jobStats, isImportItemErrorMessage, listImportPanelItems, computeImportItemDisplayProgress } from "@/lib/ecom-template-gallery/import-storage";
+import {
+  jobStats,
+  isImportItemErrorMessage,
+  listImportPanelItems,
+  computeImportItemDisplayProgress,
+  UPLOAD_DISPLAY_PROGRESS_CAP,
+} from "@/lib/ecom-template-gallery/import-storage";
 import { cn } from "@/lib/utils";
 
 function formatElapsed(ms: number): string {
@@ -29,7 +35,10 @@ function statusLabel(
     case "uploading":
       if (progress != null && progress <= 8) return "等待重试";
       if (uploadStartedAt) {
-        return `上传中 · ${formatElapsed(Date.now() - uploadStartedAt)}`;
+        const elapsed = formatElapsed(Date.now() - uploadStartedAt);
+        return progress != null && progress >= UPLOAD_DISPLAY_PROGRESS_CAP
+          ? `等待服务端确认 · ${elapsed}`
+          : `上传中 · ${elapsed}`;
       }
       return "上传中";
     case "success":

@@ -90,6 +90,12 @@ function isActiveImportItem(item: PersistedImportItem): boolean {
   );
 }
 
+/**
+ * 服务端不回传真实进度，面板按耗时估算；到达此上限即表示「只剩等回执」，
+ * 面板须改用等待文案，不要继续显示「上传中」。
+ */
+export const UPLOAD_DISPLAY_PROGRESS_CAP = 88;
+
 /** 面板展示用进度：仅随 uploadStartedAt 单调递增，避免 reconcile 写回旧值导致条闪 */
 export function computeImportItemDisplayProgress(
   item: PersistedImportItem,
@@ -107,7 +113,10 @@ export function computeImportItemDisplayProgress(
       if (item.progress != null && item.progress <= 8) return item.progress;
       if (item.uploadStartedAt) {
         const elapsed = now - item.uploadStartedAt;
-        return Math.min(88, 10 + Math.floor(elapsed / 4000));
+        return Math.min(
+          UPLOAD_DISPLAY_PROGRESS_CAP,
+          10 + Math.floor(elapsed / 4000),
+        );
       }
       return Math.max(item.progress ?? 10, 10);
     }
@@ -148,6 +157,8 @@ export function isImportItemErrorMessage(item: PersistedImportItem): boolean {
     item.error.includes("排队重试") ||
     item.error.includes("无法连接") ||
     item.error.includes("网络请求") ||
+    item.error.includes("源站拉取失败") ||
+    item.error.includes("源站响应") ||
     item.error.includes("上传中断") ||
     item.error.includes("上传失败") ||
     item.error.includes("上传超时")

@@ -75,6 +75,22 @@ export function validateTimelineLimits(
       };
     }
   }
+  const composite = timeline.composite;
+  if (composite) {
+    if (composite.backgroundUrl && !/^https:\/\//i.test(composite.backgroundUrl)) {
+      return {
+        code: "INVALID_VIDEO_URL",
+        message: "背景视频须为 HTTPS 地址",
+      };
+    }
+    if (composite.audioUrl && !/^https:\/\//i.test(composite.audioUrl)) {
+      return {
+        code: "INVALID_AUDIO_URL",
+        message: "口播音轨须为 HTTPS 地址",
+      };
+    }
+  }
+
   const estimatedSec = timeline.clips.reduce(
     (sum, c) => sum + (c.durationSec && c.durationSec > 0 ? c.durationSec : 8),
     0,

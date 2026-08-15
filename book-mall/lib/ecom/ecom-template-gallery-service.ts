@@ -42,6 +42,14 @@ export type EcomTemplateGalleryCatalog = {
   templates: EcomTemplateGalleryEntry[];
 };
 
+/** 分类概览：仅计数，用于驱动分类 / 媒体开关，避免为此拉全量清单 */
+export type EcomTemplateCategorySummaryRow = {
+  category: string;
+  image: number;
+  video: number;
+  total: number;
+};
+
 export type TemplateGalleryUploadInput = {
   category: string;
   mediaKind: "image" | "video";
@@ -177,12 +185,14 @@ function templateDelegate() {
   ).ecomTemplateCatalogEntry;
 }
 
-export async function listTemplateGalleryEntriesFromDb(): Promise<EcomTemplateGalleryEntry[]> {
+export async function listTemplateGalleryEntriesFromDb(
+  category?: string,
+): Promise<EcomTemplateGalleryEntry[]> {
   const delegate = templateDelegate();
   if (!delegate) return [];
   try {
     const rows = await delegate.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...(category ? { category } : {}) },
       orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
     });
     return rows.map(rowToEntry);
@@ -192,10 +202,57 @@ export async function listTemplateGalleryEntriesFromDb(): Promise<EcomTemplateGa
   }
 }
 
-export async function readTemplateGalleryCatalogLive(): Promise<EcomTemplateGalleryCatalog> {
-  const fromDb = await listTemplateGalleryEntriesFromDb();
+/**
+ * 全量 catalog 已达 1400+ 条 / 700KB+，页面按分类取数以免拉满超时。
+ * 不传 category 仍返回全量（管理后台与旧客户端依赖）。
+ */
+export async function readTemplateGalleryCatalogLive(
+  category?: string,
+): Promise<EcomTemplateGalleryCatalog> {
+  const fromDb = await listTemplateGalleryEntriesFromDb(category);
   if (fromDb.length > 0) return { templates: fromDb };
-  return readTemplateGalleryCatalog();
+
+  // 空库回退打包快照；按分类请求时同样只回该分类
+  const snapshot = readTemplateGalleryCatalog();
+  if (!category) return snapshot;
+  return {
+    templates: snapshot.templates.filter((t) => t.category === category),
+  };
+}
+
+export async function getTemplateGalleryCategorySummary(): Promise<
+  EcomTemplateCategorySummaryRow[]
+> {
+  const byCategory = new Map<string, EcomTemplateCategorySummaryRow>();
+  const bump = (category: string, mediaKind: string, count: number) => {
+    const row = byCategory.get(category) ?? {
+      category,
+      image: 0,
+      video: 0,
+      total: 0,
+    };
+    if (mediaKind === "video") row.video += count;
+    else row.image += count;
+    row.total += count;
+    byCategory.set(category, row);
+  };
+
+  try {
+    const grouped = await prisma.ecomTemplateCatalogEntry.groupBy({
+      by: ["category", "mediaKind"],
+      where: { deletedAt: null },
+      _count: { _all: true },
+    });
+    for (const g of grouped) bump(g.category, g.mediaKind, g._count._all);
+    if (byCategory.size > 0) return Array.from(byCategory.values());
+  } catch (e) {
+    console.warn("[ecom-template-gallery] category summary from db failed", e);
+  }
+
+  for (const t of readTemplateGalleryCatalog().templates) {
+    bump(t.category, t.mediaKind, 1);
+  }
+  return Array.from(byCategory.values());
 }
 
 export async function upsertTemplateGalleryEntry(
@@ -260,10 +317,77 @@ export async function deleteTemplateGalleryEntry(
   return true;
 }
 
+const SOURCE_FETCH_ATTEMPTS = 4;
+const SOURCE_FETCH_RETRY_BASE_MS = 800;
+const SOURCE_FETCH_TIMEOUT_MS = 120_000;
+
+/** 源站 4xx：重试无意义 */
+class PermanentSourceFetchError extends Error {}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** yibaiaigc CDN 并发拉取时会在 TLS 握手阶段重置连接（ECONNRESET），须重试 */
+function isTransientFetchError(e: unknown): boolean {
+  const parts: string[] = [];
+  let cur: unknown = e;
+  for (let depth = 0; depth < 4 && cur != null; depth += 1) {
+    if (!(cur instanceof Error)) {
+      parts.push(String(cur));
+      break;
+    }
+    parts.push(cur.message);
+    const code = (cur as NodeJS.ErrnoException).code;
+    if (code) parts.push(code);
+    cur = cur.cause;
+  }
+  return /ECONNRESET|ETIMEDOUT|EPIPE|EAI_AGAIN|ENOTFOUND|ECONNREFUSED|UND_ERR|socket disconnected|socket hang up|secure TLS connection|terminated|fetch failed|aborted|timeout/i.test(
+    parts.join(" "),
+  );
+}
+
+function describeSourceFetchError(url: string, e: unknown): string {
+  const cause = e instanceof Error ? e.cause : undefined;
+  const code =
+    cause && typeof cause === "object" && "code" in cause
+      ? String((cause as NodeJS.ErrnoException).code)
+      : "";
+  const detail =
+    cause instanceof Error
+      ? cause.message
+      : e instanceof Error
+        ? e.message
+        : String(e);
+  return `源站拉取失败${code ? ` (${code})` : ""}：${detail} · ${url}`;
+}
+
 async function fetchBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url, { redirect: "follow" });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return Buffer.from(await res.arrayBuffer());
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= SOURCE_FETCH_ATTEMPTS; attempt += 1) {
+    if (attempt > 1) {
+      await sleep(SOURCE_FETCH_RETRY_BASE_MS * 2 ** (attempt - 2));
+    }
+    try {
+      const res = await fetch(url, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(SOURCE_FETCH_TIMEOUT_MS),
+      });
+      if (res.ok) return Buffer.from(await res.arrayBuffer());
+      const err = new Error(`源站响应 HTTP ${res.status}：${url}`);
+      if (res.status !== 429 && res.status < 500) {
+        throw new PermanentSourceFetchError(err.message);
+      }
+      lastError = err;
+    } catch (e) {
+      if (e instanceof PermanentSourceFetchError) throw e;
+      if (!isTransientFetchError(e)) throw new Error(describeSourceFetchError(url, e));
+      lastError = e;
+    }
+  }
+
+  throw new Error(describeSourceFetchError(url, lastError));
 }
 
 async function uploadImageThumb(
@@ -355,8 +479,9 @@ async function uploadImagePair(args: {
     return { ossUrl, thumbUrl };
   }
 
-  const sourceBuf = await fetchBuffer(originalUrl);
-  if (!ossUrl) {
+  // 视频原件可达 10~20MB：仅在确实要上传时才拉取
+  const sourceBuf = ossUrl ? null : await fetchBuffer(originalUrl);
+  if (!ossUrl && sourceBuf) {
     ossUrl = await uploadEcomTemplateGalleryPreview({
       category: args.input.category,
       id: args.input.id,
@@ -368,9 +493,7 @@ async function uploadImagePair(args: {
 
   if (!thumbUrl) {
     if (args.input.mediaKind === "image") {
-      const thumbSource = args.previewExists
-        ? await fetchBuffer(ossUrl)
-        : sourceBuf;
+      const thumbSource = sourceBuf ?? (await fetchBuffer(ossUrl));
       thumbUrl = await uploadImageThumb(args.input.category, args.input.id, thumbSource);
     } else if (args.input.posterUrl?.trim()) {
       thumbUrl = await uploadVideoThumbFromPoster(
@@ -388,9 +511,10 @@ function entryFromExistingOss(
   input: TemplateGalleryUploadInput,
   previewKey: string,
   thumbKey: string,
+  thumbExists: boolean,
 ): EcomTemplateGalleryEntry {
   const previewUrl = ossPublicUrlForKeyFromEnv(previewKey);
-  const thumbUrl = ossPublicUrlForKeyFromEnv(thumbKey);
+  const thumbUrl = thumbExists ? ossPublicUrlForKeyFromEnv(thumbKey) : "";
   return {
     id: input.id,
     category: input.category,
@@ -426,25 +550,26 @@ export async function importTemplateGalleryItem(
   );
   const thumbKey = buildEcomTemplateGalleryThumbOssKey(input.category, input.id);
 
-  const [previewExists, thumbExists] = await Promise.all([
-    ossObjectExists(previewKey),
-    ossObjectExists(thumbKey),
-  ]);
-
-  if (previewExists && (input.mediaKind === "video" || thumbExists)) {
-    const existing = findCatalogEntry(input.id);
-    const entry =
-      existing ??
-      entryFromExistingOss(input, previewKey, thumbKey);
-    if (!existing) {
-      await persistImportedEntry(entry);
-    } else {
-      await persistImportedEntry(existing);
-    }
-    return { status: "skipped", entry };
-  }
-
+  // OSS head 也可能瞬时失败；放进 try 内，避免整条路由抛成 500
   try {
+    const [previewExists, thumbExists] = await Promise.all([
+      ossObjectExists(previewKey),
+      ossObjectExists(thumbKey),
+    ]);
+
+    // 视频缺封面来源时无法生成缩略图，不能因此每次都重传 mp4
+    const canBuildThumb =
+      input.mediaKind === "image" || Boolean(input.posterUrl?.trim());
+
+    if (previewExists && (thumbExists || !canBuildThumb)) {
+      const existing = findCatalogEntry(input.id);
+      const entry =
+        existing ??
+        entryFromExistingOss(input, previewKey, thumbKey, thumbExists);
+      await persistImportedEntry(existing ?? entry);
+      return { status: "skipped", entry };
+    }
+
     const { ossUrl, thumbUrl } = await uploadImagePair({
       input,
       ext,
@@ -467,6 +592,9 @@ export async function importTemplateGalleryItem(
     return { status: "uploaded", entry };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.warn(
+      `[ecom-template-gallery] import failed ${input.category}/${input.id}: ${message}`,
+    );
     return { status: "failed", error: message };
   }
 }

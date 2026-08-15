@@ -207,9 +207,9 @@ export async function buildProductDesignExportZip(
     "",
   ];
 
+  const archive = await createZipArchive();
   const buffer = await new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const archive = createZipArchive();
     archive.on("data", (c: Buffer) => chunks.push(c));
     archive.on("error", reject);
     archive.on("end", () => resolve(Buffer.concat(chunks)));

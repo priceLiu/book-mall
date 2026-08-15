@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export async function DELETE(req: Request) {
   if (row.thumbnailUrl && row.thumbnailUrl !== row.ossUrl) {
     await deleteManagedOssObjectByUrl(row.thumbnailUrl).catch(() => undefined);
   }
+  await cascadeDeletePinsBySource("ecom_asset", row.id);
   await prisma.ecomAsset.delete({ where: { id: row.id } });
   return NextResponse.json({ ok: true });
 }

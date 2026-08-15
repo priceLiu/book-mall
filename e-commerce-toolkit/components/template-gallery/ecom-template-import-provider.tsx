@@ -49,7 +49,6 @@ function mergeJobSnapshot(
   stored: PersistedImportJob[],
   memory: PersistedImportJob[],
   jobId: string,
-  uploadingIds: Set<string>,
 ): PersistedImportJob[] {
   const storedJob = stored.find((j) => j.id === jobId);
   const memJob = memory.find((j) => j.id === jobId);
@@ -60,9 +59,6 @@ function mergeJobSnapshot(
     const memItem = memJob.items.find((m) => m.id === storedItem.id);
     if (!memItem) return storedItem;
     if (memItem.status === "uploading") return memItem;
-    if (uploadingIds.has(storedItem.id) && memItem.status === "uploading") {
-      return memItem;
-    }
     if (
       storedItem.status === "skipped" ||
       storedItem.status === "success" ||
@@ -83,14 +79,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+/**
+ * 仅「浏览器 ↔ BFF ↔ 主站」链路中断：请求可能仍在服务端处理，重发会重复上传，
+ * 须挂起等 catalog 核对。主站已返回的业务失败（如源站拉取失败）不属于此类，
+ * 必须重新排队，否则条目会停在 uploading 直到 grace 过期。
+ */
 function isLikelyTransportError(message: string | undefined): boolean {
   if (!message) return false;
   const m = message.toLowerCase();
   return (
     m.includes("upstream_fetch_failed") ||
-    m.includes("fetch failed") ||
-    m.includes("无法连接主站") ||
-    m.includes("网络请求失败")
+    m.includes("failed to fetch") ||
+    m.includes("load failed") ||
+    m.includes("networkerror") ||
+    m.includes("无法连接主站")
   );
 }
 
@@ -119,7 +121,7 @@ function formatUploadError(raw: string): string {
     return "无法连接主站，请确认 book-mall 已启动";
   }
   if (raw === "fetch failed") {
-    return "网络请求失败，稍后自动重试";
+    return "源站拉取失败，稍后自动重试";
   }
   return raw;
 }
@@ -335,10 +337,11 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
           });
 
           const controller = new AbortController();
-          const timeoutTimer = window.setTimeout(
-            () => controller.abort(),
-            UPLOAD_CLIENT_TIMEOUT_MS,
-          );
+          let timedOut = false;
+          const timeoutTimer = window.setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+          }, UPLOAD_CLIENT_TIMEOUT_MS);
           registerAbortController(jobId, controller);
 
           try {
@@ -429,7 +432,10 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
               onEntryRef.current?.(result.entry);
             }
           } catch (e) {
-            if (cancelledRef.current.has(jobId) || controller.signal.aborted) {
+            if (
+              cancelledRef.current.has(jobId) ||
+              (controller.signal.aborted && !timedOut)
+            ) {
               patchItem(item.id, {
                 status: "cancelled",
                 progress: 0,
@@ -438,9 +444,9 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
               return;
             }
 
-            const message = formatUploadError(
-              e instanceof Error ? e.message : "上传失败",
-            );
+            const message = timedOut
+              ? "上传超时，等待服务端确认"
+              : formatUploadError(e instanceof Error ? e.message : "上传失败");
 
             const quick = await reconcileImportJobItemsOnce(
               snapshot.find((j) => j.id === jobId)!,
@@ -463,7 +469,8 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
               return;
             }
 
-            if (isLikelyTransportError(message)) {
+            // 超时后服务端仍可能在 maxDuration 内完成，重发会重复上传
+            if (timedOut || isLikelyTransportError(message)) {
               patchItem(item.id, {
                 status: "uploading",
                 uploadStartedAt: uploadStartedAt ?? Date.now(),
@@ -498,12 +505,7 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
         while (true) {
           if (cancelledRef.current.has(jobId)) break;
 
-          snapshot = mergeJobSnapshot(
-            loadPersistedImportJobs(),
-            snapshot,
-            jobId,
-            uploadingIds,
-          );
+          snapshot = mergeJobSnapshot(loadPersistedImportJobs(), snapshot, jobId);
           job = snapshot.find((j) => j.id === jobId);
           if (!job) break;
 

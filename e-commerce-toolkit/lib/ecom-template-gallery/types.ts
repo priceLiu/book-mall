@@ -31,6 +31,21 @@ export type EcomTemplateGalleryCatalog = {
   templates: EcomTemplateGalleryEntry[];
 };
 
+/** 分类概览：仅计数，驱动分类 / 媒体开关，无需为此拉全量清单 */
+export type EcomTemplateCategorySummaryRow = {
+  category: EcomTemplateCategory;
+  image: number;
+  video: number;
+  total: number;
+};
+
+export function summaryRowFor(
+  summary: EcomTemplateCategorySummaryRow[] | null,
+  category: EcomTemplateCategory,
+): EcomTemplateCategorySummaryRow | undefined {
+  return summary?.find((s) => s.category === category);
+}
+
 export const ECOM_TEMPLATE_CATEGORY_META: Array<{
   id: EcomTemplateCategory;
   label: string;

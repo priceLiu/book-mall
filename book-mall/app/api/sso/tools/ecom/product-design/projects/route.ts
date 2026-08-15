@@ -19,8 +19,8 @@ export async function GET(req: Request) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const params = new URL(req.url).searchParams;
-    const module = normalizeEcomProjectModule(params.get("module"));
-    const items = await listProductDesignProjectSummaries(auth.userId, module, {
+    const projectModule = normalizeEcomProjectModule(params.get("module"));
+    const items = await listProductDesignProjectSummaries(auth.userId, projectModule, {
       detailed: params.get("detailed") === "1",
     });
     return NextResponse.json({ items });

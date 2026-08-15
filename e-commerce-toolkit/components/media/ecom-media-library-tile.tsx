@@ -2,9 +2,12 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Download, Eye, Trash2 } from "lucide-react";
+import { Check, Download, Eye, Sparkles, Trash2 } from "lucide-react";
 
-import { EcomVideoThumb } from "@/components/media/ecom-video-player";
+import {
+  EcomVideoHoverPreview,
+  EcomVideoThumb,
+} from "@/components/media/ecom-video-player";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { cn } from "@/lib/utils";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
@@ -24,6 +27,9 @@ type Props = {
   onPreview: () => void;
   onDownload?: () => void;
   onDelete?: () => void;
+  /** 展示到「我的 AI 空间」作品墙（Book 只存指向） */
+  onPinToAiSpace?: () => void;
+  pinnedToAiSpace?: boolean;
   /** 选择模式（资产 picker） */
   selected?: boolean;
   onSelect?: () => void;
@@ -46,6 +52,8 @@ export function EcomMediaLibraryTile({
   onPreview,
   onDownload,
   onDelete,
+  onPinToAiSpace,
+  pinnedToAiSpace,
   selected,
   onSelect,
   aspectClass = "aspect-square",
@@ -56,6 +64,12 @@ export function EcomMediaLibraryTile({
   const selectable = Boolean(onSelect);
   const { ref, visible } = useIntersectionVisible<HTMLDivElement>("480px 0px");
   const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  /** 视频封面图：与 src 相同说明没有真封面，只能回退到 video 取帧 */
+  const videoPosterSrc =
+    kind === "video" && thumbnailSrc?.trim() && thumbnailSrc !== src
+      ? thumbnailSrc
+      : null;
   const thumbDisplaySrc = useMemo(
     () =>
       kind === "image"
@@ -95,11 +109,27 @@ export function EcomMediaLibraryTile({
         />
       ) : null
     ) : shouldLoad ? (
-      <EcomVideoThumb
-        src={src}
-        className="pointer-events-none"
-        onLoadedData={onMediaLoad}
-      />
+      videoPosterSrc ? (
+        <>
+          <Image
+            src={videoPosterSrc}
+            alt={alt}
+            fill
+            className="object-cover"
+            loading="lazy"
+            decoding="async"
+            unoptimized
+            onLoad={onMediaLoad}
+          />
+          {hovered ? <EcomVideoHoverPreview src={src} /> : null}
+        </>
+      ) : (
+        <EcomVideoThumb
+          src={src}
+          className="pointer-events-none"
+          onLoadedData={onMediaLoad}
+        />
+      )
     ) : null;
 
   return (
@@ -112,6 +142,8 @@ export function EcomMediaLibraryTile({
         selected && "ring-2 ring-[#0071e3] ring-offset-1",
         className,
       )}
+      onMouseEnter={videoPosterSrc ? () => setHovered(true) : undefined}
+      onMouseLeave={videoPosterSrc ? () => setHovered(false) : undefined}
       onClick={selectable ? onSelect : undefined}
       onKeyDown={
         selectable
@@ -164,6 +196,17 @@ export function EcomMediaLibraryTile({
             onClick={onDownload}
           >
             <Download className="h-4 w-4" />
+          </button>
+        ) : null}
+        {onPinToAiSpace ? (
+          <button
+            type="button"
+            className={cn(HOVER_BTN, pinnedToAiSpace && "text-[#0071e3]")}
+            aria-label={pinnedToAiSpace ? "已展示到 AI 空间" : "展示到 AI 空间"}
+            title={pinnedToAiSpace ? "已展示到 AI 空间" : "展示到 AI 空间"}
+            onClick={onPinToAiSpace}
+          >
+            <Sparkles className="h-4 w-4" />
           </button>
         ) : null}
         {onDelete ? (

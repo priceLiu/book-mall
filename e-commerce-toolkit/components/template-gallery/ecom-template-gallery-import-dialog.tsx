@@ -197,6 +197,7 @@ export function EcomTemplateGalleryImportDialog({
   const uploadableSelected = parsed.filter(
     (r) => selected.has(r.tempKey) && !r.alreadyImported,
   ).length;
+  const videoCount = parsed.filter((r) => r.mediaKind === "video").length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -332,6 +333,11 @@ export function EcomTemplateGalleryImportDialog({
                 {m === "all" ? "全部" : m === "image" ? "图片" : "视频"}
               </button>
             ))}
+            {mediaFilter === "video" ? (
+              <span className="text-[10px] text-[#6e6e73]">
+                视频站 HTML 内 <code>&lt;video src&gt;</code> 为空，按封面同名推导 .mp4
+              </span>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -422,7 +428,8 @@ export function EcomTemplateGalleryImportDialog({
                   取消全选
                 </button>
                 <span className="text-xs text-[#6e6e73]">
-                  已选 {selected.size} / {parsed.length}
+                  已选 {selected.size} / {parsed.length} · 视频 {videoCount} ·
+                  图片 {parsed.length - videoCount}
                   {importedCount > 0 ? (
                     <>
                       {" "}
@@ -443,6 +450,11 @@ export function EcomTemplateGalleryImportDialog({
                       已导入
                     </span>
                   ) : null}
+                  {row.mediaKind === "video" ? (
+                    <span className="absolute right-1 top-1 z-10 rounded bg-[#0071e3] px-1 py-0.5 text-[9px] font-medium text-white">
+                      {row.videoUrlDerived ? "视频·推导" : "视频"}
+                    </span>
+                  ) : null}
                   <EcomMediaLibraryTile
                     kind={row.mediaKind}
                     src={row.sourceUrl}
@@ -457,6 +469,14 @@ export function EcomTemplateGalleryImportDialog({
                   <p className="mt-1 truncate text-[10px] text-[#6e6e73]">
                     {row.title}
                   </p>
+                  <ParsedRowUrl
+                    label={row.mediaKind === "video" ? "视频" : "原图"}
+                    url={row.sourceUrl}
+                    accent={row.mediaKind === "video"}
+                  />
+                  {row.posterUrl ? (
+                    <ParsedRowUrl label="封面" url={row.posterUrl} />
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -477,5 +497,40 @@ export function EcomTemplateGalleryImportDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function urlFileName(url: string): string {
+  const path = url.split("?")[0] ?? url;
+  return path.split("/").pop() || url;
+}
+
+/** 解析预览行内的 URL：格子窄，只显示可区分的文件名，全文放 title，可点开核对 */
+function ParsedRowUrl({
+  label,
+  url,
+  accent,
+}: {
+  label: string;
+  url: string;
+  accent?: boolean;
+}) {
+  return (
+    <p className="flex items-center gap-1 text-[10px] leading-4">
+      <span className="shrink-0 text-[#86868b]">{label}</span>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        title={url}
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "truncate hover:underline",
+          accent ? "text-[#0071e3]" : "text-[#6e6e73]",
+        )}
+      >
+        {urlFileName(url)}
+      </a>
+    </p>
   );
 }

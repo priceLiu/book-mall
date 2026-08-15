@@ -10,7 +10,10 @@ import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { copyMediaRenderToPinned } from "@/lib/media/media-render-oss";
 import { assertFfmpegForMediaRender } from "@/lib/media/ffmpeg-preflight";
 import { prismaJsonValue } from "@/lib/media/prisma-json";
-import { runFfmpegMediaRender } from "@/lib/media/render-ffmpeg";
+import {
+  runCompositeRender,
+  runFfmpegMediaRender,
+} from "@/lib/media/render-ffmpeg";
 import {
   MEDIA_RENDER_JOB_TIMEOUT_SEC,
   MEDIA_RENDER_MAX_CONCURRENT_PER_USER,
@@ -148,27 +151,37 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
   const timeline = parseMediaTimelineV1(job.timelineJson);
   const profile = parseRenderProfile(job.profileJson);
 
+  const onProgress = (pct: number, label: string) => {
+    if (Date.now() - startedAt > MEDIA_RENDER_JOB_TIMEOUT_SEC * 1000) {
+      throw new Error("剪辑任务超时，请减少分镜数量或降低输出画质后重试");
+    }
+    void prisma.mediaRenderJob
+      .update({
+        where: { id: jobId },
+        data: {
+          progress: Math.min(89, pct),
+          progressLabel: label,
+        },
+      })
+      .catch(() => undefined);
+  };
+
   try {
-    const result = await runFfmpegMediaRender({
-      userId: job.userId,
-      jobId: job.id,
-      timeline,
-      profile,
-      onProgress: (pct, label) => {
-        if (Date.now() - startedAt > MEDIA_RENDER_JOB_TIMEOUT_SEC * 1000) {
-          throw new Error("剪辑任务超时，请减少分镜数量或降低输出画质后重试");
-        }
-        void prisma.mediaRenderJob
-          .update({
-            where: { id: jobId },
-            data: {
-              progress: Math.min(89, pct),
-              progressLabel: label,
-            },
-          })
-          .catch(() => undefined);
-      },
-    });
+    // composite（数字人画中画）与默认多镜拼接是两条滤镜链，入口按 timeline 分流
+    const result = timeline.composite
+      ? await runCompositeRender({
+          jobId: job.id,
+          timeline,
+          profile,
+          onProgress,
+        })
+      : await runFfmpegMediaRender({
+          userId: job.userId,
+          jobId: job.id,
+          timeline,
+          profile,
+          onProgress,
+        });
 
     await prisma.mediaRenderJob.update({
       where: { id: jobId },

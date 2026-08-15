@@ -3,7 +3,10 @@ import type {
   EcomTemplateGalleryEntry,
   EcomTemplateMediaKind,
 } from "./types";
-import { splitYibaiAigcImageUrl } from "./yibaiaigc-image-url";
+import {
+  deriveVideoUrlFromCoverUrl,
+  splitYibaiAigcImageUrl,
+} from "./yibaiaigc-image-url";
 
 /** 从 HTML 文件名推断品类（如「箱包 图片.html」→ bags） */
 const FILENAME_CATEGORY_HINTS: Array<{
@@ -93,6 +96,8 @@ export type ParsedImportRow = {
   hot: boolean;
   ext: string;
   posterUrl?: string;
+  /** 视频 URL 由封面同名推导（HTML 内 `<video src>` 为空） */
+  videoUrlDerived?: boolean;
   suggestedId: string;
   /** catalog 中已有同品类、同源图条目 */
   alreadyImported?: boolean;
@@ -202,56 +207,60 @@ export function parseTemplateGalleryHtml(
     : null;
   const titleRe = buildRegex(config.titlePattern);
 
-  const raw: Omit<ParsedImportRow, "suggestedId">[] = [];
+  type RawRow = Omit<ParsedImportRow, "suggestedId" | "alreadyImported">;
+  const raw: RawRow[] = [];
 
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]!;
-    const videoUrl = firstCapture(videoRe, block);
+    const explicitVideoUrl = firstCapture(videoRe, block);
     const imageUrl = firstCapture(imageRe, block);
+    // 封面优先取 poster 属性；yibaiaigc 无 poster，封面是同块的 media-image
+    const coverUrl = (posterRe ? firstCapture(posterRe, block) : null) ?? imageUrl;
 
-    let mediaKind: EcomTemplateMediaKind | null = null;
-    let sourceUrl: string | null = null;
+    const base = {
+      tempKey: "",
+      title: firstCapture(titleRe, block)?.trim() || "模板案例",
+      hot: config.hotKeyword ? block.includes(config.hotKeyword) : false,
+    };
 
-    if (videoUrl) {
-      mediaKind = "video";
-      sourceUrl = stripProcess(videoUrl);
+    let row: RawRow | null = null;
+
+    if (explicitVideoUrl) {
+      const sourceUrl = stripProcess(explicitVideoUrl);
+      row = {
+        ...base,
+        sourceUrl,
+        mediaKind: "video",
+        ext: extFromUrl(sourceUrl, "video"),
+        posterUrl: coverUrl ? stripProcess(coverUrl) : undefined,
+      };
+    } else if (mediaFilter === "video" && coverUrl) {
+      const sourceUrl = deriveVideoUrlFromCoverUrl(coverUrl);
+      if (sourceUrl) {
+        row = {
+          ...base,
+          sourceUrl,
+          mediaKind: "video",
+          ext: extFromUrl(sourceUrl, "video"),
+          posterUrl: stripProcess(coverUrl),
+          videoUrlDerived: true,
+        };
+      }
     } else if (imageUrl) {
-      mediaKind = "image";
       const split = splitYibaiAigcImageUrl(imageUrl);
-      sourceUrl = split.originalUrl;
-      raw.push({
-        tempKey: `row-${i}-${fileStemFromUrl(split.originalUrl)}`,
+      row = {
+        ...base,
         sourceUrl: split.originalUrl,
         thumbSourceUrl: split.thumbSourceUrl,
-        mediaKind,
-        title: firstCapture(titleRe, block)?.trim() || "模板案例",
-        hot: config.hotKeyword ? block.includes(config.hotKeyword) : false,
-        ext: extFromUrl(split.originalUrl, mediaKind),
-        posterUrl: (() => {
-          if (!posterRe) return undefined;
-          const p = firstCapture(posterRe, block);
-          return p ? stripProcess(p) : undefined;
-        })(),
-      });
-      continue;
+        mediaKind: "image",
+        ext: extFromUrl(split.originalUrl, "image"),
+      };
     }
 
-    if (!mediaKind || !sourceUrl) continue;
-    if (mediaFilter !== "all" && mediaKind !== mediaFilter) continue;
+    if (!row) continue;
+    if (mediaFilter !== "all" && row.mediaKind !== mediaFilter) continue;
 
-    const title = firstCapture(titleRe, block)?.trim() || "模板案例";
-    const hot = config.hotKeyword ? block.includes(config.hotKeyword) : false;
-    const posterUrl = posterRe ? firstCapture(posterRe, block) ?? undefined : undefined;
-
-    raw.push({
-      tempKey: `row-${i}-${fileStemFromUrl(sourceUrl)}`,
-      sourceUrl,
-      mediaKind,
-      title,
-      hot,
-      ext: extFromUrl(sourceUrl, mediaKind),
-      posterUrl: posterUrl ? stripProcess(posterUrl) : undefined,
-    });
+    raw.push({ ...row, tempKey: `row-${i}-${fileStemFromUrl(row.sourceUrl)}` });
   }
 
   return assignSuggestedIds(raw, category, existingTemplates);

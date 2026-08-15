@@ -8,7 +8,7 @@ import {
 } from "@/components/media/ecom-media-skeleton";
 
 type Props = {
-  sentinelRef: RefObject<HTMLDivElement | null>;
+  sentinelRef: RefObject<HTMLDivElement>;
   hasMore: boolean;
   loadingMore: boolean;
   gridClass: string;

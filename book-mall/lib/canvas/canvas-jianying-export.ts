@@ -92,10 +92,10 @@ export async function buildStoryBundleZip(
 ): Promise<Buffer> {
   const sorted = [...frames].sort((a, b) => a.frameIndex - b.frameIndex);
   const srt = buildMergedSrt(sorted);
+  const archive = await createZipArchive();
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const archive = createZipArchive();
     archive.on("data", (c: Buffer) => chunks.push(c));
     archive.on("error", reject);
     archive.on("end", () => resolve(Buffer.concat(chunks)));
@@ -149,10 +149,10 @@ export async function buildJianyingDraftZip(
   let timelineUs = 0;
 
   const bundleBuf = await buildStoryBundleZip(sorted);
+  const archive = await createZipArchive();
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const archive = createZipArchive();
     archive.on("data", (c: Buffer) => chunks.push(c));
     archive.on("error", reject);
     archive.on("end", () => resolve(Buffer.concat(chunks)));

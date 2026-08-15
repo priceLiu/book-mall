@@ -69,6 +69,31 @@ export async function deleteAsset(id: string): Promise<void> {
   });
 }
 
+/**
+ * 我的 AI 空间 · 作品墙展示（Pin 只存指向，不复制文件）
+ * 契约见 book-mall/doc/product/我的AI空间.md §8
+ */
+const AI_SPACE_SOURCE_TYPE = "ecom_asset";
+
+export async function pinAssetToAiSpace(id: string): Promise<void> {
+  await bookFetch("api/platform/v1/ai-space/pins", {
+    method: "POST",
+    body: JSON.stringify({ sourceType: AI_SPACE_SOURCE_TYPE, sourceId: id }),
+  });
+}
+
+/** 删资产前查是否已展示在 AI 空间，用于二次确认文案。失败时按未展示处理，不阻断删除。 */
+export async function isAssetPinnedInAiSpace(id: string): Promise<boolean> {
+  try {
+    const data = await bookFetch(
+      `api/platform/v1/ai-space/pins/check?sourceType=${AI_SPACE_SOURCE_TYPE}&sourceId=${encodeURIComponent(id)}`,
+    );
+    return Number(data.pinnedCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function reserveUsage(opts: {
   toolKey: string;
   action: string;

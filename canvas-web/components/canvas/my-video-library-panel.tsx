@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Film, Loader2, Play, Trash2, X } from "lucide-react";
+import { Film, Loader2, Play, Sparkles, Trash2, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { isPinnedInAiSpace, pinToAiSpace } from "@/lib/canvas-ai-space";
 import { formatCanvasApiError } from "@/lib/canvas-api";
 import {
   deleteVideoLibraryItem,
@@ -72,6 +73,7 @@ export function MyVideoLibraryPanel({
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<VideoLibraryItem | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
@@ -113,8 +115,26 @@ export function MyVideoLibraryPanel({
       window.removeEventListener("canvas:video-library-changed", onChanged);
   }, [open, load]);
 
+  const onPin = async (item: VideoLibraryItem) => {
+    if (!base) return;
+    setBusyId(item.id);
+    try {
+      await pinToAiSpace(base, "i2v_library", item.id);
+      setPinnedIds((prev) => new Set(prev).add(item.id));
+    } catch (e) {
+      await alert({
+        title: "展示失败",
+        message: e instanceof Error ? e.message : String(e),
+        variant: "error",
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const onDelete = async (item: VideoLibraryItem) => {
     if (!base) return;
+    const pinned = await isPinnedInAiSpace(base, "i2v_library", item.id);
     const ok = await doubleConfirm({
       first: {
         title: "删除视频？",
@@ -124,8 +144,9 @@ export function MyVideoLibraryPanel({
       },
       second: {
         title: "再次确认 · 不可恢复",
-        message:
-          "将删除库记录，并尝试删除云端 OSS 中的对应视频文件。",
+        message: pinned
+          ? "将删除库记录，并尝试删除云端 OSS 中的对应视频文件；本条已展示在「我的 AI 空间」，个人空间展示将一并移除。"
+          : "将删除库记录，并尝试删除云端 OSS 中的对应视频文件。",
         confirmLabel: "永久删除",
         danger: true,
       },
@@ -135,6 +156,12 @@ export function MyVideoLibraryPanel({
     try {
       await deleteVideoLibraryItem(base, item.id);
       invalidateToolbarPanelCache(CACHE_KEY);
+      setPinnedIds((prev) => {
+        if (!prev.has(item.id)) return prev;
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
       if (preview?.id === item.id) setPreview(null);
       await load();
     } catch (e) {
@@ -233,6 +260,16 @@ export function MyVideoLibraryPanel({
                         onClick={() => setPreview(item)}
                       >
                         播放
+                      </button>
+                      <button
+                        type="button"
+                        className={CANVAS_PANEL_SHELL_LINK_BTN_CLASS}
+                        disabled={busyId === item.id || pinnedIds.has(item.id)}
+                        onClick={() => void onPin(item)}
+                        title="在个人中心「我的 AI 空间」布置展示；空间只保存指向，不复制文件"
+                      >
+                        <Sparkles className="size-3" />
+                        {pinnedIds.has(item.id) ? "已在空间" : "展示到空间"}
                       </button>
                       <button
                         type="button"

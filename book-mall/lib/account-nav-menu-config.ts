@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { BillingPersona } from "@prisma/client";
 import {
+  Boxes,
   Copy,
   CreditCard,
   GraduationCap,
@@ -88,6 +89,7 @@ export function buildAccountNavMenuGroups(input: {
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
 
   const appItems: AccountNavMenuItem[] = [
+    { kind: "link", href: "/account/ai-space", label: "我的 AI 空间", icon: Boxes },
     { kind: "action", id: "launch-common-tools", label: "常用工具", icon: Wand2 },
     { kind: "action", id: "launch-tools", label: "AI 工具站", icon: Wrench },
     { kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid },

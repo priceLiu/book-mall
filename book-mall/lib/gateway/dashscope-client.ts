@@ -23,6 +23,12 @@ const WAN27_IMAGE_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation";
 const VIDEO_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
+/** 数字人 wan2.2-s2v 走 image2video 端点，与 T2V/I2V 不同 */
+const S2V_CREATE_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2video/video-synthesis";
+/** 形象图预检（同步接口，0.004 元/张），提交 S2V 前先判人像是否合规 */
+const S2V_DETECT_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2video/face-detect";
 const IMAGE_PROCESS_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/vision/image-process/process";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
@@ -517,6 +523,125 @@ export async function dashscopeCreateVideoTask(opts: {
     };
   }
   return { ok: true, taskId };
+}
+
+/**
+ * 数字人对口型（wan2.2-s2v）：形象图 + 人声音频 → 口播视频。
+ * 端点与普通 T2V/I2V 不同（image2video/video-synthesis），厂商同时处理中任务数为 **1**。
+ *
+ * @see https://help.aliyun.com/zh/model-studio/wan-s2v-api
+ */
+export async function dashscopeCreateS2vTask(opts: {
+  apiKey: string;
+  model?: string;
+  imageUrl: string;
+  audioUrl: string;
+  resolution?: "480P" | "720P";
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const imageUrl = opts.imageUrl.trim();
+  const audioUrl = opts.audioUrl.trim();
+  if (!imageUrl) return { ok: false, error: "image_url 不能为空" };
+  if (!audioUrl) return { ok: false, error: "audio_url 不能为空" };
+
+  const res = await fetch(S2V_CREATE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify({
+      model: opts.model?.trim() || "wan2.2-s2v",
+      input: { image_url: imageUrl, audio_url: audioUrl },
+      parameters: { resolution: opts.resolution ?? "480P" },
+    }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string"
+          ? json.message
+          : `创建数字人任务失败（HTTP ${res.status}）`,
+    };
+  }
+  const output = json.output as { task_id?: string } | undefined;
+  const taskId = output?.task_id?.trim();
+  if (!taskId) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string" ? json.message : "接口未返回 task_id",
+    };
+  }
+  return { ok: true, taskId };
+}
+
+export type S2vDetectResult = {
+  checkPass: boolean;
+  humanoid: boolean | null;
+  message: string | null;
+  requestId: string | null;
+};
+
+/**
+ * 数字人形象图预检（wan2.2-s2v-detect，同步）。
+ * 无论是否通过、只要请求成功即计费；用于拦住不合格人像，避免 S2V 长时间排队后失败。
+ *
+ * @see https://help.aliyun.com/zh/model-studio/wan-s2v-detect-api
+ */
+export async function dashscopeDetectS2vImage(opts: {
+  apiKey: string;
+  model?: string;
+  imageUrl: string;
+}): Promise<{ ok: true; result: S2vDetectResult } | { ok: false; error: string }> {
+  const imageUrl = opts.imageUrl.trim();
+  if (!imageUrl) return { ok: false, error: "image_url 不能为空" };
+
+  const res = await fetch(S2V_DETECT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: opts.model?.trim() || "wan2.2-s2v-detect",
+      input: { image_url: imageUrl },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string"
+          ? json.message
+          : `形象图检测失败（HTTP ${res.status}）`,
+    };
+  }
+
+  const output = (json.output ?? {}) as {
+    check_pass?: boolean;
+    humanoid?: boolean;
+    message?: string;
+  };
+  if (typeof output.check_pass !== "boolean") {
+    return { ok: false, error: "检测接口未返回 check_pass" };
+  }
+  return {
+    ok: true,
+    result: {
+      checkPass: output.check_pass,
+      humanoid: typeof output.humanoid === "boolean" ? output.humanoid : null,
+      message: output.message?.trim() || null,
+      requestId:
+        typeof json.request_id === "string" ? json.request_id : null,
+    },
+  };
 }
 
 function pickParsingUrlList(raw: unknown): (string | null)[] | undefined {
