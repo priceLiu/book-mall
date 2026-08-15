@@ -55,7 +55,17 @@ type Row = {
   updatedAt: Date;
 };
 
+/** 读项目时补齐各步槽位模板，避免前端 plan.steps 为空时「生成全部」无槽位可点 */
+export function hydrateHandCraftPlan(plan: HandCraftPlan): HandCraftPlan {
+  const steps: HandCraftPlan["steps"] = { ...plan.steps };
+  for (const stepId of HAND_CRAFT_STEP_IDS) {
+    steps[stepId] = readHandCraftStepState(plan, stepId);
+  }
+  return { steps };
+}
+
 function rowToDto(row: Row): EcomHandCraftProjectDto {
+  const plan = hydrateHandCraftPlan(parseHandCraftPlan(row.plan));
   return {
     id: row.id,
     title: row.title,
@@ -65,7 +75,7 @@ function rowToDto(row: Row): EcomHandCraftProjectDto {
     settings: (row.settings as HandCraftSettings) ?? {},
     references: sanitizeHandCraftReferences(row.references),
     chatHistory: sanitizeHandCraftChatMessages(row.chatHistory),
-    plan: parseHandCraftPlan(row.plan),
+    plan,
     meta: (row.meta as HandCraftMeta | null) ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

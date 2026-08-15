@@ -2,6 +2,7 @@ import {
   HAND_CRAFT_STEP_IDS,
   type HandCraftChatMessage,
   type HandCraftProject,
+  type HandCraftSlot,
   type HandCraftStepId,
   type HandCraftStepKind,
   type HandCraftStepState,
@@ -341,18 +342,33 @@ export function sheetPagesFor(stepId: HandCraftStepId): HandCraftSheetPage[] {
 
 /* ------------------------------ 进度推断 ------------------------------ */
 
+/** 与 book-mall readHandCraftStepState 对齐：generate 步缺槽位时用占位，避免按钮无响应 */
+function fallbackGenerateSlots(step: HandCraftStepMeta): HandCraftSlot[] {
+  return Array.from({ length: step.count }, (_, i) => ({
+    index: i + 1,
+    title: step.count === 1 ? step.label : `${step.label} ${i + 1}`,
+    prompt: "",
+  }));
+}
+
 export function stepState(
   project: HandCraftProject,
   stepId: HandCraftStepId,
 ): HandCraftStepState {
-  return (
-    project.plan?.steps?.[stepId] ?? {
+  const meta = handCraftStep(stepId);
+  const existing = project.plan?.steps?.[stepId];
+  if (!existing) {
+    return {
       stepId,
       status: "pending",
-      slots: [],
+      slots: meta.kind === "generate" ? fallbackGenerateSlots(meta) : [],
       outputs: [],
-    }
-  );
+    };
+  }
+  if (meta.kind === "generate" && existing.slots.length === 0) {
+    return { ...existing, slots: fallbackGenerateSlots(meta) };
+  }
+  return existing;
 }
 
 export function isStepReady(project: HandCraftProject, stepId: HandCraftStepId): boolean {
@@ -422,7 +438,11 @@ export function assistantChoices(
   if (ready && next) {
     out.push(`进入第 ${next.no} 步：${next.label}`);
   } else {
-    out.push(`确认生成第 ${meta.no} 步：${meta.label}`);
+    out.push(
+      meta.kind === "compose"
+        ? `确认拼版第 ${meta.no} 步：${meta.label}`
+        : `确认生成第 ${meta.no} 步：${meta.label}`,
+    );
   }
   out.push(`微调第 ${meta.no} 步：${meta.label}`);
   if (prev) out.push(`回到第 ${prev.no} 步：${prev.label}`);

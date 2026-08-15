@@ -8,6 +8,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { HandCraftComposePanel } from "@/components/hand-craft/hand-craft-compose-panel";
 import { HandCraftRefUploader } from "@/components/hand-craft/hand-craft-ref-uploader";
 import { HandCraftSlotGrid } from "@/components/hand-craft/hand-craft-slot-grid";
+import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 import {
   ProductDesignGalleryPreviewDialog,
   type ProductDesignGalleryPreviewItem,
@@ -91,6 +92,11 @@ export function HandCraftContentPanel({
   const [generating, setGenerating] = useState<{
     stepId: HandCraftStepId;
     indexes: number[];
+  } | null>(null);
+  const [composeBusy, setComposeBusy] = useState(false);
+  const [composePreview, setComposePreview] = useState<{
+    src: string;
+    title: string;
   } | null>(null);
   const [galleryPreview, setGalleryPreview] = useState<{
     items: ProductDesignGalleryPreviewItem[];
@@ -234,23 +240,24 @@ export function HandCraftContentPanel({
     [alert, confirm, project],
   );
 
-  // 助手确认后由这里执行：生成步出图，排版步滚到对应区块由用户点拼版
+  // 助手确认后：generate 步出图；compose 步滚到区块并触发 html2canvas 拼版
   const genTokenRef = useRef(generateRequest?.token ?? 0);
   useEffect(() => {
     if (!generateRequest || generateRequest.token === genTokenRef.current) return;
     genTokenRef.current = generateRequest.token;
     const meta = handCraftStep(generateRequest.stepId);
+    scrollRootRef.current
+      ?.querySelector<HTMLElement>(`#${handCraftStepAnchorId(generateRequest.stepId)}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (meta.kind === "compose") return;
     const state = stepState(project, generateRequest.stepId);
-    if (meta.kind === "compose") {
-      scrollRootRef.current
-        ?.querySelector<HTMLElement>(
-          `#${handCraftStepAnchorId(generateRequest.stepId)}`,
-        )
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
     const pending = state.slots.filter((s) => !s.imageUrl).map((s) => s.index);
-    const indexes = pending.length > 0 ? pending : state.slots.map((s) => s.index);
+    const indexes =
+      pending.length > 0
+        ? pending
+        : state.slots.length > 0
+          ? state.slots.map((s) => s.index)
+          : Array.from({ length: meta.count }, (_, i) => i + 1);
     void requestGenerate(generateRequest.stepId, indexes);
   }, [generateRequest, project, requestGenerate]);
 
@@ -309,7 +316,7 @@ export function HandCraftContentPanel({
     [project],
   );
   const totalSlots = HAND_CRAFT_STEPS.reduce((acc, s) => acc + s.count, 0);
-  const disabledAll = Boolean(streaming) || Boolean(generating);
+  const disabledAll = Boolean(streaming) || Boolean(generating) || composeBusy;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
@@ -414,12 +421,11 @@ export function HandCraftContentPanel({
                   step={step}
                   disabled={disabledAll}
                   onProjectChange={onProjectChange}
-                  onPreviewImage={(src, title) =>
-                    setGalleryPreview({
-                      items: [{ url: src, title, ratio: step.ratio }],
-                      initialIndex: 0,
-                    })
+                  composeRequest={
+                    generateRequest?.stepId === step.id ? generateRequest : null
                   }
+                  onBusyChange={setComposeBusy}
+                  onPreviewImage={(src, title) => setComposePreview({ src, title })}
                 />
               ) : (
                 <HandCraftSlotGrid
@@ -448,9 +454,13 @@ export function HandCraftContentPanel({
       </div>
 
       <StoryboardTaskStatus
-        active={Boolean(generating)}
-        title="AI 出图中"
-        detail={busy ?? "正在调用 Gateway 生图模型，请稍候…"}
+        active={Boolean(generating) || composeBusy}
+        title={composeBusy ? "拼版抓图中" : "AI 出图中"}
+        detail={
+          composeBusy
+            ? "浏览器正在排版并抓图，请勿关闭页面…"
+            : busy ?? "正在调用 Gateway 生图模型，请稍候…"
+        }
         surface="content"
       />
 
@@ -489,6 +499,15 @@ export function HandCraftContentPanel({
           onImageModelChange(modelKey);
           void runGenerate(req.stepId, req.indexes, modelKey);
         }}
+      />
+
+      <EcomImagePreviewDialog
+        src={composePreview?.src ?? ""}
+        open={Boolean(composePreview)}
+        onOpenChange={(open) => {
+          if (!open) setComposePreview(null);
+        }}
+        title={composePreview?.title ?? "拼版预览"}
       />
 
       <ProductDesignGalleryPreviewDialog

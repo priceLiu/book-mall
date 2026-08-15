@@ -129,7 +129,11 @@ export function HandCraftSlotGrid({
       return;
     }
     const isAll = selectedIndexes.length === 0;
-    const indexes = isAll ? rowsRef.current.map((r) => r.index) : selectedIndexes;
+    const indexes = isAll
+      ? rowsRef.current.length > 0
+        ? rowsRef.current.map((r) => r.index)
+        : Array.from({ length: step.count }, (_, i) => i + 1)
+      : selectedIndexes;
     if (indexes.length === 0) return;
     if (isAll) setGenerateAllActive(true);
     try {

@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import { Download, Eye, Loader2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { uploadHandCraftComposePng } from "@/lib/ecom-hand-craft-api";
-import type { HandCraftProject } from "@/lib/hand-craft-types";
+import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import {
   missingRequirements,
   sheetPagesFor,
@@ -31,6 +31,9 @@ type Props = {
   disabled?: boolean;
   onProjectChange: () => void | Promise<void>;
   onPreviewImage?: (src: string, title: string) => void;
+  /** 助手点「确认拼版」时递增，自动执行本步拼版 */
+  composeRequest?: { stepId: HandCraftStepId; token: number } | null;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 /**
@@ -44,6 +47,8 @@ export function HandCraftComposePanel({
   disabled,
   onProjectChange,
   onPreviewImage,
+  composeRequest = null,
+  onBusyChange,
 }: Props) {
   const { alert } = useDialogs();
   const pages = useMemo(() => sheetPagesFor(step.id), [step.id]);
@@ -69,15 +74,35 @@ export function HandCraftComposePanel({
     await Promise.all(
       imgs.map(
         (img) =>
-          new Promise<void>((resolve) => {
+          new Promise<void>((resolve, reject) => {
+            const label = img.alt || "成图";
+            let settled = false;
+            const finish = (fn: () => void) => {
+              if (settled) return;
+              settled = true;
+              fn();
+            };
             if (img.complete && img.naturalHeight > 0) {
               resolve();
               return;
             }
-            const done2 = () => resolve();
-            img.onload = done2;
-            img.onerror = done2;
-            setTimeout(done2, 6000);
+            img.onload = () =>
+              finish(() =>
+                img.naturalHeight > 0
+                  ? resolve()
+                  : reject(new Error(`引用图未能加载：${label}`)),
+              );
+            img.onerror = () =>
+              finish(() => reject(new Error(`引用图加载失败：${label}（请稍后重试拼版）`)));
+            setTimeout(
+              () =>
+                finish(() =>
+                  img.naturalHeight > 0
+                    ? resolve()
+                    : reject(new Error(`引用图加载超时：${label}`)),
+                ),
+              12_000,
+            );
           }),
       ),
     );
@@ -97,6 +122,7 @@ export function HandCraftComposePanel({
 
   const composePages = useCallback(
     async (indexes: number[]) => {
+      if (indexes.length === 0) return;
       if (blocked.length > 0) {
         await alert({
           title: "还不能拼版",
@@ -105,6 +131,7 @@ export function HandCraftComposePanel({
         });
         return;
       }
+      onBusyChange?.(true);
       setMounted(true);
       // 等离屏版式完成一次布局与图片挂载
       await new Promise<void>((r) => {
@@ -132,6 +159,7 @@ export function HandCraftComposePanel({
         setBusyPage(null);
         setProgress(null);
         setMounted(false);
+        onBusyChange?.(false);
         await onProjectChange();
       }
 
@@ -143,8 +171,20 @@ export function HandCraftComposePanel({
         });
       }
     },
-    [alert, blocked, capturePage, onProjectChange, project.id, step.id],
+    [alert, blocked, capturePage, onBusyChange, onProjectChange, project.id, step.id],
   );
+
+  const composeTokenRef = useRef(composeRequest?.token ?? 0);
+  useEffect(() => {
+    if (!composeRequest || composeRequest.stepId !== step.id) return;
+    if (composeRequest.token === composeTokenRef.current) return;
+    composeTokenRef.current = composeRequest.token;
+    const pending = pages
+      .filter((p) => !outputByPage.get(p.index)?.imageUrl)
+      .map((p) => p.index);
+    const indexes = pending.length > 0 ? pending : pages.map((p) => p.index);
+    void composePages(indexes);
+  }, [composePages, composeRequest, outputByPage, pages, step.id]);
 
   async function handleDownload(pageIndex: number) {
     const url = outputByPage.get(pageIndex)?.imageUrl;
@@ -208,10 +248,16 @@ export function HandCraftComposePanel({
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-3",
+          step.id === "xhs-long" ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-3",
+        )}
+      >
         {pages.map((page) => {
           const output = outputByPage.get(page.index);
           const busy = busyPage === page.index;
+          const isLongScrollPage = step.id === "xhs-long";
           return (
             <article
               key={page.index}
@@ -227,60 +273,110 @@ export function HandCraftComposePanel({
               </div>
 
               <div
-                className="group/image relative w-full shrink-0 overflow-hidden bg-[#f5f5f7]"
-                style={{ aspectRatio: "3 / 4" }}
+                className={cn(
+                  "group/image relative w-full shrink-0 bg-[#f5f5f7]",
+                  isLongScrollPage
+                    ? "max-h-[min(72vh,880px)] overflow-y-auto overscroll-y-contain"
+                    : "overflow-hidden",
+                )}
+                style={isLongScrollPage ? undefined : { aspectRatio: "3 / 4" }}
               >
                 {busy ? (
-                  <EcomMediaGeneratingBusy className="absolute inset-0" />
+                  <EcomMediaGeneratingBusy
+                    className={isLongScrollPage ? "min-h-[240px]" : "absolute inset-0"}
+                  />
                 ) : output?.imageUrl ? (
-                  <>
-                    <Image
-                      src={output.imageUrl}
-                      alt={page.title}
-                      fill
-                      className="object-contain"
-                      sizes="(max-width: 1024px) 33vw, 280px"
-                      unoptimized
-                    />
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100"
-                    />
-                    <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-3 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100">
-                      {onPreviewImage ? (
+                  isLongScrollPage ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={output.imageUrl}
+                        alt={page.title}
+                        className="block w-full h-auto"
+                      />
+                      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[#e8e8ed] bg-white/95 p-2 backdrop-blur-sm">
+                        {onPreviewImage ? (
+                          <button
+                            type="button"
+                            title="全屏预览"
+                            className={cn(ICON_BTN, "h-10 w-10")}
+                            onClick={() => onPreviewImage(output.imageUrl, page.title)}
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          title="预览"
-                          className={cn(ICON_BTN, "pointer-events-auto")}
-                          onClick={() => onPreviewImage(output.imageUrl, page.title)}
+                          title="下载"
+                          className={cn(ICON_BTN, "h-10 w-10")}
+                          onClick={() => void handleDownload(page.index)}
                         >
-                          <Eye className="h-5 w-5" />
+                          <Download className="h-5 w-5" />
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        title="下载"
-                        className={cn(ICON_BTN, "pointer-events-auto")}
-                        onClick={() => void handleDownload(page.index)}
-                      >
-                        <Download className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="重新拼版"
-                        disabled={locked}
-                        className={cn(ICON_BTN, "pointer-events-auto")}
-                        onClick={() => void composePages([page.index])}
-                      >
-                        <span className="text-[11px] font-semibold">重拼</span>
-                      </button>
-                    </div>
-                  </>
+                        <button
+                          type="button"
+                          title="重新拼版"
+                          disabled={locked}
+                          className={cn(ICON_BTN, "h-10 w-10")}
+                          onClick={() => void composePages([page.index])}
+                        >
+                          <span className="text-[10px] font-semibold">重拼</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Image
+                        src={output.imageUrl}
+                        alt={page.title}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 1024px) 33vw, 280px"
+                        unoptimized
+                      />
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100"
+                      />
+                      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-3 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100">
+                        {onPreviewImage ? (
+                          <button
+                            type="button"
+                            title="预览"
+                            className={cn(ICON_BTN, "pointer-events-auto")}
+                            onClick={() => onPreviewImage(output.imageUrl, page.title)}
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          title="下载"
+                          className={cn(ICON_BTN, "pointer-events-auto")}
+                          onClick={() => void handleDownload(page.index)}
+                        >
+                          <Download className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="重新拼版"
+                          disabled={locked}
+                          className={cn(ICON_BTN, "pointer-events-auto")}
+                          onClick={() => void composePages([page.index])}
+                        >
+                          <span className="text-[11px] font-semibold">重拼</span>
+                        </button>
+                      </div>
+                    </>
+                  )
                 ) : (
                   <button
                     type="button"
                     disabled={locked}
-                    className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] text-[#6e6e73] disabled:cursor-not-allowed disabled:opacity-60"
+                    className={cn(
+                      "flex w-full flex-col items-center justify-center gap-1 text-[11px] text-[#6e6e73] disabled:cursor-not-allowed disabled:opacity-60",
+                      isLongScrollPage ? "min-h-[240px]" : "h-full",
+                    )}
                     onClick={() => void composePages([page.index])}
                   >
                     <span className="text-sm font-semibold text-[#1d1d1f]">拼版本页</span>

@@ -48,13 +48,14 @@ function looksLikeTableHeaderRow(row: string[]): boolean {
   const cells = row.map(stripCellMd).filter(Boolean);
   if (cells.length < 2) return false;
   const joined = cells.join(" ");
-  if (/编号|序号|方案编号/.test(joined) && /方案名称|名称/.test(joined)) return true;
+  if (/编号|序号|方案编号/.test(joined) && /方案名称|名称|标题/.test(joined)) return true;
+  if (/序号/.test(joined) && /标题/.test(joined) && /画面|说明|场景/.test(joined)) return true;
   if (/方案名称/.test(joined) && /切入|痛点|收获|情绪|逻辑|维度/.test(joined)) return true;
   if (/^维度$/i.test(cells[0] ?? "") && cells.slice(1).some((c) => /方案\s*[ABC123]/i.test(c))) {
     return true;
   }
   const first = cells[0] ?? "";
-  if (/^[123]$/.test(first)) return false;
+  if (/^\d{1,2}$/.test(first)) return false;
   if (cells.some((c) => c.length > 36)) return false;
   return cells.every((c) => c.length > 0 && c.length <= 28);
 }
@@ -63,7 +64,7 @@ function looksLikeTableHeaderRow(row: string[]): boolean {
 function looksLikePlanDataRow(row: string[]): boolean {
   const cells = row.map(stripCellMd);
   const first = cells[0] ?? "";
-  if (/^[123]$/.test(first)) return true;
+  if (/^\d{1,2}$/.test(first)) return true;
   const second = cells[1] ?? "";
   if (!first && second.length > 1 && !/方案名称|编号/.test(second)) return true;
   if (!first && !second && cells.slice(2).some((c) => c.length > 10)) return true;

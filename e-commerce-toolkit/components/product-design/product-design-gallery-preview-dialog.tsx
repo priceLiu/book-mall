@@ -18,7 +18,8 @@ export type ProductDesignGalleryPreviewItem = {
   downloadFilename?: string;
 };
 
-function cssAspectRatio(ratio?: string): string {
+function cssAspectRatio(ratio?: string): string | undefined {
+  if (!ratio || ratio === "natural" || ratio === "auto") return undefined;
   switch (ratio) {
     case "3:4":
       return "3 / 4";
@@ -83,6 +84,7 @@ export function ProductDesignGalleryPreviewDialog({
 
   if (!active) return null;
 
+  const aspectRatio = cssAspectRatio(active.ratio);
   const close = () => onOpenChange(false);
 
   return (
@@ -120,17 +122,24 @@ export function ProductDesignGalleryPreviewDialog({
           </button>
         </DialogHeader>
         <div className="flex min-h-0 flex-1">
-          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center p-4 sm:p-6">
+          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-y-auto p-4 sm:p-6">
             <div
-              className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black"
-              style={{ aspectRatio: cssAspectRatio(active.ratio) }}
+              className={cn(
+                "relative max-h-full max-w-full overflow-hidden rounded-lg bg-black",
+                !aspectRatio && "w-full",
+              )}
+              style={aspectRatio ? { aspectRatio } : undefined}
               onClick={(e) => e.stopPropagation()}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={active.url}
                 alt={active.title}
-                className="h-full w-full max-h-[calc(100dvh-5rem)] object-contain"
+                className={
+                  aspectRatio
+                    ? "h-full w-full max-h-[calc(100dvh-5rem)] object-contain"
+                    : "mx-auto block h-auto max-h-[calc(100dvh-5rem)] w-auto max-w-full object-contain"
+                }
               />
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
+import { handCraftComposeImageSrc } from "@/lib/hand-craft-compose-image-src";
 import {
   handCraftStep,
   stepState,
@@ -49,7 +50,7 @@ type Props = {
 /**
  * 第 8–10 步的拼版视图：版式由代码控制，浏览器 html2canvas 抓成 PNG 后上传 OSS。
  *
- * 引用图默认带 crossOrigin，抓图失败时由调用方回退到不带 crossorigin 的重试。
+ * 引用图在 export 模式走同域代理（handCraftComposeImageSrc），避免 OSS CORS 导致抓图全灰。
  */
 export function HandCraftSheetView({ project, stepId, page, variant = "export" }: Props) {
   const isExport = variant === "export";
@@ -99,6 +100,7 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
         <SheetSection
           key={`${section.title}-${i}`}
           project={project}
+          stepId={stepId}
           section={section}
           useCrossOrigin={isExport}
         />
@@ -122,12 +124,34 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
   );
 }
 
+type GridLayout = { cols: number; maxHeight: number };
+
+/** 小红书长图：竖版营销页，区块内成图须足够大；作品集等页保持紧凑网格 */
+function gridLayoutForSection(stepId: HandCraftStepId, imageCount: number): GridLayout {
+  if (stepId === "xhs-long") {
+    if (imageCount <= 2) return { cols: 2, maxHeight: 620 };
+    if (imageCount === 3) return { cols: 3, maxHeight: 560 };
+    if (imageCount <= 4) return { cols: 2, maxHeight: 520 };
+    if (imageCount <= 6) return { cols: 2, maxHeight: 480 };
+    if (imageCount <= 9) return { cols: 3, maxHeight: 420 };
+    return { cols: 2, maxHeight: 460 };
+  }
+  const cols = imageCount <= 2 ? 2 : imageCount <= 4 ? 2 : 3;
+  return { cols, maxHeight: cols === 3 ? 260 : 340 };
+}
+
+function heroMaxHeight(stepId: HandCraftStepId): number {
+  return stepId === "xhs-long" ? 1280 : 620;
+}
+
 function SheetSection({
   project,
+  stepId,
   section,
   useCrossOrigin,
 }: {
   project: HandCraftProject;
+  stepId: HandCraftStepId;
   section: HandCraftSheetSection;
   useCrossOrigin: boolean;
 }) {
@@ -197,13 +221,18 @@ function SheetSection({
             textAlign: "center",
           }}
         >
-          <SheetImage src={first.url} alt={first.caption} useCrossOrigin={useCrossOrigin} maxHeight={620} />
+          <SheetImage
+            src={first.url}
+            alt={first.caption}
+            useCrossOrigin={useCrossOrigin}
+            maxHeight={heroMaxHeight(stepId)}
+          />
         </div>
       </section>
     );
   }
 
-  const cols = images.length <= 2 ? 2 : images.length <= 4 ? 2 : 3;
+  const { cols, maxHeight } = gridLayoutForSection(stepId, images.length);
   const cellWidth = `${(100 / cols).toFixed(4)}%`;
 
   return (
@@ -225,7 +254,7 @@ function SheetSection({
                 src={img.url}
                 alt={img.caption}
                 useCrossOrigin={useCrossOrigin}
-                maxHeight={cols === 3 ? 260 : 340}
+                maxHeight={maxHeight}
               />
             </div>
             <p
@@ -274,19 +303,30 @@ function SheetImage({
   useCrossOrigin: boolean;
   maxHeight: number;
 }) {
+  const displaySrc = useCrossOrigin ? handCraftComposeImageSrc(src) : src;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      crossOrigin={useCrossOrigin ? "anonymous" : undefined}
+    <div
       style={{
-        display: "block",
         width: "100%",
-        maxHeight,
-        objectFit: "contain",
-        margin: "0 auto",
+        height: maxHeight,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
       }}
-    />
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={displaySrc}
+        alt={alt}
+        style={{
+          display: "block",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          width: "auto",
+          height: "auto",
+        }}
+      />
+    </div>
   );
 }

@@ -4,8 +4,15 @@ import { Loader2, Maximize2, Minimize2, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
+import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import {
+  ECOM_ASSISTANT_BUBBLE_CLASS,
+  ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
+  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+  ECOM_ASSISTANT_USER_BUBBLE_CLASS,
+} from "@/lib/ecom-assistant-chat-styles";
 import {
   streamHandCraftChat,
   syncHandCraftPlan,
@@ -205,11 +212,11 @@ export function HandCraftAssistantPanel({
       const target = stepIdFromChoice(choice) ?? currentStepId;
       const meta = handCraftStep(target);
 
-      if (choice.startsWith("确认生成")) {
+      if (choice.startsWith("确认生成") || choice.startsWith("确认拼版")) {
         const blocked = missingRequirements(project, target);
         if (blocked.length > 0) {
           await onAlert({
-            title: "还不能生成",
+            title: meta.kind === "compose" ? "还不能拼版" : "还不能生成",
             message: `第 ${meta.no} 步依赖尚未齐备：${blocked.join("、")}`,
             variant: "error",
           });
@@ -263,10 +270,6 @@ export function HandCraftAssistantPanel({
       ]
     : messages;
 
-  const lastAssistantId = [...displayMessages]
-    .reverse()
-    .find((m) => m.role === "assistant")?.id;
-
   const choices = useMemo(
     () => assistantChoices(project, currentStepId),
     [project, currentStepId],
@@ -301,60 +304,76 @@ export function HandCraftAssistantPanel({
         ) : null}
       </div>
 
-      <StoryboardTaskStatus
-        active={streaming}
-        title="思考中"
-        detail="助手正在按 SOP 输出本步说明，完成后会同步到中间工作区…"
-      />
-
       <div
         ref={scrollRef}
-        className="ecom-scrollbar-overlay min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-scroll overscroll-y-contain px-4 py-4 [overflow-anchor:none]"
+        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
       >
-        {displayMessages.map((m) => {
-          const isLastAssistant = m.role === "assistant" && m.id === lastAssistantId;
-          return (
+        <div className="space-y-3">
+          {displayMessages.map((m) => (
             <div
               key={m.id}
               className={cn(
-                "max-w-[95%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                m.role === "user"
-                  ? "ml-auto border border-[var(--ecom-assistant-bubble-user-border)] bg-[var(--ecom-assistant-bubble-user-bg)] text-[#1d1d1f]"
-                  : "bg-[var(--ecom-assistant-bubble-bot-bg)] text-[#1d1d1f] shadow-sm ring-1 ring-[var(--ecom-assistant-bubble-bot-ring)]",
+                "flex w-full flex-col",
+                m.role === "user" ? "items-end" : "items-start",
               )}
             >
-              <pre className="whitespace-pre-wrap font-sans">{m.content}</pre>
-              {isLastAssistant && showChoices ? (
-                <div className="mt-3 border-t border-[var(--ecom-assistant-border)] pt-3">
-                  <p className="mb-2 text-[11px] text-[#6e6e73]">
-                    {choicePrompt(currentStepId)}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {choices.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        disabled={streaming}
-                        className={STORYBOARD_ASSISTANT_CHOICE_CLASS}
-                        onClick={() => void handleChoice(c)}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                  {isStepReady(project, currentStepId) ? (
-                    <p className="mt-2 text-[11px] text-[#6e6e73]">
-                      第 {stepMeta.no} 步已出齐，可直接进入下一步。
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+              <div
+                className={cn(
+                  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                  m.role === "user"
+                    ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                    : ECOM_ASSISTANT_BUBBLE_CLASS,
+                )}
+              >
+                {m.role === "assistant" ? (
+                  <StoryboardMarkdownBlock
+                    markdown={m.content || (streaming && m.id === "streaming" ? "…" : "")}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap">{m.content}</p>
+                )}
+              </div>
             </div>
-          );
-        })}
+          ))}
+          {showChoices ? (
+            <div className="flex flex-col items-start">
+              <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
+                <p className="mb-2 text-[11px] text-[#6e6e73]">
+                  {choicePrompt(currentStepId)}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {choices.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={streaming}
+                      className={STORYBOARD_ASSISTANT_CHOICE_CLASS}
+                      onClick={() => void handleChoice(c)}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+                {isStepReady(project, currentStepId) ? (
+                  <p className="mt-2 text-[11px] text-[#6e6e73]">
+                    第 {stepMeta.no} 步已出齐，可直接进入下一步。
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        {streaming ? (
+          <StoryboardTaskStatus
+            active
+            title="思考中"
+            detail="助手正在按 SOP 输出本步说明，完成后会同步到中间工作区…"
+            className="mt-3"
+          />
+        ) : null}
       </div>
 
-      <div className="border-t border-[var(--ecom-assistant-border)] p-4">
+      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
         <textarea
           className="mb-3 w-full resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={composerWide ? 4 : 2}
