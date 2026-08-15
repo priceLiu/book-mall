@@ -101,7 +101,8 @@ async function main() {
       console.log(`已存在，跳过: ${asset.key}`);
     } else {
       const buf = fs.readFileSync(asset.local);
-      if (asset.multipart) {
+      const useMultipart = asset.multipart && buf.length > 5 * 1024 * 1024;
+      if (useMultipart) {
         await client.multipartUpload(asset.key, buf, {
           parallel: 1,
           partSize: 1024 * 1024,
