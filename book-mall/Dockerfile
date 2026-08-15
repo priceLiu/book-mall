@@ -30,8 +30,11 @@ COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
 RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
+# CloudBase 构建机内存偏小：限制 Next 并行 worker，并抬高 Node 堆上限，避免 OOM 导致 create_build_image 无日志失败
+ENV NODE_OPTIONS="--experimental-sqlite --max-old-space-size=4096"
+ENV NEXT_BUILD_WORKERS=1
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
-  && pnpm run build:docker
+  && pnpm exec next build
 
 FROM base AS runner
 ENV NODE_ENV=production
