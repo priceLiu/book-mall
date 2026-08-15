@@ -8,6 +8,8 @@ import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
+type BootstrapBody = { deviceType?: string; deviceName?: string };
+
 /**
  * 已登录用户（tools JWT / NextAuth）-bootstrap 客户端长效凭证。
  * 供 publisher-web 登录回调页为扩展 / 桌面签发 refresh_token。
@@ -18,9 +20,9 @@ export const POST = withApiDbGuard(async (req: NextRequest) => {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  let body: { deviceType?: string; deviceName?: string } | null = null;
+  let body: BootstrapBody | null = null;
   try {
-    body = (await req.json()) as typeof body;
+    body = (await req.json()) as BootstrapBody | null;
   } catch {
     return NextResponse.json({ error: "无效请求体" }, { status: 400 });
   }
@@ -37,21 +39,18 @@ export const POST = withApiDbGuard(async (req: NextRequest) => {
     userAgent: req.headers.get("user-agent"),
   });
 
-  if ("ok" in issued && issued.ok === false) {
+  // 成功分支没有 ok 字段，判存在即可收窄；再加 === false 会让收窄失效
+  if ("ok" in issued) {
     return NextResponse.json({ error: issued.error }, { status: issued.status });
   }
 
-  const session = issued as Awaited<ReturnType<typeof issueClientSession>> & {
-    accessToken: string;
-  };
-
   return NextResponse.json({
     ok: true,
-    access_token: session.accessToken,
-    refresh_token: session.refreshToken,
-    expires_in: session.expiresIn,
-    device_id: session.deviceId,
-    user_id: session.userId,
+    access_token: issued.accessToken,
+    refresh_token: issued.refreshToken,
+    expires_in: issued.expiresIn,
+    device_id: issued.deviceId,
+    user_id: issued.userId,
     token_type: "Bearer",
   });
 });

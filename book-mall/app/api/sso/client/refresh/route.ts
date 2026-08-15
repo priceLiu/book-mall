@@ -19,24 +19,21 @@ export const POST = withApiDbGuard(async (req) => {
   }
 
   const result = await refreshClientSession(refreshToken);
-  if ("ok" in result && result.ok === false) {
+  // 成功分支没有 ok 字段，判存在即可收窄；再加 === false 会让收窄失效
+  if ("ok" in result) {
     return NextResponse.json(
       { error: result.error, ...(result.code ? { code: result.code } : {}) },
       { status: result.status },
     );
   }
 
-  const session = result as Awaited<ReturnType<typeof refreshClientSession>> & {
-    accessToken: string;
-  };
-
   return NextResponse.json({
     ok: true,
-    access_token: session.accessToken,
-    refresh_token: session.refreshToken,
-    expires_in: session.expiresIn,
-    device_id: session.deviceId,
-    user_id: session.userId,
+    access_token: result.accessToken,
+    refresh_token: result.refreshToken,
+    expires_in: result.expiresIn,
+    device_id: result.deviceId,
+    user_id: result.userId,
     token_type: "Bearer",
   });
 });

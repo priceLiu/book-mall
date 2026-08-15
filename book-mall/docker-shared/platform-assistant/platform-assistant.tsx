@@ -341,6 +341,7 @@ export function PlatformAssistant({
 
   return (
     <>
+      {/* 悬浮头像球（可拖拽 + 记忆位置） */}
       {!open && (
         <button
           ref={ballRef}
@@ -352,7 +353,9 @@ export function PlatformAssistant({
           onPointerUp={onBallPointerUp}
           style={{
             position: "fixed",
-            ...(ballPos ? { left: ballPos.x, top: ballPos.y } : { right: 20, bottom: 20 }),
+            ...(ballPos
+              ? { left: ballPos.x, top: ballPos.y }
+              : { right: 20, bottom: 20 }),
             width: BALL_SIZE,
             height: BALL_SIZE,
             borderRadius: "50%",
@@ -363,7 +366,9 @@ export function PlatformAssistant({
             touchAction: "none",
             userSelect: "none",
             boxShadow: "0 6px 20px rgba(0,0,0,.22)",
-            background: avatarSrc ? "#dbeafe" : `linear-gradient(135deg, ${accentColor}, #8b5cf6)`,
+            background: avatarSrc
+              ? "#dbeafe"
+              : `linear-gradient(135deg, ${accentColor}, #8b5cf6)`,
             zIndex: 2147483000,
             animation: "pa-pop .25s ease",
           }}
@@ -374,7 +379,12 @@ export function PlatformAssistant({
               src={avatarSrc}
               alt="助手"
               draggable={false}
-              style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                pointerEvents: "none",
+              }}
             />
           ) : (
             <span style={{ fontSize: 26, pointerEvents: "none" }}>🤖</span>
@@ -382,6 +392,7 @@ export function PlatformAssistant({
         </button>
       )}
 
+      {/* 右侧抽屉 + 点击外部收起 */}
       {open && (
         <>
           <div
@@ -400,201 +411,213 @@ export function PlatformAssistant({
             aria-label={title}
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "fixed",
-              top: 0,
-              right: 0,
-              height: "100vh",
-              width: "min(400px, 92vw)",
-              background: "#ffffff",
-              color: "#111827",
-              boxShadow: "-8px 0 30px rgba(0,0,0,.18)",
+            position: "fixed",
+            top: 0,
+            right: 0,
+            height: "100vh",
+            width: "min(400px, 92vw)",
+            background: "#ffffff",
+            color: "#111827",
+            boxShadow: "-8px 0 30px rgba(0,0,0,.18)",
+            display: "flex",
+            flexDirection: "column",
+            zIndex: 2147483000,
+            animation: "pa-slide .22s ease",
+            fontFamily:
+              "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif",
+          }}
+        >
+          {/* 头部 */}
+          <div
+            style={{
               display: "flex",
-              flexDirection: "column",
-              zIndex: 2147483000,
-              animation: "pa-slide .22s ease",
-              fontFamily:
-                "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif",
+              alignItems: "center",
+              gap: 10,
+              padding: "14px 16px",
+              borderBottom: "1px solid #eef0f3",
             }}
           >
             <div
               style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                overflow: "hidden",
+                background: avatarSrc
+                  ? "#dbeafe"
+                  : `linear-gradient(135deg, ${accentColor}, #8b5cf6)`,
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                padding: "14px 16px",
-                borderBottom: "1px solid #eef0f3",
+                justifyContent: "center",
+                flexShrink: 0,
               }}
             >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  background: avatarSrc ? "#dbeafe" : `linear-gradient(135deg, ${accentColor}, #8b5cf6)`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                {avatarSrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarSrc}
-                    alt=""
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
-                  <span style={{ fontSize: 16 }}>🤖</span>
-                )}
-              </div>
-              <div style={{ flex: 1, fontWeight: 600, fontSize: 15 }}>{title}</div>
-              <button
-                type="button"
-                aria-label="关闭"
-                onClick={() => setOpen(false)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontSize: 20,
-                  lineHeight: 1,
-                  color: "#6b7280",
-                  padding: 4,
-                }}
-              >
-                ×
-              </button>
+              {avatarSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarSrc}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span style={{ fontSize: 16 }}>🤖</span>
+              )}
             </div>
-
-            <div
-              ref={listRef}
-              className="pa-scroll"
+            <div style={{ flex: 1, fontWeight: 600, fontSize: 15 }}>{title}</div>
+            <button
+              type="button"
+              aria-label="关闭"
+              onClick={() => setOpen(false)}
               style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "16px",
-                background: "#f7f8fa",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+                color: "#6b7280",
+                padding: 4,
               }}
             >
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}
-                >
-                  <div style={{ maxWidth: "82%" }}>
-                    <div
+              ×
+            </button>
+          </div>
+
+          {/* 消息区 */}
+          <div
+            ref={listRef}
+            className="pa-scroll"
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "16px",
+              background: "#f7f8fa",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                }}
+              >
+                <div style={{ maxWidth: "82%" }}>
+                  <div
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      lineHeight: 1.6,
+                      fontSize: 14,
+                      padding: "10px 12px",
+                      borderRadius: 12,
+                      background: m.role === "user" ? accentColor : "#ffffff",
+                      color: m.role === "user" ? "#ffffff" : "#111827",
+                      border:
+                        m.role === "user" ? "none" : "1px solid #eef0f3",
+                      boxShadow:
+                        m.role === "user"
+                          ? "none"
+                          : "0 1px 2px rgba(0,0,0,.04)",
+                    }}
+                  >
+                    {m.content ||
+                      (streaming && m.role === "assistant" ? (
+                        <span>
+                          <span className="pa-dot" style={{ animationDelay: "0s" }} />
+                          <span className="pa-dot" style={{ animationDelay: ".2s" }} />
+                          <span className="pa-dot" style={{ animationDelay: ".4s" }} />
+                        </span>
+                      ) : (
+                        ""
+                      ))}
+                  </div>
+                  {m.redirect && (
+                    <a
+                      className="pa-card"
+                      href={m.redirect.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        lineHeight: 1.6,
-                        fontSize: 14,
+                        display: "block",
+                        marginTop: 8,
                         padding: "10px 12px",
                         borderRadius: 12,
-                        background: m.role === "user" ? accentColor : "#ffffff",
-                        color: m.role === "user" ? "#ffffff" : "#111827",
-                        border: m.role === "user" ? "none" : "1px solid #eef0f3",
-                        boxShadow: m.role === "user" ? "none" : "0 1px 2px rgba(0,0,0,.04)",
+                        background: "#ffffff",
+                        border: `1px solid ${accentColor}33`,
+                        textDecoration: "none",
+                        color: "#111827",
+                        transition: "box-shadow .15s ease",
                       }}
                     >
-                      {m.content ||
-                        (streaming && m.role === "assistant" ? (
-                          <span>
-                            <span className="pa-dot" style={{ animationDelay: "0s" }} />
-                            <span className="pa-dot" style={{ animationDelay: ".2s" }} />
-                            <span className="pa-dot" style={{ animationDelay: ".4s" }} />
-                          </span>
-                        ) : (
-                          ""
-                        ))}
-                    </div>
-                    {m.redirect && (
-                      <a
-                        className="pa-card"
-                        href={m.redirect.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: "block",
-                          marginTop: 8,
-                          padding: "10px 12px",
-                          borderRadius: 12,
-                          background: "#ffffff",
-                          border: `1px solid ${accentColor}33`,
-                          textDecoration: "none",
-                          color: "#111827",
-                          transition: "box-shadow .15s ease",
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, fontSize: 13, color: accentColor }}>
-                          前往「{m.redirect.title}」→
-                        </div>
-                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                          {m.redirect.description}
-                        </div>
-                      </a>
-                    )}
-                  </div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: accentColor }}>
+                        前往「{m.redirect.title}」→
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                        {m.redirect.description}
+                      </div>
+                    </a>
+                  )}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
 
-            <div
+          {/* 输入区 */}
+          <div
+            style={{
+              borderTop: "1px solid #eef0f3",
+              padding: 12,
+              background: "#ffffff",
+              display: "flex",
+              gap: 8,
+              alignItems: "flex-end",
+            }}
+          >
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="问问平台能做什么…"
+              rows={1}
               style={{
-                borderTop: "1px solid #eef0f3",
-                padding: 12,
-                background: "#ffffff",
-                display: "flex",
-                gap: 8,
-                alignItems: "flex-end",
+                flex: 1,
+                resize: "none",
+                maxHeight: 120,
+                minHeight: 40,
+                padding: "9px 12px",
+                borderRadius: 10,
+                border: "1px solid #e5e7eb",
+                outline: "none",
+                fontSize: 14,
+                lineHeight: 1.5,
+                fontFamily: "inherit",
+              }}
+            />
+            <button
+              type="button"
+              className="pa-send"
+              onClick={() => void send()}
+              disabled={streaming || !input.trim()}
+              style={{
+                border: "none",
+                borderRadius: 10,
+                padding: "0 16px",
+                height: 40,
+                cursor: streaming || !input.trim() ? "not-allowed" : "pointer",
+                background: streaming || !input.trim() ? "#c7cbd1" : accentColor,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 600,
+                flexShrink: 0,
               }}
             >
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="问问平台能做什么…"
-                rows={1}
-                style={{
-                  flex: 1,
-                  resize: "none",
-                  maxHeight: 120,
-                  minHeight: 40,
-                  padding: "9px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #e5e7eb",
-                  outline: "none",
-                  fontSize: 14,
-                  lineHeight: 1.5,
-                  fontFamily: "inherit",
-                }}
-              />
-              <button
-                type="button"
-                className="pa-send"
-                onClick={() => void send()}
-                disabled={streaming || !input.trim()}
-                style={{
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "0 16px",
-                  height: 40,
-                  cursor: streaming || !input.trim() ? "not-allowed" : "pointer",
-                  background: streaming || !input.trim() ? "#c7cbd1" : accentColor,
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  flexShrink: 0,
-                }}
-              >
-                发送
-              </button>
-            </div>
+              发送
+            </button>
           </div>
+        </div>
         </>
       )}
     </>

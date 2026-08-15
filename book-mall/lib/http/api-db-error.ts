@@ -10,8 +10,8 @@ import {
 
 export type RouteContext = { params: Record<string, string | string[]> };
 
-export type ApiRouteHandler = (
-  req: NextRequest | Request,
+export type ApiRouteHandler<Req extends Request = NextRequest | Request> = (
+  req: Req,
   context?: RouteContext,
 ) => Response | Promise<Response>;
 
@@ -34,8 +34,15 @@ export function tryApiDbUnavailableResponse(error: unknown): NextResponse | null
   return apiDbUnavailableResponse(error);
 }
 
-/** 包装 Route Handler：连接池/不可达 → 503 SYSTEM_BUSY */
-export function withApiDbGuard(handler: ApiRouteHandler): ApiRouteHandler {
+/**
+ * 包装 Route Handler：连接池/不可达 → 503 SYSTEM_BUSY。
+ *
+ * 泛型透传 req 类型：写死成 `NextRequest | Request` 会让声明为
+ * `(req: NextRequest) => …` 的处理器因参数逆变而不可赋值。
+ */
+export function withApiDbGuard<Req extends Request>(
+  handler: ApiRouteHandler<Req>,
+): ApiRouteHandler<Req> {
   return async (req, context) => {
     try {
       return await handler(req, context);

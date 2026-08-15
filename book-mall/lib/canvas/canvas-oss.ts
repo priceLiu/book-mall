@@ -4,6 +4,7 @@
  */
 import {
   createOssClientFrom,
+  ossHeadObject,
   ossUploadBuffer,
   readOssEnv,
   type OssEnvConfig,
@@ -374,7 +375,7 @@ export async function ossObjectExists(key: string): Promise<boolean> {
     }
     try {
       const client = await createOssClientFrom(cfgRaw);
-      await client.head(key);
+      await ossHeadObject(client, key);
       return true;
     } catch (e) {
       if (isOssNotFoundError(e)) return false;
