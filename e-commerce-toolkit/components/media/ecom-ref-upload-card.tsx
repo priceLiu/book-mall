@@ -32,6 +32,8 @@ type Props = {
   onMouseEnterCard?: () => void;
   onMouseLeaveCard?: () => void;
   inputRef?: ((el: HTMLInputElement | null) => void) | React.RefObject<HTMLInputElement | null>;
+  /** 渲染在「上传」钮左侧（与上传钮同排） */
+  toolbarPrefix?: React.ReactNode;
 };
 
 /** 产品图 / 素材图上传卡片 — 电商产品创作与微剧故事版统一 */
@@ -49,6 +51,7 @@ export function EcomRefUploadCard({
   removeLabel = "删除",
   onTitleClick,
   inputRef,
+  toolbarPrefix,
 }: Props) {
   const { dragOver, pasteReady, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy,
@@ -94,6 +97,7 @@ export function EcomRefUploadCard({
           ) : null}
         </TitleTag>
         <div className="flex shrink-0 gap-1.5">
+          {toolbarPrefix}
           {onOpenAssetPicker ? (
             <EcomButtonSecondary
               size="sm"

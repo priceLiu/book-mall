@@ -97,3 +97,8 @@ export type HandCraftModelsPayload = {
 };
 
 export const HAND_CRAFT_SKETCH_MAX = 3;
+
+export const HAND_CRAFT_SKETCH_GEN_MODEL = "wan2.7-image";
+
+export const HAND_CRAFT_SKETCH_GEN_DEFAULT_PROMPT =
+  "手绘铅笔画卷发女孩 基于这个IP草图，保持所有细节不变，生成泡泡玛特风格，3D卡通角色，高清可爱，明亮干净的色调，柔和光影过渡塑造简洁现代的视觉氛围，手办，纯白色背景";

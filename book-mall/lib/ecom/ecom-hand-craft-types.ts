@@ -10,6 +10,14 @@ export const ECOM_HAND_CRAFT_TOOL_KEY = "ecom-toolkit__hand-craft";
 export const ECOM_HAND_CRAFT_MODULE = "hand-craft";
 export const ECOM_HAND_CRAFT_GENERATE_ACTION = "generate";
 export const ECOM_HAND_CRAFT_COMPOSE_ACTION = "compose";
+export const ECOM_HAND_CRAFT_SKETCH_GENERATE_ACTION = "sketch-generate";
+
+/** AI 生成线稿默认模型（通义万相 2.7 多图参考） */
+export const HAND_CRAFT_SKETCH_GEN_MODEL = "wan2.7-image";
+
+/** 生成线稿弹窗默认 Prompt（用户可改） */
+export const HAND_CRAFT_SKETCH_GEN_DEFAULT_PROMPT =
+  "手绘铅笔画卷发女孩 基于这个IP草图，保持所有细节不变，生成泡泡玛特风格，3D卡通角色，高清可爱，明亮干净的色调，柔和光影过渡塑造简洁现代的视觉氛围，手办，纯白色背景";
 
 /** 线稿最多 3 张（正面 + 补充角度） */
 export const HAND_CRAFT_SKETCH_MAX = 3;
@@ -75,6 +83,9 @@ export type HandCraftMeta = {
     heroLockedUrl?: string;
   };
   lastAssistantRaw?: string;
+  workflowSnapshot?: unknown;
+  workflowSnapshotHistory?: unknown[];
+  reusedFrom?: { savedAt: string; title: string; at: string };
 };
 
 const slotSchema = z.object({

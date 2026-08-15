@@ -23,9 +23,11 @@ import {
   type EcomAsset,
 } from "@/lib/ecom-api";
 import { reuseProductDesignProject } from "@/lib/ecom-product-design-api";
+import { reuseHandCraftProject } from "@/lib/ecom-hand-craft-api";
 import {
   listLibrarySections,
   type EcomLibraryAssetGroup,
+  type EcomLibraryHandCraftBundle,
   type EcomLibraryProductDesignBundle,
   type EcomLibrarySection,
   type EcomLibrarySeedVideoBundle,
@@ -39,6 +41,7 @@ import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
 
 const STORYBOARD_STORAGE_KEY = "ecom-storyboard-active-project";
 const SEED_VIDEO_STORAGE_KEY = "ecom-seed-video-active-project";
+const HAND_CRAFT_STORAGE_KEY = "ecom-hand-craft-active-project";
 
 const DOMAIN_ORDER = ["电商", "视频", "品牌"] as const;
 
@@ -182,7 +185,8 @@ export default function LibraryPage() {
       const bundleCount =
         section.storyboardBundles.length +
         section.productDesignBundles.length +
-        section.seedVideoBundles.length;
+        section.seedVideoBundles.length +
+        section.handCraftBundles.length;
       counts.workflows += bundleCount;
       if (section.domainLabel === "电商") counts.ecom += mediaCount;
       if (section.domainLabel === "视频") counts.video += mediaCount;
@@ -211,11 +215,12 @@ export default function LibraryPage() {
     const items: Array<{
       key: string;
       section: EcomLibrarySection;
-      kind: "product-design" | "storyboard" | "seed-video";
+      kind: "product-design" | "storyboard" | "seed-video" | "hand-craft";
       bundle:
         | EcomLibraryProductDesignBundle
         | EcomLibraryStoryboardBundle
-        | EcomLibrarySeedVideoBundle;
+        | EcomLibrarySeedVideoBundle
+        | EcomLibraryHandCraftBundle;
     }> = [];
     for (const section of sections) {
       for (const bundle of section.productDesignBundles) {
@@ -223,6 +228,14 @@ export default function LibraryPage() {
           key: `pd-${bundle.projectId}-${bundle.savedAt}`,
           section,
           kind: "product-design",
+          bundle,
+        });
+      }
+      for (const bundle of section.handCraftBundles) {
+        items.push({
+          key: `hc-${bundle.projectId}-${bundle.savedAt}`,
+          section,
+          kind: "hand-craft",
           bundle,
         });
       }
@@ -304,7 +317,8 @@ export default function LibraryPage() {
               s.assets.length > 0 ||
               s.storyboardBundles.length > 0 ||
               s.productDesignBundles.length > 0 ||
-              s.seedVideoBundles.length > 0,
+              s.seedVideoBundles.length > 0 ||
+              s.handCraftBundles.length > 0,
           ),
       );
       setTotalAssets((n) => Math.max(0, n - 1));
@@ -358,6 +372,26 @@ export default function LibraryPage() {
         sessionStorage.setItem(STORYBOARD_STORAGE_KEY, project.id);
       }
       router.push("/ecom/storyboard/micro-drama");
+    } catch (e) {
+      await alert({
+        title: "复用失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setReuseBusy(null);
+    }
+  }
+
+  async function onReuseHandCraftBundle(bundle: EcomLibraryHandCraftBundle) {
+    const key = `hc:${bundle.projectId}:${bundle.savedAt}`;
+    setReuseBusy(key);
+    try {
+      const project = await reuseHandCraftProject(bundle.projectId, bundle.savedAt);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(HAND_CRAFT_STORAGE_KEY, project.id);
+      }
+      router.push("/ecom/hand-craft");
     } catch (e) {
       await alert({
         title: "复用失败",
@@ -429,7 +463,7 @@ export default function LibraryPage() {
           ) : empty ? (
             <p className="mt-6 text-sm text-[#6e6e73]">
               {activeTab === "workflows"
-                ? "暂无已保存工作流。请在种草视频 / 主图创作 / 微剧故事版等工作台点「保存」后再来此处一键复用。"
+                ? "暂无已保存工作流。请在手伴创作 / 主图创作 / 种草视频 / 微剧故事版等工作台点「保存」后再来此处一键复用。"
                 : "该分类暂无资产，去各模块生成后会出现在对应 Tab。"}
             </p>
           ) : activeTab === "workflows" ? (
@@ -447,6 +481,7 @@ export default function LibraryPage() {
                   onReuseProductDesignBundle={onReuseProductDesignBundle}
                   onReuseStoryboardBundle={onReuseStoryboardBundle}
                   onReuseSeedVideoBundle={onReuseSeedVideoBundle}
+                  onReuseHandCraftBundle={onReuseHandCraftBundle}
                 />
               ))}
             </div>
@@ -470,6 +505,7 @@ export default function LibraryPage() {
                       onReuseStoryboardBundle={onReuseStoryboardBundle}
                       onReuseProductDesignBundle={onReuseProductDesignBundle}
                       onReuseSeedVideoBundle={onReuseSeedVideoBundle}
+                      onReuseHandCraftBundle={onReuseHandCraftBundle}
                       onOpenSeedVideoProject={onOpenSeedVideoProject}
                     />
                   ))}
@@ -529,6 +565,7 @@ function LibrarySectionBlock({
   onReuseStoryboardBundle,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
+  onReuseHandCraftBundle,
   onOpenSeedVideoProject,
 }: {
   section: EcomLibrarySection;
@@ -543,6 +580,7 @@ function LibrarySectionBlock({
   onReuseStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
+  onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   const groups = flatAssets
@@ -559,7 +597,8 @@ function LibrarySectionBlock({
     groups.length === 0 &&
     section.productDesignBundles.length === 0 &&
     section.storyboardBundles.length === 0 &&
-    section.seedVideoBundles.length === 0
+    section.seedVideoBundles.length === 0 &&
+    section.handCraftBundles.length === 0
   ) {
     return null;
   }
@@ -589,7 +628,8 @@ function LibrarySectionBlock({
       {!flatAssets &&
       (section.productDesignBundles.length > 0 ||
       section.storyboardBundles.length > 0 ||
-      section.seedVideoBundles.length > 0) ? (
+      section.seedVideoBundles.length > 0 ||
+      section.handCraftBundles.length > 0) ? (
         <div className="space-y-4">
           {section.productDesignBundles.map((bundle) => {
             const busy = reuseBusy === `pd:${bundle.projectId}:${bundle.savedAt}`;
@@ -628,6 +668,50 @@ function LibrarySectionBlock({
                     title="一键复用"
                     disabled={busy}
                     onClick={() => onReuseProductDesignBundle(bundle)}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {section.handCraftBundles.map((bundle) => {
+            const busy = reuseBusy === `hc:${bundle.projectId}:${bundle.savedAt}`;
+            return (
+              <div key={`hc-${bundle.projectId}-${bundle.savedAt}`}>
+                <LibraryBreadcrumb
+                  domain={section.domainLabel}
+                  moduleTitle={section.title}
+                  projectName={bundle.title}
+                />
+                <div className="flex flex-wrap items-start gap-3">
+                  {bundle.thumbnailUrl ? (
+                    <div className="w-[calc(20%-0.4rem)] min-w-[72px] max-w-[140px] flex-1">
+                      <EcomMediaLibraryTile
+                        kind="image"
+                        src={bundle.thumbnailUrl}
+                        alt={bundle.title}
+                        onPreview={() => onPreviewImage(bundle.thumbnailUrl!, bundle.title)}
+                        onDownload={() =>
+                          void downloadMediaUrl(
+                            bundle.thumbnailUrl!,
+                            mediaDownloadFilename(bundle.title, "image", bundle.thumbnailUrl!),
+                          )
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex aspect-square w-20 items-center justify-center rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]">
+                      <Layers className="h-6 w-6 text-[#86868b] opacity-50" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e8e8ed] bg-[#1d1d1f] text-white shadow-sm hover:bg-black disabled:opacity-50"
+                    aria-label="一键复用"
+                    title="一键复用"
+                    disabled={busy}
+                    onClick={() => onReuseHandCraftBundle(bundle)}
                   >
                     <RotateCcw className="h-4 w-4" />
                   </button>
@@ -754,13 +838,15 @@ function WorkflowBundleCard({
   onReuseProductDesignBundle,
   onReuseStoryboardBundle,
   onReuseSeedVideoBundle,
+  onReuseHandCraftBundle,
 }: {
   section: EcomLibrarySection;
-  kind: "product-design" | "storyboard" | "seed-video";
+  kind: "product-design" | "storyboard" | "seed-video" | "hand-craft";
   bundle:
     | EcomLibraryProductDesignBundle
     | EcomLibraryStoryboardBundle
-    | EcomLibrarySeedVideoBundle;
+    | EcomLibrarySeedVideoBundle
+    | EcomLibraryHandCraftBundle;
   reuseBusy: string | null;
   onPreviewImage: (src: string, title?: string) => void;
   onPreviewVideo: (src: string, title?: string) => void;
@@ -768,6 +854,7 @@ function WorkflowBundleCard({
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
+  onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
 }) {
   const title = bundle.title;
   const thumb =
@@ -787,6 +874,12 @@ function WorkflowBundleCard({
     onReuse = () => onReuseProductDesignBundle(b);
     kindLabel = b.module === "detail-page" ? "详情页" : "主图";
     meta = `${b.slotCount} 个槽位 · ${b.hasGeneratedImages ? "含成图" : "仅文案/计划"}`;
+  } else if (kind === "hand-craft") {
+    const b = bundle as EcomLibraryHandCraftBundle;
+    busyKey = `hc:${b.projectId}:${b.savedAt}`;
+    onReuse = () => onReuseHandCraftBundle(b);
+    kindLabel = "手伴创作";
+    meta = `${b.stepCount} 步 · ${b.imageCount} 张成图${b.hasSketch ? " · 含线稿" : ""}`;
   } else if (kind === "storyboard") {
     const b = bundle as EcomLibraryStoryboardBundle;
     busyKey = `${b.projectId}:${b.savedAt}`;

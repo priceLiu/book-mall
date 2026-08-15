@@ -50,6 +50,22 @@ export type EcomLibrarySeedVideoBundle = {
   };
 };
 
+export type EcomLibraryHandCraftBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  stepCount: number;
+  imageCount: number;
+  hasGeneratedImages: boolean;
+  hasSketch: boolean;
+  thumbnailUrl: string | null;
+  snapshot: {
+    savedAt: string;
+    title: string;
+    ipName?: string;
+  };
+};
+
 export type EcomLibraryAssetGroup = {
   projectId: string | null;
   projectName: string;
@@ -66,6 +82,7 @@ export type EcomLibrarySection = {
   storyboardBundles: EcomLibraryStoryboardBundle[];
   productDesignBundles: EcomLibraryProductDesignBundle[];
   seedVideoBundles: EcomLibrarySeedVideoBundle[];
+  handCraftBundles: EcomLibraryHandCraftBundle[];
 };
 
 export async function listLibrarySections(): Promise<{
@@ -82,6 +99,7 @@ export async function listLibrarySections(): Promise<{
       productDesignBundles: s.productDesignBundles ?? [],
       storyboardBundles: s.storyboardBundles ?? [],
       seedVideoBundles: s.seedVideoBundles ?? [],
+      handCraftBundles: s.handCraftBundles ?? [],
     })),
     totalAssets: typeof data.totalAssets === "number" ? data.totalAssets : 0,
     totalBundles: typeof data.totalBundles === "number" ? data.totalBundles : 0,

@@ -15,6 +15,7 @@ import {
   createHandCraftProject,
   deleteHandCraftProject,
   fetchHandCraftModels,
+  generateHandCraftSketch,
   getHandCraftProject,
   listHandCraftProjectSummaries,
   removeHandCraftSketch,
@@ -43,6 +44,7 @@ export function HandCraftStudio() {
   const [empty, setEmpty] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
+  const [sketchGenBusy, setSketchGenBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantWide, setAssistantWide] = useState(false);
@@ -247,6 +249,47 @@ export function HandCraftStudio() {
     }
   }
 
+  function projectHasGeneratedOutput(p: HandCraftProject): boolean {
+    const state = p.plan?.steps ?? {};
+    return Object.values(state).some(
+      (s) => s?.slots?.some((slot) => slot.imageUrl) || (s?.outputs?.length ?? 0) > 0,
+    );
+  }
+
+  async function handleGenerateSketch(prompt: string) {
+    if (!project) return;
+
+    let resetFlow = false;
+    if (project.references.length > 0 && projectHasGeneratedOutput(project)) {
+      resetFlow = await confirm({
+        title: "重新生成主线稿？",
+        message:
+          "本项目已有成图。重新生成并替换第 1 张线稿会重置 10 步产出与主形象锁定（已出图仍留在资产库）。是否继续？",
+        confirmLabel: "重新生成并重置",
+      });
+      if (!resetFlow) return;
+    }
+
+    setSketchGenBusy(true);
+    setRefBusy(true);
+    try {
+      const { project: next } = await generateHandCraftSketch(project.id, prompt, {
+        resetFlow,
+      });
+      applyProject(next);
+    } catch (e) {
+      await alert({
+        title: "生成线稿失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+      throw e;
+    } finally {
+      setSketchGenBusy(false);
+      setRefBusy(false);
+    }
+  }
+
   async function handleRefRemove(refId: string) {
     if (!project) return;
     const ok = await doubleConfirm({
@@ -374,7 +417,9 @@ export function HandCraftStudio() {
         imageGenConcurrencyLimit={concurrencyLimit}
         onRefUpload={handleRefUpload}
         onRefRemove={handleRefRemove}
+        onGenerateSketch={handleGenerateSketch}
         refBusy={refBusy}
+        sketchGenBusy={sketchGenBusy}
         uploadProgress={uploadProgress}
         onNewProject={() => void handleNewProject()}
         onDeleteProject={() => void handleDeleteProject()}

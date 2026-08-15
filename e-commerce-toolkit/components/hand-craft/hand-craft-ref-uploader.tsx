@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 
+import { HandCraftSketchGenerateDialog } from "@/components/hand-craft/hand-craft-sketch-generate-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
+import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import { HAND_CRAFT_SKETCH_MAX, type HandCraftReference } from "@/lib/hand-craft-types";
 
@@ -10,7 +13,9 @@ type Props = {
   references: HandCraftReference[];
   onUpload: (file: File) => Promise<void>;
   onRemove?: (id: string) => void | Promise<void>;
+  onGenerateSketch?: (prompt: string) => Promise<void>;
   busy?: boolean;
+  sketchGenBusy?: boolean;
   uploadProgress?: number | null;
   className?: string;
 };
@@ -19,13 +24,17 @@ export function HandCraftRefUploader({
   references,
   onUpload,
   onRemove,
+  onGenerateSketch,
   busy,
+  sketchGenBusy = false,
   uploadProgress = null,
   className,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [genDialogOpen, setGenDialogOpen] = useState(false);
   const atLimit = references.length >= HAND_CRAFT_SKETCH_MAX;
   const disabled = Boolean(busy) || atLimit;
+  const genDisabled = Boolean(busy) || Boolean(sketchGenBusy) || !onGenerateSketch;
 
   async function handleFiles(files: File[]) {
     if (!files.length || disabled) return;
@@ -36,6 +45,16 @@ export function HandCraftRefUploader({
       remaining -= 1;
     }
     if (inputRef.current) inputRef.current.value = "";
+  }
+
+  async function handleGenerate(prompt: string) {
+    if (!onGenerateSketch) return;
+    try {
+      await onGenerateSketch(prompt);
+      setGenDialogOpen(false);
+    } catch {
+      /* 错误由上层 alert */
+    }
   }
 
   return (
@@ -61,6 +80,28 @@ export function HandCraftRefUploader({
         onOpenFilePicker={() => inputRef.current?.click()}
         onUploadFiles={(files) => void handleFiles(files)}
         onRemove={onRemove}
+        toolbarPrefix={
+          onGenerateSketch ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={genDisabled}
+              className="h-7 px-2 text-[10px]"
+              onClick={() => setGenDialogOpen(true)}
+            >
+              <Sparkles className="h-3 w-3 shrink-0" />
+              生成线稿
+            </EcomButtonSecondary>
+          ) : null
+        }
+      />
+
+      <HandCraftSketchGenerateDialog
+        open={genDialogOpen}
+        onOpenChange={setGenDialogOpen}
+        busy={sketchGenBusy}
+        hasSeedSketch={references.length > 0}
+        onConfirm={handleGenerate}
       />
     </div>
   );

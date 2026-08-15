@@ -7,6 +7,10 @@ import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-s
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
 import { ECOM_SEED_VIDEO_MODULE } from "@/lib/ecom/ecom-seed-video-types";
 import type { ProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
+import type { HandCraftWorkflowSnapshot } from "@/lib/ecom/ecom-hand-craft-snapshot";
+import { countHandCraftGeneratedImages } from "@/lib/ecom/ecom-hand-craft-snapshot";
+import { HAND_CRAFT_STEPS } from "@/lib/ecom/ecom-hand-craft-steps";
+import { ECOM_HAND_CRAFT_MODULE } from "@/lib/ecom/ecom-hand-craft-types";
 import {
   ECOM_PROJECT_MODULE_DETAIL,
   ECOM_PROJECT_MODULE_MAIN,
@@ -73,6 +77,18 @@ export type EcomLibrarySeedVideoBundle = {
   snapshot: SeedVideoDeliverableSnapshot;
 };
 
+export type EcomLibraryHandCraftBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  stepCount: number;
+  imageCount: number;
+  hasGeneratedImages: boolean;
+  hasSketch: boolean;
+  thumbnailUrl: string | null;
+  snapshot: HandCraftWorkflowSnapshot;
+};
+
 export type EcomLibrarySection = {
   moduleId: string;
   title: string;
@@ -83,6 +99,7 @@ export type EcomLibrarySection = {
   storyboardBundles: EcomLibraryStoryboardBundle[];
   productDesignBundles: EcomLibraryProductDesignBundle[];
   seedVideoBundles: EcomLibrarySeedVideoBundle[];
+  handCraftBundles: EcomLibraryHandCraftBundle[];
 };
 
 const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
@@ -249,6 +266,66 @@ function collectSeedVideoSnapshotsFromMeta(
   return out;
 }
 
+function collectHandCraftSnapshotsFromMeta(
+  meta: Record<string, unknown> | null | undefined,
+): HandCraftWorkflowSnapshot[] {
+  const out: HandCraftWorkflowSnapshot[] = [];
+  const latest = meta?.workflowSnapshot as HandCraftWorkflowSnapshot | undefined;
+  const history = Array.isArray(meta?.workflowSnapshotHistory)
+    ? (meta!.workflowSnapshotHistory as HandCraftWorkflowSnapshot[])
+    : [];
+  const seen = new Set<string>();
+  for (const snap of [latest, ...history]) {
+    if (!snap?.savedAt || !snap.plan) continue;
+    if (seen.has(snap.savedAt)) continue;
+    seen.add(snap.savedAt);
+    out.push(snap);
+  }
+  return out;
+}
+
+function snapshotToHandCraftBundle(
+  projectId: string,
+  snap: HandCraftWorkflowSnapshot,
+): EcomLibraryHandCraftBundle {
+  const imageCount = countHandCraftGeneratedImages(snap.plan);
+  const heroUrl = snap.meta?.workflow?.heroLockedUrl?.trim();
+  let thumb = heroUrl || null;
+  if (!thumb) {
+    for (const step of HAND_CRAFT_STEPS) {
+      const state = snap.plan.steps[step.id];
+      if (!state) continue;
+      if (step.kind === "compose") {
+        const url = state.outputs.find((o) => o.imageUrl?.trim())?.imageUrl?.trim();
+        if (url) {
+          thumb = url;
+          break;
+        }
+      } else {
+        const url = state.slots.find((s) => s.imageUrl?.trim())?.imageUrl?.trim();
+        if (url) {
+          thumb = url;
+          break;
+        }
+      }
+    }
+  }
+  if (!thumb) {
+    thumb = snap.references.find((r) => r.ossUrl?.trim())?.ossUrl?.trim() || null;
+  }
+  return {
+    projectId,
+    savedAt: snap.savedAt,
+    title: snap.title,
+    stepCount: HAND_CRAFT_STEPS.length,
+    imageCount,
+    hasGeneratedImages: imageCount > 0,
+    hasSketch: snap.references.length > 0,
+    thumbnailUrl: thumb,
+    snapshot: snap,
+  };
+}
+
 function snapshotToSeedVideoBundle(
   projectId: string,
   snap: SeedVideoDeliverableSnapshot,
@@ -311,7 +388,8 @@ function snapshotToBundle(
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
   await backfillEcomAssetProjectNamesForUser(userId);
 
-  const [assets, storyboardRows, productDesignRows, seedVideoRows] = await Promise.all([
+  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows] =
+    await Promise.all([
     prisma.ecomAsset.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -340,12 +418,19 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       take: 50,
       select: { id: true, meta: true, title: true },
     }),
+    prisma.ecomHandCraftProject.findMany({
+      where: { userId, module: ECOM_HAND_CRAFT_MODULE },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: { id: true, meta: true, title: true },
+    }),
   ]);
 
   const projectNameLookup = buildProjectNameLookup(
     productDesignRows,
     storyboardRows,
     seedVideoRows,
+    handCraftRows,
   );
 
   const assetsByModule = new Map<string, EcomLibraryAssetItem[]>();
@@ -404,6 +489,15 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     list.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   }
 
+  const handCraftBundles: EcomLibraryHandCraftBundle[] = [];
+  for (const row of handCraftRows) {
+    const meta = (row.meta as Record<string, unknown> | null) ?? null;
+    for (const snap of collectHandCraftSnapshotsFromMeta(meta)) {
+      handCraftBundles.push(snapshotToHandCraftBundle(row.id, snap));
+    }
+  }
+  handCraftBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+
   const orderedIds = [
     ...IMAGE_MODULE_IDS,
     ...VIDEO_MODULE_IDS,
@@ -420,11 +514,13 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       moduleId === "storyboard-micro-drama" ? bundles : [];
     const sectionSeedVideoBundles = moduleId === "seed-video" ? seedVideoBundles : [];
     const sectionProductDesignBundles = productDesignBundlesByModule.get(moduleId) ?? [];
+    const sectionHandCraftBundles = moduleId === "hand-craft" ? handCraftBundles : [];
     if (
       sectionAssets.length === 0 &&
       sectionBundles.length === 0 &&
       sectionSeedVideoBundles.length === 0 &&
-      sectionProductDesignBundles.length === 0
+      sectionProductDesignBundles.length === 0 &&
+      sectionHandCraftBundles.length === 0
     ) {
       continue;
     }
@@ -438,6 +534,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       storyboardBundles: sectionBundles,
       productDesignBundles: sectionProductDesignBundles,
       seedVideoBundles: sectionSeedVideoBundles,
+      handCraftBundles: sectionHandCraftBundles,
     });
   }
 

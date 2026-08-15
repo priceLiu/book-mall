@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Download, Images, Trash2 } from "lucide-react";
+import { Download, Images, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { HandCraftComposePanel } from "@/components/hand-craft/hand-craft-compose-panel";
 import { HandCraftRefUploader } from "@/components/hand-craft/hand-craft-ref-uploader";
+import { HandCraftSaveDialog } from "@/components/hand-craft/hand-craft-save-dialog";
 import { HandCraftSlotGrid } from "@/components/hand-craft/hand-craft-slot-grid";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 import {
@@ -20,6 +21,7 @@ import {
   downloadHandCraftExportZip,
   generateHandCraftStep,
   getHandCraftProject,
+  saveHandCraftWorkflow,
 } from "@/lib/ecom-hand-craft-api";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import {
@@ -48,7 +50,9 @@ type Props = {
   imageGenConcurrencyLimit?: number;
   onRefUpload: (file: File) => Promise<void>;
   onRefRemove: (refId: string) => void | Promise<void>;
+  onGenerateSketch?: (prompt: string) => Promise<void>;
   refBusy?: boolean;
+  sketchGenBusy?: boolean;
   uploadProgress?: number | null;
   onNewProject?: () => void | Promise<void>;
   onDeleteProject?: () => void | Promise<void>;
@@ -71,7 +75,9 @@ export function HandCraftContentPanel({
   imageGenConcurrencyLimit = 1,
   onRefUpload,
   onRefRemove,
+  onGenerateSketch,
   refBusy,
+  sketchGenBusy = false,
   uploadProgress = null,
   onNewProject,
   onDeleteProject,
@@ -102,6 +108,7 @@ export function HandCraftContentPanel({
     items: ProductDesignGalleryPreviewItem[];
     initialIndex: number;
   } | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const genPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => setDraftModelKey(imageModelKey), [imageModelKey]);
@@ -307,6 +314,29 @@ export function HandCraftContentPanel({
     }
   }
 
+  async function handleSaveWorkflow(ipName: string) {
+    setBusy("正在保存到资产库…");
+    try {
+      const snapshot = await saveHandCraftWorkflow(project.id, ipName);
+      setSaveDialogOpen(false);
+      await alert({
+        title: "已保存到资产库",
+        message: `「${snapshot.title}」已保存。可在「我的资产 · 手伴创作」一键复用。`,
+      });
+    } catch (e) {
+      await alert({
+        title: "保存失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const defaultSaveIpName = project.title?.trim() || "手伴IP";
+  const canSave = project.references.length > 0 || progress > 0;
+
   const progress = useMemo(
     () =>
       HAND_CRAFT_STEPS.reduce(
@@ -316,7 +346,7 @@ export function HandCraftContentPanel({
     [project],
   );
   const totalSlots = HAND_CRAFT_STEPS.reduce((acc, s) => acc + s.count, 0);
-  const disabledAll = Boolean(streaming) || Boolean(generating) || composeBusy;
+  const disabledAll = Boolean(streaming) || Boolean(generating) || composeBusy || sketchGenBusy;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
@@ -362,6 +392,16 @@ export function HandCraftContentPanel({
                 size="sm"
                 type="button"
                 dark
+                disabled={Boolean(busy) || !canSave || disabledAll}
+                onClick={() => setSaveDialogOpen(true)}
+              >
+                <Save className="h-3.5 w-3.5 shrink-0" />
+                保存
+              </EcomButtonSecondary>
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                dark
                 disabled={Boolean(busy) || progress === 0}
                 onClick={() => void handleExportZip()}
               >
@@ -389,7 +429,9 @@ export function HandCraftContentPanel({
             references={project.references}
             onUpload={onRefUpload}
             onRemove={onRefRemove}
+            onGenerateSketch={onGenerateSketch}
             busy={Boolean(refBusy) || disabledAll}
+            sketchGenBusy={sketchGenBusy}
             uploadProgress={uploadProgress}
           />
           <p className="mt-2 text-[11px] leading-relaxed text-[#6e6e73]">
@@ -399,8 +441,8 @@ export function HandCraftContentPanel({
         </section>
 
         <StoryboardTaskStatus
-          active={Boolean(busy)}
-          title={busy ?? ""}
+          active={Boolean(busy) || sketchGenBusy}
+          title={sketchGenBusy ? "AI 生成线稿中" : busy ?? ""}
           className="mt-3"
           surface="chrome"
         />
@@ -517,6 +559,14 @@ export function HandCraftContentPanel({
         onOpenChange={(open) => {
           if (!open) setGalleryPreview(null);
         }}
+      />
+
+      <HandCraftSaveDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultIpName={defaultSaveIpName}
+        busy={Boolean(busy)}
+        onConfirm={handleSaveWorkflow}
       />
     </div>
   );

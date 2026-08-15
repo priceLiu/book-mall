@@ -117,6 +117,38 @@ export async function removeHandCraftSketch(
   }
 }
 
+/** AI 生成线稿（wan2.7-image），可能耗时数分钟 */
+export async function generateHandCraftSketch(
+  projectId: string,
+  prompt: string,
+  opts?: { resetFlow?: boolean },
+): Promise<{ reference: HandCraftReference; project: HandCraftProject }> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/refs/generate`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: prompt.trim(),
+        resetFlow: opts?.resetFlow ? true : undefined,
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(msg === "fetch failed" ? "与服务器连接中断，请稍后重试。" : msg);
+  }
+  if (res.status === 401) throw new EcomUnauthorizedError("未登录");
+  if (!res.ok) {
+    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(j.error ?? `生成失败 (${res.status})`);
+  }
+  return (await res.json()) as {
+    reference: HandCraftReference;
+    project: HandCraftProject;
+  };
+}
+
 export async function patchHandCraftStepPrompts(
   projectId: string,
   stepId: HandCraftStepId,
@@ -303,4 +335,38 @@ export async function downloadHandCraftExportZip(projectId: string): Promise<voi
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export type HandCraftWorkflowSnapshot = {
+  savedAt: string;
+  title: string;
+  ipName?: string;
+};
+
+/** 保存完整手伴工作流镜像到资产库（手伴创作类目） */
+export async function saveHandCraftWorkflow(
+  projectId: string,
+  ipName: string,
+): Promise<HandCraftWorkflowSnapshot> {
+  const trimmed = ipName.trim();
+  if (!trimmed) throw new Error("请填写 IP 名");
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/save`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ipName: trimmed }),
+  });
+  return data.snapshot as HandCraftWorkflowSnapshot;
+}
+
+/** 从资产库快照一键复用（复制流程，去掉成图） */
+export async function reuseHandCraftProject(
+  projectId: string,
+  savedAt: string,
+): Promise<HandCraftProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/reuse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ savedAt }),
+  });
+  return data.project as HandCraftProject;
 }
