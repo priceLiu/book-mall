@@ -7,35 +7,12 @@ import type {
   StoryHeroBackground,
   StoryHeroClip,
 } from "@/lib/story-theater-videos";
-import Image from "next/image";
+import { storyHeroFallbackBackground } from "@/lib/story-theater-videos";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
 
-const LOCAL_HERO_POSTER = "/home-hero-poster.webp";
-const LOCAL_HERO_VIDEO_WEBM = "/home-hero-opt.webm";
-const LOCAL_HERO_VIDEO_MP4 = "/home-hero-opt.mp4";
-const POSTER_DIM = { w: 1920, h: 1080 } as const;
-
-function isLocalHeroVideo(url: string): boolean {
-  return url.startsWith("/home-hero");
-}
-
 function HeroPosterImage({ poster }: { poster: string }) {
-  if (poster === LOCAL_HERO_POSTER) {
-    return (
-      <Image
-        width={POSTER_DIM.w}
-        height={POSTER_DIM.h}
-        sizes="100vw"
-        priority
-        className="site-home-hero-bg-video"
-        src={poster}
-        alt=""
-      />
-    );
-  }
-
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -62,8 +39,6 @@ function SiteHomeHeroBackgroundVideo({
   onError: () => void;
   onMutedChange: (muted: boolean) => void;
 }) {
-  const useLocalSources = isLocalHeroVideo(background.url);
-
   return (
     <video
       ref={videoRef}
@@ -87,19 +62,12 @@ function SiteHomeHeroBackgroundVideo({
       }}
       onError={onError}
     >
-      {useLocalSources ? (
-        <>
-          <source src={LOCAL_HERO_VIDEO_WEBM} type="video/webm" />
-          <source src={LOCAL_HERO_VIDEO_MP4} type="video/mp4" />
-        </>
-      ) : (
-        <source src={background.url} type="video/mp4" />
-      )}
+      <source src={background.url} type="video/mp4" />
     </video>
   );
 }
 
-/** 首屏：全屏视频背景 + 底部文案浮层 */
+/** 首屏：全屏 OSS 视频背景 + 底部文案浮层 */
 export function SiteHomeHeroSection({
   clips,
   background: initialBackground,
@@ -112,6 +80,7 @@ export function SiteHomeHeroSection({
   const [videoError, setVideoError] = useState(false);
   const [audible, setAudible] = useState(false);
   const [background, setBackground] = useState(initialBackground);
+  const fallback = storyHeroFallbackBackground();
 
   useEffect(() => {
     setMounted(true);
@@ -125,11 +94,8 @@ export function SiteHomeHeroSection({
   const showVideo = mounted && !videoError;
 
   const handleVideoError = () => {
-    if (!isLocalHeroVideo(background.url)) {
-      setBackground({
-        url: LOCAL_HERO_VIDEO_MP4,
-        poster: LOCAL_HERO_POSTER,
-      });
+    if (background.url !== fallback.url) {
+      setBackground(fallback);
       setVideoError(false);
       return;
     }

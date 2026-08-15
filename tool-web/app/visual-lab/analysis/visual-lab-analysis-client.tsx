@@ -32,6 +32,7 @@ import {
   formatRequiredPointsShortfall,
   readRequiredPointsFromSettleJson,
 } from "@/lib/format-points-ui";
+import { VISUAL_LAB_DEMO_VIDEO } from "@/lib/visual-lab-demo-assets";
 import {
   type VisualLabGalleryItem,
   type VisualLabSnapshotStats,
@@ -93,8 +94,8 @@ const ANALYSIS_TEMPLATES: AnalysisTemplate[] = [
     title: "视频理解",
     description:
       "根据这个视频，在一个 HTML 中，复刻视频中的网站，需要尽量和视频中一致，不丢失细节",
-    videoSrc: "/videos/qwen36-flash-ex2.mp4",
-    fileName: "qwen36-flash-ex2.mp4",
+    videoSrc: VISUAL_LAB_DEMO_VIDEO.url,
+    fileName: VISUAL_LAB_DEMO_VIDEO.fileName,
     prompt: TEMPLATE_PROMPT_VIDEO_REPLICATE,
   },
   {
