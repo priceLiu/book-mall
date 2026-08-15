@@ -1,6 +1,7 @@
 "use client";
 
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { SeedVideoReference, SeedVideoShot } from "@/lib/seed-video-types";
 
 type Props = {
@@ -14,6 +15,14 @@ type Props = {
   /** 单次成片：只展示脚本表，不展示逐镜视频格 */
   hideVideoColumn?: boolean;
   hideStatusColumn?: boolean;
+  /** 方案②：镜号列勾选 + 表底按选中生成 */
+  showGenerateActions?: boolean;
+  selectDisabled?: boolean;
+  selectedShotIndices?: ReadonlySet<number>;
+  onToggleShotSelected?: (index: number, checked: boolean) => void;
+  onGenerateSelected?: () => void;
+  generateSelectedDisabled?: boolean;
+  selectedCount?: number;
 };
 
 export function SeedVideoShotTable({
@@ -26,6 +35,13 @@ export function SeedVideoShotTable({
   onPreviewVideo,
   hideVideoColumn = false,
   hideStatusColumn = false,
+  showGenerateActions = false,
+  selectDisabled = false,
+  selectedShotIndices,
+  onToggleShotSelected,
+  onGenerateSelected,
+  generateSelectedDisabled = false,
+  selectedCount = 0,
 }: Props) {
   function patchShot(index: number, patch: Partial<SeedVideoShot>) {
     onChange(shots.map((s) => (s.index === index ? { ...s, ...patch } : s)));
@@ -56,6 +72,12 @@ export function SeedVideoShotTable({
     return { label: "待生成", className: "text-[#86868b]" };
   }
 
+  const columnCount =
+    6 + (hideVideoColumn ? 0 : 1) + (hideStatusColumn ? 0 : 1);
+
+  const generateLabel =
+    selectedCount > 0 ? `生成 (${selectedCount})` : "生成";
+
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
       <table className="min-w-full text-left text-xs">
@@ -78,9 +100,26 @@ export function SeedVideoShotTable({
             const thumb = refUrl(shot.refImageId);
             const status = shotStatus(shot);
             const isGenerating = isShotGenerating(shot.index);
+            const isSelected = selectedShotIndices?.has(shot.index) ?? false;
             return (
               <tr key={shot.index} className="border-t border-[#e8e8ed] align-top">
-                <td className="px-3 py-2 font-medium text-[#1d1d1f]">{shot.index}</td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    {showGenerateActions ? (
+                      <input
+                        type="checkbox"
+                        className="size-3.5 shrink-0 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#0071e3]/30 disabled:opacity-40"
+                        checked={isSelected}
+                        disabled={selectDisabled}
+                        aria-label={`选择镜 ${shot.index}`}
+                        onChange={(e) => onToggleShotSelected?.(shot.index, e.target.checked)}
+                      />
+                    ) : null}
+                    <span className="min-w-[1rem] text-center text-xs font-semibold text-[#1d1d1f]">
+                      {shot.index}
+                    </span>
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-[#6e6e73]">{shot.timeSlice}</td>
                 <td className="px-3 py-2">
                   {thumb ? (
@@ -142,6 +181,23 @@ export function SeedVideoShotTable({
             );
           })}
         </tbody>
+        {showGenerateActions ? (
+          <tfoot>
+            <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
+              <td colSpan={columnCount} className="px-3 py-2.5">
+                <EcomButtonSecondary
+                  type="button"
+                  size="sm"
+                  className="min-w-[9rem] px-6"
+                  disabled={generateSelectedDisabled}
+                  onClick={() => onGenerateSelected?.()}
+                >
+                  {generateLabel}
+                </EcomButtonSecondary>
+              </td>
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );

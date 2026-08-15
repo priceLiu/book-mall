@@ -249,6 +249,9 @@ export function SeedVideoContentPanel({
   );
   const [pickerPanelIndex, setPickerPanelIndex] = useState<number | null>(null);
   const [pickerTarget, setPickerTarget] = useState<"panel" | "fullSheet">("fullSheet");
+  const [pickerGenerateAllParallel, setPickerGenerateAllParallel] = useState(false);
+  const [pickerSelectedShotIndices, setPickerSelectedShotIndices] = useState<number[]>([]);
+  const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
   const [generatingShots, setGeneratingShots] = useState<Set<number>>(() => new Set());
   const [batchShotBusy, setBatchShotBusy] = useState(false);
   const [ttsBusy, setTtsBusy] = useState(false);
@@ -278,6 +281,10 @@ export function SeedVideoContentPanel({
         SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
     );
   }, [directPlan?.durationSec, project.settings.targetDurationSec, project.id]);
+
+  useEffect(() => {
+    setSelectedShotIndices(new Set());
+  }, [project.id]);
 
   const pendingShotIndices = useMemo(
     () =>
@@ -481,7 +488,14 @@ export function SeedVideoContentPanel({
     panelIndex?: number;
     fullSheet?: boolean;
     strategy?: SeedVideoProductionStrategy;
+    generateAllParallel?: boolean;
+    generateSelected?: boolean;
+    selectedShotIndices?: number[];
   }) {
+    setPickerGenerateAllParallel(Boolean(opts.generateAllParallel));
+    setPickerSelectedShotIndices(
+      opts.generateSelected ? (opts.selectedShotIndices ?? []) : [],
+    );
     if (opts.strategy) setProductionStrategy(opts.strategy);
     setPickerTarget(opts.fullSheet ? "fullSheet" : "panel");
     setPickerPanelIndex(opts.panelIndex ?? null);
@@ -507,6 +521,9 @@ export function SeedVideoContentPanel({
     panelIndex?: number;
     fullSheet?: boolean;
     strategy?: SeedVideoProductionStrategy;
+    generateAllParallel?: boolean;
+    generateSelected?: boolean;
+    selectedShotIndices?: number[];
   }) {
     if (filteredModels.length > 0) {
       const validKeys = new Set(filteredModels.map((m) => m.modelKey));
@@ -520,6 +537,8 @@ export function SeedVideoContentPanel({
       opts.panelIndex == null &&
       !opts.fullSheet &&
       !opts.strategy &&
+      !opts.generateAllParallel &&
+      !opts.generateSelected &&
       productionStrategy == null
     ) {
       setStrategyDialogOpen(true);
@@ -628,6 +647,43 @@ export function SeedVideoContentPanel({
       const after = await getSeedVideoProject(project.id);
       current = mergeSeedVideoShots(current, after.plan?.shots ?? current);
       setLocalShots(current);
+    }
+  }
+
+  async function runSelectedShotsParallel(modelKey: string, shotIndices: number[]) {
+    const unique = [...new Set(shotIndices)].sort((a, b) => a - b);
+    if (unique.length === 0) return;
+    await persistPlanShotsQuiet(
+      mergeSeedVideoShots(localShots, project.plan?.shots ?? []),
+    );
+    const fresh = await getSeedVideoProject(project.id);
+    const current = mergeSeedVideoShots(localShots, fresh.plan?.shots ?? localShots);
+    setLocalShots(current);
+    const pending = unique.filter((index) => !generatingShotsRef.current.has(index));
+    if (pending.length === 0) return;
+    void Promise.all(pending.map((index) => runPanelGenerate(modelKey, index)));
+  }
+
+  async function runAllShotsParallel(modelKey: string) {
+    setBatchShotBusy(true);
+    try {
+      await persistPlanShotsQuiet(
+        mergeSeedVideoShots(localShots, project.plan?.shots ?? []),
+      );
+      const fresh = await getSeedVideoProject(project.id);
+      let current = mergeSeedVideoShots(localShots, fresh.plan?.shots ?? localShots);
+      setLocalShots(current);
+      const pending = [...current]
+        .sort((a, b) => a.index - b.index)
+        .filter((s) => !s.videoUrl?.trim());
+      if (pending.length === 0) return;
+      await Promise.all(pending.map((shot) => runPanelGenerate(modelKey, shot.index)));
+      const after = await getSeedVideoProject(project.id);
+      current = mergeSeedVideoShots(current, after.plan?.shots ?? current);
+      setLocalShots(current);
+      await onProjectChange();
+    } finally {
+      setBatchShotBusy(false);
     }
   }
 
@@ -1045,6 +1101,17 @@ export function SeedVideoContentPanel({
       void runPanelGenerate(modelKey, pickerPanelIndex);
       return;
     }
+    if (pickerGenerateAllParallel) {
+      setPickerGenerateAllParallel(false);
+      await runAllShotsParallel(modelKey);
+      return;
+    }
+    if (pickerSelectedShotIndices.length > 0) {
+      const indices = pickerSelectedShotIndices;
+      setPickerSelectedShotIndices([]);
+      void runSelectedShotsParallel(modelKey, indices);
+      return;
+    }
     if (productionStrategy === "auto") {
       await runAutoPipeline(modelKey);
       return;
@@ -1408,7 +1475,7 @@ export function SeedVideoContentPanel({
             </p>
           ) : (
             <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-              推荐顺序：① 各镜「生成」镜头视频 → ②「批量 TTS」→ ③ 状态均为「就绪」后点「合成成片」。
+              推荐顺序：① 勾选镜头后点表底「生成」→ ②「批量 TTS」→ ③ 状态均为「就绪」后点「合成成片」。可多次勾选、多次生成。
             </p>
           )}
           <SeedVideoShotTable
@@ -1418,23 +1485,32 @@ export function SeedVideoContentPanel({
             disabled={batchProductionBusy || !finePlanSynced}
             generatingIndices={activeGeneratingIndices}
             onPreviewVideo={onPreviewVideo}
+            showGenerateActions
+            selectDisabled={!finePlanSynced}
+            selectedShotIndices={selectedShotIndices}
+            selectedCount={selectedShotIndices.size}
+            onToggleShotSelected={(index, checked) => {
+              setSelectedShotIndices((prev) => {
+                const next = new Set(prev);
+                if (checked) next.add(index);
+                else next.delete(index);
+                return next;
+              });
+            }}
+            onGenerateSelected={() => {
+              if (selectedShotIndices.size === 0) return;
+              openVideoPicker({
+                generateSelected: true,
+                selectedShotIndices: [...selectedShotIndices].sort((a, b) => a - b),
+              });
+            }}
+            generateSelectedDisabled={
+              selectedShotIndices.size === 0 ||
+              !finePlanSynced ||
+              ttsBusy ||
+              renderBusy
+            }
           />
-          <div className="flex flex-wrap gap-2 pt-2">
-            {localShots.map((shot) => (
-              <EcomButtonSecondary
-                key={shot.index}
-                type="button"
-                disabled={
-                  batchProductionBusy ||
-                  !finePlanSynced ||
-                  activeGeneratingIndices.has(shot.index)
-                }
-                onClick={() => openVideoPicker({ panelIndex: shot.index })}
-              >
-                镜 {shot.index} 生成
-              </EcomButtonSecondary>
-            ))}
-          </div>
           {finalUrl ? (
             <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
               <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
