@@ -85,14 +85,14 @@ export function EcomTemplateImportPanel() {
     (i) => i.status === "success" || i.status === "skipped",
   ).length;
   const completedTotal = stats.success + stats.skipped;
-  const resumable =
-    !activeJob.cancelled &&
-    activeJob.items.some(
-      (i) =>
-        i.status === "queued" ||
-        i.status === "uploading" ||
-        i.status === "failed",
-    );
+  // 含 cancelled：手动停止后仍要能续传，已落库的条目会在核对时自动跳过
+  const resumable = activeJob.items.some(
+    (i) =>
+      i.status === "queued" ||
+      i.status === "uploading" ||
+      i.status === "failed" ||
+      i.status === "cancelled",
+  );
   const stoppable = stats.pending > 0 && !activeJob.cancelled;
   const uploadingCount = activeJob.items.filter(
     (i) => i.status === "uploading",
@@ -247,7 +247,11 @@ export function EcomTemplateImportPanel() {
             className="flex-1 rounded-lg border border-[#0071e3] px-2 py-1.5 text-xs text-[#0071e3]"
             onClick={() => resumeJob(activeJob.id)}
           >
-            {activeJob.done ? "继续未完成" : "恢复上传"}
+            {activeJob.cancelled
+              ? `继续导入${stats.cancelled > 0 ? ` (${stats.cancelled})` : ""}`
+              : activeJob.done
+                ? "继续未完成"
+                : "恢复上传"}
           </button>
         ) : null}
         {activeJob.done && !resumable ? (

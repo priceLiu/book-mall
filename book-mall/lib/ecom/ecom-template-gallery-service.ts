@@ -220,6 +220,22 @@ export async function readTemplateGalleryCatalogLive(
   };
 }
 
+/**
+ * 仅取已入库 id 清单，供导入去重与断点续传核对。整条目约 500B，id 约 30B，
+ * 故可按 3～15s 轮询。DB 异常时 **抛出**：误判「未导入」会整批重传，
+ * 静默回退打包快照比报错更危险（快照缺少后来导入的分类）。
+ */
+export async function listTemplateGalleryEntryIdsFromDb(
+  category?: string,
+): Promise<string[]> {
+  const rows = await prisma.ecomTemplateCatalogEntry.findMany({
+    where: { deletedAt: null, ...(category ? { category } : {}) },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  return rows.map((r) => r.id);
+}
+
 export async function getTemplateGalleryCategorySummary(): Promise<
   EcomTemplateCategorySummaryRow[]
 > {

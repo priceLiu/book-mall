@@ -87,7 +87,7 @@ export function EcomPublishDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
         <h3 className="mb-3 text-base font-semibold text-[var(--ecom-ink)]">一键发布到社交平台</h3>
         <input

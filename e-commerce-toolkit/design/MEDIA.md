@@ -278,10 +278,15 @@ const { scrollRef, sentinelRef, visibleCount, hasMore, loadingMore, pageSize } =
 模板区 **须** 在导入时用 **sharp** 生成独立 `-thumb.webp` 上传 OSS，Catalog 存 **`thumbUrl` + `ossUrl`**（原图）。列表只请求 `thumbUrl`，避免 OSS 动态处理费用与全图流量。
 
 ```bash
-cd book-mall && pnpm ecom:import-template-gallery          # 原图 + 缩略图
-pnpm ecom:import-template-gallery:thumbs                   # 仅为已有 ossUrl 补 thumb
-pnpm ecom:import-template-gallery --skip-existing          # 跳过 oss+thumb 均已存在的行
+cd book-mall
+pnpm ecom:import-template-gallery -- --category shoes             # 原图预览 + webp 缩略图
+pnpm ecom:import-template-gallery -- --file "tmp/pic/帽子.html"    # 按文件名推断分类
+pnpm ecom:import-template-gallery -- --category kids --media video
+pnpm ecom:import-template-gallery:thumbs -- --category shoes      # 仅为已有 ossUrl 补 thumb
 ```
+
+`--category` 接受任意已登记分类（见 `e-commerce-toolkit/lib/ecom-template-gallery/types.ts`）；不传时脚本会列出全部可选值。
+去重与 id 生成以 **库** 为准且与页面导入共用 `parseTemplateGalleryHtml` / `importTemplateGalleryItem`，故两条线不会产生重复条目；已传过的对象靠 OSS 存在性探测跳过，`--skip-known` 可连探测一并省掉。
 
 实现：`book-mall/lib/ecom/ecom-gallery-thumb.ts` · `uploadEcomTemplateGalleryThumb` · key `{id}-thumb.webp`。
 

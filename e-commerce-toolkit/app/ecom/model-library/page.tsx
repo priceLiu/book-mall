@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 import { EcomMediaLibraryTile } from "@/components/media/ecom-media-library-tile";
 import { EcomScrollLoadFooter } from "@/components/media/ecom-scroll-load-footer";
+import { shuffleByIdForDisplay } from "@/lib/ecom-random-order";
 import { useEcomScrollPagination } from "@/lib/use-ecom-scroll-pagination";
 import { listEcomModelLibraryEntries } from "@/lib/ecom-model-library/catalog";
 import { fetchEcomModelLibraryCatalog } from "@/lib/ecom-model-library-api";
@@ -50,23 +51,9 @@ function filterModels(
   });
 }
 
-/** 「全部性别」时大码女排最后；单项筛选仍按名称排序 */
-function sortModelsForDisplay(
-  models: EcomModelLibraryEntry[],
-  gender: GenderFilter,
-): EcomModelLibraryEntry[] {
-  const sorted = [...models];
-  if (gender === ALL) {
-    sorted.sort((a, b) => {
-      const aPlus = a.gender === "plus_female" ? 1 : 0;
-      const bPlus = b.gender === "plus_female" ? 1 : 0;
-      if (aPlus !== bPlus) return aPlus - bPlus;
-      return a.name.localeCompare(b.name, "zh-CN");
-    });
-    return sorted;
-  }
-  sorted.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-  return sorted;
+/** 大码女整体沉底，组内与其余模特一样随机 */
+function isPlusFemale(model: EcomModelLibraryEntry): boolean {
+  return model.gender === "plus_female";
 }
 
 export default function ModelLibraryPage() {
@@ -78,6 +65,17 @@ export default function ModelLibraryPage() {
   const [preview, setPreview] = useState<{ src: string; title?: string } | null>(
     null,
   );
+  /** 0 = 未洗牌，与服务端渲染顺序一致，避免水合不一致 */
+  const [shuffleSeed, setShuffleSeed] = useState(0);
+
+  /** 每次进页面 / 换筛选都换一批顺序 */
+  const reshuffle = useCallback(() => {
+    setShuffleSeed(Math.floor(Math.random() * 0xffffffff) + 1);
+  }, []);
+
+  useEffect(() => {
+    reshuffle();
+  }, [reshuffle]);
 
   useEffect(() => {
     void fetchEcomModelLibraryCatalog()
@@ -90,8 +88,13 @@ export default function ModelLibraryPage() {
   }, []);
 
   const models = useMemo(
-    () => sortModelsForDisplay(filterModels(allModels, gender, age), gender),
-    [allModels, gender, age],
+    () =>
+      shuffleByIdForDisplay(
+        filterModels(allModels, gender, age),
+        shuffleSeed,
+        isPlusFemale,
+      ),
+    [allModels, gender, age, shuffleSeed],
   );
 
   const {
@@ -103,7 +106,7 @@ export default function ModelLibraryPage() {
     pageSize,
   } = useEcomScrollPagination({
     total: models.length,
-    resetKey: `${gender}:${age}`,
+    resetKey: `${gender}:${age}:${shuffleSeed}`,
   });
 
   const visibleModels = useMemo(
@@ -130,7 +133,10 @@ export default function ModelLibraryPage() {
                 <select
                   className="h-9 min-w-[120px] rounded-lg border border-[#e8e8ed] bg-white px-3 text-sm text-[#1d1d1f]"
                   value={gender}
-                  onChange={(e) => setGender(e.target.value as GenderFilter)}
+                  onChange={(e) => {
+                    setGender(e.target.value as GenderFilter);
+                    reshuffle();
+                  }}
                   aria-label="性别筛选"
                 >
                   {GENDER_OPTIONS.map((opt) => (
@@ -142,7 +148,10 @@ export default function ModelLibraryPage() {
                 <select
                   className="h-9 min-w-[120px] rounded-lg border border-[#e8e8ed] bg-white px-3 text-sm text-[#1d1d1f]"
                   value={age}
-                  onChange={(e) => setAge(e.target.value as AgeFilter)}
+                  onChange={(e) => {
+                    setAge(e.target.value as AgeFilter);
+                    reshuffle();
+                  }}
                   aria-label="年龄筛选"
                 >
                   {AGE_OPTIONS.map((opt) => (

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "womens",
+    "label": "女装"
+  },
+  {
+    "id": "mens",
+    "label": "男装"
+  },
+  {
+    "id": "kids",
+    "label": "童装"
+  },
+  {
+    "id": "home-textile",
+    "label": "家纺"
+  },
+  {
+    "id": "bags",
+    "label": "箱包"
+  },
+  {
+    "id": "shoes",
+    "label": "鞋子"
+  },
+  {
+    "id": "accessories",
+    "label": "配饰"
+  },
+  {
+    "id": "cosmetics",
+    "label": "化妆品"
+  },
+  {
+    "id": "underwear",
+    "label": "内衣"
+  },
+  {
+    "id": "jewelry",
+    "label": "珠宝首饰"
+  },
+  {
+    "id": "swimwear",
+    "label": "泳装"
+  },
+  {
+    "id": "packaging",
+    "label": "包装"
+  },
+  {
+    "id": "pets",
+    "label": "宠物"
+  },
+  {
+    "id": "family-outfit",
+    "label": "亲子装"
+  },
+  {
+    "id": "baby",
+    "label": "婴幼童"
+  },
+  {
+    "id": "loungewear",
+    "label": "家居服"
+  },
+  {
+    "id": "hats",
+    "label": "帽子"
+  },
+  {
+    "id": "socks",
+    "label": "袜子"
+  },
+  {
+    "id": "scarves",
+    "label": "丝巾"
+  },
+  {
+    "id": "eyewear",
+    "label": "眼镜"
+  },
+  {
+    "id": "mattress-pillow",
+    "label": "床垫枕芯"
+  }
+]

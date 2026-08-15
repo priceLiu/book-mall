@@ -5,6 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
+import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { TextToImageLibraryItem } from "@/lib/text-to-image-library-types";
 import styles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
@@ -76,6 +81,7 @@ function LibraryView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewZoom = useImageZoomPan(previewUrl ?? "");
   const [mounted, setMounted] = useState(false);
   const [promptTip, setPromptTip] = useState<PromptTooltipState | null>(null);
   const [space, setSpace] = useState<"PERSONAL" | "TEAM">("PERSONAL");
@@ -268,12 +274,24 @@ function LibraryView() {
             label={t("closetLightboxClose")}
             onClick={() => setPreviewUrl(null)}
           />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt=""
-            className={styles.lightboxImg}
-            referrerPolicy="no-referrer"
+          <div {...previewZoom.stageProps}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt=""
+              draggable={false}
+              className={styles.lightboxImg}
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+        {/* 根节点 onClick 会关闭预览，控件须拦住冒泡 */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <ImageZoomControls
+            zoom={previewZoom.zoom}
+            onZoomIn={() => previewZoom.zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+            onZoomOut={() => previewZoom.zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+            onReset={previewZoom.reset}
           />
         </div>
       </div>,

@@ -5,6 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
+import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { AiFitClosetItem } from "@/lib/ai-fit-closet-types";
 import styles from "./closet.module.css";
@@ -38,6 +43,7 @@ function ClosetView() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewZoom = useImageZoomPan(previewUrl ?? "");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -131,12 +137,24 @@ function ClosetView() {
             label={t("closetLightboxClose")}
             onClick={() => setPreviewUrl(null)}
           />
-          {/* eslint-disable-next-line @next/next/no-img-element -- 外链 OSS */}
-          <img
-            src={previewUrl}
-            alt=""
-            className={styles.lightboxImg}
-            referrerPolicy="no-referrer"
+          <div {...previewZoom.stageProps}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- 外链 OSS */}
+            <img
+              src={previewUrl}
+              alt=""
+              draggable={false}
+              className={styles.lightboxImg}
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+        {/* 根节点 onClick 会关闭预览，控件须拦住冒泡 */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <ImageZoomControls
+            zoom={previewZoom.zoom}
+            onZoomIn={() => previewZoom.zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+            onZoomOut={() => previewZoom.zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+            onReset={previewZoom.reset}
           />
         </div>
       </div>,

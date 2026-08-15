@@ -62,6 +62,7 @@
     "pricing:verify-disclosure-rows": "dotenv -e .env.local -- tsx scripts/verify-disclosure-rows.ts",
     "wallet-holds:expire": "dotenv -e .env.local -- tsx scripts/release-expired-wallet-holds.ts",
     "story:sync-styles": "tsx scripts/sync-story-styles.ts",
+    "ecom:sync-categories": "tsx scripts/sync-ecom-template-categories.ts",
     "story:sync-styles:check": "tsx scripts/sync-story-styles.ts --check",
     "story:poll-once": "dotenv -e .env.local -- tsx scripts/story-ai-poll.ts",
     "story:cleanup-once": "dotenv -e .env.local -- tsx scripts/story-ai-cleanup.ts",

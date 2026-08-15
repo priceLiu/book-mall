@@ -1,6 +1,7 @@
-import type {
-  EcomTemplateCategory,
-  EcomTemplateMediaKind,
+import {
+  isEcomTemplateCategory,
+  type EcomTemplateCategory,
+  type EcomTemplateMediaKind,
 } from "@/lib/ecom-template-gallery/types";
 
 const STORAGE_KEY = "ecom-template-gallery-view-v1";
@@ -17,20 +18,6 @@ const DEFAULT_VIEW: EcomTemplateGalleryViewState = {
   scrollTop: 0,
 };
 
-const VALID_CATEGORIES = new Set<EcomTemplateCategory>([
-  "womens",
-  "mens",
-  "kids",
-  "home-textile",
-  "bags",
-  "shoes",
-  "accessories",
-]);
-
-function isValidCategory(v: unknown): v is EcomTemplateCategory {
-  return typeof v === "string" && VALID_CATEGORIES.has(v as EcomTemplateCategory);
-}
-
 function isValidMedia(
   v: unknown,
 ): v is EcomTemplateGalleryViewState["media"] {
@@ -44,7 +31,7 @@ export function loadEcomTemplateGalleryViewState(): EcomTemplateGalleryViewState
     if (!raw) return DEFAULT_VIEW;
     const parsed = JSON.parse(raw) as Partial<EcomTemplateGalleryViewState>;
     return {
-      category: isValidCategory(parsed.category)
+      category: isEcomTemplateCategory(parsed.category)
         ? parsed.category
         : DEFAULT_VIEW.category,
       media: isValidMedia(parsed.media) ? parsed.media : DEFAULT_VIEW.media,

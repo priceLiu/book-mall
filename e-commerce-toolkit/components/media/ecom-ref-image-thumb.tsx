@@ -120,7 +120,8 @@ export function EcomRefImageThumb({
       {mounted && hover && pos
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[200] overflow-hidden rounded-xl border border-[#d2d2d7] bg-white p-1 shadow-xl ring-1 ring-black/5"
+              // z-[400]：hover 浮层会在弹层内触发，必须高于弹层 z-[300]
+              className="pointer-events-none fixed z-[400] overflow-hidden rounded-xl border border-[#d2d2d7] bg-white p-1 shadow-xl ring-1 ring-black/5"
               style={{ top: pos.top, left: pos.left, width: previewW }}
               role="tooltip"
             >

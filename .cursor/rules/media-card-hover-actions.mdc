@@ -26,7 +26,7 @@ alwaysApply: false
    - 尚未生成 → 打开编辑提示词 modal
 4. **左上角小标签**（"分镜图" / "分镜视频" / "封面" 等）使用 `pointer-events-none` 不挡操作。
 5. **空/失败/加载状态**一律走 `MediaPlaceholder`，禁用纯黑死框。
-6. **全屏预览**走 `MediaLightbox`：
+6. **全屏预览**走 `MediaLightbox`，图片的缩放/平移交互见 `image-preview-zoom-pan.mdc`（滚轮缩放 + 拖拽平移 + 右下角控件，全平台一致）：
    - Esc 与点击背景关闭
    - 视频带 `controls` + `autoPlay` + `playsInline` + `poster`（用首帧图）
 

@@ -8,6 +8,7 @@ import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
 } from "@/lib/confirm-destructive-twice";
+import ECOM_TEMPLATE_CATEGORIES from "@/lib/ecom/ecom-template-categories.json";
 
 type EcomSub = "templates" | "models";
 
@@ -37,15 +38,8 @@ type ModelRow = {
   sortOrder?: number;
 };
 
-const CATEGORIES = [
-  { id: "womens", label: "女装" },
-  { id: "mens", label: "男装" },
-  { id: "kids", label: "童装" },
-  { id: "home-textile", label: "家纺" },
-  { id: "bags", label: "箱包" },
-  { id: "shoes", label: "鞋子" },
-  { id: "accessories", label: "配饰" },
-];
+/** 生成物，源头在 e-commerce-toolkit；改分类请见 `pnpm ecom:sync-categories` */
+const CATEGORIES: Array<{ id: string; label: string }> = ECOM_TEMPLATE_CATEGORIES;
 
 async function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

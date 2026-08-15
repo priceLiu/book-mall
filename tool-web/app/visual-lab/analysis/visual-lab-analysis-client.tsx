@@ -23,6 +23,11 @@ import {
 } from "lucide-react";
 import { AnalysisReplyMarkdown } from "@/components/visual-lab/analysis-reply-markdown";
 import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
+import {
   formatPointsPrimaryYuanSecondary,
   formatRequiredPointsShortfall,
   readRequiredPointsFromSettleJson,
@@ -508,6 +513,7 @@ export function VisualLabAnalysisClient({
   const [analysisReasoning, setAnalysisReasoning] = useState("");
   const [userTurnDisplay, setUserTurnDisplay] = useState<UserTurnDisplay | null>(null);
   const [mediaLightbox, setMediaLightbox] = useState<MediaLightbox>(null);
+  const lightboxZoom = useImageZoomPan(mediaLightbox?.src ?? "");
   const [analysisStopped, setAnalysisStopped] = useState(false);
   const [outcomeQuotaModalKind, setOutcomeQuotaModalKind] = useState<"image" | "video" | null>(
     null,
@@ -1731,8 +1737,15 @@ export function VisualLabAnalysisClient({
               <X className="h-5 w-5" strokeWidth={2} />
             </button>
             {mediaLightbox.kind === "image" ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data URL / dynamic blob URLs
-              <img src={mediaLightbox.src} alt="" className="vl-media-lightbox-img" />
+              <div {...lightboxZoom.stageProps}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- data URL / dynamic blob URLs */}
+                <img
+                  src={mediaLightbox.src}
+                  alt=""
+                  draggable={false}
+                  className="vl-media-lightbox-img"
+                />
+              </div>
             ) : (
               <video
                 src={mediaLightbox.src}
@@ -1743,6 +1756,17 @@ export function VisualLabAnalysisClient({
               />
             )}
           </div>
+          {mediaLightbox.kind === "image" ? (
+            // 根节点 onClick 会关闭预览，控件须拦住冒泡
+            <div onClick={(e) => e.stopPropagation()}>
+              <ImageZoomControls
+                zoom={lightboxZoom.zoom}
+                onZoomIn={() => lightboxZoom.zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+                onZoomOut={() => lightboxZoom.zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+                onReset={lightboxZoom.reset}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -21,6 +21,7 @@ import {
 } from "@/lib/ecom-template-gallery/import-reconcile";
 import {
   hasResumableItems,
+  hasUnfinishedItems,
   jobStats,
   loadPersistedImportJobs,
   mergeReconciledImportItems,
@@ -100,20 +101,21 @@ async function recoverAfterUploadResponseLoss(
   job: PersistedImportJob,
   itemId: string,
   onEntry?: (entry: EcomTemplateGalleryEntry) => void,
-): Promise<{
-  synced: boolean;
-  entry: EcomTemplateGalleryEntry | null;
-  items?: PersistedImportItem[];
-}> {
+): Promise<{ synced: boolean; items?: PersistedImportItem[] }> {
   const quick = await reconcileImportJobItemsOnce(job, {
     itemIds: new Set([itemId]),
     onEntry,
   });
   if (quick.synced > 0) {
-    return { synced: true, entry: null, items: quick.items };
+    return { synced: true, items: quick.items };
   }
-  const entry = await reconcileImportItemAfterUploadLoss(itemId, onEntry);
-  return { synced: entry != null, entry };
+  const category = job.items.find((it) => it.id === itemId)?.category;
+  const synced = await reconcileImportItemAfterUploadLoss(
+    itemId,
+    category,
+    onEntry,
+  );
+  return { synced };
 }
 
 function formatUploadError(raw: string): string {
@@ -248,9 +250,10 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
           persist(snapshot);
         };
 
+        // entry 为空表示「已确认在库、条目稍后由核对异步补上」，同样算完成
         const applyCatalogEntry = (
           itemId: string,
-          entry: EcomTemplateGalleryEntry,
+          entry: EcomTemplateGalleryEntry | null,
           opts?: { alreadyExists?: boolean },
         ) => {
           patchItem(itemId, {
@@ -260,7 +263,7 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
             retryCount: 0,
             uploadStartedAt: undefined,
           });
-          onEntryRef.current?.(entry);
+          if (entry) onEntryRef.current?.(entry);
         };
 
         // 启动前快速核对（不阻塞过久）；已落库条目直接跳过
@@ -285,8 +288,8 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
               );
               if (recovered.items) {
                 applyReconciledItems(recovered.items);
-              } else if (recovered.entry) {
-                applyCatalogEntry(stale.id, recovered.entry);
+              } else if (recovered.synced) {
+                applyCatalogEntry(stale.id, null);
               } else {
                 patchItem(stale.id, {
                   status: "queued",
@@ -384,10 +387,11 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
 
               const existing = await reconcileImportItemAfterUploadLoss(
                 item.id,
+                item.category,
                 (entry) => onEntryRef.current?.(entry),
               );
               if (existing) {
-                applyCatalogEntry(item.id, existing);
+                applyCatalogEntry(item.id, null);
                 return;
               }
 
@@ -462,10 +466,11 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
 
             const existing = await reconcileImportItemAfterUploadLoss(
               item.id,
+              item.category,
               (entry) => onEntryRef.current?.(entry),
             );
             if (existing) {
-              applyCatalogEntry(item.id, existing);
+              applyCatalogEntry(item.id, null);
               return;
             }
 
@@ -640,9 +645,10 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
   }, []);
 
   // 有排队项但 runner 未工作时自动拉起（如刷新后 done 误标、runJob 异常退出）
+  // 手动停止但仍有未落库条目的任务也要留在面板里，否则无从点「继续导入」
   const activeJob = useMemo(() => {
-    const list = jobs.filter(
-      (j) => (!j.done || hasResumableItems(j)) && !j.cancelled,
+    const list = jobs.filter((j) =>
+      j.cancelled ? hasUnfinishedItems(j) : !j.done || hasResumableItems(j),
     );
     return list[list.length - 1] ?? null;
   }, [jobs]);
@@ -767,10 +773,13 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
         j.id === jobId
           ? {
               ...j,
+              // 不清 cancelled，看门狗与刷新恢复都会跳过它，续传只能跑一轮
+              cancelled: false,
               done: false,
               notified: false,
               items: j.items.map((it) =>
                 it.status === "failed" ||
+                it.status === "cancelled" ||
                 it.status === "uploading" ||
                 (it.status === "queued" && (it.retryCount ?? 0) > 0)
                   ? {

@@ -34,6 +34,11 @@ import {
   markMediaSrcLoaded,
 } from "@/lib/canvas/loaded-media-src-cache";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
+import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
@@ -353,6 +358,10 @@ export function MediaPreviewLightbox({
   useModalEscapeClose(onClose);
   useModalCompareArrowKeys(view === "compare", stepRight);
 
+  const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(src);
+  /** 对比视图有自己的交互，只在单图预览挂缩放 */
+  const zoomable = kind === "image" && view === "single";
+
   if (!mounted) return null;
 
   return createPortal(
@@ -443,12 +452,15 @@ export function MediaPreviewLightbox({
                 </div>
               </div>
               <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt={alt}
-                  className="max-h-full max-w-full object-contain"
-                />
+                <div {...stageProps} className="inline-block leading-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={alt}
+                    draggable={false}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
               </div>
             </div>
           ) : (
@@ -460,17 +472,32 @@ export function MediaPreviewLightbox({
                   autoPlay
                 />
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={src}
-                  alt={alt}
-                  className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
-                />
+                <div {...stageProps} className="inline-block leading-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={alt}
+                    draggable={false}
+                    className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
+                  />
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
+
+      {zoomable ? (
+        // 根节点 onClick 会关闭预览，控件须拦住冒泡
+        <div onClick={(e) => e.stopPropagation()}>
+          <ImageZoomControls
+            zoom={zoom}
+            onZoomIn={() => zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+            onZoomOut={() => zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+            onReset={reset}
+          />
+        </div>
+      ) : null}
     </div>,
     document.body,
   );

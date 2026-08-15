@@ -31,6 +31,10 @@ import {
   type EcomTemplateGalleryEntry,
   type EcomTemplateMediaKind,
 } from "@/lib/ecom-template-gallery/types";
+import {
+  fetchEcomTemplateGalleryExistingIds,
+  type TemplateGalleryExistingIdsLoad,
+} from "@/lib/ecom-template-gallery-api";
 import { cn } from "@/lib/utils";
 
 type MediaFilter = "all" | EcomTemplateMediaKind;
@@ -67,6 +71,35 @@ export function EcomTemplateGalleryImportDialog({
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [existing, setExisting] =
+    useState<TemplateGalleryExistingIdsLoad | null>(null);
+  const [existingLoading, setExistingLoading] = useState(false);
+  const existingReqRef = useRef<Promise<TemplateGalleryExistingIdsLoad | null>>(
+    Promise.resolve(null),
+  );
+
+  /**
+   * 「已导入」判定必须取库中该分类的权威 id，不能用页面已加载的清单：
+   * 页面按分类懒加载，未浏览过的分类会全部误判成未导入而重复上传。
+   */
+  useEffect(() => {
+    if (!open) {
+      setExisting(null);
+      return;
+    }
+    let disposed = false;
+    setExistingLoading(true);
+    const req = fetchEcomTemplateGalleryExistingIds(category);
+    existingReqRef.current = req;
+    void req.then((load) => {
+      if (disposed) return;
+      setExisting(load);
+      setExistingLoading(false);
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [open, category]);
 
   useEffect(() => {
     if (!open) {
@@ -132,15 +165,20 @@ export function EcomTemplateGalleryImportDialog({
     if (file) void loadHtmlFile(file);
   }
 
-  function handleParse() {
+  async function handleParse() {
     if (!html.trim()) return;
     setParsing(true);
     try {
+      // 清单未就绪就等它；用页面缓存去重会漏标已导入项
+      const load = existing ?? (await existingReqRef.current);
+      const refs = load
+        ? Array.from(load.ids, (id) => ({ id, category }))
+        : existingTemplates;
       const rows = parseTemplateGalleryHtml(
         html,
         parseConfig,
         category,
-        existingTemplates,
+        refs,
         mediaFilter,
       );
       setParsed(rows);
@@ -314,6 +352,11 @@ export function EcomTemplateGalleryImportDialog({
                 </button>
               ))}
             </div>
+            <ExistingCheckHint
+              loading={existingLoading}
+              load={existing}
+              category={category}
+            />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -399,7 +442,7 @@ export function EcomTemplateGalleryImportDialog({
           <div className="flex gap-2">
             <EcomButtonSecondary
               type="button"
-              onClick={handleParse}
+              onClick={() => void handleParse()}
               disabled={parsing || fileLoading || !htmlReady}
             >
               {parsing ? (
@@ -497,6 +540,44 @@ export function EcomTemplateGalleryImportDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * 去重判据的来源必须可见：判定失败时若不提示，用户会把已导入的整批再传一遍。
+ */
+function ExistingCheckHint({
+  loading,
+  load,
+  category,
+}: {
+  loading: boolean;
+  load: TemplateGalleryExistingIdsLoad | null;
+  category: EcomTemplateCategory;
+}) {
+  if (loading) {
+    return (
+      <p className="text-[10px] text-[#6e6e73]">正在核对库中已导入的条目…</p>
+    );
+  }
+  if (!load) {
+    return (
+      <p className="text-[10px] text-[#ff3b30]">
+        无法获取已导入清单，重复项不会被标记，请先恢复主站连接再导入
+      </p>
+    );
+  }
+  if (load.source === "local") {
+    return (
+      <p className="text-[10px] text-[#ff9500]">
+        主站不可达，按本机快照判定重复；快照缺少近期导入的分类，可能重复上传
+      </p>
+    );
+  }
+  return (
+    <p className="text-[10px] text-[#6e6e73]">
+      库中「{templateCategoryLabel(category)}」已有 {load.ids.size} 条，解析时自动标记重复
+    </p>
   );
 }
 

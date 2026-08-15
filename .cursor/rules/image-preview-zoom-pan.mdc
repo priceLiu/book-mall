@@ -1,0 +1,94 @@
+---
+description: 全平台图片放大预览统一规范：滚轮缩放、拖拽平移、右下角控件、弹层层级
+globs: e-commerce-toolkit/**/*.tsx,canvas-web/**/*.tsx,story-web/**/*.tsx,tool-web/**/*.tsx,quick-replica-web/**/*.tsx,book-mall/**/*.tsx,common-tools/**/*.tsx
+alwaysApply: false
+---
+
+# 图片放大预览 · 缩放与平移（全平台统一）
+
+凡「点击图片 → 弹出大图查看」的场景（媒体库、模板区、模特库、画布节点、项目资产、我的衣柜、管理后台资源库…），**必须**是同一套交互。用户在任一子站学会的手势，在其它子站必须同样生效。
+
+## 规范实现（唯一事实源）
+
+| 文件 | 作用 |
+|---|---|
+| `e-commerce-toolkit/lib/media/use-image-zoom-pan.ts` | `useImageZoomPan(resetKey)` — 缩放状态、滚轮、拖拽、边界钳制 |
+| `e-commerce-toolkit/components/media/image-zoom-controls.tsx` | `ImageZoomControls` — 右下角缩小 / 百分比 / 放大 / 还原 |
+| `e-commerce-toolkit/components/media/ecom-image-preview-dialog.tsx` | 参考装配（全屏暗底 + stage + 控件） |
+
+两个规范文件由 `node scripts/sync-image-zoom-pan.mjs` **逐字复制**到其余子应用的同名路径。
+
+- 改行为 → 改 e-commerce-toolkit 的原件 → `node scripts/sync-image-zoom-pan.mjs`
+- CI / 提交前 → `node scripts/sync-image-zoom-pan.mjs --check`
+- **禁止**在副本里改逻辑（副本顶部有注释声明）
+- 规范文件 **只依赖 React**：不得引入 lucide、`cn`、设计系统组件，否则副本在依赖不同的子应用里编译不过
+
+## 必备交互（缺一不可）
+
+| 手势 | 行为 |
+|---|---|
+| 滚轮向上 / 向下 | 放大 / 缩小，倍率 `1.12` 每格 |
+| 按住图片拖动 | 平移；仅当放大到超出视口时可拖 |
+| 双击图片 | 在 1x 与 2x 间切换 |
+| 右下角按钮 | 缩小 · 当前百分比 · 放大 · 还原 |
+| Esc / 关闭钮 / 点击空白 | 关闭 |
+
+- 缩放范围 `1x ~ 6x`，按钮步进 `0.5`
+- 换图（`resetKey` 变化）自动归位到 1x
+- 平移必须 **钳制在图片超出视口的范围内**，不得让图片被拖出屏幕
+
+## 三个必踩的坑
+
+### 1. `<img>` 原生拖拽会让图片「拖不动」
+
+按下图片拖动会触发浏览器 `dragstart`，浏览器接管指针后 `pointermove` 断流。必须同时：
+
+```tsx
+<div {...stageProps} />        {/* stageProps 内含 onDragStart: preventDefault */}
+<img draggable={false} />
+```
+
+### 2. 滚轮会穿透去滚背后的页面
+
+React 的 `onWheel` 是被动监听，无法 `preventDefault`。必须用原生监听：
+
+```ts
+el.addEventListener("wheel", onWheel, { passive: false });
+```
+
+### 3. 控件不能放在缩放容器里
+
+`transform: scale()` 会把子元素一起放大。`ImageZoomControls` 必须是缩放容器的 **兄弟节点**；并且用 `absolute` 而非 `fixed` —— 祖先带 `transform` 时会成为 `fixed` 的包含块，定位会跑偏。
+
+## 弹层层级
+
+预览层 **必须盖住侧栏 / 顶栏**。新增浮层前先查该应用现有 `z-` 取值，别凭感觉写。
+
+| 应用 | 应用外壳 | 弹层 / 预览 | hover 浮层 |
+|---|---|---|---|
+| e-commerce-toolkit | 侧栏 `z-[200]` | Dialog `z-[300]` | `z-[400]` |
+| canvas-web | 头部 `z-40` | 媒体预览 `z-[2000]` | `z-[1500]` |
+| story-web | 头部 `z-40` | `MediaLightbox z-[105]` | — |
+| tool-web | 侧栏 `z-40` | lightbox `1000` | — |
+| quick-replica-web | 侧栏 `z-40` | `QrModal z-50` | — |
+
+**e-commerce-toolkit 曾因侧栏 `z-[200]` > 弹层 `z-[110]`，全屏预览盖不住导航**。改 `dialog.tsx` 的 z 值时须同步抬高会在弹层内触发的 hover 浮层。
+
+## 已接入（改动预览层时须保持）
+
+| 应用 | 预览层 |
+|---|---|
+| e-commerce-toolkit | `EcomImagePreviewDialog`（模板区 / 模特库 / 我的资产 / 分镜等 8 处共用） |
+| canvas-web | `MediaPreviewLightbox`（`media-hover-box.tsx`）· `StoryMediaPreviewModal`（`story-column-media-panel.tsx`） |
+| story-web | `MediaLightbox` |
+| tool-web | 我的图片库 · 我的衣柜 · Visual Lab |
+| quick-replica-web | `QrRefImageThumb` 预览 |
+
+新增预览入口时优先复用上表组件；确需新写，按「规范实现」挂钩子，并补进本表与 `scripts/sync-image-zoom-pan.mjs` 的 `TARGET_APPS`。
+
+## Code Review
+
+- 新增图片预览 UI 却没有滚轮缩放 / 拖拽平移 → **驳回**，改为挂 `useImageZoomPan` + `ImageZoomControls`
+- 出现第二套缩放实现（自己写 `scale` state）→ **驳回**
+- 副本文件与 e-commerce-toolkit 原件不一致（`--check` 报 DRIFT）→ 先同步再合并
+- 视频预览不在本规范内（不缩放），但关闭方式与层级须一致

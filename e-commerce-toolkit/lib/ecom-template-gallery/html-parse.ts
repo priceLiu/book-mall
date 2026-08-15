@@ -1,6 +1,6 @@
 import type {
   EcomTemplateCategory,
-  EcomTemplateGalleryEntry,
+  EcomTemplateEntryRef,
   EcomTemplateMediaKind,
 } from "./types";
 import {
@@ -8,43 +8,10 @@ import {
   splitYibaiAigcImageUrl,
 } from "./yibaiaigc-image-url";
 
-/** 从 HTML 文件名推断品类（如「箱包 图片.html」→ bags） */
-const FILENAME_CATEGORY_HINTS: Array<{
-  pattern: RegExp;
-  category: EcomTemplateCategory;
-}> = [
-  { pattern: /女装/, category: "womens" },
-  { pattern: /男装/, category: "mens" },
-  { pattern: /童装/, category: "kids" },
-  { pattern: /家纺/, category: "home-textile" },
-  { pattern: /箱包/, category: "bags" },
-  { pattern: /鞋子/, category: "shoes" },
-  { pattern: /配饰/, category: "accessories" },
-];
-
-export function inferTemplateCategoryFromFilename(
-  filename: string,
-): EcomTemplateCategory | null {
-  const base = filename.trim();
-  if (!base) return null;
-  for (const { pattern, category } of FILENAME_CATEGORY_HINTS) {
-    if (pattern.test(base)) return category;
-  }
-  return null;
-}
-
-export function templateCategoryLabel(category: EcomTemplateCategory): string {
-  const labels: Record<EcomTemplateCategory, string> = {
-    womens: "女装",
-    mens: "男装",
-    kids: "童装",
-    "home-textile": "家纺",
-    bags: "箱包",
-    shoes: "鞋子",
-    accessories: "配饰",
-  };
-  return labels[category];
-}
+export {
+  inferTemplateCategoryFromFilename,
+  templateCategoryLabel,
+} from "./types";
 
 export type HtmlParsePresetId = "yibaiaigc-demo-card" | "custom";
 
@@ -123,10 +90,10 @@ export function fileStemFromUrl(url: string): string {
 
 /** 按源图文件名 stem 索引已有 catalog 条目（同品类） */
 export function buildExistingStemIndex(
-  templates: EcomTemplateGalleryEntry[],
+  templates: readonly EcomTemplateEntryRef[],
   category: EcomTemplateCategory,
-): Map<string, EcomTemplateGalleryEntry> {
-  const map = new Map<string, EcomTemplateGalleryEntry>();
+): Map<string, EcomTemplateEntryRef> {
+  const map = new Map<string, EcomTemplateEntryRef>();
   for (const entry of templates) {
     if (entry.category !== category) continue;
     const stem = entry.id.split("-").slice(2).join("-");
@@ -167,7 +134,7 @@ export function maxCategoryIndex(
 export function assignSuggestedIds(
   rows: Omit<ParsedImportRow, "suggestedId" | "alreadyImported">[],
   category: EcomTemplateCategory,
-  existingTemplates: EcomTemplateGalleryEntry[],
+  existingTemplates: readonly EcomTemplateEntryRef[],
 ): ParsedImportRow[] {
   const existingIds = existingTemplates.map((t) => t.id);
   const stemIndex = buildExistingStemIndex(existingTemplates, category);
@@ -196,7 +163,7 @@ export function parseTemplateGalleryHtml(
   html: string,
   config: HtmlParseConfig,
   category: EcomTemplateCategory,
-  existingTemplates: EcomTemplateGalleryEntry[] = [],
+  existingTemplates: readonly EcomTemplateEntryRef[] = [],
   mediaFilter: "all" | EcomTemplateMediaKind = "all",
 ): ParsedImportRow[] {
   const blocks = html.split(config.blockMarker).slice(1);

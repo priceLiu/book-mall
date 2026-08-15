@@ -180,6 +180,7 @@ export function listImportPanelItems(
   );
 }
 
+/** 可自动恢复：手动停止的任务须由用户点「继续导入」，不自动重启 */
 export function hasResumableItems(job: PersistedImportJob): boolean {
   if (job.cancelled) return false;
   return job.items.some(
@@ -188,6 +189,15 @@ export function hasResumableItems(job: PersistedImportJob): boolean {
       i.status === "uploading" ||
       i.status === "failed",
   );
+}
+
+function isUnfinishedImportItem(item: PersistedImportItem): boolean {
+  return item.status !== "success" && item.status !== "skipped";
+}
+
+/** 尚有未落库条目（含手动停止的）：面板须继续展示，否则用户无从续传 */
+export function hasUnfinishedItems(job: PersistedImportJob): boolean {
+  return job.items.some(isUnfinishedImportItem);
 }
 
 function cancelPendingItems(
@@ -238,29 +248,29 @@ export function normalizeStalledImportJobs(
         items: cancelPendingItems(job.items),
       };
     }
-    return {
-      ...job,
-      done: false,
-      items: job.items.map((it) => {
-        if (it.status !== "uploading") return it;
-        const started = it.uploadStartedAt ?? 0;
-        if (started > 0 && now - started < UPLOAD_IN_FLIGHT_GRACE_MS) {
-          const progress =
-            (it.progress ?? 0) >= 90 ? 88 : Math.max(it.progress ?? 0, 55);
-          return {
-            ...it,
-            progress,
-            error: undefined,
-          };
-        }
+    const items = job.items.map((it) => {
+      if (it.status !== "uploading") return it;
+      const started = it.uploadStartedAt ?? 0;
+      if (started > 0 && now - started < UPLOAD_IN_FLIGHT_GRACE_MS) {
+        const progress =
+          (it.progress ?? 0) >= 90 ? 88 : Math.max(it.progress ?? 0, 55);
         return {
           ...it,
-          status: "queued" as const,
-          progress: 0,
-          uploadStartedAt: undefined,
+          progress,
           error: undefined,
         };
-      }),
-    };
+      }
+      return {
+        ...it,
+        status: "queued" as const,
+        progress: 0,
+        uploadStartedAt: undefined,
+        error: undefined,
+      };
+    });
+
+    // done 必须按条目现状推导：早先无条件置 false，已全部成功的任务会在
+    // 每次进页面时复活，胶囊永久停在「N/N」且再也没有 runner 去改回来
+    return { ...job, done: !items.some(isUnfinishedImportItem), items };
   });
 }
