@@ -1,44 +1,37 @@
 import { NextResponse } from "next/server";
 
+import { pickUploadExt } from "@/lib/admin/media-upload";
 import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import { uploadEcomModelLibraryPreview } from "@/lib/canvas/canvas-oss";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext: string } {
-  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) throw new Error("dataUrl 格式无效");
-  const contentType = m[1] ?? "image/jpeg";
-  const buf = Buffer.from(m[2] ?? "", "base64");
-  const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
-  return { buf, contentType, ext };
-}
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
-  let body: Record<string, unknown>;
+  // multipart 直传：base64 dataURL 会把体积撑大 1/3，大图容易顶到网关上限
+  let form: FormData;
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    form = await request.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请以 multipart/form-data 上传" }, { status: 400 });
   }
 
-  const dataUrl = typeof body.dataUrl === "string" ? body.dataUrl : "";
-  const id = typeof body.id === "string" ? body.id.trim() : `model-${Date.now()}`;
-  if (!dataUrl) {
-    return NextResponse.json({ error: "dataUrl 必填" }, { status: 400 });
+  const file = form.get("file");
+  const id = String(form.get("id") ?? "").trim() || `model-${Date.now()}`;
+  if (!(file instanceof File) || file.size === 0) {
+    return NextResponse.json({ error: "file 必填" }, { status: 400 });
   }
 
   try {
-    const parsed = parseDataUrl(dataUrl);
+    const contentType = file.type || "image/jpeg";
     const url = await uploadEcomModelLibraryPreview({
       id,
-      buf: parsed.buf,
-      contentType: parsed.contentType,
-      ext: parsed.ext,
+      buf: Buffer.from(await file.arrayBuffer()),
+      contentType,
+      ext: pickUploadExt(contentType, file.name),
     });
     return NextResponse.json({ url });
   } catch (e) {

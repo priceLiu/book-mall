@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminMediaField } from "@/components/admin/template-admin/admin-media-field";
+import { AdminMediaThumb } from "@/components/admin/template-admin/admin-media-thumb";
 import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
@@ -24,6 +25,7 @@ type TemplateRow = {
   mainImageUrl?: string | null;
   referenceImages?: Array<{ url: string; label?: string }>;
   promptText?: string | null;
+  negativePrompt?: string | null;
   defaultModelKey?: string | null;
   posterUrl?: string | null;
   sortOrder?: number;
@@ -40,19 +42,26 @@ type ModelRow = {
 
 /** 生成物，源头在 e-commerce-toolkit；改分类请见 `pnpm ecom:sync-categories` */
 const CATEGORIES: Array<{ id: string; label: string }> = ECOM_TEMPLATE_CATEGORIES;
+const DEFAULT_CATEGORY = CATEGORIES[0]?.id ?? "womens";
 
-async function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("读取失败"));
-    reader.readAsDataURL(file);
-  });
+/** 走 multipart：dataURL 会把体积撑大 1/3，模板原图动辄十几 MB */
+async function uploadMedia(
+  url: string,
+  file: File,
+  fields: Record<string, string>,
+): Promise<string> {
+  const body = new FormData();
+  body.append("file", file);
+  for (const [k, v] of Object.entries(fields)) body.append(k, v);
+  const res = await fetch(url, { method: "POST", body });
+  const data = (await res.json()) as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? "上传失败");
+  return data.url;
 }
 
 const EMPTY_TPL: TemplateRow = {
   id: "",
-  category: "accessories",
+  category: DEFAULT_CATEGORY,
   mediaKind: "image",
   title: "",
   hot: false,
@@ -62,9 +71,15 @@ const EMPTY_TPL: TemplateRow = {
   mainImageUrl: "",
   referenceImages: [],
   promptText: "",
+  negativePrompt: "",
   defaultModelKey: "",
   sortOrder: 0,
 };
+
+/** 视频行的 ossUrl 是 mp4，塞进 <img> 只会裂图，只认封面 / 缩略图 */
+function templateThumbSrc(row: TemplateRow): string {
+  return row.coverUrl || row.thumbUrl || (row.mediaKind === "video" ? "" : row.ossUrl);
+}
 
 const EMPTY_MODEL: ModelRow = {
   id: "",
@@ -112,7 +127,7 @@ export function AdminEcomTemplatesPanel() {
 
 function TemplatesAdmin() {
   const [rows, setRows] = useState<TemplateRow[]>([]);
-  const [category, setCategory] = useState("accessories");
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [media, setMedia] = useState<"all" | "image" | "video">("all");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -122,8 +137,12 @@ function TemplatesAdmin() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // 只取当前分类：全量清单已数千条，后台没必要整包拉下来再前端过滤
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/ecom/template-gallery/templates", { cache: "no-store" });
+    const res = await fetch(
+      `/api/admin/ecom/template-gallery/templates?category=${encodeURIComponent(category)}`,
+      { cache: "no-store" },
+    );
     const text = await res.text();
     if (!text.trim()) throw new Error("接口无响应");
     let data: { templates?: TemplateRow[]; error?: string };
@@ -134,12 +153,13 @@ function TemplatesAdmin() {
     }
     if (!res.ok) throw new Error(data.error ?? "加载失败");
     setRows(Array.isArray(data.templates) ? data.templates : []);
-  }, []);
+  }, [category]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setError(null);
       try {
         await load();
       } catch (e) {
@@ -156,38 +176,34 @@ function TemplatesAdmin() {
   const filtered = useMemo(
     () =>
       rows.filter((r) => {
-        if (r.category !== category) return false;
         if (media !== "all" && r.mediaKind !== media) return false;
         if (q && !`${r.title} ${r.id}`.includes(q)) return false;
         return true;
       }),
-    [rows, category, media, q],
+    [rows, media, q],
   );
 
   async function uploadField(file: File, field: "ossUrl" | "coverUrl" | "mainImageUrl" | "ref") {
     if (!form) return;
     setUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
       const id = form.id.trim() || `tpl-${Date.now()}`;
-      const res = await fetch("/api/admin/ecom/template-gallery/assets/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, category: form.category, id }),
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) throw new Error(data.error ?? "上传失败");
+      const uploaded = await uploadMedia(
+        "/api/admin/ecom/template-gallery/assets/upload",
+        file,
+        { category: form.category, id },
+      );
       setForm((prev) => {
         if (!prev) return prev;
         if (field === "ref") {
           return {
             ...prev,
             id: prev.id || id,
-            referenceImages: [...(prev.referenceImages ?? []), { url: data.url! }],
+            referenceImages: [...(prev.referenceImages ?? []), { url: uploaded }],
           };
         }
-        const next = { ...prev, id: prev.id || id, [field]: data.url };
-        if (field === "ossUrl" && !prev.thumbUrl) next.thumbUrl = data.url!;
+        const next = { ...prev, id: prev.id || id, [field]: uploaded };
+        if (field === "ossUrl" && !prev.thumbUrl) next.thumbUrl = uploaded;
         return next;
       });
     } catch (e) {
@@ -302,12 +318,7 @@ function TemplatesAdmin() {
             {filtered.map((row) => (
               <tr key={row.id} className="border-t border-[#d0d7de]">
                 <td className="px-3 py-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={row.coverUrl || row.thumbUrl || row.ossUrl}
-                    alt=""
-                    className="h-12 w-10 rounded object-cover"
-                  />
+                  <AdminMediaThumb src={templateThumbSrc(row)} title={row.title} />
                 </td>
                 <td className="px-3 py-2">
                   {row.title}
@@ -329,15 +340,24 @@ function TemplatesAdmin() {
       </div>
 
       {form ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="w-full max-w-2xl space-y-3 rounded-xl bg-white p-5 shadow-lg">
-            <div className="flex justify-between">
-              <h3 className="text-sm font-semibold">模板条目</h3>
-              <button type="button" className="text-xs" onClick={() => setForm(null)}>
-                关闭
-              </button>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+        <div className="fixed inset-0 z-50 flex flex-col bg-white">
+          <div className="flex shrink-0 items-center justify-between border-b border-[#d0d7de] px-5 py-3">
+            <h3 className="text-sm font-semibold">
+              模板条目
+              <span className="ml-2 font-mono text-xs font-normal text-[#656d76]">
+                {form.id}
+              </span>
+            </h3>
+            <button
+              type="button"
+              className="rounded border border-[#d0d7de] px-2 py-1 text-xs"
+              onClick={() => setForm(null)}
+            >
+              关闭
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="mx-auto grid max-w-6xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs">
                 ID
                 <input
@@ -414,13 +434,57 @@ function TemplatesAdmin() {
                   if (f) void uploadField(f, "mainImageUrl");
                 }}
               />
+              <div className="sm:col-span-2">
+                <AdminMediaField
+                  label="参考图"
+                  urls={(form.referenceImages ?? []).map((img) => img.url)}
+                  accept="image"
+                  multiple
+                  disabled={uploading}
+                  onFiles={(files) => {
+                    for (const f of files) void uploadField(f, "ref");
+                  }}
+                  onRemoveAt={(i) =>
+                    setForm({
+                      ...form,
+                      referenceImages: (form.referenceImages ?? []).filter((_, j) => j !== i),
+                    })
+                  }
+                />
+                {(form.referenceImages ?? []).map((img, i) => (
+                  <div key={`${img.url}-${i}`} className="mt-1.5 flex items-center gap-2">
+                    <span className="w-4 shrink-0 text-center text-[10px] text-[#656d76]">
+                      {i + 1}
+                    </span>
+                    <input
+                      className="w-full rounded border border-[#d0d7de] px-2 py-1 text-xs"
+                      placeholder="该参考图的说明（选填，会展示给用户）"
+                      value={img.label ?? ""}
+                      onChange={(e) => {
+                        const next = [...(form.referenceImages ?? [])];
+                        next[i] = { ...img, label: e.target.value };
+                        setForm({ ...form, referenceImages: next });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
               <label className="text-xs sm:col-span-2">
                 提示词
                 <textarea
                   className="mt-1 w-full rounded border px-2 py-1"
-                  rows={3}
+                  rows={5}
                   value={form.promptText ?? ""}
                   onChange={(e) => setForm({ ...form, promptText: e.target.value })}
+                />
+              </label>
+              <label className="text-xs sm:col-span-2">
+                负向提示词
+                <textarea
+                  className="mt-1 w-full rounded border px-2 py-1"
+                  rows={5}
+                  value={form.negativePrompt ?? ""}
+                  onChange={(e) => setForm({ ...form, negativePrompt: e.target.value })}
                 />
               </label>
               <label className="text-xs">
@@ -431,7 +495,18 @@ function TemplatesAdmin() {
                   onChange={(e) => setForm({ ...form, defaultModelKey: e.target.value })}
                 />
               </label>
-              <label className="flex items-center gap-2 text-xs">
+              <label className="text-xs">
+                排序
+                <input
+                  type="number"
+                  className="mt-1 w-full rounded border px-2 py-1"
+                  value={form.sortOrder ?? 0}
+                  onChange={(e) =>
+                    setForm({ ...form, sortOrder: Number(e.target.value) || 0 })
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-2 self-end pb-1 text-xs">
                 <input
                   type="checkbox"
                   checked={form.hot}
@@ -439,36 +514,27 @@ function TemplatesAdmin() {
                 />
                 爆款
               </label>
-              <AdminMediaField
-                label="参考图"
-                urls={(form.referenceImages ?? []).map((img) => img.url)}
-                accept="image"
-                multiple
-                disabled={uploading}
-                onFiles={(files) => {
-                  for (const f of files) void uploadField(f, "ref");
-                }}
-                onRemoveAt={(i) =>
-                  setForm({
-                    ...form,
-                    referenceImages: (form.referenceImages ?? []).filter((_, j) => j !== i),
-                  })
-                }
-              />
             </div>
-            <div className="flex justify-end gap-2">
-              <button type="button" className="rounded border px-3 py-1 text-xs" onClick={() => setForm(null)}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="rounded bg-[#0969da] px-3 py-1 text-xs text-white disabled:opacity-50"
-                disabled={saving || uploading}
-                onClick={() => void save()}
-              >
-                {saving ? "保存中…" : "保存"}
-              </button>
-            </div>
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[#d0d7de] px-5 py-3">
+            {uploading ? (
+              <span className="mr-auto text-xs text-[#656d76]">上传中…</span>
+            ) : null}
+            <button
+              type="button"
+              className="rounded border border-[#d0d7de] px-3 py-1 text-xs"
+              onClick={() => setForm(null)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="rounded bg-[#0969da] px-3 py-1 text-xs text-white disabled:opacity-50"
+              disabled={saving || uploading}
+              onClick={() => void save()}
+            >
+              {saving ? "保存中…" : "保存"}
+            </button>
           </div>
         </div>
       ) : null}
@@ -514,16 +580,13 @@ function ModelsAdmin() {
     if (!form) return;
     setUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
       const id = form.id.trim() || `model-${Date.now()}`;
-      const res = await fetch("/api/admin/ecom/model-library/assets/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, id }),
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) throw new Error(data.error ?? "上传失败");
-      setForm({ ...form, id, ossUrl: data.url });
+      const uploaded = await uploadMedia(
+        "/api/admin/ecom/model-library/assets/upload",
+        file,
+        { id },
+      );
+      setForm({ ...form, id, ossUrl: uploaded });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "上传失败");
     } finally {
@@ -622,8 +685,7 @@ function ModelsAdmin() {
             {filtered.map((row) => (
               <tr key={row.id} className="border-t border-[#d0d7de]">
                 <td className="px-3 py-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={row.ossUrl} alt="" className="h-12 w-10 rounded object-cover" />
+                  <AdminMediaThumb src={row.ossUrl} title={row.name} />
                 </td>
                 <td className="px-3 py-2">{row.name}</td>
                 <td className="px-3 py-2">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
+  parseRefImages,
   readTemplateGalleryCatalogLive,
   upsertTemplateGalleryEntry,
   type EcomTemplateGalleryEntry,
@@ -17,20 +18,7 @@ function parseEntry(body: Record<string, unknown>): EcomTemplateGalleryEntry | n
   const ossUrl = typeof body.ossUrl === "string" ? body.ossUrl.trim() : "";
   const thumbUrl = typeof body.thumbUrl === "string" ? body.thumbUrl.trim() : ossUrl;
   if (!id || !category || !title || !ossUrl) return null;
-  const refs = Array.isArray(body.referenceImages)
-    ? body.referenceImages
-        .map((item) => {
-          if (!item || typeof item !== "object") return null;
-          const o = item as Record<string, unknown>;
-          const url = typeof o.url === "string" ? o.url.trim() : "";
-          if (!url) return null;
-          return {
-            url,
-            label: typeof o.label === "string" ? o.label : undefined,
-          };
-        })
-        .filter((x): x is { url: string; label?: string } => x !== null)
-    : undefined;
+  const refs = parseRefImages(body.referenceImages);
   return {
     id,
     category,
@@ -54,11 +42,13 @@ function parseEntry(body: Record<string, unknown>): EcomTemplateGalleryEntry | n
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
+  // 后台一次只看一个分类；全量清单已达数千条，不按分类取会越来越慢
+  const category = new URL(request.url).searchParams.get("category")?.trim();
   try {
-    const catalog = await readTemplateGalleryCatalogLive();
+    const catalog = await readTemplateGalleryCatalogLive(category || undefined);
     return NextResponse.json(catalog);
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";

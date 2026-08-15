@@ -6,6 +6,7 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "../shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
+    "./docker-shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

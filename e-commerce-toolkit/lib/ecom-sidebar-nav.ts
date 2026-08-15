@@ -21,6 +21,7 @@ import {
   Sparkles,
   Target,
   Wrench,
+  Blocks,
   Boxes,
 } from "lucide-react";
 import {
@@ -86,6 +87,7 @@ function imageModuleIcon(id: string): LucideIcon {
   if (id === "product-creation") return LayoutGrid;
   if (id === "detail-page-creation") return ScrollText;
   if (id === "seed-video") return Video;
+  if (id === "hand-craft") return Blocks;
   return Shirt;
 }
 

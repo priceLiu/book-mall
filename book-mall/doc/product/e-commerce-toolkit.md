@@ -16,6 +16,36 @@
 - 整片视频：`doubao-seedance-2.0`，时长 4–15s 用户自定，全部经 Gateway
 - toolKey：`ecom-toolkit__storyboard`（`chat` / `video`）
 
+### 手伴创作（线稿 → 潮玩盲盒 IP 全案）
+
+> SOP 与助手话术真源：[`doc/手伴/skill.md`](../手伴/skill.md)（`ecom-hand-craft-prompts.ts` 运行时读取）
+
+- 入口：`/ecom/hand-craft`；四栏布局与交互对齐「产品主图」（进度轨 + 中间工作区 + 右侧助手）
+- 输入：**1～5 张手绘线稿**（第 1 张为主线稿）。换主线稿 = 重启流程，会清空 10 步产出
+- 一致性锁定（本模块质量命门，服务端强制拼装，不依赖助手话术）：
+  1. 第 1 步定稿主形象写入 `meta.workflow.heroLockedUrl`，后续每步生图 **参考图第 1 张恒为它**
+  2. 每条 Prompt 固定拼接 `HAND_CRAFT_BASE_STYLE` 基准风格串
+  3. `models` 路由只返回 **支持参考图** 的图像模型（`isRefCapableEcomImageModel`）
+- 10 步（`lib/ecom/ecom-hand-craft-steps.ts` 为唯一模板表，前端 `lib/hand-craft-workflow.ts` 只镜像展示字段）：
+
+| # | 步骤 | 类型 | 产出 |
+|---|------|------|------|
+| 1 | 核心主形象 | generate | 1（定稿后锁为全局参考图） |
+| 2 | 基础规范三件套 | generate | 12（三视图 3 + 表情 4 + 动作 5） |
+| 3 | 主题盲盒角色卡 | generate | 7（6 款 + 1 合集） |
+| 4 | 周边衍生品样机 | generate | 8 |
+| 5 | 色卡与细节规范 | generate | 2 |
+| 6 | 盲盒包装盒 | generate | 4 |
+| 7 | 九宫格表情包 | generate | 9 |
+| 8 | 小红书竖版长图 | compose | 1 |
+| 9 | 12 页作品集 | compose | 12 |
+| 10 | IP 招商授权页 | compose | 1 |
+
+- 第 8–10 步 **不调生图模型**：版式由 `HandCraftSheetView` 用代码排版，浏览器 `html2canvas` 抓 PNG → `POST .../compose/[stepId]` → OSS + `EcomAsset`，与微剧故事版 `sheetPngUrl` 同一条链
+- 出图：`POST .../step/[stepId]/generate`（`indexes` / `modelKey` / `concurrency`），逐张回写 `plan`，前端 2.5s 轮询上墙；批量步（12 槽 / 9 槽）按 `imageGenConcurrency` 并发，单张失败不影响其余
+- 交付：成图自动入库「我的资产 · 手伴创作」；`GET .../export` 出 ZIP（每步一个目录 + 交付清单 + 助手对话）
+- toolKey：`ecom-toolkit__hand-craft`（`generate` / `compose`）；数据表 `EcomHandCraftProject`
+
 ## 2. 计费双轨（readme §6）
 
 用户在 **个人中心 · 电商工具箱计费** 选择模式（默认 **BYOK 月费**，降低平台垫资）：

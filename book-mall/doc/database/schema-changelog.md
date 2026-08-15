@@ -262,6 +262,21 @@
 
 ---
 
+## 2026-08-15 — 手伴创作（线稿 → 潮玩盲盒 IP 全案，已落库）
+
+- **迁移目录**：`prisma/migrations/20260815120000_ecom_hand_craft_project/`
+- **产品文档**：[`doc/product/e-commerce-toolkit.md`](../product/e-commerce-toolkit.md) §手伴创作 · [`doc/手伴/skill.md`](../手伴/skill.md)（助手 system prompt 真源）
+- **新表**：
+  - `EcomHandCraftProject`——字段照 `EcomSeedVideoProject`（`userId` / `title` / `module @default("hand-craft")` / `status` / `brief` / `settings` / `references` / `chatHistory` / `plan` / `meta` + 租户三字段），索引 `[userId, module, updatedAt]`、`[tenantId, visibility, updatedAt]`。
+  - `plan.steps` 为 10 步产出：`generate` 步存 `slots[]`（index / title / prompt / imageUrl / assetId），`compose` 步存 `outputs[]`（页序 / 标题 / 拼版 PNG）。结构见 `lib/ecom/ecom-hand-craft-types.ts`，模板表见 `lib/ecom/ecom-hand-craft-steps.ts`。
+  - `meta.workflow.heroLockedUrl`——第 1 步定稿的主形象 OSS URL，是后续 9 步的一致性锚点（每步生图第 1 张参考图恒为它）。换主线稿会重置 `plan` 与该字段。
+- **不新增表**：成图直接落 `EcomAsset(module: "hand-craft")`；第 8–10 步拼版 PNG 由浏览器 html2canvas 抓图后同样落 `EcomAsset`。
+- **计费**：不新增价目行。套件月费仍走 `e-commerce-toolkit` navKey（`ecom-toolkit__` 前缀自动覆盖），厂商成本经 Gateway；`ToolBillablePrice` 已于 `20260709120000_drop_tool_billable_price` 删除，无按次价目表可写。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **回滚**：开发环境可 `DROP TABLE "EcomHandCraftProject";`；生产严禁直接回滚。
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

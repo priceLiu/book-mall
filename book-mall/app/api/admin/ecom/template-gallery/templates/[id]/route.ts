@@ -4,6 +4,7 @@ import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
   deleteTemplateGalleryEntry,
   getTemplateGalleryEntry,
+  parseRefImages,
   upsertTemplateGalleryEntry,
 } from "@/lib/ecom/ecom-template-gallery-service";
 
@@ -34,19 +35,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  // 传了数组就以其为准（空数组即清空）；没传才保留原值
   const refs = Array.isArray(body.referenceImages)
-    ? body.referenceImages
-        .map((item) => {
-          if (!item || typeof item !== "object") return null;
-          const o = item as Record<string, unknown>;
-          const url = typeof o.url === "string" ? o.url.trim() : "";
-          if (!url) return null;
-          return {
-            url,
-            label: typeof o.label === "string" ? o.label : undefined,
-          };
-        })
-        .filter((x): x is { url: string; label?: string } => x !== null)
+    ? parseRefImages(body.referenceImages)
     : existing.referenceImages;
 
   const saved = await upsertTemplateGalleryEntry({

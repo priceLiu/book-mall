@@ -1,54 +1,41 @@
 import { NextResponse } from "next/server";
 
+import { pickUploadExt } from "@/lib/admin/media-upload";
 import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import { uploadEcomTemplateGalleryPreview } from "@/lib/canvas/canvas-oss";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext: string } {
-  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) throw new Error("dataUrl 格式无效");
-  const contentType = m[1] ?? "application/octet-stream";
-  const buf = Buffer.from(m[2] ?? "", "base64");
-  const ext = contentType.includes("png")
-    ? "png"
-    : contentType.includes("webp")
-      ? "webp"
-      : contentType.includes("mp4")
-        ? "mp4"
-        : contentType.includes("webm")
-          ? "webm"
-          : "jpg";
-  return { buf, contentType, ext };
-}
+// 模板原图常有 10MB+ 的 PNG，再叠加 OSS 回源，60s 不够
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
 
-  let body: Record<string, unknown>;
+  // multipart 直传：base64 dataURL 会把体积撑大 1/3，大图容易顶到网关上限
+  let form: FormData;
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    form = await request.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请以 multipart/form-data 上传" }, { status: 400 });
   }
 
-  const dataUrl = typeof body.dataUrl === "string" ? body.dataUrl : "";
-  const category = typeof body.category === "string" ? body.category.trim() : "";
-  const id = typeof body.id === "string" ? body.id.trim() : `tmp-${Date.now()}`;
-  if (!dataUrl || !category) {
-    return NextResponse.json({ error: "dataUrl / category 必填" }, { status: 400 });
+  const file = form.get("file");
+  const category = String(form.get("category") ?? "").trim();
+  const id = String(form.get("id") ?? "").trim() || `tmp-${Date.now()}`;
+  if (!(file instanceof File) || file.size === 0 || !category) {
+    return NextResponse.json({ error: "file / category 必填" }, { status: 400 });
   }
 
   try {
-    const parsed = parseDataUrl(dataUrl);
+    const buf = Buffer.from(await file.arrayBuffer());
+    const contentType = file.type || "application/octet-stream";
     const url = await uploadEcomTemplateGalleryPreview({
       category,
       id,
-      buf: parsed.buf,
-      contentType: parsed.contentType,
-      ext: parsed.ext,
+      buf,
+      contentType,
+      ext: pickUploadExt(contentType, file.name),
     });
     return NextResponse.json({ url });
   } catch (e) {

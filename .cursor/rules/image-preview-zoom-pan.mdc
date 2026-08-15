@@ -71,6 +71,7 @@ el.addEventListener("wheel", onWheel, { passive: false });
 | story-web | 头部 `z-40` | `MediaLightbox z-[105]` | — |
 | tool-web | 侧栏 `z-40` | lightbox `1000` | — |
 | quick-replica-web | 侧栏 `z-40` | `QrModal z-50` | — |
+| book-mall | 管理后台弹层 `z-50` | 全屏预览 `z-[300]` | `z-[250]` |
 
 **e-commerce-toolkit 曾因侧栏 `z-[200]` > 弹层 `z-[110]`，全屏预览盖不住导航**。改 `dialog.tsx` 的 z 值时须同步抬高会在弹层内触发的 hover 浮层。
 
@@ -83,6 +84,7 @@ el.addEventListener("wheel", onWheel, { passive: false });
 | story-web | `MediaLightbox` |
 | tool-web | 我的图片库 · 我的衣柜 · Visual Lab |
 | quick-replica-web | `QrRefImageThumb` 预览 |
+| book-mall | `AdminMediaThumb`（管理后台模板区 / 模特库列表；悬停浮出大图，点击进全屏） |
 
 新增预览入口时优先复用上表组件；确需新写，按「规范实现」挂钩子，并补进本表与 `scripts/sync-image-zoom-pan.mjs` 的 `TARGET_APPS`。
 

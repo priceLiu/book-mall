@@ -29,6 +29,7 @@ const TARGET_APPS = [
   "story-web",
   "tool-web",
   "quick-replica-web",
+  "book-mall",
 ];
 
 const checkOnly = process.argv.includes("--check");

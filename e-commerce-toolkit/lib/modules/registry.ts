@@ -48,6 +48,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "dark",
   },
   {
+    id: "hand-craft",
+    title: "手伴创作",
+    tagline: "线稿转潮玩盲盒 IP 全案",
+    href: "/ecom/hand-craft",
+    kind: "image",
+    toolKey: "ecom-toolkit__hand-craft",
+    action: "generate",
+    tile: "parchment",
+  },
+  {
     id: "seed-video",
     title: "图片生种草视频",
     tagline: "素材策划 + 30s 种草短视频成片",

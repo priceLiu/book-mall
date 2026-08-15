@@ -119,16 +119,17 @@ export function appendTemplateGalleryEntries(
   return merged;
 }
 
-function parseRefImages(raw: unknown): EcomTemplateRefImage[] | undefined {
+/** 同时用于解析 DB 的 Json 列与后台接口的请求体，两处规则须一致 */
+export function parseRefImages(raw: unknown): EcomTemplateRefImage[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const list = raw
-    .map((item) => {
+    .map((item): EcomTemplateRefImage | null => {
       if (!item || typeof item !== "object") return null;
       const o = item as Record<string, unknown>;
       const url = typeof o.url === "string" ? o.url.trim() : "";
       if (!url) return null;
-      const label = typeof o.label === "string" ? o.label : undefined;
-      return { url, label };
+      const label = typeof o.label === "string" ? o.label.trim() : "";
+      return label ? { url, label } : { url };
     })
     .filter((x): x is EcomTemplateRefImage => x !== null);
   return list.length ? list : undefined;
