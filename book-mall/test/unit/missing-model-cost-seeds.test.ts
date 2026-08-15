@@ -51,7 +51,7 @@ describe("MISSING_MODEL_COST_SEEDS", () => {
       ...ALREADY_SEEDED,
       ...MISSING_MODEL_COST_SEEDS.map((r) => r.canonicalModelKey),
     ]);
-    expect(MISSING_MODEL_COST_SEEDS).toHaveLength(81);
+    expect(MISSING_MODEL_COST_SEEDS).toHaveLength(88);
     for (const key of registryKeys) {
       expect(covered.has(key)).toBe(true);
     }

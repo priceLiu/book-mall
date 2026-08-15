@@ -33,6 +33,23 @@ export type EcomLibraryProductDesignBundle = {
   };
 };
 
+export type EcomLibrarySeedVideoBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  shotCount: number;
+  productionMode: "direct" | "fine" | null;
+  hasScript: boolean;
+  hasVideo: boolean;
+  thumbnailUrl: string | null;
+  snapshot: {
+    savedAt: string;
+    title: string;
+    planningPrompt?: string;
+    finalVideoUrl?: string;
+  };
+};
+
 export type EcomLibraryAssetGroup = {
   projectId: string | null;
   projectName: string;
@@ -48,6 +65,7 @@ export type EcomLibrarySection = {
   assetGroups: EcomLibraryAssetGroup[];
   storyboardBundles: EcomLibraryStoryboardBundle[];
   productDesignBundles: EcomLibraryProductDesignBundle[];
+  seedVideoBundles: EcomLibrarySeedVideoBundle[];
 };
 
 export async function listLibrarySections(): Promise<{
@@ -63,6 +81,7 @@ export async function listLibrarySections(): Promise<{
       assetGroups: s.assetGroups ?? [],
       productDesignBundles: s.productDesignBundles ?? [],
       storyboardBundles: s.storyboardBundles ?? [],
+      seedVideoBundles: s.seedVideoBundles ?? [],
     })),
     totalAssets: typeof data.totalAssets === "number" ? data.totalAssets : 0,
     totalBundles: typeof data.totalBundles === "number" ? data.totalBundles : 0,

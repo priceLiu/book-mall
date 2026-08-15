@@ -67,6 +67,12 @@ import type {
   ProductDesignProject,
 } from "@/lib/product-design-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_ASSISTANT_BUBBLE_CLASS,
+  ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
+  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+  ECOM_ASSISTANT_USER_BUBBLE_CLASS,
+} from "@/lib/ecom-assistant-chat-styles";
 import { cn } from "@/lib/utils";
 
 type ProjectPatch = Parameters<typeof updateProductDesignProject>[1];
@@ -797,9 +803,8 @@ export function ProductDesignAssistantPanel({
       ]
     : messages;
 
-  const lastAssistantId = [...displayMessages]
-    .reverse()
-    .find((m) => m.role === "assistant")?.id;
+  const showChoiceBlock =
+    (choices.length > 0 || briefInferBusy) && !streaming && !choiceBusy;
 
   const assistantStepAnchorIndex = useMemo(() => {
     const last = new Map<ProductDesignStepId, number>();
@@ -814,110 +819,109 @@ export function ProductDesignAssistantPanel({
   const showThinking = streaming || choiceBusy;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-[#1d1d1f]">创作助手</p>
-          <p className="text-[10px] text-[#6e6e73]">
-            {chatModels.find((m) => m.modelKey === chatModelKey)?.displayName ?? "助手模型"}
-          </p>
-        </div>
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col">
       <div
         ref={scrollRef}
-        className="ecom-scrollbar-overlay min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-scroll overscroll-y-contain px-4 py-4 [overflow-anchor:none]"
+        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
       >
-        {displayMessages.map((m, index) => {
-          const body =
-            m.role === "assistant"
-              ? m.id === "streaming"
+        <div className="space-y-3">
+          {displayMessages.map((m, index) => {
+            const body =
+              m.role === "assistant"
                 ? toAssistantChatContent(m.content) || m.content
-                : toAssistantChatContent(m.content) || m.content
-              : m.content;
-          const isLastAssistant = m.role === "assistant" && m.id === lastAssistantId;
-          const stepAnchor = inferAssistantMessageStep(m, index);
-          const anchorId =
-            stepAnchor && assistantStepAnchorIndex.get(stepAnchor) === index
-              ? productDesignAssistantAnchorId(stepAnchor)
-              : undefined;
-          return (
-            <div
-              key={m.id}
-              id={anchorId}
-              className={cn(
-                "max-w-[95%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                m.role === "user"
-                  ? "ml-auto border border-[var(--ecom-assistant-bubble-user-border)] bg-[var(--ecom-assistant-bubble-user-bg)] text-[#1d1d1f]"
-                  : "bg-[var(--ecom-assistant-bubble-bot-bg)] text-[#1d1d1f] shadow-sm ring-1 ring-[var(--ecom-assistant-bubble-bot-ring)]",
-              )}
-            >
-              {m.role === "assistant" ? (
-                <StoryboardMarkdownBlock markdown={body} />
-              ) : (
-                <p className="whitespace-pre-wrap font-sans">{body}</p>
-              )}
-              {isLastAssistant && (briefInferBusy || choices.length > 0) ? (
-                <div className="mt-3 border-t border-[var(--ecom-assistant-border)] pt-3">
-                  {briefInferBusy ? (
-                    <div className="space-y-2">
-                      <p className="text-[11px] text-[#6e6e73]">
-                        正在根据产品图推断{pendingBriefField?.label ?? "候选项"}…
-                      </p>
-                      <div
-                        className="ecom-upload-progress ecom-upload-progress-indeterminate"
-                        role="progressbar"
-                        aria-valuetext="推断中"
-                      >
-                        <span />
-                      </div>
-                      <p className="text-[10px] text-[#86868b]">
-                        视觉模型分析中，通常需 10～30 秒；完成后会展示可点选候选项。
-                      </p>
-                    </div>
+                : m.content;
+            const stepAnchor = inferAssistantMessageStep(m, index);
+            const anchorId =
+              stepAnchor && assistantStepAnchorIndex.get(stepAnchor) === index
+                ? productDesignAssistantAnchorId(stepAnchor)
+                : undefined;
+            return (
+              <div
+                key={m.id}
+                id={anchorId}
+                className={cn(
+                  "flex w-full flex-col",
+                  m.role === "user" ? "items-end" : "items-start",
+                )}
+              >
+                <div
+                  className={cn(
+                    ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                    m.role === "user"
+                      ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                      : ECOM_ASSISTANT_BUBBLE_CLASS,
+                  )}
+                >
+                  {m.role === "assistant" ? (
+                    <StoryboardMarkdownBlock markdown={body} />
                   ) : (
-                    <>
-                      <p className="mb-2 text-[11px] text-[#6e6e73]">{prompt}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {choices.map((c) =>
-                          c === NEXT_STEP_CHOICE ||
-                          c === CONFIRM_BRIEF_MULTI_CHOICE ||
-                          c === CONFIRM_TRUST_BADGE_CHOICE ? (
-                            <EcomButtonPrimary
-                              key={c}
-                              size="sm"
-                              type="button"
-                              disabled={streaming || choiceBusy}
-                              className="!max-w-none shrink-0"
-                              onClick={() => void handleChoice(c)}
-                            >
-                              {c}
-                            </EcomButtonPrimary>
-                          ) : (
-                            <button
-                              key={c}
-                              type="button"
-                              disabled={streaming || choiceBusy}
-                              className={cn(
-                                STORYBOARD_ASSISTANT_CHOICE_CLASS,
-                                pendingBriefField?.multiSelect &&
-                                  briefMultiDraft.includes(c) &&
-                                  "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]",
-                              )}
-                              onClick={() => void handleChoice(c)}
-                            >
-                              {c}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    </>
+                    <p className="whitespace-pre-wrap">{body}</p>
                   )}
                 </div>
-              ) : null}
+              </div>
+            );
+          })}
+          {showChoiceBlock ? (
+            <div className="flex flex-col items-start">
+              <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
+                {briefInferBusy ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-[#6e6e73]">
+                      正在根据产品图推断{pendingBriefField?.label ?? "候选项"}…
+                    </p>
+                    <div
+                      className="ecom-upload-progress ecom-upload-progress-indeterminate"
+                      role="progressbar"
+                      aria-valuetext="推断中"
+                    >
+                      <span />
+                    </div>
+                    <p className="text-[10px] text-[#86868b]">
+                      视觉模型分析中，通常需 10～30 秒；完成后会展示可点选候选项。
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="mb-2 text-[11px] text-[#6e6e73]">{prompt}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {choices.map((c) =>
+                        c === NEXT_STEP_CHOICE ||
+                        c === CONFIRM_BRIEF_MULTI_CHOICE ||
+                        c === CONFIRM_TRUST_BADGE_CHOICE ? (
+                          <EcomButtonPrimary
+                            key={c}
+                            size="sm"
+                            type="button"
+                            disabled={streaming || choiceBusy}
+                            className="!max-w-none shrink-0"
+                            onClick={() => void handleChoice(c)}
+                          >
+                            {c}
+                          </EcomButtonPrimary>
+                        ) : (
+                          <button
+                            key={c}
+                            type="button"
+                            disabled={streaming || choiceBusy}
+                            className={cn(
+                              STORYBOARD_ASSISTANT_CHOICE_CLASS,
+                              pendingBriefField?.multiSelect &&
+                                briefMultiDraft.includes(c) &&
+                                "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]",
+                            )}
+                            onClick={() => void handleChoice(c)}
+                          >
+                            {c}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          );
-        })}
+          ) : null}
+        </div>
         {showThinking ? (
           <StoryboardTaskStatus
             active
@@ -927,11 +931,12 @@ export function ProductDesignAssistantPanel({
                 ? "正在进入下一步…"
                 : "助手正在输出本步内容，完成后自动同步到中间工作区…"
             }
+            className="mt-3"
           />
         ) : null}
       </div>
 
-      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] p-4">
+      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
         <div className="mb-2 flex items-center justify-end">
           <button
             type="button"
@@ -950,7 +955,11 @@ export function ProductDesignAssistantPanel({
         <textarea
           className="mb-3 min-h-[4.5rem] w-full resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={3}
-          placeholder="补充说明或让我修改某一步…"
+          placeholder={
+            showChoiceBlock && choices.length > 0
+              ? "也可输入补充说明；点选上方选项可继续下一步…"
+              : "补充说明或让我修改某一步…"
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={inputDisabled}

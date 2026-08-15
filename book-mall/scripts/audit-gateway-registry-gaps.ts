@@ -49,6 +49,7 @@ const EXTRA_INVOKE_MODEL_KEYS = [
   "qwen3.5-flash",
   "qwen3.5-27b",
   "qwen3.6-plus",
+  "qwen3.8-max",
   "qwen3.6-flash",
   "seedream-5-lite",
   "seedream-4.5",

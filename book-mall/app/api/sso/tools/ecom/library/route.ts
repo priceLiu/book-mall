@@ -16,7 +16,11 @@ export async function GET(req: Request) {
     const sections = await listEcomLibrarySections(auth.userId);
     const totalAssets = sections.reduce((n, s) => n + s.assets.length, 0);
     const totalBundles = sections.reduce(
-      (n, s) => n + s.storyboardBundles.length + s.productDesignBundles.length,
+      (n, s) =>
+        n +
+        s.storyboardBundles.length +
+        s.productDesignBundles.length +
+        s.seedVideoBundles.length,
       0,
     );
     return NextResponse.json({ sections, totalAssets, totalBundles });

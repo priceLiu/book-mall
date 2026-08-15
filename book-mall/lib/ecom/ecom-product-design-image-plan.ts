@@ -39,7 +39,7 @@ import {
   ECOM_MAIN_IMAGE_ACTION,
   ECOM_MAIN_IMAGE_TOOL_KEY,
 } from "@/lib/ecom/ecom-product-design-types";
-import { ECOM_STORYBOARD_DEFAULT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 
 export type ImageGenPlanTarget = "main" | "detail";
 
@@ -336,7 +336,7 @@ export async function decomposeImageGenPlan(opts: {
   const modelKey =
     opts.modelKey?.trim() ||
     project.settings.visionModelKey?.trim() ||
-    ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
+    ECOM_DEFAULT_VISION_MODEL;
   assertStoryLlmVisionModel(modelKey, "Prompt 拆解");
 
   const target = opts.target;

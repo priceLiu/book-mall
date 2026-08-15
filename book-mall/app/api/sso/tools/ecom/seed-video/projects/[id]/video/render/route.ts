@@ -29,6 +29,17 @@ export async function POST(req: Request, ctx: Ctx) {
   if (shots.length === 0) {
     return NextResponse.json({ error: "请先完成镜头表并生成各镜视频" }, { status: 400 });
   }
+  const missingVideo = shots.filter((s) => !s.videoUrl?.trim());
+  if (missingVideo.length > 0) {
+    return NextResponse.json({ error: "请先为各镜生成镜头视频后再合成" }, { status: 400 });
+  }
+  const missingTts = shots.filter((s) => s.videoUrl?.trim() && !s.ttsUrl?.trim());
+  if (missingTts.length > 0) {
+    return NextResponse.json(
+      { error: "请先批量 TTS，待各镜口播就绪后再合成成片" },
+      { status: 400 },
+    );
+  }
 
   let profile = parseRenderProfile(null);
   try {
@@ -101,6 +112,9 @@ export async function GET(req: Request, ctx: Ctx) {
 
   return NextResponse.json({
     status: job.status.toLowerCase(),
+    jobId,
+    progress: job.progress,
+    progressLabel: job.progressLabel ?? undefined,
     outputUrl: job.downloadUrl ?? undefined,
     failMessage: job.errorMessage ?? undefined,
   });

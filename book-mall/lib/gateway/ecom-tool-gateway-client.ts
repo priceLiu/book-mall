@@ -104,7 +104,7 @@ export async function ecomGwCreateDashscopeJob(
   const auth = await requireEcomGatewayAuth(bookUserId);
   const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
   if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope（阿里云）凭证");
   }
 
   const model = opts.model.trim();
@@ -177,7 +177,7 @@ export async function ecomGwPollDashscope(
   const auth = await requireEcomGatewayAuth(bookUserId);
   const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
   if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope（阿里云）凭证");
   }
 
   const polled = await gatewayV1RecordInfo({
@@ -458,7 +458,7 @@ export async function ecomGwCreateBailianR2vJob(
   const auth = await requireEcomGatewayAuth(bookUserId);
   const credentialId = pickCredentialForKind(auth.credentials, "BAILIAN");
   if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定百炼凭证");
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope（阿里云）凭证");
   }
 
   const model = opts.model.trim();
@@ -489,7 +489,7 @@ export async function ecomGwPollBailianR2v(
   const auth = await requireEcomGatewayAuth(bookUserId);
   const credentialId = pickCredentialForKind(auth.credentials, "BAILIAN");
   if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定百炼凭证");
+    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope（阿里云）凭证");
   }
 
   const polled = await gatewayV1RecordInfo({

@@ -1,13 +1,20 @@
 {
   "defaults": {
-    "analysisModel": "qwen3.6-plus"
+    "analysisModel": "qwen3.8-max"
   },
   "models": [
+    {
+      "id": "qwen3.8-max",
+      "apiModel": "qwen3.8-max",
+      "title": "Qwen3.8-Max",
+      "description": "旗舰视觉理解，全站默认推荐。",
+      "icon": "✦"
+    },
     {
       "id": "qwen3.6-plus",
       "apiModel": "qwen3.6-plus",
       "title": "Qwen3.6-Plus",
-      "description": "性能最强，推荐优先使用。",
+      "description": "性能强，成本低于 Max。",
       "icon": "✦"
     },
     {

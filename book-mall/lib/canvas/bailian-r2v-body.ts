@@ -28,6 +28,12 @@ export function bailianR2vMaxRefs(model: string): number {
   return BAILIAN_R2V_HAPPYHORSE_MAX_REFS;
 }
 
+/** 百炼 R2V 单条成片 API 时长上限（秒） */
+export function bailianR2vMaxDurationSec(model: string): number {
+  if (isWan26BailianR2vModel(model.trim())) return 10;
+  return 30;
+}
+
 export function wan26R2vSizeFromAspect(
   aspectRatio: string,
   resolution: "720P" | "1080P",
@@ -71,7 +77,10 @@ export function buildBailianR2vRequestBody(opts: {
 }): BailianR2vRequestBody {
   const model = opts.model.trim();
   const urls = opts.referenceImageUrls.map((s) => s.trim()).filter(Boolean);
-  const duration = Math.min(15, Math.max(3, Math.floor(opts.duration)));
+  const duration = Math.min(
+    bailianR2vMaxDurationSec(model),
+    Math.max(3, Math.floor(opts.duration)),
+  );
   const seed = parseSeed(opts.seedStr);
   const ratio = opts.ratio.trim() || "16:9";
 

@@ -6,7 +6,12 @@ import {
   getEcomSeedVideoProject,
   updateEcomSeedVideoProject,
 } from "@/lib/ecom/ecom-seed-video-service";
-import type { SeedVideoPlan, SeedVideoSettings } from "@/lib/ecom/ecom-seed-video-types";
+import {
+  sanitizeSeedVideoChatMessages,
+  type SeedVideoChatMessage,
+  type SeedVideoPlan,
+  type SeedVideoSettings,
+} from "@/lib/ecom/ecom-seed-video-types";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +45,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
+    const chatHistory = Array.isArray(body.chatHistory)
+      ? (sanitizeSeedVideoChatMessages(body.chatHistory) as SeedVideoChatMessage[])
+      : undefined;
     const project = await updateEcomSeedVideoProject(auth.userId, id, {
       title: typeof body.title === "string" ? body.title : undefined,
       settings: body.settings as SeedVideoSettings | undefined,
       plan: body.plan as SeedVideoPlan | undefined,
+      chatHistory,
       meta: body.meta as Record<string, unknown> | undefined,
       status: typeof body.status === "string" ? body.status : undefined,
     });

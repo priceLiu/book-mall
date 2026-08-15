@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
+import {
+  assertStoryLlmVisionModel,
+  isStoryLlmVisionModel,
+} from "@/lib/canvas/story-llm-vision-models";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { buildSeedVideoSystemPrompt } from "@/lib/ecom/ecom-seed-video-prompts";
 import {
@@ -12,13 +16,18 @@ import {
   resolveSeedVideoChatImageUrls,
 } from "@/lib/ecom/ecom-seed-video-mention";
 import {
+  buildSeedVideoWorkflowContext,
+  mergeSeedVideoWorkflowFromUserChoice,
+  shouldAttachSeedVideoChatImages,
+} from "@/lib/ecom/ecom-seed-video-workflow";
+import {
+  ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL,
+  ECOM_SEED_VIDEO_TOOL_KEY,
   sanitizeSeedVideoChatMessages,
   type SeedVideoChatMessage,
 } from "@/lib/ecom/ecom-seed-video-types";
 import { getVisionMaxInputImages } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
-import { ECOM_SEED_VIDEO_TOOL_KEY } from "@/lib/ecom/ecom-seed-video-types";
-import { ECOM_STORYBOARD_DEFAULT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -74,10 +83,10 @@ export async function POST(req: Request, ctx: Ctx) {
   const project = await getEcomSeedVideoProject(auth.userId, projectId);
   if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
 
-  const modelKey =
+  let modelKey =
     typeof body.modelKey === "string" && body.modelKey.trim()
       ? body.modelKey.trim()
-      : project.settings.chatModelKey?.trim() || ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
+      : project.settings.chatModelKey?.trim() || ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL;
 
   const targetDurationSec = project.settings.targetDurationSec ?? 30;
   const aspectRatio = project.settings.aspectRatio ?? "9:16";
@@ -87,13 +96,29 @@ export async function POST(req: Request, ctx: Ctx) {
     targetDurationSec,
     aspectRatio,
     materialCount: project.references.length,
+    workflowContext: buildSeedVideoWorkflowContext({
+      chatHistory: turns,
+      meta: project.meta,
+    }),
   });
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
+    const priorUserCount = turns.slice(0, -1).filter((m) => m.role === "user").length;
+    const attachImages = shouldAttachSeedVideoChatImages(lastUserText, priorUserCount);
     const max = getVisionMaxInputImages(modelKey);
-    const refUrls = resolveSeedVideoChatImageUrls(project.references, lastUserText, max);
-    const refIds = resolveMentionedRefIds(project.references, lastUserText);
+    const refUrls = attachImages
+      ? resolveSeedVideoChatImageUrls(project.references, lastUserText, max)
+      : [];
+    if (refUrls.length > 0 && !isStoryLlmVisionModel(modelKey)) {
+      modelKey = ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL;
+    }
+    if (refUrls.length > 0) {
+      assertStoryLlmVisionModel(modelKey, "种草视频策划");
+    }
+    const refIds = attachImages
+      ? resolveMentionedRefIds(project.references, lastUserText)
+      : [];
     const gwTurns = buildGwTurns(turns, refUrls);
     const gw = await ecomGwChatStream(auth.userId, {
       modelKey,
@@ -137,15 +162,18 @@ export async function POST(req: Request, ctx: Ctx) {
           }
 
           const now = new Date().toISOString();
+          const clientMessages = sanitizeSeedVideoChatMessages(body.messages);
           const history: SeedVideoChatMessage[] = [
-            ...project.chatHistory,
-            {
-              id: `user-${Date.now()}`,
-              role: "user",
-              content: lastUserText,
-              createdAt: now,
-              refIds: refIds.length > 0 ? refIds : undefined,
-            },
+            ...clientMessages.map((m, index) => ({
+              id: m.id ?? `${m.role}-${Date.now()}-${index}`,
+              role: m.role,
+              content: m.content,
+              createdAt: m.createdAt ?? now,
+              refIds:
+                index === clientMessages.length - 1 && m.role === "user" && refIds.length > 0
+                  ? refIds
+                  : m.refIds,
+            })),
             {
               id: `assistant-${Date.now()}`,
               role: "assistant",
@@ -154,13 +182,68 @@ export async function POST(req: Request, ctx: Ctx) {
             },
           ];
 
-          await updateEcomSeedVideoProject(auth.userId, projectId, {
-            chatHistory: history,
-            meta: { lastAssistantRaw: fullText },
-          });
+          try {
+            const prevWorkflow =
+              (project.meta?.workflow as Record<string, unknown> | undefined) ?? {};
+            const workflow = mergeSeedVideoWorkflowFromUserChoice(
+              prevWorkflow,
+              lastUserText,
+            );
+            const prevMeta = (project.meta as Record<string, unknown> | undefined) ?? {};
+            await updateEcomSeedVideoProject(auth.userId, projectId, {
+              chatHistory: history,
+              meta: {
+                ...prevMeta,
+                lastAssistantRaw: fullText.trim(),
+                workflow: { ...prevWorkflow, ...workflow },
+              },
+            });
+          } catch (persistErr) {
+            console.error("[seed-video assistant/chat] persist failed", projectId, persistErr);
+          }
           controller.close();
         } catch (e) {
-          controller.error(e);
+          const errMsg = e instanceof Error ? e.message : "助手流式输出失败";
+          console.error("[seed-video assistant/chat]", projectId, e);
+          if (fullText.trim()) {
+            try {
+              const now = new Date().toISOString();
+              const clientMessages = sanitizeSeedVideoChatMessages(body.messages);
+              const history: SeedVideoChatMessage[] = [
+                ...clientMessages.map((m, index) => ({
+                  id: m.id ?? `${m.role}-${Date.now()}-${index}`,
+                  role: m.role,
+                  content: m.content,
+                  createdAt: m.createdAt ?? now,
+                  refIds: m.refIds,
+                })),
+                {
+                  id: `assistant-${Date.now()}`,
+                  role: "assistant",
+                  content: fullText.trim(),
+                  createdAt: now,
+                },
+              ];
+              const prevWorkflow =
+                (project.meta?.workflow as Record<string, unknown> | undefined) ?? {};
+              const workflow = mergeSeedVideoWorkflowFromUserChoice(
+                prevWorkflow,
+                lastUserText,
+              );
+              await updateEcomSeedVideoProject(auth.userId, projectId, {
+                chatHistory: history,
+                meta: { lastAssistantRaw: fullText, workflow },
+              });
+            } catch (persistErr) {
+              console.error("[seed-video assistant/chat] partial persist failed", persistErr);
+            }
+            controller.enqueue(
+              encoder.encode(`\n\n（输出中断：${errMsg}，已保存已生成部分）`),
+            );
+            controller.close();
+            return;
+          }
+          controller.error(e instanceof Error ? e : new Error(errMsg));
         } finally {
           reader.releaseLock();
         }

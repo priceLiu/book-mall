@@ -617,6 +617,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   bailianChat("qwen3.5-plus", 81),
   bailianChat("qwen3.5-27b", 82),
   bailianChat("qwen3.6-plus", 83),
+  bailianChat("qwen3.8-max", 83.2),
   bailianChat("qwen3.6-flash", 84),
   kieMusic(
     "kie-suno-api",

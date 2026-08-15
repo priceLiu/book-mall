@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -17,9 +17,18 @@ import {
   getSeedVideoProject,
   listSeedVideoProjectSummaries,
   removeSeedVideoRef,
+  updateSeedVideoProject,
   uploadSeedVideoRef,
 } from "@/lib/ecom-seed-video-api";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import { commitFormalScriptFromRows } from "@/lib/seed-video-formal-script-commit";
+import { inferAssistantChoices, isDirectMode, resolveSeedVideoPlanningPrompt, resolveSeedVideoVideoModelKey } from "@/lib/seed-video-workflow";
+import {
+  readStoryboardDraftFromMeta,
+  resolveStoryboardDraftRows,
+  serializeFormalScriptTable,
+  type SeedVideoStoryboardDraftRow,
+} from "@/lib/seed-video-storyboard-parse";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -30,7 +39,7 @@ export function SeedVideoStudio() {
   const [project, setProject] = useState<SeedVideoProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState("qwen3.5-flash");
+  const [chatModelKey, setChatModelKey] = useState("qwen3.8-max");
   const [videoModelKey, setVideoModelKey] = useState("wan2.7-r2v");
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
@@ -40,12 +49,23 @@ export function SeedVideoStudio() {
   const [assistantWide, setAssistantWide] = useState(false);
   const [planningPrompt, setPlanningPrompt] = useState("");
   const [startPlanningToken, setStartPlanningToken] = useState(0);
+  const [openProductionAfterSyncToken, setOpenProductionAfterSyncToken] = useState(0);
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
     null,
   );
+  const planningPromptRef = useRef("");
+  const planningLaunchRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const activeProjectIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!assistantStreaming) planningLaunchRef.current = false;
+  }, [assistantStreaming]);
 
   const applyProject = useCallback((p: SeedVideoProject) => {
+    activeProjectIdRef.current = p.id;
     setProject(p);
+    setPlanningPrompt(resolveSeedVideoPlanningPrompt(p));
     if (typeof window !== "undefined") {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
@@ -55,7 +75,56 @@ export function SeedVideoStudio() {
 
   const reload = useCallback(
     async (id: string, initial?: SeedVideoProject) => {
-      applyProject(initial ?? (await getSeedVideoProject(id)));
+      const generation = loadGenerationRef.current;
+      const data = initial ?? (await getSeedVideoProject(id));
+      if (generation !== loadGenerationRef.current) return;
+      if (activeProjectIdRef.current && activeProjectIdRef.current !== id) return;
+      applyProject(data);
+    },
+    [applyProject],
+  );
+
+  const reloadActiveProject = useCallback(async () => {
+    const id = activeProjectIdRef.current;
+    if (!id) return;
+    await reload(id);
+  }, [reload]);
+
+  useEffect(() => {
+    planningPromptRef.current = planningPrompt;
+  }, [planningPrompt]);
+
+  useEffect(() => {
+    if (!project?.id) return;
+    const prompt = planningPrompt.trim();
+    if (!prompt) return;
+    const timer = window.setTimeout(() => {
+      void updateSeedVideoProject(project.id, {
+        meta: { planningPrompt: prompt },
+      }).catch(() => {
+        /* 本地草稿，静默失败 */
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [planningPrompt, project?.id]);
+
+  useEffect(() => {
+    if (!project?.id) return;
+    const flushPlanningPrompt = () => {
+      const prompt = planningPromptRef.current.trim();
+      if (!prompt) return;
+      void updateSeedVideoProject(project.id, {
+        meta: { planningPrompt: prompt },
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", flushPlanningPrompt);
+    return () => window.removeEventListener("pagehide", flushPlanningPrompt);
+  }, [project?.id]);
+
+  const reloadOnMount = useCallback(
+    async (id: string, initial?: SeedVideoProject) => {
+      const data = initial ?? (await getSeedVideoProject(id));
+      applyProject(data);
     },
     [applyProject],
   );
@@ -68,8 +137,24 @@ export function SeedVideoStudio() {
         if (cancelled) return;
         setChatModels(models.chatModels);
         setVideoModels(models.videoModels);
-        setChatModelKey((prev) => pickBoundStoryboardModelKey(models.chatModels, prev));
-        setVideoModelKey((prev) => pickBoundStoryboardModelKey(models.videoModels, prev));
+        const chatDefault = models.defaults?.chat;
+        setChatModelKey((prev) =>
+          pickBoundStoryboardModelKey(
+            models.chatModels,
+            chatDefault && models.chatModels.some((m) => m.modelKey === chatDefault)
+              ? chatDefault
+              : prev,
+          ),
+        );
+        const videoDefault = models.defaults?.video ?? "wan2.7-r2v";
+        setVideoModelKey((prev) =>
+          pickBoundStoryboardModelKey(
+            models.videoModels,
+            videoDefault && models.videoModels.some((m) => m.modelKey === videoDefault)
+              ? videoDefault
+              : prev,
+          ),
+        );
       })
       .catch(() => {
         /* 模型列表后台加载 */
@@ -109,7 +194,7 @@ export function SeedVideoStudio() {
           return;
         }
 
-        await reload(projectId, initial);
+        await reloadOnMount(projectId, initial);
       } catch (e) {
         if (cancelled) return;
         if (isEcomUnauthorizedError(e)) {
@@ -129,22 +214,51 @@ export function SeedVideoStudio() {
     return () => {
       cancelled = true;
     };
-  }, [alert, reload]);
+  }, [alert, reloadOnMount]);
+
+  useEffect(() => {
+    if (chatModels.length === 0) return;
+    setChatModelKey((prev) => pickBoundStoryboardModelKey(chatModels, prev));
+  }, [chatModels]);
+
+  useEffect(() => {
+    if (videoModels.length === 0) return;
+    const productionMode = project?.meta?.workflow?.productionMode;
+    setVideoModelKey((prev) => {
+      const direct =
+        productionMode === "direct"
+          ? true
+          : productionMode === "fine"
+            ? false
+            : project
+              ? isDirectMode(project)
+              : true;
+      return resolveSeedVideoVideoModelKey(videoModels, prev, direct);
+    });
+  }, [videoModels, project?.meta?.workflow?.productionMode]);
 
   async function handleNewProject() {
-    setLoading(true);
+    loadGenerationRef.current += 1;
+    const generation = loadGenerationRef.current;
     setEmpty(false);
     try {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(PROJECT_STORAGE_KEY);
+      }
+      activeProjectIdRef.current = null;
       const created = await createSeedVideoProject({ title: "图片生种草视频" });
-      await reload(created.id, created);
+      if (generation !== loadGenerationRef.current) return;
+      applyProject(created);
+      setAssistantWide(false);
+      setStartPlanningToken(0);
+      setOpenProductionAfterSyncToken(0);
+      planningLaunchRef.current = false;
     } catch (e) {
       await alert({
         title: "新建失败",
         message: e instanceof Error ? e.message : "无法创建项目",
         variant: "error",
       });
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -153,7 +267,7 @@ export function SeedVideoStudio() {
     setRefBusy(true);
     try {
       await uploadSeedVideoRef(project.id, file);
-      await reload(project.id);
+      await reloadActiveProject();
     } catch (e) {
       await alert({
         title: "上传失败",
@@ -178,7 +292,7 @@ export function SeedVideoStudio() {
     setRefBusy(true);
     try {
       await removeSeedVideoRef(project.id, refId);
-      await reload(project.id);
+      await reloadActiveProject();
     } catch (e) {
       await alert({
         title: "删除失败",
@@ -190,8 +304,95 @@ export function SeedVideoStudio() {
     }
   }
 
+  async function handlePlanSyncedToProduction(fresh?: SeedVideoProject) {
+    if (!project) return;
+    if (fresh) {
+      applyProject(fresh);
+    } else {
+      await reloadActiveProject();
+    }
+    setOpenProductionAfterSyncToken((t) => t + 1);
+  }
+
+  async function handleEditStoryboard() {
+    if (!project) return;
+    const rows = resolveStoryboardDraftRows(project);
+    if (rows.length === 0) {
+      await alert({
+        title: "无法打开编辑",
+        message: "未能从助手回复中解析分镜执行表，请点「重新生成」后再试。",
+        variant: "error",
+      });
+      return;
+    }
+    try {
+      const md = serializeFormalScriptTable(rows);
+      await updateSeedVideoProject(project.id, {
+        meta: {
+          ...(project.meta ?? {}),
+          storyboardDraft: rows,
+          lastAssistantRaw: md,
+          workflow: { ...(project.meta?.workflow ?? {}), editingStoryboard: true },
+        },
+      });
+      await reloadActiveProject();
+    } catch (e) {
+      await alert({
+        title: "打开编辑失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
+  async function handleSaveStoryboardDraft(rows: SeedVideoStoryboardDraftRow[]) {
+    if (!project) return;
+    const md = serializeFormalScriptTable(rows);
+    await updateSeedVideoProject(project.id, {
+      meta: {
+        ...(project.meta ?? {}),
+        storyboardDraft: rows,
+        lastAssistantRaw: md,
+      },
+    });
+    await reloadActiveProject();
+  }
+
+  async function handleProceedFromStoryboardEdit(rows: SeedVideoStoryboardDraftRow[]) {
+    if (!project) return;
+    try {
+      const updated = await commitFormalScriptFromRows(project, rows);
+      applyProject(updated);
+      await reloadActiveProject();
+    } catch (e) {
+      await alert({
+        title: "同步失败",
+        message: e instanceof Error ? e.message : "未能同步正式脚本，请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
   async function handleStartPlanning() {
     if (!project) return;
+    if (planningLaunchRef.current) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "策划进行中",
+        message: "请等待助手完成当前输出后再操作。",
+        variant: "error",
+      });
+      return;
+    }
+    const pendingChoices = inferAssistantChoices(project);
+    if (pendingChoices.length > 0) {
+      setAssistantWide(true);
+      await alert({
+        title: "请先完成当前步骤",
+        message: "右侧助手区已有待选卡片，请直接点选继续，无需再次点击「开始策划」。",
+      });
+      return;
+    }
     const materials = project.references.filter((r) => r.role === "seed-material");
     if (materials.length === 0) {
       await alert({
@@ -209,6 +410,14 @@ export function SeedVideoStudio() {
       });
       return;
     }
+    try {
+      await updateSeedVideoProject(project.id, {
+        meta: { planningPrompt: planningPrompt.trim() },
+      });
+    } catch {
+      /* 不阻断策划 */
+    }
+    planningLaunchRef.current = true;
     setAssistantWide(true);
     setStartPlanningToken((t) => t + 1);
   }
@@ -246,24 +455,28 @@ export function SeedVideoStudio() {
         progress={<SeedVideoProgressRail project={project} />}
         assistant={
           <SeedVideoAssistantPanel
+            key={project.id}
             project={project}
             chatModelKey={chatModelKey}
-            onProjectChange={() => reload(project.id)}
+            onProjectChange={reloadActiveProject}
             onStreamingChange={setAssistantStreaming}
             onAlert={alert}
             composerWide={assistantWide}
             onComposerWideChange={setAssistantWide}
             startPlanningToken={startPlanningToken}
             planningPrompt={planningPrompt}
+            onEditStoryboard={() => void handleEditStoryboard()}
+            onPlanSyncedToProduction={(fresh) => void handlePlanSyncedToProduction(fresh)}
           />
         }
       >
         <SeedVideoContentPanel
+          key={project.id}
           project={project}
           videoModels={videoModels}
           videoModelKey={videoModelKey}
           onVideoModelChange={setVideoModelKey}
-          onProjectChange={() => reload(project.id)}
+          onProjectChange={reloadActiveProject}
           onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
           onAlert={alert}
           onUploadRef={handleUploadRef}
@@ -274,6 +487,15 @@ export function SeedVideoStudio() {
           onStartPlanning={() => void handleStartPlanning()}
           onNewProject={() => void handleNewProject()}
           streaming={assistantStreaming}
+          storyboardDraft={
+            project.meta?.workflow?.editingStoryboard
+              ? resolveStoryboardDraftRows(project)
+              : readStoryboardDraftFromMeta(project.meta)
+          }
+          editingStoryboard={Boolean(project.meta?.workflow?.editingStoryboard)}
+          onSaveStoryboardDraft={handleSaveStoryboardDraft}
+          onProceedFromStoryboardEdit={handleProceedFromStoryboardEdit}
+          openProductionAfterSyncToken={openProductionAfterSyncToken}
         />
       </EcomWorkspaceLayout>
 

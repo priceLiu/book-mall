@@ -28,6 +28,14 @@ const LLM_TEMP_SCHEMA = [
 
 export const BAILIAN_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
+    modelKey: "qwen3.8-max",
+    displayName: "Qwen3.8-Max",
+    role: "LLM",
+    description: "百炼 · 旗舰 · 视频/图片理解 · 视觉理解默认",
+    paramsSchema: [...LLM_TEMP_SCHEMA],
+    defaultParams: { temperature: 0.7, max_tokens: 8000 },
+  },
+  {
     modelKey: "qwen3.7-plus",
     displayName: "Qwen3.7-Plus",
     role: "LLM",

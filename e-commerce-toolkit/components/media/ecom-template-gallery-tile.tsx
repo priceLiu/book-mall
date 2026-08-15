@@ -3,6 +3,14 @@
 import { EcomMediaLibraryTile } from "@/components/media/ecom-media-library-tile";
 import type { EcomTemplateGalleryEntry } from "@/lib/ecom-template-gallery/types";
 
+/** 模板区单格 3:4 · 成片预览等工作区复用同一视觉尺寸 */
+export const ECOM_TEMPLATE_GALLERY_TILE_WIDTH_PX = 208;
+/** 工作区成片格 · 模板格 2 倍宽（3:4 不变） */
+export const ECOM_WORKSPACE_GALLERY_TILE_WIDTH_PX =
+  ECOM_TEMPLATE_GALLERY_TILE_WIDTH_PX * 2;
+export const ECOM_TEMPLATE_GALLERY_TILE_ASPECT_RATIO = "3 / 4";
+export const ECOM_TEMPLATE_GALLERY_TILE_ASPECT_CLASS = "aspect-[3/4]";
+
 type Props = {
   entry: EcomTemplateGalleryEntry;
   onPreview: () => void;
@@ -22,7 +30,7 @@ export function EcomTemplateGalleryTile({ entry, onPreview }: Props) {
         src={entry.ossUrl}
         thumbnailSrc={thumb}
         alt=""
-        aspectClass="aspect-[3/4]"
+        aspectClass={ECOM_TEMPLATE_GALLERY_TILE_ASPECT_CLASS}
         onPreview={onPreview}
         className="rounded-none border-0"
       />

@@ -72,6 +72,7 @@ async function main() {
     }
 
     for (const modelKey of [
+      "qwen3.8-max",
       "qwen3.7-plus",
       "qwen3.6-plus",
       "qwen3.5-plus",

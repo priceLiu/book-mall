@@ -16,8 +16,17 @@ import { useIntersectionVisible } from "@/lib/use-intersection-visible";
 export const ECOM_LIBRARY_MEDIA_GRID_CLASS =
   "grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5";
 
-const HOVER_BTN =
+/** 缩略图悬停 · 预览 Eye（全站统一，见 design/MEDIA.md） */
+export const ECOM_MEDIA_TILE_PREVIEW_BTN_CLASS =
+  "inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
+
+export const ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS = "h-5 w-5";
+
+/** 缩略图悬停 · 下载 / 删除等次要操作 */
+export const ECOM_MEDIA_TILE_ACTION_BTN_CLASS =
   "inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
+
+export const ECOM_MEDIA_TILE_ACTION_ICON_CLASS = "h-4 w-4";
 
 type Props = {
   kind: "image" | "video";
@@ -180,44 +189,50 @@ export function EcomMediaLibraryTile({
       >
         <button
           type="button"
-          className={HOVER_BTN}
+          className={ECOM_MEDIA_TILE_PREVIEW_BTN_CLASS}
           aria-label="预览"
           title="预览"
           onClick={onPreview}
         >
-          <Eye className="h-4 w-4" />
+          <Eye className={ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS} />
         </button>
         {onDownload ? (
           <button
             type="button"
-            className={HOVER_BTN}
+            className={ECOM_MEDIA_TILE_ACTION_BTN_CLASS}
             aria-label="下载"
             title="下载"
             onClick={onDownload}
           >
-            <Download className="h-4 w-4" />
+            <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onPinToAiSpace ? (
           <button
             type="button"
-            className={cn(HOVER_BTN, pinnedToAiSpace && "text-[#0071e3]")}
+            className={cn(
+              ECOM_MEDIA_TILE_ACTION_BTN_CLASS,
+              pinnedToAiSpace && "text-[#0071e3]",
+            )}
             aria-label={pinnedToAiSpace ? "已展示到 AI 空间" : "展示到 AI 空间"}
             title={pinnedToAiSpace ? "已展示到 AI 空间" : "展示到 AI 空间"}
             onClick={onPinToAiSpace}
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onDelete ? (
           <button
             type="button"
-            className={cn(HOVER_BTN, "text-red-600 hover:bg-red-50")}
+            className={cn(
+              ECOM_MEDIA_TILE_ACTION_BTN_CLASS,
+              "text-red-600 hover:bg-red-50",
+            )}
             aria-label="删除"
             title="删除"
             onClick={onDelete}
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
       </div>

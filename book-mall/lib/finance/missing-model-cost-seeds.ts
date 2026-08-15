@@ -26,7 +26,7 @@ const VOLC = 0.08;
 const MOON = 0.05;
 const TENCENT = 0.1;
 
-/** 与 GATEWAY_CANONICAL_REGISTRY 缺成本档的 81 项一一对应 */
+/** 与 GATEWAY_CANONICAL_REGISTRY 缺成本档的 88 项一一对应 */
 export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   // —— CORE · TEXT_LLM ——
   { canonicalModelKey: "kimi-k3", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(20), discountRate: 0, note: "百炼 kimi/kimi-k3 输入 20/M · 输出 100/M" },
@@ -44,6 +44,7 @@ export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   { canonicalModelKey: "qwen3.5-plus", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(0.8), discountRate: ALI },
   { canonicalModelKey: "qwen3.5-27b", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(0.6), discountRate: ALI },
   { canonicalModelKey: "qwen3.6-plus", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(2), discountRate: ALI },
+  { canonicalModelKey: "qwen3.8-max", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(12), discountRate: ALI, note: "输入 12/M · 输出 36/M" },
   { canonicalModelKey: "qwen3.6-flash", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(1.2), discountRate: ALI },
 
   // —— LEGACY · TEXT_LLM（KIE Chat）——
@@ -118,6 +119,12 @@ export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   { canonicalModelKey: "pixverse-v6-t2v", vendor: "aliyun", unit: "PER_SEC", tierRaw: "360P", listCostYuan: 0.21, discountRate: ALI },
   { canonicalModelKey: "happyhorse-1.1-r2v", vendor: "aliyun", unit: "PER_SEC", tierRaw: "720P", listCostYuan: 0.9, discountRate: ALI },
   { canonicalModelKey: "wan2.6-r2v-flash", vendor: "aliyun", unit: "PER_SEC", tierRaw: "1080P", listCostYuan: 0.25, discountRate: ALI, note: "无声 flash" },
+  { canonicalModelKey: "wan3.0-video", vendor: "aliyun", unit: "PER_SEC", tierRaw: "720P", listCostYuan: 0.6, discountRate: ALI, note: "480P 0.3 · 720P 0.6 · 1080P 1.2 元/秒" },
+  { canonicalModelKey: "wan2.2-s2v", vendor: "aliyun", unit: "PER_SEC", tierRaw: "720P", listCostYuan: 0.9, discountRate: ALI, note: "480P 0.5 · 720P 0.9 元/秒" },
+  { canonicalModelKey: "wan2.2-s2v-detect", vendor: "aliyun", unit: "PER_IMAGE", listCostYuan: 0.004, discountRate: ALI, note: "0.004元/张" },
+  { canonicalModelKey: "cosyvoice-v3-plus", vendor: "aliyun", unit: "PER_IMAGE", listCostYuan: 2, discountRate: ALI, note: "2元/万字符" },
+  { canonicalModelKey: "cosyvoice-v3-flash", vendor: "aliyun", unit: "PER_IMAGE", listCostYuan: 1, discountRate: ALI, note: "1元/万字符" },
+  { canonicalModelKey: "qwen3-asr-flash-filetrans", vendor: "aliyun", unit: "PER_SEC", listCostYuan: 0.00022, discountRate: ALI, note: "音频时长 0.00022元/秒" },
 
   // —— LEGACY · KIE 视频 ——
   { canonicalModelKey: "kie-seedance-2.0", vendor: "kie", unit: "PER_SEC", tierRaw: "720p", listCostYuan: 0.125, discountRate: KIE },

@@ -62,14 +62,22 @@ import {
 />
 ```
 
-悬停层样式：
+悬停层样式（**全站统一**，模板区 / 资产库 / 模特库 / 模块结果区相同）：
 
 ```tsx
 "absolute inset-0 flex items-center justify-center gap-2"
 "bg-black/0 opacity-0 group-hover:bg-black/45 group-hover:opacity-100"
-// 按钮：h-8 w-8 rounded-full bg-white/95 shadow-md
-// 图标：Eye / Download / Trash2，h-4 w-4
+
+// 预览 Eye（主操作）
+ECOM_MEDIA_TILE_PREVIEW_BTN_CLASS   // h-10 w-10 rounded-full bg-white/95 shadow-md
+ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS   // h-5 w-5
+
+// 下载 / 删除 / 展示到 AI 空间（次要操作，可与预览并列）
+ECOM_MEDIA_TILE_ACTION_BTN_CLASS    // h-8 w-8
+ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 ```
+
+**禁止** 按页面单独放大预览钮（如模板区 2× Eye）；须复用上述 export。
 
 **禁止** 在缩略图下方用文字链接触发预览/下载。
 
@@ -122,10 +130,20 @@ import {
 ### 图片预览 Dialog
 
 - 内容区：`max-h-[80vh] overflow-auto rounded-lg bg-[#f5f5f7]`
-- 图：`mx-auto w-full object-contain`
+- 图：`mx-auto w-full object-contain`；先缩略后原图 crossfade（见 §懒加载）
 - 标题：`DialogTitle` 显示资产名/镜头号
 
 **禁止**新窗口 `window.open` 或未封装的原图弹层。
+
+### 视频预览 Dialog（与 Canvas 弹层一致）
+
+`EcomVideoPreviewDialog` 内 **`EcomVideoPlayer`** 须：
+
+- `frameless` — 无外圆角框，原生 controls 贴边
+- `adaptiveBackdrop` — 按视频比例自适应（最大 `96vw` × `calc(100dvh - 88px)`），模糊封面背景
+- `autoPlay` + `poster={thumbUrl}`（有封面时）
+
+详见 `VIDEO.md`。
 
 ## 参考图上传（StoryboardRefUploader 模式）
 
@@ -183,7 +201,7 @@ import {
 | 下载 | `rounded-full bg-white/95 text-[#1d1d1f] shadow` + `Download` |
 | 主行动（生成视频） | `rounded-full bg-[#1d1d1f] text-white shadow` |
 
-尺寸：`h-8 w-8`，图标 `h-4 w-4`。**禁止** 浮层内文字标签。
+预览 Eye：`ECOM_MEDIA_TILE_PREVIEW_*`（`h-10` / `h-5`）。其它圆形钮：`h-8 w-8`，图标 `h-4 w-4`。**禁止** 浮层内文字标签。
 
 ## 完整分镜图 / 导出预览
 

@@ -954,9 +954,11 @@ export function StoryboardContentPanel({
             ? imgBusy || regeneratingPanel != null
             : vidBusy || panelVidBusy != null
         }
-        onConfirm={() => {
+        onConfirm={(modelKey) => {
           const panelIdx = pendingPanelIndex;
           const mode = pickerMode;
+          if (mode === "image") onImageModelChange?.(modelKey);
+          else onVideoModelChange?.(modelKey);
           setPickerOpen(false);
           setPendingPanelIndex(null);
           void (async () => {

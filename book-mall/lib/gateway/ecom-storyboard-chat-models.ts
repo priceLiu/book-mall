@@ -18,6 +18,7 @@ export type EcomStoryboardGatewayModel = {
 };
 
 export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = "qwen3.5-flash";
+export const ECOM_DEFAULT_VISION_MODEL = "qwen3.8-max";
 export const ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL = "wan2.7-image";
 export const ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL = "doubao-seedance-2.0";
 

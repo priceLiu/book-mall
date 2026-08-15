@@ -4,6 +4,8 @@ import {
   type StoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
+import { ECOM_SEED_VIDEO_MODULE } from "@/lib/ecom/ecom-seed-video-types";
 import type { ProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
 import {
   ECOM_PROJECT_MODULE_DETAIL,
@@ -59,6 +61,18 @@ export type EcomLibraryProductDesignBundle = {
   snapshot: ProductDesignWorkflowSnapshot;
 };
 
+export type EcomLibrarySeedVideoBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  shotCount: number;
+  productionMode: "direct" | "fine" | null;
+  hasScript: boolean;
+  hasVideo: boolean;
+  thumbnailUrl: string | null;
+  snapshot: SeedVideoDeliverableSnapshot;
+};
+
 export type EcomLibrarySection = {
   moduleId: string;
   title: string;
@@ -68,6 +82,7 @@ export type EcomLibrarySection = {
   assetGroups: EcomLibraryAssetGroup[];
   storyboardBundles: EcomLibraryStoryboardBundle[];
   productDesignBundles: EcomLibraryProductDesignBundle[];
+  seedVideoBundles: EcomLibrarySeedVideoBundle[];
 };
 
 const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
@@ -216,6 +231,54 @@ function snapshotToProductDesignBundle(
   };
 }
 
+function collectSeedVideoSnapshotsFromMeta(
+  meta: Record<string, unknown> | null | undefined,
+): SeedVideoDeliverableSnapshot[] {
+  const out: SeedVideoDeliverableSnapshot[] = [];
+  const latest = meta?.deliverableSnapshot as SeedVideoDeliverableSnapshot | undefined;
+  const history = Array.isArray(meta?.deliverableSnapshotHistory)
+    ? (meta!.deliverableSnapshotHistory as SeedVideoDeliverableSnapshot[])
+    : [];
+  const seen = new Set<string>();
+  for (const snap of [latest, ...history]) {
+    if (!snap?.savedAt) continue;
+    if (seen.has(snap.savedAt)) continue;
+    seen.add(snap.savedAt);
+    out.push(snap);
+  }
+  return out;
+}
+
+function snapshotToSeedVideoBundle(
+  projectId: string,
+  snap: SeedVideoDeliverableSnapshot,
+): EcomLibrarySeedVideoBundle {
+  const shotCount = snap.plan?.shots?.length ?? 0;
+  const productionMode = snap.workflow?.productionMode ?? null;
+  const hasScript = Boolean(
+    snap.planningPrompt?.trim() ||
+      snap.plan?.directVideo?.globalPrompt?.trim() ||
+      (snap.plan?.scripts?.length ?? 0) >= 1 ||
+      shotCount >= 1,
+  );
+  const thumb =
+    snap.finalVideoUrl?.trim() ||
+    snap.references.find((r) => r.role === "seed-material")?.ossUrl?.trim() ||
+    snap.references[0]?.ossUrl?.trim() ||
+    null;
+  return {
+    projectId,
+    savedAt: snap.savedAt,
+    title: snap.title || "种草视频",
+    shotCount,
+    productionMode,
+    hasScript,
+    hasVideo: Boolean(snap.finalVideoUrl?.trim()),
+    thumbnailUrl: thumb,
+    snapshot: snap,
+  };
+}
+
 function snapshotToBundle(
   projectId: string,
   snap: StoryboardDeliverableSnapshot,
@@ -248,7 +311,7 @@ function snapshotToBundle(
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
   await backfillEcomAssetProjectNamesForUser(userId);
 
-  const [assets, storyboardRows, productDesignRows] = await Promise.all([
+  const [assets, storyboardRows, productDesignRows, seedVideoRows] = await Promise.all([
     prisma.ecomAsset.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -271,9 +334,19 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       take: 80,
       select: { id: true, module: true, meta: true, brief: true, title: true },
     }),
+    prisma.ecomSeedVideoProject.findMany({
+      where: { userId, module: ECOM_SEED_VIDEO_MODULE },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: { id: true, meta: true, title: true },
+    }),
   ]);
 
-  const projectNameLookup = buildProjectNameLookup(productDesignRows, storyboardRows);
+  const projectNameLookup = buildProjectNameLookup(
+    productDesignRows,
+    storyboardRows,
+    seedVideoRows,
+  );
 
   const assetsByModule = new Map<string, EcomLibraryAssetItem[]>();
   for (const row of assets) {
@@ -307,6 +380,15 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
   }
   bundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 
+  const seedVideoBundles: EcomLibrarySeedVideoBundle[] = [];
+  for (const row of seedVideoRows) {
+    const meta = (row.meta as Record<string, unknown> | null) ?? null;
+    for (const snap of collectSeedVideoSnapshotsFromMeta(meta)) {
+      seedVideoBundles.push(snapshotToSeedVideoBundle(row.id, snap));
+    }
+  }
+  seedVideoBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+
   const productDesignBundlesByModule = new Map<string, EcomLibraryProductDesignBundle[]>();
   for (const row of productDesignRows) {
     const moduleId = productDesignModuleId(row.module);
@@ -336,10 +418,12 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const sectionAssetGroups = groupAssetsByProject(sectionAssets);
     const sectionBundles =
       moduleId === "storyboard-micro-drama" ? bundles : [];
+    const sectionSeedVideoBundles = moduleId === "seed-video" ? seedVideoBundles : [];
     const sectionProductDesignBundles = productDesignBundlesByModule.get(moduleId) ?? [];
     if (
       sectionAssets.length === 0 &&
       sectionBundles.length === 0 &&
+      sectionSeedVideoBundles.length === 0 &&
       sectionProductDesignBundles.length === 0
     ) {
       continue;
@@ -353,6 +437,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       assetGroups: sectionAssetGroups,
       storyboardBundles: sectionBundles,
       productDesignBundles: sectionProductDesignBundles,
+      seedVideoBundles: sectionSeedVideoBundles,
     });
   }
 
@@ -367,6 +452,18 @@ export function findStoryboardSnapshotInProjectMeta(
   if (latest?.savedAt === savedAt) return latest;
   const history = Array.isArray(meta?.deliverableSnapshotHistory)
     ? (meta!.deliverableSnapshotHistory as StoryboardDeliverableSnapshot[])
+    : [];
+  return history.find((h) => h.savedAt === savedAt) ?? null;
+}
+
+export function findSeedVideoSnapshotInProjectMeta(
+  meta: Record<string, unknown> | null | undefined,
+  savedAt: string,
+): SeedVideoDeliverableSnapshot | null {
+  const latest = meta?.deliverableSnapshot as SeedVideoDeliverableSnapshot | undefined;
+  if (latest?.savedAt === savedAt) return latest;
+  const history = Array.isArray(meta?.deliverableSnapshotHistory)
+    ? (meta!.deliverableSnapshotHistory as SeedVideoDeliverableSnapshot[])
     : [];
   return history.find((h) => h.savedAt === savedAt) ?? null;
 }

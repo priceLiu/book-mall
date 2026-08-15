@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * 电商工具箱 · 生图/生视频模型选择弹层（唯一实现，见 `.cursor/rules/ecom-model-picker.mdc`）
+ * 横向长条卡片 + 左侧列表/右侧参数 + 类型筛选。
+ */
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Cpu, Image as ImageIcon, Loader2, Video } from "lucide-react";
 
 import {
@@ -22,10 +28,26 @@ import {
   isStoryboardBailianR2vModel,
   isStoryboardKling30KieVideoModel,
   isStoryboardWanR2vModel,
+  resolveStoryboardVideoFullSheetDurationRange,
+  resolveStoryboardVideoPanelDurationRange,
   type StoryboardVideoAspectRatio,
+  type StoryboardVideoDurationRange,
 } from "@/lib/storyboard-video-params";
+import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import {
+  formatStoryboardImageModelTypeLabel,
+  storyboardModelFilterTabsForMode,
+  storyboardModelMatchesMediaFilter,
+  type StoryboardModelMediaFilter,
+} from "@/lib/storyboard-model-type-filter";
+import { formatStoryboardVideoModelTypeLabel } from "@/lib/storyboard-video-model-type";
+import { formatStoryboardModelRefCountLabel } from "@/lib/storyboard-model-ref-count";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
+
+/** 弹层默认尺寸（可被 `contentClassName` 覆盖） */
+export const STORYBOARD_MODEL_PICKER_DIALOG_CLASS =
+  "flex max-h-[min(80vh,640px)] w-[min(96vw,920px)] max-w-[920px] flex-col gap-0 overflow-hidden p-0";
 
 type Props = {
   open: boolean;
@@ -34,7 +56,7 @@ type Props = {
   models: StoryboardGatewayModel[];
   value: string;
   onChange: (key: string) => void;
-  onConfirm: () => void;
+  onConfirm: (modelKey: string) => void;
   confirming?: boolean;
   panelIndex?: number | null;
   videoTarget?: "panel" | "fullSheet";
@@ -138,62 +160,134 @@ function roleBadgeTone(role: string): string {
   }
 }
 
+function modelVideoDurationLabel(
+  mode: "image" | "video",
+  modelKey: string,
+  videoTarget: "panel" | "fullSheet",
+): string | null {
+  if (mode !== "video") return null;
+  const range =
+    videoTarget === "panel"
+      ? resolveStoryboardVideoPanelDurationRange(modelKey)
+      : resolveStoryboardVideoFullSheetDurationRange(modelKey);
+  return `时长 ${range.label}`;
+}
+
 function ModelCard({
   model,
   selected,
   paramCount,
+  durationLabel,
+  mode,
   onSelect,
 }: {
   model: StoryboardGatewayModel;
   selected: boolean;
   paramCount: number;
+  durationLabel?: string | null;
+  mode: "image" | "video";
   onSelect: () => void;
 }) {
-  const disabled = !model.credentialBound;
+  const disabled = !model.credentialBound && !model.platformOffering;
+  const typeLabel =
+    mode === "video"
+      ? formatStoryboardVideoModelTypeLabel(model.modelKey)
+      : formatStoryboardImageModelTypeLabel(model.modelKey, model.role);
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onSelect}
       className={cn(
-        "group relative flex h-full flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-left transition",
+        "group relative flex w-full min-h-[4.75rem] flex-row items-stretch gap-4 rounded-xl border px-4 py-3 text-left transition",
         selected
           ? "border-[var(--ecom-primary)] bg-[#f0f6ff] shadow-sm"
           : "border-[#e8e8ed] bg-white hover:border-[#c7c7cc] hover:bg-[#fafafa]",
         disabled && "cursor-not-allowed opacity-50 hover:border-[#e8e8ed] hover:bg-white",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-1 text-[13px] font-semibold text-[#1d1d1f]">
-          {model.displayName || model.modelKey}
-        </p>
-        <span
-          className={cn(
-            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
-            roleBadgeTone(model.role),
-          )}
-        >
-          {model.role}
-        </span>
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[13px] font-semibold text-[#1d1d1f]">
+            {model.displayName || model.modelKey}
+          </p>
+          <span
+            className={cn(
+              "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
+              roleBadgeTone(model.role),
+            )}
+            title={typeLabel}
+          >
+            {typeLabel}
+          </span>
+        </div>
+        <p className="truncate font-mono text-[11px] text-[#86868b]">{model.modelKey}</p>
+        {model.description ? (
+          <p className="line-clamp-1 text-[11px] leading-relaxed text-[#6e6e73]">
+            {model.description}
+          </p>
+        ) : null}
       </div>
-      <p className="line-clamp-1 font-mono text-[11px] text-[#86868b]">{model.modelKey}</p>
-      {model.description ? (
-        <p className="line-clamp-2 text-[11px] leading-relaxed text-[#6e6e73]">
-          {model.description}
-        </p>
-      ) : null}
-      <div className="mt-auto flex items-center justify-between pt-1">
+      <div className="flex shrink-0 flex-col items-end justify-center gap-1 text-right">
         <span className="text-[10px] text-[#a1a1a6]">
+          {formatStoryboardModelRefCountLabel(model.modelKey, mode)}
+          {" · "}
+          {durationLabel ? `${durationLabel} · ` : ""}
           {paramCount > 0 ? `${paramCount} 项可调参数` : "无可调参数"}
         </span>
         {disabled ? <span className="text-[10px] text-[#c0392b]">未绑定</span> : null}
       </div>
       {selected ? (
-        <span className="absolute right-2 top-2 grid size-4 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
+        <span className="absolute right-3 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
           <Check className="h-2.5 w-2.5" />
         </span>
       ) : null}
     </button>
+  );
+}
+
+function ModelMediaFilterBar({
+  mode,
+  models,
+  value,
+  onChange,
+}: {
+  mode: "image" | "video";
+  models: StoryboardGatewayModel[];
+  value: StoryboardModelMediaFilter;
+  onChange: (next: StoryboardModelMediaFilter) => void;
+}) {
+  const tabs = storyboardModelFilterTabsForMode(mode);
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-[#f0f0f2] pb-3">
+      <span className="text-[11px] font-medium text-[#86868b]">类型</span>
+      {tabs.map((tab) => {
+        const count = models.filter((m) =>
+          storyboardModelMatchesMediaFilter(m, mode, tab.id),
+        ).length;
+        const active = value === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            disabled={tab.id !== "all" && count === 0}
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-[12px] font-medium transition",
+              active
+                ? "border-[var(--ecom-primary)] bg-[#f0f6ff] text-[var(--ecom-primary)]"
+                : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#c7c7cc] hover:bg-[#fafafa]",
+              tab.id !== "all" && count === 0 && "cursor-not-allowed opacity-40 hover:bg-white",
+            )}
+          >
+            {tab.label}
+            {tab.id !== "all" && count > 0 ? (
+              <span className="ml-1 tabular-nums text-[11px] opacity-80">{count}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -242,36 +336,94 @@ export function StoryboardModelPickerDialog({
   const action = confirmLabel ?? (mode === "image" ? "开始生图" : "开始生成");
   const subtitle =
     dialogDescription ??
-    (mode === "image"
-      ? "选择生图模型并调整尺寸，用于生成分镜图。"
-      : "图生视频模型（多图参考整图成片），需对应 Gateway Provider。");
+    (mode === "image" ? "选择生图模型并调整尺寸，用于生成分镜图。" : "");
   const footerLeftHint =
     footerHint ??
     (confirming || running
       ? "任务进行中，请稍候…"
       : "选好模型与参数后开始生成。");
-  const isBailianR2v = mode === "video" && isStoryboardBailianR2vModel(value);
-  const isKling30 = mode === "video" && isStoryboardKling30KieVideoModel(value);
   const showImageSize = mode === "image";
-  const showAspect = mode === "video" && !isBailianR2v;
-  const showR2vRatio = mode === "video" && isBailianR2v;
   const showFullDuration = mode === "video" && videoTarget === "fullSheet";
   const showPanelDuration = mode === "video" && videoTarget === "panel";
   const showResolution = mode === "video";
-  const showWanR2vExtras = mode === "video" && isStoryboardWanR2vModel(value);
-  const showR2vSeed = mode === "video" && isBailianR2v;
-  const fullDurationMin = isBailianR2v ? 3 : 4;
 
-  const selectedModel = models.find((m) => m.modelKey === value) ?? null;
+  const [draftKey, setDraftKey] = useState(value);
+  const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      setDraftKey(value);
+      setMediaFilter("all");
+    }
+    wasOpenRef.current = open;
+  }, [open, value]);
+
+  const visibleModels = useMemo(
+    () => models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter)),
+    [models, mode, mediaFilter],
+  );
+
+  useEffect(() => {
+    if (!open || visibleModels.length === 0) return;
+    if (visibleModels.some((m) => m.modelKey === draftKey)) return;
+    setDraftKey(pickBoundStoryboardModelKey(visibleModels, value || visibleModels[0]!.modelKey));
+  }, [open, visibleModels, draftKey, value]);
+
+  const selectedModel = models.find((m) => m.modelKey === draftKey) ?? null;
+  const isBailianR2v = mode === "video" && isStoryboardBailianR2vModel(draftKey);
+  const isKling30 = mode === "video" && isStoryboardKling30KieVideoModel(draftKey);
+  const showAspect = mode === "video" && !isBailianR2v;
+  const showR2vRatio = mode === "video" && isBailianR2v;
+  const showWanR2vExtras = mode === "video" && isStoryboardWanR2vModel(draftKey);
+  const showR2vSeed = mode === "video" && isBailianR2v;
+  const fullDurationRange: StoryboardVideoDurationRange =
+    resolveStoryboardVideoFullSheetDurationRange(draftKey);
+  const panelDurationRange: StoryboardVideoDurationRange =
+    resolveStoryboardVideoPanelDurationRange(draftKey);
+  const fullDurationMin = fullDurationRange.min;
+  const fullDurationMax = fullDurationRange.max;
+  const panelDurationMin = panelDurationRange.min;
+  const panelDurationMax = panelDurationRange.max;
+
+  useEffect(() => {
+    if (mode !== "video") return;
+    if (showFullDuration && onDurationChange) {
+      const clamped = Math.min(fullDurationMax, Math.max(fullDurationMin, durationSec));
+      if (clamped !== durationSec) onDurationChange(clamped);
+    }
+    if (showPanelDuration && onPanelDurationChange && panelDurationSec != null) {
+      const clamped = Math.min(panelDurationMax, Math.max(panelDurationMin, panelDurationSec));
+      if (clamped !== panelDurationSec) onPanelDurationChange(clamped);
+    }
+  }, [
+    mode,
+    draftKey,
+    durationSec,
+    panelDurationSec,
+    fullDurationMin,
+    fullDurationMax,
+    panelDurationMin,
+    panelDurationMax,
+    showFullDuration,
+    showPanelDuration,
+    onDurationChange,
+    onPanelDurationChange,
+  ]);
+
+  function handleConfirm() {
+    if (draftKey !== value) onChange(draftKey);
+    onConfirm(draftKey);
+  }
 
   const platformFlat = models.some((m) => m.platformOffering);
 
   // BYOK：按 providerKind 分组；平台代付：flat 去重列表
   const groups: { kind: string; models: StoryboardGatewayModel[] }[] = [];
   if (platformFlat) {
-    groups.push({ kind: "platform", models });
+    groups.push({ kind: "platform", models: visibleModels });
   } else {
-    for (const m of models) {
+    for (const m of visibleModels) {
       const kind = m.providerKind ?? "UNKNOWN";
       let g = groups.find((x) => x.kind === kind);
       if (!g) {
@@ -282,22 +434,27 @@ export function StoryboardModelPickerDialog({
     }
   }
 
+  const hasAnyModel = models.length > 0;
+  const filterEmpty = hasAnyModel && visibleModels.length === 0;
+  const canConfirm =
+    visibleModels.some(
+      (m) =>
+        m.modelKey === draftKey && (m.credentialBound || m.platformOffering),
+    ) && !filterEmpty;
+
   const ModeIcon = mode === "image" ? ImageIcon : Video;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn(
-          "flex max-h-[88vh] max-w-3xl flex-col gap-0 overflow-hidden p-0",
-          contentClassName,
-        )}
+        className={cn(STORYBOARD_MODEL_PICKER_DIALOG_CLASS, contentClassName)}
       >
         <DialogHeader className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-[15px]">
             <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
             {dialogTitle ?? pickerTitle(mode, panelIndex, videoTarget)}
           </DialogTitle>
-          <p className="text-[12px] text-[#86868b]">{subtitle}</p>
+          {subtitle ? <p className="text-[12px] text-[#86868b]">{subtitle}</p> : null}
         </DialogHeader>
 
         {running ? (
@@ -324,7 +481,7 @@ export function StoryboardModelPickerDialog({
               <Loader2 className="h-8 w-8 animate-spin text-[var(--ecom-primary)]" />
               <p className="text-sm text-[#6e6e73]">正在加载 Gateway 生图模型…</p>
             </div>
-          ) : groups.length === 0 ? (
+          ) : !hasAnyModel ? (
             <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[#86868b]">
               <p>
                 {modelsEmptyHint ??
@@ -341,8 +498,20 @@ export function StoryboardModelPickerDialog({
               ) : null}
             </div>
           ) : (
-            <div className="space-y-5">
-              {groups.map((g) => (
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
+              <div className="space-y-4">
+                <ModelMediaFilterBar
+                  mode={mode}
+                  models={models}
+                  value={mediaFilter}
+                  onChange={setMediaFilter}
+                />
+              {filterEmpty ? (
+                <p className="rounded-xl border border-dashed border-[#e8e8ed] px-4 py-10 text-center text-sm text-[#86868b]">
+                  当前筛选下暂无模型，请切换类型或选择「全部」。
+                </p>
+              ) : (
+              groups.map((g) => (
                 <section key={g.kind}>
                   {!platformFlat ? (
                     <header className="mb-2 flex items-center gap-2">
@@ -354,27 +523,41 @@ export function StoryboardModelPickerDialog({
                       </span>
                     </header>
                   ) : null}
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="flex flex-col gap-2">
                     {g.models.map((m) => (
                       <ModelCard
                         key={m.modelKey}
                         model={m}
-                        selected={m.modelKey === value}
+                        mode={mode}
+                        selected={m.modelKey === draftKey}
                         paramCount={countAdjustableParams(mode, m.modelKey, videoTarget)}
-                        onSelect={() => onChange(m.modelKey)}
+                        durationLabel={modelVideoDurationLabel(mode, m.modelKey, videoTarget)}
+                        onSelect={() => setDraftKey(m.modelKey)}
                       />
                     ))}
                   </div>
                 </section>
-              ))}
+              ))
+              )}
+              </div>
 
-              <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4">
-                <p className="mb-3 flex items-center gap-2 text-[12px] font-semibold text-[#1d1d1f]">
+              <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4 lg:sticky lg:top-0">
+                <p className="mb-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#1d1d1f]">
                   <Cpu className="h-3.5 w-3.5 text-[#86868b]" />
                   模型参数
                   <span className="font-normal text-[#86868b]">
-                    {selectedModel?.displayName ?? value}
+                    {selectedModel?.displayName ?? draftKey}
                   </span>
+                  {mode === "video" && selectedModel ? (
+                    <span className="rounded bg-[#e8f1ff] px-1.5 py-0.5 text-[10px] font-medium text-[#0058c7]">
+                      {formatStoryboardVideoModelTypeLabel(selectedModel.modelKey)}
+                    </span>
+                  ) : null}
+                  {mode === "image" && selectedModel ? (
+                    <span className="rounded bg-[#fff4e5] px-1.5 py-0.5 text-[10px] font-medium text-[#b25e09]">
+                      {formatStoryboardImageModelTypeLabel(selectedModel.modelKey, selectedModel.role)}
+                    </span>
+                  ) : null}
                 </p>
 
                 <div className="space-y-4">
@@ -463,19 +646,21 @@ export function StoryboardModelPickerDialog({
 
                   {showFullDuration ? (
                     <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">成片时长 {durationSec}s</span>
+                      <span className="text-xs font-medium text-[#6e6e73]">
+                        成片时长 {durationSec}s（{fullDurationRange.label}）
+                      </span>
                       <input
                         type="range"
                         min={fullDurationMin}
-                        max={15}
+                        max={fullDurationMax}
                         step={1}
-                        value={durationSec}
+                        value={Math.min(fullDurationMax, Math.max(fullDurationMin, durationSec))}
                         onChange={(e) => onDurationChange?.(Number(e.target.value))}
                         className="w-full accent-[var(--ecom-primary)]"
                       />
                       <div className="flex justify-between text-[10px] text-[#86868b]">
                         <span>{fullDurationMin}s</span>
-                        <span>15s</span>
+                        <span>{fullDurationMax}s</span>
                       </div>
                     </label>
                   ) : null}
@@ -508,19 +693,24 @@ export function StoryboardModelPickerDialog({
 
                   {showPanelDuration ? (
                     <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">镜头时长 {panelDurationSec}s</span>
+                      <span className="text-xs font-medium text-[#6e6e73]">
+                        镜头时长 {panelDurationSec}s（{panelDurationRange.label}）
+                      </span>
                       <input
                         type="range"
-                        min={2}
-                        max={8}
+                        min={panelDurationMin}
+                        max={panelDurationMax}
                         step={1}
-                        value={panelDurationSec}
+                        value={Math.min(
+                          panelDurationMax,
+                          Math.max(panelDurationMin, panelDurationSec ?? panelDurationMin),
+                        )}
                         onChange={(e) => onPanelDurationChange?.(Number(e.target.value))}
                         className="w-full accent-[var(--ecom-primary)]"
                       />
                       <div className="flex justify-between text-[10px] text-[#86868b]">
-                        <span>2s</span>
-                        <span>8s</span>
+                        <span>{panelDurationMin}s</span>
+                        <span>{panelDurationMax}s</span>
                       </div>
                     </label>
                   ) : null}
@@ -543,7 +733,7 @@ export function StoryboardModelPickerDialog({
               {confirming ? "关闭" : "取消"}
             </EcomButtonSecondary>
             {!running ? (
-              <EcomButtonPrimary type="button" size="sm" onClick={onConfirm} disabled={confirming}>
+              <EcomButtonPrimary type="button" size="sm" onClick={handleConfirm} disabled={confirming || !canConfirm}>
                 {confirming ? "生成中…" : action}
               </EcomButtonPrimary>
             ) : (

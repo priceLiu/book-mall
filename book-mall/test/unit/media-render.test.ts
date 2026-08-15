@@ -9,7 +9,7 @@ import {
   MEDIA_RENDER_MAX_CLIPS,
   validateTimelineLimits,
 } from "@/lib/media/render-limits";
-import { timelineToSrtFrames } from "@/lib/media/render-ffmpeg";
+import { timelineToSrtFrames, resolveMixTtsEnabled } from "@/lib/media/render-ffmpeg";
 import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 
 describe("media render adapters", () => {
@@ -66,6 +66,23 @@ describe("render limits", () => {
       clips: [{ order: 0, videoUrl: "http://insecure.mp4" }],
     });
     expect(err?.code).toBe("INVALID_VIDEO_URL");
+  });
+});
+
+describe("mixTts profile", () => {
+  it("defaults to enabled when audio section omitted", () => {
+    expect(resolveMixTtsEnabled({ transition: { type: "none" }, subtitle: { mode: "script", burnIn: false }, video: { scaleMode: "fit1080p" } })).toBe(true);
+  });
+
+  it("respects explicit mixTts=false", () => {
+    expect(
+      resolveMixTtsEnabled({
+        transition: { type: "none" },
+        subtitle: { mode: "script", burnIn: false },
+        video: { scaleMode: "fit1080p" },
+        audio: { mixTts: false },
+      }),
+    ).toBe(false);
   });
 });
 

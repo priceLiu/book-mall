@@ -4,13 +4,6 @@ import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 export function ProductCreationStudioSkeleton() {
   return (
     <EcomWorkspaceLayout
-      assistantHeader={
-        <div className="animate-pulse space-y-3">
-          <div className="h-6 w-40 rounded bg-[#e8e8ed]" />
-          <div className="h-3 w-56 rounded bg-[#f0f0f2]" />
-          <div className="h-20 rounded-xl bg-[#e8e8ed]" />
-        </div>
-      }
       progress={
         <div className="animate-pulse space-y-2 px-1">
           {Array.from({ length: 9 }).map((_, i) => (

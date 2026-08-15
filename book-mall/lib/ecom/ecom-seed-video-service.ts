@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { prisma } from "@/lib/prisma";
 import {
+  ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL,
+  ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL,
   ECOM_SEED_VIDEO_MODULE,
   parseSeedVideoPlan,
   sanitizeSeedVideoChatMessages,
@@ -13,6 +15,19 @@ import {
   type SeedVideoReference,
   type SeedVideoSettings,
 } from "@/lib/ecom/ecom-seed-video-types";
+import { mergeSeedVideoShotsPreserveMedia } from "@/lib/ecom/ecom-seed-video-shot-merge";
+import { backfillSeedVideoPlanShotsFromAssets } from "@/lib/ecom/ecom-seed-video-shot-backfill";
+import {
+  clearPendingShotVideo,
+  markPendingShotVideo,
+  readPendingShotVideos,
+  reconcileSeedVideoPendingShotMeta,
+  type SeedVideoPendingShotEntry,
+} from "@/lib/ecom/ecom-seed-video-pending-shots";
+import {
+  backfillSeedVideoDirectVideoFromAssets,
+  mergeSeedVideoDirectPlanPreserveMedia,
+} from "@/lib/ecom/ecom-seed-video-direct-backfill";
 
 export type EcomSeedVideoProjectDto = {
   id: string;
@@ -113,8 +128,8 @@ export async function createEcomSeedVideoProject(
       settings: {
         aspectRatio: "9:16",
         targetDurationSec: 30,
-        chatModelKey: "qwen3.5-flash",
-        videoModelKey: "wan2.7-r2v",
+        chatModelKey: ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL,
+        videoModelKey: ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL,
       } as Prisma.InputJsonValue,
       meta: {
         workflow: { phase: "material" },
@@ -133,7 +148,80 @@ export async function getEcomSeedVideoProject(
   });
   if (!row) return null;
   const videoOssUrl = await loadVideoOssUrl(userId, row.videoAssetId);
-  return rowToDto(row, videoOssUrl);
+  let dto = rowToDto(row, videoOssUrl);
+  const backfill = await backfillSeedVideoPlanShotsFromAssets({
+    userId,
+    projectId,
+    plan: dto.plan,
+    persist: true,
+  });
+  if (backfill.changed && backfill.plan) {
+    dto = { ...dto, plan: backfill.plan };
+  }
+  const directBackfill = await backfillSeedVideoDirectVideoFromAssets({
+    userId,
+    projectId,
+    plan: dto.plan,
+    videoAssetId: dto.videoAssetId,
+    persist: true,
+  });
+  if (directBackfill.changed && directBackfill.plan) {
+    dto = { ...dto, plan: directBackfill.plan };
+  }
+  const prevMeta = (dto.meta ?? {}) as Record<string, unknown>;
+  const pendingReconcile = reconcileSeedVideoPendingShotMeta({
+    meta: prevMeta,
+    plan: dto.plan,
+  });
+  if (pendingReconcile.changed) {
+    await prisma.ecomSeedVideoProject.update({
+      where: { id: projectId },
+      data: { meta: pendingReconcile.meta as Prisma.InputJsonValue },
+    });
+    dto = { ...dto, meta: pendingReconcile.meta };
+  }
+  return dto;
+}
+
+export async function markEcomSeedVideoPendingShot(
+  userId: string,
+  projectId: string,
+  shotIndex: number,
+  entry: SeedVideoPendingShotEntry,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.ecomSeedVideoProject.findFirst({
+      where: { id: projectId, userId },
+    });
+    if (!row) throw new Error("项目不存在");
+    const prevMeta = (row.meta as Record<string, unknown> | null) ?? {};
+    await tx.ecomSeedVideoProject.update({
+      where: { id: projectId },
+      data: {
+        meta: markPendingShotVideo(prevMeta, shotIndex, entry) as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+export async function clearEcomSeedVideoPendingShot(
+  userId: string,
+  projectId: string,
+  shotIndex: number,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.ecomSeedVideoProject.findFirst({
+      where: { id: projectId, userId },
+    });
+    if (!row) return;
+    const prevMeta = (row.meta as Record<string, unknown> | null) ?? {};
+    await tx.ecomSeedVideoProject.update({
+      where: { id: projectId },
+      data: {
+        meta: clearPendingShotVideo(prevMeta, shotIndex) as Prisma.InputJsonValue,
+      },
+    });
+  });
 }
 
 export async function updateEcomSeedVideoProject(
@@ -171,14 +259,54 @@ export async function updateEcomSeedVideoProject(
       data.plan = Prisma.JsonNull;
     } else {
       const prevPlan = parseSeedVideoPlan(existing.plan) ?? {};
-      data.plan = { ...prevPlan, ...patch.plan } as Prisma.InputJsonValue;
+      const nextPlan = { ...prevPlan, ...patch.plan } as SeedVideoPlan;
+      if (patch.plan.shots?.length) {
+        nextPlan.shots = mergeSeedVideoShotsPreserveMedia(
+          patch.plan.shots,
+          prevPlan.shots ?? [],
+        );
+      }
+      if ("directVideo" in patch.plan && patch.plan.directVideo === null) {
+        delete nextPlan.directVideo;
+      } else if (patch.plan.directVideo) {
+        nextPlan.directVideo = mergeSeedVideoDirectPlanPreserveMedia(
+          patch.plan.directVideo,
+          prevPlan.directVideo,
+        );
+      }
+      data.plan = nextPlan as Prisma.InputJsonValue;
     }
   }
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.videoAssetId !== undefined) data.videoAssetId = patch.videoAssetId;
   if (patch.meta !== undefined) {
     const prev = (existing.meta as Record<string, unknown> | null) ?? {};
-    data.meta = { ...prev, ...patch.meta } as Prisma.InputJsonValue;
+    const patchMeta = patch.meta;
+    const merged: Record<string, unknown> = { ...prev, ...patchMeta };
+    if (patchMeta.workflow !== undefined) {
+      const prevWorkflow = (prev.workflow as Record<string, unknown> | undefined) ?? {};
+      merged.workflow = {
+        ...prevWorkflow,
+        ...(patchMeta.workflow as Record<string, unknown>),
+      };
+    }
+    if (
+      patchMeta.pendingShotVideos &&
+      typeof patchMeta.pendingShotVideos === "object" &&
+      !Array.isArray(patchMeta.pendingShotVideos)
+    ) {
+      merged.pendingShotVideos = {
+        ...readPendingShotVideos(prev),
+        ...(patchMeta.pendingShotVideos as Record<string, SeedVideoPendingShotEntry>),
+      };
+      delete merged.pendingShotVideo;
+    }
+    for (const key of ["pendingShotVideo", "pendingShotVideos", "pendingDirectVideo"] as const) {
+      if (key in patchMeta && patchMeta[key] === null) {
+        delete merged[key];
+      }
+    }
+    data.meta = merged as Prisma.InputJsonValue;
   }
 
   const row = await prisma.ecomSeedVideoProject.update({

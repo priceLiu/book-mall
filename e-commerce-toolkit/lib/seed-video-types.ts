@@ -1,5 +1,8 @@
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
+/** 与 book-mall/lib/ecom/ecom-seed-video-types.ts 一致 · 方案① direct 默认/上限 */
+export const SEED_VIDEO_DIRECT_MAX_DURATION_SEC = 30;
+
 export type SeedVideoWorkflowPhase =
   | "material"
   | "scripts"
@@ -13,12 +16,29 @@ export type SeedVideoProductionMode = "direct" | "fine";
 
 export type SeedVideoStylePreset = "sweet-xhs" | "sharp-douyin";
 
+/** 用户点选后冻结在会话流中的选项卡片（选中态保留，不消失） */
+export type SeedVideoChoiceSnapshot = {
+  title: string;
+  subtitle: string;
+  choices: Array<{
+    id: string;
+    label: string;
+    message: string;
+    title: string;
+    description?: string;
+    recommended?: boolean;
+    kind?: string;
+  }>;
+  selectedMessage: string;
+};
+
 export type SeedVideoChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
   refIds?: string[];
+  choiceSnapshot?: SeedVideoChoiceSnapshot;
 };
 
 export type SeedVideoReference = {
@@ -39,6 +59,24 @@ export type SeedVideoShot = {
   durationSec: number;
   videoUrl?: string;
   ttsUrl?: string;
+  videoTaskId?: string;
+};
+
+export type SeedVideoDirectShotPreview = {
+  index: number;
+  timeSlice: string;
+  refImageLabel: string;
+  sceneDescription: string;
+  voiceover: string;
+  durationSec: number;
+};
+
+export type SeedVideoDirectGeneratedVideo = {
+  id: string;
+  videoUrl: string;
+  taskId?: string;
+  modelKey?: string;
+  createdAt?: string;
 };
 
 export type SeedVideoDirectPlan = {
@@ -47,8 +85,12 @@ export type SeedVideoDirectPlan = {
   aspectRatio: string;
   durationSec: number;
   bgmPreset?: string;
+  voiceTone?: string;
+  materialUsage?: string;
+  shotSequence?: SeedVideoDirectShotPreview[];
   videoUrl?: string;
   taskId?: string;
+  generatedVideos?: SeedVideoDirectGeneratedVideo[];
 };
 
 export type SeedVideoPlan = {
@@ -89,11 +131,15 @@ export type SeedVideoProject = {
   videoAssetId: string | null;
   videoOssUrl: string | null;
   meta: {
+    planningPrompt?: string;
+    storyboardDraft?: Array<Record<string, unknown>>;
     workflow?: {
       phase?: SeedVideoWorkflowPhase;
       selectedScriptId?: string;
       productionMode?: SeedVideoProductionMode;
       stylePreset?: SeedVideoStylePreset;
+      editingStoryboard?: boolean;
+      planSynced?: boolean;
     };
     lastAssistantRaw?: string;
     pendingDirectVideo?: {
@@ -102,6 +148,18 @@ export type SeedVideoProject = {
       modelKey: string;
       startedAt: string;
     };
+    pendingShotVideo?: {
+      shotIndex: number;
+      modelKey?: string;
+      startedAt: string;
+    };
+    pendingShotVideos?: Record<
+      string,
+      {
+        modelKey?: string;
+        startedAt: string;
+      }
+    >;
   } | null;
   createdAt: string;
   updatedAt: string;

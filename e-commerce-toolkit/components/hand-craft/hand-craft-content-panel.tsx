@@ -482,12 +482,12 @@ export function HandCraftContentPanel({
             : undefined
         }
         confirming={Boolean(generating)}
-        onConfirm={() => {
+        onConfirm={(modelKey) => {
           const req = pendingGen;
           if (!req) return;
           setPendingGen(null);
-          onImageModelChange(draftModelKey);
-          void runGenerate(req.stepId, req.indexes, draftModelKey);
+          onImageModelChange(modelKey);
+          void runGenerate(req.stepId, req.indexes, modelKey);
         }}
       />
 

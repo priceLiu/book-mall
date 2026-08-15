@@ -543,7 +543,8 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_SECOND",
     unitLabel: "元/秒",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "wan2.6-r2v", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "wan2.6-r2v", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "wan2.6-r2v-flash", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -558,7 +559,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_SECOND",
     unitLabel: "元/秒",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "wan2.7-r2v", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "wan2.7-r2v", providerKind: "BAILIAN" },
     ]),
   },
   {

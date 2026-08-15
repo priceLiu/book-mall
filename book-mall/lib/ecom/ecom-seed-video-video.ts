@@ -23,9 +23,12 @@ import {
   type SeedVideoShot,
 } from "@/lib/ecom/ecom-seed-video-types";
 import {
+  clearEcomSeedVideoPendingShot,
   getEcomSeedVideoProject,
+  markEcomSeedVideoPendingShot,
   updateEcomSeedVideoProject,
 } from "@/lib/ecom/ecom-seed-video-service";
+import { mergeSeedVideoShotsPreserveMedia } from "@/lib/ecom/ecom-seed-video-shot-merge";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_SEED_VIDEO_TOOL_KEY } from "@/lib/ecom/ecom-seed-video-types";
 import {
@@ -36,7 +39,7 @@ import {
   ecomGwPollKie,
   ecomGwPollVolcengine,
 } from "@/lib/gateway/ecom-tool-gateway-client";
-import { ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL } from "@/lib/ecom/ecom-seed-video-types";
 import { prisma } from "@/lib/prisma";
 
 type VideoResolution = "720p" | "1080p";
@@ -160,7 +163,9 @@ export async function ecomGenerateSeedVideoShot(opts: {
     throw new Error(`镜头 ${opts.shotIndex} 缺少有效参考素材图`);
   }
 
-  const modelKey = resolveStoryboardVideoModel(opts.modelKey ?? ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL);
+  const modelKey = resolveStoryboardVideoModel(
+    opts.modelKey ?? ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL,
+  );
   const provider = resolveStoryboardVideoProvider(modelKey);
   const resolution = resolveVideoResolution(opts.resolution);
   const durationCap = 15;
@@ -176,6 +181,13 @@ export async function ecomGenerateSeedVideoShot(opts: {
   const prompt = shot.videoPrompt.trim();
   if (!prompt) throw new Error("视频提示词不能为空");
 
+  const startedAt = new Date().toISOString();
+  await markEcomSeedVideoPendingShot(opts.userId, opts.projectId, shot.index, {
+    modelKey,
+    startedAt,
+  });
+
+  try {
   const panelRefPlan = resolveStoryboardPanelVideoRefPlan({
     modelKey,
     references: opts.references.map((r) => ({
@@ -292,7 +304,11 @@ export async function ecomGenerateSeedVideoShot(opts: {
     }));
   }
 
-  const updatedShots = opts.shots.map((s) =>
+  const latestProject = await getEcomSeedVideoProject(opts.userId, opts.projectId);
+  const updatedShots = (latestProject?.plan?.shots?.length
+    ? latestProject.plan.shots
+    : opts.shots
+  ).map((s) =>
     s.index === shot.index ? { ...s, videoUrl: ossUrl, videoTaskId: taskId } : s,
   );
 
@@ -314,6 +330,9 @@ export async function ecomGenerateSeedVideoShot(opts: {
   });
 
   return { videoUrl: ossUrl, shotIndex: shot.index };
+  } finally {
+    await clearEcomSeedVideoPendingShot(opts.userId, opts.projectId, shot.index);
+  }
 }
 
 export async function persistSeedVideoPlanShots(
@@ -323,7 +342,8 @@ export async function persistSeedVideoPlanShots(
 ): Promise<void> {
   const project = await getEcomSeedVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
+  const merged = mergeSeedVideoShotsPreserveMedia(shots, project.plan?.shots ?? []);
   await updateEcomSeedVideoProject(userId, projectId, {
-    plan: { ...(project.plan ?? {}), shots },
+    plan: { ...(project.plan ?? {}), shots: merged },
   });
 }

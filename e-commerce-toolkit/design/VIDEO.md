@@ -11,6 +11,26 @@
 | `EcomVideoHoverPreview` | 同上 | 列表卡片**悬停自动播放**（`muted` + `loop`、无 `controls`），悬停时才挂载 |
 | `EcomVideoPreviewDialog` | `components/media/ecom-video-preview-dialog.tsx` | 点击缩略后弹层全屏预览 |
 
+## 弹层预览（强制 · 与 Canvas lightbox 一致）
+
+`EcomVideoPreviewDialog` 内固定：
+
+```tsx
+<EcomVideoPlayer
+  src={src}
+  poster={poster}
+  autoPlay
+  adaptiveBackdrop
+  frameless
+/>
+```
+
+- **frameless**：无 `rounded-md` 外框；原生 `<video controls>` 贴边
+- **adaptiveBackdrop**：按 intrinsic 比例缩放；横屏限宽、竖屏限高；背景为模糊 `poster` 或渐变
+- 全屏黑底 + 顶栏标题 / 下载 / 关闭（`ModalPortal`，非 Dialog 白底）
+
+列表缩略悬停 **Eye** 尺寸见 `MEDIA.md` §悬停操作（`ECOM_MEDIA_TILE_PREVIEW_*`）。
+
 ## 结构（与 Canvas 一致）
 
 ```tsx

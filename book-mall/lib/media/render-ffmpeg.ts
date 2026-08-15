@@ -194,6 +194,98 @@ async function clipHasAudio(filePath: string): Promise<boolean> {
   }
 }
 
+/** 种草逐镜合成：profile.audio.mixTts 默认 true，须把 clip.audioUrl（TTS）混入成片 */
+export function resolveMixTtsEnabled(profile: RenderProfile): boolean {
+  return profile.audio?.mixTts !== false;
+}
+
+function buildVoiceoverAudioFilter(durationSec: number): string {
+  const dur = durationSec.toFixed(3);
+  return `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur=${dur},atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`;
+}
+
+/** 将 TTS 口播对齐到镜头时长并写入标准化镜头（保留视频轨，替换/新增音轨） */
+async function attachVoiceoverToNormalizedClip(args: {
+  videoPath: string;
+  audioUrl: string;
+  durationSec: number;
+  outPath: string;
+}): Promise<void> {
+  const audioPath = join(join(args.videoPath, ".."), `voice-${args.outPath.split("/").pop()}`);
+  await fetchToFile(
+    args.audioUrl,
+    audioPath,
+    MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
+  );
+  try {
+    const dur = args.durationSec.toFixed(3);
+    await runFfmpeg([
+      "-y",
+      "-i",
+      args.videoPath,
+      "-i",
+      audioPath,
+      "-filter_complex",
+      buildVoiceoverAudioFilter(args.durationSec),
+      "-map",
+      "0:v",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-b:a",
+      "128k",
+      "-t",
+      dur,
+      args.outPath,
+    ]);
+  } finally {
+    await rm(audioPath, { force: true }).catch(() => undefined);
+  }
+}
+
+async function attachSilentAudioToNormalizedClip(args: {
+  videoPath: string;
+  durationSec: number;
+  outPath: string;
+}): Promise<void> {
+  const dur = args.durationSec.toFixed(3);
+  await runFfmpeg([
+    "-y",
+    "-i",
+    args.videoPath,
+    "-f",
+    "lavfi",
+    "-i",
+    "anullsrc=r=44100:cl=stereo",
+    "-filter_complex",
+    `[1:a]atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`,
+    "-map",
+    "0:v",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-b:a",
+    "128k",
+    "-t",
+    dur,
+    args.outPath,
+  ]);
+}
+
 async function normalizeClip(
   inputPath: string,
   outputPath: string,
@@ -797,6 +889,41 @@ export async function runFfmpegMediaRender(args: {
         35 + Math.round(((i + 1) / probed.length) * 30),
         `已标准化第 ${i + 1}/${probed.length} 镜`,
       );
+    }
+
+    const mixTts = resolveMixTtsEnabled(profile);
+    if (mixTts) {
+      const voicedPaths: string[] = [];
+      let anyVoice = false;
+      for (let i = 0; i < probed.length; i++) {
+        const audioUrl = probed[i]!.audioUrl?.trim();
+        args.onProgress?.(
+          66 + Math.round((i / Math.max(probed.length, 1)) * 4),
+          audioUrl
+            ? `混入第 ${i + 1}/${probed.length} 镜口播音轨`
+            : `补齐第 ${i + 1}/${probed.length} 镜静音轨`,
+        );
+        const voicedPath = join(tmp, `norm-voiced-${i}.mp4`);
+        if (audioUrl) {
+          anyVoice = true;
+          await attachVoiceoverToNormalizedClip({
+            videoPath: normPaths[i]!,
+            audioUrl,
+            durationSec: probed[i]!.durationSec,
+            outPath: voicedPath,
+          });
+        } else {
+          await attachSilentAudioToNormalizedClip({
+            videoPath: normPaths[i]!,
+            durationSec: probed[i]!.durationSec,
+            outPath: voicedPath,
+          });
+        }
+        voicedPaths.push(voicedPath);
+      }
+      if (anyVoice) {
+        normPaths.splice(0, normPaths.length, ...voicedPaths);
+      }
     }
 
     const srtFrames = timelineToSrtFrames(timeline, durations);

@@ -4,6 +4,7 @@ import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  ECOM_DEFAULT_VISION_MODEL,
   ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
   ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL,
   registryRowsToEcomModels,
@@ -49,7 +50,9 @@ export async function GET(req: Request) {
     defaults: {
       chat: ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
       vision:
-        visionModels[0]?.modelKey ?? ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
+        visionModels.find((m) => m.modelKey === ECOM_DEFAULT_VISION_MODEL)?.modelKey ??
+        visionModels[0]?.modelKey ??
+        ECOM_DEFAULT_VISION_MODEL,
       image: ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL,
     },
   });

@@ -250,6 +250,7 @@ export const STORY_LLM_MODEL_KEYS = [
   "deepseek-v4-flash",
   "deepseek-v4-pro",
   "deepseek-chat",
+  "qwen3.8-max",
   "qwen3.7-plus",
   "qwen3.6-plus",
   "qwen3.5-plus",

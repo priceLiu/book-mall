@@ -11,7 +11,7 @@ import {
 } from "@/lib/ecom/ecom-product-design-service";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_DETAIL_PAGE_TOOL_KEY, ECOM_DETAIL_COPY_ACTION } from "@/lib/ecom/ecom-product-design-types";
-import { ECOM_STORYBOARD_DEFAULT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
 import { getVisionMaxInputImages } from "@/lib/ecom/ecom-product-design-ref-rules";
 
@@ -140,7 +140,7 @@ export async function suggestProductDesignBrief(opts: {
   const modelKey =
     opts.modelKey?.trim() ||
     project.settings.visionModelKey?.trim() ||
-    ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
+    ECOM_DEFAULT_VISION_MODEL;
   assertStoryLlmVisionModel(modelKey, "产品信息推断");
 
   const refs = refsForBriefSuggest(project.references, modelKey);

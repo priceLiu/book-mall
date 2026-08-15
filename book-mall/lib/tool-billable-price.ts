@@ -6,7 +6,7 @@ import { PricingBillingKind } from "@prisma/client";
 import { previewModelCredits } from "@/lib/billing/model-credits-preview";
 import { videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 
-export const VISUAL_LAB_ANALYSIS_DEFAULT_SCHEME_A_MODEL_KEY = "qwen3.6-plus";
+export const VISUAL_LAB_ANALYSIS_DEFAULT_SCHEME_A_MODEL_KEY = "qwen3.8-max";
 export const FITTING_ROOM_AI_FIT_DEFAULT_SCHEME_A_MODEL_KEY = "aitryon";
 export const IMAGE_TO_VIDEO_DEFAULT_SCHEME_A_MODEL_KEY = "happyhorse-i2v";
 

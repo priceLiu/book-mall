@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomSeedVideoProject } from "@/lib/ecom/ecom-seed-video-service";
 import { ecomGenerateSeedVideoShot } from "@/lib/ecom/ecom-seed-video-video";
-import { ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL } from "@/lib/ecom/ecom-seed-video-types";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const modelKey =
     typeof body.modelKey === "string" && body.modelKey.trim()
       ? body.modelKey.trim()
-      : project?.settings.videoModelKey?.trim() || ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL;
+      : project?.settings.videoModelKey?.trim() || ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL;
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);

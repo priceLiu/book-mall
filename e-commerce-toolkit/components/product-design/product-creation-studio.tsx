@@ -82,7 +82,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
   const [chatModelKey, setChatModelKey] = useState("qwen3.5-flash");
-  const [visionModelKey, setVisionModelKey] = useState("qwen3-vl-plus");
+  const [visionModelKey, setVisionModelKey] = useState("qwen3.8-max");
   const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);

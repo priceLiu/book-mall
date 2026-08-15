@@ -24,7 +24,7 @@ import {
   ECOM_MAIN_IMAGE_ACTION,
   ECOM_DETAIL_PAGE_ACTION,
 } from "@/lib/ecom/ecom-product-design-types";
-import { ECOM_STORYBOARD_DEFAULT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 
@@ -170,7 +170,7 @@ export async function analyzeProductDesignReferences(opts: {
   const modelKey =
     opts.modelKey?.trim() ||
     project.settings.visionModelKey?.trim() ||
-    ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
+    ECOM_DEFAULT_VISION_MODEL;
   assertStoryLlmVisionModel(modelKey, "视觉分析");
 
   const refs = refsForVisionAnalysis(project.references, opts.target, modelKey);

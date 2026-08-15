@@ -159,6 +159,7 @@ export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideo
       maxTotalImages: bailianR2vMaxRefs(key),
       supportsFullSheet: true,
       hasFirstFrameRole: false,
+      apiMaxDurationSec: 30,
       strategyNote:
         "万相 2.7 R2V：media[0]=多宫格故事板，再附产品/角色/场景；不送各镜头单图（官方多宫格脚本范式）。",
     };

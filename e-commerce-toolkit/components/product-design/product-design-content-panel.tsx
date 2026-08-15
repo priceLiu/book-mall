@@ -2067,9 +2067,9 @@ export function ProductDesignContentPanel({
         lockedFieldLabel="说明"
         lockedImageSizeLabel="本步仅分析图片内容，不生成图片；出图比例在下一步按平台规则设定"
         confirming={false}
-        onConfirm={() => {
+        onConfirm={(modelKey) => {
           if (!genPipeline) return;
-          const next = { ...genPipeline, draftVisionKey };
+          const next = { ...genPipeline, draftVisionKey: modelKey };
           if (next.purpose === "plan-decompose") {
             void runPlanDecompose(next);
           } else {
@@ -2157,13 +2157,13 @@ export function ProductDesignContentPanel({
             : `${project.resolved.mainImageRatio}（由 ${spec?.label ?? "平台"} 规则决定）`
         }
         confirming={imagePickerSubmitting}
-        onConfirm={() => {
+        onConfirm={(modelKey) => {
           const req = genPipeline;
           if (!req || imagePickerSubmitting) return;
           setImagePickerSubmitting(true);
           setGenPipeline(null);
-          onImageModelChange(draftModelKey);
-          void runGenerate(req.target, req.indexes, draftModelKey).finally(() => {
+          onImageModelChange(modelKey);
+          void runGenerate(req.target, req.indexes, modelKey).finally(() => {
             setImagePickerSubmitting(false);
           });
         }}

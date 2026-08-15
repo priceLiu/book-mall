@@ -39,6 +39,7 @@ export const GATEWAY_ALI_PRICE_BY_MODEL_KEY: Record<string, GatewayAliPriceSpec>
   "qwen3.5-plus": { kind: "token", inputYuanPerMillion: 0.8, outputYuanPerMillion: 2, section: "千问Plus" },
   "qwen3.5-27b": { kind: "token", inputYuanPerMillion: 0.6, outputYuanPerMillion: 2, section: "千问Plus" },
   "qwen3.6-plus": { kind: "token", inputYuanPerMillion: 2, outputYuanPerMillion: 8, section: "千问Plus" },
+  "qwen3.8-max": { kind: "token", inputYuanPerMillion: 12, outputYuanPerMillion: 36, section: "千问Max" },
   "qwen3.6-flash": { kind: "token", inputYuanPerMillion: 1.2, outputYuanPerMillion: 3.6, section: "千问Flash" },
   // Kimi · 百炼 Kimi-月之暗面
   "kimi/kimi-k3": { kind: "token", inputYuanPerMillion: 20, outputYuanPerMillion: 100, section: "Kimi-月之暗面" },
@@ -87,6 +88,14 @@ export const GATEWAY_ALI_PRICE_BY_MODEL_KEY: Record<string, GatewayAliPriceSpec>
 
   // —— 万相 3.0 ——
   "wan3.0-video": { kind: "video", yuanPerSecondByTier: { "480P": 0.3, "720P": 0.6, "1080P": 1.2 }, section: "万相3.0-视频生成" },
+
+  // —— 万相 2.2 数字人 ——
+  "wan2.2-s2v": { kind: "video", yuanPerSecondByTier: { "480P": 0.5, "720P": 0.9 }, section: "万相-数字人" },
+  "wan2.2-s2v-detect": { kind: "image", yuanPerImage: 0.004, section: "万相-数字人" },
+
+  // —— CosyVoice TTS（元/万字符 · PER_IMAGE 槽折算）——
+  "cosyvoice-v3-flash": { kind: "image", yuanPerImage: 1, section: "CosyVoice" },
+  "cosyvoice-v3-plus": { kind: "image", yuanPerImage: 2, section: "CosyVoice" },
 
   // —— Pixverse ——
   "pixverse-c1-t2v": { kind: "video", yuanPerSecondByTier: { "360P": 0.24 }, section: "视频生成-第三方" },
