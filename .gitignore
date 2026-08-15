@@ -25,3 +25,13 @@ tool-web/.env.local
 /deploy/tencent/tool-web.env
 /deploy/tencent/pgbouncer/userlist.txt
 /deploy/tencent/pgbouncer/pgbouncer.runtime.ini
+
+# 大体积媒体一律走 OSS 持久化，勿提交进 Git（历史包袱会拖垮云构建 clone）。
+# story-web 首页「发现更多」演示视频清单在 src/shared/landing-videos.manifest.json，
+# 播放走 tool-mall OSS；本地占位放 public/video 即可，不入库。
+story-web/public/video/*.mp4
+**/public/video/*.mp4
+*.mp4
+
+# 本地导入/调试临时文件（HTML 抓取、进度快照等），勿提交
+book-mall/tmp/
