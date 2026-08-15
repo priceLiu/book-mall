@@ -12,6 +12,8 @@
     "dev:all:story": "pnpm dev:all",
     "dev:all:nopoll": "pnpm install --prefer-offline && pnpm dev:preflight && node scripts/dev-all.mjs --no-poll",
     "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs",
+    "sync:docker-shared": "node scripts/sync-docker-shared.mjs",
+    "sync:docker-shared:check": "node scripts/sync-docker-shared.mjs --check",
     "build:publisher-artifacts": "node scripts/build-publisher-download-artifacts.mjs"
   },
   "devDependencies": {

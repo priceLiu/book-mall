@@ -1,0 +1,54 @@
+name: docker-shared-check
+
+on:
+  push:
+    branches: [develop, main, master]
+    paths:
+      - "shared/**"
+      - "book-mall/docker-shared/**"
+      - "canvas-web/docker-shared/**"
+      - "story-web/docker-shared/**"
+      - "common-tools/docker-shared/**"
+      - "quick-replica-web/docker-shared/**"
+      - "e-commerce-toolkit/docker-shared/**"
+      - "scripts/sync-docker-shared.mjs"
+      - "package.json"
+      - ".github/workflows/docker-shared-check.yml"
+  pull_request:
+    branches: [develop, main, master]
+    paths:
+      - "shared/**"
+      - "book-mall/docker-shared/**"
+      - "canvas-web/docker-shared/**"
+      - "story-web/docker-shared/**"
+      - "common-tools/docker-shared/**"
+      - "quick-replica-web/docker-shared/**"
+      - "e-commerce-toolkit/docker-shared/**"
+      - "scripts/sync-docker-shared.mjs"
+      - "package.json"
+      - ".github/workflows/docker-shared-check.yml"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --frozen-lockfile
+
+      - name: Check docker-shared snapshots
+        run: pnpm sync:docker-shared:check
