@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 import { prisma } from "@/lib/prisma";
 import {
   getBuiltinQrTemplateById,
@@ -369,6 +370,8 @@ export async function deleteUserQrTemplate(
     where: { id },
     data: { deletedAt: new Date() },
   });
+  // AI 空间侧清理：Pin 删除，画布块保留并渲染「素材已删除」占位
+  await cascadeDeletePinsBySource("qr_template", id);
   return true;
 }
 
@@ -386,6 +389,7 @@ export async function deleteAdminUserQrTemplate(id: string): Promise<boolean> {
     where: { id },
     data: { deletedAt: new Date() },
   });
+  await cascadeDeletePinsBySource("qr_template", id);
   return true;
 }
 

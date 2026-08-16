@@ -52,7 +52,7 @@ export function AiSpaceComposeDesk({
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromTaskId = searchParams.get(AI_SPACE_COMPOSE_FROM_TASK_PARAM)?.trim() ?? "";
-  const { tasks } = useAiSpaceComposeTasks();
+  const { tasks, addTask } = useAiSpaceComposeTasks();
   const appliedFromTaskRef = useRef<string | null>(null);
 
   const [humanId, setHumanId] = useState(
@@ -78,8 +78,6 @@ export function AiSpaceComposeDesk({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const { addTask } = useAiSpaceComposeTasks();
 
   useEffect(() => {
     if (!fromTaskId || appliedFromTaskRef.current === fromTaskId) return;

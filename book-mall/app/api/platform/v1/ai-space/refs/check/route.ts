@@ -11,6 +11,7 @@ import { checkAiSpaceAudioReferences } from "@/lib/ai-space/ai-space-audio-servi
 import { resolveAiSpaceActor } from "@/lib/ai-space/ai-space-auth";
 import { checkAiSpaceDigitalHumanReferences } from "@/lib/ai-space/ai-space-digital-human-service";
 import { checkPins } from "@/lib/ai-space/ai-space-pin-service";
+import { countBlockRefsBySource } from "@/lib/ai-space/ai-space-space-refs";
 import { checkAiSpaceVideoMaterialReferences } from "@/lib/ai-space/ai-space-video-material-service";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
 
   try {
     const userId = auth.actor.userId;
-    const [refs, pin] = await Promise.all([
+    const [refs, pin, blockRefs] = await Promise.all([
       kind === "digital-human"
         ? checkAiSpaceDigitalHumanReferences(userId, id)
         : kind === "audio"
@@ -56,12 +57,19 @@ export async function GET(req: Request) {
         sourceType: KIND_TO_PIN_SOURCE[kind],
         sourceIds: [id],
       }),
+      countBlockRefsBySource({
+        userId,
+        sourceType: KIND_TO_PIN_SOURCE[kind],
+        sourceIds: [id],
+      }),
     ]);
     return NextResponse.json({
       kind,
       id,
       refs,
       pinned: pin[id]?.pinned ?? false,
+      // 作品墙自由画布上的引用数：删素材后这些位置会变成「素材已删除」占位
+      blockRefCount: blockRefs[id] ?? 0,
     });
   } catch (e) {
     console.error("[ai-space/refs/check] failed", e);

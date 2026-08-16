@@ -11,6 +11,9 @@ export function AiSpaceTabNav({ active }: { active: AiSpaceTabId }) {
           <Link
             key={tab.id}
             href={`/account/ai-space?tab=${tab.id}`}
+            // 每个 tab 都是 force-dynamic 且要查库，鼠标划过就预取等于把
+            // 一排 tab 的 SQL 全跑一遍，白白抢连接池（合成台曾因此卡到 60s+）
+            prefetch={false}
             aria-current={isActive ? "page" : undefined}
             className={
               isActive

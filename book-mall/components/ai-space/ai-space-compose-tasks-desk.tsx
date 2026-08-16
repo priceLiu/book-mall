@@ -22,6 +22,7 @@ import {
   isComposeTaskRunning,
 } from "./ai-space-compose-progress-ui";
 import { useAiSpaceComposeTasks } from "./ai-space-compose-tasks-context";
+import { AiSpaceOverlay } from "./ai-space-overlay";
 
 const PINS_API = "/api/platform/v1/ai-space/pins";
 
@@ -102,17 +103,8 @@ function ComposeTaskDetailDialog({
   }, [task.id]);
 
   return (
-    <div
-      className="fixed inset-0 z-[460] flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="合成任务详情"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[min(90dvh,40rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[#d0d7de] bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <AiSpaceOverlay label="合成任务详情" onClose={onClose}>
+      <div className="flex max-h-[min(90dvh,40rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[#d0d7de] bg-white shadow-xl">
         <div className="flex items-start justify-between gap-3 border-b border-[#eaeef2] px-4 py-3">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-[#1f2328]">合成任务详情</h2>
@@ -210,7 +202,7 @@ function ComposeTaskDetailDialog({
           </div>
         </div>
       </div>
-    </div>
+    </AiSpaceOverlay>
   );
 }
 

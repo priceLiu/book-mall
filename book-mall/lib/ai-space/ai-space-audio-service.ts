@@ -16,6 +16,8 @@ import type { AssetVisibility } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { runFfprobe } from "@/lib/media/ffmpeg-exec";
 
+import { countBlockRefsBySource } from "./ai-space-space-refs";
+
 /** 音频来源，与 §4.2 表定义一致 */
 export type AiSpaceAudioSourceType =
   | "upload"
@@ -225,15 +227,27 @@ export async function deleteAiSpaceAudioAsset(
 export async function checkAiSpaceAudioReferences(
   userId: string,
   id: string,
-): Promise<{ composeTaskCount: number; composeTaskStatuses: string[] }> {
-  const tasks = await prisma.aiSpaceComposeTask.findMany({
-    where: { userId, audioAssetId: id },
-    select: { status: true },
-    take: 50,
-  });
+): Promise<{
+  composeTaskCount: number;
+  composeTaskStatuses: string[];
+  blockRefCount: number;
+}> {
+  const [tasks, blockRefs] = await Promise.all([
+    prisma.aiSpaceComposeTask.findMany({
+      where: { userId, audioAssetId: id },
+      select: { status: true },
+      take: 50,
+    }),
+    countBlockRefsBySource({
+      userId,
+      sourceType: "ai_space_audio",
+      sourceIds: [id],
+    }),
+  ]);
   return {
     composeTaskCount: tasks.length,
     composeTaskStatuses: [...new Set(tasks.map((t) => t.status))],
+    blockRefCount: blockRefs[id] ?? 0,
   };
 }
 

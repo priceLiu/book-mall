@@ -73,6 +73,21 @@ export async function getFavoriteTargetIdSet(
   return new Set(rows.map((r) => r.targetId));
 }
 
+/** 一次读多种收藏，省掉「每种一条 findMany」——合成台一次要形象 + 音频两种 */
+export async function getFavoriteTargetIdSets(
+  userId: string,
+  targetKinds: AiSpaceFavoriteTargetKind[],
+): Promise<Record<string, Set<string>>> {
+  const rows = await prisma.aiSpaceFavorite.findMany({
+    where: { userId, targetKind: { in: targetKinds } },
+    select: { targetKind: true, targetId: true },
+  });
+  const out: Record<string, Set<string>> = {};
+  for (const kind of targetKinds) out[kind] = new Set<string>();
+  for (const r of rows) out[r.targetKind]?.add(r.targetId);
+  return out;
+}
+
 export async function attachAudioFavorites(
   userId: string,
   items: AiSpaceAudioAssetDto[],

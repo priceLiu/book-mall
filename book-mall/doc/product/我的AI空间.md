@@ -3,6 +3,7 @@
 > **状态**：设计稿（待评审 → 分期实施）  
 > **创建**：2026-08-14  
 > **关联**：  
+> - 作品墙自由画布（5 模板 / 5 档位 / 12 挂件 / 公开页）：[AI 空间功能设计文档.md](./AI%20空间功能设计文档.md)  
 > - [12-platform-app-federation.md](./12-platform-app-federation.md)  
 > - [14-tenant-team-design.md](./14-tenant-team-design.md)  
 > - [16-project-assets-unified-design.md](./16-project-assets-unified-design.md)  
@@ -97,7 +98,8 @@
 
 ```
 /account/ai-space                    # 我的 AI 空间（Book 个人中心新入口）
-├── 作品墙（Pin 网格）                 # 跨应用已 Pin 的成片 / 项目包
+├── 作品墙（自由画布）                 # 见 AI 空间功能设计文档.md §2–§10
+├── 资产库（跨应用聚合）               # 见 AI 空间功能设计文档.md §11 · 14 种资产源，免收藏
 ├── 数字人库                         # §4.1 · 见 ../数字人.md
 ├── 音频库                           # §4.2 · 与 QuickReplica 音频统一
 ├── 视频创作库                       # §4.3 · 分类 + 各应用已发布视频 + 用户上传
@@ -482,8 +484,10 @@ model AiSpaceComposeTask {
 **与 [16-project-assets-unified-design.md](./16-project-assets-unified-design.md) 边界**：
 
 - **ProjectAsset**：画布内可复用 **组件**（角色、分镜、提示词包）。  
-- **AiSpacePin**：跨应用 **成品展示** + 空间布置。  
+- **AiSpacePin**：跨应用 **成品收藏**（快捷收藏夹）。  
 - 二者可并存：用户保存角色到 ProjectAsset，另 Pin 成片到 AI 空间。
+
+**Pin 已不是引用前置条件**：全局资产库（`?tab=library` 与作品墙素材抽屉的「全部资产」）直接扫 14 张源表，未 Pin 的资产同样可以放上画布。`ProjectAsset` 本身也是其中一个资产源（`sourceType=project_asset`）。资产源清单见 [AI 空间功能设计文档.md](./AI%20空间功能设计文档.md) §11.2。
 
 ---
 
@@ -511,13 +515,16 @@ model AiSpaceComposeTask {
 | PATCH | `/pins` | 改 `caption` |
 | DELETE | `/pins?id=` | 取消展示 |
 | PATCH | `/pins/reorder` | 布置顺序 |
-| GET | `/pins/check` | 删源前检测是否 Pin |
+| GET | `/pins/check` | 删源前检测是否 Pin（含画布 `blockRefCount`） |
+| GET | `/assets` | 全局资产库聚合（`kind` / `source` / `keyword`），**不要求已 Pin** |
+| GET | `/assets/aifit-model/[id]/image` | AI 试衣模特 base64 解码代理（仅本人） |
 | GET | `/refs/check?kind=digital-human\|audio\|video&id=` | 删素材前检测引用（合成任务数 + 是否已 Pin） |
 | GET/POST/PATCH/DELETE | `/digital-humans` | 数字人库 CRUD（Book 真源）；`?activeOnly=1` 供选用器 |
 | GET/PATCH/DELETE | `/audio-assets` | 音频库列表 / 改名 / 删除；`?maxDurationSec=` 供 20 秒门禁过滤 |
 | POST | `/audio-assets/upload` | 上传本地音频（multipart） |
 | GET/POST | `/audio-assets/tts` | 可选模型音色 / 空间内 TTS 生成（Gateway） |
 | GET/POST/PATCH/DELETE | `/video-materials` | 视频创作库；默认返回「自有 + Pin(video)」合并视图，`?ownedOnly=1` 只返回本库 |
+| GET | `/compose-options` | 合成台选材（形象 + 口播音频 + 背景视频）一次并行取全，供 tab 客户端拉取 |
 | GET/POST | `/compose-tasks` | 合成任务列表（`?id=` 单条，轮询时推进队列）/ 发起合成；DTO 含 `steps[]` 分步进度 |
 | GET/POST | `/broadcast-projects` | 口播项目列表 / 新建（§4.5） |
 | POST | `/broadcast-projects/split?id=` | LLM 拆镜 |
@@ -585,3 +592,4 @@ model AiSpaceComposeTask {
 | 2026-08-15 | 接入形象图预检 `wan2.2-s2v-detect`（同步接口 0.004 元/张）：形象上传即检、合成前门禁、UI「重新预检」；结果缓存 `AiSpaceDigitalHuman.meta.detect`（含 `imageUrl`，换图自动失效），不通过时状态置 `detect_failed`。新增 `lib/ai-space/ai-space-s2v-detect-service.ts` + `lib/ai-space/ai-space-gateway-auth.ts`（S2V / detect / TTS 共用凭证解析）+ `pnpm gateway:detect-digital-humans` 存量回填。S2V 厂商 `InternalError` 改为指向「需华北2（北京）地域 Key」的可执行提示 |
 | 2026-08-15 | 实机验证与修复：S2V 进程内 20min 硬超时改为「10min 交队列泵 + 3h 硬上限」（避免误杀厂商仍在跑的任务），对账终态补写 Gateway 日志；终态后 `kickNextPendingTask` 自动放行下一条排队；composite 字幕在底部小窗时按 ASS 脚本坐标抬高 `MarginV`，不再压住画中画。新增运维脚本 `gateway:verify-ai-space` / `gateway:ai-space-worker` / `gateway:smoke-ai-space` / `gateway:smoke-composite` 与 `scripts/debug-s2v-task.ts` |
 | 2026-08-16 | §4.5 口播分镜脚本：新增 [ai-space-broadcast-script.md](./ai-space-broadcast-script.md)；`?tab=broadcast` Tab；四表 `AiSpaceBroadcast*`；合成台分步进度 `steps[]` |
+| 2026-08-16 | 合成台选材改客户端拉取：新增 `GET /compose-options`（三份列表并行 + 收藏合并为一条查询），tab 导航 `prefetch={false}`；起因是 `?tab=compose` 一次 RSC 跑 5 条 SQL、实测出现 68s 回包与连接被回收（详见 [AI 空间功能设计文档.md](./AI%20空间功能设计文档.md) §12.4） |

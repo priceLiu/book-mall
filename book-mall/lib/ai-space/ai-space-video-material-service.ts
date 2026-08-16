@@ -15,6 +15,7 @@ import { runFfprobe } from "@/lib/media/ffmpeg-exec";
 
 import { AI_SPACE_PIN_SOURCE_LABEL } from "./ai-space-pin-types";
 import { cascadeDeletePinsBySource, listPins } from "./ai-space-pin-service";
+import { countBlockRefsBySource } from "./ai-space-space-refs";
 import {
   AI_SPACE_VIDEO_CATEGORY_LABEL,
   type AiSpaceVideoCategory,
@@ -194,15 +195,27 @@ export async function updateAiSpaceVideoMaterial(
 export async function checkAiSpaceVideoMaterialReferences(
   userId: string,
   id: string,
-): Promise<{ composeTaskCount: number; composeTaskStatuses: string[] }> {
-  const tasks = await prisma.aiSpaceComposeTask.findMany({
-    where: { userId, videoMaterialId: id },
-    select: { status: true },
-    take: 50,
-  });
+): Promise<{
+  composeTaskCount: number;
+  composeTaskStatuses: string[];
+  blockRefCount: number;
+}> {
+  const [tasks, blockRefs] = await Promise.all([
+    prisma.aiSpaceComposeTask.findMany({
+      where: { userId, videoMaterialId: id },
+      select: { status: true },
+      take: 50,
+    }),
+    countBlockRefsBySource({
+      userId,
+      sourceType: "ai_space_video",
+      sourceIds: [id],
+    }),
+  ]);
   return {
     composeTaskCount: tasks.length,
     composeTaskStatuses: [...new Set(tasks.map((t) => t.status))],
+    blockRefCount: blockRefs[id] ?? 0,
   };
 }
 

@@ -14,6 +14,7 @@ import {
   type AiSpacePinEntry,
   type AiSpacePinSourceType,
 } from "./ai-space-pin-types";
+import { cascadeDeleteBlockRefsBySource } from "./ai-space-space-refs";
 import { assertPinSourceOwned, resolvePinSources } from "./pin-resolvers";
 
 const LIST_LIMIT = 200;
@@ -195,8 +196,12 @@ export async function checkPins(args: {
 }
 
 /**
- * 删源时级联删 Pin。**必须在删除源 DB 记录前后调用**（同事务外亦可，幂等）。
+ * 删源时级联删 Pin **与画布块引用**。
+ * **必须在删除源 DB 记录前后调用**（同事务外亦可，幂等）。
  * 不校验 userId 归属：源记录所有权已由调用方校验，管理后台旁路也要能清干净。
+ *
+ * 画布块本身 **不删**：只清 AiSpaceBlockRef，块留下渲染「素材已删除」占位，
+ * 避免删一张图导致整页布局塌陷（见 doc/product/AI 空间功能设计文档.md §7.1）。
  */
 export async function cascadeDeletePinsBySource(
   sourceType: AiSpacePinSourceType,
@@ -206,6 +211,9 @@ export async function cascadeDeletePinsBySource(
     (v) => typeof v === "string" && v.length > 0,
   );
   if (ids.length === 0) return 0;
+
+  await cascadeDeleteBlockRefsBySource(sourceType, ids);
+
   try {
     const res = await prisma.aiSpacePin.deleteMany({
       where: { sourceType, sourceId: { in: ids } },

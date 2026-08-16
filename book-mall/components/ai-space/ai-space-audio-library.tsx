@@ -213,15 +213,25 @@ export function AiSpaceAudioLibrary({
   const askDelete = useCallback(
     async (asset: AiSpaceAudioAssetDto) => {
       resetFeedback();
-      let refs = { composeTaskCount: 0, composeTaskStatuses: [] as string[] };
+      let refs = {
+        composeTaskCount: 0,
+        composeTaskStatuses: [] as string[],
+        blockRefCount: 0,
+      };
       try {
         const res = await fetch(`${API}?checkRefsFor=${encodeURIComponent(asset.id)}`, {
           credentials: "include",
         });
         const data = (await res.json().catch(() => ({}))) as {
-          refs?: { composeTaskCount: number; composeTaskStatuses: string[] };
+          refs?: {
+            composeTaskCount: number;
+            composeTaskStatuses: string[];
+            blockRefCount?: number;
+          };
         };
-        if (data.refs) refs = data.refs;
+        if (data.refs) {
+          refs = { ...data.refs, blockRefCount: data.refs.blockRefCount ?? 0 };
+        }
       } catch {
         // 引用检测失败不阻断，第二次确认仍会提示不可恢复
       }
@@ -235,6 +245,11 @@ export function AiSpaceAudioLibrary({
               <p>
                 该音频已被 <strong>{refs.composeTaskCount}</strong> 个合成任务引用（
                 {refs.composeTaskStatuses.join(" / ")}），删除后这些任务无法重跑。
+              </p>
+            ) : null}
+            {refs.blockRefCount > 0 ? (
+              <p>
+                作品墙画布上有 <strong>{refs.blockRefCount}</strong> 处引用，删除后这些位置会变成「素材已删除」占位。
               </p>
             ) : null}
           </>

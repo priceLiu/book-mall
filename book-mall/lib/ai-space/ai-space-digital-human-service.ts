@@ -16,6 +16,7 @@ import {
   type AiSpaceDigitalHumanStatus,
 } from "./ai-space-digital-human-types";
 import { readDigitalHumanDetect } from "./ai-space-s2v-detect-service";
+import { countBlockRefsBySource } from "./ai-space-space-refs";
 
 export type {
   AiSpaceDigitalHumanDetect,
@@ -159,15 +160,27 @@ export async function updateAiSpaceDigitalHuman(
 export async function checkAiSpaceDigitalHumanReferences(
   userId: string,
   id: string,
-): Promise<{ composeTaskCount: number; composeTaskStatuses: string[] }> {
-  const tasks = await prisma.aiSpaceComposeTask.findMany({
-    where: { userId, digitalHumanId: id },
-    select: { status: true },
-    take: 50,
-  });
+): Promise<{
+  composeTaskCount: number;
+  composeTaskStatuses: string[];
+  blockRefCount: number;
+}> {
+  const [tasks, blockRefs] = await Promise.all([
+    prisma.aiSpaceComposeTask.findMany({
+      where: { userId, digitalHumanId: id },
+      select: { status: true },
+      take: 50,
+    }),
+    countBlockRefsBySource({
+      userId,
+      sourceType: "ai_space_digital_human",
+      sourceIds: [id],
+    }),
+  ]);
   return {
     composeTaskCount: tasks.length,
     composeTaskStatuses: [...new Set(tasks.map((t) => t.status))],
+    blockRefCount: blockRefs[id] ?? 0,
   };
 }
 

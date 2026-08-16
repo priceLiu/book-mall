@@ -129,6 +129,7 @@ model User {
   qrTemplates                      QrTemplate[]
   qrKindFeaturedUpdates            QrKindFeatured[] @relation("QrKindFeaturedUpdater")
   aiSpacePins                      AiSpacePin[]
+  aiSpacePage                      AiSpacePage?
   aiSpaceFavorites                 AiSpaceFavorite[]
   aiSpaceDigitalHumans             AiSpaceDigitalHuman[]
   aiSpaceAudioAssets               AiSpaceAudioAsset[]
@@ -3780,6 +3781,113 @@ model AiSpacePin {
 
   @@unique([userId, sourceType, sourceId])
   @@index([userId, sortOrder, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+// ---------------------------------------------------------------------------
+// 作品墙自由画布（doc/product/AI 空间功能设计文档.md）
+//
+// AiSpacePin 语义为「已收进空间的素材」（编辑器左侧素材抽屉）；
+// 画布上的实际排布由 AiSpaceBlock 承载，块引用的资产在 AiSpaceBlockRef。
+// ---------------------------------------------------------------------------
+
+/// 整页版式模板，见 lib/ai-space/space-blocks/page-templates.ts
+enum AiSpacePageTemplate {
+  MAGAZINE
+  PORTFOLIO
+  BENTO
+  TIMELINE
+  MINIMAL
+}
+
+enum AiSpacePagePublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// 空间页（v1 一人一页；slug 供 /space/{slug} 公开访问）
+model AiSpacePage {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 公开访问标识，小写字母数字与连字符
+  slug  String @unique @db.VarChar(64)
+  title String @default("我的 AI 空间") @db.VarChar(120)
+  bio   String @default("") @db.Text
+
+  templateKey AiSpacePageTemplate @default(BENTO)
+  /// 主题：背景色 / 底图 / 主色 / 字体
+  theme       Json                @default("{}")
+
+  publishStatus AiSpacePagePublishStatus @default(DRAFT)
+  publishedAt   DateTime?
+
+  blocks AiSpaceBlock[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publishStatus])
+}
+
+/// 画布块 / 挂件。blockType 取值见 lib/ai-space/space-blocks/registry.ts
+model AiSpaceBlock {
+  id     String      @id @default(cuid())
+  pageId String
+  page   AiSpacePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  /// 冗余，便于鉴权过滤与运维查询
+  userId String
+
+  /// image | video | audio | gallery | before_after | character_card |
+  /// video_playlist | heading | text | divider_spacer | profile_card | launch_button
+  blockType String @db.VarChar(40)
+  /// 五档固定尺寸：sm | portrait | wide | lg | full
+  sizeTier  String @default("lg") @db.VarChar(16)
+
+  /// 12 列栅格单位（非像素），与 react-grid-layout 的 x/y/w/h 一一对应
+  layoutX Int @default(0)
+  layoutY Int @default(0)
+  layoutW Int @default(6)
+  layoutH Int @default(6)
+  layoutZ Int @default(0)
+  /// 窄屏单列时的排列顺序
+  mobileOrder Int @default(0)
+
+  /// 块配置：标题、图片墙布局/列数、播放器选项等
+  config  Json  @default("{}")
+  /// 纯内容型挂件的正文（heading / text 等）
+  content Json?
+
+  refs AiSpaceBlockRef[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageId, layoutY, layoutX])
+  @@index([userId])
+}
+
+/// 块引用的资产：单图块 1 条，图片墙 N 条。
+/// 无 unique 约束——同一资产可同时出现在多个块中。
+model AiSpaceBlockRef {
+  id      String       @id @default(cuid())
+  blockId String
+  block   AiSpaceBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  /// 与 AiSpacePin 同一套取值，读时复用 lib/ai-space/pin-resolvers.ts
+  sourceApp  String
+  sourceType String
+  sourceId   String
+  /// 命名槽位：before / after、face / full_body 等；无槽位块为空串
+  slotKey    String  @default("") @db.VarChar(32)
+  caption    String? @db.VarChar(200)
+  sortOrder  Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([blockId, sortOrder])
+  /// 删源级联用，与 AiSpacePin 同款
   @@index([sourceType, sourceId])
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { Button } from "@/components/ui/button";
+
+import { AiSpaceOverlay } from "./ai-space-overlay";
 
 export type AiSpaceConfirmRequest = {
   title: string;
@@ -25,25 +25,15 @@ export function AiSpaceConfirmDialog({
   busy?: boolean;
   onCancel: () => void;
 }) {
-  useEffect(() => {
-    if (!request) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [request, busy, onCancel]);
-
   if (!request) return null;
 
   const destructive = request.variant === "destructive";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={request.title}
+    <AiSpaceOverlay
+      level="confirm"
+      label={request.title}
+      onClose={busy ? undefined : onCancel}
     >
       <div className="w-full max-w-md rounded-lg border border-[#d0d7de] bg-white p-5 shadow-lg">
         <h2 className="text-base font-semibold text-[#1f2328]">{request.title}</h2>
@@ -65,6 +55,6 @@ export function AiSpaceConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </AiSpaceOverlay>
   );
 }

@@ -151,7 +151,12 @@ export function AiSpaceFavoritesDesk({
                     <button
                       type="button"
                       className="rounded-md p-1.5 text-[#656d76] hover:bg-[#f6f8fa]"
-                      onClick={() => document.getElementById(`fav-v-${fav.id}`)?.play()}
+                      onClick={() => {
+                        const el = document.getElementById(
+                          `fav-v-${fav.id}`,
+                        ) as HTMLAudioElement | null;
+                        void el?.play();
+                      }}
                     >
                       <Volume2 className="h-4 w-4" />
                     </button>

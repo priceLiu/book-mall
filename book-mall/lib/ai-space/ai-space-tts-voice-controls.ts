@@ -61,7 +61,9 @@ export function parseAiSpaceTtsVoiceControls(
     pitch: readOptionalNumber(body.pitch),
   });
   const emotionRaw = typeof body.emotion === "string" ? body.emotion.trim() : "";
-  const allowed = new Set(AI_SPACE_TTS_EMOTION_OPTIONS.map((o) => o.id).filter(Boolean));
+  const allowed = new Set<string>(
+    AI_SPACE_TTS_EMOTION_OPTIONS.map((o) => o.id).filter(Boolean),
+  );
   const emotion = emotionRaw && allowed.has(emotionRaw) ? emotionRaw : null;
   return {
     emotion,

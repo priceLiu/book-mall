@@ -291,6 +291,42 @@
 
 ---
 
+## 2026-08-16 — 我的 AI 空间 · 作品墙自由画布（已落库）
+
+- **迁移目录**：`prisma/migrations/20260816160000_ai_space_canvas/`
+- **产品文档**：[`doc/product/AI 空间功能设计文档.md`](../product/AI%20空间功能设计文档.md) · [`doc/product/我的AI空间.md`](../product/我的AI空间.md)
+- **新枚举**：
+  - `AiSpacePageTemplate`（`MAGAZINE` | `PORTFOLIO` | `BENTO` | `TIMELINE` | `MINIMAL`）——5 套整页版式
+  - `AiSpacePagePublishStatus`（`DRAFT` | `PUBLISHED`）——形状对齐现网 `StorySpace`
+- **新表**：
+  - `AiSpacePage`——空间页。`userId` **unique**（v1 一人一页）、`slug` unique 供 `/space/{slug}` 公开访问；`title` / `bio` / `templateKey` / `theme`（背景与主色）/ `publishStatus` / `publishedAt`。
+  - `AiSpaceBlock`——画布块 / 挂件。`blockType`（12 种，取值真源 `lib/ai-space/space-blocks/types.ts`）、`sizeTier`（`sm` | `portrait` | `wide` | `lg` | `full`）、`layoutX/Y/W/H/Z` 为 **12 列栅格单位（非像素）**，与 react-grid-layout 的 `x/y/w/h` 一一对应；`mobileOrder` 为窄屏单列顺序；`config` / `content` 由服务端 `parseConfig` / `parseContent` 白名单规范化后落库。冗余 `userId` 便于鉴权过滤。
+  - `AiSpaceBlockRef`——块引用的资产 0..N（单图 1 条、图片墙至多 60 条）。`sourceApp` / `sourceType` / `sourceId` 与 `AiSpacePin` **同一套取值**，读时复用 `lib/ai-space/pin-resolvers.ts` 联邦解析；`slotKey` 承载命名槽位（`before` / `after`、`face` / `full_body` / `outfit` / `extra`）。
+- **`AiSpaceBlockRef` 刻意不加 unique**：同一资产可同时出现在封面块与图片墙里；保留 `@@index([sourceType, sourceId])` 供删源级联。
+- **`AiSpacePin` 零改动**：语义由「已展示在墙上」调整为「已收进空间的素材」（编辑器左侧素材抽屉），5 处子应用写入与 7 处 `cascadeDeletePinsBySource` 调用点均未修改。
+- **删源级联**：`cascadeDeletePinsBySource` 现同步调用 `cascadeDeleteBlockRefsBySource` 清 ref，**块本身保留**并渲染「素材已删除」占位——删一张图不应导致整页布局塌陷。`pins/check` / `refs/check` 及三个素材库的 `?checkRefsFor=` 返回补 `blockRefCount`。
+- **硬上限（服务端校验）**：单页块数 60、单页总 refs 500、单个 `gallery` refs 60、`video_playlist` refs 20。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **回滚**：开发环境可 `DROP TABLE "AiSpaceBlockRef","AiSpaceBlock","AiSpacePage" CASCADE;` + `DROP TYPE "AiSpacePagePublishStatus","AiSpacePageTemplate";`；生产严禁直接回滚。
+
+---
+
+## 2026-08-16 — 我的 AI 空间 · 全局资产库（**无 schema 变更**）
+
+- **迁移**：无。资产源扩展纯代码层，`sourceType` 是 `AiSpacePin` / `AiSpaceBlockRef` 的普通字符串列，新增取值不需要 DDL。
+- **产品文档**：[`doc/product/AI 空间功能设计文档.md`](../product/AI%20空间功能设计文档.md) §11
+- **新增 `sourceType` 取值（8 种，真源 `lib/ai-space/ai-space-pin-types.ts`）**：
+  `story_character`、`story_frame_image`、`story_frame_video`（`StoryCharacter` / `StoryStoryboardFrame`，归属经 `project.userId`）；
+  `project_asset`（`ProjectAsset`，归属 `ownerUserId`，跳过纯文字类 kind）；
+  `canvas_task`（`CanvasGenerationTask`，仅 `SUCCEEDED` 且 `ossUrl` 非空）；
+  `aifit_model`、`aifit_closet`（`AiFitCustomModel` / `AiFitClosetItem`）；
+  `qr_template`（`QrTemplate`，排除 `isPlatformCatalog`）。
+- **读路径**：`pin-resolvers.ts` 由「一源一 resolver」重构为「一源一适配器」（`SOURCE_ADAPTERS`），同一段 `where` 同时服务按 id 解析与按最近列举；新增聚合服务 `ai-space-asset-library.ts`（单源 24 条 / 合并 240 条 / 并发 4）。
+- **删源级联新增接入点**：`deleteProjectAsset`、`deleteUserQrTemplate` / `deleteAdminUserQrTemplate`、AI 试衣衣柜 `DELETE`。`story_*` / `canvas_task` / `aifit_model` 的删除路径在子应用侧，暂未接入；孤儿 Pin 读时静默跳过，画布块渲染「素材已删除」占位。
+- **注意**：`aifit_model` 的媒体是 base64 Data URL，经鉴权代理路由输出，且 `AI_SPACE_PIN_SOURCE_PUBLIC_SAFE=false`——公开页跳过该类引用。
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

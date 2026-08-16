@@ -4,6 +4,7 @@ import type {
   ProjectAssetKind,
 } from "@prisma/client";
 
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 import { prisma } from "@/lib/prisma";
 import { getActiveTenantContext } from "@/lib/tenant/context";
 import { assertTenantPermission } from "@/lib/tenant/permission";
@@ -507,6 +508,9 @@ export async function deleteProjectAsset(
     where: { id: assetId },
     data: { deletedAt: new Date() },
   });
+
+  // AI 空间侧清理：Pin 删除，画布块保留并渲染「素材已删除」占位
+  await cascadeDeletePinsBySource("project_asset", assetId);
 
   return { ossUrls };
 }

@@ -1,13 +1,14 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
+import { AiSpaceAssetLibraryDesk } from "@/components/ai-space/ai-space-asset-library-desk";
 import { AiSpaceAudioLibrary } from "@/components/ai-space/ai-space-audio-library";
 import { AiSpaceBroadcastDesk } from "@/components/ai-space/ai-space-broadcast-desk";
-import { AiSpaceComposeDesk } from "@/components/ai-space/ai-space-compose-desk";
+import { AiSpaceComposeDeskLoader } from "@/components/ai-space/ai-space-compose-desk-loader";
 import { AiSpaceComposeTasksDesk } from "@/components/ai-space/ai-space-compose-tasks-desk";
 import { AiSpaceDigitalHumanLibrary } from "@/components/ai-space/ai-space-digital-human-library";
 import { AiSpaceFavoritesDesk } from "@/components/ai-space/ai-space-favorites-desk";
-import { AiSpacePinWall } from "@/components/ai-space/ai-space-pin-wall";
+import { SpaceCanvasEditor } from "@/components/ai-space/space-canvas/space-canvas-editor";
 import { AiSpaceVideoLibrary } from "@/components/ai-space/ai-space-video-library";
 import { listAiSpaceAudioAssets } from "@/lib/ai-space/ai-space-audio-service";
 import { listAiSpaceDigitalHumans } from "@/lib/ai-space/ai-space-digital-human-service";
@@ -22,6 +23,7 @@ import {
   listAiSpaceFavorites,
 } from "@/lib/ai-space/ai-space-favorite-service";
 import { listPins } from "@/lib/ai-space/ai-space-pin-service";
+import { getSpacePageForOwner } from "@/lib/ai-space/ai-space-space-service";
 import { normalizeAiSpaceTab } from "@/lib/ai-space/ai-space-tabs";
 import { authOptions } from "@/lib/auth";
 
@@ -41,7 +43,11 @@ export default async function AiSpacePage({
 
   const tab = normalizeAiSpaceTab(searchParams.tab);
   const userId = session.user.id;
-  const entries = tab === "wall" ? await listPins(userId) : [];
+  // 作品墙 = 自由画布：页与块一次读全，素材抽屉读 Pin
+  const wall =
+    tab === "wall"
+      ? await Promise.all([getSpacePageForOwner(userId), listPins(userId)])
+      : null;
   const audioAssets =
     tab === "audio"
       ? await attachAudioFavorites(userId, await listAiSpaceAudioAssets(userId))
@@ -52,18 +58,6 @@ export default async function AiSpacePage({
       : [];
   const videoItems = tab === "videos" ? await listAiSpaceVideoLibrary(userId) : [];
   const favorites = tab === "favorites" ? await listAiSpaceFavorites(userId) : [];
-
-  const compose =
-    tab === "compose"
-      ? await Promise.all([
-          attachDigitalHumanFavorites(
-            userId,
-            await listAiSpaceDigitalHumans(userId, { activeOnly: true }),
-          ),
-          attachAudioFavorites(userId, await listAiSpaceAudioAssets(userId)),
-          listAiSpaceVideoMaterials(userId),
-        ])
-      : null;
 
   const broadcast =
     tab === "broadcast"
@@ -76,7 +70,11 @@ export default async function AiSpacePage({
 
   return (
     <>
-      {tab === "wall" ? <AiSpacePinWall initialEntries={entries} /> : null}
+      {tab === "wall" && wall ? (
+        <SpaceCanvasEditor initialPage={wall[0]} initialPins={wall[1]} />
+      ) : null}
+      {/* 资产库全客户端拉取：14 个源的聚合扫描不该拖慢首屏 RSC */}
+      {tab === "library" ? <AiSpaceAssetLibraryDesk /> : null}
       {tab === "digital-humans" ? (
         <AiSpaceDigitalHumanLibrary initialItems={digitalHumans} />
       ) : null}
@@ -90,13 +88,8 @@ export default async function AiSpacePage({
           backgrounds={broadcast[2]}
         />
       ) : null}
-      {tab === "compose" && compose ? (
-        <AiSpaceComposeDesk
-          digitalHumans={compose[0]}
-          audioAssets={compose[1]}
-          backgrounds={compose[2]}
-        />
-      ) : null}
+      {/* 合成台选材同样全客户端拉取：5 条 SQL 不该卡住整页导航 */}
+      {tab === "compose" ? <AiSpaceComposeDeskLoader /> : null}
       {tab === "compose-tasks" ? <AiSpaceComposeTasksDesk /> : null}
     </>
   );

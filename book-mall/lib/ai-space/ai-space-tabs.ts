@@ -1,6 +1,7 @@
 /** 我的 AI 空间 · 页内 Tab（用 ?tab= 切换，各 Tab 数据服务端按需加载） */
 export const AI_SPACE_TABS = [
   { id: "wall", label: "作品墙" },
+  { id: "library", label: "资产库" },
   { id: "digital-humans", label: "数字人库" },
   { id: "audio", label: "音频库" },
   { id: "favorites", label: "我的收藏" },
@@ -14,6 +15,8 @@ export type AiSpaceTabId = (typeof AI_SPACE_TABS)[number]["id"];
 
 export const AI_SPACE_TAB_DESCRIPTIONS: Record<AiSpaceTabId, string> = {
   wall: "各应用已发布的作品在此布置展示。空间只保存指向原作品的链接，不复制文件；删除原作品会一并移除这里的展示。",
+  library:
+    "全局资产库：汇聚各应用已完成的图片、视频、音频、角色与模特。可收进空间、直接放上作品墙，或回原应用继续创作；删除请回创建它的应用。",
   "digital-humans":
     "数字人形象的平台真源。上传形象后，电商、画布、Story 等应用都能直接引用同一条记录。",
   audio:

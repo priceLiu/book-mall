@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   try {
     assertHandCraftComposeImageUrl(url, auth.userId);
     const { buf, contentType } = await fetchHandCraftComposeImageBuffer(url);
-    return new NextResponse(buf, {
+    return new NextResponse(new Uint8Array(buf), {
       status: 200,
       headers: {
         "Content-Type": contentType,
