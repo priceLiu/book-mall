@@ -29,24 +29,22 @@ export function EcomCreditsBalanceChip({ collapsed }: { collapsed?: boolean }) {
 
   return (
     <div
-      className="rounded-lg border border-[var(--ecom-chrome-border)] bg-[var(--ecom-chrome-surface)] px-3 py-2 text-[12px] leading-snug text-[var(--ecom-chrome-text-muted)]"
+      className="flex flex-col gap-0.5 rounded-lg border border-[var(--ecom-chrome-border)] bg-[var(--ecom-chrome-surface)] px-3 py-2 text-[12px] leading-snug text-[var(--ecom-chrome-text-muted)]"
       aria-live="polite"
       title="剩余积分 · 文本池与视频池"
     >
       <span className="text-[var(--ecom-chrome-text-subtle)]">剩余积分</span>
-      <span className="mx-1.5 text-[var(--ecom-chrome-border)]" aria-hidden>
-        ·
+      <span>
+        <span className="text-[var(--ecom-chrome-text-subtle)]">文本</span>
+        <span className="ml-1 tabular-nums font-medium text-[var(--ecom-chrome-text)]">
+          {formatBalance(general)}
+        </span>
       </span>
-      <span className="text-[var(--ecom-chrome-text-subtle)]">文本</span>
-      <span className="ml-1 tabular-nums font-medium text-[var(--ecom-chrome-text)]">
-        {formatBalance(general)}
-      </span>
-      <span className="mx-2 text-[var(--ecom-chrome-border)]" aria-hidden>
-        |
-      </span>
-      <span className="text-[var(--ecom-chrome-text-subtle)]">视频</span>
-      <span className="ml-1 tabular-nums font-medium text-[var(--ecom-chrome-text)]">
-        {formatBalance(video)}
+      <span>
+        <span className="text-[var(--ecom-chrome-text-subtle)]">视频</span>
+        <span className="ml-1 tabular-nums font-medium text-[var(--ecom-chrome-text)]">
+          {formatBalance(video)}
+        </span>
       </span>
     </div>
   );

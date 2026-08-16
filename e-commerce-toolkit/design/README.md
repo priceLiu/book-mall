@@ -13,9 +13,9 @@
 | [BUTTON.md](./BUTTON.md) | 胶囊主按钮 / 次按钮（Tier 1–2） |
 | [CHAT.md](./CHAT.md) | 创作助手：气泡、输入、Choice Chip |
 | [TABLE.md](./TABLE.md) | 数据表、字段行、导出版表格 |
-| [MEDIA.md](./MEDIA.md) | 缩略图、上传、预览、浮层图标 |
+| [MEDIA.md](./MEDIA.md) | 缩略图、上传、预览、资产选取、懒加载 |
 | [DIALOG.md](./DIALOG.md) | Radix 弹出层、`useDialogs` |
-| [VIDEO.md](./VIDEO.md) | 原生视频播放 |
+| [VIDEO.md](./VIDEO.md) | 视频展示与预览 |
 
 ## 实现对照
 
@@ -25,9 +25,14 @@
 | 弹出层 | `components/ui/dialog.tsx` + `components/dialogs/dialog-provider.tsx` |
 | 工作台布局 | `components/layout/ecom-workspace-layout.tsx` |
 | 助手 Choice | `components/storyboard/storyboard-assistant-choices.tsx` |
-| 参考上传 | `components/storyboard/storyboard-ref-uploader.tsx` |
-| 图片预览 | `components/media/ecom-image-preview-dialog.tsx` |
-| 视频 | `components/media/ecom-video-player.tsx` |
+| **媒体网格 Tile** | `components/media/ecom-media-library-tile.tsx` |
+| **参考上传卡** | `components/media/ecom-ref-upload-card.tsx` |
+| **上传缩略** | `components/media/ecom-ref-image-thumb.tsx` |
+| **资产选取** | `components/media/ecom-asset-picker-dialog.tsx` |
+| **单图预览** | `components/media/ecom-image-preview-dialog.tsx` |
+| **多图轮播预览** | `components/product-design/product-design-gallery-preview-dialog.tsx` |
+| **视频播放 / 预览** | `components/media/ecom-video-player.tsx` · `ecom-video-preview-dialog.tsx` |
+| 模块上传封装 | `storyboard-ref-uploader` · `product-design-ref-uploader` · `hand-craft-ref-uploader` · `seed-video-ref-uploader` |
 | 生图/生视频模型选择 | `components/storyboard/storyboard-model-picker-dialog.tsx` |
 | CSS 变量 | `app/globals.css` |
 

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 
 import { HandCraftSketchGenerateDialog } from "@/components/hand-craft/hand-craft-sketch-generate-dialog";
+import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
@@ -13,6 +14,7 @@ type Props = {
   references: HandCraftReference[];
   onUpload: (file: File) => Promise<void>;
   onRemove?: (id: string) => void | Promise<void>;
+  onAttachAssets?: (assetIds: string[]) => Promise<void>;
   onGenerateSketch?: (prompt: string) => Promise<void>;
   busy?: boolean;
   sketchGenBusy?: boolean;
@@ -24,6 +26,7 @@ export function HandCraftRefUploader({
   references,
   onUpload,
   onRemove,
+  onAttachAssets,
   onGenerateSketch,
   busy,
   sketchGenBusy = false,
@@ -32,6 +35,7 @@ export function HandCraftRefUploader({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [genDialogOpen, setGenDialogOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const atLimit = references.length >= HAND_CRAFT_SKETCH_MAX;
   const disabled = Boolean(busy) || atLimit;
   const genDisabled = Boolean(busy) || Boolean(sketchGenBusy) || !onGenerateSketch;
@@ -78,6 +82,9 @@ export function HandCraftRefUploader({
         uploadProgress={uploadProgress}
         inputRef={inputRef}
         onOpenFilePicker={() => inputRef.current?.click()}
+        onOpenAssetPicker={
+          onAttachAssets && !atLimit ? () => setPickerOpen(true) : undefined
+        }
         onUploadFiles={(files) => void handleFiles(files)}
         onRemove={onRemove}
         toolbarPrefix={
@@ -95,6 +102,18 @@ export function HandCraftRefUploader({
           ) : null
         }
       />
+
+      {onAttachAssets ? (
+        <EcomAssetPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          maxSelect={Math.max(1, HAND_CRAFT_SKETCH_MAX - references.length)}
+          onConfirm={async (assets) => {
+            setPickerOpen(false);
+            await onAttachAssets(assets.map((a) => a.id));
+          }}
+        />
+      ) : null}
 
       <HandCraftSketchGenerateDialog
         open={genDialogOpen}

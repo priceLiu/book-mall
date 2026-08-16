@@ -531,3 +531,45 @@ export async function mergeStoryboardPanelVideos(
     jobId: data.jobId as string | undefined,
   };
 }
+
+/** 下载 ZIP 交付包（参考图 + 分镜脚本 + 分镜图/视频 + 成片 + 对话） */
+export async function downloadStoryboardExportZip(projectId: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${projectId}/export`,
+      { method: "GET", credentials: "include" },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(msg === "fetch failed" ? "与服务器连接中断，请稍后重试。" : msg);
+  }
+  if (res.status === 401) throw new EcomUnauthorizedError("未登录");
+  if (!res.ok) {
+    let message = `导出失败 (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (typeof data.error === "string") message = data.error;
+    } catch {
+      /* 非 JSON */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+  const plainMatch = disposition.match(/filename="([^"]+)"/i);
+  const filename = utf8Match
+    ? decodeURIComponent(utf8Match[1]!)
+    : plainMatch
+      ? plainMatch[1]!
+      : "storyboard-export.zip";
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

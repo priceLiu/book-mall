@@ -50,6 +50,7 @@ type Props = {
   imageGenConcurrencyLimit?: number;
   onRefUpload: (file: File) => Promise<void>;
   onRefRemove: (refId: string) => void | Promise<void>;
+  onAttachSketches?: (assetIds: string[]) => Promise<void>;
   onGenerateSketch?: (prompt: string) => Promise<void>;
   refBusy?: boolean;
   sketchGenBusy?: boolean;
@@ -75,6 +76,7 @@ export function HandCraftContentPanel({
   imageGenConcurrencyLimit = 1,
   onRefUpload,
   onRefRemove,
+  onAttachSketches,
   onGenerateSketch,
   refBusy,
   sketchGenBusy = false,
@@ -334,9 +336,6 @@ export function HandCraftContentPanel({
     }
   }
 
-  const defaultSaveIpName = project.title?.trim() || "手伴IP";
-  const canSave = project.references.length > 0 || progress > 0;
-
   const progress = useMemo(
     () =>
       HAND_CRAFT_STEPS.reduce(
@@ -345,6 +344,10 @@ export function HandCraftContentPanel({
       ),
     [project],
   );
+
+  const defaultSaveIpName = project.title?.trim() || "手伴IP";
+  const canSave = project.references.length > 0 || progress > 0;
+
   const totalSlots = HAND_CRAFT_STEPS.reduce((acc, s) => acc + s.count, 0);
   const disabledAll = Boolean(streaming) || Boolean(generating) || composeBusy || sketchGenBusy;
 
@@ -429,6 +432,7 @@ export function HandCraftContentPanel({
             references={project.references}
             onUpload={onRefUpload}
             onRemove={onRefRemove}
+            onAttachAssets={onAttachSketches}
             onGenerateSketch={onGenerateSketch}
             busy={Boolean(refBusy) || disabledAll}
             sketchGenBusy={sketchGenBusy}

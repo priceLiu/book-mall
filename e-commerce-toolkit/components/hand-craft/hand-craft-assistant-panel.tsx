@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, Maximize2, Minimize2, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
 import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
@@ -281,28 +282,12 @@ export function HandCraftAssistantPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#1d1d1f]">手伴创作助手</p>
-          <p className="truncate text-[10px] text-[#6e6e73]">
-            第 {stepMeta.no}/10 步 · {stepMeta.label} · {modelName}
-          </p>
-        </div>
-        {onComposerWideChange ? (
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]"
-            title={composerWide ? "收窄会话区" : "加宽会话区"}
-            onClick={() => onComposerWideChange(!composerWide)}
-          >
-            {composerWide ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </button>
-        ) : null}
-      </div>
+      <EcomAssistantPanelHeader
+        title="手伴创作助手"
+        subtitle={`第 ${stepMeta.no}/10 步 · ${stepMeta.label} · ${modelName}`}
+        composerWide={composerWide}
+        onComposerWideChange={onComposerWideChange}
+      />
 
       <div
         ref={scrollRef}

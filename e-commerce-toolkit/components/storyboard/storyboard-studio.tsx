@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -12,7 +11,6 @@ import { StoryboardAssistantPanel } from "@/components/storyboard/storyboard-ass
 import { StoryboardContentPanel } from "@/components/storyboard/storyboard-content-panel";
 import { StoryboardProSheetView } from "@/components/storyboard/storyboard-pro-sheet-view";
 import { StoryboardProgressRail } from "@/components/storyboard/storyboard-progress-rail";
-import { StoryboardRefUploader } from "@/components/storyboard/storyboard-ref-uploader";
 import {
   StoryboardSettingsDialog,
   type StoryboardSettingsValue,
@@ -88,6 +86,7 @@ export function StoryboardStudio() {
   const [generateAllImagesToken, setGenerateAllImagesToken] = useState(0);
   const [generateFullVideoToken, setGenerateFullVideoToken] = useState(0);
   const [mergePanelVideosToken, setMergePanelVideosToken] = useState(0);
+  const [assistantWide, setAssistantWide] = useState(false);
 
   const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
@@ -384,36 +383,7 @@ export function StoryboardStudio() {
   return (
     <>
       <EcomWorkspaceLayout
-        assistantHeader={
-          <>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="text-lg font-semibold text-[#1d1d1f]">微剧故事版</h1>
-                <p className="text-xs text-[#6e6e73]">厨卫清洁 · 10秒4镜 · Skill 策划</p>
-              </div>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={loading || refBusy}
-                onClick={() => void handleNewProject()}
-              >
-                新建微剧故事版
-              </EcomButtonSecondary>
-            </div>
-            <div className="mt-3">
-              <StoryboardRefUploader
-                references={project.references}
-                onUpload={handleRefUpload}
-                onRemove={handleRefRemove}
-                onAttachAssets={handleAttachAssets}
-                busy={refBusy}
-                activeRole={uploadRole}
-                onActiveRoleChange={setUploadRole}
-              />
-            </div>
-          </>
-        }
+        assistantWide={assistantWide}
         progress={
           <StoryboardProgressRail project={project} hasVideo={Boolean(videoAsset)} />
         }
@@ -424,6 +394,9 @@ export function StoryboardStudio() {
             imageModels={imageModels}
             videoModels={videoModels}
             settings={settings}
+            durationSec={durationSec}
+            composerWide={assistantWide}
+            onComposerWideChange={setAssistantWide}
             onStreamingChange={setAssistantStreaming}
             onOpenSettings={() => setSettingsOpen(true)}
             onDeliverableReady={async () => {
@@ -445,10 +418,19 @@ export function StoryboardStudio() {
         <StoryboardContentPanel
           project={project}
           references={project.references}
+          durationSec={durationSec}
+          aspectRatio={aspectRatio}
+          onNewProject={() => void handleNewProject()}
+          onOpenSettings={() => setSettingsOpen(true)}
+          refBusy={refBusy}
+          uploadRole={uploadRole}
+          onUploadRoleChange={setUploadRole}
+          onRefUpload={handleRefUpload}
+          onRefRemove={handleRefRemove}
+          onAttachAssets={handleAttachAssets}
           imageModels={imageModels}
           videoModels={videoModels}
           settings={settings}
-          onOpenSettings={() => setSettingsOpen(true)}
           onImageModelChange={(key) => {
             setSettings((s) => ({ ...s, imageModelKey: key }));
             updateStoryboardProject(project.id, {
@@ -504,8 +486,6 @@ export function StoryboardStudio() {
               settings: { ...project.settings, videoPromptExtend },
             }).catch(() => undefined);
           }}
-          durationSec={durationSec}
-          aspectRatio={aspectRatio}
           videoAspectRatio={videoAspectRatio}
           onVideoAspectChange={setVideoAspectRatio}
           videoOssUrl={videoAsset?.ossUrl}

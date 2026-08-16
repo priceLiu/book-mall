@@ -102,6 +102,19 @@ export async function removeSeedVideoRef(projectId: string, refId: string): Prom
   }
 }
 
+/** 从「我的资产」挂种草素材 */
+export async function attachSeedVideoRefsFromAssets(
+  projectId: string,
+  assetIds: string[],
+): Promise<SeedVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ assetIds }),
+  });
+  return data.project as SeedVideoProject;
+}
+
 export async function streamSeedVideoChat(opts: {
   projectId: string;
   messages: SeedVideoChatMessage[];
@@ -349,4 +362,46 @@ export async function reuseSeedVideoProject(
     body: JSON.stringify(savedAt ? { savedAt } : {}),
   });
   return data.project as SeedVideoProject;
+}
+
+/** 下载 ZIP 交付包（参考素材 + 脚本 + 镜头/成片视频 + 对话） */
+export async function downloadSeedVideoExportZip(projectId: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/export`, {
+      method: "GET",
+      credentials: "include",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(msg === "fetch failed" ? "与服务器连接中断，请稍后重试。" : msg);
+  }
+  if (res.status === 401) throw new EcomUnauthorizedError("未登录");
+  if (!res.ok) {
+    let message = `导出失败 (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (typeof data.error === "string") message = data.error;
+    } catch {
+      /* 非 JSON */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+  const plainMatch = disposition.match(/filename="([^"]+)"/i);
+  const filename = utf8Match
+    ? decodeURIComponent(utf8Match[1]!)
+    : plainMatch
+      ? plainMatch[1]!
+      : "seed-video-export.zip";
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }

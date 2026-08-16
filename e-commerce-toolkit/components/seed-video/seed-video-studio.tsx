@@ -17,6 +17,7 @@ import {
   getSeedVideoProject,
   listSeedVideoProjectSummaries,
   removeSeedVideoRef,
+  attachSeedVideoRefsFromAssets,
   updateSeedVideoProject,
   uploadSeedVideoRef,
 } from "@/lib/ecom-seed-video-api";
@@ -279,6 +280,23 @@ export function SeedVideoStudio() {
     }
   }
 
+  async function handleAttachRefs(assetIds: string[]) {
+    if (!project || assetIds.length === 0) return;
+    setRefBusy(true);
+    try {
+      await attachSeedVideoRefsFromAssets(project.id, assetIds);
+      await reloadActiveProject();
+    } catch (e) {
+      await alert({
+        title: "添加失败",
+        message: e instanceof Error ? e.message : "无法从资产添加素材",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
   async function handleRefRemove(refId: string) {
     if (!project) return;
     const ok = await doubleConfirm({
@@ -481,6 +499,7 @@ export function SeedVideoStudio() {
           onAlert={alert}
           onUploadRef={handleUploadRef}
           onRemoveRef={handleRefRemove}
+          onAttachRefs={handleAttachRefs}
           refBusy={refBusy}
           planningPrompt={planningPrompt}
           onPlanningPromptChange={setPlanningPrompt}

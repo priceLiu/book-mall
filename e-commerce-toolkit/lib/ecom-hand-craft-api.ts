@@ -117,6 +117,19 @@ export async function removeHandCraftSketch(
   }
 }
 
+/** 从「我的资产」挂线稿参考图 */
+export async function attachHandCraftSketchesFromAssets(
+  projectId: string,
+  assetIds: string[],
+): Promise<HandCraftProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ assetIds }),
+  });
+  return data.project as HandCraftProject;
+}
+
 /** AI 生成线稿（wan2.7-image），可能耗时数分钟 */
 export async function generateHandCraftSketch(
   projectId: string,

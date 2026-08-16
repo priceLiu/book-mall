@@ -1,7 +1,8 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Images, Settings2, Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -17,7 +18,9 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { StoryboardPanelCard } from "@/components/storyboard/storyboard-panel-card";
 import { StoryboardPanelEditDialog } from "@/components/storyboard/storyboard-panel-edit-dialog";
 import { StoryboardSheetPreviewDialog } from "@/components/storyboard/storyboard-sheet-preview-dialog";
+import { StoryboardRefUploader } from "@/components/storyboard/storyboard-ref-uploader";
 import { StoryboardStepResults } from "@/components/storyboard/storyboard-step-results";
+import type { StoryboardUploadRole } from "@/lib/storyboard-workflow";
 import type { StoryboardSettingsValue } from "@/components/storyboard/storyboard-settings-dialog";
 import {
   generateStoryboardPanelVideo,
@@ -28,6 +31,7 @@ import {
   waitStoryboardMediaRender,
   saveStoryboardDeliverableSnapshot,
   syncStoryboardSheet,
+  downloadStoryboardExportZip,
   updateStoryboardProject,
   uploadStoryboardSheetPng,
 } from "@/lib/ecom-storyboard-api";
@@ -59,10 +63,25 @@ const VIDEO_POLL_MAX_ITERS = 240;
 type Props = {
   project: StoryboardProject;
   references: StoryboardReference[];
+  durationSec: number;
+  aspectRatio: "16:9" | "9:16";
+  onNewProject?: () => void | Promise<void>;
+  onOpenSettings?: () => void;
+  refBusy?: boolean;
+  uploadRole?: StoryboardUploadRole;
+  onUploadRoleChange?: (role: StoryboardUploadRole) => void;
+  onRefUpload: (
+    file: File,
+    opts: { label: string; role: "character" | "product" | "scene" | "other" },
+  ) => Promise<void>;
+  onRefRemove: (refId: string) => void | Promise<void>;
+  onAttachAssets: (
+    assetIds: string[],
+    role: StoryboardReference["role"],
+  ) => void | Promise<void>;
   imageModels: StoryboardGatewayModel[];
   videoModels: StoryboardGatewayModel[];
   settings: StoryboardSettingsValue;
-  onOpenSettings?: () => void;
   onImageModelChange?: (key: string) => void;
   onVideoModelChange?: (key: string) => void;
   onImageSizeChange?: (v: StoryboardWanxSize) => void;
@@ -70,8 +89,6 @@ type Props = {
   onVideoR2vRatioChange?: (v: string) => void;
   onVideoSeedChange?: (v: string) => void;
   onVideoPromptExtendChange?: (v: boolean) => void;
-  durationSec: number;
-  aspectRatio: "16:9" | "9:16";
   onVideoAspectChange?: (v: "16:9" | "9:16" | "1:1") => void;
   videoAspectRatio?: "16:9" | "9:16" | "1:1";
   videoOssUrl?: string | null;
@@ -122,10 +139,19 @@ function schemeToSheet(
 export function StoryboardContentPanel({
   project,
   references,
+  durationSec,
+  aspectRatio,
+  onNewProject,
+  onOpenSettings,
+  refBusy = false,
+  uploadRole = "product",
+  onUploadRoleChange,
+  onRefUpload,
+  onRefRemove,
+  onAttachAssets,
   imageModels,
   videoModels,
   settings,
-  onOpenSettings,
   onImageModelChange,
   onVideoModelChange,
   onImageSizeChange,
@@ -133,8 +159,6 @@ export function StoryboardContentPanel({
   onVideoR2vRatioChange,
   onVideoSeedChange,
   onVideoPromptExtendChange,
-  durationSec,
-  aspectRatio,
   videoAspectRatio = aspectRatio,
   onVideoAspectChange,
   videoOssUrl,
@@ -152,6 +176,7 @@ export function StoryboardContentPanel({
   generateFullVideoToken,
   mergePanelVideosToken,
 }: Props) {
+  const router = useRouter();
   const [imgBusy, setImgBusy] = useState(false);
   const [sheetPngBusy, setSheetPngBusy] = useState(false);
   const [vidBusy, setVidBusy] = useState(false);
@@ -174,6 +199,7 @@ export function StoryboardContentPanel({
   const [sheetPreviewOpen, setSheetPreviewOpen] = useState(false);
   const [deliverableReviewOpen, setDeliverableReviewOpen] = useState(false);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ src: string; title: string } | null>(null);
   const [panelDurationSec, setPanelDurationSec] = useState(3);
   const imageSize = settings.imageSize;
@@ -781,8 +807,104 @@ export function StoryboardContentPanel({
     return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`;
   }
 
+  const canExport =
+    references.length > 0 ||
+    Boolean(project.sheet?.panels?.length) ||
+    Boolean(project.meta?.deliverableMarkdown?.trim()) ||
+    Boolean(videoOssUrl?.trim()) ||
+    Boolean(project.sheetPngUrl?.trim()) ||
+    Boolean(project.sheet?.panels?.some((p) => p.imageUrl?.trim() || p.videoUrl?.trim()));
+
+  async function handleExportZip() {
+    setExportBusy(true);
+    try {
+      await downloadStoryboardExportZip(project.id);
+    } catch (e) {
+      await onAlert({
+        title: "导出失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
+      <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
+        <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-[#1d1d1f]">
+                {project.title?.trim() || "微剧故事版"}
+              </h2>
+              <p className="text-[11px] text-[#6e6e73]">
+                带货短视频分镜 · {durationSec}秒 · {aspectRatio}
+                {project.sheet?.panels.length
+                  ? ` · ${project.sheet.panels.length} 镜`
+                  : ""}
+                {" · 成图自动入库「我的资产 · 微剧故事版」"}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {onNewProject ? (
+                <EcomButtonSecondary
+                  size="sm"
+                  type="button"
+                  dark
+                  disabled={refBusy || Boolean(streaming)}
+                  onClick={() => void onNewProject()}
+                >
+                  新建
+                </EcomButtonSecondary>
+              ) : null}
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                dark
+                onClick={() => router.push("/library")}
+              >
+                <Images className="h-3.5 w-3.5 shrink-0" />
+                我的资产
+              </EcomButtonSecondary>
+              {onOpenSettings ? (
+                <EcomButtonSecondary
+                  size="sm"
+                  type="button"
+                  dark
+                  onClick={() => onOpenSettings()}
+                >
+                  <Settings2 className="h-3.5 w-3.5 shrink-0" />
+                  影片参数
+                </EcomButtonSecondary>
+              ) : null}
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                dark
+                disabled={!canExport || exportBusy || Boolean(streaming)}
+                onClick={() => void handleExportZip()}
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                {exportBusy ? "打包中…" : "导出交付包"}
+              </EcomButtonSecondary>
+            </div>
+          </div>
+        </header>
+
+        <section className="border-b border-[#e8e8ed] px-5 py-4">
+          <StoryboardRefUploader
+            references={references}
+            onUpload={onRefUpload}
+            onRemove={onRefRemove}
+            onAttachAssets={(assetIds, role) => Promise.resolve(onAttachAssets(assetIds, role))}
+            busy={refBusy}
+            activeRole={uploadRole}
+            onActiveRoleChange={onUploadRoleChange}
+          />
+        </section>
+
       <StoryboardTaskStatus
         className="mx-6 mb-2"
         active={vidBusy}
@@ -912,6 +1034,7 @@ export function StoryboardContentPanel({
             ) : undefined
           }
         />
+      </div>
       </div>
 
       <StoryboardModelPickerDialog

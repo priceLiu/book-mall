@@ -151,6 +151,7 @@ type Props = {
   onRefRemove: (refId: string) => void | Promise<void>;
   onAttachAssets?: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
+    role: ProductDesignReferenceRole,
   ) => Promise<void>;
   refBusy?: boolean;
   uploadingRole?: ProductDesignReferenceRole | null;

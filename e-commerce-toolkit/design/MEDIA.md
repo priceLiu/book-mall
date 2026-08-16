@@ -1,6 +1,41 @@
 # 电商工具箱 · 图片、上传与预览
 
-> 母规范：`SYSTEM.md` §8。视频见 `VIDEO.md`。
+> 母规范：`SYSTEM.md` §8。视频见 `VIDEO.md`。  
+> **全站须按本文组件映射实现**；禁止各模块自写缩略图、预览弹层或上传条。
+
+---
+
+## 0. 统一组件映射（强制）
+
+凡涉及 **图片展示 / 弹出层预览 / 上传与从资产库选取**，须用下表组件，**禁止**复制布局或另起 Dialog。
+
+| 场景 | 唯一组件 | 路径 |
+|------|----------|------|
+| **资产库 / 模块结果网格** | `EcomMediaLibraryTile` | `components/media/ecom-media-library-tile.tsx` |
+| 网格容器 class | `ECOM_LIBRARY_MEDIA_GRID_CLASS` | 同上 export |
+| **单张图片放大预览** | `EcomImagePreviewDialog` | `components/media/ecom-image-preview-dialog.tsx` |
+| **多张图片轮播预览**（成图槽位画廊） | `ProductDesignGalleryPreviewDialog` | `components/product-design/product-design-gallery-preview-dialog.tsx` |
+| **参考图上传卡片** | `EcomRefUploadCard` | `components/media/ecom-ref-upload-card.tsx` |
+| **上传区 56px 缩略** | `EcomRefImageThumb` | `components/media/ecom-ref-image-thumb.tsx` |
+| **从「我的资产」选取** | `EcomAssetPickerDialog` | `components/media/ecom-asset-picker-dialog.tsx` |
+| 下载 | `downloadMediaUrl()` | `lib/ecom-media-download.ts` |
+| OSS 列表缩略 | `buildEcomOssThumbUrl()` | `lib/ecom-oss-image-url.ts` |
+| 滚动分页 | `useEcomScrollPagination` + `EcomScrollLoadFooter` | `lib/use-ecom-scroll-pagination.ts` 等 |
+
+### 业务封装（薄包装，禁止改 UI）
+
+各模块 **只** 传 props / 调 API，**不得** 重写卡片 DOM：
+
+| 模块 | 封装 | 说明 |
+|------|------|------|
+| 微剧故事版 | `StoryboardRefUploader` | 产品 / 角色 / 场景 三卡 + `EcomAssetPickerDialog` |
+| 电商主图 / 详情 | `ProductDesignRefUploader` | 按 `role` 单卡 |
+| 手伴创作 | `HandCraftRefUploader` | 线稿区；可选 `toolbarPrefix`（生成线稿） |
+| 种草视频 | `SeedVideoRefUploader` | 素材区 |
+
+新增模块参考图上传 → **必须先** 用 `EcomRefUploadCard` +（可选）`EcomAssetPickerDialog`，再写薄封装。
+
+---
 
 ## 资产库列表布局
 
@@ -81,6 +116,29 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 
 **禁止** 在缩略图下方用文字链接触发预览/下载。
 
+### 选择模式（资产 Picker · 强制）
+
+`EcomAssetPickerDialog` 及一切「多选入库」场景：
+
+```tsx
+<EcomMediaLibraryTile
+  kind="image"
+  src={thumbUrl}
+  selected={active}
+  onSelect={() => toggle(id)}
+  onPreview={() => setPreviewSrc(url)}
+/>
+```
+
+| 规则 | 说明 |
+|------|------|
+| 点击缩略图主体 | `onSelect` 切换选中；右上角蓝底 `Check` |
+| 悬停 Eye | `onPreview` → **`EcomImagePreviewDialog`**（与资产库一致） |
+| 遮罩层 | 未悬停时 **`pointer-events-none`**，不得挡住选中点击 |
+| 已选上限 | Picker 传 `maxSelect`；底栏「使用所选 N 张」 |
+
+**禁止** Picker 内自写网格卡片或裸 `<Image onClick>`。
+
 ### 视频缩略：封面 + 悬停自动播放
 
 `kind="video"` 且 `thumbnailSrc` 是**真实封面图**（与 `src` 不同）时：
@@ -120,75 +178,142 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 
 - 生成中：居中 `Loader2` + `text-sm text-[#6e6e73]`
 
-## 点击预览
+## 点击预览（图片 · 强制）
 
-| 类型 | 组件 |
-|------|------|
-| 图片 | `EcomImagePreviewDialog` |
-| 视频 | `EcomVideoPreviewDialog` + `EcomVideoPlayer` |
+| 类型 | 组件 | 何时使用 |
+|------|------|----------|
+| **单张** | `EcomImagePreviewDialog` | 资产库、模板区、Picker Eye、分镜单图 |
+| **多张轮播** | `ProductDesignGalleryPreviewDialog` | 手伴 / 主图槽位「画廊预览」、同组多成图切换 |
 
-### 图片预览 Dialog
+### 单张：`EcomImagePreviewDialog`
 
-- 内容区：`max-h-[80vh] overflow-auto rounded-lg bg-[#f5f5f7]`
-- 图：`mx-auto w-full object-contain`；先缩略后原图 crossfade（见 §懒加载）
-- 标题：`DialogTitle` 显示资产名/镜头号
+全站统一 **全屏暗底 lightbox** + **滚轮缩放 / 拖拽平移**（见 `.cursor/rules/image-preview-zoom-pan.mdc`）：
 
-**禁止**新窗口 `window.open` 或未封装的原图弹层。
-
-### 视频预览 Dialog（与 Canvas 弹层一致）
-
-`EcomVideoPreviewDialog` 内 **`EcomVideoPlayer`** 须：
-
-- `frameless` — 无外圆角框，原生 controls 贴边
-- `adaptiveBackdrop` — 按视频比例自适应（最大 `96vw` × `calc(100dvh - 88px)`），模糊封面背景
-- `autoPlay` + `poster={thumbUrl}`（有封面时）
-
-详见 `VIDEO.md`。
-
-## 参考图上传（StoryboardRefUploader 模式）
-
-全站上传交互以此为准，新模块复用或抽组件。
-
-### 分类块
-
-每组（产品/角色/场景）一个 bordered 块：
+- 容器：`h-[100dvh] w-screen bg-black/90 border-0`
+- 先 OSS 缩略占位 → 原图加载后 crossfade；加载中 indeterminate 进度条
+- 右下角 `ImageZoomControls`（须与缩放 stage **兄弟节点**，不可包在 `scale` 内）
+- 关闭：Esc、右上圆形关闭钮、点击空白
+- `<img draggable={false}>` + stage `onDragStart` preventDefault
 
 ```tsx
-"rounded-lg border px-2.5 py-2 transition-colors"
-// 默认：border-[#e8e8ed] bg-[#fafafa]
-// 助手建议当前步：border-[#1d1d1f]/25 bg-white
-// 鼠标悬停（粘贴目标）：border-[#0071e3] bg-[#0071e3]/5 ring-1 ring-[#0071e3]/40
+<EcomImagePreviewDialog
+  src={ossUrl}
+  thumbSrc={thumbnailUrl}
+  open={open}
+  onOpenChange={setOpen}
+  title="资产名或镜头号"
+/>
+```
+
+**禁止** `window.open`、白底小窗、或无缩放的手写弹层。
+
+### 多张：`ProductDesignGalleryPreviewDialog`
+
+- 全屏黑底 `bg-black/95`；顶栏标题 + 可选「下载」
+- 左侧主图 `object-contain`；右侧竖条缩略条（`items.length > 1`）
+- 键盘 `←` / `→` 切换；**不含**滚轮缩放（成图审查场景）
+
+### 参考条悬停浮层：`EcomRefImageThumb`
+
+上传区 56px 缩略 **不** 走 Dialog；悬停 portal 浮层（`z-[400]`）：
+
+- 尺寸：`EcomRefUploadCard` 内 `size={56}`
+- 角标删除：黑底圆形 `X`；删除须 `doubleConfirm`（含 OSS 说明）
+- 浮层：`rounded-xl border shadow-xl`，图 `object-contain max-h-64`
+
+---
+
+## 参考图上传（`EcomRefUploadCard` · 强制）
+
+全站上传交互 **唯一** 卡片组件；微剧 / 主图 / 手伴 / 种草均复用。
+
+### 卡片容器
+
+```tsx
+"rounded-lg border px-2.5 py-2 outline-none transition-colors"
+// 默认：border-[#e8e8ed] bg-white
+// 助手建议当前步（微剧）：border-[#0071e3]/45 ring-1 ring-[#0071e3]/15
+// 拖放 / 粘贴目标：border-[#0071e3] bg-white ring-1 ring-[#0071e3]/30
 ```
 
 ### 标题行
 
 - 左：分类名 `text-xs font-semibold text-[#1d1d1f]`
-- 悬停时副文案「粘贴至此」`text-[10px] text-[#0071e3]`
-- 右：**上传按钮** = `EcomButtonSecondary size="sm"` + **`Plus` 图标** `h-3 w-3` + 文案「上传」
+- 拖放中副文案：`可拖放 / Ctrl+V 粘贴` · `text-[10px] text-[#0071e3]`
+- 右：**工具钮组**（`flex gap-1.5`，均为 `EcomButtonSecondary size="sm" className="h-7 px-2 text-[10px]"`）
+
+| 顺序 | 按钮 | 图标 | 说明 |
+|------|------|------|------|
+| 可选前缀 | `toolbarPrefix` | 模块自定 | 如手伴「生成线稿」 |
+| 1 | **我的资产** | `Images` `h-3 w-3` | 打开 `EcomAssetPickerDialog`；达上限时隐藏 |
+| 2 | **上传** | `Plus` `h-3 w-3` | 触发 hidden file input |
 
 ```tsx
-<EcomButtonSecondary size="sm" className="h-7 px-2 text-[10px]">
-  <Plus className="h-3 w-3 shrink-0" />
-  上传
-</EcomButtonSecondary>
+<EcomRefUploadCard
+  title="产品图"
+  items={items}
+  emptyHint="…"
+  busy={busy}
+  uploadProgress={progress}
+  onUploadFiles={handleFiles}
+  onOpenFilePicker={() => inputRef.current?.click()}
+  onOpenAssetPicker={() => setPickerOpen(true)}
+  onRemove={handleRemove}
+  inputRef={inputRef}
+/>
 ```
 
 ### 交互
 
 | 行为 | 说明 |
 |------|------|
-| 点击上传 | 触发 hidden `<input type="file" accept="image/jpeg,image/png,image/webp" multiple>` |
-| 粘贴 | 全局 `paste` 监听；**鼠标悬停**在某分类块上时粘贴归入该 role |
-| 删除 | 角标 `X` 圆形黑底按钮；须 `doubleConfirm`（含 OSS 时第二次说明云端） |
-| 空列表 | 显示 `--` `text-[10px] text-[#86868b]` |
+| 点击上传 | `accept="image/jpeg,image/png,image/webp"` · `multiple` |
+| 拖放 / 粘贴 | `useImageDropPaste`；悬停块上粘贴归入该 role |
+| 上传进度 | `ecom-upload-progress` + `text-[10px] text-[#0071e3]` |
+| 空列表 | `emptyHint` · `text-[10px] text-[#86868b]` |
+| 已有图 | `EcomRefImageThumb` 横排 `gap-1.5` |
 
-### 分区标题（整块）
+### 分区标题（整块上方）
 
 ```tsx
 "text-xs font-medium uppercase tracking-wide text-[#6e6e73]"  // 如「素材图」
+"text-[10px] text-[#86868b]"  // 计数 · 拖放提示
 ```
 
-辅助：`text-[10px] text-[#86868b]`「鼠标移入分类后粘贴」
+---
+
+## 从「我的资产」选择（`EcomAssetPickerDialog` · 强制）
+
+上传区「我的资产」钮 **必须** 打开本 Dialog，**禁止** 跳转 `/library` 或自写列表。
+
+### 结构
+
+- Radix `Dialog` · `max-w-3xl` · `max-h-[85vh]`
+- 顶栏：「从我的资产选择」+ 已选 / 上限
+- 分组 Tab：`rounded-full` 胶囊（选中 `bg-[#1d1d1f] text-white`）
+- 内容：`ECOM_LIBRARY_MEDIA_GRID_CLASS` + **`EcomMediaLibraryTile` 选择模式**
+- 底栏：`EcomButtonSecondary` 取消 + `EcomButtonPrimary`「使用所选 N 张」
+
+### 分组（与资产库 module 一致）
+
+`main-image` · `detail-page` · `model-shot` · `storyboard-micro-drama` · `hand-craft` · `seed-video`
+
+### 挂载 API（各模块须实现）
+
+| 模块 | 挂载方式 |
+|------|----------|
+| 微剧故事版 | `POST .../storyboard/projects/[id]/references/attach` |
+| 电商主图/详情 | `updateProductDesignProject` · 按 **当前 role** 追加 |
+| 手伴 | `POST .../hand-craft/projects/[id]/refs/attach` |
+| 种草视频 | `POST .../seed-video/projects/[id]/refs/attach` |
+
+Picker 只选 **`kind === "image"`** 资产；`maxSelect` = 剩余可上传张数。
+
+---
+
+## 参考图上传（旧模式 · 已废弃）
+
+~~StoryboardRefUploader 内联 DOM~~ → 已改为 **`EcomRefUploadCard` 组合**。新代码 **禁止** 复制旧版 `bg-[#fafafa]` 单「上传」钮布局。
 
 ## 卡片浮层操作图标（生图槽位 / 分镜结果）
 
@@ -224,9 +349,13 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 
 - 资产库用大卡片 + 底部「删除」文字链（须 `EcomMediaLibraryTile` + 悬停图标）
 - 缩略槽内拉伸变形（须 `object-cover` 或 `object-contain` 明确选型）
-- 上传区仅用纯文字链接、无 `Plus` 与边框块
+- 上传区仅用纯文字链接、无 **我的资产 + Plus 上传** 双钮（须 `EcomRefUploadCard`）
+- 上传区「我的资产」只展示 UI 不挂 `EcomAssetPickerDialog` + 挂载 API
+- Picker / 网格内自写缩略卡片（须 `EcomMediaLibraryTile`）
+- 选择模式下遮罩层拦截点击（须 `pointer-events-none` 至 hover）
 - 参考图删除单次确认即调 API
 - 预览/下载用 `window.open` 或未封装的弹层
+- 单图预览不用 `EcomImagePreviewDialog`（须含缩放平移规范）
 
 ## 懒加载与加载态（强制）
 
@@ -324,3 +453,6 @@ pnpm ecom:import-template-gallery:thumbs -- --category shoes      # 仅为已有
 - 长画廊无 `useEcomScrollPagination` → 驳回
 - 滚动加载无 skeleton + 进度条 → 驳回
 - 缩略图无 `EcomMediaLibraryTile` / 无 skeleton → 驳回
+- 参考上传未走 `EcomRefUploadCard` → 驳回
+- 「我的资产」未走 `EcomAssetPickerDialog` → 驳回
+- 图片预览未走 `EcomImagePreviewDialog`（单张）→ 驳回

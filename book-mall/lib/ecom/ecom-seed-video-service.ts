@@ -367,3 +367,45 @@ export async function removeSeedVideoReference(
     references: project.references.filter((r) => r.id !== refId),
   });
 }
+
+/** 从「我的资产」挂种草素材（不重新上传 OSS） */
+export async function attachSeedVideoRefsFromAssets(
+  userId: string,
+  projectId: string,
+  assetIds: string[],
+): Promise<EcomSeedVideoProjectDto> {
+  const project = await getEcomSeedVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const materials = project.references.filter((r) => r.role === "seed-material");
+  const remaining = SEED_VIDEO_MATERIAL_MAX - materials.length;
+  if (remaining <= 0) {
+    throw new Error(`最多 ${SEED_VIDEO_MATERIAL_MAX} 张素材图`);
+  }
+
+  const ids = [...new Set(assetIds.filter((id) => id.trim()))].slice(0, remaining);
+  if (ids.length === 0) throw new Error("请至少选择一张资产图");
+
+  const assets = await prisma.ecomAsset.findMany({
+    where: { userId, id: { in: ids }, kind: "image" },
+    select: { id: true, title: true, ossUrl: true },
+  });
+  if (assets.length === 0) throw new Error("找不到所选资产");
+
+  const added: SeedVideoReference[] = [];
+  for (const asset of assets) {
+    const url = asset.ossUrl?.trim();
+    if (!url || !/^https?:\/\//.test(url)) continue;
+    added.push({
+      id: `ref-${asset.id.slice(-8)}-${Date.now()}${added.length}`,
+      label: (asset.title ?? "资产图").slice(0, 40),
+      role: "seed-material",
+      ossUrl: url,
+    });
+  }
+  if (added.length === 0) throw new Error("所选资产不可用");
+
+  return updateEcomSeedVideoProject(userId, projectId, {
+    references: [...project.references, ...added],
+  });
+}

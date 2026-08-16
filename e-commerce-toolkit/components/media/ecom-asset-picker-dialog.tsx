@@ -25,6 +25,8 @@ const GROUPS: Array<{ module: string; label: string }> = [
   { module: "detail-page", label: "详情页" },
   { module: "model-shot", label: "模特图" },
   { module: "storyboard-micro-drama", label: "分镜图" },
+  { module: "hand-craft", label: "手伴创作" },
+  { module: "seed-video", label: "种草视频" },
 ];
 
 type Props = {

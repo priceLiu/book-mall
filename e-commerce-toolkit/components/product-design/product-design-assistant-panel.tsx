@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, PanelRightClose, PanelRightOpen, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
@@ -42,6 +43,8 @@ import {
   parseMarketingPlanChoice,
   parsePlatformChoice,
   productDesignAssistantAnchorId,
+  resolveProductDesignStepStates,
+  stepsForTrack,
   PRODUCT_DESIGN_STEPS,
   REGENERATE_MARKETING_PLANS_CHOICE,
   BRIEF_AI_INFER_CHOICE,
@@ -818,8 +821,29 @@ export function ProductDesignAssistantPanel({
   const inputDisabled = streaming || choiceBusy || briefInferBusy;
   const showThinking = streaming || choiceBusy;
 
+  const assistantSubtitle = useMemo(() => {
+    const trackSteps = stepsForTrack(track);
+    const states = resolveProductDesignStepStates(effectiveProject);
+    const activeStep =
+      trackSteps.find((id) => states[id] === "active") ?? trackSteps[trackSteps.length - 1]!;
+    const stepIndex = Math.max(1, trackSteps.indexOf(activeStep) + 1);
+    const stepLabel =
+      PRODUCT_DESIGN_STEPS.find((s) => s.id === activeStep)?.label ?? activeStep;
+    const modelName =
+      chatModels.find((m) => m.modelKey === chatModelKey)?.displayName ?? "助手模型";
+    return `第 ${stepIndex}/${trackSteps.length} 步 · ${stepLabel} · ${modelName}`;
+  }, [track, effectiveProject, chatModels, chatModelKey]);
+
+  const assistantTitle = track === "detail" ? "电商详情页助手" : "电商主图助手";
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
+      <EcomAssistantPanelHeader
+        title={assistantTitle}
+        subtitle={assistantSubtitle}
+        composerWide={composerWide}
+        onComposerWideChange={onComposerWideChange}
+      />
       <div
         ref={scrollRef}
         className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
@@ -937,21 +961,6 @@ export function ProductDesignAssistantPanel({
       </div>
 
       <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
-        <div className="mb-2 flex items-center justify-end">
-          <button
-            type="button"
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-[#6e6e73] transition hover:bg-[var(--ecom-chrome-hover)] hover:text-[#1d1d1f]"
-            title={composerWide ? "收窄助手栏" : "展开助手栏至半屏"}
-            onClick={() => onComposerWideChange?.(!composerWide)}
-          >
-            {composerWide ? (
-              <PanelRightClose className="h-3.5 w-3.5" />
-            ) : (
-              <PanelRightOpen className="h-3.5 w-3.5" />
-            )}
-            {composerWide ? "收窄" : "半屏展开"}
-          </button>
-        </div>
         <textarea
           className="mb-3 min-h-[4.5rem] w-full resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={3}

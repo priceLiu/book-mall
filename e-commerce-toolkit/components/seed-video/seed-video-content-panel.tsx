@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Images, Save, Download } from "lucide-react";
 
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
@@ -23,6 +24,7 @@ import {
   pollSeedVideoMediaRenderJob,
   renderSeedVideo,
   saveSeedVideoDeliverableSnapshot,
+  downloadSeedVideoExportZip,
   updateSeedVideoProject,
 } from "@/lib/ecom-seed-video-api";
 import { resolveSeedVideoDirectVideos } from "@/lib/seed-video-direct-videos";
@@ -100,6 +102,7 @@ type Props = {
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
   onUploadRef: (file: File) => Promise<void>;
   onRemoveRef?: (id: string) => void | Promise<void>;
+  onAttachRefs?: (assetIds: string[]) => Promise<void>;
   refBusy?: boolean;
   planningPrompt: string;
   onPlanningPromptChange: (value: string) => void;
@@ -123,6 +126,7 @@ export function SeedVideoContentPanel({
   onAlert,
   onUploadRef,
   onRemoveRef,
+  onAttachRefs,
   refBusy,
   planningPrompt,
   onPlanningPromptChange,
@@ -135,6 +139,7 @@ export function SeedVideoContentPanel({
   onProceedFromStoryboardEdit,
   openProductionAfterSyncToken = 0,
 }: Props) {
+  const router = useRouter();
   const workspace = useMemo(
     () => resolveSeedVideoMiddleWorkspaceContent(project),
     [project],
@@ -337,6 +342,7 @@ export function SeedVideoContentPanel({
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
 
   const shotsAutosaveRef = useRef<number | null>(null);
   const shotsAutosaveSkipRef = useRef(true);
@@ -1140,6 +1146,21 @@ export function SeedVideoContentPanel({
     }
   }
 
+  async function handleExportZip() {
+    setExportBusy(true);
+    try {
+      await downloadSeedVideoExportZip(project.id);
+    } catch (e) {
+      await onAlert({
+        title: "导出失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   const hasShots = localShots.length > 0;
   const finePlanSynced = (project.plan?.shots?.length ?? 0) >= 1 && !needsConfirmPreview;
   const directPlanSynced = Boolean(directPlan?.globalPrompt?.trim());
@@ -1162,16 +1183,6 @@ export function SeedVideoContentPanel({
               <p className="text-[11px] text-[#6e6e73]">种草短视频 · 素材策划与成片</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={!canSave || saveBusy}
-                onClick={() => setSaveDialogOpen(true)}
-              >
-                <Save className="h-3.5 w-3.5 shrink-0" />
-                保存
-              </EcomButtonSecondary>
               {onNewProject ? (
                 <EcomButtonSecondary
                   size="sm"
@@ -1183,6 +1194,35 @@ export function SeedVideoContentPanel({
                   新建
                 </EcomButtonSecondary>
               ) : null}
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                dark
+                onClick={() => router.push("/library")}
+              >
+                <Images className="h-3.5 w-3.5 shrink-0" />
+                我的资产
+              </EcomButtonSecondary>
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                dark
+                disabled={!canSave || saveBusy}
+                onClick={() => setSaveDialogOpen(true)}
+              >
+                <Save className="h-3.5 w-3.5 shrink-0" />
+                保存
+              </EcomButtonSecondary>
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                dark
+                disabled={!canSave || exportBusy || streaming || productionBusy}
+                onClick={() => void handleExportZip()}
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                {exportBusy ? "打包中…" : "导出交付包"}
+              </EcomButtonSecondary>
             </div>
           </div>
         </header>
@@ -1192,6 +1232,7 @@ export function SeedVideoContentPanel({
             references={project.references}
             onUpload={onUploadRef}
             onRemove={onRemoveRef}
+            onAttachAssets={onAttachRefs}
             busy={refBusy}
           />
         </section>

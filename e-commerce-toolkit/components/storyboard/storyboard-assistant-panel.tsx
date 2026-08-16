@@ -4,6 +4,7 @@ import { Loader2, Send, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { StoryboardAssistantChoices } from "@/components/storyboard/storyboard-assistant-choices";
+import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import {
   advanceParamStep,
   completeAutoMatchCategory,
@@ -52,6 +53,12 @@ import type {
   StoryboardGatewayModel,
   StoryboardProject,
 } from "@/lib/storyboard-types";
+import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import {
+  ECOM_ASSISTANT_BUBBLE_CLASS,
+  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+  ECOM_ASSISTANT_USER_BUBBLE_CLASS,
+} from "@/lib/ecom-assistant-chat-styles";
 import { cn } from "@/lib/utils";
 
 const WELCOME: StoryboardChatMessage = {
@@ -82,6 +89,9 @@ type Props = {
   onRequestGenerateFullVideo?: () => void;
   onRequestMergePanelVideos?: () => void;
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
+  composerWide?: boolean;
+  onComposerWideChange?: (wide: boolean) => void;
+  durationSec?: number;
 };
 
 export function StoryboardAssistantPanel({
@@ -97,6 +107,9 @@ export function StoryboardAssistantPanel({
   onRequestGenerateFullVideo,
   onRequestMergePanelVideos,
   onAlert,
+  composerWide = false,
+  onComposerWideChange,
+  durationSec = 15,
 }: Props) {
   const chatHistory = project.chatHistory;
   const projectId = project.id;
@@ -627,70 +640,95 @@ export function StoryboardAssistantPanel({
   const awaitingSellpoint = isAwaitingSellpointInput(effectiveProject);
   const awaitingCustomScene = isAwaitingCustomSceneInput(effectiveProject);
   const freeTextEnabled = awaitingSellpoint || awaitingCustomScene;
+  const modelName =
+    chatModels.find((m) => m.modelKey === settings.chatModelKey)?.displayName ?? "助手模型";
+  const panelCount = project.sheet?.panels.length ?? 0;
+  const params = project.meta?.deliverable?.params;
+  const productFromParams =
+    typeof params?.产品名 === "string" ? params.产品名.trim() : "";
+  const productLabel =
+    project.meta?.deliverable?.productName?.trim() || productFromParams || "Skill 策划";
+  const assistantSubtitle = `${durationSec}秒 · ${panelCount > 0 ? `${panelCount} 镜` : productLabel} · ${modelName}`;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-[#1d1d1f]">创作助手</p>
-          <p className="text-[10px] text-[#6e6e73]">
-            {chatModels.find((m) => m.modelKey === settings.chatModelKey)?.displayName ??
-              "助手模型"}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)] hover:text-[var(--ecom-primary-on-dark)]"
-          title="影片参数"
-          onClick={() => onOpenSettings?.()}
-        >
-          <Settings2 className="h-4 w-4" />
-        </button>
-      </div>
-
-      <StoryboardTaskStatus
-        active={streaming}
-        title="思考中"
-        detail="助手正在流式输出策划内容，完成后将同步到右侧分镜区…"
+      <EcomAssistantPanelHeader
+        title="微剧故事版助手"
+        subtitle={assistantSubtitle}
+        composerWide={composerWide}
+        onComposerWideChange={onComposerWideChange}
+        trailing={
+          onOpenSettings ? (
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]"
+              title="影片参数"
+              onClick={() => onOpenSettings()}
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+          ) : null
+        }
       />
 
       <div
         ref={scrollRef}
-        className="ecom-scrollbar-overlay min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-scroll overscroll-y-contain px-4 py-4 [overflow-anchor:none]"
+        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
       >
-        {displayMessages.map((m) => {
-          const body =
-            m.id === "streaming"
-              ? stripStoryboardDeliverableFence(m.content)
-              : m.role === "assistant"
+        <div className="space-y-3">
+          {displayMessages.map((m) => {
+            const body =
+              m.id === "streaming"
                 ? stripStoryboardDeliverableFence(m.content)
-                : m.content;
-          const isLastAssistant = m.role === "assistant" && m.id === lastAssistantId;
-          return (
-            <div
-              key={m.id}
-              className={cn(
-                "max-w-[95%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                m.role === "user"
-                  ? "ml-auto border border-[var(--ecom-assistant-bubble-user-border)] bg-[var(--ecom-assistant-bubble-user-bg)] text-[#1d1d1f]"
-                  : "bg-[var(--ecom-assistant-bubble-bot-bg)] text-[#1d1d1f] shadow-sm ring-1 ring-[var(--ecom-assistant-bubble-bot-ring)]",
-              )}
-            >
-              <pre className="whitespace-pre-wrap font-sans">{body}</pre>
-              {isLastAssistant && showChoices ? (
-                <StoryboardAssistantChoices
-                  project={effectiveProject}
-                  disabled={streaming}
-                  compact
-                  onChoose={(t) => void handleChoice(t)}
-                />
-              ) : null}
-            </div>
-          );
-        })}
+                : m.role === "assistant"
+                  ? stripStoryboardDeliverableFence(m.content)
+                  : m.content;
+            const isLastAssistant = m.role === "assistant" && m.id === lastAssistantId;
+            return (
+              <div
+                key={m.id}
+                className={cn(
+                  "flex w-full flex-col",
+                  m.role === "user" ? "items-end" : "items-start",
+                )}
+              >
+                <div
+                  className={cn(
+                    ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                    m.role === "user"
+                      ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                      : ECOM_ASSISTANT_BUBBLE_CLASS,
+                  )}
+                >
+                  {m.role === "assistant" ? (
+                    <StoryboardMarkdownBlock markdown={body} />
+                  ) : (
+                    <p className="whitespace-pre-wrap">{body}</p>
+                  )}
+                  {isLastAssistant && showChoices ? (
+                    <StoryboardAssistantChoices
+                      project={effectiveProject}
+                      disabled={streaming}
+                      compact
+                      onChoose={(t) => void handleChoice(t)}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+          {streaming ? (
+            <StoryboardTaskStatus
+              active
+              title="思考中"
+              detail="助手正在流式输出策划内容，完成后将同步到中间分镜区…"
+              className="mt-3"
+            />
+          ) : null}
+        </div>
       </div>
 
-      <div className="border-t border-[var(--ecom-assistant-border)] p-4">
+      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
         <textarea
           className="mb-3 w-full resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={2}

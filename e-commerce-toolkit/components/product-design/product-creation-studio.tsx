@@ -29,8 +29,10 @@ import type {
   ProductDesignChatMessage,
   ProductDesignProject,
   ProductDesignReference,
+  ProductDesignReferenceRole,
   ProductDesignStrategyImport,
 } from "@/lib/product-design-types";
+import { getMaxRefsForRoleClient } from "@/lib/product-design-ref-rules";
 import type { DetailWorkflowPath, ProductDesignStepId } from "@/lib/product-design-workflow";
 import {
   DETAIL_INTERACTIVE_CHOICE,
@@ -398,14 +400,23 @@ export function ProductCreationStudio({ module }: StudioProps) {
 
   async function handleAttachAssets(
     assets: Array<{ id: string; ossUrl: string; title: string }>,
+    role: ProductDesignReferenceRole,
   ) {
     if (!project) return;
     setRefBusy(true);
     try {
-      const added: ProductDesignReference[] = assets.map((a, i) => ({
+      const maxCount = getMaxRefsForRoleClient(role, {
+        visionModelKey: project.settings?.visionModelKey,
+        imageModelKey: project.settings?.imageModelKey,
+      });
+      const existing = project.references.filter((r) => r.role === role);
+      const remaining = Math.max(0, maxCount - existing.length);
+      const picked = assets.slice(0, remaining);
+      if (picked.length === 0) return;
+      const added: ProductDesignReference[] = picked.map((a, i) => ({
         id: `ref-${a.id.slice(-8)}-${i}`,
         label: a.title.slice(0, 40) || "资产图",
-        role: "product",
+        role,
         ossUrl: a.ossUrl,
       }));
       await updateProductDesignProject(project.id, {

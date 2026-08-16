@@ -58,7 +58,10 @@ type Props = {
     opts: { label: string; role: ProductDesignReferenceRole },
   ) => Promise<void>;
   onRemove?: (id: string) => void | Promise<void>;
-  onAttachAssets?: (assets: Array<{ id: string; ossUrl: string; title: string }>) => Promise<void>;
+  onAttachAssets?: (
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+    role: ProductDesignReferenceRole,
+  ) => Promise<void>;
   busy?: boolean;
   uploadProgress?: number | null;
   className?: string;
@@ -132,9 +135,10 @@ export function ProductDesignRefUploader({
         <EcomAssetPickerDialog
           open={pickerOpen}
           onOpenChange={setPickerOpen}
+          maxSelect={Math.max(1, maxCount - items.length)}
           onConfirm={async (assets) => {
             setPickerOpen(false);
-            await onAttachAssets(assets);
+            await onAttachAssets(assets, role);
           }}
         />
       ) : null}

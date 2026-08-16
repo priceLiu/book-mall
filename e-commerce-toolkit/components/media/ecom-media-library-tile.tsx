@@ -184,8 +184,11 @@ export function EcomMediaLibraryTile({
           "bg-black/0 opacity-0 transition duration-150",
           "group-hover:bg-black/45 group-hover:opacity-100",
           "group-focus-within:bg-black/45 group-focus-within:opacity-100",
+          selectable && "pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto",
         )}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          if (!selectable) e.stopPropagation();
+        }}
       >
         <button
           type="button"

@@ -19,6 +19,7 @@ import {
   getHandCraftProject,
   listHandCraftProjectSummaries,
   removeHandCraftSketch,
+  attachHandCraftSketchesFromAssets,
   updateHandCraftProject,
   uploadHandCraftSketch,
 } from "@/lib/ecom-hand-craft-api";
@@ -249,6 +250,23 @@ export function HandCraftStudio() {
     }
   }
 
+  async function handleAttachSketches(assetIds: string[]) {
+    if (!project || assetIds.length === 0) return;
+    setRefBusy(true);
+    try {
+      const next = await attachHandCraftSketchesFromAssets(project.id, assetIds);
+      applyProject(next);
+    } catch (e) {
+      await alert({
+        title: "添加失败",
+        message: e instanceof Error ? e.message : "无法从资产添加线稿",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
   function projectHasGeneratedOutput(p: HandCraftProject): boolean {
     const state = p.plan?.steps ?? {};
     return Object.values(state).some(
@@ -417,6 +435,7 @@ export function HandCraftStudio() {
         imageGenConcurrencyLimit={concurrencyLimit}
         onRefUpload={handleRefUpload}
         onRefRemove={handleRefRemove}
+        onAttachSketches={handleAttachSketches}
         onGenerateSketch={handleGenerateSketch}
         refBusy={refBusy}
         sketchGenBusy={sketchGenBusy}

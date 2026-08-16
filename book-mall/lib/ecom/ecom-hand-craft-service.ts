@@ -263,6 +263,47 @@ export async function removeHandCraftReference(
   });
 }
 
+/** 从「我的资产」挂线稿参考图（不重新上传 OSS） */
+export async function attachHandCraftSketchesFromAssets(
+  userId: string,
+  projectId: string,
+  assetIds: string[],
+): Promise<EcomHandCraftProjectDto> {
+  const project = await getEcomHandCraftProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const remaining = HAND_CRAFT_SKETCH_MAX - project.references.length;
+  if (remaining <= 0) {
+    throw new Error(`最多 ${HAND_CRAFT_SKETCH_MAX} 张线稿`);
+  }
+
+  const ids = [...new Set(assetIds.filter((id) => id.trim()))].slice(0, remaining);
+  if (ids.length === 0) throw new Error("请至少选择一张资产图");
+
+  const assets = await prisma.ecomAsset.findMany({
+    where: { userId, id: { in: ids }, kind: "image" },
+    select: { id: true, title: true, ossUrl: true },
+  });
+  if (assets.length === 0) throw new Error("找不到所选资产");
+
+  const added: HandCraftReference[] = [];
+  for (const asset of assets) {
+    const url = asset.ossUrl?.trim();
+    if (!url || !/^https?:\/\//.test(url)) continue;
+    added.push({
+      id: `sketch-${asset.id.slice(-8)}-${Date.now()}${added.length}`,
+      label: (asset.title ?? "资产图").slice(0, 40),
+      role: "sketch",
+      ossUrl: url,
+    });
+  }
+  if (added.length === 0) throw new Error("所选资产不可用");
+
+  return updateEcomHandCraftProject(userId, projectId, {
+    references: [...project.references, ...added],
+  });
+}
+
 function templateSlots(step: HandCraftStepDef): HandCraftSlot[] {
   return step.slots.map((s) => ({
     index: s.index,

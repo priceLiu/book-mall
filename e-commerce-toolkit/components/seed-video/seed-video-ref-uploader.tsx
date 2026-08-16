@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
+import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type { SeedVideoReference } from "@/lib/seed-video-types";
@@ -12,6 +13,7 @@ type Props = {
   references: SeedVideoReference[];
   onUpload: (file: File) => Promise<void>;
   onRemove?: (id: string) => void | Promise<void>;
+  onAttachAssets?: (assetIds: string[]) => Promise<void>;
   busy?: boolean;
   uploadProgress?: number | null;
   className?: string;
@@ -21,11 +23,13 @@ export function SeedVideoRefUploader({
   references,
   onUpload,
   onRemove,
+  onAttachAssets,
   busy,
   uploadProgress = null,
   className,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const items = references.filter((r) => r.role === "seed-material");
   const atLimit = items.length >= MAX_MATERIALS;
   const disabled = Boolean(busy) || atLimit;
@@ -62,9 +66,24 @@ export function SeedVideoRefUploader({
         uploadProgress={uploadProgress}
         inputRef={inputRef}
         onOpenFilePicker={() => inputRef.current?.click()}
+        onOpenAssetPicker={
+          onAttachAssets && !atLimit ? () => setPickerOpen(true) : undefined
+        }
         onUploadFiles={(files) => void handleFiles(files)}
         onRemove={onRemove}
       />
+
+      {onAttachAssets ? (
+        <EcomAssetPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          maxSelect={Math.max(1, MAX_MATERIALS - items.length)}
+          onConfirm={async (assets) => {
+            setPickerOpen(false);
+            await onAttachAssets(assets.map((a) => a.id));
+          }}
+        />
+      ) : null}
     </div>
   );
 }
