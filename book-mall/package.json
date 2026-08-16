@@ -87,6 +87,7 @@
     "ecom:import-model-library": "dotenv -e .env.local -- tsx scripts/import-ecom-model-library.ts",
     "ecom:import-template-gallery": "dotenv -e .env.local -- tsx scripts/import-ecom-template-gallery.ts",
     "ecom:import-template-gallery:thumbs": "dotenv -e .env.local -- tsx scripts/import-ecom-template-gallery.ts --thumb-only",
+    "ecom:template-source-manifest": "dotenv -e .env.local -- tsx scripts/ecom-template-source-manifest.ts",
     "qr:sync-image-gallery": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-image-gallery.ts",
     "qr:sync-image-gallery:dry-run": "tsx scripts/sync-quick-replica-image-gallery.ts --dry-run",
     "qr:sync-character-gallery": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-character-gallery.ts",

@@ -14,6 +14,10 @@ import {
 } from "@/lib/canvas/canvas-oss";
 import { buildEcomGalleryThumbWebp } from "@/lib/ecom/ecom-gallery-thumb";
 import { resolveImageImportUrls } from "@/lib/ecom/ecom-yibaiaigc-image-url";
+import {
+  catalogEntryStemFromId,
+  parseSourceLookupQuery,
+} from "@/lib/ecom/ecom-template-source-stem";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { prisma } from "@/lib/prisma";
 
@@ -618,4 +622,29 @@ export async function importTemplateGalleryItem(
 
 export function assertTemplateGalleryCatalogReadable(): void {
   readTemplateGalleryCatalog();
+}
+
+export type TemplateGallerySourceLookupResult =
+  | { ok: true; stem: string; entries: EcomTemplateGalleryEntry[] }
+  | { ok: false; error: string };
+
+/** 按 yibaiaigc 源链接 / UUID / stem 反查 catalog（跨品类） */
+export async function lookupTemplateGalleryBySourceQuery(
+  query: string,
+): Promise<TemplateGallerySourceLookupResult> {
+  const stem = parseSourceLookupQuery(query);
+  if (!stem) {
+    return { ok: false, error: "无法解析源链接或 UUID，请粘贴完整 yibaiaigc URL" };
+  }
+
+  const rows = await prisma.ecomTemplateCatalogEntry.findMany({
+    where: { deletedAt: null, id: { contains: stem } },
+    orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { id: "asc" }],
+  });
+
+  const entries = rows
+    .filter((row) => catalogEntryStemFromId(row.id) === stem)
+    .map(rowToEntry);
+
+  return { ok: true, stem, entries };
 }

@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { X } from "lucide-react";
+
+import { useAdminMediaPasteTarget } from "@/components/admin/template-admin/admin-media-paste-context";
 
 export type AdminMediaAccept = "image" | "video" | "media";
 
@@ -41,6 +44,15 @@ function extractMediaFiles(
   return out;
 }
 
+function pointerLeftElement(
+  container: HTMLElement | null,
+  relatedTarget: EventTarget | null,
+): boolean {
+  if (!container) return true;
+  if (!relatedTarget || !(relatedTarget instanceof Node)) return true;
+  return !container.contains(relatedTarget);
+}
+
 function MediaPreview({
   url,
   accept,
@@ -72,6 +84,8 @@ function MediaPreview({
 
 type Props = {
   label: string;
+  /** 粘贴目标 id；同表单内须唯一。省略时本字段独立接收粘贴。 */
+  pasteFieldId?: string;
   url?: string;
   urls?: string[];
   onUrlChange?: (url: string) => void;
@@ -84,6 +98,7 @@ type Props = {
 
 export function AdminMediaField({
   label,
+  pasteFieldId: pasteFieldIdProp,
   url = "",
   urls,
   onUrlChange,
@@ -93,75 +108,111 @@ export function AdminMediaField({
   multiple = false,
   disabled = false,
 }: Props) {
+  const autoId = useId();
+  const pasteFieldId = pasteFieldIdProp ?? autoId;
   const inputRef = useRef<HTMLInputElement>(null);
   const zoneRef = useRef<HTMLDivElement>(null);
   const onFilesRef = useRef(onFiles);
   onFilesRef.current = onFiles;
+  const ctxPaste = useAdminMediaPasteTarget(pasteFieldId);
+  const [localPasteActive, setLocalPasteActive] = useState(false);
+  const isActive = pasteFieldIdProp ? ctxPaste.isActive : localPasteActive;
+  const activate = pasteFieldIdProp
+    ? ctxPaste.activate
+    : () => setLocalPasteActive(true);
   const [dragging, setDragging] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [pasteFlash, setPasteFlash] = useState(false);
 
   const previews = multiple ? (urls ?? []).filter(Boolean) : url.trim() ? [url.trim()] : [];
+  const showTargetFrame = dragging || hovering;
+  const showDropOverlay = dragging || pasteFlash;
 
   function takeFiles(files: File[]) {
     if (disabled || files.length === 0) return;
     onFilesRef.current(multiple ? files : files.slice(0, 1));
   }
 
+  function focusTarget() {
+    if (disabled) return;
+    activate();
+    setHovering(true);
+  }
+
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
-      if (disabled) return;
-      const zone = zoneRef.current;
-      if (!zone) return;
-      const active = document.activeElement;
-      const inZone =
-        hovered || focused || (active != null && zone.contains(active as Node));
-      if (!inZone) return;
+      if (disabled || !isActive) return;
       const files = extractMediaFiles(event.clipboardData, accept);
       if (!files.length) return;
       event.preventDefault();
+      setPasteFlash(true);
       takeFiles(files);
+      window.setTimeout(() => setPasteFlash(false), 600);
     };
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
-  }, [accept, disabled, focused, hovered]);
+  }, [accept, disabled, isActive]);
 
   return (
-    <div className="block text-xs sm:col-span-2">
-      <div className="mb-1 font-medium text-[#1f2328]">{label}</div>
+    <div
+      className="block text-xs sm:col-span-2"
+      onMouseEnter={() => {
+        if (disabled) return;
+        setHovering(true);
+        activate();
+      }}
+      onMouseLeave={(e) => {
+        if (pointerLeftElement(e.currentTarget, e.relatedTarget)) setHovering(false);
+      }}
+    >
+      <div className="mb-1 flex items-center gap-2 font-medium text-[#1f2328]">
+        <span>{label}</span>
+        {isActive && hovering ? (
+          <span className="rounded bg-[#ddf4ff] px-1.5 py-0.5 text-[10px] font-normal text-[#0969da]">
+            粘贴目标
+          </span>
+        ) : null}
+      </div>
       <div
         ref={zoneRef}
         tabIndex={disabled ? undefined : 0}
-        className={`relative rounded-lg border border-dashed p-2 outline-none ${
-          dragging
+        className={`relative rounded-lg border border-dashed p-2 outline-none transition-colors ${
+          showTargetFrame
             ? "border-[#0969da] bg-[#ddf4ff]"
-            : "border-[#d0d7de] bg-[#f6f8fa]"
+            : isActive
+              ? "border-[#0969da]/50 bg-[#f6f8fa]"
+              : "border-[#d0d7de] bg-[#f6f8fa]"
         } ${disabled ? "opacity-60" : "cursor-pointer"}`}
-        onFocus={() => setFocused(true)}
-        onBlur={(e) => {
-          if (!zoneRef.current?.contains(e.relatedTarget as Node)) setFocused(false);
+        onFocus={focusTarget}
+        onMouseDown={(e) => {
+          if (disabled) return;
+          if ((e.target as HTMLElement).closest("button, video, input")) return;
+          focusTarget();
         }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         onDragEnter={(e) => {
           e.preventDefault();
-          if (!disabled) setDragging(true);
+          if (!disabled) {
+            setDragging(true);
+            activate();
+          }
         }}
         onDragOver={(e) => {
           e.preventDefault();
           if (!disabled) setDragging(true);
         }}
         onDragLeave={(e) => {
-          if (!zoneRef.current?.contains(e.relatedTarget as Node)) setDragging(false);
+          if (pointerLeftElement(zoneRef.current, e.relatedTarget)) setDragging(false);
         }}
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
+          focusTarget();
           takeFiles(extractMediaFiles(e.dataTransfer, accept));
         }}
         onClick={(e) => {
           if (disabled) return;
           if ((e.target as HTMLElement).closest("button, video, input")) return;
+          focusTarget();
           inputRef.current?.click();
         }}
       >
@@ -181,13 +232,14 @@ export function AdminMediaField({
                 {onRemoveAt ? (
                   <button
                     type="button"
-                    className="absolute right-0 top-0 rounded bg-white/90 px-1 text-[10px] text-[#cf222e]"
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-[#d0d7de]/80 bg-white text-[#57606a] shadow-sm transition-colors hover:border-[#cf222e]/40 hover:bg-[#fff1f0] hover:text-[#cf222e]"
+                    aria-label="删除"
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemoveAt(index);
                     }}
                   >
-                    删
+                    <X className="h-3 w-3" strokeWidth={2.5} />
                   </button>
                 ) : null}
               </div>
@@ -206,9 +258,9 @@ export function AdminMediaField({
             </span>
           </div>
         )}
-        {dragging ? (
+        {showDropOverlay ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-[#ddf4ff]/80 text-[#0969da]">
-            松开以上传
+            {dragging ? "松开以上传" : "已粘贴"}
           </div>
         ) : null}
         <input
@@ -234,7 +286,7 @@ export function AdminMediaField({
         />
       ) : null}
       <p className="mt-1 text-[10px] text-[#656d76]">
-        支持拖入、Ctrl+V / ⌘V 粘贴
+        鼠标移入显示目标框，Ctrl+V / ⌘V 粘贴到此字段
         {previews.length > 0 && !multiple ? " · 点击空白处更换" : ""}
       </p>
     </div>

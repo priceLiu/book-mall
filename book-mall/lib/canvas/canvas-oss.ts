@@ -17,7 +17,9 @@ import {
   buildStyleLibraryOssKey,
   buildEcomModelLibraryOssKey,
   buildEcomTemplateGalleryOssKey,
+  buildEcomTemplateGallerySlotOssKey,
   buildEcomTemplateGalleryThumbOssKey,
+  type EcomTemplateGalleryUploadSlot,
   type CanvasOssKind,
 } from "./canvas-constants";
 import {
@@ -436,6 +438,77 @@ export async function uploadEcomTemplateGalleryThumb(args: {
     buf: args.buf,
     contentType: "image/webp",
   });
+}
+
+export type EcomTemplateGallerySlotUploadResult = {
+  url: string;
+  thumbUrl?: string;
+  coverUrl?: string;
+};
+
+/** 管理后台 · 按槽位上传（cover / main / ref 与 preview 分离） */
+export async function uploadEcomTemplateGallerySlot(args: {
+  category: string;
+  id: string;
+  slot: EcomTemplateGalleryUploadSlot;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+  refKey?: string;
+  /** preview / main 图片：顺带生成 thumb；preview / main 且尚无 cover 时写入 cover 槽 */
+  autoCover?: boolean;
+}): Promise<EcomTemplateGallerySlotUploadResult> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTemplateGallerySlotOssKey(
+    args.category,
+    args.id,
+    args.slot,
+    args.ext,
+    args.refKey,
+  );
+  const url = await uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+
+  const isImage = args.contentType.startsWith("image/");
+  let thumbUrl: string | undefined;
+  let coverUrl: string | undefined;
+
+  if (
+    isImage &&
+    (args.slot === "preview" || args.slot === "main")
+  ) {
+    const { buildEcomGalleryThumbWebp } = await import("@/lib/ecom/ecom-gallery-thumb");
+    const thumbBuf = await buildEcomGalleryThumbWebp(args.buf);
+    thumbUrl = await uploadEcomTemplateGalleryThumb({
+      category: args.category,
+      id: args.id,
+      buf: thumbBuf,
+    });
+  }
+
+  if (isImage && args.autoCover && args.slot !== "cover" && args.slot !== "ref") {
+    const coverKey = buildEcomTemplateGallerySlotOssKey(
+      args.category,
+      args.id,
+      "cover",
+      args.ext,
+    );
+    coverUrl = await uploadBufferToOss({
+      cfg: cfgRaw,
+      key: coverKey,
+      buf: args.buf,
+      contentType: args.contentType,
+    });
+  }
+
+  return { url, thumbUrl, coverUrl };
 }
 
 /** QuickReplica 内置模板预览图（固定 OSS key）。 */

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminMediaField } from "@/components/admin/template-admin/admin-media-field";
+import { AdminMediaPasteProvider } from "@/components/admin/template-admin/admin-media-paste-context";
 import { AdminMediaThumb } from "@/components/admin/template-admin/admin-media-thumb";
 import {
   confirmDestructiveTwice,
@@ -44,6 +45,51 @@ type ModelRow = {
 const CATEGORIES: Array<{ id: string; label: string }> = ECOM_TEMPLATE_CATEGORIES;
 const DEFAULT_CATEGORY = CATEGORIES[0]?.id ?? "womens";
 
+/** 模板区列表：「没有提示词」筛选（localStorage 持久化） */
+const NO_PROMPT_FILTER_STORAGE_KEY = "admin-ecom-templates-filter-no-prompt";
+
+function readNoPromptFilterPreference(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(NO_PROMPT_FILTER_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeNoPromptFilterPreference(on: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    if (on) localStorage.setItem(NO_PROMPT_FILTER_STORAGE_KEY, "1");
+    else localStorage.removeItem(NO_PROMPT_FILTER_STORAGE_KEY);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function templateHasPromptText(row: TemplateRow): boolean {
+  return Boolean((row.promptText ?? "").trim());
+}
+
+const CATEGORY_LABEL = new Map(CATEGORIES.map((c) => [c.id, c.label]));
+
+function categoryLabel(id: string): string {
+  return CATEGORY_LABEL.get(id) ?? id;
+}
+
+const DEFAULT_TEMPLATE_TITLE_IMAGE = "AI商品主图（服装大片）";
+const DEFAULT_TEMPLATE_TITLE_VIDEO = "AI商品视频";
+
+function defaultTemplateTitle(mediaKind: "image" | "video"): string {
+  return mediaKind === "video" ? DEFAULT_TEMPLATE_TITLE_VIDEO : DEFAULT_TEMPLATE_TITLE_IMAGE;
+}
+
+/** 标题为空时填入与 HTML 导入一致的默认文案 */
+function withAutoTemplateTitle(form: TemplateRow): TemplateRow {
+  if (form.title.trim()) return form;
+  return { ...form, title: defaultTemplateTitle(form.mediaKind) };
+}
+
 /** 走 multipart：dataURL 会把体积撑大 1/3，模板原图动辄十几 MB */
 async function uploadMedia(
   url: string,
@@ -59,6 +105,40 @@ async function uploadMedia(
   return data.url;
 }
 
+type TemplateUploadSlot = "preview" | "cover" | "main" | "ref";
+
+type TemplateUploadResult = {
+  url: string;
+  thumbUrl?: string;
+  coverUrl?: string;
+};
+
+async function uploadTemplateMedia(
+  file: File,
+  args: {
+    category: string;
+    id: string;
+    slot: TemplateUploadSlot;
+    refKey?: string;
+    autoCover?: boolean;
+  },
+): Promise<TemplateUploadResult> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("category", args.category);
+  body.append("id", args.id);
+  body.append("slot", args.slot);
+  if (args.refKey) body.append("refKey", args.refKey);
+  if (args.autoCover) body.append("autoCover", "1");
+  const res = await fetch("/api/admin/ecom/template-gallery/assets/upload", {
+    method: "POST",
+    body,
+  });
+  const data = (await res.json()) as TemplateUploadResult & { error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? "上传失败");
+  return data;
+}
+
 const EMPTY_TPL: TemplateRow = {
   id: "",
   category: DEFAULT_CATEGORY,
@@ -67,14 +147,37 @@ const EMPTY_TPL: TemplateRow = {
   hot: false,
   ossUrl: "",
   thumbUrl: "",
-  coverUrl: "",
-  mainImageUrl: "",
+  coverUrl: null,
+  mainImageUrl: null,
   referenceImages: [],
-  promptText: "",
-  negativePrompt: "",
-  defaultModelKey: "",
+  promptText: null,
+  negativePrompt: null,
+  defaultModelKey: null,
   sortOrder: 0,
 };
+
+function emptyStrToNull(value: string | null | undefined): string | null {
+  const v = (value ?? "").trim();
+  return v ? v : null;
+}
+
+/** 提交前规范化：空字符串转 null，避免 PATCH 把可选字段写成 "" */
+function normalizeTemplatePayload(form: TemplateRow): TemplateRow {
+  const withTitle = withAutoTemplateTitle(form);
+  return {
+    ...withTitle,
+    id: withTitle.id.trim(),
+    title: withTitle.title.trim(),
+    ossUrl: withTitle.ossUrl.trim(),
+    thumbUrl: (withTitle.thumbUrl ?? "").trim() || withTitle.ossUrl.trim(),
+    coverUrl: emptyStrToNull(withTitle.coverUrl),
+    mainImageUrl: emptyStrToNull(withTitle.mainImageUrl),
+    promptText: emptyStrToNull(withTitle.promptText),
+    negativePrompt: emptyStrToNull(withTitle.negativePrompt),
+    defaultModelKey: emptyStrToNull(withTitle.defaultModelKey),
+    referenceImages: (withTitle.referenceImages ?? []).filter((r) => r.url.trim()),
+  };
+}
 
 /** 视频行的 ossUrl 是 mp4，塞进 <img> 只会裂图，只认封面 / 缩略图 */
 function templateThumbSrc(row: TemplateRow): string {
@@ -129,13 +232,36 @@ function TemplatesAdmin() {
   const [rows, setRows] = useState<TemplateRow[]>([]);
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [media, setMedia] = useState<"all" | "image" | "video">("all");
+  const [noPromptOnly, setNoPromptOnly] = useState(false);
   const [q, setQ] = useState("");
+  const [sourceQ, setSourceQ] = useState("");
+  const [sourceStem, setSourceStem] = useState<string | null>(null);
+  const [sourceRows, setSourceRows] = useState<TemplateRow[] | null>(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateRow | null>(null);
+  /** 打开编辑时的原始 id，用于 PATCH 路径（与表单内可改 id 解耦） */
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const sourceSearchActive = sourceQ.trim().length > 0;
+
+  useEffect(() => {
+    setNoPromptOnly(readNoPromptFilterPreference());
+  }, []);
+
+  function toggleNoPromptOnly() {
+    setNoPromptOnly((prev) => {
+      const next = !prev;
+      writeNoPromptFilterPreference(next);
+      return next;
+    });
+  }
 
   // 只取当前分类：全量清单已数千条，后台没必要整包拉下来再前端过滤
   const load = useCallback(async () => {
@@ -173,14 +299,63 @@ function TemplatesAdmin() {
     };
   }, [load]);
 
+  useEffect(() => {
+    const raw = sourceQ.trim();
+    if (!raw) {
+      setSourceStem(null);
+      setSourceRows(null);
+      setSourceError(null);
+      setSourceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setSourceLoading(true);
+        setSourceError(null);
+        try {
+          const res = await fetch(
+            `/api/admin/ecom/template-gallery/templates/lookup?q=${encodeURIComponent(raw)}`,
+            { cache: "no-store" },
+          );
+          const data = (await res.json()) as {
+            stem?: string;
+            templates?: TemplateRow[];
+            error?: string;
+          };
+          if (!res.ok) throw new Error(data.error ?? "查询失败");
+          if (cancelled) return;
+          setSourceStem(typeof data.stem === "string" ? data.stem : null);
+          setSourceRows(Array.isArray(data.templates) ? data.templates : []);
+        } catch (e) {
+          if (cancelled) return;
+          setSourceStem(null);
+          setSourceRows([]);
+          setSourceError(e instanceof Error ? e.message : "查询失败");
+        } finally {
+          if (!cancelled) setSourceLoading(false);
+        }
+      })();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [sourceQ]);
+
+  const listRows = sourceSearchActive ? (sourceRows ?? []) : rows;
+
   const filtered = useMemo(
     () =>
-      rows.filter((r) => {
+      listRows.filter((r) => {
         if (media !== "all" && r.mediaKind !== media) return false;
+        if (noPromptOnly && templateHasPromptText(r)) return false;
         if (q && !`${r.title} ${r.id}`.includes(q)) return false;
         return true;
       }),
-    [rows, media, q],
+    [listRows, media, noPromptOnly, q],
   );
 
   async function uploadField(file: File, field: "ossUrl" | "coverUrl" | "mainImageUrl" | "ref") {
@@ -188,23 +363,50 @@ function TemplatesAdmin() {
     setUploading(true);
     try {
       const id = form.id.trim() || `tpl-${Date.now()}`;
-      const uploaded = await uploadMedia(
-        "/api/admin/ecom/template-gallery/assets/upload",
-        file,
-        { category: form.category, id },
-      );
+      const slot: TemplateUploadSlot =
+        field === "ossUrl"
+          ? "preview"
+          : field === "coverUrl"
+            ? "cover"
+            : field === "mainImageUrl"
+              ? "main"
+              : "ref";
+      const refKey =
+        field === "ref" ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : undefined;
+      const shouldAutoCover =
+        (field === "ossUrl" || field === "mainImageUrl") &&
+        file.type.startsWith("image/") &&
+        !(form.coverUrl ?? "").trim();
+
+      const uploaded = await uploadTemplateMedia(file, {
+        category: form.category,
+        id,
+        slot,
+        refKey,
+        autoCover: shouldAutoCover,
+      });
+
       setForm((prev) => {
         if (!prev) return prev;
+        const withId = { ...prev, id: prev.id || id };
+        let next: TemplateRow;
         if (field === "ref") {
-          return {
-            ...prev,
-            id: prev.id || id,
-            referenceImages: [...(prev.referenceImages ?? []), { url: uploaded }],
+          next = {
+            ...withId,
+            referenceImages: [...(withId.referenceImages ?? []), { url: uploaded.url }],
           };
+        } else {
+          next = { ...withId, [field]: uploaded.url };
+          if (field === "ossUrl" && uploaded.thumbUrl) {
+            next.thumbUrl = uploaded.thumbUrl;
+          } else if (field === "ossUrl" && !prev.thumbUrl) {
+            next.thumbUrl = uploaded.url;
+          }
+          if (uploaded.coverUrl && !(prev.coverUrl ?? "").trim()) {
+            next.coverUrl = uploaded.coverUrl;
+          }
         }
-        const next = { ...prev, id: prev.id || id, [field]: uploaded };
-        if (field === "ossUrl" && !prev.thumbUrl) next.thumbUrl = uploaded;
-        return next;
+        return withAutoTemplateTitle(next);
       });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "上传失败");
@@ -215,27 +417,77 @@ function TemplatesAdmin() {
 
   async function save() {
     if (!form) return;
+    setFormNotice(null);
+
+    const payload = normalizeTemplatePayload(form);
+    if (!payload.id) {
+      setFormNotice("请填写 ID");
+      return;
+    }
+    if (!payload.title) {
+      setFormNotice("请填写标题");
+      return;
+    }
+    if (!payload.ossUrl) {
+      setFormNotice("请上传主图 / 视频（ossUrl 必填）");
+      return;
+    }
+
     setSaving(true);
     try {
-      const isNew = !rows.some((r) => r.id === form.id);
+      const isNew = editingEntryId === null;
       const url = isNew
         ? "/api/admin/ecom/template-gallery/templates"
-        : `/api/admin/ecom/template-gallery/templates/${encodeURIComponent(form.id)}`;
+        : `/api/admin/ecom/template-gallery/templates/${encodeURIComponent(editingEntryId)}`;
       const res = await fetch(url, {
         method: isNew ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "保存失败");
+      const text = await res.text();
+      let data: { error?: string } = {};
+      if (text.trim()) {
+        try {
+          data = JSON.parse(text) as { error?: string };
+        } catch {
+          throw new Error("接口返回无效 JSON");
+        }
+      }
+      if (!res.ok) throw new Error(data.error ?? `保存失败（HTTP ${res.status}）`);
       setForm(null);
+      setEditingEntryId(null);
+      setFormNotice(null);
       await load();
       setMessage("已保存");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "保存失败");
+      setFormNotice(e instanceof Error ? e.message : "保存失败");
     } finally {
       setSaving(false);
     }
+  }
+
+  function openNewForm() {
+    setEditingEntryId(null);
+    setFormNotice(null);
+    setForm(
+      withAutoTemplateTitle({ ...EMPTY_TPL, category, id: `${category}-${Date.now()}` }),
+    );
+  }
+
+  function openEditForm(row: TemplateRow) {
+    setEditingEntryId(row.id);
+    setFormNotice(null);
+    setForm(
+      withAutoTemplateTitle({
+        ...row,
+        coverUrl: row.coverUrl ?? null,
+        mainImageUrl: row.mainImageUrl ?? null,
+        promptText: row.promptText ?? null,
+        negativePrompt: row.negativePrompt ?? null,
+        defaultModelKey: row.defaultModelKey ?? null,
+        referenceImages: row.referenceImages ?? [],
+      }),
+    );
   }
 
   async function remove(row: TemplateRow) {
@@ -285,48 +537,118 @@ function TemplatesAdmin() {
             {m === "all" ? "全部" : m === "image" ? "图片" : "视频"}
           </button>
         ))}
+        <button
+          type="button"
+          className={`rounded-md px-2 py-0.5 text-[11px] ${
+            noPromptOnly ? "bg-[#8250df] text-white" : "border border-[#d0d7de]"
+          }`}
+          onClick={toggleNoPromptOnly}
+          title="筛选 promptText 为空的条目；状态会记住，直到再次点击取消"
+        >
+          没有提示词
+        </button>
         <input
           className="rounded border border-[#d0d7de] px-2 py-1 text-xs"
           placeholder="搜索标题 / id"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <input
+          className="min-w-[min(100%,28rem)] flex-1 rounded border border-[#0969da]/40 bg-[#f6f8fa] px-2 py-1 text-xs"
+          placeholder="源链接 / UUID（yibaiaigc，跨品类反查）"
+          value={sourceQ}
+          onChange={(e) => setSourceQ(e.target.value)}
+        />
+        {sourceSearchActive ? (
+          <button
+            type="button"
+            className="rounded border border-[#d0d7de] px-2 py-1 text-xs text-[#656d76]"
+            onClick={() => setSourceQ("")}
+          >
+            清除源链接
+          </button>
+        ) : null}
         <button
           type="button"
           className="rounded-md bg-[#0969da] px-3 py-1 text-xs text-white"
-          onClick={() => setForm({ ...EMPTY_TPL, category, id: `${category}-${Date.now()}` })}
+          onClick={openNewForm}
         >
           新建
         </button>
         <span className="text-xs text-muted-foreground">
-          {loading ? "加载中…" : `${filtered.length} 条`}
-          {error ? ` · ${error}` : ""}
+          {sourceSearchActive
+            ? sourceLoading
+              ? "源链接查询中…"
+              : sourceError
+                ? `源链接 · ${sourceError}`
+                : sourceStem
+                  ? `源 stem ${sourceStem} · ${filtered.length} 条${filtered.length === 0 ? "（未入库）" : ""}`
+                  : `${filtered.length} 条`
+            : loading
+              ? "加载中…"
+              : `${filtered.length} 条`}
+          {!sourceSearchActive && error ? ` · ${error}` : ""}
           {message ? ` · ${message}` : ""}
         </span>
       </div>
+      {sourceSearchActive && !sourceLoading && !sourceError && sourceStem ? (
+        <p className="text-[11px] text-[#656d76]">
+          按源图文件名前 12 字符 <span className="font-mono">{sourceStem}</span>{" "}
+          匹配 catalog id 末尾；结果含全部品类。未入库表示 tmp/HTML 有图但尚未导入，或品类不对。
+        </p>
+      ) : null}
       <div className="overflow-x-auto rounded-lg border border-[#d0d7de] bg-white">
         <table className="min-w-full text-left text-xs">
           <thead className="bg-[#f6f8fa] text-[#656d76]">
             <tr>
               <th className="px-3 py-2">封面</th>
+              {sourceSearchActive ? <th className="px-3 py-2">品类</th> : null}
               <th className="px-3 py-2">标题</th>
               <th className="px-3 py-2">id</th>
               <th className="px-3 py-2">操作</th>
             </tr>
           </thead>
           <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={sourceSearchActive ? 5 : 4}
+                  className="px-3 py-6 text-center text-[#656d76]"
+                >
+                  {sourceSearchActive && !sourceLoading
+                    ? "无匹配条目"
+                    : loading
+                      ? "加载中…"
+                      : "暂无数据"}
+                </td>
+              </tr>
+            ) : null}
             {filtered.map((row) => (
               <tr key={row.id} className="border-t border-[#d0d7de]">
                 <td className="px-3 py-2">
                   <AdminMediaThumb src={templateThumbSrc(row)} title={row.title} />
                 </td>
+                {sourceSearchActive ? (
+                  <td className="px-3 py-2">
+                    <span className="whitespace-nowrap">{categoryLabel(row.category)}</span>
+                    {row.category !== category ? (
+                      <button
+                        type="button"
+                        className="ml-1 text-[#0969da]"
+                        onClick={() => setCategory(row.category)}
+                      >
+                        切换
+                      </button>
+                    ) : null}
+                  </td>
+                ) : null}
                 <td className="px-3 py-2">
                   {row.title}
                   {row.hot ? <span className="ml-1 text-[#cf222e]">爆</span> : null}
                 </td>
                 <td className="px-3 py-2 font-mono">{row.id}</td>
                 <td className="space-x-2 px-3 py-2">
-                  <button type="button" className="text-[#0969da]" onClick={() => setForm(row)}>
+                  <button type="button" className="text-[#0969da]" onClick={() => openEditForm(row)}>
                     编辑
                   </button>
                   <button type="button" className="text-[#cf222e]" onClick={() => void remove(row)}>
@@ -340,6 +662,7 @@ function TemplatesAdmin() {
       </div>
 
       {form ? (
+        <AdminMediaPasteProvider>
         <div className="fixed inset-0 z-50 flex flex-col bg-white">
           <div className="flex shrink-0 items-center justify-between border-b border-[#d0d7de] px-5 py-3">
             <h3 className="text-sm font-semibold">
@@ -351,7 +674,11 @@ function TemplatesAdmin() {
             <button
               type="button"
               className="rounded border border-[#d0d7de] px-2 py-1 text-xs"
-              onClick={() => setForm(null)}
+              onClick={() => {
+                setForm(null);
+                setEditingEntryId(null);
+                setFormNotice(null);
+              }}
             >
               关闭
             </button>
@@ -385,9 +712,19 @@ function TemplatesAdmin() {
                 <select
                   className="mt-1 w-full rounded border px-2 py-1"
                   value={form.mediaKind}
-                  onChange={(e) =>
-                    setForm({ ...form, mediaKind: e.target.value as "image" | "video" })
-                  }
+                  onChange={(e) => {
+                    const mediaKind = e.target.value as "image" | "video";
+                    const prevDefault = defaultTemplateTitle(form.mediaKind);
+                    const title = form.title.trim();
+                    setForm({
+                      ...form,
+                      mediaKind,
+                      title:
+                        !title || title === prevDefault
+                          ? defaultTemplateTitle(mediaKind)
+                          : form.title,
+                    });
+                  }}
                 >
                   <option value="image">图片</option>
                   <option value="video">视频</option>
@@ -398,10 +735,12 @@ function TemplatesAdmin() {
                 <input
                   className="mt-1 w-full rounded border px-2 py-1"
                   value={form.title}
+                  placeholder={defaultTemplateTitle(form.mediaKind)}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                 />
               </label>
               <AdminMediaField
+                pasteFieldId="tpl-oss"
                 label="主图 / 视频"
                 url={form.ossUrl}
                 accept="media"
@@ -413,6 +752,7 @@ function TemplatesAdmin() {
                 }}
               />
               <AdminMediaField
+                pasteFieldId="tpl-cover"
                 label="封面"
                 url={form.coverUrl ?? ""}
                 accept="image"
@@ -424,6 +764,7 @@ function TemplatesAdmin() {
                 }}
               />
               <AdminMediaField
+                pasteFieldId="tpl-main"
                 label="主图（同款）"
                 url={form.mainImageUrl ?? ""}
                 accept="image"
@@ -436,6 +777,7 @@ function TemplatesAdmin() {
               />
               <div className="sm:col-span-2">
                 <AdminMediaField
+                  pasteFieldId="tpl-ref"
                   label="参考图"
                   urls={(form.referenceImages ?? []).map((img) => img.url)}
                   accept="image"
@@ -519,11 +861,17 @@ function TemplatesAdmin() {
           <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[#d0d7de] px-5 py-3">
             {uploading ? (
               <span className="mr-auto text-xs text-[#656d76]">上传中…</span>
+            ) : formNotice ? (
+              <span className="mr-auto text-xs text-[#cf222e]">{formNotice}</span>
             ) : null}
             <button
               type="button"
               className="rounded border border-[#d0d7de] px-3 py-1 text-xs"
-              onClick={() => setForm(null)}
+              onClick={() => {
+                setForm(null);
+                setEditingEntryId(null);
+                setFormNotice(null);
+              }}
             >
               取消
             </button>
@@ -537,6 +885,7 @@ function TemplatesAdmin() {
             </button>
           </div>
         </div>
+        </AdminMediaPasteProvider>
       ) : null}
     </div>
   );

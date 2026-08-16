@@ -171,6 +171,33 @@ export function buildEcomTemplateGalleryThumbOssKey(
   return `ecom/template-gallery/${safeCat}/${safeId}-thumb.webp`;
 }
 
+export type EcomTemplateGalleryUploadSlot =
+  | "preview"
+  | "cover"
+  | "main"
+  | "ref";
+
+/** 管理后台分槽上传：preview=主媒体，cover/main/ref 互不覆盖 */
+export function buildEcomTemplateGallerySlotOssKey(
+  category: string,
+  id: string,
+  slot: EcomTemplateGalleryUploadSlot,
+  ext: string,
+  refKey?: string,
+): string {
+  if (slot === "preview") {
+    return buildEcomTemplateGalleryOssKey(category, id, ext);
+  }
+  const safeCat = category.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  if (slot === "ref") {
+    const rk = (refKey ?? "0").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 24);
+    return `ecom/template-gallery/${safeCat}/${safeId}-ref-${rk}.${safeExt}`;
+  }
+  return `ecom/template-gallery/${safeCat}/${safeId}-${slot}.${safeExt}`;
+}
+
 /** QuickReplica 内置模板预览图（固定 key） */
 export function buildQuickReplicaBuiltinOssKey(id: string, ext: string): string {
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");

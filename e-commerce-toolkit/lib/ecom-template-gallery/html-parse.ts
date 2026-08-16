@@ -88,6 +88,12 @@ export function fileStemFromUrl(url: string): string {
   return file.replace(/\.[^.]+$/, "").slice(0, 12);
 }
 
+/** catalog id 末尾 stem（支持 home-textile 等多段品类 id） */
+export function catalogEntryStemFromId(id: string): string | null {
+  const m = id.match(/^(.+)-(\d{3})-(.+)$/);
+  return m?.[3] ?? null;
+}
+
 /** 按源图文件名 stem 索引已有 catalog 条目（同品类） */
 export function buildExistingStemIndex(
   templates: readonly EcomTemplateEntryRef[],
@@ -96,7 +102,7 @@ export function buildExistingStemIndex(
   const map = new Map<string, EcomTemplateEntryRef>();
   for (const entry of templates) {
     if (entry.category !== category) continue;
-    const stem = entry.id.split("-").slice(2).join("-");
+    const stem = catalogEntryStemFromId(entry.id);
     if (stem) map.set(stem, entry);
   }
   return map;

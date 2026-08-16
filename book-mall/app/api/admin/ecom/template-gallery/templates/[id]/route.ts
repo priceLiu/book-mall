@@ -48,14 +48,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     hot: typeof body.hot === "boolean" ? body.hot : existing.hot,
     ossUrl: typeof body.ossUrl === "string" ? body.ossUrl : existing.ossUrl,
     thumbUrl: typeof body.thumbUrl === "string" ? body.thumbUrl : existing.thumbUrl,
-    coverUrl: typeof body.coverUrl === "string" ? body.coverUrl : existing.coverUrl,
-    mainImageUrl: typeof body.mainImageUrl === "string" ? body.mainImageUrl : existing.mainImageUrl,
+    coverUrl: typeof body.coverUrl === "string" ? body.coverUrl.trim() || null : existing.coverUrl,
+    mainImageUrl:
+      typeof body.mainImageUrl === "string" ? body.mainImageUrl.trim() || null : existing.mainImageUrl,
     referenceImages: refs,
-    promptText: typeof body.promptText === "string" ? body.promptText : existing.promptText,
+    promptText: typeof body.promptText === "string" ? body.promptText.trim() || null : existing.promptText,
     negativePrompt:
-      typeof body.negativePrompt === "string" ? body.negativePrompt : existing.negativePrompt,
+      typeof body.negativePrompt === "string" ? body.negativePrompt.trim() || null : existing.negativePrompt,
     defaultModelKey:
-      typeof body.defaultModelKey === "string" ? body.defaultModelKey : existing.defaultModelKey,
+      typeof body.defaultModelKey === "string" ? body.defaultModelKey.trim() || null : existing.defaultModelKey,
     defaultParams:
       body.defaultParams && typeof body.defaultParams === "object"
         ? (body.defaultParams as Record<string, unknown>)
