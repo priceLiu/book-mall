@@ -41,13 +41,29 @@ async function sendViaTencent(input: {
     profile: { httpProfile: { endpoint: "sms.tencentcloudapi.com" } },
   });
 
-  await client.SendSms({
+  const resp = await client.SendSms({
     PhoneNumberSet: [toE164Cn(input.phone)],
     SmsSdkAppId: cfg.sdkAppId,
     SignName: cfg.signName,
     TemplateId: input.templateId,
     TemplateParamSet: input.params,
   });
+
+  const status = resp.SendStatusSet?.[0];
+  if (!status || status.Code !== "Ok") {
+    const msg = status ? `${status.Code}: ${status.Message}` : "无响应";
+    console.error("[sms:tencent] 发送失败", {
+      phone: input.phone,
+      templateId: input.templateId,
+      signName: cfg.signName,
+      sdkAppId: cfg.sdkAppId,
+      code: status?.Code,
+      message: status?.Message,
+    });
+    throw new Error(`短信发送失败: ${msg}`);
+  }
+
+  console.info(`[sms:tencent] 发送成功 → ${input.phone} template=${input.templateId}`);
 }
 
 export async function sendSmsMessage(input: {

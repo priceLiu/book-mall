@@ -1,17 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
+import type { PaymentChannel } from "@prisma/client";
 
 import { authOptions } from "@/lib/auth";
 import { createPaymentCheckout } from "@/lib/payments/create-checkout";
-import {
-  canUseAdminInstantCheckout,
-  requirePaymentAdminSession,
-} from "@/lib/payments/session-auth";
+import { canUseAdminInstantCheckout } from "@/lib/payments/session-auth";
 import {
   getWechatPayeeName,
   getWechatPersonalQrUrl,
 } from "@/lib/payments/wechat-personal-config";
+import { isWechatPayConfigured } from "@/lib/payments/wechat-pay-config";
 import { productKindLabel } from "@/lib/payments/product-labels";
 
 export const dynamic = "force-dynamic";
@@ -65,12 +64,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const channel: PaymentChannel = isWechatPayConfigured()
+      ? "WECHAT_ENTERPRISE"
+      : "WECHAT_PERSONAL";
+
     const checkout = await createPaymentCheckout({
       userId: session.user.id,
       payload: parsed.data,
+      channel,
     });
     const snap = checkout.productSnapshot as Record<string, unknown>;
     const adminInstant = canUseAdminInstantCheckout(session.user.role);
+    const isEnterprise = checkout.channel === "WECHAT_ENTERPRISE";
 
     return NextResponse.json({
       checkout: {
@@ -84,8 +89,9 @@ export async function POST(request: NextRequest) {
         productLabel: productKindLabel(checkout.productKind, snap),
       },
       wechat: {
-        qrUrl: adminInstant ? null : getWechatPersonalQrUrl(),
-        payeeName: getWechatPayeeName(),
+        channel: checkout.channel,
+        qrUrl: isEnterprise || adminInstant ? null : getWechatPersonalQrUrl(),
+        payeeName: isEnterprise ? "" : getWechatPayeeName(),
       },
       adminInstant,
     });

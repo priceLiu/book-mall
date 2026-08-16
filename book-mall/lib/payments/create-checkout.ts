@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { PaymentProductKind } from "@prisma/client";
+import type { PaymentProductKind, PaymentChannel } from "@prisma/client";
 
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { packById } from "@/lib/billing/credit-topup-packs";
@@ -57,8 +57,10 @@ export async function createPaymentCheckout(input: {
   payload: CreateCheckoutInput;
   adminNote?: string | null;
   createdByAdminId?: string | null;
+  channel?: PaymentChannel;
 }) {
   const { userId, payload } = input;
+  const channel = input.channel ?? "WECHAT_PERSONAL";
   let productKind: PaymentProductKind = payload.productKind;
   let amountYuan = 0;
   let productSnapshot: Record<string, unknown> = {};
@@ -180,8 +182,16 @@ export async function createPaymentCheckout(input: {
             : productKind.startsWith("MEMBERSHIP_")
               ? snap?.planId === productSnapshot.planId
               : false;
-      if (sameProduct) {
+      // 同商品且同金额才复用，金额变化（如调价）则取消旧单建新单
+      if (sameProduct && Number(existingPending.amountYuan) === amountYuan) {
         return existingPending;
+      }
+      // 同商品但金额不同，取消旧订单
+      if (sameProduct) {
+        await tx.paymentCheckout.update({
+          where: { id: existingPending.id },
+          data: { status: "CANCELLED" },
+        });
       }
     }
 
@@ -195,6 +205,7 @@ export async function createPaymentCheckout(input: {
         amountYuan,
         expiresAt,
         adminNote: input.adminNote?.trim() || null,
+        channel,
         status: "PENDING",
       },
     });
