@@ -1,11 +1,14 @@
 import {
+  buildSeedVideoStyleChoiceJsonExample,
   loadSeedVideoSkillMd,
   resolveSeedVideoSkillKey,
   type SeedVideoSkillKey,
 } from "@/lib/ecom/ecom-seed-video-skills";
 
-/** 嵌入 system prompt 的 JSON 契约全文（与 table-format.md 一致） */
-const SEED_VIDEO_JSON_CONTRACT = `
+/** 嵌入 system prompt 的 JSON 契约（与 table-format.md 一致；Step4 style 示例按 Skill 注入） */
+function buildSeedVideoJsonContract(skillKey: SeedVideoSkillKey): string {
+  const styleExample = buildSeedVideoStyleChoiceJsonExample(skillKey);
+  return `
 ## 【强制】机器可读交付 · \`\`\`seed-video JSON
 
 **系统只解析 JSON，不解析 Markdown 表格结构。** 每条回复必须：
@@ -116,17 +119,10 @@ Markdown 须对齐：素材解析表 + \`## 脚本一：{title}\` 等三标题 +
 }
 \`\`\`
 
-### Step4 style 示例（仅方案②）
+### Step4 style 示例（仅方案② · 当前 Skill）
 
 \`\`\`seed-video
-{
-  "step": "style",
-  "action": "await_style_choice",
-  "styleOptions": [
-    { "id": "sweet-xhs", "label": "A方案：甜美种草风（小红书）", "voiceLabel": "湾湾小何", "bgmLabel": "轻快甜美轻音乐", "copyTone": "姐妹分享感" },
-    { "id": "sharp-douyin", "label": "B方案：干练安利风（抖音带货）", "voiceLabel": "爽快思思", "bgmLabel": "节奏感卡点 BGM", "copyTone": "短促有力带货" }
-  ]
-}
+${styleExample}
 \`\`\`
 
 ### 方案① directPlan 示例
@@ -183,6 +179,7 @@ Markdown 须对齐：素材解析表 + \`## 脚本一：{title}\` 等三标题 +
 }
 \`\`\`
 `.trim();
+}
 
 export function buildSeedVideoSystemPrompt(opts: {
   skillKey?: SeedVideoSkillKey | string;
@@ -217,5 +214,5 @@ ${workflowBlock}
 - 用户点选「确认逐镜参数表，同步到中间工作区」后由系统本地同步；禁止再输出「同步成功」等二次确认。
 - 「导出提示词包 / 结束创作」等**仅**在成片渲染完成后出现。
 
-${SEED_VIDEO_JSON_CONTRACT}`;
+${buildSeedVideoJsonContract(skillKey)}`;
 }

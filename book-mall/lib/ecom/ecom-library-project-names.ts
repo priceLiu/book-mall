@@ -1,3 +1,4 @@
+import type { MediaDecomposeDeliverableSnapshot } from "@/lib/ecom/ecom-media-decompose-snapshot";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
 import type { ProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
@@ -13,6 +14,7 @@ export function buildProjectNameLookup(
   storyboardRows: Array<{ id: string; meta: unknown }>,
   seedVideoRows: Array<{ id: string; meta: unknown; title: string | null }> = [],
   handCraftRows: Array<{ id: string; meta: unknown; title: string | null }> = [],
+  mediaDecomposeRows: Array<{ id: string; meta: unknown; title: string | null }> = [],
 ): Map<string, string> {
   const map = new Map<string, string>();
   for (const row of productDesignRows) {
@@ -47,6 +49,13 @@ export function buildProjectNameLookup(
     const snap = meta?.workflowSnapshot as HandCraftWorkflowSnapshot | undefined;
     if (snap?.ipName?.trim()) map.set(row.id, snap.ipName.trim());
     else if (snap?.title?.trim()) map.set(row.id, snap.title.trim());
+  }
+  for (const row of mediaDecomposeRows) {
+    const fromTitle = row.title?.trim();
+    if (fromTitle) map.set(row.id, fromTitle);
+    const meta = row.meta as Record<string, unknown> | null;
+    const snap = meta?.deliverableSnapshot as MediaDecomposeDeliverableSnapshot | undefined;
+    if (snap?.title?.trim()) map.set(row.id, snap.title.trim());
   }
   return map;
 }

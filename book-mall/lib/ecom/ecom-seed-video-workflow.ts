@@ -1,5 +1,11 @@
 import { parseMentionedImageIndices } from "@/lib/ecom/ecom-seed-video-mention";
-import { listSeedVideoSkillDefinitions } from "@/lib/ecom/ecom-seed-video-skills";
+import {
+  allSeedVideoStyleChoiceLabels,
+  formatSeedVideoSelectedScriptLabel,
+  listSeedVideoSkillDefinitions,
+  resolveSeedVideoSkillKey,
+  type SeedVideoSkillKey,
+} from "@/lib/ecom/ecom-seed-video-skills";
 import { hasStructuredDirectPlan, hasStructuredFormalShots } from "@/lib/ecom/ecom-seed-video-structured";
 
 export const ECOM_SEED_VIDEO_SCRIPT_CHOICES = [
@@ -16,6 +22,7 @@ export const ECOM_SEED_VIDEO_MODE_CHOICES = [
 export const ECOM_SEED_VIDEO_STYLE_CHOICES = [
   "A方案：甜美种草风（小红书）",
   "B方案：干练安利风（抖音带货）",
+  ...allSeedVideoStyleChoiceLabels(),
 ] as const;
 
 const ALL_CHOICE_TEXTS = new Set<string>([
@@ -305,7 +312,9 @@ export function buildSeedVideoWorkflowContext(opts: {
       stylePreset?: string;
     };
   } | null;
+  skillKey?: SeedVideoSkillKey | string;
 }): string {
+  const skillKey = resolveSeedVideoSkillKey(opts.skillKey);
   const workflow = opts.meta?.workflow ?? {};
   let scriptDone = Boolean(workflow.selectedScriptId);
   let modeDone = Boolean(workflow.productionMode);
@@ -340,9 +349,17 @@ export function buildSeedVideoWorkflowContext(opts: {
       "下一步：Markdown 结尾「请选择视频制作模式：」+ ```seed-video JSON（step=mode, action=await_mode_choice, modeOptions 恰好 2 项：direct/fine）**；禁止再次输出脚本。",
     );
   } else if (workflow.productionMode === "fine" && !styleDone) {
-    const scriptLabel = formatSelectedScriptLabel(workflow.selectedScriptId as string | undefined);
+    const scriptLabel = formatSeedVideoSelectedScriptLabel(
+      workflow.selectedScriptId as string | undefined,
+      skillKey,
+    );
+    const stylePresets = listSeedVideoSkillDefinitions().find((s) => s.key === skillKey)
+      ?.styleChoicePresets;
+    const styleHint = stylePresets
+      ? `styleOptions label 须为本 Skill：A「${stylePresets[0].label}」、B「${stylePresets[1].label}」（id 仍为 sweet-xhs / sharp-douyin）`
+      : "styleOptions 恰好 2 项";
     lines.push(
-      `下一步（Step4）：资深广告导演口吻 + A/B 成片风格；Markdown 结尾「请选择成片风格：」+ \`\`\`seed-video JSON（step=style, action=await_style_choice, styleOptions 恰好 2 项）**；基于${scriptLabel}；禁止跳步。`,
+      `下一步（Step4）：资深广告导演口吻 + A/B 成片风格；Markdown 结尾「请选择成片风格：」+ \`\`\`seed-video JSON（step=style, action=await_style_choice, ${styleHint}）**；基于${scriptLabel}；禁止跳步。`,
     );
   } else if (workflow.productionMode === "direct") {
     lines.push(
@@ -369,11 +386,9 @@ export function buildSeedVideoWorkflowContext(opts: {
   return lines.join("\n");
 }
 
+/** @deprecated 内部已由 formatSeedVideoSelectedScriptLabel 替代 */
 function formatSelectedScriptLabel(scriptId: string | undefined): string {
-  if (scriptId === "script-1") return "脚本一「氛围感切入 — 不费力的高级」";
-  if (scriptId === "script-2") return "脚本二「痛点切入 — 梨形身材天菜」";
-  if (scriptId === "script-3") return "脚本三「场景切入 — 度假出片指南」";
-  return "已选脚本";
+  return formatSeedVideoSelectedScriptLabel(scriptId, "seed-grass");
 }
 
 export function mergeSeedVideoWorkflowFromUserChoice(

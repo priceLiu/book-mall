@@ -1,8 +1,12 @@
 import type { SeedVideoChatMessage, SeedVideoProject, SeedVideoProductionMode, SeedVideoWorkflowPhase, SeedVideoChoiceSnapshot, SeedVideoDirectPlan } from "@/lib/seed-video-types";
 import {
+  allSeedVideoStyleChoiceLabels,
+  buildSeedVideoStyleAssistantChoices,
+  formatSeedVideoSelectedScriptLabel,
   getSeedVideoSkillDefinition,
   listSeedVideoSkillDefinitions,
   resolveSeedVideoSkillKey,
+  type SeedVideoSkillKey,
 } from "@/lib/seed-video-skills";
 import {
   extractSeedVideoStructuredPatch,
@@ -27,6 +31,7 @@ export const MODE_CHOICES = [
   "方案②：按精细成片流程制作",
 ] as const;
 
+/** @deprecated 仅作 seed-grass 默认兜底；请用 buildStyleChoicesForProject */
 export const STYLE_CHOICES = [
   "A方案：甜美种草风（小红书）",
   "B方案：干练安利风（抖音带货）",
@@ -283,16 +288,9 @@ const MODE_CHOICE_META = [
   },
 ] as const;
 
-const STYLE_CHOICE_META = [
-  {
-    title: "A方案：甜美种草风（小红书）",
-    description: "湾湾小何音色，轻快甜美 BGM，姐妹分享感",
-  },
-  {
-    title: "B方案：干练安利风（抖音带货）",
-    description: "爽快思思音色，节奏感卡点 BGM，短促有力",
-  },
-] as const;
+function allSkillStyleChoiceLabels(): string[] {
+  return allSeedVideoStyleChoiceLabels();
+}
 
 const GENERATE_ALL_CHOICE: SeedVideoAssistantChoice = {
   id: "generate-all",
@@ -310,7 +308,7 @@ function allSkillScriptChoiceLabels(): string[] {
 const ALL_FIXED_CHOICES = [
   ...allSkillScriptChoiceLabels(),
   ...MODE_CHOICES,
-  ...STYLE_CHOICES,
+  ...allSkillStyleChoiceLabels(),
   "A方案：甜美种草带货风（小红书向）",
   "B方案：强转化干练带货风（抖音短视频带货向）",
 ] as const;
@@ -352,12 +350,13 @@ function isModeSelectionMessage(content: string): boolean {
 
 export function isStyleSelectionMessage(content: string): boolean {
   const t = content.trim();
+  if (allSkillStyleChoiceLabels().includes(t)) return true;
   if ((STYLE_CHOICES as readonly string[]).includes(t)) return true;
   if (/^我选择成片风格[①②③123]/.test(t)) return true;
   if (/^选成片风格[①②③123]/.test(t)) return true;
   if (/^A方案：/.test(t)) return true;
   if (/^B方案：/.test(t)) return true;
-  if (/^选[①②③123]$/.test(t) && /成片风格|复古胶片|柔光梦幻|极简杂志|甜美种草|干练安利/.test(t)) {
+  if (/^选[①②③123]$/.test(t) && /成片风格|复古胶片|柔光梦幻|极简杂志|甜美种草|干练安利|治愈风|带货风|测评/.test(t)) {
     return true;
   }
   return false;
@@ -531,18 +530,14 @@ function parseTableCircledChoices(
   return parsed.length >= 2 ? parsed : [];
 }
 
-function buildDefaultStyleChoices(): SeedVideoAssistantChoice[] {
-  return STYLE_CHOICES.map((choice, index) => {
-    const meta = STYLE_CHOICE_META[index]!;
-    return {
-      id: `style-${index + 1}`,
-      label: choice,
-      title: meta.title,
-      description: meta.description,
-      kind: "style" as const,
-      message: choice,
-    };
-  });
+function buildStyleChoicesForProject(project: SeedVideoProject): SeedVideoAssistantChoice[] {
+  const skillKey = resolveSeedVideoSkillKey(project.settings.skillKey);
+  return buildSeedVideoStyleAssistantChoices(skillKey);
+}
+
+function buildDefaultStyleChoices(project?: SeedVideoProject): SeedVideoAssistantChoice[] {
+  if (project) return buildStyleChoicesForProject(project);
+  return buildSeedVideoStyleAssistantChoices("seed-grass");
 }
 
 const SCRIPT_NUM_LABELS = ["一", "二", "三"] as const;
@@ -967,7 +962,7 @@ export function inferAssistantChoices(project: SeedVideoProject): SeedVideoAssis
     const text = lastAssistant(project) ?? "";
     const parsed = parseTableCircledChoices(text, "style");
     if (parsed.length >= 2) return parsed;
-    return buildDefaultStyleChoices();
+    return buildDefaultStyleChoices(project);
   }
 
   // Step4+：须完成前置门禁
@@ -1301,11 +1296,14 @@ export function resolveSeedVideoVideoModelKey(
   return filtered[0]!.modelKey;
 }
 
-function formatSelectedScriptLabel(scriptId: string | undefined): string {
-  if (scriptId === "script-1") return "脚本一「氛围感切入 — 不费力的高级」";
-  if (scriptId === "script-2") return "脚本二「痛点切入 — 梨形身材天菜」";
-  if (scriptId === "script-3") return "脚本三「场景切入 — 度假出片指南」";
-  return "已选脚本";
+function formatSelectedScriptLabel(
+  scriptId: string | undefined,
+  skillKey?: SeedVideoSkillKey,
+): string {
+  return formatSeedVideoSelectedScriptLabel(
+    scriptId,
+    resolveSeedVideoSkillKey(skillKey),
+  );
 }
 
 /** 方案②点选后本地插入 Step4 引导语（不调 LLM），再展示 A/B 成片风格卡片 */
@@ -1317,7 +1315,7 @@ export function buildFineModeStyleIntroContent(project: SeedVideoProject): strin
   const resolvedId =
     scriptId ??
     (fromChat ? parseSeedVideoScriptIdFromChoice(fromChat.content) ?? undefined : undefined);
-  const label = formatSelectedScriptLabel(resolvedId);
+  const label = formatSelectedScriptLabel(resolvedId, project.settings.skillKey);
   return `现在我以资深广告导演身份，基于你选定的${label}，为你设计 2 套不同风格的成片方案（口播风格/音色/BGM 不同），请你挑选最终执行的一套：
 
 请选择成片风格：`;
@@ -1434,7 +1432,7 @@ export function reconstructChoiceSnapshot(
 
   if (isStyleSelectionMessage(content)) {
     const parsed = parseTableCircledChoices(assistantText, "style");
-    const choices = parsed.length >= 2 ? parsed : buildDefaultStyleChoices();
+    const choices = parsed.length >= 2 ? parsed : buildDefaultStyleChoices(project);
     return {
       title: "请选择成片风格",
       subtitle: "选择成片风格（单选）",

@@ -1,9 +1,11 @@
 "use client";
 
-import { Cpu, Loader2, Sparkles, Clapperboard } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Clapperboard, Cpu, Download, Images, Loader2, Save, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { MediaDecomposeMediaInput } from "@/components/media-decompose/media-decompose-media-input";
+import { MediaDecomposeSaveDialog } from "@/components/media-decompose/media-decompose-save-dialog";
 import {
   MediaDecomposeReplicaLaunch,
   MediaDecomposeReplicaPanel,
@@ -15,6 +17,11 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { defaultPromptForKind } from "@/lib/media-decompose-default-prompts";
+import {
+  downloadMediaDecomposeExportZip,
+  saveMediaDecomposeDeliverableSnapshot,
+  updateMediaDecomposeProject,
+} from "@/lib/ecom-media-decompose-api";
 import {
   extractMediaDecomposePatch,
   toMediaDecomposeDisplayMarkdown,
@@ -52,6 +59,7 @@ type Props = {
   onReplicaProjectChange?: () => void | Promise<void>;
   onPreviewVideo?: (src: string, title?: string) => void;
   onAlert?: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
+  onProjectUpdated?: (project: MediaDecomposeProject) => void;
 };
 
 export function MediaDecomposeWorkspace({
@@ -81,7 +89,9 @@ export function MediaDecomposeWorkspace({
   onReplicaProjectChange,
   onPreviewVideo,
   onAlert,
+  onProjectUpdated,
 }: Props) {
+  const router = useRouter();
   const [prompt, setPrompt] = useState(
     project.settings.lastPrompt ?? defaultPromptForKind(project.media?.kind),
   );
@@ -113,10 +123,77 @@ export function MediaDecomposeWorkspace({
     eligibleModels.find((m) => m.modelKey === chatModelKey)?.displayName ?? chatModelKey;
 
   const hasResult = Boolean(structured || displaySource.trim());
+  const canSave =
+    Boolean(project.media) && hasResult && !decomposing && !mediaBusy;
   const canStartReplica = Boolean(onStartReplica) && hasResult && !decomposing;
   const showReplicaPanel = Boolean(
     replicaSeedVideo && onVideoModelChange && onReplicaProjectChange && onPreviewVideo && onAlert,
   );
+
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+
+  async function flushPromptSettings(): Promise<void> {
+    const trimmed = prompt.trim();
+    if (
+      trimmed === (project.settings.lastPrompt ?? "") &&
+      chatModelKey === (project.settings.chatModelKey ?? chatModelKey)
+    ) {
+      return;
+    }
+    const updated = await updateMediaDecomposeProject(project.id, {
+      settings: { ...project.settings, lastPrompt: trimmed, chatModelKey },
+    });
+    onProjectUpdated?.(updated);
+  }
+
+  async function handleSaveDeliverable(workName: string) {
+    if (!onAlert) return;
+    setSaveBusy(true);
+    try {
+      await flushPromptSettings();
+      const { project: refreshed } = await saveMediaDecomposeDeliverableSnapshot(
+        project.id,
+        workName,
+      );
+      onProjectUpdated?.(refreshed);
+      setSaveDialogOpen(false);
+      await onAlert({
+        title: "已保存到资产库",
+        message: "可在「我的资产 → 拆图拆视频」一键复用：换素材后继续拆解或复刻。",
+      });
+    } catch (e) {
+      await onAlert({
+        title: "保存失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function handleExportZip() {
+    if (!onAlert) return;
+    setExportBusy(true);
+    try {
+      await flushPromptSettings();
+      await downloadMediaDecomposeExportZip(project.id);
+    } catch (e) {
+      await onAlert({
+        title: "导出失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  const defaultWorkName =
+    project.title?.trim() ||
+    (project.media?.kind === "video" ? "视频拆解" : project.media ? "图片拆解" : "拆图拆视频");
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
@@ -151,6 +228,35 @@ export function MediaDecomposeWorkspace({
               emptyHint="还没有保存过的拆解项目。"
             />
           ) : null}
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            dark
+            onClick={() => router.push("/library")}
+          >
+            <Images className="h-3.5 w-3.5 shrink-0" />
+            我的资产
+          </EcomButtonSecondary>
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            dark
+            disabled={!canSave || saveBusy}
+            onClick={() => setSaveDialogOpen(true)}
+          >
+            <Save className="h-3.5 w-3.5 shrink-0" />
+            保存
+          </EcomButtonSecondary>
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            dark
+            disabled={!canSave || exportBusy || decomposing}
+            onClick={() => void handleExportZip()}
+          >
+            <Download className="h-3.5 w-3.5 shrink-0" />
+            {exportBusy ? "打包中…" : "导出交付包"}
+          </EcomButtonSecondary>
         </div>
         </div>
       </header>
@@ -297,6 +403,14 @@ export function MediaDecomposeWorkspace({
       />
       </div>
       </div>
+
+      <MediaDecomposeSaveDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultWorkName={defaultWorkName}
+        busy={saveBusy}
+        onConfirm={handleSaveDeliverable}
+      />
     </div>
   );
 }

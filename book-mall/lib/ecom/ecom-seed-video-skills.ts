@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import type { SeedVideoStylePreset } from "@/lib/ecom/ecom-seed-video-types";
+
 export const SEED_VIDEO_SKILL_KEYS = [
   "seed-grass",
   "fashion-hit",
@@ -8,6 +10,16 @@ export const SEED_VIDEO_SKILL_KEYS = [
   "home-clothes-lounge-wear",
 ] as const;
 export type SeedVideoSkillKey = (typeof SEED_VIDEO_SKILL_KEYS)[number];
+
+export type SeedVideoStyleChoicePreset = {
+  presetId: SeedVideoStylePreset;
+  label: string;
+  title: string;
+  description: string;
+  voiceLabel?: string;
+  bgmLabel?: string;
+  copyTone?: string;
+};
 
 export type SeedVideoSkillDefinition = {
   key: SeedVideoSkillKey;
@@ -17,6 +29,7 @@ export type SeedVideoSkillDefinition = {
   skillDocRelative: string;
   defaultPlanningPrompt: string;
   scriptChoiceLabels: [string, string, string];
+  styleChoicePresets: [SeedVideoStyleChoicePreset, SeedVideoStyleChoicePreset];
 };
 
 const BOOK_MALL_ROOT = resolve(__dirname, "../..");
@@ -35,6 +48,26 @@ export const SEED_VIDEO_SKILLS: Record<SeedVideoSkillKey, SeedVideoSkillDefiniti
       "脚本二：痛点切入‑梨形身材天菜",
       "脚本三：场景切入‑度假出片指南",
     ],
+    styleChoicePresets: [
+      {
+        presetId: "sweet-xhs",
+        label: "A方案：甜美种草风（小红书）",
+        title: "A方案：甜美种草风（小红书）",
+        description: "湾湾小何音色，轻快甜美 BGM，姐妹分享感",
+        voiceLabel: "湾湾小何",
+        bgmLabel: "轻快甜美轻音乐",
+        copyTone: "姐妹分享感",
+      },
+      {
+        presetId: "sharp-douyin",
+        label: "B方案：干练安利风（抖音带货）",
+        title: "B方案：干练安利风（抖音带货）",
+        description: "爽快思思音色，节奏感卡点 BGM，短促有力",
+        voiceLabel: "爽快思思",
+        bgmLabel: "节奏感卡点 BGM",
+        copyTone: "短促有力带货",
+      },
+    ],
   },
   "fashion-hit": {
     key: "fashion-hit",
@@ -48,6 +81,26 @@ export const SEED_VIDEO_SKILLS: Record<SeedVideoSkillKey, SeedVideoSkillDefiniti
       "脚本一：氛围感爆款",
       "脚本二：痛点爆款",
       "脚本三：场景爆款",
+    ],
+    styleChoicePresets: [
+      {
+        presetId: "sweet-xhs",
+        label: "A方案：甜美种草带货风（小红书）",
+        title: "A方案：甜美种草带货风（小红书）",
+        description: "湾湾小何音色，轻快甜美 BGM，姐妹分享式软种草",
+        voiceLabel: "湾湾小何",
+        bgmLabel: "轻快甜美 BGM",
+        copyTone: "姐妹分享式软种草",
+      },
+      {
+        presetId: "sharp-douyin",
+        label: "B方案：强转化干练带货风（抖音）",
+        title: "B方案：强转化干练带货风（抖音）",
+        description: "爽快思思音色，卡点 BGM，短句强钩子强转化",
+        voiceLabel: "爽快思思",
+        bgmLabel: "卡点 BGM",
+        copyTone: "短句强钩子强转化",
+      },
     ],
   },
   "digital-product": {
@@ -63,6 +116,26 @@ export const SEED_VIDEO_SKILLS: Record<SeedVideoSkillKey, SeedVideoSkillDefiniti
       "脚本二：痛点解决向",
       "脚本三：场景实用向",
     ],
+    styleChoicePresets: [
+      {
+        presetId: "sweet-xhs",
+        label: "A方案：数码分享种草风（小红书测评）",
+        title: "A方案：数码分享种草风（小红书测评）",
+        description: "松弛真实测评感，温和解说，轻快 BGM",
+        voiceLabel: "温和解说",
+        bgmLabel: "轻快 BGM",
+        copyTone: "松弛真实测评感",
+      },
+      {
+        presetId: "sharp-douyin",
+        label: "B方案：强转化带货风（抖音）",
+        title: "B方案：强转化带货风（抖音）",
+        description: "快节奏、重转化，爽快音色，卡点 BGM",
+        voiceLabel: "爽快利落",
+        bgmLabel: "卡点 BGM",
+        copyTone: "快节奏强转化",
+      },
+    ],
   },
   "home-clothes-lounge-wear": {
     key: "home-clothes-lounge-wear",
@@ -76,6 +149,26 @@ export const SEED_VIDEO_SKILLS: Record<SeedVideoSkillKey, SeedVideoSkillDefiniti
       "脚本一：质感治愈向",
       "脚本二：痛点舒适向",
       "脚本三：居家场景向",
+    ],
+    styleChoicePresets: [
+      {
+        presetId: "sweet-xhs",
+        label: "A方案：温柔治愈风（小红书）",
+        title: "A方案：温柔治愈风（小红书）",
+        description: "温柔软糯、治愈松弛，轻柔舒缓居家 BGM",
+        voiceLabel: "温柔软糯",
+        bgmLabel: "轻柔舒缓居家 BGM",
+        copyTone: "治愈种草、居家氛围感",
+      },
+      {
+        presetId: "sharp-douyin",
+        label: "B方案：居家带货风（抖音）",
+        title: "B方案：居家带货风（抖音）",
+        description: "亲切自然、接地气，共鸣痛点、突出舒适实用",
+        voiceLabel: "亲切自然",
+        bgmLabel: "轻柔舒缓小众卡点 BGM",
+        copyTone: "共鸣痛点、高转化居家带货",
+      },
     ],
   },
 };
@@ -115,4 +208,37 @@ export function loadSeedVideoSkillMd(key: SeedVideoSkillKey): string {
 
 export function seedVideoSkillLabel(raw: unknown): string {
   return getSeedVideoSkillDefinition(resolveSeedVideoSkillKey(raw)).label;
+}
+
+export function formatSeedVideoSelectedScriptLabel(
+  scriptId: string | undefined,
+  skillKey: SeedVideoSkillKey,
+): string {
+  const labels = getSeedVideoSkillDefinition(skillKey).scriptChoiceLabels;
+  if (scriptId === "script-1") return labels[0];
+  if (scriptId === "script-2") return labels[1];
+  if (scriptId === "script-3") return labels[2];
+  return "已选脚本";
+}
+
+export function allSeedVideoStyleChoiceLabels(): string[] {
+  return listSeedVideoSkillDefinitions().flatMap((s) =>
+    s.styleChoicePresets.map((p) => p.label),
+  );
+}
+
+export function buildSeedVideoStyleChoiceJsonExample(skillKey: SeedVideoSkillKey): string {
+  const presets = getSeedVideoSkillDefinition(skillKey).styleChoicePresets;
+  const options = presets.map((p) => ({
+    id: p.presetId,
+    label: p.label,
+    voiceLabel: p.voiceLabel ?? "",
+    bgmLabel: p.bgmLabel ?? "",
+    copyTone: p.copyTone ?? p.description,
+  }));
+  return JSON.stringify(
+    { step: "style", action: "await_style_choice", styleOptions: options },
+    null,
+    2,
+  );
 }

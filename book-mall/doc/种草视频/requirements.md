@@ -1,6 +1,7 @@
 # 种草视频 · 产品需求（多 Skill）
 
 > **JSON 契约（全 Skill 共用）**：同目录 [`table-format.md`](./table-format.md)  
+> **调用大模型步骤与提示词**：[`implementation.md`](./implementation.md) §3  
 > **System Prompt 真源**：各 Skill 的 `skill*.md`（`ecom-seed-video-skills.ts` 注册表 + `ecom-seed-video-prompts.ts` 运行时读取）
 
 ## 1. 定位
@@ -59,8 +60,9 @@
 | 角色 | 种草短视频策划助理 | 爆款服装带货策划助理 | 3C 数码爆款带货策划助理 | 家居服爆款带货策划助理 |
 | 素材解析 | 商品概述、卖点、场景氛围 | 品类/版型/面料/颜色、带货钩子 | 品类/型号/规格、数码痛点与场景 | 款式/面料/花色、居家舒适卖点 |
 | 三套角度 | 氛围感/痛点/场景（生活方式） | 氛围感爆款/痛点爆款/场景爆款 | 视觉体验/痛点解决/场景实用 | 质感治愈/痛点舒适/居家场景 |
-| 口播 | 相对文艺种草 | 短句、强钩子、带货语气 | 短句、参数/痛点钩子、紧凑信息 | 软糯治愈、强共鸣钩子 |
-| 精细模式 | 可变镜数 | 建议 4 镜 | 建议 4 镜 | 建议 4 镜（面料/垂感/居家动态） |
+| 口播 | 相对文艺种草 | 短句、强钩子、带货语气 | 短句、参数/痛点钩子 | 软糯治愈、强共鸣钩子 |
+| 成片风格 A/B | 甜美种草风 / 干练安利风 | 甜美种草带货风 / 强转化干练带货风 | 数码分享种草风 / 强转化带货风 | 温柔治愈风 / 居家带货风 |
+| 精细模式 | 可变镜数 | 建议 4 镜 | 建议 4 镜 | 建议 4 镜 |
 
 ## 8. 非目标
 
@@ -72,6 +74,7 @@
 
 | 层 | 路径 |
 |----|------|
+| **实施 / LLM 交互** | [`implementation.md`](./implementation.md) |
 | Skill 注册表 | `book-mall/lib/ecom/ecom-seed-video-skills.ts` |
 | Prompt 构建 | `book-mall/lib/ecom/ecom-seed-video-prompts.ts` |
 | 创建 API | `POST .../seed-video/projects` body: `{ title?, skillKey? }` |

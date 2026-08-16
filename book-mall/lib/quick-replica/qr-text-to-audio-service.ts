@@ -99,6 +99,7 @@ async function uploadAudioOutput(args: {
     name: string;
     textScript?: string | null;
     originRef?: string | null;
+    meta?: Record<string, unknown> | null;
   };
 }): Promise<string> {
   const audioUrl = await uploadCanvasUserBuffer({
@@ -118,6 +119,7 @@ async function uploadAudioOutput(args: {
     name: args.aiSpace.name,
     textScript: args.aiSpace.textScript ?? null,
     originRef: args.aiSpace.originRef ?? null,
+    meta: args.aiSpace.meta ?? null,
   });
 
   return audioUrl;
@@ -670,6 +672,7 @@ export async function qrCreateMinimaxVoiceCloneJob(
           name: audioAssetName("声音克隆", draft.prompt),
           textScript: draft.prompt,
           originRef: log.id,
+          meta: { voiceId: cloneVoiceId },
         },
       });
     }
@@ -684,6 +687,7 @@ export async function qrCreateMinimaxVoiceCloneJob(
         name: audioAssetName("声音克隆", draft.prompt),
         textScript: draft.prompt,
         originRef: log.id,
+        meta: { voiceId: cloneVoiceId },
       },
     });
   }

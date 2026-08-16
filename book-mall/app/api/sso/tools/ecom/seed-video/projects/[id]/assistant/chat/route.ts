@@ -128,6 +128,7 @@ export async function POST(req: Request, ctx: Ctx) {
     workflowContext: buildSeedVideoWorkflowContext({
       chatHistory: turns,
       meta: project.meta,
+      skillKey: resolveSeedVideoSkillKey(project.settings.skillKey),
     }),
   });
 

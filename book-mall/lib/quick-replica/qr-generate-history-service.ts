@@ -77,6 +77,12 @@ export async function listQrGenerateJobRecords(
     const outputFromLog = extractQrJobOutputUrl(row.resultSummary);
     const saved = await findQrTemplateByLogId(row.id);
     const outputUrl = outputFromLog?.url ?? saved?.output?.url;
+    const resultVoiceId =
+      row.resultSummary &&
+      typeof row.resultSummary === "object" &&
+      typeof (row.resultSummary as { voice_id?: string }).voice_id === "string"
+        ? (row.resultSummary as { voice_id: string }).voice_id.trim()
+        : "";
     const outputMediaType =
       outputFromLog?.mediaType ??
       saved?.output?.mediaType ??
@@ -95,7 +101,11 @@ export async function listQrGenerateJobRecords(
       outputUrl,
       outputMediaType,
       prompt: draft?.prompt?.trim() || undefined,
-      voiceId: draft?.voiceId?.trim() || undefined,
+      voiceId:
+        draft?.voiceId?.trim() ||
+        draft?.cloneVoiceId?.trim() ||
+        resultVoiceId ||
+        undefined,
       error: row.status === "FAILED" ? row.failMessage ?? "生成失败" : undefined,
       savedTemplateId: saved?.id,
     });

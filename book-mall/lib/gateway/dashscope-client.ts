@@ -73,6 +73,11 @@ export function parseDashscopeWorkspaceIdFromApiKey(apiKey: string): string | nu
   const trimmed = apiKey.trim();
   const structured = trimmed.match(/^sk-ws-[^.]+\.([^.]+)\.[^.]+\.(MEQ[A-Za-z0-9_=-]+)$/i);
   if (structured?.[1]) return structured[1];
+  // 部分控制台 Key 尾段签名不一定以 MEQ 开头，仍按 sk-ws-*.{workspaceId}.* 取第二段
+  if (trimmed.startsWith("sk-ws-")) {
+    const parts = trimmed.split(".");
+    if (parts.length >= 3 && parts[1]?.trim()) return parts[1].trim();
+  }
   return null;
 }
 

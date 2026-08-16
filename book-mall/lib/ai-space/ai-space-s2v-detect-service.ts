@@ -12,7 +12,7 @@ import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { createRequestLog, finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 
-import { requireAiSpaceDashscopeAuth } from "./ai-space-gateway-auth";
+import { requireAiSpaceDashscopeAuth, resolveAiSpaceS2vBaseUrl } from "./ai-space-gateway-auth";
 import type { AiSpaceDigitalHumanDetect } from "./ai-space-digital-human-types";
 
 const DETECT_MODEL_KEY = "wan2.2-s2v-detect";
@@ -85,9 +85,10 @@ export async function detectAiSpaceDigitalHumanImage(args: {
   });
 
   const started = Date.now();
+  const s2vBaseUrl = resolveAiSpaceS2vBaseUrl(cred.apiKey, cred.baseUrl);
   const res = await dashscopeDetectS2vImage({
     apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl,
+    baseUrl: s2vBaseUrl,
     model: DETECT_MODEL_KEY,
     imageUrl: row.avatarImageUrl,
   });

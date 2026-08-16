@@ -49,7 +49,7 @@ import {
 } from "./ai-space-compose-types";
 import { parseAiSpaceComposeOverlayOptions } from "./ai-space-compose-options";
 import { getAiSpaceDigitalHuman } from "./ai-space-digital-human-service";
-import { requireAiSpaceDashscopeAuth } from "./ai-space-gateway-auth";
+import { requireAiSpaceDashscopeAuth, resolveAiSpaceS2vBaseUrl } from "./ai-space-gateway-auth";
 import {
   S2V_DETECT_FAILED_HINT,
   ensureDigitalHumanS2vChecked,
@@ -71,15 +71,10 @@ export {
 const S2V_MODEL_KEY = "wan2.2-s2v";
 /**
  * 进程内最多等这么久；到点 **不判失败**，任务留在 `generating_human`，
- * 由 `pumpAiSpaceComposeQueue` → `reconcileStuckGeneratingTask` 继续向厂商核对。
- * （实测厂商排队可超过 45 分钟，早年 20 分钟硬超时会把在跑的任务误杀。）
+ * 由 `pumpAiSpaceComposeQueue` → `reconcileStuckGeneratingTask` 继续向厂商核对，
+ * 直到厂商返回成功/失败（不因等待时长主动切断）。
  */
 const S2V_INPROCESS_WAIT_MS = 10 * 60 * 1000;
-/** 厂商侧硬上限：超过此时长仍 RUNNING 才收口为失败 */
-const S2V_HARD_TIMEOUT_MS = (() => {
-  const v = Number(process.env.AI_SPACE_S2V_HARD_TIMEOUT_MS);
-  return Number.isFinite(v) && v > 0 ? v : 3 * 60 * 60 * 1000;
-})();
 const S2V_POLL_INTERVAL_MS = 10_000;
 /** 合成阶段等待 MediaRenderJob 的上限 */
 const RENDER_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
@@ -218,8 +213,19 @@ async function tryClaimS2vSlot(taskId: string): Promise<boolean> {
  * 因此把这类失败指向凭证地域，而不是把裸英文报错丢给用户。
  */
 function friendlyS2vFailure(code: string | undefined, message: string): string {
+  const blob = `${code ?? ""} ${message}`.toLowerCase();
+  if (blob.includes("workspace endpoint is invalid") || blob.includes("invalidendpoint")) {
+    return (
+      "阿里云 S2V 端点无效：wan2.2-s2v 须使用华北2（北京）业务空间的 sk-ws- Key，" +
+      "且 API 根域名应为 https://dashscope.aliyuncs.com（勿填 {WorkspaceId}.cn-beijing.maas.aliyuncs.com）。" +
+      "可在 Gateway 模型管理页更新凭证 baseUrl，或运行 pnpm gateway:bind-s2v-beijing 重新绑定。"
+    );
+  }
   if (code?.trim().toLowerCase() === "internalerror") {
     return `厂商侧生成失败（${message}）。wan2.2-s2v 要求使用华北2（北京）地域的阿里云 API Key，请在 Gateway 模型管理页核对该凭证的地域后重试`;
+  }
+  if (code?.trim() === "Arrearage" || /arrearage|overdue|good standing/i.test(message)) {
+    return "百炼（阿里云）账号欠费或已停用，请在阿里云控制台检查余额后再试数字人口播合成";
   }
   return message;
 }
@@ -271,6 +277,7 @@ async function runS2vStage(taskId: string): Promise<void> {
     await failTask(taskId, "Gateway 凭证不可用，请在模型管理页重新绑定");
     return;
   }
+  const s2vBaseUrl = resolveAiSpaceS2vBaseUrl(cred.apiKey, cred.baseUrl);
 
   const payload = {
     model: S2V_MODEL_KEY,
@@ -300,7 +307,7 @@ async function runS2vStage(taskId: string): Promise<void> {
   const started = Date.now();
   const created = await dashscopeCreateS2vTask({
     apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl,
+    baseUrl: s2vBaseUrl,
     model: S2V_MODEL_KEY,
     imageUrl: human.avatarImageUrl,
     audioUrl: audio.audioUrl,
@@ -314,7 +321,7 @@ async function runS2vStage(taskId: string): Promise<void> {
       failMessage: created.error,
       model: S2V_MODEL_KEY,
     });
-    await failTask(taskId, created.error);
+    await failTask(taskId, friendlyS2vFailure(undefined, created.error));
     return;
   }
 
@@ -337,6 +344,7 @@ async function runS2vStage(taskId: string): Promise<void> {
       polled = await pollDashscopeTaskForLog({
         credentialId,
         taskId: created.taskId,
+        baseUrl: s2vBaseUrl,
       });
     } catch (e) {
       // 单次查询失败（网络抖动）继续重试，直到超时
@@ -554,16 +562,23 @@ export async function advanceAiSpaceComposeTask(taskId: string): Promise<void> {
 
 /**
  * 队列泵/重启后接管 `generating_human`：按 gatewayTaskId 向厂商核对一次。
- * 仍在跑就保持现状（下一轮再核），超过硬上限才收口失败。
+ * 仍在跑就保持现状（下一轮再核），仅厂商明确失败时才收口。
  */
 async function reconcileStuckGeneratingTask(taskId: string): Promise<void> {
   const task = await prisma.aiSpaceComposeTask.findUnique({ where: { id: taskId } });
   if (!task || task.status !== "generating_human" || !task.gatewayTaskId) return;
 
   const { credentialId } = await requireDashscopeAuth(task.userId);
+  const cred = await getDecryptedCredentialApiKey(credentialId);
+  if (!cred) {
+    await failTask(taskId, "Gateway 凭证不可用，请在模型管理页重新绑定");
+    return;
+  }
+  const s2vBaseUrl = resolveAiSpaceS2vBaseUrl(cred.apiKey, cred.baseUrl);
   const polled = await pollDashscopeTaskForLog({
     credentialId,
     taskId: task.gatewayTaskId,
+    baseUrl: s2vBaseUrl,
   });
   const status = polled.output.task_status;
 
@@ -586,6 +601,7 @@ async function reconcileStuckGeneratingTask(taskId: string): Promise<void> {
       data: { tempHumanVideoUrl: persisted.videoUrl, status: "composing" },
     });
     kickNextPendingTask();
+    await runComposeStage(taskId);
     return;
   }
 
@@ -597,12 +613,7 @@ async function reconcileStuckGeneratingTask(taskId: string): Promise<void> {
     return;
   }
 
-  const ageMs = Date.now() - task.createdAt.getTime();
-  if (ageMs > S2V_HARD_TIMEOUT_MS) {
-    const msg = `口播视频生成超过 ${Math.round(S2V_HARD_TIMEOUT_MS / 60_000)} 分钟仍未完成，已收口`;
-    await finalizeS2vLog(task, "FAILED", polled.raw, msg);
-    await failTask(taskId, msg);
-  }
+  // 厂商仍为 RUNNING/PENDING：保持 generating_human，下一轮 pump 继续核对，不因等待时长主动判失败
 }
 
 /** 核对出终态后补写 Gateway 日志（提交时只写 RUNNING，不能留悬挂） */

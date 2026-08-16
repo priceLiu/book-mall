@@ -60,6 +60,50 @@ export type MinimaxSystemVoice = {
   language?: string;
 };
 
+/** MiniMax get_voice · voice_cloning / voice_generation 条目 */
+export type MinimaxOwnedVoice = {
+  voice_id: string;
+  voice_name?: string;
+  created_time?: string;
+  description?: string[];
+};
+
+function parseMinimaxSystemVoiceList(raw: unknown): MinimaxSystemVoice[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((v): v is Record<string, unknown> => v && typeof v === "object")
+    .map((v) => ({
+      voice_id: String(v.voice_id ?? ""),
+      voice_name: typeof v.voice_name === "string" ? v.voice_name : undefined,
+      description: Array.isArray(v.description)
+        ? v.description.filter((d): d is string => typeof d === "string")
+        : undefined,
+    }))
+    .filter((v) => v.voice_id);
+}
+
+function parseMinimaxOwnedVoiceList(raw: unknown): MinimaxOwnedVoice[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: MinimaxOwnedVoice[] = [];
+  for (const v of raw) {
+    if (!v || typeof v !== "object") continue;
+    const row = v as Record<string, unknown>;
+    const voice_id = String(row.voice_id ?? "").trim();
+    if (!voice_id || seen.has(voice_id)) continue;
+    seen.add(voice_id);
+    out.push({
+      voice_id,
+      voice_name: typeof row.voice_name === "string" ? row.voice_name : undefined,
+      created_time: typeof row.created_time === "string" ? row.created_time : undefined,
+      description: Array.isArray(row.description)
+        ? row.description.filter((d): d is string => typeof d === "string")
+        : undefined,
+    });
+  }
+  return out;
+}
+
 export function resolveMinimaxApiRoot(baseUrl?: string | null): string {
   const raw = (baseUrl?.trim() || MINIMAX_DEFAULT_API_ROOT).replace(/\/$/, "");
   if (!raw) return MINIMAX_DEFAULT_API_ROOT;
@@ -94,6 +138,19 @@ function parseT2aAudioBuffer(json: Record<string, unknown>): Buffer | null {
   return null;
 }
 
+function normalizeMinimaxVoiceSettingNumbers(input: {
+  speed?: number;
+  vol?: number;
+  pitch?: number;
+}): { speed: number; vol: number; pitch: number } {
+  const speed = input.speed ?? 1;
+  const vol = input.vol ?? 1;
+  const pitchRaw = input.pitch ?? 0;
+  // MiniMax t2a_v2：pitch 必须为 integer（-12～12），float 会 2013 invalid params
+  const pitch = Math.round(Math.min(12, Math.max(-12, pitchRaw)));
+  return { speed, vol, pitch };
+}
+
 export async function forwardMinimaxT2a(args: {
   credentialId: string;
   input: MinimaxT2aInput;
@@ -124,11 +181,17 @@ export async function forwardMinimaxT2a(args: {
     };
   }
 
+  const { speed, vol, pitch } = normalizeMinimaxVoiceSettingNumbers({
+    speed: args.input.speed,
+    vol: args.input.vol,
+    pitch: args.input.pitch,
+  });
+
   const voiceSetting: Record<string, unknown> = {
     voice_id: args.input.voice_id,
-    speed: args.input.speed ?? 1,
-    vol: args.input.vol ?? 1,
-    pitch: args.input.pitch ?? 0,
+    speed,
+    vol,
+    pitch,
   };
   if (args.input.emotion?.trim()) {
     voiceSetting.emotion = args.input.emotion.trim();
@@ -296,7 +359,17 @@ export async function forwardMinimaxVoiceClone(args: {
     body.need_volume_normalization = args.input.need_volume_normalization;
   }
   if (args.input.aigc_watermark != null) body.aigc_watermark = args.input.aigc_watermark;
-  if (args.input.voice_setting) body.voice_setting = args.input.voice_setting;
+  if (args.input.voice_setting) {
+    const vs = args.input.voice_setting;
+    body.voice_setting = {
+      ...vs,
+      ...normalizeMinimaxVoiceSettingNumbers({
+        speed: vs.speed,
+        vol: vs.vol,
+        pitch: vs.pitch,
+      }),
+    };
+  }
 
   const r = await fetch(url, {
     method: "POST",
@@ -336,6 +409,8 @@ export async function forwardMinimaxGetVoice(args: {
 }): Promise<{
   status: number;
   systemVoice: MinimaxSystemVoice[];
+  voiceCloning: MinimaxOwnedVoice[];
+  voiceGeneration: MinimaxOwnedVoice[];
   vendorJson: unknown;
   durationMs: number;
 }> {
@@ -351,23 +426,15 @@ export async function forwardMinimaxGetVoice(args: {
     body: JSON.stringify({ voice_type: args.voiceType ?? "system" }),
   });
   const json = (await r.json()) as Record<string, unknown>;
-  const systemRaw = json.system_voice;
-  const systemVoice: MinimaxSystemVoice[] = Array.isArray(systemRaw)
-    ? systemRaw
-        .filter((v): v is Record<string, unknown> => v && typeof v === "object")
-        .map((v) => ({
-          voice_id: String(v.voice_id ?? ""),
-          voice_name: typeof v.voice_name === "string" ? v.voice_name : undefined,
-          description: Array.isArray(v.description)
-            ? v.description.filter((d): d is string => typeof d === "string")
-            : undefined,
-        }))
-        .filter((v) => v.voice_id)
-    : [];
+  const systemVoice = parseMinimaxSystemVoiceList(json.system_voice);
+  const voiceCloning = parseMinimaxOwnedVoiceList(json.voice_cloning);
+  const voiceGeneration = parseMinimaxOwnedVoiceList(json.voice_generation);
 
   return {
     status: r.status,
     systemVoice,
+    voiceCloning,
+    voiceGeneration,
     vendorJson: json,
     durationMs: Date.now() - started,
   };

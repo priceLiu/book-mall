@@ -304,6 +304,7 @@ export function MediaDecomposeStudio() {
       }}
       onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
       onAlert={alert}
+      onProjectUpdated={applyProject}
       onRefreshModels={() => void loadModels()}
       onChatModelChange={(key) => {
         setChatModelKey(key);

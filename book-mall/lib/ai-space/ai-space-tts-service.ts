@@ -37,6 +37,7 @@ import {
   probeAudioDurationSec,
   type AiSpaceAudioAssetDto,
 } from "./ai-space-audio-service";
+import { formatAiSpaceTtsUpstreamError } from "./ai-space-tts-errors";
 
 export class AiSpaceTtsError extends Error {
   constructor(
@@ -64,7 +65,7 @@ async function requireBailianAuth(userId: string) {
   return { auth, credentialId };
 }
 
-async function requireMinimaxAuth(userId: string) {
+export async function requireMinimaxAuth(userId: string) {
   await assertGatewayApiKeyLinkedForUser(userId);
   const auth = await resolveGatewayAuthForBookUser(userId);
   if (!auth) {
@@ -132,7 +133,9 @@ async function generateAiSpaceMinimaxTts(args: {
   const ok = result.status >= 200 && result.status < 300;
   const failMessage = ok
     ? undefined
-    : result.buffer.toString("utf8").slice(0, 500) || `上游服务返回 HTTP ${result.status}`;
+    : formatAiSpaceTtsUpstreamError(
+        result.buffer.toString("utf8").slice(0, 500) || `上游服务返回 HTTP ${result.status}`,
+      );
 
   await finalizeRequestLog(log.id, {
     status: ok ? "SUCCEEDED" : "FAILED",
@@ -236,7 +239,9 @@ async function generateAiSpaceBailianTts(args: {
   const usage = result.vendorJson ? parseOpenAiUsage(result.vendorJson) : undefined;
   const failMessage = ok
     ? undefined
-    : result.buffer.toString("utf8").slice(0, 500) || `上游服务返回 HTTP ${result.status}`;
+    : formatAiSpaceTtsUpstreamError(
+        result.buffer.toString("utf8").slice(0, 500) || `上游服务返回 HTTP ${result.status}`,
+      );
 
   await finalizeRequestLog(log.id, {
     status: ok ? "SUCCEEDED" : "FAILED",

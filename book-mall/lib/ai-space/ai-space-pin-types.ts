@@ -68,7 +68,7 @@ export const AI_SPACE_PIN_SOURCE_LABEL: Record<AiSpacePinSourceType, string> = {
   ecom_asset: "电商工具箱",
   t2i_library: "我的图片库",
   i2v_library: "我的视频库",
-  ai_space_audio: "音频库",
+  ai_space_audio: "我的音频库",
   ai_space_video: "视频创作库",
   ai_space_digital_human: "数字人库",
   story_character: "影视角色",

@@ -4,6 +4,8 @@ import {
   type StoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import type { MediaDecomposeDeliverableSnapshot } from "@/lib/ecom/ecom-media-decompose-snapshot";
+import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
 import { ECOM_SEED_VIDEO_MODULE } from "@/lib/ecom/ecom-seed-video-types";
 import type { ProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
@@ -89,6 +91,18 @@ export type EcomLibraryHandCraftBundle = {
   snapshot: HandCraftWorkflowSnapshot;
 };
 
+export type EcomLibraryMediaDecomposeBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  mediaKind: "image" | "video" | null;
+  hasReplica: boolean;
+  shotCount: number;
+  hasVideo: boolean;
+  thumbnailUrl: string | null;
+  snapshot: MediaDecomposeDeliverableSnapshot;
+};
+
 export type EcomLibrarySection = {
   moduleId: string;
   title: string;
@@ -100,12 +114,14 @@ export type EcomLibrarySection = {
   productDesignBundles: EcomLibraryProductDesignBundle[];
   seedVideoBundles: EcomLibrarySeedVideoBundle[];
   handCraftBundles: EcomLibraryHandCraftBundle[];
+  mediaDecomposeBundles: EcomLibraryMediaDecomposeBundle[];
 };
 
 const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
 const VIDEO_MODULE_IDS = [
   "storyboard-micro-drama",
   "seed-video",
+  "media-decompose",
   "video-motion",
   "video-outfit",
   "video-dance-swap",
@@ -124,6 +140,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "model-shot": { title: "服装模特图", kind: "image" },
   "storyboard-micro-drama": { title: "微剧故事版", kind: "video" },
   "seed-video": { title: "图片生种草视频", kind: "video" },
+  "media-decompose": { title: "拆图拆视频", kind: "video" },
   "video-motion": { title: "视频动作", kind: "video" },
   "video-outfit": { title: "穿搭视频", kind: "video" },
   "video-dance-swap": { title: "卡点跳舞换装", kind: "video" },
@@ -266,6 +283,24 @@ function collectSeedVideoSnapshotsFromMeta(
   return out;
 }
 
+function collectMediaDecomposeSnapshotsFromMeta(
+  meta: Record<string, unknown> | null | undefined,
+): MediaDecomposeDeliverableSnapshot[] {
+  const out: MediaDecomposeDeliverableSnapshot[] = [];
+  const latest = meta?.deliverableSnapshot as MediaDecomposeDeliverableSnapshot | undefined;
+  const history = Array.isArray(meta?.deliverableSnapshotHistory)
+    ? (meta!.deliverableSnapshotHistory as MediaDecomposeDeliverableSnapshot[])
+    : [];
+  const seen = new Set<string>();
+  for (const snap of [latest, ...history]) {
+    if (!snap?.savedAt) continue;
+    if (seen.has(snap.savedAt)) continue;
+    seen.add(snap.savedAt);
+    out.push(snap);
+  }
+  return out;
+}
+
 function collectHandCraftSnapshotsFromMeta(
   meta: Record<string, unknown> | null | undefined,
 ): HandCraftWorkflowSnapshot[] {
@@ -326,6 +361,33 @@ function snapshotToHandCraftBundle(
   };
 }
 
+function isLikelyImageOssUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u) return false;
+  return /\.(png|jpe?g|webp|gif|bmp)(\?|$)/i.test(u) || u.includes("image/");
+}
+
+function isLikelyVideoOssUrl(url: string): boolean {
+  const u = url.trim();
+  if (!/^https?:\/\//.test(u)) return false;
+  if (isLikelyImageOssUrl(u)) return false;
+  if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(u)) return true;
+  if (/\/canvas\/user\//i.test(u)) return true;
+  return false;
+}
+
+function pickSeedVideoSnapshotThumbnail(snap: SeedVideoDeliverableSnapshot): string | null {
+  const refs = snap.references ?? [];
+  const seedMaterial = refs.find((r) => r.role === "seed-material" && r.ossUrl?.trim())?.ossUrl?.trim();
+  if (seedMaterial && !isLikelyVideoOssUrl(seedMaterial)) return seedMaterial;
+  for (const ref of refs) {
+    const u = ref.ossUrl?.trim();
+    if (u && !isLikelyVideoOssUrl(u)) return u;
+  }
+  if (seedMaterial) return seedMaterial;
+  return snap.finalVideoUrl?.trim() || refs[0]?.ossUrl?.trim() || null;
+}
+
 function snapshotToSeedVideoBundle(
   projectId: string,
   snap: SeedVideoDeliverableSnapshot,
@@ -338,11 +400,7 @@ function snapshotToSeedVideoBundle(
       (snap.plan?.scripts?.length ?? 0) >= 1 ||
       shotCount >= 1,
   );
-  const thumb =
-    snap.finalVideoUrl?.trim() ||
-    snap.references.find((r) => r.role === "seed-material")?.ossUrl?.trim() ||
-    snap.references[0]?.ossUrl?.trim() ||
-    null;
+  const thumb = pickSeedVideoSnapshotThumbnail(snap);
   return {
     projectId,
     savedAt: snap.savedAt,
@@ -351,6 +409,42 @@ function snapshotToSeedVideoBundle(
     productionMode,
     hasScript,
     hasVideo: Boolean(snap.finalVideoUrl?.trim()),
+    thumbnailUrl: thumb,
+    snapshot: snap,
+  };
+}
+
+function snapshotToMediaDecomposeBundle(
+  projectId: string,
+  snap: MediaDecomposeDeliverableSnapshot,
+): EcomLibraryMediaDecomposeBundle {
+  const shots = snap.replica?.shots ?? [];
+  const shotCount = shots.length;
+  const hasReplica = shotCount > 0;
+  const hasShotVideo = shots.some((s) => Boolean(s.videoUrl?.trim()));
+  const hasVideo = Boolean(snap.replica?.finalVideoUrl?.trim() || hasShotVideo);
+  const mediaKind = snap.media?.kind ?? null;
+  const mediaUrl = snap.media?.ossUrl?.trim() || null;
+  const imageThumb =
+    mediaKind === "image" && mediaUrl
+      ? mediaUrl
+      : mediaUrl && !isLikelyVideoOssUrl(mediaUrl)
+        ? mediaUrl
+        : null;
+  const thumb =
+    imageThumb ||
+    snap.replica?.finalVideoUrl?.trim() ||
+    shots.find((s) => s.videoUrl?.trim())?.videoUrl?.trim() ||
+    mediaUrl ||
+    null;
+  return {
+    projectId,
+    savedAt: snap.savedAt,
+    title: snap.title || "拆图拆视频",
+    mediaKind,
+    hasReplica,
+    shotCount,
+    hasVideo,
     thumbnailUrl: thumb,
     snapshot: snap,
   };
@@ -388,7 +482,7 @@ function snapshotToBundle(
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
   await backfillEcomAssetProjectNamesForUser(userId);
 
-  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows] =
+  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows, mediaDecomposeRows] =
     await Promise.all([
     prisma.ecomAsset.findMany({
       where: { userId },
@@ -424,6 +518,12 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       take: 50,
       select: { id: true, meta: true, title: true },
     }),
+    prisma.ecomMediaDecomposeProject.findMany({
+      where: { userId, module: ECOM_MEDIA_DECOMPOSE_MODULE },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: { id: true, meta: true, title: true },
+    }),
   ]);
 
   const projectNameLookup = buildProjectNameLookup(
@@ -431,6 +531,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     storyboardRows,
     seedVideoRows,
     handCraftRows,
+    mediaDecomposeRows,
   );
 
   const assetsByModule = new Map<string, EcomLibraryAssetItem[]>();
@@ -498,6 +599,15 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
   }
   handCraftBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 
+  const mediaDecomposeBundles: EcomLibraryMediaDecomposeBundle[] = [];
+  for (const row of mediaDecomposeRows) {
+    const meta = (row.meta as Record<string, unknown> | null) ?? null;
+    for (const snap of collectMediaDecomposeSnapshotsFromMeta(meta)) {
+      mediaDecomposeBundles.push(snapshotToMediaDecomposeBundle(row.id, snap));
+    }
+  }
+  mediaDecomposeBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+
   const orderedIds = [
     ...IMAGE_MODULE_IDS,
     ...VIDEO_MODULE_IDS,
@@ -513,12 +623,15 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const sectionBundles =
       moduleId === "storyboard-micro-drama" ? bundles : [];
     const sectionSeedVideoBundles = moduleId === "seed-video" ? seedVideoBundles : [];
+    const sectionMediaDecomposeBundles =
+      moduleId === "media-decompose" ? mediaDecomposeBundles : [];
     const sectionProductDesignBundles = productDesignBundlesByModule.get(moduleId) ?? [];
     const sectionHandCraftBundles = moduleId === "hand-craft" ? handCraftBundles : [];
     if (
       sectionAssets.length === 0 &&
       sectionBundles.length === 0 &&
       sectionSeedVideoBundles.length === 0 &&
+      sectionMediaDecomposeBundles.length === 0 &&
       sectionProductDesignBundles.length === 0 &&
       sectionHandCraftBundles.length === 0
     ) {
@@ -535,6 +648,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       productDesignBundles: sectionProductDesignBundles,
       seedVideoBundles: sectionSeedVideoBundles,
       handCraftBundles: sectionHandCraftBundles,
+      mediaDecomposeBundles: sectionMediaDecomposeBundles,
     });
   }
 
@@ -561,6 +675,18 @@ export function findSeedVideoSnapshotInProjectMeta(
   if (latest?.savedAt === savedAt) return latest;
   const history = Array.isArray(meta?.deliverableSnapshotHistory)
     ? (meta!.deliverableSnapshotHistory as SeedVideoDeliverableSnapshot[])
+    : [];
+  return history.find((h) => h.savedAt === savedAt) ?? null;
+}
+
+export function findMediaDecomposeSnapshotInProjectMeta(
+  meta: Record<string, unknown> | null | undefined,
+  savedAt: string,
+): MediaDecomposeDeliverableSnapshot | null {
+  const latest = meta?.deliverableSnapshot as MediaDecomposeDeliverableSnapshot | undefined;
+  if (latest?.savedAt === savedAt) return latest;
+  const history = Array.isArray(meta?.deliverableSnapshotHistory)
+    ? (meta!.deliverableSnapshotHistory as MediaDecomposeDeliverableSnapshot[])
     : [];
   return history.find((h) => h.savedAt === savedAt) ?? null;
 }

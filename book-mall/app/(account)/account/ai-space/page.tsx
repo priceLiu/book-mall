@@ -9,6 +9,7 @@ import { AiSpaceComposeTasksDesk } from "@/components/ai-space/ai-space-compose-
 import { AiSpaceDigitalHumanLibrary } from "@/components/ai-space/ai-space-digital-human-library";
 import { AiSpaceFavoritesDesk } from "@/components/ai-space/ai-space-favorites-desk";
 import { SpaceCanvasEditor } from "@/components/ai-space/space-canvas/space-canvas-editor";
+import { AiSpaceUploadsDesk } from "@/components/ai-space/ai-space-uploads-desk";
 import { AiSpaceVideoLibrary } from "@/components/ai-space/ai-space-video-library";
 import { listAiSpaceAudioAssets } from "@/lib/ai-space/ai-space-audio-service";
 import { listAiSpaceDigitalHumans } from "@/lib/ai-space/ai-space-digital-human-service";
@@ -91,6 +92,7 @@ export default async function AiSpacePage({
       {/* 合成台选材同样全客户端拉取：5 条 SQL 不该卡住整页导航 */}
       {tab === "compose" ? <AiSpaceComposeDeskLoader /> : null}
       {tab === "compose-tasks" ? <AiSpaceComposeTasksDesk /> : null}
+      {tab === "uploads" ? <AiSpaceUploadsDesk /> : null}
     </>
   );
 }

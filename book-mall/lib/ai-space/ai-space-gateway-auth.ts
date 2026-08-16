@@ -10,10 +10,42 @@ import {
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
 import type { ResolvedGatewayApiKeyAuth } from "@/lib/gateway/api-key-service";
+import {
+  resolveDashscopeApiRoot,
+} from "@/lib/gateway/dashscope-client";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 
 export const AI_SPACE_S2V_BEIJING_CREDENTIAL_ALIAS = "DashScope 北京 S2V";
+
+/** sk-ws- 开头的华北2业务空间 Key（wan2.2-s2v / detect 须用 sk-ws，API 根域名仍走 dashscope.aliyuncs.com） */
+export function isDashscopeWorkspaceApiKey(apiKey: string): boolean {
+  return apiKey.trim().startsWith("sk-ws-");
+}
+
+/**
+ * 解析 wan2.2-s2v / detect 应使用的 API 根域名。
+ *
+ * sk-ws 业务空间 Key 仍走 DashScope **通用根域名** `https://dashscope.aliyuncs.com`；
+ * 若误用 `{WorkspaceId}.cn-beijing.maas.aliyuncs.com`，厂商会立刻返回
+ * `BadRequest.IllegalEndpoint / Workspace endpoint is invalid`（2026-08 实测）。
+ *
+ * 凭证里若存了华北2子域或 compatible-mode 路径，一律归一化为通用根域名。
+ */
+export function resolveAiSpaceS2vBaseUrl(
+  _apiKey: string,
+  storedBaseUrl?: string | null,
+): string {
+  const stored = storedBaseUrl?.trim();
+  if (
+    stored &&
+    !/cn-beijing\.maas\.aliyuncs\.com/i.test(stored) &&
+    !/dashscope\.aliyuncs\.com/i.test(stored)
+  ) {
+    return resolveDashscopeApiRoot(stored);
+  }
+  return resolveDashscopeApiRoot(null);
+}
 
 function isBeijingS2vCredential(row: {
   alias: string;

@@ -11,6 +11,8 @@ import {
   isMinimaxSpeechModelKey,
 } from "@/lib/gateway/minimax-speech-models";
 
+import { QWEN3_TTS_FLASH_VOICES } from "./qwen3-tts-voice-catalog";
+
 export type AiSpaceTtsModelDef = {
   modelKey: string;
   label: string;
@@ -33,12 +35,8 @@ export const AI_SPACE_TTS_MODELS: AiSpaceTtsModelDef[] = [
   {
     modelKey: "qwen3-tts",
     label: "Qwen3 TTS",
-    description: "通义千问语音合成，中英自适应",
-    voices: [
-      { id: "Cherry", label: "Cherry · 明亮女声" },
-      { id: "Serena", label: "Serena · 温柔女声" },
-      { id: "Ryan", label: "Ryan · 磁性男声" },
-    ],
+    description: "通义千问语音合成，49 种系统音色（含方言），中英自适应",
+    voices: QWEN3_TTS_FLASH_VOICES.map((v) => ({ id: v.id, label: v.label })),
   },
 ];
 

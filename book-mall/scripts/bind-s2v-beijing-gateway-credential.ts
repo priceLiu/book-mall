@@ -45,16 +45,12 @@ async function main() {
     process.exit(1);
   }
 
-  const baseUrl =
-    process.env.DASHSCOPE_S2V_BEIJING_WORKSPACE_ID?.trim()
-      ? `https://${process.env.DASHSCOPE_S2V_BEIJING_WORKSPACE_ID.trim()}.cn-beijing.maas.aliyuncs.com`
-      : resolveDashscopeBeijingMaasBaseUrl(apiKey);
-  if (!baseUrl) {
-    console.error(
-      "无法从 sk-ws Key 解析 WorkspaceId；可设置 DASHSCOPE_S2V_BEIJING_WORKSPACE_ID 环境变量",
-    );
-    process.exit(1);
-  }
+  // wan2.2-s2v / detect 走 DashScope 通用根域名；华北2 由 sk-ws Key 本身标识。
+  // `{WorkspaceId}.cn-beijing.maas.aliyuncs.com` 会触发 IllegalEndpoint（2026-08 实测）。
+  const baseUrl = "https://dashscope.aliyuncs.com";
+  const workspaceId = resolveDashscopeBeijingMaasBaseUrl(apiKey)?.match(
+    /^https:\/\/([^.]+)\./,
+  )?.[1];
 
   const emailArg =
     process.argv.slice(2).find((a) => a.includes("@"))?.trim() ||
@@ -116,7 +112,7 @@ async function main() {
   await syncCanonicalPlatformAdminKeyBindings(gwUser.id);
   const { updated } = await rebindManagedKeysToPlatformPool();
   console.log(`[ok] Platform Admin / 托管 sk-gw 绑定已刷新: ${updated} 把`);
-  console.log(`     baseUrl: ${baseUrl}`);
+  console.log(`     baseUrl: ${baseUrl}${workspaceId ? ` (workspace ${workspaceId})` : ""}`);
 
   const cred = await getDecryptedCredentialApiKey(credentialId);
   if (!cred) {

@@ -7,6 +7,7 @@ import { AiSpaceFavoriteButton } from "@/components/ai-space/ai-space-favorite-b
 import { cn } from "@/lib/utils";
 
 export type AiSpaceVoiceCatalogItem = {
+  catalogId?: string;
   voiceId: string;
   label: string;
   subtitle: string;
@@ -14,22 +15,51 @@ export type AiSpaceVoiceCatalogItem = {
   previewUrl?: string;
   tags?: string[];
   avatarLetter: string;
+  selectable?: boolean;
 };
 
 const VOICES_API = "/api/platform/v1/ai-space/voices";
+const CLONED_VOICES_API = "/api/platform/v1/ai-space/voices/cloned";
+
+function mapClonedToCatalog(item: {
+  catalogId: string;
+  voiceId: string;
+  label: string;
+  subtitle: string;
+  language?: string;
+  previewUrl?: string;
+  tags?: string[];
+  avatarLetter: string;
+  selectable?: boolean;
+}): AiSpaceVoiceCatalogItem {
+  return {
+    catalogId: item.catalogId,
+    voiceId: item.voiceId,
+    label: item.label,
+    subtitle: item.subtitle,
+    language: item.language,
+    previewUrl: item.previewUrl,
+    tags: item.tags,
+    avatarLetter: item.avatarLetter,
+    selectable: item.selectable !== false,
+  };
+}
 
 function VoiceCard({
   voice,
   selected,
   favorite,
+  selectionEnabled = true,
   onSelect,
 }: {
   voice: AiSpaceVoiceCatalogItem;
   selected: boolean;
   favorite: boolean;
+  selectionEnabled?: boolean;
   onSelect: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const canSelect = selectionEnabled && voice.selectable !== false;
 
   return (
     <div
@@ -38,14 +68,27 @@ function VoiceCard({
         selected
           ? "border-[#0969da] bg-[#f0f6ff] ring-2 ring-[#0969da]/20"
           : "border-[#d0d7de] bg-white hover:border-[#8c959f]",
+        !canSelect && "opacity-80",
       )}
     >
-      <button type="button" className="flex min-w-0 flex-1 items-start gap-2 text-left" onClick={onSelect}>
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-start gap-2 text-left disabled:cursor-not-allowed"
+        disabled={!canSelect}
+        onClick={onSelect}
+      >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#0969da] to-[#6e40c9] text-sm font-semibold text-white">
           {voice.avatarLetter}
         </span>
-        <span className="min-w-0 flex-1 pr-8">
-          <span className="block truncate text-sm font-medium text-[#1f2328]">{voice.label}</span>
+        <span className="min-w-0 flex-1 pr-16">
+          <span className="flex items-center gap-1.5 truncate text-sm font-medium text-[#1f2328]">
+            <span className="truncate">{voice.label}</span>
+            {voice.tags?.includes("cloned") ? (
+              <span className="shrink-0 rounded bg-[#fff8c5] px-1.5 py-0.5 text-[10px] font-medium text-[#9a6700]">
+                克隆
+              </span>
+            ) : null}
+          </span>
           <span className="block truncate text-[11px] text-[#656d76]">
             {voice.language ?? voice.subtitle}
           </span>
@@ -56,20 +99,31 @@ function VoiceCard({
         {voice.previewUrl ? (
           <>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio ref={audioRef} preload="none" src={voice.previewUrl} className="hidden" />
+            <audio ref={audioRef} preload="metadata" src={voice.previewUrl} className="hidden" />
             <button
               type="button"
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#656d76] hover:bg-[#f6f8fa] hover:text-[#0969da]"
               title="试听"
               onClick={(e) => {
                 e.stopPropagation();
-                void audioRef.current?.play();
+                const el = audioRef.current;
+                if (!el) return;
+                void el.play().catch(() => {
+                  window.open(voice.previewUrl, "_blank", "noopener,noreferrer");
+                });
               }}
             >
               <Volume2 className="h-3.5 w-3.5" />
             </button>
           </>
-        ) : null}
+        ) : (
+          <span
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#d0d7de]"
+            title="暂无试听文件"
+          >
+            <Volume2 className="h-3.5 w-3.5" />
+          </span>
+        )}
         <AiSpaceFavoriteButton
           targetKind="tts_voice"
           targetId={voice.voiceId}
@@ -90,12 +144,17 @@ export function AiSpaceVoiceGallery({
   selectedVoiceId,
   favoriteVoiceIds,
   onSelectVoice,
+  selectionEnabled = true,
 }: {
   selectedVoiceId?: string;
   favoriteVoiceIds?: Set<string>;
   onSelectVoice: (voice: AiSpaceVoiceCatalogItem) => void;
+  /** false = 仅试听，不可选为 TTS 音色（例如当前为百炼模型） */
+  selectionEnabled?: boolean;
 }) {
   const [items, setItems] = useState<AiSpaceVoiceCatalogItem[]>([]);
+  const [clonedItems, setClonedItems] = useState<AiSpaceVoiceCatalogItem[]>([]);
+  const [clonedLoading, setClonedLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -104,7 +163,35 @@ export function AiSpaceVoiceGallery({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
 
-  const selectedVoice = items.find((v) => v.voiceId === selectedVoiceId);
+  const selectedVoice =
+    items.find((v) => v.voiceId === selectedVoiceId) ??
+    clonedItems.find((v) => v.voiceId === selectedVoiceId);
+
+  const loadCloned = useCallback(async () => {
+    setClonedLoading(true);
+    try {
+      const res = await fetch(CLONED_VOICES_API, { credentials: "include" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        items: Array<{
+          catalogId: string;
+          voiceId: string;
+          label: string;
+          subtitle: string;
+          language?: string;
+          previewUrl?: string;
+          tags?: string[];
+          avatarLetter: string;
+          selectable?: boolean;
+        }>;
+      };
+      setClonedItems((data.items ?? []).map(mapClonedToCatalog));
+    } catch {
+      /* 克隆列表失败时不阻断系统音色 */
+    } finally {
+      setClonedLoading(false);
+    }
+  }, []);
 
   const loadPage = useCallback(async (nextPage: number) => {
     if (loadingRef.current) return;
@@ -132,8 +219,9 @@ export function AiSpaceVoiceGallery({
   }, []);
 
   useEffect(() => {
+    void loadCloned();
     void loadPage(1);
-  }, [loadPage]);
+  }, [loadCloned, loadPage]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -154,12 +242,13 @@ export function AiSpaceVoiceGallery({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-[#1f2328]">音色列表</p>
           <p className="mt-0.5 text-xs text-[#656d76]">
-            与快速复制共用 MiniMax 目录，支持试听与收藏
-            {items.length > 0 ? ` · 已加载 ${items.length} 项` : ""}
+            与快速复制「我的作品 · 音频」同步；有试听文件即可点喇叭
+            {!selectionEnabled ? " · 选用克隆音色请将语音模型切换为 MiniMax" : ""}
+            {clonedItems.length > 0 ? ` · 共 ${clonedItems.length} 项` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {loading && items.length === 0 ? (
+          {(loading && items.length === 0) || clonedLoading ? (
             <Loader2 className="h-4 w-4 animate-spin text-[#0969da]" />
           ) : null}
           <button
@@ -202,30 +291,65 @@ export function AiSpaceVoiceGallery({
 
       {!collapsed ? (
         <>
-          <div
-            id="ai-space-voice-gallery-grid"
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-          >
-            {items.map((voice) => (
-              <VoiceCard
-                key={voice.voiceId}
-                voice={voice}
-                selected={selectedVoiceId === voice.voiceId}
-                favorite={favoriteVoiceIds?.has(voice.voiceId) ?? false}
-                onSelect={() => {
-                  onSelectVoice(voice);
-                  setCollapsed(true);
-                }}
-              />
-            ))}
-          </div>
-
-          <div ref={sentinelRef} className="h-4" />
-          {loading && items.length > 0 ? (
-            <p className="text-center text-xs text-[#8c959f]">加载更多音色…</p>
+          {clonedItems.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-[#1f2328]">我的克隆音色</p>
+              {!selectionEnabled ? (
+                <p className="text-xs text-[#9a6700]">
+                  当前为百炼模型，克隆音色仅可试听；生成口播请切换上方「语音模型」为 MiniMax。
+                </p>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {clonedItems.map((voice) => (
+                  <VoiceCard
+                    key={voice.catalogId ?? `cloned-${voice.voiceId}`}
+                    voice={voice}
+                    selected={selectionEnabled && selectedVoiceId === voice.voiceId}
+                    favorite={favoriteVoiceIds?.has(voice.voiceId) ?? false}
+                    selectionEnabled={selectionEnabled}
+                    onSelect={() => {
+                      if (!selectionEnabled || voice.selectable === false) return;
+                      onSelectVoice(voice);
+                      setCollapsed(true);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
           ) : null}
-          {!hasMore && items.length > 0 ? (
-            <p className="text-center text-xs text-[#8c959f]">已加载全部音色</p>
+
+          {selectionEnabled ? (
+            <>
+              {clonedItems.length > 0 ? (
+                <p className="text-xs font-medium text-[#656d76]">系统音色</p>
+              ) : null}
+
+              <div
+                id="ai-space-voice-gallery-grid"
+                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+              >
+                {items.map((voice) => (
+                  <VoiceCard
+                    key={voice.voiceId}
+                    voice={voice}
+                    selected={selectedVoiceId === voice.voiceId}
+                    favorite={favoriteVoiceIds?.has(voice.voiceId) ?? false}
+                    onSelect={() => {
+                      onSelectVoice(voice);
+                      setCollapsed(true);
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div ref={sentinelRef} className="h-4" />
+              {loading && items.length > 0 ? (
+                <p className="text-center text-xs text-[#8c959f]">加载更多音色…</p>
+              ) : null}
+              {!hasMore && items.length > 0 ? (
+                <p className="text-center text-xs text-[#8c959f]">已加载全部音色</p>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : null}

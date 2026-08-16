@@ -260,7 +260,7 @@ export function AiSpaceComposeDesk({
         </p>
         {audioAssets.length === 0 ? (
           <p className="mt-2 text-sm text-[#656d76]">
-            音频库还是空的，请先到「音频库」生成或上传。
+            音频库还是空的，请先到「我的音频库」生成或上传。
           </p>
         ) : (
           <select

@@ -174,7 +174,7 @@ export function AiSpaceFavoritesDesk({
           <p className="text-xs text-[#8c959f]">
             收藏的音色可在
             <Link href="/account/ai-space?tab=audio" className="text-[#0969da] hover:underline">
-              音频库
+              我的音频库
             </Link>
             生成口播时快速选用。
           </p>

@@ -35,11 +35,10 @@ function normalizeAiSpaceTtsVoiceControls(input: {
   pitch?: number;
 }): Pick<AiSpaceTtsVoiceControls, "speed" | "volume" | "pitch"> {
   const d = AI_SPACE_TTS_VOICE_CONTROL_DEFAULTS;
-  return {
-    speed: clampVoiceControl(input.speed ?? d.speed, 0.5, 2),
-    volume: clampVoiceControl(input.volume ?? d.volume, 0, 2),
-    pitch: clampVoiceControl(input.pitch ?? d.pitch, -12, 12),
-  };
+  const speed = clampVoiceControl(input.speed ?? d.speed, 0.5, 2);
+  const volume = clampVoiceControl(input.volume ?? d.volume, 0, 2);
+  const pitch = Math.round(clampVoiceControl(input.pitch ?? d.pitch, -12, 12));
+  return { speed, volume, pitch };
 }
 
 function readOptionalNumber(value: unknown): number | undefined {

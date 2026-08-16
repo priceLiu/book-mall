@@ -21,7 +21,8 @@ export async function GET(req: Request) {
         s.storyboardBundles.length +
         s.productDesignBundles.length +
         s.seedVideoBundles.length +
-        s.handCraftBundles.length,
+        s.handCraftBundles.length +
+        s.mediaDecomposeBundles.length,
       0,
     );
     return NextResponse.json({ sections, totalAssets, totalBundles });

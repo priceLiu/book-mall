@@ -148,6 +148,7 @@ export async function syncQuickReplicaAudioToAiSpace(args: {
   name: string;
   textScript?: string | null;
   originRef?: string | null;
+  meta?: Record<string, unknown> | null;
 }): Promise<void> {
   try {
     const durationSec = await probeAudioDurationSec(args.buffer, args.ext);
@@ -160,6 +161,7 @@ export async function syncQuickReplicaAudioToAiSpace(args: {
       textScript: args.textScript ?? null,
       originApp: "quick-replica",
       originRef: args.originRef ?? null,
+      meta: args.meta ?? null,
     });
   } catch (e) {
     console.error("[ai-space] syncQuickReplicaAudioToAiSpace failed", e);

@@ -125,7 +125,7 @@ export function AiSpaceTtsVoiceControlsPanel({
           value={controls.pitch}
           min={-12}
           max={12}
-          step={0.1}
+          step={1}
           onChange={(pitch) => patch({ pitch })}
         />
       </div>

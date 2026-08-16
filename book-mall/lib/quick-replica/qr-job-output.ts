@@ -11,6 +11,9 @@ export function extractQrJobOutputUrl(resultSummary: unknown): {
   if (typeof root.audio_url === "string" && root.audio_url.trim()) {
     return { url: root.audio_url.trim(), mediaType: "audio" };
   }
+  if (typeof root.demo_audio === "string" && root.demo_audio.trim()) {
+    return { url: root.demo_audio.trim(), mediaType: "audio" };
+  }
   if (typeof root.video_url === "string" && root.video_url.trim()) {
     return { url: root.video_url.trim(), mediaType: "video" };
   }
