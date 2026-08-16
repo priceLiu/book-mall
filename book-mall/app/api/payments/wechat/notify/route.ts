@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   const { associated_data, nonce: resNonce, ciphertext } = notify.resource;
   let transaction: WxTransaction;
   try {
-    transaction = decryptNotifyResource(associated_data, resNonce, ciphertext) as WxTransaction;
+    transaction = decryptNotifyResource(associated_data, resNonce, ciphertext) as unknown as WxTransaction;
   } catch (e) {
     console.error("[wechat/notify] 解密失败", e);
     return new NextResponse("DECRYPT_ERROR", { status: 500 });
