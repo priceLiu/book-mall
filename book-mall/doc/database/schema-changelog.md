@@ -262,6 +262,20 @@
 
 ---
 
+## 2026-08-16 — 我的 AI 空间 · 口播分镜脚本（已落库）
+
+- **迁移目录**：`prisma/migrations/20260816140000_ai_space_broadcast/`
+- **产品文档**：[`doc/product/ai-space-broadcast-script.md`](../product/ai-space-broadcast-script.md) · [`doc/product/我的AI空间.md`](../product/我的AI空间.md) §4.5
+- **新表**：
+  - `AiSpaceBroadcastProject`——口播项目壳（`sourceKind` / `sourceText` / `brief` / `activeScriptId` / `status`）
+  - `AiSpaceBroadcastScript`——版本化脚本头（`projectId` + `version` 唯一）
+  - `AiSpaceBroadcastShot`——镜级行（台词 / 时间 / `presenter` & `visual` JSON / 素材 id 引用）
+  - `AiSpaceBroadcastRenderJob`——总拼接任务（`finalVideoUrl` / `status`）
+- **非 schema**：合成台 `ComposeProgressStep[]` 分步进度；Tab `?tab=broadcast`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
 ## 2026-08-15 — 手伴创作（线稿 → 潮玩盲盒 IP 全案，已落库）
 
 - **迁移目录**：`prisma/migrations/20260815120000_ecom_hand_craft_project/`

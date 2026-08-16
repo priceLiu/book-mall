@@ -15,7 +15,15 @@ const splitBtnClass =
   "rounded-none shadow-none first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 h-9 px-4 pointer-events-none";
 
 /** 顶栏「产品」：与各子站 federated 门户菜单一致 */
-export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" | "link" }) {
+export function SiteHomeProductNav({
+  variant = "button",
+  linkClassName = "site-home-nav-link",
+  linkActiveClassName = "site-home-nav-link-active",
+}: {
+  variant?: "button" | "link";
+  linkClassName?: string;
+  linkActiveClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const items = buildBookPortalNavItems();
 
@@ -40,7 +48,7 @@ export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" 
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className={cn("site-home-nav-link", open && "site-home-nav-link-active")}
+            className={cn(linkClassName, open && linkActiveClassName)}
             aria-haspopup="menu"
             aria-expanded={open}
           >

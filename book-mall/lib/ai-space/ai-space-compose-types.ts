@@ -1,5 +1,9 @@
 /** 合成台 · 客户端可安全引用的类型与常量（不含 prisma） */
 
+import type { ComposeProgressStep } from "./ai-space-compose-progress";
+
+export type { ComposeProgressStep } from "./ai-space-compose-progress";
+
 /** wan2.2-s2v 音频硬限制：时长 < 20 秒（入口即校验，避免无效厂商调用） */
 export const AI_SPACE_S2V_MAX_AUDIO_SEC = 20;
 
@@ -31,6 +35,10 @@ export type AiSpaceComposeOverlayOptions = {
   /** 烧录台词字幕 */
   burnSubtitle: boolean;
   resolution: "480P" | "720P";
+  /** 相对本镜/本段起点，数字人小窗开始显示（秒） */
+  appearFromSec?: number;
+  /** 相对本镜/本段终点；null = 跟本段结束 */
+  appearToSec?: number | null;
 };
 
 export const AI_SPACE_COMPOSE_DEFAULT_OPTIONS: AiSpaceComposeOverlayOptions = {
@@ -48,12 +56,15 @@ export type AiSpaceComposeTaskDto = {
   digitalHumanId: string;
   audioAssetId: string;
   videoMaterialId: string | null;
+  options: AiSpaceComposeOverlayOptions;
   tempHumanVideoUrl: string | null;
   finalVideoUrl: string | null;
   errorMessage: string | null;
   gatewayLogId: string | null;
-  /** 0–100，合成阶段取 MediaRenderJob 进度 */
+  /** 0–100，由分步进度加权计算 */
   progress: number;
+  steps: ComposeProgressStep[];
+  currentStepId: string;
   createdAt: string;
   updatedAt: string;
 };

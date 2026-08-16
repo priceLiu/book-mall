@@ -210,3 +210,21 @@ docker compose up -d --build
 | `pnpm --dir book-mall hotcold:archive -- --only=gateway` | **每 15–30 分钟** | R3：终态 Gateway 日志迁入归档（默认热保留 1h） |
 
 详见 `book-mall/doc/product/gen-hotcold-policy.md`。
+
+---
+
+## 七、book-mall 积分清零 Cron（Credit Expiry Ops）
+
+生产 **CloudBase 定时 HTTP**（鉴权 `Authorization: Bearer <CREDITS_CRON_SECRET>`，缺省回退 `CRON_SECRET`）：
+
+| 时间 (CST) | 路径 | 说明 |
+|------------|------|------|
+| 00:05 | `POST /api/admin/credits/ops/generate-work-items?includeOverdue=1` | 生成/更新当日与逾期工单 |
+| 00:15 | `POST /api/admin/credits/ops/run-daily?phase=expire` | 批次到期清扫 + 回写工单 |
+| 00:30 | `POST /api/admin/credits/ops/run-daily?phase=reset` | 订阅 31 天刷新 + 回写工单 |
+
+兼容旧路径（内部转调 ops 层）：`/api/admin/credits/expire-sweep`、`/api/admin/credits/monthly-reset`。
+
+运维监控：finance-web **`/admin/credit-expiry-ops`**（见 `docs/积分清零控制台.md`）。
+
+`vercel.json` 中同名 cron 仅作 Vercel 部署备用，**不以之为 CloudBase 唯一依赖**。

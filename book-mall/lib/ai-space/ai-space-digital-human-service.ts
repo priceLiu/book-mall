@@ -182,6 +182,10 @@ export async function deleteAiSpaceDigitalHuman(
   });
   if (!row) return { deleted: false, avatarImageUrl: null };
 
+  await prisma.aiSpaceFavorite.deleteMany({
+    where: { userId, targetKind: "digital_human", targetId: row.id },
+  });
+
   await prisma.aiSpaceDigitalHuman.delete({ where: { id: row.id } });
   const stillReferenced = await prisma.aiSpaceDigitalHuman.count({
     where: { avatarImageUrl: row.avatarImageUrl },

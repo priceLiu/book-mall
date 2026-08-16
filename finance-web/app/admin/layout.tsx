@@ -1,4 +1,5 @@
 import { AdminSidebar } from "@/components/admin-sidebar";
+import { CreditExpiryAlertBar } from "@/components/credit-expiry-alert-bar";
 import { FinanceAppTopBar } from "@/components/finance-app-top-bar";
 import { FinanceViewerBar } from "@/components/finance-viewer-bar";
 
@@ -11,6 +12,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f2f5]">
         <FinanceAppTopBar scope="admin" />
         <FinanceViewerBar scope="admin" />
+        <CreditExpiryAlertBar />
         <div className="min-h-0 flex-1 overflow-auto bg-[#f0f2f5]">{children}</div>
       </div>
     </div>

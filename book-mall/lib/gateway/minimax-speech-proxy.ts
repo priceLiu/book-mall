@@ -23,6 +23,7 @@ export type MinimaxT2aInput = {
   speed?: number;
   vol?: number;
   pitch?: number;
+  emotion?: string;
   stability?: number;
   similarity_boost?: number;
   style_exaggeration?: number;
@@ -129,6 +130,9 @@ export async function forwardMinimaxT2a(args: {
     vol: args.input.vol ?? 1,
     pitch: args.input.pitch ?? 0,
   };
+  if (args.input.emotion?.trim()) {
+    voiceSetting.emotion = args.input.emotion.trim();
+  }
 
   const body: Record<string, unknown> = {
     model,

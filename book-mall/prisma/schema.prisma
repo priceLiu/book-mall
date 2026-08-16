@@ -129,10 +129,12 @@ model User {
   qrTemplates                      QrTemplate[]
   qrKindFeaturedUpdates            QrKindFeatured[] @relation("QrKindFeaturedUpdater")
   aiSpacePins                      AiSpacePin[]
+  aiSpaceFavorites                 AiSpaceFavorite[]
   aiSpaceDigitalHumans             AiSpaceDigitalHuman[]
   aiSpaceAudioAssets               AiSpaceAudioAsset[]
   aiSpaceVideoMaterials            AiSpaceVideoMaterial[]
   aiSpaceComposeTasks              AiSpaceComposeTask[]
+  aiSpaceBroadcastProjects         AiSpaceBroadcastProject[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -3242,6 +3244,92 @@ model CreditLot {
   @@index([expiresAt])
 }
 
+// ——————————————————— 积分清零运维台（Credit Expiry Ops） ———————————————————
+
+enum CreditOpsJobType {
+  DAILY_EXPIRE_SWEEP
+  DAILY_SUBSCRIPTION_RESET
+  MANUAL_BACKFILL
+}
+
+enum CreditOpsJobTrigger {
+  CRON
+  ADMIN
+  SCRIPT
+}
+
+enum CreditOpsJobStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum CreditOpsWorkType {
+  BATCH_EXPIRE
+  SUBSCRIPTION_RESET
+}
+
+enum CreditOpsWorkStatus {
+  PENDING
+  OVERDUE
+  RUNNING
+  DONE
+  SKIPPED
+  FAILED
+}
+
+/// 积分清零批量执行记录（Cron / 手动补跑）
+model CreditOpsJobRun {
+  id             String              @id @default(cuid())
+  jobType        CreditOpsJobType
+  /// 业务日 YYYY-MM-DD（Asia/Shanghai）
+  scheduledDate  String
+  trigger        CreditOpsJobTrigger
+  triggeredByUserId String?
+  status         CreditOpsJobStatus  @default(RUNNING)
+  statsJson      Json?
+  errorSummary   String?
+  startedAt      DateTime            @default(now())
+  finishedAt     DateTime?
+  workItems      CreditOpsWorkItem[]
+
+  @@index([scheduledDate, jobType])
+  @@index([startedAt])
+}
+
+/// 积分清零单账户工单（运维台核心表）
+model CreditOpsWorkItem {
+  id                    String              @id @default(cuid())
+  workType              CreditOpsWorkType
+  /// 应处理业务日 YYYY-MM-DD（CST）
+  dueDate               String
+  dueAt                 DateTime
+  accountId             String
+  ownerType             CreditOwnerType
+  ownerId               String
+  ownerHint             String?
+  pool                  CreditPool          @default(GENERAL)
+  source                CreditSource?
+  periodKey             String              @default("")
+  expectedExpireCredits Int                 @default(0)
+  expectedGrantCredits  Int                 @default(0)
+  status                CreditOpsWorkStatus @default(PENDING)
+  isBackfill            Boolean             @default(false)
+  jobRunId              String?
+  jobRun                CreditOpsJobRun?    @relation(fields: [jobRunId], references: [id], onDelete: SetNull)
+  processedAt           DateTime?
+  resultJson            Json?
+  errorMessage          String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@unique([workType, accountId, pool, dueDate, periodKey])
+  @@index([dueDate, status])
+  @@index([status])
+  @@index([accountId])
+}
+
 /// 调价提案审批流（运营提交 → 财务复核 → 超管终审 → 生效）
 enum PlanChangeStatus {
   DRAFT // 草稿
@@ -3695,6 +3783,28 @@ model AiSpacePin {
   @@index([sourceType, sourceId])
 }
 
+/// 我的收藏：个人音频 / 数字人 / TTS 音色快捷入口（与作品墙 Pin 分离）
+model AiSpaceFavorite {
+  id     String @id @default(cuid())
+  userId String
+
+  /// audio | digital_human | tts_voice
+  targetKind String
+  targetId   String
+  /// tts_voice 等展示快照：label / language / previewUrl / modelKey
+  meta       Json?
+
+  sortOrder Int @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, targetKind, targetId])
+  @@index([userId, targetKind, sortOrder])
+}
+
 /// 数字人形象库（Book 平台真源，全应用经 digitalHumanId 引用）
 model AiSpaceDigitalHuman {
   id     String @id @default(cuid())
@@ -3822,6 +3932,107 @@ model AiSpaceComposeTask {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+/// 口播分镜 · 项目壳
+model AiSpaceBroadcastProject {
+  id     String @id @default(cuid())
+  userId String
+  title  String @default("未命名口播项目")
+
+  sourceKind         String  @default("text")
+  sourceText         String? @db.Text
+  sourceAudioAssetId String?
+
+  brief             Json   @default("{}")
+  targetDurationSec Int?
+  aspectRatio       String @default("9:16")
+
+  /// draft | locked | rendering | done
+  status         String  @default("draft")
+  activeScriptId String?
+
+  tenantId String?
+
+  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scripts    AiSpaceBroadcastScript[]
+  renderJobs AiSpaceBroadcastRenderJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+/// 口播分镜 · 版本化脚本头
+model AiSpaceBroadcastScript {
+  id        String @id @default(cuid())
+  projectId String
+  version   Int
+  /// draft | locked
+  status    String @default("draft")
+  llmMeta   Json?
+
+  project AiSpaceBroadcastProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shots   AiSpaceBroadcastShot[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt])
+}
+
+/// 口播分镜 · 镜级行
+model AiSpaceBroadcastShot {
+  id       String @id @default(cuid())
+  scriptId String
+  index    Int
+
+  startSec    Float @default(0)
+  endSec      Float @default(0)
+  durationSec Float @default(0)
+
+  voiceoverText    String @db.Text
+  sceneDescription String @default("") @db.Text
+
+  presenter Json @default("{}")
+  visual    Json @default("{}")
+
+  audioAssetId      String?
+  backgroundVideoId String?
+  digitalHumanId    String?
+
+  /// draft | tts_ready | rendering | done | failed
+  shotStatus    String  @default("draft")
+  composeTaskId String?
+  outputVideoUrl String? @db.Text
+  errorMessage   String? @db.Text
+
+  script AiSpaceBroadcastScript @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scriptId, index])
+  @@index([scriptId, index])
+}
+
+/// 口播分镜 · 总拼接任务
+model AiSpaceBroadcastRenderJob {
+  id        String @id @default(cuid())
+  projectId String
+  scriptId  String
+  status    String @default("pending")
+  finalVideoUrl String? @db.Text
+  errorMessage  String? @db.Text
+  meta          Json?
+
+  project AiSpaceBroadcastProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, createdAt])
 }
 
 /// 平台 AI 导览助手 · 白名单文档切块（RAG 知识库）

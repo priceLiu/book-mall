@@ -102,6 +102,7 @@
 ├── 音频库                           # §4.2 · 与 QuickReplica 音频统一
 ├── 视频创作库                       # §4.3 · 分类 + 各应用已发布视频 + 用户上传
 ├── 视频合成台                       # §4.4 · 数字人 + 音频 + 背景视频 → 成片
+├── 口播脚本                         # §4.5 · 整段文案拆镜 + 表格编辑 → 分镜渲染
 └── [预留] 关注 / 收藏 / 公开主页 slug
 ```
 
@@ -404,6 +405,18 @@ model AiSpaceComposeTask {
 
 **Provider 抽象**（数字人文档 §6）：预留 `IVideoProvider` / `ITTSProvider`；v1 阿里云，v2 可接 MiniMax（仍经 Gateway）。
 
+### 4.5 口播分镜脚本（创作编排层）
+
+**权威文档**：[ai-space-broadcast-script.md](./ai-space-broadcast-script.md)
+
+**定位**：合成台（§4.4）的 **上级编排**：整段口播文案 → Gateway LLM 拆镜 → 表格编辑（绑背景、数字人出镜时间段）→ 锁定 → 分镜级渲染 + 总拼接。
+
+**与 §4.4 关系**：单次 `AiSpaceComposeTask` 变为 **镜级渲染单元**；新 Tab `?tab=broadcast`（口播脚本）。
+
+**v1 范围**：文案输入 + AI 拆镜 + 表格 CRUD + 单镜 TTS；语音 ASR 路径预留。合成台单次任务增加 **分步进度条**（排队 / S2V / 转存 / 画中画 / 入库）。
+
+**数据表（Phase 2+）**：`AiSpaceBroadcastProject` · `AiSpaceBroadcastScript` · `AiSpaceBroadcastShot` · `AiSpaceBroadcastRenderJob`（见子文档 §3）。
+
 ---
 
 ## 5. 对 [../数字人.md](../数字人.md) 的评估与改造清单
@@ -505,7 +518,13 @@ model AiSpaceComposeTask {
 | POST | `/audio-assets/upload` | 上传本地音频（multipart） |
 | GET/POST | `/audio-assets/tts` | 可选模型音色 / 空间内 TTS 生成（Gateway） |
 | GET/POST/PATCH/DELETE | `/video-materials` | 视频创作库；默认返回「自有 + Pin(video)」合并视图，`?ownedOnly=1` 只返回本库 |
-| GET/POST | `/compose-tasks` | 合成任务列表（`?id=` 单条，轮询时推进队列）/ 发起合成 |
+| GET/POST | `/compose-tasks` | 合成任务列表（`?id=` 单条，轮询时推进队列）/ 发起合成；DTO 含 `steps[]` 分步进度 |
+| GET/POST | `/broadcast-projects` | 口播项目列表 / 新建（§4.5） |
+| POST | `/broadcast-projects/split?id=` | LLM 拆镜 |
+| POST | `/broadcast-projects/lock?id=` | 锁定脚本 |
+| GET/PATCH/POST/DELETE | `/broadcast-shots?scriptId=` | 分镜行 CRUD |
+| POST | `/broadcast-shots/tts?id=` | 单镜 TTS |
+| POST | `/broadcast-projects/render?id=` | 镜级渲染 + 总拼接 |
 
 > 写操作按资源分布在同一 collection 路由上（`?id=` 定位），与 `quick-replica` 现网风格一致；未使用 `/:id` 动态段。
 
@@ -524,8 +543,10 @@ model AiSpaceComposeTask {
 | **P2** | 电商 / 种草 / QR 至少一个模块接入 `digitalHumanId` / `audioAssetId` 引用 | 中 |
 | **P2** | `AiSpaceComposeTask` + Gateway S2V 队列 + FFmpeg worker | 中 |
 | **P3** | 关注 / 收藏 / 公开主页 | 低 |
+| **P4** | 口播分镜脚本（§4.5）：拆镜 + 表格 + 镜级渲染 + 总拼接 | 高 |
+| **P4** | 合成台分步进度 UI | 中 |
 
-**当前进度（2026-08-15）**：P0、P1 全部交付；P2 的 `AiSpaceComposeTask` + S2V 单飞队列 + composite 渲染已交付，剩「子应用引用 `digitalHumanId` / `audioAssetId`」待逐个接入；P3 未开始。
+**当前进度（2026-08-16）**：P0–P2（AI 空间五 Tab + 合成台）已交付；P4 口播脚本与分步进度实施中；P3 未开始。
 
 ---
 
@@ -563,3 +584,4 @@ model AiSpaceComposeTask {
 | 2026-08-15 | 一期落地：五张表迁移 `20260815020000_ai_space`；作品墙 / 数字人库 / 音频库 / 视频创作库 / 合成台五个 Tab 上线；Gateway 补登 `wan2.2-s2v` 与 CosyVoice（新建 `cosyvoice-tts-proxy.ts`）；`MediaTimelineV1.composite` + `render-ffmpeg.runCompositeRender` 实现画中画；合成台经 `pg_try_advisory_xact_lock` 单飞排队（S2V 厂商并发 1）；API 表按实际路由更新 |
 | 2026-08-15 | 接入形象图预检 `wan2.2-s2v-detect`（同步接口 0.004 元/张）：形象上传即检、合成前门禁、UI「重新预检」；结果缓存 `AiSpaceDigitalHuman.meta.detect`（含 `imageUrl`，换图自动失效），不通过时状态置 `detect_failed`。新增 `lib/ai-space/ai-space-s2v-detect-service.ts` + `lib/ai-space/ai-space-gateway-auth.ts`（S2V / detect / TTS 共用凭证解析）+ `pnpm gateway:detect-digital-humans` 存量回填。S2V 厂商 `InternalError` 改为指向「需华北2（北京）地域 Key」的可执行提示 |
 | 2026-08-15 | 实机验证与修复：S2V 进程内 20min 硬超时改为「10min 交队列泵 + 3h 硬上限」（避免误杀厂商仍在跑的任务），对账终态补写 Gateway 日志；终态后 `kickNextPendingTask` 自动放行下一条排队；composite 字幕在底部小窗时按 ASS 脚本坐标抬高 `MarginV`，不再压住画中画。新增运维脚本 `gateway:verify-ai-space` / `gateway:ai-space-worker` / `gateway:smoke-ai-space` / `gateway:smoke-composite` 与 `scripts/debug-s2v-task.ts` |
+| 2026-08-16 | §4.5 口播分镜脚本：新增 [ai-space-broadcast-script.md](./ai-space-broadcast-script.md)；`?tab=broadcast` Tab；四表 `AiSpaceBroadcast*`；合成台分步进度 `steps[]` |

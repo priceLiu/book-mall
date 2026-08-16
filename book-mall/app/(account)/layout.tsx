@@ -9,9 +9,9 @@ import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
 import { getEcommerceWebOrigin, getCommonToolsOrigin, getQuickReplicaOrigin, getPublisherWebOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { getReferralEligibility } from "@/lib/referral/referral-service";
+import { AccountAppShell } from "@/components/account/account-app-shell";
 import { AccountShell } from "@/components/account/account-shell";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
-import { SiteAppShell } from "@/components/layout/site-home/site-app-shell";
 import { runDbQuery } from "@/lib/db-query";
 import "../site-home.css";
 
@@ -142,10 +142,7 @@ export default async function AccountGroupLayout({
       });
 
   return (
-    <SiteAppShell
-      isLoggedIn
-      navAuth={<NavbarAuth appearance="site-home" />}
-    >
+    <AccountAppShell navAuth={<NavbarAuth appearance="default" />}>
       <AccountShell
         profile={{
           image: userRecord?.image ?? session.user.image ?? null,
@@ -171,6 +168,6 @@ export default async function AccountGroupLayout({
       >
         {children}
       </AccountShell>
-    </SiteAppShell>
+    </AccountAppShell>
   );
 }

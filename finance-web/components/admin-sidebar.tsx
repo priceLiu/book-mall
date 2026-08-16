@@ -79,6 +79,13 @@ const NAV_GROUPS: NavGroup[] = [
         prefix: "/admin/reconciliation",
         show: (v) => canViewFinanceCost(v.user.role),
       },
+      {
+        href: "/admin/credit-expiry-ops",
+        label: "积分清零运维",
+        icon: ListChecks,
+        prefix: "/admin/credit-expiry-ops",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
     ],
   },
   {

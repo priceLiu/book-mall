@@ -207,6 +207,10 @@ export async function deleteAiSpaceAudioAsset(
   });
   if (!row) return { deleted: false, audioUrl: null };
 
+  await prisma.aiSpaceFavorite.deleteMany({
+    where: { userId, targetKind: "audio", targetId: row.id },
+  });
+
   await prisma.aiSpaceAudioAsset.delete({ where: { id: row.id } });
   const stillReferenced = await prisma.aiSpaceAudioAsset.count({
     where: { audioUrl: row.audioUrl },

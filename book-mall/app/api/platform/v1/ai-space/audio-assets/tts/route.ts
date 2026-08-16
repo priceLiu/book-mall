@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolveAiSpaceActor } from "@/lib/ai-space/ai-space-auth";
 import {
+  AI_SPACE_TTS_MINIMAX_MODELS,
   AI_SPACE_TTS_MODELS,
   isAiSpaceTtsModelKey,
 } from "@/lib/ai-space/ai-space-tts-catalog";
@@ -9,6 +10,7 @@ import {
   AiSpaceTtsError,
   generateAiSpaceTtsAudio,
 } from "@/lib/ai-space/ai-space-tts-service";
+import { parseAiSpaceTtsVoiceControls } from "@/lib/ai-space/ai-space-tts-voice-controls";
 import { GatewayRequiredError } from "@/lib/gateway/book-gateway-link";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +21,10 @@ export const maxDuration = 300;
 export async function GET(req: Request) {
   const auth = await resolveAiSpaceActor(req);
   if (!auth.ok) return auth.res;
-  return NextResponse.json({ models: AI_SPACE_TTS_MODELS });
+  return NextResponse.json({
+    models: AI_SPACE_TTS_MODELS,
+    minimaxModels: AI_SPACE_TTS_MINIMAX_MODELS,
+  });
 }
 
 /** 生成口播音频并入库 */
@@ -47,6 +52,7 @@ export async function POST(req: Request) {
       text: typeof body.text === "string" ? body.text : "",
       name: typeof body.name === "string" ? body.name : null,
       instruction: typeof body.instruction === "string" ? body.instruction : null,
+      controls: parseAiSpaceTtsVoiceControls(body),
     });
     return NextResponse.json({ ok: true, asset });
   } catch (e) {

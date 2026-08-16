@@ -517,6 +517,19 @@ function overlayPositionExpr(
   }
 }
 
+function overlayEnableExpr(
+  overlay: CompositeOverlay,
+  durationSec: number,
+): string {
+  const from = overlay.appearFromSec ?? 0;
+  const to =
+    overlay.appearToSec != null && overlay.appearToSec >= 0
+      ? overlay.appearToSec
+      : durationSec;
+  if (from <= 0 && to >= durationSec - 0.05) return "";
+  return `:enable='between(t,${from.toFixed(3)},${to.toFixed(3)})'`;
+}
+
 function srtTimestamp(totalSec: number): string {
   const ms = Math.max(0, Math.round(totalSec * 1000));
   const h = Math.floor(ms / 3_600_000);
@@ -617,7 +630,7 @@ async function runCompositeFfmpeg(args: {
       `[1:v]scale=${Math.max(2, Math.round(targetSize.w * overlay.scale))}:-2,setsar=1,fps=30[fg]`,
     );
     filters.push(
-      `[bg][fg]overlay=${overlayPositionExpr(overlay.position, overlay.marginPx)}:shortest=1[vmix]`,
+      `[bg][fg]overlay=${overlayPositionExpr(overlay.position, overlay.marginPx)}${overlayEnableExpr(overlay, args.foregroundDurationSec)}:shortest=1[vmix]`,
     );
   } else {
     inputs.push("-i", args.foregroundPath);

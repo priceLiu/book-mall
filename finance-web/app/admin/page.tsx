@@ -3,6 +3,7 @@ import { FinancePageShell } from "@/components/finance-page-shell";
 
 const cards = [
   { href: "/admin/help", title: "财务 2.0 使用说明", desc: "积分换算口径、角色权限、调价流程与模块导航。" },
+  { href: "/admin/credit-expiry-ops", title: "积分清零运维台", desc: "到期清单、自动执行记录、漏跑预警与补跑。" },
   { href: "/admin/teams", title: "团队财务", desc: "全站团队列表、团队驾驶舱与成员溯源。" },
   { href: "/admin/billing/users", title: "按用户查看账单明细", desc: "财务管理员 · 31 列费用明细。" },
   { href: "/admin/billing/all", title: "费用明细（全部）", desc: "财务管理员 · 全站云级账单行。" },

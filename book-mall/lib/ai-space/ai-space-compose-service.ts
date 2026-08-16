@@ -47,6 +47,7 @@ import {
   type AiSpaceComposeOverlayOptions,
   type AiSpaceComposeTaskDto,
 } from "./ai-space-compose-types";
+import { parseAiSpaceComposeOverlayOptions } from "./ai-space-compose-options";
 import { getAiSpaceDigitalHuman } from "./ai-space-digital-human-service";
 import { requireAiSpaceDashscopeAuth } from "./ai-space-gateway-auth";
 import {
@@ -100,29 +101,7 @@ function s2vLockKeys(): [number, number] {
 }
 
 function normalizeOptions(raw: unknown): AiSpaceComposeOverlayOptions {
-  const o = (raw ?? {}) as Partial<AiSpaceComposeOverlayOptions>;
-  const scale =
-    typeof o.scale === "number" && o.scale >= 0.1 && o.scale <= 1
-      ? o.scale
-      : AI_SPACE_COMPOSE_DEFAULT_OPTIONS.scale;
-  const marginPx =
-    typeof o.marginPx === "number" && o.marginPx >= 0 && o.marginPx <= 400
-      ? Math.round(o.marginPx)
-      : AI_SPACE_COMPOSE_DEFAULT_OPTIONS.marginPx;
-  const position =
-    o.position === "bottom-left" ||
-    o.position === "top-right" ||
-    o.position === "top-left" ||
-    o.position === "center"
-      ? o.position
-      : AI_SPACE_COMPOSE_DEFAULT_OPTIONS.position;
-  return {
-    scale,
-    marginPx,
-    position,
-    burnSubtitle: o.burnSubtitle === true,
-    resolution: o.resolution === "720P" ? "720P" : "480P",
-  };
+  return parseAiSpaceComposeOverlayOptions(raw);
 }
 
 const toDto = toAiSpaceComposeTaskDto;
@@ -469,6 +448,8 @@ async function runComposeStage(taskId: string): Promise<void> {
             scale: options.scale,
             position: options.position,
             marginPx: options.marginPx,
+            appearFromSec: options.appearFromSec,
+            appearToSec: options.appearToSec,
           },
           subtitleText: options.burnSubtitle
             ? (audio?.textScript ?? undefined)
@@ -689,6 +670,63 @@ export async function pumpAiSpaceComposeQueue(): Promise<void> {
     select: { id: true },
   });
   if (next) await advanceAiSpaceComposeTask(next.id);
+}
+
+/** 失败任务重试：重置状态并重新入队（保留同一条任务记录） */
+export async function retryAiSpaceComposeTask(
+  userId: string,
+  taskId: string,
+): Promise<AiSpaceComposeTaskDto> {
+  const task = await prisma.aiSpaceComposeTask.findFirst({
+    where: { id: taskId, userId },
+  });
+  if (!task) throw new AiSpaceComposeError("任务不存在", 404);
+  if (task.status !== "failed") {
+    throw new AiSpaceComposeError("只有失败的任务可以重试", 400);
+  }
+
+  const human = await getAiSpaceDigitalHuman(userId, task.digitalHumanId);
+  if (!human) throw new AiSpaceComposeError("数字人形象不存在或已删除", 400);
+  if (human.status === "inactive") {
+    throw new AiSpaceComposeError("该形象已停用，请先启用或换一个形象", 400);
+  }
+
+  const audio = await getAiSpaceAudioAsset(userId, task.audioAssetId);
+  if (!audio) throw new AiSpaceComposeError("音频不存在或已删除", 400);
+  if (audio.durationSec <= 0 || audio.durationSec >= AI_SPACE_S2V_MAX_AUDIO_SEC) {
+    throw new AiSpaceComposeError(
+      `口播音频不可用（需大于 0 秒且小于 ${AI_SPACE_S2V_MAX_AUDIO_SEC} 秒）`,
+      400,
+    );
+  }
+
+  if (task.videoMaterialId) {
+    const bg = await getAiSpaceVideoMaterial(userId, task.videoMaterialId);
+    if (!bg) throw new AiSpaceComposeError("背景视频不存在或已删除", 400);
+  }
+
+  await requireDashscopeAuth(userId);
+
+  await prisma.aiSpaceComposeTask.update({
+    where: { id: taskId },
+    data: {
+      status: "pending",
+      errorMessage: null,
+      gatewayLogId: null,
+      gatewayTaskId: null,
+      tempHumanVideoUrl: null,
+      mediaRenderJobId: null,
+      finalVideoUrl: null,
+    },
+  });
+
+  void advanceAiSpaceComposeTask(taskId).catch((e) => {
+    console.error("[ai-space/compose] retry advance failed", taskId, e);
+  });
+
+  const dto = await getAiSpaceComposeTask(userId, taskId);
+  if (!dto) throw new AiSpaceComposeError("任务不存在", 404);
+  return dto;
 }
 
 

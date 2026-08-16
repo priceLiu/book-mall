@@ -13,6 +13,7 @@ import {
   AiSpaceConfirmDialog,
   type AiSpaceConfirmRequest,
 } from "./ai-space-confirm-dialog";
+import { AiSpaceAudioControls } from "./ai-space-audio-controls";
 
 /** launch.app → Book 侧 SSO 中转页 */
 const OPEN_ROUTE: Record<string, string> = {
@@ -37,8 +38,7 @@ function MediaPreview({ entry }: { entry: AiSpacePinEntry }) {
   if (resolved.kind === "audio") {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#f6f8fa] p-3">
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <audio className="w-full" controls preload="none" src={resolved.mediaUrl} />
+        <AiSpaceAudioControls className="w-full" src={resolved.mediaUrl} />
       </div>
     );
   }
@@ -151,7 +151,7 @@ export function AiSpacePinWall({
             {label}
             <span className="ml-2 text-xs font-normal text-[#656d76]">{list.length} 件</span>
           </h2>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {list.map((entry) => {
               const href = entry.resolved.launch ? launchHref(entry.resolved.launch) : null;
               return (

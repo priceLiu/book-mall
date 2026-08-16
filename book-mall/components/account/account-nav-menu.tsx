@@ -61,6 +61,7 @@ type NavRuntimeProps = {
   pathname: string;
   onAction: (id: string) => void;
   onNavigate?: () => void;
+  compact?: boolean;
 };
 
 /** 侧栏常驻导航（不用 Ark Menu，避免 Positioner 撑满视口） */
@@ -69,11 +70,16 @@ function AccountSidebarNav({
   pathname,
   onAction,
   onNavigate,
+  compact = false,
 }: NavRuntimeProps) {
   function renderLink(item: AccountNavLinkItem) {
     const active = isAccountNavLinkActive(pathname, item.href, item.exact);
     const Icon = item.icon;
-    const className = cn(itemClass, active && itemActiveClass);
+    const className = cn(
+      itemClass,
+      active && itemActiveClass,
+      compact && "account-nav-item-compact justify-center px-2",
+    );
 
     if (item.external || item.openInNewTab) {
       return (
@@ -83,10 +89,18 @@ function AccountSidebarNav({
           target="_blank"
           rel="noopener noreferrer"
           className={className}
+          title={compact ? item.label : undefined}
           onClick={() => onNavigate?.()}
         >
           <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-          <span className="truncate">{item.label}</span>
+          <span
+            className={cn(
+              "truncate transition-[opacity,max-width] duration-300 ease-out",
+              compact ? "max-w-0 opacity-0" : "max-w-[12rem] opacity-100",
+            )}
+          >
+            {item.label}
+          </span>
         </a>
       );
     }
@@ -96,11 +110,19 @@ function AccountSidebarNav({
         key={item.href}
         href={item.href}
         className={className}
+        title={compact ? item.label : undefined}
         aria-current={active ? "page" : undefined}
         onClick={() => onNavigate?.()}
       >
         <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-        <span className="truncate">{item.label}</span>
+        <span
+          className={cn(
+            "truncate transition-[opacity,max-width] duration-300 ease-out",
+            compact ? "max-w-0 opacity-0" : "max-w-[12rem] opacity-100",
+          )}
+        >
+          {item.label}
+        </span>
       </Link>
     );
   }
@@ -114,7 +136,11 @@ function AccountSidebarNav({
       <button
         key={item.id}
         type="button"
-        className={subscriptionAction ? signOutButtonClass : itemClass}
+        className={cn(
+          subscriptionAction ? signOutButtonClass : itemClass,
+          compact && !subscriptionAction && "account-nav-item-compact justify-center px-2",
+        )}
+        title={compact ? item.label : undefined}
         onClick={() => {
           onNavigate?.();
           void onAction(item.id);
@@ -124,7 +150,14 @@ function AccountSidebarNav({
           className={cn("h-4 w-4 shrink-0", subscriptionAction ? "opacity-95" : "opacity-70")}
           aria-hidden
         />
-        <span className="truncate">{item.label}</span>
+        <span
+          className={cn(
+            "truncate transition-[opacity,max-width] duration-300 ease-out",
+            compact ? "max-w-0 opacity-0" : "max-w-[12rem] opacity-100",
+          )}
+        >
+          {item.label}
+        </span>
       </button>
     );
   }
@@ -133,11 +166,21 @@ function AccountSidebarNav({
     <nav className="mt-2 min-w-0 w-full" aria-label="个人中心导航">
       {groups.map((group, index) => (
         <div key={group.id} className="min-w-0">
-          <p className="account-nav-group-label">
+          <p
+            className={cn(
+              "account-nav-group-label overflow-hidden transition-[opacity,max-height] duration-300 ease-out",
+              compact ? "max-h-0 opacity-0" : "max-h-8 opacity-100",
+            )}
+          >
             {group.label}
           </p>
           <div className="min-w-0 space-y-0.5">{group.items.map((item) => renderItem(item))}</div>
-          {index < groups.length - 1 ? <div className={separatorClass} role="separator" /> : null}
+          {index < groups.length - 1 ? (
+            <div
+              className={cn(separatorClass, compact && "mx-1")}
+              role="separator"
+            />
+          ) : null}
         </div>
       ))}
     </nav>
@@ -163,6 +206,7 @@ export function AccountNavMenu({
   billingPersona,
   showReferral = false,
   placement = "sidebar",
+  compact = false,
 }: {
   profile: Profile;
   isAdmin: boolean;
@@ -182,6 +226,7 @@ export function AccountNavMenu({
   publisherOriginConfigured: boolean;
   appsMenuHint: string | null;
   placement?: "sidebar" | "drawer";
+  compact?: boolean;
 }) {
   const pathname = usePathname();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -297,15 +342,27 @@ export function AccountNavMenu({
   if (isSidebar) {
     return (
       <div className="flex w-full min-w-0 flex-col gap-4">
-        <div className="site-app-profile-card flex min-w-0 items-center gap-2 px-3 py-2.5">
+        <div
+          className={cn(
+            "site-app-profile-card flex min-w-0 items-center gap-2 px-3 py-2.5 transition-[padding,background-color] duration-200",
+            compact && "account-sidebar-profile-compact justify-center px-2",
+          )}
+        >
           <Avatar className="h-9 w-9 shrink-0 border border-[#d1d9e0]">
             {profile.image ? (
               <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
             ) : null}
             <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
           </Avatar>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-[#1f2328]">{profileLabel}</span>
+          <span
+            className={cn(
+              "min-w-0 flex-1 overflow-hidden transition-[opacity,max-width] duration-300 ease-out",
+              compact ? "max-w-0 opacity-0" : "max-w-[12rem] opacity-100",
+            )}
+          >
+            <span className="block truncate text-sm font-semibold text-[#1f2328]">
+              {profileLabel}
+            </span>
             {phoneLabel ? (
               <span className="block truncate text-xs font-normal text-[#656d76]">
                 {phoneLabel}
@@ -314,7 +371,7 @@ export function AccountNavMenu({
           </span>
         </div>
         <nav id="account-sidebar-nav" className="min-w-0">
-          <AccountSidebarNav {...navProps} />
+          <AccountSidebarNav {...navProps} compact={compact} />
         </nav>
         {actionMsg ? (
           <p className="px-1 text-xs leading-relaxed text-destructive">{actionMsg}</p>

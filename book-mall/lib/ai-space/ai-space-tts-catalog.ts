@@ -5,6 +5,12 @@
  * 本文件只描述「界面可选项 + 默认音色」，不承担路由职责。
  */
 
+import {
+  MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
+  MINIMAX_SPEECH_MODELS,
+  isMinimaxSpeechModelKey,
+} from "@/lib/gateway/minimax-speech-models";
+
 export type AiSpaceTtsModelDef = {
   modelKey: string;
   label: string;
@@ -36,10 +42,25 @@ export const AI_SPACE_TTS_MODELS: AiSpaceTtsModelDef[] = [
   },
 ];
 
-export const AI_SPACE_TTS_DEFAULT_MODEL_KEY = "cosyvoice-v3-flash";
+export const AI_SPACE_TTS_DEFAULT_MODEL_KEY = MINIMAX_DEFAULT_SPEECH_MODEL_KEY;
+
+export const AI_SPACE_TTS_MINIMAX_MODELS = MINIMAX_SPEECH_MODELS.map((m) => ({
+  modelKey: m.modelKey,
+  label: m.label,
+  description: m.subtitle,
+}));
 
 export function getAiSpaceTtsModelDef(modelKey: string): AiSpaceTtsModelDef {
   const key = modelKey.trim();
+  if (isMinimaxSpeechModelKey(key)) {
+    const mm = MINIMAX_SPEECH_MODELS.find((m) => m.modelKey === key);
+    return {
+      modelKey: key,
+      label: mm?.label ?? key,
+      description: mm?.subtitle ?? "MiniMax 语音合成",
+      voices: [],
+    };
+  }
   return (
     AI_SPACE_TTS_MODELS.find((m) => m.modelKey === key) ??
     AI_SPACE_TTS_MODELS[0]
@@ -49,7 +70,8 @@ export function getAiSpaceTtsModelDef(modelKey: string): AiSpaceTtsModelDef {
 export function isAiSpaceTtsModelKey(modelKey: unknown): boolean {
   return (
     typeof modelKey === "string" &&
-    AI_SPACE_TTS_MODELS.some((m) => m.modelKey === modelKey.trim())
+    (isMinimaxSpeechModelKey(modelKey.trim()) ||
+      AI_SPACE_TTS_MODELS.some((m) => m.modelKey === modelKey.trim()))
   );
 }
 

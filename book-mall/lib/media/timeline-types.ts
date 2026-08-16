@@ -59,6 +59,10 @@ export const compositeOverlaySchema = z.object({
     .enum(["bottom-right", "bottom-left", "top-right", "top-left", "center"])
     .default("bottom-right"),
   marginPx: z.number().int().min(0).max(400).default(20),
+  /** 小窗开始显示（秒，相对本段起点） */
+  appearFromSec: z.number().min(0).optional(),
+  /** 小窗结束显示（秒）；缺省 = 整段 */
+  appearToSec: z.number().min(0).nullable().optional(),
 });
 
 export const mediaCompositeSchema = z.object({

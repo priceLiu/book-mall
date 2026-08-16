@@ -4,7 +4,7 @@ import { AI_SPACE_TABS, type AiSpaceTabId } from "@/lib/ai-space/ai-space-tabs";
 
 export function AiSpaceTabNav({ active }: { active: AiSpaceTabId }) {
   return (
-    <nav className="mb-5 flex flex-wrap gap-1 border-b border-[#d0d7de]">
+    <nav className="-mx-1 mb-5 flex flex-wrap gap-x-1 gap-y-0 border-b border-[#d0d7de] overflow-x-auto">
       {AI_SPACE_TABS.map((tab) => {
         const isActive = tab.id === active;
         return (

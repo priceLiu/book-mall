@@ -12,10 +12,8 @@ import {
   type AiSpaceDigitalHumanDto,
 } from "@/lib/ai-space/ai-space-digital-human-types";
 
-import {
-  AiSpaceConfirmDialog,
-  type AiSpaceConfirmRequest,
-} from "./ai-space-confirm-dialog";
+import { AiSpaceConfirmDialog, type AiSpaceConfirmRequest } from "./ai-space-confirm-dialog";
+import { AiSpaceFavoriteButton } from "./ai-space-favorite-button";
 
 const API = "/api/platform/v1/ai-space/digital-humans";
 
@@ -28,7 +26,7 @@ const STATUS_LABEL: Record<string, string> = {
 export function AiSpaceDigitalHumanLibrary({
   initialItems,
 }: {
-  initialItems: AiSpaceDigitalHumanDto[];
+  initialItems: Array<AiSpaceDigitalHumanDto & { isFavorite?: boolean }>;
 }) {
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
@@ -248,13 +246,13 @@ export function AiSpaceDigitalHumanLibrary({
           </p>
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {items.map((item) => (
             <li
               key={item.id}
               className="overflow-hidden rounded-lg border border-[#d0d7de] bg-white"
             >
-              <div className="aspect-[3/4] bg-[#f6f8fa]">
+              <div className="relative aspect-[3/4] bg-[#f6f8fa]">
                 {/* 形象图为 OSS 任意尺寸，走原生 img 避免 next/image 域名白名单维护 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -263,6 +261,13 @@ export function AiSpaceDigitalHumanLibrary({
                   alt={item.name}
                   loading="lazy"
                 />
+                <div className="absolute right-2 top-2">
+                  <AiSpaceFavoriteButton
+                    targetKind="digital_human"
+                    targetId={item.id}
+                    initialFavorite={item.isFavorite}
+                  />
+                </div>
               </div>
               <div className="space-y-2 p-3">
                 <Input

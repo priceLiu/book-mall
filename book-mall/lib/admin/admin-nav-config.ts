@@ -53,6 +53,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         { label: "支付核对", href: "/admin/payments" },
         { label: "课程订阅", href: "/admin/billing" },
         { label: "提现审核", href: "/admin/refunds" },
+        { label: "积分清零控制台", href: "/admin/finance/credit-expiry-ops" },
       ],
     },
     {
@@ -67,6 +68,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         fin(o, "/admin/membership-plans", "工具会员套餐与席位", "/admin/finance/membership-plans"),
         fin(o, "/admin/plan-change", "调价测算与审批", "/admin/finance/plan-change"),
         fin(o, "/admin/pnl-alerts", "盈亏预警中心", "/admin/finance/pnl-alerts"),
+        fin(o, "/admin/credit-expiry-ops", "积分清零运维台", "/admin/finance/credit-expiry-ops"),
         fin(o, "/admin/pnl-report", "盈亏报表", "/admin/finance/pnl-alerts"),
         fin(o, "/admin/billing/users", "账单明细（按用户）", "/admin/finance/usage-overview"),
         fin(o, "/admin/teams", "团队与租户", "/admin/finance/usage-overview"),
@@ -112,9 +114,10 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
 
 /** 桌面顶栏：单链 + 下拉分组（不含对外公示，改由概览页链出） */
 export const ADMIN_TOP_LEVEL_LINKS = [
-  { label: "概览", href: "/admin" },
+  { label: "驾驶舱", href: "/admin" },
   { label: "用户", href: "/admin/users" },
   { label: "账号安全", href: "/admin/security" },
+  { label: "积分清零", href: "/admin/finance/credit-expiry-ops" },
 ] as const;
 
 export function adminNavGroupsForDesktop(financeWebOrigin: string | null): AdminNavGroup[] {

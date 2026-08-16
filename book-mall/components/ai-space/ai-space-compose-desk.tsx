@@ -1,11 +1,18 @@
 "use client";
 
-import { CheckCircle2, Loader2, Sparkles, XCircle } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  AiSpaceComposeFavoriteAudio,
+  AiSpaceComposeFavoriteHumans,
+} from "@/components/ai-space/ai-space-compose-favorites";
+import { useAiSpaceComposeTasks } from "@/components/ai-space/ai-space-compose-tasks-context";
 import { Button } from "@/components/ui/button";
 import type { AiSpaceAudioAssetDto } from "@/lib/ai-space/ai-space-audio-service";
+import { AI_SPACE_COMPOSE_FROM_TASK_PARAM } from "@/lib/ai-space/ai-space-compose-options";
 import {
   AI_SPACE_COMPOSE_DEFAULT_OPTIONS,
   AI_SPACE_S2V_MAX_AUDIO_SEC,
@@ -16,8 +23,6 @@ import type { AiSpaceDigitalHumanDto } from "@/lib/ai-space/ai-space-digital-hum
 import type { AiSpaceVideoMaterialDto } from "@/lib/ai-space/ai-space-video-types";
 
 const COMPOSE_API = "/api/platform/v1/ai-space/compose-tasks";
-const PINS_API = "/api/platform/v1/ai-space/pins";
-const POLL_MS = 5_000;
 
 const POSITION_OPTIONS: Array<{
   id: AiSpaceComposeOverlayOptions["position"];
@@ -35,27 +40,37 @@ function formatDuration(sec: number | null): string {
   return `${sec.toFixed(1)} 秒`;
 }
 
-function isRunning(status: string): boolean {
-  return status === "pending" || status === "generating_human" || status === "composing";
-}
-
 export function AiSpaceComposeDesk({
   digitalHumans,
   audioAssets,
   backgrounds,
-  initialTasks,
 }: {
-  digitalHumans: AiSpaceDigitalHumanDto[];
-  audioAssets: AiSpaceAudioAssetDto[];
+  digitalHumans: Array<AiSpaceDigitalHumanDto & { isFavorite?: boolean }>;
+  audioAssets: Array<AiSpaceAudioAssetDto & { isFavorite?: boolean }>;
   backgrounds: AiSpaceVideoMaterialDto[];
-  initialTasks: AiSpaceComposeTaskDto[];
 }) {
-  const [tasks, setTasks] = useState(initialTasks);
-  const [humanId, setHumanId] = useState(digitalHumans[0]?.id ?? "");
-  const [audioId, setAudioId] = useState(
-    audioAssets.find((a) => a.durationSec > 0 && a.durationSec < AI_SPACE_S2V_MAX_AUDIO_SEC)
-      ?.id ?? "",
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromTaskId = searchParams.get(AI_SPACE_COMPOSE_FROM_TASK_PARAM)?.trim() ?? "";
+  const { tasks } = useAiSpaceComposeTasks();
+  const appliedFromTaskRef = useRef<string | null>(null);
+
+  const [humanId, setHumanId] = useState(
+    () => digitalHumans.find((h) => h.isFavorite)?.id ?? digitalHumans[0]?.id ?? "",
   );
+  const [audioId, setAudioId] = useState(() => {
+    const fav = audioAssets.find(
+      (a) =>
+        a.isFavorite &&
+        a.durationSec > 0 &&
+        a.durationSec < AI_SPACE_S2V_MAX_AUDIO_SEC,
+    );
+    if (fav) return fav.id;
+    return (
+      audioAssets.find((a) => a.durationSec > 0 && a.durationSec < AI_SPACE_S2V_MAX_AUDIO_SEC)
+        ?.id ?? ""
+    );
+  });
   const [backgroundId, setBackgroundId] = useState("");
   const [options, setOptions] = useState<AiSpaceComposeOverlayOptions>(
     AI_SPACE_COMPOSE_DEFAULT_OPTIONS,
@@ -63,7 +78,84 @@ export function AiSpaceComposeDesk({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [pinningId, setPinningId] = useState<string | null>(null);
+
+  const { addTask } = useAiSpaceComposeTasks();
+
+  useEffect(() => {
+    if (!fromTaskId || appliedFromTaskRef.current === fromTaskId) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      let task: AiSpaceComposeTaskDto | null =
+        tasks.find((t) => t.id === fromTaskId) ?? null;
+      if (!task) {
+        const res = await fetch(
+          `${COMPOSE_API}?id=${encodeURIComponent(fromTaskId)}`,
+          { credentials: "include" },
+        );
+        const data = (await res.json().catch(() => ({}))) as {
+          task?: AiSpaceComposeTaskDto;
+        };
+        task = data.task ?? null;
+      }
+      if (cancelled) return;
+
+      if (!task) {
+        setError("未找到该任务，无法载入合成参数");
+        return;
+      }
+
+      appliedFromTaskRef.current = fromTaskId;
+      const warnings: string[] = [];
+
+      if (digitalHumans.some((h) => h.id === task.digitalHumanId)) {
+        setHumanId(task.digitalHumanId);
+      } else {
+        warnings.push("原数字人形象已不可用");
+      }
+
+      if (audioAssets.some((a) => a.id === task.audioAssetId)) {
+        setAudioId(task.audioAssetId);
+      } else {
+        warnings.push("原口播音频已不可用");
+      }
+
+      if (task.videoMaterialId) {
+        if (backgrounds.some((b) => b.id === task.videoMaterialId)) {
+          setBackgroundId(task.videoMaterialId);
+        } else {
+          warnings.push("原背景视频已不可用");
+        }
+      } else {
+        setBackgroundId("");
+      }
+
+      setOptions(task.options);
+      setError(null);
+      setNotice(
+        warnings.length > 0
+          ? `已载入任务参数（${warnings.join("；")}，请检查后再提交）`
+          : "已载入任务参数，可修改后重新提交",
+      );
+
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete(AI_SPACE_COMPOSE_FROM_TASK_PARAM);
+      router.replace(`/account/ai-space?${params.toString()}`, { scroll: false });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    audioAssets,
+    backgrounds,
+    digitalHumans,
+    fromTaskId,
+    router,
+    searchParams,
+    tasks,
+  ]);
 
   const selectedAudio = useMemo(
     () => audioAssets.find((a) => a.id === audioId) ?? null,
@@ -72,24 +164,6 @@ export function AiSpaceComposeDesk({
   const audioTooLong =
     !!selectedAudio && selectedAudio.durationSec >= AI_SPACE_S2V_MAX_AUDIO_SEC;
   const audioUnknown = !!selectedAudio && selectedAudio.durationSec <= 0;
-  const hasRunning = tasks.some((t) => isRunning(t.status));
-
-  const refresh = useCallback(async () => {
-    const res = await fetch(COMPOSE_API, { credentials: "include" });
-    const data = (await res.json().catch(() => ({}))) as {
-      tasks?: AiSpaceComposeTaskDto[];
-    };
-    if (data.tasks) setTasks(data.tasks);
-  }, []);
-
-  // 无常驻 worker：前台轮询同时推进队列（S2V 厂商并发 1）
-  useEffect(() => {
-    if (!hasRunning) return;
-    const timer = setInterval(() => {
-      void refresh();
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [hasRunning, refresh]);
 
   const submit = useCallback(async () => {
     setError(null);
@@ -115,47 +189,12 @@ export function AiSpaceComposeDesk({
         setError(data.error ?? "创建合成任务失败");
         return;
       }
-      setTasks((prev) => [data.task!, ...prev]);
-      setNotice("已提交，口播生成与合成会在后台依次进行");
+      addTask(data.task);
+      setNotice("已提交，进度可在右下角小窗查看");
     } finally {
       setSubmitting(false);
     }
-  }, [audioId, backgroundId, humanId, options]);
-
-  const pinToWall = useCallback(async (task: AiSpaceComposeTaskDto) => {
-    setError(null);
-    setNotice(null);
-    setPinningId(task.id);
-    try {
-      // 成片已入视频创作库，Pin 指向该记录而非任务
-      const listRes = await fetch(
-        "/api/platform/v1/ai-space/video-materials?ownedOnly=1",
-        { credentials: "include" },
-      );
-      const listData = (await listRes.json().catch(() => ({}))) as {
-        materials?: AiSpaceVideoMaterialDto[];
-      };
-      const material = listData.materials?.find((m) => m.composeTaskId === task.id);
-      if (!material) {
-        setError("未找到成片记录，请刷新后重试");
-        return;
-      }
-      const res = await fetch(PINS_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ sourceType: "ai_space_video", sourceId: material.id }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "展示到作品墙失败");
-        return;
-      }
-      setNotice("已展示到作品墙");
-    } finally {
-      setPinningId(null);
-    }
-  }, []);
+  }, [addTask, audioId, backgroundId, humanId, options]);
 
   const canSubmit =
     !!humanId && !!audioId && !audioTooLong && !audioUnknown && !submitting;
@@ -172,7 +211,13 @@ export function AiSpaceComposeDesk({
             数字人库还没有可用形象，请先到「数字人库」上传。
           </p>
         ) : (
-          <ul className="mt-3 flex flex-wrap gap-3">
+          <>
+            <AiSpaceComposeFavoriteHumans
+              items={digitalHumans}
+              selectedId={humanId}
+              onSelect={setHumanId}
+            />
+            <ul className="mt-3 flex flex-wrap gap-3">
             {digitalHumans.map((h) => (
               <li key={h.id}>
                 <button
@@ -201,11 +246,17 @@ export function AiSpaceComposeDesk({
               </li>
             ))}
           </ul>
+          </>
         )}
       </section>
 
       <section className="rounded-lg border border-[#d0d7de] bg-white p-4">
         <h2 className="text-sm font-semibold text-[#1f2328]">2 · 选口播音频</h2>
+        <AiSpaceComposeFavoriteAudio
+          items={audioAssets}
+          selectedId={audioId}
+          onSelect={setAudioId}
+        />
         <p className="mt-1 text-xs text-[#656d76]">
           数字人模型要求音频时长小于 {AI_SPACE_S2V_MAX_AUDIO_SEC} 秒；更长的台词请拆成多条分别合成。
         </p>
@@ -215,7 +266,7 @@ export function AiSpaceComposeDesk({
           </p>
         ) : (
           <select
-            className="mt-3 h-9 w-full max-w-xl rounded-md border border-[#d0d7de] bg-white px-2 text-sm text-[#1f2328]"
+            className="mt-3 h-9 w-full rounded-md border border-[#d0d7de] bg-white px-2 text-sm text-[#1f2328]"
             value={audioId}
             onChange={(e) => setAudioId(e.target.value)}
           >
@@ -246,7 +297,7 @@ export function AiSpaceComposeDesk({
           不选背景时只输出口播视频本身；选背景后数字人会缩放叠加在背景之上，背景不足则循环铺底。
         </p>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1 text-xs text-[#656d76]">
             <span>背景视频</span>
             <select
@@ -342,87 +393,9 @@ export function AiSpaceComposeDesk({
             )}
           </Button>
           <span className="text-xs text-[#8c959f]">
-            厂商同时只处理 1 个口播任务，多条会自动排队。
+            厂商同时只处理 1 个口播任务，多条会自动排队；进度在右下角小窗。
           </span>
         </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-[#1f2328]">合成记录</h2>
-        {tasks.length === 0 ? (
-          <p className="text-sm text-[#656d76]">还没有合成任务。</p>
-        ) : (
-          <ul className="space-y-3">
-            {tasks.map((task) => (
-              <li
-                key={task.id}
-                className="rounded-lg border border-[#d0d7de] bg-white p-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm text-[#1f2328]">
-                    {task.status === "completed" ? (
-                      <CheckCircle2 className="h-4 w-4 text-[#1a7f37]" />
-                    ) : task.status === "failed" ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <Loader2 className="h-4 w-4 animate-spin text-[#0969da]" />
-                    )}
-                    <span>{task.statusLabel}</span>
-                    <span className="text-xs text-[#8c959f]">
-                      {new Date(task.createdAt).toLocaleString("zh-CN")}
-                    </span>
-                  </div>
-                  {task.status === "completed" && task.finalVideoUrl ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={pinningId === task.id}
-                      onClick={() => void pinToWall(task)}
-                    >
-                      {pinningId === task.id ? (
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      ) : null}
-                      展示到作品墙
-                    </Button>
-                  ) : null}
-                </div>
-
-                {isRunning(task.status) ? (
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#eaeef2]">
-                    <div
-                      className="h-full rounded-full bg-[#0969da] transition-all"
-                      style={{ width: `${task.progress}%` }}
-                    />
-                  </div>
-                ) : null}
-
-                {task.errorMessage ? (
-                  <p className="mt-2 text-xs text-destructive">
-                    {task.errorMessage}
-                    {task.gatewayLogId ? `（Gateway 日志 ${task.gatewayLogId}）` : ""}
-                  </p>
-                ) : null}
-
-                {task.finalVideoUrl ? (
-                  <video
-                    className="mt-3 aspect-video w-full max-w-lg rounded-md bg-black object-contain"
-                    controls
-                    preload="metadata"
-                    src={task.finalVideoUrl}
-                  />
-                ) : task.tempHumanVideoUrl ? (
-                  <video
-                    className="mt-3 aspect-video w-full max-w-sm rounded-md bg-black object-contain"
-                    controls
-                    preload="metadata"
-                    src={task.tempHumanVideoUrl}
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
     </div>
   );

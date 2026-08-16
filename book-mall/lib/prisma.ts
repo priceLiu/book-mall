@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { isPrismaConnectionUnavailable, toDbUnavailableError } from "@/lib/db-unavailable";
 import {
@@ -42,10 +43,17 @@ const globalForPrisma = globalThis as unknown as PrismaGlobal;
 
 function generatedClientStamp(): string {
   try {
-    const p = join(process.cwd(), "node_modules/.prisma/client/index.js");
-    return String(statSync(p).mtimeMs);
+    const requireFromRoot = createRequire(join(process.cwd(), "package.json"));
+    const clientEntry = requireFromRoot.resolve("@prisma/client/default.js");
+    const generated = join(dirname(clientEntry), "..", "..", ".prisma", "client", "default.js");
+    return String(statSync(generated).mtimeMs);
   } catch {
-    return "0";
+    try {
+      const p = join(process.cwd(), "node_modules/.prisma/client/index.js");
+      return String(statSync(p).mtimeMs);
+    } catch {
+      return "0";
+    }
   }
 }
 
@@ -134,17 +142,45 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
   return extended as unknown as PrismaClient;
 }
 
+/** schema 新增 model 后，dev 热更新可能仍持有旧 Client（缺 delegate） */
+const REQUIRED_PRISMA_DELEGATES = ["aiSpaceFavorite"] as const;
+
+function prismaClientHasRequiredDelegates(client: PrismaClient): boolean {
+  const record = client as unknown as Record<string, { findMany?: unknown } | undefined>;
+  return REQUIRED_PRISMA_DELEGATES.every(
+    (key) => typeof record[key]?.findMany === "function",
+  );
+}
+
+function discardCachedPrismaClients() {
+  const main = globalForPrisma.prisma;
+  const read = globalForPrisma.prismaRead;
+  globalForPrisma.prisma = undefined;
+  globalForPrisma.prismaRead = undefined;
+  if (main) void main.$disconnect().catch(() => {});
+  if (read && read !== main) void read.$disconnect().catch(() => {});
+}
+
 const clientStamp = generatedClientStamp();
 if (
   globalForPrisma.prisma &&
-  globalForPrisma.prismaClientStamp &&
-  globalForPrisma.prismaClientStamp !== clientStamp
+  ((globalForPrisma.prismaClientStamp &&
+    globalForPrisma.prismaClientStamp !== clientStamp) ||
+    !prismaClientHasRequiredDelegates(globalForPrisma.prisma))
 ) {
-  void globalForPrisma.prisma.$disconnect().catch(() => {});
-  globalForPrisma.prisma = undefined;
+  discardCachedPrismaClients();
 }
 
 export const prisma = globalForPrisma.prisma ?? buildPrismaClient();
+
+if (
+  process.env.NODE_ENV === "development" &&
+  !prismaClientHasRequiredDelegates(prisma)
+) {
+  console.error(
+    "[prisma] Client 缺少 AiSpaceFavorite delegate；请在 book-mall 执行 pnpm db:generate 并重启 dev:all。",
+  );
+}
 
 globalForPrisma.prisma = prisma;
 globalForPrisma.prismaClientStamp = clientStamp;

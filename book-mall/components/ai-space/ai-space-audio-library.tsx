@@ -1,23 +1,36 @@
 "use client";
 
 import { Loader2, Mic, Trash2, Upload } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AiSpaceAudioControls } from "@/components/ai-space/ai-space-audio-controls";
+import { AiSpaceFavoriteButton } from "@/components/ai-space/ai-space-favorite-button";
+import {
+  AiSpaceVoiceGallery,
+  type AiSpaceVoiceCatalogItem,
+} from "@/components/ai-space/ai-space-voice-gallery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AiSpaceAudioAssetDto } from "@/lib/ai-space/ai-space-audio-service";
 import {
   AI_SPACE_TTS_DEFAULT_MODEL_KEY,
+  AI_SPACE_TTS_MINIMAX_MODELS,
   AI_SPACE_TTS_MODELS,
   AI_SPACE_TTS_TEXT_MAX,
   getAiSpaceTtsModelDef,
 } from "@/lib/ai-space/ai-space-tts-catalog";
+import { isMinimaxSpeechModelKey } from "@/lib/gateway/minimax-speech-models";
 
 import {
   AiSpaceConfirmDialog,
   type AiSpaceConfirmRequest,
 } from "./ai-space-confirm-dialog";
+import { AiSpaceTtsVoiceControlsPanel } from "./ai-space-tts-voice-controls-panel";
+import {
+  AI_SPACE_TTS_VOICE_CONTROL_DEFAULTS,
+  type AiSpaceTtsVoiceControls,
+} from "@/lib/ai-space/ai-space-tts-voice-controls";
 
 const SOURCE_LABEL: Record<string, string> = {
   upload: "本地上传",
@@ -29,6 +42,9 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const API = "/api/platform/v1/ai-space/audio-assets";
+const FAV_API = "/api/platform/v1/ai-space/favorites";
+
+type AudioAssetRow = AiSpaceAudioAssetDto & { isFavorite?: boolean };
 
 function formatDuration(sec: number): string {
   if (!sec || sec <= 0) return "时长未知";
@@ -40,7 +56,7 @@ function formatDuration(sec: number): string {
 export function AiSpaceAudioLibrary({
   initialAssets,
 }: {
-  initialAssets: AiSpaceAudioAssetDto[];
+  initialAssets: AudioAssetRow[];
 }) {
   const [assets, setAssets] = useState(initialAssets);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +69,26 @@ export function AiSpaceAudioLibrary({
 
   const [modelKey, setModelKey] = useState(AI_SPACE_TTS_DEFAULT_MODEL_KEY);
   const modelDef = getAiSpaceTtsModelDef(modelKey);
-  const [voice, setVoice] = useState(modelDef.voices[0]?.id ?? "");
+  const isMinimax = isMinimaxSpeechModelKey(modelKey);
+  const [selectedVoice, setSelectedVoice] = useState<AiSpaceVoiceCatalogItem | null>(null);
+  const [voice, setVoice] = useState("");
+  const [favoriteVoiceIds, setFavoriteVoiceIds] = useState<Set<string>>(new Set());
   const [text, setText] = useState("");
   const [instruction, setInstruction] = useState("");
+  const [voiceControls, setVoiceControls] = useState<AiSpaceTtsVoiceControls>(
+    AI_SPACE_TTS_VOICE_CONTROL_DEFAULTS,
+  );
   const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    void fetch(`${FAV_API}?targetKind=tts_voice`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { favorites?: Array<{ targetId: string }> }) => {
+        const ids = data.favorites?.map((f) => f.targetId) ?? [];
+        setFavoriteVoiceIds(new Set(ids));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const resetFeedback = () => {
     setError(null);
@@ -96,6 +128,10 @@ export function AiSpaceAudioLibrary({
       setError("请先填写台词");
       return;
     }
+    if (isMinimax && !selectedVoice && !voice.trim()) {
+      setError("请先选择音色");
+      return;
+    }
     setGenerating(true);
     try {
       const res = await fetch(`${API}/tts`, {
@@ -104,9 +140,13 @@ export function AiSpaceAudioLibrary({
         credentials: "include",
         body: JSON.stringify({
           modelKey,
-          voice,
+          voice: isMinimax ? selectedVoice?.voiceId ?? voice : voice,
           text,
           instruction: instruction.trim() || undefined,
+          emotion: voiceControls.emotion ?? undefined,
+          speed: voiceControls.speed,
+          volume: voiceControls.volume,
+          pitch: voiceControls.pitch,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -126,7 +166,7 @@ export function AiSpaceAudioLibrary({
     } finally {
       setGenerating(false);
     }
-  }, [instruction, modelKey, text, voice]);
+  }, [instruction, isMinimax, modelKey, selectedVoice, text, voice, voiceControls]);
 
   const rename = useCallback(async (id: string, name: string) => {
     resetFeedback();
@@ -228,10 +268,10 @@ export function AiSpaceAudioLibrary({
       <section className="rounded-lg border border-[#d0d7de] bg-white p-4">
         <h2 className="text-sm font-semibold text-[#1f2328]">生成口播</h2>
         <p className="mt-1 text-xs text-[#656d76]">
-          经 Gateway 调用你已关联的百炼凭证；未绑定凭证时会提示前往 Gateway 模型管理页绑定。
+          音色列表与快速复制共用；MiniMax 经 Gateway 凭证，百炼模型需在模型管理页绑定。
         </p>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <label className="space-y-1 text-xs text-[#656d76]">
             <span>语音模型</span>
             <select
@@ -240,52 +280,85 @@ export function AiSpaceAudioLibrary({
               onChange={(e) => {
                 const next = e.target.value;
                 setModelKey(next);
-                setVoice(getAiSpaceTtsModelDef(next).voices[0]?.id ?? "");
+                setVoiceControls(AI_SPACE_TTS_VOICE_CONTROL_DEFAULTS);
+                if (!isMinimaxSpeechModelKey(next)) {
+                  setVoice(getAiSpaceTtsModelDef(next).voices[0]?.id ?? "");
+                  setSelectedVoice(null);
+                }
               }}
             >
-              {AI_SPACE_TTS_MODELS.map((m) => (
-                <option key={m.modelKey} value={m.modelKey}>
-                  {m.label}
-                </option>
-              ))}
+              <optgroup label="MiniMax（与快速复制一致）">
+                {AI_SPACE_TTS_MINIMAX_MODELS.map((m) => (
+                  <option key={m.modelKey} value={m.modelKey}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="百炼">
+                {AI_SPACE_TTS_MODELS.map((m) => (
+                  <option key={m.modelKey} value={m.modelKey}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </label>
 
-          <label className="space-y-1 text-xs text-[#656d76]">
-            <span>音色</span>
-            <select
-              className="h-9 w-full rounded-md border border-[#d0d7de] bg-white px-2 text-sm text-[#1f2328]"
-              value={voice}
-              onChange={(e) => setVoice(e.target.value)}
-            >
-              {modelDef.voices.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!isMinimax ? (
+            <label className="space-y-1 text-xs text-[#656d76]">
+              <span>音色</span>
+              <select
+                className="h-9 w-full rounded-md border border-[#d0d7de] bg-white px-2 text-sm text-[#1f2328]"
+                value={voice}
+                onChange={(e) => setVoice(e.target.value)}
+              >
+                {modelDef.voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : selectedVoice ? (
+            <div className="space-y-1 text-xs text-[#656d76]">
+              <span>已选音色</span>
+              <p className="rounded-md border border-[#0969da]/30 bg-[#f0f6ff] px-2 py-2 text-sm text-[#1f2328]">
+                {selectedVoice.label}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <p className="mt-2 text-xs text-[#8c959f]">{modelDef.description}</p>
 
+        {isMinimax ? (
+          <div className="mt-4">
+            <AiSpaceVoiceGallery
+              selectedVoiceId={selectedVoice?.voiceId}
+              favoriteVoiceIds={favoriteVoiceIds}
+              onSelectVoice={(v) => {
+                setSelectedVoice(v);
+                setVoice(v.voiceId);
+              }}
+            />
+          </div>
+        ) : null}
+
+        <AiSpaceTtsVoiceControlsPanel
+          variant={isMinimax ? "minimax" : "bailian"}
+          controls={voiceControls}
+          instruction={instruction}
+          onControlsChange={setVoiceControls}
+          onInstructionChange={setInstruction}
+        />
+
         <Textarea
-          className="mt-3 min-h-[96px]"
+          className="mt-3 min-h-[96px] w-full resize-y"
           maxLength={AI_SPACE_TTS_TEXT_MAX}
           placeholder="输入台词，建议单条不超过 20 秒，便于后续数字人口播合成"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-
-        {modelKey.startsWith("cosyvoice") ? (
-          <Input
-            className="mt-2"
-            maxLength={100}
-            placeholder="可选：情感/方言指令，如「语速稍快，语气亲切」"
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-          />
-        ) : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" disabled={generating} onClick={() => void onGenerate()}>
@@ -349,12 +422,12 @@ export function AiSpaceAudioLibrary({
           {assets.map((asset) => (
             <li
               key={asset.id}
-              className="rounded-lg border border-[#d0d7de] bg-white p-3"
+              className="rounded-lg border border-[#d0d7de] bg-white p-3 lg:p-4"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0 flex-1 space-y-1">
                   <Input
-                    className="h-8 max-w-md text-sm"
+                    className="h-8 w-full text-sm"
                     defaultValue={asset.name}
                     disabled={busyId === asset.id}
                     onBlur={(e) => {
@@ -374,9 +447,16 @@ export function AiSpaceAudioLibrary({
                     </p>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2">
-                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                  <audio className="h-8 w-56" controls preload="none" src={asset.audioUrl} />
+                <div className="flex w-full min-w-0 items-center gap-2 xl:w-auto xl:min-w-[16rem] xl:max-w-xl xl:flex-1 xl:justify-end">
+                  <AiSpaceFavoriteButton
+                    targetKind="audio"
+                    targetId={asset.id}
+                    initialFavorite={asset.isFavorite}
+                  />
+                  <AiSpaceAudioControls
+                    className="h-8 min-w-0 flex-1 xl:max-w-md"
+                    src={asset.audioUrl}
+                  />
                   <Button
                     type="button"
                     size="sm"
