@@ -255,6 +255,50 @@ export function ProductCreationStudio({ module }: StudioProps) {
     }
   }
 
+  const loadProjectList = useCallback(async () => {
+    const items = await listProductDesignProjects(module);
+    return items.map((p) => {
+      const platformLabel = specs.find((s) => s.code === p.platform)?.label ?? p.platform;
+      const trackLabel = module === "detail-page" ? "详情页" : "主图";
+      const countHint =
+        p.mainImageCount != null && module === "main-image"
+          ? ` · 主图 ${p.mainImageCount} 张`
+          : "";
+      return {
+        id: p.id,
+        title: p.productName ?? p.title ?? "未命名项目",
+        updatedAt: p.updatedAt,
+        subtitle: `${platformLabel} · ${trackLabel}${countHint}`,
+        thumbnailUrl: p.thumbnailUrl,
+      };
+    });
+  }, [module, specs]);
+
+  async function handleOpenProject(id: string) {
+    if (project?.id === id) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再切换项目。",
+        variant: "error",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await reload(id);
+      setEmpty(false);
+    } catch (e) {
+      await alert({
+        title: "打开失败",
+        message: e instanceof Error ? e.message : "无法打开项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   /** 主图出图完成后引导进入详情页产线：新建详情页项目并搬运 Step0–3 策略 */
   async function handleContinueToDetailPages() {
     if (!project) return;
@@ -581,6 +625,8 @@ export function ProductCreationStudio({ module }: StudioProps) {
         uploadingRole={uploadingRole}
         uploadProgress={uploadProgress}
         onNewProject={() => void handleNewProject()}
+        loadProjectList={loadProjectList}
+        onOpenProject={(id) => void handleOpenProject(id)}
         onImportFromMainProject={
           module === "detail-page" ? () => setImportPickerOpen(true) : undefined
         }

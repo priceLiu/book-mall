@@ -23,15 +23,65 @@ const WAN27_IMAGE_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation";
 const VIDEO_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
-/** 数字人 wan2.2-s2v 走 image2video 端点，与 T2V/I2V 不同 */
-const S2V_CREATE_URL =
-  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2video/video-synthesis";
+/** 数字人 wan2.2-s2v 走 image2video 端点，与 T2V/I2V 不同（华北2 须用业务空间域名） */
+const S2V_CREATE_PATH = "/api/v1/services/aigc/image2video/video-synthesis";
 /** 形象图预检（同步接口，0.004 元/张），提交 S2V 前先判人像是否合规 */
-const S2V_DETECT_URL =
-  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2video/face-detect";
+const S2V_DETECT_PATH = "/api/v1/services/aigc/image2video/face-detect";
 const IMAGE_PROCESS_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/vision/image-process/process";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
+
+const DASHSCOPE_DEFAULT_ROOT = "https://dashscope.aliyuncs.com";
+
+/** 从凭证 baseUrl 解析 DashScope / 百炼业务空间 API 根域名 */
+export function resolveDashscopeApiRoot(baseUrl?: string | null): string {
+  let raw = (baseUrl?.trim() || DASHSCOPE_DEFAULT_ROOT).replace(/\/$/, "");
+  raw = raw.replace(/\/compatible-mode\/v1$/i, "");
+  if (raw.includes("/api/v1/services")) {
+    return raw.replace(/\/api\/v1\/services.*$/, "");
+  }
+  if (raw.includes("/api/v1/tasks")) {
+    return raw.replace(/\/api\/v1\/tasks.*$/, "");
+  }
+  if (/\/api\/v1$/i.test(raw)) {
+    return raw.replace(/\/api\/v1$/i, "");
+  }
+  return raw || DASHSCOPE_DEFAULT_ROOT;
+}
+
+export function resolveDashscopeS2vCreateUrl(baseUrl?: string | null): string {
+  return `${resolveDashscopeApiRoot(baseUrl)}${S2V_CREATE_PATH}`;
+}
+
+export function resolveDashscopeS2vDetectUrl(baseUrl?: string | null): string {
+  return `${resolveDashscopeApiRoot(baseUrl)}${S2V_DETECT_PATH}`;
+}
+
+export function resolveDashscopeTaskUrl(
+  baseUrl: string | null | undefined,
+  taskId: string,
+): string {
+  return `${resolveDashscopeApiRoot(baseUrl)}/api/v1/tasks/${encodeURIComponent(taskId.trim())}`;
+}
+
+/**
+ * 从 sk-ws Key 解析业务空间 ID。
+ * 格式示例：sk-ws-{prefix}.{workspaceId}.{keyId}.{MEQ…签名}
+ * workspaceId 须为单段（*.cn-beijing.maas.aliyuncs.com 通配符不覆盖多级子域）。
+ */
+export function parseDashscopeWorkspaceIdFromApiKey(apiKey: string): string | null {
+  const trimmed = apiKey.trim();
+  const structured = trimmed.match(/^sk-ws-[^.]+\.([^.]+)\.[^.]+\.(MEQ[A-Za-z0-9_=-]+)$/i);
+  if (structured?.[1]) return structured[1];
+  return null;
+}
+
+/** sk-ws-{WorkspaceId}.… → 华北2 业务空间根域名 */
+export function resolveDashscopeBeijingMaasBaseUrl(apiKey: string): string | null {
+  const workspaceId = parseDashscopeWorkspaceIdFromApiKey(apiKey);
+  if (!workspaceId) return null;
+  return `https://${workspaceId}.cn-beijing.maas.aliyuncs.com`;
+}
 
 export const AITRYON_PARSING_MODEL = "aitryon-parsing-v1";
 
@@ -148,13 +198,14 @@ export function isDashscopeAsrNoSpeechOutcome(
 export async function dashscopeGetTask(opts: {
   apiKey: string;
   taskId: string;
+  baseUrl?: string | null;
 }): Promise<{ ok: true; output: DashscopeTaskOutput; raw: unknown } | { ok: false; error: string }> {
   const taskId = opts.taskId.trim();
   if (!taskId) return { ok: false, error: "缺少 task_id" };
 
   let res: Response;
   try {
-    res = await fetch(`${TASK_URL_BASE}/${encodeURIComponent(taskId)}`, {
+    res = await fetch(resolveDashscopeTaskUrl(opts.baseUrl, taskId), {
       headers: { Authorization: `Bearer ${opts.apiKey}` },
       cache: "no-store",
     });
@@ -533,6 +584,7 @@ export async function dashscopeCreateVideoTask(opts: {
  */
 export async function dashscopeCreateS2vTask(opts: {
   apiKey: string;
+  baseUrl?: string | null;
   model?: string;
   imageUrl: string;
   audioUrl: string;
@@ -543,7 +595,7 @@ export async function dashscopeCreateS2vTask(opts: {
   if (!imageUrl) return { ok: false, error: "image_url 不能为空" };
   if (!audioUrl) return { ok: false, error: "audio_url 不能为空" };
 
-  const res = await fetch(S2V_CREATE_URL, {
+  const res = await fetch(resolveDashscopeS2vCreateUrl(opts.baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -594,13 +646,14 @@ export type S2vDetectResult = {
  */
 export async function dashscopeDetectS2vImage(opts: {
   apiKey: string;
+  baseUrl?: string | null;
   model?: string;
   imageUrl: string;
 }): Promise<{ ok: true; result: S2vDetectResult } | { ok: false; error: string }> {
   const imageUrl = opts.imageUrl.trim();
   if (!imageUrl) return { ok: false, error: "image_url 不能为空" };
 
-  const res = await fetch(S2V_DETECT_URL, {
+  const res = await fetch(resolveDashscopeS2vDetectUrl(opts.baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

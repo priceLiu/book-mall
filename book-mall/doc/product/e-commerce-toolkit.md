@@ -16,11 +16,21 @@
 - 整片视频：`doubao-seedance-2.0`，时长 4–15s 用户自定，全部经 Gateway
 - toolKey：`ecom-toolkit__storyboard`（`chat` / `video`）
 
+### 拆图拆视频（图片/视频反推拆解）
+
+> 需求与 JSON 契约：[`doc/拆图拆视频/`](../拆图拆视频/requirements.md)（`ecom-media-decompose-prompts.ts` 运行时读取 `skill.md`）
+
+- 入口：`/ecom/media-decompose`；**电商**侧栏；单页工作区（上传 + Prompt + 模型 + 拆解结果）
+- 输入：本地图片/视频文件、**公网 HTTPS 链接**、我的资产（单素材）
+- 输出：Markdown + ` ```media-decompose ` JSON（Zod 校验）；视频 15 列分镜表 + 叙事/卡点/拍摄脚本；静态图要素 + 正/负向 Prompt + 实拍方案
+- 模型：Vision LLM（拆视频须 video-understanding）；Gateway `image_url` / `video_url`
+- toolKey：`ecom-toolkit__media-decompose`（`decompose`）；数据表 `EcomMediaDecomposeProject`
+
 ### 手伴创作（线稿 → 潮玩盲盒 IP 全案）
 
 > SOP 与助手话术真源：[`doc/手伴/skill.md`](../手伴/skill.md)（`ecom-hand-craft-prompts.ts` 运行时读取）
 
-- 入口：`/ecom/hand-craft`；四栏布局与交互对齐「产品主图」（进度轨 + 中间工作区 + 右侧助手）
+- 入口：`/ecom/hand-craft`；**营销**侧栏；四栏布局与交互对齐「产品主图」（进度轨 + 中间工作区 + 右侧助手）
 - 输入：**1～5 张手绘线稿**（第 1 张为主线稿）。换主线稿 = 重启流程，会清空 10 步产出
 - 一致性锁定（本模块质量命门，服务端强制拼装，不依赖助手话术）：
   1. 第 1 步定稿主形象写入 `meta.workflow.heroLockedUrl`，后续每步生图 **参考图第 1 张恒为它**

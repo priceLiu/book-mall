@@ -1,17 +1,20 @@
 "use client";
 
-import { Images, Plus } from "lucide-react";
+import { Images, Play, Plus, X } from "lucide-react";
 import type React from "react";
 
 import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
+import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
+import { IMAGE_UPLOAD_ACCEPT } from "@/lib/image-upload-utils";
 import { cn } from "@/lib/utils";
 
 export type EcomRefUploadItem = {
   id: string;
   ossUrl: string;
   label: string;
+  kind?: "image" | "video";
 };
 
 type Props = {
@@ -27,6 +30,7 @@ type Props = {
   onOpenFilePicker: () => void;
   onOpenAssetPicker?: () => void;
   onRemove?: (id: string) => void;
+  onPreviewItem?: (item: EcomRefUploadItem) => void;
   removeLabel?: string;
   onTitleClick?: () => void;
   onMouseEnterCard?: () => void;
@@ -34,7 +38,56 @@ type Props = {
   inputRef?: ((el: HTMLInputElement | null) => void) | React.RefObject<HTMLInputElement | null>;
   /** 渲染在「上传」钮左侧（与上传钮同排） */
   toolbarPrefix?: React.ReactNode;
+  accept?: string;
+  multiple?: boolean;
+  /** 拖放 / 粘贴同时接受视频（拆图拆视频） */
+  allowVideo?: boolean;
 };
+
+function EcomRefVideoThumb({
+  src,
+  alt,
+  size = 56,
+  onRemove,
+  removeLabel = "删除",
+  onPreview,
+}: {
+  src: string;
+  alt: string;
+  size?: number;
+  onRemove?: () => void;
+  removeLabel?: string;
+  onPreview?: () => void;
+}) {
+  return (
+    <div className="group relative shrink-0" style={{ width: size, height: size }}>
+      <button
+        type="button"
+        title={alt}
+        className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-black"
+        onClick={onPreview}
+      >
+        <EcomVideoThumb src={src} className="absolute inset-0 size-full" />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+          <Play className="ml-0.5 h-4 w-4 fill-white text-white" />
+        </span>
+      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          className="absolute right-0.5 top-0.5 z-[1] rounded-full bg-black/65 p-0.5 text-white"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          aria-label={removeLabel}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 /** 产品图 / 素材图上传卡片 — 电商产品创作与微剧故事版统一 */
 export function EcomRefUploadCard({
@@ -48,14 +101,19 @@ export function EcomRefUploadCard({
   onOpenFilePicker,
   onOpenAssetPicker,
   onRemove,
+  onPreviewItem,
   removeLabel = "删除",
   onTitleClick,
   inputRef,
   toolbarPrefix,
+  accept = IMAGE_UPLOAD_ACCEPT,
+  multiple = true,
+  allowVideo = false,
 }: Props) {
   const { dragOver, pasteReady, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy,
-    multiple: true,
+    multiple,
+    allowVideo,
     onFiles: onUploadFiles,
   });
 
@@ -132,8 +190,8 @@ export function EcomRefUploadCard({
       <input
         ref={setInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
-        multiple
+        accept={accept}
+        multiple={multiple}
         className="hidden"
         onChange={(e) => {
           const files = e.target.files;
@@ -159,16 +217,28 @@ export function EcomRefUploadCard({
 
       {items.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
-          {items.map((r) => (
-            <EcomRefImageThumb
-              key={r.id}
-              src={r.ossUrl}
-              alt={r.label}
-              size={56}
-              onRemove={onRemove ? () => void onRemove(r.id) : undefined}
-              removeLabel={removeLabel}
-            />
-          ))}
+          {items.map((r) =>
+            r.kind === "video" ? (
+              <EcomRefVideoThumb
+                key={r.id}
+                src={r.ossUrl}
+                alt={r.label}
+                size={56}
+                onPreview={onPreviewItem ? () => onPreviewItem(r) : undefined}
+                onRemove={onRemove ? () => void onRemove(r.id) : undefined}
+                removeLabel={removeLabel}
+              />
+            ) : (
+              <EcomRefImageThumb
+                key={r.id}
+                src={r.ossUrl}
+                alt={r.label}
+                size={56}
+                onRemove={onRemove ? () => void onRemove(r.id) : undefined}
+                removeLabel={removeLabel}
+              />
+            ),
+          )}
         </div>
       ) : (
         <p className="text-[10px] text-[#86868b]">{emptyHint}</p>

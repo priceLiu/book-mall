@@ -124,6 +124,7 @@ model User {
   ecomProductDesignProjects        EcomProductDesignProject[]
   ecomSeedVideoProjects            EcomSeedVideoProject[]
   ecomHandCraftProjects            EcomHandCraftProject[]
+  ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
   qrTemplates                      QrTemplate[]
@@ -641,6 +642,33 @@ model EcomHandCraftProject {
   meta        Json?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 拆图拆视频（图片/视频反推拆解）
+model EcomMediaDecomposeProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("media-decompose")
+  status      String  @default("draft")
+  settings    Json?
+  /// 单条素材 { id, kind, ossUrl, source, sourceUrl?, label? }
+  references  Json?
+  /// { rawText, structured?, parseError?, completedAt? }
+  result      Json?
+  meta        Json?
+
   tenantId    String?
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)

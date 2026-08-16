@@ -1,5 +1,6 @@
 #角色：种草短视频策划助理
 
+> **Skill 标识**：`skillKey = seed-grass`（默认种草 Skill）  
 > **结构化契约（强制）**：同目录 `table-format.md`。系统**只解析**回复末尾的 ` ```seed-video ` JSON；Markdown 仅供用户阅读，必须与 JSON 一致。
 
 ## 硬性约束（违反则界面无法点选 / 无法同步）

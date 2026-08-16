@@ -1,6 +1,7 @@
 # 种草视频 · 结构化交付契约（权威）
 
-> **系统只解析 ` ```seed-video ` JSON 围栏。** Markdown 仅供用户阅读，须与 JSON 一致；缺围栏或校验失败则无法点选、无法同步。
+> **系统只解析 ` ```seed-video ` JSON 围栏。** Markdown 仅供用户阅读，须与 JSON 一致；缺围栏或校验失败则无法点选、无法同步。  
+> **所有 Skill 共用本契约**（`seed-grass`、`fashion-hit`、`digital-product`、`home-clothes-lounge-wear` 及后续扩展）：不因 Skill 改字段名、step 或枚举 id。
 
 ## 硬性规则（每条助手回复必须遵守）
 

@@ -3,6 +3,7 @@ import type {
   SeedVideoScript,
   SeedVideoScriptRow,
   SeedVideoShot,
+  ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
 } from "@/lib/ecom/ecom-seed-video-types";
 import {
   directPlanFromStructuredPatch,
@@ -392,7 +393,7 @@ export function parseSeedVideoDirectFromMarkdown(markdown: string): SeedVideoDir
     durationSec = shotRows.reduce((sum, s) => sum + s.durationSec, 0);
   }
   if (!durationSec) {
-    durationSec = parseDurationFromText(markdown.match(/总时长[^\d]*(\d+)\s*秒/)?.[0] ?? "") || 30;
+    durationSec = parseDurationFromText(markdown.match(/总时长[^\d]*(\d+)\s*秒/)?.[0] ?? "") || ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC;
   }
 
   if (!globalPrompt && !fullVoiceover && shotRows.length === 0) {
@@ -470,7 +471,7 @@ function parseSeedVideoDirectFromMarkdownLegacy(markdown: string): SeedVideoDire
     ? parseInt(durFromPlan[1]!, 10)
     : durFromTable > 0
       ? durFromTable
-      : 30;
+      : ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC;
 
   const aspectMatch = markdown.match(/\b(9:16|16:9)\b/);
   const bgmMatch = markdown.match(/背景音乐[：:]\s*([^\n]+)/);
@@ -479,7 +480,10 @@ function parseSeedVideoDirectFromMarkdownLegacy(markdown: string): SeedVideoDire
     globalPrompt: globalPrompt || fullVoiceover,
     fullVoiceover,
     aspectRatio: aspectMatch?.[1] ?? "9:16",
-    durationSec: Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 30,
+    durationSec:
+      Number.isFinite(durationSec) && durationSec > 0
+        ? durationSec
+        : ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
     bgmPreset: bgmMatch?.[1]?.trim() ?? "",
   };
 }

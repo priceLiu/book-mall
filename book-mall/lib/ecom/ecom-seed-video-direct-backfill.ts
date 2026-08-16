@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
+  ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
   ECOM_SEED_VIDEO_MODULE,
   parseSeedVideoPlan,
   type SeedVideoDirectGeneratedVideo,
@@ -113,7 +114,7 @@ export async function backfillSeedVideoDirectVideoFromAssets(opts: {
     globalPrompt: prevDirect?.globalPrompt ?? "",
     fullVoiceover: prevDirect?.fullVoiceover ?? "",
     aspectRatio: prevDirect?.aspectRatio ?? "9:16",
-    durationSec: prevDirect?.durationSec ?? 30,
+    durationSec: prevDirect?.durationSec ?? ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
     bgmPreset: prevDirect?.bgmPreset,
     voiceTone: prevDirect?.voiceTone,
     materialUsage: prevDirect?.materialUsage,

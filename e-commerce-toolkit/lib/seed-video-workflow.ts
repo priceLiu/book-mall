@@ -1,5 +1,10 @@
 import type { SeedVideoChatMessage, SeedVideoProject, SeedVideoProductionMode, SeedVideoWorkflowPhase, SeedVideoChoiceSnapshot, SeedVideoDirectPlan } from "@/lib/seed-video-types";
 import {
+  getSeedVideoSkillDefinition,
+  listSeedVideoSkillDefinitions,
+  resolveSeedVideoSkillKey,
+} from "@/lib/seed-video-skills";
+import {
   extractSeedVideoStructuredPatch,
   hasStructuredDirectPlan,
   hasStructuredFormalShots,
@@ -270,7 +275,7 @@ const SCRIPT_CHOICE_META = [
 const MODE_CHOICE_META = [
   {
     title: "方案①：直接连贯生成视频",
-    description: "一条 wan3.0 连贯 30s 成片，适合快节奏种草",
+    description: "一条连贯成片（时长由策划 Prompt 决定，默认约 20s），适合快节奏种草",
   },
   {
     title: "方案②：按精细成片流程制作",
@@ -298,7 +303,17 @@ const GENERATE_ALL_CHOICE: SeedVideoAssistantChoice = {
   kind: "generate-all",
 };
 
-const ALL_FIXED_CHOICES = [...SCRIPT_CHOICES, ...MODE_CHOICES, ...STYLE_CHOICES] as const;
+function allSkillScriptChoiceLabels(): string[] {
+  return listSeedVideoSkillDefinitions().flatMap((s) => [...s.scriptChoiceLabels]);
+}
+
+const ALL_FIXED_CHOICES = [
+  ...allSkillScriptChoiceLabels(),
+  ...MODE_CHOICES,
+  ...STYLE_CHOICES,
+  "A方案：甜美种草带货风（小红书向）",
+  "B方案：强转化干练带货风（抖音短视频带货向）",
+] as const;
 
 const SCRIPT_MARKERS = ["①", "②", "③"] as const;
 
@@ -309,6 +324,7 @@ function lastAssistant(project: SeedVideoProject): string | null {
 
 function isScriptSelectionMessage(content: string): boolean {
   const t = content.trim();
+  if (allSkillScriptChoiceLabels().includes(t)) return true;
   if ((SCRIPT_CHOICES as readonly string[]).includes(t)) return true;
   if (/^全部生成/.test(t)) return true;
   if (/^我选择方案[①②③123ABCabc]/.test(t)) return true;
@@ -432,6 +448,11 @@ export function parseSeedVideoScriptIdFromChoice(
   if (/^我选择方案[②2][：:]/i.test(t)) return "script-2";
   if (/^我选择方案[③3][：:]/i.test(t)) return "script-3";
   if ((SCRIPT_CHOICES as readonly string[]).includes(t)) {
+    if (t.startsWith("脚本一")) return "script-1";
+    if (t.startsWith("脚本二")) return "script-2";
+    return "script-3";
+  }
+  if (allSkillScriptChoiceLabels().includes(t)) {
     if (t.startsWith("脚本一")) return "script-1";
     if (t.startsWith("脚本二")) return "script-2";
     return "script-3";
@@ -582,20 +603,20 @@ function buildScriptChoicesFromParsedMarkdown(text: string): SeedVideoAssistantC
   ];
 }
 
-function buildDefaultScriptChoices(): SeedVideoAssistantChoice[] {
+function buildDefaultScriptChoices(project: SeedVideoProject): SeedVideoAssistantChoice[] {
+  const labels = getSeedVideoSkillDefinition(
+    resolveSeedVideoSkillKey(project.settings.skillKey),
+  ).scriptChoiceLabels;
   return [
-    ...SCRIPT_CHOICES.map((choice, index) => {
-      const meta = SCRIPT_CHOICE_META[index]!;
-      return {
-        id: `script-${index + 1}`,
-        label: choice,
-        title: meta.title,
-        description: meta.description,
-        recommended: index === 0 ? true : undefined,
-        kind: "script" as const,
-        message: choice,
-      };
-    }),
+    ...labels.map((choice, index) => ({
+      id: `script-${index + 1}`,
+      label: choice,
+      title: choice,
+      description: choice.replace(/^脚本[一二三]：/, ""),
+      recommended: index === 0 ? true : undefined,
+      kind: "script" as const,
+      message: choice,
+    })),
     GENERATE_ALL_CHOICE,
   ];
 }
@@ -679,7 +700,9 @@ function lastAssistantScriptProposal(project: SeedVideoProject): string | null {
 function resolveScriptStepChoices(project: SeedVideoProject): SeedVideoAssistantChoice[] {
   const text = lastAssistantScriptProposal(project);
   if (!text) return [];
-  return buildScriptChoicesFromParsedMarkdown(text);
+  const fromJson = buildScriptChoicesFromParsedMarkdown(text);
+  if (fromJson.length > 0) return fromJson;
+  return buildDefaultScriptChoices(project);
 }
 
 function buildStoryboardReviewChoices(): SeedVideoAssistantChoice[] {
@@ -1082,7 +1105,10 @@ export function resolveSeedVideoPlanningPrompt(project: SeedVideoProject): strin
   const firstPlanning = project.chatHistory.find(
     (m) => m.role === "user" && !isSeedVideoChoiceMessage(m.content),
   );
-  return firstPlanning?.content?.trim() ?? "";
+  const fromHistory = firstPlanning?.content?.trim();
+  if (fromHistory) return fromHistory;
+  return getSeedVideoSkillDefinition(resolveSeedVideoSkillKey(project.settings.skillKey))
+    .defaultPlanningPrompt;
 }
 
 export function normalizeSeedVideoChoiceInput(

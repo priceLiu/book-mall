@@ -8,6 +8,12 @@ import {
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { buildSeedVideoSystemPrompt } from "@/lib/ecom/ecom-seed-video-prompts";
 import {
+  collectSeedVideoPlanningTexts,
+  parseSeedVideoTargetDurationFromText,
+  resolveSeedVideoTargetDurationSec,
+} from "@/lib/ecom/ecom-seed-video-duration";
+import { resolveSeedVideoSkillKey } from "@/lib/ecom/ecom-seed-video-skills";
+import {
   getEcomSeedVideoProject,
   updateEcomSeedVideoProject,
 } from "@/lib/ecom/ecom-seed-video-service";
@@ -88,11 +94,34 @@ export async function POST(req: Request, ctx: Ctx) {
       ? body.modelKey.trim()
       : project.settings.chatModelKey?.trim() || ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL;
 
-  const targetDurationSec = project.settings.targetDurationSec ?? 30;
-  const aspectRatio = project.settings.aspectRatio ?? "9:16";
   const lastUserText = turns[turns.length - 1]!.content;
+  const planningPrompt =
+    typeof project.meta?.planningPrompt === "string" ? project.meta.planningPrompt : undefined;
+  const planningTexts = collectSeedVideoPlanningTexts({ turns, planningPrompt });
+  const targetDurationSec = resolveSeedVideoTargetDurationSec({
+    texts: planningTexts,
+    planDurationSec: project.plan?.directVideo?.durationSec,
+    settingsTargetDurationSec: project.settings.targetDurationSec,
+  });
+  const parsedFromUser = parseSeedVideoTargetDurationFromText(lastUserText);
+  if (
+    parsedFromUser != null &&
+    parsedFromUser !== project.settings.targetDurationSec
+  ) {
+    try {
+      await updateEcomSeedVideoProject(auth.userId, projectId, {
+        settings: { ...project.settings, targetDurationSec: parsedFromUser },
+      });
+      project.settings.targetDurationSec = parsedFromUser;
+    } catch {
+      /* 不阻断助手 */
+    }
+  }
+
+  const aspectRatio = project.settings.aspectRatio ?? "9:16";
 
   const systemPrompt = buildSeedVideoSystemPrompt({
+    skillKey: resolveSeedVideoSkillKey(project.settings.skillKey),
     targetDurationSec,
     aspectRatio,
     materialCount: project.references.length,

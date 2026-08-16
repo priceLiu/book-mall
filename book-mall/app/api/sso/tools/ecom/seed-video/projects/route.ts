@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { isSeedVideoSkillKey } from "@/lib/ecom/ecom-seed-video-skills";
 import {
   createEcomSeedVideoProject,
   listEcomSeedVideoProjects,
@@ -40,7 +41,9 @@ export async function POST(req: Request) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const title = typeof body.title === "string" ? body.title : undefined;
-    const project = await createEcomSeedVideoProject(auth.userId, { title });
+    const skillKeyRaw = body.skillKey;
+    const skillKey = isSeedVideoSkillKey(skillKeyRaw) ? skillKeyRaw : undefined;
+    const project = await createEcomSeedVideoProject(auth.userId, { title, skillKey });
     return NextResponse.json({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";

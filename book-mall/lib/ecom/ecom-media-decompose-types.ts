@@ -1,0 +1,91 @@
+import { z } from "zod";
+
+import type { MediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
+
+export const ECOM_MEDIA_DECOMPOSE_TOOL_KEY = "ecom-toolkit__media-decompose";
+export const ECOM_MEDIA_DECOMPOSE_MODULE = "media-decompose";
+export const ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL = "qwen3.8-max";
+
+export type MediaDecomposeKind = "image" | "video";
+export type MediaDecomposeSource = "upload" | "url" | "asset";
+
+export type MediaDecomposeReference = {
+  id: string;
+  kind: MediaDecomposeKind;
+  ossUrl: string;
+  source: MediaDecomposeSource;
+  sourceUrl?: string;
+  label?: string;
+};
+
+export type MediaDecomposeSettings = {
+  chatModelKey?: string;
+  lastPrompt?: string;
+};
+
+export type MediaDecomposeResult = {
+  rawText?: string;
+  structured?: MediaDecomposePatch | null;
+  parseError?: string | null;
+  completedAt?: string;
+};
+
+export type MediaDecomposeProjectDto = {
+  id: string;
+  title: string | null;
+  module: string;
+  status: string;
+  settings: MediaDecomposeSettings;
+  media: MediaDecomposeReference | null;
+  result: MediaDecomposeResult | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const refSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(["image", "video"]),
+  ossUrl: z.string().url(),
+  source: z.enum(["upload", "url", "asset"]),
+  sourceUrl: z.string().optional(),
+  label: z.string().optional(),
+});
+
+export function sanitizeMediaDecomposeReference(raw: unknown): MediaDecomposeReference | null {
+  const parsed = refSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+export function sanitizeMediaDecomposeSettings(raw: unknown): MediaDecomposeSettings {
+  if (!raw || typeof raw !== "object") return {};
+  const o = raw as Record<string, unknown>;
+  return {
+    chatModelKey:
+      typeof o.chatModelKey === "string" && o.chatModelKey.trim()
+        ? o.chatModelKey.trim()
+        : undefined,
+    lastPrompt:
+      typeof o.lastPrompt === "string" && o.lastPrompt.trim()
+        ? o.lastPrompt.trim()
+        : undefined,
+  };
+}
+
+export function sanitizeMediaDecomposeResult(raw: unknown): MediaDecomposeResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    rawText: typeof o.rawText === "string" ? o.rawText : undefined,
+    structured:
+      o.structured && typeof o.structured === "object"
+        ? (o.structured as MediaDecomposePatch)
+        : o.structured === null
+          ? null
+          : undefined,
+    parseError: typeof o.parseError === "string" ? o.parseError : o.parseError === null ? null : undefined,
+    completedAt: typeof o.completedAt === "string" ? o.completedAt : undefined,
+  };
+}
+
+export type { MediaDecomposePatch };

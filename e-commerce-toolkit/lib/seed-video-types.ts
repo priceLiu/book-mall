@@ -1,6 +1,9 @@
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import type { SeedVideoSkillKey } from "@/lib/seed-video-skills";
 
-/** 与 book-mall/lib/ecom/ecom-seed-video-types.ts 一致 · 方案① direct 默认/上限 */
+/** 用户未在 Prompt 中说明时长时的默认目标成片秒数 */
+export const SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC = 20;
+/** 与 book-mall 一致 · 方案① direct 单次生成模型上限 */
 export const SEED_VIDEO_DIRECT_MAX_DURATION_SEC = 30;
 
 export type SeedVideoWorkflowPhase =
@@ -116,6 +119,7 @@ export type SeedVideoSettings = {
   ttsModelKey?: string;
   aspectRatio?: "9:16" | "16:9";
   targetDurationSec?: number;
+  skillKey?: SeedVideoSkillKey;
 };
 
 export type SeedVideoProject = {

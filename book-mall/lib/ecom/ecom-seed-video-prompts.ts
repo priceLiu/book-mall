@@ -1,19 +1,8 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const SKILL_PATH = resolve(__dirname, "../../doc/种草视频/skill.md");
-
-let cachedSkill: string | null = null;
-
-function loadSkillMd(): string {
-  if (cachedSkill) return cachedSkill;
-  try {
-    cachedSkill = readFileSync(SKILL_PATH, "utf8");
-  } catch {
-    cachedSkill = "";
-  }
-  return cachedSkill;
-}
+import {
+  loadSeedVideoSkillMd,
+  resolveSeedVideoSkillKey,
+  type SeedVideoSkillKey,
+} from "@/lib/ecom/ecom-seed-video-skills";
 
 /** 嵌入 system prompt 的 JSON 契约全文（与 table-format.md 一致） */
 const SEED_VIDEO_JSON_CONTRACT = `
@@ -196,12 +185,14 @@ Markdown 须对齐：素材解析表 + \`## 脚本一：{title}\` 等三标题 +
 `.trim();
 
 export function buildSeedVideoSystemPrompt(opts: {
+  skillKey?: SeedVideoSkillKey | string;
   targetDurationSec: number;
   aspectRatio: string;
   materialCount: number;
   workflowContext?: string;
 }): string {
-  const skill = loadSkillMd();
+  const skillKey = resolveSeedVideoSkillKey(opts.skillKey);
+  const skill = loadSeedVideoSkillMd(skillKey);
   const workflowBlock = opts.workflowContext?.trim()
     ? `\n${opts.workflowContext.trim()}\n`
     : "";
@@ -210,7 +201,8 @@ export function buildSeedVideoSystemPrompt(opts: {
 ---
 
 ## 运行时上下文（界面已选定，勿重复追问）
-- 目标成片时长：约 ${opts.targetDurationSec} 秒（用户可在首条指令中覆盖，以用户为准；方案① directPlan.configTable.durationSec 须与此一致）
+- 当前 Skill：${skillKey}
+- 目标成片时长：**以用户 Prompt 为准**（须从用户指令解析秒数；用户未说明时默认 **20 秒**）。当前解析参考：${opts.targetDurationSec} 秒（若与用户 Prompt 不一致，以 Prompt 为准；方案① \`directPlan.configTable.durationSec\` 须与用户目标一致）
 - 画幅：${opts.aspectRatio}
 - 已上传素材图：${opts.materialCount} 张（@图片1 对应第 1 张上传顺序，依此类推）
 ${workflowBlock}

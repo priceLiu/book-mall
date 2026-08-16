@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Images, Save, Download } from "lucide-react";
 
+import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
@@ -27,10 +28,16 @@ import {
   downloadSeedVideoExportZip,
   updateSeedVideoProject,
 } from "@/lib/ecom-seed-video-api";
+import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import { resolveSeedVideoDirectVideos } from "@/lib/seed-video-direct-videos";
-import { buildSeedVideoMentionRefs, SEED_VIDEO_PROMPT_PLACEHOLDER } from "@/lib/seed-video-mention-refs";
+import { buildSeedVideoMentionRefs } from "@/lib/seed-video-mention-refs";
+import {
+  getSeedVideoSkillDefinition,
+  resolveSeedVideoSkillKey,
+} from "@/lib/seed-video-skills";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { buildSeedVideoDirectPlanFromShots } from "@/lib/seed-video-direct-plan";
+import { resolveSeedVideoTargetDurationSec } from "@/lib/seed-video-duration";
 import { mergeSeedVideoShots } from "@/lib/seed-video-shot-merge";
 import {
   appendSeedVideoRenderStepLog,
@@ -108,6 +115,9 @@ type Props = {
   onPlanningPromptChange: (value: string) => void;
   onStartPlanning: () => void;
   onNewProject?: () => void | Promise<void>;
+  skillLabel?: string;
+  loadProjectList?: () => Promise<EcomProjectListItem[]>;
+  onOpenProject?: (id: string) => void | Promise<void>;
   streaming?: boolean;
   storyboardDraft?: SeedVideoStoryboardDraftRow[];
   editingStoryboard?: boolean;
@@ -132,6 +142,9 @@ export function SeedVideoContentPanel({
   onPlanningPromptChange,
   onStartPlanning,
   onNewProject,
+  skillLabel,
+  loadProjectList,
+  onOpenProject,
   streaming,
   storyboardDraft = [],
   editingStoryboard = false,
@@ -151,6 +164,18 @@ export function SeedVideoContentPanel({
     [project],
   );
   const directPlan = project.plan?.directVideo;
+  const projectTargetDurationSec = useMemo(
+    () =>
+      resolveSeedVideoTargetDurationSec({
+        texts:
+          typeof project.meta?.planningPrompt === "string"
+            ? [project.meta.planningPrompt]
+            : [],
+        planDurationSec: directPlan?.durationSec,
+        settingsTargetDurationSec: project.settings.targetDurationSec,
+      }),
+    [directPlan?.durationSec, project.meta?.planningPrompt, project.settings.targetDurationSec],
+  );
   const needsConfirmPreview = workspace.needsConfirm && Boolean(workspace.mode);
   const [localRenderedFinalUrl, setLocalRenderedFinalUrl] = useState<string | null>(null);
   const finalUrl =
@@ -267,10 +292,7 @@ export function SeedVideoContentPanel({
   const renderResumeLockRef = useRef(false);
   const [directBusy, setDirectBusy] = useState(false);
   const [pickerDurationSec, setPickerDurationSec] = useState(
-    () =>
-      directPlan?.durationSec ??
-      project.settings.targetDurationSec ??
-      SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
+    () => directPlan?.durationSec ?? projectTargetDurationSec,
   );
   const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(8);
   const directPollLock = useRef(false);
@@ -280,12 +302,8 @@ export function SeedVideoContentPanel({
   const projectChangeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setPickerDurationSec(
-      directPlan?.durationSec ??
-        project.settings.targetDurationSec ??
-        SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
-    );
-  }, [directPlan?.durationSec, project.settings.targetDurationSec, project.id]);
+    setPickerDurationSec(directPlan?.durationSec ?? projectTargetDurationSec);
+  }, [directPlan?.durationSec, projectTargetDurationSec, project.id]);
 
   useEffect(() => {
     setSelectedShotIndices(new Set());
@@ -318,6 +336,10 @@ export function SeedVideoContentPanel({
     () => buildSeedVideoMentionRefs(project.references),
     [project.references],
   );
+  const skillDef = getSeedVideoSkillDefinition(
+    resolveSeedVideoSkillKey(project.settings.skillKey),
+  );
+  const displaySkillLabel = skillLabel ?? skillDef.label;
   const directPreviewBgUrl = useMemo(
     () =>
       project.references.find((r) => r.role === "seed-material" && r.ossUrl?.trim())?.ossUrl?.trim(),
@@ -510,11 +532,7 @@ export function SeedVideoContentPanel({
       setPickerPanelDurationSec(shot?.durationSec ?? 8);
     }
     if (opts.fullSheet) {
-      setPickerDurationSec(
-        directPlan?.durationSec ??
-          project.settings.targetDurationSec ??
-          SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
-      );
+      setPickerDurationSec(directPlan?.durationSec ?? projectTargetDurationSec);
     }
     if (!direct && opts.panelIndex == null && !opts.strategy && productionStrategy == null) {
       setPickerTarget("fullSheet");
@@ -1180,7 +1198,7 @@ export function SeedVideoContentPanel({
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
                 {project.title ?? "图片生种草视频"}
               </h2>
-              <p className="text-[11px] text-[#6e6e73]">种草短视频 · 素材策划与成片</p>
+              <p className="text-[11px] text-[#6e6e73]">{displaySkillLabel} · 素材策划与成片</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {onNewProject ? (
@@ -1193,6 +1211,16 @@ export function SeedVideoContentPanel({
                 >
                   新建
                 </EcomButtonSecondary>
+              ) : null}
+              {loadProjectList && onOpenProject ? (
+                <EcomProjectListButton
+                  disabled={Boolean(refBusy) || streaming}
+                  currentProjectId={project.id}
+                  loadProjects={loadProjectList}
+                  onSelectProject={onOpenProject}
+                  title="种草视频 · 项目列表"
+                  emptyHint="还没有保存过的种草视频项目。"
+                />
               ) : null}
               <EcomButtonSecondary
                 size="sm"
@@ -1272,7 +1300,7 @@ export function SeedVideoContentPanel({
                 type="button"
                 className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
                 disabled={Boolean(refBusy) || streaming}
-                onClick={() => onPlanningPromptChange(SEED_VIDEO_PROMPT_PLACEHOLDER)}
+                onClick={() => onPlanningPromptChange(skillDef.defaultPlanningPrompt)}
               >
                 填入示例 Prompt
               </button>
@@ -1359,7 +1387,7 @@ export function SeedVideoContentPanel({
             ) : null}
           </div>
           <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-            将脚本与参考图一次性交给视频模型，生成一条不超过 30 秒的成片（非逐镜单独生成）。
+            将脚本与参考图一次性交给视频模型，生成一条连贯成片（时长由策划方案决定；单次生成受模型上限约 {SEED_VIDEO_DIRECT_MAX_DURATION_SEC} 秒约束，非逐镜单独生成）。
           </p>
           {!directPlanSynced && needsConfirmPreview ? (
             <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs leading-relaxed text-[#6e6e73]">

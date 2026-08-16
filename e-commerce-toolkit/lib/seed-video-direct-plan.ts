@@ -1,4 +1,5 @@
 import {
+  SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
   SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
   type SeedVideoDirectPlan,
   type SeedVideoPlan,
@@ -52,7 +53,7 @@ export function buildSeedVideoDirectPlanFromShots(
       3,
       opts?.existing?.durationSec ??
         opts?.settings?.targetDurationSec ??
-        (summed > 0 ? summed : SEED_VIDEO_DIRECT_MAX_DURATION_SEC),
+        (summed > 0 ? summed : SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC),
     ),
   );
 

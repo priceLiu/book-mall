@@ -9,6 +9,7 @@ import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-di
 import { SeedVideoAssistantPanel } from "@/components/seed-video/seed-video-assistant-panel";
 import { SeedVideoContentPanel } from "@/components/seed-video/seed-video-content-panel";
 import { SeedVideoProgressRail } from "@/components/seed-video/seed-video-progress-rail";
+import { SeedVideoSkillPickerDialog } from "@/components/seed-video/seed-video-skill-picker-dialog";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -23,6 +24,10 @@ import {
 } from "@/lib/ecom-seed-video-api";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { commitFormalScriptFromRows } from "@/lib/seed-video-formal-script-commit";
+import {
+  parseSeedVideoTargetDurationFromText,
+  resolveSeedVideoTargetDurationSec,
+} from "@/lib/seed-video-duration";
 import { inferAssistantChoices, isDirectMode, resolveSeedVideoPlanningPrompt, resolveSeedVideoVideoModelKey } from "@/lib/seed-video-workflow";
 import {
   readStoryboardDraftFromMeta,
@@ -31,6 +36,11 @@ import {
   type SeedVideoStoryboardDraftRow,
 } from "@/lib/seed-video-storyboard-parse";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
+import {
+  getSeedVideoSkillDefinition,
+  seedVideoSkillLabel,
+  type SeedVideoSkillKey,
+} from "@/lib/seed-video-skills";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
 const PROJECT_STORAGE_KEY = "ecom-seed-video-active-project";
@@ -54,6 +64,7 @@ export function SeedVideoStudio() {
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
     null,
   );
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
   const planningPromptRef = useRef("");
   const planningLaunchRef = useRef(false);
   const loadGenerationRef = useRef(0);
@@ -238,7 +249,7 @@ export function SeedVideoStudio() {
     });
   }, [videoModels, project?.meta?.workflow?.productionMode]);
 
-  async function handleNewProject() {
+  async function createProjectWithSkill(skillKey: SeedVideoSkillKey) {
     loadGenerationRef.current += 1;
     const generation = loadGenerationRef.current;
     setEmpty(false);
@@ -247,7 +258,11 @@ export function SeedVideoStudio() {
         sessionStorage.removeItem(PROJECT_STORAGE_KEY);
       }
       activeProjectIdRef.current = null;
-      const created = await createSeedVideoProject({ title: "图片生种草视频" });
+      const def = getSeedVideoSkillDefinition(skillKey);
+      const created = await createSeedVideoProject({
+        skillKey,
+        title: def.defaultTitle,
+      });
       if (generation !== loadGenerationRef.current) return;
       applyProject(created);
       setAssistantWide(false);
@@ -258,6 +273,48 @@ export function SeedVideoStudio() {
       await alert({
         title: "新建失败",
         message: e instanceof Error ? e.message : "无法创建项目",
+        variant: "error",
+      });
+    }
+  }
+
+  function handleRequestNewProject() {
+    setSkillPickerOpen(true);
+  }
+
+  const loadProjectList = useCallback(async () => {
+    const items = await listSeedVideoProjectSummaries();
+    return items.map((p) => ({
+      id: p.id,
+      title: p.title?.trim() || "种草视频项目",
+      updatedAt: p.updatedAt,
+      subtitle: p.skillLabel ?? seedVideoSkillLabel(p.skillKey),
+    }));
+  }, []);
+
+  async function handleOpenProject(id: string) {
+    if (project?.id === id) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再切换项目。",
+        variant: "error",
+      });
+      return;
+    }
+    loadGenerationRef.current += 1;
+    try {
+      const data = await getSeedVideoProject(id);
+      applyProject(data);
+      setEmpty(false);
+      setAssistantWide(false);
+      setStartPlanningToken(0);
+      setOpenProductionAfterSyncToken(0);
+      planningLaunchRef.current = false;
+    } catch (e) {
+      await alert({
+        title: "打开失败",
+        message: e instanceof Error ? e.message : "无法打开项目",
         variant: "error",
       });
     }
@@ -429,8 +486,18 @@ export function SeedVideoStudio() {
       return;
     }
     try {
+      const prompt = planningPrompt.trim();
+      const parsedDuration = parseSeedVideoTargetDurationFromText(prompt);
       await updateSeedVideoProject(project.id, {
-        meta: { planningPrompt: planningPrompt.trim() },
+        meta: { planningPrompt: prompt },
+        settings: {
+          ...project.settings,
+          targetDurationSec:
+            parsedDuration ??
+            resolveSeedVideoTargetDurationSec({
+              settingsTargetDurationSec: project.settings.targetDurationSec,
+            }),
+        },
       });
     } catch {
       /* 不阻断策划 */
@@ -454,17 +521,27 @@ export function SeedVideoStudio() {
 
   if (empty || !project) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-        <h1 className="text-lg font-semibold text-[#1d1d1f]">图片生种草视频</h1>
-        <p className="max-w-md text-sm text-[#6e6e73]">
-          上传商品/穿搭素材，用 Skill 策划脚本与镜头，支持方案① wan3.0 直接 30s 成片或方案② 逐镜 I2V + TTS + 合成。
-        </p>
-        <EcomButtonPrimary type="button" onClick={() => void handleNewProject()}>
-          开始创作
-        </EcomButtonPrimary>
-      </div>
+      <>
+        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+          <h1 className="text-lg font-semibold text-[#1d1d1f]">图片生种草视频</h1>
+          <p className="max-w-md text-sm text-[#6e6e73]">
+            上传商品/穿搭素材，选择 Skill 策划脚本与镜头，支持方案①直接连贯成片或方案②逐镜 I2V + TTS +
+            合成。
+          </p>
+          <EcomButtonPrimary type="button" onClick={() => setSkillPickerOpen(true)}>
+            开始创作
+          </EcomButtonPrimary>
+        </div>
+        <SeedVideoSkillPickerDialog
+          open={skillPickerOpen}
+          onOpenChange={setSkillPickerOpen}
+          onConfirm={(skillKey) => createProjectWithSkill(skillKey)}
+        />
+      </>
     );
   }
+
+  const skillLabel = seedVideoSkillLabel(project.settings.skillKey);
 
   return (
     <>
@@ -504,7 +581,10 @@ export function SeedVideoStudio() {
           planningPrompt={planningPrompt}
           onPlanningPromptChange={setPlanningPrompt}
           onStartPlanning={() => void handleStartPlanning()}
-          onNewProject={() => void handleNewProject()}
+          onNewProject={() => void handleRequestNewProject()}
+          skillLabel={skillLabel}
+          loadProjectList={loadProjectList}
+          onOpenProject={(id) => void handleOpenProject(id)}
           streaming={assistantStreaming}
           storyboardDraft={
             project.meta?.workflow?.editingStoryboard
@@ -528,6 +608,12 @@ export function SeedVideoStudio() {
           title={previewVideo.title}
         />
       ) : null}
+
+      <SeedVideoSkillPickerDialog
+        open={skillPickerOpen}
+        onOpenChange={setSkillPickerOpen}
+        onConfirm={(skillKey) => createProjectWithSkill(skillKey)}
+      />
     </>
   );
 }

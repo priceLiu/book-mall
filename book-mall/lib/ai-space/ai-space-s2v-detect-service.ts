@@ -87,6 +87,7 @@ export async function detectAiSpaceDigitalHumanImage(args: {
   const started = Date.now();
   const res = await dashscopeDetectS2vImage({
     apiKey: cred.apiKey,
+    baseUrl: cred.baseUrl,
     model: DETECT_MODEL_KEY,
     imageUrl: row.avatarImageUrl,
   });

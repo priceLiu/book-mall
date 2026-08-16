@@ -5,11 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import {
   ensureEcomSessionFresh,
   redirectEcomSessionRefresh,
 } from "@/lib/ecom-silent-sso";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
 import { StoryboardDeliverableSection } from "@/components/storyboard/storyboard-deliverable-section";
@@ -66,6 +68,8 @@ type Props = {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   onNewProject?: () => void | Promise<void>;
+  loadProjectList?: () => Promise<EcomProjectListItem[]>;
+  onOpenProject?: (id: string) => void | Promise<void>;
   onOpenSettings?: () => void;
   refBusy?: boolean;
   uploadRole?: StoryboardUploadRole;
@@ -142,6 +146,8 @@ export function StoryboardContentPanel({
   durationSec,
   aspectRatio,
   onNewProject,
+  loadProjectList,
+  onOpenProject,
   onOpenSettings,
   refBusy = false,
   uploadRole = "product",
@@ -858,6 +864,16 @@ export function StoryboardContentPanel({
                 >
                   新建
                 </EcomButtonSecondary>
+              ) : null}
+              {loadProjectList && onOpenProject ? (
+                <EcomProjectListButton
+                  disabled={refBusy || Boolean(streaming)}
+                  currentProjectId={project.id}
+                  loadProjects={loadProjectList}
+                  onSelectProject={onOpenProject}
+                  title="微剧故事版 · 项目列表"
+                  emptyHint="还没有保存过的微剧故事版项目。"
+                />
               ) : null}
               <EcomButtonSecondary
                 size="sm"

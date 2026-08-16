@@ -300,6 +300,7 @@ async function runS2vStage(taskId: string): Promise<void> {
   const started = Date.now();
   const created = await dashscopeCreateS2vTask({
     apiKey: cred.apiKey,
+    baseUrl: cred.baseUrl,
     model: S2V_MODEL_KEY,
     imageUrl: human.avatarImageUrl,
     audioUrl: audio.audioUrl,

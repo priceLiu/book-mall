@@ -298,6 +298,39 @@ export function StoryboardStudio() {
     }
   }
 
+  const loadProjectList = useCallback(async () => {
+    const items = await listStoryboardProjectSummaries();
+    return items.map((p) => ({
+      id: p.id,
+      title: p.title?.trim() || "微剧故事版",
+      updatedAt: p.updatedAt,
+    }));
+  }, []);
+
+  async function handleOpenProject(id: string) {
+    if (project?.id === id) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再切换项目。",
+        variant: "error",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await reload(id);
+    } catch (e) {
+      await alert({
+        title: "打开失败",
+        message: e instanceof Error ? e.message : "无法打开项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleRefUpload(
     file: File,
     opts: { label: string; role: "character" | "product" | "scene" | "other" },
@@ -421,6 +454,8 @@ export function StoryboardStudio() {
           durationSec={durationSec}
           aspectRatio={aspectRatio}
           onNewProject={() => void handleNewProject()}
+          loadProjectList={loadProjectList}
+          onOpenProject={(id) => void handleOpenProject(id)}
           onOpenSettings={() => setSettingsOpen(true)}
           refBusy={refBusy}
           uploadRole={uploadRole}

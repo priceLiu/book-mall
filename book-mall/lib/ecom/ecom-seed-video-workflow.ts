@@ -1,4 +1,5 @@
 import { parseMentionedImageIndices } from "@/lib/ecom/ecom-seed-video-mention";
+import { listSeedVideoSkillDefinitions } from "@/lib/ecom/ecom-seed-video-skills";
 import { hasStructuredDirectPlan, hasStructuredFormalShots } from "@/lib/ecom/ecom-seed-video-structured";
 
 export const ECOM_SEED_VIDEO_SCRIPT_CHOICES = [
@@ -18,9 +19,11 @@ export const ECOM_SEED_VIDEO_STYLE_CHOICES = [
 ] as const;
 
 const ALL_CHOICE_TEXTS = new Set<string>([
-  ...ECOM_SEED_VIDEO_SCRIPT_CHOICES,
+  ...listSeedVideoSkillDefinitions().flatMap((s) => [...s.scriptChoiceLabels]),
   ...ECOM_SEED_VIDEO_MODE_CHOICES,
   ...ECOM_SEED_VIDEO_STYLE_CHOICES,
+  "A方案：甜美种草带货风（小红书向）",
+  "B方案：强转化干练带货风（抖音短视频带货向）",
 ]);
 
 /** 点选/编号回复，不应再附带素材图送 Vision */
@@ -203,6 +206,13 @@ export function parseSeedVideoScriptIdFromChoice(
     if (t.startsWith("脚本一")) return "script-1";
     if (t.startsWith("脚本二")) return "script-2";
     return "script-3";
+  }
+  for (const label of listSeedVideoSkillDefinitions().flatMap((s) => s.scriptChoiceLabels)) {
+    if (t === label) {
+      if (label.startsWith("脚本一")) return "script-1";
+      if (label.startsWith("脚本二")) return "script-2";
+      return "script-3";
+    }
   }
   return null;
 }

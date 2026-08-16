@@ -4,9 +4,9 @@
  *
  *   cd book-mall && pnpm tsx scripts/debug-s2v-task.ts <vendorTaskId> [bookUserEmail]
  */
+import { pickAiSpaceS2vCredentialId } from "../lib/ai-space/ai-space-gateway-auth";
 import { resolveGatewayAuthForBookUser } from "../lib/gateway/book-gateway-link";
 import { pollDashscopeTaskForLog } from "../lib/gateway/poll-service";
-import { pickCredentialForKind } from "../lib/gateway/proxy-common";
 import { prisma } from "../lib/prisma";
 
 async function main() {
@@ -26,8 +26,8 @@ async function main() {
 
   const auth = await resolveGatewayAuthForBookUser(user.id);
   if (!auth) throw new Error("用户未关联 Gateway API Key");
-  const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
-  if (!credentialId) throw new Error("无 DASHSCOPE 凭证");
+  const credentialId = await pickAiSpaceS2vCredentialId(auth);
+  if (!credentialId) throw new Error("无 DASHSCOPE / 北京 S2V 凭证");
 
   const log = await prisma.gatewayRequestLog.findFirst({
     where: { externalTaskId: taskId },

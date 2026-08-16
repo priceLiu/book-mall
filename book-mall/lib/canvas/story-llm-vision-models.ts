@@ -47,3 +47,14 @@ export function assertStoryLlmVisionModel(
     `${prefix}模型「${modelKey}」不支持图片/视频理解，请换用 Qwen3.8 Max、Qwen3-VL、Qwen3.7 Plus、Gemini 3 Flash 或 GPT-5.5`,
   );
 }
+
+export function assertStoryLlmVideoUnderstandingModel(
+  modelKey: string,
+  context?: string,
+): void {
+  if (isStoryLlmVideoUnderstandingModel(modelKey)) return;
+  const prefix = context ? `${context}：` : "";
+  throw new Error(
+    `${prefix}模型「${modelKey}」不支持视频理解，请换用 Qwen3.8 Max、Qwen3-VL 或 Qwen3.7/3.6/3.5 Plus`,
+  );
+}

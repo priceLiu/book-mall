@@ -4,6 +4,7 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { prisma } from "@/lib/prisma";
 import {
   ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL,
+  ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
   ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL,
   ECOM_SEED_VIDEO_MODULE,
   parseSeedVideoPlan,
@@ -15,6 +16,12 @@ import {
   type SeedVideoReference,
   type SeedVideoSettings,
 } from "@/lib/ecom/ecom-seed-video-types";
+import {
+  getSeedVideoSkillDefinition,
+  resolveSeedVideoSkillKey,
+  seedVideoSkillLabel,
+  type SeedVideoSkillKey,
+} from "@/lib/ecom/ecom-seed-video-skills";
 import { mergeSeedVideoShotsPreserveMedia } from "@/lib/ecom/ecom-seed-video-shot-merge";
 import { backfillSeedVideoPlanShotsFromAssets } from "@/lib/ecom/ecom-seed-video-shot-backfill";
 import {
@@ -96,40 +103,61 @@ export async function listEcomSeedVideoProjects(userId: string): Promise<EcomSee
   const rows = await prisma.ecomSeedVideoProject.findMany({
     where: { userId, module: ECOM_SEED_VIDEO_MODULE },
     orderBy: { updatedAt: "desc" },
-    take: 50,
+    take: 80,
   });
-  return rows.map((row) => rowToDto(row));
+  return rows
+    .filter((row) => {
+      const meta = row.meta as Record<string, unknown> | null;
+      return typeof meta?.sourceMediaDecomposeProjectId !== "string";
+    })
+    .slice(0, 50)
+    .map((row) => rowToDto(row));
 }
 
 export async function listEcomSeedVideoProjectSummaries(userId: string) {
   const rows = await prisma.ecomSeedVideoProject.findMany({
     where: { userId, module: ECOM_SEED_VIDEO_MODULE },
     orderBy: { updatedAt: "desc" },
-    take: 50,
-    select: { id: true, title: true, updatedAt: true },
+    take: 80,
+    select: { id: true, title: true, updatedAt: true, settings: true, meta: true },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    updatedAt: row.updatedAt.toISOString(),
-  }));
+  return rows
+    .filter((row) => {
+      const meta = row.meta as Record<string, unknown> | null;
+      return typeof meta?.sourceMediaDecomposeProjectId !== "string";
+    })
+    .slice(0, 50)
+    .map((row) => {
+    const settings = row.settings as SeedVideoSettings | null;
+    const skillKey = resolveSeedVideoSkillKey(settings?.skillKey);
+    return {
+      id: row.id,
+      title: row.title,
+      updatedAt: row.updatedAt.toISOString(),
+      skillKey,
+      skillLabel: seedVideoSkillLabel(skillKey),
+    };
+  });
 }
 
 export async function createEcomSeedVideoProject(
   userId: string,
-  opts?: { title?: string },
+  opts?: { title?: string; skillKey?: SeedVideoSkillKey | string },
 ): Promise<EcomSeedVideoProjectDto> {
+  const skillKey = resolveSeedVideoSkillKey(opts?.skillKey);
+  const skillDef = getSeedVideoSkillDefinition(skillKey);
   const row = await prisma.ecomSeedVideoProject.create({
     data: {
       userId,
-      title: opts?.title?.trim().slice(0, 120) || "图片生种草视频",
+      title: opts?.title?.trim().slice(0, 120) || skillDef.defaultTitle,
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       settings: {
         aspectRatio: "9:16",
-        targetDurationSec: 30,
+        targetDurationSec: ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
         chatModelKey: ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL,
         videoModelKey: ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL,
+        skillKey,
       } as Prisma.InputJsonValue,
       meta: {
         workflow: { phase: "material" },
@@ -247,7 +275,10 @@ export async function updateEcomSeedVideoProject(
   const data: Prisma.EcomSeedVideoProjectUpdateInput = {};
   if (patch.title !== undefined) data.title = patch.title.slice(0, 120);
   if (patch.brief !== undefined) data.brief = patch.brief as Prisma.InputJsonValue;
-  if (patch.settings !== undefined) data.settings = patch.settings as Prisma.InputJsonValue;
+  if (patch.settings !== undefined) {
+    const prevSettings = (existing.settings as SeedVideoSettings | null) ?? {};
+    data.settings = { ...prevSettings, ...patch.settings } as Prisma.InputJsonValue;
+  }
   if (patch.references !== undefined) {
     data.references = sanitizeSeedVideoReferences(patch.references) as Prisma.InputJsonValue;
   }

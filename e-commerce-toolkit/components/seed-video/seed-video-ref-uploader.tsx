@@ -17,6 +17,9 @@ type Props = {
   busy?: boolean;
   uploadProgress?: number | null;
   className?: string;
+  sectionLabel?: string;
+  requiredMark?: boolean;
+  emptyHint?: string;
 };
 
 export function SeedVideoRefUploader({
@@ -27,6 +30,9 @@ export function SeedVideoRefUploader({
   busy,
   uploadProgress = null,
   className,
+  sectionLabel = "种草素材",
+  requiredMark = true,
+  emptyHint,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -49,8 +55,10 @@ export function SeedVideoRefUploader({
     <div className={className ?? "space-y-2"}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
-          种草素材
-          <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传）</span>
+          {sectionLabel}
+          {requiredMark ? (
+            <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传）</span>
+          ) : null}
         </span>
         <span className="text-[10px] text-[#86868b]">
           {items.length}/{MAX_MATERIALS} · {IMAGE_UPLOAD_DROP_HINT}
@@ -58,9 +66,12 @@ export function SeedVideoRefUploader({
       </div>
 
       <EcomRefUploadCard
-        title="种草素材"
+        title={sectionLabel}
         items={items.map((r) => ({ id: r.id, ossUrl: r.ossUrl, label: r.label }))}
-        emptyHint={`上传 1～${MAX_MATERIALS} 张商品/穿搭素材，发送时用 @图片1 … 引用。${IMAGE_UPLOAD_DROP_HINT}`}
+        emptyHint={
+          emptyHint ??
+          `上传 1～${MAX_MATERIALS} 张参考图，发送时用 @图片1 … 引用。${IMAGE_UPLOAD_DROP_HINT}`
+        }
         removeLabel="删除素材"
         busy={disabled}
         uploadProgress={uploadProgress}

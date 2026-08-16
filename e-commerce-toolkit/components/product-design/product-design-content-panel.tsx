@@ -6,6 +6,7 @@ import { Download, Eye, FileText, Film, ImageIcon, RefreshCw, Save } from "lucid
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -20,6 +21,7 @@ import {
   syncProductDesign,
   updateProductDesignProject,
 } from "@/lib/ecom-product-design-api";
+import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { ProductDesignRefUploader } from "@/components/product-design/product-design-ref-uploader";
 import { ProductDesignGenSlotWorkspace } from "@/components/product-design/product-design-gen-slot-workspace";
@@ -157,6 +159,8 @@ type Props = {
   uploadingRole?: ProductDesignReferenceRole | null;
   uploadProgress?: number | null;
   onNewProject?: () => void | Promise<void>;
+  loadProjectList?: () => Promise<EcomProjectListItem[]>;
+  onOpenProject?: (id: string) => void | Promise<void>;
   /** 详情页入口：打开「从已有主图项目导入」选择器 */
   onImportFromMainProject?: () => void;
   /** 主图入口：主图出完后引导新建详情页项目并带走策略 */
@@ -218,6 +222,8 @@ export function ProductDesignContentPanel({
   uploadingRole = null,
   uploadProgress = null,
   onNewProject,
+  loadProjectList,
+  onOpenProject,
   onImportFromMainProject,
   onContinueToDetailPages,
   onProjectChange,
@@ -1367,6 +1373,22 @@ export function ProductDesignContentPanel({
             >
               新建
             </EcomButtonSecondary>
+          ) : null}
+          {loadProjectList && onOpenProject ? (
+            <EcomProjectListButton
+              disabled={Boolean(busy) || Boolean(refBusy) || streaming}
+              currentProjectId={project.id}
+              loadProjects={loadProjectList}
+              onSelectProject={onOpenProject}
+              title={
+                activeTrack === "detail" ? "详情页 · 项目列表" : "主图 · 项目列表"
+              }
+              emptyHint={
+                activeTrack === "detail"
+                  ? "还没有保存过的详情页项目。"
+                  : "还没有保存过的主图项目。"
+              }
+            />
           ) : null}
           {onImportFromMainProject ? (
             <EcomButtonSecondary

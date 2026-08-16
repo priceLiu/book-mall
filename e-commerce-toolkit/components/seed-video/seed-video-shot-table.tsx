@@ -1,7 +1,10 @@
 "use client";
 
+import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { SeedVideoShotRefCell } from "@/components/seed-video/seed-video-shot-ref-cell";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import type { SeedVideoReference, SeedVideoShot } from "@/lib/seed-video-types";
 
 type Props = {
@@ -23,6 +26,12 @@ type Props = {
   onGenerateSelected?: () => void;
   generateSelectedDisabled?: boolean;
   selectedCount?: number;
+  /** 参考图列可上传 / 粘贴 / 选择；表内视频 Prompt 可 @ 参考图 */
+  editableRefs?: boolean;
+  refBusy?: boolean;
+  videoPromptMentionRefs?: EcomPromptImageRef[];
+  onUploadShotRef?: (shotIndex: number, file: File) => void | Promise<void>;
+  onUnassignShotRef?: (shotIndex: number) => void;
 };
 
 export function SeedVideoShotTable({
@@ -42,6 +51,11 @@ export function SeedVideoShotTable({
   onGenerateSelected,
   generateSelectedDisabled = false,
   selectedCount = 0,
+  editableRefs = false,
+  refBusy = false,
+  videoPromptMentionRefs,
+  onUploadShotRef,
+  onUnassignShotRef,
 }: Props) {
   function patchShot(index: number, patch: Partial<SeedVideoShot>) {
     onChange(shots.map((s) => (s.index === index ? { ...s, ...patch } : s)));
@@ -99,7 +113,7 @@ export function SeedVideoShotTable({
           {shots.map((shot) => {
             const thumb = refUrl(shot.refImageId);
             const status = shotStatus(shot);
-            const isGenerating = isShotGenerating(shot.index);
+            const isGenerating = isShotGenerating(shot.index) && !shot.videoUrl?.trim();
             const isSelected = selectedShotIndices?.has(shot.index) ?? false;
             return (
               <tr key={shot.index} className="border-t border-[#e8e8ed] align-top">
@@ -110,7 +124,7 @@ export function SeedVideoShotTable({
                         type="checkbox"
                         className="size-3.5 shrink-0 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#0071e3]/30 disabled:opacity-40"
                         checked={isSelected}
-                        disabled={selectDisabled}
+                        disabled={selectDisabled || isGenerating}
                         aria-label={`选择镜 ${shot.index}`}
                         onChange={(e) => onToggleShotSelected?.(shot.index, e.target.checked)}
                       />
@@ -122,7 +136,25 @@ export function SeedVideoShotTable({
                 </td>
                 <td className="px-3 py-2 text-[#6e6e73]">{shot.timeSlice}</td>
                 <td className="px-3 py-2">
-                  {thumb ? (
+                  {editableRefs && onUploadShotRef ? (
+                    <SeedVideoShotRefCell
+                      shotIndex={shot.index}
+                      refImageId={shot.refImageId}
+                      refImageLabel={shot.refImageLabel}
+                      references={references}
+                      disabled={disabled || isGenerating}
+                      busy={refBusy}
+                      onAssign={(refId, refLabel) =>
+                        patchShot(shot.index, { refImageId: refId, refImageLabel: refLabel })
+                      }
+                      onUpload={(file) => onUploadShotRef(shot.index, file)}
+                      onUnassign={
+                        onUnassignShotRef
+                          ? () => onUnassignShotRef(shot.index)
+                          : () => patchShot(shot.index, { refImageId: "", refImageLabel: "" })
+                      }
+                    />
+                  ) : thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={thumb}
@@ -154,23 +186,34 @@ export function SeedVideoShotTable({
                   <textarea
                     className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
                     value={shot.sceneDescription}
-                    disabled={disabled}
+                    disabled={disabled || isGenerating}
                     onChange={(e) => patchShot(shot.index, { sceneDescription: e.target.value })}
                   />
                 </td>
                 <td className="px-3 py-2">
-                  <textarea
-                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
-                    value={shot.videoPrompt}
-                    disabled={disabled}
-                    onChange={(e) => patchShot(shot.index, { videoPrompt: e.target.value })}
-                  />
+                  {videoPromptMentionRefs && videoPromptMentionRefs.length > 0 ? (
+                    <ProductDesignPromptMentionTextarea
+                      value={shot.videoPrompt}
+                      referenceImages={videoPromptMentionRefs}
+                      disabled={disabled || isGenerating}
+                      minHeightClass="min-h-[4rem]"
+                      className="rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-xs leading-relaxed"
+                      onChange={(next) => patchShot(shot.index, { videoPrompt: next })}
+                    />
+                  ) : (
+                    <textarea
+                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                      value={shot.videoPrompt}
+                      disabled={disabled || isGenerating}
+                      onChange={(e) => patchShot(shot.index, { videoPrompt: e.target.value })}
+                    />
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <textarea
                     className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
                     value={shot.voiceover}
-                    disabled={disabled}
+                    disabled={disabled || isGenerating}
                     onChange={(e) => patchShot(shot.index, { voiceover: e.target.value })}
                   />
                 </td>

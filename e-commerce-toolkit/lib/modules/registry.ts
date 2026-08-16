@@ -58,6 +58,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "parchment",
   },
   {
+    id: "media-decompose",
+    title: "拆图拆视频",
+    tagline: "图片/视频反推拆解 · 分镜与生图提示词",
+    href: "/ecom/media-decompose",
+    kind: "image",
+    toolKey: "ecom-toolkit__media-decompose",
+    action: "decompose",
+    tile: "light",
+  },
+  {
     id: "seed-video",
     title: "图片生种草视频",
     tagline: "素材策划 + 30s 种草短视频成片",

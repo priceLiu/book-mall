@@ -170,6 +170,44 @@ export function HandCraftStudio() {
     }
   }
 
+  const loadProjectList = useCallback(async () => {
+    const items = await listHandCraftProjectSummaries();
+    return items.map((p) => ({
+      id: p.id,
+      title: p.title?.trim() || "手伴创作",
+      updatedAt: p.updatedAt,
+      thumbnailUrl: p.thumbnailUrl,
+    }));
+  }, []);
+
+  async function handleOpenProject(id: string) {
+    if (project?.id === id) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再切换项目。",
+        variant: "error",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await reload(id);
+      setEmpty(false);
+      setAssistantWide(false);
+      setFocusStepId(null);
+      setGenerateRequest(null);
+    } catch (e) {
+      await alert({
+        title: "打开失败",
+        message: e instanceof Error ? e.message : "无法打开项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleDeleteProject() {
     if (!project) return;
     const ok = await doubleConfirm({
@@ -441,6 +479,8 @@ export function HandCraftStudio() {
         sketchGenBusy={sketchGenBusy}
         uploadProgress={uploadProgress}
         onNewProject={() => void handleNewProject()}
+        loadProjectList={loadProjectList}
+        onOpenProject={(id) => void handleOpenProject(id)}
         onDeleteProject={() => void handleDeleteProject()}
         onProjectChange={async () => {
           await reload(project.id);

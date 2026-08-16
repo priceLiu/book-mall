@@ -945,12 +945,14 @@ export async function submitDashscopeVideoJobForLog(opts: {
 export async function pollDashscopeTaskForLog(opts: {
   credentialId: string;
   taskId: string;
+  baseUrl?: string | null;
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
   const polled = await dashscopeGetTask({
     apiKey: cred.apiKey,
     taskId: opts.taskId,
+    baseUrl: opts.baseUrl ?? cred.baseUrl,
   });
   if (!polled.ok) throw new Error(polled.error);
   return { output: polled.output, raw: polled.raw };

@@ -1,7 +1,7 @@
 /**
  * 我的 AI 空间 · 阿里云（DashScope / 百炼）Gateway 鉴权
  *
- * 凭证按 `providerKind` 绑定，S2V / 形象检测 / CosyVoice 共用同一把用户 `sk-gw`。
+ * S2V / 形象检测须优先使用华北2（北京）业务空间凭证；CosyVoice TTS 仍走 BAILIAN 分支。
  */
 
 import {
@@ -9,7 +9,56 @@ import {
   assertGatewayApiKeyLinkedForUser,
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
+import type { ResolvedGatewayApiKeyAuth } from "@/lib/gateway/api-key-service";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
+import { prisma } from "@/lib/prisma";
+
+export const AI_SPACE_S2V_BEIJING_CREDENTIAL_ALIAS = "DashScope 北京 S2V";
+
+function isBeijingS2vCredential(row: {
+  alias: string;
+  baseUrl: string | null;
+}): boolean {
+  if (/cn-beijing\.maas\.aliyuncs\.com/i.test(row.baseUrl ?? "")) return true;
+  if (row.alias.trim() === AI_SPACE_S2V_BEIJING_CREDENTIAL_ALIAS) return true;
+  return /北京.*s2v|s2v.*北京/i.test(row.alias);
+}
+
+/** 在已绑定的 sk-gw 凭证中优先选用华北2 S2V 专用 Key */
+export async function pickAiSpaceS2vCredentialId(
+  auth: ResolvedGatewayApiKeyAuth,
+): Promise<string | null> {
+  const boundIds = auth.credentials.map((c) => c.id);
+  if (boundIds.length === 0) return null;
+
+  const rows = await prisma.gatewayVendorCredential.findMany({
+    where: { id: { in: boundIds }, active: true },
+    select: {
+      id: true,
+      alias: true,
+      baseUrl: true,
+      providerKind: true,
+      isDefaultForProvider: true,
+      sortOrder: true,
+    },
+  });
+
+  const beijing = rows.filter(isBeijingS2vCredential);
+  if (beijing.length > 0) {
+    beijing.sort((a, b) => {
+      const da = a.isDefaultForProvider ? 0 : 1;
+      const db = b.isDefaultForProvider ? 0 : 1;
+      if (da !== db) return da - db;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
+    return beijing[0]!.id;
+  }
+
+  return (
+    pickCredentialForKind(auth.credentials, "DASHSCOPE") ??
+    pickCredentialForKind(auth.credentials, "BAILIAN")
+  );
+}
 
 export async function requireAiSpaceDashscopeAuth(userId: string) {
   await assertGatewayApiKeyLinkedForUser(userId);
@@ -17,9 +66,7 @@ export async function requireAiSpaceDashscopeAuth(userId: string) {
   if (!auth) {
     throw new GatewayRequiredError("请先在个人中心关联 Gateway API Key");
   }
-  const credentialId =
-    pickCredentialForKind(auth.credentials, "DASHSCOPE") ??
-    pickCredentialForKind(auth.credentials, "BAILIAN");
+  const credentialId = await pickAiSpaceS2vCredentialId(auth);
   if (!credentialId) {
     throw new GatewayRequiredError(
       "Gateway Key 未绑定阿里云（百炼 / DashScope）凭证，请在 Gateway 模型管理页绑定后重试",

@@ -32,8 +32,11 @@
 | 电商主图 / 详情 | `ProductDesignRefUploader` | 按 `role` 单卡 |
 | 手伴创作 | `HandCraftRefUploader` | 线稿区；可选 `toolbarPrefix`（生成线稿） |
 | 种草视频 | `SeedVideoRefUploader` | 素材区 |
+| 拆图拆视频 | `MediaDecomposeMediaInput` | 单素材：`EcomRefUploadCard`（图片/视频）+ `toolbarPrefix` 粘贴 HTTPS 链接 + `EcomAssetPickerDialog`（`allowVideo`） |
 
 新增模块参考图上传 → **必须先** 用 `EcomRefUploadCard` +（可选）`EcomAssetPickerDialog`，再写薄封装。
+
+**拆图拆视频**（`components/media-decompose/media-decompose-media-input.tsx`）与主图 / 种草共用 `EcomRefUploadCard`（我的资产 + 上传 + 拖放粘贴）。额外用 `toolbarPrefix` **粘贴链接** 展开 HTTPS 输入；URL 经 `POST .../media/from-url` 服务端校验并转存 OSS。视频缩略走卡片内 56px 槽，预览用 `EcomVideoPreviewDialog`（见 `VIDEO.md`）。
 
 ---
 
@@ -244,7 +247,7 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 
 | 顺序 | 按钮 | 图标 | 说明 |
 |------|------|------|------|
-| 可选前缀 | `toolbarPrefix` | 模块自定 | 如手伴「生成线稿」 |
+| 可选前缀 | `toolbarPrefix` | 模块自定 | 如手伴「生成线稿」、拆图「粘贴链接」 |
 | 1 | **我的资产** | `Images` `h-3 w-3` | 打开 `EcomAssetPickerDialog`；达上限时隐藏 |
 | 2 | **上传** | `Plus` `h-3 w-3` | 触发 hidden file input |
 
@@ -267,7 +270,7 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 
 | 行为 | 说明 |
 |------|------|
-| 点击上传 | `accept="image/jpeg,image/png,image/webp"` · `multiple` |
+| 点击上传 | 默认 `accept="image/jpeg,image/png,image/webp"` · `multiple`；拆图可覆盖 `accept` / `multiple={false}` / `allowVideo` |
 | 拖放 / 粘贴 | `useImageDropPaste`；悬停块上粘贴归入该 role |
 | 上传进度 | `ecom-upload-progress` + `text-[10px] text-[#0071e3]` |
 | 空列表 | `emptyHint` · `text-[10px] text-[#86868b]` |
@@ -307,7 +310,7 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 | 手伴 | `POST .../hand-craft/projects/[id]/refs/attach` |
 | 种草视频 | `POST .../seed-video/projects/[id]/refs/attach` |
 
-Picker 只选 **`kind === "image"`** 资产；`maxSelect` = 剩余可上传张数。
+Picker 默认只选 **`kind === "image"`** 资产；`maxSelect` = 剩余可上传张数。拆图拆视频传 `allowVideo`，可选图片或视频。
 
 ---
 

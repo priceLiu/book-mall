@@ -13,6 +13,7 @@ import {
   Package,
   Rocket,
   ScrollText,
+  ScanSearch,
   Settings,
   Shirt,
   ShoppingBag,
@@ -88,6 +89,7 @@ function imageModuleIcon(id: string): LucideIcon {
   if (id === "detail-page-creation") return ScrollText;
   if (id === "seed-video") return Video;
   if (id === "hand-craft") return Blocks;
+  if (id === "media-decompose") return ScanSearch;
   return Shirt;
 }
 
@@ -134,7 +136,11 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
       external: true,
     }));
   const imageMods = ECOM_MODULES.filter(
-    (m) => m.kind === "image" && m.href.startsWith("/ecom/"),
+    (m) =>
+      m.kind === "image" &&
+      m.href.startsWith("/ecom/") &&
+      m.id !== "hand-craft" &&
+      m.id !== "media-decompose",
   );
   const videoMods = ECOM_MODULES.filter(
     (m) =>
@@ -145,6 +151,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
   );
 
   const seedVideoMod = ECOM_MODULES.find((m) => m.id === "seed-video");
+  const mediaDecomposeMod = ECOM_MODULES.find((m) => m.id === "media-decompose");
   const imageModLinks = imageMods.map((m) => link(m.title, m.href, imageModuleIcon(m.id)));
   const detailIdx = imageModLinks.findIndex((l) => l.href === "/ecom/detail-page-creation");
   if (seedVideoMod && detailIdx >= 0) {
@@ -156,6 +163,15 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
   } else if (seedVideoMod) {
     imageModLinks.push(link(seedVideoMod.title, seedVideoMod.href, Video));
   }
+  if (mediaDecomposeMod) {
+    const seedIdx = imageModLinks.findIndex((l) => l.href === "/ecom/seed-video");
+    const insertAt = seedIdx >= 0 ? seedIdx + 1 : imageModLinks.length;
+    imageModLinks.splice(
+      insertAt,
+      0,
+      link(mediaDecomposeMod.title, mediaDecomposeMod.href, ScanSearch),
+    );
+  }
 
   const ecomChildren: EcomSidebarNavLink[] = dedupeNavLinks([
     ...imageModLinks,
@@ -166,6 +182,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
 
   const marketingOrder = [
     "storyboard-micro-drama",
+    "hand-craft",
     "promo",
     "ad",
     "video-digital-human",

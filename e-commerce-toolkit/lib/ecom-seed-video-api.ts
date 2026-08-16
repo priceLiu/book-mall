@@ -2,6 +2,7 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import type { SeedVideoSkillKey } from "@/lib/seed-video-skills";
 import type {
   SeedVideoChatMessage,
   SeedVideoPlan,
@@ -27,14 +28,29 @@ export async function fetchSeedVideoModels(): Promise<{
 }
 
 export async function listSeedVideoProjectSummaries(): Promise<
-  Array<{ id: string; title: string | null; updatedAt: string }>
+  Array<{
+    id: string;
+    title: string | null;
+    updatedAt: string;
+    skillKey?: SeedVideoSkillKey;
+    skillLabel?: string;
+  }>
 > {
   const data = await ecomBookFetch(`${BASE}/projects?summary=1`);
-  return (data.items as Array<{ id: string; title: string | null; updatedAt: string }>) ?? [];
+  return (
+    (data.items as Array<{
+      id: string;
+      title: string | null;
+      updatedAt: string;
+      skillKey?: SeedVideoSkillKey;
+      skillLabel?: string;
+    }>) ?? []
+  );
 }
 
 export async function createSeedVideoProject(opts?: {
   title?: string;
+  skillKey?: SeedVideoSkillKey;
 }): Promise<SeedVideoProject> {
   const data = await ecomBookFetch(`${BASE}/projects`, {
     method: "POST",

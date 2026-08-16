@@ -1,6 +1,7 @@
 /** 与 book-mall `ecom-seed-video-structured.ts` 保持一致的客户端解析（勿改围栏名） */
 
 import type { SeedVideoDirectPlan, SeedVideoShot } from "@/lib/seed-video-types";
+import { SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC } from "@/lib/seed-video-types";
 
 export type SeedVideoStructuredScript = {
   id: "script-1" | "script-2" | "script-3";
@@ -144,7 +145,7 @@ export function resolveDirectPlanFromAssistantText(text: string): SeedVideoDirec
     globalPrompt,
     fullVoiceover,
     aspectRatio: cfg?.aspectRatio ?? "9:16",
-    durationSec: cfg?.durationSec ?? durationFromShots ?? 30,
+    durationSec: cfg?.durationSec ?? durationFromShots ?? SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
     bgmPreset: cfg?.bgmPreset,
     voiceTone: cfg?.voiceTone,
     materialUsage: cfg?.materialUsage,

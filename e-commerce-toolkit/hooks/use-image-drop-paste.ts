@@ -4,14 +4,18 @@ import { useCallback, useEffect, useRef, useState, type DragEvent, type FocusEve
 
 import {
   extractImageFileFromClipboard,
-  extractImageFilesFromClipboard,
-  extractImageFilesFromDataTransfer,
+  extractMediaFilesFromClipboard,
+  extractMediaFilesFromDataTransfer,
   validateImageFile,
+  validateImageOrVideoFile,
+  type ImageUploadError,
 } from "@/lib/image-upload-utils";
 
 type Options = {
   enabled?: boolean;
   multiple?: boolean;
+  /** 同时接受拖放 / 粘贴的视频文件（拆图拆视频） */
+  allowVideo?: boolean;
   onFiles: (files: File[]) => void | Promise<void>;
   onError?: (title: string, message: string) => void;
 };
@@ -23,6 +27,7 @@ type Options = {
 export function useImageDropPaste({
   enabled = true,
   multiple = false,
+  allowVideo = false,
   onFiles,
   onError,
 }: Options) {
@@ -38,8 +43,11 @@ export function useImageDropPaste({
     async (raw: File[]) => {
       if (!enabled || raw.length === 0) return;
       const accepted: File[] = [];
+      const validate: (file: File) => ImageUploadError | null = allowVideo
+        ? validateImageOrVideoFile
+        : validateImageFile;
       for (const file of raw) {
-        const err = validateImageFile(file);
+        const err = validate(file);
         if (err) {
           onError?.(err.title, err.message);
           continue;
@@ -49,7 +57,7 @@ export function useImageDropPaste({
       }
       if (accepted.length > 0) await onFilesRef.current(accepted);
     },
-    [enabled, multiple, onError],
+    [allowVideo, enabled, multiple, onError],
   );
 
   const isPasteTargetActive = useCallback(() => {
@@ -67,10 +75,12 @@ export function useImageDropPaste({
     function onPaste(e: ClipboardEvent) {
       if (!isPasteTargetActive()) return;
 
-      const files = extractImageFilesFromClipboard(e);
+      const files = extractMediaFilesFromClipboard(e, { allowVideo });
       const file =
         files[0] ??
-        (e.clipboardData ? extractImageFileFromClipboard(e.clipboardData) : null);
+        (e.clipboardData && !allowVideo
+          ? extractImageFileFromClipboard(e.clipboardData)
+          : null);
       const batch = files.length > 0 ? files : file ? [file] : [];
       if (batch.length === 0) return;
 
@@ -80,7 +90,7 @@ export function useImageDropPaste({
 
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
-  }, [enabled, ingestFiles, isPasteTargetActive, multiple]);
+  }, [allowVideo, enabled, ingestFiles, isPasteTargetActive, multiple]);
 
   const onDragOver = useCallback(
     (e: DragEvent) => {
@@ -105,9 +115,9 @@ export function useImageDropPaste({
       e.preventDefault();
       e.stopPropagation();
       setDragOver(false);
-      void ingestFiles(extractImageFilesFromDataTransfer(e.dataTransfer));
+      void ingestFiles(extractMediaFilesFromDataTransfer(e.dataTransfer, { allowVideo }));
     },
-    [enabled, ingestFiles],
+    [allowVideo, enabled, ingestFiles],
   );
 
   const focusZone = useCallback(() => {

@@ -6,10 +6,12 @@ export const ECOM_SEED_VIDEO_MODULE = "seed-video";
 export const ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL = "qwen3.8-max";
 /** 方案②逐镜成片默认参考生视频（与 createTask · BAILIAN R2V 一致） */
 export const ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL = "wan2.7-r2v";
-/** 方案① 直接成片 · 默认/上限时长（秒；wan2.6-r2v 等例外见 bailianR2vMaxDurationSec） */
+/** 用户未在 Prompt 中说明时长时的默认目标成片秒数 */
+export const ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC = 20;
+/** 方案① 直接成片 · 单次生成模型上限（秒；wan2.6-r2v 等例外见 bailianR2vMaxDurationSec） */
 export const ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC = 30;
-/** 方案② · 多镜合成目标时长默认/上限（秒） */
-export const ECOM_SEED_VIDEO_FINE_DEFAULT_TARGET_DURATION_SEC = 30;
+/** 方案② · 多镜合成目标时长默认（秒；用户 Prompt 可覆盖） */
+export const ECOM_SEED_VIDEO_FINE_DEFAULT_TARGET_DURATION_SEC = 20;
 
 export type SeedVideoWorkflowPhase =
   | "material"
@@ -145,12 +147,16 @@ export type SeedVideoPlan = {
   };
 };
 
+import type { SeedVideoSkillKey } from "@/lib/ecom/ecom-seed-video-skills";
+
 export type SeedVideoSettings = {
   chatModelKey?: string;
   videoModelKey?: string;
   ttsModelKey?: string;
   aspectRatio?: "9:16" | "16:9";
   targetDurationSec?: number;
+  /** 创建时选定，不可切换 */
+  skillKey?: SeedVideoSkillKey;
 };
 
 export type SeedVideoMeta = {

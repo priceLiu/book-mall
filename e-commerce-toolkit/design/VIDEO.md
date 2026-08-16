@@ -110,7 +110,7 @@
 | 悬停 Eye | → `EcomImagePreviewDialog` | → `EcomVideoPreviewDialog` |
 | 悬停 Download | `downloadMediaUrl` | 同 |
 | 弹层背景 | 黑底 + 缩放平移 | 黑底 + 原生 controls |
-| 上传区 | `EcomRefUploadCard`（图片） | 种草/微剧成片走生成 API，**无**单独视频上传卡 |
+| 上传区 | `EcomRefUploadCard`（图片） | 种草/微剧成片走生成 API。**拆图拆视频** 用同一卡片 `allowVideo`，预览走 `EcomVideoPreviewDialog` |
 
 ---
 

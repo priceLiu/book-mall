@@ -14,6 +14,7 @@ import {
   resolveStoryboardVideoProvider,
 } from "@/lib/ecom/ecom-storyboard-video-models";
 import {
+  ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
   ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
   ECOM_SEED_VIDEO_MODULE,
   ECOM_SEED_VIDEO_TOOL_KEY,
@@ -40,7 +41,7 @@ export function resolveSeedVideoDirectDurationSec(opts: {
 }): number {
   const modelKey = opts.modelKey.trim();
   const raw = Math.round(
-    opts.durationSec ?? opts.directVideo?.durationSec ?? ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
+    opts.durationSec ?? opts.directVideo?.durationSec ?? ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
   );
   let cap = ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC;
   if (
@@ -61,7 +62,7 @@ export function buildSeedVideoDirectGenerationPrompt(plan: SeedVideoDirectPlan):
 
   const durationSec = Math.max(
     3,
-    Math.round(plan.durationSec || ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC),
+    Math.round(plan.durationSec || ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC),
   );
   parts.push(
     `目标成片时长：${durationSec} 秒（须严格按此时长完成镜头切换与口播节奏，勿超出）`,
@@ -140,7 +141,7 @@ export function buildSeedVideoDirectPlanFromShots(
     durationSec:
       opts?.existing?.durationSec ??
       opts?.settings?.targetDurationSec ??
-      (summed > 0 ? summed : ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC),
+      (summed > 0 ? summed : ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC),
     directVideo: opts?.existing,
   });
 
@@ -266,7 +267,7 @@ export async function ecomSubmitSeedVideoDirectJob(opts: {
   } else {
     durationSec = resolveSeedVideoDirectDurationSec({
       modelKey,
-      durationSec: opts.durationSec ?? opts.directVideo.durationSec ?? ECOM_SEED_VIDEO_DIRECT_MAX_DURATION_SEC,
+      durationSec: opts.durationSec ?? opts.directVideo.durationSec ?? ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
       directVideo: opts.directVideo,
     });
     const { parameters, input } = buildDashscopeSbv1T2vVideoBody({
@@ -399,7 +400,7 @@ export async function ecomPollSeedVideoDirectJob(opts: {
         globalPrompt: prevDirect?.globalPrompt ?? "",
         fullVoiceover: prevDirect?.fullVoiceover ?? "",
         aspectRatio: prevDirect?.aspectRatio ?? "9:16",
-        durationSec: prevDirect?.durationSec ?? 30,
+        durationSec: prevDirect?.durationSec ?? ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
         bgmPreset: prevDirect?.bgmPreset,
         voiceTone: prevDirect?.voiceTone,
         materialUsage: prevDirect?.materialUsage,

@@ -5,6 +5,7 @@ import { Download, Images, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { HandCraftComposePanel } from "@/components/hand-craft/hand-craft-compose-panel";
 import { HandCraftRefUploader } from "@/components/hand-craft/hand-craft-ref-uploader";
 import { HandCraftSaveDialog } from "@/components/hand-craft/hand-craft-save-dialog";
@@ -23,6 +24,7 @@ import {
   getHandCraftProject,
   saveHandCraftWorkflow,
 } from "@/lib/ecom-hand-craft-api";
+import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import {
   doneCount,
@@ -56,6 +58,8 @@ type Props = {
   sketchGenBusy?: boolean;
   uploadProgress?: number | null;
   onNewProject?: () => void | Promise<void>;
+  loadProjectList?: () => Promise<EcomProjectListItem[]>;
+  onOpenProject?: (id: string) => void | Promise<void>;
   onDeleteProject?: () => void | Promise<void>;
   onProjectChange: () => void | Promise<void>;
   streaming?: boolean;
@@ -82,6 +86,8 @@ export function HandCraftContentPanel({
   sketchGenBusy = false,
   uploadProgress = null,
   onNewProject,
+  loadProjectList,
+  onOpenProject,
   onDeleteProject,
   onProjectChange,
   streaming,
@@ -380,6 +386,16 @@ export function HandCraftContentPanel({
                 >
                   新建
                 </EcomButtonSecondary>
+              ) : null}
+              {loadProjectList && onOpenProject ? (
+                <EcomProjectListButton
+                  disabled={Boolean(busy) || Boolean(refBusy) || disabledAll || Boolean(streaming)}
+                  currentProjectId={project.id}
+                  loadProjects={loadProjectList}
+                  onSelectProject={onOpenProject}
+                  title="手伴创作 · 项目列表"
+                  emptyHint="还没有保存过的手伴创作项目。"
+                />
               ) : null}
               <EcomButtonSecondary
                 size="sm"

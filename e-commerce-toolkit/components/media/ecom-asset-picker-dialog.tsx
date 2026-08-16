@@ -36,6 +36,8 @@ type Props = {
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => void | Promise<void>;
   maxSelect?: number;
+  /** 为 true 时同时展示图片与视频资产（拆图拆视频等） */
+  allowVideo?: boolean;
 };
 
 export function EcomAssetPickerDialog({
@@ -43,6 +45,7 @@ export function EcomAssetPickerDialog({
   onOpenChange,
   onConfirm,
   maxSelect = 8,
+  allowVideo = false,
 }: Props) {
   const [activeModule, setActiveModule] = useState(GROUPS[0]!.module);
   const [assets, setAssets] = useState<EcomAsset[]>([]);
@@ -62,7 +65,13 @@ export function EcomAssetPickerDialog({
     setError(null);
     void listAssets(activeModule)
       .then((items) => {
-        if (!cancelled) setAssets(items.filter((a) => a.kind === "image"));
+        if (!cancelled) {
+          setAssets(
+            items.filter((a) =>
+              allowVideo ? a.kind === "image" || a.kind === "video" : a.kind === "image",
+            ),
+          );
+        }
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "加载失败");
@@ -73,7 +82,7 @@ export function EcomAssetPickerDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, activeModule]);
+  }, [open, activeModule, allowVideo]);
 
   function toggle(id: string) {
     setSelected((prev) =>
@@ -137,7 +146,7 @@ export function EcomAssetPickerDialog({
             <p className="py-14 text-center text-sm text-[#c0392b]">{error}</p>
           ) : assets.length === 0 ? (
             <p className="py-14 text-center text-sm text-[#86868b]">
-              该分组下还没有图片资产。
+              该分组下还没有{allowVideo ? "图片或视频" : "图片"}资产。
             </p>
           ) : (
             <div className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
@@ -146,9 +155,9 @@ export function EcomAssetPickerDialog({
                 return (
                   <EcomMediaLibraryTile
                     key={asset.id}
-                    kind="image"
+                    kind={asset.kind === "video" ? "video" : "image"}
                     src={asset.thumbnailUrl ?? asset.ossUrl}
-                    alt={asset.title ?? "资产图"}
+                    alt={asset.title ?? "资产"}
                     selected={active}
                     onSelect={() => toggle(asset.id)}
                     onPreview={() =>
