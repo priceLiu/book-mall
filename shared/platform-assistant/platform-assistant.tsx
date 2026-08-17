@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -63,6 +64,59 @@ function clampToViewport(x: number, y: number): BallPos {
   };
 }
 
+function SparklesIcon({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" />
+      <path d="M20 3v4" />
+      <path d="M22 5h-4" />
+      <path d="M4 17v2" />
+      <path d="M5 18H3" />
+    </svg>
+  );
+}
+
+function SendIcon({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m22 2-7 20-4-9-9-4z" />
+      <path d="M22 2 11 13" />
+    </svg>
+  );
+}
+
 function useInjectStyles(accent: string) {
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -71,11 +125,238 @@ function useInjectStyles(accent: string) {
 @keyframes pa-pop { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
 @keyframes pa-slide { from { transform: translateX(24px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
 @keyframes pa-blink { 0%,80%,100% { opacity: .2 } 40% { opacity: 1 } }
-.pa-scroll::-webkit-scrollbar { width: 6px }
-.pa-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px }
-.pa-dot { width:6px;height:6px;border-radius:50%;background:${accent};display:inline-block;margin:0 2px;animation:pa-blink 1.4s infinite both }
-.pa-send:hover { filter: brightness(1.08) }
-.pa-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.12) }
+.pa-root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+.pa-ball {
+  position: fixed;
+  width: ${BALL_SIZE}px;
+  height: ${BALL_SIZE}px;
+  border-radius: 50%;
+  border: none;
+  cursor: grab;
+  padding: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  box-shadow: 0 6px 24px rgba(99,102,241,.35);
+  z-index: 2147483000;
+  animation: pa-pop .25s ease;
+}
+.pa-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482999;
+  background: rgba(15, 23, 42, 0.35);
+}
+.pa-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(400px, 92vw);
+  display: flex;
+  flex-direction: column;
+  z-index: 2147483000;
+  animation: pa-slide .22s ease;
+  background: linear-gradient(to bottom, #18181b, #09090b);
+  color: #f4f4f5;
+  border-left: 1px solid rgba(255,255,255,.08);
+  box-shadow: -8px 0 40px rgba(0,0,0,.45);
+}
+.pa-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.pa-header-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, ${accent}, #8b5cf6);
+}
+.pa-header-title {
+  flex: 1;
+  min-width: 0;
+}
+.pa-header-title h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  line-height: 1.3;
+}
+.pa-header-title p {
+  font-size: 12px;
+  color: rgba(255,255,255,.4);
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+.pa-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: rgba(255,255,255,.5);
+  padding: 4px;
+  border-radius: 8px;
+  transition: color .15s, background .15s;
+}
+.pa-close:hover {
+  color: #fff;
+  background: rgba(255,255,255,.08);
+}
+.pa-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(161,161,170,.45) transparent;
+}
+.pa-scroll::-webkit-scrollbar { width: 5px; }
+.pa-scroll::-webkit-scrollbar-track { background: transparent; }
+.pa-scroll::-webkit-scrollbar-thumb {
+  background: rgba(161,161,170,.45);
+  border-radius: 999px;
+}
+.pa-scroll::-webkit-scrollbar-thumb:hover { background: rgba(161,161,170,.65); }
+.pa-row { display: flex; width: 100%; }
+.pa-row-user { justify-content: flex-end; }
+.pa-row-assistant { justify-content: flex-start; }
+.pa-msg-wrap { max-width: 82%; }
+.pa-msg-row { display: flex; align-items: flex-end; gap: 8px; }
+.pa-msg-row-user { flex-direction: row-reverse; }
+.pa-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+}
+.pa-bubble {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 16px;
+}
+.pa-bubble-user {
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
+  color: #fff;
+  box-shadow: 0 8px 24px -4px rgba(99,102,241,.4);
+}
+.pa-bubble-assistant {
+  background: rgba(39,39,42,.9);
+  color: #f4f4f5;
+  border: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,.3);
+}
+.pa-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.6);
+  display: inline-block;
+  margin: 0 2px;
+  animation: pa-blink 1.4s infinite both;
+}
+.pa-card {
+  display: block;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(39,39,42,.9);
+  border: 1px solid rgba(99,102,241,.3);
+  text-decoration: none;
+  color: #f4f4f5;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.pa-card:hover {
+  box-shadow: 0 4px 14px rgba(99,102,241,.2);
+  border-color: rgba(99,102,241,.5);
+}
+.pa-card-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #a5b4fc;
+}
+.pa-card-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,.5);
+  margin-top: 2px;
+}
+.pa-input-bar {
+  border-top: 1px solid rgba(255,255,255,.06);
+  padding: 12px;
+  background: rgba(24,24,27,.95);
+}
+.pa-input-shell {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(39,39,42,.5);
+  padding: 8px 10px;
+  backdrop-filter: blur(8px);
+  transition: border-color .15s, background .15s;
+}
+.pa-input-shell:focus-within {
+  border-color: rgba(255,255,255,.2);
+  background: rgba(39,39,42,.7);
+}
+.pa-input {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  min-height: 36px;
+  padding: 4px 6px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  background: transparent;
+  color: #fff;
+}
+.pa-input::placeholder { color: rgba(255,255,255,.3); }
+.pa-send {
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .15s, filter .15s;
+}
+.pa-send:disabled { cursor: not-allowed; }
+.pa-send-active {
+  background: #4f46e5;
+  color: #fff;
+}
+.pa-send-active:hover { filter: brightness(1.08); }
+.pa-send-idle {
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.3);
+}
 `;
     if (!el) {
       el = document.createElement("style");
@@ -103,7 +384,6 @@ export function PlatformAssistant({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 悬浮球位置（可拖拽 + 记忆）；null = 默认右下角
   const [ballPos, setBallPos] = useState<BallPos | null>(null);
   const ballRef = useRef<HTMLButtonElement | null>(null);
   const dragRef = useRef<{
@@ -131,7 +411,6 @@ export function PlatformAssistant({
     }
   }, []);
 
-  // 窗口尺寸变化时把球夹回可视区
   useEffect(() => {
     if (!ballPos) return;
     const onResize = () => setBallPos((p) => (p ? clampToViewport(p.x, p.y) : p));
@@ -339,38 +618,27 @@ export function PlatformAssistant({
     }
   };
 
+  const canSend = !streaming && input.trim().length > 0;
+
   return (
-    <>
-      {/* 悬浮头像球（可拖拽 + 记忆位置） */}
+    <div className="pa-root">
       {!open && (
         <button
           ref={ballRef}
           type="button"
+          className="pa-ball"
           aria-label={`打开${title}`}
           title={`${title}（可拖动）`}
           onPointerDown={onBallPointerDown}
           onPointerMove={onBallPointerMove}
           onPointerUp={onBallPointerUp}
           style={{
-            position: "fixed",
             ...(ballPos
               ? { left: ballPos.x, top: ballPos.y }
               : { right: 20, bottom: 20 }),
-            width: BALL_SIZE,
-            height: BALL_SIZE,
-            borderRadius: "50%",
-            border: "none",
-            cursor: "grab",
-            padding: 0,
-            overflow: "hidden",
-            touchAction: "none",
-            userSelect: "none",
-            boxShadow: "0 6px 20px rgba(0,0,0,.22)",
             background: avatarSrc
               ? "#dbeafe"
               : `linear-gradient(135deg, ${accentColor}, #8b5cf6)`,
-            zIndex: 2147483000,
-            animation: "pa-pop .25s ease",
           }}
         >
           {avatarSrc ? (
@@ -387,239 +655,138 @@ export function PlatformAssistant({
               }}
             />
           ) : (
-            <span style={{ fontSize: 26, pointerEvents: "none" }}>🤖</span>
+            <SparklesIcon
+              style={{ width: 26, height: 26, color: "#fff", pointerEvents: "none" }}
+            />
           )}
         </button>
       )}
 
-      {/* 右侧抽屉 + 点击外部收起 */}
       {open && (
         <>
           <div
+            className="pa-backdrop"
             aria-hidden
             onClick={() => setOpen(false)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 2147482999,
-              background: "rgba(15, 23, 42, 0.08)",
-            }}
           />
           <div
             ref={drawerRef}
             role="dialog"
             aria-label={title}
+            className="pa-drawer"
             onClick={(e) => e.stopPropagation()}
-            style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            height: "100vh",
-            width: "min(400px, 92vw)",
-            background: "#ffffff",
-            color: "#111827",
-            boxShadow: "-8px 0 30px rgba(0,0,0,.18)",
-            display: "flex",
-            flexDirection: "column",
-            zIndex: 2147483000,
-            animation: "pa-slide .22s ease",
-            fontFamily:
-              "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif",
-          }}
-        >
-          {/* 头部 */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "14px 16px",
-              borderBottom: "1px solid #eef0f3",
-            }}
           >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                overflow: "hidden",
-                background: avatarSrc
-                  ? "#dbeafe"
-                  : `linear-gradient(135deg, ${accentColor}, #8b5cf6)`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {avatarSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarSrc}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <span style={{ fontSize: 16 }}>🤖</span>
-              )}
-            </div>
-            <div style={{ flex: 1, fontWeight: 600, fontSize: 15 }}>{title}</div>
-            <button
-              type="button"
-              aria-label="关闭"
-              onClick={() => setOpen(false)}
-              style={{
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                fontSize: 20,
-                lineHeight: 1,
-                color: "#6b7280",
-                padding: 4,
-              }}
-            >
-              ×
-            </button>
-          </div>
-
-          {/* 消息区 */}
-          <div
-            ref={listRef}
-            className="pa-scroll"
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "16px",
-              background: "#f7f8fa",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  justifyContent: m.role === "user" ? "flex-end" : "flex-start",
-                }}
-              >
-                <div style={{ maxWidth: "82%" }}>
-                  <div
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      lineHeight: 1.6,
-                      fontSize: 14,
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      background: m.role === "user" ? accentColor : "#ffffff",
-                      color: m.role === "user" ? "#ffffff" : "#111827",
-                      border:
-                        m.role === "user" ? "none" : "1px solid #eef0f3",
-                      boxShadow:
-                        m.role === "user"
-                          ? "none"
-                          : "0 1px 2px rgba(0,0,0,.04)",
-                    }}
-                  >
-                    {m.content ||
-                      (streaming && m.role === "assistant" ? (
-                        <span>
-                          <span className="pa-dot" style={{ animationDelay: "0s" }} />
-                          <span className="pa-dot" style={{ animationDelay: ".2s" }} />
-                          <span className="pa-dot" style={{ animationDelay: ".4s" }} />
-                        </span>
-                      ) : (
-                        ""
-                      ))}
-                  </div>
-                  {m.redirect && (
-                    <a
-                      className="pa-card"
-                      href={m.redirect.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "block",
-                        marginTop: 8,
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        background: "#ffffff",
-                        border: `1px solid ${accentColor}33`,
-                        textDecoration: "none",
-                        color: "#111827",
-                        transition: "box-shadow .15s ease",
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: 13, color: accentColor }}>
-                        前往「{m.redirect.title}」→
-                      </div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                        {m.redirect.description}
-                      </div>
-                    </a>
-                  )}
-                </div>
+            <div className="pa-header">
+              <div className="pa-header-avatar">
+                {avatarSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarSrc}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <SparklesIcon style={{ width: 16, height: 16, color: "#fff" }} />
+                )}
               </div>
-            ))}
-          </div>
+              <div className="pa-header-title">
+                <h3>{title}</h3>
+                <p>随时为你解答</p>
+              </div>
+              <button
+                type="button"
+                className="pa-close"
+                aria-label="关闭"
+                onClick={() => setOpen(false)}
+              >
+                ×
+              </button>
+            </div>
 
-          {/* 输入区 */}
-          <div
-            style={{
-              borderTop: "1px solid #eef0f3",
-              padding: 12,
-              background: "#ffffff",
-              display: "flex",
-              gap: 8,
-              alignItems: "flex-end",
-            }}
-          >
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder="问问平台能做什么…"
-              rows={1}
-              style={{
-                flex: 1,
-                resize: "none",
-                maxHeight: 120,
-                minHeight: 40,
-                padding: "9px 12px",
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                outline: "none",
-                fontSize: 14,
-                lineHeight: 1.5,
-                fontFamily: "inherit",
-              }}
-            />
-            <button
-              type="button"
-              className="pa-send"
-              onClick={() => void send()}
-              disabled={streaming || !input.trim()}
-              style={{
-                border: "none",
-                borderRadius: 10,
-                padding: "0 16px",
-                height: 40,
-                cursor: streaming || !input.trim() ? "not-allowed" : "pointer",
-                background: streaming || !input.trim() ? "#c7cbd1" : accentColor,
-                color: "#fff",
-                fontSize: 14,
-                fontWeight: 600,
-                flexShrink: 0,
-              }}
+            <div
+              ref={listRef}
+              className="pa-scroll"
+              role="log"
+              aria-label="对话消息"
+              aria-live="polite"
             >
-              发送
-            </button>
+              {messages.map((m, i) => {
+                const isUser = m.role === "user";
+                return (
+                  <div
+                    key={i}
+                    className={`pa-row ${isUser ? "pa-row-user" : "pa-row-assistant"}`}
+                  >
+                    <div className="pa-msg-wrap">
+                      <div
+                        className={`pa-msg-row ${isUser ? "pa-msg-row-user" : ""}`}
+                      >
+                        {!isUser && (
+                          <div className="pa-msg-avatar">
+                            <SparklesIcon style={{ width: 16, height: 16 }} />
+                          </div>
+                        )}
+                        <div
+                          className={`pa-bubble ${
+                            isUser ? "pa-bubble-user" : "pa-bubble-assistant"
+                          }`}
+                        >
+                          {m.content ||
+                            (streaming && m.role === "assistant" ? (
+                              <span>
+                                <span className="pa-dot" style={{ animationDelay: "0s" }} />
+                                <span className="pa-dot" style={{ animationDelay: ".2s" }} />
+                                <span className="pa-dot" style={{ animationDelay: ".4s" }} />
+                              </span>
+                            ) : (
+                              ""
+                            ))}
+                        </div>
+                      </div>
+                      {m.redirect && (
+                        <a
+                          className="pa-card"
+                          href={m.redirect.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <div className="pa-card-title">
+                            前往「{m.redirect.title}」→
+                          </div>
+                          <div className="pa-card-desc">{m.redirect.description}</div>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pa-input-bar">
+              <div className="pa-input-shell">
+                <textarea
+                  className="pa-input"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="问问平台能做什么…"
+                  rows={1}
+                  aria-label="输入消息"
+                />
+                <button
+                  type="button"
+                  className={`pa-send ${canSend ? "pa-send-active" : "pa-send-idle"}`}
+                  onClick={() => void send()}
+                  disabled={!canSend}
+                  aria-label="发送消息"
+                >
+                  <SendIcon style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
         </>
       )}
-    </>
+    </div>
   );
 }

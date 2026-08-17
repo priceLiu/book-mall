@@ -39,6 +39,8 @@ export type EcomSidebarNavLink = {
   external?: boolean;
   /** 本应用内门户项（如电商工具箱）始终高亮 */
   activeAlways?: boolean;
+  /** 图标轨点击：仅跳转/外链，不切换右侧详情面板 */
+  directOpen?: boolean;
 };
 
 export type EcomSidebarNavGroup = {
@@ -57,9 +59,13 @@ function link(
   label: string,
   href: string,
   icon: LucideIcon,
-  opts?: { external?: boolean },
+  opts?: { external?: boolean; directOpen?: boolean },
 ): EcomSidebarNavLink {
   return { type: "link", label, href, icon, ...opts };
+}
+
+function bookAccountHref(bookOrigin: string, path: string): string {
+  return `${bookOrigin.replace(/\/$/, "")}${path}`;
 }
 
 function group(
@@ -205,13 +211,19 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
   );
 
   return [
-    link("个人中心", `${bookOrigin}/account`, UserCircle, { external: true }),
+    link("个人中心", bookAccountHref(bookOrigin, "/account"), UserCircle, {
+      external: true,
+      directOpen: true,
+    }),
     group("电商", ShoppingBag, ecomChildren),
     group("营销", Target, marketingChildren),
     group("应用", Boxes, portalLinks),
     link("我的资产", "/library", Package),
     sep(),
-    link("计费与账户", `${bookOrigin}/account`, Settings, { external: true }),
+    link("计费与账户", bookAccountHref(bookOrigin, "/account/billing"), Settings, {
+      external: true,
+      directOpen: true,
+    }),
   ];
 }
 

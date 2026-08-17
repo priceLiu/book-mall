@@ -115,14 +115,18 @@ export function EcomAppShell({
   }, []);
 
   const sidebarInset = navCollapsed
-    ? "md:grid-cols-[3.5rem_minmax(0,1fr)]"
-    : "md:grid-cols-[17.5rem_minmax(0,1fr)]";
+    ? "md:grid-cols-[4rem_minmax(0,1fr)]"
+    : "md:grid-cols-[21rem_minmax(0,1fr)]";
+
+  const collapseNavOnWorkspaceClick = React.useCallback(() => {
+    if (!navCollapsed) setCollapsed(true);
+  }, [navCollapsed, setCollapsed]);
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#0c0c0e] p-3 md:p-5">
       <div
         className={cn(
-          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:gap-4",
+          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-visible md:gap-4",
           sidebarInset,
         )}
       >
@@ -133,7 +137,10 @@ export function EcomAppShell({
           onCollapsedChange={setCollapsed}
           className="relative z-[200] hidden h-full max-h-full md:flex"
         />
-        <div className="relative z-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-inner">
+        <div
+          className="relative z-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-inner"
+          onPointerDown={collapseNavOnWorkspaceClick}
+        >
           <EcomMobileBar bookOrigin={bookOrigin} />
           <EcomAuthBanner />
           <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
