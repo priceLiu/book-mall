@@ -1,222 +1,348 @@
-# API 会员 — 方案草案（待评审 · 未实施）
+# API 会员 — 产品方案（定价 · 报价页 · 未实施）
 
-> **状态**：讨论稿。本文描述「订阅会员在平台申请 Key、HTTP 直接调用平台模型」的产品与技术方案；**不含代码实现**。
+> **状态**：产品口径与 **前台报价页结构** 已定稿（2026-08-17）；**不含代码实现**。
 >
-> **命名约定（2026-08）**
+> **命名约定**
 >
 > | 用户叫法 | 系统 `billingPersona` | 说明 |
 > |---------|----------------------|------|
-> | **订阅会员** | `PLATFORM_CREDIT` | App 内使用，平台代付 AI，按积分扣费 |
-> | **自带 key 会员** | `BYOK` | 自备厂商 Key，经 Gateway 绑定，厂商账单自理 |
-> | **API 会员** | （待定，见 §2） | 在 Book 申请平台 API Key，HTTP 调平台已上架模型 |
+> | **订阅会员 / 平台代付** | `PLATFORM_CREDIT` | App、工具站、画布；**订阅报价页** |
+> | **API 会员** | `API_PLATFORM`（待定枚举名） | HTTP 调 `/api/gw/v1/*`；**API 价格页** + 随用随充 |
+> | ~~自带 key 会员~~ | `BYOK` | C 端已下线；存量只读/迁移，不新开 |
 
 ---
 
-## 1. 背景与目标
+## 1. 核心定价原则（已定稿）
 
-### 1.1 现状
+### 1.1 三句话
 
-- **订阅会员**：系统在后台创建隐藏 `sk-gw`（`managedByPlatform: true`），用户无感；Canvas / Story / 工具站经 Book 内部转发 Gateway，扣积分。
-- **自带 key 会员**：用户在 Gateway 绑厂商凭证、自建 `sk-gw`，回 Book 关联；推理走用户 Key，平台不代付 AI。
-- **底层能力**：Book 已暴露 `/api/gw/v1/*`，支持 `Authorization: Bearer sk-gw-...`；平台凭证池、积分预检与结算链路已存在。
+1. **全站统一**：不管什么身份、什么会员，**同一模型扣减的积分相同**（一份 `ModelCreditPrice`）。
+2. **价差在充值**：差别只在 **充 1 块钱能换多少积分**——**订阅贵、API 充值便宜**，鼓励 API 多调用。
+3. **身份互斥**：一个账号 **只能是** 平台代付 **或** API 会员；两种都要 → **分身**（多个独立账号，架构预留）。
 
-### 1.2 缺口
+### 1.2 换算梯度（示意）
 
-订阅会员 **无法** 拿到可用于外部 HTTP 调用的明文 API Key；Gateway 控制台对订阅会员也非主路径。产品侧缺少「平台模型开放 API」的独立身份与申请流程。
+| 积分来源 | 折合 ¥/积分（示意） | 说明 |
+|----------|---------------------|------|
+| **App 会员月发** | 最高（如 ≈0.046） | 月费含 **工具与准入**，不单卖裸积分 |
+| **App 轻量包充值** | 中等（如 ≈0.041，锚定 0.04 附近） | 纯加积分 |
+| **API 充值** | **最低**（如 ≈0.036） | **多换积分**，鼓励 HTTP 调用 |
 
-### 1.3 目标
+**模型调用**：人人扣同一积分数；API 用户因 **买积分更便宜**，同样预算可调用更多次。
 
-让 **订阅会员**（及满足准入的团队）在 Book **自助申请平台 API Key**，用统一 HTTP 接口调用 **与 App 内相同的已上架模型**，**计费与 App 内一致**（扣平台积分，非厂商直结）。
+参考竞品：[Kie.ai 账单页](https://kie.ai/zh-CN/billing)（余额 + 充值档位 + 模型单次积分；无 API 订阅套餐）。
 
-### 1.4 非目标（首版）
+### 1.3 非目标
 
-- 不替代自带 key 会员（用户自备厂商 Key 的场景保留）。
-- 不默认开放「注册表全量模型」；首版建议与 **已上架 offering + 已发布积分价** 对齐。
-- 不做「卖 Token / 代扣云厂商账单」；仍走 Gateway + 平台凭证池。
+- ❌ API 与 App **不同扣费价目**（不做 API 专用 M / 双价目表）
+- ❌ API **订阅套餐**（月付/年付会员档）
+- ❌ 同一账号 **双身份 / 双积分池**
+- ❌ C 端新开 BYOK
 
 ---
 
 ## 2. 产品定义
 
-### 2.1 三种会员对比
+### 2.1 订阅会员 vs API 会员
 
-| 维度 | 订阅会员（App） | 自带 key 会员 | **API 会员（本方案）** |
-|------|----------------|--------------|------------------------|
-| 使用场景 | Canvas / Story / 工具站 UI | 同上 + 外部脚本（用户 Key） | **外部 HTTP / 自建服务** |
-| 厂商 Key | 平台池（隐藏） | 用户自备 | **平台池** |
-| 用户可见 Key | 否 | 是（Gateway 自建 sk-gw） | **是（Book 发放 sk-gw）** |
-| AI 费用 | 平台积分 | 用户 ↔ 厂商 | **平台积分** |
-| 会员订阅 | 需要 | 需要（工具准入） | **需要** |
-| Gateway 控制台 | 通常不需要 | 必须（绑凭证） | **可选（只看日志）** |
+| 维度 | 订阅会员（App） | **API 会员** |
+|------|----------------|--------------|
+| 使用场景 | Canvas / Story / 工具站 UI | 外部 HTTP / 自建服务 |
+| 前台报价 | **订阅报价** `/pricing` | **API 价格** `/pricing/api` |
+| 付费方式 | 会员订阅（月/年）+ 轻量包 | **仅充值**（随用随充） |
+| 积分入账 | 月发 + 轻量包（换算 **较贵**） | 充值档位（换算 **较便宜**） |
+| 模型扣积分 | **与 API 相同** | **与 App 相同** |
+| 用户可见 Key | 否（隐藏托管 sk-gw） | 是（Book 发放 sk-gw） |
+| 登录后充值 | 个人中心 · 轻量包购买 | 个人中心 · **API 账单**（见 §3.4） |
 
-### 2.2 身份模型（待选）
+### 2.2 身份与分身
 
-**方案 A — 订阅会员子能力（推荐）**
+- 注册时二选一：`PLATFORM_CREDIT` / `API_PLATFORM`；锁定后不自服务切换。
+- **分身**：同一自然人可注册两个账号（一个 App、一个 API）；**每账号单一身份、单一积分账**。
+- App 账号不能在同一账号上领 API Key；需 API 时使用 API 分身账号。
 
-- 不新增 `billingPersona` 枚举。
-- `PLATFORM_CREDIT` 用户开通会员后，可在「API 会员」页 **额外创建/轮换** 一把 **对外 API Key**。
-- 与现有「隐藏托管 Key」（供 App 内 BFF 使用）**分离**：  
-  - `managedByPlatform + apiAccessVisible: false` → App 内专用  
-  - `managedByPlatform + apiAccessVisible: true` → 用户可见、可吊销的 API Key  
-
-**方案 B — 注册时第三种 persona**
-
-- 新增 `BillingPersona.API_PLATFORM` 或类似枚举。
-- 注册、报价、财务全链路分叉，改动面大；**不推荐首版**。
-
-**方案 C — 与 BYOK 共用 sk-gw 入口**
-
-- 订阅用户去 Gateway 自建 Key 并绑平台池凭证（运维代绑）。
-- 体验差、易与自带 key 会员混淆；**不推荐**。
-
-**建议**：采用 **方案 A**。
-
----
-
-## 3. 用户流程（目标态）
+### 2.3 API 会员用户流程
 
 ```text
-注册 / 登录（订阅会员 PLATFORM_CREDIT）
-  → 开通会员订阅（与 App 共用套餐体系）
-  → 个人中心 → API 会员 → 创建平台 API Key（明文仅展示一次）
-  → 外部服务：Authorization: Bearer sk-gw-...
-     POST https://{book-origin}/api/gw/v1/chat/completions
-     POST https://{book-origin}/api/gw/v1/jobs/createTask
-     …
-  → 按模型扣积分；余额不足 → 403/402
-  → 用量：Book 财务中心 + Gateway 请求日志（clientSource=EXTERNAL）
+注册（API 身份）→ 浏览「API 价格」页
+  → 个人中心 · API 账单：充值
+  → 余额 > 0 → 创建平台 API Key（明文仅展示一次）
+  → Bearer sk-gw → /api/gw/v1/*
+  → 按 ModelCreditPrice 扣积分；不足 → 402
+  → 失败/取消不扣
 ```
-
-### 3.1 准入
-
-- 有效会员订阅（个人 / 团队），与 App 工具准入一致。
-- 积分池有余额（或视频池，按模型类型）；生成前 `assertCreditsBeforeGenerate`。
-- 可选：仅 **指定套餐 tier** 以上开放 API（产品策略）。
-
-### 3.2 Key 生命周期
-
-| 操作 | 说明 |
-|------|------|
-| 创建 | 生成 `sk-gw`，绑平台凭证池，展示明文一次 |
-| 查看 | 仅前缀 `sk-gw-xxxx****` |
-| 轮换 | 吊销旧 Key，创建新 Key（需二次确认） |
-| 吊销 | 立即失效；App 内隐藏 Key 不受影响 |
 
 ---
 
-## 4. 技术方案
+## 3. 前台报价页（订阅报价 · API 价格）
 
-### 4.1 已有可复用
+### 3.1 路由与命名
 
-| 模块 | 路径 / 行为 |
-|------|-------------|
-| HTTP 入口 | `book-mall/app/api/gw/v1/**` |
-| 鉴权 | `requireGatewayV1Auth` ← Bearer `sk-gw` |
-| 平台凭证池 | `resolvePlatformVendorCredentialIds` + `ensurePlatformManagedKeyBindingsSynced` |
-| 积分预检 / 结算 | `assertCreditsBeforeGenerate` / `gateway-credit-settlement`（`billingMode=PLATFORM_CREDIT`） |
-| 模型路由 | `routeGatewayModel` + `pickCredentialForKind` |
-| 日志 | `GatewayRequestLog`，`clientSource=EXTERNAL` |
+| 页面 | 路由 | 浏览器标题（metadata） | 说明 |
+|------|------|------------------------|------|
+| **订阅报价** | `/pricing` | 订阅报价 · 个人 / 团队会员 | **现网 `/pricing` 改名**；内容不变：订阅套餐 + App 轻量包 + 模型矩阵 |
+| **API 价格** | `/pricing/api` | API 价格 · 充值与模型扣费 | **新增**；无订阅套餐，仅充值档位 + 统一模型价目 |
+| 价格公示（既有） | `/pricing-disclosure` | 平台价目表 / 计费政策 | 法规公示；两报价页均可链到此处 |
+| 个人中心价目（既有） | `/account/pricing` | 我的价目 | 登录用户快捷查看，链回对应报价页 |
 
-### 4.2 待开发（按优先级）
+**兼容**：`/pricing` **保留 URL**（外链、SEO、历史链接不断）；仅改 **页面内标题与导航文案** 为「订阅报价」。
 
-#### P0 — 最小可用
+**不采用** `/pricing/subscribe` 作为主 URL，避免全站改链；若将来需要，可加 302：`/pricing/subscribe` → `/pricing`。
 
-1. **数据模型**（Prisma）  
-   - `GatewayApiKey` 增加字段，例如：`apiAccessPurpose: HIDDEN_APP | USER_API | null`  
-   - 或 `visibleToUser: boolean` + `revokedAt` 现有字段  
+### 3.2 共用组件：`PricingModeTabs`
 
-2. **Book API**  
-   - `GET/POST/DELETE /api/account/platform-api-key`  
-   - 创建时：`createPlatformManagedApiKey` 变体，返回 `{ rawKey, prefix, createdAt }` 一次  
+两页顶部 **同一 Tab 条**，固定顺序：
 
-3. **Book UI**  
-   - `/account/api-member` 或并入个人中心「API 会员」卡片  
-   - 创建 / 前缀展示 / 轮换 / 吊销 / 链接开发者文档  
-
-4. **模型白名单**  
-   - 在 `/api/gw/v1/*` 创建日志前，对 `billingPersona=PLATFORM_CREDIT` + `clientSource=EXTERNAL` 校验模型属于 **ACTIVE offering**（与报价页一致）  
-
-5. **文档**  
-   - Base URL、鉴权头、主要 endpoint、错误码、积分不足示例  
-
-#### P1 — 安全与运营
-
-- 每用户 Key 数量上限（如 2 把）  
-- 可选 IP  allowlist（Key 级 metadata）  
-- 限流（按 Key / 用户 / 模型）  
-- 团队：Tenant 级 API Key，扣团队共享池  
-
-#### P2 — 开发者体验
-
-- OpenAPI / Postman 集合  
-- 与 `examples/platform-client` 并列的 **curl / Python 示例**  
-- finance-web 单独「API 调用量」视图  
-
-### 4.3 与现有隐藏 Key 的关系
-
-```
-User (PLATFORM_CREDIT)
-  ├── gatewayApiKeyId → hidden sk-gw (App BFF / Canvas 内部 Gateway-Internal)
-  └── platformApiKeys[] → 0..N 用户可见 sk-gw (EXTERNAL HTTP)
+```text
+┌─────────────────────────────────────────────────────────┐
+│  [ 订阅报价 ]    [ API 价格 ]                              │
+│   /pricing         /pricing/api   ← 当前页高亮            │
+└─────────────────────────────────────────────────────────┘
 ```
 
-- **不要**把隐藏 Key 明文暴露给用户。  
-- App 内 BFF 继续用 `Gateway-Internal` 或现有 `User.gatewayApiKeyId` 逻辑；用户 API Key 仅用于外部 Bearer 调用。  
-- 若坚持 `User.gatewayApiKeyId` 单字段，需评估：外部 Key 轮换是否影响 App——**建议双轨**。
+- 样式：与现网 `site-pricing-page` 同宽；Tab 切换 **整页跳转**（非单页内锚点）。
+- 移动端：两 Tab 等分一行，可横向滚动。
 
-### 4.4 计费
+### 3.3 页面结构
 
-- 与 App 内生成 **完全相同**：`billingMode = PLATFORM_CREDIT`，按 `ModelCreditPrice` / 成本快照扣积分。  
-- **不**走 BYOK 超额逻辑。  
-- 视频模型：沿用 RESERVE → settle 流程。
+#### A. 订阅报价 `/pricing`（原报价页 · 改名）
 
-### 4.5 模型范围（待产品确认）
-
-| 选项 | 优点 | 风险 |
+| 区块 | 内容 | 变更 |
 |------|------|------|
-| **仅已上架 offering**（推荐） | 与报价页、成本可控一致 | 新模型需先上架 |
-| 注册表全量 + 平台池凭证 | 接入快 | 未定价模型可能亏损 |
-| 按套餐 tier 分模型包 | 可差异化定价 | 规则复杂 |
+| Hero | 标题 **「订阅报价」**；副标题：画布 / 工具站 / 电商工具箱 · 会员订阅与轻量包 | 原「积分报价」等文案替换 |
+| Tabs | `PricingModeTabs` | **新增** |
+| 订阅套餐 | 个人 / 团队 × 月付 / 年付 · 套餐卡片 | 保持 |
+| 轻量包购买 | App `CREDIT_TOPUP_PACKS` | 保持；标注「App 订阅会员轻量包」 |
+| 模型消耗矩阵 | `ModelCreditPrice` 全表 | 保持；脚注：**「以下扣减积分全站统一，API 用户相同」** |
+| 交叉引导 | 横幅或 Hero 下链接 | **新增**：「只做 HTTP 集成？查看 [API 价格](/pricing/api) — 充值更划算」 |
+
+#### B. API 价格 `/pricing/api`（新增）
+
+参考 [Kie 定价/账单](https://kie.ai/zh-CN/billing) 的信息层次，但 **报价页偏「营销 + 透明价目」**；登录后充值在 **账单页**（§3.4）。
+
+| 区块 | 内容 |
+|------|------|
+| Hero | 标题 **「API 价格」**；副标题：HTTP 调用平台已上架模型 · 随用随充 · **模型扣费与订阅用户相同** |
+| Tabs | `PricingModeTabs` |
+| 三要点 | ① 充值积分长期有效 ② 失败任务不扣 ③ 余额不足 402 |
+| **API 充值档位** | 5 档卡片（§4 表）；展示 ¥、到账积分、约合 ¥/积分、大额 bonus 角标 |
+| CTA 行 | 未登录：**注册 API 账号**；已登录（API 身份）：**去充值** → `/account/api-billing`；已登录（App 身份）：提示「请使用 API 分身账号」+ 注册链接 |
+| **模型扣费一览** | **同一张** `ModelCreditPrice` 表（与订阅页相同数据）；说明：「每次调用扣减下表积分，与订阅报价页一致」 |
+| 换算对比（可选折叠） | 小表：订阅月发 vs App 轻量包 vs API 充值 的 ¥/积分；强调 **不是扣费不同，是买积分更便宜** |
+| 开发者入口 | 链接：`/docs/api` 或 `doc/tech/platform-api-v1.md` 对应前台文档路由（实现时定） |
+| 交叉引导 | 「需要画布与工具站？查看 [订阅报价](/pricing)」 |
+
+**API 价格页不放**：会员订阅卡片、团队席位、App 轻量包 SKU。
+
+#### C. 页面关系图
+
+```mermaid
+flowchart TB
+  subgraph public [对外报价]
+    P["/pricing 订阅报价"]
+    A["/pricing/api API 价格"]
+    D["/pricing-disclosure 价格公示"]
+  end
+  subgraph account [登录后]
+    AB["/account/api-billing API 账单充值"]
+    AT["/account/billing App 轻量包"]
+    AP["/account/pricing 我的价目"]
+  end
+  P <-->|PricingModeTabs| A
+  P --> AT
+  A --> AB
+  P --> D
+  A --> D
+  AP --> P
+  AP --> A
+```
+
+### 3.4 登录后页面（与报价页分工）
+
+| 页面 | 路由 | 受众 | 作用 |
+|------|------|------|------|
+| App 轻量包 | `/account/billing` | `PLATFORM_CREDIT` | 现有；购 App 轻量包 |
+| **API 账单** | `/account/api-billing` | `API_PLATFORM` | **新增**；余额 + 充值网格 + Key 管理入口；交互对齐 Kie Billing |
+| API Key 管理 | `/account/api-keys` 或合并在 api-billing | `API_PLATFORM` | 创建 / 前缀 / 轮换 / 吊销 |
+
+报价页 **可展示** 充值档位与「立即购买」；支付履约 **必须在** 对应账单页（身份校验 + 微信支付）。
+
+### 3.5 全站入口（链接设计）
+
+#### 顶部导航 `navbar-shell`
+
+**方案（推荐）**：主 nav「报价」改为 **下拉 / 二级**：
+
+| 菜单项 | 链接 | 说明 |
+|--------|------|------|
+| 订阅报价 | `/pricing` | 默认第一项 |
+| API 价格 | `/pricing/api` | 第二项 |
+
+未实现下拉前，可暂用两项并列：`订阅报价` | `API 价格`（窄屏收进「更多」）。
+
+`site-home-nav` 与 `navbar-shell` **保持一致**。
+
+#### 页脚 `footer.tsx`
+
+| 原文案 | 新文案 | 链接 |
+|--------|--------|------|
+| 积分报价 | **订阅报价** | `/pricing` |
+| （新增） | **API 价格** | `/pricing/api` |
+| 价格公示 | 不变 | `/pricing-disclosure` |
+
+#### 首页 Hero `site-home-hero`
+
+- 主 CTA：**订阅报价** → `/pricing`
+- 次 CTA：**API 价格** → `/pricing/api`（替换或补充现有「多种接入方式」文案）
+
+#### 个人中心 `account-nav-menu-config`
+
+| 身份 | 计费相关入口 |
+|------|----------------|
+| `PLATFORM_CREDIT` | 轻量包购买 · **订阅报价** `/pricing` · 积分用量… |
+| `API_PLATFORM` | **API 账单** `/account/api-billing` · **API 价格** `/pricing/api` · 用量… |
+
+原「会员套餐」链 `/pricing` 对 App 用户标签改为 **「订阅报价」**。
+
+#### 注册 /  onboarding
+
+| 注册身份 | 注册成功默认引导 |
+|----------|------------------|
+| 平台代付 | `/pricing`（订阅报价） |
+| API 会员 | `/pricing/api` → 提示首充 → `/account/api-billing` |
+
+注册页底部互链：「使用 HTTP API？查看 API 价格」「使用 App？查看订阅报价」。
+
+#### 其它引用（实现时批量替换文案）
+
+| 位置 | 调整 |
+|------|------|
+| `lib/platform-assistant/guardrails.ts` | 价格类问题引导：**订阅** → `/pricing`，**API** → `/pricing/api` |
+| `lib/account-app-launch-gate.ts` | `ACCOUNT_APP_SUBSCRIBE_HREF` 仍为 `/pricing` |
+| `app/admin/.../admin-nav-config` | 外链增加「API 价格页」`/pricing/api` |
+| `components/publisher/...` | 「查看会员与定价」→ 订阅报价；可加 API 链接 |
+
+### 3.6 文案规范（对外）
+
+| 避免 | 改用 |
+|------|------|
+| 积分报价（作页面名） | **订阅报价** |
+| 会员套餐（作 nav 名） | **订阅报价**（个人中心可保留「选购套餐」作按钮） |
+| API 会员套餐 | **API 价格** / **API 充值** |
+| 两套扣费 | **扣费相同；充值换算不同** |
 
 ---
 
-## 5. 风险与对策
+## 4. API 充值档位（首版 SKU）
+
+锚定参考 **¥0.04/积分**。API 充值 **同样 1 元换更多积分**。
+
+| 售价 | 到账积分 | 约合 ¥/积分 | 备注 |
+|------|----------|------------|------|
+| **¥38** | 1,050 | ≈0.036 | 最低档 |
+| ¥188 | 5,250 | ≈0.036 | |
+| **¥368** | **10,500** | ≈0.035 | 角标「省 5%」 |
+| ¥1,888 | 55,000 | ≈0.034 | |
+| **¥4,688** | **140,000** | ≈0.033 | 角标「省 10%」 |
+
+- 积分 **长期有效**（`CreditSource.TOPUP`）。
+- 配置：`CreditTopupPack.audience = API`（与 App pack 分表或分字段）。
+- **API 价格页**与 **API 账单页** 共用同一 pack 数据源。
+
+App 轻量包（现有，订阅报价页展示）：
+
+| id | 售价 | 积分 | 池 |
+|----|------|------|-----|
+| pack-light | ¥62 | 1,500 | GENERAL |
+| pack-standard | ¥160 | 4,000 | GENERAL |
+| pack-plus | ¥304 | 8,000 | GENERAL |
+
+---
+
+## 5. 技术方案（摘要 · 实现阶段）
+
+### 5.1 报价页实现要点（Phase 1-UI）
+
+1. 新建 `app/(site)/pricing/api/page.tsx` + `ApiPricingPageClient`  
+2. 抽取 `PricingModeTabs`；`/pricing` 与 `/pricing/api` 均挂载  
+3. 更新 `/pricing` metadata 与 Hero 文案 → **订阅报价**  
+4. 模型表：复用 `ModelCreditPrice` 查询；**两页同组件、同数据**  
+5. API 充值区：读 `API_CREDIT_TOPUP_PACKS`（新常量或 pack audience 过滤）  
+6. 全站入口按 §3.5 改链（navbar / footer / hero / account nav）
+
+### 5.2 已有可复用
+
+| 模块 | 说明 |
+|------|------|
+| `/api/gw/v1/**` | HTTP 入口 |
+| `ModelCreditPrice` | **唯一**扣费价目 |
+| 积分账户 / Checkout / 微信 notify | 轻量包链路 |
+| `GatewayRequestLog.clientSource=EXTERNAL` | API 用量 |
+
+### 5.3 待开发（P0 业务）
+
+1. `BillingPersona.API_PLATFORM` + 注册分流  
+2. API topup packs + `/account/api-billing`  
+3. `GatewayApiKey.apiAccessPurpose` + Key CRUD  
+4. 开发者文档页 + offering 白名单  
+
+### 5.4 计费
+
+- 扣费：只读一份 `creditsPerUnit`。  
+- 充值：按 persona 限制 pack audience。  
+
+---
+
+## 6. 风险与对策
 
 | 风险 | 对策 |
 |------|------|
-| 平台 API Key 泄露 → 积分被刷 | 轮换/吊销、限流、异常告警、可选 IP 限制 |
-| 与自带 key 会员混淆 | UI 分区命名；BYOK 仍走 Gateway 自建 Key |
-| 隐藏 Key 与用户 Key 混用 | 数据模型区分 `apiAccessPurpose` |
-| 未上架模型被裸调 | EXTERNAL 路径加强 offering 校验 |
-| 团队席位 / 扣费归属 | 外部 Key 绑 Tenant 或 User，文档写清 |
+| 用户混淆两报价页 | Tab 固定、Hero 副标题、交叉引导 |
+| App 用户在 API 页误购 | Checkout 校验 persona；CTA 分流 |
+| 套利 | 身份互斥 + pack audience |
+| 外链仍指向 `/pricing` | URL 不变，仅改标题 |
 
 ---
 
-## 6. 实施阶段建议
+## 7. 实施阶段
 
-| 阶段 | 交付 | 预估 |
-|------|------|------|
-| **Phase 0** | 本文评审定稿：身份模型、模型范围、UI 入口 | — |
-| **Phase 1** | P0：单用户 API Key CRUD + 白名单 + 一页开发者文档 | 小 |
-| **Phase 2** | P1：限流 + 团队 Key + 财务视图 | 中 |
-| **Phase 3** | P2：OpenAPI、示例 SDK、监控大盘 | 中 |
-
----
-
-## 7. 待讨论问题（请产品确认）
-
-1. **API 会员是否必须单独买套餐**，还是「任意订阅会员即可申请 Key」？  
-2. **模型范围**：仅 offering 上架 vs 全注册表？  
-3. **是否允许 BYOK 用户同时申请平台 API Key**？（建议：否，身份互斥）  
-4. **Key 数量上限**与是否支持 **只读/只写 scope**（如仅 LLM、禁 VIDEO）？  
-5. **对外 Base URL**：生产用 `book` 主域还是独立 `api.` 子域？  
-6. **首版是否开放异步任务**（`createTask` + `recordInfo` 轮询）全量？
+| 阶段 | 交付 |
+|------|------|
+| **Phase 0** | ✅ 本文：定价 + **双报价页 + 入口** |
+| **Phase 1a** | 仅文档/UI  spec：**订阅报价改名 + API 价格页 + Tab + 入口**（可先静态） |
+| **Phase 1b** | API 身份、充值、Key、账单页 |
+| **Phase 2** | 限流、用量视图、分身关联 |
+| **Phase 3** | OpenAPI、SDK |
 
 ---
 
-## 8. 参考
+## 8. 仍待确认（实现前）
 
-- [gateway-user-guide.md](./gateway-user-guide.md)  
+1. 开发者文档前台路由：`/docs/api` vs `/developers`  
+2. API 注册礼：是否送体验积分  
+3. Navbar 用下拉还是两项并列  
+4. `/account/api-billing` 与 Key 管理是否单页两 Tab  
+
+---
+
+## 9. 参考
+
+- [gateway-user-guide.md](./gateway-user-guide.md) §1.3  
 - [platform-api-v1.md](../tech/platform-api-v1.md)  
-- [12-platform-app-federation.md](./12-platform-app-federation.md)  
-- 实现参考：`lib/gateway/platform-managed-key.ts`、`app/api/gw/v1/**`
+- [Kie.ai 账单 / 定价](https://kie.ai/zh-CN/billing)  
+- 现网订阅报价：`app/(site)/pricing/page.tsx`、`components/pricing/pricing-page-client.tsx`  
+- 轻量包：`lib/billing/credit-topup-packs.ts`
+
+---
+
+## 附录 A · 订阅报价 vs API 价格 · 一页对照
+
+| | 订阅报价 `/pricing` | API 价格 `/pricing/api` |
+|--|---------------------|-------------------------|
+| 目标用户 | App / 工具站用户 | 开发者 / 集成商 |
+| 会员订阅 | ✅ | ❌ |
+| App 轻量包 | ✅ | ❌ |
+| API 充值档位 | ❌ | ✅ |
+| 模型扣费表 | ✅ 同表 | ✅ 同表 |
+| 登录后购买 | `/account/billing` + checkout 会员 | `/account/api-billing` |
+| 注册身份 | `PLATFORM_CREDIT` | `API_PLATFORM` |
