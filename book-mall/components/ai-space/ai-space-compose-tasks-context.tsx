@@ -43,11 +43,17 @@ export function AiSpaceComposeTasksProvider({
   const [panelOpen, setPanelOpen] = useState(false);
 
   const refresh = useCallback(async () => {
-    const res = await fetch(COMPOSE_API, { credentials: "include" });
-    const data = (await res.json().catch(() => ({}))) as {
-      tasks?: AiSpaceComposeTaskDto[];
-    };
-    if (data.tasks) setTasks(data.tasks);
+    try {
+      const res = await fetch(COMPOSE_API, { credentials: "include" });
+      const data = (await res.json().catch(() => ({}))) as {
+        tasks?: AiSpaceComposeTaskDto[];
+        error?: string;
+      };
+      if (!res.ok) return;
+      if (data.tasks) setTasks(data.tasks);
+    } catch {
+      // 轮询 / 刷新时网络抖动或服务重启：保留上次任务列表，勿打断整页
+    }
   }, []);
 
   const addTask = useCallback((task: AiSpaceComposeTaskDto) => {
