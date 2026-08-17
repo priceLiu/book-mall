@@ -4,7 +4,7 @@
 
 **计费身份（billingPersona）**：注册时二选一 **订阅会员（平台代付 / PLATFORM_CREDIT）** 或 **API 会员（API_PLATFORM）**，锁定后不可切换；两种都要请用 **分身账号**。C 端已不再新开 BYOK。详见 [20-platform-api-member-proposal.md](./20-platform-api-member-proposal.md)。
 
-**前台报价**：**[订阅报价](/pricing)**（App 会员 + 轻量包）与 **[API 价格](/pricing/api)**（充值档位 + 统一模型扣费）分开展示，顶部 Tab 切换。
+**前台报价**：**[订阅价格](/pricing)**（App 会员 + 轻量包）与 **[API 价格](/pricing/api)**（充值档位 + 统一模型扣费）分开展示，顶部 Tab 切换。
 
 模型清单见 [story-gateway-models.md](./story-gateway-models.md)。
 
@@ -43,7 +43,7 @@ Book 注册（选择「API 会员」）
   → 充值换算优于 App 订阅，鼓励多调用
 ```
 
-- 报价页：**API 价格** `/pricing/api`（与 **订阅报价** `/pricing` 分轨，见方案 §3）。
+- 报价页：**API 价格** `/pricing/api`（与 **订阅价格** `/pricing` 分轨，见方案 §3）。
 - 无 App 工具准入；无会员订阅套餐，仅 **随用随充**。
 - 详见 [20-platform-api-member-proposal.md](./20-platform-api-member-proposal.md)。
 

@@ -31,7 +31,7 @@ const centerNavLinks: NavItem[] = [
   { label: "主屏", href: "#hero-video" },
   { label: "客户评价", href: "#testimonials" },
   {
-    label: "订阅报价",
+    label: "订阅价格",
     href: "/pricing",
     isActive: (p) => p === "/pricing",
   },

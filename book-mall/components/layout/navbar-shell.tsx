@@ -34,7 +34,7 @@ interface RouteProps {
 const routeList: RouteProps[] = [
   { href: "#hero-video", label: "主屏" },
   { href: "#testimonials", label: "客户评价" },
-  { href: "/pricing", label: "订阅报价" },
+  { href: "/pricing", label: "订阅价格" },
   { href: "/pricing/api", label: "API 价格" },
 ];
 

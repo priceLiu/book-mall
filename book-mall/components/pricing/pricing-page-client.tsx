@@ -212,8 +212,6 @@ export function PricingPageClient({
   isLoggedIn,
   billingPersona = null,
   welcomeGift,
-  showAdminPacks = false,
-  userPhone = null,
 }: {
   anchorYuan: number;
   plans: Plan[];
@@ -224,8 +222,6 @@ export function PricingPageClient({
   isLoggedIn: boolean;
   billingPersona?: BillingPersona | null;
   welcomeGift?: { generalCredits: number; videoCredits: number } | null;
-  showAdminPacks?: boolean;
-  userPhone?: string | null;
 }) {
   const [family, setFamily] = useState<"PERSONAL" | "TEAM">("PERSONAL");
   const [interval, setInterval] = useState<"MONTH" | "YEAR">("MONTH");
@@ -278,46 +274,8 @@ export function PricingPageClient({
   return (
     <div className="site-pricing-page">
       <div className="site-pricing-hero">
-        <PricingModeTabs className="mb-6" />
-        <h1 className="site-pricing-title">订阅报价</h1>
-        <p className="site-pricing-subtitle">
-          画布 / 工具站 / 电商工具箱 · 会员订阅与轻量包；模型扣费与{" "}
-          <Link href="/pricing/api" className="font-medium text-foreground underline underline-offset-2">
-            API 价格
-          </Link>{" "}
-          页一致，按积分扣减。
-        </p>
-
-        {welcomeGift &&
-        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
-          <div className="mx-auto mt-5 inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[#8957e5]/30 bg-[#8957e5]/10 px-4 py-2 text-sm text-[#5a32a3]">
-            <Gift className="h-4 w-4" />
-            <span>
-              新用户注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
-              {welcomeGift.videoCredits > 0
-                ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
-                : ""}
-              ，30 天内有效
-            </span>
-          </div>
-        ) : null}
-
-        {checkoutErrorMessage ? (
-          <div
-            id="checkout-error-banner"
-            className="mx-auto mt-5 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          >
-            {checkoutErrorMessage}
-            {checkoutError === "persona" ? (
-              <>
-                {" "}
-                <Link href="/onboarding/billing-persona" className="font-medium underline">
-                  去选择计费身份
-                </Link>
-              </>
-            ) : null}
-          </div>
-        ) : null}
+        <h1 className="sr-only">订阅价格</h1>
+        <PricingModeTabs />
 
         <div className="site-pricing-toggles">
           <div className="site-pricing-toggle-group">
@@ -340,18 +298,40 @@ export function PricingPageClient({
             </ToggleBtn>
           </div>
         </div>
+
+        {welcomeGift &&
+        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+          <div className="flex w-full max-w-2xl flex-wrap items-center justify-center gap-2 rounded-full border border-[#8957e5]/30 bg-[#8957e5]/10 px-4 py-2 text-sm text-[#5a32a3]">
+            <Gift className="h-4 w-4 shrink-0" />
+            <span>
+              新用户注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
+              {welcomeGift.videoCredits > 0
+                ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
+                : ""}
+              ，30 天内有效
+            </span>
+          </div>
+        ) : null}
+
+        {checkoutErrorMessage ? (
+          <div
+            id="checkout-error-banner"
+            className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            {checkoutErrorMessage}
+            {checkoutError === "persona" ? (
+              <>
+                {" "}
+                <Link href="/onboarding/billing-persona" className="font-medium underline">
+                  去选择计费身份
+                </Link>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="site-pricing-body">
-        <div className="site-pricing-disclosure">
-          <p>
-            下方{visible.length}档为订阅会员（积分套餐）：月发积分拆为通用池（图文 / 文本等）与视频池（仅视频生成），两池不互通、按模型扣积分。
-            {isTeam
-              ? " 团队套餐 3 席起订，大卡价格为套餐合计（非单席价），下方标注每席单价。"
-              : null}
-          </p>
-        </div>
-
         <section className="site-pricing-section-head">
           <h2 className="site-pricing-section-title">订阅套餐</h2>
           <p className="site-pricing-section-hint">自动续订，包月可随时取消</p>
@@ -423,8 +403,6 @@ export function PricingPageClient({
           isTeam={isTeam}
           teamTenants={teamTenants}
           isLoggedIn={isLoggedIn}
-          showAdminPacks={showAdminPacks}
-          userPhone={userPhone}
         />
 
         {/* 全档「可生成数量」矩阵 */}
@@ -832,8 +810,8 @@ function ToggleBtn({
         "site-pricing-toggle inline-flex items-center rounded-full transition",
         small ? "px-4 py-1.5" : "px-5 py-2",
         active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
+          ? "site-pricing-toggle-active bg-primary text-primary-foreground shadow-sm"
+          : "text-muted-foreground",
       )}
     >
       {children}

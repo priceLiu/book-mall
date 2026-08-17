@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
-import { canManagePricing } from "@/lib/auth/permissions";
 import {
   BYOK_TASK_KIND_LABEL,
   sortByokQuotasForDisplay,
@@ -18,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata = {
-  title: "订阅报价 · 个人 / 团队会员",
+  title: "订阅价格 · 个人 / 团队会员",
   description:
     "App 会员订阅与轻量包充值；模型扣费全站统一。HTTP API 见 API 价格页。",
 };
@@ -97,8 +96,6 @@ export default async function PricingPage() {
         }))}
         teamTenants={teamTenants}
         welcomeGift={welcomeGift}
-        showAdminPacks={canManagePricing(session?.user?.role)}
-        userPhone={session?.user?.phone ?? null}
       />
     </Suspense>
   );

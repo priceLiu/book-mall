@@ -109,7 +109,7 @@ export function buildAccountNavMenuGroups(input: {
     financeNavItem("/fees/billing/ledger", "/account/fees/ledger", "积分流水", ScrollText),
   ];
   if (isPlatform) {
-    billingItems.push({ kind: "link", href: "/pricing", label: "订阅报价", icon: CreditCard });
+    billingItems.push({ kind: "link", href: "/pricing", label: "订阅价格", icon: CreditCard });
     billingItems.push({ kind: "link", href: "/pricing/api", label: "API 价格", icon: CreditCard });
   }
   billingItems.push({

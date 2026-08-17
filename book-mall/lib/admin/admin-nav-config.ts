@@ -82,7 +82,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
       id: "public",
       label: "对外公示",
       items: [
-        { label: "对外报价页（订阅）", href: "/pricing", external: true },
+        { label: "订阅价格页", href: "/pricing", external: true },
         { label: "API 价格页", href: "/pricing/api", external: true },
         { label: "平台价目表（前台）", href: "/pricing-disclosure", external: true },
       ],

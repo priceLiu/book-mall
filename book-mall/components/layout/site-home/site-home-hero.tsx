@@ -170,7 +170,7 @@ export function SiteHomeHeroSection({
                     开始使用
                   </Link>
                   <Link href="/pricing" className="site-home-btn-secondary">
-                    <span>订阅报价</span>
+                    <span>订阅价格</span>
                   </Link>
                   <Link href="/pricing/api" className="site-home-btn-secondary">
                     <span>API 价格</span>

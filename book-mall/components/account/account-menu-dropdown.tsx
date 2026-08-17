@@ -59,7 +59,7 @@ const NAV_LINKS = [
   { href: "/account/team", label: "团队空间", icon: Users },
   { href: "/account/team/billing", label: "团队账单", icon: Receipt },
   { href: "/account/billing", label: "轻量包购买", icon: Sparkles },
-  { href: "/pricing", label: "订阅报价", icon: Receipt },
+  { href: "/pricing", label: "订阅价格", icon: Receipt },
   { href: "/pricing/api", label: "API 价格", icon: Receipt },
   { href: "/account/courses", label: "AI 学堂", icon: Sparkles },
 ] as const;

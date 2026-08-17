@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Calculator, Code2, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -72,48 +71,18 @@ export function ApiPricingPageClient({
   return (
     <div className="site-pricing-page">
       <div className="site-pricing-hero">
-        <PricingModeTabs className="mb-6" />
-        <h1 className="site-pricing-title">API 价格</h1>
-        <p className="site-pricing-subtitle">
-          HTTP 调用平台已上架模型 · 随用随充 · 每次扣减积分与{" "}
-          <Link href="/pricing" className="font-medium text-foreground underline underline-offset-2">
-            订阅报价
-          </Link>{" "}
-          相同；充值换算更优惠，鼓励多调用。
-        </p>
-
-        <ul className="mx-auto mt-6 flex max-w-2xl flex-col gap-2 text-left text-sm text-muted-foreground sm:text-center">
-          <li className="flex items-start justify-center gap-2">
-            <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-            充值积分长期有效，余额不足返回 402
-          </li>
-          <li className="flex items-start justify-center gap-2">
-            <Code2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-            申请 API Key 后调用 <code className="text-xs">/api/gw/v1/*</code>
-          </li>
-          <li className="flex items-start justify-center gap-2">
-            <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-            失败任务不扣积分（与 App 一致）
-          </li>
-        </ul>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          {isLoggedIn ? (
-            <Button asChild variant="secondary" disabled>
-              <span>API 账单（即将开放）</span>
-            </Button>
-          ) : (
-            <Button asChild>
-              <Link href="/register">注册 API 账号</Link>
-            </Button>
-          )}
-        </div>
+        <h1 className="sr-only">API 价格</h1>
+        <PricingModeTabs />
+        {!isLoggedIn ? (
+          <Button asChild>
+            <Link href="/register">注册 API 账号</Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="site-pricing-body">
         <section className="site-pricing-section-head">
           <h2 className="site-pricing-section-title">充值积分</h2>
-          <p className="site-pricing-section-hint">API 会员随用随充；同样 1 元可兑换更多积分</p>
         </section>
 
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-stretch lg:grid-cols-3 xl:grid-cols-5">
@@ -126,9 +95,6 @@ export function ApiPricingPageClient({
           <section className="mt-16">
             <div className="site-pricing-section-head">
               <h2 className="site-pricing-section-title">模型扣费（全站统一）</h2>
-              <p className="site-pricing-section-hint">
-                每次成功调用扣减下表积分；与订阅用户相同，不因 API 身份而增减
-              </p>
             </div>
             <div className={cn("mt-4 overflow-x-auto", PANEL_CLASS)}>
               <Table>
@@ -156,18 +122,6 @@ export function ApiPricingPageClient({
             </div>
           </section>
         ) : null}
-
-        <p className="mt-10 text-center site-pricing-footnote">
-          需要画布与工具站？请查看{" "}
-          <Link href="/pricing" className="font-medium text-foreground underline underline-offset-2">
-            订阅报价
-          </Link>
-          。完整 API 文档见{" "}
-          <Link href="/pricing-disclosure" className="underline underline-offset-2">
-            价格公示
-          </Link>
-          。
-        </p>
       </div>
     </div>
   );

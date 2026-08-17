@@ -6,7 +6,7 @@
 >
 > | 用户叫法 | 系统 `billingPersona` | 说明 |
 > |---------|----------------------|------|
-> | **订阅会员 / 平台代付** | `PLATFORM_CREDIT` | App、工具站、画布；**订阅报价页** |
+> | **订阅会员 / 平台代付** | `PLATFORM_CREDIT` | App、工具站、画布；**订阅价格页** |
 > | **API 会员** | `API_PLATFORM`（待定枚举名） | HTTP 调 `/api/gw/v1/*`；**API 价格页** + 随用随充 |
 > | ~~自带 key 会员~~ | `BYOK` | C 端已下线；存量只读/迁移，不新开 |
 
@@ -48,7 +48,7 @@
 | 维度 | 订阅会员（App） | **API 会员** |
 |------|----------------|--------------|
 | 使用场景 | Canvas / Story / 工具站 UI | 外部 HTTP / 自建服务 |
-| 前台报价 | **订阅报价** `/pricing` | **API 价格** `/pricing/api` |
+| 前台报价 | **订阅价格** `/pricing` | **API 价格** `/pricing/api` |
 | 付费方式 | 会员订阅（月/年）+ 轻量包 | **仅充值**（随用随充） |
 | 积分入账 | 月发 + 轻量包（换算 **较贵**） | 充值档位（换算 **较便宜**） |
 | 模型扣积分 | **与 API 相同** | **与 App 相同** |
@@ -74,18 +74,18 @@
 
 ---
 
-## 3. 前台报价页（订阅报价 · API 价格）
+## 3. 前台报价页（订阅价格 · API 价格）
 
 ### 3.1 路由与命名
 
 | 页面 | 路由 | 浏览器标题（metadata） | 说明 |
 |------|------|------------------------|------|
-| **订阅报价** | `/pricing` | 订阅报价 · 个人 / 团队会员 | **现网 `/pricing` 改名**；内容不变：订阅套餐 + App 轻量包 + 模型矩阵 |
+| **订阅价格** | `/pricing` | 订阅价格 · 个人 / 团队会员 | **现网 `/pricing` 改名**；内容不变：订阅套餐 + App 轻量包 + 模型矩阵 |
 | **API 价格** | `/pricing/api` | API 价格 · 充值与模型扣费 | **新增**；无订阅套餐，仅充值档位 + 统一模型价目 |
 | 价格公示（既有） | `/pricing-disclosure` | 平台价目表 / 计费政策 | 法规公示；两报价页均可链到此处 |
 | 个人中心价目（既有） | `/account/pricing` | 我的价目 | 登录用户快捷查看，链回对应报价页 |
 
-**兼容**：`/pricing` **保留 URL**（外链、SEO、历史链接不断）；仅改 **页面内标题与导航文案** 为「订阅报价」。
+**兼容**：`/pricing` **保留 URL**（外链、SEO、历史链接不断）；仅改 **页面内标题与导航文案** 为「订阅价格」。
 
 **不采用** `/pricing/subscribe` 作为主 URL，避免全站改链；若将来需要，可加 302：`/pricing/subscribe` → `/pricing`。
 
@@ -95,7 +95,7 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  [ 订阅报价 ]    [ API 价格 ]                              │
+│  [ 订阅价格 ]    [ API 价格 ]                              │
 │   /pricing         /pricing/api   ← 当前页高亮            │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -105,11 +105,11 @@
 
 ### 3.3 页面结构
 
-#### A. 订阅报价 `/pricing`（原报价页 · 改名）
+#### A. 订阅价格 `/pricing`（原报价页 · 改名）
 
 | 区块 | 内容 | 变更 |
 |------|------|------|
-| Hero | 标题 **「订阅报价」**；副标题：画布 / 工具站 / 电商工具箱 · 会员订阅与轻量包 | 原「积分报价」等文案替换 |
+| Hero | 标题 **「订阅价格」**；副标题：画布 / 工具站 / 电商工具箱 · 会员订阅与轻量包 | 原「积分报价」等文案替换 |
 | Tabs | `PricingModeTabs` | **新增** |
 | 订阅套餐 | 个人 / 团队 × 月付 / 年付 · 套餐卡片 | 保持 |
 | 轻量包购买 | App `CREDIT_TOPUP_PACKS` | 保持；标注「App 订阅会员轻量包」 |
@@ -127,10 +127,10 @@
 | 三要点 | ① 充值积分长期有效 ② 失败任务不扣 ③ 余额不足 402 |
 | **API 充值档位** | 5 档卡片（§4 表）；展示 ¥、到账积分、约合 ¥/积分、大额 bonus 角标 |
 | CTA 行 | 未登录：**注册 API 账号**；已登录（API 身份）：**去充值** → `/account/api-billing`；已登录（App 身份）：提示「请使用 API 分身账号」+ 注册链接 |
-| **模型扣费一览** | **同一张** `ModelCreditPrice` 表（与订阅页相同数据）；说明：「每次调用扣减下表积分，与订阅报价页一致」 |
+| **模型扣费一览** | **同一张** `ModelCreditPrice` 表（与订阅页相同数据）；说明：「每次调用扣减下表积分，与订阅价格页一致」 |
 | 换算对比（可选折叠） | 小表：订阅月发 vs App 轻量包 vs API 充值 的 ¥/积分；强调 **不是扣费不同，是买积分更便宜** |
 | 开发者入口 | 链接：`/docs/api` 或 `doc/tech/platform-api-v1.md` 对应前台文档路由（实现时定） |
-| 交叉引导 | 「需要画布与工具站？查看 [订阅报价](/pricing)」 |
+| 交叉引导 | 「需要画布与工具站？查看 [订阅价格](/pricing)」 |
 
 **API 价格页不放**：会员订阅卡片、团队席位、App 轻量包 SKU。
 
@@ -139,7 +139,7 @@
 ```mermaid
 flowchart TB
   subgraph public [对外报价]
-    P["/pricing 订阅报价"]
+    P["/pricing 订阅价格"]
     A["/pricing/api API 价格"]
     D["/pricing-disclosure 价格公示"]
   end
@@ -175,10 +175,10 @@ flowchart TB
 
 | 菜单项 | 链接 | 说明 |
 |--------|------|------|
-| 订阅报价 | `/pricing` | 默认第一项 |
+| 订阅价格 | `/pricing` | 默认第一项 |
 | API 价格 | `/pricing/api` | 第二项 |
 
-未实现下拉前，可暂用两项并列：`订阅报价` | `API 价格`（窄屏收进「更多」）。
+未实现下拉前，可暂用两项并列：`订阅价格` | `API 价格`（窄屏收进「更多」）。
 
 `site-home-nav` 与 `navbar-shell` **保持一致**。
 
@@ -186,32 +186,32 @@ flowchart TB
 
 | 原文案 | 新文案 | 链接 |
 |--------|--------|------|
-| 积分报价 | **订阅报价** | `/pricing` |
+| 积分报价 | **订阅价格** | `/pricing` |
 | （新增） | **API 价格** | `/pricing/api` |
 | 价格公示 | 不变 | `/pricing-disclosure` |
 
 #### 首页 Hero `site-home-hero`
 
-- 主 CTA：**订阅报价** → `/pricing`
+- 主 CTA：**订阅价格** → `/pricing`
 - 次 CTA：**API 价格** → `/pricing/api`（替换或补充现有「多种接入方式」文案）
 
 #### 个人中心 `account-nav-menu-config`
 
 | 身份 | 计费相关入口 |
 |------|----------------|
-| `PLATFORM_CREDIT` | 轻量包购买 · **订阅报价** `/pricing` · 积分用量… |
+| `PLATFORM_CREDIT` | 轻量包购买 · **订阅价格** `/pricing` · 积分用量… |
 | `API_PLATFORM` | **API 账单** `/account/api-billing` · **API 价格** `/pricing/api` · 用量… |
 
-原「会员套餐」链 `/pricing` 对 App 用户标签改为 **「订阅报价」**。
+原「会员套餐」链 `/pricing` 对 App 用户标签改为 **「订阅价格」**。
 
 #### 注册 /  onboarding
 
 | 注册身份 | 注册成功默认引导 |
 |----------|------------------|
-| 平台代付 | `/pricing`（订阅报价） |
+| 平台代付 | `/pricing`（订阅价格） |
 | API 会员 | `/pricing/api` → 提示首充 → `/account/api-billing` |
 
-注册页底部互链：「使用 HTTP API？查看 API 价格」「使用 App？查看订阅报价」。
+注册页底部互链：「使用 HTTP API？查看 API 价格」「使用 App？查看订阅价格」。
 
 #### 其它引用（实现时批量替换文案）
 
@@ -220,14 +220,14 @@ flowchart TB
 | `lib/platform-assistant/guardrails.ts` | 价格类问题引导：**订阅** → `/pricing`，**API** → `/pricing/api` |
 | `lib/account-app-launch-gate.ts` | `ACCOUNT_APP_SUBSCRIBE_HREF` 仍为 `/pricing` |
 | `app/admin/.../admin-nav-config` | 外链增加「API 价格页」`/pricing/api` |
-| `components/publisher/...` | 「查看会员与定价」→ 订阅报价；可加 API 链接 |
+| `components/publisher/...` | 「查看会员与定价」→ 订阅价格；可加 API 链接 |
 
 ### 3.6 文案规范（对外）
 
 | 避免 | 改用 |
 |------|------|
-| 积分报价（作页面名） | **订阅报价** |
-| 会员套餐（作 nav 名） | **订阅报价**（个人中心可保留「选购套餐」作按钮） |
+| 积分报价（作页面名） | **订阅价格** |
+| 会员套餐（作 nav 名） | **订阅价格**（个人中心可保留「选购套餐」作按钮） |
 | API 会员套餐 | **API 价格** / **API 充值** |
 | 两套扣费 | **扣费相同；充值换算不同** |
 
@@ -249,7 +249,7 @@ flowchart TB
 - 配置：`CreditTopupPack.audience = API`（与 App pack 分表或分字段）。
 - **API 价格页**与 **API 账单页** 共用同一 pack 数据源。
 
-App 轻量包（现有，订阅报价页展示）：
+App 轻量包（现有，订阅价格页展示）：
 
 | id | 售价 | 积分 | 池 |
 |----|------|------|-----|
@@ -265,7 +265,7 @@ App 轻量包（现有，订阅报价页展示）：
 
 1. 新建 `app/(site)/pricing/api/page.tsx` + `ApiPricingPageClient`  
 2. 抽取 `PricingModeTabs`；`/pricing` 与 `/pricing/api` 均挂载  
-3. 更新 `/pricing` metadata 与 Hero 文案 → **订阅报价**  
+3. 更新 `/pricing` metadata 与 Hero 文案 → **订阅价格**  
 4. 模型表：复用 `ModelCreditPrice` 查询；**两页同组件、同数据**  
 5. API 充值区：读 `API_CREDIT_TOPUP_PACKS`（新常量或 pack audience 过滤）  
 6. 全站入口按 §3.5 改链（navbar / footer / hero / account nav）
@@ -309,7 +309,7 @@ App 轻量包（现有，订阅报价页展示）：
 | 阶段 | 交付 |
 |------|------|
 | **Phase 0** | ✅ 本文：定价 + **双报价页 + 入口** |
-| **Phase 1a** | ✅ 双报价页 UI：`/pricing` 订阅报价 + `/pricing/api` API 价格 + Tab + 顶栏对齐个人中心 |
+| **Phase 1a** | ✅ 双报价页 UI：`/pricing` 订阅价格 + `/pricing/api` API 价格 + Tab + 顶栏对齐个人中心 |
 | **Phase 1b** | API 身份、充值、Key、账单页 |
 | **Phase 2** | 限流、用量视图、分身关联 |
 | **Phase 3** | OpenAPI、SDK |
@@ -330,14 +330,14 @@ App 轻量包（现有，订阅报价页展示）：
 - [gateway-user-guide.md](./gateway-user-guide.md) §1.3  
 - [platform-api-v1.md](../tech/platform-api-v1.md)  
 - [Kie.ai 账单 / 定价](https://kie.ai/zh-CN/billing)  
-- 现网订阅报价：`app/(site)/pricing/page.tsx`、`components/pricing/pricing-page-client.tsx`  
+- 现网订阅价格：`app/(site)/pricing/page.tsx`、`components/pricing/pricing-page-client.tsx`  
 - 轻量包：`lib/billing/credit-topup-packs.ts`
 
 ---
 
-## 附录 A · 订阅报价 vs API 价格 · 一页对照
+## 附录 A · 订阅价格 vs API 价格 · 一页对照
 
-| | 订阅报价 `/pricing` | API 价格 `/pricing/api` |
+| | 订阅价格 `/pricing` | API 价格 `/pricing/api` |
 |--|---------------------|-------------------------|
 | 目标用户 | App / 工具站用户 | 开发者 / 集成商 |
 | 会员订阅 | ✅ | ❌ |
