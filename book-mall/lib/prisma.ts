@@ -1,6 +1,5 @@
 import { statSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { isPrismaConnectionUnavailable, toDbUnavailableError } from "@/lib/db-unavailable";
 import {
@@ -53,14 +52,7 @@ function generatedClientStamp(): string {
       /* try next */
     }
   }
-  try {
-    const requireFromRoot = createRequire(join(process.cwd(), "package.json"));
-    const clientEntry = requireFromRoot.resolve("@prisma/client/default.js");
-    const generated = join(dirname(clientEntry), "..", "..", ".prisma", "client", "default.js");
-    return String(statSync(generated).mtimeMs);
-  } catch {
-    return "0";
-  }
+  return "0";
 }
 
 const datasourceUrl = resolvePrismaDatasourceUrl();

@@ -49,7 +49,7 @@ import {
 } from "./ai-space-compose-types";
 import { parseAiSpaceComposeOverlayOptions } from "./ai-space-compose-options";
 import { getAiSpaceDigitalHuman } from "./ai-space-digital-human-service";
-import { requireAiSpaceDashscopeAuth, resolveAiSpaceS2vBaseUrl } from "./ai-space-gateway-auth";
+import { requireAiSpaceDashscopeAuth, resolveAiSpaceS2vBaseUrl, isDashscopeWorkspaceApiKey } from "./ai-space-gateway-auth";
 import {
   S2V_DETECT_FAILED_HINT,
   ensureDigitalHumanS2vChecked,
@@ -222,7 +222,10 @@ function friendlyS2vFailure(code: string | undefined, message: string): string {
     );
   }
   if (code?.trim().toLowerCase() === "internalerror") {
-    return `厂商侧生成失败（${message}）。wan2.2-s2v 要求使用华北2（北京）地域的阿里云 API Key，请在 Gateway 模型管理页核对该凭证的地域后重试`;
+    return (
+      "厂商 wan2.2-s2v 生成失败（Internal server error）。这通常是阿里云侧排队超时或服务异常，" +
+      "并非端点或 Key 地域配错。请稍后点「重试」；若连续多次失败，请在阿里云百炼控制台查看异步任务或提交工单。"
+    );
   }
   if (code?.trim() === "Arrearage" || /arrearage|overdue|good standing/i.test(message)) {
     return "百炼（阿里云）账号欠费或已停用，请在阿里云控制台检查余额后再试数字人口播合成";
@@ -275,6 +278,13 @@ async function runS2vStage(taskId: string): Promise<void> {
   const cred = await getDecryptedCredentialApiKey(credentialId);
   if (!cred) {
     await failTask(taskId, "Gateway 凭证不可用，请在模型管理页重新绑定");
+    return;
+  }
+  if (!isDashscopeWorkspaceApiKey(cred.apiKey)) {
+    await failTask(
+      taskId,
+      "数字人口播须使用华北2（北京）业务空间的 sk-ws- Key。请在 Gateway 绑定「DashScope 北京 S2V」凭证，或运行 pnpm gateway:bind-s2v-beijing",
+    );
     return;
   }
   const s2vBaseUrl = resolveAiSpaceS2vBaseUrl(cred.apiKey, cred.baseUrl);
