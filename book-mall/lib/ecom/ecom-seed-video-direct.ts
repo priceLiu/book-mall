@@ -37,7 +37,7 @@ import { prisma } from "@/lib/prisma";
 export function resolveSeedVideoDirectDurationSec(opts: {
   modelKey: string;
   durationSec?: number;
-  directVideo?: Pick<SeedVideoDirectPlan, "durationSec">;
+  directVideo?: { durationSec?: number };
 }): number {
   const modelKey = opts.modelKey.trim();
   const raw = Math.round(

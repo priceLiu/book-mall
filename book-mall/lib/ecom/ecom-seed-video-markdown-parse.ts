@@ -1,9 +1,9 @@
-import type {
-  SeedVideoDirectPlan,
-  SeedVideoScript,
-  SeedVideoScriptRow,
-  SeedVideoShot,
+import {
   ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
+  type SeedVideoDirectPlan,
+  type SeedVideoScript,
+  type SeedVideoScriptRow,
+  type SeedVideoShot,
 } from "@/lib/ecom/ecom-seed-video-types";
 import {
   directPlanFromStructuredPatch,

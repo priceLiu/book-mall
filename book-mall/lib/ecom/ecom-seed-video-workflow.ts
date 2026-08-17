@@ -263,7 +263,7 @@ function userPickedModeFromProject(project: {
 
 function userPickedFineModeFromProject(project: {
   chatHistory: Array<{ role: string; content: string }>;
-  meta?: { workflow?: { productionMode?: string } } | null;
+  meta?: { workflow?: { productionMode?: string; stylePreset?: string } } | null;
 }): boolean {
   if (project.meta?.workflow?.productionMode === "fine") return true;
   return project.chatHistory.some(
