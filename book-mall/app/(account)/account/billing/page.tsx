@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
+import { canManagePricing } from "@/lib/auth/permissions";
 import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
 import { listUserTenantMemberships } from "@/lib/tenant/context";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
@@ -35,6 +36,8 @@ export default async function AccountBillingPage() {
         isTeam={false}
         teamTenants={teamTenants}
         isLoggedIn
+        showAdminPacks={canManagePricing(session.user.role)}
+        userPhone={session.user.phone}
       />
     </>
   );

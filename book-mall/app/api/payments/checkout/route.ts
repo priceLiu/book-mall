@@ -7,6 +7,10 @@ import { authOptions } from "@/lib/auth";
 import { createPaymentCheckout } from "@/lib/payments/create-checkout";
 import { canUseAdminInstantCheckout } from "@/lib/payments/session-auth";
 import {
+  isAdminOnlyTopupPack,
+  packById,
+} from "@/lib/billing/credit-topup-packs";
+import {
   getWechatPayeeName,
   getWechatPersonalQrUrl,
 } from "@/lib/payments/wechat-personal-config";
@@ -35,6 +39,7 @@ const bodySchema = z.discriminatedUnion("productKind", [
     packId: z.string().min(1),
     target: z.enum(["personal", "team"]).optional(),
     tenantId: z.string().optional().nullable(),
+    verifyToken: z.string().optional(),
   }),
   z.object({
     productKind: z.literal("VIP_PACKAGE"),
@@ -70,11 +75,16 @@ export async function POST(request: NextRequest) {
 
     const checkout = await createPaymentCheckout({
       userId: session.user.id,
+      userRole: session.user.role,
       payload: parsed.data,
       channel,
     });
     const snap = checkout.productSnapshot as Record<string, unknown>;
-    const adminInstant = canUseAdminInstantCheckout(session.user.role);
+    const topupPack =
+      parsed.data.productKind === "CREDIT_TOPUP" ? packById(parsed.data.packId) : undefined;
+    const forceRealPayment = isAdminOnlyTopupPack(topupPack);
+    const adminInstant =
+      canUseAdminInstantCheckout(session.user.role) && !forceRealPayment;
     const isEnterprise = checkout.channel === "WECHAT_ENTERPRISE";
 
     return NextResponse.json({

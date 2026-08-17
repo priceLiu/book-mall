@@ -3,16 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Film, Zap, Users } from "lucide-react";
+import { Film, Zap, Users, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   CREDIT_TOPUP_PACKS,
   VIDEO_CREDIT_TOPUP_PACKS,
+  ADMIN_VIDEO_TOPUP_PACK,
   packListPriceYuan,
   type CreditTopupPack,
 } from "@/lib/billing/credit-topup-packs";
+import { AdminTopupVerifyDialog } from "@/components/pricing/admin-topup-verify-dialog";
 
 const PANEL_CLASS =
   "rounded-2xl border border-border bg-card";
@@ -45,7 +47,7 @@ function PackGrid({
               <span className="ml-1 text-base text-muted-foreground">积分</span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold text-foreground">¥{pack.priceYuan}</span>
+              <span className="text-2xl font-semibold text-foreground">¥{pack.priceYuan.toFixed(2)}</span>
               {listYuan > pack.priceYuan ? (
                 <span className="text-sm text-muted-foreground line-through">¥{listYuan}</span>
               ) : null}
@@ -79,21 +81,30 @@ export function CreditTopupSection({
   isTeam,
   teamTenants,
   isLoggedIn,
+  showAdminPacks = false,
+  userPhone,
 }: {
   anchorYuan: number;
   isTeam: boolean;
   teamTenants: { id: string; name: string }[];
   isLoggedIn: boolean;
+  showAdminPacks?: boolean;
+  userPhone?: string | null;
 }) {
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [adminVerifyPack, setAdminVerifyPack] = useState<CreditTopupPack | null>(null);
 
   const activeTeam = teamTenants[0] ?? null;
 
   async function buyPack(pack: CreditTopupPack) {
     if (!isLoggedIn) {
       router.push(`/login?callbackUrl=${encodeURIComponent("/pricing")}`);
+      return;
+    }
+    if (pack.adminOnly && pack.requirePhoneVerify) {
+      setAdminVerifyPack(pack);
       return;
     }
     const params = new URLSearchParams({ packId: pack.id });
@@ -159,6 +170,34 @@ export function CreditTopupSection({
           onBuy={buyPack}
         />
       </section>
+
+      {showAdminPacks ? (
+        <section className="mt-12">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-foreground">
+              <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+              管理员专用充值
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              仅平台管理员可见。购买前须验证注册手机号；支付 ¥0.01 后充入个人视频专项池。
+            </p>
+          </div>
+          <PackGrid
+            packs={[ADMIN_VIDEO_TOPUP_PACK]}
+            anchorYuan={anchorYuan}
+            loadingId={loadingId}
+            onBuy={buyPack}
+          />
+        </section>
+      ) : null}
+
+      {adminVerifyPack ? (
+        <AdminTopupVerifyDialog
+          pack={adminVerifyPack}
+          defaultPhone={userPhone}
+          onClose={() => setAdminVerifyPack(null)}
+        />
+      ) : null}
 
       {message ? (
         <p className="mt-4 text-center text-sm text-foreground">{message}</p>

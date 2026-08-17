@@ -2,7 +2,12 @@ import type { Prisma } from "@prisma/client";
 import type { PaymentProductKind, PaymentChannel } from "@prisma/client";
 
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
-import { packById } from "@/lib/billing/credit-topup-packs";
+import {
+  isAdminOnlyTopupPack,
+  packById,
+} from "@/lib/billing/credit-topup-packs";
+import { canManagePricing } from "@/lib/auth/permissions";
+import { verifyAdminTopupVerifyToken } from "@/lib/payments/admin-topup-verify-token";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import {
@@ -43,6 +48,7 @@ export type CreateCheckoutInput =
       packId: string;
       target?: "personal" | "team";
       tenantId?: string | null;
+      verifyToken?: string | null;
     }
   | {
       productKind: "VIP_PACKAGE";
@@ -54,6 +60,7 @@ export type CreateCheckoutInput =
 
 export async function createPaymentCheckout(input: {
   userId: string;
+  userRole?: string | null;
   payload: CreateCheckoutInput;
   adminNote?: string | null;
   createdByAdminId?: string | null;
@@ -105,6 +112,21 @@ export async function createPaymentCheckout(input: {
     case "CREDIT_TOPUP": {
       const pack = packById(payload.packId);
       if (!pack) throw new Error("无效的积分包档位");
+      if (isAdminOnlyTopupPack(pack)) {
+        if (!canManagePricing(input.userRole)) {
+          throw new Error("无权购买该档位");
+        }
+        if (pack.requirePhoneVerify) {
+          if (
+            !verifyAdminTopupVerifyToken(payload.verifyToken, userId, pack.id)
+          ) {
+            throw new Error("请先完成手机号验证");
+          }
+        }
+        if (payload.target === "team") {
+          throw new Error("管理员专用包仅支持个人充值");
+        }
+      }
       amountYuan = pack.priceYuan;
       productSnapshot = {
         packId: pack.id,

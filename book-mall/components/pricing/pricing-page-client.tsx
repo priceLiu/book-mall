@@ -213,6 +213,8 @@ export function PricingPageClient({
   isLoggedIn,
   billingPersona = null,
   welcomeGift,
+  showAdminPacks = false,
+  userPhone = null,
 }: {
   anchorYuan: number;
   plans: Plan[];
@@ -223,6 +225,8 @@ export function PricingPageClient({
   isLoggedIn: boolean;
   billingPersona?: BillingPersona | null;
   welcomeGift?: { generalCredits: number; videoCredits: number } | null;
+  showAdminPacks?: boolean;
+  userPhone?: string | null;
 }) {
   const [family, setFamily] = useState<"PERSONAL" | "TEAM">("PERSONAL");
   const [interval, setInterval] = useState<"MONTH" | "YEAR">("MONTH");
@@ -482,6 +486,8 @@ export function PricingPageClient({
           isTeam={isTeam}
           teamTenants={teamTenants}
           isLoggedIn={isLoggedIn}
+          showAdminPacks={showAdminPacks}
+          userPhone={userPhone}
         />
 
         {/* 规则说明 + 用完处理 */}
