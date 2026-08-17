@@ -9,7 +9,6 @@ import {
   X,
   Sparkles,
   Users,
-  KeyRound,
   Calculator,
   Minus,
   Plus,
@@ -39,8 +38,6 @@ import {
 } from "@/lib/pricing/credit-pricing-formulas";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
-import { ByokMembershipCta } from "@/components/pricing/byok-subscribe-buttons";
-import { billingPersonaLabel } from "@/lib/billing/billing-persona-labels";
 import {
   buildLoginRedirectForCheckout,
   buildMembershipCheckoutPath,
@@ -282,7 +279,7 @@ export function PricingPageClient({
       <div className="site-pricing-hero">
         <h1 className="site-pricing-title">专业 AI 工具 · 积分会员</h1>
         <p className="site-pricing-subtitle">
-          透明积分体系：按月订阅发放积分，全站 AI 应用通用；自带 key 会员厂商费用自理，超额从轻量包扣点。
+          透明积分体系：按月订阅发放积分，全站 AI 应用通用；积分用完可购买轻量包加购。
         </p>
 
         {welcomeGift &&
@@ -316,13 +313,6 @@ export function PricingPageClient({
           </div>
         ) : null}
 
-        {isLoggedIn && billingPersona === "BYOK" && !checkoutErrorMessage ? (
-          <div className="mx-auto mt-5 max-w-2xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            您当前为 <strong>{billingPersonaLabel("BYOK", "mode")}</strong>：可照常开通下方会员套餐获得工具准入与月度积分；AI
-            推理费用由您在 Gateway 绑定的厂商 Key 自行结算。超额编排与工具月费从轻量积分包扣点。
-          </div>
-        ) : null}
-
         <div className="site-pricing-toggles">
           <div className="site-pricing-toggle-group">
             <ToggleBtn active={family === "PERSONAL"} onClick={() => setFamily("PERSONAL")}>
@@ -346,32 +336,30 @@ export function PricingPageClient({
         </div>
       </div>
 
-      <div className="site-pricing-disclosure">
-        <p>
-          下方{visible.length}档为平台代付（积分套餐）：月发积分拆为通用池（图文 / 文本等）与视频池（仅视频生成），两池不互通、按模型扣积分。
-          {isTeam
-            ? " 团队套餐 3 席起订，大卡价格为套餐合计（非单席价），下方标注每席单价。"
-            : null}
-        </p>
-        <p>
-          若注册时选择{billingPersonaLabel("BYOK", "short")}，仍可开通同款会员获得工具准入；不含平台代推理积分扣费，超额从轻量积分包扣点。
-        </p>
-      </div>
+      <div className="site-pricing-body">
+        <div className="site-pricing-disclosure">
+          <p>
+            下方{visible.length}档为订阅会员（积分套餐）：月发积分拆为通用池（图文 / 文本等）与视频池（仅视频生成），两池不互通、按模型扣积分。
+            {isTeam
+              ? " 团队套餐 3 席起订，大卡价格为套餐合计（非单席价），下方标注每席单价。"
+              : null}
+          </p>
+        </div>
 
-      <section className="mx-auto mt-8 max-w-3xl px-4">
-        <h2 className="text-xl font-semibold text-foreground">订阅套餐</h2>
-        <p className="mt-1 text-sm text-muted-foreground">自动续订，包月可随时取消</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          会员积分每月发放，当期未使用积分不结转至下期
-        </p>
-      </section>
+        <section className="site-pricing-section-head">
+          <h2 className="site-pricing-section-title">订阅套餐</h2>
+          <p className="site-pricing-section-hint">自动续订，包月可随时取消</p>
+          <p className="site-pricing-section-hint">
+            会员积分每月发放，当期未使用积分不结转至下期
+          </p>
+        </section>
 
-      <div
-        className={cn(
-          "site-pricing-plans-grid mt-8",
-          isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
-        )}
-      >
+        <div
+          className={cn(
+            "site-pricing-plans-grid mt-8",
+            isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
+          )}
+        >
           {visible.map((p, i) => {
             const yearPrice = yearPriceByTier.get(p.tier);
             const annualSavingPct =
@@ -401,9 +389,8 @@ export function PricingPageClient({
               该组合套餐即将上线
             </div>
           ) : null}
-      </div>
+        </div>
 
-      <div className="site-pricing-body">
         {isTeam ? (
           <div className="mt-8 flex justify-center">
             <Link
@@ -536,61 +523,6 @@ export function PricingPageClient({
                   可生成数量 = <code className="rounded bg-muted px-1 text-foreground">套餐积分 ÷ 每次消耗</code>
                 </li>
               </ul>
-            </div>
-
-            <div className={cn(PANEL_CLASS, "p-6")}>
-              <div className="site-pricing-panel-title flex items-center gap-2">
-                <KeyRound className="h-5 w-5 text-muted-foreground" /> {billingPersonaLabel("BYOK", "short")}
-              </div>
-              <p className="mt-2 site-pricing-body-text">
-                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台不扣推理积分。须先开通会员订阅获得工具准入；套餐内含月度任务次数，超出后购买轻量积分包按次扣积分。
-              </p>
-              <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 site-pricing-body-text-sm">
-                <p className="site-pricing-panel-title">自带 key 会员怎么扣费？</p>
-                <ul className="mt-1 list-inside list-disc space-y-0.5">
-                  <li>会员订阅：工具准入（与平台代付共用套餐体系）</li>
-                  <li>套餐内：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费</li>
-                  <li>超额：从轻量积分包通用积分池按次扣分</li>
-                  <li>厂商费：走你的 Gateway Key，Book 不代收</li>
-                </ul>
-              </div>
-              {byokQuotas.length > 0 ? (
-                <ul className="mt-3 space-y-1 site-pricing-footnote">
-                  {byokQuotas
-                    .filter((q) => q.scopeKey === "personal")
-                    .map((q) => (
-                      <li key={q.taskKind}>
-                        {q.label}：含 {q.monthlyIncluded} 次/月，超额 {q.overageCredits} 积分/次
-                      </li>
-                    ))}
-                </ul>
-              ) : null}
-              <ByokMembershipCta isLoggedIn={isLoggedIn} />
-              {byokQuotas.some((q) => q.scopeKey === "team-seat") ? (
-                <div className="mt-3 border-t border-border pt-3">
-                  <p className="site-pricing-panel-title">团队 · 自带 key 会员</p>
-                  <ul className="mt-1 space-y-0.5 site-pricing-footnote">
-                    {byokQuotas
-                      .filter((q) => q.scopeKey === "team-seat")
-                      .map((q) => (
-                        <li key={q.taskKind}>
-                          {q.label}：含 {q.monthlyIncluded} 次/月/席，超额 {q.overageCredits} 积分/次
-                        </li>
-                      ))}
-                  </ul>
-                  <ByokMembershipCta isLoggedIn={isLoggedIn} isTeamScope />
-                </div>
-              ) : null}
-              {rates.length > 0 ? (
-                <div className="mt-3 border-t border-border pt-3 site-pricing-footnote">
-                  资源使用费：
-                  {rates.map((r) => (
-                    <span key={r.resourceType} className="mr-2">
-                      {RESOURCE_LABEL[r.resourceType] ?? r.resourceType} ¥{r.coefficientYuan}/{r.unitLabel}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
             </div>
           </div>
         </section>

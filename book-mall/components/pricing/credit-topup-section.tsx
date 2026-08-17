@@ -125,9 +125,9 @@ export function CreditTopupSection({
       <section className="mt-16">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">轻量包购买</h2>
-            <p className="mt-1 text-sm text-muted-foreground">轻量包积分，长期有效</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h2 className="site-pricing-section-title">轻量包购买</h2>
+            <p className="site-pricing-section-hint">轻量包积分，长期有效</p>
+            <p className="site-pricing-section-hint">
               套餐积分用完可即时加购，到账后立即可用；可叠加月付会员。
               {isTeam && activeTeam
                 ? ` 充入「${activeTeam.name}」团队共享池（仅主账号）。`
