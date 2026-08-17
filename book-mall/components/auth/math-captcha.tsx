@@ -34,7 +34,7 @@ export function MathCaptcha({ onVerify, disabled, className }: MathCaptchaProps)
     setVerifying(false);
     verifiedRef.current = false;
     try {
-      const res = await fetch("/api/auth/captcha/generate");
+      const res = await fetch("/api/auth/captcha/generate", { cache: "no-store" });
       const data = await res.json();
       setQuestion(data.question);
       setToken(data.token);
