@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { ByokRenewButton } from "@/components/account/byok-renew-button";
 
 export const metadata = {
-  title: "自带 Key（BYOK）— 个人中心",
+  title: "自带 key 会员 — 个人中心",
 };
 
 function periodKeyOf(d = new Date()): string {
@@ -110,7 +110,7 @@ export default async function AccountByokPage({
       ) : null}
 
       <AccountSectionHeader
-        title="自带 Key（BYOK）"
+        title="自带 key 会员"
         description="模型费用与厂商直接结算；平台收取技术服务费，套餐内含月度任务额度，超额从轻量包扣分。"
       />
 

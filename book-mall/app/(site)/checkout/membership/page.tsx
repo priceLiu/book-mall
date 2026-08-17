@@ -29,16 +29,14 @@ export default async function CheckoutMembershipPage({
   if (!planId) redirect("/pricing?error=no-plan");
 
   try {
-    await assertBillingPersona(session.user.id, "PLATFORM_CREDIT");
+    await assertBillingPersona(session.user.id, ["PLATFORM_CREDIT", "BYOK"]);
   } catch (e) {
     if (e instanceof BillingPersonaError && e.code === "PERSONA_REQUIRED") {
       redirect(
         `/onboarding/billing-persona?next=${encodeURIComponent(checkoutPath)}`,
       );
     }
-    redirect(
-      `/pricing?error=${e instanceof BillingPersonaError && e.code === "PERSONA_MISMATCH" ? "byok-persona" : "persona"}`,
-    );
+    redirect("/pricing?error=persona");
   }
 
   const plan = await prisma.membershipPlan.findUnique({ where: { id: planId } });

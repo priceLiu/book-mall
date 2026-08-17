@@ -52,8 +52,8 @@ export async function assertBillingPersona(
   if (!allowed.includes(persona)) {
     throw new BillingPersonaError(
       persona === "BYOK"
-        ? "当前账号为自带 Key 身份，无法开通此平台代付产品"
-        : "当前账号为平台代付身份，无法开通自带 Key 产品",
+        ? "当前账号为自带厂商 Key 身份，无法开通此平台代付产品"
+        : "当前账号为平台代付身份，无法开通自带厂商 Key 产品",
       "PERSONA_MISMATCH",
     );
   }

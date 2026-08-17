@@ -24,7 +24,7 @@ export const CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
     id: "pack-light",
     credits: 1500,
     priceYuan: 62,
-    label: "轻量包",
+    label: "轻量积分包",
     pool: "GENERAL",
   },
   {

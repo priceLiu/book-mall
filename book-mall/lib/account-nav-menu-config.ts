@@ -112,9 +112,9 @@ export function buildAccountNavMenuGroups(input: {
   ];
   if (isByok) {
     billingItems.push(
-      financeNavItem("/fees/billing/byok", "/account/fees/byok", "BYOK 任务用量", Key),
+      financeNavItem("/fees/billing/byok", "/account/fees/byok", "自带 Key 任务用量", Key),
     );
-    billingItems.push({ kind: "link", href: "/account/byok", label: "自带 Key 管理", icon: Key });
+    billingItems.push({ kind: "link", href: "/account/byok", label: "自带 key 会员", icon: Key });
   }
   if (isPlatform) {
     billingItems.push({ kind: "link", href: "/pricing", label: "会员套餐", icon: CreditCard });

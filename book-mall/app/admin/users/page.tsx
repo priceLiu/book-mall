@@ -9,7 +9,7 @@ function accountScopeLabel(inTeam: boolean): string {
 }
 
 function billingPersonaLabel(persona: "PLATFORM_CREDIT" | "BYOK"): string {
-  return persona === "BYOK" ? "自带 Key" : "平台代付";
+  return persona === "BYOK" ? "自带 key 会员" : "平台代付";
 }
 
 export default async function AdminUsersPage() {

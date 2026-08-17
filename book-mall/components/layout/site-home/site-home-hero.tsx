@@ -162,7 +162,7 @@ export function SiteHomeHeroSection({
                 </h1>
 
                 <p className="site-home-hero-subtitle">
-                  多种接入方式：开箱即用、自带厂商 Key 接入，或通过 API 统一调用。
+                  多种接入方式：订阅会员开箱即用、自带 key 会员自备厂商 Key，或通过 API 会员统一调用（规划中）。
                 </p>
 
                 <div className="site-home-hero-actions">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Film, Zap, Users, ShieldCheck } from "lucide-react";
+import { Film, Users, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,11 @@ function PackGrid({
               约 ¥{(pack.priceYuan / pack.credits).toFixed(3)}/积分
               {pack.pool === "VIDEO" ? " · 视频专项池" : " · 通用池"}
             </p>
+            {pack.id === "pack-light" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                轻量积分包，积分永不过期，可叠加月付
+              </p>
+            ) : null}
             <Button
               type="button"
               className="mt-5 w-full"
@@ -120,12 +125,10 @@ export function CreditTopupSection({
       <section className="mt-16">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-foreground">
-              <Zap className="h-5 w-5 text-muted-foreground" />
-              积分加油包（加量包）
-            </h2>
+            <h2 className="text-xl font-semibold text-foreground">轻量包购买</h2>
+            <p className="mt-1 text-sm text-muted-foreground">轻量包积分，长期有效</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              套餐积分用完可即时加购，到账后立即可用。
+              套餐积分用完可即时加购，到账后立即可用；可叠加月付会员。
               {isTeam && activeTeam
                 ? ` 充入「${activeTeam.name}」团队共享池（仅主账号）。`
                 : isTeam

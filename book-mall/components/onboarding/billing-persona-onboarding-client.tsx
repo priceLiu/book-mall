@@ -8,6 +8,7 @@ import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
 import { BoxReveal } from "@/components/auth/animated-auth-ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BILLING_PERSONA_LABELS } from "@/lib/billing/billing-persona-labels";
 
 const PERSONA_OPTIONS: {
   value: BillingPersona;
@@ -21,8 +22,8 @@ const PERSONA_OPTIONS: {
   },
   {
     value: "BYOK",
-    title: "自带 Key（BYOK）",
-    description: "自备云厂商 Key，开通 BYOK 套餐后绑定 Gateway。",
+    title: BILLING_PERSONA_LABELS.BYOK.short,
+    description: BILLING_PERSONA_LABELS.BYOK.tagline + "。开通会员后于 Gateway 绑定 Key。",
   },
 ];
 

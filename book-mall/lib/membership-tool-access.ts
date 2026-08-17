@@ -187,7 +187,7 @@ async function getByokToolAccess(
       const label = plan
         ? `${plan.family === "TEAM" ? "团队" : "个人"} · ${plan.tier}（${plan.interval === "YEAR" ? "年付" : "月付"}）`
         : "会员订阅";
-      return { ok: true, planName: `${label} · 自带 Key`, source: "byok_personal" };
+      return { ok: true, planName: `${label} · 自带 key 会员`, source: "byok_personal" };
     }
   }
 
@@ -210,7 +210,7 @@ async function getByokToolAccess(
     const interval = t.interval === "YEAR" ? "年付" : "月付";
     return {
       ok: true,
-      planName: `${t.name} · ${tier}（${interval}）· 自带 Key`,
+      planName: `${t.name} · ${tier}（${interval}）· 自带 key 会员`,
       source: "byok_team",
     };
   }

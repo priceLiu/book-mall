@@ -24,7 +24,7 @@ export async function applyMockMembershipSubscribe(input: {
   seats?: number;
   teamName?: string | null;
 }) {
-  await assertBillingPersona(input.userId, "PLATFORM_CREDIT");
+  await assertBillingPersona(input.userId, ["PLATFORM_CREDIT", "BYOK"]);
 
   const plan = await prisma.membershipPlan.findUnique({ where: { id: input.planId } });
   if (!plan || !plan.active) throw new Error("无效的会员套餐");

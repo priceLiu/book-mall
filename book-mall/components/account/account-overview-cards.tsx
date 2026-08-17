@@ -15,6 +15,7 @@ import {
   accountOverviewCardFooterClass,
 } from "@/components/account/account-nav-styles";
 import { getFinanceFeesRedirectUrl } from "@/lib/finance-account-redirect";
+import { billingPersonaLabel } from "@/lib/billing/billing-persona-labels";
 import type { PackageUsageRow } from "@/lib/finance/account-usage-summary";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +49,7 @@ type Props = {
 
 function personaLabel(persona: BillingPersona | null): string {
   if (persona === "PLATFORM_CREDIT") return "平台代付（积分套餐）";
-  if (persona === "BYOK") return "自带 Key（BYOK 月费）";
+  if (persona === "BYOK") return billingPersonaLabel("BYOK", "mode") + " · 会员订阅";
   return "未完成身份选择";
 }
 
@@ -313,11 +314,11 @@ export function AccountOverviewCards({
       <Card className="flex h-full flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{isByok ? "BYOK 套餐" : "会员套餐"}</CardTitle>
+            <CardTitle className="text-base">{isByok ? "会员套餐（自带 key 会员）" : "会员套餐"}</CardTitle>
             <BadgeCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
           <CardDescription className="text-xs">
-            {isByok ? "BYOK 技术服务费 + 自备厂商 Key" : "个人或团队积分套餐"}
+            {isByok ? "自备厂商 Key + 会员准入；超额从轻量积分包扣点" : "个人或团队积分套餐"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
@@ -362,7 +363,7 @@ export function AccountOverviewCards({
             </Link>
             {isByok ? (
               <Link href="/account/byok" className={accountInlineLinkClass()}>
-                BYOK 管理
+                自带 key 会员管理
               </Link>
             ) : (
               <Link href="/account/team" className={accountInlineLinkClass()}>

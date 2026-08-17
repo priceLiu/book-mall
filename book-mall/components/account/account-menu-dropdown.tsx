@@ -59,7 +59,7 @@ const NAV_LINKS = [
   { href: "/account/team", label: "团队空间", icon: Users },
   { href: "/account/team/billing", label: "团队账单", icon: Receipt },
   { href: "/account/billing", label: "轻量包购买", icon: Sparkles },
-  { href: "/account/byok", label: "自带 Key（BYOK）", icon: Zap },
+  { href: "/account/byok", label: "自带 key 会员", icon: Zap },
   { href: "/pricing", label: "会员套餐", icon: Receipt },
   { href: "/account/courses", label: "AI 学堂", icon: Sparkles },
 ] as const;

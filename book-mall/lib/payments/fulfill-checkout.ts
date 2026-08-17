@@ -78,7 +78,7 @@ async function fulfillMembership(
   const plan = await prisma.membershipPlan.findUnique({ where: { id: planId } });
   if (!plan || !plan.active) throw new Error("无效的会员套餐");
 
-  await assertBillingPersona(checkout.userId, "PLATFORM_CREDIT");
+  await assertBillingPersona(checkout.userId, ["PLATFORM_CREDIT", "BYOK"]);
 
   const now = new Date();
   const creditPeriodEnd = subscriptionCreditPeriodEnd(now);
@@ -303,7 +303,7 @@ async function fulfillByok(checkout: PaymentCheckout, snap: Record<string, unkno
 }
 
 async function fulfillVipPackage(checkout: PaymentCheckout, snap: Record<string, unknown>) {
-  await assertBillingPersona(checkout.userId, "PLATFORM_CREDIT");
+  await assertBillingPersona(checkout.userId, ["PLATFORM_CREDIT", "BYOK"]);
 
   const scheme = snap.scheme === "video_heavy" ? "video_heavy" : "general_heavy";
   const amountYuan = Math.round(Number(snap.amountYuan));

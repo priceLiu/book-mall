@@ -14,6 +14,7 @@ import {
 } from "@/components/auth/animated-auth-ui";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
+import { BILLING_PERSONA_LABELS } from "@/lib/billing/billing-persona-labels";
 import { cn } from "@/lib/utils";
 
 const PERSONA_OPTIONS: {
@@ -28,8 +29,8 @@ const PERSONA_OPTIONS: {
   },
   {
     value: "BYOK",
-    title: "自带 Key（BYOK）",
-    description: "自备云厂商 API Key，平台收取技术服务费；云账单在 Gateway 查看。",
+    title: BILLING_PERSONA_LABELS.BYOK.short,
+    description: BILLING_PERSONA_LABELS.BYOK.tagline + "；云账单在 Gateway 查看。",
   },
 ];
 

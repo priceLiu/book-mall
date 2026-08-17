@@ -50,6 +50,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --chown=nextjs:nodejs certs/wechat_pay_pub_key.pem ./certs/wechat_pay_pub_key.pem
 
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh && chown nextjs:nodejs docker-entrypoint.sh

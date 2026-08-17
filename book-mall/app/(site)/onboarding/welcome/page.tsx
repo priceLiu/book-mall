@@ -12,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import { billingPersonaLabel } from "@/lib/billing/billing-persona-labels";
+
 export const metadata = { title: "欢迎" };
 export const dynamic = "force-dynamic";
 
@@ -41,7 +43,11 @@ export default async function OnboardingWelcomePage({
     <main className="mx-auto flex min-h-[60vh] max-w-lg flex-col justify-center px-4 py-12">
       <Card>
         <CardHeader>
-          <CardTitle>{persona === "BYOK" ? "欢迎使用 BYOK 模式" : "欢迎使用平台代付"}</CardTitle>
+          <CardTitle>
+            {persona === "BYOK"
+              ? `欢迎使用${billingPersonaLabel("BYOK", "mode")}`
+              : "欢迎使用平台代付"}
+          </CardTitle>
           <CardDescription>
             {persona === "BYOK"
               ? "按以下步骤完成 Gateway 绑定后即可使用 AI 工具。"
@@ -53,7 +59,7 @@ export default async function OnboardingWelcomePage({
             <ol className="list-decimal space-y-2 pl-5 text-muted-foreground">
               <li>
                 <Link href="/pricing#personal" className="text-foreground underline">
-                  开通 BYOK 月费套餐
+                  开通会员订阅
                 </Link>
               </li>
               <li>
@@ -76,7 +82,7 @@ export default async function OnboardingWelcomePage({
           )}
           <Button asChild className="w-full">
             <Link href={persona === "BYOK" ? "/account/byok" : "/pricing"}>
-              {persona === "BYOK" ? "前往 BYOK 中心" : "查看会员套餐"}
+              {persona === "BYOK" ? "前往自带 key 会员管理" : "查看会员套餐"}
             </Link>
           </Button>
           <Button variant="outline" asChild className="w-full">

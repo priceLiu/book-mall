@@ -1,7 +1,5 @@
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
-import { getWechatPayConfig, readPrivateKey } from "./wechat-pay-config";
+import { getWechatPayConfig, readPrivateKey, readWechatPayPublicKey } from "./wechat-pay-config";
 
 const WECHAT_API_BASE = "https://api.mch.weixin.qq.com";
 
@@ -31,14 +29,9 @@ function authorization(method: string, urlPath: string, body: string): string {
 
 let _pubKeyCache: string | null = null;
 
-function readWechatPayPublicKey(): string {
+function loadWechatPayPublicKey(): string {
   if (_pubKeyCache) return _pubKeyCache;
-  const cfg = getWechatPayConfig();
-  const resolved = path.resolve(cfg.pubKeyPath);
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`微信支付公钥文件不存在: ${resolved}`);
-  }
-  _pubKeyCache = fs.readFileSync(resolved, "utf8");
+  _pubKeyCache = readWechatPayPublicKey();
   return _pubKeyCache;
 }
 

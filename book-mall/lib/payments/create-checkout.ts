@@ -75,7 +75,7 @@ export async function createPaymentCheckout(input: {
 
   switch (payload.productKind) {
     case "MEMBERSHIP_PERSONAL": {
-      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      await assertBillingPersona(userId, ["PLATFORM_CREDIT", "BYOK"]);
       const plan = await prisma.membershipPlan.findUnique({ where: { id: payload.planId } });
       if (!plan || !plan.active) throw new Error("无效的会员套餐");
       amountYuan = Number(plan.priceYuan);
@@ -88,7 +88,7 @@ export async function createPaymentCheckout(input: {
       break;
     }
     case "MEMBERSHIP_TEAM": {
-      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      await assertBillingPersona(userId, ["PLATFORM_CREDIT", "BYOK"]);
       const plan = await prisma.membershipPlan.findUnique({ where: { id: payload.planId } });
       if (!plan || !plan.active || plan.family !== "TEAM") throw new Error("无效的团队套餐");
       const seats = Math.max(
@@ -153,7 +153,7 @@ export async function createPaymentCheckout(input: {
       break;
     }
     case "VIP_PACKAGE": {
-      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      await assertBillingPersona(userId, ["PLATFORM_CREDIT", "BYOK"]);
       const vipAmount = Math.round(payload.amountYuan);
       if (vipAmount < VIP_MIN_AMOUNT_YUAN) {
         throw new Error(`VIP 起订金额为 ¥${VIP_MIN_AMOUNT_YUAN.toLocaleString()}`);

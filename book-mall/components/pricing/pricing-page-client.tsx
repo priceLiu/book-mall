@@ -40,6 +40,7 @@ import {
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
 import { ByokMembershipCta } from "@/components/pricing/byok-subscribe-buttons";
+import { billingPersonaLabel } from "@/lib/billing/billing-persona-labels";
 import {
   buildLoginRedirectForCheckout,
   buildMembershipCheckoutPath,
@@ -234,15 +235,13 @@ export function PricingPageClient({
   const checkoutError = searchParams.get("error");
 
   const checkoutErrorMessage =
-    checkoutError === "byok-persona"
-      ? "当前账号为自带 Key（BYOK）身份，无法购买平台代付会员套餐。积分清零不影响此限制——计费身份在注册时已锁定。请使用 BYOK 入口，或由财务后台为您续充。"
-      : checkoutError === "persona"
-        ? "请先完成计费身份选择后再开通会员。"
-        : checkoutError === "no-plan"
-          ? "未选择有效套餐，请从下方卡片重新点击「立即开通」。"
-          : checkoutError === "invalid-plan"
-            ? "所选套餐已下架或不存在，请刷新页面后重试。"
-            : null;
+    checkoutError === "persona"
+      ? "请先完成计费身份选择后再开通会员。"
+      : checkoutError === "no-plan"
+        ? "未选择有效套餐，请从下方卡片重新点击「立即开通」。"
+        : checkoutError === "invalid-plan"
+          ? "所选套餐已下架或不存在，请刷新页面后重试。"
+          : null;
 
   useEffect(() => {
     if (!checkoutError) return;
@@ -283,7 +282,7 @@ export function PricingPageClient({
       <div className="site-pricing-hero">
         <h1 className="site-pricing-title">专业 AI 工具 · 积分会员</h1>
         <p className="site-pricing-subtitle">
-          透明积分体系：按月订阅发放积分，全站 AI 应用通用；自带 Key 用户厂商费用自理，超额从轻量包扣点。
+          透明积分体系：按月订阅发放积分，全站 AI 应用通用；自带 key 会员厂商费用自理，超额从轻量包扣点。
         </p>
 
         {welcomeGift &&
@@ -314,25 +313,13 @@ export function PricingPageClient({
                 </Link>
               </>
             ) : null}
-            {checkoutError === "byok-persona" ? (
-              <>
-                {" "}
-                <Link href="/account/billing" className="font-medium underline">
-                  查看账户计费
-                </Link>
-              </>
-            ) : null}
           </div>
         ) : null}
 
         {isLoggedIn && billingPersona === "BYOK" && !checkoutErrorMessage ? (
           <div className="mx-auto mt-5 max-w-2xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            您当前为 <strong>自带 Key（BYOK）</strong> 身份，报价页「立即开通」仅适用于
-            <strong>平台代付</strong> 会员。积分清零不会解除此限制。如需续充 VIP 大额预充，请联系商务或在
-            <Link href="/account/team" className="font-medium underline">
-              团队中心
-            </Link>
-            查看现有团队。
+            您当前为 <strong>{billingPersonaLabel("BYOK", "mode")}</strong>：可照常开通下方会员套餐获得工具准入与月度积分；AI
+            推理费用由您在 Gateway 绑定的厂商 Key 自行结算。超额编排与工具月费从轻量积分包扣点。
           </div>
         ) : null}
 
@@ -367,9 +354,17 @@ export function PricingPageClient({
             : null}
         </p>
         <p>
-          若注册时选择自带 Key（BYOK），请见本页下方说明——不含月度积分，含任务次数额度；超额与工具月费从轻量包余额扣。
+          若注册时选择{billingPersonaLabel("BYOK", "short")}，仍可开通同款会员获得工具准入；不含平台代推理积分扣费，超额从轻量积分包扣点。
         </p>
       </div>
+
+      <section className="mx-auto mt-8 max-w-3xl px-4">
+        <h2 className="text-xl font-semibold text-foreground">订阅套餐</h2>
+        <p className="mt-1 text-sm text-muted-foreground">自动续订，包月可随时取消</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          会员积分每月发放，当期未使用积分不结转至下期
+        </p>
+      </section>
 
       <div
         className={cn(
@@ -420,6 +415,15 @@ export function PricingPageClient({
             </Link>
           </div>
         ) : null}
+
+        <CreditTopupSection
+          anchorYuan={anchorYuan}
+          isTeam={isTeam}
+          teamTenants={teamTenants}
+          isLoggedIn={isLoggedIn}
+          showAdminPacks={showAdminPacks}
+          userPhone={userPhone}
+        />
 
         {/* 全档「可生成数量」矩阵 */}
         {models.length > 0 && visible.length > 0 ? (
@@ -481,15 +485,6 @@ export function PricingPageClient({
           </section>
         ) : null}
 
-        <CreditTopupSection
-          anchorYuan={anchorYuan}
-          isTeam={isTeam}
-          teamTenants={teamTenants}
-          isLoggedIn={isLoggedIn}
-          showAdminPacks={showAdminPacks}
-          userPhone={userPhone}
-        />
-
         {/* 规则说明 + 用完处理 */}
         <section className="mt-16 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className={cn(PANEL_CLASS, "p-6")}>
@@ -545,17 +540,17 @@ export function PricingPageClient({
 
             <div className={cn(PANEL_CLASS, "p-6")}>
               <div className="site-pricing-panel-title flex items-center gap-2">
-                <KeyRound className="h-5 w-5 text-muted-foreground" /> 自带 Key（BYOK）
+                <KeyRound className="h-5 w-5 text-muted-foreground" /> {billingPersonaLabel("BYOK", "short")}
               </div>
               <p className="mt-2 site-pricing-body-text">
-                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台不扣推理积分。须先开通会员订阅获得工具准入；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
+                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台不扣推理积分。须先开通会员订阅获得工具准入；套餐内含月度任务次数，超出后购买轻量积分包按次扣积分。
               </p>
               <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 site-pricing-body-text-sm">
-                <p className="site-pricing-panel-title">BYOK 怎么扣费？</p>
+                <p className="site-pricing-panel-title">自带 key 会员怎么扣费？</p>
                 <ul className="mt-1 list-inside list-disc space-y-0.5">
                   <li>会员订阅：工具准入（与平台代付共用套餐体系）</li>
                   <li>套餐内：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费</li>
-                  <li>超额：从轻量包通用积分池按次扣分</li>
+                  <li>超额：从轻量积分包通用积分池按次扣分</li>
                   <li>厂商费：走你的 Gateway Key，Book 不代收</li>
                 </ul>
               </div>
@@ -573,7 +568,7 @@ export function PricingPageClient({
               <ByokMembershipCta isLoggedIn={isLoggedIn} />
               {byokQuotas.some((q) => q.scopeKey === "team-seat") ? (
                 <div className="mt-3 border-t border-border pt-3">
-                  <p className="site-pricing-panel-title">团队 BYOK</p>
+                  <p className="site-pricing-panel-title">团队 · 自带 key 会员</p>
                   <ul className="mt-1 space-y-0.5 site-pricing-footnote">
                     {byokQuotas
                       .filter((q) => q.scopeKey === "team-seat")
@@ -694,10 +689,6 @@ function PlanCard({
   });
 
   function goCheckout() {
-    if (isLoggedIn && billingPersona === "BYOK") {
-      window.location.assign("/pricing?error=byok-persona");
-      return;
-    }
     const checkoutPath = buildMembershipCheckoutPath({
       planId: plan.id,
       seats: isTeam ? quote.seats : undefined,
@@ -827,13 +818,8 @@ function PlanCard({
           variant={featured ? "default" : "outline"}
           className="h-11 w-full rounded-full text-sm font-medium"
           onClick={goCheckout}
-          disabled={isLoggedIn && billingPersona === "BYOK"}
         >
-          {isLoggedIn && billingPersona === "BYOK"
-            ? "BYOK 账号不可购"
-            : isTeam
-              ? "开通团队会员"
-              : "立即开通"}
+          {isTeam ? "开通团队会员" : "立即开通"}
         </Button>
       </div>
     </motion.div>
