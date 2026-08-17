@@ -18,9 +18,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata = {
-  title: "积分报价 · 个人 / 团队会员",
+  title: "订阅报价 · 个人 / 团队会员",
   description:
-    "统一积分体系：个人 / 团队会员订阅与轻量包充值；透明公式：套餐积分 → 各模型每次消耗。",
+    "App 会员订阅与轻量包充值；模型扣费全站统一。HTTP API 见 API 价格页。",
 };
 
 export default async function PricingPage() {

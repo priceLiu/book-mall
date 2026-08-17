@@ -31,9 +31,14 @@ const centerNavLinks: NavItem[] = [
   { label: "主屏", href: "#hero-video" },
   { label: "客户评价", href: "#testimonials" },
   {
-    label: "报价",
+    label: "订阅报价",
     href: "/pricing",
-    isActive: (p) => p === "/pricing" || p.startsWith("/pricing/"),
+    isActive: (p) => p === "/pricing",
+  },
+  {
+    label: "API 价格",
+    href: "/pricing/api",
+    isActive: (p) => p === "/pricing/api" || p.startsWith("/pricing/api/"),
   },
 ];
 

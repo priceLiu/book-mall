@@ -162,7 +162,7 @@ export function SiteHomeHeroSection({
                 </h1>
 
                 <p className="site-home-hero-subtitle">
-                  多种接入方式：订阅会员开箱即用、自带 key 会员自备厂商 Key，或通过 API 会员统一调用（规划中）。
+                  订阅会员使用画布与工具站；HTTP API 随用随充，模型扣费全站统一。
                 </p>
 
                 <div className="site-home-hero-actions">
@@ -170,7 +170,10 @@ export function SiteHomeHeroSection({
                     开始使用
                   </Link>
                   <Link href="/pricing" className="site-home-btn-secondary">
-                    <span>查看报价</span>
+                    <span>订阅报价</span>
+                  </Link>
+                  <Link href="/pricing/api" className="site-home-btn-secondary">
+                    <span>API 价格</span>
                   </Link>
                 </div>
 

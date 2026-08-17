@@ -38,6 +38,7 @@ import {
 } from "@/lib/pricing/credit-pricing-formulas";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
+import { PricingModeTabs } from "@/components/pricing/pricing-mode-tabs";
 import {
   buildLoginRedirectForCheckout,
   buildMembershipCheckoutPath,
@@ -277,9 +278,14 @@ export function PricingPageClient({
   return (
     <div className="site-pricing-page">
       <div className="site-pricing-hero">
-        <h1 className="site-pricing-title">专业 AI 工具 · 积分会员</h1>
+        <PricingModeTabs className="mb-6" />
+        <h1 className="site-pricing-title">订阅报价</h1>
         <p className="site-pricing-subtitle">
-          透明积分体系：按月订阅发放积分，全站 AI 应用通用；积分用完可购买轻量包加购。
+          画布 / 工具站 / 电商工具箱 · 会员订阅与轻量包；模型扣费与{" "}
+          <Link href="/pricing/api" className="font-medium text-foreground underline underline-offset-2">
+            API 价格
+          </Link>{" "}
+          页一致，按积分扣减。
         </p>
 
         {welcomeGift &&
@@ -353,10 +359,17 @@ export function PricingPageClient({
             会员积分每月发放，当期未使用积分不结转至下期
           </p>
         </section>
+      </div>
 
+      <div
+        className={cn(
+          "site-pricing-plans-band",
+          isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
+        )}
+      >
         <div
           className={cn(
-            "site-pricing-plans-grid mt-8",
+            "site-pricing-plans-grid",
             isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
           )}
         >
@@ -390,7 +403,9 @@ export function PricingPageClient({
             </div>
           ) : null}
         </div>
+      </div>
 
+      <div className="site-pricing-body">
         {isTeam ? (
           <div className="mt-8 flex justify-center">
             <Link

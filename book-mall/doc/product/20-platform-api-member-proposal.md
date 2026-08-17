@@ -309,7 +309,7 @@ App 轻量包（现有，订阅报价页展示）：
 | 阶段 | 交付 |
 |------|------|
 | **Phase 0** | ✅ 本文：定价 + **双报价页 + 入口** |
-| **Phase 1a** | 仅文档/UI  spec：**订阅报价改名 + API 价格页 + Tab + 入口**（可先静态） |
+| **Phase 1a** | ✅ 双报价页 UI：`/pricing` 订阅报价 + `/pricing/api` API 价格 + Tab + 顶栏对齐个人中心 |
 | **Phase 1b** | API 身份、充值、Key、账单页 |
 | **Phase 2** | 限流、用量视图、分身关联 |
 | **Phase 3** | OpenAPI、SDK |

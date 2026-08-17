@@ -31,13 +31,13 @@ function PackGrid({
   onBuy: (pack: CreditTopupPack) => void;
 }) {
   return (
-    <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-stretch">
       {packs.map((pack) => {
         const listYuan = packListPriceYuan(pack.credits, anchorYuan);
         return (
           <div
             key={pack.id}
-            className={cn(PANEL_CLASS, "flex flex-col p-6")}
+            className={cn(PANEL_CLASS, "flex h-full min-h-0 flex-col p-6")}
           >
             <div className="text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
               {pack.label}
@@ -61,14 +61,14 @@ function PackGrid({
               约 ¥{(pack.priceYuan / pack.credits).toFixed(3)}/积分
               {pack.pool === "VIDEO" ? " · 视频专项池" : " · 通用池"}
             </p>
-            {pack.id === "pack-light" ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                轻量积分包，积分永不过期，可叠加月付
-              </p>
-            ) : null}
+            <p className="mt-1 min-h-[2.5rem] text-xs text-muted-foreground">
+              {pack.id === "pack-light"
+                ? "轻量积分包，积分永不过期，可叠加月付"
+                : "\u00a0"}
+            </p>
             <Button
               type="button"
-              className="mt-5 w-full"
+              className="mt-auto w-full"
               disabled={loadingId === pack.id}
               onClick={() => onBuy(pack)}
             >
