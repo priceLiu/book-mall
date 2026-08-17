@@ -15,7 +15,6 @@ import {
   accountOverviewCardFooterClass,
 } from "@/components/account/account-nav-styles";
 import { getFinanceFeesRedirectUrl } from "@/lib/finance-account-redirect";
-import { billingPersonaLabel } from "@/lib/billing/billing-persona-labels";
 import type { PackageUsageRow } from "@/lib/finance/account-usage-summary";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +39,6 @@ type Props = {
   hasActiveCourseSubscription: boolean;
   coursePlanName: string | null;
   courseSubscriptionEndsAt: Date | null;
-  legacyMonthlyGrantCredits?: number | null;
   usageSummary?: UsageSummary | null;
   packageUsageRows?: PackageUsageRow[];
   /** 当前在团队空间：积分/用量展示团队共享池总量 */
@@ -48,8 +46,7 @@ type Props = {
 };
 
 function personaLabel(persona: BillingPersona | null): string {
-  if (persona === "PLATFORM_CREDIT") return "平台代付（积分套餐）";
-  if (persona === "BYOK") return billingPersonaLabel("BYOK", "mode") + " · 会员订阅";
+  if (persona === "PLATFORM_CREDIT" || persona === "BYOK") return "订阅会员（平台代付）";
   return "未完成身份选择";
 }
 
@@ -65,11 +62,6 @@ function StatusDot({ ok }: { ok: boolean }) {
   );
 }
 
-function fmtQuota(n: number | null): string {
-  if (n == null) return "—";
-  return n.toLocaleString("zh-CN");
-}
-
 export function AccountOverviewCards({
   generalCredits,
   videoCredits,
@@ -81,12 +73,10 @@ export function AccountOverviewCards({
   hasActiveCourseSubscription,
   coursePlanName,
   courseSubscriptionEndsAt,
-  legacyMonthlyGrantCredits = null,
   usageSummary = null,
   packageUsageRows = [],
   isTeamSharedPool = false,
 }: Props) {
-  const isByok = billingPersona === "BYOK";
   const textLink = accountBodyTextLinkClass();
   const financeUsageUrl = getFinanceFeesRedirectUrl("/fees/usage") ?? "/account/usage";
   const financeLedgerUrl = getFinanceFeesRedirectUrl("/fees/billing/ledger") ?? "/account/fees/ledger";
@@ -98,7 +88,7 @@ export function AccountOverviewCards({
         <CardHeader className="pb-3">
           <CardTitle className="text-base">账户身份</CardTitle>
           <CardDescription className="text-xs">
-            注册时选定的计费方式；与下方套餐状态共同决定工具与 AI 调用权限。
+            订阅会员通过积分套餐使用 AI；下方为当前套餐与用量。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -139,14 +129,12 @@ export function AccountOverviewCards({
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              {isByok ? "套餐使用情况" : isTeamSharedPool ? "团队本月消耗" : "本月按类型消耗"}
+              {isTeamSharedPool ? "团队本月消耗" : "本月按类型消耗"}
             </CardTitle>
             <CardDescription className="text-xs">
-              {isByok
-                ? "剩余 = 总数 − 套餐已用（与 Gateway 成功次数可能不同：仅 BYOK 套餐内扣次计入已用）。试衣计入文生图。"
-                : isTeamSharedPool
-                  ? "团队共享积分池按七类统计全员成功/失败与扣积分（试衣计入文生图）。"
-                  : "积分池按七类统计成功/失败与扣积分（无含次额度；试衣计入文生图，明细按 modelKey 展示）。"}
+              {isTeamSharedPool
+                ? "团队共享积分池按七类统计全员成功/失败与扣积分（试衣计入文生图）。"
+                : "积分池按七类统计成功/失败与扣积分（试衣计入文生图，明细按 modelKey 展示）。"}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-3">
@@ -155,54 +143,24 @@ export function AccountOverviewCards({
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">类型</th>
-                    {isByok ? (
-                      <>
-                        <th className="px-3 py-2 text-right font-medium">总数</th>
-                        <th className="px-3 py-2 text-right font-medium">套餐已用</th>
-                        <th className="px-3 py-2 text-right font-medium">剩余</th>
-                        <th className="px-3 py-2 text-right font-medium">Gateway 成功</th>
-                        <th className="px-3 py-2 text-right font-medium">失败</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="px-3 py-2 text-right font-medium">成功</th>
-                        <th className="px-3 py-2 text-right font-medium">失败</th>
-                        <th className="px-3 py-2 text-right font-medium">扣积分</th>
-                      </>
-                    )}
+                    <th className="px-3 py-2 text-right font-medium">成功</th>
+                    <th className="px-3 py-2 text-right font-medium">失败</th>
+                    <th className="px-3 py-2 text-right font-medium">扣积分</th>
                   </tr>
                 </thead>
                 <tbody>
                   {packageUsageRows.map((row) => (
                     <tr key={row.key} className="border-t border-border/50">
                       <td className="px-3 py-2 font-medium text-foreground">{row.label}</td>
-                      {isByok ? (
-                        <>
-                          <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.total)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-[#262626]">
-                            {fmtQuota(row.includedUsed)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {row.succeeded}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-destructive">
-                            {row.failed}
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {row.succeeded}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-destructive">
-                            {row.failed}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {(row.creditsConsumed ?? 0).toLocaleString("zh-CN")}
-                          </td>
-                        </>
-                      )}
+                      <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {row.succeeded}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                        {row.failed}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {(row.creditsConsumed ?? 0).toLocaleString("zh-CN")}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -222,34 +180,21 @@ export function AccountOverviewCards({
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              {isByok ? "轻量包积分" : isTeamSharedPool ? "团队套餐积分" : "套餐积分"}
+              {isTeamSharedPool ? "团队套餐积分" : "套餐积分"}
             </CardTitle>
             <CardDescription className="text-xs">
-              {isByok
-                ? "轻量包加购与超额扣分；BYOK 月费不含月度积分发放。"
-                : isTeamSharedPool
-                  ? "团队共享池本月发放、消耗与剩余（含轻量包加购）。"
-                  : "套餐月发积分与轻量包加购；用于平台代付扣费。"}
+              {isTeamSharedPool
+                ? "团队共享池本月发放、消耗与剩余（含轻量包加购）。"
+                : "套餐月发积分与轻量包加购；用于平台代付扣费。"}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
-              <UsageStat
-                label={isByok ? "轻量包加购" : "本月发放"}
-                value={
-                  isByok ? usageSummary.topupCreditsThisMonth : usageSummary.creditsGranted
-                }
-              />
+              <UsageStat label="本月发放" value={usageSummary.creditsGranted} />
               <UsageStat label="本月消耗" value={usageSummary.creditsConsumed} />
               <UsageStat label="剩余积分" value={usageSummary.creditsRemaining} />
             </div>
-            {isByok && usageSummary.grantCreditsThisMonth > 0 && usageSummary.topupCreditsThisMonth === 0 ? (
-              <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-                本月另有历史套餐月发 {usageSummary.grantCreditsThisMonth.toLocaleString("zh-CN")}{" "}
-                积分（切换 BYOK 前的 GRANT 流水，非轻量包加购）。
-              </p>
-            ) : null}
-            {!isByok && usageSummary.topupCreditsThisMonth > 0 ? (
+            {usageSummary.topupCreditsThisMonth > 0 ? (
               <p className="text-xs text-muted-foreground">
                 其中轻量包加购 {usageSummary.topupCreditsThisMonth.toLocaleString("zh-CN")} 积分
               </p>
@@ -274,16 +219,14 @@ export function AccountOverviewCards({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">
-              {isByok ? "当前余额" : isTeamSharedPool ? "团队积分余额" : "积分余额"}
+              {isTeamSharedPool ? "团队积分余额" : "积分余额"}
             </CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
           <CardDescription className="text-xs">
-            {isByok
-              ? "通用池用于超额任务与各工具月费"
-              : isTeamSharedPool
-                ? "团队共享通用 + 视频池"
-                : "通用 + 视频池 · 套餐月积分 + 轻量包"}
+            {isTeamSharedPool
+              ? "团队共享通用 + 视频池"
+              : "通用 + 视频池 · 套餐月积分 + 轻量包"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
@@ -296,30 +239,21 @@ export function AccountOverviewCards({
               {videoCredits > 0 ? (
                 <p className="mt-1 text-sm text-muted-foreground tabular-nums">
                   视频池 {videoCredits.toLocaleString("zh-CN")} 积分
-                  {isByok ? "（历史结余）" : null}
                 </p>
               ) : null}
             </div>
-            {legacyMonthlyGrantCredits && legacyMonthlyGrantCredits > 0 ? (
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                账户仍关联历史月发配置（{legacyMonthlyGrantCredits.toLocaleString("zh-CN")} 通用/月），BYOK
-                下不再刷新。
-              </p>
-            ) : null}
           </div>
         </CardContent>
       </Card>
 
-      {/* 会员 / BYOK 套餐状态 */}
+      {/* 会员套餐状态 */}
       <Card className="flex h-full flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{isByok ? "会员套餐（自带 key 会员）" : "会员套餐"}</CardTitle>
+            <CardTitle className="text-base">会员套餐</CardTitle>
             <BadgeCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
-          <CardDescription className="text-xs">
-            {isByok ? "自备厂商 Key + 会员准入；超额从轻量积分包扣点" : "个人或团队积分套餐"}
-          </CardDescription>
+          <CardDescription className="text-xs">个人或团队积分套餐</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
           <div className={accountOverviewCardBodyClass()}>
@@ -361,15 +295,9 @@ export function AccountOverviewCards({
             <Link href="/pricing" className={accountInlineLinkClass()}>
               选购套餐
             </Link>
-            {isByok ? (
-              <Link href="/account/byok" className={accountInlineLinkClass()}>
-                自带 key 会员管理
-              </Link>
-            ) : (
-              <Link href="/account/team" className={accountInlineLinkClass()}>
-                团队空间
-              </Link>
-            )}
+            <Link href="/account/team" className={accountInlineLinkClass()}>
+              团队空间
+            </Link>
           </div>
         </CardContent>
       </Card>

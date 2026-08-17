@@ -14,25 +14,6 @@ import {
 } from "@/components/auth/animated-auth-ui";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
-import { BILLING_PERSONA_LABELS } from "@/lib/billing/billing-persona-labels";
-import { cn } from "@/lib/utils";
-
-const PERSONA_OPTIONS: {
-  value: BillingPersona;
-  title: string;
-  description: string;
-}[] = [
-  {
-    value: "PLATFORM_CREDIT",
-    title: "平台代付（推荐）",
-    description: "购买会员套餐，平台代付 AI 费用，按积分实时扣费，无需自备云厂商 Key。",
-  },
-  {
-    value: "BYOK",
-    title: BILLING_PERSONA_LABELS.BYOK.short,
-    description: BILLING_PERSONA_LABELS.BYOK.tagline + "；云账单在 Gateway 查看。",
-  },
-];
 
 export function RegisterForm({
   welcomeGift,
@@ -45,7 +26,7 @@ export function RegisterForm({
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [billingPersona, setBillingPersona] = useState<BillingPersona>("PLATFORM_CREDIT");
+  const billingPersona: BillingPersona = "PLATFORM_CREDIT";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -110,7 +91,7 @@ export function RegisterForm({
 
         <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
           <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            使用手机号注册；请选择计费方式（注册后不可更改）
+            使用手机号注册；订阅会员由平台代付 AI 费用，按积分扣费。
           </p>
         </BoxReveal>
 
@@ -126,35 +107,6 @@ export function RegisterForm({
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-2">
-            {PERSONA_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition",
-                  billingPersona === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/40",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="billingPersona"
-                  value={opt.value}
-                  checked={billingPersona === opt.value}
-                  onChange={() => setBillingPersona(opt.value)}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block text-sm font-medium">{opt.title}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    {opt.description}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-
           <AnimatedAuthFields
             fields={[
               {

@@ -6,7 +6,6 @@ import {
   CreditCard,
   GraduationCap,
   Home,
-  Key,
   LayoutGrid,
   LogOut,
   MonitorSmartphone,
@@ -85,7 +84,6 @@ export function buildAccountNavMenuGroups(input: {
   /** 任意有效订阅（个人套餐或团队 OWNER）显示分享返佣入口；团队非 OWNER 成员不显示 */
   showReferral?: boolean;
 }): AccountNavMenuGroup[] {
-  const isByok = input.billingPersona === "BYOK";
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
 
   const appItems: AccountNavMenuItem[] = [
@@ -110,12 +108,6 @@ export function buildAccountNavMenuGroups(input: {
     financeNavItem("/fees/billing/details", "/account/fees/details", "费用明细", Receipt),
     financeNavItem("/fees/billing/ledger", "/account/fees/ledger", "积分流水", ScrollText),
   ];
-  if (isByok) {
-    billingItems.push(
-      financeNavItem("/fees/billing/byok", "/account/fees/byok", "自带 Key 任务用量", Key),
-    );
-    billingItems.push({ kind: "link", href: "/account/byok", label: "自带 key 会员", icon: Key });
-  }
   if (isPlatform) {
     billingItems.push({ kind: "link", href: "/pricing", label: "会员套餐", icon: CreditCard });
   }
@@ -175,15 +167,6 @@ export function buildAccountNavMenuGroups(input: {
     { kind: "link", href: "/account/security", label: "账户与安全", icon: Shield, exact: true },
     { kind: "link", href: "/account/devices", label: "已登录设备", icon: MonitorSmartphone, exact: true },
   ];
-
-  if (isByok) {
-    accountItems.push({
-      kind: "link",
-      href: "/account/gateway",
-      label: "Gateway API Key",
-      icon: Key,
-    });
-  }
 
   accountItems.push(
     { kind: "link", href: "/", label: "返回商城首页", icon: Home },

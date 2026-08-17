@@ -3,13 +3,11 @@ import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
-import { getActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
 import { getMembershipFlags } from "@/lib/membership";
 import { getMembershipToolAccess } from "@/lib/membership-tool-access";
 import { getPoolBalances, getLotBreakdown } from "@/lib/billing/credit-account-service";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import {
-  getAccountPackageUsageRows,
   getAccountPlatformCategoryUsageRows,
   getAccountUsageSummary,
 } from "@/lib/finance/account-usage-summary";
@@ -60,11 +58,10 @@ type AccountOverviewData = {
   memberAccess: Awaited<ReturnType<typeof getMembershipToolAccess>>;
   poolBalances: Awaited<ReturnType<typeof getPoolBalances>>;
   usageSummary: Awaited<ReturnType<typeof getAccountUsageSummary>>;
-  packageUsageRows: Awaited<ReturnType<typeof getAccountPackageUsageRows>>;
+  packageUsageRows: Awaited<ReturnType<typeof getAccountPlatformCategoryUsageRows>>;
   lotBreakdown: Awaited<ReturnType<typeof getLotBreakdown>>;
   membershipPeriodEnd: Date | null;
   planPriceLabel: string | null;
-  legacyMonthlyGrantCredits: number | null;
   isTeamSharedPool: boolean;
 };
 
@@ -72,15 +69,9 @@ async function loadAccountOverview(userId: string): Promise<AccountOverviewData>
   const billingPersona = await getUserBillingPersona(userId);
   const activeCtx = await getActiveTenantContext(userId);
 
-  const byokSubPromise =
-    billingPersona === "BYOK"
-      ? getActiveByokSubscription({ ownerType: "USER", ownerId: userId })
-      : Promise.resolve(null);
-
-  const [flags, memberAccess, byokSub] = await Promise.all([
+  const [flags, memberAccess] = await Promise.all([
     getMembershipFlags(userId),
     getMembershipToolAccess(userId),
-    byokSubPromise,
   ]);
 
   let teamBillingRef: { ownerType: "TENANT"; ownerId: string } | null =
@@ -140,14 +131,9 @@ async function loadAccountOverview(userId: string): Promise<AccountOverviewData>
     ]);
 
   const packageUsageRows =
-    billingPersona === "BYOK"
-      ? await getAccountPackageUsageRows(userId, byokSub?.scopeKey ?? null)
-      : billingPersona === "PLATFORM_CREDIT"
-        ? await getAccountPlatformCategoryUsageRows(
-            userId,
-            teamBillingRef ?? undefined,
-          )
-        : [];
+    billingPersona === "BYOK" || billingPersona === "PLATFORM_CREDIT"
+      ? await getAccountPlatformCategoryUsageRows(userId, teamBillingRef ?? undefined)
+      : [];
 
   const membershipPlan =
     billingPersona === "PLATFORM_CREDIT" && creditAcc?.planId
@@ -187,7 +173,6 @@ async function loadAccountOverview(userId: string): Promise<AccountOverviewData>
   const membershipPeriodEnd =
     teamTenant?.currentPeriodEnd ??
     creditAcc?.membershipPaidUntil ??
-    byokSub?.periodEnd ??
     null;
 
   return {
@@ -200,10 +185,6 @@ async function loadAccountOverview(userId: string): Promise<AccountOverviewData>
     lotBreakdown,
     membershipPeriodEnd,
     planPriceLabel,
-    legacyMonthlyGrantCredits:
-      billingPersona === "BYOK" && creditAcc?.monthlyGrantCredits
-        ? creditAcc.monthlyGrantCredits
-        : null,
     isTeamSharedPool: Boolean(teamBillingRef),
   };
 }
@@ -269,7 +250,6 @@ export default async function AccountPage({
             }
             coursePlanName={overview.flags.membershipPlanName}
             courseSubscriptionEndsAt={overview.flags.subscriptionEndsAt}
-            legacyMonthlyGrantCredits={overview.legacyMonthlyGrantCredits}
             usageSummary={overview.usageSummary}
             packageUsageRows={overview.packageUsageRows}
             isTeamSharedPool={overview.isTeamSharedPool}
