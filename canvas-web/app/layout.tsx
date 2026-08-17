@@ -35,7 +35,7 @@ export default function RootLayout({
             </CanvasAuthGate>
           </DialogProvider>
         </BookMallBaseUrlProvider>
-        <PlatformAssistant title="AI 小智" accentColor="#7c5cff" />
+        <PlatformAssistant title="AI 小智" />
       </body>
     </html>
   );

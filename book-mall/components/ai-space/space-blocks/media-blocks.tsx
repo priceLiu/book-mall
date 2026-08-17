@@ -53,7 +53,7 @@ export function ImageBlockView({
     <figure className="flex h-full w-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1">
         <SpaceImage
-          ref={ref}
+          assetRef={ref}
           fit={fit}
           onClick={onOpenLightbox ? () => onOpenLightbox([ref], 0) : undefined}
         />
@@ -106,7 +106,7 @@ export function VideoBlockView({ block, readOnly, theme }: SpaceBlockViewProps) 
 
   return (
     <SpaceVideo
-      ref={ref}
+      assetRef={ref}
       fit={readConfig<"cover" | "contain">(block, "fit", "contain")}
       loop={readConfig(block, "loop", false)}
       muted={readConfig(block, "muted", true)}

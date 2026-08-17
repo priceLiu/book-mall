@@ -75,12 +75,18 @@ export function GalleryBlockView({
   const gap = readConfig<(typeof GAP_SIZES)[number]>(block, "gap", "md");
   const showCaptions = readConfig(block, "showCaptions", false);
 
-  const Tile = ({ ref: r, index }: { ref: AiSpaceBlockRefDto; index: number }) => (
+  const Tile = ({
+    assetRef: r,
+    index,
+  }: {
+    assetRef: AiSpaceBlockRefDto;
+    index: number;
+  }) => (
     <figure className="overflow-hidden rounded-md" style={{ background: theme.border }}>
       <div className={layout === "masonry" ? "" : "aspect-square"}>
         {r.resolved ? (
           <SpaceImage
-            ref={r}
+            assetRef={r}
             fit={layout === "masonry" ? "contain" : "cover"}
             className={layout === "masonry" ? "h-auto" : undefined}
             onClick={
@@ -113,7 +119,7 @@ export function GalleryBlockView({
                 className="pl-2"
                 style={{ flexBasis: `${100 / Math.min(columns, refs.length)}%` }}
               >
-                <Tile ref={r} index={i} />
+                <Tile assetRef={r} index={i} />
               </CarouselItem>
             ))}
           </CarouselContent>
@@ -132,7 +138,7 @@ export function GalleryBlockView({
       >
         {refs.map((r, i) => (
           <div key={r.id} style={{ marginBottom: GAP_PX[gap] }} className="break-inside-avoid">
-            <Tile ref={r} index={i} />
+            <Tile assetRef={r} index={i} />
           </div>
         ))}
       </div>
@@ -145,7 +151,7 @@ export function GalleryBlockView({
       style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
     >
       {refs.map((r, i) => (
-        <Tile key={r.id} ref={r} index={i} />
+        <Tile key={r.id} assetRef={r} index={i} />
       ))}
     </div>
   );
@@ -223,7 +229,7 @@ export function VideoPlaylistBlockView({
     <div className="flex h-full w-full flex-col gap-2">
       <div className="min-h-0 flex-1 overflow-hidden rounded-md">
         {active.resolved ? (
-          <SpaceVideo ref={active} fit="contain" />
+          <SpaceVideo assetRef={active} fit="contain" />
         ) : (
           <SpaceMissingAsset readOnly={readOnly} theme={theme} />
         )}
@@ -353,7 +359,7 @@ export function CharacterCardBlockView({
             <div className="min-h-0 flex-1">
               {r.resolved ? (
                 <SpaceImage
-                  ref={r}
+                  assetRef={r}
                   fit="cover"
                   onClick={
                     onOpenLightbox
@@ -448,12 +454,12 @@ export function BeforeAfterBlockView({
         className="relative min-h-0 flex-1 select-none overflow-hidden rounded-md"
         style={{ background: theme.border }}
       >
-        <SpaceImage ref={after} fit="contain" />
+        <SpaceImage assetRef={after} fit="contain" />
         <div
           className="absolute inset-0 overflow-hidden"
           style={{ clipPath: `inset(0 ${100 - percent}% 0 0)` }}
         >
-          <SpaceImage ref={before} fit="contain" />
+          <SpaceImage assetRef={before} fit="contain" />
         </div>
         <div
           className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow"

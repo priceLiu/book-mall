@@ -144,16 +144,17 @@ export function useInView<T extends HTMLElement>(): [
 }
 
 export function SpaceImage({
-  ref: assetRef,
+  assetRef,
   fit = "cover",
   className,
   onClick,
 }: {
-  ref: AiSpaceBlockRefDto;
+  assetRef: AiSpaceBlockRefDto | null | undefined;
   fit?: "cover" | "contain";
   className?: string;
   onClick?: () => void;
 }) {
+  if (!assetRef) return null;
   const resolved = assetRef.resolved;
   if (!resolved) return null;
   const src = resolved.thumbnailUrl ?? resolved.mediaUrl;
@@ -178,14 +179,14 @@ export function SpaceImage({
 }
 
 export function SpaceVideo({
-  ref: assetRef,
+  assetRef,
   fit = "contain",
   loop = false,
   muted = true,
   autoplay = false,
   className,
 }: {
-  ref: AiSpaceBlockRefDto;
+  assetRef: AiSpaceBlockRefDto | null | undefined;
   fit?: "cover" | "contain";
   loop?: boolean;
   muted?: boolean;
@@ -193,6 +194,7 @@ export function SpaceVideo({
   className?: string;
 }) {
   const [holderRef, inView] = useInView<HTMLDivElement>();
+  if (!assetRef) return null;
   const resolved = assetRef.resolved;
   if (!resolved) return null;
 

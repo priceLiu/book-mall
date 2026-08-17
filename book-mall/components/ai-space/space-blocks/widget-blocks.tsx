@@ -271,7 +271,7 @@ export function ProfileCardBlockView({
           className="h-16 w-16 shrink-0 overflow-hidden rounded-full"
           style={{ background: theme.border }}
         >
-          {avatarRef?.resolved ? <SpaceImage ref={avatarRef} fit="cover" /> : null}
+          {avatarRef?.resolved ? <SpaceImage assetRef={avatarRef} fit="cover" /> : null}
         </div>
       ) : null}
       <div className="min-w-0 flex-1">
