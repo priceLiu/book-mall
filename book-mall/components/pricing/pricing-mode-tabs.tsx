@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-const TABS = [
+const TABS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/pricing", label: "订阅价格", exact: true },
   { href: "/pricing/api", label: "API 价格" },
-] as const;
+];
 
 export function PricingModeTabs({ className }: { className?: string }) {
   const pathname = usePathname();
