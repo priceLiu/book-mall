@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { decryptNotifyResource, verifyNotifySignature } from "@/lib/payments/wechat-pay-client";
+import { wechatAmountMatchesCheckout } from "@/lib/payments/checkout-create-dedupe";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,13 @@ export async function POST(request: Request) {
 
     if (checkout.status === "PAID") {
       return new NextResponse("OK", { status: 200 }); // 已处理，幂等返回
+    }
+
+    if (!wechatAmountMatchesCheckout(checkout.amountYuan, transaction.amount.total)) {
+      console.error(
+        `[wechat/notify] 金额不一致: checkout=${checkout.amountYuan} wx=${transaction.amount.total}fen outTradeNo=${outTradeNo}`,
+      );
+      return new NextResponse("OK", { status: 200 });
     }
 
     // 执行履约（发放积分/会员等）—— fulfillPaymentCheckout 内部会在事务中更新状态

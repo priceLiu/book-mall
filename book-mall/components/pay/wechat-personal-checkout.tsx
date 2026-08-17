@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FakeQrPlaceholder } from "@/components/pay/fake-qr-placeholder";
 import { WechatEnterpriseCheckout } from "@/components/pay/wechat-enterprise-checkout";
@@ -36,8 +36,13 @@ export function WechatPersonalCheckout({
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [payeeName, setPayeeName] = useState("");
   const [channel, setChannel] = useState<string>("WECHAT_PERSONAL");
+  const creatingRef = useRef(false);
+  const createdRef = useRef(false);
+  const payloadKey = JSON.stringify(createPayload);
 
-  const initCheckout = useCallback(async () => {
+  const initCheckout = useCallback(async (force = false) => {
+    if (!force && (createdRef.current || creatingRef.current)) return;
+    creatingRef.current = true;
     setLoading(true);
     setMsg(null);
     try {
@@ -65,16 +70,21 @@ export function WechatPersonalCheckout({
       setQrUrl(data.wechat?.qrUrl ?? null);
       setPayeeName(data.wechat?.payeeName ?? "");
       setChannel(data.wechat?.channel ?? "WECHAT_PERSONAL");
+      createdRef.current = true;
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "创建支付单失败");
+      createdRef.current = false;
     } finally {
       setLoading(false);
+      creatingRef.current = false;
     }
   }, [createPayload]);
 
   useEffect(() => {
+    createdRef.current = false;
+    creatingRef.current = false;
     void initCheckout();
-  }, [initCheckout]);
+  }, [payloadKey, initCheckout]);
 
   async function onUserSubmitted() {
     if (!checkout) return;
@@ -123,7 +133,14 @@ export function WechatPersonalCheckout({
     return (
       <div className="space-y-3">
         <p className="text-sm text-red-500">{msg ?? "无法创建支付单"}</p>
-        <Button variant="outline" onClick={() => void initCheckout()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            createdRef.current = false;
+            creatingRef.current = false;
+            void initCheckout(true);
+          }}
+        >
           重试
         </Button>
       </div>

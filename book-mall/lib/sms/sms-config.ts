@@ -9,12 +9,14 @@ export function smsProvider(): SmsProvider {
 }
 
 export function templateIdForPurpose(purpose: SmsVerificationPurpose): string | null {
+  const registerTemplate = process.env.TENCENT_SMS_TEMPLATE_REGISTER?.trim();
   const map: Partial<Record<SmsVerificationPurpose, string | undefined>> = {
-    REGISTER: process.env.TENCENT_SMS_TEMPLATE_REGISTER,
-    LOGIN: process.env.TENCENT_SMS_TEMPLATE_LOGIN,
+    REGISTER: registerTemplate,
+    // 登录/重置密码与注册共用同一验证码模板（单参数 {1}=code）
+    LOGIN: registerTemplate,
     BIND_PHONE: process.env.TENCENT_SMS_TEMPLATE_BIND,
     TEAM_INVITE: process.env.TENCENT_SMS_TEMPLATE_TEAM_INVITE,
-    RESET_PASSWORD: process.env.TENCENT_SMS_TEMPLATE_LOGIN,
+    RESET_PASSWORD: registerTemplate,
   };
   const id = map[purpose]?.trim();
   return id || null;

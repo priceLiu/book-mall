@@ -7,7 +7,8 @@ dotenv.config({ path: ".env.local" });
 
 async function main() {
   const phone = process.argv[2] || "13808816802";
-  const templateId = process.argv[3] || process.env.TENCENT_SMS_TEMPLATE_LOGIN || "2705687";
+  const templateId =
+    process.argv[3] || process.env.TENCENT_SMS_TEMPLATE_REGISTER || "2705693";
 
   const secretId = process.env.TENCENT_SMS_SECRET_ID!;
   const secretKey = process.env.TENCENT_SMS_SECRET_KEY!;

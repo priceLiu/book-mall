@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { queryOrder } from "@/lib/payments/wechat-pay-client";
+import { wechatAmountMatchesCheckout } from "@/lib/payments/checkout-create-dedupe";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,12 @@ export async function GET(request: Request) {
 
     // 如果微信侧已支付但本地还没履约，执行履约（发放积分等）
     if (result.tradeState === "SUCCESS" && checkout.status !== "PAID") {
+      if (
+        result.amountTotalFen != null &&
+        !wechatAmountMatchesCheckout(checkout.amountYuan, result.amountTotalFen)
+      ) {
+        return NextResponse.json({ error: "支付金额与订单不一致" }, { status: 400 });
+      }
       const { fulfillPaymentCheckout } = await import("@/lib/payments/fulfill-checkout");
       await fulfillPaymentCheckout({
         checkoutId: checkout.id,

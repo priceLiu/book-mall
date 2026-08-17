@@ -16,6 +16,7 @@ import {
 } from "@/lib/finance/vip-package-service";
 import { VIP_MIN_AMOUNT_YUAN } from "@/lib/finance/vip-package-calculator";
 import { generateOutTradeNo } from "@/lib/payments/out-trade-no";
+import { resolvePendingCheckoutDedupe } from "@/lib/payments/checkout-create-dedupe";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { generateUniqueRemarkCode } from "@/lib/payments/remark-code";
 import { checkoutExpiresHours } from "@/lib/payments/wechat-personal-config";
@@ -179,42 +180,15 @@ export async function createPaymentCheckout(input: {
   expiresAt.setHours(expiresAt.getHours() + checkoutExpiresHours());
 
   return prisma.$transaction(async (tx) => {
-    const dedupeWhere: Prisma.PaymentCheckoutWhereInput = {
+    const dedupe = await resolvePendingCheckoutDedupe({
+      tx,
       userId,
       productKind,
-      status: { in: ["PENDING", "AWAITING_CONFIRM"] },
-      expiresAt: { gt: new Date() },
-    };
-    const existingPending = await tx.paymentCheckout.findFirst({
-      where: dedupeWhere,
-      orderBy: { createdAt: "desc" },
+      productSnapshot,
+      amountYuan,
     });
-    if (existingPending) {
-      const snap = existingPending.productSnapshot as Record<string, unknown> | null;
-      const sameProduct =
-        productKind === "CREDIT_TOPUP"
-          ? snap?.packId === productSnapshot.packId && snap?.target === productSnapshot.target
-          : productKind === "VIP_PACKAGE"
-            ? snap?.amountYuan === productSnapshot.amountYuan &&
-              snap?.scheme === productSnapshot.scheme &&
-              snap?.seats === productSnapshot.seats
-            : productKind.startsWith("BYOK_")
-            ? snap?.scopeKey === productSnapshot.scopeKey &&
-              (productKind !== "BYOK_TEAM" || snap?.tenantId === productSnapshot.tenantId)
-            : productKind.startsWith("MEMBERSHIP_")
-              ? snap?.planId === productSnapshot.planId
-              : false;
-      // 同商品且同金额才复用，金额变化（如调价）则取消旧单建新单
-      if (sameProduct && Number(existingPending.amountYuan) === amountYuan) {
-        return existingPending;
-      }
-      // 同商品但金额不同，取消旧订单
-      if (sameProduct) {
-        await tx.paymentCheckout.update({
-          where: { id: existingPending.id },
-          data: { status: "CANCELLED" },
-        });
-      }
+    if (dedupe.action === "reuse") {
+      return dedupe.checkout;
     }
 
     const checkout = await tx.paymentCheckout.create({

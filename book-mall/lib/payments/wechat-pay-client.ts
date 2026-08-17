@@ -142,6 +142,7 @@ export async function queryOrder(outTradeNo: string): Promise<{
   tradeState: string;
   transactionId?: string;
   tradeStateDesc: string;
+  amountTotalFen?: number;
 }> {
   const cfg = getWechatPayConfig();
   const urlPath = `/v3/pay/transactions/out-trade-no/${outTradeNo}?mchid=${cfg.mchid}`;
@@ -149,12 +150,14 @@ export async function queryOrder(outTradeNo: string): Promise<{
     trade_state: string;
     transaction_id?: string;
     trade_state_desc: string;
+    amount?: { total?: number };
   }>("GET", urlPath);
 
   return {
     tradeState: res.body.trade_state,
     transactionId: res.body.transaction_id,
     tradeStateDesc: res.body.trade_state_desc,
+    amountTotalFen: res.body.amount?.total,
   };
 }
 
