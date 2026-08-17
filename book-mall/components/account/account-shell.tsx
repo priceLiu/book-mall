@@ -87,15 +87,22 @@ export function AccountShell({
             "site-app-sidebar relative z-[410] hidden shrink-0 overflow-hidden bg-white transition-[width,box-shadow] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:sticky md:top-14 md:block md:max-h-[calc(100dvh-3.5rem)] md:self-start md:overscroll-y-contain",
             sidebarExpanded
               ? "w-[15.5rem] shadow-lg shadow-black/5"
-              : "account-sidebar-rail w-12",
+              : "account-sidebar-rail w-3",
           )}
           onMouseEnter={() => setSidebarHover(true)}
           onMouseLeave={() => setSidebarHover(false)}
           aria-expanded={sidebarExpanded}
+          aria-label={sidebarExpanded ? "个人中心导航" : "展开个人中心导航"}
         >
           <div
-            className="account-sidebar-panel h-full overflow-y-auto overscroll-y-contain px-2 py-4"
+            className={cn(
+              "account-sidebar-panel h-full overflow-y-auto overscroll-y-contain px-2 py-4 transition-[opacity,visibility] duration-200",
+              sidebarExpanded
+                ? "visible opacity-100"
+                : "invisible opacity-0 pointer-events-none",
+            )}
             style={{ width: ACCOUNT_SIDEBAR_EXPANDED_W }}
+            aria-hidden={!sidebarExpanded}
           >
             <AccountNavMenu
               {...menuProps}

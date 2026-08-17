@@ -37,6 +37,7 @@ import {
 } from "@/lib/story/kie-client";
 import {
   dashscopeExtractTaskImageUrl,
+  dashscopeExtractTaskVideoUrl,
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
   type DashscopeTaskOutput,
@@ -165,7 +166,8 @@ export async function ecomGwCreateDashscopeJob(
 }
 
 export function ecomExtractMediaUrl(output: DashscopeTaskOutput): string | null {
-  if (output.video_url?.trim()) return output.video_url.trim();
+  const video = dashscopeExtractTaskVideoUrl(output as Record<string, unknown>);
+  if (video) return video;
   const img = dashscopeExtractTaskImageUrl(output as Record<string, unknown>);
   return img ?? null;
 }

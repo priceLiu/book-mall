@@ -171,8 +171,28 @@ export function dashscopeExtractTaskImageUrl(
 export function dashscopeExtractTaskVideoUrl(
   output: Record<string, unknown>,
 ): string | undefined {
-  const v = output.video_url;
-  if (typeof v === "string" && v.trim()) return upgradeAliyunHttpToHttps(v.trim());
+  const pick = (val: unknown): string | undefined =>
+    typeof val === "string" && val.trim() ? val.trim() : undefined;
+
+  const direct = pick(output.video_url);
+  if (direct) return upgradeAliyunHttpToHttps(direct);
+
+  const results = output.results;
+  if (results && typeof results === "object" && !Array.isArray(results)) {
+    const nested = results as Record<string, unknown>;
+    const fromResults =
+      pick(nested.video_url) ?? pick(nested.url) ?? pick(nested.videoUrl);
+    if (fromResults) return upgradeAliyunHttpToHttps(fromResults);
+  }
+  if (Array.isArray(results) && results.length > 0) {
+    const first = results[0];
+    if (first && typeof first === "object") {
+      const row = first as Record<string, unknown>;
+      const fromRow = pick(row.video_url) ?? pick(row.url) ?? pick(row.videoUrl);
+      if (fromRow) return upgradeAliyunHttpToHttps(fromRow);
+    }
+  }
+
   return undefined;
 }
 
