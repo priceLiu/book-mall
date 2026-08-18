@@ -191,7 +191,6 @@ export function PricingPageClient({
   plans,
   models,
   byokQuotas = [],
-  rates,
   teamTenants = [],
   isLoggedIn,
   billingPersona = null,
@@ -201,7 +200,7 @@ export function PricingPageClient({
   plans: Plan[];
   models: ModelPrice[];
   byokQuotas?: ByokQuota[];
-  rates: ResourceRate[];
+  rates?: ResourceRate[];
   teamTenants?: { id: string; name: string }[];
   isLoggedIn: boolean;
   billingPersona?: BillingPersona | null;
