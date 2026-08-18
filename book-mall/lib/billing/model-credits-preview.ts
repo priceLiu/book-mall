@@ -9,8 +9,10 @@ import {
   resolveCostSnapshot,
 } from "@/lib/gateway/credit-billing-guard";
 import {
+  audioBillableSeconds,
   computeLlmSplitChargeCredits,
   computeUnifiedChargeCredits,
+  videoBillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
 
 import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
