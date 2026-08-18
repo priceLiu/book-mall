@@ -23,10 +23,17 @@ const WAN27_IMAGE_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation";
 const VIDEO_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
-/** 数字人 wan2.2-s2v 走 image2video 端点，与 T2V/I2V 不同（华北2 须用业务空间域名） */
-const S2V_CREATE_PATH = "/api/v1/services/aigc/image2video/video-synthesis";
+/**
+ * 数字人 wan2.2-s2v 创建端点（厂商确认须 image2video，**非** video-generation）。
+ * @see https://help.aliyun.com/zh/model-studio/wan-s2v-api
+ */
+export const S2V_CREATE_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2video/video-synthesis/";
+export const S2V_CREATE_PATH = "/api/v1/services/aigc/image2video/video-synthesis/";
 /** 形象图预检（同步接口，0.004 元/张），提交 S2V 前先判人像是否合规 */
-const S2V_DETECT_PATH = "/api/v1/services/aigc/image2video/face-detect";
+export const S2V_DETECT_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2video/face-detect/";
+export const S2V_DETECT_PATH = "/api/v1/services/aigc/image2video/face-detect/";
 const IMAGE_PROCESS_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/vision/image-process/process";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
@@ -49,12 +56,13 @@ export function resolveDashscopeApiRoot(baseUrl?: string | null): string {
   return raw || DASHSCOPE_DEFAULT_ROOT;
 }
 
-export function resolveDashscopeS2vCreateUrl(baseUrl?: string | null): string {
-  return `${resolveDashscopeApiRoot(baseUrl)}${S2V_CREATE_PATH}`;
+/** wan2.2-s2v 固定走厂商确认的 image2video 端点（忽略凭证里误配的 video-generation 路径） */
+export function resolveDashscopeS2vCreateUrl(_baseUrl?: string | null): string {
+  return S2V_CREATE_URL;
 }
 
-export function resolveDashscopeS2vDetectUrl(baseUrl?: string | null): string {
-  return `${resolveDashscopeApiRoot(baseUrl)}${S2V_DETECT_PATH}`;
+export function resolveDashscopeS2vDetectUrl(_baseUrl?: string | null): string {
+  return S2V_DETECT_URL;
 }
 
 export function resolveDashscopeTaskUrl(

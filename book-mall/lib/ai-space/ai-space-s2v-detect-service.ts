@@ -16,7 +16,7 @@ import { requireAiSpaceDashscopeAuth, resolveAiSpaceS2vBaseUrl } from "./ai-spac
 import type { AiSpaceDigitalHumanDetect } from "./ai-space-digital-human-types";
 
 const DETECT_MODEL_KEY = "wan2.2-s2v-detect";
-const DETECT_ENDPOINT = "/api/v1/services/aigc/image2video/face-detect";
+const DETECT_ENDPOINT = "/api/v1/services/aigc/image2video/face-detect/";
 
 /** 检测不通过时给用户的可执行建议 */
 export const S2V_DETECT_FAILED_HINT =

@@ -24,13 +24,13 @@ export function isDashscopeWorkspaceApiKey(apiKey: string): boolean {
 }
 
 /**
- * 解析 wan2.2-s2v / detect 应使用的 API 根域名。
+ * 解析 wan2.2-s2v / detect 应使用的 API 根域名（轮询任务等仍用）。
  *
- * sk-ws 业务空间 Key 仍走 DashScope **通用根域名** `https://dashscope.aliyuncs.com`；
- * 若误用 `{WorkspaceId}.cn-beijing.maas.aliyuncs.com`，厂商会立刻返回
- * `BadRequest.IllegalEndpoint / Workspace endpoint is invalid`（2026-08 实测）。
+ * **提交 S2V** 固定走 `S2V_CREATE_URL`（image2video/video-synthesis/），
+ * 不再拼接凭证 baseUrl，避免误配成 video-generation 路径。
  *
- * 凭证里若存了华北2子域或 compatible-mode 路径，一律归一化为通用根域名。
+ * sk-ws 业务空间 Key 仍走 DashScope 通用根域名 `https://dashscope.aliyuncs.com`；
+ * 若误用 `{WorkspaceId}.cn-beijing.maas.aliyuncs.com`，厂商会返回 IllegalEndpoint。
  */
 export function resolveAiSpaceS2vBaseUrl(
   _apiKey: string,

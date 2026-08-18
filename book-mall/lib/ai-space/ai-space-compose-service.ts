@@ -300,7 +300,7 @@ async function runS2vStage(taskId: string): Promise<void> {
     apiKeyId: auth.id,
     credentialId,
     model: S2V_MODEL_KEY,
-    endpoint: "/api/v1/services/aigc/image2video/video-synthesis",
+    endpoint: "/api/v1/services/aigc/image2video/video-synthesis/",
     providerKind: "DASHSCOPE",
     requestKind: "VIDEO",
     clientSource: "EXTERNAL",
