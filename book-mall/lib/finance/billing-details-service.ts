@@ -102,6 +102,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
         settlementKind: true,
         quotaDelta: true,
         monthlyIncluded: true,
+        includedUsedAfter: true,
+        includedRemainingAfter: true,
       },
       orderBy: { submittedAt: "asc" },
     });
@@ -124,6 +126,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
         settlementKind: true,
         quotaDelta: true,
         monthlyIncluded: true,
+        includedUsedAfter: true,
+        includedRemainingAfter: true,
       },
       orderBy: { submittedAt: "asc" },
     });
@@ -158,6 +162,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
       settlementKind: true,
       quotaDelta: true,
       monthlyIncluded: true,
+      includedUsedAfter: true,
+      includedRemainingAfter: true,
     },
     orderBy: { submittedAt: "asc" },
   });
