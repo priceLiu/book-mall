@@ -22,13 +22,18 @@ export function isStaffRole(role: UserRole | string | null | undefined): boolean
   return STAFF_ROLES.includes(role as UserRole);
 }
 
+/** BYOK 已退役，统一归口为平台代付积分。 */
+export function normalizeBillingPersona(p: BillingPersona): BillingPersona {
+  return p === "BYOK" ? "PLATFORM_CREDIT" : p;
+}
+
 export async function getUserBillingPersona(userId: string): Promise<BillingPersona | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { billingPersona: true, billingPersonaLockedAt: true },
   });
   if (!user?.billingPersonaLockedAt) return null;
-  return user.billingPersona === "BYOK" ? "PLATFORM_CREDIT" : user.billingPersona;
+  return normalizeBillingPersona(user.billingPersona);
 }
 
 export async function requireUserBillingPersona(userId: string): Promise<BillingPersona> {
@@ -45,8 +50,9 @@ export async function assertBillingPersona(
 ): Promise<BillingPersona> {
   const persona = await requireUserBillingPersona(userId);
   const allowed = Array.isArray(expected) ? expected : [expected];
-  const normalized = allowed.map((p) => (p === "BYOK" ? "PLATFORM_CREDIT" : p));
-  if (!normalized.includes(persona)) {
+  const normalized = allowed.map(normalizeBillingPersona);
+  const personaNorm = normalizeBillingPersona(persona);
+  if (!normalized.includes(personaNorm)) {
     throw new BillingPersonaError("当前账号计费身份不符合此产品要求", "PERSONA_MISMATCH");
   }
   return persona;
@@ -64,7 +70,7 @@ export async function lockBillingPersona(
   userId: string,
   persona: BillingPersona,
 ): Promise<void> {
-  const lockedPersona = persona === "BYOK" ? "PLATFORM_CREDIT" : persona;
+  const lockedPersona = normalizeBillingPersona(persona);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { billingPersonaLockedAt: true, billingPersona: true },
