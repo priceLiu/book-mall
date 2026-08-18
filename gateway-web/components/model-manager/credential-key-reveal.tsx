@@ -156,8 +156,7 @@ export function CredentialKeyReveal({
     );
   }
 
-  const display =
-    typeof revealed === "string" ? revealed : (revealed ?? masked);
+  const display = typeof revealed === "string" ? revealed : masked;
   const isRevealed = typeof revealed === "string";
 
   return (
