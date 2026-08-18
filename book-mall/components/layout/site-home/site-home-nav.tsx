@@ -2,17 +2,25 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu } from "lucide-react";
+import {
+  Braces,
+  CreditCard,
+  Layers,
+  Menu,
+  MessageSquareText,
+  Monitor,
+} from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 import { cn } from "@/lib/utils";
-import {
-  SiteHomeProductNav,
-} from "@/components/layout/site-home/site-home-product-nav";
 import { buildBookPortalNavItems } from "@/lib/portal-nav";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { Button } from "@/components/ui/button";
+import {
+  TubelightNavBar,
+  type TubelightNavItem,
+} from "@/components/ui/tubelight-navbar";
 import {
   Sheet,
   SheetContent,
@@ -42,6 +50,30 @@ const centerNavLinks: NavItem[] = [
   },
 ];
 
+const centerNavIcons: Record<string, TubelightNavItem["icon"]> = {
+  主屏: Monitor,
+  客户评价: MessageSquareText,
+  订阅价格: CreditCard,
+  "API 价格": Braces,
+};
+
+function ProductNavDropdown() {
+  const items = buildBookPortalNavItems();
+  return (
+    <div className="flex flex-col gap-0.5 p-1">
+      {items.map((item) => (
+        <a
+          key={item.key}
+          href={item.href}
+          className="site-home-nav-sheet-item rounded-md px-3 py-2.5 hover:bg-muted"
+        >
+          {item.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function SiteHomeNav({
   children,
   isLoggedIn,
@@ -54,9 +86,21 @@ export function SiteHomeNav({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [productOpen, setProductOpen] = useState(false);
+  const [hash, setHash] = useState("");
   const isAccount = variant === "account";
-  const navLinkClass = isAccount ? "site-app-nav-link" : "site-home-nav-link";
-  const navLinkActiveClass = isAccount ? "site-app-nav-link-active" : "site-home-nav-link-active";
+
+  useEffect(() => {
+    const read = () =>
+      setHash(typeof window !== "undefined" ? window.location.hash : "");
+    read();
+    window.addEventListener("hashchange", read);
+    window.addEventListener("popstate", read);
+    return () => {
+      window.removeEventListener("hashchange", read);
+      window.removeEventListener("popstate", read);
+    };
+  }, [pathname]);
 
   const navigate = (href: string) => {
     setOpen(false);
@@ -72,28 +116,38 @@ export function SiteHomeNav({
     router.push(href);
   };
 
-  const portalNavLinks = (
-    <>
-      <SiteHomeProductNav
-        variant="link"
-        linkClassName={navLinkClass}
-        linkActiveClassName={navLinkActiveClass}
-      />
-      {centerNavLinks.map((item) => {
-        const active = item.isActive?.(pathname) ?? false;
-        return (
-          <button
-            key={item.label}
-            type="button"
-            onClick={() => navigate(item.href)}
-            className={cn(navLinkClass, active && navLinkActiveClass)}
-          >
-            {item.label}
-          </button>
-        );
-      })}
-    </>
-  );
+  const activeNavName = useMemo(() => {
+    if (productOpen) return "产品";
+    const pricingApi = centerNavLinks.find((l) => l.label === "API 价格");
+    const pricing = centerNavLinks.find((l) => l.label === "订阅价格");
+    if (pricingApi?.isActive?.(pathname)) return "API 价格";
+    if (pricing?.isActive?.(pathname)) return "订阅价格";
+    if (pathname === "/") {
+      if (hash === "#testimonials") return "客户评价";
+      return "主屏";
+    }
+    return "主屏";
+  }, [pathname, hash, productOpen]);
+
+  const tubelightItems = useMemo((): TubelightNavItem[] => {
+    return [
+      {
+        name: "产品",
+        icon: Layers,
+        dropdown: <ProductNavDropdown />,
+        onDropdownOpenChange: setProductOpen,
+      },
+      ...centerNavLinks.map((item) => ({
+        name: item.label,
+        url: item.href,
+        icon: centerNavIcons[item.label] ?? Monitor,
+      })),
+    ];
+  }, []);
+
+  const handleTubelightNavigate = (item: TubelightNavItem) => {
+    if (item.url) navigate(item.url);
+  };
 
   const authAndMobile = (
     <>
@@ -195,7 +249,11 @@ export function SiteHomeNav({
               />
             </Link>
             <nav className="site-app-topnav-center hidden lg:flex" aria-label="主导航">
-              {portalNavLinks}
+              <TubelightNavBar
+                items={tubelightItems}
+                activeName={activeNavName}
+                onNavigate={handleTubelightNavigate}
+              />
             </nav>
           </div>
           <div className="site-app-topnav-opts">{authAndMobile}</div>
@@ -223,9 +281,13 @@ export function SiteHomeNav({
             />
           </Link>
 
-          <nav className="site-home-nav-center hidden lg:flex" aria-label="主导航">
-            {portalNavLinks}
-          </nav>
+          <div className="site-home-nav-center hidden lg:flex">
+            <TubelightNavBar
+              items={tubelightItems}
+              activeName={activeNavName}
+              onNavigate={handleTubelightNavigate}
+            />
+          </div>
 
           <div className="site-home-nav-opts flex items-center justify-end">{authAndMobile}</div>
         </div>
