@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 
-import { QrCreateMusicForm } from "@/components/quick-replica/qr-create-music-workspace";
+import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
 import { QrCreateSfxForm } from "@/components/quick-replica/qr-create-sfx-workspace";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrVoiceChangerForm } from "@/components/quick-replica/qr-voice-changer-workspace";
@@ -14,6 +14,8 @@ import {
   getKindDef,
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
+import { useQrCreditsPreview } from "@/hooks/use-qr-credits-preview";
+import { getQrCreditsInsufficientMessage } from "@/lib/qr-credits-preview";
 
 type Props = {
   draft: QrWorkspaceDraft;
@@ -37,6 +39,7 @@ export function QrAudioMiddlePanel({
   const [error, setError] = useState<string | null>(null);
   const kindDef = getKindDef(draft.kind);
   const audioKinds = QR_KINDS_BY_CATEGORY.audio;
+  const { preview: creditsPreview, loading: creditsLoading } = useQrCreditsPreview(draft);
 
   const switchKind = (kind: string) => {
     onDraftChange(
@@ -60,10 +63,7 @@ export function QrAudioMiddlePanel({
         setError("请填写复刻的文字");
         return;
       }
-      onGenerate(draft);
-      return;
-    }
-    if (!draft.prompt.trim() && draft.kind !== "voice-changer") {
+    } else if (!draft.prompt.trim() && draft.kind !== "voice-changer") {
       setError("请填写内容");
       return;
     }
@@ -77,6 +77,11 @@ export function QrAudioMiddlePanel({
         setError("请选择目标音色");
         return;
       }
+    }
+    const creditsMessage = getQrCreditsInsufficientMessage(creditsPreview);
+    if (creditsMessage) {
+      setError(creditsMessage);
+      return;
     }
     onGenerate(draft);
   };
@@ -149,6 +154,11 @@ export function QrAudioMiddlePanel({
         style={{ borderColor: "var(--qr-border)", background: "var(--qr-bg-surface)" }}
       >
         {error ? <p className="mb-2 text-sm text-red-400">{error}</p> : null}
+        <QrCreditsHint
+          preview={creditsPreview}
+          loading={creditsLoading}
+          className="mb-2 text-center"
+        />
         <button
           type="button"
           className="qr-btn-primary flex w-full items-center justify-center gap-2"

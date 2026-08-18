@@ -1,6 +1,7 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { resolveLibtvVideoPosterUrl } from "./libtv-video-poster";
 import { parseStoryboardRows } from "./parse-md-tables";
+import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
 import { resolveHubStoryboardMd } from "./story-hub-runtime";
 import { normalizeSubtitleBurnInText } from "./subtitle-burn-in";
 import type {
@@ -135,6 +136,16 @@ function resolveFrameIndexForVideoNode(
   return undefined;
 }
 
+function dialogueFromStoryboardMdByFrameIndex(
+  md: string,
+  frameIndex: number,
+): string | undefined {
+  if (!md.trim() || frameIndex <= 0) return undefined;
+  const row = parseStoryboardRows(md).find((r) => r.frameIndex === frameIndex);
+  if (!row?.dialogue?.trim()) return undefined;
+  return normalizeSubtitleBurnInText(row.dialogue);
+}
+
 /** 从脚本中心分镜表按镜号取对白（视频节点未写入 frameDialogue 时的回退） */
 export function dialogueFromScriptHubByFrameIndex(
   nodes: CanvasFlowNode[],
@@ -146,10 +157,41 @@ export function dialogueFromScriptHubByFrameIndex(
     const md = resolveHubStoryboardMd(
       node.data as unknown as StoryScriptHubNodeData,
     );
-    const row = parseStoryboardRows(md).find((r) => r.frameIndex === frameIndex);
-    if (!row?.dialogue?.trim()) continue;
-    const text = normalizeSubtitleBurnInText(row.dialogue);
+    const text = dialogueFromStoryboardMdByFrameIndex(md, frameIndex);
     if (text) return text;
+  }
+  return undefined;
+}
+
+/** sbv1 视频 · in_text 上游文本/脚本表按剪辑顺序取对白 */
+function dialogueFromSbv1UpstreamText(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  clipSequence?: number,
+): string | undefined {
+  if ((node.type ?? "") !== "sbv1-video-engine") return undefined;
+  const frameIndex =
+    resolveFrameIndexForVideoNode(node, nodes, edges, clipSequence) ??
+    clipSequence ??
+    1;
+  const links = resolveSbv1UpstreamTextLinks(node.id, nodes, edges);
+  for (const link of links) {
+    const source = nodes.find((n) => n.id === link.sourceNodeId);
+    if (source?.type === "story-pro2-script-hub") {
+      const md = resolveHubStoryboardMd(
+        source.data as unknown as StoryScriptHubNodeData,
+      );
+      const fromHub = dialogueFromStoryboardMdByFrameIndex(md, frameIndex);
+      if (fromHub) return fromHub;
+    }
+    const fromLinkText = dialogueFromStoryboardMdByFrameIndex(
+      link.fullText,
+      frameIndex,
+    );
+    if (fromLinkText) return fromLinkText;
+    const normalized = normalizeSubtitleBurnInText(link.fullText);
+    if (normalized) return normalized;
   }
   return undefined;
 }
@@ -162,6 +204,13 @@ export function resolveClipDialogue(
 ): string | undefined {
   const fromNode = dialogueFromConnectedVideoNode(node, nodes, edges);
   if (fromNode) return fromNode;
+  const fromSbv1Text = dialogueFromSbv1UpstreamText(
+    node,
+    nodes,
+    edges,
+    clipSequence,
+  );
+  if (fromSbv1Text) return fromSbv1Text;
   const frameIndex = resolveFrameIndexForVideoNode(
     node,
     nodes,

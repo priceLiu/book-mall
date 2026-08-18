@@ -946,6 +946,11 @@ export async function runFfmpegMediaRender(args: {
         transitionType: profile.transition.type,
         transitionSec,
       });
+      if (profile.subtitle.burnIn && !srtContent?.trim()) {
+        throw new Error(
+          "未找到可烧录的分镜对白：请确认脚本表「对白」列已填写，或视频已连线文本/脚本节点后再试",
+        );
+      }
     } else if (profile.subtitle.mode === "asr" && profile.subtitle.burnIn) {
       const asrModelKey =
         profile.subtitle.asrModelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL;
@@ -1001,12 +1006,13 @@ export async function runFfmpegMediaRender(args: {
     }
 
     const outPath = join(tmp, "merged.mp4");
+    const willBurnSubs = Boolean(srtPath?.trim() && profile.subtitle.burnIn);
     const xfadeLabel =
       profile.transition.type === "xfade" && normPaths.length > 1
-        ? profile.subtitle.burnIn
+        ? willBurnSubs
           ? "合并转场并烧录字幕"
           : "合并转场"
-        : profile.subtitle.burnIn
+        : willBurnSubs
           ? "拼接镜头并烧录字幕"
           : "拼接镜头";
     args.onProgress?.(72, xfadeLabel);

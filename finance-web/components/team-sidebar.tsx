@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  KeyRound,
   LayoutDashboard,
   Receipt,
   ScrollText,
@@ -18,7 +17,6 @@ const nav = [
   { href: "/team/billing/details", label: "费用明细", icon: Receipt },
   { href: "/team/billing/ledger", label: "积分流水", icon: ScrollText },
   { href: "/team/usage", label: "积分用量", icon: BarChart3 },
-  { href: "/team/billing/byok", label: "BYOK 用量", icon: KeyRound },
   { href: "/team/members", label: "成员分账", icon: Users },
 ] as const;
 

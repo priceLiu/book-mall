@@ -10,10 +10,6 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 import { clientPageToToolKey } from "@/lib/finance/client-page-tool";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
-import {
-  normalizeByokFeeDescription,
-  normalizeByokQuotaSettlementSnapshot,
-} from "@/lib/billing/byok-pricing";
 import type { UserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
@@ -165,8 +161,9 @@ function personaLabel(
   persona: string | null | undefined,
   billingMode: string | null | undefined,
 ): string {
-  if (persona === "BYOK" || billingMode === "BYOK") return "自带 Key（BYOK）";
-  if (persona === "PLATFORM_CREDIT" || billingMode === "PLATFORM_CREDIT") return "平台代付";
+  if (persona === "PLATFORM_CREDIT" || persona === "BYOK" || billingMode === "PLATFORM_CREDIT") {
+    return "平台代付";
+  }
   return "—";
 }
 
@@ -204,8 +201,7 @@ export async function buildUsageOverviewData(
     actorUserId: tenantId && onlyUserId ? onlyUserId : undefined,
     submittedFrom: sinceCutoff,
     status: "SUCCEEDED",
-    billingMode:
-      persona === "BYOK" || persona === "PLATFORM_CREDIT" ? persona : undefined,
+    billingMode: persona === "PLATFORM_CREDIT" ? persona : undefined,
     staffFlag:
       staffFlag === "1" ? true : staffFlag === "0" ? false : undefined,
   });
@@ -276,27 +272,7 @@ export async function buildUsageOverviewData(
     );
 
     const creditsConsumed = parseInt(billRow[K_CREDITS_CONSUMED] ?? "0", 10) || 0;
-
-    const quotaSnap = settlement
-      ? normalizeByokQuotaSettlementSnapshot({
-          byokTaskKind: settlement.byokTaskKind ?? g.byokTaskKind,
-          ownerType: settlement.ownerType,
-          monthlyIncluded: settlement.monthlyIncluded,
-          includedUsedAfter: settlement.includedUsedAfter ?? g.includedUsedAfter,
-          includedRemainingAfter:
-            settlement.includedRemainingAfter ?? g.includedRemainingAfter,
-        })
-      : null;
-
-    const feeDescriptionRaw = billRow["平台账单/费用说明"] ?? "";
-    const feeDescription =
-      quotaSnap?.corrected
-        ? normalizeByokFeeDescription(
-            feeDescriptionRaw,
-            true,
-            quotaSnap.includedRemainingAfter,
-          )
-        : feeDescriptionRaw;
+    const feeDescription = billRow["平台账单/费用说明"] ?? "";
 
     lines.push({
       id: g.id,
@@ -311,20 +287,10 @@ export async function buildUsageOverviewData(
       settlementKind: billRow[K_SETTLEMENT_KIND] ?? "",
       taskKind: billRow[K_TASK_KIND] ?? "",
       quotaDelta: billRow[K_QUOTA_DELTA] ?? "",
-      includedUsed:
-        quotaSnap?.includedUsedAfter != null
-          ? String(quotaSnap.includedUsedAfter)
-          : billRow[K_INCLUDED_USED] ?? "",
+      includedUsed: billRow[K_INCLUDED_USED] ?? "",
       monthlyIncluded:
-        quotaSnap?.monthlyIncluded != null
-          ? String(quotaSnap.monthlyIncluded)
-          : settlement?.monthlyIncluded != null
-            ? String(settlement.monthlyIncluded)
-            : "—",
-      includedRemaining:
-        quotaSnap?.includedRemainingAfter != null
-          ? String(quotaSnap.includedRemainingAfter)
-          : billRow[K_INCLUDED_REMAINING] ?? "",
+        settlement?.monthlyIncluded != null ? String(settlement.monthlyIncluded) : "—",
+      includedRemaining: billRow[K_INCLUDED_REMAINING] ?? "",
       yuan: creditsToYuan(creditsConsumed),
     });
   }

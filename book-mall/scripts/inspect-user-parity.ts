@@ -18,13 +18,9 @@ async function snapshot(email: string) {
   });
   if (!user) return { email, found: false as const };
 
-  const [credit, byokSub, toolPeriods] = await Promise.all([
+  const [credit, toolPeriods] = await Promise.all([
     prisma.creditAccount.findUnique({
       where: { ownerType_ownerId: { ownerType: "USER", ownerId: user.id } },
-    }),
-    prisma.byokSubscription.findFirst({
-      where: { ownerType: "USER", ownerId: user.id, status: "ACTIVE" },
-      orderBy: { periodEnd: "desc" },
     }),
     prisma.userToolServicePeriod.count({ where: { userId: user.id, status: "ACTIVE" } }),
   ]);
@@ -40,14 +36,6 @@ async function snapshot(email: string) {
           monthlyGrantCredits: credit.monthlyGrantCredits,
           planId: credit.planId,
           currentPeriodEnd: credit.currentPeriodEnd,
-        }
-      : null,
-    byokSub: byokSub
-      ? {
-          scopeKey: byokSub.scopeKey,
-          status: byokSub.status,
-          periodEnd: byokSub.periodEnd,
-          techServiceFeeYuan: Number(byokSub.techServiceFeeYuan),
         }
       : null,
     activeToolPeriods: toolPeriods,

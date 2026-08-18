@@ -753,7 +753,7 @@ export function BillDetailsClient({
           </button>
           <span className="text-xs text-[#8c8c8c]">
             {activeTab === "usage"
-              ? "含成功与失败调用；BYOK 套餐内 0 积分行亦展示"
+              ? "含成功与失败调用；0 积分成功行亦展示"
               : "仅实际消耗积分 > 0 的行"}
           </span>
         </div>

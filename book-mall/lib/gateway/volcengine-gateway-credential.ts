@@ -195,3 +195,28 @@ export function parseVolcenginePortraitCredentialsFromApiKey(
   const parsed = parseVolcengineGatewayCredential(apiKey);
   return parsed.portraitIam ?? null;
 }
+
+function maskPlainSecret(value: string): string {
+  const plain = value.trim();
+  if (!plain) return "****";
+  if (plain.length <= 8) return "*".repeat(plain.length);
+  return `${plain.slice(0, 4)}****${plain.slice(-4)}`;
+}
+
+/** Gateway 列表 / 详情脱敏：ark Key 与 IAM Access Key 分开展示 */
+export function maskVolcengineCredentialDisplay(raw: string): {
+  arkApiKeyMasked: string;
+  portraitAccessKeyMasked: string | null;
+  hasPortraitIam: boolean;
+} {
+  const parsed = parseVolcengineGatewayCredential(raw);
+  return {
+    arkApiKeyMasked: parsed.arkApiKey
+      ? maskPlainSecret(parsed.arkApiKey)
+      : "(未配置 ark)",
+    portraitAccessKeyMasked: parsed.portraitIam?.accessKeyId
+      ? maskPlainSecret(parsed.portraitIam.accessKeyId)
+      : null,
+    hasPortraitIam: Boolean(parsed.portraitIam?.accessKeyId),
+  };
+}

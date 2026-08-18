@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 
-import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
+import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
 import { extractImageFilesFromClipboard } from "@/lib/qr-image-upload-paste";
 import {
   QR_DEFAULT_WORLD_MODEL_KEY,
@@ -30,6 +30,8 @@ import {
 import type { QrTemplate, QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { uploadQrAsset } from "@/lib/qr-upload-asset";
 import { useLockBodyScroll } from "@/lib/use-lock-body-scroll";
+import { useQrCreditsPreview } from "@/hooks/use-qr-credits-preview";
+import { getQrCreditsInsufficientMessage } from "@/lib/qr-credits-preview";
 
 const MAX_REF_IMAGES = 8;
 
@@ -81,6 +83,16 @@ export function QrWorldPromptOmnibox({
   const refUrls = draft.sceneImageUrls.filter((u) => u.trim());
   const thumbUrl = refUrls[0] ?? (draft.targetImageUrl.trim() || undefined);
   const canGenerate = Boolean(draft.prompt.trim() || refUrls.length > 0);
+  const { preview: creditsPreview, loading: creditsLoading } = useQrCreditsPreview(draft);
+
+  const handleGenerateClick = () => {
+    const creditsMessage = getQrCreditsInsufficientMessage(creditsPreview);
+    if (creditsMessage) {
+      onToast?.(creditsMessage);
+      return;
+    }
+    onGenerate();
+  };
 
   useLockBodyScroll(expanded);
 
@@ -456,10 +468,11 @@ export function QrWorldPromptOmnibox({
               </p>
               <div className="flex items-center gap-2">
                 {modelDropdown}
+                <QrCreditsHint preview={creditsPreview} loading={creditsLoading} />
                 <button
                   type="button"
                   disabled={generating || !canGenerate}
-                  onClick={onGenerate}
+                  onClick={handleGenerateClick}
                   className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
                   style={{ background: "var(--qr-brand)" }}
                 >

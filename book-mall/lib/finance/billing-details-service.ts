@@ -6,7 +6,6 @@ import {
 } from "@/lib/finance/gateway-bill-projection";
 import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
-import { computeSequentialByokQuotaSnapshots } from "@/lib/finance/byok-quota-reconcile";
 import {
   loadGatewayLogKeyLabels,
   pickGatewayLogKeyLabels,
@@ -248,19 +247,18 @@ async function buildGatewayRows(input: {
     tenantId: input.tenantId,
     settlementsInBatch: [...settlements.values()],
   });
-  const sequentialSnapshots = computeSequentialByokQuotaSnapshots(
-    settlementLinesForSnapshots.map((line) => ({
-      logId: line.gatewayLogId,
-      submittedAt: line.submittedAt,
-      ownerType: line.ownerType,
-      ownerId: line.ownerId,
-      periodKey: line.periodKey,
-      byokTaskKind: line.byokTaskKind,
-      settlementKind: line.settlementKind,
-      quotaDelta: line.quotaDelta,
-      monthlyIncluded: line.monthlyIncluded,
-    })),
-  );
+  const sequentialSnapshots = new Map<
+    string,
+    { includedUsedAfter: number; includedRemainingAfter: number }
+  >();
+  for (const line of settlementLinesForSnapshots) {
+    if (line.includedUsedAfter != null || line.includedRemainingAfter != null) {
+      sequentialSnapshots.set(line.gatewayLogId, {
+        includedUsedAfter: line.includedUsedAfter ?? 0,
+        includedRemainingAfter: line.includedRemainingAfter ?? 0,
+      });
+    }
+  }
 
   const keyLabelMap = await loadGatewayLogKeyLabels(
     logs.map((log) => ({

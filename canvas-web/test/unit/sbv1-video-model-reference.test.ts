@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDashscopeVideoModelRefSyncPatch,
+  getSbv1VideoDockModeChips,
   getSbv1VideoModelRefCaps,
   resolveDashscopeVideoModelForRefLinks,
   resolveSbv1VideoModelRefLinkBlock,
@@ -10,6 +11,18 @@ import {
 } from "@/lib/canvas/sbv1-video-model-reference";
 
 describe("sbv1-video-model-reference", () => {
+  it("Seedance 2.0 dock exposes text-to-video chip", () => {
+    const chips = getSbv1VideoDockModeChips("doubao-seedance-2.0");
+    expect(chips.map((c) => c.id)).toEqual([
+      "i2v",
+      "t2v",
+      "first_last",
+      "omni",
+      "multi_ref",
+    ]);
+    expect(chips.find((c) => c.id === "t2v")?.label).toBe("文生视频");
+  });
+
   it("Kling 3.0 Turbo supports omni + first_last", () => {
     const caps = getSbv1VideoModelRefCaps("kling/v3-turbo-image-to-video");
     expect(caps.supportedModes).toEqual(["omni", "first_last"]);

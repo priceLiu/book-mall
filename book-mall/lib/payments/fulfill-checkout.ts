@@ -4,14 +4,6 @@
 import type { PaymentCheckout, PaymentConfirmMode, Prisma } from "@prisma/client";
 
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
-import {
-  activateByokSubscription,
-  resolveByokSeatsForTenant,
-} from "@/lib/billing/byok-subscription-service";
-import {
-  BYOK_SCOPE_PERSONAL,
-  BYOK_SCOPE_TEAM_SEAT,
-} from "@/lib/billing/byok-pricing";
 import { grantCredits, topupCredits } from "@/lib/billing/credit-account-service";
 import { subscriptionCreditPeriodEnd } from "@/lib/billing/credit-lot-logic";
 import {
@@ -78,7 +70,7 @@ async function fulfillMembership(
   const plan = await prisma.membershipPlan.findUnique({ where: { id: planId } });
   if (!plan || !plan.active) throw new Error("无效的会员套餐");
 
-  await assertBillingPersona(checkout.userId, ["PLATFORM_CREDIT", "BYOK"]);
+  await assertBillingPersona(checkout.userId, "PLATFORM_CREDIT");
 
   const now = new Date();
   const creditPeriodEnd = subscriptionCreditPeriodEnd(now);
@@ -251,54 +243,8 @@ async function fulfillCreditTopup(checkout: PaymentCheckout, snap: Record<string
   return { amountPoints: pack.credits, meta: { packId: pack.id } };
 }
 
-async function fulfillByok(checkout: PaymentCheckout, snap: Record<string, unknown>) {
-  await assertBillingPersona(checkout.userId, "BYOK");
-
-  const scopeKey = String(snap.scopeKey ?? "");
-  if (scopeKey !== BYOK_SCOPE_PERSONAL && scopeKey !== BYOK_SCOPE_TEAM_SEAT) {
-    throw new Error("无效的 BYOK 档位");
-  }
-
-  let ownerType: "USER" | "TENANT" = "USER";
-  let ownerId = checkout.userId;
-  let seats = 1;
-
-  if (checkout.productKind === "BYOK_TEAM" || scopeKey === BYOK_SCOPE_TEAM_SEAT) {
-    const tenantId = String(snap.tenantId ?? "");
-    if (!tenantId) throw new Error("请选择团队");
-    const member = await prisma.tenantMember.findFirst({
-      where: { userId: checkout.userId, tenantId, status: "ACTIVE" },
-      include: { tenant: { select: { type: true, status: true } } },
-    });
-    if (!member || member.tenant.type !== "TEAM" || member.tenant.status !== "ACTIVE") {
-      throw new Error("你不是该团队的活跃成员");
-    }
-    if (!canTenant(member.role, "billing:manage")) {
-      throw new Error("仅团队主账号可开通团队 BYOK");
-    }
-    ownerType = "TENANT";
-    ownerId = tenantId;
-    seats = snap.seats
-      ? Math.max(1, Math.round(Number(snap.seats)))
-      : await resolveByokSeatsForTenant(tenantId);
-  }
-
-  const result = await activateByokSubscription({
-    ownerType,
-    ownerId,
-    scopeKey,
-    seats,
-    orderId: checkout.id,
-  });
-
-  return {
-    amountPoints: Math.round(Number(checkout.amountYuan) * 100),
-    meta: { scopeKey, ownerType, ownerId, periodEnd: result.periodEnd.toISOString() },
-  };
-}
-
 async function fulfillVipPackage(checkout: PaymentCheckout, snap: Record<string, unknown>) {
-  await assertBillingPersona(checkout.userId, ["PLATFORM_CREDIT", "BYOK"]);
+  await assertBillingPersona(checkout.userId, "PLATFORM_CREDIT");
 
   const scheme = snap.scheme === "video_heavy" ? "video_heavy" : "general_heavy";
   const amountYuan = Math.round(Number(snap.amountYuan));
@@ -346,7 +292,7 @@ async function runProductFulfillment(checkout: PaymentCheckout, snap: Record<str
       return fulfillVipPackage(checkout, snap);
     case "BYOK_PERSONAL":
     case "BYOK_TEAM":
-      return fulfillByok(checkout, snap);
+      throw new Error("自带 Key 套餐已下线，请开通会员订阅");
     default:
       throw new Error("未知商品类型");
   }

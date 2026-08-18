@@ -8,6 +8,7 @@ type PackageUsageRow = {
   succeeded: number;
   failed: number;
   remaining: number | null;
+  creditsConsumed?: number | null;
 };
 
 export type PackageReconciliationData = {
@@ -30,24 +31,17 @@ function fmtQuota(n: number | null): string {
 }
 
 export function PackageReconciliationPanel({ data }: { data: PackageReconciliationData }) {
-  const isByok = data.billingPersona === "BYOK";
-
   return (
     <section className="space-y-4 rounded border border-[#e8e8e8] bg-white p-4">
       <header>
-        <h2 className="text-sm font-medium text-[#262626]">
-          套餐与积分对帐 · {data.periodKey}
-          {data.scopeKey ? (
-            <span className="ml-2 text-xs font-normal text-[#8c8c8c]">BYOK · {data.scopeKey}</span>
-          ) : null}
-        </h2>
+        <h2 className="text-sm font-medium text-[#262626]">套餐与积分对帐 · {data.periodKey}</h2>
         <p className="mt-1 text-xs text-[#8c8c8c]">
-          剩余 = 总数 − 套餐已用；Gateway 成功/失败为调用观测，与套餐已用口径可能不同。试衣计入「文生图（含试衣）」额度。
+          平台代付按七类统计本月 Gateway 成功/失败与积分消耗；试衣计入「文生图（含试衣）」。
         </p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label={isByok ? "轻量包加购" : "本月发放"} value={data.usageSummary.topupCreditsThisMonth} />
+        <Stat label="本月发放" value={data.usageSummary.topupCreditsThisMonth} />
         <Stat label="本月消耗积分" value={data.usageSummary.creditsConsumed} />
         <Stat label="剩余积分" value={data.usageSummary.creditsRemaining} />
         <Stat label="Gateway 成功调用" value={data.usageSummary.totalCallsThisMonth} />
@@ -58,10 +52,8 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
           <table className="w-full min-w-[480px] text-xs">
             <thead className="bg-[#fafafa] text-[#8c8c8c]">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">任务类型</th>
-                <th className="px-3 py-2 text-right font-medium">套餐总数</th>
-                <th className="px-3 py-2 text-right font-medium">套餐已用</th>
-                <th className="px-3 py-2 text-right font-medium">剩余</th>
+                <th className="px-3 py-2 text-left font-medium">类别</th>
+                <th className="px-3 py-2 text-right font-medium">本月扣积分</th>
                 <th className="px-3 py-2 text-right font-medium">Gateway 成功</th>
                 <th className="px-3 py-2 text-right font-medium">失败</th>
               </tr>
@@ -70,9 +62,9 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
               {data.packageUsageRows.map((row) => (
                 <tr key={row.key} className="border-t border-[#f0f0f0]">
                   <td className="px-3 py-2 font-medium">{row.label}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.total)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.includedUsed)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {fmtQuota(row.creditsConsumed ?? null)}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums text-[#389e0d]">{row.succeeded}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-[#cf1322]">{row.failed}</td>
                 </tr>
@@ -81,7 +73,7 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
           </table>
         </div>
       ) : (
-        <p className="text-xs text-[#8c8c8c]">该用户无 BYOK 套餐额度或未开通有效 BYOK。</p>
+        <p className="text-xs text-[#8c8c8c]">本月暂无 Gateway 调用记录。</p>
       )}
     </section>
   );

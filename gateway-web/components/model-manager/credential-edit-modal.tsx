@@ -193,7 +193,9 @@ export function CredentialEditModal({
               checked={isDefault}
               onChange={(e) => setIsDefault(e.target.checked)}
             />
-            设为该厂商默认凭证（生成默认走此 Key）
+            {isVolcengine
+              ? "设为火山方舟默认凭证（生视频 ark Key + 人像 IAM 均走此条）"
+              : "设为该厂商默认凭证（生成默认走此 Key）"}
           </label>
 
           {!isEdit ? (
@@ -244,8 +246,15 @@ export function CredentialEditModal({
           {isVolcengine ? (
             <>
               <p className="text-xs leading-relaxed text-[var(--gw-muted)]">
-                仅生视频可只填 ARK API Key。私域人像入库 / 活体认证还须 IAM Access Key（与 ark Key 不同，在火山控制台「访问控制」创建）。
+                生视频填 ARK API Key（ark-…）。真人过审 / 私域人像入库须在同一条凭证填写 IAM
+                Access Key + Secret（火山控制台「访问控制」创建，与 ark Key 不同）。
               </p>
+              {isEdit && credential?.volcengineHasPortraitIam ? (
+                <p className="text-xs text-emerald-300/90">
+                  当前已配置人像 IAM：
+                  {credential.volcenginePortraitAccessKeyMasked ?? "已设置"}
+                </p>
+              ) : null}
               <label className="block">
                 <span className="mb-1 block text-sm text-[var(--gw-muted)]">
                   Access Key ID（可选 · 私域人像 / 活体）

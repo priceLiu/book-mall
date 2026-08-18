@@ -56,7 +56,7 @@ export function PaymentCheckoutsClient() {
         <div>
           <h2 className="text-lg font-semibold">支付明细</h2>
           <p className="text-sm text-muted-foreground">
-            微信个人收款 Checkout 与 Order 联查。默认仅显示已支付（PAID）；未支付的 CANCELLED 不影响已开通的 BYOK 权益。
+            微信个人收款 Checkout 与 Order 联查。默认仅显示已支付（PAID）。
           </p>
         </div>
         <select

@@ -1,6 +1,7 @@
 import type { GatewayProviderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { encryptApiKey, maskApiKey } from "@/lib/canvas/secret";
+import { encryptApiKey, maskApiKey, decryptApiKey } from "@/lib/canvas/secret";
+import { maskVolcengineCredentialDisplay } from "@/lib/gateway/volcengine-gateway-credential";
 import { syncPersonalGatewayApiKeyBindings } from "@/lib/gateway/api-key-service";
 import { resolveKieApiRoot, resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
 import { testGatewayCredentialConnection } from "@/lib/gateway/gateway-credential-test";
@@ -37,21 +38,40 @@ export async function listGatewayCredentials(userId: string) {
       { updatedAt: "desc" },
     ],
   });
-  return rows.map((r) => ({
-    id: r.id,
-    alias: r.alias,
-    providerKind: r.providerKind,
-    baseUrl: r.baseUrl,
-    active: r.active,
-    channel: r.channel,
-    sortOrder: r.sortOrder,
-    isDefaultForProvider: r.isDefaultForProvider,
-    apiKeyMasked: maskApiKey(r.apiKeyEncrypted),
-    lastTestedAt: r.lastTestedAt?.toISOString() ?? null,
-    lastTestStatus: r.lastTestStatus,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  }));
+  return rows.map((r) => {
+    const base = {
+      id: r.id,
+      alias: r.alias,
+      providerKind: r.providerKind,
+      baseUrl: r.baseUrl,
+      active: r.active,
+      channel: r.channel,
+      sortOrder: r.sortOrder,
+      isDefaultForProvider: r.isDefaultForProvider,
+      apiKeyMasked: maskApiKey(r.apiKeyEncrypted),
+      lastTestedAt: r.lastTestedAt?.toISOString() ?? null,
+      lastTestStatus: r.lastTestStatus,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+      volcengineHasPortraitIam: false as boolean,
+      volcenginePortraitAccessKeyMasked: null as string | null,
+    };
+
+    if (r.providerKind !== "VOLCENGINE") return base;
+
+    try {
+      const plain = decryptApiKey(r.apiKeyEncrypted);
+      const volc = maskVolcengineCredentialDisplay(plain);
+      return {
+        ...base,
+        apiKeyMasked: volc.arkApiKeyMasked,
+        volcengineHasPortraitIam: volc.hasPortraitIam,
+        volcenginePortraitAccessKeyMasked: volc.portraitAccessKeyMasked,
+      };
+    } catch {
+      return base;
+    }
+  });
 }
 
 export async function createGatewayCredential(opts: {

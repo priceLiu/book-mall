@@ -360,7 +360,11 @@ export function ModelManager({
                     <p className="text-xs text-[var(--gw-muted)]">
                       默认凭证：{primary.alias}
                       {primary.channel ? `（${primary.channel}）` : ""} ·{" "}
-                      <CredentialKeyReveal credentialId={primary.id} masked={primary.apiKeyMasked} />
+                      <CredentialKeyReveal
+                        credentialId={primary.id}
+                        masked={primary.apiKeyMasked}
+                        credential={primary}
+                      />
                       {primary.lastTestStatus
                         ? ` · 最近测试 ${primary.lastTestStatus}`
                         : ""}
@@ -458,12 +462,25 @@ export function ModelManager({
                             默认
                           </span>
                         ) : null}
+                        {c.volcengineHasPortraitIam ? (
+                          <span className={`rounded-full border px-2 py-0.5 ${tagClass("cap")}`}>
+                            人像 IAM
+                          </span>
+                        ) : c.providerKind === "VOLCENGINE" ? (
+                          <span className="rounded-full border border-amber-500/30 px-2 py-0.5 text-amber-200/90">
+                            缺人像 IAM
+                          </span>
+                        ) : null}
                         {!c.active ? (
                           <span className="rounded-full border border-[var(--gw-border)] px-2 py-0.5 text-[var(--gw-muted)]">
                             停用
                           </span>
                         ) : null}
-                        <CredentialKeyReveal credentialId={c.id} masked={c.apiKeyMasked} />
+                        <CredentialKeyReveal
+                          credentialId={c.id}
+                          masked={c.apiKeyMasked}
+                          credential={c}
+                        />
                       </div>
                       <div className="flex items-center gap-3">
                         {!c.isDefaultForProvider && c.active ? (

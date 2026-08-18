@@ -190,8 +190,8 @@ async function main() {
       deriveEcomBillingMode("PLATFORM_CREDIT") === "PLATFORM_METERED",
     );
     check(
-      "BYOK → BYOK_SERVICE_FEE",
-      deriveEcomBillingMode("BYOK") === "BYOK_SERVICE_FEE",
+      "legacy BYOK persona → PLATFORM_METERED",
+      deriveEcomBillingMode("BYOK") === "PLATFORM_METERED",
     );
 
     console.log("");

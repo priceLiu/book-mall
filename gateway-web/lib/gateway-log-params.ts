@@ -527,6 +527,13 @@ export function resolveLogDisplayDurationMs(input: {
   liveTotalMs?: number | null;
 }): number | null {
   if (input.isInProgress) {
+    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
+      return input.liveTotalMs;
+    }
+    if (input.nowMs != null) {
+      const wall = input.nowMs - new Date(input.submittedAt).getTime();
+      if (wall >= 0) return wall;
+    }
     const phaseSum =
       Math.max(0, input.queueMs ?? 0) +
       Math.max(0, input.generateMs ?? 0) +
@@ -538,13 +545,6 @@ export function resolveLogDisplayDurationMs(input: {
       (input.vendorPostProcessMs ?? 0) > 0 ||
       (input.pollDelayMs ?? 0) > 0;
     if (hasPhaseAnchors) return phaseSum;
-    if (input.nowMs != null) {
-      const wall = input.nowMs - new Date(input.submittedAt).getTime();
-      if (wall >= 0) return wall;
-    }
-    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
-      return input.liveTotalMs;
-    }
     return null;
   }
 

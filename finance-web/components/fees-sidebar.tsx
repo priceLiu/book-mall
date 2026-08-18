@@ -6,7 +6,6 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
-  KeyRound,
   LayoutGrid,
   Receipt,
   ScrollText,
@@ -39,19 +38,13 @@ const NAV_GROUPS = [
       { href: "/fees/billing/subscriptions", label: "账单订阅", icon: Receipt },
     ],
   },
-  {
-    id: "byok",
-    label: "BYOK",
-    items: [{ href: "/fees/billing/byok", label: "BYOK 任务用量", icon: KeyRound }],
-  },
 ] as const;
 
-/** 自个人中心进入时，侧栏与个人中心菜单对齐（3～4 项 + 图标）。 */
+/** 自个人中心进入时，侧栏与个人中心菜单对齐。 */
 const ACCOUNT_NAV_ITEMS: NavItem[] = [
   { href: "/fees/usage", label: "积分用量", icon: BarChart3 },
   { href: "/fees/billing/details", label: "费用明细", icon: Receipt },
   { href: "/fees/billing/ledger", label: "积分流水", icon: ScrollText },
-  { href: "/fees/billing/byok", label: "BYOK 任务用量", icon: KeyRound },
 ];
 
 function FeesSidebarNav() {

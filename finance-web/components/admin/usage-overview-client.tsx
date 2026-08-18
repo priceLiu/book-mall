@@ -166,8 +166,7 @@ export function UsageOverviewClient() {
         <div>
           <h1 className="text-lg font-medium">费用多维度概览</h1>
           <p className="mt-1 text-sm text-[#8c8c8c]">
-            来源 GatewayRequestLog（财务 2.0）。含 BYOK 0 积分成功调用；扣积分行另计锚定金额。
-            BYOK「套餐剩余」= 该任务类型本月额度内剩余次数（非积分）。
+            来源 GatewayRequestLog（财务 2.0）。含 0 积分成功调用；扣积分行另计锚定金额。
           </p>
         </div>
         <button
@@ -197,7 +196,6 @@ export function UsageOverviewClient() {
             {[
               { value: "", label: "全部身份" },
               { value: "PLATFORM_CREDIT", label: "平台代付" },
-              { value: "BYOK", label: "自带 Key" },
             ].map((tab) => (
               <button
                 key={tab.value || "all"}

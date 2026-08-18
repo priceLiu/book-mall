@@ -1,12 +1,10 @@
 /**
- * 创建 admin@126.com、修复试点 BYOK 订阅、同步平台凭证池。
+ * 创建 admin@126.com、同步平台凭证池。
  *
  *   pnpm exec dotenv -e .env.local -- tsx scripts/ensure-admin-gateway-setup.ts
  */
 import bcrypt from "bcryptjs";
 
-import { activateByokSubscription } from "../lib/billing/byok-subscription-service";
-import { BYOK_SCOPE_PERSONAL } from "../lib/billing/byok-pricing";
 import { deriveEcomBillingMode } from "../lib/billing/billing-persona";
 import {
   getGatewayLinkStatusForUser,
@@ -28,24 +26,6 @@ const ADMIN_EMAIL = "admin@126.com";
 const ADMIN_PASSWORD = "123456";
 const PILOT_EMAIL = "13808816802@126.com";
 
-async function ensureByokSubscription(userId: string, email: string) {
-  const existing = await prisma.byokSubscription.findFirst({
-    where: { ownerType: "USER", ownerId: userId, status: "ACTIVE" },
-  });
-  if (existing) {
-    console.log(`[ok] ${email} 已有 BYOK 订阅至 ${existing.periodEnd.toISOString()}`);
-    return;
-  }
-  const result = await activateByokSubscription({
-    ownerType: "USER",
-    ownerId: userId,
-    scopeKey: BYOK_SCOPE_PERSONAL,
-    seats: 1,
-    orderId: `setup_${Date.now()}`,
-  });
-  console.log(`[ok] ${email} 已开通 BYOK 个人套餐，至 ${result.periodEnd.toISOString()}`);
-}
-
 async function ensureAdminUser() {
   let user = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
   if (!user) {
@@ -56,24 +36,24 @@ async function ensureAdminUser() {
         passwordHash,
         name: "系统管理员",
         role: "ADMIN",
-        billingPersona: "BYOK",
+        billingPersona: "PLATFORM_CREDIT",
         billingPersonaLockedAt: new Date(),
-        ecomBillingMode: deriveEcomBillingMode("BYOK"),
+        ecomBillingMode: deriveEcomBillingMode("PLATFORM_CREDIT"),
       },
     });
     await prisma.wallet.create({ data: { userId: user.id } });
-    console.log(`[ok] 已创建 ${ADMIN_EMAIL}（ADMIN · BYOK）`);
+    console.log(`[ok] 已创建 ${ADMIN_EMAIL}（ADMIN · 平台代付）`);
   } else {
     user = await prisma.user.update({
       where: { id: user.id },
       data: {
         role: "ADMIN",
-        billingPersona: "BYOK",
+        billingPersona: "PLATFORM_CREDIT",
         billingPersonaLockedAt: user.billingPersonaLockedAt ?? new Date(),
-        ecomBillingMode: deriveEcomBillingMode("BYOK"),
+        ecomBillingMode: deriveEcomBillingMode("PLATFORM_CREDIT"),
       },
     });
-    console.log(`[ok] ${ADMIN_EMAIL} 已确认为 ADMIN · BYOK`);
+    console.log(`[ok] ${ADMIN_EMAIL} 已确认为 ADMIN · 平台代付`);
   }
   return user;
 }
@@ -150,20 +130,18 @@ async function main() {
         ).map((b) => b.credentialId)
       : [];
   await ensurePersonalKeyLinked(admin.id, ADMIN_EMAIL, credIds);
-  await ensureByokSubscription(admin.id, ADMIN_EMAIL);
 
   const pilot = await prisma.user.findUnique({ where: { email: PILOT_EMAIL } });
   if (pilot) {
     await prisma.user.update({
       where: { id: pilot.id },
       data: {
-        billingPersona: "BYOK",
+        billingPersona: "PLATFORM_CREDIT",
         billingPersonaLockedAt: pilot.billingPersonaLockedAt ?? new Date(),
-        ecomBillingMode: deriveEcomBillingMode("BYOK"),
+        ecomBillingMode: deriveEcomBillingMode("PLATFORM_CREDIT"),
       },
     });
-    await ensureByokSubscription(pilot.id, PILOT_EMAIL);
-    console.log(`[ok] ${PILOT_EMAIL} persona=BYOK，Gateway Key 已存在`);
+    console.log(`[ok] ${PILOT_EMAIL} persona=平台代付`);
   } else {
     console.warn(`[warn] 未找到试点用户 ${PILOT_EMAIL}`);
   }

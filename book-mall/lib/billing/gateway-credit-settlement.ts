@@ -5,7 +5,7 @@
  *  - SUCCEEDED：按成本快照的 creditsPerUnit × 计费单位 扣减积分（个人账户 / 团队共享池）。
  *  - FAILED：按幂等键返还（若已扣）。
  *
- * 互斥：仅当 billingMode 解析为 PLATFORM_CREDIT 时扣积分；BYOK 走旧资源计量/月费，避免双扣。
+ * 互斥：仅 PLATFORM_CREDIT 扣积分。
  * 安全：扣费 allowNegative（成功后结算不阻断），永不向上抛错打断主流程；可用 CREDIT_BILLING_OFF=1 关闭。
  */
 import type { CreditCostUnit, GatewayRequestLog } from "@prisma/client";
@@ -32,13 +32,12 @@ import {
   type AccountRef,
 } from "./credit-account-service";
 import { consumeTeamCredits } from "./seat-billing-service";
-import { settleByokOverage } from "./byok-overage-service";
 import {
   billingCategoryLabel,
   classifyBillingCategory,
 } from "./billing-category";
 import { recordBillingSettlement } from "./billing-settlement-service";
-import { extractTryonModelKey } from "./byok-pricing";
+import { extractTryonModelKey } from "./gateway-log-classifier";
 import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
 import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
@@ -302,10 +301,6 @@ export async function settleSucceededGatewayLog(input: {
 }): Promise<number> {
   if (!creditBillingEnabled()) return 0;
   if (input.log.clientPage === "media-render-asr") return 0;
-  if (input.log.billingMode === "BYOK") {
-    const r = await settleByokOverage(input.log);
-    return r?.creditsCharged ?? 0;
-  }
 
   const target = await resolveLogBillingTarget(input.log);
   if (!target) return 0;
@@ -565,7 +560,6 @@ export async function refundFailedGatewayLog(
  */
 export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise<number> {
   if (!creditBillingEnabled()) return 0;
-  if (log.billingMode === "BYOK") return 0;
   if (!isVideoLog(log)) return 0;
 
   const canonical =

@@ -69,12 +69,10 @@ import {
 } from "@/lib/billing/gateway-credit-settlement";
 import { assertCreditsBeforeGenerate } from "@/lib/billing/credit-pre-check";
 import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
-import { ByokSubscriptionRequiredError } from "@/lib/billing/byok-subscription-service";
 import {
   guardVideoGenerate,
   releaseVideoGenerate,
 } from "@/lib/billing/video-risk-control";
-import { assertByokQuotaBeforeGenerate } from "@/lib/billing/byok-overage-service";
 import { resolveGatewayLogBillingMode } from "@/lib/billing/gateway-billing-mode";
 import {
   isStaffRole,
@@ -104,9 +102,6 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
   }
   if (e instanceof InsufficientCreditsError) {
     return { status: 402, error: e.message };
-  }
-  if (e instanceof ByokSubscriptionRequiredError) {
-    return { status: 403, error: e.message };
   }
   if (e instanceof VideoRiskError) {
     return { status: 429, error: e.message };
@@ -214,35 +209,26 @@ export async function createRequestLog(opts: {
   let riskPopup: string | undefined;
 
   // 团队共享积分池：余额不足则拒绝发起（用完即停）
-  if (billingMode === "PLATFORM_CREDIT") {
-    await assertCreditsBeforeGenerate({
+  await assertCreditsBeforeGenerate({
+    tenantId: opts.tenantId,
+    actorBookUserId: opts.actorBookUserId,
+    apiKeyId: opts.apiKeyId,
+    model: opts.model,
+    requestKind: opts.requestKind ?? route.requestKind,
+    inputSummary: opts.inputSummary,
+  });
+  // 视频专项风控（当前仅批量上限）
+  if (isVideoReq) {
+    const g = await guardVideoGenerate({
       tenantId: opts.tenantId,
       actorBookUserId: opts.actorBookUserId,
       apiKeyId: opts.apiKeyId,
-      model: opts.model,
-      requestKind: opts.requestKind ?? route.requestKind,
-      inputSummary: opts.inputSummary,
+      batchCount: 1,
     });
-    // 视频专项风控（当前仅批量上限）
-    if (isVideoReq) {
-      const g = await guardVideoGenerate({
-        tenantId: opts.tenantId,
-        actorBookUserId: opts.actorBookUserId,
-        apiKeyId: opts.apiKeyId,
-        batchCount: 1,
-      });
-      riskAccountId = g.accountId;
-      riskPopup = g.riskPopup;
-    }
-  } else if (billingMode === "BYOK") {
-    await assertByokQuotaBeforeGenerate({
-      tenantId: opts.tenantId,
-      actorBookUserId: opts.actorBookUserId,
-      apiKeyId: opts.apiKeyId,
-      requestKind: opts.requestKind ?? route.requestKind,
-      inputSummary: opts.inputSummary,
-    });
+    riskAccountId = g.accountId;
+    riskPopup = g.riskPopup;
   }
+
   const log = await prisma.gatewayRequestLog.create({
     data: {
       userId: opts.userId,

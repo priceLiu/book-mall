@@ -354,6 +354,7 @@ export function getSbv1VideoDockModeChips(
   if (isVolcengineSbv1Model(k, opts?.providerId)) {
     return [
       chip("i2v"),
+      chip("t2v"),
       chip("first_last"),
       chip("omni"),
       chip("multi_ref", "智能多帧"),

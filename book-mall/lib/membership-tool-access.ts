@@ -1,12 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
 
 export type MembershipToolAccessSource =
   | "personal_plan"
   | "team_plan"
-  | "byok_personal"
-  | "byok_team"
   | null;
 
 export type MembershipToolAccess = {
@@ -30,9 +27,7 @@ export function invalidateMembershipToolAccessCache(userId?: string): void {
 }
 
 /**
- * 工具准入：按 billingPersona 单一路径，禁止混用。
- * PLATFORM_CREDIT → 有效积分会员（个人/团队）
- * BYOK → 有效 BYOK 订阅 + 已关联 Gateway Key
+ * 工具准入：平台代付积分会员（个人/团队）或可用积分。
  */
 export async function getMembershipToolAccess(
   userId: string,
@@ -50,17 +45,7 @@ async function computeMembershipToolAccess(
   userId: string,
 ): Promise<MembershipToolAccess> {
   const now = new Date();
-  const persona = await getUserBillingPersona(userId);
-
-  if (persona === "BYOK") {
-    return getByokToolAccess(userId, now);
-  }
-
-  if (persona === "PLATFORM_CREDIT" || persona === null) {
-    return getPlatformCreditToolAccess(userId, now);
-  }
-
-  return { ok: false, planName: null, source: null };
+  return getPlatformCreditToolAccess(userId, now);
 }
 
 async function getPlatformCreditToolAccess(
@@ -145,78 +130,6 @@ async function sumUsableCredits(
     select: { remainingCredits: true },
   });
   return lots.reduce((sum, lot) => sum + lot.remainingCredits, 0);
-}
-
-async function getByokToolAccess(
-  userId: string,
-  now: Date,
-): Promise<MembershipToolAccess> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { gatewayApiKeyId: true },
-  });
-  if (!user?.gatewayApiKeyId) {
-    return { ok: false, planName: null, source: null };
-  }
-
-  // 积分换算 1.0：BYOK 准入 = 有效会员订阅 + Gateway Key（不再单独收技术服务费）
-  const creditAcc = await prisma.creditAccount.findUnique({
-    where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
-    select: { planId: true, membershipPaidUntil: true },
-  });
-  if (creditAcc?.planId) {
-    const periodOk = isMembershipServiceActive(creditAcc.membershipPaidUntil, now);
-    if (periodOk) {
-      const plan = await prisma.membershipPlan.findUnique({
-        where: { id: creditAcc.planId },
-        select: { tier: true, family: true, interval: true },
-      });
-      const label = plan
-        ? `${plan.family === "TEAM" ? "团队" : "个人"} · ${plan.tier}（${plan.interval === "YEAR" ? "年付" : "月付"}）`
-        : "会员订阅";
-      return { ok: true, planName: `${label} · 自带 key 会员`, source: "byok_personal" };
-    }
-  }
-
-  const teamMember = await prisma.tenantMember.findFirst({
-    where: {
-      userId,
-      status: "ACTIVE",
-      tenant: {
-        type: "TEAM",
-        status: "ACTIVE",
-        planId: { not: null },
-        OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: now } }],
-      },
-    },
-    include: { tenant: { select: { name: true, packageLevel: true, interval: true } } },
-  });
-  if (teamMember?.tenant) {
-    const t = teamMember.tenant;
-    const tier = t.packageLevel ?? "团队套餐";
-    const interval = t.interval === "YEAR" ? "年付" : "月付";
-    return {
-      ok: true,
-      planName: `${t.name} · ${tier}（${interval}）· 自带 key 会员`,
-      source: "byok_team",
-    };
-  }
-
-  // 兼容历史 BYOK 技术服务费订阅（只读过渡，不再新开）
-  const personalByok = await prisma.byokSubscription.findFirst({
-    where: {
-      ownerType: "USER",
-      ownerId: userId,
-      status: "ACTIVE",
-      periodEnd: { gt: now },
-    },
-    orderBy: { periodEnd: "desc" },
-  });
-  if (personalByok) {
-    return { ok: true, planName: "历史 BYOK 套餐", source: "byok_personal" };
-  }
-
-  return { ok: false, planName: null, source: null };
 }
 
 export async function userHasMembershipToolAccess(userId: string): Promise<boolean> {

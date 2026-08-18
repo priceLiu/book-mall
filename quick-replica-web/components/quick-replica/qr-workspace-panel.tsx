@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { QrCreateImageForm } from "@/components/quick-replica/qr-create-image-workspace";
+import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
 import { QrAudioMiddlePanel } from "@/components/quick-replica/qr-audio-middle-panel";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrMotionSyncForm } from "@/components/quick-replica/qr-motion-sync-workspace";
@@ -21,6 +21,8 @@ import {
   type QrWorkspaceDraft,
 } from "@/lib/qr-template-types";
 import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
+import { getQrCreditsInsufficientMessage } from "@/lib/qr-credits-preview";
+import { useQrCreditsPreview } from "@/hooks/use-qr-credits-preview";
 
 type Props = {
   draft: QrWorkspaceDraft;
@@ -58,6 +60,7 @@ export function QrWorkspacePanel({
   const isTextToVideo = draft.kind === "text-to-video";
   const isCreateImage = isQrTextToImageKind(draft.kind);
   const isTextToAudio = isQrTextToAudioKind(draft);
+  const { preview: creditsPreview, loading: creditsLoading } = useQrCreditsPreview(draft);
 
   const uploadAsset = async (file: File, kind: "image" | "video" | "audio") => {
     const dataUrl = await readFileAsDataUrl(file);
@@ -123,6 +126,11 @@ export function QrWorkspacePanel({
         setError(validationError);
         return;
       }
+    }
+    const creditsMessage = getQrCreditsInsufficientMessage(creditsPreview);
+    if (creditsMessage) {
+      setError(creditsMessage);
+      return;
     }
     onGenerate(draft);
   };
@@ -462,6 +470,11 @@ export function QrWorkspacePanel({
       </div>
 
       <div className="shrink-0 p-4" style={{ borderTop: "1px solid var(--qr-border)" }}>
+        <QrCreditsHint
+          preview={creditsPreview}
+          loading={creditsLoading}
+          className="mb-2 text-center"
+        />
         <button
           type="button"
           disabled={generating}

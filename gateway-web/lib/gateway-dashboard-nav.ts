@@ -23,15 +23,16 @@ export type GatewayDashboardUser = {
   name: string | null;
   bookRole?: "ADMIN" | "USER";
   billingPersona?: "PLATFORM_CREDIT" | "BYOK" | null;
+  canManageGatewayModels?: boolean;
   platformPoolDelegate?: { canonicalOwnerEmail: string } | null;
 };
 
 export function resolveGatewayDashboardNav(
   user: GatewayDashboardUser,
 ): DashboardNavItem[] {
-  const isByok = user.billingPersona === "BYOK";
-  const isPlatformPoolDelegate = Boolean(user.platformPoolDelegate);
-  return isByok || isPlatformPoolDelegate
-    ? GATEWAY_FULL_NAV
-    : GATEWAY_BASE_NAV;
+  const canManage =
+    user.canManageGatewayModels === true ||
+    user.billingPersona === "BYOK" ||
+    Boolean(user.platformPoolDelegate);
+  return canManage ? GATEWAY_FULL_NAV : GATEWAY_BASE_NAV;
 }

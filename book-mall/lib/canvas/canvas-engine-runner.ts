@@ -1304,7 +1304,9 @@ export async function runVideoEngineNode(
   const isKlingT2v =
     modelKey === "kling-3.0/video" &&
     (dockInputModeRaw === "t2v" || !dockInputModeRaw);
-  const isTextToVideoOnly = isDashscopeT2v || isKlingT2v;
+  const isVolcengineT2v =
+    isVolcengineStoryVideoModelKey(modelKey) && dockInputModeRaw === "t2v";
+  const isTextToVideoOnly = isDashscopeT2v || isKlingT2v || isVolcengineT2v;
   const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)
         ? (params.reference_video_urls as unknown[])

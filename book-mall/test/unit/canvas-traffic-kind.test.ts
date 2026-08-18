@@ -18,7 +18,8 @@ describe("canvas-traffic-kind", () => {
     expect(isCanvasImageTrafficKind({ kind: "image-engine" })).toBe(true);
     expect(isCanvasImageTrafficKind({ kind: "three-view-engine" })).toBe(true);
     expect(isCanvasTrafficKind({ kind: "image-engine" })).toBe(true);
-    expect(isCanvasTrafficKind({ kind: "ai-engine" })).toBe(false);
+    expect(isCanvasTrafficKind({ kind: "ai-engine" })).toBe(true);
+    expect(isCanvasTrafficKind({ kind: "unknown-kind" })).toBe(false);
   });
 
   it("canvasTrafficPayloadWhere includes image kinds", () => {

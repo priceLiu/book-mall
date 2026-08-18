@@ -147,10 +147,10 @@ model User {
   /// 单会话挤下线：每次成功登录自增；JWT 内 ver 与此不一致即失效（里程碑 7 启用）
   sessionVersion Int @default(0)
 
-  /// 电商工具箱计费：默认 BYOK 月费；PLATFORM_METERED 为代付按次扣点（由 billingPersona 推导，用户不可改）
-  ecomBillingMode EcomBillingMode @default(BYOK_SERVICE_FEE)
+  /// 电商工具箱计费：统一平台代付按量（由 billingPersona 推导，用户不可改）
+  ecomBillingMode EcomBillingMode @default(PLATFORM_METERED)
 
-  /// 计费身份：注册时选定，互斥（平台代付 vs 自带 Key）
+  /// 计费身份：注册时锁定为平台代付
   billingPersona         BillingPersona  @default(PLATFORM_CREDIT)
   billingPersonaLockedAt DateTime?
 
@@ -3396,21 +3396,7 @@ model PlanChangeEvent {
   @@index([proposalId, createdAt])
 }
 
-/// BYOK 技术服务费配置（个人 / 团队两档）
-model ByokServiceConfig {
-  id                 String             @id @default(cuid())
-  scopeKey           String             @unique // personal | team-seat
-  label              String
-  techServiceFeeYuan Decimal            @db.Decimal(12, 2)
-  interval           MembershipInterval @default(MONTH)
-  minSeats           Int? // 团队最低席位数（仅 team-seat）
-  active             Boolean            @default(true)
-  note               String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-}
-
-/// BYOK 任务类型（套餐内额度 + 超额轻量包扣分）
+/// 历史 Gateway 日志任务类型快照（BYOK 退役；报表仍读此列）
 enum ByokTaskKind {
   TEXT_TO_IMAGE
   IMAGE_TO_VIDEO
@@ -3419,7 +3405,7 @@ enum ByokTaskKind {
   TTS
 }
 
-/// 七类计费 taxonomy（BYOK + 平台代付报表/结算共用；含无含次的 TEXT / OTHER）
+/// 七类计费 taxonomy（平台代付报表/结算；含无含次的 TEXT / OTHER）
 enum BillingCategory {
   TEXT_TO_IMAGE
   IMAGE_TO_VIDEO
@@ -3428,92 +3414,6 @@ enum BillingCategory {
   TTS
   TEXT
   OTHER
-}
-
-/// BYOK 套餐内月度额度与超额扣分（从轻量包/general 池扣）
-model ByokTaskQuota {
-  id              String       @id @default(cuid())
-  scopeKey        String // personal | team-seat
-  taskKind        ByokTaskKind
-  label           String
-  monthlyIncluded Int
-  overageCredits  Int
-  active          Boolean      @default(true)
-  updatedAt       DateTime     @updatedAt
-
-  @@unique([scopeKey, taskKind])
-  @@index([scopeKey])
-}
-
-enum ByokSubscriptionStatus {
-  ACTIVE
-  EXPIRED
-  SUSPENDED
-}
-
-/// BYOK 套餐订阅（个人或团队租户；与积分会员套餐并列）
-model ByokSubscription {
-  id                 String                 @id @default(cuid())
-  ownerType          CreditOwnerType
-  ownerId            String
-  scopeKey           String // personal | team-seat
-  status             ByokSubscriptionStatus @default(ACTIVE)
-  seats              Int                    @default(1)
-  techServiceFeeYuan Decimal                @db.Decimal(12, 2)
-  periodStart        DateTime
-  periodEnd          DateTime
-  lastOrderId        String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-
-  @@index([ownerType, ownerId, status])
-  @@index([periodEnd])
-  @@index([scopeKey, status])
-}
-
-/// BYOK 月度任务用量（套餐内 + 超额）
-model ByokUsageMonthly {
-  id              String          @id @default(cuid())
-  ownerType       CreditOwnerType
-  ownerId         String
-  scopeKey        String // personal | team-seat
-  periodKey       String // YYYY-MM
-  taskKind        ByokTaskKind
-  seatsSnapshot   Int             @default(1)
-  includedUsed    Int             @default(0)
-  overageUsed     Int             @default(0)
-  overageCredits  Int             @default(0)
-  updatedAt       DateTime        @updatedAt
-
-  @@unique([ownerType, ownerId, periodKey, taskKind])
-  @@index([periodKey, scopeKey])
-  @@index([ownerType, ownerId, periodKey])
-}
-
-/// BYOK 资源计量单价（用量 × 系数）
-model ResourceMeterRate {
-  id              String            @id @default(cuid())
-  resourceType    ResourceMeterType @unique
-  coefficientYuan Decimal           @db.Decimal(16, 8) // 每单位资源单价
-  unitLabel       String // GB·月 / GB / 次
-  active          Boolean           @default(true)
-  updatedAt       DateTime          @updatedAt
-}
-
-/// BYOK 资源用量事件
-model ResourceMeterEvent {
-  id           String            @id @default(cuid())
-  ownerType    CreditOwnerType
-  ownerId      String
-  resourceType ResourceMeterType
-  quantity     Decimal           @db.Decimal(16, 6)
-  costYuan     Decimal           @db.Decimal(16, 6) // quantity × coefficient 快照
-  refType      String?
-  refId        String?
-  periodKey    String // YYYY-MM 结算桶
-  createdAt    DateTime          @default(now())
-
-  @@index([ownerType, ownerId, periodKey])
 }
 
 // ============================================================

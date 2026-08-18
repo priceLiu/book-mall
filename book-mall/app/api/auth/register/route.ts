@@ -25,7 +25,7 @@ const registerSchema = z.object({
   // 分享链接免密注册时可省略密码（后续可用短信 OTP 登录或在设置中补设密码）。
   password: z.string().min(8, "密码至少 8 位").optional(),
   name: z.string().max(64).optional(),
-  billingPersona: z.enum(["PLATFORM_CREDIT", "BYOK"]).optional(),
+  billingPersona: z.enum(["PLATFORM_CREDIT"]).optional(),
   inviteToken: z.string().min(1).optional(),
   /// 分享码（来自 /r/{code} 链接），用于注册归因
   referralCode: z.string().min(1).max(32).optional(),

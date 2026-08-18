@@ -40,13 +40,13 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "flux-kontext-pro": ["image_t2i", "image_multi_ref"],
   "flux-kontext-max": ["image_t2i", "image_multi_ref"],
   "qwen-text-to-image": ["image_t2i"],
-  /** 与 book-mall/lib/canvas/story-model-capabilities.ts 对齐；勿仅靠 infer（seedance 会被误判为 t2v） */
+  /** 与 book-mall/lib/canvas/story-model-capabilities.ts 对齐；勿仅靠 infer（seedance 会被误判能力组合） */
   "kling-2.6/image-to-video": ["video_i2v"],
   "kling/v3-turbo-image-to-video": ["video_i2v"],
   "kling/v3-turbo-text-to-video": ["video_t2v"],
   "kling-3.0/video": ["video_i2v", "video_t2v"],
-  "bytedance/seedance-2": ["video_i2v", "video_r2v", "video_multi_ref"],
-  "doubao-seedance-2.0": ["video_i2v", "video_r2v", "video_multi_ref"],
+  "bytedance/seedance-2": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
+  "doubao-seedance-2.0": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
   "doubao-seedance-1.5-pro": ["video_i2v"],
   "wan/2-7-image-to-video": ["video_i2v"],
   "happyhorse/image-to-video": ["video_i2v"],

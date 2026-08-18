@@ -2,7 +2,8 @@
 
 > **索引**：[docs/quick-replica.md](../../../docs/quick-replica.md)  
 > **实施计划**：[2026-quick-replica-rollout.md](../plans/2026-quick-replica-rollout.md)  
-> **联邦约束**：[12-platform-app-federation.md](./12-platform-app-federation.md)
+> **联邦约束**：[12-platform-app-federation.md](./12-platform-app-federation.md)  
+> **积分预览**：[22-quick-replica-credits-preview.md](./22-quick-replica-credits-preview.md)
 
 ## 1. 产品定位
 
@@ -169,7 +170,9 @@ interface QrTemplate {
 | GET | `/templates/:id` | 单条 |
 | POST | `/templates` | 用户生成后创建（P2） |
 | POST | `/assets/upload` | `{ dataUrl, kind: image \| video }` → OSS URL |
-| POST | `/jobs/motion-sync` | 创建 motion-control Gateway 任务 |
+| POST | `/credits-preview` | 生成前积分预览（与 `jobs/generate` 同 draft 结构；见 [22-quick-replica-credits-preview](22-quick-replica-credits-preview.md)） |
+| POST | `/jobs/generate` | 统一生成入口（运动同步 / 文生视频 / 图 / 音频 / 世界 / KIE 通用） |
+| POST | `/jobs/motion-sync` | 创建 motion-control Gateway 任务（遗留直连接口） |
 | GET | `/jobs/:logId` | 轮询 `GatewayRequestLog` 状态与结果 URL |
 
 子站 BFF：`/api/book-mall/api/platform/v1/quick-replica/*`

@@ -234,7 +234,9 @@ export function JianyingMediaRenderActions({
     if (isMediaRenderJobInflight(inFlight)) {
       if (!syncDismissedRef.current) {
         setBusy(true);
-        setProgress(inFlight?.progress ?? 0);
+        setProgress((prev) =>
+          Math.max(prev ?? 0, inFlight?.progress ?? 0),
+        );
         setStepLabel(inFlight?.progressLabel?.trim() || "处理中…");
       }
       if (inFlight?.transitionKind) setTransitionKind(inFlight.transitionKind);
@@ -337,7 +339,11 @@ export function JianyingMediaRenderActions({
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
       const dismissed = syncDismissedRef.current;
       if (!dismissed) {
-        setProgress((prev) => Math.max(prev ?? 0, job.progress));
+        setProgress((prev) => {
+          const next = Math.max(prev ?? 0, job.progress);
+          progressRef.current = next;
+          return next;
+        });
       }
       const ossUrl = job.downloadUrl?.trim() || null;
       const sessionPreviewUrl =
@@ -421,10 +427,15 @@ export function JianyingMediaRenderActions({
       }
       if (job.status === "PENDING" || job.status === "RUNNING") {
         const settings = settingsRef.current;
+        const monotonicProgress = Math.max(
+          progressRef.current ?? 0,
+          job.progress,
+        );
+        progressRef.current = monotonicProgress;
         patchInFlight({
           jobId: job.id,
           status: inflightStatus(job),
-          progress: job.progress,
+          progress: monotonicProgress,
           // 本地成片已就绪：进度只在 Dock 展示，节点不写上传文案
           progressLabel: localReady ? null : (job.progressLabel ?? null),
           errorMessage: job.uploadFailed
@@ -673,6 +684,21 @@ export function JianyingMediaRenderActions({
         variant: "warning",
       });
       return;
+    }
+    if (burnIn && subtitleMode === "script") {
+      const hasDialogue = videoFrames.some((f) => f.dialogue?.trim());
+      if (!hasDialogue) {
+        await dialogs.alert({
+          title: "无法烧录字幕",
+          message:
+            "当前各镜未解析到分镜对白。请确认：\n" +
+            "1. 脚本表「对白」列已填写；或\n" +
+            "2. 视频节点已连线文本/脚本节点；或\n" +
+            "3. 改用「从视频音频识别 (ASR)」模式。",
+          variant: "warning",
+        });
+        return;
+      }
     }
 
     submittingRef.current = true;

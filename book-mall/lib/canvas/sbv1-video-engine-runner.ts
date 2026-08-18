@@ -2,7 +2,10 @@
  * 分镜视频 1.0 · sbv1-video-engine runner
  */
 import { CanvasProjectError } from "./canvas-project-service";
-import { resolveVolcengineVideoRatio } from "./canvas-video-volcengine";
+import {
+  isVolcengineStoryVideoModelKey,
+  resolveVolcengineVideoRatio,
+} from "./canvas-video-volcengine";
 import {
   runVideoEngineNode,
   type RunEngineNodeArgs,
@@ -127,10 +130,13 @@ export async function runSbv1VideoEngineNode(
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
+  const isVolcengineTextToVideo =
+    isVolcengineStoryVideoModelKey(modelKey) && dockInputMode === "t2v";
   const hasReferenceImages = imageInputs.length > 0 || hasPortraitRefs;
   /** 纯文生视频：无参考图；有 @图片 / 连线参考时保留图片并走 R2V 升级 */
   const isTextToVideoOnly =
-    (isDashscopeT2v || isKlingTextToVideo) && !hasReferenceImages;
+    (isDashscopeT2v || isKlingTextToVideo || isVolcengineTextToVideo) &&
+    !hasReferenceImages;
 
   if (
     !promptRaw &&

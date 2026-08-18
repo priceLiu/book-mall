@@ -128,6 +128,77 @@ export async function createMediaRenderJob(
   return { id: job.id, expiresAt: job.expiresAt, reusedExisting: false };
 }
 
+/** 本进程内正在执行的剪辑（dev 热重载后 Map 清空，轮询可据此恢复孤儿任务） */
+const activeMediaRenderRuns = new Map<string, Promise<void>>();
+const orphanResumeAttemptAt = new Map<string, number>();
+
+/** 刚提交后短暂宽限，避免与 POST enqueue 竞态双开 */
+export const MEDIA_RENDER_ORPHAN_RESUME_GRACE_MS = 45_000;
+/** 同一 job 两次恢复尝试的最小间隔 */
+export const MEDIA_RENDER_ORPHAN_RESUME_COOLDOWN_MS = 30_000;
+/**
+ * RUNNING 且进度已达合片前段（≥50%）时不再自动重跑。
+ * FFmpeg 合片（72%）可能持续数分钟且无中间写库；误恢复会整任务重来并导致进度条回跳。
+ */
+export const MEDIA_RENDER_ORPHAN_RESUME_MAX_PROGRESS = 50;
+
+export function isMediaRenderJobActivelyProcessing(jobId: string): boolean {
+  return activeMediaRenderRuns.has(jobId);
+}
+
+export function shouldResumeOrphanedMediaRenderJob(args: {
+  status: MediaRenderJobStatus;
+  progress: number;
+  createdAt: Date;
+  now?: number;
+  isActivelyProcessing: boolean;
+  lastResumeAttemptAt?: number | null;
+}): boolean {
+  if (
+    args.status !== MediaRenderJobStatus.PENDING &&
+    args.status !== MediaRenderJobStatus.RUNNING
+  ) {
+    return false;
+  }
+  if (args.status === MediaRenderJobStatus.RUNNING && args.progress >= 90) {
+    return false;
+  }
+  if (
+    args.status === MediaRenderJobStatus.RUNNING &&
+    args.progress >= MEDIA_RENDER_ORPHAN_RESUME_MAX_PROGRESS
+  ) {
+    return false;
+  }
+  if (args.isActivelyProcessing) return false;
+  const now = args.now ?? Date.now();
+  if (now - args.createdAt.getTime() < MEDIA_RENDER_ORPHAN_RESUME_GRACE_MS) {
+    return false;
+  }
+  const lastAttempt = args.lastResumeAttemptAt ?? 0;
+  return now - lastAttempt >= MEDIA_RENDER_ORPHAN_RESUME_COOLDOWN_MS;
+}
+
+function maybeResumeOrphanedMediaRenderJob(job: {
+  id: string;
+  status: MediaRenderJobStatus;
+  progress: number;
+  createdAt: Date;
+}): void {
+  if (
+    !shouldResumeOrphanedMediaRenderJob({
+      status: job.status,
+      progress: job.progress,
+      createdAt: job.createdAt,
+      isActivelyProcessing: isMediaRenderJobActivelyProcessing(job.id),
+      lastResumeAttemptAt: orphanResumeAttemptAt.get(job.id) ?? null,
+    })
+  ) {
+    return;
+  }
+  orphanResumeAttemptAt.set(job.id, Date.now());
+  enqueueMediaRenderJob(job.id);
+}
+
 export async function processMediaRenderJob(jobId: string): Promise<void> {
   const job = await prisma.mediaRenderJob.findUnique({ where: { id: jobId } });
   if (!job) return;
@@ -219,7 +290,12 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
 }
 
 export function enqueueMediaRenderJob(jobId: string): void {
-  void processMediaRenderJob(jobId);
+  if (activeMediaRenderRuns.has(jobId)) return;
+  const run = processMediaRenderJob(jobId).finally(() => {
+    activeMediaRenderRuns.delete(jobId);
+    orphanResumeAttemptAt.delete(jobId);
+  });
+  activeMediaRenderRuns.set(jobId, run);
 }
 
 export async function waitForMediaRenderJob(
@@ -303,6 +379,8 @@ export async function getMediaRenderJobForUser(
     },
   });
   if (!job) return null;
+
+  maybeResumeOrphanedMediaRenderJob(job);
 
   const expired =
     job.storageTier === MediaRenderStorageTier.ephemeral &&

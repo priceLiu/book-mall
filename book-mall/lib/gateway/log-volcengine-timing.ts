@@ -370,7 +370,10 @@ export function computeVolcengineTimingBreakdown(input: {
       if (vendorUpdated != null && (st === "running" || st === "processing")) {
         vendorPostProcessMs = Math.max(0, now - vendorUpdated);
       }
-    } else if (genStart != null) {
+    } else if (
+      genStart != null &&
+      (st === "running" || st === "processing" || firstRunning != null)
+    ) {
       generateMs = Math.max(0, now - genStart);
     }
   } else if (vendorCreated != null && vendorUpdated != null) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { signVolcengineOpenApiRequest } from "@/lib/gateway/volcengine-open-api-sign";
 import {
   buildVolcengineCredentialStorage,
+  maskVolcengineCredentialDisplay,
   parseVolcengineGatewayCredential,
   parseVolcenginePortraitCredentialsFromApiKey,
   resolveVolcengineArkApiKey,
@@ -169,5 +170,28 @@ describe("resolveVolcenginePortraitCredentialsFromEnv", () => {
     expect(resolveVolcenginePortraitCredentialsFromEnv()).toBeNull();
     if (prevAk) process.env.VOLCENGINE_ACCESS_KEY = prevAk;
     if (prevSk) process.env.VOLCENGINE_SECRET_ACCESS_KEY = prevSk;
+  });
+});
+
+describe("maskVolcengineCredentialDisplay", () => {
+  it("masks ark and IAM separately for list display", () => {
+    const raw = JSON.stringify({
+      apiKey: "ark-9b038b6a-aac6-41b4-aca5-26fa9f69fd0c-a2d2f",
+      accessKeyId: "AKLTZWJlTEST",
+      secretAccessKey: "sk-secret-value",
+    });
+    expect(maskVolcengineCredentialDisplay(raw)).toEqual({
+      arkApiKeyMasked: "ark-****2d2f",
+      portraitAccessKeyMasked: "AKLT****TEST",
+      hasPortraitIam: true,
+    });
+  });
+
+  it("reports missing IAM", () => {
+    expect(maskVolcengineCredentialDisplay("ark-only-key-12345678")).toEqual({
+      arkApiKeyMasked: "ark-****5678",
+      portraitAccessKeyMasked: null,
+      hasPortraitIam: false,
+    });
   });
 });

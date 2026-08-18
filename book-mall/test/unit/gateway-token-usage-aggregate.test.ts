@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isTextToVideoInput } from "@/lib/billing/byok-pricing";
+import { isTextToVideoInput } from "@/lib/billing/gateway-log-classifier";
 import {
   aggregateGatewayTokenUsageFromLogs,
   matchesSeedance20ModelKey,

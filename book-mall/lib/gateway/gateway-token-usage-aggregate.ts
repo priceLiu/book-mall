@@ -9,7 +9,7 @@ import {
   isPortraitLibraryGatewayLog,
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
-import { isTextToVideoInput } from "@/lib/billing/byok-pricing";
+import { isTextToVideoInput } from "@/lib/billing/gateway-log-classifier";
 import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
 import {
   resolveBillableImageCountFromLog,

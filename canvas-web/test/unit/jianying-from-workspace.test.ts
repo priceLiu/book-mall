@@ -107,6 +107,59 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     expect(dialogueFromScriptHubByFrameIndex(nodes, 2)).toBe("小蓝：再见");
   });
 
+  it("resolves sbv1 upstream starter text as dialogue by clip sequence", () => {
+    const exportId = "export-1";
+    const storyboardMd = `| 镜号 | 对白 |
+| --- | --- |
+| 1 | 旁白：开场白 |
+| 2 | 旁白：第二句 |`;
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v1", 100, "https://oss/a.mp4"),
+      videoNode("v2", 200, "https://oss/b.mp4"),
+      {
+        id: "starter-1",
+        type: "story-pro2-starter",
+        position: { x: -100, y: 0 },
+        data: { dockInput: storyboardMd },
+      },
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      {
+        id: "text-v1",
+        source: "starter-1",
+        target: "v1",
+        sourceHandle: "text",
+        targetHandle: "in_text",
+      },
+      {
+        id: "text-v2",
+        source: "starter-1",
+        target: "v2",
+        sourceHandle: "text",
+        targetHandle: "in_text",
+      },
+      {
+        id: "e1",
+        source: "v1",
+        target: exportId,
+        sourceHandle: "out_video",
+        targetHandle: "in_video",
+      },
+      {
+        id: "e2",
+        source: "v2",
+        target: exportId,
+        sourceHandle: "out_video",
+        targetHandle: "in_video",
+      },
+    ];
+
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
+    expect(snap.frames[0]?.dialogue).toBe("旁白：开场白");
+    expect(snap.frames[1]?.dialogue).toBe("旁白：第二句");
+  });
+
   it("prefers LibTV edges over workspace columns", () => {
     const exportId = "export-1";
     const nodes: CanvasFlowNode[] = [

@@ -2,7 +2,6 @@
  * 统一积分计费 — 积分账户与流水（unified-credit-billing）
  *
  * 模式 A（平台 Key / 会员）：从 CreditAccount 扣 creditsCharged；失败/取消全额返还。
- * 模式 B（BYOK）：不扣积分，写 ResourceMeterEvent 计量，按月结算 BYOK 费。
  *
  * 所有写操作在事务内更新余额 + 落流水（含 balanceAfter 与幂等键）。
  */
@@ -910,14 +909,14 @@ export async function adjustCredits(input: {
   });
 }
 
-// ——————————————————— BYOK 资源计量 ———————————————————
+// ——————————————————— 资源计量（BYOK 退役，恒空） ———————————————————
 
 function periodKeyOf(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** 记录一条 BYOK 资源用量事件（OSS / 出网 / 任务数）。 */
-export async function recordResourceMeter(input: {
+/** @deprecated BYOK 资源计量已退役 */
+export async function recordResourceMeter(_input: {
   ref: AccountRef;
   resourceType: ResourceMeterType;
   quantity: number;
@@ -925,37 +924,15 @@ export async function recordResourceMeter(input: {
   refId?: string | null;
   periodKey?: string;
 }) {
-  const rate = await prisma.resourceMeterRate.findUnique({ where: { resourceType: input.resourceType } });
-  const coef = rate ? Number(rate.coefficientYuan) : 0;
-  const costYuan = input.quantity * coef;
-  return prisma.resourceMeterEvent.create({
-    data: {
-      ownerType: input.ref.ownerType,
-      ownerId: input.ref.ownerId,
-      resourceType: input.resourceType,
-      quantity: input.quantity,
-      costYuan,
-      refType: input.refType ?? null,
-      refId: input.refId ?? null,
-      periodKey: input.periodKey ?? periodKeyOf(),
-    },
-  });
+  return null;
 }
 
-/** 某账户某月 BYOK 资源费汇总。 */
-export async function sumResourceFees(ref: AccountRef, periodKey = periodKeyOf()) {
-  const events = await prisma.resourceMeterEvent.groupBy({
-    by: ["resourceType"],
-    where: { ownerType: ref.ownerType, ownerId: ref.ownerId, periodKey },
-    _sum: { quantity: true, costYuan: true },
-  });
-  const byType = events.map((e) => ({
-    resourceType: e.resourceType,
-    quantity: Number(e._sum.quantity ?? 0),
-    costYuan: Number(e._sum.costYuan ?? 0),
-  }));
-  const totalYuan = byType.reduce((s, b) => s + b.costYuan, 0);
-  return { periodKey, byType, totalYuan };
+/** @deprecated BYOK 资源计量已退役 */
+export async function sumResourceFees(
+  _ref: AccountRef,
+  periodKey = periodKeyOf(),
+) {
+  return { periodKey, byType: [], totalYuan: 0 };
 }
 
 // ——————————————————— 用量中心查询 ———————————————————

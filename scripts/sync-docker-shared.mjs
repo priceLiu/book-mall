@@ -30,6 +30,9 @@ const APP_SHARED_MAP = {
     "platform-assistant",
     "publisher-client",
   ],
+  "tool-web": ["platform-assistant"],
+  "finance-web": ["platform-assistant"],
+  "gateway-web": ["platform-assistant"],
 };
 
 function listDirNames(path) {

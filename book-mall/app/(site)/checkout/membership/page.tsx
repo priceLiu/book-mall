@@ -29,7 +29,7 @@ export default async function CheckoutMembershipPage({
   if (!planId) redirect("/pricing?error=no-plan");
 
   try {
-    await assertBillingPersona(session.user.id, ["PLATFORM_CREDIT", "BYOK"]);
+    await assertBillingPersona(session.user.id, ["PLATFORM_CREDIT"]);
   } catch (e) {
     if (e instanceof BillingPersonaError && e.code === "PERSONA_REQUIRED") {
       redirect(
