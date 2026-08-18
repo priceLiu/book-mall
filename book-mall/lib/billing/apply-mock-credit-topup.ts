@@ -42,7 +42,6 @@ export async function applyMockCreditTopup(input: {
   const res = await topupCredits({
     ref: { ownerType, ownerId },
     credits: pack.credits,
-    pool: pack.pool,
     refType: "mock_topup_order",
     refId: orderId,
     idempotencyKey: orderId,

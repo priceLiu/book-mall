@@ -378,23 +378,12 @@ export function CanvasToolbar({
             CANVAS_TOOLBAR_META_CHIP_CLASS,
             "hidden min-w-0 truncate lg:inline-flex",
           )}
-          title="剩余积分（文本池 / 视频池）"
+          title="剩余积分"
           aria-live="polite"
         >
           <span className="text-white/50">剩余积分</span>
-          <span className="mx-1 text-white/25" aria-hidden>
-            ·
-          </span>
-          <span className="text-white/55">文本</span>
           <span className="ml-1 tabular-nums font-medium text-white/90">
-            {formatCreditBalance(creditPools.general)}
-          </span>
-          <span className="mx-1.5 text-white/20" aria-hidden>
-            |
-          </span>
-          <span className="text-white/55">视频</span>
-          <span className="ml-1 tabular-nums font-medium text-white/90">
-            {formatCreditBalance(creditPools.video)}
+            {formatCreditBalance(creditPools.total)}
           </span>
         </span>
 

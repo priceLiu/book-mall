@@ -1,8 +1,8 @@
 # VIP 大额套餐（按充值金额定制）
 
 > 面向大额预充客户（如 ¥20 万对等积分，**起订 ¥100,000**）的定制套餐：
-> 财务后台按充值金额测算「通用多 / 视频多」两套积分方案供客户二选一，
-> 一键开通 VIP 团队并一次性发放双池积分。VIP 积分**永久有效、不清零**（批次 `source=TOPUP`、`expiresAt=null`；见 `19-credit-expiry`）。
+> 财务后台按充值金额测算「均衡 / 视频偏重」两套 **总积分** 方案供客户二选一，
+> 一键开通 VIP 团队并一次性发放单池积分。VIP 积分**5 年有效**（批次 `source=TOPUP`；见 `19-credit-expiry`）。
 
 ## 1. 形态
 
@@ -10,17 +10,29 @@
 - **一次性预充**：`monthlyGrantCredits=0`、`videoMonthlyGrant=0`、`currentPeriodEnd=null`——
   月度重置（`runMonthlyResetSweep` 仅扫 `currentPeriodEnd<=now` 且 `monthlyGrantCredits>0`）据此**天然跳过**该账户；
   批次 `expiresAt=null` 使到期清扫（`sweepExpiredLots`）永不清零 VIP 积分。
-- 席位可自主分配：`seatLimit` 由财务设定；`perSeatCapCredits` 默认取「通用积分 ÷ 席位」平均值（治理用）。
+- 席位可自主分配：`seatLimit` 由财务设定；`perSeatCapCredits` 默认取「总积分 ÷ 席位」平均值（治理用）。
 
-## 2. 测算口径（保证毛利）
+## 2. 测算口径 v2（单积分池 · 毛利护栏）
 
-- 保守满额消耗：**通用 ¥0.016/积分**（锚定 ¥0.04 ÷ M 2.5）、**视频 ¥0.0267/积分**（锚定 ¥0.04 ÷ M 1.5，取保守低毛利）。
-- 令充值金额 `A`、目标毛利 `m`、视频占比 `f`：
-  - 混合单位成本 `c(f) = (1−f)·0.016 + f·0.0267`
-  - 每积分售价 `p = c(f) ÷ (1−m)`
-  - **总积分 `T = A ÷ p`**，通用 `= (1−f)·T`，视频 `= f·T`
-- **毛利由「调总积分」恒定保证**：视频占比越高、同毛利下总积分越少。
-- 两方案：**通用多**（默认 `f=15%`）/ **视频多**（默认 `f=40%`），`f` 与目标毛利均可在后台调整。
+与全站 [21-unified-credit-formula-v2](21-unified-credit-formula-v2.md) 一致：**一种积分、人人同一扣分**；VIP 一次性发放 **总积分** 进团队共享池（`videoCredits=0`）。
+
+**锚定最坏模型**（Seedance 2.0 15s）：`U₀=525`，净成本 `C=¥15` → `c_worst = 15/525` 元/积分。
+
+**用量画像** `f`（预期视频算力占总消耗的比例，非双池拆分）：
+
+- 轻量单位成本 `c_light = ¥0.016/积分`（图文/文本保守）
+- 混合成本 `c_blend(f) = (1−f)·c_light + f·c_worst`
+- 目标毛利 `m`、充值 `A`：`T = A·(1−m) / c_blend(f)` → **总积分**
+- **锚定护栏**：若客户全部用于 Seedance 15s，毛利 `g = 1 − c_worst/ppc`；不足 **22%** 时下调整 `T`
+
+两方案（客户二选一）：
+
+| 方案 | 默认 f | 说明 |
+|------|--------|------|
+| **均衡** | 15% | 偏图文/文本，总积分更多 |
+| **视频偏重** | 40% | 偏短视频/数字人，总积分较少、锚定毛利更高 |
+
+毛利由「调总积分」在预期用量下恒定；锚定 Seedance 15s 毛利 **≥ 22%**（默认目标毛利 50% 时通常远高于护栏）。
 
 ## 3. 实现
 
@@ -28,7 +40,7 @@
 |---|---|
 | 纯函数测算 | `book-mall/lib/finance/vip-package-calculator.ts`（`computeVipPackageQuote` / `computeVipCreditScheme` / 席位分配与守恒校验） |
 | 单元测试 | `book-mall/test/unit/vip-package-calculator.test.ts` |
-| 开通服务 | `book-mall/lib/finance/vip-package-service.ts` · `provisionVipPackage`（建 VIP 团队 + `grantCredits` 双池发放，幂等键 `vip_grant:<tenantId>`） |
+| 开通服务 | `book-mall/lib/finance/vip-package-service.ts` · `provisionVipPackage`（建 VIP 团队 + `grantCredits` 单池发放，幂等键 `vip_grant:<tenantId>`） |
 | 测算 API | `POST /api/finance/admin/vip-packages/quote`（`canViewFinanceCost`） |
 | 开通 API | `POST /api/finance/admin/vip-packages/provision`（`canManagePricing`） |
 | 后台页 | finance-web `/admin/vip-packages`（`FinanceAdminGate require="managePricing"`） |

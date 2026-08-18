@@ -9,10 +9,8 @@ import {
   resolveCostSnapshot,
 } from "@/lib/gateway/credit-billing-guard";
 import {
-  audioBillableSeconds,
   computeLlmSplitChargeCredits,
-  computeTierCredits,
-  videoBillableSeconds,
+  computeUnifiedChargeCredits,
 } from "@/lib/pricing/credit-pricing-formulas";
 
 import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
@@ -170,8 +168,10 @@ export async function previewModelCredits(
     });
   } else {
     const units = billableUnits(snap.unit, input, canonical);
-    const totalList = (snap.listPriceYuan ?? 0) * units;
-    estimatedCredits = computeTierCredits(totalList, ppc);
+    estimatedCredits = computeUnifiedChargeCredits({
+      creditsPerUnit,
+      units,
+    });
   }
 
   return {

@@ -36,7 +36,6 @@ export async function chargeMediaRenderJobCredits(args: {
   await consumeCredits({
     ref: args.ref,
     credits,
-    pool: "GENERAL",
     actorUserId: args.actorUserId,
     idempotencyKey: `media_render:${args.jobId}`,
     description: usesMediaRenderAsr(args.profile)

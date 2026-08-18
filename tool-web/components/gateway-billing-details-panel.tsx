@@ -25,7 +25,7 @@ const DISPLAY_KEYS = [
 type BillingDetailsPayload = {
   source?: string;
   tab?: "usage" | "charge";
-  poolBalances?: { general: number; video: number };
+  balanceCredits?: number;
   totalCalls?: number;
   succeededCalls?: number;
   failedCalls?: number;
@@ -89,7 +89,7 @@ export function GatewayBillingDetailsPanel() {
     [rows],
   );
 
-  const pools = payload?.poolBalances;
+  const balanceCredits = payload?.balanceCredits ?? payload?.balancePoints;
 
   return (
     <section className={styles.gatewayPanel} aria-label="Gateway 扣减明细">
@@ -134,10 +134,9 @@ export function GatewayBillingDetailsPanel() {
       </div>
 
       <div className={styles.gatewayStats} aria-live="polite">
-        {pools ? (
+        {balanceCredits != null ? (
           <span className={styles.gatewayStatChip}>
-            通用池 {pools.general.toLocaleString("zh-CN")} · 视频池{" "}
-            {pools.video.toLocaleString("zh-CN")}
+            积分余额 {balanceCredits.toLocaleString("zh-CN")}
           </span>
         ) : null}
         {tab === "charge" && rows.length > 0 ? (

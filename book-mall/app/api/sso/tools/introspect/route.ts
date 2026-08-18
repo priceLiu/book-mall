@@ -16,7 +16,7 @@ import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
-import { getCreditBalance, getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getCreditBalance } from "@/lib/billing/credit-account-service";
 import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
@@ -178,20 +178,10 @@ export const GET = withApiDbGuard(async (req) => {
     verified.tenant_id ?? null,
   );
   let creditBalance: number | null = null;
-  let creditPools: { general: number; video: number } | null = null;
   if (tenantCtx) {
     creditBalance = await getCreditBalance(tenantCtx.billingOwnerRef).catch(
       () => null,
     );
-    const pools = await getPoolBalances(tenantCtx.billingOwnerRef).catch(
-      () => null,
-    );
-    if (pools) {
-      creditPools = {
-        general: pools.general.balance,
-        video: pools.video.balance,
-      };
-    }
   }
 
   const payload = {
@@ -213,7 +203,7 @@ export const GET = withApiDbGuard(async (req) => {
     role_type: tenantCtx?.role ?? null,
     seat_id: tenantCtx?.seatId ?? null,
     credit_balance: creditBalance,
-    credit_pools: creditPools,
+    credit_balance_total: creditBalance,
     email: elig.email,
     phone: elig.phone,
     name: elig.name,

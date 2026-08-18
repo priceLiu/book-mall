@@ -23,6 +23,7 @@
 | [**12-platform-app-federation.md**](./product/12-platform-app-federation.md) | **平台联邦架构**（独立部署、门户、Book SSO、Gateway、第三方接入） |
 | [**13-tool-service-fee-and-wallet.md**](./product/13-tool-service-fee-and-wallet.md) | **工具技术服务费与钱包**（月费 + Gateway BYOK，退役按次扣点） |
 | [**20-platform-api-member-proposal.md**](./product/20-platform-api-member-proposal.md) | **API 会员方案**（定价 · **订阅价格 / API 价格** 双页 · HTTP Key · 未实施） |
+| [**21-unified-credit-formula-v2.md**](./product/21-unified-credit-formula-v2.md) | **单积分统一计价 v2**（一种积分、人人同 U₀、ppc 价差、毛利护栏） |
 | [**14-tenant-team-design.md**](./product/14-tenant-team-design.md) | **租户/团队体系完整设计**（租户/席位/RBAC/资源共享/财务对账/使用明细/单会话；待评审） |
 | [**15-team-usage-manual.md**](./product/15-team-usage-manual.md) | **团队/公司版使用手册**（开通/成员席位/公共私有库/账单对账/BYOK/FAQ） |
 | [**我的AI空间.md**](./product/我的AI空间.md) | **我的 AI 空间**（个人中心跨应用 Pin、数字人/音频/视频库、合成创作台） |

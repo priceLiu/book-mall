@@ -55,7 +55,6 @@ export async function createInvite(input: {
   createdById: string;
   sendIp?: string | null;
   plannedGeneralCredits?: number | null;
-  plannedVideoCredits?: number | null;
 }) {
   const phone = normalizePhone(input.phone);
   if (!phone) {
@@ -106,8 +105,6 @@ export async function createInvite(input: {
       createdById: input.createdById,
       plannedGeneralCredits:
         input.plannedGeneralCredits != null ? Math.max(0, Math.round(input.plannedGeneralCredits)) : null,
-      plannedVideoCredits:
-        input.plannedVideoCredits != null ? Math.max(0, Math.round(input.plannedVideoCredits)) : null,
     },
   });
 

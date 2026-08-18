@@ -5,13 +5,15 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell } from "@/components/finance-page-shell";
 import { financeApiPost } from "@/lib/finance-viewer";
 
+const VIP_CREDIT_VALIDITY_YEARS = 5;
+
 type Scheme = {
   videoFraction: number;
   pricePerCreditYuan: number;
   totalCredits: number;
-  generalCredits: number;
-  videoCredits: number;
   actualMargin: number;
+  anchorMarginRate: number;
+  anchorMarginOk: boolean;
   faceValueYuan: number;
   costYuan: number;
 };
@@ -121,16 +123,15 @@ export function VipPackagesClient() {
           />
           {title}
         </span>
-        <span className="text-xs text-[#8c8c8c]">视频占比 {(s.videoFraction * 100).toFixed(0)}%</span>
+        <span className="text-xs text-[#8c8c8c]">视频用量 {(s.videoFraction * 100).toFixed(0)}%</span>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-1 text-sm text-[#262626]">
         <div>总积分：<b>{credits(s.totalCredits)}</b></div>
-        <div>实际毛利：<b>{(s.actualMargin * 100).toFixed(1)}%</b></div>
-        <div>通用：{credits(s.generalCredits)}</div>
-        <div>视频：{credits(s.videoCredits)}</div>
+        <div>预期毛利：<b>{(s.actualMargin * 100).toFixed(1)}%</b></div>
+        <div>锚定 Seedance 15s 毛利：<b>{(s.anchorMarginRate * 100).toFixed(1)}%</b></div>
         <div>每积分售价：¥{s.pricePerCreditYuan.toFixed(5)}</div>
         <div>锚定面值：{yuan(s.faceValueYuan)}</div>
-        <div className="col-span-2 text-xs text-[#8c8c8c]">平台成本：{yuan(s.costYuan)}</div>
+        <div className="col-span-2 text-xs text-[#8c8c8c]">预期平台成本：{yuan(s.costYuan)}</div>
       </div>
     </label>
   );
@@ -139,8 +140,8 @@ export function VipPackagesClient() {
     <FinancePageShell>
       <h1 className="text-lg font-medium text-[#262626]">VIP 大额套餐 · 测算与开通</h1>
       <p className="text-xs text-[#8c8c8c]">
-        大额预充客户（起订 ¥100,000）。输入充值金额与目标毛利，生成「通用多 / 视频多」两方案；毛利由调总积分恒定保证。
-        口径（保守满额消耗）：通用 ¥0.016/积分、视频 ¥0.0267/积分。VIP 积分一次性发放、长期有效、不清零。
+        大额预充（起订 ¥100,000）。单积分池 · 人人同一扣分；输入充值金额与目标毛利，生成「均衡 / 视频偏重」两套总积分方案。
+        锚定 Seedance 15s 毛利护栏 ≥22%。VIP 积分一次性发放、{VIP_CREDIT_VALIDITY_YEARS} 年有效。
       </p>
 
       <div className="rounded border border-[#e8e8e8] bg-[#fafcff] p-4">
@@ -154,11 +155,11 @@ export function VipPackagesClient() {
             <input className={inputCls} type="number" min={0} max={99} value={marginPct} onChange={(e) => setMarginPct(e.target.value)} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-[#595959]">通用多方案 · 视频占比（%）</span>
+            <span className="mb-1 block text-xs text-[#595959]">均衡方案 · 视频用量占比（%）</span>
             <input className={inputCls} type="number" min={0} max={100} value={generalHeavyPct} onChange={(e) => setGeneralHeavyPct(e.target.value)} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-[#595959]">视频多方案 · 视频占比（%）</span>
+            <span className="mb-1 block text-xs text-[#595959]">视频偏重方案 · 视频用量占比（%）</span>
             <input className={inputCls} type="number" min={0} max={100} value={videoHeavyPct} onChange={(e) => setVideoHeavyPct(e.target.value)} />
           </label>
         </div>
@@ -176,12 +177,12 @@ export function VipPackagesClient() {
       {quote ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
-            {renderScheme("方案 A · 通用多", quote.schemeGeneralHeavy, "general_heavy")}
-            {renderScheme("方案 B · 视频多", quote.schemeVideoHeavy, "video_heavy")}
+            {renderScheme("方案 A · 均衡", quote.schemeGeneralHeavy, "general_heavy")}
+            {renderScheme("方案 B · 视频偏重", quote.schemeVideoHeavy, "video_heavy")}
           </div>
 
           <div className="rounded border border-[#e8e8e8] bg-white p-4">
-            <h2 className="text-sm font-medium text-[#262626]">开通 VIP 团队（选定方案：{chosen === "video_heavy" ? "视频多" : "通用多"}）</h2>
+            <h2 className="text-sm font-medium text-[#262626]">开通 VIP 团队（选定方案：{chosen === "video_heavy" ? "视频偏重" : "均衡"}）</h2>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="text-sm">
                 <span className="mb-1 block text-xs text-[#595959]">客户 ownerUserId</span>

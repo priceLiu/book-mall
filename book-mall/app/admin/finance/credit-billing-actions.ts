@@ -60,7 +60,7 @@ export async function savePricingConfigAction(formData: FormData): Promise<Actio
   const minMarginGuard = num(formData.get("minMarginGuard"), 0.3);
   const defaultVideoSec = Math.max(1, Math.round(num(formData.get("defaultVideoSec"), 15)));
   const videoMarginM = num(formData.get("videoMarginM"), 1.5);
-  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), -0.02);
+  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), 0.22);
   if (creditAnchorYuan <= 0) return { ok: false, error: "锚定单价必须大于 0" };
   await prisma.platformPricingConfig.upsert({
     where: { id: "default" },
@@ -303,17 +303,11 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
   const originalYuan = originalRaw ? Number(originalRaw) : null;
   const promoLabel = str(formData.get("promoLabel")) || null;
   const monthlyCredits = Math.round(num(formData.get("monthlyCredits")));
-  const videoMonthlyRaw = formData.get("videoMonthlyCredits");
-  const videoMonthlyCredits =
-    videoMonthlyRaw != null && String(videoMonthlyRaw).trim() !== ""
-      ? Math.max(0, Math.round(num(videoMonthlyRaw)))
-      : Math.round(monthlyCredits * 0.2);
   const includedSeats = Math.max(1, Math.round(num(formData.get("includedSeats"), 1)));
   const active = formData.get("active") === "on" || formData.get("active") === "true";
   const pricePerCreditYuan = derivePricePerCredit(priceYuan, monthlyCredits, includedSeats);
 
   if (!family || !interval || !tier) return { ok: false, error: "类型/周期/档位必填" };
-  if (videoMonthlyCredits > monthlyCredits) return { ok: false, error: "视频池积分不能超过月积分" };
 
   const existingPlans = await prisma.membershipPlan.findMany({
     where: { active: true },
@@ -369,7 +363,6 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
     originalYuan,
     promoLabel,
     monthlyCredits,
-    videoMonthlyCredits,
     pricePerCreditYuan,
     includedSeats,
     active,

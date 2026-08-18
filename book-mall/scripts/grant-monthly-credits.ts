@@ -63,7 +63,6 @@ async function main() {
       ownerId: true,
       balanceCredits: true,
       monthlyGrantCredits: true,
-      videoMonthlyGrant: true,
       perSeatCapCredits: true,
       planId: true,
       currentPeriodEnd: true,
@@ -118,7 +117,6 @@ async function main() {
     const res = await resetMonthlyCredits({
       ref: { ownerType: acc.ownerType, ownerId: acc.ownerId },
       monthlyGrantCredits: acc.monthlyGrantCredits,
-      videoMonthlyGrantCredits: acc.videoMonthlyGrant ?? 0,
       periodKey,
       planId: acc.planId,
       nextPeriodEnd,

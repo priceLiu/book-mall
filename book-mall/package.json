@@ -9,7 +9,7 @@
     "dev": "prisma generate && next dev",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:finance-integration": "dotenv -e .env.local -- tsx test/integration/finance-2.0-video.integration.ts",
+    "test:finance-integration": "dotenv -e .env.local -- tsx test/integration/unified-credit-single-pool.integration.ts && dotenv -e .env.local -- tsx test/integration/finance-2.0-video.integration.ts",
     "test:gen-hotcold-integration": "dotenv -e .env.local -- tsx test/integration/gen-hotcold.integration.ts",
     "test:credit-lot-integration": "dotenv -e .env.local -- tsx test/integration/credit-lot-expiry.integration.ts",
     "build": "dotenv -e .env.local -- prisma migrate deploy && prisma generate && next build",

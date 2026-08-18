@@ -10,6 +10,7 @@ import {
   getFinanceSession,
 } from "@/lib/finance/finance-api";
 import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
+import { buildUnifiedFormulaSimulation } from "@/lib/pricing/unified-credit-formula";
 import { prisma } from "@/lib/prisma";
 import {
   previewCreditPriceAction,
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
 
   return financeJson(request, {
     config,
+    simulation: buildUnifiedFormulaSimulation(config),
     models: [...byKey.values()].map((p) => ({
       canonicalModelKey: p.canonicalModelKey,
       vendor: p.vendor,

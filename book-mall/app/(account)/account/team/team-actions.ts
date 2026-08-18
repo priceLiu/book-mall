@@ -130,10 +130,8 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
   const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: tenant.id },
-    credits: grants.generalCredits,
-    videoCredits: grants.videoCredits,
+    credits: grants.credits,
     monthlyGrantCredits: grants.monthlyGrantCredits,
-    videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
     pricePerCreditYuan: quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
     planId,
     currentPeriodEnd: creditPeriodEnd,
@@ -180,11 +178,9 @@ export async function inviteMemberAction(
       sendIp,
       plannedGeneralCredits: (() => {
         const raw = str(formData.get("plannedGeneralCredits"));
-        return raw === "" ? null : Math.max(0, Math.round(Number(raw)));
-      })(),
-      plannedVideoCredits: (() => {
-        const raw = str(formData.get("plannedVideoCredits"));
-        return raw === "" ? null : Math.max(0, Math.round(Number(raw)));
+        if (raw === "") return null;
+        const total = Math.max(0, Math.round(Number(raw)));
+        return total > 0 ? total : null;
       })(),
     });
     revalidatePath("/account/team");

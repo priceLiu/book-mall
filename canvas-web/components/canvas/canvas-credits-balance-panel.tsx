@@ -11,7 +11,7 @@ function formatBalance(n: number | null): string {
 
 /** 画布右下角 · 剩余积分（单行） */
 export function CanvasCreditsBalancePanel() {
-  const { general, video } = useCanvasCreditBalance();
+  const { total } = useCanvasCreditBalance();
 
   return (
     <Panel position="bottom-right" className="!m-0 !mb-4 !mr-4">
@@ -23,16 +23,8 @@ export function CanvasCreditsBalancePanel() {
         <span className="mx-1.5 text-white/25" aria-hidden>
           ·
         </span>
-        <span className="text-white/55">文本</span>
-        <span className="ml-1 tabular-nums font-medium text-white/90">
-          {formatBalance(general)}
-        </span>
-        <span className="mx-2 text-white/20" aria-hidden>
-          |
-        </span>
-        <span className="text-white/55">视频</span>
-        <span className="ml-1 tabular-nums font-medium text-white/90">
-          {formatBalance(video)}
+        <span className="tabular-nums font-medium text-white/90">
+          {formatBalance(total)}
         </span>
       </div>
     </Panel>

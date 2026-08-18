@@ -17,8 +17,7 @@ export const dynamic = "force-dynamic";
 const seatPlanSchema = z.object({
   phone: z.string().optional().nullable(),
   role: z.enum(["OWNER", "MEMBER"]).optional(),
-  generalCredits: z.number().int().min(0),
-  videoCredits: z.number().int().min(0),
+  credits: z.number().int().min(0),
   label: z.string().max(32).optional().nullable(),
 });
 
@@ -40,7 +39,7 @@ export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
 }
 
-/** finance-web：开通 VIP 大额套餐（创建团队租户 + 发放双池积分）。仅财务管理员。 */
+/** finance-web：开通 VIP 大额套餐（创建团队租户 + 发放单池积分）。仅财务管理员。 */
 export async function POST(request: NextRequest) {
   const user = await getFinanceSession();
   if (!user) return financeUnauthorized(request);

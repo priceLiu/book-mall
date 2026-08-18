@@ -17,22 +17,19 @@ import {
   audioBillableSeconds,
   computeChargeCreditsFromSnapshot,
   computeLlmSplitChargeCredits,
-  computeTierCredits,
   isVideoBillingUnit,
   videoBillableSeconds,
   wan30BillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
 import {
   consumeCredits,
-  getPoolBalances,
+  getAccountCreditBalances,
   refundCredits,
   releaseReserved,
   reserveCredits,
-  resolveVideoPool,
   settleReserved,
   InsufficientCreditsError,
   type AccountRef,
-  type PoolKind,
 } from "./credit-account-service";
 import { consumeTeamCredits } from "./seat-billing-service";
 import { settleByokOverage } from "./byok-overage-service";
@@ -118,17 +115,17 @@ export async function computeExpectedVideoCreditsForLog(
       inputSummary: log.inputSummary,
     }).catch(() => null));
   if (!canonical) return null;
-  const snap = await resolveCostSnapshot(canonical);
-  if (!snap) return null;
-  const pools = await getPoolBalances(target.ref);
+  const costSnap = await resolveCostSnapshot(canonical);
+  if (!costSnap) return null;
+  const accountSnap = await getAccountCreditBalances(target.ref);
   const durationSec =
     metrics?.durationSec != null && metrics.durationSec > 0
       ? videoBillableSeconds(metrics.durationSec)
       : resolveBillableVideoSecondsFromLog(log);
   return computeVideoChargeCredits({
-    snapshot: snap,
+    snapshot: costSnap,
     durationSec,
-    pricePerCreditYuan: pools.pricePerCreditYuan,
+    pricePerCreditYuan: accountSnap.pricePerCreditYuan,
   });
 }
 
@@ -313,33 +310,33 @@ export async function settleSucceededGatewayLog(input: {
   const target = await resolveLogBillingTarget(input.log);
   if (!target) return 0;
 
-  const snap = input.snapshot;
-  const isVideo = isVideoLog(input.log, snap?.unit ?? null);
+  const costSnap = input.snapshot;
+  const isVideo = isVideoLog(input.log, costSnap?.unit ?? null);
 
   // 视频：以 RESERVE 流水为唯一真值结算，避免「冻结额 ≠ 结算额」造成幻影冻结/重复扣。
   if (isVideo) {
-    return settleVideoFromReserve(target, input.log, snap, input.metrics);
+    return settleVideoFromReserve(target, input.log, costSnap, input.metrics);
   }
 
   // 文本/图像：需有报价快照才扣费。
-  if (!snap) return 0;
+  if (!costSnap) return 0;
 
-  const pools = await getPoolBalances(target.ref);
+  const accountSnap = await getAccountCreditBalances(target.ref);
   const unitMetrics = {
     ...input.metrics,
-    isVideo: isVideoLog(input.log, snap?.unit ?? null),
-    isAsr: isAsrCanonical(snap?.canonicalModelKey ?? input.log.canonicalModelKey),
-    isWan30: isWan30Model(input.log.model, snap?.canonicalModelKey ?? input.log.canonicalModelKey),
+    isVideo: isVideoLog(input.log, costSnap.unit ?? null),
+    isAsr: isAsrCanonical(costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
+    isWan30: isWan30Model(input.log.model, costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
   };
-  const units = billableUnitCount(snap.unit, unitMetrics);
+  const units = billableUnitCount(costSnap.unit, unitMetrics);
   const credits = computeChargeCredits({
-    snapshot: snap,
+    snapshot: costSnap,
     units,
-    pricePerCreditYuan: pools.pricePerCreditYuan,
+    pricePerCreditYuan: accountSnap.pricePerCreditYuan,
     promptTokens: input.metrics.promptTokens,
     completionTokens: input.metrics.completionTokens,
     totalTokens: input.metrics.totalTokens,
-    unit: snap.unit,
+    unit: costSnap.unit,
   });
   if (credits === 0) {
     await recordBillingSettlement({
@@ -360,9 +357,9 @@ export async function settleSucceededGatewayLog(input: {
         credits,
         seatId: target.seatId,
         gatewayLogId: input.log.id,
-        canonicalModelKey: snap.canonicalModelKey,
-        costSnapshotYuan: snap.netCostYuan,
-        marginSnapshot: snap.marginRate,
+        canonicalModelKey: costSnap.canonicalModelKey,
+        costSnapshotYuan: costSnap.netCostYuan,
+        marginSnapshot: costSnap.marginRate,
         periodStart: monthStartUtc(),
         allowNegative: true,
       });
@@ -380,9 +377,9 @@ export async function settleSucceededGatewayLog(input: {
         credits,
         actorUserId: target.actorUserId,
         gatewayLogId: input.log.id,
-        canonicalModelKey: snap.canonicalModelKey,
-        costSnapshotYuan: snap.netCostYuan,
-        marginSnapshot: snap.marginRate,
+        canonicalModelKey: costSnap.canonicalModelKey,
+        costSnapshotYuan: costSnap.netCostYuan,
+        marginSnapshot: costSnap.marginRate,
         description: platformConsumeDescription(input.log, units),
         allowNegative: true,
       });
@@ -414,19 +411,19 @@ async function settleVideoFromReserve(
   metrics: { durationSec?: number | null; images?: number | null; totalTokens?: number | null },
 ): Promise<number> {
   const billableSec = resolveVideoDurationSec(log, metrics);
-  const pools = await getPoolBalances(target.ref);
+  const accountSnap = await getAccountCreditBalances(target.ref);
   const settleCredits =
     snap != null
       ? computeVideoChargeCredits({
           snapshot: snap,
           durationSec: billableSec,
-          pricePerCreditYuan: pools.pricePerCreditYuan,
+          pricePerCreditYuan: accountSnap.pricePerCreditYuan,
         }).credits
       : 0;
 
   const reserveLedger = await prisma.creditLedger.findUnique({
     where: { idempotencyKey: `reserve:${log.id}` },
-    select: { credits: true, pool: true },
+    select: { credits: true },
   });
   if (reserveLedger) {
     const frozen = Math.abs(reserveLedger.credits);
@@ -436,7 +433,6 @@ async function settleVideoFromReserve(
       await settleReserved({
         ref: target.ref,
         credits: chargeCredits,
-        pool: reserveLedger.pool,
         actorUserId: target.actorUserId,
         seatId: target.seatId,
         gatewayLogId: log.id,
@@ -449,7 +445,6 @@ async function settleVideoFromReserve(
         await releaseReserved({
           ref: target.ref,
           credits: overcharge,
-          pool: reserveLedger.pool,
           gatewayLogId: log.id,
           idempotencyKey: `release-overcharge:${log.id}`,
           description: `视频按时长结算退还（${billableSec} 秒，预扣 ${frozen} → 实扣 ${chargeCredits}）`,
@@ -459,7 +454,6 @@ async function settleVideoFromReserve(
         await consumeCredits({
           ref: target.ref,
           credits: extra,
-          pool: reserveLedger.pool,
           actorUserId: target.actorUserId,
           seatId: target.seatId,
           gatewayLogId: log.id,
@@ -493,12 +487,10 @@ async function settleVideoFromReserve(
   }
 
   if (!snap || settleCredits <= 0) return 0;
-  const pool: PoolKind = await resolveVideoPool(target.ref);
   try {
     const consumeRes = await consumeCredits({
       ref: target.ref,
       credits: settleCredits,
-      pool,
       actorUserId: target.actorUserId,
       seatId: target.seatId,
       gatewayLogId: log.id,
@@ -537,7 +529,7 @@ export async function refundFailedGatewayLog(
   if (isVideoLog(log)) {
     const reserveLedger = await prisma.creditLedger.findUnique({
       where: { idempotencyKey: `reserve:${log.id}` },
-      select: { credits: true, pool: true },
+      select: { credits: true },
     });
     if (!reserveLedger) return; // 未冻结（如发起即失败）
     const frozen = Math.abs(reserveLedger.credits);
@@ -546,7 +538,6 @@ export async function refundFailedGatewayLog(
       await releaseReserved({
         ref: target.ref,
         credits: frozen,
-        pool: reserveLedger.pool,
         gatewayLogId: log.id,
       });
     } catch (e) {
@@ -584,29 +575,27 @@ export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise
       inputSummary: log.inputSummary,
     }).catch(() => null));
   if (!canonical) return 0;
-  const snap = await resolveCostSnapshot(canonical);
-  if (!snap) return 0;
+  const costSnap = await resolveCostSnapshot(canonical);
+  if (!costSnap) return 0;
 
   const target = await resolveLogBillingTarget(log);
   if (!target) return 0;
 
-  const pools = await getPoolBalances(target.ref);
+  const accountSnap = await getAccountCreditBalances(target.ref);
   const hints = parseVideoPricingHints(log.inputSummary);
   const { credits } = computeVideoChargeCredits({
-    snapshot: snap,
+    snapshot: costSnap,
     durationSec: hints.durationSec,
-    pricePerCreditYuan: pools.pricePerCreditYuan,
+    pricePerCreditYuan: accountSnap.pricePerCreditYuan,
   });
   if (credits === 0) return 0;
 
-  const pool = await resolveVideoPool(target.ref);
   await reserveCredits({
     ref: target.ref,
     credits,
-    pool,
     actorUserId: target.actorUserId,
     gatewayLogId: log.id,
-    costSnapshotYuan: snap.netCostYuan,
+    costSnapshotYuan: costSnap.netCostYuan,
   });
   return credits;
 }

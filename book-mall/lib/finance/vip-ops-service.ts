@@ -98,14 +98,14 @@ export async function listVipTeams(take = 50) {
         where: { tenantId: t.id, status: "ACTIVE" },
       });
       const docs = await prisma.vipDealDocument.count({ where: { tenantId: t.id } });
+      const totalCredits = account.balanceCredits ?? 0;
       return {
         tenantId: t.id,
         name: t.name,
         seatLimit: t.seatLimit,
         activeMembers: members,
         perSeatCapCredits: t.perSeatCapCredits,
-        generalCredits: account.balanceCredits,
-        videoCredits: account.videoBalanceCredits ?? 0,
+        totalCredits,
         owner: ownerMap.get(t.ownerUserId) ?? { id: t.ownerUserId, name: null, email: null, phone: null },
         documentCount: docs,
         createdAt: t.createdAt.toISOString(),
@@ -170,7 +170,6 @@ export async function getVipTenantOpsDetail(tenantId: string) {
       take: 20,
       select: {
         id: true,
-        pool: true,
         source: true,
         remainingCredits: true,
         expiresAt: true,
@@ -188,8 +187,7 @@ export async function getVipTenantOpsDetail(tenantId: string) {
     },
     owner,
     credits: {
-      general: account.balanceCredits,
-      video: account.videoBalanceCredits ?? 0,
+      totalCredits: account.balanceCredits ?? 0,
       perSeatCapCredits: account.perSeatCapCredits,
     },
     members,
@@ -209,7 +207,6 @@ export async function getVipTenantOpsDetail(tenantId: string) {
       role: inv.role,
       status: inv.status,
       plannedGeneralCredits: inv.plannedGeneralCredits,
-      plannedVideoCredits: inv.plannedVideoCredits,
       expiresAt: inv.expiresAt.toISOString(),
       createdAt: inv.createdAt.toISOString(),
     })),
@@ -242,8 +239,7 @@ export async function adminUpdateVipTenantConfig(input: {
 
 export async function adminGrantVipTestCredits(input: {
   tenantId: string;
-  generalCredits?: number;
-  videoCredits?: number;
+  credits?: number;
   description?: string;
   adminUserId: string;
   idempotencyKey?: string;
@@ -253,9 +249,8 @@ export async function adminGrantVipTestCredits(input: {
     throw new Error("非 VIP 团队");
   }
 
-  const general = Math.max(0, Math.round(input.generalCredits ?? 0));
-  const video = Math.max(0, Math.round(input.videoCredits ?? 0));
-  if (general === 0 && video === 0) throw new Error("请填写通用或视频积分");
+  const total = Math.max(0, Math.round(input.credits ?? 0));
+  if (total === 0) throw new Error("请填写积分数量");
 
   const expiresAt = vipLotExpiresAt();
   const key =
@@ -264,10 +259,8 @@ export async function adminGrantVipTestCredits(input: {
 
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: input.tenantId },
-    credits: general,
-    videoCredits: video,
+    credits: total,
     monthlyGrantCredits: 0,
-    videoMonthlyGrantCredits: 0,
     currentPeriodEnd: null,
     lotSource: "TOPUP",
     lotExpiresAt: expiresAt,
@@ -281,7 +274,6 @@ export async function adminGrantVipTestCredits(input: {
 export async function adminAdjustVipCredits(input: {
   tenantId: string;
   credits: number;
-  pool?: "GENERAL" | "VIDEO";
   description?: string;
   adminUserId: string;
   idempotencyKey?: string;
@@ -301,7 +293,6 @@ export async function adminAdjustVipCredits(input: {
   await adjustCredits({
     ref: { ownerType: "TENANT", ownerId: input.tenantId },
     credits: amount,
-    pool: input.pool ?? "GENERAL",
     actorUserId: input.adminUserId,
     idempotencyKey: key,
     description: input.description?.trim() || `VIP 后台积分校正（操作人 ${input.adminUserId}）`,
@@ -332,7 +323,6 @@ export async function adminCreateVipInvite(input: {
   tenantId: string;
   phone: string;
   plannedGeneralCredits?: number | null;
-  plannedVideoCredits?: number | null;
   adminUserId: string;
 }) {
   const tenant = await prisma.tenant.findUnique({ where: { id: input.tenantId } });
@@ -344,7 +334,6 @@ export async function adminCreateVipInvite(input: {
     phone: input.phone,
     createdById: input.adminUserId,
     plannedGeneralCredits: input.plannedGeneralCredits,
-    plannedVideoCredits: input.plannedVideoCredits,
   });
   const detail = await getVipTenantOpsDetail(input.tenantId);
   return { inviteUrl, detail };

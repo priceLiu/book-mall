@@ -5,18 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 const REFRESH_EVENT = "platform:credits-balance-refresh";
 const POLL_MS = 30_000;
 
-type CreditPools = { general: number | null; video: number | null };
-
 function fmt(n: number | null): string {
   return n == null ? "—" : n.toLocaleString("zh-CN");
 }
 
 /** 工具站顶栏 · 剩余积分（单行） */
 export function ToolCreditBalanceChip() {
-  const [pools, setPools] = useState<CreditPools>({
-    general: null,
-    video: null,
-  });
+  const [total, setTotal] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -26,20 +21,25 @@ export function ToolCreditBalanceChip() {
       });
       const raw = (await r.json().catch(() => null)) as {
         active?: boolean;
+        creditBalance?: number;
+        creditBalanceTotal?: number;
         creditPools?: { general?: number; video?: number } | null;
       } | null;
       if (!raw?.active) return;
+      if (typeof raw.creditBalanceTotal === "number") {
+        setTotal(Math.max(0, Math.round(raw.creditBalanceTotal)));
+        return;
+      }
+      if (typeof raw.creditBalance === "number") {
+        setTotal(Math.max(0, Math.round(raw.creditBalance)));
+        return;
+      }
       const cp = raw.creditPools;
-      setPools({
-        general:
-          cp && typeof cp.general === "number"
-            ? Math.max(0, Math.round(cp.general))
-            : null,
-        video:
-          cp && typeof cp.video === "number"
-            ? Math.max(0, Math.round(cp.video))
-            : null,
-      });
+      if (cp) {
+        const g = typeof cp.general === "number" ? cp.general : 0;
+        const v = typeof cp.video === "number" ? cp.video : 0;
+        setTotal(Math.max(0, Math.round(g + v)));
+      }
     } catch {
       /* ignore */
     }
@@ -58,25 +58,17 @@ export function ToolCreditBalanceChip() {
     };
   }, [refresh]);
 
-  if (pools.general == null && pools.video == null) return null;
+  if (total == null) return null;
 
   return (
     <div
       className="tool-credit-balance-chip hidden shrink-0 whitespace-nowrap rounded-full border border-[var(--tool-border)] bg-[var(--tool-surface-2)] px-2.5 py-1 text-[11px] leading-none text-[var(--tool-muted)] md:inline-block"
       aria-live="polite"
-      title="剩余积分 · 文本池与视频池"
+      title="剩余积分"
     >
       <span>剩余积分</span>
       <span className="mx-1 opacity-40">·</span>
-      <span>文本</span>
-      <span className="ml-0.5 tabular-nums font-medium text-[var(--tool-fg)]">
-        {fmt(pools.general)}
-      </span>
-      <span className="mx-1.5 opacity-30">|</span>
-      <span>视频</span>
-      <span className="ml-0.5 tabular-nums font-medium text-[var(--tool-fg)]">
-        {fmt(pools.video)}
-      </span>
+      <span className="tabular-nums font-medium text-[var(--tool-fg)]">{fmt(total)}</span>
     </div>
   );
 }

@@ -21,7 +21,7 @@ export function ReferralRegisterForm({
 }: {
   code: string;
   referrerName: string | null;
-  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
+  welcomeGift?: { generalCredits: number } | null;
 }) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -105,14 +105,9 @@ export function ReferralRegisterForm({
           </p>
         </BoxReveal>
 
-        {welcomeGift &&
-        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+        {welcomeGift && welcomeGift.generalCredits > 0 ? (
           <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            完成注册立得 {welcomeGift.generalCredits.toLocaleString()} 通用积分
-            {welcomeGift.videoCredits > 0
-              ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
-              : ""}
-            （含视频，30 天内有效），可直接体验生图与生视频。
+            完成注册立得 {welcomeGift.generalCredits.toLocaleString()} 积分（30 天内有效），可直接体验生图与生视频。
           </div>
         ) : null}
 

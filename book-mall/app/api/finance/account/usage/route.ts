@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 
 import {
   aggregateUsageByModel,
+  getAccountCreditBalances,
   getCreditBalance,
-  getPoolBalances,
   listUsageRecords,
 } from "@/lib/billing/credit-account-service";
 import {
@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
 
   const take = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("take") ?? 50)));
 
-  const [balance, pools, byModel, byTool, recent, totalCalls, teamMemberships] = await Promise.all([
+  const [balance, balances, byModel, byTool, recent, totalCalls, teamMemberships] = await Promise.all([
     getCreditBalance({ ownerType: "USER", ownerId: user.id }),
-    getPoolBalances({ ownerType: "USER", ownerId: user.id }),
+    getAccountCreditBalances({ ownerType: "USER", ownerId: user.id }),
     aggregateUsageByModel({ bookUserId: user.id }),
     aggregateUsageByTool(user.id),
     listUsageRecords({ bookUserId: user.id, take }),
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
   return financeJson(request, {
     balance,
-    pools,
+    reserved: balances.reserved,
     teamContext,
     byModel,
     byTool,

@@ -50,8 +50,7 @@ export type PlatformCockpitSnapshot = {
   courseSubscriptions: { active: number };
   credits: {
     accountCount: number;
-    generalBalance: number;
-    videoBalance: number;
+    totalBalance: number;
     subscriptionAccounts: number;
     consumedAllTime: number;
     consumedToday: number;
@@ -125,7 +124,7 @@ export async function getPlatformCockpitSnapshot(
     }),
     prisma.creditAccount.aggregate({
       _count: { id: true },
-      _sum: { balanceCredits: true, videoBalanceCredits: true },
+      _sum: { balanceCredits: true },
     }),
     prisma.creditAccount.count({ where: { monthlyGrantCredits: { gt: 0 } } }),
     prisma.creditLedger.aggregate({
@@ -209,8 +208,7 @@ export async function getPlatformCockpitSnapshot(
     courseSubscriptions: { active: activeSubscriptions },
     credits: {
       accountCount: creditAgg._count.id,
-      generalBalance: creditAgg._sum.balanceCredits ?? 0,
-      videoBalance: creditAgg._sum.videoBalanceCredits ?? 0,
+      totalBalance: creditAgg._sum.balanceCredits ?? 0,
       subscriptionAccounts: subscriptionAccountCount,
       consumedAllTime: Math.abs(creditConsumeAll._sum.credits ?? 0),
       consumedToday: Math.abs(creditConsumeToday._sum.credits ?? 0),
@@ -246,8 +244,10 @@ export async function getPlatformCockpitSnapshot(
         { label: "今日新增", value: newToday },
       ],
       creditsBilling: [
-        { label: "通用池余额", value: creditAgg._sum.balanceCredits ?? 0 },
-        { label: "视频池余额", value: creditAgg._sum.videoBalanceCredits ?? 0 },
+        {
+          label: "积分池余额",
+          value: creditAgg._sum.balanceCredits ?? 0,
+        },
         { label: "今日消耗", value: Math.abs(creditConsumeToday._sum.credits ?? 0) },
         { label: "累计消耗", value: Math.abs(creditConsumeAll._sum.credits ?? 0) },
         { label: "钱包余额", value: balanceSum._sum.balancePoints ?? 0 },

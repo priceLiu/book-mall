@@ -26,6 +26,12 @@ import { resolveModelMarginM } from "./model-margin-policy";
 
 export * from "./credit-pricing-formulas";
 export { resolveModelMarginM, expectedAnchorMarginForM } from "./model-margin-policy";
+export {
+  buildUnifiedFormulaSimulation,
+  UNIFIED_CREDIT_FORMULA_LINES,
+  UNIFIED_CREDIT_FORMULA_VERSION,
+  type UnifiedFormulaSimulation,
+} from "./unified-credit-formula";
 
 function toNum(v: unknown, fallback = 0): number {
   if (v == null) return fallback;
@@ -110,6 +116,7 @@ export async function publishModelCreditPrice(input: {
     resolveModelMarginM({
       unit: chosen.unit,
       netCostYuan,
+      listCostYuan: toNum(chosen.listCostYuan),
       defaultMarginM: config.defaultMarginM,
       videoMarginM: config.videoMarginM,
     });

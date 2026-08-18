@@ -95,10 +95,8 @@ export async function applyMockMembershipSubscribe(input: {
     const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
     await grantCredits({
       ref: { ownerType: "TENANT", ownerId: tenantId },
-      credits: grants.generalCredits,
-      videoCredits: grants.videoCredits,
+      credits: grants.credits,
       monthlyGrantCredits: grants.monthlyGrantCredits,
-      videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
       pricePerCreditYuan:
         quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
       planId: plan.id,
@@ -122,10 +120,8 @@ export async function applyMockMembershipSubscribe(input: {
   );
   await grantCredits({
     ref: { ownerType: "USER", ownerId: input.userId },
-    credits: grants.generalCredits,
-    videoCredits: grants.videoCredits,
+    credits: grants.credits,
     monthlyGrantCredits: grants.monthlyGrantCredits,
-    videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
     pricePerCreditYuan:
       plan.monthlyCredits > 0 ? Number(plan.priceYuan) / plan.monthlyCredits : null,
     planId: plan.id,

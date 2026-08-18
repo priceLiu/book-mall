@@ -135,7 +135,6 @@ export async function activateToolServiceFee(
       await consumeCredits({
         ref: { ownerType: "USER", ownerId: userId },
         credits: fee,
-        pool: "GENERAL",
         idempotencyKey,
         description: `工具技术服务费 · ${plan.label}（${TOOL_SERVICE_FEE_PERIOD_DAYS} 天）`,
       });

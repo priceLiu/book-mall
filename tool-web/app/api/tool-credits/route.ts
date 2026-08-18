@@ -16,7 +16,7 @@ function originOrError(): string | NextResponse {
   return origin.replace(/\/$/, "");
 }
 
-/** Finance 2.0 · 统一积分余额（通用池 + 视频池）。 */
+/** Finance 2.0 · 统一积分余额（单池 v2）。 */
 export async function GET() {
   const gate = await requireActiveToolsSession();
   if (!gate.ok) return gate.response;
@@ -55,28 +55,15 @@ export async function GET() {
     typeof raw.credit_balance === "number" && Number.isFinite(raw.credit_balance)
       ? Math.max(0, Math.floor(raw.credit_balance))
       : null;
-  const creditPoolsRaw = raw.credit_pools;
-  const creditPools =
-    creditPoolsRaw &&
-    typeof creditPoolsRaw === "object" &&
-    typeof (creditPoolsRaw as { general?: unknown }).general === "number" &&
-    typeof (creditPoolsRaw as { video?: unknown }).video === "number"
-      ? {
-          general: Math.max(
-            0,
-            Math.floor((creditPoolsRaw as { general: number }).general),
-          ),
-          video: Math.max(
-            0,
-            Math.floor((creditPoolsRaw as { video: number }).video),
-          ),
-        }
-      : null;
+  const creditBalanceTotal =
+    typeof raw.credit_balance_total === "number" && Number.isFinite(raw.credit_balance_total)
+      ? Math.max(0, Math.floor(raw.credit_balance_total))
+      : creditBalance;
 
   return NextResponse.json({
     active,
-    creditBalance,
-    creditPools,
+    creditBalance: creditBalanceTotal,
+    creditBalanceTotal,
     reason: typeof raw.reason === "string" ? raw.reason : undefined,
   });
 }

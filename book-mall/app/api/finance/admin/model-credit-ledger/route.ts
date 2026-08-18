@@ -15,8 +15,10 @@ import {
   marginGuardForUnit,
   marginPassesGuard,
   resolveModelMarginM,
+  computeUnifiedChargeCredits,
 } from "@/lib/pricing/credit-pricing-engine";
-import { computeTierCredits } from "@/lib/pricing/credit-pricing-formulas";
+import { computeModelQuoteFromCostProfile } from "@/lib/pricing/unified-credit-formula";
+import { videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 import { prisma } from "@/lib/prisma";
 import {
   publishModelPriceAction,
@@ -40,23 +42,14 @@ export async function GET(request: NextRequest) {
     return financeForbidden(request, "积分换算仅财务管理员可见");
   }
 
-  const [config, profiles, prices, defaultPlan] = await Promise.all([
+  const [config, profiles, prices] = await Promise.all([
     loadPricingConfig(),
     prisma.modelCostProfile.findMany({
       where: { active: true },
       orderBy: [{ canonicalModelKey: "asc" }, { channel: "asc" }],
     }),
     prisma.modelCreditPrice.findMany({ orderBy: { canonicalModelKey: "asc" } }),
-    prisma.membershipPlan.findFirst({
-      where: { family: "PERSONAL", interval: "MONTH", tier: "高级版", active: true },
-      select: { priceYuan: true, monthlyCredits: true },
-    }),
   ]);
-
-  const defaultPpc =
-    defaultPlan && defaultPlan.monthlyCredits > 0
-      ? Number(defaultPlan.priceYuan) / defaultPlan.monthlyCredits
-      : config.creditAnchorYuan;
 
   const rank: Record<string, number> = { CHANNEL: 0, RESELLER: 1, OWN: 2 };
   const byKey = new Map<string, (typeof profiles)[number]>();
@@ -75,28 +68,24 @@ export async function GET(request: NextRequest) {
   const priceByKey = new Map(prices.map((p) => [p.canonicalModelKey, p]));
 
   const rows = [...byKey.values()].map((p) => {
-    const netCostYuan = toNum(p.netCostYuan);
-    const marginM = resolveModelMarginM({
+    const quote = computeModelQuoteFromCostProfile({
+      canonicalModelKey: p.canonicalModelKey,
+      vendor: p.vendor,
+      displayName: p.canonicalModelKey,
       unit: p.unit,
-      netCostYuan,
-      defaultMarginM: config.defaultMarginM,
-      videoMarginM: config.videoMarginM,
-    });
-    const minGuard = marginGuardForUnit(p.unit, config);
-    const comp = computeCreditPrice({
       listCostYuan: toNum(p.listCostYuan),
       discountRate: toNum(p.discountRate),
-      marginM,
-      anchorYuan: config.creditAnchorYuan,
+      config,
     });
     const published = priceByKey.get(p.canonicalModelKey);
-    const videoCredits15Anchor =
+    const videoUnits =
+      p.unit === "PER_SEC" ? videoBillableSeconds(null, config.defaultVideoSec) : null;
+    const chargeCredits15 =
       p.unit === "PER_SEC"
-        ? Math.round(comp.creditsPerUnit * config.defaultVideoSec)
-        : null;
-    const tierVideoCredits15 =
-      p.unit === "PER_SEC"
-        ? computeTierCredits(comp.listPriceYuan * config.defaultVideoSec, defaultPpc)
+        ? computeUnifiedChargeCredits({
+            creditsPerUnit: quote.creditsPerUnit,
+            units: videoUnits ?? config.defaultVideoSec,
+          })
         : null;
 
     return {
@@ -106,16 +95,16 @@ export async function GET(request: NextRequest) {
       tierRaw: p.tierRaw,
       listCostYuan: toNum(p.listCostYuan),
       discountRate: toNum(p.discountRate),
-      netCostYuan,
-      marginM,
-      minGuard,
+      netCostYuan: quote.netCostYuan,
+      marginM: quote.marginM,
+      minGuard: quote.minGuard,
       computed: {
-        listPriceYuan: comp.listPriceYuan,
-        creditsPerUnit: comp.creditsPerUnit,
-        baseMarginRate: comp.baseMarginRate,
-        marginOk: marginPassesGuard(comp.baseMarginRate, minGuard),
-        videoCredits15Anchor,
-        tierVideoCredits15,
+        listPriceYuan: quote.listPriceYuan,
+        creditsPerUnit: quote.creditsPerUnit,
+        baseMarginRate: quote.baseMarginRate,
+        marginOk: quote.marginOk,
+        chargeCredits15,
+        netCost15s: quote.netCost15s,
       },
       published: published
         ? {
@@ -156,6 +145,7 @@ export async function POST(request: NextRequest) {
           : resolveModelMarginM({
               unit,
               netCostYuan,
+              listCostYuan,
               defaultMarginM: config.defaultMarginM,
               videoMarginM: config.videoMarginM,
             });

@@ -6,7 +6,7 @@
  */
 import type { PlanChangeStatus, Prisma } from "@prisma/client";
 
-import { deriveVideoMonthlyCredits, VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
+import { VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
 import { prisma } from "@/lib/prisma";
 import { loadPricingConfig, publishModelCreditPrice } from "./credit-pricing-engine";
 import {
@@ -242,14 +242,12 @@ export async function applyEffectiveProposal(proposalId: string, actorId: string
   const tiers = payload.tiers?.length ? payload.tiers : await resolveTiers(payload);
   for (const t of tiers) {
     const includedSeats = t.includedSeats ?? 1;
-    const videoMonthlyCredits = deriveVideoMonthlyCredits(t.monthlyCredits);
     const pricePerCreditYuan = derivePricePerCredit(t.priceYuan, t.monthlyCredits, includedSeats);
     await prisma.membershipPlan.updateMany({
       where: { family: "PERSONAL", interval: "MONTH", tier: t.tier },
       data: {
         priceYuan: t.priceYuan,
         monthlyCredits: t.monthlyCredits,
-        videoMonthlyCredits,
         pricePerCreditYuan,
         includedSeats,
       },

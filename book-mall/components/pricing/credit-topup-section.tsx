@@ -3,13 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Film, Users, ShieldCheck } from "lucide-react";
+import { Users, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   CREDIT_TOPUP_PACKS,
-  VIDEO_CREDIT_TOPUP_PACKS,
   ADMIN_VIDEO_TOPUP_PACK,
   packListPriceYuan,
   type CreditTopupPack,
@@ -59,7 +58,6 @@ function PackGrid({
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               约 ¥{(pack.priceYuan / pack.credits).toFixed(3)}/积分
-              {pack.pool === "VIDEO" ? " · 视频专项池" : " · 通用池"}
             </p>
             <p className="mt-1 min-h-[2.5rem] text-xs text-muted-foreground">
               {pack.id === "pack-light"
@@ -133,7 +131,7 @@ export function CreditTopupSection({
                 ? ` 充入「${activeTeam.name}」团队共享池（仅主账号）。`
                 : isTeam
                   ? " 开通团队后，可在此为团队共享池加购。"
-                  : " 充入个人通用积分池。"}
+                  : " 充入个人账户积分余额。"}
             </p>
           </div>
           {isTeam ? (
@@ -155,25 +153,6 @@ export function CreditTopupSection({
         />
       </section>
 
-      <section className="mt-12">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-semibold text-foreground">
-            <Film className="h-5 w-5 text-muted-foreground" />
-            视频专项充值包
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            独立视频积分池，不占用套餐月积分；适合高频视频生成用户加购。
-          </p>
-        </div>
-
-        <PackGrid
-          packs={VIDEO_CREDIT_TOPUP_PACKS}
-          anchorYuan={anchorYuan}
-          loadingId={loadingId}
-          onBuy={buyPack}
-        />
-      </section>
-
       {showAdminPacks ? (
         <section className="mt-12">
           <div>
@@ -182,7 +161,7 @@ export function CreditTopupSection({
               管理员专用充值
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              仅平台管理员可见。购买前须验证注册手机号；支付 ¥0.01 后充入个人视频专项池。
+              仅平台管理员可见。购买前须验证注册手机号；支付 ¥0.01 后充入个人账户。
             </p>
           </div>
           <PackGrid
@@ -203,20 +182,8 @@ export function CreditTopupSection({
       ) : null}
 
       {message ? (
-        <p className="mt-4 text-center text-sm text-foreground">{message}</p>
+        <p className="mt-4 text-sm text-muted-foreground" role="status">{message}</p>
       ) : null}
-
-      <p className="mt-4 text-center text-xs text-muted-foreground">
-        购买后将进入微信扫码收银；转账备注请填写系统生成的 6 位码。
-        {!isLoggedIn ? (
-          <>
-            {" "}
-            <Link href="/login?callbackUrl=/pricing" className="text-foreground underline">
-              登录后购买
-            </Link>
-          </>
-        ) : null}
-      </p>
     </>
   );
 }

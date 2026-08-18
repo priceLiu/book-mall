@@ -1,4 +1,4 @@
-import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances } from "@/lib/billing/credit-account-service";
 import { K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
 import {
   loadModelCatalogBillMaps,
@@ -325,12 +325,12 @@ export async function fetchBillingDetailsForUser(input: {
   const periodKey = currentPeriodKey();
   const { from, to } = financePeriodFromKey(periodKey);
 
-  const [user, pools, gatewayPart, packageReconciliation, tokenUsageRaw] = await Promise.all([
+  const [user, balances, gatewayPart, packageReconciliation, tokenUsageRaw] = await Promise.all([
     prisma.user.findUnique({
       where: { id: input.userId },
       select: { id: true, name: true, email: true },
     }),
-    getPoolBalances({ ownerType: "USER", ownerId: input.userId }),
+    getAccountCreditBalances({ ownerType: "USER", ownerId: input.userId }),
     buildGatewayRows({ tab: input.tab, userId: input.userId, take, periodKey }),
     fetchUserPackageReconciliation(input.userId),
     fetchUserGatewayTokenUsage({
@@ -342,7 +342,7 @@ export async function fetchBillingDetailsForUser(input: {
 
   if (!user) return null;
 
-  const balanceCredits = pools.general.balance + pools.video.balance;
+  const balanceCredits = balances.balance;
   const totalCredits = sumCredits(gatewayPart.rows);
 
   return {
@@ -350,10 +350,7 @@ export async function fetchBillingDetailsForUser(input: {
     tab: input.tab,
     user: { id: user.id, name: user.name, email: user.email },
     balancePoints: balanceCredits,
-    poolBalances: {
-      general: pools.general.balance,
-      video: pools.video.balance,
-    },
+    balanceCredits,
     totalCalls: gatewayPart.totalCalls,
     succeededCalls: gatewayPart.succeededCalls,
     failedCalls: gatewayPart.failedCalls,
@@ -411,12 +408,12 @@ export async function fetchBillingDetailsForTenant(input: {
   const periodKey = currentPeriodKey();
   const { from, to } = financePeriodFromKey(periodKey);
 
-  const [tenant, pools, gatewayPart, tokenUsageRaw] = await Promise.all([
+  const [tenant, balances, gatewayPart, tokenUsageRaw] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: input.tenantId },
       select: { id: true, name: true, ownerUserId: true },
     }),
-    getPoolBalances({ ownerType: "TENANT", ownerId: input.tenantId }),
+    getAccountCreditBalances({ ownerType: "TENANT", ownerId: input.tenantId }),
     buildGatewayRows({
       tab: input.tab,
       tenantId: input.tenantId,
@@ -433,7 +430,7 @@ export async function fetchBillingDetailsForTenant(input: {
 
   if (!tenant) return null;
 
-  const balanceCredits = pools.general.balance + pools.video.balance;
+  const balanceCredits = balances.balance;
   const totalCredits = sumCredits(gatewayPart.rows);
 
   return {
@@ -441,10 +438,7 @@ export async function fetchBillingDetailsForTenant(input: {
     tab: input.tab,
     tenant: { id: tenant.id, name: tenant.name },
     balancePoints: balanceCredits,
-    poolBalances: {
-      general: pools.general.balance,
-      video: pools.video.balance,
-    },
+    balanceCredits,
     totalCalls: gatewayPart.totalCalls,
     succeededCalls: gatewayPart.succeededCalls,
     failedCalls: gatewayPart.failedCalls,

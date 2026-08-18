@@ -18,7 +18,7 @@ import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 export function RegisterForm({
   welcomeGift,
 }: {
-  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
+  welcomeGift?: { generalCredits: number } | null;
 } = {}) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -95,14 +95,9 @@ export function RegisterForm({
           </p>
         </BoxReveal>
 
-        {welcomeGift &&
-        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+        {welcomeGift && welcomeGift.generalCredits > 0 ? (
           <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
-            {welcomeGift.videoCredits > 0
-              ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
-              : ""}
-            （含视频，30 天内有效）。
+            注册即送 {welcomeGift.generalCredits.toLocaleString()} 积分（30 天内有效）。
           </div>
         ) : null}
 

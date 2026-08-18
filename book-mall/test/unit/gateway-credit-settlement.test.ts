@@ -42,17 +42,25 @@ describe("video billing units", () => {
     expect(c15.credits / c5.credits).toBeCloseTo(3, 0);
   });
 
-  it("computeChargeCredits falls back to creditsPerUnit × units", () => {
+  it("computeChargeCredits falls back to U₀ × units（不随 ppc 变化）", () => {
+    const snap25 = { listPriceYuan: null, creditsPerUnit: 25 };
     expect(
       computeChargeCredits({
-        snapshot: { listPriceYuan: null, creditsPerUnit: 25 },
+        snapshot: snap25,
         units: 5,
-        pricePerCreditYuan: null,
+        pricePerCreditYuan: 0.069,
       }),
     ).toBe(125);
     expect(
       computeChargeCredits({
-        snapshot: { listPriceYuan: null, creditsPerUnit: 25 },
+        snapshot: snap25,
+        units: 5,
+        pricePerCreditYuan: 0.04,
+      }),
+    ).toBe(125);
+    expect(
+      computeChargeCredits({
+        snapshot: snap25,
         units: 15,
         pricePerCreditYuan: null,
       }),

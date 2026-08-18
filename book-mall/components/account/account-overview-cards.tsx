@@ -29,8 +29,7 @@ type UsageSummary = {
 };
 
 type Props = {
-  generalCredits: number;
-  videoCredits: number;
+  totalCredits: number;
   billingPersona: BillingPersona | null;
   membershipPlanName: string | null;
   membershipPeriodEnd: Date | null;
@@ -63,8 +62,7 @@ function StatusDot({ ok }: { ok: boolean }) {
 }
 
 export function AccountOverviewCards({
-  generalCredits,
-  videoCredits,
+  totalCredits,
   billingPersona,
   membershipPlanName,
   membershipPeriodEnd,
@@ -225,22 +223,17 @@ export function AccountOverviewCards({
           </div>
           <CardDescription className="text-xs">
             {isTeamSharedPool
-              ? "团队共享通用 + 视频池"
-              : "通用 + 视频池 · 套餐月积分 + 轻量包"}
+              ? "团队共享积分池"
+              : "套餐月积分 + 轻量包"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
           <div className={accountOverviewCardBodyClass()}>
             <div>
               <p className="text-3xl font-semibold tabular-nums tracking-tight">
-                {generalCredits.toLocaleString("zh-CN")}{" "}
-                <span className="text-base font-medium text-muted-foreground">通用</span>
+                {totalCredits.toLocaleString("zh-CN")}
+                <span className="text-base font-medium text-muted-foreground"> 积分</span>
               </p>
-              {videoCredits > 0 ? (
-                <p className="mt-1 text-sm text-muted-foreground tabular-nums">
-                  视频池 {videoCredits.toLocaleString("zh-CN")} 积分
-                </p>
-              ) : null}
             </div>
           </div>
         </CardContent>

@@ -2835,7 +2835,6 @@ model CreditLedgerArchive {
   refType          String?
   refId            String?
   costSnapshotYuan Decimal?         @db.Decimal(16, 6)
-  pool             CreditPool       @default(GENERAL)
   idempotencyKey   String?          @unique
   description      String?
   staffFlag        Boolean          @default(false)
@@ -2979,8 +2978,7 @@ model PlatformPricingConfig {
   videoMarginM        Decimal  @default("4") @db.Decimal(6, 3) // 视频专项系数 M（4 → 75% 毛利）
   videoMinMarginGuard Decimal  @default("0.75") @db.Decimal(6, 4) // 视频专项毛利护栏 ≥75%
   // 新用户注册赠送积分（分享链接 1.0）：长期有效、不清零；财务可调
-  welcomeGiftGeneralCredits Int  @default(500) // 注册赠送通用积分
-  welcomeGiftVideoCredits   Int  @default(100) // 注册赠送视频专项积分
+  welcomeGiftGeneralCredits Int  @default(600) // 注册赠送积分（单池）
   // 分享返佣默认比例（0~1）：新建分享档案时的初始返佣（建议 0.05 保 20% 毛利）
   referralDefaultRate       Decimal @default("0.05") @db.Decimal(5, 4)
   updatedAt           DateTime @updatedAt
@@ -3160,7 +3158,6 @@ model MembershipPlan {
   originalYuan        Decimal?           @db.Decimal(12, 2) // 划线原价
   promoLabel          String? // 限时67折等
   monthlyCredits      Int // 月积分（团队=每席位）
-  videoMonthlyCredits Int                @default(0) // 视频专项池月额度（0 = 不单独分池，复用通用池）
   pricePerCreditYuan  Decimal?           @db.Decimal(12, 6) // 派生快照：priceYuan ÷ monthlyCredits（逐档积分换算单价）
   includedSeats       Int                @default(1) // 套餐含席位数
   active              Boolean            @default(true)
@@ -3181,7 +3178,6 @@ model TeamSeatTier {
   seatMax             Int? // null = 不封顶（10人以上）
   perSeatPriceYuan    Decimal        @db.Decimal(12, 2)
   perSeatCredits      Int
-  perSeatVideoCredits Int            @default(0) // 每席视频专项池额度（0 = 复用通用池）
   sortOrder           Int            @default(0)
 
   @@index([planId, sortOrder])
@@ -3192,12 +3188,9 @@ model CreditAccount {
   id                   String          @id @default(cuid())
   ownerType            CreditOwnerType
   ownerId              String // userId 或 tenantId
-  balanceCredits       Int             @default(0) // 通用池可用余额
+  balanceCredits       Int             @default(0) // 可用余额
   monthlyGrantCredits  Int             @default(0) // 当前套餐月发放额
-  reservedCredits      Int             @default(0) // 通用池冻结中（已 RESERVE 未 SETTLE/RELEASE）
-  videoBalanceCredits  Int             @default(0) // 视频专项池可用余额
-  videoMonthlyGrant    Int             @default(0) // 视频专项池月发放额
-  videoReservedCredits Int             @default(0) // 视频专项池冻结中
+  reservedCredits      Int             @default(0) // 冻结中（已 RESERVE 未 SETTLE/RELEASE）
   pricePerCreditYuan   Decimal?        @db.Decimal(12, 6) // 该账户档位「每积分单价」快照（逐档积分换算）
   perSeatCapCredits    Int? // 子账号人均上限（可选）
   planId               String?
@@ -3225,7 +3218,6 @@ model CreditLedger {
   refType          String? // gateway_log / plan_grant / topup_order ...
   refId            String?
   costSnapshotYuan Decimal?         @db.Decimal(16, 6)
-  pool             CreditPool       @default(GENERAL) // 通用池 / 视频专项池
   idempotencyKey   String?          @unique
   description      String?
   staffFlag        Boolean          @default(false)
@@ -3233,12 +3225,6 @@ model CreditLedger {
   createdAt        DateTime         @default(now())
 
   @@index([accountId, createdAt])
-  @@index([staffFlag, createdAt])
-}
-
-enum CreditPool {
-  GENERAL // 通用积分池（文本/图像/其它）
-  VIDEO // 视频专项池
 }
 
 /// 积分批次来源（决定到期口径）
@@ -3249,14 +3235,13 @@ enum CreditSource {
 }
 
 /// 积分批次：账户余额的「按来源分别到期」覆盖层。
-/// 账户 CreditAccount.balanceCredits/videoBalanceCredits 仍为快路径真相，
+/// 账户 CreditAccount.balanceCredits 仍为快路径真相，
 /// 批次用于扣费优先级（先到期先扣）与到期清扫。
-/// 不变量：sum(active lot.remainingCredits, pool) == 账户该池余额。
+/// 不变量：sum(active lot.remainingCredits) == 余额 + 冻结。
 model CreditLot {
   id               String       @id @default(cuid())
   accountId        String
   account          CreditAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  pool             CreditPool   @default(GENERAL)
   source           CreditSource
   originalCredits  Int
   remainingCredits Int
@@ -3270,7 +3255,7 @@ model CreditLot {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  @@index([accountId, pool, expiresAt])
+  @@index([accountId, expiresAt])
   @@index([expiresAt])
 }
 
@@ -3339,7 +3324,6 @@ model CreditOpsWorkItem {
   ownerType             CreditOwnerType
   ownerId               String
   ownerHint             String?
-  pool                  CreditPool          @default(GENERAL)
   source                CreditSource?
   periodKey             String              @default("")
   expectedExpireCredits Int                 @default(0)
@@ -3354,7 +3338,7 @@ model CreditOpsWorkItem {
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
-  @@unique([workType, accountId, pool, dueDate, periodKey])
+  @@unique([workType, accountId, dueDate, periodKey])
   @@index([dueDate, status])
   @@index([status])
   @@index([accountId])
@@ -3685,10 +3669,8 @@ model TenantInvite {
   token       String             @unique
   /// 邀请链接 query 中的验证码（与短信一并发出，供复制链接使用）
   urlCode     String?
-  /// VIP 预分配通用积分额度（受邀人加入后写入 monthlyCapCredits）
+  /// VIP 预分配积分额度（受邀人加入后写入 monthlyCapCredits）
   plannedGeneralCredits Int?
-  /// VIP 预分配视频积分额度（展示/台账；视频池按团队共享扣减）
-  plannedVideoCredits   Int?
   role        TenantRole         @default(MEMBER)
   status      TenantInviteStatus @default(PENDING)
   expiresAt   DateTime

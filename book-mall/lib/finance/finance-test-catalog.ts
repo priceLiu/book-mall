@@ -47,6 +47,7 @@ const FILE = {
   permissions: "test/unit/permissions.test.ts",
   integrationScenario: "test/integration/scenario-lab.integration.ts",
   integrationVideo: "test/integration/finance-2.0-video.integration.ts",
+  integrationSinglePool: "test/integration/unified-credit-single-pool.integration.ts",
 } as const;
 
 function unit(
@@ -401,9 +402,20 @@ export const FINANCE_INTEGRATION_SCRIPTS: FinanceTestCase[] = [
     category: "pricing",
     layer: "integration",
     suite: "finance-2.0-video.integration",
-    title: "RESERVE→SETTLE、RELEASE、视频池隔离、团队分账",
+    title: "RESERVE→SETTLE、RELEASE、单池余额不足、团队分账",
     file: FILE.integrationVideo,
     fullName: "finance-2.0-video.integration",
+    command: "pnpm test:finance-integration",
+  },
+  {
+    id: "int-single-pool",
+    docId: "TC-v2-single-pool",
+    category: "pricing",
+    layer: "integration",
+    suite: "unified-credit-single-pool.integration",
+    title: "单池发放、统一扣分、团队共享池",
+    file: FILE.integrationSinglePool,
+    fullName: "unified-credit-single-pool.integration",
     command: "pnpm test:finance-integration",
   },
 ];

@@ -5,23 +5,14 @@ import { useCallback, useEffect, useState } from "react";
 const REFRESH_EVENT = "platform:credits-balance-refresh";
 const POLL_MS = 30_000;
 
-type CreditPools = { general: number | null; video: number | null };
-
-function parsePools(raw: unknown): CreditPools {
-  if (!raw || typeof raw !== "object") return { general: null, video: null };
-  const pools = (raw as Record<string, unknown>).credit_pools;
-  if (!pools || typeof pools !== "object") return { general: null, video: null };
-  const p = pools as Record<string, unknown>;
-  return {
-    general:
-      typeof p.general === "number" && Number.isFinite(p.general)
-        ? Math.max(0, Math.round(p.general))
-        : null,
-    video:
-      typeof p.video === "number" && Number.isFinite(p.video)
-        ? Math.max(0, Math.round(p.video))
-        : null,
-  };
+function parseTotal(raw: unknown): number | null {
+  if (!raw || typeof raw !== "object") return null;
+  const intro = raw as Record<string, unknown>;
+  const totalField = intro.credit_balance_total ?? intro.credit_balance;
+  if (typeof totalField === "number" && Number.isFinite(totalField)) {
+    return Math.max(0, Math.round(totalField));
+  }
+  return null;
 }
 
 function fmt(n: number | null): string {
@@ -30,10 +21,7 @@ function fmt(n: number | null): string {
 
 /** Story 顶栏 · 剩余积分（单行） */
 export function StoryCreditBalanceChip() {
-  const [pools, setPools] = useState<CreditPools>({
-    general: null,
-    video: null,
-  });
+  const [total, setTotal] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,7 +31,7 @@ export function StoryCreditBalanceChip() {
       });
       const raw = await r.json().catch(() => null);
       if (raw && typeof raw === "object" && (raw as { active?: boolean }).active) {
-        setPools(parsePools((raw as { introspect?: unknown }).introspect));
+        setTotal(parseTotal((raw as { introspect?: unknown }).introspect));
       }
     } catch {
       /* ignore */
@@ -63,25 +51,17 @@ export function StoryCreditBalanceChip() {
     };
   }, [refresh]);
 
-  if (pools.general == null && pools.video == null) return null;
+  if (total == null) return null;
 
   return (
     <div
       className="hidden shrink-0 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] leading-none text-white/70 lg:inline-block"
       aria-live="polite"
-      title="剩余积分 · 文本池与视频池"
+      title="剩余积分"
     >
       <span className="text-white/45">剩余积分</span>
       <span className="mx-1 text-white/25">·</span>
-      <span className="text-white/50">文本</span>
-      <span className="ml-0.5 tabular-nums font-medium text-white/90">
-        {fmt(pools.general)}
-      </span>
-      <span className="mx-1.5 text-white/20">|</span>
-      <span className="text-white/50">视频</span>
-      <span className="ml-0.5 tabular-nums font-medium text-white/90">
-        {fmt(pools.video)}
-      </span>
+      <span className="tabular-nums font-medium text-white/90">{fmt(total)}</span>
     </div>
   );
 }

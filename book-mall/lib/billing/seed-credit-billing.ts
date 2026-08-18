@@ -22,7 +22,6 @@ import {
   DEFAULT_VIDEO_SEC,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
-import { deriveVideoMonthlyCredits } from "@/lib/billing/video-model-seeds";
 import { seedByokSimplifiedPricing } from "@/lib/billing/byok-pricing";
 import {
   RETIRED_TEAM_TIERS,
@@ -121,7 +120,6 @@ async function seedPlans(
 ) {
   for (const s of seeds) {
     const pricePerCreditYuan = derivePricePerCredit(s.priceYuan, s.monthlyCredits, s.includedSeats);
-    const videoMonthlyCredits = deriveVideoMonthlyCredits(s.monthlyCredits);
     const plan = await prisma.membershipPlan.upsert({
       where: { family_interval_tier: { family, interval, tier: s.tier } },
       create: {
@@ -133,7 +131,6 @@ async function seedPlans(
         originalYuan: s.originalYuan ?? null,
         promoLabel: s.promoLabel ?? null,
         monthlyCredits: s.monthlyCredits,
-        videoMonthlyCredits,
         pricePerCreditYuan,
         includedSeats: s.includedSeats,
         active: true,
@@ -144,7 +141,6 @@ async function seedPlans(
         originalYuan: s.originalYuan ?? null,
         promoLabel: s.promoLabel ?? null,
         monthlyCredits: s.monthlyCredits,
-        videoMonthlyCredits,
         pricePerCreditYuan,
         includedSeats: s.includedSeats,
         active: true,

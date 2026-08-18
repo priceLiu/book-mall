@@ -27,7 +27,8 @@ type LedgerRow = {
     marginOk: boolean;
     videoCredits15: number | null;
     videoCredits15Anchor?: number | null;
-    tierVideoCredits15?: number | null;
+    chargeCredits15?: number | null;
+    netCost15s?: number | null;
   };
   published: {
     displayName: string;
@@ -237,8 +238,7 @@ export function ModelCreditLedgerClient({ embedded = false }: { embedded?: boole
                 <th className="px-3 py-2 text-right">系数 M</th>
                 <th className="px-3 py-2 text-right">积分/单位</th>
                 <th className="px-3 py-2 text-right">毛利</th>
-                <th className="px-3 py-2 text-right">15s 锚定</th>
-                <th className="px-3 py-2 text-right">15s 用户实扣</th>
+                <th className="px-3 py-2 text-right">15s 扣分 U₀</th>
                 <th className="px-3 py-2">状态</th>
               </tr>
             </thead>
@@ -266,11 +266,8 @@ export function ModelCreditLedgerClient({ embedded = false }: { embedded?: boole
                   >
                     {(r.computed.baseMarginRate * 100).toFixed(1)}%
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-[#8c8c8c]">
-                    {r.computed.videoCredits15Anchor ?? r.computed.videoCredits15 ?? "—"}
-                  </td>
                   <td className="px-3 py-2 text-right tabular-nums font-medium text-[#1890ff]">
-                    {r.computed.tierVideoCredits15 ?? "—"}
+                    {r.computed.chargeCredits15 ?? "—"}
                   </td>
                   <td className="px-3 py-2">
                     {r.published?.active ? (

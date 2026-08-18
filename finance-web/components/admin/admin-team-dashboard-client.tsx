@@ -132,13 +132,13 @@ export function AdminTeamDashboardClient({ tenantId }: { tenantId: string }) {
       <section className="rounded border border-[#e8e8e8] bg-white p-4">
         <h2 className="mb-3 text-sm font-medium text-[#262626]">当前套餐</h2>
         <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <PackageItem label="套餐总积分" value={pkg.packageTotalCredits != null ? fmt(pkg.packageTotalCredits) : "—"} hint="通用+视频池" />
+          <PackageItem label="套餐总积分" value={pkg.packageTotalCredits != null ? fmt(pkg.packageTotalCredits) : "—"} />
           <PackageItem label="套餐总金额（元）" value={fmtYuan(pkg.packageTotalPriceYuan)} />
           <PackageItem label="计费周期" value={pkg.packageIntervalLabel} />
           <PackageItem label="账期起始日" value={fmtDate(pkg.periodStartAt)} />
           <PackageItem label="到期日" value={pkg.periodEndAt ? fmtDate(pkg.periodEndAt) : "—"} hint="续费后顺延" />
           <PackageItem label="续期次数" value={String(pkg.renewalCount)} hint="含首期" />
-          <PackageItem label="剩余积分" value={fmt(pkg.remainingCredits)} hint="通用+视频可用余额" />
+          <PackageItem label="剩余积分" value={fmt(pkg.remainingCredits)} />
           <PackageItem
             label="池明细"
             value={`${fmt(pkg.generalGrantCredits)} / ${fmt(pkg.videoGrantCredits)}`}

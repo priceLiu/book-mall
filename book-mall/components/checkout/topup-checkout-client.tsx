@@ -49,7 +49,7 @@ export function TopupCheckoutClient({
         </p>
         {forceRealPayment ? (
           <p className="text-xs text-muted-foreground">
-            管理员专用包须完成企业微信支付，支付成功后自动充入视频专项池。
+            管理员专用包须完成企业微信支付，支付成功后自动充入积分余额。
           </p>
         ) : null}
         <WechatPersonalCheckout

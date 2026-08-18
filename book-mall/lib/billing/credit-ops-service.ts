@@ -8,7 +8,6 @@ import type {
   CreditOpsJobType,
   CreditOpsWorkStatus,
   CreditOpsWorkType,
-  CreditPool,
   CreditSource,
 } from "@prisma/client";
 
@@ -134,7 +133,6 @@ type WorkItemUpsert = {
   ownerType: "USER" | "TENANT";
   ownerId: string;
   ownerHint: string | null;
-  pool: CreditPool;
   source: CreditSource | null;
   periodKey: string;
   expectedExpireCredits: number;
@@ -174,10 +172,9 @@ async function upsertWorkItems(items: WorkItemUpsert[]): Promise<{ created: numb
   for (const item of items) {
     const existing = await prisma.creditOpsWorkItem.findUnique({
       where: {
-        workType_accountId_pool_dueDate_periodKey: {
+        workType_accountId_dueDate_periodKey: {
           workType: item.workType,
           accountId: item.accountId,
-          pool: item.pool,
           dueDate: item.dueDate,
           periodKey: item.periodKey,
         },
@@ -252,7 +249,6 @@ export async function generateCreditOpsWorkItems(input?: {
     where: lotWhere,
     select: {
       accountId: true,
-      pool: true,
       source: true,
       remainingCredits: true,
       expiresAt: true,
@@ -264,7 +260,7 @@ export async function generateCreditOpsWorkItems(input?: {
   for (const lot of lots) {
     if (!lot.expiresAt) continue;
     const dueDate = cstBusinessDate(lot.expiresAt);
-    const key = `BATCH_EXPIRE:${lot.accountId}:${lot.pool}:${dueDate}:${lot.source}`;
+    const key = `BATCH_EXPIRE:${lot.accountId}:${dueDate}:${lot.source}`;
     const prev = lotGroups.get(key);
     if (prev) {
       prev.expectedExpireCredits += lot.remainingCredits;
@@ -277,7 +273,6 @@ export async function generateCreditOpsWorkItems(input?: {
         ownerType: lot.account.ownerType,
         ownerId: lot.account.ownerId,
         ownerHint: null,
-        pool: lot.pool,
         source: lot.source,
         periodKey: "",
         expectedExpireCredits: lot.remainingCredits,
@@ -308,7 +303,6 @@ export async function generateCreditOpsWorkItems(input?: {
       ownerType: true,
       ownerId: true,
       monthlyGrantCredits: true,
-      videoMonthlyGrant: true,
       currentPeriodEnd: true,
     },
   });
@@ -326,11 +320,10 @@ export async function generateCreditOpsWorkItems(input?: {
       ownerType: acct.ownerType,
       ownerId: acct.ownerId,
       ownerHint: null,
-      pool: "GENERAL",
       source: "SUBSCRIPTION",
       periodKey,
       expectedExpireCredits: 0,
-      expectedGrantCredits: acct.monthlyGrantCredits + (acct.videoMonthlyGrant ?? 0),
+      expectedGrantCredits: acct.monthlyGrantCredits,
     });
   }
 
@@ -390,7 +383,7 @@ async function executeWorkItem(
       _sum: { remainingCredits: true },
     });
     const expired = await expireDueLotsForAccount(ref, now);
-    const total = expired.expiredGeneral + expired.expiredVideo;
+    const total = expired.expiredCredits;
     const after = await prisma.creditLot.aggregate({
       where: {
         accountId: item.accountId,
@@ -403,8 +396,7 @@ async function executeWorkItem(
     return {
       status: drift && total === 0 ? "FAILED" : "DONE",
       resultJson: {
-        expiredGeneral: expired.expiredGeneral,
-        expiredVideo: expired.expiredVideo,
+        expiredCredits: expired.expiredCredits,
         beforeDue: before._sum.remainingCredits ?? 0,
         afterDue: after._sum.remainingCredits ?? 0,
         drift,
@@ -417,7 +409,6 @@ async function executeWorkItem(
     where: { id: item.accountId },
     select: {
       monthlyGrantCredits: true,
-      videoMonthlyGrant: true,
       planId: true,
       perSeatCapCredits: true,
       currentPeriodEnd: true,
@@ -445,7 +436,6 @@ async function executeWorkItem(
   const res = await resetMonthlyCredits({
     ref,
     monthlyGrantCredits: acct.monthlyGrantCredits,
-    videoMonthlyGrantCredits: acct.videoMonthlyGrant,
     periodKey,
     planId: acct.planId,
     nextPeriodEnd: nextEnd,
@@ -457,7 +447,6 @@ async function executeWorkItem(
     resultJson: {
       deduped: res.deduped,
       target: res.target,
-      videoTarget: res.videoTarget,
       balanceBefore: res.balanceBefore,
       nextPeriodEnd: nextEnd.toISOString(),
     },

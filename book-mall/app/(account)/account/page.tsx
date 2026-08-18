@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { getMembershipFlags } from "@/lib/membership";
 import { getMembershipToolAccess } from "@/lib/membership-tool-access";
-import { getPoolBalances, getLotBreakdown } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances, getLotBreakdown } from "@/lib/billing/credit-account-service";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import {
   getAccountPlatformCategoryUsageRows,
@@ -56,7 +56,7 @@ type AccountOverviewData = {
   billingPersona: BillingPersona | null;
   flags: Awaited<ReturnType<typeof getMembershipFlags>>;
   memberAccess: Awaited<ReturnType<typeof getMembershipToolAccess>>;
-  poolBalances: Awaited<ReturnType<typeof getPoolBalances>>;
+  creditBalances: Awaited<ReturnType<typeof getAccountCreditBalances>>;
   usageSummary: Awaited<ReturnType<typeof getAccountUsageSummary>>;
   packageUsageRows: Awaited<ReturnType<typeof getAccountPlatformCategoryUsageRows>>;
   lotBreakdown: Awaited<ReturnType<typeof getLotBreakdown>>;
@@ -103,9 +103,9 @@ async function loadAccountOverview(userId: string): Promise<AccountOverviewData>
     ownerId: userId,
   };
 
-  const [poolBalances, creditAcc, usageSummary, teamTenant, lotBreakdown] =
+  const [creditBalances, creditAcc, usageSummary, teamTenant, lotBreakdown] =
     await Promise.all([
-      getPoolBalances(billingRef),
+      getAccountCreditBalances(billingRef),
       prisma.creditAccount.findUnique({
         where: { ownerType_ownerId: billingRef },
         select: {
@@ -179,7 +179,7 @@ async function loadAccountOverview(userId: string): Promise<AccountOverviewData>
     billingPersona,
     flags,
     memberAccess,
-    poolBalances,
+    creditBalances,
     usageSummary,
     packageUsageRows,
     lotBreakdown,
@@ -237,8 +237,7 @@ export default async function AccountPage({
       ) : (
         <>
           <AccountOverviewCards
-            generalCredits={overview.poolBalances.general.balance}
-            videoCredits={overview.poolBalances.video.balance}
+            totalCredits={overview.creditBalances.balance}
             billingPersona={overview.billingPersona}
             membershipPlanName={overview.memberAccess.planName}
             membershipPeriodEnd={overview.membershipPeriodEnd}

@@ -75,7 +75,6 @@ async function getPlatformCreditToolAccess(
       monthlyGrantCredits: true,
       membershipPaidUntil: true,
       balanceCredits: true,
-      videoBalanceCredits: true,
     },
   });
   if (creditAcc?.planId && creditAcc.monthlyGrantCredits > 0) {
@@ -119,8 +118,8 @@ async function getPlatformCreditToolAccess(
   }
 
   // 注册赠送 / 轻量包充值：有可用积分即可进工具站，不要求先买会员订阅。
-  const usable = await sumUsableCreditPools(creditAcc, now);
-  if (usable.general > 0 || usable.video > 0) {
+  const usable = await sumUsableCredits(creditAcc, now);
+  if (usable > 0) {
     return { ok: true, planName: "积分可用（赠送/充值）", source: "personal_plan" };
   }
 
@@ -128,36 +127,24 @@ async function getPlatformCreditToolAccess(
 }
 
 /** 账户余额优先；余额为 0 时回退统计未过期批次（修复运维清零后批次未同步）。 */
-async function sumUsableCreditPools(
+async function sumUsableCredits(
   creditAcc: {
     id: string;
     balanceCredits: number;
-    videoBalanceCredits: number;
   } | null,
   now: Date,
-): Promise<{ general: number; video: number }> {
-  if (!creditAcc) return { general: 0, video: 0 };
-  if (creditAcc.balanceCredits > 0 || creditAcc.videoBalanceCredits > 0) {
-    return {
-      general: creditAcc.balanceCredits,
-      video: creditAcc.videoBalanceCredits,
-    };
-  }
+): Promise<number> {
+  if (!creditAcc) return 0;
+  if (creditAcc.balanceCredits > 0) return creditAcc.balanceCredits;
   const lots = await prisma.creditLot.findMany({
     where: {
       accountId: creditAcc.id,
       remainingCredits: { gt: 0 },
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
-    select: { pool: true, remainingCredits: true },
+    select: { remainingCredits: true },
   });
-  let general = 0;
-  let video = 0;
-  for (const lot of lots) {
-    if (lot.pool === "VIDEO") video += lot.remainingCredits;
-    else general += lot.remainingCredits;
-  }
-  return { general, video };
+  return lots.reduce((sum, lot) => sum + lot.remainingCredits, 0);
 }
 
 async function getByokToolAccess(

@@ -22,11 +22,12 @@ const DOC_KIND_LABEL: Record<string, string> = {
 type Scheme = {
   videoFraction: number;
   totalCredits: number;
-  generalCredits: number;
-  videoCredits: number;
   actualMargin: number;
+  anchorMarginRate: number;
+  anchorMarginOk: boolean;
   faceValueYuan: number;
 };
+
 type Quote = {
   amountYuan: number;
   targetMargin: number;
@@ -39,8 +40,7 @@ type SeatRow = {
   label: string;
   phone: string;
   role: "OWNER" | "MEMBER";
-  generalCredits: number;
-  videoCredits: number;
+  credits: number;
   isChief?: boolean;
 };
 
@@ -58,8 +58,7 @@ type TeamRow = {
   name: string;
   seatLimit: number;
   activeMembers: number;
-  generalCredits: number;
-  videoCredits: number;
+  totalCredits: number;
   owner: { id: string; name: string | null; phone: string | null };
 };
 
@@ -73,7 +72,7 @@ type TenantDetail = {
     packageLevel: string | null;
   };
   owner: { id: string; name: string | null; phone: string | null; email: string | null } | null;
-  credits: { general: number; video: number; perSeatCapCredits: number | null };
+  credits: { totalCredits: number; perSeatCapCredits: number | null };
   members: {
     id: string;
     userId: string;
@@ -90,7 +89,6 @@ type TenantDetail = {
     createdAt: string;
   }[];
   creditLots: {
-    pool: string;
     source: string;
     remainingCredits: number;
     expiresAt: string | null;
@@ -101,7 +99,6 @@ type TenantDetail = {
     role: string;
     status: string;
     plannedGeneralCredits: number | null;
-    plannedVideoCredits: number | null;
     expiresAt: string;
     createdAt: string;
   }[];
@@ -117,31 +114,27 @@ function formatPowerRef(yuan: number) {
 
 function autoSeatRows(scheme: Scheme, seats: number, ownerPhone: string): SeatRow[] {
   const s = Math.max(1, seats);
-  const perG = Math.floor(scheme.generalCredits / s);
-  const perV = Math.floor(scheme.videoCredits / s);
-  const remG = scheme.generalCredits - perG * s;
-  const remV = scheme.videoCredits - perV * s;
+  const per = Math.floor(scheme.totalCredits / s);
+  const rem = scheme.totalCredits - per * s;
   return Array.from({ length: s }, (_, i) => {
     const isChief = i === 0;
+    const credits = per + (isChief ? rem : 0);
     return {
       label: isChief ? "首席席（含余数）" : `席位 ${i + 1}`,
       phone: isChief ? ownerPhone : "",
       role: isChief ? "OWNER" : "MEMBER",
-      generalCredits: perG + (isChief ? remG : 0),
-      videoCredits: perV + (isChief ? remV : 0),
+      credits,
       isChief,
     };
   });
 }
 
 function sumSeatRows(rows: SeatRow[]) {
-  return rows.reduce(
-    (acc, r) => ({
-      general: acc.general + Math.max(0, Math.round(r.generalCredits)),
-      video: acc.video + Math.max(0, Math.round(r.videoCredits)),
-    }),
-    { general: 0, video: 0 },
+  const credits = rows.reduce(
+    (acc, r) => acc + Math.max(0, Math.round(r.credits)),
+    0,
   );
+  return { credits };
 }
 
 export function VipOpsClient() {
@@ -177,9 +170,7 @@ export function VipOpsClient() {
   const [cfgSeats, setCfgSeats] = useState("");
   const [cfgCap, setCfgCap] = useState("");
   const [grantGeneral, setGrantGeneral] = useState("");
-  const [grantVideo, setGrantVideo] = useState("");
   const [adjustCredits, setAdjustCredits] = useState("");
-  const [adjustPool, setAdjustPool] = useState<"GENERAL" | "VIDEO">("GENERAL");
 
   // —— 附件 ——
   const [docKind, setDocKind] = useState("CONTRACT");
@@ -224,9 +215,12 @@ export function VipOpsClient() {
   const seatValidation = useMemo(() => {
     if (!activeScheme || seatRows.length === 0) return null;
     const sum = sumSeatRows(seatRows);
-    const ok =
-      sum.general === activeScheme.generalCredits && sum.video === activeScheme.videoCredits;
-    return { ...sum, ok, targetGeneral: activeScheme.generalCredits, targetVideo: activeScheme.videoCredits };
+    const ok = sum.credits === activeScheme.totalCredits;
+    return {
+      ...sum,
+      ok,
+      targetCredits: activeScheme.totalCredits,
+    };
   }, [activeScheme, seatRows]);
 
   const runQuote = useCallback(async () => {
@@ -258,8 +252,7 @@ export function VipOpsClient() {
             label: `席位 ${next.length + 1}`,
             phone: "",
             role: "MEMBER",
-            generalCredits: 0,
-            videoCredits: 0,
+            credits: 0,
           });
         }
         return next.slice(0, seats).map((r, i) => ({
@@ -337,8 +330,7 @@ export function VipOpsClient() {
       seatPlans: seatRows.map((row) => ({
         phone: row.phone.trim() || null,
         role: row.role,
-        generalCredits: row.generalCredits,
-        videoCredits: row.videoCredits,
+        credits: row.credits,
         label: row.label,
       })),
       sendInvites: true,
@@ -386,8 +378,7 @@ export function VipOpsClient() {
       `/api/finance/admin/vip-ops/tenants/${selectedTenantId}/credits`,
       {
         action: "grant",
-        generalCredits: Number(grantGeneral) || 0,
-        videoCredits: Number(grantVideo) || 0,
+        credits: Number(grantGeneral) || 0,
         description: "VIP 后台积分发放",
       },
     );
@@ -411,7 +402,6 @@ export function VipOpsClient() {
       {
         action: "adjust",
         credits: Number(adjustCredits),
-        pool: adjustPool,
         description: "VIP 后台积分校正",
       },
     );
@@ -493,7 +483,6 @@ export function VipOpsClient() {
   async function sendInvite(input: {
     phone: string;
     plannedGeneralCredits?: number;
-    plannedVideoCredits?: number;
   }) {
     if (!base || !selectedTenantId) return;
     const r = await financeApiPost<{ ok: boolean; inviteUrl: string | null; detail: TenantDetail }>(
@@ -503,7 +492,6 @@ export function VipOpsClient() {
         action: "create",
         phone: input.phone,
         plannedGeneralCredits: input.plannedGeneralCredits ?? null,
-        plannedVideoCredits: input.plannedVideoCredits ?? null,
       },
     );
     if (r.ok) {
@@ -619,7 +607,7 @@ export function VipOpsClient() {
                   >
                     <div className="font-medium">{t.name}</div>
                     <div className="text-[#8c8c8c]">
-                      {t.seatLimit} 席 · 通用 {credits(t.generalCredits)} / 视频 {credits(t.videoCredits)}
+                      {t.seatLimit} 席 · 积分 {credits(t.totalCredits)}
                     </div>
                     <div className="text-[#8c8c8c]">{t.owner.phone || t.owner.name || t.owner.id}</div>
                   </button>
@@ -633,7 +621,7 @@ export function VipOpsClient() {
         <div className="space-y-4">
           <Panel title="① 充值测算与开通">
             <p className="mb-2 text-xs text-[#8c8c8c]">
-              选择充值档位并输入目标毛利，系统自动生成「通用多 / 视频多」两套方案；席位支持自动均分或手动分配（实时校验合计）。
+              选择充值档位并输入目标毛利，系统自动生成「均衡 / 视频偏重」两套单池总积分方案；席位支持自动均分或手动分配（实时校验合计）。锚定 Seedance 15s 毛利护栏 ≥22%。
             </p>
             <div className="flex flex-wrap gap-2">
               {AMOUNT_TIERS.map((tier) => (
@@ -681,8 +669,8 @@ export function VipOpsClient() {
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 {(
                   [
-                    ["general_heavy", "方案 A · 通用多", quote.schemeGeneralHeavy, "视频算力约 15%，偏图文/文本"],
-                    ["video_heavy", "方案 B · 视频多", quote.schemeVideoHeavy, "视频算力约 40%，偏短视频/数字人"],
+                    ["general_heavy", "方案 A · 均衡", quote.schemeGeneralHeavy, "视频算力约 15%，偏图文/文本"],
+                    ["video_heavy", "方案 B · 视频偏重", quote.schemeVideoHeavy, "视频算力约 40%，偏短视频/数字人"],
                   ] as const
                 ).map(([key, title, scheme, scene]) => (
                   <label
@@ -697,7 +685,7 @@ export function VipOpsClient() {
                     </div>
                     <p className="mt-1 text-[#8c8c8c]">{scene}</p>
                     <p className="mt-2">总积分 {credits(scheme.totalCredits)}</p>
-                    <p>通用 {credits(scheme.generalCredits)} · 视频 {credits(scheme.videoCredits)}</p>
+                    <p>锚定毛利 {(scheme.anchorMarginRate * 100).toFixed(1)}%</p>
                     <p className="mt-1 text-[#8c8c8c]">{formatPowerRef(scheme.faceValueYuan)}</p>
                     <p className="text-[#8c8c8c]">实际毛利 {(scheme.actualMargin * 100).toFixed(1)}%</p>
                   </label>
@@ -724,8 +712,7 @@ export function VipOpsClient() {
                       <tr className="text-left text-[#8c8c8c]">
                         <th className="py-1">席位</th>
                         <th>手机号</th>
-                        <th>通用积分</th>
-                        <th>视频积分</th>
+                        <th>积分</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -746,19 +733,12 @@ export function VipOpsClient() {
                               className="w-24 rounded border border-[#d9d9d9] px-1 py-0.5"
                               type="number"
                               min={0}
-                              value={row.generalCredits}
+                              value={row.credits}
                               disabled={allocationMode === "auto"}
-                              onChange={(e) => updateSeatRow(i, { generalCredits: Number(e.target.value) || 0 })}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="w-24 rounded border border-[#d9d9d9] px-1 py-0.5"
-                              type="number"
-                              min={0}
-                              value={row.videoCredits}
-                              disabled={allocationMode === "auto"}
-                              onChange={(e) => updateSeatRow(i, { videoCredits: Number(e.target.value) || 0 })}
+                              onChange={(e) => {
+                                const v = Number(e.target.value) || 0;
+                                updateSeatRow(i, { credits: v });
+                              }}
                             />
                           </td>
                         </tr>
@@ -767,8 +747,7 @@ export function VipOpsClient() {
                   </table>
                   {seatValidation ? (
                     <p className={`mt-2 text-xs ${seatValidation.ok ? "text-[#52c41a]" : "text-[#fa8c16]"}`}>
-                      合计：通用 {credits(seatValidation.general)} / {credits(seatValidation.targetGeneral)}
-                      ，视频 {credits(seatValidation.video)} / {credits(seatValidation.targetVideo)}
+                      合计：{credits(seatValidation.credits)} / {credits(seatValidation.targetCredits)}
                       {seatValidation.ok ? " · 已对齐" : " · 请调整至与池总数一致"}
                     </p>
                   ) : null}
@@ -836,8 +815,7 @@ export function VipOpsClient() {
             <>
               <Panel title={`③ 席位与积分运维 · ${detail.tenant.name}`}>
                 <div className="mb-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                  <Stat label="通用积分" value={credits(detail.credits.general)} />
-                  <Stat label="视频积分" value={credits(detail.credits.video)} />
+                  <Stat label="总积分" value={credits(detail.credits.totalCredits)} />
                   <Stat label="席位" value={`${detail.members.length} / ${detail.tenant.seatLimit}`} />
                   <Stat label="人均上限" value={detail.credits.perSeatCapCredits != null ? credits(detail.credits.perSeatCapCredits) : "未设"} />
                 </div>
@@ -860,12 +838,8 @@ export function VipOpsClient() {
                   <p className="text-xs font-medium text-[#595959]">积分发放（充值到账 / 测试）</p>
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <label className="text-xs">
-                      通用积分
+                      积分
                       <input className={inputCls} type="number" value={grantGeneral} onChange={(e) => setGrantGeneral(e.target.value)} />
-                    </label>
-                    <label className="text-xs">
-                      视频积分
-                      <input className={inputCls} type="number" value={grantVideo} onChange={(e) => setGrantVideo(e.target.value)} />
                     </label>
                   </div>
                   <button type="button" disabled={busy} className="mt-2 rounded bg-[#52c41a] px-3 py-1 text-sm text-white" onClick={() => void grantCreditsAction()}>
@@ -879,13 +853,6 @@ export function VipOpsClient() {
                     <label className="text-xs">
                       数额（可负）
                       <input className={inputCls} type="number" value={adjustCredits} onChange={(e) => setAdjustCredits(e.target.value)} />
-                    </label>
-                    <label className="text-xs">
-                      池
-                      <select className={inputCls} value={adjustPool} onChange={(e) => setAdjustPool(e.target.value as "GENERAL" | "VIDEO")}>
-                        <option value="GENERAL">通用</option>
-                        <option value="VIDEO">视频</option>
-                      </select>
                     </label>
                   </div>
                   <button type="button" disabled={busy} className="mt-2 rounded border border-[#fa8c16] px-3 py-1 text-sm text-[#fa8c16]" onClick={() => void adjustCreditsAction()}>
@@ -908,7 +875,7 @@ export function VipOpsClient() {
 
               <Panel title="⑤ 席位邀请（短信 / 链接）">
                 <p className="text-xs text-[#8c8c8c]">
-                  为成员席位发送邀请码；受邀人加入后按预分配积分额度使用（通用池 personal cap）。
+                  为成员席位发送邀请码；受邀人加入后按预分配积分额度使用。
                 </p>
                 {detail.invites?.length ? (
                   <ul className="mt-2 space-y-2 text-xs">
@@ -916,9 +883,10 @@ export function VipOpsClient() {
                       <li key={inv.id} className="flex flex-wrap items-center gap-2 rounded border border-[#f0f0f0] px-2 py-1.5">
                         <span className="font-medium">{inv.phone}</span>
                         <span className="text-[#8c8c8c]">
-                          通用 {inv.plannedGeneralCredits != null ? credits(inv.plannedGeneralCredits) : "—"}
-                          {" / "}
-                          视频 {inv.plannedVideoCredits != null ? credits(inv.plannedVideoCredits) : "—"}
+                          积分{" "}
+                          {inv.plannedGeneralCredits != null
+                            ? credits(inv.plannedGeneralCredits)
+                            : "—"}
                         </span>
                         <button type="button" className="text-[#1890ff]" onClick={() => void copyInviteLink(inv.id)}>
                           复制邀请链接
@@ -938,17 +906,15 @@ export function VipOpsClient() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-[#8c8c8c]">
-                      <th className="py-1">池</th>
-                      <th>来源</th>
+                      <th className="py-1">来源</th>
                       <th>余额</th>
                       <th>到期</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detail.creditLots.map((l) => (
-                      <tr key={`${l.pool}-${l.source}-${l.remainingCredits}-${l.expiresAt}`} className="border-t border-[#f0f0f0]">
-                        <td className="py-1">{l.pool}</td>
-                        <td>{l.source}</td>
+                      <tr key={`${l.source}-${l.remainingCredits}-${l.expiresAt}`} className="border-t border-[#f0f0f0]">
+                        <td className="py-1">{l.source}</td>
                         <td>{credits(l.remainingCredits)}</td>
                         <td>{l.expiresAt ? l.expiresAt.slice(0, 10) : "—"}</td>
                       </tr>
@@ -987,10 +953,13 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InviteSendRow({ onSend }: { onSend: (p: { phone: string; plannedGeneralCredits?: number; plannedVideoCredits?: number }) => void }) {
+function InviteSendRow({
+  onSend,
+}: {
+  onSend: (p: { phone: string; plannedGeneralCredits?: number }) => void;
+}) {
   const [phone, setPhone] = useState("");
-  const [general, setGeneral] = useState("");
-  const [video, setVideo] = useState("");
+  const [creditsInput, setCreditsInput] = useState("");
   return (
     <>
       <label className="text-xs sm:col-span-2">
@@ -998,12 +967,8 @@ function InviteSendRow({ onSend }: { onSend: (p: { phone: string; plannedGeneral
         <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="发送新邀请" />
       </label>
       <label className="text-xs">
-        通用额度
-        <input className={inputCls} type="number" value={general} onChange={(e) => setGeneral(e.target.value)} />
-      </label>
-      <label className="text-xs">
-        视频额度
-        <input className={inputCls} type="number" value={video} onChange={(e) => setVideo(e.target.value)} />
+        积分额度
+        <input className={inputCls} type="number" value={creditsInput} onChange={(e) => setCreditsInput(e.target.value)} />
       </label>
       <button
         type="button"
@@ -1011,8 +976,7 @@ function InviteSendRow({ onSend }: { onSend: (p: { phone: string; plannedGeneral
         onClick={() =>
           onSend({
             phone: phone.trim(),
-            plannedGeneralCredits: general.trim() === "" ? undefined : Number(general),
-            plannedVideoCredits: video.trim() === "" ? undefined : Number(video),
+            plannedGeneralCredits: creditsInput.trim() === "" ? undefined : Number(creditsInput),
           })
         }
       >

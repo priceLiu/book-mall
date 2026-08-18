@@ -127,7 +127,6 @@ export async function POST(
     await consumeCredits({
       ref: { ownerType: "USER", ownerId: targetUserId },
       credits: clawCredits,
-      pool: "GENERAL",
       idempotencyKey,
       description: `对账补扣 · run=${runId} · 应补 ${requiredCredits} / 实扣 ${clawCredits}` +
         (owedCredits > 0 ? ` / 欠扣 ${owedCredits}` : ""),

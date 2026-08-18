@@ -133,7 +133,6 @@ export async function createPaymentCheckout(input: {
         packId: pack.id,
         packLabel: pack.label,
         credits: pack.credits,
-        pool: pack.pool,
         target: payload.target ?? "personal",
         tenantId: payload.tenantId ?? null,
       };

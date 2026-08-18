@@ -57,7 +57,7 @@ type RemotePayload = {
   tenantId?: string;
   tenantName?: string | null;
   balancePoints: number;
-  poolBalances?: { general: number; video: number };
+  balanceCredits?: number;
   totalCalls?: number;
   succeededCalls?: number;
   failedCalls?: number;

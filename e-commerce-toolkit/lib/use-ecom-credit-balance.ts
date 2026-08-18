@@ -6,45 +6,31 @@ import { PLATFORM_CREDITS_BALANCE_REFRESH_EVENT } from "@/lib/ecom-credits-balan
 import { fetchEcomToolsSessionFull } from "@/lib/ecom-tools-session-client";
 
 export type EcomCreditPools = {
-  general: number | null;
-  video: number | null;
+  total: number | null;
 };
 
 const POLL_MS = 60_000;
 const INITIAL_DELAY_MS = 800;
 
-function parseCreditPools(introspect: unknown): EcomCreditPools {
-  if (!introspect || typeof introspect !== "object") {
-    return { general: null, video: null };
+function parseCreditTotal(introspect: unknown): number | null {
+  if (!introspect || typeof introspect !== "object") return null;
+  const raw = introspect as Record<string, unknown>;
+  const totalField = raw.credit_balance_total ?? raw.credit_balance;
+  if (typeof totalField === "number" && Number.isFinite(totalField)) {
+    return Math.max(0, Math.round(totalField));
   }
-  const pools = (introspect as Record<string, unknown>).credit_pools;
-  if (!pools || typeof pools !== "object") {
-    return { general: null, video: null };
-  }
-  const p = pools as Record<string, unknown>;
-  const general =
-    typeof p.general === "number" && Number.isFinite(p.general)
-      ? Math.max(0, Math.round(p.general))
-      : null;
-  const video =
-    typeof p.video === "number" && Number.isFinite(p.video)
-      ? Math.max(0, Math.round(p.video))
-      : null;
-  return { general, video };
+  return null;
 }
 
-/** 电商工具箱侧栏 · 剩余积分（文本池 / 视频池） */
+/** 电商工具箱侧栏 · 剩余积分 */
 export function useEcomCreditBalance(): EcomCreditPools {
-  const [pools, setPools] = useState<EcomCreditPools>({
-    general: null,
-    video: null,
-  });
+  const [pools, setPools] = useState<EcomCreditPools>({ total: null });
 
   const refresh = useCallback(async () => {
     try {
       const raw = await fetchEcomToolsSessionFull();
       if (!raw.active) return;
-      setPools(parseCreditPools(raw.introspect));
+      setPools({ total: parseCreditTotal(raw.introspect) });
     } catch {
       /* 静默 */
     }

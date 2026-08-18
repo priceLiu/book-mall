@@ -150,10 +150,8 @@ async function fulfillMembership(
     const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
     await grantCredits({
       ref: { ownerType: "TENANT", ownerId: tenantId },
-      credits: grants.generalCredits,
-      videoCredits: grants.videoCredits,
+      credits: grants.credits,
       monthlyGrantCredits: grants.monthlyGrantCredits,
-      videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
       pricePerCreditYuan:
         quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
       planId: plan.id,
@@ -163,7 +161,7 @@ async function fulfillMembership(
     });
 
     return {
-      amountPoints: grants.generalCredits + grants.videoCredits,
+      amountPoints: grants.credits,
       meta: {
         tenantId,
         planId: plan.id,
@@ -194,10 +192,8 @@ async function fulfillMembership(
 
   await grantCredits({
     ref: { ownerType: "USER", ownerId: checkout.userId },
-    credits: grants.generalCredits,
-    videoCredits: grants.videoCredits,
+    credits: grants.credits,
     monthlyGrantCredits: grants.monthlyGrantCredits,
-    videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
     pricePerCreditYuan:
       plan.monthlyCredits > 0 ? Number(plan.priceYuan) / plan.monthlyCredits : null,
     planId: plan.id,
@@ -208,7 +204,7 @@ async function fulfillMembership(
   });
 
   return {
-    amountPoints: grants.generalCredits + grants.videoCredits,
+    amountPoints: grants.credits,
     meta: {
       planId: plan.id,
       family: "PERSONAL",
@@ -246,14 +242,13 @@ async function fulfillCreditTopup(checkout: PaymentCheckout, snap: Record<string
   await topupCredits({
     ref: { ownerType, ownerId },
     credits: pack.credits,
-    pool: pack.pool,
     refType: "payment_order",
     refId: checkout.id,
     idempotencyKey: idem,
     description: `${pack.label}充值`,
   });
 
-  return { amountPoints: pack.credits, meta: { packId: pack.id, pool: pack.pool } };
+  return { amountPoints: pack.credits, meta: { packId: pack.id } };
 }
 
 async function fulfillByok(checkout: PaymentCheckout, snap: Record<string, unknown>) {
@@ -329,7 +324,7 @@ async function fulfillVipPackage(checkout: PaymentCheckout, snap: Record<string,
   }
 
   return {
-    amountPoints: result.generalCredits + result.videoCredits,
+    amountPoints: result.credits,
     meta: {
       tenantId: result.tenantId,
       family: "VIP",

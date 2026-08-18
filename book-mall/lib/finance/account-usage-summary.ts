@@ -7,7 +7,7 @@ import {
   type BillingCategoryKey,
 } from "@/lib/billing/billing-category";
 import type { AccountRef } from "@/lib/billing/credit-account-service";
-import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances } from "@/lib/billing/credit-account-service";
 import {
   buildGatewayLogActorWhere,
   buildGatewayLogWhereForTeamTenant,
@@ -119,7 +119,7 @@ export async function getAccountUsageSummary(
 
   const account = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: ref },
-    select: { id: true, planId: true, balanceCredits: true, videoBalanceCredits: true },
+    select: { id: true, planId: true, balanceCredits: true },
   });
 
   const user = await prisma.user.findUnique({
@@ -127,8 +127,8 @@ export async function getAccountUsageSummary(
     select: { billingPersona: true },
   });
 
-  const [pools, topupAgg, grantAgg, adjustAgg, consumedAgg, totalCalls] = await Promise.all([
-    getPoolBalances(ref),
+  const [balances, topupAgg, grantAgg, adjustAgg, consumedAgg, totalCalls] = await Promise.all([
+    getAccountCreditBalances(ref),
     account
       ? prisma.creditLedger.aggregate({
           where: { accountId: account.id, createdAt: { gte: since }, type: "TOPUP" },
@@ -176,7 +176,7 @@ export async function getAccountUsageSummary(
   let grantCreditsThisMonth = Math.max(0, grantAgg._sum.credits ?? 0);
   const adjustCreditsThisMonth = Math.max(0, adjustAgg._sum.credits ?? 0);
   const creditsConsumed = Math.abs(consumedAgg._sum.credits ?? 0);
-  const creditsRemaining = pools.general.balance + pools.video.balance;
+  const creditsRemaining = balances.balance;
 
   if (user?.billingPersona === "BYOK" && !account?.planId) {
     grantCreditsThisMonth = 0;
@@ -198,8 +198,8 @@ export async function getAccountUsageSummary(
     adjustCreditsThisMonth,
     creditsConsumed,
     creditsRemaining,
-    generalBalance: pools.general.balance,
-    videoBalance: pools.video.balance,
+    balance: balances.balance,
+    reserved: balances.reserved,
     totalCallsThisMonth: totalCalls,
   };
 }

@@ -10,43 +10,30 @@ import {
 } from "@/lib/tools-session-client-cache";
 
 export type CanvasCreditPools = {
-  general: number | null;
-  video: number | null;
+  /** 总可用积分（单池 v2） */
+  total: number | null;
 };
 
 const POLL_MS = 30_000;
 
-function parseCreditPools(introspect: unknown): CanvasCreditPools {
-  if (!introspect || typeof introspect !== "object") {
-    return { general: null, video: null };
+function parseCreditTotal(introspect: unknown): number | null {
+  if (!introspect || typeof introspect !== "object") return null;
+  const raw = introspect as Record<string, unknown>;
+  const totalField = raw.credit_balance_total ?? raw.credit_balance;
+  if (typeof totalField === "number" && Number.isFinite(totalField)) {
+    return Math.max(0, Math.round(totalField));
   }
-  const pools = (introspect as Record<string, unknown>).credit_pools;
-  if (!pools || typeof pools !== "object") {
-    return { general: null, video: null };
-  }
-  const p = pools as Record<string, unknown>;
-  const general =
-    typeof p.general === "number" && Number.isFinite(p.general)
-      ? Math.max(0, Math.round(p.general))
-      : null;
-  const video =
-    typeof p.video === "number" && Number.isFinite(p.video)
-      ? Math.max(0, Math.round(p.video))
-      : null;
-  return { general, video };
+  return null;
 }
 
-/** 用户剩余积分（文本池 / 视频池 · introspect + 扣费事件即时刷新） */
+/** 用户剩余积分（introspect + 扣费事件即时刷新） */
 export function useCanvasCreditBalance(): CanvasCreditPools {
-  const [pools, setPools] = useState<CanvasCreditPools>({
-    general: null,
-    video: null,
-  });
+  const [pools, setPools] = useState<CanvasCreditPools>({ total: null });
 
   const refresh = useCallback(async () => {
     const cached = getCachedToolsSession();
     if (cached?.active && cached.introspect) {
-      setPools(parseCreditPools(cached.introspect));
+      setPools({ total: parseCreditTotal(cached.introspect) });
     }
 
     try {
@@ -58,7 +45,7 @@ export function useCanvasCreditBalance(): CanvasCreditPools {
       const parsed = parseToolsSessionPayload(raw);
       if (parsed.active) {
         setCachedToolsSession(parsed);
-        setPools(parseCreditPools(parsed.introspect));
+        setPools({ total: parseCreditTotal(parsed.introspect) });
       }
     } catch {
       /* 静默 */

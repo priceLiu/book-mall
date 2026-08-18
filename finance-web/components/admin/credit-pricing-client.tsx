@@ -6,6 +6,8 @@ import { FinancePageShell, FinancePageState } from "@/components/finance-page-sh
 import { unitLabel, type PricingConfig } from "@/lib/credit-pricing-formulas";
 import { financeApiFetch, financeApiPost } from "@/lib/finance-viewer";
 import { ModelCreditLedgerClient } from "@/components/admin/model-credit-ledger-client";
+import { UnifiedCreditFormulaPanel } from "@/components/admin/unified-credit-formula-panel";
+import type { UnifiedFormulaSimulation } from "@/lib/unified-credit-formula-types";
 
 type PublishedPrice = {
   canonicalModelKey: string;
@@ -33,6 +35,8 @@ export function CreditPricingClient() {
   const [marginM, setMarginM] = useState(2.5);
   const [minGuard, setMinGuard] = useState(0.3);
   const [videoSec, setVideoSec] = useState(15);
+  const [videoMinGuard, setVideoMinGuard] = useState(0.22);
+  const [simulation, setSimulation] = useState<UnifiedFormulaSimulation | null>(null);
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async () => {
@@ -41,6 +45,7 @@ export function CreditPricingClient() {
     const r = await financeApiFetch<{
       config: PricingConfig;
       published: PublishedPrice[];
+      simulation: UnifiedFormulaSimulation;
     }>(base, "/api/finance/admin/credit-pricing");
     if (r.ok) {
       setConfig(r.data.config);
@@ -49,6 +54,8 @@ export function CreditPricingClient() {
       setMarginM(r.data.config.defaultMarginM);
       setMinGuard(r.data.config.minMarginGuard);
       setVideoSec(r.data.config.defaultVideoSec);
+      setVideoMinGuard(r.data.config.videoMinMarginGuard);
+      setSimulation(r.data.simulation ?? null);
     } else {
       setError(r.error);
     }
@@ -68,6 +75,7 @@ export function CreditPricingClient() {
       defaultMarginM: marginM,
       minMarginGuard: minGuard,
       defaultVideoSec: videoSec,
+      videoMinMarginGuard: videoMinGuard,
     });
     setSaving(false);
     if (!r.ok || !r.data.ok) setMsg(r.ok ? (r.data.error ?? "保存失败") : r.error);
@@ -101,7 +109,7 @@ export function CreditPricingClient() {
 
       <section className="rounded border border-[#e8e8e8] bg-white p-4">
         <h2 className="mb-2 text-sm font-medium">全局参数</h2>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <label className="text-sm">
             <span className="text-[#8c8c8c]">积分锚定（元）</span>
             <input type="number" step="0.01" className={inputCls} value={anchor} onChange={(e) => setAnchor(Number(e.target.value))} />
@@ -115,6 +123,16 @@ export function CreditPricingClient() {
             <input type="number" step="0.05" className={inputCls} value={minGuard} onChange={(e) => setMinGuard(Number(e.target.value))} />
           </label>
           <label className="text-sm">
+            <span className="text-[#8c8c8c]">视频毛利护栏</span>
+            <input
+              type="number"
+              step="0.01"
+              className={inputCls}
+              value={videoMinGuard}
+              onChange={(e) => setVideoMinGuard(Number(e.target.value))}
+            />
+          </label>
+          <label className="text-sm">
             <span className="text-[#8c8c8c]">视频封顶秒数</span>
             <input type="number" className={inputCls} value={videoSec} onChange={(e) => setVideoSec(Number(e.target.value))} />
           </label>
@@ -123,6 +141,8 @@ export function CreditPricingClient() {
           保存全局参数
         </button>
       </section>
+
+      {simulation ? <UnifiedCreditFormulaPanel simulation={simulation} /> : null}
 
       <ModelCreditLedgerClient embedded />
 

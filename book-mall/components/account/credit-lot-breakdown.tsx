@@ -1,8 +1,7 @@
 import Link from "next/link";
-import type { CreditPool, CreditSource } from "@prisma/client";
+import type { CreditSource } from "@prisma/client";
 
 type Lot = {
-  pool: CreditPool;
   source: CreditSource;
   remainingCredits: number;
   expiresAt: Date | null;
@@ -14,11 +13,6 @@ const SOURCE_LABEL: Record<CreditSource, string> = {
   FREE: "活动/注册赠送",
 };
 
-const POOL_LABEL: Record<CreditPool, string> = {
-  GENERAL: "通用积分",
-  VIDEO: "视频积分",
-};
-
 function fmtDate(d: Date | null): string {
   if (!d) return "永久有效";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -26,18 +20,17 @@ function fmtDate(d: Date | null): string {
   ).padStart(2, "0")} 到期`;
 }
 
-/** 账户中心：按「池 + 来源 + 最近到期」展示有效积分批次（透明化清零规则）。 */
+/** 账户中心：按「来源 + 最近到期」展示有效积分批次（透明化清零规则）。 */
 export function CreditLotBreakdown({ lots }: { lots: Lot[] }) {
   if (!lots || lots.length === 0) return null;
 
-  // 聚合到 (pool, source)：合计剩余、取最近到期。
-  const map = new Map<string, { pool: CreditPool; source: CreditSource; remaining: number; nearest: Date | null }>();
+  // 聚合到 source：合计剩余、取最近到期。
+  const map = new Map<string, { source: CreditSource; remaining: number; nearest: Date | null }>();
   for (const lot of lots) {
-    const key = `${lot.pool}:${lot.source}`;
+    const key = lot.source;
     const prev = map.get(key);
     if (!prev) {
       map.set(key, {
-        pool: lot.pool,
         source: lot.source,
         remaining: lot.remainingCredits,
         nearest: lot.expiresAt,
@@ -50,7 +43,6 @@ export function CreditLotBreakdown({ lots }: { lots: Lot[] }) {
     }
   }
   const rows = Array.from(map.values()).sort((a, b) => {
-    if (a.pool !== b.pool) return a.pool === "GENERAL" ? -1 : 1;
     const ax = a.nearest ? a.nearest.getTime() : Number.POSITIVE_INFINITY;
     const bx = b.nearest ? b.nearest.getTime() : Number.POSITIVE_INFINITY;
     return ax - bx;
@@ -72,10 +64,8 @@ export function CreditLotBreakdown({ lots }: { lots: Lot[] }) {
       </p>
       <ul className="divide-y divide-secondary">
         {rows.map((r) => (
-          <li key={`${r.pool}:${r.source}`} className="flex items-center justify-between py-2 text-sm">
-            <span className="text-muted-foreground">
-              {POOL_LABEL[r.pool]} · {SOURCE_LABEL[r.source]}
-            </span>
+          <li key={r.source} className="flex items-center justify-between py-2 text-sm">
+            <span className="text-muted-foreground">{SOURCE_LABEL[r.source]}</span>
             <span className="flex items-center gap-3">
               <span className="font-medium tabular-nums">{r.remaining.toLocaleString()}</span>
               <span className="text-xs text-muted-foreground">{fmtDate(r.nearest)}</span>

@@ -1,4 +1,4 @@
-/** VIP 大额预充 · 报价页合规公示文案（见 docs/大额vip.md） */
+/** VIP 大额预充 · 报价页合规公示文案（见 docs/大额vip.md · v2 单积分） */
 
 import { VIP_CREDIT_VALIDITY_YEARS } from "@/lib/finance/vip-package-calculator";
 
@@ -7,7 +7,7 @@ export { VIP_CREDIT_VALIDITY_YEARS };
 export const VIP_PACKAGE_TITLE = "VIP大额预充套餐";
 
 export const VIP_PACKAGE_INTRO =
-  "一次性充值解锁双池独立积分（通用池+视频池），席位数量、成员人均消耗上限支持自主配置；" +
+  "一次性充值解锁企业积分池（单积分、人人同一扣分）；席位数量、成员人均消耗上限支持自主配置。" +
   `积分有效期${VIP_CREDIT_VALIDITY_YEARS}年，有效期内无月度清零。` +
   "开通后激活团队共享积分池，适配长期高频图文、AI视频生产的企业客户。";
 
@@ -18,7 +18,7 @@ export const VIP_CREDIT_NO_CASH_NOTE =
   "积分仅为平台AI服务消耗额度，不具备现金价值，无法折现、赎回、提现。";
 
 export const VIP_CONSUMPTION_ORDER_NOTE =
-  "团队积分消耗顺序：成员个人分配额度 → 团队公共共享积分池；通用积分、视频积分分区独立消耗，不可跨池互换。";
+  "团队积分消耗顺序：成员个人分配额度 → 团队公共共享积分池；图文与视频均从同一积分池扣减（扣分人人相同）。";
 
 export const VIP_SEAT_POLICY_NOTE =
   "开通后主账号可在团队中心调整席位人均积分消耗上限；席位仅支持增购，不支持单独退订席位；删除席位仅可通过清空账号回收未分配积分。";
@@ -31,7 +31,8 @@ export const VIP_CONTRACT_NOTE =
   "页面积分测算数据仅为展示参考，最终充值配比、服务规则以双方盖章合同及公司财务确认为准。";
 
 export const VIP_BENEFITS = [
-  `一次性预充值，双池积分${VIP_CREDIT_VALIDITY_YEARS}年有效期，周期内无月度清零`,
+  `一次性预充值，积分${VIP_CREDIT_VALIDITY_YEARS}年有效期，周期内无月度清零`,
+  "单积分池：高级会员积分单价更低，可生成更多次；扣分与全站统一",
   "套餐开通后席位支持增购，管理员自主分配成员积分额度",
   "主账号管理员可设置团队成员人均积分消耗上限",
   "普通团队成员无积分划转、对外分享、转售积分权限",
@@ -41,7 +42,7 @@ export const VIP_BENEFITS = [
 export const VIP_COMPLIANCE_FOOTER_TITLE = "积分与预充值合规须知";
 
 export const VIP_COMPLIANCE_FOOTER_ITEMS = [
-  "平台通用、视频积分仅用于抵扣AI文本、图文、视频模型调用消耗，为虚拟服务权益，不具备现金价值，无法提现、折现、转让、交易；",
+  "平台积分仅用于抵扣AI文本、图文、视频模型调用消耗，为虚拟服务权益，不具备现金价值，无法提现、折现、转让、交易；",
   `大额预充积分自充值到账起有效期${VIP_CREDIT_VALIDITY_YEARS}年，有效期内无月度清零；超出有效期未消耗积分自动失效，不予退款、补偿；`,
   "退款规则：订单付款7自然日内，积分无任何消耗可申请全额退款；产生任意积分消耗后，剩余额度不支持折算退费；超出冷静期，企业自身原因申请退款不予受理；仅平台服务故障导致无法使用，可按剩余积分补偿；",
   "本预充值服务仅兑换平台AI技术服务，不属于理财、投资、金融产品，无资金增值、返利相关权益；",
