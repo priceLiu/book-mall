@@ -293,6 +293,7 @@ export async function listMyCanvasProjects(
 
 export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
   portalFeaturedBlurb: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
 /** 门户首页 · 精选示例项目（与「我的画布」同源 thumbnailUrl） */
@@ -333,6 +334,155 @@ export async function patchPortalFeaturedProject(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     },
+  );
+  return j.project;
+}
+
+export type PortalCaseProjectSummary = CanvasProjectSummary & {
+  portalCaseBlurb: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export type CanvasPortalPublishKind =
+  | "CASE"
+  | "FEATURED"
+  | "TEMPLATE"
+  | "PUBLIC_TEMPLATE";
+
+export type PortalSubmissionRecord = {
+  id: string;
+  projectId: string;
+  userId: string;
+  status: string;
+  requestKind: CanvasPortalPublishKind;
+  userNote: string;
+  adminNote: string;
+  reviewedAt: string | null;
+  approvedKind: CanvasPortalPublishKind | null;
+  createdAt: string;
+  project: {
+    id: string;
+    name: string;
+    thumbnailUrl: string;
+    edition: CanvasProjectSummary["edition"];
+  };
+  user: { id: string; name: string | null; email: string | null };
+};
+
+/** 门户首页 · 案例墙 */
+export async function listPortalCaseProjects(
+  base: string,
+): Promise<PortalCaseProjectSummary[]> {
+  const j = await call<{ projects: PortalCaseProjectSummary[] }>(
+    base,
+    "/api/canvas/projects/portal-cases",
+  );
+  return Array.isArray(j.projects) ? j.projects : [];
+}
+
+export async function duplicatePortalCaseProject(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const j = await call<{ project: CanvasProjectDetail }>(
+    base,
+    `/api/canvas/projects/portal-cases/${id}/duplicate`,
+    { method: "POST" },
+  );
+  return j.project;
+}
+
+/** 管理员 · 设置/取消门户案例 */
+export async function patchPortalCaseProject(
+  base: string,
+  id: string,
+  patch: { case: boolean; sort?: number; blurb?: string },
+): Promise<PortalCaseProjectSummary> {
+  const j = await call<{ project: PortalCaseProjectSummary }>(
+    base,
+    `/api/canvas/projects/${id}/portal-case`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return j.project;
+}
+
+/** 用户 · 提交作品 / 发布（模板即时；精选/案例审核；管理员全部即时） */
+export async function submitCanvasPortalReview(
+  base: string,
+  projectId: string,
+  body: { requestKind: CanvasPortalPublishKind; userNote?: string },
+): Promise<{ appliedImmediately: boolean; submission?: PortalSubmissionRecord }> {
+  const j = await call<{
+    appliedImmediately?: boolean;
+    submission?: PortalSubmissionRecord;
+  }>(base, `/api/canvas/projects/${projectId}/portal-submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return {
+    appliedImmediately: Boolean(j.appliedImmediately),
+    submission: j.submission,
+  };
+}
+
+export async function listPortalSubmissions(
+  base: string,
+  status: "PENDING" | "APPROVED" | "REJECTED" = "PENDING",
+): Promise<PortalSubmissionRecord[]> {
+  const j = await call<{ submissions: PortalSubmissionRecord[] }>(
+    base,
+    `/api/canvas/admin/portal-submissions?status=${encodeURIComponent(status)}`,
+  );
+  return Array.isArray(j.submissions) ? j.submissions : [];
+}
+
+export async function reviewPortalSubmission(
+  base: string,
+  submissionId: string,
+  body: {
+    approve: boolean;
+    approvedKind?: CanvasPortalPublishKind;
+    adminNote?: string;
+  },
+): Promise<PortalSubmissionRecord> {
+  const j = await call<{ submission: PortalSubmissionRecord }>(
+    base,
+    `/api/canvas/admin/portal-submissions/${submissionId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return j.submission;
+}
+
+export type AdminPortalProjectPreview = {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  edition: CanvasProjectSummary["edition"];
+  portalFeatured: boolean;
+  portalCase: boolean;
+  portalFeaturedBlurb: string;
+  portalCaseBlurb: string;
+  canvas: unknown;
+  owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export async function getAdminPortalProjectPreview(
+  base: string,
+  projectId: string,
+): Promise<AdminPortalProjectPreview> {
+  const j = await call<{ project: AdminPortalProjectPreview }>(
+    base,
+    `/api/canvas/admin/portal-projects/${projectId}`,
   );
   return j.project;
 }

@@ -1,6 +1,8 @@
 /**
- * 订阅套餐亮点 · 可生成次数估算（锚定模型，与 unified-credit-formula 一致）。
- * 视频按财务 2.0：每条 = 15 秒（封顶计费秒数）。
+ * 订阅套餐亮点 · 可生成次数估算（展示用低成本锚定）。
+ *
+ * 与财务毛利护栏锚定（Seedance 2.0）分离：定价页只展示「平台内主流低成本模型」换算，
+ * 让用户感知可生成次数；视频仍按 15 秒/条封顶计费。
  */
 import type { CreditCostUnit } from "@prisma/client";
 
@@ -17,33 +19,80 @@ export type PricingHighlightModelPrice = {
   creditsPerUnit: number;
 };
 
-/** 锚定视频：Seedance 2.0 720P（15s = 525 积分） */
-const ANCHOR_VIDEO_KEYS = [
-  "seedance-2.0-720p-real",
-  "seedance-2.0",
-  "bytedance/seedance-2",
+/** 展示锚定：非 Seedance 的主流低成本视频（同价时优先） */
+const PREFERRED_CHEAP_VIDEO_KEYS = [
+  "wanxiang-video-2.6",
+  "wanxiang-video-2.7",
+  "wanxiang-video-2.7-i2v",
+  "grok-imagine/image-to-video",
+  "happyhorse-r2v",
+  "wanxiang-i2v",
 ] as const;
 
-/** 锚定生图：通义万相示意（非最便宜 nano 档） */
-const ANCHOR_IMAGE_KEYS = ["wanxiang-image", "wan2.7-image", "wanxiang-i2i"] as const;
+/** 展示锚定：主流低成本生图（同价时优先） */
+const PREFERRED_CHEAP_IMAGE_KEYS = [
+  "lib-nano-pro-1k",
+  "lib-nano-pro-2k",
+  "grok-imagine/text-to-image",
+  "gpt-image-1",
+  "wanxiang-image",
+] as const;
 
+/** 不计入「最多可生成」的生视频类（贵锚定 / 工具 / 非标准生成） */
+const HIGHLIGHT_VIDEO_EXCLUDE_RE =
+  /seedance|topaz|upscale|motion-control|video-to-video|regeneration|h3-regeneration|asr|tts|speech/i;
+
+/** 不计入的生图类（试衣解析 / 语音 / 非出图） */
+const HIGHLIGHT_IMAGE_EXCLUDE_RE =
+  /parsing|speech|tts|suno|eleven|aitryon|tryon|vl-|vision|kie-suno|music-/i;
+
+function isEligibleHighlightModel(
+  model: PricingHighlightModelPrice,
+  unit: "PER_IMAGE" | "PER_SEC",
+  excludeRe: RegExp,
+): boolean {
+  if (model.unit !== unit || model.creditsPerUnit <= 0) return false;
+  const hay = `${model.canonicalModelKey} ${model.displayName}`;
+  return !excludeRe.test(hay);
+}
+
+/**
+ * 在已上架报价中取最低 creditsPerUnit；同价时优先 preferredKeys。
+ */
+export function findCheapestHighlightModel(
+  models: PricingHighlightModelPrice[],
+  unit: "PER_IMAGE" | "PER_SEC",
+  excludeRe: RegExp,
+  preferredKeys: readonly string[],
+): PricingHighlightModelPrice | null {
+  const eligible = models.filter((m) => isEligibleHighlightModel(m, unit, excludeRe));
+  if (eligible.length === 0) return null;
+
+  const minCpu = Math.min(...eligible.map((m) => m.creditsPerUnit));
+  const tied = eligible.filter((m) => m.creditsPerUnit === minCpu);
+
+  for (const key of preferredKeys) {
+    const hit = tied.find(
+      (m) => m.canonicalModelKey === key || m.canonicalModelKey.includes(key),
+    );
+    if (hit) return hit;
+  }
+  return tied.sort((a, b) => a.canonicalModelKey.localeCompare(b.canonicalModelKey))[0];
+}
+
+/** @deprecated 保留导出名，内部走低价锚定 */
 export function findPricingAnchorModel(
   models: PricingHighlightModelPrice[],
   unit: "PER_IMAGE" | "PER_SEC",
-  preferredKeys: readonly string[],
+  _preferredKeys: readonly string[],
 ): PricingHighlightModelPrice | null {
-  for (const key of preferredKeys) {
-    const hit = models.find((m) => m.unit === unit && m.canonicalModelKey === key);
-    if (hit) return hit;
-  }
-  const unitModels = models.filter((m) => m.unit === unit && m.creditsPerUnit > 0);
-  if (unitModels.length === 0) return null;
-  for (const key of preferredKeys) {
-    const stem = key.split("-")[0];
-    const hit = unitModels.find((m) => m.canonicalModelKey.includes(stem));
-    if (hit) return hit;
-  }
-  return unitModels.sort((a, b) => a.creditsPerUnit - b.creditsPerUnit)[0];
+  void _preferredKeys;
+  return findCheapestHighlightModel(
+    models,
+    unit,
+    unit === "PER_SEC" ? HIGHLIGHT_VIDEO_EXCLUDE_RE : HIGHLIGHT_IMAGE_EXCLUDE_RE,
+    unit === "PER_SEC" ? PREFERRED_CHEAP_VIDEO_KEYS : PREFERRED_CHEAP_IMAGE_KEYS,
+  );
 }
 
 /** 会员积分每 31 天刷新；年付套餐在库内为 12 期合计，展示/估算用单期额度。 */
@@ -67,8 +116,18 @@ export function computePricingHighlightEstimate(
   imageAnchorLabel: string;
   videoAnchorLabel: string;
 } {
-  const imageModel = findPricingAnchorModel(models, "PER_IMAGE", ANCHOR_IMAGE_KEYS);
-  const videoModel = findPricingAnchorModel(models, "PER_SEC", ANCHOR_VIDEO_KEYS);
+  const imageModel = findCheapestHighlightModel(
+    models,
+    "PER_IMAGE",
+    HIGHLIGHT_IMAGE_EXCLUDE_RE,
+    PREFERRED_CHEAP_IMAGE_KEYS,
+  );
+  const videoModel = findCheapestHighlightModel(
+    models,
+    "PER_SEC",
+    HIGHLIGHT_VIDEO_EXCLUDE_RE,
+    PREFERRED_CHEAP_VIDEO_KEYS,
+  );
 
   const imageCreditsPerUnit = imageModel?.creditsPerUnit ?? 0;
   const videoCreditsPer15s =
@@ -84,7 +143,7 @@ export function computePricingHighlightEstimate(
     maxVideos15s: computeTierGenerations(creditsPool, videoCreditsPer15s),
     imageCreditsPerUnit,
     videoCreditsPer15s,
-    imageAnchorLabel: imageModel?.displayName ?? "标准生图",
-    videoAnchorLabel: videoModel?.displayName ?? "标准 15 秒视频",
+    imageAnchorLabel: imageModel?.displayName ?? "低成本生图",
+    videoAnchorLabel: videoModel?.displayName ?? "低成本 15 秒视频",
   };
 }

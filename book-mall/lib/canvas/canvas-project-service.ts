@@ -403,6 +403,7 @@ export async function duplicateCanvasProjectForUser(
 
 export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
   portalFeaturedBlurb: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
 function portalFeaturedBlurbOf(p: {
@@ -422,11 +423,17 @@ export async function listPortalFeaturedCanvasProjects(): Promise<
     where: { portalFeatured: true, deletedAt: null },
     orderBy: [{ portalFeaturedSort: "asc" }, { updatedAt: "desc" }],
     take: 50,
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
   });
-  return rows.map((p) => ({
-    ...toSummary(p),
-    portalFeaturedBlurb: portalFeaturedBlurbOf(p),
-  }));
+  return rows
+    .filter((p) => canvasProjectEditionFromGraph(p.canvas) === "pro2")
+    .map((p) => ({
+      ...toSummary(p),
+      portalFeaturedBlurb: portalFeaturedBlurbOf(p),
+      owner: p.user,
+    }));
 }
 
 async function getPortalFeaturedCanvasProjectRow(projectId: string) {
@@ -445,6 +452,45 @@ export async function duplicatePortalFeaturedProjectForUser(
   sourceProjectId: string,
 ): Promise<CanvasProjectDetail> {
   const source = await getPortalFeaturedCanvasProjectRow(sourceProjectId);
+  const canvas = cloneCanvasGraphForDuplicate(source.canvas);
+  const thumbnailUrl =
+    resolveThumbnailUrl({
+      thumbnailUrl: source.thumbnailUrl,
+      canvas: source.canvas,
+    }) || "";
+  const created = await createCanvasProjectForUser(userId, {
+    name: duplicateProjectName(source.name),
+    description: source.description,
+    canvas,
+  });
+  if (!thumbnailUrl) return created;
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: created.id },
+    data: { thumbnailUrl },
+  });
+  return {
+    ...toSummary(updated),
+    canvas: updated.canvas,
+  };
+}
+
+async function getPortalCaseCanvasProjectRow(projectId: string) {
+  const p = await prisma.canvasProject.findFirst({
+    where: { id: projectId, deletedAt: null, portalCase: true },
+  });
+  if (!p) {
+    throw new CanvasProjectError("NOT_FOUND", "portal case project not found", 404);
+  }
+  return p;
+}
+
+/** 从门户案例复制到当前用户 */
+export async function duplicatePortalCaseProjectForUser(
+  userId: string,
+  sourceProjectId: string,
+): Promise<CanvasProjectDetail> {
+  const source = await getPortalCaseCanvasProjectRow(sourceProjectId);
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({

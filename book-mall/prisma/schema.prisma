@@ -108,6 +108,8 @@ model User {
   storyProjects                    StoryProject[]
   canvasProjects                   CanvasProject[]
   canvasProjectHistories           CanvasProjectHistory[]
+  canvasPortalSubmissions          CanvasPortalSubmission[]
+  canvasPortalSubmissionsReviewed  CanvasPortalSubmission[] @relation("CanvasPortalSubmissionReviewer")
   canvasTemplates                  CanvasTemplate[]
   canvasCharacters                 CanvasCharacter[]
   storyProCharacterAssets          StoryProCharacterAsset[]
@@ -1967,6 +1969,11 @@ model CanvasProject {
   /// 首页卡片副文案（空则用 description）
   portalFeaturedBlurb String  @default("") @db.Text
 
+  /// 门户首页案例墙（TV Show 式展示，与精选/社区模板并列）
+  portalCase      Boolean @default(false)
+  portalCaseSort  Int     @default(0)
+  portalCaseBlurb String  @default("") @db.Text
+
   deletedAt DateTime?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
@@ -1977,6 +1984,7 @@ model CanvasProject {
   tasks        CanvasGenerationTask[]
   cleanupItems CanvasOssCleanupQueue[]
   histories    CanvasProjectHistory[]
+  portalSubmissions CanvasPortalSubmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1984,6 +1992,45 @@ model CanvasProject {
   @@index([userId, deletedAt, updatedAt])
   @@index([tenantId, visibility, updatedAt])
   @@index([portalFeatured, portalFeaturedSort])
+  @@index([portalCase, portalCaseSort])
+}
+
+/// 用户提交画布 → 管理员审核 → 案例 / 精选 / 模板
+enum CanvasPortalPublishKind {
+  CASE
+  FEATURED
+  TEMPLATE
+  PUBLIC_TEMPLATE
+}
+
+enum CanvasPortalSubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CanvasPortalSubmission {
+  id        String @id @default(cuid())
+  projectId String
+  project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status      CanvasPortalSubmissionStatus @default(PENDING)
+  requestKind CanvasPortalPublishKind
+  userNote    String @default("") @db.Text
+  adminNote   String @default("") @db.Text
+
+  reviewedByUserId String?
+  reviewedBy       User?   @relation("CanvasPortalSubmissionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  approvedKind     CanvasPortalPublishKind?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([projectId])
 }
 
 /// 画布自动/手动保存历史（每项目最多保留 20 条）

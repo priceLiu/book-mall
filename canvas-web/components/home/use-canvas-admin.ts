@@ -11,7 +11,7 @@ function isPlatformAdminRole(role: string | null | undefined): boolean {
   return r === "ADMIN" || r === "SUPER_ADMIN";
 }
 
-async function resolveCanvasPortalAdmin(
+export async function resolveCanvasPortalAdmin(
   base: string,
   signal?: AbortSignal,
 ): Promise<boolean> {
@@ -26,13 +26,13 @@ async function resolveCanvasPortalAdmin(
   const tools = parseToolsSessionPayload(toolsRaw);
   const intro = tools.introspect;
   if (intro && typeof intro === "object") {
-    const role = (intro as Record<string, unknown>).tools_role;
-    return role === "admin";
+    const o = intro as Record<string, unknown>;
+    if (o.tools_role === "admin" || o.tier === "admin") return true;
   }
   return false;
 }
 
-/** 门户首页 · 是否平台管理员（可删社区/精选模板） */
+/** 门户 · 是否平台管理员（viewer-session ADMIN 或 tools_role admin） */
 export function useCanvasAdmin(): boolean {
   const base = useBookMallBaseUrl();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -43,10 +43,17 @@ export function useCanvasAdmin(): boolean {
       return;
     }
     const ac = new AbortController();
-    void resolveCanvasPortalAdmin(base, ac.signal)
-      .then(setIsAdmin)
-      .catch(() => setIsAdmin(false));
-    return () => ac.abort();
+    const load = () => {
+      void resolveCanvasPortalAdmin(base, ac.signal)
+        .then(setIsAdmin)
+        .catch(() => setIsAdmin(false));
+    };
+    load();
+    window.addEventListener("canvas:tools-session-refreshed", load);
+    return () => {
+      ac.abort();
+      window.removeEventListener("canvas:tools-session-refreshed", load);
+    };
   }, [base]);
 
   return isAdmin;

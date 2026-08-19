@@ -27,6 +27,7 @@ import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel"
 import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel";
 import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
 import { useCanvasTaskEventStream } from "@/lib/canvas/use-canvas-task-event-stream";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
 import { hasAnyMediaRenderInFlight } from "@/lib/canvas/media-render-in-flight";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
@@ -259,6 +260,7 @@ function Inner({ projectId }: { projectId: string }) {
     graphMeta,
   });
   const isStoryPro2Canvas = isStoryPro2Project || layoutShell === "pro2";
+  const crewAccess = useCrewCollaborationAccess();
   const isSbv1Canvas =
     !isStoryPro2Canvas && (isSbv1Project || layoutShell === "sbv1");
   const isStoryProCanvas =
@@ -1554,7 +1556,10 @@ function Inner({ projectId }: { projectId: string }) {
               showImmersiveChrome ? () => void toggleImmersive() : undefined
             }
             centerLeading={
-              isStoryPro2Canvas ? <Pro2ProductionGateToolbarLink /> : undefined
+              isStoryPro2Canvas &&
+              (crewAccess.canUseCrewBulletin || crewAccess.isPlatformAdmin)
+                ? <Pro2ProductionGateToolbarLink />
+                : undefined
             }
           />
           <GatewayLinkBanner />

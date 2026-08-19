@@ -1,83 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Loader2, Palette } from "lucide-react";
+import { Palette } from "lucide-react";
 import { PortalNav } from "@/components/portal-nav";
-import { CANVAS_NAV_ITEMS } from "@/lib/site-config";
-import { getBookAccountUrl } from "@/lib/site-origin";
+import { CanvasShellAuthSlot } from "@/components/layout/canvas-shell-auth-slot";
+import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
+import { CANVAS_NAV_ITEMS, CANVAS_SITE_BRAND_NAME } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
-import {
-  fetchCanvasViewerUser,
-  type CanvasViewerUser,
-} from "@/lib/canvas-viewer-session";
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-
-function ShellAuthSlot() {
-  const base = useBookMallBaseUrl();
-  const bookAccountUrl = getBookAccountUrl();
-  const [user, setUser] = useState<CanvasViewerUser | null | undefined>(undefined);
-
-  useEffect(() => {
-    if (!base) {
-      setUser(null);
-      return;
-    }
-    const ac = new AbortController();
-    const timer = window.setTimeout(() => ac.abort(), 12_000);
-    void fetchCanvasViewerUser(base, ac.signal)
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      ac.abort();
-      window.clearTimeout(timer);
-    };
-  }, [base]);
-
-  if (user === undefined) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--canvas-muted)]">
-        <Loader2 className="size-3 animate-spin" aria-hidden />
-        <span className="hidden sm:inline">登录检查</span>
-      </span>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex shrink-0 items-center gap-2">
-        <Link href="/login" className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
-          登录
-        </Link>
-        <Link href="/register" className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
-          注册
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-2">
-      <span className="hidden max-w-[100px] truncate text-[11px] text-[var(--canvas-muted)] md:inline xl:max-w-[160px]">
-        {user.name ?? user.phone ?? user.email ?? user.id}
-      </span>
-      {bookAccountUrl ? (
-        <a href={bookAccountUrl} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
-          个人中心
-        </a>
-      ) : null}
-      <a href="/api/auth/logout" className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
-        退出
-      </a>
-    </div>
-  );
-}
 
 export function CanvasShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const isCanvasEditor = pathname.startsWith("/canvas/");
+  const isAdmin = useCanvasAdmin();
 
   if (isCanvasEditor) {
     return <>{children}</>;
@@ -97,7 +32,7 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
             <span className="flex size-8 items-center justify-center rounded-md border border-white/15 bg-gradient-to-br from-[var(--canvas-accent)]/30 to-transparent">
               <Palette className="size-4 text-[var(--canvas-accent)]" strokeWidth={2} />
             </span>
-            <span className="canvas-sans hidden text-sm sm:inline">canvas-web</span>
+            <span className="canvas-sans hidden text-sm sm:inline">{CANVAS_SITE_BRAND_NAME}</span>
           </Link>
 
           <nav
@@ -124,13 +59,26 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            {isAdmin ? (
+              <Link
+                href="/admin/portal"
+                className={cn(
+                  "canvas-sans shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold tracking-tight transition sm:px-3 sm:text-sm",
+                  pathname.startsWith("/admin/portal")
+                    ? "bg-white/12 text-white ring-1 ring-white/15"
+                    : "text-white/70 hover:bg-white/10 hover:text-white",
+                )}
+              >
+                工作流管理
+              </Link>
+            ) : null}
           </nav>
 
           <div className="min-w-0 flex-1" aria-hidden />
 
           <PortalNav current="canvas" />
 
-          <ShellAuthSlot />
+          <CanvasShellAuthSlot />
         </div>
       </header>
 

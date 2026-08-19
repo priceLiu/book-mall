@@ -6,9 +6,13 @@ import { buildTemplateWorkflowDiagramLayout } from "@/lib/canvas/template-workfl
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
 
-/** 与「我的画布」列表封面完全相同的容器样式 */
+/** 列表封面标准尺寸（发现 / 我的画布） */
+export const CANVAS_LIST_COVER_WIDTH = 340;
+export const CANVAS_LIST_COVER_HEIGHT = 190;
+
+/** 与「我的画布」列表封面完全相同的容器样式（340×190） */
 export const CANVAS_LIST_COVER_CLASS =
-  "aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-[var(--canvas-accent)]/15 to-[var(--canvas-surface-2)]";
+  "aspect-[340/190] w-full overflow-hidden rounded-xl bg-gradient-to-br from-[var(--canvas-accent)]/15 to-[var(--canvas-surface-2)]";
 
 type Props = {
   /** 与项目列表 `thumbnailUrl` 同名字段，直接复用 */

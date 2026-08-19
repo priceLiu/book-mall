@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: {
-    default: "canvas-web · AI 海报画布",
-    template: "%s · canvas-web",
+    default: "ZH 无限画布",
+    template: "%s · ZH 无限画布",
   },
   description:
-    "无限画布 AI 设计工具：拖拽节点、风格迁移、产品融合，一人即设计室。",
+    "ZH 无限画布：影视专业版 2.0 节点工作流，拖拽编排、AI 生图生视频，一人即制作室。",
 };
 
 export default function RootLayout({

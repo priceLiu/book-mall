@@ -54,7 +54,7 @@ export function PricingPlanCreditsBlock({
 
   const { images, videos } = estimateForCredits(displayCredits);
 
-  const tooltipText = `按锚定模型示意换算：生图 ${imageAnchorLabel}（${formatCredits(maxImages)} 张/每席·31天）、视频 ${videoAnchorLabel} 每条 15 秒（${formatCredits(maxVideos15s)} 条/每席·31天）。实际模型与参数不同会有差异；同池互斥。`;
+  const tooltipText = `按平台内主流低成本模型示意换算（非最贵档）：生图 ${imageAnchorLabel}、视频 ${videoAnchorLabel} 每条 15 秒。每席每 31 天约 ${formatCredits(maxImages)} 张图 / ${formatCredits(maxVideos15s)} 条视频；实际模型与参数不同会有差异，同池互斥。`;
 
   const toggleShellClass = cn(
     "inline-flex max-w-full items-center rounded-full border p-0.5",

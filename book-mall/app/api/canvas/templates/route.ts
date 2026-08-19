@@ -46,10 +46,11 @@ export async function GET(request: NextRequest) {
   let where: Prisma.CanvasTemplateWhereInput;
   if (scope === "featured") {
     where = {
+      edition: "pro2",
       OR: [{ builtin: true, featured: true }, { featured: true, visibility: "public" }],
     };
   } else if (scope === "public") {
-    where = { visibility: "public", builtin: false };
+    where = { visibility: "public", builtin: false, edition: "pro2" };
   } else if (scope === "my") {
     where = { ownerUserId: guard.user.id };
   } else {

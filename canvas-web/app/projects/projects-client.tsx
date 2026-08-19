@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Copy, Plus, Trash2, X, Star } from "lucide-react";
+import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
@@ -16,8 +16,11 @@ import {
   listCanvasTemplates,
   listMyCanvasProjects,
   listPortalFeaturedProjects,
+  listPortalCaseProjects,
   patchCanvasProject,
   patchPortalFeaturedProject,
+  patchPortalCaseProject,
+  submitCanvasPortalReview,
   prefetchCanvasProject,
   prefetchCanvasProjects,
   type CanvasProjectSummary,
@@ -53,6 +56,7 @@ import {
 } from "@/lib/canvas/pro2-new-project-script-package";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
+import { PortalSubmitDialog } from "@/components/home/portal-submit-dialog";
 import { cn } from "@/lib/utils";
 
 type StarterPick =
@@ -79,6 +83,13 @@ function Inner() {
   const [portalFeaturedIds, setPortalFeaturedIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [portalCaseIds, setPortalCaseIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [submitTarget, setSubmitTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [userTemplates, setUserTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -162,6 +173,66 @@ function Inner() {
   useEffect(() => {
     void refreshPortalFeaturedIds();
   }, [refreshPortalFeaturedIds]);
+
+  const refreshPortalCaseIds = useCallback(async () => {
+    if (!base?.trim() || !isAdmin) {
+      setPortalCaseIds(new Set());
+      return;
+    }
+    try {
+      const list = await listPortalCaseProjects(base);
+      setPortalCaseIds(new Set(list.map((p) => p.id)));
+    } catch {
+      setPortalCaseIds(new Set());
+    }
+  }, [base, isAdmin]);
+
+  useEffect(() => {
+    void refreshPortalCaseIds();
+  }, [refreshPortalCaseIds]);
+
+  const onTogglePortalCase = useCallback(
+    async (id: string, caseFlag: boolean) => {
+      if (!base?.trim()) return;
+      try {
+        await patchPortalCaseProject(base, id, { case: caseFlag });
+        await refreshPortalCaseIds();
+      } catch (e) {
+        await dialogs.alert({
+          title: caseFlag ? "设为案例失败" : "取消案例失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      }
+    },
+    [base, dialogs, refreshPortalCaseIds],
+  );
+
+  const onSubmitPortalReview = useCallback(
+    async (kind: import("@/lib/canvas-api").CanvasPortalPublishKind, note: string) => {
+      if (!base?.trim() || !submitTarget) return;
+      const result = await submitCanvasPortalReview(base, submitTarget.id, {
+        requestKind: kind,
+        userNote: note || undefined,
+      });
+      if (result.appliedImmediately) {
+        await dialogs.alert({
+          title: "已发布",
+          message: "作品已按所选类型对外展示。",
+          variant: "success",
+        });
+        if (kind === "FEATURED") await refreshPortalFeaturedIds();
+        if (kind === "CASE") await refreshPortalCaseIds();
+      } else {
+        await dialogs.alert({
+          title: "已提交",
+          message: "管理员审核通过后将展示在首页相应位置。",
+          variant: "success",
+        });
+      }
+    },
+    [base, dialogs, submitTarget, refreshPortalFeaturedIds, refreshPortalCaseIds],
+  );
 
   const onTogglePortalFeatured = useCallback(
     async (id: string, featured: boolean) => {
@@ -502,11 +573,11 @@ function Inner() {
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <button
               type="button"
-              onClick={() => onOpenPicker("pro")}
+              onClick={openPro2CreateDialog}
               className="twenty-btn-accent text-sm"
             >
               <Plus className="mr-2 size-4" />
-              新建影视专业版
+              新建影视专业版 2.0
             </button>
             <button
               type="button"
@@ -518,11 +589,11 @@ function Inner() {
             </button>
             <button
               type="button"
-              onClick={openPro2CreateDialog}
+              onClick={() => onOpenPicker("pro")}
               className="rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-2 text-sm font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
             >
               <Plus className="mr-2 inline size-4" />
-              新建影视专业版 2.0
+              新建影视专业版
             </button>
           </div>
         </div>
@@ -564,7 +635,10 @@ function Inner() {
             onCreate={() => onOpenPicker("sbv1")}
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
+            portalCaseIds={portalCaseIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
+            onTogglePortalCase={onTogglePortalCase}
+            onOpenSubmit={(id, name) => setSubmitTarget({ id, name })}
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
@@ -580,7 +654,10 @@ function Inner() {
             onCreate={openPro2CreateDialog}
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
+            portalCaseIds={portalCaseIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
+            onTogglePortalCase={onTogglePortalCase}
+            onOpenSubmit={(id, name) => setSubmitTarget({ id, name })}
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
@@ -596,7 +673,10 @@ function Inner() {
             onCreate={() => onOpenPicker("pro")}
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
+            portalCaseIds={portalCaseIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
+            onTogglePortalCase={onTogglePortalCase}
+            onOpenSubmit={(id, name) => setSubmitTarget({ id, name })}
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
@@ -824,6 +904,14 @@ function Inner() {
           </div>
         </div>
       ) : null}
+
+      <PortalSubmitDialog
+        open={submitTarget != null}
+        projectName={submitTarget?.name ?? ""}
+        isAdmin={isAdmin}
+        onClose={() => setSubmitTarget(null)}
+        onSubmit={onSubmitPortalReview}
+      />
     </div>
   );
 }
@@ -840,7 +928,10 @@ function ProjectsSection({
   onCreate,
   isAdmin,
   portalFeaturedIds,
+  portalCaseIds,
   onTogglePortalFeatured,
+  onTogglePortalCase,
+  onOpenSubmit,
   openingProjectId,
   onOpeningProject,
 }: {
@@ -855,7 +946,10 @@ function ProjectsSection({
   onCreate: () => void;
   isAdmin?: boolean;
   portalFeaturedIds?: Set<string>;
+  portalCaseIds?: Set<string>;
   onTogglePortalFeatured?: (id: string, featured: boolean) => void | Promise<void>;
+  onTogglePortalCase?: (id: string, caseFlag: boolean) => void | Promise<void>;
+  onOpenSubmit?: (id: string, name: string) => void;
   openingProjectId: string | null;
   onOpeningProject: (id: string | null) => void;
 }) {
@@ -923,6 +1017,26 @@ function ProjectsSection({
                 </p>
               </Link>
               <div className="mt-3 flex items-center justify-end gap-2">
+                {isAdmin && onTogglePortalCase ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void onTogglePortalCase(p.id, !portalCaseIds?.has(p.id))
+                    }
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
+                      portalCaseIds?.has(p.id)
+                        ? "border-violet-400/40 text-violet-200 hover:border-violet-400/60"
+                        : "border-white/10 text-[var(--canvas-muted)] hover:border-violet-400/35 hover:text-violet-200/90",
+                    )}
+                    title={
+                      portalCaseIds?.has(p.id) ? "取消首页案例" : "设为首页案例"
+                    }
+                  >
+                    <Clapperboard className="size-3" />
+                    案例
+                  </button>
+                ) : null}
                 {isAdmin && onTogglePortalFeatured ? (
                   <button
                     type="button"
@@ -951,6 +1065,17 @@ function ProjectsSection({
                       )}
                     />
                     首页
+                  </button>
+                ) : null}
+                {onOpenSubmit ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenSubmit(p.id, p.name)}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-sky-400/40 hover:text-sky-200"
+                    title="提交作品给管理员审核"
+                  >
+                    <Send className="size-3" />
+                    投稿
                   </button>
                 ) : null}
                 <button
