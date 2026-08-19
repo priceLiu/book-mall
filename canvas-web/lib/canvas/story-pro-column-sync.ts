@@ -9,11 +9,17 @@ import {
   buildVideoRowsFromFrames,
   isFrameScriptPrompt,
   isShotSizeSceneLabel,
+  mergeFrameRowCharacterRefsFromIds,
   patchVideoRowsFromFrameRows,
   syncFrameRowCharacterRefs,
 } from "./story-column-sync";
 import { preservePro2MediaRowPrompt } from "./pro2-media-row-spawn";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
+import {
+  compactGfmTables,
+  parseMdTable,
+  parseStoryboardRows,
+} from "./parse-md-tables";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
@@ -220,7 +226,7 @@ function buildProFrameRowsFromProductionScript(
   return (script.shots ?? []).map((shot) => {
     const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
     const aiImagePrompt = shot.imagePrompt?.trim() || undefined;
-    const base: StoryFrameRow = syncFrameRowCharacterRefs(
+    const base: StoryFrameRow = mergeFrameRowCharacterRefsFromIds(
       {
         frameIndex: shot.index,
         key: String(shot.index),
@@ -232,6 +238,7 @@ function buildProFrameRowsFromProductionScript(
         prompt: "",
       },
       charCompat,
+      shot.characterIds,
     );
     return {
       ...base,

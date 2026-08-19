@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { buildCrewBulletinFromHub } from "@/lib/canvas/crew-bulletin-build";
 import { tryRepairHubFromStoredProductionJson } from "@/lib/canvas/pro2-production-script-apply";
+import {
+  resolvePro2HubCharacterPickerRows,
+  resolvePro2HubStoryboardPickerRows,
+} from "@/lib/canvas/pro2-script-hub-helpers";
 import { applyHubSectionFromTask } from "@/lib/canvas/story-row-patch";
+import {
+  buildSceneRowsFromProductionScript,
+  splitEnvironmentTimeMood,
+} from "@/lib/canvas/story-column-sync";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import {
   PRO2_FIXTURE_FULL_PACK,
@@ -44,6 +52,57 @@ describe("pro2-production-script flow", () => {
     expect(
       bulletin.tasks.some((t) => t.kind === "character" && t.label === "沈知意"),
     ).toBe(true);
+
+    const pickerRows = resolvePro2HubCharacterPickerRows(merged);
+    expect(pickerRows[0]?.name).toBe("沈知意");
+    expect(pickerRows[0]?.personality).toContain("乖巧");
+  });
+
+  it("scene picker rows split environmentTimeMood from JSON", () => {
+    const hub: StoryProScriptHubNodeData = {
+      outlineMd: "",
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+      productionScript: PRO2_FIXTURE_FULL_PACK.patch,
+    };
+    const rows = buildSceneRowsFromProductionScript(hub, "hub-1");
+    expect(rows[0]?.name).toBe("长安主街·日");
+    expect(rows[0]?.environment).toBe("正午暖金阳光");
+    expect(rows[0]?.time).toBe("百姓攒动");
+    expect(rows[0]?.imageKeywords).toContain("朱雀大街");
+
+    const split = splitEnvironmentTimeMood("深夜 · 压抑 · 电脑蓝光");
+    expect(split.environment).toBe("深夜");
+    expect(split.time).toBe("压抑");
+    expect(split.mood).toBe("电脑蓝光");
+  });
+
+  it("storyboard picker rows map productionScript.shots", () => {
+    const hub: StoryProScriptHubNodeData = {
+      outlineMd: "",
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+      productionScript: PRO2_FIXTURE_FULL_PACK.patch,
+    };
+    const rows = resolvePro2HubStoryboardPickerRows(hub);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.frameIndex).toBe(1);
+    expect(rows[0]?.shotSize).toBe("全景");
+    expect(rows[0]?.cameraMove).toBe("缓慢摇移");
+    expect(rows[0]?.description).toContain("朱雀大街");
+    expect(rows[0]?.duration).toBe("10");
+    expect(rows[0]?.aiVideoPrompt).toContain("scene_A");
+    expect(rows[0]?.scene).toBe("长安主街·日");
   });
 
   it("falls back to MD when no fence present", () => {

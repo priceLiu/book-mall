@@ -1,6 +1,7 @@
 "use client";
 
 import type { StoryProCharacterRow } from "./story-pro-workspace-types";
+import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import { buildPro2ThreeViewNodeData } from "./pro2-spawn-nodes";
 import { buildPro2ThreeViewDockPrompt } from "./three-view-prompt-rules";
 import {
@@ -244,6 +245,14 @@ export function optimisticPro2ThreeViewBatchStart(
       ? { ...n, data: { ...n.data, rows: nextRows } }
       : n,
   );
+  for (const key of allowed) {
+    const tv = findPro2CharacterThreeViewNodeForRow(
+      syncedNodes,
+      characterColumnId,
+      key,
+    );
+    if (tv) markCanvasNodeGenerationStarted(tv.id);
+  }
   syncPro2CharacterImagesFromRows(
     syncedNodes,
     characterColumnId,

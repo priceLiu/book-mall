@@ -135,22 +135,133 @@ function threeViewNodeSyncPatchFromRow(
   return patch;
 }
 
+function characterThreeViewNodesForRow(
+  nodes: CanvasFlowNode[],
+  characterColumnId: string,
+  rowKey: string,
+): CanvasFlowNode[] {
+  return nodes.filter((n) => {
+    if (!isCharacterThreeViewChild(n, characterColumnId)) return false;
+    return (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey;
+  });
+}
+
+function characterBoardGroupIds(nodes: CanvasFlowNode[]): Set<string> {
+  return new Set(
+    nodes
+      .filter(
+        (n) =>
+          n.type === "group" &&
+          (n.data as { pro2Kind?: string }).pro2Kind === "character-board",
+      )
+      .map((n) => n.id),
+  );
+}
+
+function threeViewNodeGroupId(n: CanvasFlowNode): string | undefined {
+  return (
+    n.parentId?.trim() ||
+    (n.data as { pro2GroupId?: string }).pro2GroupId?.trim() ||
+    undefined
+  );
+}
+
 /** 角色列 rowKey → 组内三视图节点（多组抽卡时按 pending/visual 组定位） */
 export function findPro2CharacterThreeViewNodeForRow(
   nodes: CanvasFlowNode[],
   characterColumnId: string,
   rowKey: string,
 ): CanvasFlowNode | undefined {
+  const candidates = characterThreeViewNodesForRow(
+    nodes,
+    characterColumnId,
+    rowKey,
+  );
+  if (!candidates.length) return undefined;
+
   const syncGroupId = resolveCharacterSyncGroupId(nodes, characterColumnId);
-  return nodes.find((n) => {
-    if (!isCharacterThreeViewChild(n, characterColumnId)) return false;
-    if ((n.data as { pro2RowKey?: string }).pro2RowKey !== rowKey) return false;
-    if (!syncGroupId) return true;
-    return (
-      n.parentId === syncGroupId ||
-      (n.data as { pro2GroupId?: string }).pro2GroupId === syncGroupId
+  if (syncGroupId) {
+    const inSync = candidates.find(
+      (n) => threeViewNodeGroupId(n) === syncGroupId,
     );
-  });
+    if (inSync) return inSync;
+  }
+
+  const validGroups = characterBoardGroupIds(nodes);
+  const syncGroupStale =
+    Boolean(syncGroupId) && !validGroups.has(syncGroupId!);
+  if (!syncGroupId || syncGroupStale) {
+    const inValidGroups = candidates.filter((n) => {
+      const gid = threeViewNodeGroupId(n);
+      return gid && validGroups.has(gid);
+    });
+    if (inValidGroups.length === 1) return inValidGroups[0];
+    const pendingId = (
+      nodes.find((n) => n.id === characterColumnId)?.data as {
+        pro2PendingSyncGroupId?: string;
+      }
+    )?.pro2PendingSyncGroupId?.trim();
+    if (pendingId) {
+      const inPending = inValidGroups.find(
+        (n) => threeViewNodeGroupId(n) === pendingId,
+      );
+      if (inPending) return inPending;
+    }
+    const inflight = inValidGroups.find((n) => {
+      const d = n.data as {
+        uploading?: boolean;
+        runtime?: CanvasNodeRuntime;
+        ossUrl?: string;
+      };
+      return (
+        d.uploading ||
+        isThreeViewRowInflight(d.runtime) ||
+        !d.ossUrl?.trim()
+      );
+    });
+    if (inflight) return inflight;
+    if (inValidGroups.length) return inValidGroups[inValidGroups.length - 1];
+  }
+
+  return candidates[0];
+}
+
+/** 批量再生成 · 清掉其它组内同 rowKey 三视图的残留扫光（避免旧组误显示生成中） */
+export function clearPro2ThreeViewInflightOutsideSyncGroup(
+  characterColumnId: string,
+  rowKeys: string[],
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const allowed = new Set(rowKeys.filter(Boolean));
+  if (!allowed.size) return;
+  const syncGroupId = resolveCharacterSyncGroupId(nodes, characterColumnId);
+  if (!syncGroupId) return;
+
+  for (const n of nodes) {
+    if (!isCharacterThreeViewChild(n, characterColumnId)) continue;
+    const rowKey = (n.data as { pro2RowKey?: string }).pro2RowKey?.trim();
+    if (!rowKey || !allowed.has(rowKey)) continue;
+    const groupId =
+      n.parentId?.trim() ||
+      (n.data as { pro2GroupId?: string }).pro2GroupId?.trim();
+    if (!groupId || groupId === syncGroupId) continue;
+    const nodeData = n.data as {
+      uploading?: boolean;
+      runtime?: CanvasNodeRuntime;
+    };
+    if (
+      !nodeData.uploading &&
+      !isThreeViewRowInflight(nodeData.runtime)
+    ) {
+      continue;
+    }
+    updateNodeData(n.id, {
+      uploading: false,
+      runtime: undefined,
+      uploadError: undefined,
+    });
+  }
 }
 
 /** 轮询 · 列上已无 in-flight 时，清掉三视图节点残留扫光（保留行级 error / done 预览） */
@@ -189,7 +300,7 @@ export function reconcilePro2ThreeViewNodesWithColumnRows(
       }
     }
     const rowKey = (n.data as { pro2RowKey?: string }).pro2RowKey?.trim();
-    if (!rowKey || inflightKeys.has(rowKey)) continue;
+    if (!rowKey) continue;
 
     const groupId =
       n.parentId?.trim() ||
@@ -197,12 +308,43 @@ export function reconcilePro2ThreeViewNodesWithColumnRows(
     const row = rowByKey.get(rowKey);
     const inSyncGroup = !syncGroupId || groupId === syncGroupId;
 
-    if (
-      inSyncGroup &&
-      (row?.runtime?.status === "error" || row?.runtime?.status === "done")
-    ) {
-      updateNodeData(n.id, threeViewNodeSyncPatchFromRow(row));
+    if (inflightKeys.has(rowKey) && syncGroupId && groupId && groupId !== syncGroupId) {
+      const nodeData = n.data as {
+        uploading?: boolean;
+        runtime?: CanvasNodeRuntime;
+      };
+      if (
+        nodeData.uploading ||
+        isThreeViewRowInflight(nodeData.runtime)
+      ) {
+        updateNodeData(n.id, {
+          uploading: false,
+          runtime: undefined,
+          uploadError: undefined,
+        });
+      }
       continue;
+    }
+
+    if (inflightKeys.has(rowKey)) continue;
+
+    if (
+      row?.runtime?.status === "error" ||
+      row?.runtime?.status === "done"
+    ) {
+      const syncTarget = findPro2CharacterThreeViewNodeForRow(
+        nodes,
+        characterColumnId,
+        rowKey,
+      );
+      if (syncTarget && syncTarget.id === n.id) {
+        updateNodeData(n.id, threeViewNodeSyncPatchFromRow(row));
+        continue;
+      }
+      if (inSyncGroup) {
+        updateNodeData(n.id, threeViewNodeSyncPatchFromRow(row));
+        continue;
+      }
     }
 
     const nodeData = n.data as {

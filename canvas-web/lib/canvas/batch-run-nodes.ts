@@ -7,6 +7,8 @@ import {
   busEnqueueStoryRunsSequential,
 } from "./canvas-run-bus";
 import { optimisticPro2ThreeViewBatchStart, clearStalePro2ThreeViewInflight } from "./pro2-spawn-character-image-group";
+import { clearPro2ThreeViewInflightOutsideSyncGroup } from "./pro2-group-row-resolve";
+import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import { useCanvasStore } from "./store";
 import type { StoryLlmSection } from "./story-workspace-types";
 import { STORY_HUB_SECTION_ORDER } from "./spawn-story-workspace";
@@ -91,6 +93,7 @@ export function batchRunPro2ThreeViewRows(
 ) {
   const keys = rowKeys.filter(Boolean);
   if (!keys.length) return;
+  markCanvasNodeGenerationStarted(columnNodeId);
   const { nodes, updateNodeData } = useCanvasStore.getState();
   clearStalePro2ThreeViewInflight(columnNodeId, keys, nodes, updateNodeData);
   const nodesAfterClear = useCanvasStore.getState().nodes;
@@ -108,6 +111,12 @@ export function batchRunPro2ThreeViewRows(
       n.id === columnNodeId
         ? { ...n, data: { ...n.data, rows: cleared } }
         : n,
+    );
+    clearPro2ThreeViewInflightOutsideSyncGroup(
+      columnNodeId,
+      keys,
+      nodesAfter,
+      updateNodeData,
     );
     optimisticPro2ThreeViewBatchStart(
       columnNodeId,

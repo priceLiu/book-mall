@@ -16,6 +16,7 @@ import { isCanvasNodeRunSessionActive } from "./canvas-run-session";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { isUnparsedPro2ProductionJsonBlob } from "./pro2-production-script-structured";
+import { renderProductionScriptStoryboardMd } from "./pro2-production-script-render-md";
 import { tryRepairHubFromStoredProductionJson } from "./pro2-production-script-apply";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
@@ -75,6 +76,12 @@ export function resolveHubSectionMd(
 }
 
 export function resolveHubStoryboardMd(d: StoryScriptHubNodeData): string {
+  const pro2 = (d as StoryProScriptHubNodeData).productionScript;
+  if (pro2?.shots?.length) {
+    return ensureStoryboardAiVideoPromptsMd(
+      renderProductionScriptStoryboardMd(pro2),
+    );
+  }
   const synced = hubDataForColumnSync(d);
   const storyboard =
     (synced.storyboardMd ?? "").trim() ||

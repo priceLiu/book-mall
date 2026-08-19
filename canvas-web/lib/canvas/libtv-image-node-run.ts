@@ -13,13 +13,32 @@ export function isLibtvPipelineImageCell(
   return Boolean(d.pro2ControllerNodeId?.trim() || node.parentId);
 }
 
+/** 组内三视图格：走角色列 batch（任务 nodeId=列 · scope.rowKey），非独立 freestanding runner */
+export function isPro2PipelineThreeViewCell(
+  node: Pick<CanvasFlowNode, "type" | "data"> | undefined,
+): boolean {
+  if (!node) return false;
+  const d = node.data as {
+    pro2ControllerNodeId?: string;
+    pro2MediaRole?: string;
+  };
+  if (!d.pro2ControllerNodeId?.trim()) return false;
+  if (node.type === "story-pro2-three-view") return true;
+  return (
+    node.type === "story-pro2-image" &&
+    d.pro2MediaRole === "character-three-view"
+  );
+}
+
 /** sbv1-image · Pro2 独立/场景图格：Dock 模型选择 + sbv1-image runner */
 export function isLibtvFreestandingImageNode(
   node: Pick<CanvasFlowNode, "type" | "data"> | undefined,
 ): boolean {
   if (!node) return false;
   if (node.type === "sbv1-image") return true;
-  if (node.type === "story-pro2-three-view") return true;
+  if (node.type === "story-pro2-three-view") {
+    return !isPro2PipelineThreeViewCell(node);
+  }
   if (node.type === "story-pro2-image") {
     const role = (node.data as { pro2MediaRole?: string }).pro2MediaRole ?? "generic";
     if (role === "generic" || role === "scene" || role === "prop" || role === "mood") {

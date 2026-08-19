@@ -53,10 +53,10 @@ function cellText(value: string | undefined, fallback = "—"): string {
 }
 
 const GRID_HEAD =
-  "grid grid-cols-[28px_52px_72px_72px_52px_minmax(140px,1.4fr)_minmax(100px,1fr)_minmax(160px,1.6fr)] gap-x-2 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40";
+  "grid grid-cols-[28px_52px_72px_72px_52px_minmax(120px,1.2fr)_minmax(90px,0.9fr)_minmax(120px,1.2fr)_minmax(140px,1.4fr)] gap-x-2 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40";
 
 const GRID_ROW =
-  "grid grid-cols-[28px_52px_72px_72px_52px_minmax(140px,1.4fr)_minmax(100px,1fr)_minmax(160px,1.6fr)] gap-x-2 px-3 py-2.5";
+  "grid grid-cols-[28px_52px_72px_72px_52px_minmax(120px,1.2fr)_minmax(90px,0.9fr)_minmax(120px,1.2fr)_minmax(140px,1.4fr)] gap-x-2 px-3 py-2.5";
 
 /** 生成分镜图 · 选择镜号 + 与三视图一致的 Dock 模型/参数 */
 export function Pro2FrameGeneratePicker({
@@ -199,6 +199,7 @@ export function Pro2FrameGeneratePicker({
             <span>时长</span>
             <span>画面描述</span>
             <span>对白</span>
+            <span>AI生图提示词</span>
             <span>AI视频提示词</span>
           </div>
           <ul>
@@ -237,8 +238,11 @@ export function Pro2FrameGeneratePicker({
                     <span className="line-clamp-2 text-[11px] leading-snug text-white/50">
                       {cellText(row.dialogue)}
                     </span>
+                    <span className="line-clamp-3 text-[11px] leading-snug text-emerald-100/55">
+                      {cellText(row.aiImagePrompt, "（无生图提示词）")}
+                    </span>
                     <span className="line-clamp-3 text-[11px] leading-snug text-violet-100/55">
-                      {cellText(row.aiVideoPrompt, "（无提示词）")}
+                      {cellText(row.aiVideoPrompt, "（无视频提示词）")}
                     </span>
                   </label>
                 </li>

@@ -5,8 +5,6 @@ import { Download, LayoutGrid, MapPin, Megaphone, RotateCw, Users, BookmarkPlus,
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
-import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
 import { runPro2ScriptPublishFlow } from "@/lib/canvas/pro2-script-publish-flow";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import {
@@ -24,8 +22,10 @@ import {
   pro2HubIsGenerating,
   pro2HubIsLinkedOutline,
   resolvePro2HubCharacterMd,
+  resolvePro2HubCharacterPickerRows,
   resolvePro2HubSceneMd,
   resolvePro2HubSceneRows,
+  resolvePro2HubStoryboardPickerRows,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
   resolvePro2ThreeViewBatchImageForHub,
@@ -144,8 +144,10 @@ export function Pro2ScriptHubToolbar({
   } as never);
 
   const storyboardRows = useMemo(() => {
-    if (!hasTable) return [];
-    return parseStoryboardRows(resolveHubStoryboardMd(liveHubData));
+    if (!hasTable && !(liveHubData.productionScript?.shots?.length ?? 0)) {
+      return [];
+    }
+    return resolvePro2HubStoryboardPickerRows(liveHubData);
   }, [hasTable, liveHubData]);
 
   const initialFrameBatchImage = useMemo(
@@ -445,7 +447,7 @@ export function Pro2ScriptHubToolbar({
 
       <Pro2CharacterThreeViewPicker
         open={tvPickerOpen}
-        characterMd={resolvePro2HubCharacterMd(hubData)}
+        characterRows={resolvePro2HubCharacterPickerRows(hubData)}
         initialBatchImage={initialThreeViewBatchImage}
         onClose={() => setTvPickerOpen(false)}
         onConfirm={runThreeViewGenerate}

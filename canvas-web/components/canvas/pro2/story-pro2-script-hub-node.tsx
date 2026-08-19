@@ -53,6 +53,7 @@ import {
   pro2HubIsLinkedOutline,
   pro2ScriptHubHasLinkedOutlineContent,
   resolvePro2HubCharacterMd,
+  resolvePro2HubCharacterPickerRows,
   resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
@@ -645,7 +646,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
 
       <Pro2CharacterThreeViewPicker
         open={tvPickerOpen}
-        characterMd={characterMd}
+        characterRows={resolvePro2HubCharacterPickerRows(d)}
         initialBatchImage={resolvePro2ThreeViewBatchImageForHub(id, nodes, edges)}
         onClose={() => setTvPickerOpen(false)}
         onConfirm={runThreeViewGenerate}

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   clearOrphanPro2ThreeViewInflightInGroup,
+  clearPro2ThreeViewInflightOutsideSyncGroup,
   findPro2CharacterThreeViewNodeForRow,
   findPro2FrameImageNodeForRow,
   maybeClearHubPendingSceneSyncGroup,
@@ -9,6 +10,10 @@ import {
   scopePro2CharacterSyncGroupForThreeViewNode,
 } from "@/lib/canvas/pro2-group-row-resolve";
 import { countCanvasInflightWork } from "@/lib/canvas/story-column-runtime";
+import {
+  isLibtvFreestandingImageNode,
+  isPro2PipelineThreeViewCell,
+} from "@/lib/canvas/libtv-image-node-run";
 import { pickStoryRowApplyTask } from "@/lib/canvas/task-pick";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
@@ -467,5 +472,95 @@ describe("pickStoryRowApplyTask · threeView", () => {
       { status: "pending" },
     );
     expect(pick?.id).toBe("fresh-done");
+  });
+});
+
+describe("isPro2PipelineThreeViewCell", () => {
+  it("treats hub column three-view cells as pipeline (not freestanding)", () => {
+    const pipeline = {
+      type: "story-pro2-three-view" as const,
+      data: { pro2ControllerNodeId: "col-char" },
+    };
+    expect(isPro2PipelineThreeViewCell(pipeline)).toBe(true);
+    expect(isLibtvFreestandingImageNode(pipeline)).toBe(false);
+  });
+
+  it("treats orphan three-view without controller as freestanding", () => {
+    const orphan = {
+      type: "story-pro2-three-view" as const,
+      data: {},
+    };
+    expect(isPro2PipelineThreeViewCell(orphan)).toBe(false);
+    expect(isLibtvFreestandingImageNode(orphan)).toBe(true);
+  });
+});
+
+describe("clearPro2ThreeViewInflightOutsideSyncGroup", () => {
+  it("clears stale inflight on old group while new group is pending sync", () => {
+    const columnId = "col-char";
+    const oldGroup = "grp-old";
+    const newGroup = "grp-new";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-character",
+        position: { x: 0, y: 0 },
+        data: { pro2PendingSyncGroupId: newGroup },
+      },
+      {
+        ...threeViewNode("tv-old", columnId, "hero", oldGroup),
+        data: {
+          ...threeViewNode("tv-old", columnId, "hero", oldGroup).data,
+          uploading: true,
+          runtime: { status: "pending" },
+        },
+      },
+      threeViewNode("tv-new", columnId, "hero", newGroup),
+    ];
+    const updateNodeData = vi.fn();
+    clearPro2ThreeViewInflightOutsideSyncGroup(
+      columnId,
+      ["hero"],
+      nodes,
+      updateNodeData,
+    );
+    expect(updateNodeData).toHaveBeenCalledWith("tv-old", {
+      uploading: false,
+      runtime: undefined,
+      uploadError: undefined,
+    });
+    expect(updateNodeData).not.toHaveBeenCalledWith(
+      "tv-new",
+      expect.objectContaining({ uploading: false }),
+    );
+  });
+});
+
+describe("findPro2CharacterThreeViewNodeForRow · stale visual group", () => {
+  it("falls back to the live character-board group when visual group id is stale", () => {
+    const columnId = "col-char";
+    const staleGroup = "grp-deleted";
+    const liveGroup = "grp-live";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-character",
+        position: { x: 0, y: 0 },
+        data: { pro2VisualGroupId: staleGroup },
+      },
+      {
+        id: liveGroup,
+        type: "group",
+        position: { x: 0, y: 0 },
+        data: { pro2Kind: "character-board" },
+      },
+      threeViewNode("tv-minister", columnId, "char-minister", liveGroup),
+    ];
+    const found = findPro2CharacterThreeViewNodeForRow(
+      nodes,
+      columnId,
+      "char-minister",
+    );
+    expect(found?.id).toBe("tv-minister");
   });
 });

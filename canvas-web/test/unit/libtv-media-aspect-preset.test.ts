@@ -127,11 +127,17 @@ describe("libtv-media-aspect-preset", () => {
     ).toBe("sbv1-video");
   });
 
-  it("maps pro2 scene/frame cells to pro2-frame-cell profile", () => {
+  it("maps pro2 scene cells to three-view profile and frame cells to pro2-frame-cell", () => {
     expect(
       resolveLibtvMediaAspectPresetProfile({
         type: "story-pro2-image",
         data: { pro2MediaRole: "scene" },
+      }),
+    ).toBe("three-view");
+    expect(
+      resolveLibtvMediaAspectPresetProfile({
+        type: "story-pro2-image",
+        data: { pro2MediaRole: "frame" },
       }),
     ).toBe("pro2-frame-cell");
   });

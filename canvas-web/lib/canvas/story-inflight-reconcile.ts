@@ -36,6 +36,7 @@ import type {
 } from "./story-workspace-types";
 import {
   isLibtvFreestandingImageNode,
+  isPro2PipelineThreeViewCell,
 } from "./libtv-image-node-run";
 import {
   isSameSbv1MediaDataPatch,
@@ -74,6 +75,19 @@ function hasServerInflightForScope(
 
 function rowHasMediaResult(runtime?: CanvasNodeRuntime): boolean {
   return Boolean(runtime?.ossUrl?.trim() || runtime?.ephemeralUrl?.trim());
+}
+
+/** 角色列行级任务刚入队 · task 列表尚未返回时勿清 inflight / 勿判失败 */
+function shouldDeferStoryRowInflightReconcile(
+  nodeId: string,
+  runtime?: CanvasNodeRuntime,
+): boolean {
+  if (!isInflightStatus(runtime?.status)) return false;
+  if (runtime?.taskId?.trim()) return false;
+  return (
+    shouldDeferLibtvOrphanReconcile(nodeId) ||
+    isCanvasNodeRunSessionActive(nodeId)
+  );
 }
 
 function clearInflightRuntime(
@@ -248,7 +262,10 @@ export function reconcileStaleInflightRuntimes(
       let changed = false;
       const nextRows = rows.map((row) => {
         if (!isInflightStatus(row.runtime?.status)) return row;
-        const scope = { rowKey: row.key, mediaKind: "threeView" };
+        const scope = { rowKey: row.key, mediaKind: "threeView" as const };
+        if (shouldDeferStoryRowInflightReconcile(node.id, row.runtime)) {
+          return row;
+        }
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickStoryRowApplyTask(
@@ -266,6 +283,9 @@ export function reconcileStaleInflightRuntimes(
               nodes,
             );
           } else if (!hasServerInflightForScope(tasks, node.id, scope)) {
+            if (shouldDeferStoryRowInflightReconcile(node.id, row.runtime)) {
+              return row;
+            }
             changed = true;
             return {
               ...row,
@@ -283,6 +303,9 @@ export function reconcileStaleInflightRuntimes(
             ...row,
             runtime: clearInflightRuntime(row.runtime),
           };
+        }
+        if (shouldDeferStoryRowInflightReconcile(node.id, row.runtime)) {
+          return row;
         }
         changed = true;
         return {
@@ -477,6 +500,9 @@ export function reconcileStaleInflightRuntimes(
     if (isStoryWorkspaceNodeType(node.type ?? "")) continue;
 
     if (skipNodeIds?.has(node.id)) continue;
+
+    /** 组内三视图由角色列 reconcile；勿按独立 media 节点判 orphan 失败 */
+    if (isPro2PipelineThreeViewCell(node)) continue;
 
     const rt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
     if (!rt || !isInflightStatus(rt.status)) continue;

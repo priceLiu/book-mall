@@ -14,6 +14,12 @@ import {
 } from "./pro2-script-category-presets";
 import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows, resolveSceneDictionaryMarkdown } from "./parse-md-tables";
 import {
+  renderProductionScriptCharacterMd,
+  renderProductionScriptSceneMd,
+} from "./pro2-production-script-render-md";
+import { buildCharacterRowsFromHub } from "./story-column-sync";
+import type { StoryboardTableRow } from "./parse-md-tables";
+import {
   hubAggregateStatus,
   hubDataForColumnSync,
   hubSectionIsRunning,
@@ -82,21 +88,52 @@ import {
   readHubVisualStylePack,
 } from "./story-pro-visual-style-pack";
 export function pro2HubHasScriptTable(d: StoryProScriptHubNodeData): boolean {
+  if ((d.productionScript?.shots?.length ?? 0) > 0) return true;
   const md = resolveHubStoryboardMd(d);
   return parseStoryboardRows(md).length > 0;
 }
 
-/** 角色表 Markdown（含从大纲拆出的角色段） */
+/** 角色表 Markdown（JSON 真源优先，否则 characterMd / 大纲嵌入段） */
 export function resolvePro2HubCharacterMd(
   d: StoryProScriptHubNodeData,
 ): string {
+  const pro2 = d.productionScript;
+  if (pro2?.characters?.length) {
+    return renderProductionScriptCharacterMd(pro2);
+  }
   const synced = hubDataForColumnSync(
     d as Parameters<typeof hubDataForColumnSync>[0],
   );
   return (synced.characterMd ?? "").trim();
 }
 
+export type Pro2HubCharacterPickerRow = {
+  name: string;
+  role: string;
+  appearance: string;
+  personality: string;
+  aiImagePrompt: string;
+};
+
+/** 三视图选择弹层 · 优先 productionScript.characters，回退 MD 解析 */
+export function resolvePro2HubCharacterPickerRows(
+  d: StoryProScriptHubNodeData,
+): Pro2HubCharacterPickerRow[] {
+  const fromJson = buildCharacterRowsFromHub(d);
+  if (fromJson.length) {
+    return fromJson.map((r) => ({
+      name: r.name,
+      role: r.role,
+      appearance: r.appearance,
+      personality: r.personality?.trim() ?? "",
+      aiImagePrompt: r.aiImagePrompt?.trim() ?? "",
+    }));
+  }
+  return parseCharacterRows(resolvePro2HubCharacterMd(d));
+}
+
 export function pro2HubHasCharacterTable(d: StoryProScriptHubNodeData): boolean {
+  if ((d.productionScript?.characters?.length ?? 0) > 0) return true;
   return parseCharacterRows(resolvePro2HubCharacterMd(d)).length > 0;
 }
 
@@ -133,6 +170,10 @@ export function resolvePro2HubSceneMd(
   d: StoryProScriptHubNodeData,
   ctx?: Pro2HubSceneResolveContext,
 ): string {
+  const pro2 = d.productionScript;
+  if (pro2?.scenes?.length) {
+    return renderProductionScriptSceneMd(pro2);
+  }
   const synced = hubDataForColumnSync(
     hubDataWithEffectiveOutline(d, ctx) as Parameters<
       typeof hubDataForColumnSync
@@ -173,7 +214,40 @@ export function pro2HubHasSceneTable(
   d: StoryProScriptHubNodeData,
   ctx?: Pro2HubSceneResolveContext,
 ): boolean {
+  if ((d.productionScript?.scenes?.length ?? 0) > 0) return true;
   return parseSceneVisualDictionaryRows(resolvePro2HubSceneMd(d, ctx)).length > 0;
+}
+
+/** 分镜组选择弹层 · 优先 productionScript.shots */
+export function resolvePro2HubStoryboardPickerRows(
+  d: StoryProScriptHubNodeData,
+): StoryboardTableRow[] {
+  const shots = d.productionScript?.shots;
+  if (shots?.length) {
+    const sceneById = new Map(
+      (d.productionScript?.scenes ?? []).map((s) => [s.id, s.name] as const),
+    );
+    return shots.map((shot) => {
+      const video = shot.videoPrompt?.trim() ?? "";
+      return {
+        frameIndex: shot.index,
+        scene: shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "",
+        shotSize: shot.shotSize?.trim() ?? "",
+        cameraMove: shot.cameraMove?.trim() ?? "",
+        description: shot.sceneDescription?.trim() ?? "",
+        dialogue: shot.dialogue?.trim() ?? "",
+        duration:
+          shot.durationSec != null && shot.durationSec > 0
+            ? String(shot.durationSec)
+            : "",
+        aiImagePrompt: shot.imagePrompt?.trim() ?? "",
+        aiVideoPrompt: video,
+        lipSyncNote: shot.audioNote?.trim() ?? "",
+        videoPrompt: video,
+      };
+    });
+  }
+  return parseStoryboardRows(resolveHubStoryboardMd(d));
 }
 
 export { PRO2_HUB_SECTION_ORDER, resolvePro2HubScriptGenerationSections };
@@ -564,8 +638,7 @@ export function kickoffPro2FrameBoardFromHub(
   const starter = resolveStarterForHub(store.nodes, store.edges, hubId);
   if (!starter) return null;
 
-  const storyboardMd = resolveHubStoryboardMd(hubData);
-  if (!parseStoryboardRows(storyboardMd).length) return null;
+  if (!pro2HubHasScriptTable(hubData)) return null;
 
   store.updateNodeData(hubId, { dockInput, dockRefImages });
   store = getStore();
@@ -1079,11 +1152,9 @@ export function kickoffPro2CharacterThreeViewFromHub(
   });
 
   if (keys.length) {
-    window.setTimeout(() => {
-      batchRunPro2ThreeViewRows(characterColumnId!, keys, {
-        forceFresh: Boolean(options?.spawnNewGroup ?? true),
-      });
-    }, 0);
+    batchRunPro2ThreeViewRows(characterColumnId!, keys, {
+      forceFresh: Boolean(options?.spawnNewGroup ?? true),
+    });
   }
 
   return { characterColumnId };

@@ -97,7 +97,13 @@ export function pro2MediaChildSize(node: {
       height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
     };
   }
-  if (node.pro2MediaRole === "frame" || node.pro2MediaRole === "scene") {
+  if (node.pro2MediaRole === "scene") {
+    return {
+      width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+      height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+    };
+  }
+  if (node.pro2MediaRole === "frame") {
     return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
   }
   if (node.pro2MediaRole === "video") {

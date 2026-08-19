@@ -92,18 +92,20 @@ export function buildCharacterRowsFromHub(
     .productionScript;
   const visualPack = hubVisualStylePackForCharacterRows(d);
   if (pro2?.characters?.length) {
-    return pro2.characters.map((c) =>
-      characterRowFromParts(
+    return pro2.characters.map((c) => ({
+      ...characterRowFromParts(
         {
           name: c.name,
           role: c.role,
           appearance: c.appearance,
+          personality: c.personality,
           aiImagePrompt: c.imagePrompt,
         },
-        c.id,
+        undefined,
         visualPack,
       ),
-    );
+      key: c.id,
+    }));
   }
   const synced = hubDataForColumnSync(d);
   const characterSource =
@@ -352,6 +354,31 @@ export function isFrameScriptPrompt(prompt: string): boolean {
   );
 }
 
+/** 将 scenes[].environmentTimeMood 拆为环境/时间/气氛（展示用） */
+export function splitEnvironmentTimeMood(combined: string): {
+  environment: string;
+  time: string;
+  mood: string;
+} {
+  const text = combined.trim();
+  if (!text) return { environment: "", time: "", mood: "" };
+  const parts = text
+    .split(/\s*[·•/|，,]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) {
+    return {
+      environment: parts[0]!,
+      time: parts[1]!,
+      mood: parts.slice(2).join(" · "),
+    };
+  }
+  if (parts.length === 2) {
+    return { environment: parts[0]!, time: parts[1]!, mood: "" };
+  }
+  return { environment: text, time: "", mood: "" };
+}
+
 /** 从 productionScript.scenes 拆分场景行（JSON 真源） */
 export function buildSceneRowsFromProductionScript(
   d: StoryScriptHubNodeData,
@@ -365,9 +392,13 @@ export function buildSceneRowsFromProductionScript(
   for (const s of pro2.scenes) {
     const key = hub ? storyProSceneRowKey(hub, s.name) : s.id;
     if (byKey.has(key)) continue;
+    const etm = splitEnvironmentTimeMood(s.environmentTimeMood);
     byKey.set(key, {
       key,
       name: s.name,
+      environment: etm.environment,
+      time: etm.time,
+      mood: etm.mood,
       description: s.environmentTimeMood,
       imageKeywords: s.imagePrompt,
       negativePrompt: s.negativePrompt?.trim() || undefined,
@@ -388,7 +419,7 @@ export function buildFrameRowsFromProductionScript(
   return (script.shots ?? []).map((shot) => {
     const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
     const aiImagePrompt = shot.imagePrompt?.trim() || undefined;
-    return syncFrameRowCharacterRefs(
+    return mergeFrameRowCharacterRefsFromIds(
       {
         frameIndex: shot.index,
         key: String(shot.index),
@@ -400,6 +431,7 @@ export function buildFrameRowsFromProductionScript(
         prompt: aiImagePrompt ?? "",
       },
       characterRows,
+      shot.characterIds,
     );
   });
 }
@@ -464,6 +496,39 @@ export function syncFrameRowCharacterRefs(
     refImageUrls,
     referencedNodeIds,
   };
+}
+
+/** 分镜 JSON characterIds → 参考图绑定（不修改 prompt 正文） */
+export function mergeFrameRowCharacterRefsFromIds(
+  frame: StoryFrameRow,
+  characterRows: StoryCharacterRow[],
+  characterIds: string[] | undefined,
+): StoryFrameRow {
+  const synced = syncFrameRowCharacterRefs(frame, characterRows);
+  if (!characterIds?.length) return synced;
+  const idSet = new Set(characterIds);
+  const explicit = characterRows.filter((c) => idSet.has(c.key));
+  if (!explicit.length) return synced;
+  const catalog = buildFrameRefImagesForCharacters(characterRows);
+  const fromIds = explicit.map((c) => ({
+    id: `ref-char-${c.key}`,
+    label: c.name,
+    url: c.runtime?.ossUrl ?? c.runtime?.ephemeralUrl,
+  }));
+  const refImages = refreshStoryRefImagesFromCatalog(
+    [...(synced.refImages ?? []), ...fromIds],
+    catalog,
+  );
+  const referencedNodeIds = [
+    ...new Set([
+      ...(synced.referencedNodeIds ?? []),
+      ...explicit.map((c) => `ref-char-${c.key}`),
+    ]),
+  ];
+  const refImageUrls = refImages
+    .map((ref) => ref.url)
+    .filter((u): u is string => Boolean(u && /^https?:\/\//.test(u)));
+  return { ...synced, refImages, referencedNodeIds, refImageUrls };
 }
 
 export function buildFrameRowsFromMd(

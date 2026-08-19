@@ -94,7 +94,10 @@ export function Pro2SceneImagePicker({
       return sceneRows.map((r) => ({
         key: r.key,
         name: r.name,
-        environment: r.environment?.trim() ?? "",
+        environment:
+          r.environment?.trim() ||
+          r.description?.trim() ||
+          "",
         time: r.time?.trim() ?? "",
         mood: r.mood?.trim() ?? "",
         imageKeywords: r.imageKeywords?.trim() ?? "",

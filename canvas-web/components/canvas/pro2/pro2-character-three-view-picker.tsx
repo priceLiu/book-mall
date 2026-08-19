@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Users, X } from "lucide-react";
+import type { Pro2HubCharacterPickerRow } from "@/lib/canvas/pro2-script-hub-helpers";
 import { parseCharacterRows } from "@/lib/canvas/parse-md-tables";
 import {
   pickDefaultPro2ThreeViewImageEngine,
@@ -36,7 +37,9 @@ export type Pro2CharacterThreeViewResult = {
 
 export type Pro2CharacterThreeViewPickerProps = {
   open: boolean;
-  characterMd: string;
+  /** @deprecated 优先传 characterRows（JSON 真源） */
+  characterMd?: string;
+  characterRows?: Pro2HubCharacterPickerRow[];
   initialBatchImage?: Pro2ThreeViewBatchImagePick | null;
   onClose: () => void;
   onConfirm: (result: Pro2CharacterThreeViewResult) => void;
@@ -56,7 +59,8 @@ const GRID_ROW =
 /** 生成角色三视图 · 选择角色 + 与 2.0 图片节点一致的模型设置 */
 export function Pro2CharacterThreeViewPicker({
   open,
-  characterMd,
+  characterMd = "",
+  characterRows,
   initialBatchImage,
   onClose,
   onConfirm,
@@ -72,7 +76,13 @@ export function Pro2CharacterThreeViewPicker({
     outputCount: 1,
   });
 
-  const rows = useMemo(() => parseCharacterRows(characterMd), [characterMd]);
+  const rows = useMemo(
+    () =>
+      characterRows?.length
+        ? characterRows
+        : parseCharacterRows(characterMd),
+    [characterMd, characterRows],
+  );
 
   useEffect(() => {
     setMounted(true);

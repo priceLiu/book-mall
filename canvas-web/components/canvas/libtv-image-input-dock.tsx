@@ -60,6 +60,7 @@ import { Pro2DockStyleButton } from "./pro2/pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2/pro2-dock-upstream-chips";
 import { Pro2DockUpstreamHeader } from "./pro2/pro2-dock-upstream-header";
 import { Pro2VisualStylePackBar } from "./pro2/pro2-visual-style-pack-bar";
+import { promptHasEmbeddedVisualStyleBlock } from "@/lib/canvas/story-pro-visual-style-pack";
 import {
   Pro2DockToolbar,
   Pro2InputDockShell,
@@ -231,6 +232,11 @@ export function LibtvImageInputDock() {
 
   const isFrameFreestanding =
     pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
+  const showVisualStylePackBar =
+    isPro2 &&
+    Boolean(pro2Data.pro2HubNodeId) &&
+    pro2Data.pro2MediaRole !== "scene" &&
+    !promptHasEmbeddedVisualStyleBlock(dockInput);
   const imageModelKeys =
     isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
       ? PRO2_FRAME_IMAGE_MODEL_KEYS
@@ -612,7 +618,7 @@ export function LibtvImageInputDock() {
           disabled={isRunning}
           maxImages={12}
         >
-          {isPro2 && pro2Data.pro2HubNodeId ? (
+          {showVisualStylePackBar ? (
             <Pro2VisualStylePackBar hubNodeId={pro2Data.pro2HubNodeId} />
           ) : null}
           <MentionsEditable
