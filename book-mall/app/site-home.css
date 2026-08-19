@@ -1625,6 +1625,37 @@
   line-height: 1.25;
 }
 
+[data-site-home] .site-pricing-plan-card--featured {
+  border-color: #d1d9e0;
+  box-shadow: 0 4px 24px rgb(31 35 40 / 0.06);
+}
+
+[data-site-home] .site-pricing-credits-block {
+  text-align: center;
+}
+
+[data-site-home] .site-pricing-credits-amount {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: hsl(var(--foreground));
+}
+
+[data-site-home] .site-pricing-credits-suffix {
+  margin-left: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+}
+
+[data-site-home] .site-pricing-credits-estimate {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: hsl(var(--muted-foreground));
+}
+
 [data-site-home] .site-pricing-highlights-label {
   font-size: 0.6875rem;
   font-weight: 500;

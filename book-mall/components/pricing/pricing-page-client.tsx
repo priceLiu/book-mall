@@ -32,12 +32,19 @@ import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import {
   computeTeamSeatQuote,
   computeTierGenerations,
+  computeUnifiedChargeCredits,
+  DEFAULT_VIDEO_SEC,
   unitLabel,
   type SeatBand,
 } from "@/lib/pricing/credit-pricing-formulas";
+import {
+  computePricingHighlightEstimate,
+  resolveMembershipPeriodCredits,
+} from "@/lib/pricing/pricing-highlight-estimate";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
 import { PricingModeTabs } from "@/components/pricing/pricing-mode-tabs";
+import { PricingPlanCreditsBlock } from "@/components/pricing/pricing-plan-credits-block";
 import {
   buildLoginRedirectForCheckout,
   buildMembershipCheckoutPath,
@@ -114,47 +121,14 @@ interface Highlight {
   nowrap?: boolean;
 }
 
-function buildHighlights(args: {
-  isTeam: boolean;
-  index: number;
-  periodLabel: string;
-  monthlyCredits: number;
-  teamSeats?: number;
-  maxImages: number;
-  maxVideoSec: number;
-}): Highlight[] {
-  const {
-    isTeam,
-    index,
-    periodLabel,
-    monthlyCredits,
-    teamSeats = 1,
-    maxImages,
-    maxVideoSec,
-  } = args;
-  const poolCredits = isTeam ? monthlyCredits * teamSeats : monthlyCredits;
+function buildHighlights(args: { isTeam: boolean; index: number }): Highlight[] {
+  const { isTeam, index } = args;
 
   if (isTeam) {
     return [
       {
-        text: `团队 ${poolCredits.toLocaleString()} 积分/${periodLabel}（${teamSeats} 席）`,
+        text: "人人同一扣分；高级会员积分单价更低，可生成更多次",
         included: true,
-        nowrap: true,
-      },
-      {
-        text: `每席 ${monthlyCredits.toLocaleString()} 积分 · 人人同一扣分，高级会员积分更划算`,
-        included: true,
-        nowrap: true,
-      },
-      {
-        text: `最多约 ${maxImages.toLocaleString()} 张图/${periodLabel}（每席）`,
-        included: true,
-        nowrap: true,
-      },
-      {
-        text: `最多约 ${maxVideoSec.toLocaleString()} 秒视频/${periodLabel}（每席）`,
-        included: true,
-        nowrap: true,
       },
       { text: "团队共享资产库 · 多人画布协作", included: true },
       { text: "席位 / 权限 / 用量管控", included: true },
@@ -166,15 +140,7 @@ function buildHighlights(args: {
 
   return [
     {
-      text: `每月 ${monthlyCredits.toLocaleString()} 积分`,
-      included: true,
-    },
-    {
       text: "人人同一扣分；高级会员积分单价更低，可生成更多次",
-      included: true,
-    },
-    {
-      text: `最多约 ${maxImages.toLocaleString()} 张图 / ${maxVideoSec.toLocaleString()} 秒视频`,
       included: true,
     },
     { text: "全站应用通用：工具站 / Canvas / Story / 电商 / 提示词", included: true },
@@ -240,10 +206,6 @@ export function PricingPageClient({
   const videoModels = models.filter((m) => m.unit === "PER_SEC");
   const imageModels = models.filter((m) => m.unit === "PER_IMAGE");
   const otherModels = models.filter((m) => m.unit !== "PER_SEC" && m.unit !== "PER_IMAGE");
-
-  // 各档「最便宜」单价，用于「最多生成约 …」估算
-  const minImageCpu = imageModels.length > 0 ? Math.min(...imageModels.map((m) => m.creditsPerUnit)) : 0;
-  const minVideoCpu = videoModels.length > 0 ? Math.min(...videoModels.map((m) => m.creditsPerUnit)) : 0;
 
   // 同档年付价（用于「买年卡立省 X%」）
   const yearPriceByTier = useMemo(() => {
@@ -314,7 +276,7 @@ export function PricingPageClient({
           <h2 className="site-pricing-section-title">订阅套餐</h2>
           <p className="site-pricing-section-hint">自动续订，包月可随时取消</p>
           <p className="site-pricing-section-hint">
-            会员积分每月发放，当期未使用积分不结转至下期
+            会员积分每 31 天发放一期，当期未使用积分不结转至下期（年付按{periodLabel}计费，积分仍按 31 天周期刷新）
           </p>
         </section>
       </div>
@@ -349,8 +311,7 @@ export function PricingPageClient({
                 periodLabel={periodLabel}
                 anchorYuan={anchorYuan}
                 featured={isTeam ? i === 1 : i === Math.min(2, visible.length - 1)}
-                minImageCpu={minImageCpu}
-                minVideoCpu={minVideoCpu}
+                models={models}
                 annualSavingPct={annualSavingPct}
               />
             );
@@ -404,7 +365,9 @@ export function PricingPageClient({
                       <TableHead key={p.id} className="min-w-[7.5rem] text-right text-foreground">
                         {p.tier}
                         <span className="mt-0.5 block text-[10px] font-normal leading-tight text-muted-foreground">
-                          {p.monthlyCredits.toLocaleString()} 积分
+                          {resolveMembershipPeriodCredits(p.monthlyCredits, p.interval).toLocaleString()}{" "}
+                          积分/31天
+                          {isTeam ? "（每席）" : ""}
                         </span>
                       </TableHead>
                     ))}
@@ -431,7 +394,7 @@ export function PricingPageClient({
               </Table>
             </div>
             <p className="mt-2 site-pricing-footnote">
-              生成次数为单一模型的估算值（实际因参数而异）。扣分人人相同，会员档越高可生成次数越多。
+              生成次数为单一模型的估算值（视频按 15 秒/条；实际因参数而异）。扣分人人相同，会员档越高可生成次数越多。
               {isTeam ? " 团队为「每席位」口径，团队池 = 每席 × 席数。" : ""}
             </p>
           </section>
@@ -447,7 +410,9 @@ export function PricingPageClient({
               <li>一种积分：图文、视频、文本模型均从同一积分池扣减。</li>
               <li>人人同一扣分（U₀×单位数）；高级会员积分单价更低，可生成更多次。</li>
               <li>每次生成按该模型「积分/单位」扣减；不是每个模型各有独立配额。</li>
-              <li>上表「X 张 / X 秒」是只用该模型的上限，同池内互斥——做图就少了做视频的额度。</li>
+              <li>
+                上表视频按 <strong className="text-foreground">15 秒/条</strong> 估算；「X 张 / X 条」是只用该模型的上限，同池内互斥。
+              </li>
               <li>失败 / 取消全额返还积分。</li>
               <li>
                 会员服务：月付自购买起 <strong className="text-foreground">31 天</strong>、年付{" "}
@@ -516,8 +481,7 @@ function PlanCard({
   periodLabel,
   anchorYuan,
   featured,
-  minImageCpu,
-  minVideoCpu,
+  models,
   annualSavingPct,
 }: {
   plan: Plan;
@@ -529,8 +493,7 @@ function PlanCard({
   periodLabel: string;
   anchorYuan: number;
   featured: boolean;
-  minImageCpu: number;
-  minVideoCpu: number;
+  models: ModelPrice[];
   annualSavingPct: number | null;
 }) {
   const router = useRouter();
@@ -559,24 +522,16 @@ function PlanCard({
     isTeam && plan.originalYuan
       ? Math.round((plan.originalYuan / minSeats) * quote.seats)
       : plan.originalYuan;
-  // 用于「最多生成约 …」与「1积分≈¥X」的积分口径（团队按每席）
-  const basisCredits = isTeam ? quote.perSeatCredits : plan.monthlyCredits;
+  const rawCredits = isTeam ? quote.perSeatCredits : plan.monthlyCredits;
+  const perPeriodCredits = resolveMembershipPeriodCredits(rawCredits, interval);
+  const poolCreditsPerPeriod = isTeam ? perPeriodCredits * quote.seats : perPeriodCredits;
+  const ppcPriceYuan = isTeam ? quote.perSeatPriceYuan : headlinePrice;
   const yuanPerCredit =
-    basisCredits > 0 ? Math.round((headlinePrice / basisCredits) * 1000) / 1000 : anchorYuan;
-  const maxImages = minImageCpu > 0 ? Math.floor(plan.monthlyCredits / minImageCpu) : 0;
-  const maxVideoSec =
-    minVideoCpu > 0 ? Math.floor(plan.monthlyCredits / minVideoCpu) : 0;
+    perPeriodCredits > 0 ? Math.round((ppcPriceYuan / perPeriodCredits) * 1000) / 1000 : anchorYuan;
+  const creditEstimate = computePricingHighlightEstimate(perPeriodCredits, models);
 
   const desc = (isTeam ? TEAM_DESC : PERSONAL_DESC)[index] ?? "";
-  const highlights = buildHighlights({
-    isTeam,
-    index,
-    periodLabel,
-    monthlyCredits: plan.monthlyCredits,
-    teamSeats: isTeam ? quote.seats : undefined,
-    maxImages,
-    maxVideoSec,
-  });
+  const highlights = buildHighlights({ isTeam, index });
 
   function goCheckout() {
     const checkoutPath = buildMembershipCheckoutPath({
@@ -597,7 +552,7 @@ function PlanCard({
       transition={{ delay: index * 0.04 }}
       className={cn(
         "site-pricing-plan-card relative flex w-full min-w-0 flex-col overflow-visible rounded-2xl border border-border bg-white transition-colors duration-300",
-        featured && "z-10 ring-1 ring-black/5",
+        featured && "site-pricing-plan-card--featured z-10 ring-1 ring-black/5",
       )}
     >
       {/* 顶部药丸徽标：骑在顶边线上，文字中线对齐边框（见图 2） */}
@@ -643,6 +598,17 @@ function PlanCard({
           ) : null}
         </div>
         <p className="mt-4 site-pricing-plan-desc">{desc}</p>
+
+        <PricingPlanCreditsBlock
+          perPeriodCredits={perPeriodCredits}
+          poolCreditsPerPeriod={poolCreditsPerPeriod}
+          maxImages={creditEstimate.maxImages}
+          maxVideos15s={creditEstimate.maxVideos15s}
+          imageAnchorLabel={creditEstimate.imageAnchorLabel}
+          videoAnchorLabel={creditEstimate.videoAnchorLabel}
+          isTeam={isTeam}
+          featured={featured}
+        />
 
         {/* 团队席位计数器 */}
         {isTeam ? (
@@ -732,20 +698,32 @@ function GroupRow({ icon, label, span }: { icon: React.ReactNode; label: string;
 }
 
 function ModelMatrixRow({ model, tiers }: { model: ModelPrice; tiers: Plan[] }) {
+  const isVideoSec = model.unit === "PER_SEC";
+  const chargePerUnit = isVideoSec
+    ? computeUnifiedChargeCredits({
+        creditsPerUnit: model.creditsPerUnit,
+        units: DEFAULT_VIDEO_SEC,
+      })
+    : model.creditsPerUnit;
+  const unitSuffix = isVideoSec ? "条15秒" : unitLabel(model.unit);
+
   return (
     <TableRow className="border-border">
       <TableCell className="font-medium text-foreground">{model.displayName}</TableCell>
       <TableCell className="whitespace-nowrap text-right text-muted-foreground">
-        {model.creditsPerUnit} 积分 / {unitLabel(model.unit)}
+        {chargePerUnit} 积分 / {unitSuffix}
       </TableCell>
-      {tiers.map((p) => (
-        <TableCell key={p.id} className="whitespace-nowrap text-right text-foreground">
-          {computeTierGenerations(p.monthlyCredits, model.creditsPerUnit).toLocaleString()}
-          <span className="ml-0.5 text-xs font-normal text-muted-foreground">
-            {unitLabel(model.unit)}
-          </span>
-        </TableCell>
-      ))}
+      {tiers.map((p) => {
+        const periodCredits = resolveMembershipPeriodCredits(p.monthlyCredits, p.interval);
+        return (
+          <TableCell key={p.id} className="whitespace-nowrap text-right text-foreground">
+            {computeTierGenerations(periodCredits, chargePerUnit).toLocaleString()}
+            <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+              {unitSuffix}
+            </span>
+          </TableCell>
+        );
+      })}
     </TableRow>
   );
 }
