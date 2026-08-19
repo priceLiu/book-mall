@@ -27,6 +27,7 @@
 | [**22-quick-replica-credits-preview.md**](./product/22-quick-replica-credits-preview.md) | **快速复制 · 生成前积分预览**（Platform API + 产生钮 hint） |
 | [**23-new-model-onboarding-mandatory.md**](./product/23-new-model-onboarding-mandatory.md) | **新模型接入强制规范**（Gateway 注册 · 运营中心上架 · 成本积分 · API 文档 · 禁止直连） |
 | [**24-prompt-hub-open-library.md**](./product/24-prompt-hub-open-library.md) | **提示词库（Prompt Hub）** · 全平台开放查阅 + 优化器联动（草案） |
+| [**25-canvas-pro2-script-structured-output.md**](./product/25-canvas-pro2-script-structured-output.md) | **画布剧本结构化（Pro2）** · JSON 围栏 + 胖/瘦结构 + Zod + MD 回退 |
 | [**14-tenant-team-design.md**](./product/14-tenant-team-design.md) | **租户/团队体系完整设计**（租户/席位/RBAC/资源共享/财务对账/使用明细/单会话；待评审） |
 | [**15-team-usage-manual.md**](./product/15-team-usage-manual.md) | **团队/公司版使用手册**（开通/成员席位/公共私有库/账单对账/BYOK/FAQ） |
 | [**我的AI空间.md**](./product/我的AI空间.md) | **我的 AI 空间**（个人中心跨应用 Pin、数字人/音频/视频库、合成创作台） |

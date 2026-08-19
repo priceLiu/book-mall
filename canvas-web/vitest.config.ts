@@ -14,6 +14,12 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "@/components/canvas/mentions/MentionsTextarea",
+        replacement: fileURLToPath(
+          new URL("./test/mocks/mentions-textarea.ts", import.meta.url),
+        ),
+      },
+      {
         find: "@/components/canvas/canvas-credits-toast-host",
         replacement: fileURLToPath(
           new URL("./test/mocks/canvas-credits-toast-host.ts", import.meta.url),
@@ -58,6 +64,12 @@ export default defineConfig({
       "test/unit/pro2-script-generation-sections.test.ts",
       "test/unit/pro2-script-category-prompts.test.ts",
       "test/unit/pro2-production-pack-standard.test.ts",
+      "test/unit/pro2-pack-parse-contract.test.ts",
+      "test/unit/pro2-production-script-schema.test.ts",
+      "test/unit/pro2-production-script-structured.test.ts",
+      "test/unit/pro2-production-script-render-md.test.ts",
+      "test/unit/pro2-production-script-apply.test.ts",
+      "test/unit/pro2-production-script-flow.test.ts",
       "test/unit/three-view-prompt-rules.test.ts",
       "test/unit/pro2-gu-feng-full-pack-run.test.ts",
       "test/unit/pro2-gu-feng-prompt-parity.test.ts",

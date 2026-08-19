@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubStoryboardMd, outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import { extractThemeFromStorySystemPrompt } from "@/lib/canvas/story-prompts";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -19,7 +19,8 @@ import {
   resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
-import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
+import { applyProductionScriptDirectToHub } from "@/lib/canvas/pro2-production-script-apply";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
 import {
   CREW_BULLETIN_META_ANCHOR_ID,
@@ -83,7 +84,8 @@ export function Pro2ScriptTableEditorHost() {
     pro2HubHasScriptTable(d) ||
     pro2HubHasCharacterTable(d) ||
     pro2HubHasSceneTable(d, sceneCtx) ||
-    pro2HubHasOutlineContent(d);
+    pro2HubHasOutlineContent(d) ||
+    Boolean(d.productionScript);
 
   const liveContent: CachedContent = {
     storyboardMd,
@@ -198,6 +200,15 @@ export function Pro2ScriptTableEditorHost() {
     [node, d, updateNodeData],
   );
 
+  const persistStructured = useCallback(
+    (script: Pro2ProductionScript) => {
+      if (!node) return;
+      const patch = applyProductionScriptDirectToHub(d, script, node.id);
+      updateNodeData(node.id, patch);
+    },
+    [node, d, updateNodeData],
+  );
+
   if (!editorNodeId) return null;
 
   const displayContent =
@@ -248,6 +259,8 @@ export function Pro2ScriptTableEditorHost() {
       onAutoSaveScene={persistScene}
       onAutoSaveCharacter={persistCharacter}
       onAutoSaveStoryboard={persistStoryboard}
+      productionScript={d.productionScript}
+      onAutoSaveStructured={persistStructured}
       hubId={node.id}
       hubData={d}
     />

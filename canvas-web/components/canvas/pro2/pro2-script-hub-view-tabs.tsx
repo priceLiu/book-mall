@@ -7,6 +7,7 @@ const TABS: Array<{ id: Pro2ScriptHubViewTab; label: string }> = [
   { id: "outline", label: "大纲" },
   { id: "character", label: "角色" },
   { id: "script", label: "脚本" },
+  { id: "structured", label: "结构化" },
 ];
 
 export function Pro2ScriptHubViewTabs({

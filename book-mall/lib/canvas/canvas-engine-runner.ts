@@ -33,6 +33,13 @@ import { isLikelyVideoUrl } from "./media-url-kind";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
+  buildPro2StructuredRetryUserMessage,
+  ensurePro2ProductionScriptFence,
+  isPro2StructuredLlmScope,
+  mergePro2StructuredLlmParams,
+  validatePro2ProductionScriptLlmOutput,
+} from "./pro2-production-script-llm";
+import {
   assertNoProjectInflightByInputHash,
   claimCanvasTaskKieSubmit,
 } from "./canvas-kie-gateway-claim";
@@ -1188,17 +1195,64 @@ async function executeStoryLlmEngineTask(
             : userContent,
       },
     ];
-    const resp = await canvasGwChat(userId, {
+    const structuredPro2 = isPro2StructuredLlmScope(storyScope);
+    const llmParams = structuredPro2
+      ? mergePro2StructuredLlmParams(params)
+      : params;
+
+    let resp = await canvasGwChat(userId, {
       modelKey,
       messages,
-      params,
+      params: llmParams,
       clientPage: gwClientPage,
       projectId,
       canvasTaskId: taskId,
     });
+
+    let outputText = (resp.text ?? "").trim();
+    let pro2Validation: ReturnType<
+      typeof validatePro2ProductionScriptLlmOutput
+    > | null = null;
+    let pro2Retried = false;
+
+    if (structuredPro2 && outputText) {
+      pro2Validation = validatePro2ProductionScriptLlmOutput(
+        outputText,
+        storyScope,
+      );
+      if (!pro2Validation.ok) {
+        pro2Retried = true;
+        const retryResp = await canvasGwChat(userId, {
+          modelKey,
+          messages: [
+            ...messages,
+            { role: "assistant", content: outputText },
+            {
+              role: "user",
+              content: buildPro2StructuredRetryUserMessage(
+                pro2Validation.error ?? "校验失败",
+              ),
+            },
+          ],
+          params: llmParams,
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: taskId,
+        });
+        outputText = (retryResp.text ?? "").trim();
+        resp = retryResp;
+        pro2Validation = outputText
+          ? validatePro2ProductionScriptLlmOutput(outputText, storyScope)
+          : { ok: false, error: "重试后仍为空" };
+      }
+      if (outputText) {
+        outputText = ensurePro2ProductionScriptFence(outputText);
+      }
+    }
+
     // 模型返回空内容（推理预算耗尽 / 上游异常 / 解析失败）时，勿当作成功落库：
     // 否则前端会从「生成中」直接翻到 done 且无正文，表现为「转圈一会就消失但没生成」。
-    if (!(resp.text ?? "").trim()) {
+    if (!outputText) {
       const failed = await prisma.canvasGenerationTask.update({
         where: { id: taskId },
         data: {
@@ -1213,23 +1267,32 @@ async function executeStoryLlmEngineTask(
     }
     const scriptStudioMirror =
       data.scriptStudioMode === true
-        ? scriptStudioMirrorPayload(resp.text)
+        ? scriptStudioMirrorPayload(outputText)
         : null;
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
         status: "SUCCEEDED",
-        textOutput: resp.text,
+        textOutput: outputText,
         resultPayload: {
           ...(typeof resp.rawPayload === "object" && resp.rawPayload
             ? (resp.rawPayload as Record<string, unknown>)
             : {}),
           ...(scriptStudioMirror ?? {}),
+          ...(structuredPro2
+            ? {
+                pro2ScriptValidation: {
+                  ok: pro2Validation?.ok ?? false,
+                  error: pro2Validation?.error,
+                  retried: pro2Retried,
+                },
+              }
+            : {}),
         } as Prisma.InputJsonValue,
         inputPayload: {
           kind: engineKind,
           prompt: clipPrompt(userText, STORY_LLM_MAX_PROMPT_LEN),
-          params,
+          params: llmParams,
           providerId,
           modelKey,
           textInputs: node.textInputs ?? [],

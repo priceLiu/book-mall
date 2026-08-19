@@ -5,4 +5,6 @@ export type StoryProScriptHubNodeData = {
   scriptCategoryId?: Pro2ScriptCategoryId;
   scriptCategoryDocBody?: string;
   dockInput?: string;
+  /** 2.0 · LLM 结构化 JSON 胖结构（与 canvas-web 同步） */
+  productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
 };

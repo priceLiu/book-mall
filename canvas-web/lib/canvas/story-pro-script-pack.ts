@@ -9,6 +9,7 @@ import {
   STORY_PRO2_CORE_CONFLICT_TABLE_RULES,
   STORY_PRO2_HANDOFF_TABLE_HEADER,
   STORY_PRO2_HANDOFF_TABLE_RULES,
+  STORY_PRO2_JSON_OUTPUT_CONTRACT,
   STORY_PRO2_PACK_LANGUAGE_RULES,
   STORY_PRO2_PACK_V7_MARKER,
   STORY_PRO2_SCENE_TABLE_HEADER,
@@ -34,6 +35,7 @@ export const STORY_PRO_PACK_MARKDOWN_STRUCTURE = `# 输出骨架（## 标题字�
 
 | 维度 | 内容 |
 |------|------|
+| 故事背景 | （世界观 / 时代背景 / 戏剧空间） |
 | 年代/环境定位 | （时代 + 地点 + 季节） |
 | 全剧色调基调 | （主色 + HEX） |
 | 画面风格 | （如电影级写实） |
@@ -80,7 +82,7 @@ export const STORY_PRO_PACK_OUTPUT_RULES = `【制作包硬性约束 · 缺一�
 9. 「画面描述」每镜须标注 **起始→终止站位**（【起始】…【结束】或 起始/动作/终止）；第 2 镜起 AI 视频列写承接上一镜末尾。
 10. 场景表每行须含 **生图关键词(英文)** 与 **固定反向提示词**；角色表每行须含 **AI生图提示词(英文)**。
 11. 「下一步交接清单」至少 6 行（序号 | 交接项 | 负责方 | 备注）。
-12. 不要 JSON；不要用 \`\`\` 代码块包裹全文。
+12. 回复 **末尾** 须附 \`\`\`pro2-production-script\` JSON 围栏（机器可读真源）；GFM 须与 JSON 一致。详见 JSON 输出契约。
 13. ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}`;
 
 /** 启动节点 · 导演向系统提示词（@ 引用上传剧本 · 界面默认模板） */
@@ -112,6 +114,8 @@ ${PRO2_DEFAULT_SHOT_GFM_EXAMPLE}
 
 ${PRO2_HANDOFF_EXAMPLE_ROWS}
 
+${STORY_PRO2_JSON_OUTPUT_CONTRACT}
+
 # 注意事项
 - ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}
 - **AI视频提示词(英文)** 列内写 **中文 Seedance** 提示词（列名不变）。
@@ -121,7 +125,7 @@ ${PRO2_HANDOFF_EXAMPLE_ROWS}
 
 export const STORY_PRO_OUTLINE_USER_PROMPT = `# 任务：故事剧本 · 完整制作包
 
-你将收到 **故事大纲或完整上传剧本**（见上游参考文本）。请以导演视角输出 **完整 Markdown 制作包**（不要 JSON、不要代码块）。
+你将收到 **故事大纲或完整上传剧本**（见上游参考文本）。请以导演视角输出 **完整 Markdown 制作包**，并在末尾附 \`\`\`pro2-production-script\` JSON 围栏。
 
 ${STORY_PRO_PACK_OUTPUT_RULES}
 
@@ -159,7 +163,7 @@ ${STORY_PRO2_CHARACTER_TABLE_HEADER}
 - **必须**输出上表；每行一个主要角色（3~8 行）
 - **AI生图提示词(英文)** 列内写 **中文** 生图简报，须完整可直用于三视图/分镜生图（表头含「英文」仅为解析兼容）
 - 外貌列供 AI 三视图生图一致性：${THREE_VIEW_APPEARANCE_LLM_RULE_ZH}
-- 只输出「## 角色视觉辞典」+ 一张表，不要 JSON`;
+- 只输出「## 角色视觉辞典」+ 一张表；末尾附 step=character 的 JSON 围栏`;
 
 export const STORY_PRO_STORYBOARD_PROMPT = `# 任务：分镜脚本表（AI 生图/生视频预备 · 定稿拆分真源）
 
@@ -177,7 +181,7 @@ ${STORY_PRO2_STORYBOARD_TABLE_HEADER}
 ${STORY_PRO2_VIDEO_PROMPT_RULES}
 
 - 镜号从 1 **连续递增**；时长为整数秒；短片不少于 **8** 镜
-- 只输出「## 分镜脚本」+ 一张表，不要 JSON
+- 只输出「## 分镜脚本」+ 一张表；末尾附 step=storyboard 的 JSON 围栏
 
 ${PRO2_DEFAULT_SHOT_GFM_EXAMPLE}`;
 

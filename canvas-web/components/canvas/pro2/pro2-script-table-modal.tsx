@@ -33,6 +33,11 @@ import { StoryOutlineDocumentEditor } from "../story-outline-document-editor";
 import { StoryHubReadonlyPane } from "../story-hub-readonly-pane";
 import { cn } from "@/lib/utils";
 import { Pro2ScriptHubViewTabs } from "./pro2-script-hub-view-tabs";
+import {
+  Pro2ProductionScriptEditor,
+  normalizeHubProductionScript,
+} from "./pro2-production-script-editor";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 
 const DOC_PAD = "px-10 py-12 sm:px-14 sm:py-16";
 const AUTOSAVE_MS = 600;
@@ -51,6 +56,8 @@ export type Pro2ScriptHubEditorModalProps = {
   onAutoSaveScene: (md: string) => void;
   onAutoSaveCharacter: (md: string) => void;
   onAutoSaveStoryboard: (md: string) => void;
+  onAutoSaveStructured?: (script: Pro2ProductionScript) => void;
+  productionScript?: Pro2ProductionScript;
   /** 脚本 hub id · 用于发布剧本 */
   hubId?: string;
   hubData?: StoryProScriptHubNodeData;
@@ -73,6 +80,8 @@ export function Pro2ScriptHubEditorModal({
   onAutoSaveScene,
   onAutoSaveCharacter,
   onAutoSaveStoryboard,
+  onAutoSaveStructured,
+  productionScript,
   hubId,
   hubData,
   readOnly = false,
@@ -86,6 +95,9 @@ export function Pro2ScriptHubEditorModal({
   const [draftScene, setDraftScene] = useState(sceneMd);
   const [draftCharacter, setDraftCharacter] = useState(characterMd);
   const [draftStoryboard, setDraftStoryboard] = useState(storyboardMd);
+  const [draftStructured, setDraftStructured] = useState(() =>
+    normalizeHubProductionScript(productionScript),
+  );
   const [savedHint, setSavedHint] = useState(false);
   const skipNextSaveRef = useRef(true);
   const wasOpenRef = useRef(false);
@@ -94,10 +106,12 @@ export function Pro2ScriptHubEditorModal({
   const onAutoSaveSceneRef = useRef(onAutoSaveScene);
   const onAutoSaveCharacterRef = useRef(onAutoSaveCharacter);
   const onAutoSaveStoryboardRef = useRef(onAutoSaveStoryboard);
+  const onAutoSaveStructuredRef = useRef(onAutoSaveStructured);
   onAutoSaveOutlineRef.current = onAutoSaveOutline;
   onAutoSaveSceneRef.current = onAutoSaveScene;
   onAutoSaveCharacterRef.current = onAutoSaveCharacter;
   onAutoSaveStoryboardRef.current = onAutoSaveStoryboard;
+  onAutoSaveStructuredRef.current = onAutoSaveStructured;
 
   const onPublishScript = useCallback(async () => {
     if (!hubId || !hubData) return;
@@ -153,6 +167,7 @@ export function Pro2ScriptHubEditorModal({
       setDraftScene(sceneMd);
       setDraftCharacter(characterMd);
       setDraftStoryboard(storyboardMd);
+      setDraftStructured(normalizeHubProductionScript(productionScript));
       setSavedHint(false);
     }
     const onKey = (e: KeyboardEvent) => {
@@ -181,6 +196,8 @@ export function Pro2ScriptHubEditorModal({
         onAutoSaveSceneRef.current(draftScene);
       } else if (tab === "character") {
         onAutoSaveCharacterRef.current(draftCharacter);
+      } else if (tab === "structured") {
+        onAutoSaveStructuredRef.current?.(draftStructured);
       } else {
         onAutoSaveStoryboardRef.current(draftStoryboard);
       }
@@ -190,7 +207,7 @@ export function Pro2ScriptHubEditorModal({
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [draftOutline, draftScene, draftCharacter, draftStoryboard, open, readOnly, tab]);
+  }, [draftOutline, draftScene, draftCharacter, draftStoryboard, draftStructured, open, readOnly, tab]);
 
   if (!open) return null;
 
@@ -201,7 +218,9 @@ export function Pro2ScriptHubEditorModal({
         ? "场景视图 · 双击单元格编辑"
         : tab === "character"
           ? "角色视图 · 双击单元格编辑"
-          : "脚本视图 · 双击单元格编辑";
+          : tab === "structured"
+            ? "结构化 JSON · 表单 + 色块编辑（自动同步 Markdown）"
+            : "脚本视图 · 双击单元格编辑";
 
   const tableDraft =
     tab === "scene"
@@ -312,6 +331,34 @@ export function Pro2ScriptHubEditorModal({
           </div>
         </div>
         )
+      ) : tab === "structured" ? (
+        <div
+          className={cn(
+            RF_NODE_SCROLL,
+            "min-h-0 flex-1 overflow-auto bg-[#f8f7f4] px-4 py-6 sm:px-8",
+          )}
+        >
+          {(productionScript || hubData?.productionScript) &&
+          ((draftStructured.scenes?.length ?? 0) > 0 ||
+            (draftStructured.shots?.length ?? 0) > 0 ||
+            draftStructured.visualStyle?.worldBackground?.trim()) ? (
+            <Pro2ProductionScriptEditor
+              value={draftStructured}
+              onChange={setDraftStructured}
+              readOnly={readOnly}
+            />
+          ) : (
+            <div className="mx-auto max-w-lg rounded-xl border border-violet-200 bg-white p-6 text-center">
+              <p className="text-[13px] font-medium text-neutral-800">
+                暂无结构化剧本数据
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                请先在输入坞生成制作包（LLM 须返回 pro2-production-script JSON）。
+                生成成功后可在本页编辑视觉风格、场景色块与分镜字段；保存会自动同步 Markdown 与公告栏行。
+              </p>
+            </div>
+          )}
+        </div>
       ) : (
         <div
           className={cn(

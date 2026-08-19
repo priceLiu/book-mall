@@ -63,13 +63,33 @@ export const STORY_PRO2_PACK_PARSE_CONTRACT = `【系统解析契约 · 硬性 �
 5. 「画面描述」须含起始→终止站位（可用【起始】…【结束】或 起始/动作/终止）。
 6. 「视觉风格总纲」须含可执行色调 HEX、年代/环境、摄影风格；后续生图/视频须与此一致。
 7. 「下一步交接清单」至少 6 行，覆盖三视图、场景图、分镜视频、配音、音效/BGM、剪辑交付等。
-8. **输出语言**：表头含 \`(英文)\` 仅为解析兼容；列内正文 **默认全部中文**，非必要禁止英文（占位符/HEX/Negative 除外）。`;
+8. **输出语言**：表头含 \`(英文)\` 仅为解析兼容；列内正文 **默认全部中文**，非必要禁止英文（占位符/HEX/Negative 除外）。
+9. **机器可读 JSON**：回复 **末尾** 须附唯一 \`\`\`pro2-production-script\` 围栏 JSON（见 JSON 输出契约）；GFM 章节须与 JSON 一致。`;
+
+/** Pro2 · JSON 围栏输出契约（机器可读真源 · 2026-08） */
+export const STORY_PRO2_JSON_OUTPUT_CONTRACT = `【JSON 结构化输出契约 · 硬性 · 机器可读真源】
+1. 回复 **末尾** 须输出 **唯一** 围栏块（语言标记必须为 pro2-production-script）：
+\`\`\`pro2-production-script
+{
+  "schemaVersion": 1,
+  "tier": "pro",
+  "step": "full_pack",
+  "patch": { ... }
+}
+\`\`\`
+2. **step** 取值：full_pack · outline · character · scene · storyboard（与当前任务段一致）。
+3. **patch** 内块须与上方 GFM 章节 **字段一致**；缺块视为失败。
+4. patch.visualStyle 须含 **worldBackground**（故事背景）与 **era**；scenes/shots 可含 **colorBlock**（primary/secondary/highlight/shadow）。
+5. 分镜 shots[] 字段：index · shotSize · cameraMove · sceneDescription · dialogue · durationSec · imagePrompt · videoPrompt · audioNote。
+6. 可在围栏前保留人读 Markdown 六章节；**画布以 JSON 为准** 写入 Hub；无有效围栏时系统回退 GFM 解析。
+7. JSON 须为标准 JSON（禁止尾逗号、禁止 // 注释）；仅围栏内允许 JSON，不要用代码块包裹全文。`;
 
 /** 摄影级视觉风格总纲 GFM 维度 */
 export const STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6 = `- **视觉风格总纲**须用 GFM 表输出（表头 \`维度 | 内容\`），须 **具体可执行**：
 
 | 维度 | 内容 |
 |------|------|
+| 故事背景 | （世界观 / 时代背景 / 戏剧空间，1–3 句） |
 | 年代/环境定位 | （时代 + 地点 + 季节/气候） |
 | 全剧色调基调 | （主色名 + HEX，日/夜或冷暖对比概述） |
 | 画面风格 | （如电影级写实；禁止动画/CG/插画感） |

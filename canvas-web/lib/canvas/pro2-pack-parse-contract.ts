@@ -4,6 +4,7 @@
 import { PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT } from "./data/pro2-gu-feng-deepseek-full-pack-prompt";
 import {
   PRO2_HANDOFF_EXAMPLE_ROWS,
+  STORY_PRO2_JSON_OUTPUT_CONTRACT,
   STORY_PRO2_PACK_LANGUAGE_RULES,
   STORY_PRO2_PACK_PARSE_CONTRACT,
 } from "./data/pro2-production-pack-standard";
@@ -25,6 +26,7 @@ export function appendPro2ParseContract(
   const parts = [
     STORY_PRO2_PACK_LANGUAGE_RULES.trim(),
     STORY_PRO2_PACK_PARSE_CONTRACT.trim(),
+    STORY_PRO2_JSON_OUTPUT_CONTRACT.trim(),
   ];
   const budgetSource = options?.outlineMd?.trim();
   if (budgetSource) {

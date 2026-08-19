@@ -107,6 +107,8 @@ export type StoryProScriptHubNodeData = {
   };
   /** 2.0 · 从大纲「视觉风格总纲」解析的全片视觉锚定（生图统一风格） */
   visualStylePack?: import("./story-pro-visual-style-pack").StoryProVisualStylePack;
+  /** 2.0 · LLM 结构化 JSON 胖结构真源（schemaVersion: 1） */
+  productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
   storyboardMd: string;
   /** 点击发送后、段级 pending 写入前：保持「生成中」扫光，避免空态闪一下 */
   hubGenerateIntent?: boolean;

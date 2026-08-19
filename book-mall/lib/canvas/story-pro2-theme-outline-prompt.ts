@@ -7,6 +7,7 @@ import {
   PRO2_UNIVERSAL_NEGATIVE,
   STORY_PRO2_CORE_CONFLICT_TABLE_RULES,
   STORY_PRO2_HANDOFF_TABLE_RULES,
+  STORY_PRO2_JSON_OUTPUT_CONTRACT,
   STORY_PRO2_PACK_LANGUAGE_RULES,
   STORY_PRO2_PACK_V6_MARKER,
   STORY_PRO2_STORYBOARD_TABLE_HEADER,
@@ -82,7 +83,7 @@ export function isLegacyStoryPro2StoryboardPrompt(prompt: string): boolean {
 
 export const STORY_PRO2_THEME_OUTLINE_SYSTEM = `${STORY_PRO_PLANNER_SYSTEM_PREFIX}
 
-用户将提供故事主题、梗概或若干场景描述。请输出 **Markdown 故事大纲 / 制作包前段**（不要 JSON、不要代码块）。
+用户将提供故事主题、梗概或若干场景描述。请输出 **Markdown 故事大纲 / 制作包前段**，并在末尾附 \`\`\`pro2-production-script\` JSON 围栏（step=outline）。
 
 ${STORY_PRO_PACK_OUTPUT_RULES}
 
@@ -112,8 +113,10 @@ ${STORY_PRO2_HANDOFF_TABLE_RULES}
 # 约束
 - 考虑 AI 生图/生视频可行性：优先单人镜头、可控场景数
 - ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}
-- 不要 JSON；不要用代码块包裹全文
-- 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（9 列表头），不得留空表`;
+- 回复末尾须附 \`\`\`pro2-production-script\` JSON 围栏；详见 JSON 输出契约
+- 若信息足够，可同时输出 ## 角色视觉辞典 与 ## 分镜脚本（9 列表头），不得留空表
+
+${STORY_PRO2_JSON_OUTPUT_CONTRACT}`;
 
 export const STORY_PRO2_THEME_OUTLINE_USER_PREFIX =
   "请根据以下故事主题或内容，生成完整故事大纲：";
@@ -121,7 +124,7 @@ export const STORY_PRO2_THEME_OUTLINE_USER_PREFIX =
 /** 2.0 脚本生成器 · 大纲段（主题 / 上游文本 / Dock 补充 → 制作包前段） */
 export const STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT = `# 任务：故事剧本 · 大纲段（视觉风格 + 场景 + 结构 + 交接 · ${STORY_PRO2_PACK_V6_MARKER}）
 
-你将收到故事主题、梗概或上游创意参考。请输出 **Markdown**（不要 JSON、不要代码块）。
+你将收到故事主题、梗概或上游创意参考。请输出 **Markdown**，并在末尾附 \`\`\`pro2-production-script\` JSON 围栏（step=outline 或 full_pack）。
 
 ${STORY_PRO_PACK_OUTPUT_RULES}
 
@@ -150,7 +153,7 @@ ${STORY_PRO2_PACK_LANGUAGE_RULES}
 【制作包硬性约束 · 缺一不可 · 影响 AI 生图角色一致性】
 1. 必须输出 **## 角色视觉辞典** GFM 表，表头列名不可改。
 2. 角色须来自故事大纲中已写明的人物，**禁止**擅自替换题材或套用无关示例剧情。
-3. 不要 JSON；不要用代码块包裹全文。
+3. 回复末尾须附 step=character 的 \`\`\`pro2-production-script\` JSON 围栏。
 
 # 输出格式（表头列名不可改）
 ## 角色视觉辞典
@@ -174,7 +177,7 @@ ${STORY_PRO2_PACK_LANGUAGE_RULES}
 - **必须**输出上表；每行一个主要角色（3~8 行）
 - **外貌描写字数不少于 50 字**；泛泛写「普通/一般」无法生成一致角色
 - 若大纲中已有角色信息，须 **完整迁移并扩写**，不得删行
-- 只输出「## 角色视觉辞典」+ 一张表，不要 JSON
+- 只输出「## 角色视觉辞典」+ 一张表；末尾附 JSON 围栏
 
 ${STORY_PRO2_PROFESSIONAL_CHARACTER_RULES}`;
 
@@ -188,7 +191,7 @@ export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI �
 2. **场景名** 须与大纲「场景视觉辞典 · 场景名」列 **完全一致**，禁止新增、删减或替换场景。
 3. 须根据大纲中的环境、时间、气氛、生图关键词扩写 **AI生图提示词(英文)**；每个场景不少于 40 个汉字（表头「英文」仅为解析兼容）。
 4. **场景图默认纯环境空镜**：广角/远景/建立镜头；禁止中近景/特写人物、禁止角色互动叙事画面，除非大纲生图关键词已标注 **【含人物】** 或 **【角色出镜】**。
-5. 不要 JSON；不要用代码块包裹全文。
+5. 回复末尾须附 step=scene 的 \`\`\`pro2-production-script\` JSON 围栏。
 
 # 输出格式（表头列名不可改）
 ## 场景视觉提示词
@@ -213,7 +216,7 @@ export const STORY_PRO2_SCENE_PROMPT = `# 任务：场景视觉提示词（AI �
 - ✅ 须包含：地点、时间、光线、气氛、电影级写实质感、35mm、2K、空镜/无人物
 
 - 每行对应大纲场景视觉辞典中的一行；行数须一致
-- 只输出「## 场景视觉提示词」+ 一张表，不要 JSON`;
+- 只输出「## 场景视觉提示词」+ 一张表；末尾附 JSON 围栏`;
 
 /** 2.0 脚本节点 · 分镜段（基于故事大纲，非「上传剧本」） */
 export const STORY_PRO2_STORYBOARD_PROMPT = `# 任务：分镜脚本表（AI 生图/生视频预备 · 定稿拆分真源 · ${STORY_PRO2_PACK_V6_MARKER}）
@@ -223,14 +226,14 @@ ${STORY_PRO2_PACK_LANGUAGE_RULES}
 【硬性指标 · 未达标视为失败】
 - 须输出 **8–14 镜**完整序列；**禁止**只输出 1 镜概括、禁止「镜数规划/总时长」小表代替分镜表
 - **每镜必填** \`时长(秒)\` **正整数**；各镜时长之和须与大纲目标总时长一致（±5 秒）
-- 只输出 **## 分镜脚本** + **一张** 9 列 GFM 表；不要 JSON、不要代码块
+- 只输出 **## 分镜脚本** + **一张** 9 列 GFM 表；末尾附 step=storyboard 的 JSON 围栏
 
 根据 **已连接的故事大纲 / 创意参考包**、**场景视觉提示词**、风格总纲与角色辞典，将故事拆解为镜头序列。**须与大纲题材、人物、场景一致**；禁止只输出 3～5 个概括镜头，禁止套用与大纲无关的示例剧情。
 
 【制作包硬性约束 · 缺一不可 · 影响 AI 生图/生视频质量】
 1. 必须输出 **## 分镜脚本** GFM 表，表头列名不可改。
 2. 分镜 **角色名** 须与「角色视觉辞典 · 姓名」列 **完全一致**。
-3. 不要 JSON；不要用代码块包裹全文。
+3. 回复末尾须附 step=storyboard 的 \`\`\`pro2-production-script\` JSON 围栏。
 
 # 输出格式（表头列名不可改）
 ## 分镜脚本
@@ -256,7 +259,7 @@ ${STORY_PRO2_VIDEO_PROMPT_RULES}
 
 - 镜号从 1 **连续递增**；时长为整数秒；短片不少于 **8** 镜
 - **对白**列：格式「角色名：台词」；无对白写「—」
-- 只输出「## 分镜脚本」+ 一张表，不要 JSON
+- 只输出「## 分镜脚本」+ 一张表；末尾附 JSON 围栏
 
 ${STORY_PRO2_PROFESSIONAL_STORYBOARD_RULES}
 

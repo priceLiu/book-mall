@@ -27,6 +27,8 @@ import {
   promoteEmbeddedPackFromOutline,
 } from "./story-hub-runtime";
 import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
+import { tryApplyStructuredProductionScript } from "./pro2-production-script-apply";
+import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
 export function applyHubSectionFromTask(
   data: StoryScriptHubNodeData,
@@ -38,6 +40,20 @@ export function applyHubSectionFromTask(
   if (section === "outline") {
     patch.outlineRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return {
+          ...structured,
+          outlineRuntime: runtime,
+          ...(structured.characterMd != null ? { characterRuntime: runtime } : {}),
+          ...(structured.sceneMd != null ? { sceneRuntime: runtime } : {}),
+          ...(structured.storyboardMd != null ? { storyboardRuntime: runtime } : {}),
+        } as Partial<StoryScriptHubNodeData>;
+      }
       const replaceEmbedded = outlineTextHasEmbeddedProductionPack(textOutput);
       const promoted = promoteEmbeddedPackFromOutline(
         textOutput,
@@ -112,6 +128,14 @@ export function applyHubSectionFromTask(
   } else if (section === "character") {
     patch.characterRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return { ...structured, characterRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+      }
       const brief = parseOutlineBriefCharacters(data.outlineMd ?? "");
       const characterMd = normalizeCharacterTableMd(
         brief.length > 0
@@ -127,6 +151,14 @@ export function applyHubSectionFromTask(
   } else if (section === "scene") {
     patch.sceneRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return { ...structured, sceneRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+      }
       const sceneMd = textOutput.trim();
       patch.sceneMd = sceneMd;
       patch.sceneHistory = pushStoryRevision(data.sceneHistory, sceneMd);
@@ -134,6 +166,14 @@ export function applyHubSectionFromTask(
   } else {
     patch.storyboardRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return { ...structured, storyboardRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+      }
       const storyboardMd = normalizeStoryboardSectionMd(textOutput);
       patch.storyboardMd = storyboardMd;
       patch.storyboardHistory = pushStoryRevision(

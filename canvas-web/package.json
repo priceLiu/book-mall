@@ -27,6 +27,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.6.0",
+    "zod": "^3.25.76",
     "zundo": "^2.2.0",
     "zustand": "^4.5.5"
   },
