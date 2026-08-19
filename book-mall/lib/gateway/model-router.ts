@@ -158,6 +158,17 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DASHSCOPE", requestKind: "TRYON" };
   }
 
+  if (
+    m === "qwen-image-edit" ||
+    m === "qwen-image-edit-max" ||
+    m.startsWith("qwen-image-edit") ||
+    m === "qwen-image-3.0-pro" ||
+    m === "qwen-image-3.0" ||
+    m === "z-image-turbo"
+  ) {
+    return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
+  }
+
   if (m.startsWith("wan2.7-image") || m.startsWith("wan2.7_image")) {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }
@@ -239,14 +250,6 @@ export function routeGatewayModel(model: string): RoutedModel {
     m.startsWith("nano-banana")
   ) {
     return { providerKind: "KIE", requestKind: "IMAGE" };
-  }
-
-  if (
-    m === "qwen-image-edit" ||
-    m === "qwen-image-edit-max" ||
-    m.startsWith("qwen-image-edit")
-  ) {
-    return { providerKind: "BAILIAN", requestKind: "IMAGE" };
   }
 
   if (

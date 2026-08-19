@@ -6,6 +6,7 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 import { recoverCanvasTextLlmFromGateway } from "@/lib/canvas/canvas-text-llm-recover";
+import { recoverCanvasDashscopeSyncImageFromGateway } from "@/lib/canvas/canvas-dashscope-sync-image-recover";
 import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
 
 const SUBMITTED_INCOMPLETE_MS = 3 * 60 * 1000;
@@ -63,6 +64,24 @@ export async function reconcileCanvasInflightZombies(opts?: {
   for (const t of pseudoTimeoutFailed) {
     if (await recoverCanvasSubmitDispatchTimeoutTask(t.id)) {
       summary.submitTimeoutRecovered += 1;
+    }
+  }
+
+  const submitIncompleteFailed = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "FAILED",
+      failCode: "CANVAS_SUBMIT_INCOMPLETE",
+      updatedAt: { gte: new Date(now - 24 * 60 * 60 * 1000) },
+      ...projectFilter,
+    },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    select: { id: true },
+  });
+  for (const t of submitIncompleteFailed) {
+    const dashscope = await recoverCanvasDashscopeSyncImageFromGateway(t.id);
+    if (dashscope === "succeeded") {
+      summary.imageKieRecovered += 1;
     }
   }
 
@@ -139,6 +158,11 @@ export async function reconcileCanvasInflightZombies(opts?: {
     const gwId =
       typeof payload.gatewayLogId === "string" ? payload.gatewayLogId.trim() : "";
     if (gwId) {
+      const dashscope = await recoverCanvasDashscopeSyncImageFromGateway(t.id);
+      if (dashscope === "succeeded") {
+        summary.imageKieRecovered += 1;
+        continue;
+      }
       const r = await recoverCanvasVideoTaskDisplay(t.id);
       if (r.ok && r.action !== "failed" && r.action !== "noop") {
         summary.displayRecovered += 1;

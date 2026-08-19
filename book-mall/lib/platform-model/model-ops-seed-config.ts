@@ -37,6 +37,13 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "qwen-max",
   ],
   "pro2-image": [
+    "qwen-image-3.0-pro",
+    "z-image-turbo",
+    "qwen-image-edit",
+    "qwen-image-edit-max",
+    "wan2.7-image",
+    "wan2.7-image-pro",
+    "wan2.6-image",
     "nano-banana-pro",
     "kling-3.0-image",
     "4o-image",
@@ -80,6 +87,13 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "wan3.0-video",
   ],
   "sbv1-image": [
+    "qwen-image-3.0-pro",
+    "z-image-turbo",
+    "qwen-image-edit",
+    "qwen-image-edit-max",
+    "wan2.7-image",
+    "wan2.7-image-pro",
+    "wan2.6-image",
     "nano-banana-pro",
     "kling-3.0-image",
     "4o-image",
@@ -140,6 +154,27 @@ export type SceneShelfSpec = {
   modelKeys: readonly string[];
 };
 
+export const ECOM_SCENE_MODEL_KEYS = {
+  "ecom-storyboard-image": [
+    "qwen-image-3.0-pro",
+    "z-image-turbo",
+    "qwen-image-edit",
+    "qwen-image-edit-max",
+    "wan2.7-image",
+    "wan2.7-image-pro",
+    "wan2.6-image",
+    "kling-3.0-image",
+    "nano-banana-pro",
+  ],
+  "ecom-image-processing": [
+    "qwen-image-edit",
+    "qwen-image-edit-max",
+    "wanx-x-painting",
+    "image-out-painting",
+    "doubao-seedream-5-0-lite",
+  ],
+} as const;
+
 export const SCENE_SHELF_SPECS: SceneShelfSpec[] = [
   ...Object.entries(CANVAS_SCENE_MODEL_KEYS).map(([sceneKey, modelKeys]) => ({
     appTag: "canvas",
@@ -148,6 +183,11 @@ export const SCENE_SHELF_SPECS: SceneShelfSpec[] = [
   })),
   ...Object.entries(QUICK_REPLICA_SCENE_MODEL_KEYS).map(([sceneKey, modelKeys]) => ({
     appTag: "quick-replica",
+    sceneKey,
+    modelKeys,
+  })),
+  ...Object.entries(ECOM_SCENE_MODEL_KEYS).map(([sceneKey, modelKeys]) => ({
+    appTag: "ecom",
     sceneKey,
     modelKeys,
   })),

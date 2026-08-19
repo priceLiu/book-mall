@@ -279,7 +279,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 variant="generated"
                 alt={label}
                 fit="cover"
-                hidePreviewOverlay
+                previewChrome="ecom"
                 className="absolute inset-0"
               />
             ) : hasError ? (

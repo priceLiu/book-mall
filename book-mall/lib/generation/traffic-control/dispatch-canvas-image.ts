@@ -7,16 +7,29 @@ import { cropCanvasGridSplitCellToOss } from "@/lib/canvas/canvas-grid-split-cro
 import { claimCanvasTaskKieSubmit, findSiblingActiveVendorJob } from "@/lib/canvas/canvas-kie-gateway-claim";
 import {
   canvasGwCreateDashscopeKlingImageJob,
+  canvasGwCreateDashscopeMultimodalImageSyncJob,
+  canvasGwCreateDashscopeWan27ImageJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
 } from "@/lib/canvas/canvas-gateway-client";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 import { buildKieImageCreateArgs } from "@/lib/canvas/providers/kie";
 import {
+  isStoryboardDashscopeImageModel,
   isStoryboardKlingImageModel,
+  isWan26ImageModel,
+  resolveStoryboardDashscopeModel,
   resolveStoryboardKlingModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
-import { resolveKlingV3Resolution } from "@/lib/ecom/ecom-storyboard-gen-params";
+import {
+  resolveKlingV3Resolution,
+  resolveWan27ImageSize,
+} from "@/lib/ecom/ecom-storyboard-gen-params";
+import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
+import {
+  isDashscopeMultimodalImageGenModel,
+  isZImageTurboModel,
+} from "@/lib/gateway/qwen-image-edit-proxy";
 
 function resolveKlingImageAspectFromParams(
   params: Record<string, unknown>,
@@ -183,6 +196,126 @@ async function submitCanvasImageToGateway(
         gatewayLogId: job.logId,
         providerKind: "DASHSCOPE",
         dashscopeJobKind: "kling-v3-image",
+      },
+    };
+  }
+
+  if (isDashscopeMultimodalImageGenModel(modelKey)) {
+    const resolution = String(params.resolution ?? "2K");
+    const size =
+      resolution === "4K"
+        ? "2048*2048"
+        : resolution === "1K"
+          ? "1024*1024"
+          : "1536*1536";
+    const n = Math.min(
+      isZImageTurboModel(modelKey) ? 1 : 6,
+      Math.max(1, Number(params.n ?? 1) || 1),
+    );
+    const refs =
+      !isZImageTurboModel(modelKey) && imageUrls.length > 0
+        ? await ensureStoryboardRefImagesForWan27({
+            userId,
+            urls: imageUrls.slice(0, 3),
+          })
+        : [];
+    const content: Array<{ text: string } | { image: string }> =
+      refs.length > 0
+        ? [...refs.map((url) => ({ image: url })), { text: prompt }]
+        : [{ text: prompt }];
+    const job = await canvasGwCreateDashscopeMultimodalImageSyncJob(userId, {
+      model: modelKey,
+      content,
+      parameters: {
+        size,
+        n,
+        prompt_extend: isZImageTurboModel(modelKey) ? false : true,
+        watermark: false,
+      },
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
+    });
+    return {
+      taskId: job.taskId,
+      logId: job.logId,
+      payloadPatch: {
+        kind: engineKind,
+        prompt,
+        params,
+        providerId,
+        modelKey,
+        imageUrls,
+        clientPage,
+        gatewayLogId: job.logId,
+        providerKind: "DASHSCOPE",
+        dashscopeJobKind: "multimodal-image-sync",
+      },
+    };
+  }
+
+  if (isStoryboardDashscopeImageModel(modelKey)) {
+    const apiModel = resolveStoryboardDashscopeModel(modelKey);
+    const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(modelKey);
+    const resolution = String(params.resolution ?? "2K");
+    const aspectRaw = String(params.aspect_ratio ?? "1:1");
+    const wanAspect: "16:9" | "9:16" =
+      aspectRaw === "9:16" ||
+      aspectRaw === "3:4" ||
+      aspectRaw === "2:3" ||
+      aspectRaw === "4:5" ||
+      aspectRaw === "9:21"
+        ? "9:16"
+        : "16:9";
+    const wan27Size =
+      !wan26 && imageUrls.length === 0
+        ? resolveWan27ImageSize({
+            aspectRatio: wanAspect,
+            imageSize:
+              resolution === "4K"
+                ? "4K"
+                : resolution === "1K"
+                  ? "1K"
+                  : "2K",
+          })
+        : undefined;
+    const refs =
+      imageUrls.length > 0
+        ? await ensureStoryboardRefImagesForWan27({
+            userId,
+            urls: imageUrls,
+          })
+        : [];
+    const content: Array<{ text: string } | { image: string }> =
+      refs.length > 0
+        ? wan26
+          ? [{ text: prompt }, ...refs.map((url) => ({ image: url }))]
+          : [...refs.map((url) => ({ image: url })), { text: prompt }]
+        : [{ text: prompt }];
+    const job = await canvasGwCreateDashscopeWan27ImageJob(userId, {
+      model: apiModel,
+      content,
+      size: wan27Size,
+      n: Math.min(4, Math.max(1, Number(params.n ?? 1) || 1)),
+      contentOrder: wan26 ? "text-first" : "images-first",
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
+    });
+    return {
+      taskId: job.taskId,
+      logId: job.logId,
+      payloadPatch: {
+        kind: engineKind,
+        prompt,
+        params,
+        providerId,
+        modelKey,
+        imageUrls,
+        clientPage,
+        gatewayLogId: job.logId,
+        providerKind: "DASHSCOPE",
+        dashscopeJobKind: "wan27-image",
       },
     };
   }

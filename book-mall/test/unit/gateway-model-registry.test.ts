@@ -59,4 +59,22 @@ describe("resolveKnownGatewayModelRegistration", () => {
       vendor: "volcengine",
     });
   });
+
+  it("resolves qwen-image-3.0-pro via canonical registry", () => {
+    expect(
+      resolveKnownGatewayModelRegistration("qwen-image-3.0-pro"),
+    ).toMatchObject({
+      canonicalModelKey: "qwen-image-3.0-pro",
+      providerKind: "DASHSCOPE",
+      vendor: "aliyun",
+    });
+  });
+
+  it("resolves z-image-turbo via canonical registry", () => {
+    expect(resolveKnownGatewayModelRegistration("z-image-turbo")).toMatchObject({
+      canonicalModelKey: "z-image-turbo",
+      providerKind: "DASHSCOPE",
+      vendor: "aliyun",
+    });
+  });
 });

@@ -173,6 +173,9 @@ cast 必填至少 1 名主角，appearance 须写清可拍的外貌与穿搭，�
 参考图三步结束后，介绍生图模型（与视频模型分开，勿混谈）：
 - wan2.7-image（通义万相 2.7，多图参考，推荐）
 - wan2.7-image-pro（通义万相 2.7 Pro，更高画质）
+- qwen-image-3.0-pro（千问 Image 3.0 Pro，文生图/多图参考）
+- z-image-turbo（Z-Image Turbo，快速文生图）
+- qwen-image-edit / qwen-image-edit-max（千问图像编辑，须参考图）
 - wan2.6-image（通义万相 2.6 · 生图，多图参考；非视频）
 - kling-3.0-image（可灵 3.0，百炼多图参考）
 - nano-banana-pro（Nano Banana Pro，KIE 多图参考，角色一致性好）

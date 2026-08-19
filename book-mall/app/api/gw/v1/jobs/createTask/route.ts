@@ -24,6 +24,7 @@ import {
   parseGatewayClientSource,
   submitBailianR2vJobForLog,
   submitDashscopeKlingV3ImageJobForLog,
+  submitDashscopeMultimodalImageSyncForLog,
   submitDashscopeTryOnJobForLog,
   submitDashscopeVideoJobForLog,
   submitDashscopeWan27ImageJobForLog,
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       parameterExtras?: Record<string, unknown>;
     };
     dashscope?: {
-      jobKind?: "tryon" | "wanx" | "video" | "wan27-image" | "kling-v3-image";
+      jobKind?: "tryon" | "wanx" | "video" | "wan27-image" | "kling-v3-image" | "multimodal-image-sync";
       personImageUrl?: string;
       topGarmentUrl?: string;
       bottomGarmentUrl?: string;
@@ -103,6 +104,16 @@ export async function POST(request: NextRequest) {
       contentOrder?: "text-first" | "images-first";
       aspectRatio?: "16:9" | "9:16" | "1:1";
       resolution?: "1k" | "2k" | "4k";
+      parameters?: {
+        negative_prompt?: string;
+        prompt_extend?: boolean;
+        prompt_extend_mode?: "direct" | "agent";
+        enable_thinking?: boolean;
+        watermark?: boolean;
+        seed?: number;
+        n?: number;
+        size?: string;
+      };
     };
     hunyuan?: {
       prompt?: string;
@@ -472,6 +483,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           code: 200,
           data: { taskId, logId: log.id, providerKind: "DASHSCOPE" },
+        });
+      }
+
+      if (jobKind === "multimodal-image-sync") {
+        const content = Array.isArray(ds.content) ? ds.content : [];
+        const taskId = await submitDashscopeMultimodalImageSyncForLog({
+          logId: log.id,
+          credentialId,
+          model,
+          content,
+          parameters: ds.parameters,
+        });
+        return NextResponse.json({
+          code: 200,
+          data: {
+            taskId,
+            logId: log.id,
+            providerKind: "DASHSCOPE",
+            sync: true,
+          },
         });
       }
 

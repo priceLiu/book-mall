@@ -5,7 +5,8 @@ export type QrTextToImageParamProfile =
   | "seedream"
   | "gpt_image_2"
   | "gpt_image_1"
-  | "qwen_t2i";
+  | "qwen_t2i"
+  | "qwen_multimodal";
 
 export type QrTextToImageModelDef = {
   modelKey: string;
@@ -75,6 +76,20 @@ export const QR_TEXT_TO_IMAGE_MODELS: QrTextToImageModelDef[] = [
     subtitle: "文/图生图",
     maxRefImages: 1,
     paramProfile: "qwen_t2i",
+  },
+  {
+    modelKey: "qwen-image-3.0-pro",
+    label: "千问 Image 3.0 Pro",
+    subtitle: "文生图 / 多图参考",
+    maxRefImages: 3,
+    paramProfile: "qwen_multimodal",
+  },
+  {
+    modelKey: "z-image-turbo",
+    label: "Z-Image Turbo",
+    subtitle: "快速文生图",
+    maxRefImages: 0,
+    paramProfile: "qwen_multimodal",
   },
 ];
 

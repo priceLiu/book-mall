@@ -1454,6 +1454,33 @@ async function pollOneSubmittedCanvasTask(
         return "pending";
       }
     }
+    if (
+      providerKind === "DASHSCOPE" ||
+      gatewayLog.providerKind === "DASHSCOPE"
+    ) {
+      const summary = (gatewayLog.resultSummary ?? {}) as Record<string, unknown>;
+      if (summary.sync === true && summary.output) {
+        await applyCanvasDashscopeImagePollResult(
+          task.id,
+          summary.output as DashscopeTaskOutput,
+        );
+        const after = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+        });
+        if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+          return "succeeded";
+        }
+        if (after?.status === "FAILED" && before !== "FAILED") {
+          return "failed";
+        }
+        return "pending";
+      }
+    }
   } else if (gatewayLog?.status === "FAILED") {
     const stallFail =
       gatewayLog.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||

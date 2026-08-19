@@ -39,6 +39,10 @@ import {
   IMAGE_ZOOM_BUTTON_STEP,
 } from "@/components/media/image-zoom-controls";
 import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
+import {
+  readElementShortSide,
+  resolveCanvasMediaPreviewChrome,
+} from "@/lib/canvas/canvas-media-preview-chrome";
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
@@ -69,6 +73,11 @@ export type MediaHoverBoxProps = {
   initialView?: "single" | "compare";
   /** 悬停预览 Eye 尺寸 · 图片节点用 lg（约 2×） */
   previewIconSize?: "default" | "lg";
+  /**
+   * 预览钮视觉 · `ecom` = 白底圆钮 + scrim（对齐电商 MEDIA.md，自适应 Stage 尺寸）
+   * `canvas` = 深色半透明圆钮（Story 列等 legacy）
+   */
+  previewChrome?: "canvas" | "ecom";
   /** LibTV 图片节点：预览改在标题栏 Eye，Stage 不显示居中 Eye */
   hidePreviewOverlay?: boolean;
   /** 图片 src 加载失败（供 OSS → blob 回退） */
@@ -100,16 +109,22 @@ export function MediaHoverBox({
   prompt,
   initialView = "single",
   previewIconSize = "default",
+  previewChrome = "canvas",
   hidePreviewOverlay = false,
   onImageError,
   onNaturalSize,
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [stageShortSide, setStageShortSide] = useState(160);
   const overlayBtnClass =
     previewIconSize === "lg" ? OVERLAY_ICON_BTN_LG : OVERLAY_ICON_BTN;
   const overlayIconClass =
     previewIconSize === "lg" ? "size-8 pointer-events-none" : "size-4 pointer-events-none";
+  const ecomPreviewChrome = useMemo(
+    () => resolveCanvasMediaPreviewChrome(stageShortSide),
+    [stageShortSide],
+  );
   const alreadyLoaded = isMediaSrcLoaded(src);
   /** 画布已生成图/视频：不 lazy，避免 onlyRenderVisibleElements 重挂载时灰底 */
   const eagerMedia = variant === "generated" || alreadyLoaded;
@@ -118,6 +133,18 @@ export function MediaHoverBox({
     eagerMedia,
   );
   const mediaReady = mediaActive || alreadyLoaded;
+
+  useEffect(() => {
+    if (previewChrome !== "ecom" || hidePreviewOverlay) return;
+    const el = lazyRef.current;
+    if (!el) return;
+    const sync = () => setStageShortSide(readElementShortSide(el));
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [previewChrome, hidePreviewOverlay, lazyRef, src]);
+
   const markLoaded = useCallback(
     (e?: SyntheticEvent<HTMLImageElement>) => {
       markMediaSrcLoaded(src);
@@ -199,8 +226,8 @@ export function MediaHoverBox({
                 naturalSize
                   ? "block w-full"
                   : fit === "cover"
-                    ? "h-full w-full object-cover"
-                    : "h-full w-full object-contain"
+                    ? "h-full w-full object-cover object-center"
+                    : "h-full w-full object-contain object-center"
               }
               draggable={false}
             />
@@ -211,8 +238,8 @@ export function MediaHoverBox({
                 naturalSize
                   ? "block w-full"
                   : fit === "cover"
-                    ? "h-full w-full object-cover"
-                    : "h-full w-full object-contain"
+                    ? "h-full w-full object-cover object-center"
+                    : "h-full w-full object-contain object-center"
               }
               muted
               playsInline
@@ -231,8 +258,8 @@ export function MediaHoverBox({
                 naturalSize
                   ? "block h-auto w-full object-contain"
                   : fit === "cover"
-                    ? "h-full w-full object-cover"
-                    : "h-full w-full object-contain"
+                    ? "h-full w-full object-cover object-center"
+                    : "h-full w-full object-contain object-center"
               }
               draggable={false}
             />
@@ -244,7 +271,13 @@ export function MediaHoverBox({
         )}
 
         {(showUpload || canPreview) && src ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition group-hover/media:opacity-100">
+          <div
+            className={
+              previewChrome === "ecom" && !hidePreviewOverlay
+                ? ecomPreviewChrome.overlayClass
+                : "pointer-events-none absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition group-hover/media:opacity-100"
+            }
+          >
             {showUpload ? (
               <button
                 type="button"
@@ -257,15 +290,38 @@ export function MediaHoverBox({
               </button>
             ) : null}
             {canPreview && !hidePreviewOverlay ? (
-              <button
-                type="button"
-                title="预览大图"
-                aria-label="预览"
-                onClick={openPreview}
-                className={overlayBtnClass}
-              >
-                <Eye className={overlayIconClass} strokeWidth={1.75} />
-              </button>
+              previewChrome === "ecom" ? (
+                <button
+                  type="button"
+                  title="预览大图"
+                  aria-label="预览"
+                  onClick={openPreview}
+                  className={ecomPreviewChrome.btnClass}
+                  style={{
+                    width: ecomPreviewChrome.btnSizePx,
+                    height: ecomPreviewChrome.btnSizePx,
+                  }}
+                >
+                  <Eye
+                    className="pointer-events-none shrink-0"
+                    style={{
+                      width: ecomPreviewChrome.iconSizePx,
+                      height: ecomPreviewChrome.iconSizePx,
+                    }}
+                    strokeWidth={1.75}
+                  />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  title="预览大图"
+                  aria-label="预览"
+                  onClick={openPreview}
+                  className={overlayBtnClass}
+                >
+                  <Eye className={overlayIconClass} strokeWidth={1.75} />
+                </button>
+              )
             ) : null}
           </div>
         ) : null}
@@ -430,61 +486,74 @@ export function MediaPreviewLightbox({
         点击背景或按 Esc 关闭
       </p>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3">
-        <div
-          className="flex max-h-full max-w-full min-h-0 flex-1 flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {view === "compare" && showCompare ? (
+      <div
+        className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3"
+        onClick={onClose}
+      >
+        {view === "compare" && showCompare ? (
+          <div
+            className="flex max-h-full max-w-full min-h-0 flex-1 flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CompareSplitView
               options={options}
               leftId={leftId}
               rightId={rightId}
             />
-          ) : splitPrompt ? (
-            <div className="flex min-h-0 flex-1 gap-3">
-              <div className="flex w-[30%] min-w-0 shrink-0 flex-col border-r border-white/10 pr-3">
-                <p className="mb-2 shrink-0 text-[11px] uppercase tracking-wider text-white/50">
-                  Prompt
-                </p>
-                <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/90">
-                  {prompt}
-                </div>
-              </div>
-              <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
-                <div {...stageProps} className="inline-block leading-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={alt}
-                    draggable={false}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
+          </div>
+        ) : splitPrompt ? (
+          <div className="flex min-h-0 max-h-full max-w-full flex-1 gap-3">
+            <div className="flex w-[30%] min-w-0 shrink-0 flex-col border-r border-white/10 pr-3">
+              <p className="mb-2 shrink-0 text-[11px] uppercase tracking-wider text-white/50">
+                Prompt
+              </p>
+              <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/90">
+                {prompt}
               </div>
             </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              {kind === "video" ? (
+            <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+              <div
+                {...stageProps}
+                className="inline-block leading-none"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt={alt}
+                  draggable={false}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            {kind === "video" ? (
+              <div onClick={(e) => e.stopPropagation()}>
                 <CanvasVideoPlayer
                   src={src}
                   poster={posterUrl?.trim() || undefined}
                   autoPlay
                 />
-              ) : (
-                <div {...stageProps} className="inline-block leading-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={alt}
-                    draggable={false}
-                    className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            ) : (
+              <div
+                {...stageProps}
+                className="inline-block leading-none"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt={alt}
+                  draggable={false}
+                  className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {zoomable ? (

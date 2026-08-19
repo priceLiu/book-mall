@@ -7,7 +7,9 @@ import {
   type EcomImageRatio,
 } from "@/lib/ecom/ecom-platform-spec";
 import { resolveKlingV3Resolution } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { isDashscopeMultimodalImageGenModel, isZImageTurboModel } from "@/lib/gateway/qwen-image-edit-proxy";
 import {
+  isStoryboardDashscopeImageModel,
   isStoryboardKieImageModel,
   isStoryboardKlingImageModel,
   isWan26ImageModel,
@@ -102,6 +104,51 @@ async function downloadAndUpload(userId: string, imageUrl: string): Promise<stri
   return uploadCanvasUserBuffer({ userId, ext: "png", buf, contentType: "image/png" });
 }
 
+async function pollMultimodalSyncImage(
+  userId: string,
+  taskId: string,
+  logId: string,
+): Promise<string> {
+  return pollDashscopeImage(userId, taskId, logId);
+}
+
+async function generateMultimodalSyncImage(opts: {
+  userId: string;
+  modelKey: string;
+  prompt: string;
+  ratio: EcomImageRatio;
+  refImageUrls: string[];
+  toolKey: string;
+}): Promise<string> {
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
+  const refs =
+    !isZImageTurboModel(opts.modelKey) && opts.refImageUrls.length > 0
+      ? await ensureStoryboardRefImagesForWan27({
+          userId: opts.userId,
+          urls: opts.refImageUrls.slice(0, 3),
+        })
+      : [];
+  const content: Array<{ text: string } | { image: string }> =
+    refs.length > 0
+      ? [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
+      : [{ text: opts.prompt }];
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "multimodal-image-sync",
+    model: opts.modelKey,
+    content,
+    parameters: {
+      size: ecomRatioToImageSize(opts.ratio),
+      n: 1,
+      prompt_extend: !isZImageTurboModel(opts.modelKey),
+      watermark: false,
+    },
+    clientPage,
+  });
+  const vendorUrl = await pollMultimodalSyncImage(opts.userId, taskId, logId);
+  return downloadAndUpload(opts.userId, vendorUrl);
+}
+
 export async function generateEcomImage(opts: {
   userId: string;
   modelKey: string;
@@ -117,6 +164,10 @@ export async function generateEcomImage(opts: {
   }
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
+
+  if (isDashscopeMultimodalImageGenModel(opts.modelKey)) {
+    return generateMultimodalSyncImage(opts);
+  }
 
   if (isStoryboardKieImageModel(opts.modelKey)) {
     const { model, input } = buildKieImageCreateArgs({
@@ -203,6 +254,9 @@ export function isRefCapableEcomImageModel(modelKey: string): boolean {
   const key = modelKey.trim().toLowerCase();
   if (isStoryboardKieImageModel(key)) return true;
   if (isStoryboardKlingImageModel(key)) return true;
+  if (isDashscopeMultimodalImageGenModel(key)) {
+    return !isZImageTurboModel(key);
+  }
   // wanx* 与 *-t2i 为纯文生图；wan2.6-image / wan2.7-image 系支持多图参考
   if (key.includes("wanx") || key.endsWith("-t2i")) return false;
   return key.startsWith("wan2.6-image") || key.startsWith("wan2.7-image");

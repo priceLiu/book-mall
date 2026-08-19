@@ -37,6 +37,7 @@ import {
   buildStoryboardPanelRefGuide,
 } from "@/lib/ecom/ecom-storyboard-image-prompt";
 import {
+  isStoryboardDashscopeImageModel,
   isStoryboardKieImageModel,
   isStoryboardKlingImageModel,
   isWan26ImageModel,
@@ -45,6 +46,10 @@ import {
   resolveStoryboardKlingModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
 import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
+import {
+  isDashscopeMultimodalImageGenModel,
+  isZImageTurboModel,
+} from "@/lib/gateway/qwen-image-edit-proxy";
 import {
   requireStoryboardProductRef,
   resolveStoryboardImageGenRefs,
@@ -152,7 +157,89 @@ async function generateOneImage(opts: {
   if (isStoryboardKlingImageModel(opts.modelKey)) {
     return generateOneKlingImage(opts);
   }
+  if (isDashscopeMultimodalImageGenModel(opts.modelKey)) {
+    return generateOneMultimodalSyncImage(opts);
+  }
+  if (isStoryboardDashscopeImageModel(opts.modelKey)) {
+    return generateOneWan27Image(opts);
+  }
   return generateOneWanxImage(opts);
+}
+
+async function generateOneMultimodalSyncImage(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  imageSize: EcomStoryboardWanxSize;
+  refImg?: string;
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const refs =
+    !isZImageTurboModel(opts.modelKey) && opts.refImg
+      ? await ensureStoryboardRefImagesForWan27({
+          userId: opts.userId,
+          urls: [opts.refImg],
+        })
+      : [];
+  const content: Array<{ text: string } | { image: string }> =
+    refs.length > 0
+      ? [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
+      : [{ text: opts.prompt }];
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "multimodal-image-sync",
+    model: opts.modelKey,
+    content,
+    parameters: {
+      size: opts.imageSize,
+      n: 1,
+      prompt_extend: !isZImageTurboModel(opts.modelKey),
+      watermark: false,
+    },
+    clientPage,
+  });
+  const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
+  const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
+  return { ossUrl, chargePoints: null, taskId };
+}
+
+async function generateOneWan27Image(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  imageSize: EcomStoryboardWanxSize;
+  refImg?: string;
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+  const apiModel = resolveStoryboardDashscopeModel(opts.modelKey);
+  const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const refs = opts.refImg
+    ? await ensureStoryboardRefImagesForWan27({
+        userId: opts.userId,
+        urls: [opts.refImg],
+      })
+    : [];
+  const content: Array<{ text: string } | { image: string }> =
+    refs.length > 0
+      ? wan26
+        ? [{ text: opts.prompt }, ...refs.map((url) => ({ image: url }))]
+        : [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
+      : [{ text: opts.prompt }];
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "wan27-image",
+    model: apiModel,
+    content,
+    size: wan26 ? undefined : opts.imageSize,
+    n: 1,
+    contentOrder: wan26 ? "text-first" : "images-first",
+    clientPage,
+  });
+  const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
+  const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
+  return { ossUrl, chargePoints: null, taskId };
 }
 
 async function generateOneKlingImage(opts: {
@@ -167,9 +254,7 @@ async function generateOneKlingImage(opts: {
   const apiModel = resolveStoryboardKlingModel(opts.modelKey);
   const resolution = resolveKlingV3Resolution();
   const workspaceId = randomUUID().slice(0, 8);
-  const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
-
 
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "kling-v3-image",
@@ -183,7 +268,6 @@ async function generateOneKlingImage(opts: {
 
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
-
 
   return { ossUrl, chargePoints: null, taskId };
 }
@@ -260,6 +344,48 @@ async function generateOneWanxImage(opts: {
 
 
   return { ossUrl, chargePoints: null, taskId };
+}
+
+/** 单镜头分镜图：千问/Z-Image 同步 multimodal-generation */
+async function generatePanelImageWithMultimodalSync(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  refGuide: string;
+  wan27Size: string;
+  panelIndex: number;
+  refImageUrls: string[];
+}): Promise<{ ossUrl: string; chargePoints: number | null }> {
+  const refImageUrls =
+    !isZImageTurboModel(opts.modelKey) && opts.refImageUrls.length > 0
+      ? await ensureStoryboardRefImagesForWan27({
+          userId: opts.userId,
+          urls: opts.refImageUrls.slice(0, 3),
+        })
+      : [];
+  const promptText = `${opts.refGuide}\n\n${opts.prompt}`;
+  const content: Array<{ text: string } | { image: string }> =
+    refImageUrls.length > 0
+      ? [...refImageUrls.map((url) => ({ image: url })), { text: promptText }]
+      : [{ text: promptText }];
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "multimodal-image-sync",
+    model: opts.modelKey,
+    content,
+    parameters: {
+      size: opts.wan27Size,
+      n: 1,
+      prompt_extend: !isZImageTurboModel(opts.modelKey),
+      watermark: false,
+    },
+    clientPage,
+  });
+  const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
+  const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
+  return { ossUrl, chargePoints: null };
 }
 
 /** 单镜头分镜图：wan2.7 多图参考（产品 + 角色 + 场景一次传入） */
@@ -530,7 +656,18 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
             panelIndex: panel.index,
             refImageUrls,
           })
-        : await generatePanelImageWithRefs({
+        : isDashscopeMultimodalImageGenModel(modelKey)
+          ? await generatePanelImageWithMultimodalSync({
+              userId: opts.userId,
+              projectId: opts.projectId,
+              modelKey,
+              prompt,
+              refGuide,
+              wan27Size,
+              panelIndex: panel.index,
+              refImageUrls,
+            })
+          : await generatePanelImageWithRefs({
             userId: opts.userId,
             projectId: opts.projectId,
             modelKey,

@@ -9,6 +9,11 @@ const USER_REVIEW_OPTIONS: {
   label: string;
   hint: string;
 }[] = [
+  {
+    kind: "PUBLIC_TEMPLATE",
+    label: "社区模板",
+    hint: "立即公开到首页「模板」，他人可复制到你的画布",
+  },
   { kind: "CASE", label: "案例墙", hint: "提交后由管理员审核，通过后展示在首页「案例」" },
   {
     kind: "FEATURED",
@@ -32,6 +37,8 @@ type Props = {
   open: boolean;
   projectName: string;
   isAdmin?: boolean;
+  /** 画布内分享 vs 项目列表投稿 */
+  context?: "canvas" | "projects";
   onClose: () => void;
   onSubmit: (kind: CanvasPortalPublishKind, note: string) => Promise<void>;
 };
@@ -40,6 +47,7 @@ export function PortalSubmitDialog({
   open,
   projectName,
   isAdmin = false,
+  context = "projects",
   onClose,
   onSubmit,
 }: Props) {
@@ -48,9 +56,17 @@ export function PortalSubmitDialog({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const dialogTitle = isAdmin
+    ? context === "canvas"
+      ? "分享 / 发布"
+      : "发布到首页"
+    : context === "canvas"
+      ? "分享作品"
+      : "提交作品审核";
+
   useEffect(() => {
     if (!open) return;
-    setKind("CASE");
+    setKind(isAdmin ? "CASE" : "PUBLIC_TEMPLATE");
     setNote("");
   }, [open, isAdmin]);
 
@@ -61,22 +77,22 @@ export function PortalSubmitDialog({
       className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal
-      aria-label={isAdmin ? "发布到首页" : "提交作品审核"}
+      aria-label={dialogTitle}
       onClick={onClose}
     >
       <div
         className="w-full max-w-md rounded-2xl border border-white/10 bg-[var(--canvas-surface)] p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-base font-semibold text-white">
-          {isAdmin ? "发布到首页" : "提交作品审核"}
-        </h3>
+        <h3 className="text-base font-semibold text-white">{dialogTitle}</h3>
         <p className="mt-1 text-sm text-[var(--canvas-muted)]">
           项目：{projectName}
         </p>
-        {!isAdmin ? (
+        {context === "canvas" ? (
           <p className="mt-2 text-xs text-[var(--canvas-muted)]">
-            分享为「社区模板」请使用画布工具栏「分享到社区」，无需审核。
+            {isAdmin
+              ? "管理员可直接发布到首页「精选」「案例」或「模板」；发布前已自动保存当前画布。"
+              : "社区模板即时公开；精选与案例需管理员审核通过后展示。"}
           </p>
         ) : null}
 

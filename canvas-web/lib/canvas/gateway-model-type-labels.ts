@@ -26,26 +26,15 @@ export function getGatewayModelTypeLabels(args: {
   }
 
   if (
-    role === "VIDEO" ||
-    k.includes("seedance") ||
-    k.includes("kling") ||
-    k.includes("veo") ||
-    k.includes("wan2.") ||
-    k.includes("happyhorse") ||
-    k.includes("video")
-  ) {
-    const video = getSbv1VideoModelTypeLabels(key);
-    return video.length > 0 ? video : ["文生视频"];
-  }
-
-  if (
     role === "IMAGE" ||
+    /wan2\.\d+-image/.test(k) ||
+    k === "kling-3.0-image" ||
     k.includes("seedream") ||
     k.includes("flux") ||
     k.includes("nano-banana") ||
     k.includes("gpt-image") ||
     k.includes("t2i") ||
-    k.includes("image")
+    (k.includes("image") && !k.includes("video") && !k.includes("i2v"))
   ) {
     const labels = ["文生图"];
     if (
@@ -54,11 +43,32 @@ export function getGatewayModelTypeLabels(args: {
       k.includes("i2i") ||
       k.includes("img2img") ||
       k.includes("kontext") ||
-      k.includes("nano-banana")
+      k.includes("nano-banana") ||
+      /wan2\.\d+-image/.test(k) ||
+      k === "kling-3.0-image" ||
+      k === "wan2.6-image" ||
+      k === "qwen-image-3.0-pro" ||
+      k === "qwen-image-edit" ||
+      k === "qwen-image-edit-max" ||
+      k.startsWith("qwen-image-edit")
     ) {
       labels.push("图生图");
     }
     return labels;
+  }
+
+  if (
+    role === "VIDEO" ||
+    k.includes("seedance") ||
+    (k.includes("kling") && !k.includes("-image")) ||
+    k.includes("veo") ||
+    (/wan2\./.test(k) && !/-image/.test(k)) ||
+    (/wan3\./.test(k) && !/-image/.test(k)) ||
+    k.includes("happyhorse") ||
+    k.includes("video")
+  ) {
+    const video = getSbv1VideoModelTypeLabels(key);
+    return video.length > 0 ? video : ["文生视频"];
   }
 
   if (role === "LLM" || role === "CHAT" || role === "TEXT") {

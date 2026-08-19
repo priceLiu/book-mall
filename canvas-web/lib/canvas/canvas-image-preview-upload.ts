@@ -1,4 +1,5 @@
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { fitLibtvUploadedImageNaturalSize } from "./libtv-media-aspect-preset-apply";
 
 import {
   CANVAS_IMAGE_UPLOAD_STALE_MS,
@@ -83,9 +84,10 @@ export function scheduleCanvasImageUpload(
       uploading: false,
       blobUrl: undefined,
       uploadError: undefined,
-      mediaFit: true,
-      mediaFitKey: `image|${ossUrl}|sbv1-media`,
+      imageMode: "upload",
+      mediaAspectPreset: "",
     });
+    fitLibtvUploadedImageNaturalSize(args.nodeId, ossUrl);
   })().catch((e) => {
     const msg = e instanceof Error ? e.message : String(e);
     args.updateNodeData(args.nodeId, {

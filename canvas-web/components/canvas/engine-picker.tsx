@@ -18,6 +18,7 @@ import {
   buildModelParams,
 } from "./dynamic-param-form";
 import {
+  isImageGenerationModelKey,
   modelHasStoryCapabilities,
   storyCapabilityHint,
   type StoryModelCapability,
@@ -150,8 +151,9 @@ export function EnginePicker({
           models: p.models.filter(
             (m) =>
               m.enabled &&
+              m.role === role &&
+              (role !== "IMAGE" || isImageGenerationModelKey(m.modelKey)) &&
               (!allowedSet || allowedSet.has(m.modelKey)) &&
-              (allowedSet?.has(m.modelKey) || m.role === role) &&
               (!stableReqCaps?.length ||
                 modelHasStoryCapabilities(m.modelKey, stableReqCaps)),
           ),

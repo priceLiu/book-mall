@@ -304,8 +304,8 @@ export function LibtvImageNode({
     edition === "pro2" && hasImage && !isCharacterThreeView,
   );
 
-  // 矮框阶段用 contain 避免竖图被裁成「只露天空」；外框自适配正确后与 cover 观感接近
-  const stageImageFit: "cover" | "contain" = "contain";
+  /** Stage 内图片/视频 · cover 铺满，避免比例未齐时出现深色留边 */
+  const stageImageFit: "cover" | "contain" = "cover";
 
   const gridSplitCropCss = d.gridSplitCrop;
 
@@ -329,6 +329,16 @@ export function LibtvImageNode({
       Boolean(d.uploading) ||
       (isGenerating && !d.uploading),
   });
+
+  /** 侧 + 拉出邻居后 graph 变更 · 若外框仍停在默认横条则按 natural 重算 */
+  useEffect(() => {
+    if (!hasImage || isCharacterThreeView || d.uploading) return;
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node || !isLibtvMediaNodeBoxStale(node, "sbv1-media")) return;
+    const url = previewUrl?.trim();
+    if (!url) return;
+    fitLibtvUploadedImageNaturalSize(id, url);
+  }, [edges, id, hasImage, isCharacterThreeView, d.uploading, previewUrl]);
 
   const applyLibtvMediaFit = useCanvasStore((s) => s.applyLibtvMediaFit);
   const onStageNaturalSize = useCallback(
@@ -408,7 +418,7 @@ export function LibtvImageNode({
         uploadError: undefined,
         label: file.name.replace(/\.[^.]+$/, "") || "图片",
         mediaAspectPreset: "",
-        ...(edition === "sbv1" ? { imageMode: "upload" as const } : {}),
+        imageMode: "upload" as const,
       });
       scheduleCanvasImageUpload({
         nodeId: id,
@@ -628,7 +638,7 @@ export function LibtvImageNode({
             variant="generated"
             alt={nodeLabel}
             fit="cover"
-            hidePreviewOverlay
+            previewChrome="ecom"
             onImageError={onPreviewLoadError}
             className="absolute inset-0"
           />
@@ -724,7 +734,7 @@ export function LibtvImageNode({
           variant="generated"
           alt={nodeLabel}
           fit={stageImageFit}
-          hidePreviewOverlay
+          previewChrome="ecom"
           onImageError={onPreviewLoadError}
           onNaturalSize={onStageNaturalSize}
           className="absolute inset-0"
@@ -933,7 +943,7 @@ export function LibtvImageNode({
                   <LibtvNodeHeaderActions
                     portraitActive={portraitActive}
                     portraitImporting={portraitImporting}
-                    showPreview={hasImage}
+                    showPreview={false}
                     onPreview={() => setPreviewOpen(true)}
                   />
                 ) : null}

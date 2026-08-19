@@ -45,7 +45,9 @@ import {
   canvasGwChat,
   canvasGwCreateBailianR2vJob,
   canvasGwCreateDashscopeKlingImageJob,
+  canvasGwCreateDashscopeMultimodalImageSyncJob,
   canvasGwCreateDashscopeVideoJob,
+  canvasGwCreateDashscopeWan27ImageJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
   canvasGwCreateMinimaxVideoJob,
@@ -114,10 +116,18 @@ import { buildGridSplitPrepareFromNodeData } from "@/lib/generation/traffic-cont
 import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 import {
+  isStoryboardDashscopeImageModel,
   isStoryboardKlingImageModel,
+  isWan26ImageModel,
+  resolveStoryboardDashscopeModel,
   resolveStoryboardKlingModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
-import { resolveKlingV3Resolution } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { resolveKlingV3Resolution, resolveWan27ImageSize } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
+import {
+  isQwenImage30ProModel,
+  isZImageTurboModel,
+} from "@/lib/gateway/qwen-image-edit-proxy";
 
 const MAX_PROMPT_LEN = 16000;
 /** Story LLM（故事大纲等）允许更长上游参考包，避免截断创意描述 */
@@ -537,6 +547,9 @@ export async function runImageEngineNode(
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
   const isKlingImage = isStoryboardKlingImageModel(modelKey);
+  const isDashscopeWanImage = isStoryboardDashscopeImageModel(modelKey);
+  const isMultimodalSyncImage =
+    isQwenImage30ProModel(modelKey) || isZImageTurboModel(modelKey);
   const isVolcengineSeedream = isVolcengineSeedreamImageModelKey(modelKey);
   await shouldCanvasUseGateway(userId, providerId, modelKey);
 
@@ -683,6 +696,146 @@ export async function runImageEngineNode(
               gatewayLogId: job.logId,
               providerKind: "DASHSCOPE",
               dashscopeJobKind: "kling-v3-image",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return { reused: false, task: updated };
+      }
+
+      if (isMultimodalSyncImage) {
+        const promptText = clipPrompt(expandedPrompt);
+        const resolution = String(params.resolution ?? "2K");
+        const size =
+          resolution === "4K"
+            ? "2048*2048"
+            : resolution === "1K"
+              ? "1024*1024"
+              : "1536*1536";
+        const n = Math.min(
+          isZImageTurboModel(modelKey) ? 1 : 6,
+          Math.max(1, Number(params.n ?? 1) || 1),
+        );
+        const refs =
+          !isZImageTurboModel(modelKey) && imageUrls.length > 0
+            ? await ensureStoryboardRefImagesForWan27({
+                userId,
+                urls: imageUrls.slice(0, 3),
+              })
+            : [];
+        const content: Array<{ text: string } | { image: string }> =
+          refs.length > 0
+            ? [...refs.map((url) => ({ image: url })), { text: promptText }]
+            : [{ text: promptText }];
+        const job = await canvasGwCreateDashscopeMultimodalImageSyncJob(userId, {
+          model: modelKey,
+          content,
+          parameters: {
+            size,
+            n,
+            prompt_extend: isZImageTurboModel(modelKey) ? false : true,
+            watermark: false,
+          },
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: created.id,
+        });
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: job.logId,
+              providerKind: "DASHSCOPE",
+              dashscopeJobKind: "multimodal-image-sync",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return { reused: false, task: updated };
+      }
+
+      if (isDashscopeWanImage) {
+        const apiModel = resolveStoryboardDashscopeModel(modelKey);
+        const promptText = clipPrompt(expandedPrompt);
+        const wan26 =
+          isWan26ImageModel(apiModel) || isWan26ImageModel(modelKey);
+        const resolution = String(params.resolution ?? "2K");
+        const aspectRaw = String(params.aspect_ratio ?? "1:1");
+        const wanAspect: "16:9" | "9:16" =
+          aspectRaw === "9:16" ||
+          aspectRaw === "3:4" ||
+          aspectRaw === "2:3" ||
+          aspectRaw === "4:5" ||
+          aspectRaw === "9:21"
+            ? "9:16"
+            : "16:9";
+        const wan27Size =
+          !wan26 && imageUrls.length === 0
+            ? resolveWan27ImageSize({
+                aspectRatio: wanAspect,
+                imageSize:
+                  resolution === "4K"
+                    ? "4K"
+                    : resolution === "1K"
+                      ? "1K"
+                      : "2K",
+              })
+            : undefined;
+        const refs =
+          imageUrls.length > 0
+            ? await ensureStoryboardRefImagesForWan27({
+                userId,
+                urls: imageUrls,
+              })
+            : [];
+        const content: Array<{ text: string } | { image: string }> =
+          refs.length > 0
+            ? wan26
+              ? [{ text: promptText }, ...refs.map((url) => ({ image: url }))]
+              : [
+                  ...refs.map((url) => ({ image: url })),
+                  { text: promptText },
+                ]
+            : [{ text: promptText }];
+        const job = await canvasGwCreateDashscopeWan27ImageJob(userId, {
+          model: apiModel,
+          content,
+          size: wan27Size,
+          n: Math.min(4, Math.max(1, Number(params.n ?? 1) || 1)),
+          contentOrder: wan26 ? "text-first" : "images-first",
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: created.id,
+        });
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: job.logId,
+              providerKind: "DASHSCOPE",
+              dashscopeJobKind: "wan27-image",
               ...(args.storyScope ? { storyScope: args.storyScope } : {}),
             } as Prisma.InputJsonValue,
           },

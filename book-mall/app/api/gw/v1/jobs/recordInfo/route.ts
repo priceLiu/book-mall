@@ -76,6 +76,17 @@ export async function GET(request: NextRequest) {
 
   try {
     if (providerKind === "DASHSCOPE") {
+      if (log?.status === "SUCCEEDED" || log?.status === "FAILED") {
+        const summary = (log.resultSummary ?? {}) as Record<string, unknown>;
+        if (summary.sync === true && summary.output) {
+          return NextResponse.json({
+            code: 200,
+            data: summary.output,
+            providerKind: "DASHSCOPE",
+          });
+        }
+      }
+
       const polled = await pollDashscopeTaskForLog({
         credentialId,
         taskId,

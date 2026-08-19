@@ -14,7 +14,7 @@ type Props = {
   className?: string;
 };
 
-/** 无封面图时的工作流结构预览（静态 SVG，填满 aspect-video 区域） */
+/** 无封面图时的工作流结构预览（静态 SVG，cover 填满 340×190 区域） */
 export function TemplateWorkflowDiagramPreview({ graph, className }: Props) {
   const layout = useMemo(
     () => buildTemplateWorkflowDiagramLayout(graph),
@@ -28,8 +28,8 @@ export function TemplateWorkflowDiagramPreview({ graph, className }: Props) {
   return (
     <svg
       viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-      className={cn("h-full w-full", className)}
-      preserveAspectRatio="xMidYMid meet"
+      className={cn("size-full", className)}
+      preserveAspectRatio="xMidYMid slice"
       aria-hidden
     >
       <defs>

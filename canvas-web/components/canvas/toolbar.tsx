@@ -71,6 +71,8 @@ export function CanvasToolbar({
   onSave,
   onSaveTemplate,
   onShareTemplate,
+  shareIsAdmin = false,
+  sharePreparing = false,
   onOpenMyTemplates,
   onOpenMyHistory,
   onOpenGenerationRecords,
@@ -97,6 +99,9 @@ export function CanvasToolbar({
   onSave: () => void;
   onSaveTemplate?: () => void;
   onShareTemplate?: () => void;
+  /** 管理员可在画布内直接发布精选 / 案例 / 模板 */
+  shareIsAdmin?: boolean;
+  sharePreparing?: boolean;
   onOpenMyTemplates?: () => void;
   onOpenMyHistory?: () => void;
   onOpenGenerationRecords?: () => void;
@@ -471,9 +476,16 @@ export function CanvasToolbar({
         ) : null}
         {onShareTemplate ? (
           <CanvasToolbarIconButton
-            label="分享到社区"
-            hint="将当前画布分享到社区模板"
+            label="分享"
+            hint={
+              sharePreparing
+                ? "正在保存画布…"
+                : shareIsAdmin
+                  ? "发布到精选、案例或社区模板（管理员即时生效）"
+                  : "分享到社区模板，或投稿精选 / 案例"
+            }
             onClick={onShareTemplate}
+            disabled={sharePreparing}
           >
             <Share2 className="size-3.5" />
           </CanvasToolbarIconButton>

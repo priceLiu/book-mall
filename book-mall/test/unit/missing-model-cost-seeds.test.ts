@@ -12,6 +12,8 @@ const ALREADY_SEEDED = new Set([
   "lib-nano-pro-1k",
   "lib-nano-pro-2k",
   "lib-nano-pro-4k",
+  "qwen-image-3.0-pro",
+  "z-image-turbo",
   "wan2.7-image",
   "wan2.7-image-pro",
   "kling-3.0-image",
@@ -51,7 +53,7 @@ describe("MISSING_MODEL_COST_SEEDS", () => {
       ...ALREADY_SEEDED,
       ...MISSING_MODEL_COST_SEEDS.map((r) => r.canonicalModelKey),
     ]);
-    expect(MISSING_MODEL_COST_SEEDS).toHaveLength(88);
+    expect(MISSING_MODEL_COST_SEEDS).toHaveLength(92);
     for (const key of registryKeys) {
       expect(covered.has(key)).toBe(true);
     }

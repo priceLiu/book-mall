@@ -438,6 +438,13 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
     return true;
   }
 
+  if (
+    d.ossUrl?.trim() &&
+    (role === "generic" || role === "prop" || role === "mood" || !role)
+  ) {
+    return true;
+  }
+
   const rt = d.runtime?.status;
   if (
     rt === "pending" ||
@@ -446,10 +453,6 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
     rt === "failed"
   ) {
     return false;
-  }
-
-  if (d.ossUrl?.trim() && !role) {
-    return true;
   }
 
   return false;

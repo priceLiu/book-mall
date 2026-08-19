@@ -84,6 +84,21 @@ const EXTRA_COSTS: CostSeed[] = [
     discountRate: 0.1,
   },
   {
+    canonicalModelKey: "qwen-image-3.0-pro",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.5,
+    discountRate: 0.1,
+    note: "2K 输出档 · 官方 0.5 元/张",
+  },
+  {
+    canonicalModelKey: "z-image-turbo",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.1,
+    discountRate: 0.1,
+  },
+  {
     canonicalModelKey: "kling-3.0-image",
     vendor: "aliyun",
     unit: "PER_IMAGE",

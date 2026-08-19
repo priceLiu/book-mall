@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 export const CANVAS_LIST_COVER_WIDTH = 340;
 export const CANVAS_LIST_COVER_HEIGHT = 190;
 
-/** 与「我的画布」列表封面完全相同的容器样式（340×190） */
+/** 与「我的画布」列表封面完全相同的容器样式（340×190，内容 cover 铺满） */
 export const CANVAS_LIST_COVER_CLASS =
-  "aspect-[340/190] w-full overflow-hidden rounded-xl bg-gradient-to-br from-[var(--canvas-accent)]/15 to-[var(--canvas-surface-2)]";
+  "relative aspect-[340/190] w-full overflow-hidden rounded-xl bg-[var(--canvas-surface-2)]";
 
 type Props = {
   /** 与项目列表 `thumbnailUrl` 同名字段，直接复用 */
@@ -25,7 +25,7 @@ type Props = {
 
 /**
  * 画布列表封面 — 「我的画布」与首页模板共用同一组件。
- * 有 thumbnailUrl → 图片/视频；无图且有 graph → 工作流结构图；否则占位。
+ * 有 thumbnailUrl → 图片/视频 cover 铺满；无图且有 graph → 工作流结构图；否则占位。
  */
 export function CanvasListCover({ url, name, graph, className }: Props) {
   const coverUrl = url?.trim() || "";
@@ -34,21 +34,23 @@ export function CanvasListCover({ url, name, graph, className }: Props) {
 
   return (
     <div className={cn(CANVAS_LIST_COVER_CLASS, className)}>
-      {coverUrl ? (
-        <ProjectCoverMedia
-          url={coverUrl}
-          alt={name ?? "封面"}
-          placeholderLetter={name}
-        />
-      ) : showDiagram ? (
-        <TemplateWorkflowDiagramPreview graph={graph!} />
-      ) : (
-        <ProjectCoverMedia
-          url={undefined}
-          alt={name ?? "封面"}
-          placeholderLetter={name}
-        />
-      )}
+      <div className="absolute inset-0 size-full">
+        {coverUrl ? (
+          <ProjectCoverMedia
+            url={coverUrl}
+            alt={name ?? "封面"}
+            placeholderLetter={name}
+          />
+        ) : showDiagram ? (
+          <TemplateWorkflowDiagramPreview graph={graph!} className="size-full" />
+        ) : (
+          <ProjectCoverMedia
+            url={undefined}
+            alt={name ?? "封面"}
+            placeholderLetter={name}
+          />
+        )}
+      </div>
     </div>
   );
 }

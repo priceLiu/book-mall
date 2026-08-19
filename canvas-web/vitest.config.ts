@@ -94,6 +94,7 @@ export default defineConfig({
       "test/unit/libtv-media-node-auto-fit.test.ts",
       "test/unit/libtv-canvas-viewport-reflow.test.ts",
       "test/unit/libtv-media-aspect-preset.test.ts",
+      "test/unit/canvas-media-preview-chrome.test.ts",
       "test/unit/libtv-media-node-box.test.ts",
       "test/unit/libtv-grid-split-hd.test.ts",
       "test/unit/libtv-plain-text-display.test.ts",

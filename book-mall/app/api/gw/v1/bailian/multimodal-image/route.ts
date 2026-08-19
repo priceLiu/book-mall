@@ -15,19 +15,19 @@ import {
 } from "@/lib/gateway/proxy-common";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import {
+  DASHSCOPE_MULTIMODAL_IMAGE_GEN_MODELS,
   isDashscopeMultimodalImageGenModel,
-  isZImageTurboModel,
-  validateDashscopeMultimodalImageContent,
   qwenImageEditGenerate,
   type QwenImageEditContentItem,
   type QwenImageEditParams,
+  validateDashscopeMultimodalImageContent,
 } from "@/lib/gateway/qwen-image-edit-proxy";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const ALLOWED = new Set(["qwen-image-edit", "qwen-image-edit-max"]);
+const ALLOWED = new Set<string>(DASHSCOPE_MULTIMODAL_IMAGE_GEN_MODELS);
 
 export async function POST(request: NextRequest) {
   const authOrResp = await requireGatewayV1Auth(request);
@@ -47,9 +47,11 @@ export async function POST(request: NextRequest) {
   }
 
   const model = body.model?.trim() ?? "";
-  if (!model || !ALLOWED.has(model)) {
+  if (!model || !ALLOWED.has(model) || !isDashscopeMultimodalImageGenModel(model)) {
     return NextResponse.json(
-      { error: "model must be qwen-image-edit or qwen-image-edit-max" },
+      {
+        error: `model must be one of: ${[...ALLOWED].join(", ")}`,
+      },
       { status: 400 },
     );
   }
@@ -81,7 +83,7 @@ export async function POST(request: NextRequest) {
       apiKeyId: auth.id,
       credentialId,
       model,
-      endpoint: "/v1/bailian/qwen-image-edit",
+      endpoint: "/v1/bailian/multimodal-image",
       providerKind: "DASHSCOPE",
       requestKind: "IMAGE",
       clientSource,

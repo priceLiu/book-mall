@@ -22,6 +22,13 @@ export class StoryModelCapabilityError extends Error {
 }
 
 const EXPLICIT: Record<string, StoryModelCapability[]> = {
+  "qwen-image-3.0-pro": ["image_t2i", "image_multi_ref"],
+  "z-image-turbo": ["image_t2i"],
+  "qwen-image-edit": ["image_multi_ref"],
+  "qwen-image-edit-max": ["image_multi_ref"],
+  "wan2.7-image": ["image_t2i", "image_multi_ref"],
+  "wan2.7-image-pro": ["image_t2i", "image_multi_ref"],
+  "wan2.6-image": ["image_t2i", "image_multi_ref"],
   "nano-banana-pro": ["image_t2i", "image_multi_ref"],
   "kling-3.0-image": ["image_t2i", "image_multi_ref"],
   "4o-image": ["image_t2i", "image_multi_ref"],
@@ -86,9 +93,10 @@ function inferCapabilities(modelKey: string): StoryModelCapability[] {
   const isVideo =
     k.includes("video") ||
     k.includes("seedance") ||
-    k.includes("kling") ||
+    (k.includes("kling") && !k.includes("-image")) ||
     k.includes("veo") ||
-    k.includes("wan2.") ||
+    (k.includes("wan2.") && !k.includes("-image")) ||
+    (k.includes("wan3.0") && !k.includes("-image")) ||
     k.includes("happyhorse") ||
     k.includes("minimax-h3") ||
     k.includes("minimax/minimax-h3");

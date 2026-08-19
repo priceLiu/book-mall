@@ -37,6 +37,13 @@ import {
 } from "./dashscope-client";
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
+import { finalizeRequestLog } from "./proxy-common";
+import {
+  qwenImageEditGenerate,
+  type QwenImageEditContentItem,
+  type QwenImageEditParams,
+  validateDashscopeMultimodalImageContent,
+} from "./qwen-image-edit-proxy";
 
 import { SUBMIT_ORPHAN_FAIL } from "@/lib/gateway/gateway-submit-error-policy";
 import {
@@ -887,6 +894,62 @@ export async function submitDashscopeKlingV3ImageJobForLog(opts: {
     data: { externalTaskId: created.taskId, status: "RUNNING" },
   });
   return created.taskId;
+}
+
+/** 百炼 multimodal-generation · 同步出图（qwen-image-3.0-pro / z-image-turbo） */
+export async function submitDashscopeMultimodalImageSyncForLog(opts: {
+  logId: string;
+  credentialId: string;
+  model: string;
+  content: QwenImageEditContentItem[];
+  parameters?: QwenImageEditParams;
+}) {
+  const contentErr = validateDashscopeMultimodalImageContent(
+    opts.model,
+    opts.content,
+  );
+  if (contentErr) throw new Error(contentErr);
+
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+  const started = Date.now();
+  const result = await qwenImageEditGenerate({
+    apiKey: cred.apiKey,
+    baseUrl: cred.baseUrl ?? undefined,
+    model: opts.model,
+    content: opts.content,
+    parameters: opts.parameters,
+  });
+  if (!result.ok) throw new Error(result.error);
+
+  const output = {
+    task_status: "SUCCEEDED",
+    choices: result.imageUrls.map((image) => ({
+      finish_reason: "stop",
+      message: {
+        role: "assistant",
+        content: [{ image }],
+      },
+    })),
+  };
+
+  await prisma.gatewayRequestLog.update({
+    where: { id: opts.logId },
+    data: { externalTaskId: opts.logId, status: "RUNNING" },
+  });
+  await finalizeRequestLog(opts.logId, {
+    status: "SUCCEEDED",
+    durationMs: Date.now() - started,
+    resultSummary: {
+      sync: true,
+      output,
+      imageUrls: result.imageUrls,
+      imageCount: result.imageUrls.length,
+    },
+    externalTaskId: opts.logId,
+    model: opts.model,
+  });
+  return opts.logId;
 }
 
 export async function submitDashscopeWanxJobForLog(opts: {

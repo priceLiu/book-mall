@@ -154,6 +154,16 @@
       "taskTags": ["Text to Image"],
       "readme": "万相 2.7 文生图 · DashScope。"
     },
+    "qwen-image-3.0-pro": {
+      "providerLabel": "Alibaba",
+      "taskTags": ["Text to Image", "Image to Image"],
+      "readme": "千问 Image 3.0 Pro · 文生图 / 图生图 · multimodal-generation。"
+    },
+    "z-image-turbo": {
+      "providerLabel": "Alibaba",
+      "taskTags": ["Text to Image"],
+      "readme": "Z-Image Turbo · 快速低成本文生图。"
+    },
     "qwen-turbo": {
       "providerLabel": "Alibaba",
       "taskTags": ["Chat"],

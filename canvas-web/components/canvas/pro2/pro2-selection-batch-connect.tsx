@@ -85,6 +85,8 @@ function Pro2SelectionBatchConnectLayerInner({
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const canvasDraggingNodeId = useCanvasStore((s) => s.canvasDraggingNodeId);
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
 
   const selectedIds = useMemo(
     () => pro2SelectedNonGroupIds(rfNodes),
@@ -235,6 +237,18 @@ function Pro2SelectionBatchConnectLayerInner({
     gestureRef.current = null;
   }, []);
 
+  useEffect(() => {
+    if (canvasDraggingNodeId || canvasGeometryDragging) {
+      clearPreview();
+    }
+  }, [canvasDraggingNodeId, canvasGeometryDragging, clearPreview]);
+
+  useEffect(() => {
+    if (selectedIds.length < 2) {
+      clearPreview();
+    }
+  }, [selectedIds.length, clearPreview]);
+
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
 
   const spawnAtAnchor = useCallback(
@@ -363,12 +377,8 @@ function Pro2SelectionBatchConnectLayerInner({
   );
 
   const closeMenu = useCallback(() => {
-    menuOpenRef.current = false;
-    gestureActiveRef.current = false;
-    frozenScreenBoxRef.current = null;
-    setMenuAnchor(null);
-    setLineTarget(null);
-  }, []);
+    clearPreview();
+  }, [clearPreview]);
 
   const connectSnapTarget = useCallback(
     (target: CanvasFlowNode, mode: BatchConnectMode): boolean => {

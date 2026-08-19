@@ -3,12 +3,22 @@ import type { CanvasEnginePick } from "./types";
 
 /** sbv1 / Pro2 图片节点 · IMAGE 白名单（Gateway 登记模型） */
 export const SBV1_IMAGE_MODEL_KEYS = [
+  /** 与电商主图 / 分镜默认一致 · 多图参考（图生图） */
+  "qwen-image-3.0-pro",
+  "z-image-turbo",
+  "qwen-image-edit",
+  "qwen-image-edit-max",
+  "wan2.7-image",
+  "wan2.7-image-pro",
+  "wan2.6-image",
   "nano-banana-pro",
   "kling-3.0-image",
   "4o-image",
   "nano-banana-2",
   "gpt-image-2",
   "google/nano-banana",
+  /** 专用图生图 / 编辑 */
+  "google/nano-banana-edit",
   "doubao-seedream-5-0-pro",
   "doubao-seedream-5-0-lite",
   "seedream-4.5",

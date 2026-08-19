@@ -539,6 +539,109 @@ export async function canvasGwCreateDashscopeKlingImageJob(
   };
 }
 
+/** Canvas · 万相 2.6/2.7 多图参考生图（DashScope 异步） */
+export async function canvasGwCreateDashscopeWan27ImageJob(
+  userId: string,
+  opts: {
+    model: string;
+    content: Array<{ text: string } | { image: string }>;
+    size?: string;
+    n?: number;
+    contentOrder?: "text-first" | "images-first";
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  if (!pickDashscopeCredentialForCanvas(auth.credentials)) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope / 百炼凭证（万相生图需要阿里云 DashScope Key）",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      dashscope: {
+        jobKind: "wan27-image" as const,
+        content: opts.content,
+        size: opts.size,
+        n: opts.n,
+        contentOrder: opts.contentOrder,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
+}
+
+/** Canvas · 千问 Image 3.0 Pro / Z-Image Turbo（DashScope 同步 multimodal-generation） */
+export async function canvasGwCreateDashscopeMultimodalImageSyncJob(
+  userId: string,
+  opts: {
+    model: string;
+    content: Array<{ text: string } | { image: string }>;
+    parameters?: {
+      negative_prompt?: string;
+      prompt_extend?: boolean;
+      prompt_extend_mode?: "direct" | "agent";
+      enable_thinking?: boolean;
+      watermark?: boolean;
+      seed?: number;
+      n?: number;
+      size?: string;
+    };
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  if (!pickDashscopeCredentialForCanvas(auth.credentials)) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope / 百炼凭证（千问/Z-Image 生图需要阿里云 DashScope Key）",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      dashscope: {
+        jobKind: "multimodal-image-sync" as const,
+        content: opts.content,
+        parameters: opts.parameters,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
+}
+
 /** Canvas · DashScope 文生视频（wan2.6-t2v / wan2.7-t2v / wan3.0-video） */
 export async function canvasGwCreateDashscopeVideoJob(
   userId: string,

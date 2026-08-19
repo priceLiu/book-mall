@@ -21,6 +21,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { EnginePicker } from "./engine-picker";
+import { STORY_PRO_FRAME_IMAGE_MODEL_KEYS } from "@/lib/canvas/story-prompts";
 import {
   MentionsTextarea,
   type MentionableItem,
@@ -455,6 +456,7 @@ export function FrameImageActionsModal({
                   providerId={providerId}
                   modelKey={modelKey}
                   params={params}
+                  allowedModelKeys={[...STORY_PRO_FRAME_IMAGE_MODEL_KEYS]}
                   onChange={onPickEngine}
                 />
               </div>

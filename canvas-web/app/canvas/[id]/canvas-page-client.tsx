@@ -71,6 +71,7 @@ import {
   listCanvasProjectHistory,
   patchCanvasProject,
   saveCanvasTemplate,
+  submitCanvasPortalReview,
   type CanvasCharacterRecord,
   type CanvasProjectDetail,
 } from "@/lib/canvas-api";
@@ -104,6 +105,8 @@ import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-panel";
 import { MyCanvasGenerationRecordsPanel } from "@/components/canvas/my-canvas-generation-records-panel";
 import { MyPromptHistoryPanel } from "@/components/canvas/my-prompt-history-panel";
+import { PortalSubmitDialog } from "@/components/home/portal-submit-dialog";
+import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import { SaveProjectAssetDialogHost } from "@/components/canvas/save-project-asset-dialog";
 import { PortraitImportProgressHost } from "@/components/canvas/portrait-import-progress-dialog";
 import { useRegisterProjectAssetCanvasInsert } from "@/lib/canvas/use-register-project-asset-canvas-insert";
@@ -304,6 +307,9 @@ function Inner({ projectId }: { projectId: string }) {
   const [myHistoryOpen, setMyHistoryOpen] = useState(false);
   const [myGenerationRecordsOpen, setMyGenerationRecordsOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [sharePreparing, setSharePreparing] = useState(false);
+  const isCanvasPortalAdmin = useCanvasAdmin();
 
   const closeAllToolbarPanels = useCallback(() => {
     setMyTemplatesOpen(false);
@@ -1361,59 +1367,71 @@ function Inner({ projectId }: { projectId: string }) {
     }
   }, [base, project?.name, toGraph, dialogs]);
 
-  const onShareTemplate = useCallback(async () => {
-    if (!base) return;
-    const tplName = await dialogs.prompt({
-      title: "分享到社区",
-      message: "公开模板将出现在首页「社区模板」区，他人可复制到你的画布。",
-      label: "模板名",
-      defaultValue: `${project?.name ?? "未命名"} 工作流`,
-      placeholder: "请输入模板名",
-      confirmLabel: "下一步",
-      validate: (v) => (v.trim() ? null : "模板名不能为空"),
-    });
-    if (!tplName) return;
-    const description = await dialogs.prompt({
-      title: "模板描述",
-      message: "可选：说明工作流用途与节点结构。",
-      label: "描述",
-      defaultValue: "",
-      placeholder: "描述（可选）",
-      confirmLabel: "发布",
-    });
-    if (description === null) return;
+  const onOpenShareDialog = useCallback(async () => {
+    if (!base || !project) return;
+    setSharePreparing(true);
     try {
-      const cleaned = stripRuntimeForTemplate(toGraph(), {
-        keepPersistableMedia: true,
-      });
-      const edition =
-        project?.edition === "pro2" || project?.edition === "sbv1"
-          ? project.edition
-          : "classic";
-      const { pickPersistableProjectThumbnailUrl } = await import(
-        "@/lib/canvas/project-thumbnail"
-      );
-      const thumbnail = pickPersistableProjectThumbnailUrl(cleaned);
-      await saveCanvasTemplate(base, {
-        name: tplName.trim(),
-        description: description.trim(),
-        canvas: cleaned,
-        category: "user",
-        edition,
-        visibility: "public",
-        ...(thumbnail ? { thumbnail } : {}),
-      });
-      setSaveError(null);
-      setTemplatesRefreshKey((k) => k + 1);
+      await runAutosaveRef.current(true);
+      await Promise.race([
+        waitForAutosaveIdle(),
+        new Promise<void>((_, reject) => {
+          window.setTimeout(() => reject(new Error("save_wait_timeout")), 12_000);
+        }),
+      ]);
+      setShareDialogOpen(true);
+    } catch {
       await dialogs.alert({
-        title: "已发布",
-        message: "工作流已公开到社区，可在首页查看。",
-        variant: "success",
+        title: "保存未完成",
+        message: "分享前需先保存画布。请稍候重试，或点击「保存」后再分享。",
+        variant: "warning",
       });
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "分享失败");
+    } finally {
+      setSharePreparing(false);
     }
-  }, [base, project?.name, project?.edition, toGraph, dialogs]);
+  }, [base, project, dialogs]);
+
+  const onSubmitPortalShare = useCallback(
+    async (kind: import("@/lib/canvas-api").CanvasPortalPublishKind, note: string) => {
+      if (!base?.trim()) return;
+      try {
+        const result = await submitCanvasPortalReview(base, projectId, {
+          requestKind: kind,
+          userNote: note || undefined,
+        });
+        if (result.appliedImmediately) {
+          await dialogs.alert({
+            title: "已发布",
+            message:
+              kind === "PUBLIC_TEMPLATE" || kind === "TEMPLATE"
+                ? "工作流模板已发布，可在首页「模板」查看。"
+                : kind === "FEATURED"
+                  ? "作品已发布到首页「精选」。"
+                  : kind === "CASE"
+                    ? "作品已发布到首页「案例」。"
+                    : "作品已按所选类型对外展示。",
+            variant: "success",
+          });
+          if (kind === "PUBLIC_TEMPLATE" || kind === "TEMPLATE") {
+            setTemplatesRefreshKey((k) => k + 1);
+          }
+        } else {
+          await dialogs.alert({
+            title: "已提交",
+            message: "管理员审核通过后将展示在首页相应位置。",
+            variant: "success",
+          });
+        }
+      } catch (e) {
+        await dialogs.alert({
+          title: "分享失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+        throw e;
+      }
+    },
+    [base, dialogs, projectId],
+  );
 
   const restoreStoryComicTemplate = useCallback(async () => {
     const tpl = getBuiltinCanvasTemplate(STORY_COMIC_TEMPLATE_ID);
@@ -1549,7 +1567,9 @@ function Inner({ projectId }: { projectId: string }) {
               isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
             }
             onSaveTemplate={() => void onSaveTemplate()}
-            onShareTemplate={() => void onShareTemplate()}
+            onShareTemplate={() => void onOpenShareDialog()}
+            shareIsAdmin={isCanvasPortalAdmin}
+            sharePreparing={sharePreparing}
             inflightTaskCount={inflightTaskCount}
             immersive={showImmersiveChrome ? immersive : false}
             onToggleImmersive={
@@ -1614,6 +1634,14 @@ function Inner({ projectId }: { projectId: string }) {
           onClose={() => setStyleLibraryOpen(false)}
         />
       ) : null}
+      <PortalSubmitDialog
+        open={shareDialogOpen}
+        projectName={project.name}
+        isAdmin={isCanvasPortalAdmin}
+        context="canvas"
+        onClose={() => setShareDialogOpen(false)}
+        onSubmit={onSubmitPortalShare}
+      />
       <div className="relative z-0 flex min-h-0 min-w-0 w-full max-w-full flex-1 overflow-hidden isolate">
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel

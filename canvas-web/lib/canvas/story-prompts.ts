@@ -316,6 +316,13 @@ export const STORY_PRO_VIDEO_MODEL_KEYS = [
  * 与 KIE_KNOWN_MODELS 对齐；含多参考图（image_input / image_urls / input_urls）
  */
 export const STORY_PRO_FRAME_IMAGE_MODEL_KEYS = [
+  "qwen-image-3.0-pro",
+  "z-image-turbo",
+  "qwen-image-edit",
+  "qwen-image-edit-max",
+  "wan2.7-image",
+  "wan2.7-image-pro",
+  "wan2.6-image",
   "nano-banana-pro",
   "kling-3.0-image",
   "4o-image",

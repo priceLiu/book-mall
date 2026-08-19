@@ -3,6 +3,7 @@ import type {
   CanvasProviderModelDto,
 } from "@/lib/canvas-providers-api";
 import {
+  isImageGenerationModelKey,
   modelHasStoryCapabilities,
   type StoryModelCapability,
 } from "@/lib/canvas/story-model-capabilities";
@@ -38,8 +39,11 @@ export function collectLibtvDockEngineModels(
     if (providerIdSet && !providerIdSet.has(provider.id)) continue;
     for (const model of provider.models) {
       if (!model.enabled) continue;
+      if (model.role !== opts.role) continue;
+      if (opts.role === "IMAGE" && !isImageGenerationModelKey(model.modelKey)) {
+        continue;
+      }
       if (allowedSet && !allowedSet.has(model.modelKey)) continue;
-      if (!allowedSet && model.role !== opts.role) continue;
       if (
         reqCaps?.length &&
         !modelHasStoryCapabilities(model.modelKey, reqCaps)

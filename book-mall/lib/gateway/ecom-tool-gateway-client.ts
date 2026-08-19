@@ -25,6 +25,7 @@ import {
   gatewayV1RecordInfo,
   gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
+import type { QwenImageEditParams } from "@/lib/gateway/qwen-image-edit-proxy";
 import {
   isBailianR2vFailed,
   isBailianR2vSucceeded,
@@ -102,6 +103,13 @@ export async function ecomGwCreateDashscopeJob(
         clientPage?: string;
       }
     | {
+        kind: "multimodal-image-sync";
+        model: string;
+        content: Array<{ text: string } | { image: string }>;
+        parameters?: QwenImageEditParams;
+        clientPage?: string;
+      }
+    | {
         kind: "video";
         model: string;
         body: Record<string, unknown>;
@@ -154,7 +162,16 @@ export async function ecomGwCreateDashscopeJob(
                 n: opts.n,
               },
             }
-          : {
+          : opts.kind === "multimodal-image-sync"
+            ? {
+                model,
+                dashscope: {
+                  jobKind: "multimodal-image-sync" as const,
+                  content: opts.content,
+                  parameters: opts.parameters,
+                },
+              }
+            : {
               model,
               dashscope: {
                 jobKind: "video" as const,

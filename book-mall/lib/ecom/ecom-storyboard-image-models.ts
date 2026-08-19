@@ -11,6 +11,14 @@ export const STORYBOARD_DASHSCOPE_IMAGE_MODELS = [
   "wan2.6-image",
 ] as const;
 
+/** 百炼 multimodal-generation · 同步文生图/图生图/图像编辑 */
+export const STORYBOARD_MULTIMODAL_SYNC_IMAGE_MODELS = [
+  "qwen-image-3.0-pro",
+  "z-image-turbo",
+  "qwen-image-edit",
+  "qwen-image-edit-max",
+] as const;
+
 /** 阿里 DashScope 可灵 3.0 Omni 多图参考 */
 export const STORYBOARD_KLING_IMAGE_MODELS = ["kling-3.0-image"] as const;
 
@@ -19,6 +27,7 @@ export const STORYBOARD_KIE_IMAGE_MODELS = ["nano-banana-pro"] as const;
 
 export const STORYBOARD_IMAGE_MODELS = [
   ...STORYBOARD_DASHSCOPE_IMAGE_MODELS,
+  ...STORYBOARD_MULTIMODAL_SYNC_IMAGE_MODELS,
   ...STORYBOARD_KLING_IMAGE_MODELS,
   ...STORYBOARD_KIE_IMAGE_MODELS,
 ] as const;

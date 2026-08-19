@@ -247,6 +247,38 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "qwen-image-3.0-pro",
+    displayName: "Qwen Image 3.0 Pro",
+    description: "千问图像 3.0 Pro · 文生图 / 图生图（最多 3 张参考）· 小字与版面",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 19,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen-image-3.0-pro", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "z-image-turbo",
+    displayName: "Z-Image Turbo",
+    description: "百炼 Z-Image Turbo · 快速低成本文生图（不支持参考图编辑）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 18,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "z-image-turbo", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
     canonicalModelKey: "kling-3.0-image",
     displayName: "Kling 3.0 Image",
     mediaKind: "TEXT_TO_IMAGE",
@@ -575,7 +607,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_IMAGE",
     unitLabel: "元/张",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "qwen-image-edit", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "qwen-image-edit", providerKind: "DASHSCOPE" },
     ]),
   },
   {
@@ -591,7 +623,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_IMAGE",
     unitLabel: "元/张",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "qwen-image-edit-max", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "qwen-image-edit-max", providerKind: "DASHSCOPE" },
     ]),
   },
   {
