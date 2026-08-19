@@ -23,7 +23,7 @@ import { shareWorkflowAsTemplate } from "@/lib/canvas/share-workflow";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
-import { batchRunPro2ThreeViewRows, batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
+import { batchRunPro2FrameRows, batchRunPro2ThreeViewRows, batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
 import { kickoffPro2VideoBoardFromFrameGroup } from "@/lib/canvas/pro2-script-hub-helpers";
 import { resolvePro2VideoBatchVideoForHub } from "@/lib/canvas/pro2-video-batch-video";
 import {
@@ -479,7 +479,7 @@ export function Pro2MediaGroupToolbarPanel({
       const keys =
         rowKeys.length > 0 ? rowKeys : rows.map((r) => r.key);
       updateNodeData(controller.id, { pro2PendingSyncGroupId: groupId });
-      batchRunStoryRows(controller.id, keys, "frameImage", {
+      batchRunPro2FrameRows(controller.id, keys, {
         forceFresh: true,
       });
       return;

@@ -118,6 +118,9 @@ export function ensurePro2HubToMediaGroupChildEdges(
         targetHandle,
       });
     }
+    if (next.length === prev.length && next.every((e, i) => e === prev[i])) {
+      return prev;
+    }
     return next;
   });
 }

@@ -127,7 +127,7 @@ describe("libtv-media-aspect-preset", () => {
     ).toBe("sbv1-video");
   });
 
-  it("maps pro2 scene cells to three-view profile and frame cells to pro2-frame-cell", () => {
+  it("maps pro2 scene and frame cells to three-view profile", () => {
     expect(
       resolveLibtvMediaAspectPresetProfile({
         type: "story-pro2-image",
@@ -139,7 +139,7 @@ describe("libtv-media-aspect-preset", () => {
         type: "story-pro2-image",
         data: { pro2MediaRole: "frame" },
       }),
-    ).toBe("pro2-frame-cell");
+    ).toBe("three-view");
   });
 
   it("uses 100% canvas standard spans for landscape / portrait / square", () => {

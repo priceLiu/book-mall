@@ -23,7 +23,7 @@ const FIXTURE = {
         name: "场景A",
         environmentTimeMood: "日内",
         imagePrompt: "空镜",
-        negativePrompt: "anime",
+        negativePrompt: "动画风",
       },
     ],
     handoff: [{ index: 1, item: "三视图", owner: "美术", note: "—" }],
@@ -68,6 +68,27 @@ describe("pro2-production-script-llm", () => {
     const raw = JSON.stringify(FIXTURE);
     const out = ensurePro2ProductionScriptFence(raw);
     expect(out).toContain("```pro2-production-script");
+  });
+
+  it("validate rejects English negativePrompt", () => {
+    const bad = {
+      ...FIXTURE,
+      patch: {
+        ...FIXTURE.patch,
+        scenes: [
+          {
+            ...FIXTURE.patch.scenes[0],
+            negativePrompt: "[Negative: blurry, anime]",
+          },
+        ],
+      },
+    };
+    const text = `\`\`\`pro2-production-script\n${JSON.stringify(bad)}\n\`\`\``;
+    const v = validatePro2ProductionScriptLlmOutput(text, {
+      llmSection: "outline",
+    });
+    expect(v.ok).toBe(false);
+    expect(v.error).toContain("negativePrompt");
   });
 
   it("buildPro2StructuredRetryUserMessage includes error", () => {

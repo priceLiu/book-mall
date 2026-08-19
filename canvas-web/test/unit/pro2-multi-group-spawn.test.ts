@@ -12,6 +12,7 @@ import {
 import { countCanvasInflightWork } from "@/lib/canvas/story-column-runtime";
 import {
   isLibtvFreestandingImageNode,
+  isPro2PipelineFrameCell,
   isPro2PipelineThreeViewCell,
 } from "@/lib/canvas/libtv-image-node-run";
 import { pickStoryRowApplyTask } from "@/lib/canvas/task-pick";
@@ -475,6 +476,18 @@ describe("pickStoryRowApplyTask · threeView", () => {
   });
 });
 
+describe("isPro2PipelineFrameCell", () => {
+  it("treats hub column frame cells as pipeline (not freestanding)", () => {
+    const pipeline = {
+      type: "story-pro2-image" as const,
+      parentId: "grp-1",
+      data: { pro2MediaRole: "frame", pro2ControllerNodeId: "col-frame" },
+    };
+    expect(isPro2PipelineFrameCell(pipeline)).toBe(true);
+    expect(isLibtvFreestandingImageNode(pipeline)).toBe(false);
+  });
+});
+
 describe("isPro2PipelineThreeViewCell", () => {
   it("treats hub column three-view cells as pipeline (not freestanding)", () => {
     const pipeline = {
@@ -533,6 +546,42 @@ describe("clearPro2ThreeViewInflightOutsideSyncGroup", () => {
       "tv-new",
       expect.objectContaining({ uploading: false }),
     );
+  });
+});
+
+describe("findPro2FrameImageNodeForRow · stale visual group", () => {
+  it("falls back to the live frame-board group when visual group id is stale", () => {
+    const columnId = "col-frame";
+    const staleGroup = "grp-deleted";
+    const liveGroup = "grp-live";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: columnId,
+        type: "story-pro2-frame",
+        position: { x: 0, y: 0 },
+        data: { pro2VisualGroupId: staleGroup },
+      },
+      {
+        id: liveGroup,
+        type: "group",
+        position: { x: 0, y: 0 },
+        data: { pro2Kind: "frame-board" },
+      },
+      {
+        id: "img-1",
+        type: "story-pro2-image",
+        parentId: liveGroup,
+        position: { x: 0, y: 0 },
+        data: {
+          pro2ControllerNodeId: columnId,
+          pro2RowKey: "frame-1",
+          pro2GroupId: liveGroup,
+          pro2MediaRole: "frame",
+        },
+      },
+    ];
+    const found = findPro2FrameImageNodeForRow(nodes, columnId, "frame-1");
+    expect(found?.id).toBe("img-1");
   });
 });
 

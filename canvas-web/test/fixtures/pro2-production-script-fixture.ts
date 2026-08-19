@@ -1,8 +1,8 @@
 import type { Pro2ProductionScriptPatch } from "@/lib/canvas/data/pro2-production-script-schema";
 
-/** 精简 fixture · 抽象 docs/result.md 结构 */
+/** 精简 fixture · v2 Pass1 导演表结构 */
 export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   tier: "pro",
   step: "full_pack",
   patch: {
@@ -28,7 +28,7 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         name: "长安主街·日",
         environmentTimeMood: "正午暖金阳光，百姓攒动",
         imagePrompt: "电影级古代朱雀大街，青石板路，红灯笼",
-        negativePrompt: "animation, anime",
+        negativePrompt: "动画风、动漫风",
       },
     ],
     characters: [
@@ -41,16 +41,24 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         imagePrompt: "18岁女子，鹅黄古装，电影级写实，2K",
       },
     ],
+    props: [
+      {
+        id: "prop-book",
+        name: "明黄婚书",
+        description: "明黄绢面婚书，边缘金线滚边",
+      },
+    ],
     shots: [
       {
         index: 1,
         shotSize: "全景",
-        cameraMove: "缓慢摇移",
+        lighting: "正午暖金侧逆光，明暗对比强烈",
+        cameraMove: "缓慢摇移推进，前景旗幡遮挡增加层次",
         sceneDescription: "【起始】朱雀大街人声鼎沸。【结束】女主举婚书立于外廊。",
+        propIds: ["prop-book"],
         dialogue: "百姓甲：「她要退婚？」",
         durationSec: 10,
-        imagePrompt: "电影级大全景，古代街道，暖金侧逆光，2K",
-        videoPrompt: "<<<scene_A>>> 缓慢摇移，暖金侧逆光，无字幕",
+        sfxNote: "人群议论声、旗幡猎猎",
         audioNote: "群杂收音",
         sceneId: "scene-a",
         characterIds: ["char-heroine"],
@@ -58,19 +66,19 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
       {
         index: 2,
         shotSize: "中景",
-        cameraMove: "固定",
+        lighting: "暖金侧光打亮人物轮廓",
+        cameraMove: "固定机位平拍，人物入画",
         sceneDescription: "【起始】承接上镜举书姿势。【结束】男主现身楼下。",
         dialogue: "—",
         durationSec: 8,
-        imagePrompt: "中景，古装女子举婚书，35mm，2K",
-        videoPrompt: "<<<scene_A>>> 固定镜头，对话 {男主：「昨晚睡得好吗？」}",
+        sfxNote: "远处马蹄声",
         audioNote: "男主台词同期",
       },
     ],
     handoff: [
       { index: 1, item: "角色三视图", owner: "美术", note: "按角色表生成" },
       { index: 2, item: "场景图", owner: "美术", note: "按场景辞典" },
-      { index: 3, item: "分镜视频", owner: "后期", note: "按视频 prompt" },
+      { index: 3, item: "分镜提示词润色", owner: "导演", note: "Pass2 生成 frameImagePrompt + videoPrompt" },
       { index: 4, item: "配音", owner: "声音", note: "对白轨" },
       { index: 5, item: "BGM", owner: "声音", note: "古风暧昧" },
       { index: 6, item: "粗剪交付", owner: "剪辑", note: "180秒" },

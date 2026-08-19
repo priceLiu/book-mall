@@ -36,13 +36,19 @@ function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
 }
 
-export type StoryProLlmSection = "outline" | "character" | "scene" | "storyboard";
+export type StoryProLlmSection =
+  | "outline"
+  | "character"
+  | "scene"
+  | "storyboard"
+  | "shot_prompts";
 
 const PROMPT_KEY: Record<StoryProLlmSection, string> = {
   outline: "promptOutline",
   character: "promptCharacter",
   scene: "promptScene",
   storyboard: "promptStoryboard",
+  shot_prompts: "promptShotPrompts",
 };
 
 type StoryRow = Record<string, unknown>;
@@ -288,8 +294,22 @@ export async function runStoryProScriptHubSection(
   },
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
-  const prompt = String(data[PROMPT_KEY[args.llmSection]] ?? data.prompt ?? "");
-  const salt = hashSalt({ llmSection: args.llmSection });
+  const promptKey = PROMPT_KEY[args.llmSection];
+  let prompt = String(data[promptKey] ?? data.prompt ?? "");
+  if (args.llmSection === "shot_prompts") {
+    const rowKey = args.storyScope?.rowKey?.trim();
+    const queue = data.shotPromptPolishQueue as Record<string, string> | undefined;
+    if (rowKey && queue?.[rowKey]?.trim()) {
+      prompt = queue[rowKey]!.trim();
+    }
+    const system = String(
+      data.shotPromptPolishSystemPrompt ?? data.outlineSystemPrompt ?? "",
+    ).trim();
+    if (system) {
+      (data as Record<string, unknown>).outlineSystemPrompt = system;
+    }
+  }
+  const salt = hashSalt({ llmSection: args.llmSection, rowKey: args.storyScope?.rowKey });
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "story-outline-engine",

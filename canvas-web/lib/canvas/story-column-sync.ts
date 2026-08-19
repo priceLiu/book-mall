@@ -274,7 +274,10 @@ export function buildDefaultFrameRowPrompt(frame: {
   aiImagePrompt?: string;
 }): string {
   const fromPack = frame.aiImagePrompt?.trim();
-  if (fromPack) return fromPack;
+  const shotLine = frame.shotSize?.trim() ? `景别：${frame.shotSize.trim()}` : "";
+  if (fromPack) {
+    return [shotLine, fromPack].filter(Boolean).join("\n");
+  }
   return buildFrameRowImagePrompt(frame);
 }
 

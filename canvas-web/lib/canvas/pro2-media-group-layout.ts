@@ -104,7 +104,10 @@ export function pro2MediaChildSize(node: {
     };
   }
   if (node.pro2MediaRole === "frame") {
-    return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
+    return {
+      width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+      height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+    };
   }
   if (node.pro2MediaRole === "video") {
     // 分镜视频组 · 与分镜图组同宫格尺寸（图 3/4）
@@ -143,12 +146,19 @@ export function effectivePro2MediaChildSize(
     pro2MediaRole?: string;
     gridSplitFrameCrop?: boolean;
   };
-  if (data.pro2MediaRole === "frame" || data.pro2MediaRole === "scene" || data.pro2MediaRole === "video") {
-    const cell = pro2MediaChildSize({
+  if (
+    data.pro2MediaRole === "frame" ||
+    data.pro2MediaRole === "scene" ||
+    node.type === "story-pro2-three-view" ||
+    data.pro2MediaRole === "character-three-view"
+  ) {
+    return resolveLibtvMediaNodeBoxSize(node, allNodes);
+  }
+  if (data.pro2MediaRole === "video") {
+    return pro2MediaChildSize({
       type: node.type,
       pro2MediaRole: data.pro2MediaRole,
     });
-    return cell;
   }
   if (data.gridSplitFrameCrop) {
     const style = node.style as { width?: number; height?: number } | undefined;
@@ -561,4 +571,22 @@ export function relayoutPro2MediaGroup(
     if (!pro2MediaRelayoutChanged(nodes, next, groupId)) return nodes;
     return next;
   });
+}
+
+const pro2GroupRelayoutTimers = new Map<string, number>();
+
+/** 组内多节点并发 aspect sync 时合并为一次 relayout，避免 Maximum update depth */
+export function scheduleRelayoutPro2MediaGroup(
+  setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  groupId: string,
+  delayMs = 120,
+  opts?: { resetOrigin?: boolean },
+): void {
+  const prev = pro2GroupRelayoutTimers.get(groupId);
+  if (prev !== undefined) window.clearTimeout(prev);
+  const timer = window.setTimeout(() => {
+    pro2GroupRelayoutTimers.delete(groupId);
+    relayoutPro2MediaGroup(setNodes, groupId, opts);
+  }, delayMs);
+  pro2GroupRelayoutTimers.set(groupId, timer);
 }

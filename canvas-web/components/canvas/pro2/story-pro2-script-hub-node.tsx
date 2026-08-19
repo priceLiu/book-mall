@@ -62,7 +62,7 @@ import {
   resolveLibtvThinNodeDisplayState,
 } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
-import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubOutlineMd, resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
 import { resolvePro2HubTableTitle } from "@/lib/canvas/pro2-hub-display-title";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -78,7 +78,6 @@ import {
   resolveHubProductionScript,
   tryRepairHubFromStoredProductionJson,
 } from "@/lib/canvas/pro2-production-script-apply";
-import { isUnparsedPro2ProductionJsonBlob } from "@/lib/canvas/pro2-production-script-structured";
 import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
@@ -183,14 +182,20 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     [nodes, edges, id],
   );
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
-  const outlineMd = d.outlineMd ?? "";
+  const outlineMd = resolveHubOutlineMd(d);
   const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
 
   useEffect(() => {
-    if (!isUnparsedPro2ProductionJsonBlob(d.outlineMd ?? "")) return;
     const patch = tryRepairHubFromStoredProductionJson(d, id);
     if (patch) updateNodeData(id, patch);
-  }, [d, id, updateNodeData]);
+  }, [
+    d.outlineMd,
+    d.storyboardMd,
+    d.outlineRuntime?.textOutput,
+    d.storyboardRuntime?.textOutput,
+    id,
+    updateNodeData,
+  ]);
   const hasTable = pro2HubHasScriptTable(d);
   const hasCharacter = pro2HubHasCharacterTable(d);
   const hasScene = pro2HubHasSceneTable(d, sceneCtx);

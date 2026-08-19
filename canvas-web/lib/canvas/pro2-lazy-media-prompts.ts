@@ -6,6 +6,7 @@ import type {
 import type { CanvasFlowNode } from "./types";
 import type { StoryProVisualStylePack } from "./story-pro-visual-style-pack";
 import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
+import { normalizePro2NegativePrompt } from "./pro2-chinese-prompt-normalize";
 import { buildPro2ThreeViewDockPrompt } from "./three-view-prompt-rules";
 import { appendVisualStylePackToDockPrompt } from "./story-pro-visual-style-pack";
 
@@ -31,17 +32,26 @@ function formatSceneRowForMediaPrompt(row: StoryProSceneRow): string {
       : "",
   ].filter(Boolean);
   let prompt = finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
-  const neg = row.negativePrompt?.trim();
+  const neg = normalizePro2NegativePrompt(row.negativePrompt?.trim() ?? "");
   if (neg) prompt = `${prompt}\n【反向提示词】${neg}`;
   return prompt;
 }
 
 function buildFrameRowMediaPrompt(row: StoryProFrameRow): string {
-  const fromPack = row.aiImagePrompt?.trim();
-  if (fromPack) return fromPack;
+  const pass2 =
+    row.frameImagePrompt?.trim() ||
+    row.aiImagePrompt?.trim();
+  const shotLine = row.shotSize?.trim() ? `景别：${row.shotSize.trim()}` : "";
+  if (pass2) {
+    return [shotLine, pass2].filter(Boolean).join("\n");
+  }
+  const lightingLine = row.lighting?.trim()
+    ? `光影：${row.lighting.trim()}`
+    : "";
   const parts = [
     `镜 ${row.frameIndex}`,
-    row.shotSize?.trim() ? `景别：${row.shotSize.trim()}` : "",
+    shotLine,
+    lightingLine,
     row.scene?.trim() ? `场景：${row.scene.trim()}` : "",
     row.description?.trim() ? `镜头描述：${row.description.trim()}` : "",
     dialogueLine(row.dialogue),
@@ -124,16 +134,17 @@ export function applyPro2SceneMediaPromptsForKeys(
   );
 }
 
+/** @param frameSupplement 仅用于分镜图专用补充（勿传剧本 hub dockInput） */
 export function applyPro2FrameMediaPromptsForIndices(
   rows: StoryProFrameRow[],
   frameIndices: number[],
-  dockNote?: string,
+  frameSupplement?: string,
 ): StoryProFrameRow[] {
   const allowed = new Set(
     frameIndices.filter((n) => Number.isFinite(n) && n > 0),
   );
   if (!allowed.size) return rows;
-  const note = dockNote?.trim();
+  const note = frameSupplement?.trim();
   return rows.map((row) => {
     if (!allowed.has(row.frameIndex)) return row;
     let prompt = buildPro2FrameMediaPrompt(row);

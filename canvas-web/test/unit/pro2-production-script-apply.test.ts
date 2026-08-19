@@ -33,10 +33,12 @@ describe("pro2-production-script-apply", () => {
     expect(patch.scriptStudioFrameRows?.length).toBe(2);
     const frame = patch.scriptStudioFrameRows?.[0];
     expect(frame?.shotSize).toBe("全景");
-    expect(frame?.cameraMove).toBe("缓慢摇移");
+    expect(frame?.cameraMove).toContain("缓慢摇移");
     expect(frame?.durationSec).toBe(10);
-    expect(frame?.aiImagePrompt).toContain("大全景");
-    expect(frame?.videoPrompt).toContain("scene_A");
+    expect(frame?.lighting).toContain("暖金");
+    expect(frame?.sfxNote).toContain("旗幡");
+    expect(frame?.aiImagePrompt).toBeFalsy();
+    expect(frame?.videoPrompt).toBeFalsy();
   });
 
   it("applyProductionScriptDirectToHub syncs all sections", () => {

@@ -26,6 +26,8 @@ import {
   resolvePro2HubSceneMd,
   resolvePro2HubSceneRows,
   resolvePro2HubStoryboardPickerRows,
+  enqueuePro2ShotPromptPolish,
+  persistPro2StoryboardTableEditsToHub,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
   resolvePro2ThreeViewBatchImageForHub,
@@ -54,7 +56,7 @@ import {
 } from "./pro2-character-three-view-picker";
 import {
   Pro2FrameGeneratePicker,
-  type Pro2FrameGenerateResult,
+  type Pro2StoryboardSpawnResult,
 } from "./pro2-frame-generate-picker";
 import {
   Pro2SceneImagePicker,
@@ -84,14 +86,16 @@ function pro2HubBatchStore() {
         | "story-pro2-character"
         | "story-pro2-scene"
         | "story-pro2-frame"
+        | "story-pro2-video"
         | "story-pro2-image"
         | "story-pro2-three-view"
+        | "sbv1-video-engine"
         | "group",
       position: { x: number; y: number },
       data: Record<string, unknown>,
     ) => state.addNode(type, position, data),
     addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
+      type: "story-pro2-image" | "story-pro2-three-view" | "sbv1-video-engine",
       groupId: string,
       relativePosition: { x: number; y: number },
       data: Record<string, unknown>,
@@ -125,6 +129,7 @@ export function Pro2ScriptHubToolbar({
   const liveHubData =
     (liveHubNode?.data as StoryProScriptHubNodeData | undefined) ?? hubData;
   const [framePickerOpen, setFramePickerOpen] = useState(false);
+  const [shotPromptPolishBusy, setShotPromptPolishBusy] = useState(false);
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? "";
@@ -165,18 +170,44 @@ export function Pro2ScriptHubToolbar({
     [hubId, nodes, edges],
   );
 
-  const runFrameGenerate = (result: Pro2FrameGenerateResult) => {
+  const runFrameGenerate = (result: Pro2StoryboardSpawnResult) => {
+    const hubPatch = persistPro2StoryboardTableEditsToHub(
+      hubData,
+      result.rows,
+      hubId,
+    );
+    updateNodeData(hubId, hubPatch);
+    const mergedHub = { ...hubData, ...hubPatch };
     generatePro2FrameBoardFromHub(
       hubId,
-      hubData,
+      mergedHub,
       dockInput,
       dockRefImages,
       providers,
       pro2HubBatchStore,
       result.frameIndices,
-      result.batchImage,
+      result.batchImage ?? undefined,
       { spawnNewGroup: true },
     );
+  };
+
+  const runShotPromptPolish = (frameIndices: number[]) => {
+    if (!liveHubData.providerId?.trim() || !liveHubData.modelKey?.trim()) {
+      void alert({
+        title: "请选择模型",
+        message: "在底部输入坞选择 LLM 模型后再生成提示词。",
+        variant: "warning",
+      });
+      return;
+    }
+    setShotPromptPolishBusy(true);
+    enqueuePro2ShotPromptPolish(
+      hubId,
+      frameIndices,
+      liveHubData,
+      updateNodeData,
+    );
+    window.setTimeout(() => setShotPromptPolishBusy(false), 1200);
   };
 
   const runThreeViewGenerate = (result: Pro2CharacterThreeViewResult) => {
@@ -236,7 +267,7 @@ export function Pro2ScriptHubToolbar({
       await alert({
         title: "请先生成分镜脚本",
         message:
-          "在底部输入坞发送生成专业版分镜脚本后，再点击「生成分镜组」。",
+          "在底部输入坞发送生成专业版分镜脚本后，再点击「生成分镜」。",
         variant: "warning",
       });
       return;
@@ -377,11 +408,11 @@ export function Pro2ScriptHubToolbar({
           type="button"
           className={TOOL_BTN}
           disabled={isGenerating || !hasTable}
-          title="选择镜号并新建分镜图组（保留已有组，可多次抽卡）"
+          title="编辑分镜表并创建分镜图组 + 分镜视频组（不自动生图/生视频）"
           onClick={() => void onGenerateFrames()}
         >
           <LayoutGrid className="size-3.5" />
-          <span>生成分镜组</span>
+          <span>生成分镜</span>
         </button>
         {collaboration.canPublishScript ? (
           <>
@@ -439,10 +470,12 @@ export function Pro2ScriptHubToolbar({
         open={framePickerOpen}
         rows={storyboardRows}
         initialBatchImage={initialFrameBatchImage}
+        generatingPrompts={shotPromptPolishBusy}
         onClose={() => {
           setFramePickerOpen(false);
         }}
         onConfirm={runFrameGenerate}
+        onGeneratePrompts={runShotPromptPolish}
       />
 
       <Pro2CharacterThreeViewPicker

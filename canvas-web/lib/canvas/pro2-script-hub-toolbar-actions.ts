@@ -4,7 +4,7 @@ import type { Pro2ThreeViewBatchImagePick } from "./pro2-three-view-batch-image"
 import {
   enqueuePro2ScriptGeneration,
   kickoffPro2CharacterThreeViewFromHub,
-  kickoffPro2FrameBoardFromHub,
+  kickoffPro2StoryboardFromHub,
   kickoffPro2SceneImageFromHub,
   pro2HubHasScriptTable,
   pro2HubIsLinkedOutline,
@@ -64,12 +64,17 @@ export function generatePro2FrameBoardFromHub(
     nodes: CanvasFlowNode[];
     edges: CanvasFlowEdge[];
     addNode: (
-      type: "story-pro2-frame" | "story-pro2-image" | "group",
+      type:
+        | "story-pro2-frame"
+        | "story-pro2-video"
+        | "story-pro2-image"
+        | "sbv1-video-engine"
+        | "group",
       position: { x: number; y: number },
       data: Record<string, unknown>,
     ) => string;
     addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
+      type: "story-pro2-image" | "story-pro2-three-view" | "sbv1-video-engine",
       groupId: string,
       relativePosition: { x: number; y: number },
       data: Record<string, unknown>,
@@ -87,7 +92,7 @@ export function generatePro2FrameBoardFromHub(
     providerId: string;
     modelKey: string;
     params?: Record<string, unknown>;
-  },
+  } | null,
   kickoffOptions?: Pick<
     KickoffPro2FrameBoardOptions,
     "spawnNewGroup" | "forceFresh"
@@ -107,7 +112,7 @@ export function generatePro2FrameBoardFromHub(
   if (kickoffOptions?.forceFresh) {
     opts.forceFresh = true;
   }
-  kickoffPro2FrameBoardFromHub(
+  kickoffPro2StoryboardFromHub(
     getStore,
     hubId,
     hubData,

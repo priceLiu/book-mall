@@ -24,8 +24,8 @@ describe("parseStoryboardRows", () => {
 ## 分镜脚本
 
 ${STORY_PRO2_STORYBOARD_TABLE_HEADER}
-| 1 | 全景 | 固定 | 【起始】A。【结束】B。 | — | 8 | img en | vid zh | lip |
-| 2 | 中景 | 推 | 【起始】B。【结束】C。 | 甲：「 hi 」 | 6 | img2 | vid2 | — |`;
+| 1 | 全景 | 暖调侧光 | 固定 | 【起始】A。【结束】B。 | — | — | 8 | 环境音 | lip |
+| 2 | 中景 | 侧逆光 | 推 | 【起始】B。【结束】C。 | 道具A | 甲：「 hi 」 | 6 | 敲击声 | — |`;
 
     const rows = parseStoryboardRows(md);
     expect(rows).toHaveLength(2);
@@ -45,8 +45,8 @@ ${STORY_PRO2_STORYBOARD_TABLE_HEADER}
 
   it("parses multiple rows when cells contain <br> (LLM full-pack)", () => {
     const md = `${STORY_PRO2_STORYBOARD_TABLE_HEADER}
-| 1 | 远景 | 横摇 | 起始：A。<br>动作：B。<br>终止：C。 | — | 10 | 中文生图1 | 中文视频1 | — |
-| 2 | 中景 | 固定 | 起始：D。<br>终止：E。 | 台词 | 8 | 中文生图2 | 中文视频2 | BGM |`;
+| 1 | 远景 | 暖金逆光 | 横摇 | 起始：A。<br>动作：B。<br>终止：C。 | — | — | 10 | 风声 | — |
+| 2 | 中景 | 柔光 | 固定 | 起始：D。<br>终止：E。 | 竹简 | 台词 | 8 | 脚步 | BGM |`;
     expect(parseStoryboardRows(md)).toHaveLength(2);
   });
 

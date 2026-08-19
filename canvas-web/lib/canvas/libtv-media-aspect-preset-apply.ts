@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { LIBTV_MEDIA_FIT_VERSION, LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION } from "./libtv-node-chrome";
-import { expandLibtvGroupToFitChildren } from "./libtv-group-content-bounds";
 import {
   computeLibtvMediaAspectPresetSize,
   LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES,
@@ -13,8 +12,10 @@ import {
   resolveLibtvMediaAspectPresetProfile,
   shouldSkipLibtvMediaAspectPresetForNaturalMedia,
 } from "./libtv-media-aspect-preset";
-import { isPro2StyledGroup } from "./pro2-media-group-meta";
-import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
+import { isPro2StyledGroup, isPro2PipelineMediaGroupChild } from "./pro2-media-group-meta";
+import {
+  scheduleRelayoutPro2MediaGroup,
+} from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import {
   shouldUseSbv1ImageVideoColumnLayout,
@@ -69,8 +70,8 @@ function relayoutParentGroupIfNeeded(nodeId: string, parentId?: string): void {
   if (parentManualSize) return;
 
   if (isPro2StyledGroup(parentGroup, state.nodes)) {
-    relayoutPro2MediaGroup(setNodes, parentId);
-    setNodes((nodes) => expandLibtvGroupToFitChildren(nodes, parentId));
+    scheduleRelayoutPro2MediaGroup(setNodes, parentId);
+    return;
   }
 }
 
@@ -82,6 +83,9 @@ export function applyLibtvMediaAspectPreset(nodeId: string): void {
     return;
   }
   if (shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
+    return;
+  }
+  if (isPro2PipelineMediaGroupChild(node, state.nodes)) {
     return;
   }
 
@@ -223,6 +227,12 @@ export function maybeApplyLibtvMediaAspectPresetForNewNode(
   if (!LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(type)) return;
   queueMicrotask(() => {
     const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
+    if (!node?.type || !LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(node.type)) {
+      return;
+    }
+    if (isPro2PipelineMediaGroupChild(node, useCanvasStore.getState().nodes)) {
+      return;
+    }
     if (node && shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
       const url = String(
         (node.data as { blobUrl?: string }).blobUrl ?? "",
@@ -244,6 +254,11 @@ export function useLibtvMediaAspectPresetSync(
     if (!enabled || !nodeId) return;
     const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
     if (!node?.type || !LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(node.type)) {
+      return;
+    }
+
+    const allNodes = useCanvasStore.getState().nodes;
+    if (isPro2PipelineMediaGroupChild(node, allNodes)) {
       return;
     }
 

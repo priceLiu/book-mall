@@ -2,9 +2,9 @@ import { parseStoryboardRows } from "./parse-md-tables";
 
 const PER_SHOT_SEC_MIN = 10;
 const PER_SHOT_SEC_MAX = 15;
-const DEFAULT_TARGET_DURATION_SEC = 90;
-const ABS_MIN_SHOTS = 8;
-const ABS_MAX_SHOTS = 20;
+const DEFAULT_TARGET_DURATION_SEC = 180;
+const ABS_MIN_SHOTS = 12;
+const ABS_MAX_SHOTS = 18;
 
 function parseChineseDurationToSeconds(text: string): number | null {
   const t = text.trim();
@@ -117,7 +117,7 @@ export function buildPro2StoryboardShotBudgetPromptBlock(
 - **目标总时长**：${durLabel}（${b.targetDurationSec} 秒；自故事大纲解析，若无则默认 ${DEFAULT_TARGET_DURATION_SEC} 秒）
 - **每镜时长**：${b.perShotSecMin}–${b.perShotSecMax} 秒整数；各镜 \`时长(秒)\` **之和**须在 ${sumMin}–${sumMax} 秒
 - **须输出镜数**：**${b.minShots}–${b.maxShots} 镜**（不得少于 **${b.minShots}** 镜；禁止只输出 1–2 镜样例即停）
-- **禁止**用「镜数规划」小表或散文概括代替完整 9 列 GFM 分镜表`;
+- **禁止**用「镜数规划」小表或散文概括代替完整 10 列 GFM 分镜表`;
 }
 
 export function storyboardMeetsMinimumShotCount(

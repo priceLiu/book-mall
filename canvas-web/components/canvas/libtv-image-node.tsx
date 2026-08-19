@@ -271,7 +271,11 @@ export function LibtvImageNode({
     enabled: !isMislabeledVendorSuccessError(
       d.runtime?.failCode,
       d.runtime?.failMessage,
-    ),
+    ) &&
+      !(
+        d.runtime?.failCode === "RUN_STALE" &&
+        Boolean(d.pro2ControllerNodeId?.trim())
+      ),
     onAlert: ({ message, failCode }) => {
       void alert({
         title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),

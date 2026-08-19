@@ -20,6 +20,7 @@ import {
   normalizeOutlineSection,
   normalizeStoryboardSectionMd,
   parseOutlineBriefCharacters,
+  storyboardMdHasParseableRows,
 } from "./parse-md-tables";
 import { pushStoryRevision } from "./story-revision";
 import {
@@ -126,10 +127,11 @@ export function applyHubSectionFromTask(
         }
       }
       if (
-        replaceEmbedded
+        storyboardMdHasParseableRows(promoted.storyboardMd) &&
+        (replaceEmbedded
           ? promoted.storyboardMd.trim()
           : promoted.storyboardMd.trim() &&
-            promoted.storyboardMd !== (data.storyboardMd ?? "")
+            promoted.storyboardMd !== (data.storyboardMd ?? ""))
       ) {
         patch.storyboardMd = promoted.storyboardMd;
         patch.storyboardHistory = pushStoryRevision(
@@ -179,6 +181,16 @@ export function applyHubSectionFromTask(
       patch.sceneMd = sceneMd;
       patch.sceneHistory = pushStoryRevision(data.sceneHistory, sceneMd);
     }
+  } else if (section === "shot_prompts") {
+    if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) return structured;
+    }
+    return patch;
   } else {
     patch.storyboardRuntime = runtime;
     if (textOutput?.trim()) {
@@ -191,11 +203,13 @@ export function applyHubSectionFromTask(
         return { ...structured, storyboardRuntime: runtime } as Partial<StoryScriptHubNodeData>;
       }
       const storyboardMd = normalizeStoryboardSectionMd(textOutput);
-      patch.storyboardMd = storyboardMd;
-      patch.storyboardHistory = pushStoryRevision(
-        data.storyboardHistory,
-        storyboardMd,
-      );
+      if (storyboardMdHasParseableRows(storyboardMd)) {
+        patch.storyboardMd = storyboardMd;
+        patch.storyboardHistory = pushStoryRevision(
+          data.storyboardHistory,
+          storyboardMd,
+        );
+      }
     }
   }
   return patch;

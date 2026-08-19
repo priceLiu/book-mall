@@ -6,6 +6,7 @@ import { Film } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
+import { isPro2FrameBoardColumnVisualPlaceholder } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import { resolvePro2BoardRowCancelScope } from "@/lib/canvas/use-canvas-generation-cancel-scope";
 import {
   PRO2_CARD_SHELL_CLASS,
@@ -27,8 +28,12 @@ export function StoryPro2FrameBoardNode({ id, data, selected }: NodeProps) {
     rows?: StoryProFrameRow[];
     hubNodeId?: string;
     pro2VisualGroupId?: string;
+    pro2PendingSyncGroupId?: string;
   };
-  const isVisualGroupPlaceholder = Boolean(d.pro2VisualGroupId);
+  const isVisualGroupPlaceholder = useMemo(
+    () => isPro2FrameBoardColumnVisualPlaceholder(id, nodes),
+    [id, nodes],
+  );
 
   const label = useMemo(() => {
     const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");

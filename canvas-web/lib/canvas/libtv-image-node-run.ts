@@ -1,8 +1,8 @@
 import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 
-/** 组内分镜格：走列 batch，不用 Dock 模型选择（公告栏独立分镜节点除外） */
-export function isLibtvPipelineImageCell(
+/** 组内分镜格：走分镜列 batch（任务 nodeId=列 · scope.rowKey），非独立 freestanding runner */
+export function isPro2PipelineFrameCell(
   node: Pick<CanvasFlowNode, "type" | "data" | "parentId"> | undefined,
 ): boolean {
   if (node?.type !== "story-pro2-image") return false;
@@ -11,6 +11,13 @@ export function isLibtvPipelineImageCell(
   }
   const d = node.data as { pro2ControllerNodeId?: string };
   return Boolean(d.pro2ControllerNodeId?.trim() || node.parentId);
+}
+
+/** @deprecated 使用 isPro2PipelineFrameCell */
+export function isLibtvPipelineImageCell(
+  node: Pick<CanvasFlowNode, "type" | "data" | "parentId"> | undefined,
+): boolean {
+  return isPro2PipelineFrameCell(node);
 }
 
 /** 组内三视图格：走角色列 batch（任务 nodeId=列 · scope.rowKey），非独立 freestanding runner */

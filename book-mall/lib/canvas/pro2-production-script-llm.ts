@@ -5,9 +5,11 @@ import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
   describePro2ProductionScriptParseFailure,
   extractPro2ProductionScriptPatch,
+  extractPro2ProductionScriptPatchRaw,
   pro2PatchStepMatchesSection,
 } from "./pro2-production-script-structured";
-import { STORY_PRO2_JSON_FIELD_RULES } from "./data/pro2-production-pack-standard";
+import { findPro2UnwantedEnglishFields } from "./pro2-chinese-prompt-normalize";
+import { STORY_PRO2_JSON_FIELD_RULES, STORY_PRO2_PACK_LANGUAGE_RULES } from "./data/pro2-production-pack-standard";
 import type { Pro2ProductionScriptPatch } from "./data/pro2-production-script-schema";
 
 const PRO2_HUB_SECTIONS = new Set([
@@ -15,6 +17,7 @@ const PRO2_HUB_SECTIONS = new Set([
   "character",
   "scene",
   "storyboard",
+  "shot_prompts",
 ]);
 
 export function isPro2StructuredLlmScope(
@@ -46,8 +49,8 @@ export function validatePro2ProductionScriptLlmOutput(
   if (!trimmed) {
     return { ok: false, error: "模型返回空内容" };
   }
-  const patch = extractPro2ProductionScriptPatch(trimmed);
-  if (!patch) {
+  const patchRaw = extractPro2ProductionScriptPatchRaw(trimmed);
+  if (!patchRaw) {
     const detail =
       describePro2ProductionScriptParseFailure(trimmed) ??
       "无法解析 pro2-production-script JSON";
@@ -61,14 +64,25 @@ export function validatePro2ProductionScriptLlmOutput(
     section &&
     PRO2_HUB_SECTIONS.has(section) &&
     !pro2PatchStepMatchesSection(
-      patch.step,
-      section as "outline" | "character" | "scene" | "storyboard",
+      patchRaw.step,
+      section as "outline" | "character" | "scene" | "storyboard" | "shot_prompts",
     )
   ) {
     return {
       ok: false,
-      error: `JSON step=${patch.step} 与当前段 llmSection=${section} 不匹配`,
+      error: `JSON step=${patchRaw.step} 与当前段 llmSection=${section} 不匹配`,
     };
+  }
+  const englishIssues = findPro2UnwantedEnglishFields(patchRaw);
+  if (englishIssues.length) {
+    return {
+      ok: false,
+      error: englishIssues.slice(0, 4).join("；"),
+    };
+  }
+  const patch = extractPro2ProductionScriptPatch(trimmed);
+  if (!patch) {
+    return { ok: false, error: "无法解析 pro2-production-script JSON" };
   }
   return { ok: true, patch };
 }
@@ -82,11 +96,14 @@ export function buildPro2StructuredRetryUserMessage(error: string): string {
     "",
     STORY_PRO2_JSON_FIELD_RULES,
     "",
+    STORY_PRO2_PACK_LANGUAGE_RULES,
+    "",
     "要求：",
     "1. 输出合法 JSON（schemaVersion: 1 · tier: pro · step · patch）",
     "2. step 须与当前任务段一致；full_pack 须含 visualStyle/coreConflict/scenes/characters/shots/handoff",
     "3. 字段名须与契约完全一致，禁止 identity/aiImagePrompt/environment/keywords 等 alias",
-    "4. 可包在 ```pro2-production-script 围栏内；禁止尾逗号与 // 注释",
+    "4. scenes[].negativePrompt 须中文顿号列表，禁止 [Negative: …] 英文",
+    "5. 可包在 ```pro2-production-script 围栏内；禁止尾逗号与 // 注释",
   ].join("\n");
 }
 

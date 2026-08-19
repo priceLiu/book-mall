@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { resolveHubStoryboardMd, outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubStoryboardMd, resolveHubOutlineMd } from "@/lib/canvas/story-hub-runtime";
 import { extractThemeFromStorySystemPrompt } from "@/lib/canvas/story-prompts";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -81,7 +81,10 @@ export function Pro2ScriptTableEditorHost() {
       node.data as StoryProScriptHubNodeData,
       node.id,
     );
-    if (patch) updateNodeData(node.id, patch);
+    if (patch) {
+      updateNodeData(node.id, patch);
+      openSnapshotRef.current = null;
+    }
     // 打开全屏编辑时尝试把 raw JSON 落库为 productionScript
     // eslint-disable-next-line react-hooks/exhaustive-deps -- editorNodeId only
   }, [editorNodeId]);
@@ -95,7 +98,7 @@ export function Pro2ScriptTableEditorHost() {
     [editorNodeId, isMetaAnchor, nodes, edges],
   );
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
-  const outlineMd = outlineDisplayMd(d.outlineMd ?? "");
+  const outlineMd = resolveHubOutlineMd(d);
   const hasContent =
     pro2HubHasScriptTable(d) ||
     pro2HubHasCharacterTable(d) ||

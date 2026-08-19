@@ -2,7 +2,12 @@ import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
 import type { StoryTextRevision } from "./story-revision";
 import type { StoryRefImage } from "./story-ref-image";
 
-export type StoryLlmSection = "outline" | "character" | "scene" | "storyboard";
+export type StoryLlmSection =
+  | "outline"
+  | "character"
+  | "scene"
+  | "storyboard"
+  | "shot_prompts";
 
 export type StoryRunContext = {
   llmSection?: StoryLlmSection;

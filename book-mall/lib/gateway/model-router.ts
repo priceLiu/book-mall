@@ -622,6 +622,42 @@ export function resolveDeepseekChatModelKey(modelKey: string): string {
   return raw;
 }
 
+/** DeepSeek V4 · thinking_mode → thinking 对象；校验 reasoning_effort */
+export function resolveDeepseekChatCompletionsBody(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...body };
+  const model = typeof out.model === "string" ? out.model : "";
+  if (model) {
+    out.model = resolveDeepseekChatModelKey(model);
+  }
+
+  const thinkingMode = out.thinking_mode;
+  if (typeof thinkingMode === "string") {
+    out.thinking = {
+      type: thinkingMode.trim().toLowerCase() === "disabled" ? "disabled" : "enabled",
+    };
+  }
+  delete out.thinking_mode;
+
+  const effort = out.reasoning_effort;
+  const thinkingType =
+    out.thinking &&
+    typeof out.thinking === "object" &&
+    !Array.isArray(out.thinking) &&
+    (out.thinking as { type?: string }).type;
+  if (thinkingType === "enabled") {
+    if (effort !== "low" && effort !== "high" && effort !== "max") {
+      out.reasoning_effort = "low";
+    }
+  } else if (effort === "low" || effort === "high" || effort === "max") {
+    // 非思考模式不传 reasoning_effort，避免上游忽略或告警
+    delete out.reasoning_effort;
+  }
+
+  return out;
+}
+
 export {
   assertStoryModelCapabilities,
   getStoryModelCapabilities,

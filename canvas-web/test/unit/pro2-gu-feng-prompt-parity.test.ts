@@ -42,7 +42,8 @@ describe("gu-feng prompt parity vs DeepSeek console", () => {
     expect(doc).toContain("3 分钟");
     expect(doc).toContain("黑色发丝，高髻云鬓");
     expect(doc).toContain("深墨蓝暗青色广袖长袍");
-    expect(doc).toContain("[Negative:");
+    expect(doc).toContain("固定反向提示词");
+    expect(doc).not.toContain("[Negative:");
   });
 
   it("storyboard system prompt includes category doc + shot budget for 3min outline", () => {
@@ -52,7 +53,7 @@ describe("gu-feng prompt parity vs DeepSeek console", () => {
     expect(merged).toContain("镜数与时长预算");
     expect(merged).toContain("不得少于 **12** 镜");
     expect(merged).toContain("高密度糖点");
-    expect(merged).toContain("Seedance");
+    expect(merged).toContain("Pass1 禁止");
     expect(merged).toContain("禁止只输出 1–2 镜样例即停");
   });
 
@@ -85,11 +86,11 @@ describe("docs/result.md gold standard structure", () => {
 
   it("result.md storyboard has 14 rows when parsed as GFM", () => {
     // 镜号 1–14 行 · 与 docs/result.md 一致
-    const header = `| 镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI生图提示词(英文) | AI视频提示词(英文) | 口型/配音备注 |
-|------|------|------|----------|------|----------|---------------------|---------------------|---------------|`;
+    const header = `| 镜号 | 景别 | 光影 | 运镜 | 画面描述 | 道具 | 对白 | 时长(秒) | 音效 | 口型/配音备注 |
+|------|------|------|------|----------|------|------|----------|------|---------------|`;
     const rows = Array.from({ length: 14 }, (_, i) => {
       const n = i + 1;
-      return `| ${n} | 中景 | 固定 | 【起始】…【结束】… | — | 10 | img | vid | — |`;
+      return `| ${n} | 中景 | 暖光 | 固定机位平拍，人物入画 | 【起始】…【结束】… | — | — | 10 | 环境音 | — |`;
     });
     const md = `## 分镜脚本\n\n${header}\n${rows.join("\n")}`;
     const parsed = parseStoryboardRows(md);

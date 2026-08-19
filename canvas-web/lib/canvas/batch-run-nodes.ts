@@ -6,7 +6,14 @@ import {
   busEnqueueStoryRun,
   busEnqueueStoryRunsSequential,
 } from "./canvas-run-bus";
-import { optimisticPro2ThreeViewBatchStart, clearStalePro2ThreeViewInflight } from "./pro2-spawn-character-image-group";
+import {
+  optimisticPro2ThreeViewBatchStart,
+  clearStalePro2ThreeViewInflight,
+} from "./pro2-spawn-character-image-group";
+import {
+  clearPro2FrameInflightOutsideSyncGroup,
+  optimisticPro2FrameBatchStart,
+} from "./pro2-spawn-frame-image-group";
 import { clearPro2ThreeViewInflightOutsideSyncGroup } from "./pro2-group-row-resolve";
 import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import { useCanvasStore } from "./store";
@@ -133,6 +140,55 @@ export function batchRunPro2ThreeViewRows(
     );
   }
   batchRunStoryRows(columnNodeId, keys, "threeView", options);
+}
+
+/** Pro2 分镜图 · 全量 optimistic + 并发入队 */
+export function batchRunPro2FrameRows(
+  columnNodeId: string,
+  rowKeys: string[],
+  options?: { forceFresh?: boolean },
+) {
+  const keys = rowKeys.filter(Boolean);
+  if (!keys.length) return;
+  markCanvasNodeGenerationStarted(columnNodeId);
+  const { updateNodeData } = useCanvasStore.getState();
+  const nodesAfterClear = useCanvasStore.getState().nodes;
+  if (options?.forceFresh) {
+    const col = nodesAfterClear.find((n) => n.id === columnNodeId);
+    const rows =
+      (col?.data as { rows?: import("./story-pro-workspace-types").StoryProFrameRow[] })
+        .rows ?? [];
+    const allowed = new Set(keys);
+    const cleared = rows.map((r) =>
+      allowed.has(r.key) ? { ...r, runtime: undefined } : r,
+    );
+    updateNodeData(columnNodeId, { rows: cleared });
+    const nodesAfter = nodesAfterClear.map((n) =>
+      n.id === columnNodeId
+        ? { ...n, data: { ...n.data, rows: cleared } }
+        : n,
+    );
+    clearPro2FrameInflightOutsideSyncGroup(
+      columnNodeId,
+      keys,
+      nodesAfter,
+      updateNodeData,
+    );
+    optimisticPro2FrameBatchStart(
+      columnNodeId,
+      keys,
+      nodesAfter,
+      updateNodeData,
+    );
+  } else {
+    optimisticPro2FrameBatchStart(
+      columnNodeId,
+      keys,
+      nodesAfterClear,
+      updateNodeData,
+    );
+  }
+  batchRunStoryRows(columnNodeId, keys, "frameImage", options);
 }
 
 /** 列节点 · 按行顺序跑 */

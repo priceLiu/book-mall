@@ -116,6 +116,7 @@ export function ensurePro2VideoBoardGroup(
     const label = `镜 ${row.frameIndex}`;
     const prompt =
       row.videoPrompt?.trim() ||
+      frameRow?.videoPrompt?.trim() ||
       (frameRow ? buildFrameRowScriptPrompt(frameRow) : "");
     const existing = childVideos.find(
       (n) => (n.data as { pro2RowKey?: string }).pro2RowKey === row.key,

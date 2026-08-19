@@ -98,15 +98,21 @@ export function LibtvDockGatewayParamsPicker({
   );
 }
 
-/** LLM 默认参数摘要（reasoning_effort · max_tokens） */
+/** LLM 默认参数摘要（thinking · reasoning_effort · max_tokens） */
 export function libtvLlmParamsSummaryLabel(
   params: Record<string, unknown>,
 ): string {
   const parts: string[] = [];
+  const thinking = String(params.thinking_mode ?? "").trim();
+  if (thinking === "enabled") parts.push("深度思考");
+  else if (thinking === "disabled") parts.push("快答");
   const effort = String(params.reasoning_effort ?? "").trim();
-  if (effort === "low") parts.push("低推理");
-  else if (effort === "medium") parts.push("中推理");
-  else if (effort === "high") parts.push("高推理");
+  if (thinking === "enabled") {
+    if (effort === "low") parts.push("低推理");
+    else if (effort === "medium") parts.push("中推理");
+    else if (effort === "high") parts.push("高推理");
+    else if (effort === "max") parts.push("最深推理");
+  }
   const maxTokens = Number(params.max_tokens);
   if (Number.isFinite(maxTokens) && maxTokens > 0) {
     parts.push(maxTokens >= 1000 ? `${Math.round(maxTokens / 1000)}k` : String(maxTokens));

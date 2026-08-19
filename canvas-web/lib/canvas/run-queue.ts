@@ -150,14 +150,20 @@ import {
 } from "./use-node-task-history";
 import { restoreServerInflightNodeRuntimes } from "./restore-server-inflight-node-runtimes";
 import {
+  characterRowsNeedingThreeViewNodeSync,
   findPro2CharacterThreeViewNodeForRow,
   findPro2FrameImageNodeForRow,
+  frameRowsNeedingImageNodeSync,
   maybeClearHubPendingSceneSyncGroup,
+  reconcilePro2FrameNodesWithColumnRows,
   reconcilePro2ThreeViewNodesWithColumnRows,
 } from "./pro2-group-row-resolve";
 import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
-import { characterRowsNeedingThreeViewNodeSync } from "./pro2-group-row-resolve";
-import type { StoryProCharacterRow } from "./story-pro-workspace-types";
+import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
+import type {
+  StoryProCharacterRow,
+  StoryProFrameRow,
+} from "./story-pro-workspace-types";
 import {
   CANVAS_POLL_IDLE_RECHECK_MS,
   CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS,
@@ -191,6 +197,27 @@ function syncPro2CharacterGroupImagesFromColumnRuntimes(
       );
     }
     reconcilePro2ThreeViewNodesWithColumnRows(nodes, node.id, updateNodeData);
+  }
+}
+
+function syncPro2FrameGroupImagesFromColumnRuntimes(
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  for (const node of nodes) {
+    if (!isAnyStoryFrameColumnType(node.type ?? "")) continue;
+    const rows = (node.data as { rows?: StoryProFrameRow[] }).rows ?? [];
+    if (!rows.length) continue;
+    const rowsToSync = frameRowsNeedingImageNodeSync(rows);
+    if (rowsToSync.length) {
+      syncPro2FrameImagesFromRows(
+        nodes,
+        node.id,
+        rowsToSync,
+        updateNodeData,
+      );
+    }
+    reconcilePro2FrameNodesWithColumnRows(nodes, node.id, updateNodeData);
   }
 }
 
@@ -2929,6 +2956,10 @@ export function useCanvasRunner(
         );
         applyStoryColumnRowTasks(tasks, nodesNow);
         syncPro2CharacterGroupImagesFromColumnRuntimes(
+          useCanvasStore.getState().nodes,
+          updateNodeData,
+        );
+        syncPro2FrameGroupImagesFromColumnRuntimes(
           useCanvasStore.getState().nodes,
           updateNodeData,
         );

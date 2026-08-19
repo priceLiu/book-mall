@@ -26,7 +26,7 @@ describe("pro2 gu-feng DeepSeek full pack", () => {
     expect(PRO2_GU_FENG_DEEPSEEK_SYSTEM_PROMPT).toContain(
       "精通古风甜宠与短视频节奏",
     );
-    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain("创作死锁铁律");
+    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain("道具六视图生成");
     expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain(
       "场景名 | 环境/时间/气氛 | 生图关键词(英文) | 固定反向提示词",
     );
@@ -54,7 +54,7 @@ describe("pro2 gu-feng DeepSeek full pack", () => {
       "# 任务：故事剧本 · 大纲段",
     );
     expect(resolved).not.toContain("# 任务：故事剧本 · 大纲段");
-    expect(resolved).toContain("创作死锁铁律");
+    expect(resolved).toContain("道具六视图生成");
     expect(isPro2GuFengFullPackRun("gu-feng-tian-chong", "3分钟")).toBe(true);
     expect(isPro2GuFengFullPackRun("gu-feng-tian-chong", "")).toBe(false);
   });

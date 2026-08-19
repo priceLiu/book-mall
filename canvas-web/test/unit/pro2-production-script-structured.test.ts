@@ -5,6 +5,7 @@ import {
   describePro2ProductionScriptParseFailure,
   extractPro2ProductionScriptPatch,
   isPro2ProductionScriptFenceComplete,
+  isUnparsedPro2ProductionJsonBlob,
   pro2PatchStepMatchesSection,
   stripPro2ProductionScriptFence,
 } from "@/lib/canvas/pro2-production-script-structured";
@@ -111,5 +112,47 @@ describe("pro2-production-script-structured", () => {
     expect(patch?.patch.characters?.length).toBe(2);
     expect(patch?.patch.shots?.length).toBe(2);
     expect(patch?.patch.handoff?.length).toBe(6);
+  });
+
+  it("extracts patch from ## 分镜脚本 header + pretty-printed JSON", () => {
+    const raw = readFileSync(
+      join(__dirname, "../fixtures/pro2-tang-dynasty-pack.json"),
+      "utf8",
+    );
+    const text = `## 分镜脚本\n\n${JSON.stringify(JSON.parse(raw), null, 2)}`;
+    const patch = extractPro2ProductionScriptPatch(text);
+    expect(patch?.step).toBe("full_pack");
+    expect(patch?.patch.meta?.title).toBe("我在盛唐写天下");
+    expect(patch?.patch.shots?.length).toBe(2);
+  });
+
+  it("does not flag rendered markdown outline as JSON blob", () => {
+    const rendered = [
+      "## 视觉风格总纲",
+      "",
+      "| 维度 | 内容 |",
+      "|------|------|",
+      "| 故事背景 | 现代 × 盛唐 |",
+      "",
+      "```pro2-production-script",
+      '{"schemaVersion":2,"tier":"pro","step":"full_pack","patch":{"visualStyle":{"worldBackground":"x"}}}',
+      "```",
+    ].join("\n");
+    expect(isUnparsedPro2ProductionJsonBlob(rendered)).toBe(false);
+  });
+
+  it("parses full_pack from human markdown + trailing JSON (大模型剧本返回)", () => {
+    const text = readFileSync(
+      join(__dirname, "../../../docs/大模型剧本返回.md "),
+      "utf8",
+    );
+    expect(isUnparsedPro2ProductionJsonBlob(text)).toBe(false);
+    const patch = extractPro2ProductionScriptPatch(text);
+    expect(patch?.step).toBe("full_pack");
+    expect(patch?.patch.meta?.title).toBe("我在盛唐写天下");
+    expect(patch?.patch.characters?.length).toBe(4);
+    expect(patch?.patch.scenes?.length).toBe(4);
+    expect(patch?.patch.shots?.length).toBe(16);
+    expect(patch?.patch.handoff?.length).toBe(10);
   });
 });

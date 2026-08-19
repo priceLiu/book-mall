@@ -36,7 +36,10 @@ import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import {
   syncPro2CharacterImagesFromRows,
 } from "./pro2-spawn-character-image-group";
-import { reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-group-row-resolve";
+import {
+  reconcilePro2FrameNodesWithColumnRows,
+  reconcilePro2ThreeViewNodesWithColumnRows,
+} from "./pro2-group-row-resolve";
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
 import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
@@ -761,16 +764,31 @@ export function storyApplyTaskResult(
       nextRows as never,
       updateNodeData,
     );
+    if (runtime.status === "done" || runtime.status === "error") {
+      const nodesAfter = allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
+      );
+      reconcilePro2FrameNodesWithColumnRows(
+        nodesAfter,
+        node.id,
+        updateNodeData,
+      );
+    }
     const pendingSyncGroupId = (
       node.data as { pro2PendingSyncGroupId?: string }
     ).pro2PendingSyncGroupId?.trim();
     if (pendingSyncGroupId) {
       const anyInflight = (nextRows as StoryProFrameRow[]).some(
         (r) =>
-          r.runtime?.status === "pending" || r.runtime?.status === "running",
+          r.runtime?.status === "pending" ||
+          r.runtime?.status === "running" ||
+          r.runtime?.status === "queued",
       );
       if (!anyInflight) {
-        updateNodeData(node.id, { pro2PendingSyncGroupId: undefined });
+        updateNodeData(node.id, {
+          pro2PendingSyncGroupId: undefined,
+          pro2VisualGroupId: pendingSyncGroupId,
+        });
       }
     }
     const starterFrame = findStarterByHubId(

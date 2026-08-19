@@ -36,7 +36,7 @@ import { Pro2DockUpstreamHeader } from "./pro2-dock-upstream-header";
 
 function framePromptPlaceholder(role?: string): string {
   if (role === "frame") {
-    return "编辑本镜画面描述；输入 @ 引用角色三视图或风格参考…";
+    return "编辑本镜 AI 生图提示词；输入 @ 引用角色三视图或风格参考…";
   }
   return "描述你想生成的画面，或输入 @ 引用已链接的图片…";
 }

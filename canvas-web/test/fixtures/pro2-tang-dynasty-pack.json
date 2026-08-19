@@ -43,14 +43,14 @@
         "name": "现代深夜办公室",
         "environmentTimeMood": "深夜 · 压抑 · 电脑蓝光与惨白顶光",
         "imagePrompt": "深夜现代办公室，电脑屏幕蓝光，冷蓝灰调，广角空镜",
-        "negativePrompt": "[Negative: blurry, anime]"
+        "negativePrompt": "动画风、游戏CG、模糊、水印"
       },
       {
         "id": "scene-palace",
         "name": "盛唐金銮殿",
         "environmentTimeMood": "正午 · 庄严压迫 · 金色阳光斜入",
         "imagePrompt": "盛唐大明宫金銮殿，金色体积光，蟠龙巨柱，2K",
-        "negativePrompt": "[Negative: blurry, anime]"
+        "negativePrompt": "动画风、游戏CG、模糊、水印"
       }
     ],
     "shots": [

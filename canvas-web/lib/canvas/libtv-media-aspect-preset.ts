@@ -329,8 +329,7 @@ export function resolveLibtvMediaAspectPresetProfile(
     ) {
       return "sbv1-video";
     }
-    if (role === "scene") return "three-view";
-    if (role === "frame") return "pro2-frame-cell";
+    if (role === "scene" || role === "frame") return "three-view";
     return "pro2-image";
   }
   return null;

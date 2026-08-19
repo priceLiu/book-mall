@@ -259,8 +259,16 @@ export function Pro2ScriptHubEditorModal({
       (scriptForPreview.shots?.length ?? 0) > 0,
   );
   const outlineShowsJsonBlob =
-    isUnparsedPro2ProductionJsonBlob(draftOutline) ||
-    isUnparsedPro2ProductionJsonBlob(hubData?.outlineMd ?? "");
+    !hasStructuredPreview &&
+    (isUnparsedPro2ProductionJsonBlob(hubData?.outlineMd ?? "") ||
+      isUnparsedPro2ProductionJsonBlob(draftOutline));
+  const storyboardShowsJsonBlob =
+    isUnparsedPro2ProductionJsonBlob(tableDraft) ||
+    isUnparsedPro2ProductionJsonBlob(hubData?.storyboardMd ?? "");
+  const scriptTabUsesStructuredPreview =
+    tab === "script" &&
+    (scriptForPreview.shots?.length ?? 0) > 0 &&
+    (!canTable || storyboardShowsJsonBlob);
 
   return createPortal(
     <div
@@ -324,26 +332,18 @@ export function Pro2ScriptHubEditorModal({
               <StoryHubReadonlyPane md={draftOutline} />
             )}
           </div>
-        ) : hasStructuredPreview || outlineShowsJsonBlob ? (
+        ) : outlineShowsJsonBlob ? (
           <div
             className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
           >
-            {hasStructuredPreview ? (
-              <Pro2ProductionScriptHtmlPreview
-                script={scriptForPreview}
-                tab="outline"
-                variant="document"
-              />
-            ) : (
-              <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-white p-6 text-center">
-                <p className="text-[13px] font-medium text-neutral-800">
-                  JSON 未能解析为制作包
-                </p>
-                <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
-                  请切换到「结构化」Tab 检查，或重新生成。若 Gateway 日志有返回体，请联系支持附带完整 output。
-                </p>
-              </div>
-            )}
+            <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-white p-6 text-center">
+              <p className="text-[13px] font-medium text-neutral-800">
+                JSON 未能解析为制作包
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                请切换到「结构化」Tab 检查，或重新生成。若 Gateway 日志有返回体，请联系支持附带完整 output。
+              </p>
+            </div>
           </div>
         ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
@@ -431,6 +431,12 @@ export function Pro2ScriptHubEditorModal({
             />
           ) : readOnly ? (
             <StoryHubReadonlyPane md={tableDraft} />
+          ) : scriptTabUsesStructuredPreview ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={scriptForPreview}
+              tab="script"
+              variant="document"
+            />
           ) : canTable ? (
             tab === "character" ? (
               <StoryCharacterTableEditor
@@ -441,6 +447,7 @@ export function Pro2ScriptHubEditorModal({
               <StoryStoryboardTableEditor
                 value={tableDraft}
                 onChange={setTableDraft}
+                variant="v2"
               />
             ) : tab === "scene" ? (
               <StorySceneDictionaryTableEditor

@@ -294,9 +294,6 @@ export function formatThreeViewVisualStyleSection(
     "- 环境光适配：由于背景纯白，所有材质（丝绸、金属、皮肤）应反射柔和的白色环境光，呈现摄影棚质感，高光自然不溢出。",
   );
 
-  const en = pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack);
-  if (en) lines.push(`[Global visual style] ${en}`);
-
   return lines.join("\n");
 }
 
@@ -316,11 +313,8 @@ export function formatVisualStylePackDockSection(
 ): string {
   if (!pack) return "";
   const zh = buildVisualStyleAnchorZh(pack);
-  const en = pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack);
-  if (!zh && !en) return "";
-  const lines = ["【全片视觉 · 生图统一风格】"];
-  if (zh) lines.push(zh);
-  if (en) lines.push(`[Global visual style] ${en}`);
+  if (!zh) return "";
+  const lines = ["【全片视觉 · 生图统一风格】", zh];
   return lines.join("\n");
 }
 
@@ -358,12 +352,7 @@ export function appendVisualStylePackToPrompt(
   const base = prompt.trim();
   if (!pack) return base;
   const zh = buildVisualStyleAnchorZh(pack);
-  const en = pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack);
-  const lines = [
-    base,
-    zh ? `\n【全片视觉】${zh}` : "",
-    en ? `\n[Global visual style] ${en}` : "",
-  ].filter(Boolean);
+  const lines = [base, zh ? `\n【全片视觉】${zh}` : ""].filter(Boolean);
   return lines.join("");
 }
 

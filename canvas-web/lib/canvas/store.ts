@@ -1571,7 +1571,23 @@ export const useCanvasStore = create<CanvasState>()(
           s.libtvFloatingDockNodeId === id
             ? { libtvFloatingDockNodeId: null, libtvFloatingDockNodeType: null }
             : {};
-        set((state) => withGraphRevision(state, { nodes, edges, ...clearDockPin }));
+        const clearConnectState =
+          s.connectingFromNodeId === id ||
+          s.pendingSideConnect?.fromNodeId === id
+            ? {
+                connectingFromNodeId: null,
+                connectingFromHandleId: null,
+                pendingSideConnect: null,
+              }
+            : {};
+        set((state) =>
+          withGraphRevision(state, {
+            nodes,
+            edges,
+            ...clearDockPin,
+            ...clearConnectState,
+          }),
+        );
       },
 
       duplicateNode: (id, options) => {

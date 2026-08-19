@@ -98,10 +98,9 @@ describe("pro2-production-script flow", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.frameIndex).toBe(1);
     expect(rows[0]?.shotSize).toBe("全景");
-    expect(rows[0]?.cameraMove).toBe("缓慢摇移");
+    expect(rows[0]?.cameraMove).toBe("缓慢摇移推进，前景旗幡遮挡增加层次");
     expect(rows[0]?.description).toContain("朱雀大街");
     expect(rows[0]?.duration).toBe("10");
-    expect(rows[0]?.aiVideoPrompt).toContain("scene_A");
     expect(rows[0]?.scene).toBe("长安主街·日");
   });
 

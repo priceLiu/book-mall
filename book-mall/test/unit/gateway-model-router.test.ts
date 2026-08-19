@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { routeGatewayModel, isBailianR2vGatewayModel } from "@/lib/gateway/model-router";
+import { routeGatewayModel, isBailianR2vGatewayModel, resolveDeepseekChatCompletionsBody } from "@/lib/gateway/model-router";
 
 describe("routeGatewayModel · 百炼 R2V", () => {
   it("happyhorse-1.0-r2v 走 BAILIAN 而非 DASHSCOPE 前缀", () => {
@@ -84,5 +84,32 @@ describe("routeGatewayModel · Kimi K3", () => {
       providerKind: "BAILIAN",
       requestKind: "CHAT",
     });
+  });
+});
+
+describe("resolveDeepseekChatCompletionsBody", () => {
+  it("maps thinking_mode to thinking.type and resolves legacy model id", () => {
+    const body = resolveDeepseekChatCompletionsBody({
+      model: "deepseek-chat",
+      thinking_mode: "enabled",
+      reasoning_effort: "high",
+      temperature: 0.7,
+      max_tokens: 24000,
+    });
+    expect(body.model).toBe("deepseek-v4-flash");
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.thinking_mode).toBeUndefined();
+    expect(body.reasoning_effort).toBe("high");
+  });
+
+  it("drops reasoning_effort when thinking disabled", () => {
+    const body = resolveDeepseekChatCompletionsBody({
+      model: "deepseek-v4-flash",
+      thinking_mode: "disabled",
+      reasoning_effort: "low",
+      max_tokens: 8000,
+    });
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.reasoning_effort).toBeUndefined();
   });
 });

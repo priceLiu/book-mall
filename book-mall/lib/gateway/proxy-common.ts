@@ -15,6 +15,7 @@ import {
   isKieCodexChatModel,
   resolveBailianChatModelKey,
   resolveDeepseekChatModelKey,
+  resolveDeepseekChatCompletionsBody,
   resolveKieApiRoot,
   resolveKieGeminiChatPath,
   resolveMoonshotChatCompletionsBody,
@@ -510,7 +511,7 @@ function resolveChatCompletionsBody(
     return { ...body, model: resolveVolcengineModelKey(model) };
   }
   if (providerKind === "DEEPSEEK") {
-    return { ...body, model: resolveDeepseekChatModelKey(model) };
+    return resolveDeepseekChatCompletionsBody(body);
   }
   if (providerKind === "MOONSHOT") {
     return resolveMoonshotChatCompletionsBody(body);

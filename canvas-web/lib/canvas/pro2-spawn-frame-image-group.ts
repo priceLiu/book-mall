@@ -12,18 +12,59 @@ import {
 import { ensurePro2HubToMediaGroupChildEdges } from "./pro2-hub-media-group-edge";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { isPro2FrameBoardGroup } from "./pro2-resolve-frame-board-group";
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 import {
+  clearPro2FrameInflightOutsideSyncGroup,
   findPro2FrameImageNodeForRow,
-  resolveFrameSyncGroupId,
 } from "./pro2-group-row-resolve";
 import { filterPro2RowsForSpawn } from "./pro2-media-row-spawn";
+import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
+import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 
 export {
+  clearPro2FrameInflightOutsideSyncGroup,
   findPro2FrameImageNodeForRow,
+  reconcilePro2FrameNodesWithColumnRows,
   resolveFrameSyncGroupId,
 } from "./pro2-group-row-resolve";
+
+const FRAME_BATCH_PENDING: CanvasNodeRuntime = {
+  status: "pending",
+};
+
+/** 批量分镜图 · 入队前立刻标记全部镜号行 + 组内节点为生成中 */
+export function optimisticPro2FrameBatchStart(
+  frameColumnId: string,
+  rowKeys: string[],
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const allowed = new Set(rowKeys.filter(Boolean));
+  if (!allowed.size) return;
+  const col = nodes.find((n) => n.id === frameColumnId);
+  if (!col) return;
+  const rows = (col.data as { rows?: StoryProFrameRow[] }).rows ?? [];
+  const nextRows = rows.map((r) =>
+    allowed.has(r.key) ? { ...r, runtime: FRAME_BATCH_PENDING } : r,
+  );
+  updateNodeData(frameColumnId, { rows: nextRows });
+  const syncedNodes = nodes.map((n) =>
+    n.id === frameColumnId
+      ? { ...n, data: { ...n.data, rows: nextRows } }
+      : n,
+  );
+  for (const key of allowed) {
+    const img = findPro2FrameImageNodeForRow(syncedNodes, frameColumnId, key);
+    if (img) markCanvasNodeGenerationStarted(img.id);
+  }
+  syncPro2FrameImagesFromRows(
+    syncedNodes,
+    frameColumnId,
+    nextRows.filter((r) => allowed.has(r.key)),
+    updateNodeData,
+  );
+}
 
 function frameRowPreview(row: StoryProFrameRow): {
   ossUrl?: string;
@@ -290,10 +331,16 @@ export function syncPro2FrameImagesFromRows(
     const img = findPro2FrameImageNodeForRow(nodes, frameColumnId, row.key);
     if (!img) continue;
     const preview = frameRowPreview(row);
-    updateNodeData(img.id, {
+    const patch = {
       label: `镜 ${row.frameIndex}`,
       dockInput: row.prompt ?? "",
       ...preview,
-    });
+    };
+    if (
+      isSameSbv1MediaDataPatch(img.data as Record<string, unknown>, patch)
+    ) {
+      continue;
+    }
+    updateNodeData(img.id, patch);
   }
 }

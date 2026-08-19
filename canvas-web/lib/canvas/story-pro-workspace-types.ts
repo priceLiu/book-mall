@@ -137,6 +137,9 @@ export type StoryProScriptHubNodeData = {
   promptCharacter: string;
   promptScene?: string;
   promptStoryboard: string;
+  /** Pass 2 · 按镜 user prompt 队列（rowKey → prompt） */
+  shotPromptPolishQueue?: Record<string, string>;
+  shotPromptPolishSystemPrompt?: string;
   outlineHistory?: StoryTextRevision[];
   characterHistory?: StoryTextRevision[];
   sceneHistory?: StoryTextRevision[];
@@ -294,7 +297,12 @@ export type StoryProFrameRow = {
   description: string;
   dialogue: string;
   videoPrompt: string;
-  /** 分镜表 · AI生图提示词(英文) */
+  /** v2 Pass2 · 分镜图提示词（优先于 aiImagePrompt） */
+  frameImagePrompt?: string;
+  lighting?: string;
+  sfxNote?: string;
+  audioNote?: string;
+  /** 分镜表 · AI生图提示词(英文) · v1 legacy */
   aiImagePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];

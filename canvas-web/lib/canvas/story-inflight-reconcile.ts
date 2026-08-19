@@ -27,8 +27,11 @@ import { storyApplyTaskResult } from "./story-run-apply";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
 import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
-import { reconcilePro2ThreeViewNodesWithColumnRows } from "./pro2-group-row-resolve";
-import { useCanvasStore } from "./store";
+import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
+import {
+  reconcilePro2FrameNodesWithColumnRows,
+  reconcilePro2ThreeViewNodesWithColumnRows,
+} from "./pro2-group-row-resolve";
 import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryLlmSection,
@@ -36,6 +39,7 @@ import type {
 } from "./story-workspace-types";
 import {
   isLibtvFreestandingImageNode,
+  isPro2PipelineFrameCell,
   isPro2PipelineThreeViewCell,
 } from "./libtv-image-node-run";
 import {
@@ -77,7 +81,7 @@ function rowHasMediaResult(runtime?: CanvasNodeRuntime): boolean {
   return Boolean(runtime?.ossUrl?.trim() || runtime?.ephemeralUrl?.trim());
 }
 
-/** 角色列行级任务刚入队 · task 列表尚未返回时勿清 inflight / 勿判失败 */
+/** 列行级任务刚入队 · task 列表尚未返回时勿清 inflight / 勿判失败 */
 function shouldDeferStoryRowInflightReconcile(
   nodeId: string,
   runtime?: CanvasNodeRuntime,
@@ -391,7 +395,10 @@ export function reconcileStaleInflightRuntimes(
       let changed = false;
       const nextRows = rows.map((row) => {
         if (!isInflightStatus(row.runtime?.status)) return row;
-        const scope = { rowKey: row.key, mediaKind: "frameImage" };
+        const scope = { rowKey: row.key, mediaKind: "frameImage" as const };
+        if (shouldDeferStoryRowInflightReconcile(node.id, row.runtime)) {
+          return row;
+        }
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickStoryRowApplyTask(
@@ -408,7 +415,29 @@ export function reconcileStaleInflightRuntimes(
               updateNodeData,
               nodes,
             );
+          } else if (!hasServerInflightForScope(tasks, node.id, scope)) {
+            if (shouldDeferStoryRowInflightReconcile(node.id, row.runtime)) {
+              return row;
+            }
+            changed = true;
+            return {
+              ...row,
+              runtime: clearInflightRuntime(row.runtime),
+            };
           }
+          return row;
+        }
+        if (
+          rowHasMediaResult(row.runtime) &&
+          !hasServerInflightForScope(tasks, node.id, scope)
+        ) {
+          changed = true;
+          return {
+            ...row,
+            runtime: clearInflightRuntime(row.runtime),
+          };
+        }
+        if (shouldDeferStoryRowInflightReconcile(node.id, row.runtime)) {
           return row;
         }
         changed = true;
@@ -417,7 +446,25 @@ export function reconcileStaleInflightRuntimes(
           runtime: clearInflightRuntime(row.runtime),
         };
       });
-      if (changed) updateNodeData(node.id, { rows: nextRows });
+      if (changed) {
+        updateNodeData(node.id, { rows: nextRows });
+        const nodesAfter = nodes.map((n) =>
+          n.id === node.id
+            ? { ...n, data: { ...n.data, rows: nextRows } }
+            : n,
+        );
+        syncPro2FrameImagesFromRows(
+          nodesAfter,
+          node.id,
+          nextRows as never,
+          updateNodeData,
+        );
+        reconcilePro2FrameNodesWithColumnRows(
+          nodesAfter,
+          node.id,
+          updateNodeData,
+        );
+      }
       continue;
     }
 
@@ -501,8 +548,10 @@ export function reconcileStaleInflightRuntimes(
 
     if (skipNodeIds?.has(node.id)) continue;
 
-    /** 组内三视图由角色列 reconcile；勿按独立 media 节点判 orphan 失败 */
-    if (isPro2PipelineThreeViewCell(node)) continue;
+    /** 组内三视图/分镜格由列 reconcile；勿按独立 media 节点判 orphan 失败 */
+    if (isPro2PipelineThreeViewCell(node) || isPro2PipelineFrameCell(node)) {
+      continue;
+    }
 
     const rt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
     if (!rt || !isInflightStatus(rt.status)) continue;
@@ -632,17 +681,6 @@ export function reconcileStaleInflightRuntimes(
         failMessage:
           "生成未完成（服务端无进行中的任务）。请重试；若仍失败请查看 Gateway 状态或联系管理员。",
       });
-    }
-  }
-
-  const freshNodes = useCanvasStore.getState().nodes;
-  for (const node of freshNodes) {
-    if (isAnyStoryCharacterColumnType(node.type ?? "")) {
-      reconcilePro2ThreeViewNodesWithColumnRows(
-        freshNodes,
-        node.id,
-        updateNodeData,
-      );
     }
   }
 }

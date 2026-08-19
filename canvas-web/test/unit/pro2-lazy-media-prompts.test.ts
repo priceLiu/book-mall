@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { applyPro2CharacterMediaPromptsForKeys, commitPro2ThreeViewRowPromptFromDock } from "@/lib/canvas/pro2-lazy-media-prompts";
-import type { StoryProCharacterRow } from "@/lib/canvas/story-pro-workspace-types";
+import {
+  applyPro2CharacterMediaPromptsForKeys,
+  applyPro2FrameMediaPromptsForIndices,
+  commitPro2ThreeViewRowPromptFromDock,
+} from "@/lib/canvas/pro2-lazy-media-prompts";
+import type {
+  StoryProCharacterRow,
+  StoryProFrameRow,
+} from "@/lib/canvas/story-pro-workspace-types";
 
 describe("pro2 lazy media prompts", () => {
   it("commitPro2ThreeViewRowPromptFromDock writes prompt to matching row", () => {
@@ -36,6 +43,20 @@ describe("pro2 lazy media prompts", () => {
     ]);
   });
 
+  it("applyPro2FrameMediaPromptsForIndices does not append script hub dock text by default", () => {
+    const rows: StoryProFrameRow[] = [
+      {
+        key: "f1",
+        frameIndex: 1,
+        shotSize: "近景",
+        aiImagePrompt: "现代深夜办公室近景，2K",
+      },
+    ];
+    const out = applyPro2FrameMediaPromptsForIndices(rows, [1]);
+    expect(out[0]?.prompt).toBe("景别：近景\n现代深夜办公室近景，2K");
+    expect(out[0]?.prompt).not.toContain("用户补充");
+  });
+
   it("applyPro2CharacterMediaPromptsForKeys only builds selected rows", () => {
     const rows: StoryProCharacterRow[] = [
       {
@@ -56,6 +77,6 @@ describe("pro2 lazy media prompts", () => {
     const out = applyPro2CharacterMediaPromptsForKeys(rows, ["b"]);
     expect(out[0]?.prompt?.trim() || "").toBe("");
     expect(out[1]?.prompt).toContain("乙");
-    expect(out[1]?.prompt).toContain("【三视图 · 系统约束】");
+    expect(out[1]?.prompt).toContain("【任务】");
   });
 });

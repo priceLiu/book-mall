@@ -1,6 +1,10 @@
 "use client";
 
-import type { Pro2ProductionScript } from "./data/pro2-production-script-schema";
+import {
+  PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
+  resolvePro2ShotFrameImagePrompt,
+  type Pro2ProductionScript,
+} from "./data/pro2-production-script-schema";
 import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
@@ -225,7 +229,8 @@ function buildProFrameRowsFromProductionScript(
   );
   return (script.shots ?? []).map((shot) => {
     const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
-    const aiImagePrompt = shot.imagePrompt?.trim() || undefined;
+    const frameImagePrompt =
+      resolvePro2ShotFrameImagePrompt(shot) || undefined;
     const base: StoryFrameRow = mergeFrameRowCharacterRefsFromIds(
       {
         frameIndex: shot.index,
@@ -235,14 +240,19 @@ function buildProFrameRowsFromProductionScript(
         description: shot.sceneDescription,
         dialogue: shot.dialogue,
         videoPrompt: shot.videoPrompt ?? "",
-        prompt: "",
+        prompt: frameImagePrompt ?? "",
       },
       charCompat,
       shot.characterIds,
     );
     return {
       ...base,
-      aiImagePrompt,
+      frameImagePrompt,
+      aiImagePrompt: frameImagePrompt,
+      lighting: shot.lighting,
+      sfxNote: shot.sfxNote,
+      audioNote: shot.audioNote,
+      propRefIds: shot.propIds,
       shotNo: String(shot.index),
       shotSize: shot.shotSize,
       cameraMove: shot.cameraMove,

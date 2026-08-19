@@ -2,7 +2,12 @@
 
 import type { ReactNode } from "react";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
+import {
+  ensurePro2ProductionScriptSchemaVersion,
+  isPro2ProductionScriptV2,
+} from "@/lib/canvas/data/pro2-production-script-schema";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
+import { resolveShotPropNames } from "@/lib/canvas/pro2-production-script-render-md";
 import { cn } from "@/lib/utils";
 
 function DarkTable({
@@ -142,7 +147,8 @@ export function Pro2ProductionScriptHtmlPreview({
   tab: Exclude<Pro2ScriptHubViewTab, "structured">;
   variant?: "dark" | "document";
 }) {
-  const vs = script.visualStyle;
+  const normalized = ensurePro2ProductionScriptSchemaVersion(script);
+  const vs = normalized.visualStyle;
   const Table = variant === "document" ? DocTable : DarkTable;
   const compact = variant === "dark";
 
@@ -161,9 +167,9 @@ export function Pro2ProductionScriptHtmlPreview({
       ["风格锚定", vs?.styleAnchor ?? "—"],
     ];
     const conflictRows =
-      script.coreConflict?.map((r) => [r.dimension, r.content]) ?? [];
+      normalized.coreConflict?.map((r) => [r.dimension, r.content]) ?? [];
     const characterRows =
-      script.characters?.map((c) => [
+      normalized.characters?.map((c) => [
         c.name,
         c.role,
         c.appearance,
@@ -171,14 +177,14 @@ export function Pro2ProductionScriptHtmlPreview({
         c.imagePrompt,
       ]) ?? [];
     const sceneRows =
-      script.scenes?.map((s) => [
+      normalized.scenes?.map((s) => [
         s.name,
         s.environmentTimeMood,
         s.imagePrompt,
         s.negativePrompt || "—",
       ]) ?? [];
     const shotRows =
-      script.shots?.map((s) => [
+      normalized.shots?.map((s) => [
         String(s.index),
         s.shotSize ?? "—",
         s.cameraMove ?? "—",
@@ -187,7 +193,7 @@ export function Pro2ProductionScriptHtmlPreview({
         s.durationSec != null ? `${s.durationSec}s` : "—",
       ]) ?? [];
     const handoffRows =
-      script.handoff?.map((h) => [
+      normalized.handoff?.map((h) => [
         String(h.index),
         h.item,
         h.owner,
@@ -206,10 +212,10 @@ export function Pro2ProductionScriptHtmlPreview({
           variant === "document" ? "text-neutral-800" : "text-white/80",
         )}
       >
-        {script.meta?.title ? (
-          <h2 className={sectionTitle}>{script.meta.title}</h2>
+        {normalized.meta?.title ? (
+          <h2 className={sectionTitle}>{normalized.meta.title}</h2>
         ) : null}
-        {script.meta?.synopsis ? (
+        {normalized.meta?.synopsis ? (
           <p
             className={
               variant === "document"
@@ -217,7 +223,7 @@ export function Pro2ProductionScriptHtmlPreview({
                 : "text-[11px] leading-relaxed text-white/55"
             }
           >
-            {script.meta.synopsis}
+            {normalized.meta.synopsis}
           </p>
         ) : null}
         <Section title="视觉风格总纲" variant={variant}>
@@ -270,7 +276,7 @@ export function Pro2ProductionScriptHtmlPreview({
 
   if (tab === "scene") {
     const rows =
-      script.scenes?.map((s) => [
+      normalized.scenes?.map((s) => [
         s.name,
         s.environmentTimeMood,
         s.imagePrompt,
@@ -287,7 +293,7 @@ export function Pro2ProductionScriptHtmlPreview({
 
   if (tab === "character") {
     const rows =
-      script.characters?.map((c) => [
+      normalized.characters?.map((c) => [
         c.name,
         c.role,
         c.appearance,
@@ -304,30 +310,61 @@ export function Pro2ProductionScriptHtmlPreview({
   }
 
   const rows =
-    script.shots?.map((s) => [
-      String(s.index),
-      s.shotSize ?? "—",
-      s.cameraMove ?? "—",
-      s.sceneDescription,
-      s.dialogue || "—",
-      s.durationSec != null ? String(s.durationSec) : "—",
-      s.imagePrompt ?? "—",
-      s.videoPrompt ?? "—",
-      s.audioNote || "—",
-    ]) ?? [];
+    normalized.shots?.map((s) => {
+      if (isPro2ProductionScriptV2(normalized.schemaVersion)) {
+        return [
+          String(s.index),
+          s.shotSize ?? "—",
+          s.lighting ?? "—",
+          s.cameraMove ?? "—",
+          s.sceneDescription,
+          resolveShotPropNames(s, normalized),
+          s.dialogue || "—",
+          s.durationSec != null ? String(s.durationSec) : "—",
+          s.sfxNote ?? "—",
+          s.audioNote || "—",
+        ];
+      }
+      return [
+        String(s.index),
+        s.shotSize ?? "—",
+        s.cameraMove ?? "—",
+        s.sceneDescription,
+        s.dialogue || "—",
+        s.durationSec != null ? String(s.durationSec) : "—",
+        s.imagePrompt ?? "—",
+        s.videoPrompt ?? "—",
+        s.audioNote || "—",
+      ];
+    }) ?? [];
   return (
     <Table
-      headers={[
-        "镜号",
-        "景别",
-        "运镜",
-        "画面描述",
-        "对白",
-        "时长",
-        "AI生图",
-        "AI视频",
-        "口型/配音",
-      ]}
+      headers={
+        isPro2ProductionScriptV2(normalized.schemaVersion)
+          ? [
+              "镜号",
+              "景别",
+              "光影",
+              "运镜",
+              "画面描述",
+              "道具",
+              "对白",
+              "时长",
+              "音效",
+              "口型/配音",
+            ]
+          : [
+              "镜号",
+              "景别",
+              "运镜",
+              "画面描述",
+              "对白",
+              "时长",
+              "AI生图",
+              "AI视频",
+              "口型/配音",
+            ]
+      }
       rows={rows}
       compact={compact}
     />

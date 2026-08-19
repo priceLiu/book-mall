@@ -1,9 +1,9 @@
 # 画布剧本结构化输出（Pro2）· 需求真源
 
-> **状态**：已实施（2026-08-19）  
+> **状态**：v1 已实施（2026-08-19）· **v2 分镜 spawn / Pass2 实施中（2026-08-20）**  
 > **范围**：影视专业版 2.0（`story-pro2`）· `story-pro2-starter` / `story-pro2-script-hub` / 剧组公告栏  
 > **非范围**：Story-Pro 1.0、分镜视频 1.0（sbv1）、电商跨站 adapter、Prisma 新表  
-> **关联**：[story-pro2-workflow-canonical.md](../../../canvas-web/docs/story-pro2-workflow-canonical.md) · [pro2-production-pack-standard.ts](../../../canvas-web/lib/canvas/data/pro2-production-pack-standard.ts) · 金标准 [docs/result.md](../../../docs/result.md)
+> **关联**：[Pro2剧本结构化.md](../../../docs/Pro2剧本结构化.md) · [画布提示词.md](../../../docs/画布提示词.md) · [story-pro2-workflow-canonical.md](../../../canvas-web/docs/story-pro2-workflow-canonical.md) · [pro2-production-pack-standard.ts](../../../canvas-web/lib/canvas/data/pro2-production-pack-standard.ts)
 
 ---
 
@@ -31,7 +31,7 @@ Pro2 制作包 v7 以 **GFM Markdown 表** 为 LLM 返回契约，程序经 `par
 |------|------|
 | 围栏语言标记 | 必须为 `pro2-production-script` |
 | 机器可读源 | **仅 JSON**；缺围栏或 Zod 失败 → 走 legacy MD 解析 |
-| step | `full_pack` · `outline` · `character` · `scene` · `storyboard` |
+| step | `full_pack` · `outline` · `character` · `scene` · `storyboard` · **`shot_prompts`**（v2 · Pass 2 按镜润色） |
 | tier | `standard` · `pro` · `fine`（控制必填字段） |
 
 实现：`canvas-web/lib/canvas/pro2-production-script-structured.ts` · `pro2-production-script-schema.ts`
@@ -180,14 +180,57 @@ Hub 节点字段：`productionScript?: Pro2ProductionScript`（与 `outlineMd` �
 
 ---
 
-## 8. 遗留（后续迭代）
+## 8. schemaVersion 2（2026-08-20）
+
+### 8.1 Pass 1 · `shots[]`（导演表 · 无最终 prompt）
+
+| 字段 | 分镜表列 | pro 必填 |
+|------|----------|----------|
+| `shotSize` | 景别 | 是 |
+| `lighting` | 光影 | 是 |
+| `cameraMove` | 运镜 | 是（minLength ~40） |
+| `sceneDescription` | 画面描述 | 是 |
+| `propIds?` | 道具 | 否（有则引用 props） |
+| `dialogue` | 对白 | 是 |
+| `durationSec` | 时长(秒) | 是 |
+| `sfxNote` | 音效 | 是 |
+| `audioNote` | 口型/配音备注 | 是 |
+
+**v2 Pass 1 不要求**：`imagePrompt` / `videoPrompt`。
+
+### 8.2 Pass 2 · 弹表生成后写入
+
+| 字段 | 用途 |
+|------|------|
+| `frameImagePrompt` | 分镜图 Dock / Gateway IMAGE |
+| `videoPrompt` | 分镜视频 Dock（**中文**多段模板） |
+
+### 8.3 资产 structured 块
+
+`scenes[]` / `characters[]` / `props[]` 扩展：`description`, `foreground`, `atmosphere`, `clothing`, `traits`, `compositionSpec`, `visualStyleTag` 等。范例见 [画布提示词.md](../../../docs/画布提示词.md)。
+
+### 8.4 Legacy
+
+- `schemaVersion: 1` 仍可读；`imagePrompt` 视为 Pass 2 分镜图 prompt。
+- Hub「生成分镜」：**spawn-only**，不调用 `batchRunPro2FrameRows`。
+
+### 8.5 v2 验收增补
+
+- [ ] Pass 1 v2 JSON 无 `imagePrompt` 可通过校验  
+- [ ] 弹表「生成提示词」→ Pass 2 LLM → 两列可编辑  
+- [ ] 「创建分镜」→ frame-board + video-board 双组已连线，无自动 Gateway  
+- [ ] 分镜视频 prompt 含参考图规则 / 分段描述 / 输出约束（中文）  
+
+---
+
+## 9. 遗留（后续迭代）
 
 - Story-Pro 1.0 / sbv1 结构化  
 - 电商 / 拆图拆视频 adapter  
 - 删除 MD 回退与 `parse-md-tables` 主路径  
 - 存量 graph 批量迁移 `productionScript`
 
-## 9. 已实现增强（2026-08-19 续）
+## 10. 已实现增强（2026-08-19 续）
 
 | 能力 | 说明 |
 |------|------|

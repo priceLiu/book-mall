@@ -38,10 +38,15 @@ describe("pro2-production-script-schema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("pro2ProductionScriptSchema requires schemaVersion 1", () => {
-    const result = pro2ProductionScriptSchema.safeParse({
-      schemaVersion: 2,
-    });
-    expect(result.success).toBe(false);
+  it("pro2ProductionScriptSchema accepts schemaVersion 1 and 2", () => {
+    expect(pro2ProductionScriptSchema.safeParse({ schemaVersion: 1 }).success).toBe(
+      true,
+    );
+    expect(pro2ProductionScriptSchema.safeParse({ schemaVersion: 2 }).success).toBe(
+      true,
+    );
+    expect(pro2ProductionScriptSchema.safeParse({ schemaVersion: 3 }).success).toBe(
+      false,
+    );
   });
 });

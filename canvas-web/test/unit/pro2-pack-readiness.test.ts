@@ -10,13 +10,13 @@ import {
 function buildStoryboardFixture(shotCount: number): string {
   const rows = Array.from({ length: shotCount }, (_, i) => {
     const n = i + 1;
-    return `| ${n} | 中景 | 固定 | 【起始】镜${n}起始。【结束】镜${n}终止。 | — | 10 | img prompt ${n} | vid prompt ${n} | lip ${n} |`;
+    return `| ${n} | 中景 | 暖调侧光 | 固定机位平拍，人物入画 | 【起始】镜${n}起始。【结束】镜${n}终止。 | — | — | 10 | 环境音 ${n} | lip ${n} |`;
   });
   return `${STORY_PRO2_STORYBOARD_TABLE_HEADER}\n${rows.join("\n")}`;
 }
 
 describe("pro2 pack readiness", () => {
-  it("storyboardMeetsPackQuality requires min shots and 9-col completeness", () => {
+  it("storyboardMeetsPackQuality requires min shots and v2 completeness", () => {
     const outline = "预计时长 | 3分钟";
     expect(storyboardMeetsPackQuality(buildStoryboardFixture(12), outline)).toBe(
       true,
@@ -25,7 +25,7 @@ describe("pro2 pack readiness", () => {
       false,
     );
     const incomplete = `${STORY_PRO2_STORYBOARD_TABLE_HEADER}
-| 1 | 中景 | 固定 | desc | — | 10 |  | vid | lip |`;
+| 1 | 中景 |  | 固定机位平拍，人物入画 | desc | — | — | 10 |  | lip |`;
     expect(storyboardMeetsPackQuality(incomplete, outline)).toBe(false);
   });
 

@@ -108,7 +108,7 @@ function resolveSceneEngineFromHub(
 
 function framePromptPlaceholder(role?: string): string {
   if (role === "frame") {
-    return "编辑本镜画面描述；输入 @ 引用角色三视图或风格参考…";
+    return "编辑本镜 AI 生图提示词；输入 @ 引用角色三视图或风格参考…";
   }
   if (role === "scene") {
     return "编辑场景生图关键词；输入 @ 引用风格或上游图片…";
@@ -235,6 +235,7 @@ export function LibtvImageInputDock() {
   const showVisualStylePackBar =
     isPro2 &&
     Boolean(pro2Data.pro2HubNodeId) &&
+    !isPipelineCell &&
     pro2Data.pro2MediaRole !== "scene" &&
     !promptHasEmbeddedVisualStyleBlock(dockInput);
   const imageModelKeys =
