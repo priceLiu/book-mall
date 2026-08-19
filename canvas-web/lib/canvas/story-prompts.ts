@@ -268,6 +268,23 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "happyhorse/image-to-video",
   "grok-imagine/image-to-video",
   "grok-imagine-video-1-5-preview",
+  "MiniMax/MiniMax-H3-t2v",
+  "MiniMax/MiniMax-H3-i2v",
+  "MiniMax/MiniMax-H3-fl2v",
+  "MiniMax/MiniMax-H3-r2v",
+  "MiniMax/MiniMax-H3-s2v",
+  "MiniMax/MiniMax-H3-regeneration",
+] as const;
+
+/** 影视专业版 · MiniMax H3 直连 Gateway */
+export const STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS = [
+  "MiniMax/MiniMax-H3-t2v",
+  "MiniMax/MiniMax-H3-i2v",
+  "MiniMax/MiniMax-H3-fl2v",
+  "MiniMax/MiniMax-H3-r2v",
+  "MiniMax/MiniMax-H3-s2v",
+  "MiniMax/MiniMax-H3-regeneration",
+  "MiniMax/MiniMax-H3-context-ir",
 ] as const;
 
 /** 影视专业版 · 百炼参考生视频（Gateway · 百炼，非 KIE 直连） */
@@ -291,6 +308,7 @@ export const STORY_PRO_VIDEO_MODEL_KEYS = [
   ...STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   ...STORY_VIDEO_MODEL_KEYS,
   ...STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
+  ...STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS,
 ] as const;
 
 /**

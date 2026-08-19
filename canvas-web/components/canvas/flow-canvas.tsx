@@ -68,6 +68,7 @@ import type {
   CanvasNodeType,
 } from "@/lib/canvas/types";
 import { isGroupNode } from "@/lib/canvas/types";
+import { pro2NodeAbsolutePosition } from "@/lib/canvas/pro2-selection-bbox";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
@@ -254,6 +255,8 @@ function FlowCanvasInner({
   const groupResizeSnapshotRef = useRef<GroupResizeSnapshot | null>(null);
   const groupResizeIdRef = useRef<string | null>(null);
   const groupResizeDetachedRef = useRef(false);
+  /** 组内子节点拖动时暂解除 extent，松手后恢复或 reparent */
+  const groupChildDragLiftRef = useRef<Set<string>>(new Set());
   /** 用户真实拖过组框角/边（resizing:true）· pointerup 仅此时落库 */
   const groupResizeUserActiveRef = useRef(false);
   /** store→RF 推送期间忽略 RF 回写的选中/测量/坐标 echo，避免打组后 Maximum update depth */
@@ -1216,6 +1219,41 @@ function FlowCanvasInner({
     [addNode, base, updateNodeData, pro2FloatingInspector, sbv1Canvas],
   );
 
+  const liftGroupChildrenExtent = useCallback(
+    (draggedNodeId: string) => {
+      setRfNodes((prev) => {
+        const dragged = prev.find((n) => n.id === draggedNodeId);
+        if (!dragged?.parentId) return prev;
+
+        const selectedInGroup = prev.filter((n) => n.selected && n.parentId);
+        const liftIds =
+          selectedInGroup.length > 1 &&
+          selectedInGroup.some((n) => n.id === draggedNodeId)
+            ? new Set(selectedInGroup.map((n) => n.id))
+            : new Set([draggedNodeId]);
+
+        groupChildDragLiftRef.current = liftIds;
+        return prev.map((n) =>
+          liftIds.has(n.id) && n.parentId ? { ...n, extent: undefined } : n,
+        );
+      });
+    },
+    [setRfNodes],
+  );
+
+  const restoreLiftedGroupChildrenExtent = useCallback(() => {
+    const lifted = groupChildDragLiftRef.current;
+    if (!lifted.size) return;
+    groupChildDragLiftRef.current = new Set();
+    setRfNodes((prev) =>
+      prev.map((n) =>
+        lifted.has(n.id) && n.parentId
+          ? { ...n, extent: "parent" as const }
+          : n,
+      ),
+    );
+  }, [setRfNodes]);
+
   // ── 拖入分组归属：识别"鼠标当前是否在某个 group bbox 内"
   const findGroupAtPoint = useCallback(
     (clientX: number, clientY: number): string | null => {
@@ -1279,8 +1317,11 @@ function FlowCanvasInner({
       if (dragUndoPausedRef.current) return;
       useCanvasStore.temporal.getState().pause();
       dragUndoPausedRef.current = true;
+      if (node.type !== "group") {
+        liftGroupChildrenExtent(node.id);
+      }
     },
-    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging, setCanvasDraggingNodeId, libtvCanvas],
+    [enableDragSnapGuides, getNodes, liftGroupChildrenExtent, setCanvasGeometryDragging, setCanvasDraggingNodeId, libtvCanvas],
   );
 
   const onNodeDrag = useCallback(
@@ -1440,8 +1481,15 @@ function FlowCanvasInner({
       const gid = findGroupAtPoint(event.clientX, event.clientY);
       const willReparent = gid !== (node.parentId ?? null);
       if (willReparent) {
-        // 进 / 出 / 换组
-        reparentNode(node.id, gid);
+        const rfAll = getNodes() as CanvasFlowNode[];
+        const rfNode = rfAll.find((n) => n.id === node.id);
+        const dropAbs = rfNode
+          ? pro2NodeAbsolutePosition(rfNode, rfAll)
+          : undefined;
+        reparentNode(node.id, gid, dropAbs);
+        groupChildDragLiftRef.current = new Set();
+      } else {
+        restoreLiftedGroupChildrenExtent();
       }
       setDragHoverGroup(null);
       if (libtvCanvas && node.type && node.type !== "group") {
@@ -1472,6 +1520,7 @@ function FlowCanvasInner({
       getZoom,
       libtvCanvas,
       reparentNode,
+      restoreLiftedGroupChildrenExtent,
       setDragHoverGroup,
       setRfNodes,
       setCanvasGeometryDragging,
@@ -2042,6 +2091,17 @@ function FlowCanvasInner({
         }}
         onSelectionDragStart={() => {
           useCanvasStore.getState().setCanvasSelectionDragging(true);
+          setRfNodes((prev) => {
+            const selectedInGroup = prev.filter(
+              (n) => n.selected && n.parentId && n.type !== "group",
+            );
+            if (!selectedInGroup.length) return prev;
+            const liftIds = new Set(selectedInGroup.map((n) => n.id));
+            groupChildDragLiftRef.current = liftIds;
+            return prev.map((n) =>
+              liftIds.has(n.id) ? { ...n, extent: undefined } : n,
+            );
+          });
         }}
         onSelectionDragStop={() => {
           useCanvasStore.getState().setCanvasSelectionDragging(false);

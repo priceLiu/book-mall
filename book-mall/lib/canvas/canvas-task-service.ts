@@ -33,6 +33,7 @@ import {
   isCanvasBailianR2vVideoTaskPayload,
   isCanvasKieVideoTaskPayload,
   isCanvasVolcengineVideoTaskPayload,
+  isCanvasMinimaxVideoTaskPayload,
   resolveCanvasSubmittedTaskTimeoutMin,
   resolveCanvasSubmittedTaskTimeoutMs,
 } from "./canvas-constants";
@@ -99,6 +100,12 @@ import {
   extractVolcengineVideoUrlFromGatewaySummary,
   patchCanvasProjectNodeRuntimeFromTask,
 } from "@/lib/canvas/canvas-volcengine-recover";
+import { extractMinimaxVideoUrlFromGatewaySummary } from "@/lib/gateway/minimax-video-jobs";
+import {
+  isMinimaxVideoTaskFailed,
+  isMinimaxVideoTaskSuccess,
+  minimaxVideoTaskResultUrl,
+} from "@/lib/gateway/minimax-video-client";
 import {
   canvasNodeShowsPersistedMedia,
   patchCanvasProjectNodeMediaFromTask,
@@ -249,6 +256,7 @@ function gatewayProviderKindFromPayload(
   if (pk === "BAILIAN_R2V" || pk === "BAILIAN") return "BAILIAN";
   if (pk === "HUNYUAN" || pk === "HUNYUAN_3D") return "HUNYUAN";
   if (pk === "TOPAZ") return "TOPAZ";
+  if (pk === "MINIMAX") return "MINIMAX";
   return "KIE";
 }
 
@@ -1391,6 +1399,32 @@ async function pollOneSubmittedCanvasTask(
       }
     }
     if (
+      providerKind === "MINIMAX" ||
+      gatewayLog.providerKind === "MINIMAX"
+    ) {
+      const videoUrl = extractMinimaxVideoUrlFromGatewaySummary(
+        gatewayLog.resultSummary,
+      );
+      if (videoUrl) {
+        await applyCanvasVolcengineVideoResult(task.id, videoUrl);
+        const after = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+        });
+        if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+          return "succeeded";
+        }
+        if (after?.status === "FAILED" && before !== "FAILED") {
+          return "failed";
+        }
+        return "pending";
+      }
+    }
+    if (
       providerKind === "BAILIAN" ||
       gatewayLog.providerKind === "BAILIAN"
     ) {
@@ -1459,6 +1493,7 @@ async function pollOneSubmittedCanvasTask(
   if (
     isSlowGenerationAge(task.submittedAt, task.createdAt) &&
     (isCanvasVolcengineVideoTaskPayload(payload) ||
+      isCanvasMinimaxVideoTaskPayload(payload) ||
       isCanvasBailianR2vVideoTaskPayload(payload) ||
       isCanvasKieVideoTaskPayload(payload))
   ) {
@@ -1514,6 +1549,25 @@ async function pollOneSubmittedCanvasTask(
             typeof row.error === "string"
               ? row.error
               : (row.error?.message ?? `status=${row.status}`),
+          completedAt: new Date(),
+        },
+      });
+    }
+  } else if (gw.providerKind === "MINIMAX") {
+    const row = gw.task;
+    if (isMinimaxVideoTaskSuccess(row)) {
+      await applyCanvasVolcengineVideoResult(
+        task.id,
+        minimaxVideoTaskResultUrl(row) ?? undefined,
+      );
+    } else if (isMinimaxVideoTaskFailed(row)) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "FAILED",
+          failCode: "MINIMAX_VIDEO_TASK_FAILED",
+          failMessage:
+            row.error?.message ?? `MiniMax status=${row.status ?? "failed"}`,
           completedAt: new Date(),
         },
       });

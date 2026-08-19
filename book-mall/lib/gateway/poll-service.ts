@@ -33,6 +33,7 @@ import {
   dashscopeGetTask,
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
+  resolveDashscopeVideoTaskPollBaseUrl,
 } from "./dashscope-client";
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
@@ -178,7 +179,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
       requestKind: "VIDEO",
       externalTaskId: { not: null },
       submittedAt: { lt: asyncVideoCutoff },
-      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE"] },
+      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE", "MINIMAX"] },
     },
     data: {
       status: "FAILED",
@@ -310,7 +311,7 @@ const GATEWAY_POLL_PROVIDER_KINDS = [
  * - 其它异步轮询（BAILIAN / DASHSCOPE / HUNYUAN）：中等预算，同样按公平调度。
  */
 const CALLBACK_POLL_PROVIDER_KINDS = ["KIE"] as const;
-const OTHER_POLL_PROVIDER_KINDS = ["BAILIAN", "DASHSCOPE", "HUNYUAN"] as const;
+const OTHER_POLL_PROVIDER_KINDS = ["BAILIAN", "DASHSCOPE", "HUNYUAN", "MINIMAX"] as const;
 
 const ESCALATION_POLL_TIMEOUT_MS = 20_000;
 
@@ -933,6 +934,7 @@ export async function submitDashscopeVideoJobForLog(opts: {
     apiKey: cred.apiKey,
     model: opts.model,
     body: opts.body,
+    baseUrl: cred.baseUrl,
   });
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({
@@ -946,13 +948,18 @@ export async function pollDashscopeTaskForLog(opts: {
   credentialId: string;
   taskId: string;
   baseUrl?: string | null;
+  model?: string | null;
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
   const polled = await dashscopeGetTask({
     apiKey: cred.apiKey,
     taskId: opts.taskId,
-    baseUrl: opts.baseUrl ?? cred.baseUrl,
+    baseUrl: resolveDashscopeVideoTaskPollBaseUrl({
+      model: opts.model,
+      apiKey: cred.apiKey,
+      storedBaseUrl: opts.baseUrl ?? cred.baseUrl,
+    }),
   });
   if (!polled.ok) throw new Error(polled.error);
   return { output: polled.output, raw: polled.raw };

@@ -3,7 +3,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
+import { ModelOpsPresentationTab } from "@/components/admin/model-ops-presentation-tab";
+import { ModelOpsShelfTab } from "@/components/admin/model-ops-shelf-tab";
 import { financeApiFetch, financeApiPost } from "@/lib/finance-viewer";
+
+type OpsTab = "offerings" | "presentation" | "shelf";
 
 type CandidateRow = {
   id: string;
@@ -68,6 +72,7 @@ function formatMargin(c: CandidateRow): string {
 
 export function PlatformModelsClient() {
   const base = useBookMallBaseUrl();
+  const [opsTab, setOpsTab] = useState<OpsTab>("offerings");
   const [rows, setRows] = useState<OfferingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -183,26 +188,58 @@ export function PlatformModelsClient() {
     setBusyId(null);
   }
 
-  if (loading) return <FinancePageState>加载平台模型…</FinancePageState>;
+  if (loading && opsTab === "offerings") {
+    return <FinancePageState>加载平台模型…</FinancePageState>;
+  }
 
   return (
     <FinancePageShell className="gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Gateway 模型上架</h1>
+          <h1 className="text-xl font-semibold">模型运营中心</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            每个逻辑模型（canonical）一行；候选 = 同模型多厂商路由。推荐 = 毛利达标前提下净成本最低的厂商路由。
+            商业上架、展示来源（sourceLabel）、按应用/场景分发（AppModelShelf）。
           </p>
         </div>
-        <button
-          type="button"
-          className="rounded-md bg-[#1890ff] px-4 py-2 text-sm text-white hover:bg-[#096dd9]"
-          onClick={() => void syncAll()}
-        >
-          同步自动上架
-        </button>
+        {opsTab === "offerings" ? (
+          <button
+            type="button"
+            className="rounded-md bg-[#1890ff] px-4 py-2 text-sm text-white hover:bg-[#096dd9]"
+            onClick={() => void syncAll()}
+          >
+            同步自动上架
+          </button>
+        ) : null}
       </div>
 
+      <nav className="flex gap-2 border-b border-[#f0f0f0]">
+        {(
+          [
+            ["offerings", "商业上架"],
+            ["presentation", "展示配置"],
+            ["shelf", "应用分发"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`border-b-2 px-3 py-2 text-sm ${
+              opsTab === id
+                ? "border-[#1890ff] font-medium text-[#1890ff]"
+                : "border-transparent text-[#8c8c8c]"
+            }`}
+            onClick={() => setOpsTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {opsTab === "presentation" ? <ModelOpsPresentationTab /> : null}
+      {opsTab === "shelf" ? <ModelOpsShelfTab /> : null}
+
+      {opsTab === "offerings" ? (
+        <>
       <div className="rounded-lg border border-[#91d5ff] bg-[#e6f7ff] px-4 py-3 text-sm text-[#262626]">
         <p className="font-medium">同模型多厂商路由</p>
         <ol className="mt-1 list-decimal pl-5 text-[#595959]">
@@ -465,6 +502,8 @@ export function PlatformModelsClient() {
           </div>
         </section>
       ))}
+        </>
+      ) : null}
     </FinancePageShell>
   );
 }

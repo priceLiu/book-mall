@@ -6,11 +6,18 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { buildCanvasVideoKieInput } from "@/lib/canvas/canvas-video-kie";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
 import {
+  buildCanvasVideoMinimaxInput,
+  minimaxResolutionFromEcom,
+} from "@/lib/gateway/minimax-video-body";
+import { resolveMinimaxVideoModel } from "@/lib/gateway/minimax-video-models";
+import {
   ecomGwCreateBailianR2vJob,
   ecomGwCreateKieJob,
+  ecomGwCreateMinimaxVideoJob,
   ecomGwCreateVolcengineVideoJob,
   ecomGwPollBailianR2v,
   ecomGwPollKie,
+  ecomGwPollMinimax,
   ecomGwPollVolcengine,
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
@@ -62,7 +69,7 @@ type PendingFullVideoJob = {
   taskId: string;
   logId: string;
   modelKey: string;
-  provider: "volcengine" | "kie" | "bailian";
+  provider: "volcengine" | "kie" | "bailian" | "minimax";
   durationSec: number;
   startedAt: string;
   prompt: string;
@@ -81,6 +88,12 @@ async function pollFullVideoGatewayJob(
   }
   if (pending.provider === "bailian") {
     return ecomGwPollBailianR2v(userId, {
+      taskId: pending.taskId,
+      gatewayLogId: pending.logId,
+    });
+  }
+  if (pending.provider === "minimax") {
+    return ecomGwPollMinimax(userId, {
       taskId: pending.taskId,
       gatewayLogId: pending.logId,
     });
@@ -104,7 +117,10 @@ function readPendingFullVideoJob(meta: unknown): PendingFullVideoJob | null {
     logId: j.logId,
     modelKey: typeof j.modelKey === "string" ? j.modelKey : ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL,
     provider:
-      j.provider === "kie" || j.provider === "volcengine" || j.provider === "bailian"
+      j.provider === "kie" ||
+      j.provider === "volcengine" ||
+      j.provider === "bailian" ||
+      j.provider === "minimax"
         ? j.provider
         : resolveStoryboardVideoProvider(
             typeof j.modelKey === "string" ? j.modelKey : "",
@@ -286,7 +302,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     panelImages,
   });
 
-  const durationMin = provider === "bailian" ? 3 : 4;
+  const durationMin = provider === "bailian" ? 3 : provider === "minimax" ? 4 : 4;
   const durationCap = refPlan.rules.apiMaxDurationSec ?? 15;
   const durationSec = Math.max(
     durationMin,
@@ -412,6 +428,35 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
       seedStr: opts.seedStr,
       parameterExtras:
         Object.keys(parameterExtras).length > 0 ? parameterExtras : undefined,
+      clientPage,
+    });
+    taskId = created.taskId;
+    logId = created.logId;
+  } else if (provider === "minimax") {
+    const spec = resolveMinimaxVideoModel(modelKey);
+    const minimaxRes = minimaxResolutionFromEcom(resolution);
+    const mode = spec?.mode;
+    const refUrlsForMinimax =
+      mode === "r2v" || mode === "s2v"
+        ? refPlan.slots.map((s) => norm(s.url))
+        : normalizedReferenceImageUrls;
+    const { input } = buildCanvasVideoMinimaxInput({
+      modelKey,
+      prompt,
+      imageUrl:
+        mode === "t2v" || mode === "r2v" || mode === "s2v"
+          ? undefined
+          : firstFrameUrl,
+      referenceImageUrls: refUrlsForMinimax,
+      options: {
+        resolution: minimaxRes,
+        duration: durationSec,
+        ratio,
+      },
+    });
+    const created = await ecomGwCreateMinimaxVideoJob(opts.userId, {
+      model: modelKey,
+      input,
       clientPage,
     });
     taskId = created.taskId;

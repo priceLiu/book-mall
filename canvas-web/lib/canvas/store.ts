@@ -485,8 +485,13 @@ type CanvasState = {
   /**
    * 把指定节点重新挂到 newParentGroupId（或挂到画布根，传 null）。
    * 自动换算 position 使屏幕坐标不变；并设置 / 清除 extent='parent'。
+   * `absolutePosition`：拖动松手时传入 RF 当前视觉绝对坐标，避免用过期的 store 相对坐标。
    */
-  reparentNode: (nodeId: string, newParentGroupId: string | null) => void;
+  reparentNode: (
+    nodeId: string,
+    newParentGroupId: string | null,
+    absolutePosition?: { x: number; y: number },
+  ) => void;
   /** 从 React Flow 本地 nodes 提交坐标（拖动松手兜底；不跑 normalize） */
   commitFlowNodePositions: (
     patches: Array<{ id: string; position: { x: number; y: number } }>,
@@ -2127,7 +2132,7 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      reparentNode: (nodeId, newParentGroupId) => {
+      reparentNode: (nodeId, newParentGroupId, absolutePosition) => {
         const all = get().nodes;
         const node = all.find((n) => n.id === nodeId);
         if (!node) return;
@@ -2154,7 +2159,7 @@ export const useCanvasStore = create<CanvasState>()(
           return { x: pa.x + n.position.x, y: pa.y + n.position.y };
         };
 
-        const abs = absOf(node);
+        const abs = absolutePosition ?? absOf(node);
         let newPosition = abs;
         if (newParentGroupId) {
           const g = all.find((x) => x.id === newParentGroupId);
@@ -2163,16 +2168,25 @@ export const useCanvasStore = create<CanvasState>()(
           newPosition = { x: abs.x - gAbs.x, y: abs.y - gAbs.y };
         }
 
-        const updated = all.map((n) =>
-          n.id === nodeId
-            ? ({
-                ...n,
-                parentId: newParentGroupId ?? undefined,
-                extent: newParentGroupId ? "parent" : undefined,
-                position: newPosition,
-              } as CanvasFlowNode)
-            : n,
-        );
+        const updated = all.map((n) => {
+          if (n.id !== nodeId) return n;
+          const data = { ...(n.data as Record<string, unknown>) };
+          if (newParentGroupId) {
+            const parentGroup = all.find((x) => x.id === newParentGroupId);
+            if (parentGroup && isGroupNode(parentGroup.type)) {
+              data.pro2GroupId = newParentGroupId;
+            }
+          } else {
+            delete data.pro2GroupId;
+          }
+          return {
+            ...n,
+            parentId: newParentGroupId ?? undefined,
+            extent: newParentGroupId ? "parent" : undefined,
+            position: newPosition,
+            data,
+          } as CanvasFlowNode;
+        });
         // React Flow 要求父节点先于子节点出现：重排，把所有 group 放最前
         set((state) =>
           withGraphRevision(state, {

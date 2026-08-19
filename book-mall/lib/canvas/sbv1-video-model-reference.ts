@@ -53,9 +53,22 @@ const DASHSCOPE_T2V_KEYS = new Set([
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
+  "wan3.0-video",
   "happyhorse-1.0-t2v",
   "happyhorse-1.1-t2v",
 ]);
+
+function minimaxH3VideoMode(modelKey: string): string | null {
+  const k = modelKey.trim().toLowerCase();
+  if (!k.includes("minimax/minimax-h3")) return null;
+  if (k.endsWith("-t2v")) return "t2v";
+  if (k.endsWith("-i2v")) return "i2v";
+  if (k.endsWith("-fl2v")) return "fl2v";
+  if (k.endsWith("-r2v") || k.endsWith("-s2v")) return "r2v";
+  if (k.endsWith("-regeneration")) return "regeneration";
+  if (k.endsWith("-context-ir")) return "context_ir";
+  return null;
+}
 
 export function getSbv1VideoModelRefCaps(
   modelKey: string,
@@ -65,6 +78,27 @@ export function getSbv1VideoModelRefCaps(
   const providerId = opts?.providerId?.trim() ?? "";
   const isVolc =
     providerId.includes("volcengine") || VOLCENGINE_VIDEO_KEYS.has(k);
+
+  const h3Mode = minimaxH3VideoMode(k);
+  if (h3Mode === "t2v" || h3Mode === "context_ir") {
+    return { supportedModes: ["omni"], refApi: "bailian_r2v_media", maxRefsOmni: 0 };
+  }
+  if (h3Mode === "i2v") {
+    return { supportedModes: ["omni"], refApi: "single_i2v", maxRefsOmni: 1 };
+  }
+  if (h3Mode === "fl2v") {
+    return {
+      supportedModes: ["first_last"],
+      refApi: "wan_first_last_url",
+      maxRefsOmni: 2,
+    };
+  }
+  if (h3Mode === "r2v" || h3Mode === "s2v") {
+    return { supportedModes: ["omni"], refApi: "bailian_r2v_media", maxRefsOmni: 9 };
+  }
+  if (h3Mode === "regeneration") {
+    return { supportedModes: ["omni"], refApi: "single_i2v", maxRefsOmni: 0 };
+  }
 
   if (MOTION_KEYS.has(k)) {
     return {
@@ -113,6 +147,14 @@ export function getSbv1VideoModelRefCaps(
       supportedModes: ["omni", "first_last"],
       refApi: "wan_first_last_url",
       maxRefsOmni: 1,
+    };
+  }
+
+  if (k === "wan3.0-video") {
+    return {
+      supportedModes: ["omni", "first_last"],
+      refApi: "bailian_r2v_media",
+      maxRefsOmni: 10,
     };
   }
 

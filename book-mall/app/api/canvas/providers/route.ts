@@ -18,9 +18,15 @@ export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   try {
-    // skipEnsure：打开画布时勿跑 identity sync（连接池紧张时曾拖到 180s → BFF 502）
+    const url = new URL(request.url);
+    const sceneKey = url.searchParams.get("sceneKey")?.trim() || undefined;
+    const roleParam = url.searchParams.get("role")?.trim().toUpperCase();
+    const role =
+      roleParam === "LLM" || roleParam === "IMAGE" || roleParam === "VIDEO"
+        ? roleParam
+        : undefined;
     const [gatewayProviders, gatewayLink] = await Promise.all([
-      listCanvasProvidersForUser(guard.user.id, { skipEnsure: true }),
+      listCanvasProvidersForUser(guard.user.id, { skipEnsure: true, sceneKey, role }),
       getGatewayLinkStatusForUser(guard.user.id),
     ]);
     return NextResponse.json(

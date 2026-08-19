@@ -48,6 +48,11 @@ import {
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
 import type { VolcengineVideoTaskResult } from "@/lib/gateway/volcengine-client";
+import type { MinimaxVideoTaskRow } from "@/lib/gateway/minimax-video-client";
+import {
+  isMinimaxVideoTaskFailed,
+  isMinimaxVideoTaskSuccess,
+} from "@/lib/gateway/minimax-video-client";
 
 const CLIENT_SOURCE = "CANVAS" as const;
 
@@ -328,6 +333,54 @@ export async function canvasGwCreateVolcengineVideoJob(
   };
 }
 
+export async function canvasGwCreateMinimaxVideoJob(
+  userId: string,
+  opts: {
+    model: string;
+    input: Record<string, unknown>;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  const route = routeGatewayModel(opts.model);
+  if (route.providerKind !== "MINIMAX" || route.requestKind !== "VIDEO") {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `模型 ${opts.model} 非 MiniMax H3 视频`,
+      400,
+    );
+  }
+  const credentialId = pickCredentialForKind(auth.credentials, "MINIMAX");
+  if (!credentialId) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 MiniMax 凭证",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      input: opts.input,
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "MINIMAX",
+  };
+}
+
 export async function canvasGwCreateBailianR2vJob(
   userId: string,
   opts: {
@@ -486,7 +539,7 @@ export async function canvasGwCreateDashscopeKlingImageJob(
   };
 }
 
-/** Canvas · DashScope 文生视频（wan2.6-t2v / wan2.7-t2v） */
+/** Canvas · DashScope 文生视频（wan2.6-t2v / wan2.7-t2v / wan3.0-video） */
 export async function canvasGwCreateDashscopeVideoJob(
   userId: string,
   opts: {
@@ -691,6 +744,7 @@ export type CanvasGwPollResult =
   | { providerKind: "HUNYUAN"; polled: CanvasGatewayPollResult }
   | { providerKind: "DASHSCOPE"; output: DashscopeTaskOutput }
   | { providerKind: "VOLCENGINE"; task: VolcengineVideoTaskResult }
+  | { providerKind: "MINIMAX"; task: MinimaxVideoTaskRow }
   | {
       providerKind: "TOPAZ";
       polled: {
@@ -746,6 +800,13 @@ export async function canvasGwRecordInfo(
     return {
       providerKind: "VOLCENGINE",
       task: polled.data as VolcengineVideoTaskResult,
+    };
+  }
+  if (polled.providerKind === "MINIMAX") {
+    const data = polled.data as { task?: MinimaxVideoTaskRow };
+    return {
+      providerKind: "MINIMAX",
+      task: data.task ?? (polled.data as MinimaxVideoTaskRow),
     };
   }
   if (polled.providerKind === "TOPAZ") {

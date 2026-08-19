@@ -12,8 +12,12 @@ import { EnginePicker } from "@/components/canvas/engine-picker";
 import {
   GATEWAY_BAILIAN_PROVIDER_ID,
   GATEWAY_KIE_PROVIDER_ID,
+  GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
   GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+  GATEWAY_VOLCENGINE_PROVIDER_ID,
+  PLATFORM_OFFERING_PROVIDER_ID,
 } from "@/lib/canvas/system-providers";
+import { STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS } from "@/lib/canvas/story-prompts";
 import { hideKieVendorLabel, ENGINE_PICKER_MODAL_BG } from "@/lib/canvas/gateway-model-role";
 import type { CanvasProviderDto, CanvasProviderModelDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -76,12 +80,16 @@ const SBV1_DOCK_EXTRA_VIDEO_MODEL_KEYS = [
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan3.0-video",
+  ...STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS,
 ] as const;
 
 const SBV1_DOCK_VIDEO_PROVIDER_IDS = [
   GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+  GATEWAY_VOLCENGINE_PROVIDER_ID,
   GATEWAY_KIE_PROVIDER_ID,
   GATEWAY_BAILIAN_PROVIDER_ID,
+  GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  PLATFORM_OFFERING_PROVIDER_ID,
 ];
 
 export const SBV1_DOCK_VIDEO_MODEL_KEYS = [

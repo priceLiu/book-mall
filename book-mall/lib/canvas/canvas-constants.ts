@@ -17,6 +17,20 @@ export function isCanvasVolcengineVideoTaskPayload(
   return kind === "video-engine" || kind === "ai-video-engine";
 }
 
+export function getCanvasMinimaxVideoTimeoutMin(): number {
+  const raw = Number(process.env.CANVAS_MINIMAX_VIDEO_TIMEOUT_MIN ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : 45;
+}
+
+export function isCanvasMinimaxVideoTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  if (payload.providerKind !== "MINIMAX") return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  return kind === "video-engine" || kind === "ai-video-engine";
+}
+
 /** 百炼参考生视频（HappyHorse / 万相 R2V）实测可超过 20min，单独放宽。 */
 export function getCanvasBailianR2vVideoTimeoutMin(): number {
   const raw = Number(process.env.CANVAS_BAILIAN_R2V_VIDEO_TIMEOUT_MIN ?? "");
@@ -55,6 +69,8 @@ export function resolveCanvasSubmittedTaskTimeoutMs(input: {
       : null;
   const min = isCanvasVolcengineVideoTaskPayload(payload)
     ? getCanvasVolcengineVideoTimeoutMin()
+    : isCanvasMinimaxVideoTaskPayload(payload)
+      ? getCanvasMinimaxVideoTimeoutMin()
     : isCanvasBailianR2vVideoTaskPayload(payload)
       ? getCanvasBailianR2vVideoTimeoutMin()
       : CANVAS_AI_TASK_TIMEOUT_MIN;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDashscopeSbv1T2vVideoBody,
+  buildDashscopeWan30Media,
   dashscopeSbv1T2vModelToR2v,
   isDashscopeSbv1TextToVideoModel,
   resolveDashscopeT2vRefMismatchMessage,
@@ -33,6 +34,25 @@ describe("wan3.0-video", () => {
     });
     expect(body.parameters.resolution).toBe("480P");
     expect(body.parameters.duration).toBe(30);
+    expect(body.input.prompt).toBe("test");
+    expect(body.input.media).toBeUndefined();
+  });
+
+  it("allows reference images (All-in-One, no R2V mismatch)", () => {
+    expect(
+      resolveDashscopeT2vRefMismatchMessage("wan3.0-video", [
+        "https://oss.example/a.png",
+      ]),
+    ).toBeNull();
+  });
+
+  it("builds first_frame media for i2v", () => {
+    const media = buildDashscopeWan30Media({
+      firstFrameUrl: "https://oss.example/first.png",
+    });
+    expect(media).toEqual([
+      { type: "first_frame", url: "https://oss.example/first.png" },
+    ]);
   });
 });
 

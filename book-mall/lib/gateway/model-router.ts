@@ -4,6 +4,7 @@ import {
   isMinimaxMusicModelKey,
   isMinimaxSpeechModelKey,
 } from "@/lib/gateway/minimax-speech-models";
+import { isMinimaxVideoModelKey } from "@/lib/gateway/minimax-video-models";
 import {
   isKieElevenLabsMarketModelKey,
   isKieSunoModelKey,
@@ -359,6 +360,10 @@ export function routeGatewayModel(model: string): RoutedModel {
 
   if (isMinimaxMusicModelKey(raw) || isMinimaxMusicModelKey(m)) {
     return { providerKind: "MINIMAX", requestKind: "MUSIC" };
+  }
+
+  if (isMinimaxVideoModelKey(raw) || isMinimaxVideoModelKey(m)) {
+    return { providerKind: "MINIMAX", requestKind: "VIDEO" };
   }
 
   if (isElevenLabsStsModelKey(raw) || isElevenLabsStsModelKey(m)) {

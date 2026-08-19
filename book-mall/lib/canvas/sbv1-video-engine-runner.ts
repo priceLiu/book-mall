@@ -21,6 +21,7 @@ import {
   isDashscopeSbv1TextToVideoModel,
 } from "./dashscope-sbv1-t2v";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
+import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
@@ -132,10 +133,17 @@ export async function runSbv1VideoEngineNode(
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
   const isVolcengineTextToVideo =
     isVolcengineStoryVideoModelKey(modelKey) && dockInputMode === "t2v";
+  const isMinimaxTextToVideo =
+    isMinimaxCanvasVideoModelKey(modelKey) &&
+    modelKey.toLowerCase().includes("-t2v") &&
+    dockInputMode === "t2v";
   const hasReferenceImages = imageInputs.length > 0 || hasPortraitRefs;
   /** 纯文生视频：无参考图；有 @图片 / 连线参考时保留图片并走 R2V 升级 */
   const isTextToVideoOnly =
-    (isDashscopeT2v || isKlingTextToVideo || isVolcengineTextToVideo) &&
+    (isDashscopeT2v ||
+      isKlingTextToVideo ||
+      isVolcengineTextToVideo ||
+      isMinimaxTextToVideo) &&
     !hasReferenceImages;
 
   if (
@@ -225,7 +233,15 @@ export async function runSbv1VideoEngineNode(
     (isDashscopeT2v && hasReferenceImages)
   ) {
     params.ratio = aspectRatio;
-    params.resolution = /^720p$/i.test(resolution) ? "720P" : "1080P";
+    if (modelKey === "wan3.0-video") {
+      params.resolution = /^480p$/i.test(resolution)
+        ? "480P"
+        : /^1080p$/i.test(resolution)
+          ? "1080P"
+          : "720P";
+    } else {
+      params.resolution = /^720p$/i.test(resolution) ? "720P" : "1080P";
+    }
     params.duration = durationSec;
   }
   if (referenceMode !== "smart_multi") {
@@ -236,6 +252,14 @@ export async function runSbv1VideoEngineNode(
   }
   params.generate_audio =
     params.generate_audio !== false && params.generateAudio !== false;
+
+  if (isMinimaxCanvasVideoModelKey(modelKey)) {
+    const minimaxRes =
+      resolution === "720p" || resolution === "768p" ? "768P" : "2K";
+    params.resolution = minimaxRes;
+    params.ratio = aspectRatio;
+    params.duration = durationSec > 0 ? durationSec : 5;
+  }
 
   if (isMotionControl) {
     const videoUrls = Array.isArray(params.reference_video_urls)

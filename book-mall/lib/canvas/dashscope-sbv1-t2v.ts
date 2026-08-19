@@ -69,6 +69,8 @@ export function resolveDashscopeT2vRefMismatchMessage(
 ): string | null {
   const trimmed = modelKey.trim();
   if (!isDashscopeSbv1TextToVideoModel(trimmed)) return null;
+  /** 万相 3.0 为 All-in-One，官方支持参考图 / 首尾帧，不升 R2V */
+  if (isDashscopeWan30VideoModel(trimmed)) return null;
   const refCount = referenceImageUrls.filter((u) => u.trim().length > 0).length;
   if (refCount <= 0) return null;
   const r2vKey = dashscopeSbv1T2vModelToR2v(trimmed);
@@ -99,6 +101,30 @@ function parseResolution(raw: string): "480P" | "720P" | "1080P" {
   return "720P";
 }
 
+export type DashscopeWan30MediaItem = {
+  type: "first_frame" | "last_frame" | "reference_image";
+  url: string;
+};
+
+export function buildDashscopeWan30Media(opts: {
+  firstFrameUrl?: string;
+  lastFrameUrl?: string;
+  referenceImageUrls?: readonly string[];
+}): DashscopeWan30MediaItem[] {
+  const first = opts.firstFrameUrl?.trim() ?? "";
+  const last = opts.lastFrameUrl?.trim() ?? "";
+  const refs = (opts.referenceImageUrls ?? [])
+    .map((u) => u.trim())
+    .filter((u) => u.length > 0);
+  if (first || last) {
+    const media: DashscopeWan30MediaItem[] = [];
+    if (first) media.push({ type: "first_frame", url: first });
+    if (last) media.push({ type: "last_frame", url: last });
+    return media;
+  }
+  return refs.slice(0, 10).map((url) => ({ type: "reference_image", url }));
+}
+
 export function buildDashscopeWan30VideoBody(opts: {
   prompt: string;
   aspectRatio: string;
@@ -106,10 +132,14 @@ export function buildDashscopeWan30VideoBody(opts: {
   durationSec: number;
   seed?: number;
   watermark?: boolean;
-}): { input: { prompt: string }; parameters: Record<string, unknown> } {
+  media?: DashscopeWan30MediaItem[];
+}): { input: Record<string, unknown>; parameters: Record<string, unknown> } {
   const prompt = opts.prompt.trim();
-  if (!prompt) throw new Error("prompt required for text-to-video");
-  const duration = Math.min(30, Math.max(3, Math.floor(opts.durationSec)));
+  const media = (opts.media ?? []).filter((m) => m.url.trim().length > 0);
+  if (!prompt && media.length === 0) {
+    throw new Error("prompt or media required for wan3.0-video");
+  }
+  const duration = Math.min(30, Math.max(2, Math.floor(opts.durationSec)));
   const parameters: Record<string, unknown> = {
     resolution: parseResolution(opts.resolution),
     ratio: opts.aspectRatio.trim() || "16:9",
@@ -119,10 +149,10 @@ export function buildDashscopeWan30VideoBody(opts: {
   if (opts.seed != null && Number.isInteger(opts.seed)) {
     parameters.seed = opts.seed;
   }
-  return {
-    input: { prompt },
-    parameters,
-  };
+  const input: Record<string, unknown> = {};
+  if (prompt) input.prompt = prompt;
+  if (media.length > 0) input.media = media;
+  return { input, parameters };
 }
 
 export function buildDashscopeHappyhorseT2vVideoBody(opts: {
@@ -192,6 +222,7 @@ export function buildDashscopeSbv1T2vVideoBody(opts: {
   modelKey?: string;
   seed?: number;
   watermark?: boolean;
+  media?: DashscopeWan30MediaItem[];
 }): { input: Record<string, unknown>; parameters: Record<string, unknown> } {
   const modelKey = opts.modelKey?.trim() ?? "";
   if (isDashscopeWan30VideoModel(modelKey)) {

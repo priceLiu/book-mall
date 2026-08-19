@@ -1042,6 +1042,8 @@ model ModelCatalog {
   mediaKind         ModelMediaKind?
   appTags           String[]           @default([])
   gatewayPublished  Boolean            @default(false)
+  /// 用户选模时展示的「来源」标签（如 第三方 / 平台 / Grok），与 vendor/providerKind 解耦
+  sourceLabel       String?
 
   /// v006（2026-05-17）：云厂商账单 5 列的"本 catalog 主映射"——配合费用明细展示。
   /// 一个 canonical 配 1 个 primary vendor 映射；未来若同 canonical 跨多家云需要并存，
@@ -3044,6 +3046,13 @@ enum AppModelOfferingStatus {
   DEPRECATED
 }
 
+/// 应用/场景级模型上架（模型运营中心 · 应用分发）
+enum AppModelShelfStatus {
+  ACTIVE
+  HIDDEN
+  DEPRECATED
+}
+
 /// 媒介四槽（文生图 / 图生视频 / 视频生视频 / 纯文本）
 enum ModelMediaKind {
   TEXT_TO_IMAGE
@@ -3070,6 +3079,26 @@ model GatewayModelRoute {
   @@unique([canonicalModelKey, vendor, modelKey])
   @@index([modelKey, active])
   @@index([canonicalModelKey, active])
+}
+
+/// 应用/场景级模型上架（模型运营中心 · L5 应用分发）
+model AppModelShelf {
+  id                  String              @id @default(cuid())
+  appTag              String
+  /// 空串 = 应用全局；非空如 pro2-video | qr-t2v
+  sceneKey            String              @default("")
+  canonicalModelKey   String
+  status              AppModelShelfStatus @default(ACTIVE)
+  sortOrder           Int                 @default(0)
+  displayNameOverride String?
+  sourceLabelOverride String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([appTag, sceneKey, canonicalModelKey])
+  @@index([appTag, sceneKey, status])
+  @@index([canonicalModelKey])
 }
 
 /// 四媒介槽默认 canonical（应用无用户选模时的 fallback）

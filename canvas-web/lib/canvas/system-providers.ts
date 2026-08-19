@@ -9,6 +9,7 @@ import {
 import {
   STORY_LLM_MODEL_KEYS,
   STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
+  STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS,
   STORY_PRO_VIDEO_MODEL_KEYS,
   STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
@@ -29,6 +30,10 @@ export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
 export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
 /** Topaz Labs · 高清视频增强 */
 export const GATEWAY_TOPAZ_PROVIDER_ID = "gateway:topaz";
+/** MiniMax H3 视频 · Gateway 直连 */
+export const GATEWAY_MINIMAX_VIDEO_PROVIDER_ID = "gateway:minimax-video";
+/** 平台代付 · 统一 offering 分组（registry 优先映射到 gateway:*，此处作兼容） */
+export const PLATFORM_OFFERING_PROVIDER_ID = "platform:offering";
 /** 与 story-web 初始化大纲一致，走 KIE gemini-3-flash 端点 */
 export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 
@@ -234,6 +239,16 @@ export function pickDefaultStoryVideoEngine(
   if (volc) {
     for (const key of STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS) {
       const hit = findVideoOnProvider(volc, key);
+      if (hit) return hit;
+    }
+  }
+
+  const minimax = activeCanvasProviders(providers).find(
+    (p) => p.id === GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  );
+  if (minimax) {
+    for (const key of STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS) {
+      const hit = findVideoOnProvider(minimax, key);
       if (hit) return hit;
     }
   }

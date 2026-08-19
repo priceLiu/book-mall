@@ -21,6 +21,7 @@ import { listPlatformOfferingProvidersForUser } from "@/lib/canvas/platform-offe
 import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
+import { MINIMAX_VIDEO_KNOWN_MODELS_CANVAS } from "./providers/minimax-video";
 
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
@@ -32,6 +33,8 @@ export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
 export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
 /** Topaz Labs · 高清视频增强 */
 export const GATEWAY_TOPAZ_PROVIDER_ID = "gateway:topaz";
+/** MiniMax · H3 视频生成 */
+export const GATEWAY_MINIMAX_VIDEO_PROVIDER_ID = "gateway:minimax-video";
 
 export function isGatewayVirtualProviderId(id: string | null | undefined): boolean {
   return !!id && id.startsWith("gateway:");
@@ -345,6 +348,33 @@ export async function listGatewayVirtualProvidersForUser(
     });
   }
 
+  /** MiniMax H3：目录已登记；已关联 Gateway Key 即在画布展示，提交时校验 MINIMAX 凭证 */
+  if (link.linked) {
+    out.push({
+      id: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+      alias: "Gateway · MiniMax H3 视频",
+      kind: "OPENAI_COMPAT",
+      baseUrl: "https://api.minimaxi.com",
+      apiKeyMasked: "gateway",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "gateway",
+      models: MINIMAX_VIDEO_KNOWN_MODELS_CANVAS.map((m, idx) => ({
+        id: `${GATEWAY_MINIMAX_VIDEO_PROVIDER_ID}::${m.modelKey}`,
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        role: m.role,
+        description: m.description ?? null,
+        paramsSchema: m.paramsSchema ?? null,
+        defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+        enabled: true,
+        sortOrder: idx,
+      })),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
   return out;
 }
 
@@ -354,9 +384,12 @@ export type ListCanvasProvidersOpts = {
    * 画布打开时的列表请求应设 true，避免连接池紧张时拖到 180s。
    */
   skipEnsure?: boolean;
+  /** 应用内场景（模型运营中心 · AppModelShelf） */
+  sceneKey?: string | null;
+  role?: import("@prisma/client").CanvasModelRole;
 };
 
-/** Canvas / Story 模型列表：平台代付 = 上架模型 + Gateway 虚拟 Provider（含 sbv1 火山 VIDEO） */
+/** Canvas / Story 模型列表：统一注册表驱动 */
 export async function listCanvasProvidersForUser(
   userId: string,
   opts?: ListCanvasProvidersOpts,
@@ -380,17 +413,13 @@ export async function listCanvasProvidersForUser(
         console.warn("[listCanvasProvidersForUser] platform key ensure failed", e);
       }
     }
-    const [offerings, gateway] = await Promise.all([
-      listPlatformOfferingProvidersForUser(userId),
-      listGatewayVirtualProvidersForUser(userId),
-    ]);
-    const byId = new Map<string, CanvasProviderDto>();
-    for (const p of offerings) byId.set(p.id, p);
-    for (const p of gateway) byId.set(p.id, p);
-    return [...byId.values()];
   }
 
-  return listGatewayVirtualProvidersForUser(userId);
+  const { buildCanvasProvidersFromRegistry } = await import("./canvas-registry-providers");
+  return buildCanvasProvidersFromRegistry(userId, {
+    sceneKey: opts?.sceneKey,
+    role: opts?.role,
+  });
 }
 
 export async function getGatewayVirtualProviderForUser(

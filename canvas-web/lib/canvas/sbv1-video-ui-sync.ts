@@ -42,6 +42,8 @@ export function syncSbv1UiFromModelParams(
   if (typeof res === "string") {
     const rl = res.toLowerCase();
     if (rl === "720p" || rl === "1080p") setters.setResolution(rl);
+    if (rl === "768p") setters.setResolution("720p");
+    if (rl === "2k") setters.setResolution("1080p");
   }
   const dur = Number(p.duration);
   if (Number.isFinite(dur) && dur >= 3 && dur <= 15) {

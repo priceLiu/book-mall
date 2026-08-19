@@ -126,6 +126,23 @@
       "taskTags": ["Image to Video"],
       "readme": "海螺 2.3 图生视频 · standard / pro。"
     },
+    "minimax-h3-2k": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "MiniMax",
+      "taskTags": ["Image to Video", "Video to Video"],
+      "readme": "MiniMax H3 · 2K 按秒计费（刊例价 0.80 元/秒）。"
+    },
+    "minimax-h3-768p": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "MiniMax",
+      "taskTags": ["Image to Video"],
+      "readme": "MiniMax H3 · 768P 按秒计费（刊例价 0.50 元/秒）。"
+    },
+    "minimax-h3-regeneration-2k": {
+      "providerLabel": "MiniMax",
+      "taskTags": ["Video Upscale"],
+      "readme": "MiniMax H3 视频再生成 768P→2K（刊例价 0.30 元/秒）。"
+    },
     "kling-2.5-turbo-i2v": {
       "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
       "providerLabel": "Kling",

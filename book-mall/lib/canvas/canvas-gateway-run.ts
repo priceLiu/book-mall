@@ -17,14 +17,22 @@ import { CanvasProjectError } from "./canvas-project-service";
 import {
   GATEWAY_BAILIAN_PROVIDER_ID,
   GATEWAY_DEEPSEEK_PROVIDER_ID,
+  GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
   GATEWAY_MOONSHOT_PROVIDER_ID,
   GATEWAY_HUNYUAN_PROVIDER_ID,
   GATEWAY_KIE_PROVIDER_ID,
+  GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
   GATEWAY_TOPAZ_PROVIDER_ID,
   GATEWAY_VOLCENGINE_PROVIDER_ID,
   isGatewayVirtualProviderId,
 } from "./canvas-gateway-providers";
+import { isPlatformOfferingProviderId } from "./platform-offering-providers";
 import { isSystemProviderId } from "./canvas-system-provider";
+
+const SBV1_VOLCENGINE_VIDEO_MODEL_KEYS = new Set([
+  "doubao-seedance-2.0",
+  "doubao-seedance-1.5-pro",
+]);
 
 /** 仅允许 gateway:* 与 system:*（运行时会走 Gateway） */
 export function assertCanvasProviderGatewayOnly(providerId: string): void {
@@ -35,7 +43,11 @@ export function assertCanvasProviderGatewayOnly(providerId: string): void {
       400,
     );
   }
-  if (isGatewayVirtualProviderId(providerId) || isSystemProviderId(providerId)) {
+  if (
+    isGatewayVirtualProviderId(providerId) ||
+    isSystemProviderId(providerId) ||
+    isPlatformOfferingProviderId(providerId)
+  ) {
     return;
   }
   throw new CanvasProjectError(
@@ -81,6 +93,7 @@ const GATEWAY_ID_BY_PROVIDER_KIND: Partial<
   HUNYUAN: GATEWAY_HUNYUAN_PROVIDER_ID,
   VOLCENGINE: GATEWAY_VOLCENGINE_PROVIDER_ID,
   TOPAZ: GATEWAY_TOPAZ_PROVIDER_ID,
+  MINIMAX: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
 };
 
 /** 节点 providerId 须与 modelKey 路由一致（Gateway 实际按 modelKey 选凭证） */
@@ -88,9 +101,9 @@ export function assertCanvasProviderMatchesModelRoute(
   providerId: string,
   modelKey: string,
 ): void {
-  const normalized = canvasProviderIdForGateway(providerId);
+  const normalized = canvasProviderIdForGateway(providerId, modelKey);
   const route = routeGatewayModel(modelKey);
-  const expected = GATEWAY_ID_BY_PROVIDER_KIND[route.providerKind];
+  const expected = resolveExpectedGatewayProviderId(route.providerKind, modelKey);
   if (!expected || normalized === expected) return;
   throw new CanvasProjectError(
     "INVALID_INPUT",
@@ -99,8 +112,30 @@ export function assertCanvasProviderMatchesModelRoute(
   );
 }
 
-/** system:* → gateway:* 映射（节点仍可能存 legacy id） */
-export function canvasProviderIdForGateway(providerId: string): string {
+function resolveExpectedGatewayProviderId(
+  providerKind: GatewayProviderKind,
+  modelKey: string,
+): string | undefined {
+  if (
+    providerKind === "VOLCENGINE" &&
+    SBV1_VOLCENGINE_VIDEO_MODEL_KEYS.has(modelKey.trim())
+  ) {
+    return GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID;
+  }
+  return GATEWAY_ID_BY_PROVIDER_KIND[providerKind];
+}
+
+/** system:* / platform:offering → gateway:* 映射（节点仍可能存 legacy id） */
+export function canvasProviderIdForGateway(
+  providerId: string,
+  modelKey?: string,
+): string {
+  const key = modelKey?.trim() ?? "";
+  if (isPlatformOfferingProviderId(providerId) && key) {
+    const route = routeGatewayModel(key);
+    const expected = resolveExpectedGatewayProviderId(route.providerKind, key);
+    if (expected) return expected;
+  }
   if (isGatewayVirtualProviderId(providerId)) return providerId;
   if (providerId === "system:kie") return "gateway:kie";
   if (providerId === "system:deepseek") return "gateway:deepseek";

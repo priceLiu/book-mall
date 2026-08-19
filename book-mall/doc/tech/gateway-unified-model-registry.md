@@ -3,6 +3,9 @@
 > 状态：已实施（2026-06）  
 > 关联：`gateway-volcengine-architecture.md`、`12-platform-app-federation.md`
 
+关联：`doc/product/model-operations-center.md`（模型运营中心 · sourceLabel / AppModelShelf）  
+关联：`doc/product/23-new-model-onboarding-mandatory.md`（**新模型接入强制规范**）
+
 ## 1. 背景
 
 此前存在三套平行 modelKey 清单（Gateway 控制台硬编码、ecom 分镜常量、`scenario-registry` 的 platform/ecom 块），且「候选厂商」误将不同 canonical 模型（如 DeepSeek / Qwen / Gemini）放在同一槽位竞价。

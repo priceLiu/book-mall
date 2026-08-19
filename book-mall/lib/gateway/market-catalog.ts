@@ -4,6 +4,7 @@
 import type { ModelMediaKind } from "@prisma/client";
 
 import marketPresentation from "@/config/gateway-market-presentation.json";
+import { resolveSourceLabel } from "@/lib/gateway/model-source-label";
 import { listGatewayCredentials } from "@/lib/gateway/credential-service";
 import {
   gatewayRouteDisplayName,
@@ -115,12 +116,20 @@ export function readmeFor(canonicalKey: string, fallback: string): string {
   return presentationFor(canonicalKey).readme ?? fallback;
 }
 
-export function providerLabelFor(canonicalKey: string, vendor: string): string {
-  return (
-    presentationFor(canonicalKey).providerLabel ??
-    VENDOR_LABEL[vendor.toLowerCase()] ??
-    vendor
-  );
+export function providerLabelFor(
+  canonicalKey: string,
+  vendor: string,
+  opts?: {
+    catalogSourceLabel?: string | null;
+    providerKind?: import("@prisma/client").GatewayProviderKind;
+  },
+): string {
+  return resolveSourceLabel({
+    canonicalModelKey: canonicalKey,
+    vendor,
+    providerKind: opts?.providerKind ?? "KIE",
+    catalogSourceLabel: opts?.catalogSourceLabel,
+  });
 }
 
 /** 首页走马灯：仅展示厂商名，隐藏 KIE 等第三方路由平台。 */
@@ -273,7 +282,9 @@ export async function listMarketModelsForGatewayUser(input: {
       displayName: r.displayName,
       description: r.description,
       vendor: r.vendor,
-      providerLabel: providerLabelFor(r.canonicalModelKey, r.vendor),
+      providerLabel: providerLabelFor(r.canonicalModelKey, r.vendor, {
+        providerKind: r.providerKind as import("@prisma/client").GatewayProviderKind,
+      }),
       providerKind: r.providerKind,
       mediaKind: r.mediaKind,
       mediaKindLabel: r.mediaKindLabel,

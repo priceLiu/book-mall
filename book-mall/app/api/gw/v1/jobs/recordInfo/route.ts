@@ -25,6 +25,7 @@ import {
   pollKieTaskForLog,
 } from "@/lib/gateway/poll-service";
 import { pollTopazVideoTaskForLog } from "@/lib/gateway/topaz-jobs";
+import { pollMinimaxVideoTaskStatus } from "@/lib/gateway/minimax-video-jobs";
 import {
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
@@ -75,7 +76,11 @@ export async function GET(request: NextRequest) {
 
   try {
     if (providerKind === "DASHSCOPE") {
-      const polled = await pollDashscopeTaskForLog({ credentialId, taskId });
+      const polled = await pollDashscopeTaskForLog({
+        credentialId,
+        taskId,
+        model: log?.model,
+      });
       const { output, raw } = polled;
       if (log) {
         const status = output.task_status;
@@ -255,6 +260,69 @@ export async function GET(request: NextRequest) {
         }
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "BAILIAN" });
+    }
+
+    if (providerKind === "MINIMAX") {
+      const polled = await pollMinimaxVideoTaskStatus({ credentialId, taskId });
+      if (log) {
+        if (polled.state === "succeeded") {
+          await finalizeRequestLog(log.id, {
+            status: "SUCCEEDED",
+            durationMs: log.submittedAt
+              ? Date.now() - log.submittedAt.getTime()
+              : 0,
+            resultSummary: buildGatewayTaskResultSummary(polled.raw, {
+              ...(polled.videoUrl ? { videoUrl: polled.videoUrl } : {}),
+              ...(polled.enhancedPrompt
+                ? { enhancedPrompt: polled.enhancedPrompt }
+                : {}),
+              status: polled.task.status,
+              usage: polled.task.usage,
+            }),
+            externalTaskId: taskId,
+            model: log.model,
+            usage: polled.task.usage
+              ? {
+                  totalTokens: polled.task.usage.total_tokens,
+                  promptTokens: polled.task.usage.prompt_tokens,
+                  completionTokens: polled.task.usage.completion_tokens,
+                }
+              : undefined,
+          });
+        } else if (polled.state === "failed") {
+          await finalizeRequestLog(log.id, {
+            status: "FAILED",
+            durationMs: log.submittedAt
+              ? Date.now() - log.submittedAt.getTime()
+              : 0,
+            failMessage: polled.errorMessage ?? "MiniMax video task failed",
+            failCode: "MINIMAX_VIDEO_TASK_FAILED",
+            externalTaskId: taskId,
+            model: log.model,
+            resultSummary: buildGatewayTaskResultSummary(polled.raw, {
+              status: polled.task.status,
+              error: polled.task.error,
+            }),
+          });
+        } else {
+          await touchGatewayLogProgress(
+            log.id,
+            buildGatewayLogProgressSummary({
+              providerKind: "MINIMAX",
+              status: polled.state,
+            }),
+          );
+        }
+      }
+      return NextResponse.json({
+        code: 200,
+        data: {
+          task: polled.task,
+          video_url: polled.videoUrl,
+          enhanced_prompt: polled.enhancedPrompt,
+        },
+        providerKind: "MINIMAX",
+      });
     }
 
     if (providerKind === "VOLCENGINE") {

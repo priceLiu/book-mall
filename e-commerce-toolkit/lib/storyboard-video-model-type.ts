@@ -51,7 +51,7 @@ const EXPLICIT: Record<string, StoryboardVideoModelCapability[]> = {
   "wan2.6-t2v": ["video_t2v"],
   "wan2.7-t2v": ["video_t2v"],
   "wan2.7-t2v-2026-04-25": ["video_t2v"],
-  "wan3.0-video": ["video_t2v"],
+  "wan3.0-video": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
 };
 
 /** 视频模型能力推断（筛选 · 角标共用） */

@@ -10,6 +10,7 @@ import {
   canvasGwCreateBailianR2vJob,
   canvasGwCreateDashscopeVideoJob,
   canvasGwCreateKieJob,
+  canvasGwCreateMinimaxVideoJob,
   canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
 } from "@/lib/canvas/canvas-gateway-client";
@@ -156,6 +157,17 @@ async function submitCanvasVideoToGateway(
         topazInput.frame_interpolation ?? topazInput.frameInterpolation,
       ),
       resolution,
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
+    });
+    return { taskId: job.taskId, logId: job.logId };
+  }
+
+  if (providerKind === "MINIMAX") {
+    const job = await canvasGwCreateMinimaxVideoJob(userId, {
+      model: String(payload.minimaxModel ?? task.model),
+      input: (payload.minimaxInput as Record<string, unknown>) ?? {},
       clientPage,
       projectId: task.projectId,
       canvasTaskId: task.id,

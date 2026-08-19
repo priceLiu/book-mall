@@ -10,6 +10,10 @@ import {
   MINIMAX_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
 import {
+  MINIMAX_VIDEO_KNOWN_MODELS,
+  minimaxH3BillingCanonicalFromInput,
+} from "@/lib/gateway/minimax-video-models";
+import {
   ELEVENLABS_SFX_MODELS,
   ELEVENLABS_STS_MODELS,
   ELEVENLABS_MUSIC_MODELS,
@@ -59,6 +63,89 @@ function dashVideo(modelKey: string, sortOrder: number): CanonicalModelDef {
     unitLabel: "元/秒",
     routes: [{ vendor: "aliyun", modelKey, providerKind: "DASHSCOPE" }],
   };
+}
+
+function buildMinimaxH3CanonicalRegistryDefs(): CanonicalModelDef[] {
+  const grouped = new Map<string, (typeof MINIMAX_VIDEO_KNOWN_MODELS)[number][]>();
+  for (const m of MINIMAX_VIDEO_KNOWN_MODELS) {
+    const ck = minimaxH3BillingCanonicalFromInput({
+      modelKey: m.modelKey,
+      resolution: m.defaultParams.resolution as string | undefined,
+    });
+    const list = grouped.get(ck) ?? [];
+    list.push(m);
+    grouped.set(ck, list);
+  }
+
+  const metaByCanonical: Record<
+    string,
+    {
+      displayName: string;
+      mediaKind: ModelMediaKind;
+      billingKind: "PER_SECOND" | "PER_1K_TOKENS";
+      unitLabel: string;
+      sortOrder: number;
+    }
+  > = {
+    "minimax-h3-2k": {
+      displayName: "MiniMax H3 · 2K",
+      mediaKind: "IMAGE_TO_VIDEO",
+      billingKind: "PER_SECOND",
+      unitLabel: "元/秒",
+      sortOrder: 76.6,
+    },
+    "minimax-h3-768p": {
+      displayName: "MiniMax H3 · 768P",
+      mediaKind: "IMAGE_TO_VIDEO",
+      billingKind: "PER_SECOND",
+      unitLabel: "元/秒",
+      sortOrder: 76.7,
+    },
+    "minimax-h3-regeneration-2k": {
+      displayName: "MiniMax H3 再生成",
+      mediaKind: "VIDEO_TO_VIDEO",
+      billingKind: "PER_SECOND",
+      unitLabel: "元/秒",
+      sortOrder: 76.8,
+    },
+    "minimax-h3-context-ir": {
+      displayName: "MiniMax H3 Context-IR",
+      mediaKind: "TEXT_LLM",
+      billingKind: "PER_1K_TOKENS",
+      unitLabel: "元/百万 tokens",
+      sortOrder: 76.9,
+    },
+  };
+
+  const defs: CanonicalModelDef[] = [];
+  for (const [canonicalModelKey, models] of grouped) {
+    const meta = metaByCanonical[canonicalModelKey] ?? {
+      displayName: canonicalModelKey,
+      mediaKind: "IMAGE_TO_VIDEO" as const,
+      billingKind: "PER_SECOND" as const,
+      unitLabel: "元/秒",
+      sortOrder: 76.6,
+    };
+    defs.push({
+      canonicalModelKey,
+      displayName: meta.displayName,
+      description: models.map((m) => m.displayName).join(" · "),
+      mediaKind: meta.mediaKind,
+      role: "VIDEO",
+      requestKind: "VIDEO",
+      appTags: [...VISUAL],
+      sortOrder: meta.sortOrder,
+      primaryVendor: "minimax",
+      billingKind: meta.billingKind,
+      unitLabel: meta.unitLabel,
+      routes: models.map((m) => ({
+        vendor: "minimax",
+        modelKey: m.modelKey,
+        providerKind: "MINIMAX" as const,
+      })),
+    });
+  }
+  return defs.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function bailianVideo(modelKey: string, sortOrder: number): CanonicalModelDef {
@@ -732,4 +819,5 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/次",
     routes: [{ vendor: "elevenlabs", modelKey: m.modelKey, providerKind: "ELEVENLABS" as const }],
   })),
+  ...buildMinimaxH3CanonicalRegistryDefs(),
 ];

@@ -98,6 +98,14 @@ export function resolveSbv1VideoModelRefRunWarning(args: {
     };
   }
 
+  const h3Mode = minimaxH3VideoMode(modelKey);
+  if (h3Mode === "t2v" || h3Mode === "context_ir") {
+    return {
+      title: "请切换为图生/参考生视频模型",
+      message: `MiniMax H3 文生视频不支持参考图。请改用「图生视频 / 参考生视频」模型，或移除参考图。`,
+    };
+  }
+
   if (
     caps.refApi === "single_i2v" &&
     refCount > caps.maxRefsOmni
@@ -174,6 +182,18 @@ const DASHSCOPE_I2V_KEYS = new Set([
   "happyhorse-1.1-i2v",
 ]);
 
+function minimaxH3VideoMode(modelKey: string): string | null {
+  const k = modelKey.trim().toLowerCase();
+  if (!k.includes("minimax/minimax-h3")) return null;
+  if (k.endsWith("-t2v")) return "t2v";
+  if (k.endsWith("-i2v")) return "i2v";
+  if (k.endsWith("-fl2v")) return "fl2v";
+  if (k.endsWith("-r2v") || k.endsWith("-s2v")) return "r2v";
+  if (k.endsWith("-regeneration")) return "regeneration";
+  if (k.endsWith("-context-ir")) return "context_ir";
+  return null;
+}
+
 function isVolcengineSbv1Model(modelKey: string, providerId?: string): boolean {
   if (providerId === GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID) return true;
   return (SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS as readonly string[]).includes(
@@ -194,6 +214,43 @@ export function getSbv1VideoModelRefCaps(
   opts?: { multiShots?: boolean; providerId?: string },
 ): Sbv1VideoModelRefCaps {
   const k = modelKey.trim();
+
+  const h3Mode = minimaxH3VideoMode(k);
+  if (h3Mode === "t2v" || h3Mode === "context_ir") {
+    return {
+      supportedModes: ["omni"],
+      refApi: "bailian_r2v_media",
+      maxRefsOmni: 0,
+    };
+  }
+  if (h3Mode === "i2v") {
+    return {
+      supportedModes: ["omni"],
+      refApi: "single_i2v",
+      maxRefsOmni: 1,
+    };
+  }
+  if (h3Mode === "fl2v") {
+    return {
+      supportedModes: ["first_last"],
+      refApi: "wan_first_last_url",
+      maxRefsOmni: 2,
+    };
+  }
+  if (h3Mode === "r2v" || h3Mode === "s2v") {
+    return {
+      supportedModes: ["omni"],
+      refApi: "bailian_r2v_media",
+      maxRefsOmni: 9,
+    };
+  }
+  if (h3Mode === "regeneration") {
+    return {
+      supportedModes: ["omni"],
+      refApi: "single_i2v",
+      maxRefsOmni: 0,
+    };
+  }
 
   if (MOTION_KEYS.has(k)) {
     return {
@@ -242,6 +299,14 @@ export function getSbv1VideoModelRefCaps(
       supportedModes: ["omni", "first_last"],
       refApi: "wan_first_last_url",
       maxRefsOmni: 1,
+    };
+  }
+
+  if (k === "wan3.0-video") {
+    return {
+      supportedModes: ["omni", "first_last"],
+      refApi: "bailian_r2v_media",
+      maxRefsOmni: 10,
     };
   }
 
@@ -361,6 +426,15 @@ export function getSbv1VideoDockModeChips(
     ];
   }
 
+  if (k === "wan3.0-video") {
+    return [
+      chip("t2v"),
+      chip("i2v"),
+      chip("first_last"),
+      chip("omni"),
+    ];
+  }
+
   if (DASHSCOPE_T2V_KEYS.has(k)) {
     return [chip("t2v")];
   }
@@ -390,6 +464,16 @@ export function getSbv1VideoDockModeChips(
 
   if (KIE_MULTI_REF_KEYS.has(k)) {
     return [chip("i2v"), chip("omni", "多图参考")];
+  }
+
+  const h3Mode = minimaxH3VideoMode(k);
+  if (h3Mode === "t2v" || h3Mode === "context_ir") {
+    return [chip("t2v")];
+  }
+  if (h3Mode === "i2v") return [chip("i2v")];
+  if (h3Mode === "fl2v") return [chip("first_last")];
+  if (h3Mode === "r2v" || h3Mode === "s2v") {
+    return [chip("omni", "参考生视频")];
   }
 
   if (caps.supportedModes.includes("first_last")) {
@@ -436,7 +520,17 @@ export function resolveSbv1VideoModelRefLinkBlock(args: {
   const refLinkCount = Math.max(0, Math.floor(args.refLinkCount));
   if (refLinkCount <= 0) return { blocked: false };
   const modelKey = args.modelKey.trim();
-  if (!isDashscopeSbv1TextToVideoModel(modelKey)) return { blocked: false };
+  if (!isDashscopeSbv1TextToVideoModel(modelKey)) {
+    const h3Mode = minimaxH3VideoMode(modelKey);
+    if (h3Mode === "t2v" || h3Mode === "context_ir") {
+      return {
+        blocked: true,
+        reason: `已连接 ${refLinkCount} 张参考图，文生视频不可用；请选 MiniMax H3 图生/参考生视频或断开参考图`,
+      };
+    }
+    return { blocked: false };
+  }
+  if (modelKey === "wan3.0-video") return { blocked: false };
   const r2vKey = DASHSCOPE_T2V_TO_R2V[modelKey];
   return {
     blocked: true,

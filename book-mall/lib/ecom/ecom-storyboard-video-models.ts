@@ -16,10 +16,21 @@ export const STORYBOARD_KIE_VIDEO_MODELS = [
 /** 百炼 DashScope 参考生视频（1～9 张 reference_image） */
 export const STORYBOARD_BAILIAN_R2V_VIDEO_MODELS = BAILIAN_R2V_MODEL_IDS;
 
+/** MiniMax H3 直连 */
+export const STORYBOARD_MINIMAX_VIDEO_MODELS = [
+  "MiniMax/MiniMax-H3-t2v",
+  "MiniMax/MiniMax-H3-i2v",
+  "MiniMax/MiniMax-H3-fl2v",
+  "MiniMax/MiniMax-H3-r2v",
+  "MiniMax/MiniMax-H3-s2v",
+  "MiniMax/MiniMax-H3-regeneration",
+] as const;
+
 export const STORYBOARD_VIDEO_MODELS = [
   ...STORYBOARD_VOLCENGINE_VIDEO_MODELS,
   ...STORYBOARD_KIE_VIDEO_MODELS,
   ...STORYBOARD_BAILIAN_R2V_VIDEO_MODELS,
+  ...STORYBOARD_MINIMAX_VIDEO_MODELS,
 ] as const;
 
 export function isStoryboardKieVideoModel(modelKey: string): boolean {
@@ -54,11 +65,19 @@ export function isStoryboardBailianR2vVideoModel(modelKey: string): boolean {
   );
 }
 
+export function isStoryboardMinimaxVideoModel(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return (STORYBOARD_MINIMAX_VIDEO_MODELS as readonly string[]).some(
+    (m) => m.toLowerCase() === k,
+  );
+}
+
 export function resolveStoryboardVideoProvider(
   modelKey: string,
-): "volcengine" | "kie" | "bailian" {
+): "volcengine" | "kie" | "bailian" | "minimax" {
   if (isStoryboardKieVideoModel(modelKey)) return "kie";
   if (isStoryboardBailianR2vVideoModel(modelKey)) return "bailian";
+  if (isStoryboardMinimaxVideoModel(modelKey)) return "minimax";
   return "volcengine";
 }
 

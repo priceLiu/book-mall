@@ -98,6 +98,7 @@ export default defineConfig({
       "test/unit/libtv-grid-split-hd.test.ts",
       "test/unit/libtv-plain-text-display.test.ts",
       "test/unit/task-pick-preferred.test.ts",
+      "test/unit/canvas-rf-sync.test.ts",
     ],
     environment: "node",
     globals: false,

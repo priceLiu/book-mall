@@ -135,7 +135,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         href: "/admin/platform-models",
-        label: "平台模型",
+        label: "模型运营中心",
         icon: Layers,
         prefix: "/admin/platform-models",
         show: (v) => canViewFinanceCost(v.user.role),

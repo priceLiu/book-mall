@@ -98,6 +98,36 @@ export const REFERENCE_VENDOR_MODELS: ReferenceVendorModel[] = [
     discountRate: 0.1,
     tierRaw: "千 token",
   },
+  {
+    id: "minimax-h3-2k",
+    vendor: "minimax",
+    displayName: "MiniMax H3 · 2K",
+    unit: "PER_SEC",
+    listCostYuan: 0.8,
+    discountRate: 0,
+    tierRaw: "2K",
+    note: "刊例价 0.80 元/秒",
+  },
+  {
+    id: "minimax-h3-768p",
+    vendor: "minimax",
+    displayName: "MiniMax H3 · 768P",
+    unit: "PER_SEC",
+    listCostYuan: 0.5,
+    discountRate: 0,
+    tierRaw: "768P",
+    note: "刊例价 0.50 元/秒",
+  },
+  {
+    id: "minimax-h3-regeneration-2k",
+    vendor: "minimax",
+    displayName: "MiniMax H3 再生成",
+    unit: "PER_SEC",
+    listCostYuan: 0.3,
+    discountRate: 0,
+    tierRaw: "2K",
+    note: "768P→2K 刊例价 0.30 元/秒",
+  },
 ];
 
 export interface CreditAcquisitionSku {

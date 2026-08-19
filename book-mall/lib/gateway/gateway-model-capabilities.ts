@@ -74,6 +74,15 @@ export function marketTaskTagsForModel(input: {
   }
 
   if (k.includes("hailuo") && k.includes("image-to-video")) return ["image-to-video"];
+  if (k.includes("minimax-h3-t2v")) return ["image-to-video"];
+  if (k.includes("minimax-h3-i2v") || k.includes("minimax-h3-fl2v")) {
+    return ["image-to-video"];
+  }
+  if (k.includes("minimax-h3-r2v") || k.includes("minimax-h3-s2v")) {
+    return ["image-to-video"];
+  }
+  if (k.includes("minimax-h3-regeneration")) return ["video-upscale"];
+  if (k.includes("minimax-h3-context-ir")) return ["chat"];
   if (k.includes("kling/v2-5-turbo-image-to-video")) return ["image-to-video"];
   if (k.includes("kling/v2-5-turbo-text-to-video")) return ["image-to-video"];
 
@@ -126,6 +135,13 @@ export function gatewayRouteDisplayName(
     "veo3.1": "Veo 3.1",
     "hailuo/2-3-image-to-video-standard": "Hailuo 2.3 I2V Standard",
     "hailuo/2-3-image-to-video-pro": "Hailuo 2.3 I2V Pro",
+    "MiniMax/MiniMax-H3-t2v": "MiniMax H3 文生视频",
+    "MiniMax/MiniMax-H3-i2v": "MiniMax H3 图生视频",
+    "MiniMax/MiniMax-H3-fl2v": "MiniMax H3 首尾帧",
+    "MiniMax/MiniMax-H3-r2v": "MiniMax H3 参考生视频",
+    "MiniMax/MiniMax-H3-s2v": "MiniMax H3 主体参考",
+    "MiniMax/MiniMax-H3-regeneration": "MiniMax H3 768P→2K",
+    "MiniMax/MiniMax-H3-context-ir": "MiniMax H3 Context-IR",
     "kling/v2-5-turbo-image-to-video-pro": "Kling 2.5 Turbo I2V",
     "kling/v2-5-turbo-text-to-video-pro": "Kling 2.5 Turbo T2V",
     "suno/generate": "Suno API · 文生音乐",

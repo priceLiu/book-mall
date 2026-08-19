@@ -62,7 +62,14 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "wan2.6-t2v": ["video_t2v"],
   "wan2.7-t2v": ["video_t2v"],
   "wan2.7-t2v-2026-04-25": ["video_t2v"],
-  "wan3.0-video": ["video_t2v"],
+  "wan3.0-video": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
+  "MiniMax/MiniMax-H3-t2v": ["video_t2v"],
+  "MiniMax/MiniMax-H3-i2v": ["video_i2v"],
+  "MiniMax/MiniMax-H3-fl2v": ["video_i2v"],
+  "MiniMax/MiniMax-H3-r2v": ["video_r2v", "video_multi_ref"],
+  "MiniMax/MiniMax-H3-s2v": ["video_r2v", "video_multi_ref"],
+  "MiniMax/MiniMax-H3-regeneration": ["video_v2v"],
+  "MiniMax/MiniMax-H3-context-ir": ["video_t2v"],
 };
 
 const VIDEO_CAPABILITY_LABELS: Record<
@@ -103,7 +110,9 @@ function inferCapabilities(modelKey: string): StoryModelCapability[] {
     k.includes("veo") ||
     k.includes("wan2.") ||
     k.includes("wan3.0") ||
-    k.includes("happyhorse");
+    k.includes("happyhorse") ||
+    k.includes("minimax-h3") ||
+    k.includes("minimax/minimax-h3");
 
   if (isVideo) {
     if (k.includes("-r2v") || k.endsWith("r2v")) {

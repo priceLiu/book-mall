@@ -43,7 +43,10 @@ export const VIDEO_MODEL_SEEDS: VideoModelSeed[] = [
   { canonicalModelKey: "kling-video-720p", displayName: "可灵 视频 720P", vendor: "kie", tierRaw: "720P", listCostYuan: 0.48, discountRate: 0.05 },
   { canonicalModelKey: "kling-video-1080p", displayName: "可灵 视频 1080P", vendor: "kie", tierRaw: "1080P", listCostYuan: 0.72, discountRate: 0.05 },
   { canonicalModelKey: "kling-3.0-video", displayName: "可灵 3.0 视频", vendor: "kie", tierRaw: "720P", listCostYuan: 0.49, discountRate: 0.05 },
-  { canonicalModelKey: "minimax-video", displayName: "MiniMax 视频", vendor: "kie", tierRaw: "标准", listCostYuan: 0.55, discountRate: 0.05 },
+  { canonicalModelKey: "minimax-video", displayName: "MiniMax 视频 (KIE 海螺)", vendor: "kie", tierRaw: "标准", listCostYuan: 0.55, discountRate: 0.05 },
+  { canonicalModelKey: "minimax-h3-2k", displayName: "MiniMax H3 · 2K", vendor: "minimax", tierRaw: "2K", listCostYuan: 0.8, discountRate: 0 },
+  { canonicalModelKey: "minimax-h3-768p", displayName: "MiniMax H3 · 768P", vendor: "minimax", tierRaw: "768P", listCostYuan: 0.5, discountRate: 0 },
+  { canonicalModelKey: "minimax-h3-regeneration-2k", displayName: "MiniMax H3 再生成", vendor: "minimax", tierRaw: "2K", listCostYuan: 0.3, discountRate: 0 },
   { canonicalModelKey: "runway-gen3", displayName: "Runway Gen-3", vendor: "kie", tierRaw: "标准", listCostYuan: 0.75, discountRate: 0.05 },
   // —— 腾讯 ——
   { canonicalModelKey: "hunyuan-video", displayName: "混元 视频生成", vendor: "tencent", tierRaw: "标准", listCostYuan: 0.56, discountRate: 0.1 },

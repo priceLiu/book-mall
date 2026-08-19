@@ -32,6 +32,8 @@
 
 项目规则见 **`.cursor/rules/ai-mall-product-doc.mdc`**，与本文档一致。
 
+**新模型接入**（强制）：阅读并执行 **[23-new-model-onboarding-mandatory.md](../product/23-new-model-onboarding-mandatory.md)**；Cursor 规则 **`.cursor/rules/new-model-onboarding-mandatory.mdc`**。
+
 ## 7. 平台联邦（新应用必遵）
 
 1. 阅读 **[12-platform-app-federation.md](../product/12-platform-app-federation.md)** 与实施计划 **[2026-platform-unification-rollout.md](../plans/2026-platform-unification-rollout.md)**。  

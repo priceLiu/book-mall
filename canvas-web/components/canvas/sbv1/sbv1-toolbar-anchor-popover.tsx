@@ -41,7 +41,8 @@ export function useSbv1ToolbarAnchor(isOpen?: boolean): {
 } {
   const anchorRef = useRef<HTMLButtonElement>(null!);
   const [internalOpen, setInternalOpen] = useState(false);
-  const effectiveOpen = isOpen ?? internalOpen;
+  const isControlled = isOpen !== undefined;
+  const effectiveOpen = isControlled ? isOpen : internalOpen;
   const viewport = useViewport();
   const [tick, setTick] = useState(0);
 
@@ -56,7 +57,11 @@ export function useSbv1ToolbarAnchor(isOpen?: boolean): {
     return anchorRef.current?.getBoundingClientRect() ?? null;
   }, [effectiveOpen, tick, viewport.x, viewport.y, viewport.zoom]);
 
-  return { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect };
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+  };
+
+  return { anchorRef, open: effectiveOpen, setOpen, rect };
 }
 
 export type Sbv1ToolbarDropdownPlacement = "auto" | "above" | "below";

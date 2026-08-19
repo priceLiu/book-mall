@@ -23,6 +23,18 @@ const WAN27_IMAGE_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation";
 const VIDEO_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
+export const VIDEO_CREATE_PATH =
+  "/api/v1/services/aigc/video-generation/video-synthesis";
+
+/**
+ * 万相 3.0（邀测）官方要求走业务空间专属域名，打 dashscope.aliyuncs.com 会 403 Access denied。
+ * @see https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference
+ */
+export const WAN30_VIDEO_MODEL_KEY = "wan3.0-video";
+export const WAN30_MISSING_WORKSPACE_ERROR =
+  "万相 3.0 须使用华北2（北京）业务空间 API Key（sk-ws- 开头），" +
+  "并走 {WorkspaceId}.cn-beijing.maas.aliyuncs.com。" +
+  "请在 Gateway 绑定「DashScope 北京 S2V」凭证后重试。";
 /**
  * 数字人 wan2.2-s2v 创建端点（厂商确认须 image2video，**非** video-generation）。
  * @see https://help.aliyun.com/zh/model-studio/wan-s2v-api
@@ -94,6 +106,52 @@ export function resolveDashscopeBeijingMaasBaseUrl(apiKey: string): string | nul
   const workspaceId = parseDashscopeWorkspaceIdFromApiKey(apiKey);
   if (!workspaceId) return null;
   return `https://${workspaceId}.cn-beijing.maas.aliyuncs.com`;
+}
+
+export function isDashscopeWan30VideoModelKey(model: string): boolean {
+  return model.trim().toLowerCase() === WAN30_VIDEO_MODEL_KEY;
+}
+
+/**
+ * 万相 3.0 创建/轮询根域名：优先凭证已配的 *.maas.aliyuncs.com，否则从 sk-ws- Key 解析华北2 业务空间。
+ * 北京 S2V 凭证常把 baseUrl 存成 dashscope.aliyuncs.com（S2V 不能走 MAAS），此处须忽略该误配。
+ */
+export function resolveDashscopeWan30VideoApiRoot(
+  apiKey: string,
+  storedBaseUrl?: string | null,
+): string | null {
+  const stored = storedBaseUrl?.trim() ?? "";
+  if (/\.maas\.aliyuncs\.com/i.test(stored)) {
+    return resolveDashscopeApiRoot(stored);
+  }
+  return resolveDashscopeBeijingMaasBaseUrl(apiKey);
+}
+
+export function resolveDashscopeVideoCreateUrl(opts: {
+  model: string;
+  apiKey: string;
+  baseUrl?: string | null;
+}): { ok: true; url: string } | { ok: false; error: string } {
+  if (!isDashscopeWan30VideoModelKey(opts.model)) {
+    return { ok: true, url: VIDEO_CREATE_URL };
+  }
+  const root = resolveDashscopeWan30VideoApiRoot(opts.apiKey, opts.baseUrl);
+  if (!root) {
+    return { ok: false, error: WAN30_MISSING_WORKSPACE_ERROR };
+  }
+  return { ok: true, url: `${root}${VIDEO_CREATE_PATH}` };
+}
+
+/** 万相 3.0 轮询须与创建同一 MAAS 根域名；其它 DashScope 视频仍走凭证 baseUrl / 默认 dashscope。 */
+export function resolveDashscopeVideoTaskPollBaseUrl(opts: {
+  model?: string | null;
+  apiKey: string;
+  storedBaseUrl?: string | null;
+}): string | null {
+  if (!isDashscopeWan30VideoModelKey(opts.model ?? "")) {
+    return opts.storedBaseUrl ?? null;
+  }
+  return resolveDashscopeWan30VideoApiRoot(opts.apiKey, opts.storedBaseUrl);
 }
 
 export const AITRYON_PARSING_MODEL = "aitryon-parsing-v1";
@@ -576,8 +634,16 @@ export async function dashscopeCreateVideoTask(opts: {
   apiKey: string;
   model: string;
   body: Record<string, unknown>;
+  baseUrl?: string | null;
 }): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
-  const res = await fetch(VIDEO_CREATE_URL, {
+  const resolved = resolveDashscopeVideoCreateUrl({
+    model: opts.model,
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+
+  const res = await fetch(resolved.url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

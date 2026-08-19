@@ -12,12 +12,16 @@ const CACHE: {
   value: CanvasProviderDto[] | null;
   gatewayLink: GatewayLinkStatusDto | null;
   ts: number;
+  version: number;
 } = {
   value: null,
   gatewayLink: null,
   ts: 0,
+  version: 0,
 };
 /** 会话内缓存：打开模型选择器时不重复阻塞 UI；后台静默刷新 */
+/** bump 后强制刷新（Provider 映射变更时递增） */
+const PROVIDERS_CACHE_VERSION = 4;
 const TTL_MS = 30 * 60 * 1000;
 let prefetchInflight: Promise<void> | null = null;
 
@@ -26,12 +30,16 @@ async function fetchUserProvidersIntoCache(base: string): Promise<void> {
   CACHE.value = result.providers;
   CACHE.gatewayLink = result.gatewayLink;
   CACHE.ts = Date.now();
+  CACHE.version = PROVIDERS_CACHE_VERSION;
 }
 
 /** 画布页挂载时预拉 Provider，避免 EnginePicker 首次打开卡顿 */
 export function prefetchUserProviders(base: string | null | undefined): void {
   if (!base) return;
-  const fresh = CACHE.value && Date.now() - CACHE.ts < TTL_MS;
+  const fresh =
+    CACHE.value &&
+    CACHE.version === PROVIDERS_CACHE_VERSION &&
+    Date.now() - CACHE.ts < TTL_MS;
   if (fresh) return;
   if (prefetchInflight) return;
   prefetchInflight = fetchUserProvidersIntoCache(base)
@@ -62,7 +70,10 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
 
   useEffect(() => {
     if (!base) return;
-    const fresh = CACHE.value && Date.now() - CACHE.ts < TTL_MS;
+    const fresh =
+      CACHE.value &&
+      CACHE.version === PROVIDERS_CACHE_VERSION &&
+      Date.now() - CACHE.ts < TTL_MS;
     if (fresh && !opts?.forceRefresh) {
       setProviders(CACHE.value!);
       setGatewayLink(CACHE.gatewayLink);
@@ -114,4 +125,5 @@ export function invalidateUserProvidersCache() {
   CACHE.value = null;
   CACHE.gatewayLink = null;
   CACHE.ts = 0;
+  CACHE.version = 0;
 }

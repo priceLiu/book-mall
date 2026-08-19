@@ -47,6 +47,12 @@ import {
   isVolcengineVideoTaskFailed,
   isVolcengineVideoTaskSuccess,
 } from "@/lib/gateway/volcengine-client";
+import {
+  isMinimaxVideoTaskFailed,
+  isMinimaxVideoTaskSuccess,
+  minimaxVideoTaskResultUrl,
+  type MinimaxVideoTaskRow,
+} from "@/lib/gateway/minimax-video-client";
 import type { CanvasChatMessage } from "@/lib/canvas/providers/types";
 
 const CLIENT_SOURCE: GatewayClientSource = "E_COMMERCE";
@@ -354,6 +360,64 @@ export async function ecomGwCreateVolcengineVideoJob(
   });
 
   return { taskId: created.taskId, logId: created.logId };
+}
+
+export async function ecomGwCreateMinimaxVideoJob(
+  bookUserId: string,
+  opts: {
+    model: string;
+    input: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<{ taskId: string; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  const route = routeGatewayModel(opts.model);
+  if (route.providerKind !== "MINIMAX" || route.requestKind !== "VIDEO") {
+    throw new GatewayRequiredError(`模型 ${opts.model} 非 MiniMax H3 视频`);
+  }
+  const credentialId = pickCredentialForKind(auth.credentials, "MINIMAX");
+  if (!credentialId) {
+    throw new GatewayRequiredError("Gateway Key 未绑定 MiniMax 凭证");
+  }
+
+  const model = opts.model.trim();
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: { model, input: opts.input },
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
+  });
+
+  return { taskId: created.taskId, logId: created.logId };
+}
+
+export async function ecomGwPollMinimax(
+  bookUserId: string,
+  opts: { taskId: string; gatewayLogId: string },
+): Promise<{ status: string; outputUrl?: string; failMessage?: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  const credentialId = pickCredentialForKind(auth.credentials, "MINIMAX");
+  if (!credentialId) {
+    throw new GatewayRequiredError("Gateway Key 未绑定 MiniMax 凭证");
+  }
+
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
+    taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
+  });
+  const row = polled.data as MinimaxVideoTaskRow;
+
+  if (isMinimaxVideoTaskSuccess(row)) {
+    return { status: "SUCCEEDED", outputUrl: minimaxVideoTaskResultUrl(row) ?? undefined };
+  }
+  if (isMinimaxVideoTaskFailed(row)) {
+    const failMessage =
+      typeof row.error === "object" && row.error?.message
+        ? String(row.error.message)
+        : `status=${row.status}`;
+    return { status: "FAILED", failMessage };
+  }
+  return { status: row.status ?? "PENDING" };
 }
 
 export async function ecomGwPollVolcengine(

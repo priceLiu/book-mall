@@ -20,9 +20,11 @@ import {
   isStoryboardBailianR2vVideoModel,
   isStoryboardKieVideoModel,
   isStoryboardKling30KieVideoModel,
+  isStoryboardMinimaxVideoModel,
   isStoryboardVolcengineVideoModel,
   resolveStoryboardVideoProvider,
 } from "@/lib/ecom/ecom-storyboard-video-models";
+import { resolveMinimaxVideoModel } from "@/lib/gateway/minimax-video-models";
 
 export type StoryboardVideoRefSlotRole =
   | "full_sheet"
@@ -41,11 +43,15 @@ export type StoryboardVideoRefPackStrategy =
   /** 百炼 wan2.7 / HappyHorse：单张多宫格故事板 + 产品/角色/场景，不重复送各镜头分镜 */
   | "bailian_storyboard_grid"
   /** 百炼万相 2.6 multi：仅分镜镜头图（shot_type=multi），不送整版故事版 */
-  | "bailian_multi_shot_panels";
+  | "bailian_multi_shot_panels"
+  /** MiniMax H3 R2V/S2V：reference_* 角色，故事版 + 身份参考 */
+  | "minimax_reference_pack"
+  /** MiniMax H3 文生视频：不传参考图 */
+  | "minimax_t2v";
 
 export type StoryboardVideoInvokeRules = {
   modelKey: string;
-  provider: "volcengine" | "kie" | "bailian";
+  provider: "volcengine" | "kie" | "bailian" | "minimax";
   strategy: StoryboardVideoRefPackStrategy;
   /** 参考图总上限（含首帧或 flat 数组全部条目） */
   maxTotalImages: number;
@@ -175,6 +181,46 @@ export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideo
       hasFirstFrameRole: false,
       strategyNote:
         "HappyHorse R2V：产品/角色/场景参考前置（[Image 1] 起），故事板置后仅作构图节奏；不重复送各镜头单图。",
+    };
+  }
+
+  if (isStoryboardMinimaxVideoModel(key)) {
+    const spec = resolveMinimaxVideoModel(key);
+    if (spec?.mode === "t2v") {
+      return {
+        modelKey: key,
+        provider: "minimax",
+        strategy: "minimax_t2v",
+        maxTotalImages: 0,
+        supportsFullSheet: false,
+        hasFirstFrameRole: false,
+        apiMaxDurationSec: 15,
+        strategyNote: "MiniMax H3 文生视频：仅文本 prompt，不传参考图。",
+      };
+    }
+    if (spec?.mode === "r2v" || spec?.mode === "s2v") {
+      return {
+        modelKey: key,
+        provider: "minimax",
+        strategy: "minimax_reference_pack",
+        maxTotalImages: 9,
+        supportsFullSheet: true,
+        hasFirstFrameRole: false,
+        apiMaxDurationSec: 15,
+        strategyNote:
+          "MiniMax H3 主体/参考生视频：故事版 + 产品/角色/场景作 reference_image。",
+      };
+    }
+    return {
+      modelKey: key,
+      provider: "minimax",
+      strategy: "volcengine_sheet_plus_identity",
+      maxTotalImages: 9,
+      supportsFullSheet: true,
+      hasFirstFrameRole: true,
+      apiMaxDurationSec: 15,
+      strategyNote:
+        "MiniMax H3 图生/首尾帧：first_frame=故事版；reference_image=身份参考。",
     };
   }
 
@@ -316,7 +362,8 @@ export function resolveStoryboardVideoRefPlan(opts: {
       break;
     }
 
-    case "kie_flat_rich": {
+    case "kie_flat_rich":
+    case "minimax_reference_pack": {
       if (rules.supportsFullSheet && sheetUrl) {
         pushSlot(slots, cap, {
           role: "full_sheet",
@@ -332,6 +379,9 @@ export function resolveStoryboardVideoRefPlan(opts: {
       }
       break;
     }
+
+    case "minimax_t2v":
+      break;
 
     case "volcengine_sheet_plus_identity":
     case "kling_first_frame_elements":
@@ -353,11 +403,12 @@ export function resolveStoryboardVideoRefPlan(opts: {
   const urls = slots.map((s) => s.url);
   const sheetSlot = slots.find((s) => s.role === "full_sheet");
   const firstFrameUrl = sheetSlot?.url ?? urls[0] ?? sheetUrl;
-  const referenceImageUrls = rules.hasFirstFrameRole
-    ? urls.filter((u) => u !== firstFrameUrl)
-    : rules.provider === "kie"
+  const referenceImageUrls =
+    rules.hasFirstFrameRole || rules.provider === "kie"
       ? urls.filter((u) => u !== firstFrameUrl)
-      : [];
+      : rules.strategy === "minimax_reference_pack"
+        ? urls
+        : [];
 
   const bailianAllUrls = rules.provider === "bailian" ? urls : [];
 

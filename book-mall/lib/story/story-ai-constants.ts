@@ -33,6 +33,13 @@ export const STORY_VIDEO_MODEL_IDS = [
   "happyhorse/image-to-video",
   "grok-imagine/image-to-video",
   "grok-imagine-video-1-5-preview",
+  "MiniMax/MiniMax-H3-t2v",
+  "MiniMax/MiniMax-H3-i2v",
+  "MiniMax/MiniMax-H3-fl2v",
+  "MiniMax/MiniMax-H3-r2v",
+  "MiniMax/MiniMax-H3-s2v",
+  "MiniMax/MiniMax-H3-regeneration",
+  "MiniMax/MiniMax-H3-context-ir",
 ] as const;
 export type StoryVideoModelId = (typeof STORY_VIDEO_MODEL_IDS)[number];
 

@@ -14,7 +14,8 @@ let routesCache: { at: number; routes: RoutesRow[] } | null = null;
 
 function listModelsCacheKey(input: ListModelsForAppInput): string {
   const kinds = [...input.boundKinds].sort().join(",");
-  return `${input.appTag}:${input.role ?? "*"}:${input.persona}:${kinds}`;
+  const scene = input.sceneKey?.trim() ?? "";
+  return `${input.appTag}:${input.role ?? "*"}:${input.persona}:${scene}:${kinds}`;
 }
 
 export function getCachedModelsForApp(input: ListModelsForAppInput): RegistryModelRow[] | null {

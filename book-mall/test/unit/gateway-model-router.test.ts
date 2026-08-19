@@ -31,11 +31,42 @@ describe("routeGatewayModel · 百炼 R2V", () => {
     });
   });
 
+  it("wan3.0-video 走 DASHSCOPE 视频（非百炼 R2V）", () => {
+    expect(routeGatewayModel("wan3.0-video")).toEqual({
+      providerKind: "DASHSCOPE",
+      requestKind: "VIDEO",
+    });
+    expect(isBailianR2vGatewayModel("wan3.0-video")).toBe(false);
+  });
+
   it("happyhorse-1.1-r2v 走 BAILIAN", () => {
     expect(routeGatewayModel("happyhorse-1.1-r2v")).toEqual({
       providerKind: "BAILIAN",
       requestKind: "VIDEO",
     });
     expect(isBailianR2vGatewayModel("happyhorse-1.1-r2v")).toBe(true);
+  });
+});
+
+describe("routeGatewayModel · MiniMax H3", () => {
+  it("MiniMax/MiniMax-H3-i2v 走 MINIMAX VIDEO", () => {
+    expect(routeGatewayModel("MiniMax/MiniMax-H3-i2v")).toEqual({
+      providerKind: "MINIMAX",
+      requestKind: "VIDEO",
+    });
+  });
+
+  it("MiniMax/MiniMax-H3-context-ir 走 MINIMAX VIDEO", () => {
+    expect(routeGatewayModel("MiniMax/MiniMax-H3-context-ir")).toEqual({
+      providerKind: "MINIMAX",
+      requestKind: "VIDEO",
+    });
+  });
+
+  it("minimax speech 仍走 TTS", () => {
+    expect(routeGatewayModel("speech-2.8-hd")).toEqual({
+      providerKind: "MINIMAX",
+      requestKind: "TTS",
+    });
   });
 });

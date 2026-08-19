@@ -92,7 +92,7 @@ function volcengineVendorFailMessage(msg: string, blob: string): string {
 export function formatVideoEngineFailMessage(
   failCode?: string | null,
   failMessage?: string | null,
-  opts?: { providerKind?: "KIE" | "VOLCENGINE" | "BAILIAN" | "DASHSCOPE" | "TOPAZ" },
+  opts?: { providerKind?: "KIE" | "VOLCENGINE" | "BAILIAN" | "DASHSCOPE" | "TOPAZ" | "MINIMAX" },
 ): string {
   const msg = (failMessage ?? "").trim();
   const code = (failCode ?? "").trim();

@@ -135,6 +135,12 @@ export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   { canonicalModelKey: "hailuo-2.3-i2v", vendor: "kie", unit: "PER_SEC", tierRaw: "720p", listCostYuan: 0.29, discountRate: KIE },
   { canonicalModelKey: "kling-2.5-turbo-i2v", vendor: "kie", unit: "PER_SEC", tierRaw: "720P", listCostYuan: 0.36, discountRate: KIE },
 
+  // —— MiniMax H3 视频（刊例价 · discountRate=0）——
+  { canonicalModelKey: "minimax-h3-2k", vendor: "minimax", unit: "PER_SEC", tierRaw: "2K", listCostYuan: 0.8, discountRate: 0, note: "MiniMax-H3 2K 输出 0.80元/秒" },
+  { canonicalModelKey: "minimax-h3-768p", vendor: "minimax", unit: "PER_SEC", tierRaw: "768P", listCostYuan: 0.5, discountRate: 0, note: "MiniMax-H3 768P 输出 0.50元/秒" },
+  { canonicalModelKey: "minimax-h3-regeneration-2k", vendor: "minimax", unit: "PER_SEC", tierRaw: "2K", listCostYuan: 0.3, discountRate: 0, note: "768P→2K 再生成 0.30元/秒" },
+  { canonicalModelKey: "minimax-h3-context-ir", vendor: "minimax", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(23), discountRate: 0, note: "H3-Context-IR 输出 23/M；输入 5.8/M 结算时按 token 分价" },
+
   // —— LEGACY · Topaz ——
   { canonicalModelKey: "topaz-labs/video-enhance", vendor: "topaz", unit: "PER_SEC", tierRaw: "2x", listCostYuan: 0.15, discountRate: KIE },
 ];

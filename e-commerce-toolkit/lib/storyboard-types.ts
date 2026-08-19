@@ -155,4 +155,7 @@ export type StoryboardGatewayModel = {
   credentialBound: boolean;
   platformOffering?: boolean;
   scenarioKey?: string;
+  /** 用户可见来源（模型运营中心 sourceLabel） */
+  sourceLabel?: string;
+  sortOrder?: number;
 };

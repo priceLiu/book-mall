@@ -35,9 +35,9 @@ export const PLATFORM_MEDIA_KIND_LABEL: Record<ModelMediaKind, string> = {
   TEXT_LLM: "纯文本",
 };
 
-const ALL_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer"] as const;
-const CHAT_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer"] as const;
-const VISUAL_APPS = ["canvas", "story", "tool", "ecom"] as const;
+const ALL_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer", "quick-replica"] as const;
+const CHAT_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer", "quick-replica"] as const;
+const VISUAL_APPS = ["canvas", "story", "tool", "ecom", "quick-replica"] as const;
 
 function dedupeRoutes(list: CanonicalRouteDef[]): CanonicalRouteDef[] {
   const seen = new Set<string>();

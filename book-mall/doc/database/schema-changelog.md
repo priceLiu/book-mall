@@ -327,6 +327,16 @@
 
 ---
 
+## 2026-08-19 — 模型运营中心（sourceLabel + AppModelShelf）
+
+- **迁移目录**：`prisma/migrations/20260819120000_model_operations_center/`
+- **ModelCatalog**：新增可空字段 `sourceLabel`（用户选模时展示的「来源」标签）
+- **新表 `AppModelShelf`**：按 `appTag` + `sceneKey` + `canonicalModelKey` 管理应用/场景级上架与排序；`AppModelShelfStatus`（`ACTIVE` | `HIDDEN` | `DEPRECATED`）
+- **产品文档**：`doc/product/model-operations-center.md`
+- **Seed**：`pnpm gateway:seed-model-ops`（回填 sourceLabel 与全局 AppModelShelf）
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

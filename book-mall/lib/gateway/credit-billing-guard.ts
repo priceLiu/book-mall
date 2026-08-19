@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
 import { resolveKnownGatewayModelRegistration } from "@/lib/gateway/model-registry";
 import { resolveSbv1BillingCanonicalFromInputSummary } from "@/lib/gateway/log-pricing-hints";
+import { minimaxH3BillingCanonicalFromInput, isMinimaxVideoModelKey } from "@/lib/gateway/minimax-video-models";
 import { canonicalKeyForAlias } from "@/lib/model-catalog/resolve";
 import {
   computeBaseMarginRate,
@@ -34,6 +35,8 @@ export function vendorForProviderKind(kind: GatewayProviderKind): string {
       return "deepseek";
     case "MOONSHOT":
       return "moonshot";
+    case "MINIMAX":
+      return "minimax";
     default:
       return String(kind).toLowerCase();
   }
@@ -87,6 +90,15 @@ function finalizeBillingCanonical(
         resolutionFromInputSummary(inputSummary),
       ) ?? "lib-nano-pro-2k"
     );
+  }
+  if (
+    canonicalModelKey.startsWith("minimax-h3") ||
+    isMinimaxVideoModelKey(modelKey)
+  ) {
+    return minimaxH3BillingCanonicalFromInput({
+      modelKey,
+      resolution: resolutionFromInputSummary(inputSummary),
+    });
   }
   return canonicalModelKey;
 }

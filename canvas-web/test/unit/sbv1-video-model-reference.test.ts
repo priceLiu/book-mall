@@ -143,5 +143,23 @@ describe("sbv1-video-model-reference", () => {
         refLinkCount: 2,
       }).blocked,
     ).toBe(false);
+    expect(
+      resolveSbv1VideoModelRefLinkBlock({
+        modelKey: "wan3.0-video",
+        refLinkCount: 2,
+      }).blocked,
+    ).toBe(false);
+  });
+
+  it("Wan 3.0 is All-in-One: t2v/i2v/first_last/omni, 10 refs", () => {
+    const caps = getSbv1VideoModelRefCaps("wan3.0-video");
+    expect(caps.supportedModes).toEqual(["omni", "first_last"]);
+    expect(caps.maxRefsOmni).toBe(10);
+    expect(getSbv1VideoDockModeChips("wan3.0-video").map((c) => c.id)).toEqual([
+      "t2v",
+      "i2v",
+      "first_last",
+      "omni",
+    ]);
   });
 });

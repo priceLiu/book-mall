@@ -11,6 +11,8 @@ import {
   mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
 import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
+import { pickAiSpaceS2vCredentialId } from "@/lib/ai-space/ai-space-gateway-auth";
+import { isDashscopeWan30VideoModelKey } from "@/lib/gateway/dashscope-client";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
 import {
@@ -29,6 +31,7 @@ import {
   submitHunyuanJobForLog,
 } from "@/lib/gateway/poll-service";
 import { submitTopazVideoJobForLog } from "@/lib/gateway/topaz-jobs";
+import { submitMinimaxVideoJobForLog } from "@/lib/gateway/minimax-video-jobs";
 import { runGatewayV1KieCreateTask } from "@/lib/gateway/gateway-v1-kie-task-service";
 import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
     ? ({ providerKind: "BAILIAN", requestKind: "VIDEO" } as const)
     : route;
 
-  const credentialId =
+  let credentialId =
     route.providerKind === "VOLCENGINE" &&
     route.requestKind === "VIDEO" &&
     !isBailianR2vModel
@@ -156,6 +159,10 @@ export async function POST(request: NextRequest) {
           auth.credentials,
           effectiveRoute.providerKind,
         );
+  if (isDashscopeWan30VideoModelKey(model)) {
+    credentialId =
+      (await pickAiSpaceS2vCredentialId(auth)) ?? credentialId;
+  }
   if (!credentialId) {
     return NextResponse.json(
       {
@@ -503,6 +510,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         code: 200,
         data: { taskId, logId: log.id, providerKind: "VOLCENGINE" },
+      });
+    }
+
+    if (route.providerKind === "MINIMAX" && route.requestKind === "VIDEO") {
+      const minimaxInput = (body.input ?? {}) as Record<string, unknown>;
+      const taskId = await submitMinimaxVideoJobForLog({
+        logId: log.id,
+        credentialId,
+        model,
+        input: minimaxInput,
+      });
+      return NextResponse.json({
+        code: 200,
+        data: { taskId, logId: log.id, providerKind: "MINIMAX" },
       });
     }
 

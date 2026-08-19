@@ -48,6 +48,7 @@ import {
   canvasGwCreateDashscopeVideoJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
+  canvasGwCreateMinimaxVideoJob,
   canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
   canvasGwTts,
@@ -74,13 +75,17 @@ import {
   isVolcengineStoryVideoModelKey,
   VOLCENGINE_VIDEO_MULTI_REF_MODEL,
 } from "./canvas-video-volcengine";
+import { buildCanvasVideoMinimaxInput } from "@/lib/gateway/minimax-video-body";
+import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 import {
   buildDashscopeHappyhorseI2vVideoBody,
   buildDashscopeSbv1T2vVideoBody,
+  buildDashscopeWan30Media,
   isDashscopeHappyhorseImageToVideoModel,
   isDashscopeSbv1TextToVideoModel,
+  isDashscopeWan30VideoModel,
   resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
 import {
@@ -1306,7 +1311,12 @@ export async function runVideoEngineNode(
     (dockInputModeRaw === "t2v" || !dockInputModeRaw);
   const isVolcengineT2v =
     isVolcengineStoryVideoModelKey(modelKey) && dockInputModeRaw === "t2v";
-  const isTextToVideoOnly = isDashscopeT2v || isKlingT2v || isVolcengineT2v;
+  const isMinimaxT2v =
+    isMinimaxCanvasVideoModelKey(modelKey) &&
+    (modelKey.toLowerCase().includes("-t2v") ||
+      modelKey.toLowerCase().includes("context-ir"));
+  const isTextToVideoOnly =
+    isDashscopeT2v || isKlingT2v || isVolcengineT2v || isMinimaxT2v;
   const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)
         ? (params.reference_video_urls as unknown[])
@@ -1415,6 +1425,7 @@ export async function runVideoEngineNode(
   if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(effectiveModelKey)) {
     if (
       !isVolcengineStoryVideoModelKey(effectiveModelKey) &&
+      !isMinimaxCanvasVideoModelKey(effectiveModelKey) &&
       !isMotionControl &&
       !isVideoOnlyV2v &&
       !isDashscopeT2v
@@ -1429,6 +1440,7 @@ export async function runVideoEngineNode(
   await shouldCanvasUseGateway(userId, providerId, effectiveModelKey);
 
   const isVolcengineVideo = isVolcengineStoryVideoModelKey(effectiveModelKey);
+  const isMinimaxVideo = isMinimaxCanvasVideoModelKey(effectiveModelKey);
 
   const inputHash = computeInputHash({
     modelKey: effectiveModelKey,
@@ -1485,8 +1497,8 @@ export async function runVideoEngineNode(
   let model: string;
   let input: Record<string, unknown>;
   let dashscopeVideoBody: Record<string, unknown> | undefined;
-  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" | "DASHSCOPE" =
-    isVolcengineVideo ? "VOLCENGINE" : "KIE";
+  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" | "DASHSCOPE" | "MINIMAX" =
+    isVolcengineVideo ? "VOLCENGINE" : isMinimaxVideo ? "MINIMAX" : "KIE";
 
   if (isTopazDirectV2v) {
     model = effectiveModelKey;
@@ -1553,6 +1565,35 @@ export async function runVideoEngineNode(
     });
     model = built.model;
     input = built.body as Record<string, unknown>;
+  } else if (isMinimaxVideo) {
+    const refVideos = Array.isArray(params.reference_video_urls)
+      ? params.reference_video_urls.filter(
+          (u): u is string => typeof u === "string",
+        )
+      : undefined;
+    const refAudios = Array.isArray(params.reference_audio_urls)
+      ? params.reference_audio_urls.filter(
+          (u): u is string => typeof u === "string",
+        )
+      : undefined;
+    const built = buildCanvasVideoMinimaxInput({
+      modelKey: effectiveModelKey,
+      prompt: expandedPrompt,
+      imageUrl: mainFrameImageUrl,
+      lastFrameUrl: lastFrameImageUrl,
+      referenceImageUrls,
+      referenceVideoUrls: refVideos,
+      referenceAudioUrls: refAudios,
+      options: {
+        resolution: String(params.resolution ?? "2K"),
+        duration: Number(params.duration ?? 5),
+        ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
+        aigc_watermark: params.aigc_watermark === true,
+      },
+    });
+    model = built.modelKey;
+    input = built.input;
+    videoProviderKind = "MINIMAX";
   } else if (isDashscopeT2v) {
     try {
       const aspectRatio = String(
@@ -1562,6 +1603,21 @@ export async function runVideoEngineNode(
         params.resolution ?? data.resolution ?? "720p",
       );
       const durationSec = Number(params.duration ?? data.durationSec ?? 5);
+      const dockMode = String(data.dockInputMode ?? "").trim();
+      const wan30Media = isDashscopeWan30VideoModel(effectiveModelKey)
+        ? dockMode === "first_last" || Boolean(kieLastFrame)
+          ? buildDashscopeWan30Media({
+              firstFrameUrl: kieMainFrame,
+              lastFrameUrl: kieLastFrame,
+            })
+          : dockMode === "i2v"
+            ? buildDashscopeWan30Media({
+                firstFrameUrl: kieMainFrame,
+              })
+            : buildDashscopeWan30Media({
+                referenceImageUrls: [kieMainFrame, ...kieReferenceImageUrls],
+              })
+        : undefined;
       dashscopeVideoBody = buildDashscopeSbv1T2vVideoBody({
         prompt: expandedPrompt,
         aspectRatio,
@@ -1570,6 +1626,7 @@ export async function runVideoEngineNode(
         promptExtend: params.prompt_extend !== false,
         modelKey: effectiveModelKey,
         watermark: params.watermark === true,
+        media: wan30Media,
       });
       model = effectiveModelKey;
       input = dashscopeVideoBody;
@@ -1688,6 +1745,8 @@ export async function runVideoEngineNode(
         providerKind: videoProviderKind,
         ...(videoProviderKind === "VOLCENGINE"
           ? { volcengineModel: model, volcengineBody: input }
+          : videoProviderKind === "MINIMAX"
+            ? { minimaxModel: model, minimaxInput: input }
           : videoProviderKind === "TOPAZ"
             ? { topazModel: model, topazInput: input }
             : videoProviderKind === "DASHSCOPE"
@@ -1728,6 +1787,8 @@ export async function runVideoEngineNode(
     providerKind: videoProviderKind,
     ...(videoProviderKind === "VOLCENGINE"
       ? { volcengineModel: model, volcengineBody: input }
+      : videoProviderKind === "MINIMAX"
+        ? { minimaxModel: model, minimaxInput: input }
       : videoProviderKind === "TOPAZ"
         ? { topazModel: model, topazInput: input }
         : videoProviderKind === "DASHSCOPE"
@@ -1792,6 +1853,14 @@ export async function runVideoEngineNode(
               ? (data.sbv1Billing as Record<string, unknown>)
               : undefined,
         })
+      : videoProviderKind === "MINIMAX"
+        ? await canvasGwCreateMinimaxVideoJob(userId, {
+            model,
+            input: input as Record<string, unknown>,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: claimedTask.id,
+          })
       : videoProviderKind === "DASHSCOPE"
         ? await canvasGwCreateDashscopeVideoJob(userId, {
             model,

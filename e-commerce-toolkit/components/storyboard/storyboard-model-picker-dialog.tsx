@@ -220,6 +220,11 @@ function ModelCard({
           >
             {typeLabel}
           </span>
+          {model.sourceLabel ? (
+            <span className="shrink-0 rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[#6e6e73]">
+              {model.sourceLabel}
+            </span>
+          ) : null}
         </div>
         <p className="truncate font-mono text-[11px] text-[#86868b]">{model.modelKey}</p>
         {model.description ? (
@@ -418,13 +423,13 @@ export function StoryboardModelPickerDialog({
 
   const platformFlat = models.some((m) => m.platformOffering);
 
-  // BYOK：按 providerKind 分组；平台代付：flat 去重列表
+  // BYOK：按 sourceLabel（优先）或 providerKind 分组；平台代付：flat 去重列表
   const groups: { kind: string; models: StoryboardGatewayModel[] }[] = [];
   if (platformFlat) {
     groups.push({ kind: "platform", models: visibleModels });
   } else {
     for (const m of visibleModels) {
-      const kind = m.providerKind ?? "UNKNOWN";
+      const kind = m.sourceLabel?.trim() || m.providerKind || "UNKNOWN";
       let g = groups.find((x) => x.kind === kind);
       if (!g) {
         g = { kind, models: [] };
@@ -516,11 +521,8 @@ export function StoryboardModelPickerDialog({
                   {!platformFlat ? (
                     <header className="mb-2 flex items-center gap-2">
                       <h3 className="text-[12px] font-semibold text-[#1d1d1f]">
-                        Gateway · {providerLabel(g.kind)}
-                      </h3>
-                      <span className="rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[#86868b]">
                         {g.kind}
-                      </span>
+                      </h3>
                     </header>
                   ) : null}
                   <div className="flex flex-col gap-2">

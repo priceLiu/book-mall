@@ -1,4 +1,4 @@
-export type ModelTab = "text" | "image" | "video" | "function";
+export type ModelTab = "all" | "text" | "image" | "video" | "function";
 
 export type CredentialRow = {
   id: string;

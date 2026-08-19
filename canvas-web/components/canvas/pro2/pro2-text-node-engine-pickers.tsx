@@ -41,7 +41,10 @@ import {
   pickDefaultStoryLlmEngine,
   pickDefaultStoryVisionLlmEngine,
 } from "@/lib/canvas/system-providers";
-import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
+import { STORY_LLM_MODEL_KEYS, STORY_PRO_VIDEO_MODEL_KEYS } from "@/lib/canvas/types";
+import {
+  pickDefaultPro2VideoEngine,
+} from "@/lib/canvas/pro2-video-batch-video";
 import {
   isStoryLlmVisionModel,
   STORY_LLM_VISION_MODEL_KEYS,
@@ -90,6 +93,9 @@ function rolePickerConfig(
   if (role === "TTS") {
     return { allowedModelKeys: [...PRO2_TTS_MODEL_KEYS] };
   }
+  if (preset === "text-to-video") {
+    return { allowedModelKeys: [...STORY_PRO_VIDEO_MODEL_KEYS] };
+  }
   return {
     providerIds: [GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID],
     allowedModelKeys: [...SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS],
@@ -137,6 +143,12 @@ function defaultPickForRole(
   }
   if (role === "TTS") {
     const pick = pickDefaultPro2TtsEngine(providers);
+    if (!pick) return null;
+    return { ...pick, params: pick.params ?? {} };
+  }
+  const preset = String(data?.pro2PresetKind ?? "").trim();
+  if (preset === "text-to-video") {
+    const pick = pickDefaultPro2VideoEngine(providers);
     if (!pick) return null;
     return { ...pick, params: pick.params ?? {} };
   }

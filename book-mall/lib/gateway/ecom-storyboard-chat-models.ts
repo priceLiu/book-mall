@@ -15,6 +15,8 @@ export type EcomStoryboardGatewayModel = {
   credentialBound: boolean;
   canonicalModelKey?: string;
   platformOffering?: boolean;
+  sourceLabel?: string;
+  sortOrder?: number;
 };
 
 export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = "qwen3.5-flash";
@@ -32,6 +34,8 @@ export function registryRowsToEcomModels(rows: RegistryModelRow[]): EcomStoryboa
     credentialBound: r.credentialBound,
     canonicalModelKey: r.canonicalModelKey,
     platformOffering: r.platformOffering,
+    sourceLabel: r.sourceLabel,
+    sortOrder: r.sortOrder,
   }));
 }
 

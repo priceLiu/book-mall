@@ -21,6 +21,7 @@ import {
   MINIMAX_MUSIC_MODELS,
   MINIMAX_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
+import { MINIMAX_VIDEO_KNOWN_MODELS } from "@/lib/gateway/minimax-video-models";
 import {
   ELEVENLABS_SFX_MODELS,
   ELEVENLABS_STS_MODELS,
@@ -62,8 +63,10 @@ export type GatewayModelCatalog = {
   boundKinds: GatewayProviderKind[];
   /** Model Manager Tab 分组 */
   tabs: {
+    all: GatewayCatalogGroup[];
     text: GatewayCatalogGroup[];
     image: GatewayCatalogGroup[];
+    video: GatewayCatalogGroup[];
     function: GatewayCatalogGroup[];
   };
 };
@@ -373,8 +376,12 @@ function isImageModel(m: GatewayCatalogModel): boolean {
   return m.requestKind === "IMAGE";
 }
 
+function isVideoModel(m: GatewayCatalogModel): boolean {
+  return m.requestKind === "VIDEO";
+}
+
 function isFunctionModel(m: GatewayCatalogModel): boolean {
-  return !isTextModel(m) && !isImageModel(m);
+  return !isTextModel(m) && !isImageModel(m) && !isVideoModel(m);
 }
 
 function sortModels(models: GatewayCatalogModel[]): GatewayCatalogModel[] {
@@ -498,6 +505,15 @@ export function buildGatewayModelCatalog(
         products: ["QuickReplica"],
         capabilities: [] as string[],
       })),
+      ...MINIMAX_VIDEO_KNOWN_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        requestKind: "VIDEO" as const,
+        role: "VIDEO" as const,
+        description: m.description,
+        products: ["Canvas", "Story", "工具站", "电商工具箱"],
+        capabilities: m.capabilities,
+      })),
     ]),
   );
 
@@ -559,8 +575,10 @@ export function buildGatewayModelCatalog(
     totalCount,
     boundKinds,
     tabs: {
+      all: groups,
       text: filterGroupModels(groups, isTextModel),
       image: filterGroupModels(groups, isImageModel),
+      video: filterGroupModels(groups, isVideoModel),
       function: filterGroupModels(groups, isFunctionModel),
     },
   };
