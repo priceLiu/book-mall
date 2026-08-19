@@ -6,8 +6,6 @@ import {
   shouldIncludePro2CategoryDocInSection,
 } from "./pro2-script-category-doc";
 import {
-  formatPro2FullPackStoryInput,
-  isPro2FullPackRun,
   resolvePro2FullPackSystemPrompt,
   resolvePro2OutlinePromptForRun,
 } from "./pro2-gu-feng-full-pack-run";
@@ -36,6 +34,8 @@ import type { StoryRefImage } from "./story-ref-image";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
+import { outlineDisplayMd } from "./story-hub-runtime";
+import { isUnparsedPro2ProductionJsonBlob } from "./pro2-production-script-structured";
 import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection } from "./story-workspace-types";
 import {
@@ -101,7 +101,9 @@ export function pro2HubHasCharacterTable(d: StoryProScriptHubNodeData): boolean 
 }
 
 export function pro2HubHasOutlineContent(d: StoryProScriptHubNodeData): boolean {
-  return Boolean(d.outlineMd?.trim());
+  if (d.productionScript?.visualStyle?.worldBackground?.trim()) return true;
+  if (isUnparsedPro2ProductionJsonBlob(d.outlineMd ?? "")) return true;
+  return Boolean(outlineDisplayMd(d.outlineMd ?? "").trim());
 }
 
 export type Pro2HubSceneResolveContext = {
@@ -302,7 +304,6 @@ export function enqueuePro2ScriptGeneration(
     effectiveOutline,
     hubData?.scriptCategoryId,
   );
-  const isFullPack = isPro2FullPackRun(effectiveOutline);
   const firstSection = sections[0];
 
   // 登记会话，避免任务轮询 reconcile 在 Gateway 提交前误清乐观 pending（尤其 forceFresh 保留旧 MD）
@@ -320,12 +321,9 @@ export function enqueuePro2ScriptGeneration(
     optimisticPatch.outlineMd = effectiveOutline;
   }
   if (options?.forceFresh) {
-    const runtimeSectionsToClear = isFullPack
-      ? PRO2_HUB_SECTION_ORDER
-      : sections;
     Object.assign(
       optimisticPatch,
-      clearHubSectionRuntimesForForceFresh(runtimeSectionsToClear),
+      clearHubSectionRuntimesForForceFresh(PRO2_HUB_SECTION_ORDER),
     );
     if (firstSection) {
       Object.assign(optimisticPatch, hubSectionPendingPatch(firstSection));
@@ -334,7 +332,7 @@ export function enqueuePro2ScriptGeneration(
   const fullPackSystem = hubData
     ? resolvePro2FullPackSystemPrompt(hubData.scriptCategoryId)
     : undefined;
-  if (isFullPack && fullPackSystem) {
+  if (fullPackSystem) {
     optimisticPatch.outlineSystemPrompt = fullPackSystem;
   }
   updateNodeData(hubId, optimisticPatch);
@@ -378,7 +376,7 @@ export function enqueuePro2ScriptGeneration(
         shouldIncludePro2CategoryDocInSection(
           section,
           mergeCtx.scriptCategoryId,
-        ) && !(isFullPack && section === "outline");
+        ) && section !== "outline";
       return mergePro2ScriptGenerationPrompt(base, dockInput, resolvedDockRefs, {
         categoryDoc: includeDoc ? mergeCtx.categoryDoc : undefined,
         includeCategoryDoc: includeDoc,
@@ -403,7 +401,7 @@ export function enqueuePro2ScriptGeneration(
           promptPack.promptOutline,
         ),
         "outline",
-        !isFullPack,
+        false,
       ),
       promptCharacter: mergeSectionPrompt(
         promptPack.promptCharacter,

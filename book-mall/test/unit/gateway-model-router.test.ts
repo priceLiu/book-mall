@@ -70,3 +70,19 @@ describe("routeGatewayModel · MiniMax H3", () => {
     });
   });
 });
+
+describe("routeGatewayModel · Kimi K3", () => {
+  it("kimi-k3 走 Moonshot 直连（非百炼 kimi/kimi-k3）", () => {
+    expect(routeGatewayModel("kimi-k3")).toEqual({
+      providerKind: "MOONSHOT",
+      requestKind: "CHAT",
+    });
+  });
+
+  it("kimi/kimi-k3 仍走百炼第三方区", () => {
+    expect(routeGatewayModel("kimi/kimi-k3")).toEqual({
+      providerKind: "BAILIAN",
+      requestKind: "CHAT",
+    });
+  });
+});

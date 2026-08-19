@@ -17,8 +17,13 @@ export function isLegacyStoryProPlannerSystemPrompt(prompt: string): boolean {
   return t.startsWith(STORY_PRO_LEGACY_PLANNER_SYSTEM_MARK);
 }
 
-/** 故事剧本 hub · LLM system（短指令；完整创意参考经上游 textInputs 传入 user） */
-export const STORY_PRO_HUB_LLM_SYSTEM = STORY_PRO_PLANNER_SYSTEM_PREFIX;
+/** 故事剧本 hub · LLM system（含 JSON 结构化契约摘要） */
+export const STORY_PRO_HUB_LLM_SYSTEM = `${STORY_PRO_PLANNER_SYSTEM_PREFIX}
+
+【输出格式 · 硬性】
+1. 正文须为 GFM Markdown 制作包（## 章节 + 管道表）
+2. 回复 **末尾** 须附唯一 \`\`\`pro2-production-script\` JSON 围栏；tier 须为 pro（禁止 pro2）；patch 须为对象
+3. 画布以 JSON 为准写入 Hub；GFM 与 JSON 字段须一致`;
 
 /** 影视专业版 LLM 默认参数：参考包较长，提高 max_tokens 避免截断 */
 export const STORY_PRO_LLM_PARAMS_DEFAULT = {

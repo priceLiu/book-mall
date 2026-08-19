@@ -1,3 +1,4 @@
+import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import {
   ensureStoryboardAiVideoPromptsMd,
   stripOutlineCharacterTable,
@@ -11,8 +12,20 @@ import {
 } from "./parse-md-tables";
 import { storyboardMeetsMinimumShotCount } from "./pro2-storyboard-shot-budget";
 import { storyboardMeetsPackQuality } from "./pro2-pack-readiness";
+import { isCanvasNodeRunSessionActive } from "./canvas-run-session";
+import { isCanvasInflightStatus } from "./story-column-runtime";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
+import { isUnparsedPro2ProductionJsonBlob } from "./pro2-production-script-structured";
+import { tryRepairHubFromStoredProductionJson } from "./pro2-production-script-apply";
+import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
+
+const HUB_INFLIGHT_SERVER_STATUSES = new Set([
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
+  "SUBMITTED",
+]);
 
 export function hubSectionRuntime(
   node: CanvasFlowNode,
@@ -32,6 +45,7 @@ function outlineStripMd(md: string): string {
 
 /** 故事大纲展示用（不含人物表简表与嵌入的制作包段落） */
 export function outlineDisplayMd(md: string): string {
+  if (isUnparsedPro2ProductionJsonBlob(md)) return "";
   return outlineStripMd(md);
 }
 
@@ -166,6 +180,19 @@ export function repairHubEmbeddedPackSections(
   });
 }
 
+/** 将误写入 outlineMd 的 raw JSON 解析为 productionScript + 各 Tab Markdown */
+export function repairHubStructuredProductionScriptNodes(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return nodes.map((node) => {
+    if (node.type !== "story-pro2-script-hub") return node;
+    const d = node.data as unknown as StoryProScriptHubNodeData;
+    const patch = tryRepairHubFromStoredProductionJson(d, node.id);
+    if (!patch || !Object.keys(patch).length) return node;
+    return { ...node, data: { ...node.data, ...patch } };
+  });
+}
+
 export function hubDataForColumnSync(
   d: StoryScriptHubNodeData,
 ): StoryScriptHubNodeData {
@@ -294,7 +321,31 @@ export function hubSectionIsRunning(
   if (st === "running") return true;
   // pending 含无 taskId：顺序链占位 / 提交前乐观态，须立刻展示「生成中」
   if (st === "pending") return true;
+  if (st === "queued") return true;
   return false;
+}
+
+/**
+ * 段已有落库内容且本地 runtime 已 idle 时，勿误用旧轮询写回覆盖；
+ * 但用户本轮重生成（run session）或服务端新 taskId 仍须同步「生成中」。
+ */
+export function shouldSkipHubSectionInflightTaskApply(
+  node: CanvasFlowNode,
+  section: StoryLlmSection,
+  task: Pick<CanvasTaskRecord, "id" | "status">,
+): boolean {
+  if (!HUB_INFLIGHT_SERVER_STATUSES.has(task.status)) return false;
+  if (!hubSectionIsReady(node, section)) return false;
+  const rt = hubSectionRuntime(node, section);
+  if (isCanvasInflightStatus(rt?.status)) return false;
+  if (isCanvasNodeRunSessionActive(node.id)) return false;
+
+  const prevTaskId = rt?.taskId?.trim();
+  const taskId = task.id?.trim();
+  if (prevTaskId && taskId && prevTaskId !== taskId) return false;
+  if (!prevTaskId) return false;
+
+  return true;
 }
 
 /** 顺序链启动时写入段级 pending（与 storyRunPendingPatch 一致） */

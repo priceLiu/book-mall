@@ -112,7 +112,7 @@ function rowToModelDto(
   return {
     id: `${providerId}::${row.modelKey}`,
     modelKey: row.modelKey,
-    displayName: row.displayName,
+    displayName: meta.displayName || row.displayName,
     role: meta.role,
     description: meta.description ?? row.description ?? null,
     paramsSchema: meta.paramsSchema ?? null,

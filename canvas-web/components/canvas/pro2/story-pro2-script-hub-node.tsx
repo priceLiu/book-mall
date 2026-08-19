@@ -73,6 +73,11 @@ import {
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
+import {
+  resolveHubProductionScript,
+  tryRepairHubFromStoredProductionJson,
+} from "@/lib/canvas/pro2-production-script-apply";
+import { isUnparsedPro2ProductionJsonBlob } from "@/lib/canvas/pro2-production-script-structured";
 import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
@@ -178,6 +183,13 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   );
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
   const outlineMd = d.outlineMd ?? "";
+  const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
+
+  useEffect(() => {
+    if (!isUnparsedPro2ProductionJsonBlob(d.outlineMd ?? "")) return;
+    const patch = tryRepairHubFromStoredProductionJson(d, id);
+    if (patch) updateNodeData(id, patch);
+  }, [d, id, updateNodeData]);
   const hasTable = pro2HubHasScriptTable(d);
   const hasCharacter = pro2HubHasCharacterTable(d);
   const hasScene = pro2HubHasSceneTable(d, sceneCtx);
@@ -558,6 +570,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
               sceneMd={sceneMd}
               storyboardMd={storyboardMd}
               outlineMd={outlineMd}
+              productionScript={productionScript}
               title={previewTitle}
               tab={previewTab}
               onTabChange={setPreviewTab}

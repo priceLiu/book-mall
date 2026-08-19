@@ -103,7 +103,7 @@ import {
   migratePro2SceneColumnOffCanvas,
 } from "./pro2-spawn-scene-image-group";
 import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
-import { stripStaleHubGenerateIntent, repairHubEmbeddedPackSections } from "./story-hub-runtime";
+import { stripStaleHubGenerateIntent, repairHubEmbeddedPackSections, repairHubStructuredProductionScriptNodes } from "./story-hub-runtime";
 import { repairPro2VideoBoardVisualGroups } from "./pro2-spawn-video-board-group";
 import { canvasNotify } from "./canvas-notify";
 import {
@@ -670,7 +670,9 @@ export const useCanvasStore = create<CanvasState>()(
         let nodes = stripPersistedNodeSelection(
           normalized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
             ? stripStaleHubGenerateIntent(
-                repairHubEmbeddedPackSections(reconcileStoryPro2Workspace(normalized)),
+                repairHubStructuredProductionScriptNodes(
+                  repairHubEmbeddedPackSections(reconcileStoryPro2Workspace(normalized)),
+                ),
               )
             : reconcileStoryProWorkspace(normalized),
         );

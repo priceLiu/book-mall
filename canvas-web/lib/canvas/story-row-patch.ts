@@ -28,7 +28,12 @@ import {
 } from "./story-hub-runtime";
 import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
 import { tryApplyStructuredProductionScript } from "./pro2-production-script-apply";
+import { isUnparsedPro2ProductionJsonBlob } from "./pro2-production-script-structured";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
+
+function isUnparsedPro2JsonBlob(text: string): boolean {
+  return isUnparsedPro2ProductionJsonBlob(text);
+}
 
 export function applyHubSectionFromTask(
   data: StoryScriptHubNodeData,
@@ -53,6 +58,17 @@ export function applyHubSectionFromTask(
           ...(structured.sceneMd != null ? { sceneRuntime: runtime } : {}),
           ...(structured.storyboardMd != null ? { storyboardRuntime: runtime } : {}),
         } as Partial<StoryScriptHubNodeData>;
+      }
+      if (isUnparsedPro2JsonBlob(textOutput)) {
+        return {
+          outlineRuntime: {
+            ...runtime,
+            status: "failed",
+            failCode: "PRO2_SCRIPT_JSON_INVALID",
+            failMessage:
+              "模型返回了未解析的结构化 JSON，未写入大纲预览。请重试生成。",
+          },
+        };
       }
       const replaceEmbedded = outlineTextHasEmbeddedProductionPack(textOutput);
       const promoted = promoteEmbeddedPackFromOutline(

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { pickPreferredCanvasTaskForScope } from "@/lib/canvas/task-pick";
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
@@ -6,6 +6,7 @@ import {
   clearCanvasNodeRunSession,
   markCanvasNodeRunSession,
 } from "@/lib/canvas/canvas-run-session";
+import { storyApplyTaskResult } from "@/lib/canvas/story-run-apply";
 import {
   hubAggregateStatus,
   hubSectionCountsAsInflight,
@@ -15,6 +16,7 @@ import {
   clearHubSectionMdForForceFresh,
   clearHubSectionRuntimesForForceFresh,
   hubShowsGeneratingUi,
+  shouldSkipHubSectionInflightTaskApply,
   stripStaleHubGenerateIntent,
   outlineTextHasEmbeddedProductionPack,
   hubEmbeddedPackSectionsStale,
@@ -50,6 +52,13 @@ describe("hubSectionIsRunning", () => {
       storyboardRuntime: { status: "pending", taskId: "t-1" },
     });
     expect(hubSectionIsRunning(node, "storyboard")).toBe(true);
+  });
+
+  it("queued counts as running", () => {
+    const node = hubNode({
+      outlineRuntime: { status: "queued", taskId: "t-q" },
+    });
+    expect(hubSectionIsRunning(node, "outline")).toBe(true);
   });
 
   it("aggregate running when sequential chain has pending sections", () => {
@@ -264,6 +273,84 @@ describe("pickPreferredCanvasTaskForScope · hub regenerate", () => {
     );
     expect(pick?.id).toBe("new-char");
     clearCanvasNodeRunSession("hub-2");
+  });
+});
+
+describe("shouldSkipHubSectionInflightTaskApply", () => {
+  it("does not skip when run session active and section already has content", () => {
+    markCanvasNodeRunSession("hub-1");
+    const node = hubNode({
+      outlineMd: "# 旧大纲",
+      outlineRuntime: { status: "done", taskId: "old-task" },
+    });
+    expect(
+      shouldSkipHubSectionInflightTaskApply(node, "outline", {
+        id: "new-task",
+        status: "SUBMITTED",
+      }),
+    ).toBe(false);
+    clearCanvasNodeRunSession("hub-1");
+  });
+
+  it("skips stale inflight poll for same task on completed section", () => {
+    const node = hubNode({
+      outlineMd: "# 旧大纲",
+      outlineRuntime: { status: "done", taskId: "same-task" },
+    });
+    expect(
+      shouldSkipHubSectionInflightTaskApply(node, "outline", {
+        id: "same-task",
+        status: "SUBMITTED",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not skip when server task id differs after refresh", () => {
+    const node = hubNode({
+      outlineMd: "# 旧大纲",
+      outlineRuntime: { status: "done", taskId: "old-task" },
+    });
+    expect(
+      shouldSkipHubSectionInflightTaskApply(node, "outline", {
+        id: "new-task",
+        status: "PENDING",
+      }),
+    ).toBe(false);
+  });
+
+  it("storyApplyTaskResult syncs running when regen over ready section", () => {
+    markCanvasNodeRunSession("hub-1");
+    const node = hubNode({
+      outlineMd: '{"tier":"pro2"}',
+      outlineRuntime: { status: "done", taskId: "old-task" },
+    });
+    const task = {
+      id: "new-task",
+      status: "SUBMITTED",
+      nodeId: "hub-1",
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    } as CanvasTaskRecord;
+    const updateNodeData = vi.fn();
+
+    storyApplyTaskResult(
+      node,
+      task,
+      { nodeId: "hub-1", llmSection: "outline" },
+      updateNodeData,
+      [node],
+    );
+
+    expect(updateNodeData).toHaveBeenCalledWith(
+      "hub-1",
+      expect.objectContaining({
+        outlineRuntime: expect.objectContaining({
+          status: "running",
+          taskId: "new-task",
+        }),
+      }),
+    );
+    clearCanvasNodeRunSession("hub-1");
   });
 });
 

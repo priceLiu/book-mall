@@ -1,6 +1,6 @@
 "use client";
 
-import { compactGfmTables, parseMdTable, parseStoryboardRows, resolveMergedSceneVisualDictionaryRows } from "./parse-md-tables";
+import type { Pro2ProductionScript } from "./data/pro2-production-script-schema";
 import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
@@ -209,6 +209,42 @@ function mergeProSceneRows(
   return extras.length ? [...merged, ...extras] : merged;
 }
 
+function buildProFrameRowsFromProductionScript(
+  script: Pro2ProductionScript,
+  characterRows: StoryProCharacterRow[],
+): StoryProFrameRow[] {
+  const charCompat: StoryCharacterRow[] = characterRows;
+  const sceneById = new Map(
+    (script.scenes ?? []).map((s) => [s.id, s.name] as const),
+  );
+  return (script.shots ?? []).map((shot) => {
+    const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
+    const aiImagePrompt = shot.imagePrompt?.trim() || undefined;
+    const base: StoryFrameRow = syncFrameRowCharacterRefs(
+      {
+        frameIndex: shot.index,
+        key: String(shot.index),
+        scene: sceneName,
+        shotSize: shot.shotSize,
+        description: shot.sceneDescription,
+        dialogue: shot.dialogue,
+        videoPrompt: shot.videoPrompt ?? "",
+        prompt: "",
+      },
+      charCompat,
+    );
+    return {
+      ...base,
+      aiImagePrompt,
+      shotNo: String(shot.index),
+      shotSize: shot.shotSize,
+      cameraMove: shot.cameraMove,
+      durationSec: shot.durationSec,
+      sceneRefId: sceneName || undefined,
+    };
+  });
+}
+
 function buildProFrameRowsFromMd(
   md: string,
   characterRows: StoryProCharacterRow[],
@@ -380,10 +416,14 @@ export function syncStoryProColumnRows(
     hubId,
     fromDictionary.length > 0,
   );
-  const frameRows = mergeProFrameRows(
-    buildProFrameRowsFromMd(storyboardMd, characterRows),
-    existing?.frameRows,
-  );
+  const frameBuilt =
+    synced.productionScript?.shots?.length
+      ? buildProFrameRowsFromProductionScript(
+          synced.productionScript,
+          characterRows,
+        )
+      : buildProFrameRowsFromMd(storyboardMd, characterRows);
+  const frameRows = mergeProFrameRows(frameBuilt, existing?.frameRows);
   const videoRows = mergeProVideoRows(
     buildVideoRowsFromFrames(frameRows as StoryFrameRow[]) as StoryProVideoRow[],
     existing?.videoRows,

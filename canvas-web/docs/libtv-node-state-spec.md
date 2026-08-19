@@ -38,7 +38,7 @@
 
 - 初始/连线态 **不**展示空表格壳；仅 **generated** 使用 `Pro2ScriptHubContentPreview`。
 - 连线判定：`pro2ThinNodeIsLinked`（有边即 connected；`outlineMd` 未同步也算 connected）。
-- **生成逻辑（蓝色箭头 · Dock 发送）**：`enqueuePro2ScriptGeneration` 始终按序 LLM：`outline` → `character` → `storyboard`（完整脚本）。
+- **生成逻辑（蓝色箭头 · Dock 发送）**：`enqueuePro2ScriptGeneration` 单次 LLM（`outline` 段 · `step=full_pack` JSON）；角色/场景/分镜 Tab 由 apply 拆分。单段重生成仍走 `runStoryHubSection`。
 - **工具栏按钮功能**：
   - 「重新生成」→ 重新生成完整脚本（同上）
   - 「生成分镜」→ 根据已有脚本表生成分镜 **图片**（`kickoffPro2FrameBoardFromHub`）

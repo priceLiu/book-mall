@@ -33,6 +33,11 @@ import { StoryOutlineDocumentEditor } from "../story-outline-document-editor";
 import { StoryHubReadonlyPane } from "../story-hub-readonly-pane";
 import { cn } from "@/lib/utils";
 import { Pro2ScriptHubViewTabs } from "./pro2-script-hub-view-tabs";
+import { Pro2ProductionScriptHtmlPreview } from "./pro2-production-script-html-preview";
+import {
+  resolveHubProductionScript,
+} from "@/lib/canvas/pro2-production-script-apply";
+import { isUnparsedPro2ProductionJsonBlob } from "@/lib/canvas/pro2-production-script-structured";
 import {
   Pro2ProductionScriptEditor,
   normalizeHubProductionScript,
@@ -244,6 +249,19 @@ export function Pro2ScriptHubEditorModal({
           ? canEditStoryboardAsTable(tableDraft)
           : false;
 
+  const scriptForPreview = normalizeHubProductionScript(
+    productionScript ?? (hubData ? resolveHubProductionScript(hubData) : undefined),
+  );
+  const hasStructuredPreview = Boolean(
+    scriptForPreview.visualStyle?.worldBackground?.trim() ||
+      (scriptForPreview.scenes?.length ?? 0) > 0 ||
+      (scriptForPreview.characters?.length ?? 0) > 0 ||
+      (scriptForPreview.shots?.length ?? 0) > 0,
+  );
+  const outlineShowsJsonBlob =
+    isUnparsedPro2ProductionJsonBlob(draftOutline) ||
+    isUnparsedPro2ProductionJsonBlob(hubData?.outlineMd ?? "");
+
   return createPortal(
     <div
       className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-[#0c0a14]/92 backdrop-blur-sm"
@@ -296,12 +314,41 @@ export function Pro2ScriptHubEditorModal({
           <div
             className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
           >
-            <StoryHubReadonlyPane md={draftOutline} />
+            {hasStructuredPreview ? (
+              <Pro2ProductionScriptHtmlPreview
+                script={scriptForPreview}
+                tab="outline"
+                variant="document"
+              />
+            ) : (
+              <StoryHubReadonlyPane md={draftOutline} />
+            )}
+          </div>
+        ) : hasStructuredPreview || outlineShowsJsonBlob ? (
+          <div
+            className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
+          >
+            {hasStructuredPreview ? (
+              <Pro2ProductionScriptHtmlPreview
+                script={scriptForPreview}
+                tab="outline"
+                variant="document"
+              />
+            ) : (
+              <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-white p-6 text-center">
+                <p className="text-[13px] font-medium text-neutral-800">
+                  JSON 未能解析为制作包
+                </p>
+                <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                  请切换到「结构化」Tab 检查，或重新生成。若 Gateway 日志有返回体，请联系支持附带完整 output。
+                </p>
+              </div>
+            )}
           </div>
         ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
           <div
-            className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 flex-col overflow-y-auto border-r border-violet-400/10 bg-white`}
+            className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-violet-400/10 bg-white`}
           >
             <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-50/95 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-700">编辑区</p>
@@ -316,7 +363,7 @@ export function Pro2ScriptHubEditorModal({
               />
             </div>
           </div>
-          <div className="flex min-h-0 flex-col overflow-hidden bg-neutral-50/80">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-neutral-50/80">
             <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">渲染预览</p>
               <p className="text-[10px] text-neutral-500">
@@ -326,7 +373,15 @@ export function Pro2ScriptHubEditorModal({
             <div
               className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto ${DOC_PAD}`}
             >
-              <StoryHubReadonlyPane md={draftOutline} />
+              {hasStructuredPreview ? (
+                <Pro2ProductionScriptHtmlPreview
+                  script={scriptForPreview}
+                  tab="outline"
+                  variant="document"
+                />
+              ) : (
+                <StoryHubReadonlyPane md={draftOutline} />
+              )}
             </div>
           </div>
         </div>
@@ -339,9 +394,7 @@ export function Pro2ScriptHubEditorModal({
           )}
         >
           {(productionScript || hubData?.productionScript) &&
-          ((draftStructured.scenes?.length ?? 0) > 0 ||
-            (draftStructured.shots?.length ?? 0) > 0 ||
-            draftStructured.visualStyle?.worldBackground?.trim()) ? (
+          hasStructuredPreview ? (
             <Pro2ProductionScriptEditor
               value={draftStructured}
               onChange={setDraftStructured}
@@ -366,7 +419,17 @@ export function Pro2ScriptHubEditorModal({
             "min-h-0 flex-1 overflow-auto bg-[#f8f7f4] px-4 py-6 sm:px-8",
           )}
         >
-          {readOnly ? (
+          {readOnly && hasStructuredPreview ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={scriptForPreview}
+              tab={
+                tab === "outline" || tab === "scene" || tab === "character"
+                  ? tab
+                  : "script"
+              }
+              variant="document"
+            />
+          ) : readOnly ? (
             <StoryHubReadonlyPane md={tableDraft} />
           ) : canTable ? (
             tab === "character" ? (

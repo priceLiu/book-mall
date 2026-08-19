@@ -12,8 +12,11 @@ import {
   syncColumnsFromHub,
   syncDownstreamMediaColumns,
 } from "./story-column-sync";
-import { hubSectionIsReady, hubSectionIsRunning, hubSectionRuntime } from "./story-hub-runtime";
-import { isCanvasInflightStatus } from "./story-column-runtime";
+import {
+  hubSectionIsRunning,
+  hubSectionRuntime,
+  shouldSkipHubSectionInflightTaskApply,
+} from "./story-hub-runtime";
 import type {
   StoryLlmSection,
   StoryRunContext,
@@ -562,11 +565,7 @@ export function storyApplyTaskResult(
   }
 
   if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
-    if (
-      (task.status === "SUBMITTED" || task.status === "PENDING") &&
-      hubSectionIsReady(node, ctx.llmSection) &&
-      !isCanvasInflightStatus(hubSectionRuntime(node, ctx.llmSection)?.status)
-    ) {
+    if (shouldSkipHubSectionInflightTaskApply(node, ctx.llmSection, task)) {
       return;
     }
     const prevRt = hubSectionRuntime(node, ctx.llmSection);

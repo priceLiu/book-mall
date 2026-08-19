@@ -118,6 +118,7 @@ import {
   hubSectionHasTerminalError,
   hubSectionNeedsRun,
   hubSectionRuntime,
+  shouldSkipHubSectionInflightTaskApply,
 } from "./story-hub-runtime";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import {
@@ -2695,12 +2696,7 @@ export function useCanvasRunner(
         };
         if (
           ctx.llmSection &&
-          (t.status === "SUBMITTED" ||
-            t.status === "DISPATCHING" ||
-            t.status === "PENDING" ||
-            t.status === "QUEUED") &&
-          hubSectionIsComplete(node, ctx.llmSection) &&
-          !isCanvasInflightStatus(hubSectionRuntime(node, ctx.llmSection)?.status)
+          shouldSkipHubSectionInflightTaskApply(node, ctx.llmSection, t)
         ) {
           return;
         }

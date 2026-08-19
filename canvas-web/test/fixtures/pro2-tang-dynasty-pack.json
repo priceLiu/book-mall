@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "tier": "pro",
+  "step": "full_pack",
+  "patch": {
+    "meta": { "title": "我在盛唐写天下" },
+    "visualStyle": {
+      "worldBackground": "现代都市 × 盛唐长安双时空交织",
+      "era": "现代深夜办公室 / 盛唐金銮殿",
+      "globalColorTone": "主暖金 #D4A050，高光米白 #F5E6C8",
+      "pictureStyle": "电影级写实",
+      "cinematography": "大景深广角定场 + 中近景推动叙事",
+      "dayPalette": { "primary": "#D4A050", "highlight": "#F5E6C8", "shadow": "#3C251B" },
+      "nightPalette": { "primary": "#1C2833", "highlight": "#4A6C8A", "shadow": "#0A0F14" },
+      "setDesign": "唐式单檐庑殿顶金銮殿，长安城棋盘街市",
+      "lighting": "轴侧光与体积光强化空间纵深"
+    },
+    "coreConflict": [
+      { "dimension": "表层冲突", "content": "穿越者殿前作诗保命" },
+      { "dimension": "深层冲突", "content": "现代女性以诗逆天改命" }
+    ],
+    "characters": [
+      {
+        "id": "char-shen",
+        "name": "沈昭昭",
+        "role": "现代女白领 / 穿越后男装诗人",
+        "appearance": "28岁东方女性，青灰圆领男官袍，黑腰带，乌皮靴",
+        "personality": "外柔内刚，隐忍爆发型",
+        "imagePrompt": "28岁东方女性，古装男官袍，电影级打光，2K"
+      },
+      {
+        "id": "char-emperor",
+        "name": "唐玄宗",
+        "role": "盛唐皇帝",
+        "appearance": "中年男性，明黄团龙纹龙袍，常朝冠",
+        "personality": "威严、心思深沉",
+        "imagePrompt": "中年帝王，明黄龙袍，端坐龙椅，电影级打光"
+      }
+    ],
+    "scenes": [
+      {
+        "id": "scene-office",
+        "name": "现代深夜办公室",
+        "environmentTimeMood": "深夜 · 压抑 · 电脑蓝光与惨白顶光",
+        "imagePrompt": "深夜现代办公室，电脑屏幕蓝光，冷蓝灰调，广角空镜",
+        "negativePrompt": "[Negative: blurry, anime]"
+      },
+      {
+        "id": "scene-palace",
+        "name": "盛唐金銮殿",
+        "environmentTimeMood": "正午 · 庄严压迫 · 金色阳光斜入",
+        "imagePrompt": "盛唐大明宫金銮殿，金色体积光，蟠龙巨柱，2K",
+        "negativePrompt": "[Negative: blurry, anime]"
+      }
+    ],
+    "shots": [
+      {
+        "index": 1,
+        "shotSize": "近景→特写",
+        "cameraMove": "快速横移推近",
+        "sceneDescription": "【起始】伏案加班【结束】瞳孔特写骤黑",
+        "dialogue": "键盘声",
+        "durationSec": 10,
+        "imagePrompt": "深夜办公室近景，屏幕蓝光映脸",
+        "videoPrompt": "镜头快速横移推近至瞳孔，画面骤黑",
+        "audioNote": "黑屏过渡",
+        "sceneId": "scene-office",
+        "characterIds": ["char-shen"]
+      },
+      {
+        "index": 2,
+        "shotSize": "大全景→中景",
+        "cameraMove": "高悬置镜缓降",
+        "sceneDescription": "【起始】殿顶俯拍【结束】降至身后中景",
+        "dialogue": "大臣：大逆不道！",
+        "durationSec": 12,
+        "imagePrompt": "盛唐金銮殿全景，百官列立",
+        "videoPrompt": "镜头自殿顶缓降，鼓声震天",
+        "audioNote": "大殿混响",
+        "sceneId": "scene-palace",
+        "characterIds": ["char-shen", "char-emperor"]
+      }
+    ],
+    "handoff": [
+      { "index": 1, "item": "角色三视图生成", "owner": "美术", "note": "沈昭昭、皇帝" },
+      { "index": 2, "item": "场景图生成", "owner": "美术", "note": "办公室、金銮殿" },
+      { "index": 3, "item": "分镜视频生成", "owner": "后期", "note": "逐镜生成" },
+      { "index": 4, "item": "配音", "owner": "声音", "note": "对白轨" },
+      { "index": 5, "item": "BGM/音效", "owner": "声音", "note": "混音" },
+      { "index": 6, "item": "剪辑交付", "owner": "剪辑", "note": "校色合成" }
+    ]
+  }
+}

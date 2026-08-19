@@ -195,7 +195,15 @@ function patchPro2HubOutlineSystemPrompt(
   data: Record<string, unknown>,
 ): Record<string, unknown> | null {
   const sys = String(data.outlineSystemPrompt ?? "").trim();
-  if (!isLegacyStoryProPlannerSystemPrompt(sys)) return null;
+  if (
+    sys.includes("pro2-production-script") &&
+    sys.includes("tier 须为 pro")
+  ) {
+    return null;
+  }
+  if (!isLegacyStoryProPlannerSystemPrompt(sys) && sys.length > 120) {
+    return null;
+  }
   return { ...data, outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { resolveHubStoryboardMd, outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import { extractThemeFromStorySystemPrompt } from "@/lib/canvas/story-prompts";
@@ -19,7 +19,11 @@ import {
   resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
-import { applyProductionScriptDirectToHub } from "@/lib/canvas/pro2-production-script-apply";
+import {
+  applyProductionScriptDirectToHub,
+  resolveHubProductionScript,
+  tryRepairHubFromStoredProductionJson,
+} from "@/lib/canvas/pro2-production-script-apply";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
 import {
@@ -69,6 +73,18 @@ export function Pro2ScriptTableEditorHost() {
 
   const d = ((isMetaAnchor ? metaHubFields : node?.data) ??
     {}) as StoryProScriptHubNodeData;
+  const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
+
+  useEffect(() => {
+    if (!node || isMetaAnchor) return;
+    const patch = tryRepairHubFromStoredProductionJson(
+      node.data as StoryProScriptHubNodeData,
+      node.id,
+    );
+    if (patch) updateNodeData(node.id, patch);
+    // 打开全屏编辑时尝试把 raw JSON 落库为 productionScript
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- editorNodeId only
+  }, [editorNodeId]);
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
   const sceneCtx = useMemo(
@@ -259,7 +275,7 @@ export function Pro2ScriptTableEditorHost() {
       onAutoSaveScene={persistScene}
       onAutoSaveCharacter={persistCharacter}
       onAutoSaveStoryboard={persistStoryboard}
-      productionScript={d.productionScript}
+      productionScript={productionScript ?? d.productionScript}
       onAutoSaveStructured={persistStructured}
       hubId={node.id}
       hubData={d}

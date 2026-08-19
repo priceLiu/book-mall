@@ -30,6 +30,14 @@ describe("resolveUpstreamChatTimeoutMs", () => {
     expect(ms).toBe(120_000);
   });
 
+  it("uses story timeout for KIE codex responses (GPT-5.5 剧本)", () => {
+    const ms = resolveUpstreamChatTimeoutMs("https://api.kie.ai/codex/v1/responses", {
+      method: "POST",
+      body: JSON.stringify({ model: "gpt-5-5", input: [] }),
+    });
+    expect(ms).toBeGreaterThanOrEqual(600_000);
+  });
+
   it("exports story threshold at 8000", () => {
     expect(UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD).toBe(8_000);
   });

@@ -28,6 +28,7 @@ import {
   type StoryRefImage,
 } from "./story-ref-image";
 import { storyProSceneRowKey } from "./story-pro-scene-asset-catalog";
+import type { Pro2ProductionScript } from "./data/pro2-production-script-schema";
 import {
   isAnyStoryScriptHubType,
 } from "./story-workspace-resolver";
@@ -87,11 +88,27 @@ export function buildCharacterRowsFromMd(md: string): StoryCharacterRow[] {
 export function buildCharacterRowsFromHub(
   d: StoryScriptHubNodeData,
 ): StoryCharacterRow[] {
+  const pro2 = (d as import("./story-pro-workspace-types").StoryProScriptHubNodeData)
+    .productionScript;
+  const visualPack = hubVisualStylePackForCharacterRows(d);
+  if (pro2?.characters?.length) {
+    return pro2.characters.map((c) =>
+      characterRowFromParts(
+        {
+          name: c.name,
+          role: c.role,
+          appearance: c.appearance,
+          aiImagePrompt: c.imagePrompt,
+        },
+        c.id,
+        visualPack,
+      ),
+    );
+  }
   const synced = hubDataForColumnSync(d);
   const characterSource =
     (synced.characterMd ?? "").trim() ||
     extractCharacterSectionFromOutline(d.outlineMd ?? "");
-  const visualPack = hubVisualStylePackForCharacterRows(d);
   const fromCharacter = parseCharacterListFromSection(characterSource);
   if (fromCharacter.length > 0) {
     return fromCharacter.map((c) => characterRowFromParts(c, undefined, visualPack));
@@ -335,11 +352,65 @@ export function isFrameScriptPrompt(prompt: string): boolean {
   );
 }
 
+/** 从 productionScript.scenes 拆分场景行（JSON 真源） */
+export function buildSceneRowsFromProductionScript(
+  d: StoryScriptHubNodeData,
+  scriptHubId: string,
+): StoryProSceneRow[] {
+  const pro2 = (d as import("./story-pro-workspace-types").StoryProScriptHubNodeData)
+    .productionScript;
+  if (!pro2?.scenes?.length) return [];
+  const hub = scriptHubId.trim();
+  const byKey = new Map<string, StoryProSceneRow>();
+  for (const s of pro2.scenes) {
+    const key = hub ? storyProSceneRowKey(hub, s.name) : s.id;
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      key,
+      name: s.name,
+      description: s.environmentTimeMood,
+      imageKeywords: s.imagePrompt,
+      negativePrompt: s.negativePrompt?.trim() || undefined,
+      prompt: "",
+    });
+  }
+  return Array.from(byKey.values());
+}
+
+/** 从 productionScript.shots 拆分分镜行（JSON 真源） */
+export function buildFrameRowsFromProductionScript(
+  script: Pro2ProductionScript,
+  characterRows: StoryCharacterRow[],
+): StoryFrameRow[] {
+  const sceneById = new Map(
+    (script.scenes ?? []).map((s) => [s.id, s.name] as const),
+  );
+  return (script.shots ?? []).map((shot) => {
+    const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
+    const aiImagePrompt = shot.imagePrompt?.trim() || undefined;
+    return syncFrameRowCharacterRefs(
+      {
+        frameIndex: shot.index,
+        key: String(shot.index),
+        scene: sceneName,
+        shotSize: shot.shotSize,
+        description: shot.sceneDescription,
+        dialogue: shot.dialogue,
+        videoPrompt: shot.videoPrompt ?? "",
+        prompt: aiImagePrompt ?? "",
+      },
+      characterRows,
+    );
+  });
+}
+
 /** 从故事剧本大纲「场景视觉辞典」拆分场景行（定稿真源） */
 export function buildSceneRowsFromHub(
   d: StoryScriptHubNodeData,
   scriptHubId: string,
 ): StoryProSceneRow[] {
+  const fromJson = buildSceneRowsFromProductionScript(d, scriptHubId);
+  if (fromJson.length) return fromJson;
   const synced = hubDataForColumnSync(d);
   const dictRows = resolveMergedSceneVisualDictionaryRows(
     synced.outlineMd ?? "",
@@ -497,7 +568,12 @@ export function syncColumnsFromHub(
       runtime: prev.runtime,
     };
   });
-  const frameRows = buildFrameRowsFromMd(resolveHubStoryboardMd(d), mergedChar);
+  const pro2 = (d as import("./story-pro-workspace-types").StoryProScriptHubNodeData)
+    .productionScript;
+  const frameRows =
+    pro2?.shots?.length
+      ? buildFrameRowsFromProductionScript(pro2, mergedChar)
+      : buildFrameRowsFromMd(resolveHubStoryboardMd(d), mergedChar);
   const existingFrame = (
     nodes.find((n) => n.id === frameColumnId)?.data as {
       rows?: StoryFrameRow[];

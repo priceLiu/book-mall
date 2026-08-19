@@ -50,6 +50,10 @@ export function resolveUpstreamChatTimeoutMs(
   if (init.method?.toUpperCase() === "POST" && /\/createTask$/i.test(url)) {
     return UPSTREAM_CREATE_TASK_TIMEOUT_MS;
   }
+  // KIE GPT-5.5 codex · 剧本长文；body 无 max_tokens，须单独放宽
+  if (init.method?.toUpperCase() === "POST" && /\/codex\/v1\/responses/i.test(url)) {
+    return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
+  }
   const maxTokens = readChatMaxTokensFromBody(init.body);
   if (
     typeof maxTokens === "number" &&

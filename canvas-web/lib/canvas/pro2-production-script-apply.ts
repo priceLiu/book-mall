@@ -1,7 +1,7 @@
 /**
  * Pro2 制作包 · JSON patch merge → Hub productionScript / *Md / scriptStudio*Rows
  */
-import type { Pro2ProductionScriptPatch } from "./data/pro2-production-script-schema";
+import type { Pro2ProductionScriptStep } from "./data/pro2-production-script-schema";
 import { mergeProductionScriptPatch } from "./data/pro2-production-script-schema";
 import {
   renderProductionScriptCharacterMd,
@@ -11,6 +11,8 @@ import {
 } from "./pro2-production-script-render-md";
 import {
   extractPro2ProductionScriptPatch,
+  isUnparsedPro2ProductionJsonBlob,
+  parsePro2ProductionScriptEnvelope,
   pro2PatchStepMatchesSection,
 } from "./pro2-production-script-structured";
 import { syncStoryProColumnRows } from "./story-pro-column-sync";
@@ -203,4 +205,104 @@ export function tryApplyStructuredProductionScript(
   if (!envelope) return null;
   if (!pro2PatchStepMatchesSection(envelope.step, section)) return null;
   return applyProductionScriptPatchToHub(data, envelope, scriptHubId);
+}
+
+/** hydrate / 打开编辑：从误落库的 raw JSON 或 runtime textOutput 恢复 productionScript 与各 Tab */
+export function tryRepairHubFromStoredProductionJson(
+  data: StoryProScriptHubNodeData,
+  scriptHubId?: string,
+): Partial<StoryProScriptHubNodeData> | null {
+  const outlineBlob = isUnparsedPro2ProductionJsonBlob(data.outlineMd ?? "");
+  const hasStructured =
+    Boolean(data.productionScript?.visualStyle?.worldBackground?.trim()) ||
+    Boolean(data.productionScript?.shots?.length) ||
+    Boolean(data.productionScript?.characters?.length);
+  if (!outlineBlob && hasStructured) return null;
+
+  const sources = [
+    data.outlineMd,
+    data.outlineRuntime?.textOutput,
+    data.characterRuntime?.textOutput,
+    data.storyboardRuntime?.textOutput,
+  ];
+  for (const raw of sources) {
+    if (!raw?.trim()) continue;
+    const envelope = extractPro2ProductionScriptPatch(raw);
+    if (!envelope) continue;
+    return applyProductionScriptPatchToHub(data, envelope, scriptHubId);
+  }
+  return null;
+}
+
+function inferStoredScriptStep(
+  stored: Pro2ProductionScript,
+): Pro2ProductionScriptStep {
+  const hasChars = (stored.characters?.length ?? 0) > 0;
+  const hasShots = (stored.shots?.length ?? 0) > 0;
+  const hasHandoff = (stored.handoff?.length ?? 0) > 0;
+  if (hasChars && hasShots && hasHandoff) return "full_pack";
+  if (hasShots) return "storyboard";
+  if (hasChars) return "character";
+  if ((stored.scenes?.length ?? 0) > 0) return "scene";
+  return "outline";
+}
+
+function isStrictStoredProductionScript(
+  stored: Pro2ProductionScript,
+): boolean {
+  const step = inferStoredScriptStep(stored);
+  const envelope = parsePro2ProductionScriptEnvelope({
+    schemaVersion: 1,
+    tier: "pro",
+    step,
+    patch: {
+      meta: stored.meta,
+      visualStyle: stored.visualStyle,
+      coreConflict: stored.coreConflict,
+      scenes: stored.scenes,
+      characters: stored.characters,
+      shots: stored.shots,
+      handoff: stored.handoff,
+      props: stored.props,
+      moods: stored.moods,
+      audios: stored.audios,
+    },
+  });
+  return envelope.ok;
+}
+
+/** 运行时解析：优先已落库且通过严格校验的 productionScript，否则从 raw JSON 推断 */
+export function resolveHubProductionScript(
+  data: StoryProScriptHubNodeData,
+): Pro2ProductionScript | null {
+  const stored = data.productionScript;
+  const outlineBlob = isUnparsedPro2ProductionJsonBlob(data.outlineMd ?? "");
+  const storedUsable =
+    stored &&
+    isStrictStoredProductionScript(stored) &&
+    (stored.visualStyle?.worldBackground?.trim() ||
+      (stored.shots?.length ?? 0) > 0 ||
+      (stored.characters?.length ?? 0) > 0 ||
+      (stored.scenes?.length ?? 0) > 0);
+  if (storedUsable && !outlineBlob) return stored;
+
+  const sources = [
+    data.outlineMd,
+    data.outlineRuntime?.textOutput,
+    data.characterRuntime?.textOutput,
+    data.storyboardRuntime?.textOutput,
+  ];
+  for (const raw of sources) {
+    if (!raw?.trim()) continue;
+    const envelope = extractPro2ProductionScriptPatch(raw);
+    if (!envelope) continue;
+    return mergeProductionScriptPatch(stored, envelope);
+  }
+  return storedUsable ? stored! : stored ?? null;
+}
+
+export function hubHasStructuredProductionScript(
+  data: StoryProScriptHubNodeData,
+): boolean {
+  return resolveHubProductionScript(data) != null;
 }

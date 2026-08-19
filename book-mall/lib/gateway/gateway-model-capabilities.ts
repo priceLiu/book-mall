@@ -147,6 +147,10 @@ export function gatewayRouteDisplayName(
     "suno/generate": "Suno API · 文生音乐",
     "elevenlabs/text-to-dialogue-v3": "ElevenLabs V3",
     "elevenlabs/text-to-speech-multilingual-v2": "ElevenLabs Text to Speech",
+    "deepseek-v4-flash": "DeepSeek V4 Flash",
+    "deepseek-v4-pro": "DeepSeek V4 Pro",
+    "deepseek-chat": "DeepSeek Chat（旧 ID → V4 Flash）",
+    "deepseek-reasoner": "DeepSeek Reasoner（旧 ID → V4 思考）",
   };
   return labels[mk] ?? catalog.displayName;
 }

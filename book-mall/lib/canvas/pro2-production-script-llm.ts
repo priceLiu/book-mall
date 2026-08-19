@@ -1,11 +1,13 @@
 /**
- * Pro2 制作包 · Gateway LLM 结构化输出（response_format + Zod 校验 + 自动重试）
+ * Pro2 制作包 · Gateway LLM 结构化输出（Zod 校验 + 自动重试）
  */
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
+  describePro2ProductionScriptParseFailure,
   extractPro2ProductionScriptPatch,
   pro2PatchStepMatchesSection,
 } from "./pro2-production-script-structured";
+import { STORY_PRO2_JSON_FIELD_RULES } from "./data/pro2-production-pack-standard";
 import type { Pro2ProductionScriptPatch } from "./data/pro2-production-script-schema";
 
 const PRO2_HUB_SECTIONS = new Set([
@@ -25,18 +27,9 @@ export function isPro2StructuredLlmScope(
 export function mergePro2StructuredLlmParams(
   params: Record<string, unknown>,
 ): Record<string, unknown> {
-  const existing = params.response_format;
-  if (
-    existing &&
-    typeof existing === "object" &&
-    (existing as { type?: string }).type === "json_object"
-  ) {
-    return params;
-  }
-  return {
-    ...params,
-    response_format: { type: "json_object" },
-  };
+  const next = { ...params };
+  delete next.response_format;
+  return next;
 }
 
 export type Pro2StructuredLlmValidation = {
@@ -55,10 +48,12 @@ export function validatePro2ProductionScriptLlmOutput(
   }
   const patch = extractPro2ProductionScriptPatch(trimmed);
   if (!patch) {
+    const detail =
+      describePro2ProductionScriptParseFailure(trimmed) ??
+      "无法解析 pro2-production-script JSON";
     return {
       ok: false,
-      error:
-        "无法解析 pro2-production-script JSON（缺围栏、JSON 语法错误或 Zod 校验失败）",
+      error: detail,
     };
   }
   const section = storyScope?.llmSection;
@@ -81,15 +76,17 @@ export function validatePro2ProductionScriptLlmOutput(
 export function buildPro2StructuredRetryUserMessage(error: string): string {
   return [
     "【系统 · 结构化 JSON 重试】",
-    "上一回复未通过 pro2-production-script 校验，请重新输出。",
+    "上一回复未通过 pro2-production-script 严格校验，请重新输出。",
     "",
-    `校验错误：${error.slice(0, 400)}`,
+    `校验错误：${error.slice(0, 600)}`,
+    "",
+    STORY_PRO2_JSON_FIELD_RULES,
     "",
     "要求：",
-    "1. 输出合法 JSON（schemaVersion: 1 · tier · step · patch）",
-    "2. step 须与当前任务段一致",
-    "3. 可包在 ```pro2-production-script 围栏内，或直接输出 JSON 对象",
-    "4. 禁止尾逗号与 // 注释",
+    "1. 输出合法 JSON（schemaVersion: 1 · tier: pro · step · patch）",
+    "2. step 须与当前任务段一致；full_pack 须含 visualStyle/coreConflict/scenes/characters/shots/handoff",
+    "3. 字段名须与契约完全一致，禁止 identity/aiImagePrompt/environment/keywords 等 alias",
+    "4. 可包在 ```pro2-production-script 围栏内；禁止尾逗号与 // 注释",
   ].join("\n");
 }
 

@@ -70,11 +70,8 @@ export function resolvePro2OutlinePromptForRun(
     "scriptCategoryId" | "scriptCategoryDocBody" | "dockInput"
   >,
   effectiveOutline: string,
-  defaultOutlinePrompt: string,
+  _defaultOutlinePrompt: string,
 ): string {
-  if (!isPro2FullPackRun(effectiveOutline)) {
-    return defaultOutlinePrompt;
-  }
   return buildPro2FullPackOutlineUserPrompt(hub, effectiveOutline);
 }
 

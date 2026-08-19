@@ -112,6 +112,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     where: {
       status: "RUNNING",
       externalTaskId: null,
+      requestKind: { not: "CHAT" },
       submittedAt: { lt: noTaskCutoff },
     },
     data: {

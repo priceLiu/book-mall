@@ -62,7 +62,7 @@ export async function listPlatformOfferingProvidersForUser(
     return {
       id: `${PLATFORM_OFFERING_PROVIDER_ID}::${o.modelKey}`,
       modelKey: o.modelKey,
-      displayName: o.displayName,
+      displayName: meta.displayName || o.displayName,
       role: meta.role,
       description: o.description || meta.description || null,
       paramsSchema: meta.paramsSchema ?? null,

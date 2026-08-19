@@ -34,6 +34,7 @@ const DEEPSEEK_MODELS = new Set([
 ]);
 
 const MOONSHOT_MODELS = new Set([
+  "kimi-k3",
   "kimi-k2.6",
   "kimi-k2.5",
   "kimi-k2.7-code",
@@ -213,7 +214,7 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DEEPSEEK", requestKind: "CHAT" };
   }
 
-  if (m === "kimi/kimi-k3" || m === "kimi-k3") {
+  if (m === "kimi/kimi-k3") {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
@@ -508,6 +509,18 @@ export function resolveMoonshotChatCompletionsBody(
     out.thinking = { type: thinkingMode === "disabled" ? "disabled" : "enabled" };
   }
   delete out.thinking_mode;
+
+  // Kimi K3 · reasoning_effort 须为 low / high / max（Story 默认 low 合法）
+  if (model === "kimi-k3") {
+    const effort = out.reasoning_effort;
+    if (
+      effort !== "low" &&
+      effort !== "high" &&
+      effort !== "max"
+    ) {
+      out.reasoning_effort = "max";
+    }
+  }
 
   return out;
 }

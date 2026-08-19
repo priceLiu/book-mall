@@ -1250,7 +1250,29 @@ async function executeStoryLlmEngineTask(
       }
     }
 
-    // 模型返回空内容（推理预算耗尽 / 上游异常 / 解析失败）时，勿当作成功落库：
+    if (structuredPro2 && pro2Validation && !pro2Validation.ok) {
+      const failed = await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: "PRO2_SCRIPT_JSON_INVALID",
+          failMessage:
+            pro2Validation.error?.slice(0, 500) ??
+            "结构化 JSON 校验失败，请重试或更换文本模型",
+          completedAt: new Date(),
+          resultPayload: {
+            pro2ScriptValidation: {
+              ok: false,
+              error: pro2Validation.error,
+              retried: pro2Retried,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return { reused: false, task: failed };
+    }
+
+    // 模型返回空内容
     // 否则前端会从「生成中」直接翻到 done 且无正文，表现为「转圈一会就消失但没生成」。
     if (!outputText) {
       const failed = await prisma.canvasGenerationTask.update({

@@ -97,6 +97,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_1K_TOKENS",
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
+      { vendor: "moonshot", modelKey: "kimi-k3", providerKind: "MOONSHOT" },
       { vendor: "aliyun", modelKey: "kimi/kimi-k3", providerKind: "BAILIAN" },
       { vendor: "aliyun", modelKey: "kimi-k3", providerKind: "BAILIAN" },
     ]),

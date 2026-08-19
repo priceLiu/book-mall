@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCrewBulletinFromHub } from "@/lib/canvas/crew-bulletin-build";
+import { tryRepairHubFromStoredProductionJson } from "@/lib/canvas/pro2-production-script-apply";
 import { applyHubSectionFromTask } from "@/lib/canvas/story-row-patch";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import {
@@ -64,5 +65,23 @@ describe("pro2-production-script flow", () => {
 
     expect((patch as StoryProScriptHubNodeData).productionScript).toBeUndefined();
     expect(patch.characterMd).toContain("小明");
+  });
+
+  it("repairs hub when outlineMd is raw JSON blob", () => {
+    const rawJson = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
+    const hub: StoryProScriptHubNodeData = {
+      outlineMd: rawJson,
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+    };
+    const patch = tryRepairHubFromStoredProductionJson(hub, "hub-repair");
+    expect(patch?.productionScript?.characters?.[0]?.name).toBe("沈知意");
+    expect(patch?.outlineMd).toContain("视觉风格总纲");
+    expect(patch?.outlineMd).not.toContain('"schemaVersion"');
   });
 });

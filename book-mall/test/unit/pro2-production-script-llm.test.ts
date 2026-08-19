@@ -38,9 +38,12 @@ describe("pro2-production-script-llm", () => {
     );
   });
 
-  it("mergePro2StructuredLlmParams adds json_object response_format", () => {
-    const merged = mergePro2StructuredLlmParams({ temperature: 0.7 });
-    expect(merged.response_format).toEqual({ type: "json_object" });
+  it("mergePro2StructuredLlmParams strips json_object (dual-track GFM+JSON)", () => {
+    const merged = mergePro2StructuredLlmParams({
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+    });
+    expect(merged.response_format).toBeUndefined();
     expect(merged.temperature).toBe(0.7);
   });
 

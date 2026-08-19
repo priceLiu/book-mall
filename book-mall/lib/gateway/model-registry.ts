@@ -388,7 +388,10 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
       appendRow(out, {
         canonicalModelKey: catalog.canonicalKey,
         modelKey: route.modelKey,
-        displayName: catalog.displayName,
+        displayName: gatewayRouteDisplayName(
+          { displayName: catalog.displayName, canonicalKey: catalog.canonicalKey },
+          route.modelKey,
+        ),
         description: def?.description ?? "",
         role: catalog.role ?? "LLM",
         requestKind: catalog.requestKind ?? "CHAT",

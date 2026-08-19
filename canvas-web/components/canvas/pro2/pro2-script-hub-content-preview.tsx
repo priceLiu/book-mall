@@ -9,7 +9,9 @@ import {
 } from "@/lib/canvas/parse-md-tables";
 import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { Pro2ProductionScriptHtmlPreview } from "./pro2-production-script-html-preview";
 import { LIBTV_NODE_STAGE_DRAG_CLASS } from "@/components/canvas/libtv-thin-node-try-row";
 import { cn } from "@/lib/utils";
 import { MarkdownView } from "../markdown-view";
@@ -56,6 +58,7 @@ export function Pro2ScriptHubContentPreview({
   sceneMd,
   storyboardMd,
   outlineMd,
+  productionScript,
   title,
   tab,
   onTabChange,
@@ -67,6 +70,7 @@ export function Pro2ScriptHubContentPreview({
   sceneMd: string;
   storyboardMd: string;
   outlineMd?: string;
+  productionScript?: Pro2ProductionScript | null;
   title?: string;
   tab: Pro2ScriptHubViewTab;
   onTabChange: (tab: Pro2ScriptHubViewTab) => void;
@@ -91,6 +95,27 @@ export function Pro2ScriptHubContentPreview({
     () => outlineDisplayMd(outlineMd ?? ""),
     [outlineMd],
   );
+  const structuredTab =
+    tab === "script" || tab === "outline" || tab === "scene" || tab === "character"
+      ? tab
+      : "script";
+  const useStructuredPreview = Boolean(
+    productionScript &&
+      (productionScript.visualStyle?.worldBackground?.trim() ||
+        (productionScript.scenes?.length ?? 0) > 0 ||
+        (productionScript.characters?.length ?? 0) > 0 ||
+        (productionScript.shots?.length ?? 0) > 0),
+  );
+
+  const hasStructuredRows =
+    useStructuredPreview &&
+    (structuredTab === "outline"
+      ? Boolean(productionScript?.visualStyle?.worldBackground?.trim())
+      : structuredTab === "scene"
+        ? (productionScript?.scenes?.length ?? 0) > 0
+        : structuredTab === "character"
+          ? (productionScript?.characters?.length ?? 0) > 0
+          : (productionScript?.shots?.length ?? 0) > 0);
 
   const emptyMessage =
     tab === "outline"
@@ -101,6 +126,7 @@ export function Pro2ScriptHubContentPreview({
           ? "暂无角色设定"
           : "暂无分镜脚本";
   const hasAnyRows =
+    hasStructuredRows ||
     Boolean(outlinePreview.trim()) ||
     sceneRows.length > 0 ||
     characterRows.length > 0 ||
@@ -153,8 +179,14 @@ export function Pro2ScriptHubContentPreview({
     return (
       <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
         {header}
-        <Pro2NodeScrollArea className="py-2 pl-2 pr-1">
-          {outlinePreview.trim() ? (
+        <Pro2NodeScrollArea className="py-2 pl-2 pr-1" wrapContent>
+          {useStructuredPreview && productionScript ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={productionScript}
+              tab="outline"
+              variant="dark"
+            />
+          ) : outlinePreview.trim() ? (
             <MarkdownView
               content={outlinePreview}
               variant="darkPreview"
@@ -165,6 +197,21 @@ export function Pro2ScriptHubContentPreview({
               {statusMessage ?? emptyMessage}
             </p>
           )}
+        </Pro2NodeScrollArea>
+      </div>
+    );
+  }
+
+  if (useStructuredPreview && productionScript && hasStructuredRows) {
+    return (
+      <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
+        {header}
+        <Pro2NodeScrollArea className="py-1 pl-2 pr-1">
+          <Pro2ProductionScriptHtmlPreview
+            script={productionScript}
+            tab={structuredTab}
+            variant="dark"
+          />
         </Pro2NodeScrollArea>
       </div>
     );
