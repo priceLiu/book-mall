@@ -62,7 +62,7 @@ import {
   resolveLibtvThinNodeDisplayState,
 } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
-import { resolveHubOutlineMd, resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubOutlineMd, resolveHubStoryboardMd, buildHubStoryboardBackfillPatch } from "@/lib/canvas/story-hub-runtime";
 import { resolvePro2HubTableTitle } from "@/lib/canvas/pro2-hub-display-title";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -77,6 +77,7 @@ import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
 import {
   resolveHubProductionScript,
   tryRepairHubFromStoredProductionJson,
+  trySyncResolvedProductionScriptToHub,
 } from "@/lib/canvas/pro2-production-script-apply";
 import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
@@ -186,8 +187,23 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
 
   useEffect(() => {
-    const patch = tryRepairHubFromStoredProductionJson(d, id);
-    if (patch) updateNodeData(id, patch);
+    const storyboardPatch = buildHubStoryboardBackfillPatch(d);
+    const repairPatch = tryRepairHubFromStoredProductionJson(d, id);
+    const merged = { ...d, ...storyboardPatch, ...(repairPatch ?? {}) };
+    const syncPatch = trySyncResolvedProductionScriptToHub(merged);
+    const patch =
+      storyboardPatch && Object.keys(storyboardPatch).length
+        ? storyboardPatch
+        : null;
+    const finalPatch =
+      repairPatch || syncPatch || patch
+        ? {
+            ...(patch ?? {}),
+            ...(repairPatch ?? {}),
+            ...(syncPatch ?? {}),
+          }
+        : null;
+    if (finalPatch) updateNodeData(id, finalPatch);
   }, [
     d.outlineMd,
     d.storyboardMd,

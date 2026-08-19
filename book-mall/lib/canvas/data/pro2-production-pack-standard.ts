@@ -66,6 +66,16 @@ export const STORY_PRO2_PACK_LANGUAGE_RULES = `# 输出语言（硬性 · 全制
 - **视觉风格总纲 · 英文风格锚定**：优先写 **中文风格锚定**；非必要不填英文
 - **画面风格统一**：所有角色/场景/道具生图提示词末尾须追加 \`[视觉风格：xxx]\`，与总纲一致`;
 
+/** 分镜表「运镜」列撰写规范 · docs/大模型剧本提示词.md §五 */
+export const STORY_PRO2_CAMERA_MOVE_COLUMN_RULES = `- 每镜运镜描述 **≥12 字**；禁止只写「固定」「推」等单/双字
+- 须同时包含：**机位状态**（固定/手持/摇移/跟拍）+ **运动方向**（推/拉/摇/移/升/降）+ **速度**（缓慢/快速）+ **视觉目的**（强调情绪/揭示信息/衔接动作等）`;
+
+/** 分镜表「对白」列撰写规范 · docs/大模型剧本提示词.md §五 */
+export const STORY_PRO2_DIALOGUE_COLUMN_RULES = `- 格式：**角色名（情绪/语气）："台词"**
+- 内心独白：**角色名（内心OS，情绪）："台词"**
+- 多人对白：**角色群（齐声/低语/议论）："台词语"**
+- 无对白写「—」；**禁止**只写台词而不标注说话角色；**禁止**只写在「画面描述」里`;
+
 /** 系统解析契约 · 追加在用户创意模板之后 */
 export const STORY_PRO2_PACK_PARSE_CONTRACT = `【系统解析契约 · 硬性 · 影响画布自动拆分】
 1. 全部章节须用 \`## 标题\`；禁止 Tab 分隔表；**仅 GFM 管道表**（每行以 | 开头和结尾）。
@@ -98,7 +108,7 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
 - shots[] v2 Pass1（storyboard step · schemaVersion 2）：
   { index, shotSize, lighting, cameraMove, sceneDescription, propIds?, dialogue, durationSec, sfxNote, audioNote, sceneId?, characterIds? }
   - **禁止** Pass1 写 imagePrompt / videoPrompt / frameImagePrompt（Pass2 shot_prompts 才写）
-  - cameraMove 须 ≥8 字中文运镜描述
+  - cameraMove 须 ≥12 字中文运镜描述；须含机位状态+运动方向+速度+视觉目的；禁止单/双字如「固定」「推」
   - 禁止 description / aiImagePrompt / duration 等 alias
 - shots[] v1 legacy：{ index, shotSize, cameraMove, sceneDescription, dialogue, durationSec, imagePrompt, videoPrompt, audioNote, sceneId?, characterIds? }
 - handoff[]：{ index, item, owner, note } 对象数组，禁止字符串数组`;
@@ -145,7 +155,7 @@ ${STORY_PRO2_JSON_SCHEMA_EXAMPLE}
 3. **patch** 内块须与上方 GFM 章节 **字段一致**；缺块或字段名错误视为失败。
 4. full_pack 须含非空：visualStyle · coreConflict · scenes · characters · **props[]**（≥1 项）· shots · handoff（至少 6 行）。
 5. v2 Pass1（storyboard / full_pack · schemaVersion 2）须 **12–18 镜**，各镜 \`durationSec\` 之和 **175–185 秒**（目标 3 分钟），每镜 **10–15 秒**整数。
-   shots[] 每镜必填：shotSize · lighting · cameraMove(≥8字) · sceneDescription · durationSec · sfxNote · audioNote；**禁止** imagePrompt / videoPrompt / frameImagePrompt。
+   shots[] 每镜必填：shotSize · lighting · cameraMove(≥12字) · sceneDescription · durationSec · sfxNote · audioNote；**禁止** imagePrompt / videoPrompt / frameImagePrompt。
    v1 legacy shots[] 仍须 imagePrompt · videoPrompt。
    Pass2（step=shot_prompts）每镜必填 frameImagePrompt · videoPrompt。
 ${STORY_PRO2_JSON_FIELD_RULES}
@@ -311,18 +321,23 @@ export const STORY_PRO2_PACK_OUTPUT_RULES = `【制作包硬性约束 · 缺一�
 7. **Pass1 禁止** 分镜表含 AI生图/AI视频 列；JSON shots[] **禁止** imagePrompt / videoPrompt / frameImagePrompt（Pass2「生成提示词」才写）。
 8. **props[]** 道具辞典 **≥1 项**；GFM **道具视觉辞典** 每行含完整六视图构图规范；分镜「道具」列写名称，JSON 用 propIds 引用。
 9. 场景表 **生图关键词(英文)** 列须含 **2×2 四视角**构图规范；角色表 **AI生图提示词(英文)** 列须含 **四视图**构图规范；均末尾追加 \`[视觉风格：…]\`。
-10. 「对白」列：从剧本 **逐字提取**，格式「角色名：台词」；**禁止**只写在「画面描述」里。
+10. 「对白」列撰写规范：
+${STORY_PRO2_DIALOGUE_COLUMN_RULES}
 11. 分镜 **角色名** 须与「角色视觉辞典 · 姓名」列 **完全一致**。
-12. 「画面描述」每镜须标注 **【起始】…【结束】**（≥30 字）；运镜 ≥8 字；光影 ≥8 字。
-13. 「下一步交接清单」至少 6 行（含道具六视图、Pass2 提示词、分镜视频等）。
-14. 回复 **末尾** 须附 \`\`\`pro2-production-script\` JSON 围栏（schemaVersion 2）；GFM 须与 JSON 一致。
-15. ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}`;
+12. 「运镜」列撰写规范：
+${STORY_PRO2_CAMERA_MOVE_COLUMN_RULES}
+13. 「画面描述」每镜须标注 **【起始】…【结束】**（≥30 字）；「光影」≥8 字。
+14. 「下一步交接清单」至少 6 行（含道具六视图、Pass2 提示词、分镜视频等）。
+15. 回复 **末尾** 须附 \`\`\`pro2-production-script\` JSON 围栏（schemaVersion 2）；GFM 须与 JSON 一致。
+16. ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}`;
 
 /** Pass1 导演表字段金标准 · 源：docs/画布提示词.md · docs/大模型剧本提示词.md §五 */
 export const PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE = `# Pass1 导演表字段（v2 · 每镜必填 · ${STORY_PRO2_PACK_V8_MARKER}）
 
 ## 运镜
-固定机位，微小手持晃动增加压抑感（须 ≥8 字，禁止全部写「固定」）
+固定机位，微小手持晃动增加压抑感（须 ≥12 字；禁止单/双字；须含机位状态+运动方向+速度+视觉目的）
+
+${STORY_PRO2_CAMERA_MOVE_COLUMN_RULES}
 
 ## 光影
 深夜室内，极低饱和度的冷蓝光影，压抑沉闷的社畜氛围（须 ≥8 字）
@@ -337,7 +352,9 @@ export const PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE = `# Pass1 导演表字段（v2 
 电脑（须在 props[] / 道具视觉辞典 中定义）
 
 ## 对白
-角色名：台词；无对白写「—」
+沈昭昭（内心OS，疲惫）："又……加班……"（无对白写「—」）
+
+${STORY_PRO2_DIALOGUE_COLUMN_RULES}
 
 ## 口型/配音备注
 BGM 音量 dB、口型同步、OS/后期配音说明

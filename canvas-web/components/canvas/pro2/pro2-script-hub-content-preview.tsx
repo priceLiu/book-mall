@@ -7,6 +7,8 @@ import {
   parseSceneVisualDictionaryRows,
   parseStoryboardRows,
 } from "@/lib/canvas/parse-md-tables";
+import { resolvePro2StoryboardMdFromPackSource } from "@/lib/canvas/story-hub-runtime";
+import { mergeStoryboardRowsWithProductionScript } from "@/lib/canvas/pro2-production-script-render-md";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
@@ -87,10 +89,16 @@ export function Pro2ScriptHubContentPreview({
     () => parseSceneVisualDictionaryRows(sceneMd),
     [sceneMd],
   );
-  const storyboardRows = useMemo(
-    () => parseStoryboardRows(storyboardMd),
-    [storyboardMd],
-  );
+  const storyboardRows = useMemo(() => {
+    const fromMd = parseStoryboardRows(storyboardMd);
+    const base =
+      fromMd.length > 0
+        ? fromMd
+        : outlineMd?.trim()
+          ? parseStoryboardRows(resolvePro2StoryboardMdFromPackSource(outlineMd))
+          : [];
+    return mergeStoryboardRowsWithProductionScript(base, productionScript);
+  }, [storyboardMd, outlineMd, productionScript]);
   const outlinePreview = useMemo(() => (outlineMd ?? "").trim(), [outlineMd]);
   const structuredTab =
     tab === "script" || tab === "outline" || tab === "scene" || tab === "character"
@@ -192,6 +200,47 @@ export function Pro2ScriptHubContentPreview({
           ) : (
             <p className="py-8 text-center text-[11px] text-white/40">
               {statusMessage ?? emptyMessage}
+            </p>
+          )}
+        </Pro2NodeScrollArea>
+      </div>
+    );
+  }
+
+  if (tab === "structured") {
+    const structuredReady =
+      productionScript &&
+      (productionScript.visualStyle?.worldBackground?.trim() ||
+        (productionScript.scenes?.length ?? 0) > 0 ||
+        (productionScript.characters?.length ?? 0) > 0 ||
+        (productionScript.shots?.length ?? 0) > 0);
+    const storyboardOnly =
+      !structuredReady &&
+      storyboardRows.length > 0 &&
+      (productionScript?.shots?.length ?? 0) > 0;
+    return (
+      <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
+        {header}
+        <Pro2NodeScrollArea className="py-2 pl-2 pr-1" wrapContent>
+          {structuredReady && productionScript ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={productionScript}
+              tab="outline"
+              variant="dark"
+            />
+          ) : storyboardOnly && productionScript ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={productionScript}
+              tab="script"
+              variant="dark"
+            />
+          ) : storyboardRows.length > 0 ? (
+            <p className="py-4 text-center text-[11px] text-white/45">
+              分镜表已解析（{storyboardRows.length} 镜）· 结构化 JSON 待同步，请双击放大或刷新节点
+            </p>
+          ) : (
+            <p className="py-8 text-center text-[11px] text-white/40">
+              暂无结构化 JSON · 双击放大编辑
             </p>
           )}
         </Pro2NodeScrollArea>

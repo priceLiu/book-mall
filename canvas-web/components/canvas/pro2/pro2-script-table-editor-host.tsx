@@ -23,6 +23,7 @@ import {
   applyProductionScriptDirectToHub,
   resolveHubProductionScript,
   tryRepairHubFromStoredProductionJson,
+  trySyncResolvedProductionScriptToHub,
 } from "@/lib/canvas/pro2-production-script-apply";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
@@ -77,10 +78,15 @@ export function Pro2ScriptTableEditorHost() {
 
   useEffect(() => {
     if (!node || isMetaAnchor) return;
-    const patch = tryRepairHubFromStoredProductionJson(
-      node.data as StoryProScriptHubNodeData,
-      node.id,
-    );
+    const hubData = node.data as StoryProScriptHubNodeData;
+    const repairPatch = tryRepairHubFromStoredProductionJson(hubData, node.id);
+    const syncPatch = trySyncResolvedProductionScriptToHub({
+      ...hubData,
+      ...(repairPatch ?? {}),
+    });
+    const patch = repairPatch || syncPatch
+      ? { ...(repairPatch ?? {}), ...(syncPatch ?? {}) }
+      : null;
     if (patch) {
       updateNodeData(node.id, patch);
       openSnapshotRef.current = null;

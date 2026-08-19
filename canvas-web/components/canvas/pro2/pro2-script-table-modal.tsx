@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Megaphone, X } from "lucide-react";
 
@@ -36,6 +36,7 @@ import { Pro2ScriptHubViewTabs } from "./pro2-script-hub-view-tabs";
 import { Pro2ProductionScriptHtmlPreview } from "./pro2-production-script-html-preview";
 import {
   resolveHubProductionScript,
+  productionScriptHasDisplayContent,
 } from "@/lib/canvas/pro2-production-script-apply";
 import { isUnparsedPro2ProductionJsonBlob } from "@/lib/canvas/pro2-production-script-structured";
 import {
@@ -172,7 +173,12 @@ export function Pro2ScriptHubEditorModal({
       setDraftScene(sceneMd);
       setDraftCharacter(characterMd);
       setDraftStoryboard(storyboardMd);
-      setDraftStructured(normalizeHubProductionScript(productionScript));
+      setDraftStructured(
+        normalizeHubProductionScript(
+          productionScript ??
+            (hubData ? resolveHubProductionScript(hubData) : undefined),
+        ),
+      );
       setSavedHint(false);
     }
     const onKey = (e: KeyboardEvent) => {
@@ -214,6 +220,34 @@ export function Pro2ScriptHubEditorModal({
     };
   }, [draftOutline, draftScene, draftCharacter, draftStoryboard, draftStructured, open, readOnly, tab]);
 
+  const scriptForPreview = useMemo(
+    () =>
+      normalizeHubProductionScript(
+        productionScript ??
+          (hubData ? resolveHubProductionScript(hubData) : undefined),
+      ),
+    [productionScript, hubData],
+  );
+  const resolvedStructuredFingerprint = useMemo(() => {
+    const s = scriptForPreview;
+    return [
+      s.visualStyle?.worldBackground ?? "",
+      s.scenes?.length ?? 0,
+      s.characters?.length ?? 0,
+      s.shots?.length ?? 0,
+    ].join("|");
+  }, [scriptForPreview]);
+  const hasStructuredPreview = productionScriptHasDisplayContent(scriptForPreview);
+
+  useEffect(() => {
+    if (!open || !hasStructuredPreview) return;
+    setDraftStructured((prev) => {
+      if (productionScriptHasDisplayContent(prev)) return prev;
+      skipNextSaveRef.current = true;
+      return scriptForPreview;
+    });
+  }, [open, hasStructuredPreview, resolvedStructuredFingerprint, scriptForPreview]);
+
   if (!open) return null;
 
   const subtitle =
@@ -249,15 +283,6 @@ export function Pro2ScriptHubEditorModal({
           ? canEditStoryboardAsTable(tableDraft)
           : false;
 
-  const scriptForPreview = normalizeHubProductionScript(
-    productionScript ?? (hubData ? resolveHubProductionScript(hubData) : undefined),
-  );
-  const hasStructuredPreview = Boolean(
-    scriptForPreview.visualStyle?.worldBackground?.trim() ||
-      (scriptForPreview.scenes?.length ?? 0) > 0 ||
-      (scriptForPreview.characters?.length ?? 0) > 0 ||
-      (scriptForPreview.shots?.length ?? 0) > 0,
-  );
   const outlineShowsJsonBlob =
     !hasStructuredPreview &&
     (isUnparsedPro2ProductionJsonBlob(hubData?.outlineMd ?? "") ||
@@ -393,8 +418,7 @@ export function Pro2ScriptHubEditorModal({
             "min-h-0 flex-1 overflow-auto bg-[#f8f7f4] px-4 py-6 sm:px-8",
           )}
         >
-          {(productionScript || hubData?.productionScript) &&
-          hasStructuredPreview ? (
+          {hasStructuredPreview ? (
             <Pro2ProductionScriptEditor
               value={draftStructured}
               onChange={setDraftStructured}

@@ -26,10 +26,10 @@
 | 镜号 | `index` | 从 1 连续 |
 | 景别 | `shotSize` | 特写/近景/中景/全景/远景… |
 | 光影 | `lighting` | 每镜独立，环境+色温+情绪 |
-| 运镜 | `cameraMove` | 电影级描述，禁止仅「固定/推近」 |
+| 运镜 | `cameraMove` | ≥12 字；须含机位状态+运动方向+速度+视觉目的；禁止单/双字 |
 | 画面描述 | `sceneDescription` | 【起始】→【结束】，≥30 字 |
 | 道具 | `propIds` | 引用 `props[].id` |
-| 对白 | `dialogue` | 无则「—」 |
+| 对白 | `dialogue` | 「角色名（情绪/语气）："台词"」；内心OS/群杂按规范标注；无则「—」 |
 | 时长(秒) | `durationSec` | 整数 |
 | 音效 | `sfxNote` | 与口型分离 |
 | 口型/配音备注 | `audioNote` | BGM dB、同期/OS 等 |

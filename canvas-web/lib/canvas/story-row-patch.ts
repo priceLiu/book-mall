@@ -28,7 +28,7 @@ import {
   promoteEmbeddedPackFromOutline,
 } from "./story-hub-runtime";
 import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
-import { tryApplyStructuredProductionScript } from "./pro2-production-script-apply";
+import { tryApplyStructuredProductionScript, trySyncResolvedProductionScriptToHub } from "./pro2-production-script-apply";
 import { isUnparsedPro2ProductionJsonBlob } from "./pro2-production-script-structured";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
@@ -52,12 +52,45 @@ export function applyHubSectionFromTask(
         textOutput,
       );
       if (structured) {
-        return {
+        const promoted = promoteEmbeddedPackFromOutline(textOutput, "", "", "");
+        const storyboardBackfill =
+          !storyboardMdHasParseableRows(structured.storyboardMd ?? "") &&
+          storyboardMdHasParseableRows(promoted.storyboardMd)
+            ? promoted.storyboardMd
+            : null;
+        const merged: Partial<StoryProScriptHubNodeData> = {
           ...structured,
-          outlineRuntime: runtime,
-          ...(structured.characterMd != null ? { characterRuntime: runtime } : {}),
-          ...(structured.sceneMd != null ? { sceneRuntime: runtime } : {}),
-          ...(structured.storyboardMd != null ? { storyboardRuntime: runtime } : {}),
+          ...(storyboardBackfill
+            ? {
+                storyboardMd: storyboardBackfill,
+                storyboardHistory: pushStoryRevision(
+                  data.storyboardHistory,
+                  storyboardBackfill,
+                ),
+              }
+            : {}),
+        };
+        const syncPatch = trySyncResolvedProductionScriptToHub({
+          ...(data as StoryProScriptHubNodeData),
+          ...merged,
+          outlineRuntime: { ...runtime, textOutput },
+        });
+        const withSync = syncPatch ? { ...merged, ...syncPatch } : merged;
+        const pro2Sync = withSync as StoryProScriptHubNodeData;
+        const keepTextOutput =
+          !storyboardMdHasParseableRows(pro2Sync.storyboardMd ?? "") &&
+          !pro2Sync.productionScript;
+        return {
+          ...withSync,
+          outlineRuntime: {
+            ...runtime,
+            textOutput: keepTextOutput ? textOutput : undefined,
+          },
+          ...(withSync.characterMd != null ? { characterRuntime: runtime } : {}),
+          ...(withSync.sceneMd != null ? { sceneRuntime: runtime } : {}),
+          ...(withSync.storyboardMd != null || storyboardBackfill
+            ? { storyboardRuntime: runtime }
+            : {}),
         } as Partial<StoryScriptHubNodeData>;
       }
       if (isUnparsedPro2JsonBlob(textOutput)) {
@@ -88,16 +121,7 @@ export function applyHubSectionFromTask(
       if (stylePack) {
         (patch as Record<string, unknown>).visualStylePack = stylePack;
       }
-      const derivedSectionRuntime: CanvasNodeRuntime | undefined =
-        replaceEmbedded && runtime.status === "done"
-          ? {
-              status: "done",
-              taskId: runtime.taskId,
-              textOutput: undefined,
-              failCode: undefined,
-              failMessage: undefined,
-            }
-          : undefined;
+      const storyboardReady = storyboardMdHasParseableRows(promoted.storyboardMd);
       if (
         replaceEmbedded
           ? characterMd.trim()
@@ -108,9 +132,6 @@ export function applyHubSectionFromTask(
           data.characterHistory,
           characterMd,
         );
-        if (derivedSectionRuntime) {
-          patch.characterRuntime = derivedSectionRuntime;
-        }
       }
       if (promoted.sceneMd.trim()) {
         const sceneChanged =
@@ -121,13 +142,10 @@ export function applyHubSectionFromTask(
             data.sceneHistory,
             promoted.sceneMd,
           );
-          if (derivedSectionRuntime) {
-            patch.sceneRuntime = derivedSectionRuntime;
-          }
         }
       }
       if (
-        storyboardMdHasParseableRows(promoted.storyboardMd) &&
+        storyboardReady &&
         (replaceEmbedded
           ? promoted.storyboardMd.trim()
           : promoted.storyboardMd.trim() &&
@@ -138,9 +156,35 @@ export function applyHubSectionFromTask(
           data.storyboardHistory,
           promoted.storyboardMd,
         );
-        if (derivedSectionRuntime) {
-          patch.storyboardRuntime = derivedSectionRuntime;
-        }
+      }
+      const syncPatch = trySyncResolvedProductionScriptToHub({
+        ...(data as StoryProScriptHubNodeData),
+        ...patch,
+        outlineRuntime: { ...runtime, textOutput },
+      });
+      if (syncPatch) Object.assign(patch, syncPatch);
+      const pro2Patch = patch as StoryProScriptHubNodeData;
+      const packComplete =
+        storyboardMdHasParseableRows(pro2Patch.storyboardMd ?? "") ||
+        Boolean(pro2Patch.productionScript);
+      const sectionRuntime: CanvasNodeRuntime | undefined =
+        replaceEmbedded && runtime.status === "done"
+          ? {
+              status: "done",
+              taskId: runtime.taskId,
+              textOutput: packComplete ? undefined : textOutput,
+              failCode: undefined,
+              failMessage: undefined,
+            }
+          : undefined;
+      if (patch.characterMd != null && sectionRuntime) {
+        patch.characterRuntime = sectionRuntime;
+      }
+      if (patch.sceneMd != null && sectionRuntime) {
+        patch.sceneRuntime = sectionRuntime;
+      }
+      if (patch.storyboardMd != null && sectionRuntime) {
+        patch.storyboardRuntime = sectionRuntime;
       }
     }
   } else if (section === "character") {

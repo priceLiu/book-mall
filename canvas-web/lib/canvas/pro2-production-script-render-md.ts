@@ -213,8 +213,8 @@ export function renderHubOutlineDisplayMd(
   return parts.filter(Boolean).join("\n\n");
 }
 
-/** 分镜 MD · 从 JSON 渲染并回落人读 Markdown 道具列 */
-export function enrichStoryboardMdPropNames(
+/** 分镜 MD · 从 JSON / 落库表合并人读 fallback 的道具、音效、口型列 */
+export function enrichStoryboardMdShotFields(
   renderedMd: string,
   fallbackMd: string | undefined,
   script: Pro2ProductionScript,
@@ -224,26 +224,56 @@ export function enrichStoryboardMdPropNames(
   if (!renderedRows.length) return renderedMd;
   const fallbackRows = parseStoryboardRows(fallbackMd ?? "");
   const byFrame = new Map(fallbackRows.map((r) => [r.frameIndex, r]));
+  const shotsByIndex = new Map(
+    (normalized.shots ?? []).map((s) => [s.index, s]),
+  );
+  const isEmptyCell = (value?: string) => {
+    const t = value?.trim();
+    return !t || t === "—";
+  };
   let changed = false;
   const merged = renderedRows.map((row) => {
-    const current = row.propNames?.trim();
-    if (current && current !== "—") {
-      const resolved = resolvePro2PropNamesCell(current, normalized);
-      if (resolved !== current) {
+    let next = { ...row };
+    const fb = byFrame.get(row.frameIndex);
+    const shot = shotsByIndex.get(row.frameIndex);
+
+    if (isEmptyCell(next.propNames)) {
+      if (fb && !isEmptyCell(fb.propNames)) {
+        next.propNames = resolvePro2PropNamesCell(fb.propNames, normalized);
         changed = true;
-        return { ...row, propNames: resolved };
+      } else if (shot?.propIds?.length) {
+        next.propNames = resolveShotPropNames(shot, normalized);
+        changed = true;
       }
-      return row;
+    } else {
+      const resolved = resolvePro2PropNamesCell(next.propNames, normalized);
+      if (resolved !== next.propNames) {
+        next.propNames = resolved;
+        changed = true;
+      }
     }
-    const fb = byFrame.get(row.frameIndex)?.propNames?.trim();
-    if (fb && fb !== "—") {
-      changed = true;
-      return {
-        ...row,
-        propNames: resolvePro2PropNamesCell(fb, normalized),
-      };
+
+    if (isEmptyCell(next.sfxNote)) {
+      if (fb && !isEmptyCell(fb.sfxNote)) {
+        next.sfxNote = fb.sfxNote.trim();
+        changed = true;
+      } else if (shot?.sfxNote?.trim() && shot.sfxNote !== "—") {
+        next.sfxNote = shot.sfxNote.trim();
+        changed = true;
+      }
     }
-    return row;
+
+    if (isEmptyCell(next.lipSyncNote)) {
+      if (fb && !isEmptyCell(fb.lipSyncNote)) {
+        next.lipSyncNote = fb.lipSyncNote.trim();
+        changed = true;
+      } else if (shot?.audioNote?.trim() && shot.audioNote !== "—") {
+        next.lipSyncNote = shot.audioNote.trim();
+        changed = true;
+      }
+    }
+
+    return next;
   });
   if (!changed) return renderedMd;
   const table = formatStoryboardTableMarkdown(merged);
@@ -251,6 +281,15 @@ export function enrichStoryboardMdPropNames(
     return renderedMd.replace(/##\s*分镜脚本[\s\S]*/i, `## 分镜脚本\n\n${table}`);
   }
   return `## 分镜脚本\n\n${table}`;
+}
+
+/** @deprecated 使用 enrichStoryboardMdShotFields */
+export function enrichStoryboardMdPropNames(
+  renderedMd: string,
+  fallbackMd: string | undefined,
+  script: Pro2ProductionScript,
+): string {
+  return enrichStoryboardMdShotFields(renderedMd, fallbackMd, script);
 }
 
 export function renderProductionScriptCharacterMd(
@@ -269,6 +308,39 @@ export function renderProductionScriptStoryboardMd(
   script: Pro2ProductionScript,
 ): string {
   return renderStoryboardSection(script);
+}
+
+/** 预览/编辑 · 分镜表行合并 JSON shots 的道具/音效/口型（MD 列为空时） */
+export function mergeStoryboardRowsWithProductionScript<
+  T extends {
+    frameIndex: number;
+    propNames?: string;
+    sfxNote?: string;
+    lipSyncNote?: string;
+  },
+>(rows: T[], script?: Pro2ProductionScript | null): T[] {
+  if (!rows.length || !script?.shots?.length) return rows;
+  const normalized = ensurePro2ProductionScriptSchemaVersion(script);
+  const byIndex = new Map(normalized.shots!.map((s) => [s.index, s]));
+  const isEmptyCell = (value?: string) => {
+    const t = value?.trim();
+    return !t || t === "—";
+  };
+  return rows.map((row) => {
+    const shot = byIndex.get(row.frameIndex);
+    if (!shot) return row;
+    let next = { ...row };
+    if (isEmptyCell(next.propNames) && shot.propIds?.length) {
+      next.propNames = resolveShotPropNames(shot, normalized);
+    }
+    if (isEmptyCell(next.sfxNote) && !isEmptyCell(shot.sfxNote)) {
+      next.sfxNote = shot.sfxNote!.trim();
+    }
+    if (isEmptyCell(next.lipSyncNote) && !isEmptyCell(shot.audioNote)) {
+      next.lipSyncNote = shot.audioNote!.trim();
+    }
+    return next;
+  });
 }
 
 /** 完整六章 GFM（人读 + legacy 兼容） */

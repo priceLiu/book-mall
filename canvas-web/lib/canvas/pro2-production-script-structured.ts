@@ -66,7 +66,7 @@ function coerceShotRecordForV2Parse(
     out.lighting = DEFAULT_V2_LIGHTING;
   }
   const move = String(out.cameraMove ?? "").trim();
-  if (!move || move.length < 8) {
+  if (!move || move.length < 12) {
     out.cameraMove = DEFAULT_V2_CAMERA_MOVE;
   }
   if (!String(out.sfxNote ?? "").trim()) out.sfxNote = "—";

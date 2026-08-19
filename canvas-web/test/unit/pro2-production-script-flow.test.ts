@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildCrewBulletinFromHub } from "@/lib/canvas/crew-bulletin-build";
-import { tryRepairHubFromStoredProductionJson } from "@/lib/canvas/pro2-production-script-apply";
+import { tryRepairHubFromStoredProductionJson, trySyncResolvedProductionScriptToHub, resolveHubProductionScript } from "@/lib/canvas/pro2-production-script-apply";
+import { extractPro2ProductionScriptPatch } from "@/lib/canvas/pro2-production-script-structured";
+import { mergeProductionScriptPatch } from "@/lib/canvas/data/pro2-production-script-schema";
 import {
   resolvePro2HubCharacterPickerRows,
   resolvePro2HubStoryboardPickerRows,
@@ -141,5 +143,86 @@ describe("pro2-production-script flow", () => {
     expect(patch?.productionScript?.characters?.[0]?.name).toBe("沈知意");
     expect(patch?.outlineMd).toContain("视觉风格总纲");
     expect(patch?.outlineMd).not.toContain('"schemaVersion"');
+  });
+
+  it("syncs productionScript from outlineRuntime when hub field empty", () => {
+    const rawJson = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
+    const hub: StoryProScriptHubNodeData = {
+      outlineMd: "truncated",
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+      outlineRuntime: {
+        status: "done",
+        taskId: "t1",
+        textOutput: rawJson,
+      },
+    };
+    const patch = trySyncResolvedProductionScriptToHub(hub);
+    expect(patch?.productionScript?.characters?.[0]?.name).toBe("沈知意");
+    expect(patch?.outlineMd).toBeUndefined();
+  });
+
+  it("syncs shots when hub productionScript is partial", () => {
+    const rawJson = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
+    const envelope = extractPro2ProductionScriptPatch(rawJson)!;
+    const partial = mergeProductionScriptPatch(undefined, envelope);
+    const hub: StoryProScriptHubNodeData = {
+      productionScript: { ...partial, shots: [] },
+      outlineMd: "truncated",
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+      outlineRuntime: {
+        status: "done",
+        taskId: "t1",
+        textOutput: rawJson,
+      },
+    };
+    expect(resolveHubProductionScript(hub)?.shots?.length).toBe(2);
+    const patch = trySyncResolvedProductionScriptToHub(hub);
+    expect(patch?.productionScript?.shots?.length).toBe(2);
+    expect(patch?.productionScript?.shots?.[0]?.propIds).toEqual(["prop-book"]);
+  });
+
+  it("syncs director fields when shot count matches but prop/sfx missing", () => {
+    const rawJson = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
+    const envelope = extractPro2ProductionScriptPatch(rawJson)!;
+    const full = mergeProductionScriptPatch(undefined, envelope);
+    const hub: StoryProScriptHubNodeData = {
+      productionScript: {
+        ...full,
+        shots: full.shots?.map((s) => ({
+          ...s,
+          propIds: [],
+          sfxNote: undefined,
+          audioNote: undefined,
+        })),
+      },
+      outlineMd: "",
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+      outlineRuntime: {
+        status: "done",
+        taskId: "t1",
+        textOutput: rawJson,
+      },
+    };
+    const patch = trySyncResolvedProductionScriptToHub(hub);
+    expect(patch?.productionScript?.shots?.[0]?.propIds).toEqual(["prop-book"]);
+    expect(patch?.productionScript?.shots?.[0]?.sfxNote).toMatch(/人群议论/);
   });
 });

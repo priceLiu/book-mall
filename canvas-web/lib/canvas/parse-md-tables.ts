@@ -17,9 +17,19 @@ function normHeader(h: string): string {
 
 function pickColumn(row: MdTableRow, aliases: string[]): string {
   for (const alias of aliases) {
+    const na = normHeader(alias);
+    for (const [key, val] of Object.entries(row)) {
+      if (normHeader(key) === na) {
+        return stripInlineMarkdownCell(val);
+      }
+    }
+  }
+  for (const alias of aliases) {
+    if (/^[a-z]{1,4}$/i.test(alias)) continue;
+    const na = normHeader(alias);
     for (const [key, val] of Object.entries(row)) {
       const nk = normHeader(key);
-      if (nk === alias || nk.includes(alias)) {
+      if (nk.includes(na)) {
         return stripInlineMarkdownCell(val);
       }
     }

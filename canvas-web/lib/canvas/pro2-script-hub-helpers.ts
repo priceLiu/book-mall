@@ -16,6 +16,7 @@ import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows
 import {
   renderProductionScriptCharacterMd,
   renderProductionScriptSceneMd,
+  resolveShotPropNames,
 } from "./pro2-production-script-render-md";
 import { buildCharacterRowsFromHub } from "./story-column-sync";
 import { applyProductionScriptPatchToHub, resolveHubProductionScript } from "./pro2-production-script-apply";
@@ -269,6 +270,7 @@ export function resolvePro2HubStoryboardPickerRows(
           shot.durationSec != null && shot.durationSec > 0
             ? String(shot.durationSec)
             : "",
+        propNames: resolveShotPropNames(shot, d.productionScript!),
         sfxNote: shot.sfxNote?.trim() ?? "",
         frameImagePrompt: frameImage,
         aiImagePrompt: frameImage,

@@ -6,7 +6,7 @@ import {
 } from "@/lib/canvas/data/pro2-production-pack-standard";
 import { mergeProductionScriptPatch } from "@/lib/canvas/data/pro2-production-script-schema";
 import {
-  enrichStoryboardMdPropNames,
+  enrichStoryboardMdShotFields,
   renderHubOutlineDisplayMd,
   renderProductionScriptMarkdown,
   renderProductionScriptStoryboardMd,
@@ -58,18 +58,22 @@ describe("pro2-production-script-render-md", () => {
     expect(md).toContain("明黄婚书");
   });
 
-  it("enrichStoryboardMdPropNames merges fallback markdown prop column", () => {
+  it("enrichStoryboardMdShotFields merges fallback markdown prop and sfx columns", () => {
     const rendered = renderProductionScriptStoryboardMd({
       ...script,
       shots: [
         {
           ...script.shots![0]!,
           propIds: [],
+          sfxNote: "—",
         },
       ],
     });
-    const fallback = rendered.replace("— |", "明黄婚书 |");
-    const enriched = enrichStoryboardMdPropNames(rendered, fallback, script);
+    const fallback = rendered
+      .replace("| — | 百姓甲", "| 明黄婚书 | 百姓甲")
+      .replace("| — | 10 |", "| 人群议论 | 10 |");
+    const enriched = enrichStoryboardMdShotFields(rendered, fallback, script);
     expect(enriched).toContain("明黄婚书");
+    expect(enriched).toContain("人群议论");
   });
 });

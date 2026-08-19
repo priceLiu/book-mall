@@ -13,6 +13,7 @@ import {
   convertPro2HumanTabMarkdownToGfm,
   extractPro2OutlineDisplayMdFromHumanGfm,
   extractPro2HumanStoryboardMd,
+  promotePro2HumanGfmToHubFields,
 } from "./parse-md-tables";
 import { storyboardMeetsMinimumShotCount } from "./pro2-storyboard-shot-budget";
 import { storyboardMeetsPackQuality } from "./pro2-pack-readiness";
@@ -25,7 +26,7 @@ import {
   isUnparsedPro2ProductionJsonBlob,
   stripTrailingPro2ProductionScriptJson,
 } from "./pro2-production-script-structured";
-import { renderHubOutlineDisplayMd, renderProductionScriptStoryboardMd, enrichStoryboardMdPropNames } from "./pro2-production-script-render-md";
+import { renderHubOutlineDisplayMd, renderProductionScriptStoryboardMd, enrichStoryboardMdShotFields } from "./pro2-production-script-render-md";
 import {
   ensurePro2ProductionScriptSchemaVersion,
 } from "./data/pro2-production-script-schema";
@@ -35,6 +36,7 @@ import {
 } from "./pro2-production-script-apply";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
+import { pushStoryRevision } from "./story-revision";
 
 const HUB_INFLIGHT_SERVER_STATUSES = new Set([
   "QUEUED",
@@ -64,7 +66,7 @@ export function outlineDisplayMd(md: string): string {
   return outlineStripMd(md ?? "");
 }
 
-/** 从 Hub 各来源解析人读分镜段（不要求完整制作包 · 支持 outline textOutput 仅含分镜脚本） */
+/** 从 Hub 各来源解析人读分镜段（优先 full_pack 原文 · 不用已 normalize 的空道具/音效 storyboardMd） */
 function resolvePro2HumanStoryboardFromHubSources(
   d: StoryProScriptHubNodeData,
 ): string {
@@ -72,15 +74,11 @@ function resolvePro2HumanStoryboardFromHubSources(
     d.outlineRuntime?.textOutput,
     d.outlineMd,
     d.storyboardRuntime?.textOutput,
-    d.storyboardMd,
   ];
   for (const raw of sources) {
     if (!raw?.trim()) continue;
-    const gfm = convertPro2HumanTabMarkdownToGfm(
-      extractPro2HumanProductionPackPrefix(raw),
-    );
-    const sb = extractPro2HumanStoryboardMd(gfm);
-    if (storyboardMdHasParseableRows(sb)) return sb;
+    const fromPack = resolvePro2StoryboardMdFromPackSource(raw);
+    if (storyboardMdHasParseableRows(fromPack)) return fromPack;
   }
   return "";
 }
@@ -186,49 +184,81 @@ export function resolveHubSectionMd(
   return hubDialoguePreviewMd(storyboard);
 }
 
+function resolveHubStoryboardHumanFallbackMd(
+  pro2Data: StoryProScriptHubNodeData,
+): string {
+  const sources = [
+    pro2Data.outlineRuntime?.textOutput,
+    pro2Data.outlineMd,
+    pro2Data.storyboardRuntime?.textOutput,
+  ];
+  for (const raw of sources) {
+    if (!raw?.trim()) continue;
+    const fromPack = resolvePro2StoryboardMdFromPackSource(raw);
+    if (storyboardMdHasParseableRows(fromPack)) return fromPack;
+  }
+  return "";
+}
+
+function finalizeHubStoryboardMd(
+  pro2Data: StoryProScriptHubNodeData,
+  storyboardMd: string,
+): string {
+  if (!storyboardMd.trim() || !storyboardMdHasParseableRows(storyboardMd)) {
+    return storyboardMd;
+  }
+  const script = resolveHubProductionScript(pro2Data);
+  if (!script) return ensureStoryboardAiVideoPromptsMd(storyboardMd);
+  const fallback = resolveHubStoryboardHumanFallbackMd(pro2Data);
+  const enriched = enrichStoryboardMdShotFields(
+    storyboardMd,
+    fallback && fallback !== storyboardMd ? fallback : fallback || undefined,
+    script,
+  );
+  return ensureStoryboardAiVideoPromptsMd(enriched);
+}
+
 export function resolveHubStoryboardMd(d: StoryScriptHubNodeData): string {
   const pro2Data = d as StoryProScriptHubNodeData;
-  const humanStoryboard = resolvePro2HumanStoryboardFromHubSources(pro2Data);
-  if (humanStoryboard) {
-    return humanStoryboard;
-  }
-
+  const humanFallback =
+    resolveHubStoryboardHumanFallbackMd(pro2Data) ||
+    resolvePro2HumanStoryboardFromHubSources(pro2Data);
   const humanGfm = resolvePro2HumanGfmFromHubSources(pro2Data);
-  if (humanGfm) {
-    const fromHuman = extractPro2HumanStoryboardMd(humanGfm);
-    if (storyboardMdHasParseableRows(fromHuman)) {
-      return fromHuman;
-    }
-  }
-
   const resolvedScript = resolveHubProductionScript(pro2Data);
-  const fallbackMd =
-    (pro2Data.storyboardMd ?? "").trim() ||
-    (humanGfm ? normalizeStoryboardSectionFromOutline(humanGfm) : "") ||
-    resolveHubSectionMd(pro2Data, "storyboard");
+
+  // 优先 JSON shots 渲染 + 人读 fallback 合并（道具/音效在 JSON propIds / 人读表）
   if (resolvedScript?.shots?.length) {
     const normalized = ensurePro2ProductionScriptSchemaVersion(resolvedScript);
     const rendered = renderProductionScriptStoryboardMd(normalized);
-    const enriched = enrichStoryboardMdPropNames(
+    const enriched = enrichStoryboardMdShotFields(
       rendered,
-      fallbackMd,
+      humanFallback || undefined,
       normalized,
     );
-    return ensureStoryboardAiVideoPromptsMd(enriched);
+    if (storyboardMdHasParseableRows(enriched)) {
+      return ensureStoryboardAiVideoPromptsMd(enriched);
+    }
   }
+
+  if (humanFallback && storyboardMdHasParseableRows(humanFallback)) {
+    return finalizeHubStoryboardMd(pro2Data, humanFallback);
+  }
+
+  if (humanGfm) {
+    const fromHuman = extractPro2HumanStoryboardMd(humanGfm);
+    if (storyboardMdHasParseableRows(fromHuman)) {
+      return finalizeHubStoryboardMd(pro2Data, fromHuman);
+    }
+  }
+
   const synced = hubDataForColumnSync(d);
   const storyboard =
+    (pro2Data.storyboardMd ?? "").trim() ||
     (synced.storyboardMd ?? "").trim() ||
     resolveHubSectionMd(synced, "storyboard");
   if (isUnparsedPro2ProductionJsonBlob(storyboard)) return "";
   if (!storyboardMdHasParseableRows(storyboard)) return "";
-  const stored = pro2Data.productionScript
-    ? ensurePro2ProductionScriptSchemaVersion(pro2Data.productionScript)
-    : undefined;
-  const enriched = stored
-    ? enrichStoryboardMdPropNames(storyboard, storyboard, stored)
-    : storyboard;
-  return ensureStoryboardAiVideoPromptsMd(enriched);
+  return finalizeHubStoryboardMd(pro2Data, storyboard);
 }
 
 /** 将大纲嵌入段拆入 hub 各字段，供 syncColumnsFromHub 使用 */
@@ -312,6 +342,26 @@ export function buildHubEmbeddedPackRepairPatch(
   return patch;
 }
 
+/** 大纲已落库但 storyboardMd / productionScript 缺失时，从 textOutput 或 outline 原文补分镜表 */
+export function buildHubStoryboardBackfillPatch(
+  d: StoryScriptHubNodeData,
+): Partial<StoryScriptHubNodeData> {
+  const pro2 = d as StoryProScriptHubNodeData;
+  if (storyboardMdHasParseableRows(pro2.storyboardMd ?? "")) return {};
+  if ((pro2.productionScript?.shots?.length ?? 0) > 0) return {};
+  const source =
+    pro2.outlineRuntime?.textOutput?.trim() ||
+    hubOutlineSourceForEmbeddedPromote(pro2);
+  if (!source.trim()) return {};
+  const storyboardMd = resolvePro2StoryboardMdFromPackSource(source);
+  if (!storyboardMdHasParseableRows(storyboardMd)) return {};
+  if (storyboardMd === (pro2.storyboardMd ?? "")) return {};
+  return {
+    storyboardMd,
+    storyboardHistory: pushStoryRevision(pro2.storyboardHistory, storyboardMd),
+  };
+}
+
 export function repairHubEmbeddedPackSections(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
@@ -372,6 +422,20 @@ export function outlineTextHasEmbeddedProductionPack(md: string): boolean {
   );
 }
 
+/** 从 full_pack 原文（Tab/GFM + JSON）解析人读分镜段 · 供 promote / resolve 共用 */
+export function resolvePro2StoryboardMdFromPackSource(raw: string): string {
+  if (!raw?.trim()) return "";
+  const prefix = extractPro2HumanProductionPackPrefix(raw);
+  const gfm = convertPro2HumanTabMarkdownToGfm(prefix);
+  const human = extractPro2HumanStoryboardMd(gfm);
+  if (storyboardMdHasParseableRows(human)) return human;
+  const fromGfm = normalizeStoryboardSectionFromOutline(gfm);
+  if (storyboardMdHasParseableRows(fromGfm)) return fromGfm;
+  const fromRaw = normalizeStoryboardSectionFromOutline(raw);
+  if (storyboardMdHasParseableRows(fromRaw)) return fromRaw;
+  return "";
+}
+
 /** 保存大纲时：将嵌入的制作包段落拆到独立字段，避免其他 Tab 读不到 */
 export function promoteEmbeddedPackFromOutline(
   outlineMd: string,
@@ -384,14 +448,26 @@ export function promoteEmbeddedPackFromOutline(
   sceneMd: string;
   storyboardMd: string;
 } {
+  const humanGfm = convertPro2HumanTabMarkdownToGfm(
+    extractPro2HumanProductionPackPrefix(outlineMd),
+  );
+  const humanFields = hasHumanReadableProductionPackSections(humanGfm)
+    ? promotePro2HumanGfmToHubFields(humanGfm)
+    : null;
   return {
     outlineMd: outlineStripMd(outlineMd),
     characterMd:
-      characterMd.trim() || extractCharacterSectionFromOutline(outlineMd),
-    sceneMd: resolveSceneDictionaryMarkdown(outlineMd, sceneMd),
+      characterMd.trim() ||
+      humanFields?.characterMd?.trim() ||
+      extractCharacterSectionFromOutline(outlineMd),
+    sceneMd:
+      sceneMd.trim() ||
+      humanFields?.sceneMd?.trim() ||
+      resolveSceneDictionaryMarkdown(outlineMd, sceneMd),
     storyboardMd:
       storyboardMd.trim() ||
-      normalizeStoryboardSectionFromOutline(outlineMd),
+      humanFields?.storyboardMd?.trim() ||
+      resolvePro2StoryboardMdFromPackSource(outlineMd),
   };
 }
 

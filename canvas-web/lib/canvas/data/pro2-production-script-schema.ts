@@ -264,7 +264,7 @@ function validateProTierShotsV2Pass1(
     const missing: string[] = [];
     if (!shot.shotSize?.trim()) missing.push("shotSize");
     if (!shot.lighting?.trim()) missing.push("lighting");
-    if (!shot.cameraMove?.trim() || shot.cameraMove.trim().length < 8) {
+    if (!shot.cameraMove?.trim() || shot.cameraMove.trim().length < 12) {
       missing.push("cameraMove");
     }
     if (!shot.durationSec || shot.durationSec <= 0) missing.push("durationSec");

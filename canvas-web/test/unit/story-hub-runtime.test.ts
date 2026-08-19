@@ -21,9 +21,14 @@ import {
   outlineTextHasEmbeddedProductionPack,
   hubEmbeddedPackSectionsStale,
   buildHubEmbeddedPackRepairPatch,
+  buildHubStoryboardBackfillPatch,
+  promoteEmbeddedPackFromOutline,
   resolveHubStoryboardMd,
+  resolvePro2StoryboardMdFromPackSource,
 } from "@/lib/canvas/story-hub-runtime";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
+import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
+import { PRO2_FIXTURE_FULL_PACK } from "../fixtures/pro2-production-script-fixture";
 
 function hubNode(
   data: Record<string, unknown>,
@@ -394,5 +399,51 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
       hubGenerateIntent: undefined,
     });
     expect(hubShowsGeneratingUi(node, false)).toBe(true);
+  });
+});
+
+describe("pro2 human pack · storyboard promote", () => {
+  it("promoteEmbeddedPackFromOutline extracts tab-separated storyboard", () => {
+    const raw = [
+      "视觉风格总纲",
+      "维度\t内容",
+      "故事背景\t测试",
+      "分镜脚本",
+      "镜号\t景别\t光影\t运镜\t画面描述（含起始→终止站位）\t道具\t对白\t时长(秒)\t音效\t口型/配音备注",
+      "1\t特写\t冷蓝光影\t固定机位缓慢推进\t【起始】A【结束】B\t电脑\t—\t5\t键盘声\t—",
+    ].join("\n");
+    const promoted = promoteEmbeddedPackFromOutline(raw);
+    expect(parseStoryboardRows(promoted.storyboardMd).length).toBe(1);
+    expect(resolvePro2StoryboardMdFromPackSource(raw)).toContain("分镜脚本");
+  });
+
+  it("buildHubStoryboardBackfillPatch fills empty storyboardMd from outlineRuntime", () => {
+    const raw = [
+      "分镜脚本",
+      "镜号\t景别\t光影\t运镜\t画面描述（含起始→终止站位）\t道具\t对白\t时长(秒)\t音效\t口型/配音备注",
+      "1\t特写\t冷蓝\t固定机位缓慢推进\t【起始】A【结束】B\t—\t—\t5\t—\t—",
+    ].join("\n");
+    const patch = buildHubStoryboardBackfillPatch({
+      outlineMd: "视觉风格",
+      storyboardMd: "",
+      outlineRuntime: { status: "done", taskId: "t1", textOutput: raw },
+    } as never);
+    expect(patch.storyboardMd).toContain("分镜脚本");
+    expect(parseStoryboardRows(patch.storyboardMd ?? "").length).toBe(1);
+  });
+
+  it("resolveHubStoryboardMd merges JSON prop/sfx when stored storyboardMd is stale v1", () => {
+    const staleV1 = `| 镜号 | 景别 | 运镜 | 画面描述（含起始→终止站位） | 对白 | 时长(秒) | AI生图提示词(英文) | AI视频提示词(英文) | 口型/配音备注 |
+|------|------|------|---------------------------|------|----------|---------------------|---------------------|---------------|
+| 1 | 全景 | 固定 | 【起始】旧画面【结束】旧结束 | — | 10 | img | vid | — |`;
+    const hubData = {
+      storyboardMd: staleV1,
+      productionScript: PRO2_FIXTURE_FULL_PACK.patch,
+    };
+    const md = resolveHubStoryboardMd(hubData);
+    const rows = parseStoryboardRows(md);
+    const shot1 = rows.find((r) => r.frameIndex === 1);
+    expect(shot1?.propNames).toMatch(/明黄婚书/);
+    expect(shot1?.sfxNote).toMatch(/人群议论/);
   });
 });
