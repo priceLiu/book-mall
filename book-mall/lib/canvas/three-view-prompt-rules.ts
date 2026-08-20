@@ -37,6 +37,16 @@ export const THREE_VIEW_SYSTEM_SUFFIX_ZH = THREE_VIEW_SYSTEM_PREFIX_ZH;
 
 export const THREE_VIEW_IMAGE_RULES_ZH = THREE_VIEW_SYSTEM_PREFIX_ZH;
 
+import {
+  isPro2ProductionPackCharacterImagePrompt,
+  isLegacyWrappedMediaPrompt,
+  resolvePro2CharacterImagePromptFromRow,
+  finalizePro2CharacterImageDockPrompt,
+} from "./pro2-production-pack-prompt";
+import { buildPro2CharacterImagePromptFromStructuredFields } from "./pro2-character-script-fields";
+
+export { isPro2ProductionPackCharacterImagePrompt } from "./pro2-production-pack-prompt";
+
 export const THREE_VIEW_TURNAROUND_REQUIREMENT_EN =
   "White-bg turnaround: front, side, back full-body only; no props in hands, no labels or panel borders.";
 
@@ -280,9 +290,53 @@ export function shouldRebuildPro2CharacterRowPrompt(
   next: Pro2CharacterTablePromptFields,
 ): boolean {
   if (!prev.prompt?.trim()) return true;
+  if (isLegacyWrappedMediaPrompt(prev.prompt)) return true;
   return (
     pro2CharacterTablePromptFingerprint(prev) !==
     pro2CharacterTablePromptFingerprint(next)
+  );
+}
+
+export function resolvePro2ThreeViewRunPrompt(
+  row: Pro2CharacterTablePromptFields & {
+    prompt?: string;
+    visualStyleTag?: string;
+  },
+  visualStylePack?: ThreeViewVisualStyleInput | null,
+): string {
+  const finalizeOpts = {
+    visualStylePack: visualStylePack ?? null,
+    visualStyleTag: row.visualStyleTag,
+  };
+
+  const passthrough = resolvePro2CharacterImagePromptFromRow(row);
+  if (passthrough) {
+    return finalizePro2CharacterImageDockPrompt(passthrough, finalizeOpts);
+  }
+
+  const saved = row.prompt?.trim();
+  if (saved && !isLegacyWrappedMediaPrompt(saved)) {
+    return finalizePro2CharacterImageDockPrompt(saved, finalizeOpts);
+  }
+
+  const structured = buildPro2CharacterImagePromptFromStructuredFields(
+    {
+      name: row.name,
+      role: row.role,
+      appearance: row.appearance,
+      personality: row.personality,
+      aiImagePrompt: row.aiImagePrompt,
+      imagePrompt: row.prompt,
+      visualStyleTag: row.visualStyleTag,
+    },
+    visualStylePack ?? null,
+    { finalizeDock: true },
+  );
+  if (structured?.trim()) return structured;
+
+  return assembleThreeViewPrompt(
+    buildThreeViewCharacterBody(row),
+    visualStylePack ?? null,
   );
 }
 
@@ -348,7 +402,20 @@ export function normalizeThreeViewDockPrompt(
   visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
   const trimmed = prompt.trim();
-  if (!trimmed) return assembleThreeViewPrompt("", visualStylePack ?? null);
+  if (!trimmed) {
+    return (
+      buildPro2CharacterImagePromptFromStructuredFields(
+        { name: "未命名角色", role: "角色", appearance: "" },
+        visualStylePack ?? null,
+        { finalizeDock: true },
+      ) ?? assembleThreeViewPrompt("", visualStylePack ?? null)
+    );
+  }
+  if (isPro2ProductionPackCharacterImagePrompt(trimmed)) {
+    return finalizePro2CharacterImageDockPrompt(trimmed, {
+      visualStylePack: visualStylePack ?? null,
+    });
+  }
 
   const legacyMatch = trimmed.match(/^角色：([^\n]+)/m);
   if (legacyMatch && !trimmed.includes("【角色设定：")) {
@@ -356,10 +423,37 @@ export function normalizeThreeViewDockPrompt(
     const role = trimmed.match(/^定位：([^\n]+)/m)?.[1]?.trim() || "角色";
     const appearance =
       trimmed.match(/^外貌\/服装[^\n]*：([^\n]+)/m)?.[1]?.trim() || "";
-    return assembleThreeViewPrompt(
-      buildThreeViewCharacterBody({ name, role, appearance }),
-      visualStylePack ?? null,
+    return (
+      buildPro2CharacterImagePromptFromStructuredFields(
+        { name, role, appearance },
+        visualStylePack ?? null,
+        { finalizeDock: true },
+      ) ??
+      assembleThreeViewPrompt(
+        buildThreeViewCharacterBody({ name, role, appearance }),
+        visualStylePack ?? null,
+      )
     );
+  }
+
+  if (isLegacyWrappedMediaPrompt(trimmed)) {
+    const stripped = stripThreeViewSystemBlocks(trimmed);
+    const headerMatch = stripped.match(
+      /^【角色设定：([^-\n]+)\s*-\s*([^\n]+)】\n([\s\S]*)$/m,
+    );
+    if (headerMatch) {
+      return (
+        buildPro2CharacterImagePromptFromStructuredFields(
+          {
+            name: headerMatch[1]!.trim(),
+            role: headerMatch[2]!.trim(),
+            appearance: headerMatch[3]!.trim(),
+          },
+          visualStylePack ?? null,
+          { finalizeDock: true },
+        ) ?? assembleThreeViewPrompt(stripped, visualStylePack ?? null)
+      );
+    }
   }
 
   const character = stripThreeViewSystemBlocks(trimmed);
@@ -377,11 +471,12 @@ export function formatThreeViewPromptFromCharacterDescription(
   },
   visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody({
+  return resolvePro2ThreeViewRunPrompt(
+    {
       ...c,
+      appearance: c.appearance ?? "",
       aiImagePrompt: characterDescription.trim() || c.aiImagePrompt,
-    }),
+    },
     visualStylePack ?? null,
   );
 }
@@ -393,13 +488,11 @@ export function formatCharacterRowThreeViewPrompt(
     appearance: string;
     personality?: string;
     aiImagePrompt?: string;
+    prompt?: string;
   },
   visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody(c),
-    visualStylePack ?? null,
-  );
+  return resolvePro2ThreeViewRunPrompt(c, visualStylePack ?? null);
 }
 
 export function resolveCharacterRowThreeViewPrompt(
@@ -409,6 +502,7 @@ export function resolveCharacterRowThreeViewPrompt(
     appearance: string;
     personality?: string;
     aiImagePrompt?: string;
+    prompt?: string;
   },
   visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
@@ -426,10 +520,7 @@ export function buildPro2ThreeViewDockPrompt(
   },
   visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody(row),
-    visualStylePack ?? undefined,
-  );
+  return resolvePro2ThreeViewRunPrompt(row, visualStylePack ?? undefined);
 }
 
 export function formatBatchThreeViewPrompt(
@@ -439,11 +530,9 @@ export function formatBatchThreeViewPrompt(
     appearance: string;
     personality?: string;
     aiImagePrompt?: string;
+    prompt?: string;
   },
   visualStylePack?: ThreeViewVisualStyleInput | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody(c),
-    visualStylePack ?? null,
-  );
+  return resolvePro2ThreeViewRunPrompt(c, visualStylePack ?? null);
 }

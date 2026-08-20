@@ -106,7 +106,7 @@ describe("pro2-production-script flow", () => {
     expect(rows[0]?.scene).toBe("长安主街·日");
   });
 
-  it("falls back to MD when no fence present", () => {
+  it("legacy hub falls back to MD when no fence and prompt version < 13", () => {
     const hub: StoryProScriptHubNodeData = {
       outlineMd: "",
       characterMd: "",
@@ -116,15 +116,40 @@ describe("pro2-production-script flow", () => {
       promptOutline: "",
       promptCharacter: "",
       promptStoryboard: "",
+      storyPro2PackPromptVersion: 12,
     };
-    const mdOnly = `## 角色视觉辞典\n\n| 姓名 | 身份 | 外貌/服装/标志性动作 | 性格 | AI生图提示词(英文) |\n|------|------|----------------------|------|---------------------|\n| 小明 | 主角 | 圆脸 | 开朗 | 中文生图 prompt |`;
+    const mdOnly = `## 角色视觉辞典\n\n| 姓名 | 身份 | 外貌/服装/特征 | 性格 | AI生图提示词(英文) |\n|------|------|----------------|------|---------------------|\n| 小明 | 主角 | 圆脸 | 开朗 | 中文生图 prompt |`;
 
     const patch = applyHubSectionFromTask(hub, "character", {
       status: "done",
     }, mdOnly);
 
-    expect((patch as StoryProScriptHubNodeData).productionScript).toBeUndefined();
+    expect((patch as StoryProScriptHubNodeData).productionScript?.characters?.[0]?.name).toBe(
+      "小明",
+    );
     expect(patch.characterMd).toContain("小明");
+  });
+
+  it("v13 hub rejects MD-only character output", () => {
+    const hub: StoryProScriptHubNodeData = {
+      outlineMd: "",
+      characterMd: "",
+      storyboardMd: "",
+      providerId: "p",
+      modelKey: "m",
+      promptOutline: "",
+      promptCharacter: "",
+      promptStoryboard: "",
+      storyPro2PackPromptVersion: 13,
+    };
+    const mdOnly = `## 角色视觉辞典\n\n| 姓名 | 身份 | 外貌/服装/特征 | 性格 | AI生图提示词(英文) |\n|------|------|----------------|------|---------------------|\n| 小明 | 主角 | 圆脸 | 开朗 | 中文生图 prompt |`;
+
+    const patch = applyHubSectionFromTask(hub, "character", {
+      status: "done",
+    }, mdOnly);
+
+    expect(patch.characterRuntime?.status).toBe("error");
+    expect(patch.characterRuntime?.failCode).toBe("PRO2_SCRIPT_JSON_INVALID");
   });
 
   it("repairs hub when outlineMd is raw JSON blob", () => {

@@ -2,6 +2,7 @@
  * 影视专业版 2.0 · 场景图生图 prompt 约束（运行时 + Dock）
  * book-mall/lib/canvas/story-pro2-scene-image-prompt.ts 须保持同步
  */
+import { isPro2ProductionPackSceneImagePrompt, finalizePro2SceneImageDockPrompt, isLegacyWrappedMediaPrompt } from "./pro2-production-pack-prompt";
 
 /** 场景段 LLM 模板版本标记（用于 hub prompt 迁移） */
 export const STORY_PRO2_SCENE_PROMPT_VERSION_MARKER =
@@ -41,11 +42,17 @@ export function sceneImagePromptAllowsCharacters(prompt: string): boolean {
   return SCENE_IMAGE_CHARACTER_OPT_IN_PATTERNS.some((re) => re.test(t));
 }
 
-/** 为场景图 Dock / 生图 API 追加空镜约束（默认）；含人物标注时跳过 */
+/** 为场景图 Dock / 生图 API 追加空镜约束（默认）；制作包正文或含人物标注时跳过 */
 export function finalizeStoryPro2SceneImagePrompt(prompt: string): string {
   const base = prompt.trim();
   if (!base) {
     return `${STORY_PRO2_SCENE_IMAGE_RUN_CONSTRAINTS_ZH}\n${STORY_PRO2_SCENE_IMAGE_RUN_CONSTRAINTS}`;
+  }
+  if (
+    !isLegacyWrappedMediaPrompt(base) &&
+    (isPro2ProductionPackSceneImagePrompt(base) || base.includes("名称："))
+  ) {
+    return finalizePro2SceneImageDockPrompt(base);
   }
   if (sceneImagePromptAllowsCharacters(base)) return base;
   if (SCENE_IMAGE_CONSTRAINT_ALREADY_APPLIED.test(base)) return base;

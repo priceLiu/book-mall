@@ -21,6 +21,7 @@ import {
   STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
+import { PRO2_SCRIPT_FORMAT_JSON_ONLY_V13 } from "./pro2-project-format";
 import {
   STORY_PRO_CHARACTER_PROMPT,
   STORY_PRO_OUTLINE_USER_PROMPT,
@@ -482,7 +483,7 @@ const STORY_PRO2_STARTER_ORIGIN = { x: 120, y: 160 };
 
 const STORY_PRO2_PIPELINE: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
-  meta: { edition: "pro2" },
+  meta: { edition: "pro2", pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13 },
   viewport: { x: 0, y: 0, zoom: 1 },
   nodes: [
     {
@@ -517,7 +518,7 @@ const STORY_PRO2_PIPELINE: CanvasGraph = {
  */
 const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
-  meta: { edition: "pro2" },
+  meta: { edition: "pro2", pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13 },
   viewport: { x: 0, y: 0, zoom: 0.85 },
   nodes: [
     {
@@ -562,6 +563,7 @@ const STORY_PRO2_PRODUCTION: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
   meta: {
     edition: "pro2",
+    pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13,
     productionCanvas: true,
     requireScriptLink: true,
   },

@@ -88,8 +88,8 @@ describe("hubSectionHasTerminalError", () => {
 });
 
 describe("hubSectionCountsAsInflight", () => {
-  it("ignores pending without taskId", () => {
-    expect(hubSectionCountsAsInflight({ status: "pending" })).toBe(false);
+  it("counts pending without taskId for poll targeting (sequential chain / optimistic)", () => {
+    expect(hubSectionCountsAsInflight({ status: "pending" })).toBe(true);
     expect(
       hubSectionCountsAsInflight({ status: "pending", taskId: "t1" }),
     ).toBe(true);

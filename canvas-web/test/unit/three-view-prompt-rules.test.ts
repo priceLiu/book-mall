@@ -2,12 +2,23 @@ import { describe, expect, it } from "vitest";
 import {
   buildPro2ThreeViewDockPrompt,
   buildThreeViewCharacterBody,
+  isPro2ProductionPackCharacterImagePrompt,
   normalizeThreeViewDockPrompt,
   resolveCharacterRowThreeViewPrompt,
-  THREE_VIEW_HARD_CONSTRAINTS_ZH,
-  THREE_VIEW_TASK_ZH,
-  THREE_VIEW_TURNAROUND_REQUIREMENT_EN,
 } from "@/lib/canvas/three-view-prompt-rules";
+import { PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC } from "@/lib/canvas/data/pro2-production-pack-standard";
+
+const PRODUCTION_PACK_CHARACTER_PROMPT = `名称：现代沈昭昭，现代职场女性
+
+描述：现代职场社畜，女，28岁，身高1.65米，体型偏瘦，中长发，发质干枯，黑色头发，瓜子脸，黑瞳，肤色苍白
+
+服装：上衣为宽松的浅灰色条纹衬衫，下装为黑色西装长裤，黑色平底皮鞋，无帽，无配饰
+
+特征：眼下有明显的黑眼圈，双颊微陷
+
+构图规范：高质量专业角色设定图，横向构图，纯白色纯净背景，中性摄影棚灯光，平光布光；布局结构（必须是角色四视图）：正面面部头部特写（占图片水平 1/3 的空间）+ [全身正面视图 + 全身左侧面视图 + 全身背面视图]（占图片水平剩余的 2/3 的空间，并列排列），四个视图中间用淡灰色(#E2E2E2)的2px细线分割，无任何道具或背景物体。
+
+[视觉风格：盛唐穿越题材，国风二次元厚涂，2D动漫媒介]`;
 
 const XIAO_JINGHENG_APPEARANCE = `- 年龄与身份：24 岁，中国古代王爷，架空唐代风格。
 - 发型：乌黑长发，佩戴银色尖刺造型的玄幻冠饰。
@@ -29,7 +40,77 @@ const VISUAL_PACK = {
 };
 
 describe("three-view-prompt-rules", () => {
-  it("assembles task → constraints → character → global visual → en", () => {
+  it("detects production pack character imagePrompt", () => {
+    expect(isPro2ProductionPackCharacterImagePrompt(PRODUCTION_PACK_CHARACTER_PROMPT)).toBe(
+      true,
+    );
+  });
+
+  it("passes through LLM production pack imagePrompt with canonical four-view composition", () => {
+    const prompt = buildPro2ThreeViewDockPrompt(
+      {
+        name: "现代沈昭昭",
+        role: "现代职场社畜",
+        appearance: "女，28岁，浅灰条纹衬衫",
+        aiImagePrompt: PRODUCTION_PACK_CHARACTER_PROMPT,
+      },
+      VISUAL_PACK,
+    );
+
+    expect(prompt).toContain(`构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`);
+    expect(prompt).toContain("名称：现代沈昭昭");
+    expect(prompt).not.toContain("【任务】");
+    expect(prompt).not.toContain("【全局视觉风格");
+  });
+
+  it("prefers aiImagePrompt over stale legacy row.prompt", () => {
+    const legacyPrompt = `【任务】
+生成主角的标准三视图设计稿。`;
+
+    const prompt = buildPro2ThreeViewDockPrompt(
+      {
+        name: "现代沈昭昭",
+        role: "现代职场社畜",
+        appearance: "女，28岁，浅灰条纹衬衫",
+        aiImagePrompt: PRODUCTION_PACK_CHARACTER_PROMPT,
+        prompt: legacyPrompt,
+      },
+      VISUAL_PACK,
+    );
+
+    expect(prompt).toContain(`构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`);
+    expect(prompt).not.toContain("【任务】");
+  });
+
+  it("appends missing composition spec and visual style for partial imagePrompt", () => {
+    const partial = `名称：现代沈昭昭，现代职场女性
+
+描述：女，28岁，身高1.65米，偏瘦
+
+服装：浅灰色条纹衬衫
+
+特征：眼下有明显的黑眼圈，双颊微陷`;
+
+    const prompt = buildPro2ThreeViewDockPrompt(
+      {
+        name: "现代沈昭昭",
+        role: "现代职场社畜",
+        appearance: "…",
+        aiImagePrompt: partial,
+      },
+      {
+        era: "盛唐穿越题材",
+        visualStyle: "国风二次元厚涂，2D动漫媒介",
+      },
+    );
+
+    expect(prompt).toContain("构图规范：");
+    expect(prompt).toContain("角色四视图");
+    expect(prompt).toContain("[视觉风格：盛唐穿越题材，国风二次元厚涂，2D动漫媒介]");
+    expect(prompt).not.toContain("【任务】");
+  });
+
+  it("builds golden four-view prompt for legacy appearance rows", () => {
     const prompt = buildPro2ThreeViewDockPrompt(
       {
         name: "萧景珩",
@@ -40,22 +121,15 @@ describe("three-view-prompt-rules", () => {
       VISUAL_PACK,
     );
 
-    expect(prompt.indexOf(THREE_VIEW_TASK_ZH)).toBeLessThan(
-      prompt.indexOf("【角色设定：萧景珩 - 摄政王】"),
-    );
-    expect(prompt.indexOf("【角色设定：萧景珩 - 摄政王】")).toBeLessThan(
-      prompt.indexOf("【全局视觉风格"),
-    );
-    expect(prompt.indexOf("【全局视觉风格")).toBeLessThan(
-      prompt.indexOf(THREE_VIEW_TURNAROUND_REQUIREMENT_EN),
-    );
-
-    expect(prompt).toContain(THREE_VIEW_HARD_CONSTRAINTS_ZH);
-    expect(prompt).toContain(XIAO_JINGHENG_APPEARANCE);
-    expect(prompt).toContain("照片级写实");
-    expect(prompt).toContain("环境光适配");
+    expect(prompt).toContain("名称：萧景珩，摄政王");
+    expect(prompt).toContain("描述：");
+    expect(prompt).toContain("服装：");
+    expect(prompt).toContain(`构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`);
+    expect(prompt).toContain("[视觉风格：");
+    expect(prompt).not.toContain("【任务】");
+    expect(prompt).not.toContain("【全局视觉风格");
+    expect(prompt).not.toContain("White-bg turnaround");
     expect(prompt).not.toContain("性格：");
-    expect(prompt).not.toContain("【三视图 · 系统约束】");
   });
 
   it("builds character section as bullet block under header", () => {
@@ -77,18 +151,17 @@ describe("three-view-prompt-rules", () => {
       appearance: SAMPLE_APPEARANCE_ZH,
       personality: "倔强",
     });
-    expect(prompt).toContain("【任务】");
+    expect(prompt).toContain("名称：沈知意，女主");
+    expect(prompt).toContain(`构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`);
     expect(prompt).not.toContain("性格：");
+    expect(prompt).not.toContain("【任务】");
   });
 
-  it("normalizes legacy flat prompt into new template", () => {
+  it("normalizes legacy flat prompt into golden four-view template", () => {
     const legacy = `角色：苏清禾\n定位：女主\n外貌/服装/标志性动作：鹅黄襦裙`;
     const reordered = normalizeThreeViewDockPrompt(legacy, VISUAL_PACK);
-    expect(reordered.indexOf("【角色设定：苏清禾 - 女主】")).toBeGreaterThan(-1);
-    expect(reordered.indexOf("【任务】")).toBeLessThan(
-      reordered.indexOf("【角色设定"),
-    );
-    expect(reordered).toContain("【全局视觉风格");
-    expect(reordered.match(/【任务】/g)?.length).toBe(1);
+    expect(reordered).toContain("名称：苏清禾，女主");
+    expect(reordered).toContain(`构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`);
+    expect(reordered).not.toContain("【任务】");
   });
 });

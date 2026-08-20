@@ -1,9 +1,11 @@
 import { resolveHubRowsForCrewBulletin } from "./crew-bulletin-build";
 import type { CrewBulletinTask, CrewTaskKind } from "./crew-bulletin-types";
+import { buildPro2FrameMediaPrompt, buildPro2PropMediaPrompt } from "./pro2-lazy-media-prompts";
 import {
   buildDefaultFrameRowPrompt,
   formatSceneRowDockInput,
 } from "./story-column-sync";
+import { resolveHubVisualStylePackFromHubData } from "./story-pro-visual-style-pack";
 import type {
   StoryProAudioRow,
   StoryProCharacterRow,
@@ -250,24 +252,57 @@ export function findCrewTaskRow(
   }
 }
 
-export function characterCrewTaskDockInput(row: StoryProCharacterRow): string {
-  return resolveCharacterRowThreeViewPrompt({
-    name: row.name?.trim() || "角色",
-    role: row.role?.trim() || "",
-    appearance: row.appearance?.trim() || "",
-    personality: row.personality,
-    aiImagePrompt: row.aiImagePrompt,
-  });
+export function characterCrewTaskDockInput(
+  row: StoryProCharacterRow,
+  hubData?: StoryProScriptHubNodeData,
+): string {
+  const visualStylePack = hubData
+    ? resolveHubVisualStylePackFromHubData(hubData)
+    : null;
+  return resolveCharacterRowThreeViewPrompt(
+    {
+      name: row.name?.trim() || "角色",
+      role: row.role?.trim() || "",
+      appearance: row.appearance?.trim() || "",
+      personality: row.personality,
+      aiImagePrompt: row.aiImagePrompt,
+      prompt: row.prompt,
+    },
+    visualStylePack,
+  );
 }
 
-export function sceneCrewTaskDockInput(row: StoryProSceneRow): string {
-  const fromRow = formatSceneRowDockInput(row);
+export function sceneCrewTaskDockInput(
+  row: StoryProSceneRow,
+  hubData?: StoryProScriptHubNodeData,
+): string {
+  const visualStylePack = hubData
+    ? resolveHubVisualStylePackFromHubData(hubData)
+    : null;
+  const fromRow = formatSceneRowDockInput(row, visualStylePack);
   if (fromRow.trim()) return fromRow;
   return row.name?.trim() || "";
 }
 
+export function propCrewTaskDockInput(
+  row: StoryProPropRow,
+  hubData?: StoryProScriptHubNodeData,
+): string {
+  const visualStylePack = hubData
+    ? resolveHubVisualStylePackFromHubData(hubData)
+    : null;
+  return (
+    buildPro2PropMediaPrompt(row, visualStylePack) ||
+    row.prompt?.trim() ||
+    row.description?.trim() ||
+    row.name?.trim() ||
+    ""
+  );
+}
+
 export function frameCrewTaskDockInput(row: StoryProFrameRow): string {
   return (
+    buildPro2FrameMediaPrompt(row) ||
     row.prompt?.trim() ||
     row.aiImagePrompt?.trim() ||
     buildDefaultFrameRowPrompt(row) ||
@@ -297,15 +332,16 @@ export function resolveCrewTaskDockInput(
 
   switch (task.kind) {
     case "character":
-      return characterCrewTaskDockInput(row as StoryProCharacterRow);
+      return characterCrewTaskDockInput(row as StoryProCharacterRow, hubData);
     case "scene":
-      return sceneCrewTaskDockInput(row as StoryProSceneRow);
+      return sceneCrewTaskDockInput(row as StoryProSceneRow, hubData);
     case "frame":
     case "frameVideo":
     case "dialogue":
     case "composite":
       return frameCrewTaskDockInput(row as StoryProFrameRow);
     case "prop":
+      return propCrewTaskDockInput(row as StoryProPropRow, hubData);
     case "mood":
     case "audio":
       return mediaCrewTaskDockInput(row as StoryProPropRow, task.label);

@@ -21,11 +21,9 @@ import { busEnqueueStoryRunsSequential } from "./canvas-run-bus";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 import { formatSceneRowDockInput } from "./story-column-sync";
+import { buildPro2SceneMediaPrompt } from "./pro2-lazy-media-prompts";
 import { filterPro2RowsForSpawn } from "./pro2-media-row-spawn";
-import {
-  appendVisualStylePackToDockPrompt,
-  parseVisualStylePackFromOutline,
-} from "./story-pro-visual-style-pack";
+import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
 function readHubVisualStylePack(
@@ -88,13 +86,12 @@ export function buildSceneImageNodeDataPatch(
   },
 ): Record<string, unknown> {
   const preview = sceneRowPreview(row);
-  const dockInput = appendVisualStylePackToDockPrompt(
-    formatSceneRowDockInput(row) ||
-      row.prompt?.trim() ||
-      row.description?.trim() ||
-      "",
-    opts?.visualStylePack,
-  );
+  const dockInput =
+    buildPro2SceneMediaPrompt(row, opts?.visualStylePack) ||
+    formatSceneRowDockInput(row, opts?.visualStylePack) ||
+    row.prompt?.trim() ||
+    row.description?.trim() ||
+    "";
   const patch: Record<string, unknown> = {
     label: row.name?.trim() || "场景",
     dockInput,

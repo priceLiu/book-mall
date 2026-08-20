@@ -144,7 +144,10 @@ export function canvasNodeHasInflightWork(
     );
   }
   if (isAnyStoryScriptHubType(node.type ?? "")) {
-    const d = node.data as unknown as StoryScriptHubNodeData;
+    const d = node.data as unknown as StoryScriptHubNodeData & {
+      hubGenerateIntent?: boolean;
+    };
+    if (d.hubGenerateIntent) return true;
     return hubHasInflightWork(d);
   }
   if (node.type === "story-pro-starter" || node.type === "story-pro2-starter") {

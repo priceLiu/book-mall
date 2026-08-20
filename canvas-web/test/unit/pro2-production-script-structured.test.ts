@@ -62,39 +62,30 @@ describe("pro2-production-script-structured", () => {
     expect(patch?.patch.visualStyle?.worldBackground).toBe("穿越");
   });
 
-  it("rejects LLM alias fields (identity / aiImagePrompt / string handoff)", () => {
+  it("coerces LLM alias fields (identity / aiImagePrompt) into canonical schema", () => {
     const raw = JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       tier: "pro",
-      step: "full_pack",
+      step: "character",
       patch: {
-        title: "我在盛唐写天下",
-        visualStyle: {
-          worldBackground: "穿越盛唐",
-          era: "盛唐",
-          photographyStyle: "史诗广角",
-          dayPalette: "主暖金 #D4A050",
-        },
         characters: [
           {
+            id: "char-heroine",
             name: "沈昭昭",
             identity: "女主",
-            aiImagePrompt: "tang official",
-          },
-        ],
-        handoff: ["角色三视图：按角色表生成"],
-        shots: [
-          {
-            index: 1,
-            description: "殿内",
-            aiImagePrompt: "close up",
+            appearance: "女，28岁",
+            traits: "①眼下黑眼圈 ②双颊微陷 ③眉心浅纹",
+            aiImagePrompt:
+              "名称：沈昭昭\n描述：女，28岁\n服装：衬衫\n特征：①眼下黑眼圈 ②双颊微陷 ③眉心浅纹\n构图规范：四视图\n[视觉风格：测试]",
           },
         ],
       },
     });
-    expect(extractPro2ProductionScriptPatch(raw)).toBeNull();
-    const err = describePro2ProductionScriptParseFailure(raw);
-    expect(err).toBeTruthy();
+    const patch = extractPro2ProductionScriptPatch(raw);
+    expect(patch).not.toBeNull();
+    expect(patch?.patch.characters?.[0]?.role).toBe("女主");
+    expect(patch?.patch.characters?.[0]?.imagePrompt).toContain("名称：");
+    expect(patch?.patch.characters?.[0]?.appearance).toContain("特征");
   });
 
   it("pro2PatchStepMatchesSection allows full_pack on outline section", () => {
@@ -141,18 +132,12 @@ describe("pro2-production-script-structured", () => {
     expect(isUnparsedPro2ProductionJsonBlob(rendered)).toBe(false);
   });
 
-  it("parses full_pack from human markdown + trailing JSON (大模型剧本返回)", () => {
-    const text = readFileSync(
-      join(__dirname, "../../../docs/大模型剧本返回.md "),
-      "utf8",
-    );
-    expect(isUnparsedPro2ProductionJsonBlob(text)).toBe(false);
+  it("parses full_pack from fence in legacy human markdown wrapper", () => {
+    const text = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
     const patch = extractPro2ProductionScriptPatch(text);
     expect(patch?.step).toBe("full_pack");
-    expect(patch?.patch.meta?.title).toBe("我在盛唐写天下");
-    expect(patch?.patch.characters?.length).toBe(4);
-    expect(patch?.patch.scenes?.length).toBe(4);
-    expect(patch?.patch.shots?.length).toBe(16);
-    expect(patch?.patch.handoff?.length).toBe(10);
+    expect(patch?.patch.meta?.title).toBe("测试剧");
+    expect(patch?.patch.characters?.length).toBe(1);
+    expect(patch?.patch.shots?.length).toBe(2);
   });
 });

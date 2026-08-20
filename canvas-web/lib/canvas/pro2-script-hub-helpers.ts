@@ -107,10 +107,14 @@ export function pro2HubHasScriptTable(d: StoryProScriptHubNodeData): boolean {
   return parseStoryboardRows(md).length > 0;
 }
 
-/** 角色表 Markdown（人读 Tab/GFM 优先 · JSON 仅回落） */
+/** 角色表 Markdown（productionScript 真源优先 · 保证 ①②③ 与 imagePrompt 列） */
 export function resolvePro2HubCharacterMd(
   d: StoryProScriptHubNodeData,
 ): string {
+  const script = resolveHubProductionScript(d);
+  if (script?.characters?.length) {
+    return renderProductionScriptCharacterMd(script);
+  }
   const humanGfm = resolvePro2HumanGfmFromHubSources(d);
   if (humanGfm) {
     const fromHuman = extractCharacterSectionFromOutline(humanGfm);
@@ -123,10 +127,6 @@ export function resolvePro2HubCharacterMd(
   );
   const fromSync = (synced.characterMd ?? "").trim();
   if (parseCharacterRows(fromSync).length > 0) return fromSync;
-  const script = resolveHubProductionScript(d);
-  if (script?.characters?.length) {
-    return renderProductionScriptCharacterMd(script);
-  }
   return fromSync;
 }
 
@@ -614,8 +614,7 @@ export function enqueuePro2ScriptGeneration(
     });
 
     runStoryHubSectionsSequential(hubId, sections, options);
-    // intent 仅首帧占位；段级 pending/running 接管后清掉，避免 Gateway 完成后仍扫光
-    updateNodeData(hubId, { hubGenerateIntent: undefined });
+    // hubGenerateIntent 由 story-run-apply 在任务终态时清除；勿在此处提前清掉以免轮询窗口内扫光消失
   };
 
   if (typeof window !== "undefined") {

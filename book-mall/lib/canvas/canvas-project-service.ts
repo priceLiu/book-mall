@@ -13,6 +13,11 @@ import {
   canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
+import {
+  isRetiredLegacyPro2Canvas,
+  isRetiredLegacyPro2FromListHints,
+  withPro2ScriptFormatV13Meta,
+} from "@/lib/canvas/pro2-project-format";
 import { getActiveTenantContext } from "@/lib/tenant/context";
 import {
   pickPersistableProjectThumbnailUrl,
@@ -185,7 +190,15 @@ export async function listCanvasProjectsForUser(
     ORDER BY cp."updatedAt" DESC
     LIMIT 200
   `;
-  return rows.map(listRowToSummary);
+  return rows
+    .map(listRowToSummary)
+    .filter(
+      (_, i) =>
+        !isRetiredLegacyPro2FromListHints(
+          rows[i]!.meta,
+          parseListNodeTypes(rows[i]!.nodeTypes),
+        ),
+    );
 }
 
 function defaultCanvasProjectName(now = new Date()): string {
@@ -211,10 +224,15 @@ export async function createCanvasProjectForUser(
   if (name.length > MAX_NAME)
     throw new CanvasProjectError("INVALID_INPUT", "name too long");
   const description = (args.description ?? "").toString();
-  const canvas =
+  let canvas =
     args.canvas && typeof args.canvas === "object"
       ? args.canvas
       : { schemaVersion: 1, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  if (canvasProjectEditionFromGraph(canvas) === "pro2") {
+    canvas = withPro2ScriptFormatV13Meta(
+      canvas as { meta?: unknown },
+    );
+  }
 
   const tenantCtx = await getActiveTenantContext(userId);
 
@@ -241,6 +259,9 @@ export async function getCanvasProjectForUser(
   projectId: string,
 ): Promise<CanvasProjectDetail> {
   const p = await loadAccessibleCanvasProjectRow(userId, projectId, {});
+  if (isRetiredLegacyPro2Canvas(p.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
   return {
     ...toSummary(p),
     canvas: p.canvas,
@@ -263,6 +284,9 @@ export async function updateCanvasProjectForUser(
     where: { id: projectId, deletedAt: null },
   });
   if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  if (isRetiredLegacyPro2Canvas(p.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
 
   const data: Prisma.CanvasProjectUpdateInput = {};
   if (typeof patch.name === "string") {
@@ -428,7 +452,11 @@ export async function listPortalFeaturedCanvasProjects(): Promise<
     },
   });
   return rows
-    .filter((p) => canvasProjectEditionFromGraph(p.canvas) === "pro2")
+    .filter(
+      (p) =>
+        canvasProjectEditionFromGraph(p.canvas) === "pro2" &&
+        !isRetiredLegacyPro2Canvas(p.canvas),
+    )
     .map((p) => ({
       ...toSummary(p),
       portalFeaturedBlurb: portalFeaturedBlurbOf(p),
@@ -452,6 +480,9 @@ export async function duplicatePortalFeaturedProjectForUser(
   sourceProjectId: string,
 ): Promise<CanvasProjectDetail> {
   const source = await getPortalFeaturedCanvasProjectRow(sourceProjectId);
+  if (isRetiredLegacyPro2Canvas(source.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "portal featured project not found", 404);
+  }
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({
@@ -491,6 +522,9 @@ export async function duplicatePortalCaseProjectForUser(
   sourceProjectId: string,
 ): Promise<CanvasProjectDetail> {
   const source = await getPortalCaseCanvasProjectRow(sourceProjectId);
+  if (isRetiredLegacyPro2Canvas(source.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "portal case project not found", 404);
+  }
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({

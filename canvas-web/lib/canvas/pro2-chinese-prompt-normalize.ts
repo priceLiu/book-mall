@@ -6,6 +6,10 @@ import type {
   Pro2ProductionScript,
   Pro2ProductionScriptPatch,
 } from "./data/pro2-production-script-schema";
+import {
+  formatPro2CharacterAppearanceCell,
+  buildPro2CharacterImagePromptFromStructuredFields,
+} from "./pro2-character-script-fields";
 
 /** 去掉 `<<<scene_A>>>` / `<<<prop_computer>>>` 等锚点占位符（保留可读名称） */
 export function stripPro2AnchorPlaceholders(text: string): string {
@@ -227,13 +231,24 @@ export function normalizePro2ProductionScriptPatchChinese(
       : s.negativePrompt,
   }));
 
-  const characters = patch.characters?.map((c) => ({
-    ...c,
-    name: normalizePro2DisplayText(c.name) ?? c.name,
-    role: normalizePro2DisplayText(c.role) ?? c.role,
-    appearance: normalizePro2DisplayText(c.appearance) ?? c.appearance,
-    imagePrompt: normalizeOptionalPrompt(c.imagePrompt) ?? c.imagePrompt,
-  }));
+  const characters = patch.characters?.map((c) => {
+    const appearance = formatPro2CharacterAppearanceCell(c);
+    const imagePrompt =
+      buildPro2CharacterImagePromptFromStructuredFields({
+        ...c,
+        appearance,
+      }) ??
+      normalizeOptionalPrompt(c.imagePrompt) ??
+      c.imagePrompt;
+    return {
+      ...c,
+      name: normalizePro2DisplayText(c.name) ?? c.name,
+      role: normalizePro2DisplayText(c.role) ?? c.role,
+      appearance: normalizePro2DisplayText(appearance) ?? appearance,
+      traits: normalizePro2DisplayText(c.traits) ?? c.traits,
+      imagePrompt,
+    };
+  });
 
   const shots = patch.shots?.map((sh) => ({
     ...sh,

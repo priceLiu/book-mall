@@ -7,6 +7,9 @@
 /** pack v8 指纹 · migrate 与 legacy 检测 */
 export const STORY_PRO2_PACK_V8_MARKER = "道具六视图生成";
 
+/** JSON-only v13 指纹 · migrate 与 legacy prompt 检测 */
+export const STORY_PRO2_JSON_ONLY_MARKER = "json-only-v13";
+
 /** @deprecated v7 指纹 · 旧画布 migrate 检测 */
 export const STORY_PRO2_PACK_V7_MARKER = "序号 | 交接项 | 负责方 | 备注";
 
@@ -18,8 +21,8 @@ export const STORY_PRO2_SCENE_TABLE_HEADER = `| 场景名 | 环境/时间/气氛
 |------|----------------|---------------------|------------------|`;
 
 /** 角色视觉辞典 5 列表头 */
-export const STORY_PRO2_CHARACTER_TABLE_HEADER = `| 姓名 | 身份 | 外貌/服装/标志性动作 | 性格 | AI生图提示词(英文) |
-|------|------|----------------------|------|---------------------|`;
+export const STORY_PRO2_CHARACTER_TABLE_HEADER = `| 姓名 | 身份 | 外貌/服装/特征 | 性格 | AI生图提示词(英文) |
+|------|------|------------------|------|---------------------|`;
 
 /** 画布表格 UI 列名（MD 表头仍含「(英文)」供解析；界面展示去掉） */
 export const STORY_PRO2_UI_CHARACTER_AI_PROMPT_LABEL = "AI生图提示词";
@@ -76,22 +79,12 @@ export const STORY_PRO2_DIALOGUE_COLUMN_RULES = `- 格式：**角色名（情绪
 - 多人对白：**角色群（齐声/低语/议论）："台词语"**
 - 无对白写「—」；**禁止**只写台词而不标注说话角色；**禁止**只写在「画面描述」里`;
 
-/** 系统解析契约 · 追加在用户创意模板之后 */
-export const STORY_PRO2_PACK_PARSE_CONTRACT = `【系统解析契约 · 硬性 · 影响画布自动拆分】
-1. 全部章节须用 \`## 标题\`；禁止 Tab 分隔表；**仅 GFM 管道表**（每行以 | 开头和结尾）。
-2. 表头须与下列 **逐字一致**（含括号与标点）：
-   - 场景：${STORY_PRO2_SCENE_TABLE_HEADER.split("\n")[0]?.trim()}
-   - 角色：${STORY_PRO2_CHARACTER_TABLE_HEADER.split("\n")[0]?.trim()}
-   - 道具：${STORY_PRO2_PROP_TABLE_HEADER.split("\n")[0]?.trim()}
-   - 分镜：${STORY_PRO2_STORYBOARD_TABLE_HEADER.split("\n")[0]?.trim()}
-   - 交接：${STORY_PRO2_HANDOFF_TABLE_HEADER.split("\n")[0]?.trim()}
-3. **每行/每镜所有列均须非空**（无对白写「—」；场景反向词可写「（同上）」引用全局反向词）。
-4. 单元格内换行用 \`<br>\`，**禁止**物理换行拆行（每镜一行 GFM）。
-5. 「画面描述」须含起始→终止站位（可用【起始】…【结束】或 起始/动作/终止）。
-6. 「视觉风格总纲」须含可执行色调 HEX、年代/环境、摄影风格；后续生图/视频须与此一致。
-7. 「下一步交接清单」至少 6 行，覆盖三视图、场景图、分镜视频、配音、音效/BGM、剪辑交付等。
-8. **输出语言**：表头含 \`(英文)\` 仅为解析兼容；列内正文 **默认全部中文**，非必要禁止英文（占位符/HEX/技术缩写除外）；反向词须中文。
-9. **机器可读 JSON**：回复 **末尾** 须附唯一 \`\`\`pro2-production-script\` 围栏 JSON（见 JSON 输出契约）；GFM 章节须与 JSON 一致。`;
+/** 系统解析契约 · JSON-only v13（程序只解析 pro2-production-script 围栏） */
+export const STORY_PRO2_PACK_PARSE_CONTRACT = `【系统解析契约 · JSON-only v13 · 硬性】
+1. **只输出** 唯一 \`\`\`pro2-production-script\` JSON 围栏；**禁止** Markdown 章节、GFM 表、说明文字、前言/后记。
+2. JSON 须为标准 JSON（禁止尾逗号、禁止 // 注释）；缺围栏或 Zod/语义校验失败 → 任务失败，**无 MD 回退**。
+3. 字段名与结构见【JSON patch 字段名】；Pass1 shots[] **禁止** imagePrompt / videoPrompt / frameImagePrompt。
+4. 全文默认中文（占位符/HEX/技术缩写除外）；对白格式见对白撰写规范。`;
 
 /** Pro2 · JSON 围栏输出契约（机器可读真源 · 2026-08） */
 export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 · 禁止 alias】
@@ -103,6 +96,8 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
 - scenes[]：{ id, name, environmentTimeMood, imagePrompt, negativePrompt?, colorBlock?, description?, foreground?, atmosphere?, compositionSpec?, visualStyleTag? }
   - 禁止 environment / keywords / prompt 等 alias
 - characters[]：{ id, name, role, appearance, personality?, imagePrompt, description?, clothing?, traits?, compositionSpec?, visualStyleTag? }
+  - appearance 须为 ①外貌 / ②服装 / ③特征 三段（或分别写 description · clothing · traits）
+  - traits 强制 ≥3 项固定面部/体态细节；**禁止** 在 appearance 写「标志性动作」
   - 禁止 identity / aiImagePrompt 等 alias
 - props[]（v2 Pass1 必填 · 与分镜道具列对应）：{ id, name, description?, traits?, compositionSpec?, visualStyleTag?, imagePrompt? }
 - shots[] v2 Pass1（storyboard step · schemaVersion 2）：
@@ -116,15 +111,54 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
 export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
   "schemaVersion": 2,
   "tier": "pro",
-  "step": "storyboard",
+  "step": "full_pack",
   "patch": {
-    "meta": { "title": "剧名", "synopsis": "一句话梗概" },
+    "meta": { "title": "示例剧名", "synopsis": "一句话梗概" },
+    "visualStyle": {
+      "worldBackground": "现代都市职场",
+      "era": "当代",
+      "globalColorTone": "冷蓝低饱和",
+      "pictureStyle": "国风二次元厚涂，2D动漫媒介",
+      "cinematography": "35mm 浅景深",
+      "dayPalette": { "primary": "#3A4A5C", "highlight": "#6A8AAA", "shadow": "#1A2030" },
+      "nightPalette": { "primary": "#1A2030", "highlight": "#4A6A8A", "shadow": "#0A1020" },
+      "skinMaterial": "苍白偏冷",
+      "setDesign": "现代开放式办公室",
+      "lighting": "屏幕冷蓝光为主，环境极暗",
+      "styleAnchor": "现代场景冷蓝低饱和与场景暖金红高饱和强烈对比"
+    },
+    "coreConflict": [
+      { "dimension": "表层冲突", "content": "加班与身体极限" }
+    ],
+    "scenes": [
+      {
+        "id": "scene-office",
+        "name": "现代办公室",
+        "environmentTimeMood": "深夜，极低饱和冷蓝，压抑",
+        "imagePrompt": "名称：现代办公室，深夜开放式办公区。描述：室内，宏观，高度约3米，宽度约15米。前背景：工位隔板、显示器、键盘。氛围：压抑沉闷。构图规范：（2×2四视角场景规范全文）。[视觉风格：…]",
+        "negativePrompt": "动画风、游戏CG、插画风、水印"
+      }
+    ],
+    "characters": [
+      {
+        "id": "char-heroine",
+        "name": "现代沈昭昭",
+        "role": "现代职场女性",
+        "description": "女，28岁，身高1.65米，偏瘦，瓜子脸，中长发干枯黑色，黑瞳，肤色苍白",
+        "clothing": "宽松浅灰色条纹衬衫，黑色西装长裤，黑色平底皮鞋，无帽无配饰",
+        "traits": "①眼下明显黑眼圈呈青紫色 ②双颊微陷 ③右手食指与中指内侧有薄茧",
+        "appearance": "① 外貌：女，28岁…\\n② 服装：…\\n③ 特征：…",
+        "personality": "压抑、疲惫",
+        "imagePrompt": "名称：现代沈昭昭，现代职场女性\\n描述：…\\n服装：…\\n特征：…\\n构图规范：（四视图规范全文）\\n[视觉风格：…]"
+      }
+    ],
     "props": [
       {
         "id": "prop-computer",
         "name": "电脑",
-        "description": "现代办公电脑显示器，窄边框黑色磨砂材质",
-        "traits": "现代标准尺寸办公屏幕"
+        "description": "16:9宽屏液晶显示器，窄边框，黑色磨砂材质",
+        "traits": "现代标准尺寸办公屏幕",
+        "imagePrompt": "名称：电脑，现代办公电脑显示器。描述：…。特征：…。构图规范：（六视图规范全文）。[视觉风格：…]"
       }
     ],
     "shots": [
@@ -135,32 +169,31 @@ export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
         "cameraMove": "固定机位，微小手持晃动增加压抑感",
         "sceneDescription": "【起始】在伏案加班，双手飞速敲击着，屏幕刺眼的蓝光照在她苍白的脸上。【结束】保持伏案姿势，视线锁定屏幕",
         "propIds": ["prop-computer"],
-        "dialogue": "—",
-        "durationSec": 5,
+        "dialogue": "沈昭昭（内心OS，疲惫）：\\"又……加班……\\"",
+        "durationSec": 12,
         "sfxNote": "急促而沉重的键盘敲击声，微弱的空调底噪",
         "audioNote": "—",
         "sceneId": "scene-office",
         "characterIds": ["char-heroine"]
       }
+    ],
+    "handoff": [
+      { "index": 1, "item": "角色三视图生成", "owner": "后期/美术", "note": "按角色 imagePrompt 四视图" }
     ]
   }
 }`;
 
-export const STORY_PRO2_JSON_OUTPUT_CONTRACT = `【JSON 结构化输出契约 · 硬性 · 机器可读真源】
-1. 回复 **末尾** 须输出 **唯一** 围栏块（语言标记必须为 pro2-production-script）：
+export const STORY_PRO2_JSON_OUTPUT_CONTRACT = `【JSON 结构化输出契约 · JSON-only v13 · ${STORY_PRO2_JSON_ONLY_MARKER}】
+1. **唯一合法回复**：仅输出一个 \`\`\`pro2-production-script\` 围栏块（语言标记必须为 pro2-production-script），**禁止**围栏外任何文字。
 \`\`\`pro2-production-script
 ${STORY_PRO2_JSON_SCHEMA_EXAMPLE}
 \`\`\`
-2. **step** 取值：full_pack · outline · character · scene · storyboard（与当前任务段一致）；**tier 须为 pro**（禁止 pro2 等别名）。
-3. **patch** 内块须与上方 GFM 章节 **字段一致**；缺块或字段名错误视为失败。
-4. full_pack 须含非空：visualStyle · coreConflict · scenes · characters · **props[]**（≥1 项）· shots · handoff（至少 6 行）。
-5. v2 Pass1（storyboard / full_pack · schemaVersion 2）须 **12–18 镜**，各镜 \`durationSec\` 之和 **175–185 秒**（目标 3 分钟），每镜 **10–15 秒**整数。
-   shots[] 每镜必填：shotSize · lighting · cameraMove(≥12字) · sceneDescription · durationSec · sfxNote · audioNote；**禁止** imagePrompt / videoPrompt / frameImagePrompt。
-   v1 legacy shots[] 仍须 imagePrompt · videoPrompt。
-   Pass2（step=shot_prompts）每镜必填 frameImagePrompt · videoPrompt。
+2. **step** 取值：full_pack · outline · character · scene · storyboard · shot_prompts（与当前任务段一致）；**tier 须为 pro**；**schemaVersion 须为 2**。
+3. full_pack 须含非空：meta · visualStyle · coreConflict · scenes · characters · **props[]**（≥1）· shots · handoff（≥6 行）。
+4. v2 Pass1 须 **12–18 镜**，各镜 durationSec 之和 **175–185 秒**，每镜 **10–15 秒**整数；shots[] 禁止 imagePrompt / videoPrompt / frameImagePrompt。
+5. Pass1 字段金标准见 docs/画布提示词.md（运镜/光影/画面描述/音效/角色/场景/道具块结构）。
 ${STORY_PRO2_JSON_FIELD_RULES}
-6. 可在围栏前保留人读 Markdown 六章节；**画布以 JSON 为准** 写入 Hub；无有效围栏时任务失败，不回退 GFM。
-7. JSON 须为标准 JSON（禁止尾逗号、禁止 // 注释）；仅围栏内允许 JSON。`;
+6. 无有效 JSON 围栏或校验失败 → 任务失败；程序由 JSON 渲染人读 Markdown，**禁止**输出 GFM。`;
 
 /** 摄影级视觉风格总纲 GFM 维度 */
 export const STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6 = `- **视觉风格总纲**须用 GFM 表输出（表头 \`维度 | 内容\`），须 **具体可执行**：
@@ -199,36 +232,60 @@ export const STORY_PRO2_CORE_CONFLICT_TABLE_RULES = `- **核心冲突与结构�
 /** 下一步交接清单 GFM 表规范 */
 export const STORY_PRO2_HANDOFF_TABLE_RULES = `- **下一步交接清单**须用 GFM 表（表头 \`序号 | 交接项 | 负责方 | 备注\`），至少 6 行，覆盖：角色三视图、场景图、**道具六视图**、分镜 Pass2 提示词、分镜视频、对白配音、BGM/音效、剪辑交付等；备注须写可执行细节。`;
 
+/** 场景 · 2×2 四视角空镜 · 构图规范全文（Dock / 生图关键词列共用） */
+export const PRO2_SCENE_FOUR_VIEW_COMPOSITION_SPEC = `高质量专业场景设定图，横向构图，以 2 行 2 列的干净网格四等分整齐排版，每个格子都是独立的 16:9 横向画面，展示同一场景的四个大全景视角（1为正面中心线大全景视图，镜头正对场景中心轴，构图严格居中，画面同时包含顶面与底面，尽量展示完整空间层次、更多环境细节和深景深；2以1的中心线为参考，摄像机移动到场景左前方45度位置的大全景视图，镜头仍对准场景核心区域；3为以1的中心线为参考，摄像机移动到场景右前方45度位置的大全景视图；4为镜头在室内最深处向外拍摄的正中心全景图。四个视角也可以是东南西北四个方位的视角。四个视角必须表现同一地点、同一时间、同一天气、同一光源、同一空间结构和同一美术风格。环境清晰，细节丰富，景深较深，光影自然，专业摄影，超清画质。不得出现任何人物（这是空场景参考图，必须空无一人），也不得出现人群、背影、剪影、人脸、手脚、人物倒影、人物影子、照片人物、屏幕人物、镜中人物、剧情事件、人物活动；不得让四个视角表现成四个不同场景；不得改变建筑结构、空间比例、主体位置、材质、色彩、天气、时间段或光源方向；画面构图不得倾斜、透视畸变、广角畸变、变形、扭曲；不得出现鱼眼视角、斜角、极端俯视、极端仰视；正面视图必须居中、对称、中心线构图；左前方 45 度、右前方 45 度和背后视角必须保持镜头稳定、空间连贯、比例一致；禁止模糊、低画质；禁止景深太浅；不得出现文字、水印、签名、边框、标签、UI元素、杂乱元素。`;
+
 /** 场景生图关键词(英文) 列 · 金标准撰写规范 */
 export const PRO2_SCENE_IMAGE_PROMPT_GOLDEN_RULES = `# 场景 · 生图关键词(英文) 列撰写规范（金标准）
 
 列内写 **中文**，结构：
-（场景名称），（室内/室外），（宏观/微观），高度约X米，宽度约X米。
+名称：（场景名称），（室内/室外），（宏观/微观）
+描述：（室内/室外、时间、天气、高度约X米、宽度约X米等）
 前背景：（前景层描述）
 氛围：（威严压抑/温馨浪漫/紧张悬疑等）
-构图规范：高质量专业场景设定图，横向构图，以 2 行 2 列的干净网格四等分整齐排版，每个格子都是独立的 16:9 横向画面，展示同一场景的四个大全景视角：
-- 格子1：正面中心线大全景视图…
-- 格子2：左前方45度大全景视图…
-- 格子3：右前方45度大全景视图…
-- 格子4：最深处向外拍摄的正中心全景图
-四个视角必须表现同一地点、同一时间、同一天气、同一光源、同一空间结构和同一美术风格。
-**禁止项**：不得出现任何人物；不得让四个视角表现成四个不同场景；禁止模糊、低画质、文字水印。
+构图规范：${PRO2_SCENE_FOUR_VIEW_COMPOSITION_SPEC}
 末尾追加 \`[视觉风格：xxx]\``;
+
+/** 角色 · description / clothing / traits 撰写规范（JSON · 金标准 docs/画布提示词.md） */
+export const PRO2_CHARACTER_APPEARANCE_COLUMN_RULES = `【角色视觉辞典 · JSON 撰写规范 · ${STORY_PRO2_JSON_ONLY_MARKER}】
+
+须写 **description · clothing · traits**（或 appearance 内显式 ①②③），**禁止**「标志性动作」：
+
+① description / 外貌：（年龄/性别/身高/体型/脸型/发色发型/瞳色/肤色）
+   示例：女，28岁，身高1.65米，偏瘦，瓜子脸，中长发干枯黑色，黑瞳，肤色苍白
+
+② clothing / 服装：（上衣/下装/鞋袜/帽子/配饰，逐项列出）
+   示例：宽松浅灰色条纹衬衫，黑色西装长裤，黑色平底皮鞋，无帽无配饰
+
+③ traits / 特征（强制 ≥3 项）：（面部独特特征/体态特征/疤痕/痣/茧/纹路等 · **固定外貌细节**）
+   示例：①眼下明显黑眼圈呈青紫色 ②双颊微陷颧骨略突出 ③右手食指与中指内侧有薄茧
+
+**硬性禁止**：
+- **禁止** 在本列写「标志性动作」（动作/表演属分镜与性格，不是角色设定图字段）
+- **禁止** 把 ①②③ 合并成一段；JSON 须同时提供 description / clothing / traits 字段（或 appearance 内显式 ①②③）
+- 禁止泛化/情绪化/场景化描述（见特征禁止项）
+
+特征禁止项：
+- 禁止泛化描述：如"气质出众""面容清秀""看起来很有故事"
+- 禁止情绪化描述：如"面带愁容""眼神忧伤"（特征应固定，不随情绪变化）
+- 禁止场景相关描述：如"衣袖沾了墨渍""头发被风吹乱"`;
+
+/** 角色四视图 · 构图规范全文（Dock / AI生图列共用） */
+export const PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC = `高质量专业角色设定图，横向构图，纯白色纯净背景，中性摄影棚灯光，平光布光；布局结构（必须是角色四视图）：正面面部头部特写（占图片水平 1/3 的空间）+ [全身正面视图 + 全身左侧面视图 + 全身背面视图]（占图片水平剩余的 2/3 的空间，并列排列），四个视图中间用淡灰色(#E2E2E2)的2px细线分割，无任何道具或背景物体。光影：中性摄影棚灯光，柔和的前侧光，清晰的轮廓定义，自然的肤色，面部清晰服装可辨识，平视镜头，完整全身，无裁剪。不得出现任何道具/武器/食物/饮料/手持物（角色必须空手）；不得出现复杂动作、情绪表情、面部遮挡；不得出现环境背景（仅白色）；不得出现其他角色；确保所有视图中的面部特征、发型、体型和服装保持一致；不得出现文字、水印、标签、UI元素；无背景场景，无过度风格化，纯素颜样貌。`;
 
 /** 角色 AI生图提示词(英文) 列 · 金标准撰写规范 */
 export const PRO2_CHARACTER_IMAGE_PROMPT_GOLDEN_RULES = `# 角色 · AI生图提示词(英文) 列撰写规范（金标准）
 
-列内写 **中文**，结构：
+列内写 **中文**，结构（段落之间空一行）：
 名称：（角色全名），（身份/定位）
 描述：（性别），（年龄），（身高），（体型），（发型/发质/发色），（脸型），（瞳色），（肤色）
 服装：（上衣、下装、鞋袜、帽子、配饰等，逐项列出）
-特征：（独特面部或身体特征）
-构图规范：高质量专业角色设定图，横向构图，纯白色纯净背景，中性摄影棚灯光；布局结构（必须是角色四视图）：
-- 图片水平 1/3：正面面部头部特写
-- 图片水平剩余 2/3：[全身正面 + 全身左侧 + 全身背面] 并列排列
-- 四个视图中间用淡灰色(#E2E2E2)的2px细线分割
-**禁止项**：不得出现道具/武器/手持物；不得出现环境背景（仅白色）；不得出现其他角色；不得出现文字水印。
-末尾追加 \`[视觉风格：xxx]\``;
+特征：（≥3 项固定面部/体态/细节特征，禁止泛化/情绪化/场景化描述）
+构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}
+末尾追加 \`[视觉风格：xxx]\`（与视觉风格总纲一致）`;
+
+/** 道具 · 2×3 六视图 · 构图规范全文（Dock / 道具生图提示词列共用） */
+export const PRO2_PROP_SIX_VIEW_COMPOSITION_SPEC = `高质量写实道具多角度展示图，横向构图，以 2 行 3 列的干净网格整齐排版，展示道具的六个极正视角。纯白色纯净背景，专业产品影棚摄影，标准六视图参考。六视图包括（必须是道具六视图）：绝对正前方视图、绝对正后方视图、绝对左侧视图、绝对右侧视图、绝对正上方俯拍视图、绝对正下方仰拍视图。所有视图必须是同一件道具，材质、颜色、比例、结构完全一致。使用超长焦镜头或移轴镜头效果，将透视变形降到最低，物体所有本该平行的边缘在画面中保持平行，接近正交投影。每个视图都像在专业产品影棚中用三脚架精密校准拍摄，构图绝对端正，物体在每个格子中居中，无任何倾斜、旋转或透视畸变。画面出不得出现任何人物、角色、人群、人影等；不得出现手、脚、人脸、场景、建筑、自然景观；无其他道具；必须无文字、无水印、无 logo、无 UI 元素，不要任何剧情事件，保持道具本体清晰、保持完整轮廓、保持所有角度的材质和结构一致。`;
 
 /** 道具生图提示词 列 · 金标准撰写规范 */
 export const PRO2_PROP_IMAGE_PROMPT_GOLDEN_RULES = `# 道具 · 道具生图提示词 列撰写规范（金标准）
@@ -237,8 +294,7 @@ export const PRO2_PROP_IMAGE_PROMPT_GOLDEN_RULES = `# 道具 · 道具生图提�
 名称：（道具名），（分类/用途）
 描述：（材质、颜色、尺寸、结构细节，逐项列出）
 特征：（关键识别特征，1-2句）
-构图规范：高质量写实道具多角度展示图，横向构图，以 2 行 3 列的干净网格整齐排版，展示道具的六个极正视角（正前/正后/左/右/正上/正下）。纯白色纯净背景，专业产品影棚摄影。
-**禁止项**：不得出现任何人物、场景、建筑；必须无文字、无水印。
+构图规范：${PRO2_PROP_SIX_VIEW_COMPOSITION_SPEC}
 末尾追加 \`[视觉风格：xxx]\``;
 
 /** Pass2 · 分镜视频 videoPrompt 撰写规范（shot_prompts · 非 Pass1 GFM 列） */
@@ -311,25 +367,20 @@ ${STORY_PRO2_HANDOFF_TABLE_HEADER.split("\n")[0] ?? ""}
 ${STORY_PRO2_HANDOFF_TABLE_HEADER.split("\n")[1] ?? ""}`;
 
 /** 制作包硬性约束（导演模板 / hub 各段共用 · docs/大模型剧本提示词.md §三/§七） */
-export const STORY_PRO2_PACK_OUTPUT_RULES = `【制作包硬性约束 · 缺一不可 · 影响定稿拆分 · ${STORY_PRO2_PACK_V8_MARKER}】
-1. 必须输出全部 **## 章节**（含 **道具视觉辞典**）；禁止用「一、二、三」或纯散文代替；**禁止 Tab 分隔表**，仅 GFM 管道表。
-2. 所有 GFM 表头列名与骨架 **逐字一致**（含括号与标点）。
-3. 「核心冲突与结构摘要」须为 **GFM 表**，禁止纯散文代替。
-4. 须 **完整保留** 上传剧本中已有场景、人物与对白，只做结构化整理，不得压缩成梗概。
-5. 「分镜脚本」须 **12–18 镜**（目标总时长 3 分钟 · 175–185 秒）；**禁止**只输出 3～5 个概括镜头。
-6. **分镜 Pass1 · 每镜 10 列均须非空**（镜号、景别、光影、运镜、画面描述、道具、对白、时长(秒)、音效、口型/配音）；无对白/无道具写「—」；每镜时长 **10–15 秒**整数。
-7. **Pass1 禁止** 分镜表含 AI生图/AI视频 列；JSON shots[] **禁止** imagePrompt / videoPrompt / frameImagePrompt（Pass2「生成提示词」才写）。
-8. **props[]** 道具辞典 **≥1 项**；GFM **道具视觉辞典** 每行含完整六视图构图规范；分镜「道具」列写名称，JSON 用 propIds 引用。
-9. 场景表 **生图关键词(英文)** 列须含 **2×2 四视角**构图规范；角色表 **AI生图提示词(英文)** 列须含 **四视图**构图规范；均末尾追加 \`[视觉风格：…]\`。
-10. 「对白」列撰写规范：
+export const STORY_PRO2_PACK_OUTPUT_RULES = `【制作包硬性约束 · JSON-only v13 · ${STORY_PRO2_JSON_ONLY_MARKER} · ${STORY_PRO2_PACK_V8_MARKER}】
+1. **只输出** \`\`\`pro2-production-script\` JSON 围栏；**禁止** Markdown/GFM/说明文字。
+2. 须 **完整保留** 上传剧本中已有场景、人物与对白，只做结构化整理，不得压缩成梗概。
+3. full_pack patch 须含：meta · visualStyle · coreConflict · scenes · characters · props[]（≥1）· shots · handoff（≥6 行）。
+4. **分镜 Pass1** 须 **12–18 镜**（总时长 175–185 秒）；每镜 **10–15 秒**整数；shots[] **禁止** imagePrompt / videoPrompt / frameImagePrompt。
+5. 每镜必填：shotSize · lighting(≥8字) · cameraMove(≥12字) · sceneDescription（【起始】…【结束】≥30字）· propIds/道具 · dialogue · durationSec · sfxNote · audioNote。
+6. characters[] 须 description · clothing · traits（≥3 项）；imagePrompt 须含四视图构图规范 + [视觉风格：…]（见 docs/画布提示词.md）。
+7. scenes[] / props[] 的 imagePrompt 须含对应构图规范 + [视觉风格：…]。
+8. 「对白」撰写规范：
 ${STORY_PRO2_DIALOGUE_COLUMN_RULES}
-11. 分镜 **角色名** 须与「角色视觉辞典 · 姓名」列 **完全一致**。
-12. 「运镜」列撰写规范：
+9. 「运镜」撰写规范：
 ${STORY_PRO2_CAMERA_MOVE_COLUMN_RULES}
-13. 「画面描述」每镜须标注 **【起始】…【结束】**（≥30 字）；「光影」≥8 字。
-14. 「下一步交接清单」至少 6 行（含道具六视图、Pass2 提示词、分镜视频等）。
-15. 回复 **末尾** 须附 \`\`\`pro2-production-script\` JSON 围栏（schemaVersion 2）；GFM 须与 JSON 一致。
-16. ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}`;
+10. Pass1 字段范例（运镜/光影/画面描述/音效）见 PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE。
+11. ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}`;
 
 /** Pass1 导演表字段金标准 · 源：docs/画布提示词.md · docs/大模型剧本提示词.md §五 */
 export const PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE = `# Pass1 导演表字段（v2 · 每镜必填 · ${STORY_PRO2_PACK_V8_MARKER}）

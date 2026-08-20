@@ -8,6 +8,7 @@ import {
 } from "@/lib/canvas/data/pro2-production-script-schema";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
 import { resolveShotPropNames } from "@/lib/canvas/pro2-production-script-render-md";
+import { formatPro2CharacterAppearanceCell } from "@/lib/canvas/pro2-character-script-fields";
 import { cn } from "@/lib/utils";
 
 function DarkTable({
@@ -172,7 +173,7 @@ export function Pro2ProductionScriptHtmlPreview({
       normalized.characters?.map((c) => [
         c.name,
         c.role,
-        c.appearance,
+        formatPro2CharacterAppearanceCell(c),
         c.personality || "—",
         c.imagePrompt,
       ]) ?? [];
@@ -296,7 +297,7 @@ export function Pro2ProductionScriptHtmlPreview({
       normalized.characters?.map((c) => [
         c.name,
         c.role,
-        c.appearance,
+        formatPro2CharacterAppearanceCell(c),
         c.personality || "—",
         c.imagePrompt,
       ]) ?? [];

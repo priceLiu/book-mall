@@ -9,6 +9,7 @@ import {
   canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
+import { isRetiredLegacyPro2Canvas } from "@/lib/canvas/pro2-project-format";
 import {
   CanvasProjectError,
   type CanvasProjectSummary,
@@ -95,7 +96,11 @@ export async function listPortalCaseCanvasProjects(): Promise<PortalCaseProjectS
     },
   });
   return rows
-    .filter((p) => canvasProjectEditionFromGraph(p.canvas) === "pro2")
+    .filter(
+      (p) =>
+        canvasProjectEditionFromGraph(p.canvas) === "pro2" &&
+        !isRetiredLegacyPro2Canvas(p.canvas),
+    )
     .map((p) => ({
       ...toSummaryWithEdition(p),
       portalCaseBlurb: portalCaseBlurbOf(p),

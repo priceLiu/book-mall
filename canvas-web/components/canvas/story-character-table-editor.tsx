@@ -13,6 +13,7 @@ import {
   storyMdThClass,
 } from "@/lib/canvas/story-md-table-chrome";
 import { storyTableTextareaRows } from "@/lib/canvas/story-table-textarea-rows";
+import { stripBrTags } from "@/lib/canvas/pro2-character-script-fields";
 import { STORY_PRO2_UI_CHARACTER_AI_PROMPT_LABEL } from "@/lib/canvas/data/pro2-production-pack-standard";
 
 export type CharacterTableRow = {
@@ -27,7 +28,7 @@ export function characterRowsFromMd(md: string): CharacterTableRow[] {
   return parseCharacterRows(md).map((r) => ({
     name: r.name,
     role: r.role,
-    appearance: r.appearance,
+    appearance: stripBrTags(r.appearance),
     personality: r.personality ?? "",
     aiImagePrompt: r.aiImagePrompt ?? "",
   }));

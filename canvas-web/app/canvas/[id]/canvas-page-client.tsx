@@ -1479,9 +1479,13 @@ function Inner({ projectId }: { projectId: string }) {
       </div>
     );
   } else if (loadError || !project) {
+    const retiredHint =
+      loadError && /\b404\b/.test(loadError)
+        ? "旧版 2.0 剧本项目已停用（须新建项目使用 JSON-only 剧本），或项目不存在。纯生图/未用剧本的 2.0 项目不受影响。"
+        : (loadError ?? "未知错误");
     body = (
-      <div className="fixed inset-0 z-[200] flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] text-sm text-red-200">
-        <p>无法加载画布：{loadError ?? "未知错误"}</p>
+      <div className="fixed inset-0 z-[200] flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] px-6 text-center text-sm text-red-200">
+        <p>无法加载画布：{retiredHint}</p>
         <a href="/projects" className="underline">
           回到画布列表
         </a>

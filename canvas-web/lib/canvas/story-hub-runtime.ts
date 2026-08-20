@@ -596,14 +596,14 @@ export function hubSectionHasTerminalError(
   return hubSectionRuntime(node, section)?.status === "error";
 }
 
-/** 顶栏任务计数 / 轮询：仅已提交段算进行中（pending 无 taskId 为顺序链占位） */
+/** 顶栏任务计数 / 轮询：与 hubSectionIsRunning 一致（含顺序链 pending 占位） */
 export function hubSectionCountsAsInflight(
   rt?: { status?: string; taskId?: string },
 ): boolean {
   const st = rt?.status;
   if (st === "running") return true;
   if (st === "queued") return true;
-  if (st === "pending" && rt?.taskId?.trim()) return true;
+  if (st === "pending") return true;
   return false;
 }
 

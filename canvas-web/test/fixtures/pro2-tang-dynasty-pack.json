@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "tier": "pro",
   "step": "full_pack",
   "patch": {
-    "meta": { "title": "我在盛唐写天下" },
+    "meta": { "title": "我在盛唐写天下", "synopsis": "穿越甜宠" },
     "visualStyle": {
       "worldBackground": "现代都市 × 盛唐长安双时空交织",
       "era": "现代深夜办公室 / 盛唐金銮殿",
@@ -13,7 +13,8 @@
       "dayPalette": { "primary": "#D4A050", "highlight": "#F5E6C8", "shadow": "#3C251B" },
       "nightPalette": { "primary": "#1C2833", "highlight": "#4A6C8A", "shadow": "#0A0F14" },
       "setDesign": "唐式单檐庑殿顶金銮殿，长安城棋盘街市",
-      "lighting": "轴侧光与体积光强化空间纵深"
+      "lighting": "轴侧光与体积光强化空间纵深",
+      "styleAnchor": "电影级写实古装"
     },
     "coreConflict": [
       { "dimension": "表层冲突", "content": "穿越者殿前作诗保命" },
@@ -24,17 +25,19 @@
         "id": "char-shen",
         "name": "沈昭昭",
         "role": "现代女白领 / 穿越后男装诗人",
-        "appearance": "28岁东方女性，青灰圆领男官袍，黑腰带，乌皮靴",
+        "appearance": "① 外貌：28岁东方女性\n② 服装：青灰圆领男官袍\n③ 特征：①杏眼 ②瓜子脸 ③青丝束发",
         "personality": "外柔内刚，隐忍爆发型",
-        "imagePrompt": "28岁东方女性，古装男官袍，电影级打光，2K"
+        "traits": "①杏眼 ②瓜子脸 ③青丝束发",
+        "imagePrompt": "名称：沈昭昭\n描述：28岁东方女性\n服装：青灰圆领男官袍\n特征：①杏眼 ②瓜子脸 ③青丝束发\n构图规范：高质量专业角色设定图，四视图\n[视觉风格：电影级写实古装]"
       },
       {
         "id": "char-emperor",
         "name": "唐玄宗",
         "role": "盛唐皇帝",
-        "appearance": "中年男性，明黄团龙纹龙袍，常朝冠",
+        "appearance": "① 外貌：中年男性\n② 服装：明黄团龙纹龙袍\n③ 特征：①目光深沉 ②胡须修剪 ③眉峰上挑",
         "personality": "威严、心思深沉",
-        "imagePrompt": "中年帝王，明黄龙袍，端坐龙椅，电影级打光"
+        "traits": "①目光深沉 ②胡须修剪 ③眉峰上挑",
+        "imagePrompt": "名称：唐玄宗\n描述：中年男性\n服装：明黄团龙纹龙袍\n特征：①目光深沉 ②胡须修剪 ③眉峰上挑\n构图规范：高质量专业角色设定图，四视图\n[视觉风格：电影级写实古装]"
       }
     ],
     "scenes": [
@@ -42,40 +45,47 @@
         "id": "scene-office",
         "name": "现代深夜办公室",
         "environmentTimeMood": "深夜 · 压抑 · 电脑蓝光与惨白顶光",
-        "imagePrompt": "深夜现代办公室，电脑屏幕蓝光，冷蓝灰调，广角空镜",
+        "imagePrompt": "名称：现代深夜办公室\n描述：冷蓝灰调广角空镜\n构图规范：2×2网格四视角场景\n[视觉风格：电影级写实]",
         "negativePrompt": "动画风、游戏CG、模糊、水印"
       },
       {
         "id": "scene-palace",
         "name": "盛唐金銮殿",
         "environmentTimeMood": "正午 · 庄严压迫 · 金色阳光斜入",
-        "imagePrompt": "盛唐大明宫金銮殿，金色体积光，蟠龙巨柱，2K",
+        "imagePrompt": "名称：盛唐金銮殿\n描述：金色体积光，蟠龙巨柱\n构图规范：2×2网格四视角场景\n[视觉风格：电影级写实古装]",
         "negativePrompt": "动画风、游戏CG、模糊、水印"
+      }
+    ],
+    "props": [
+      {
+        "id": "prop-scroll",
+        "name": "诗卷",
+        "description": "宣纸诗卷，边缘泛黄"
       }
     ],
     "shots": [
       {
         "index": 1,
-        "shotSize": "近景→特写",
-        "cameraMove": "快速横移推近",
+        "shotSize": "近景",
+        "lighting": "深夜室内冷蓝屏幕光，低饱和压抑",
+        "cameraMove": "固定机位缓慢推近，屏幕蓝光映脸增加层次",
         "sceneDescription": "【起始】伏案加班【结束】瞳孔特写骤黑",
-        "dialogue": "键盘声",
+        "dialogue": "沈昭昭（内心OS，疲惫）：\"又要加班…\"",
         "durationSec": 10,
-        "imagePrompt": "深夜办公室近景，屏幕蓝光映脸",
-        "videoPrompt": "镜头快速横移推近至瞳孔，画面骤黑",
+        "sfxNote": "键盘敲击声",
         "audioNote": "黑屏过渡",
         "sceneId": "scene-office",
         "characterIds": ["char-shen"]
       },
       {
         "index": 2,
-        "shotSize": "大全景→中景",
-        "cameraMove": "高悬置镜缓降",
+        "shotSize": "大全景",
+        "lighting": "正午金色体积光自殿顶斜入，庄严压迫",
+        "cameraMove": "高悬置镜缓慢下降，由殿顶降至身后中景",
         "sceneDescription": "【起始】殿顶俯拍【结束】降至身后中景",
-        "dialogue": "大臣：大逆不道！",
+        "dialogue": "大臣（怒斥）：\"大逆不道！\"",
         "durationSec": 12,
-        "imagePrompt": "盛唐金銮殿全景，百官列立",
-        "videoPrompt": "镜头自殿顶缓降，鼓声震天",
+        "sfxNote": "鼓声震天",
         "audioNote": "大殿混响",
         "sceneId": "scene-palace",
         "characterIds": ["char-shen", "char-emperor"]

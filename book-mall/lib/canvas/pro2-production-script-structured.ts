@@ -9,6 +9,7 @@ import {
   type Pro2ProductionScriptStep,
 } from "./data/pro2-production-script-schema";
 import { normalizePro2ProductionScriptPatchChinese, pro2PlaceholderSlug } from "./pro2-chinese-prompt-normalize";
+import { enrichPro2CharacterRecordForParse } from "./pro2-character-script-fields";
 import type { StoryLlmSection } from "./story-workspace-types";
 
 const FENCE_TAG = "pro2-production-script";
@@ -62,6 +63,12 @@ function coerceShotRecordForV2Parse(
   shot: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...shot };
+  if (!String(out.sceneDescription ?? "").trim()) {
+    const desc = String(
+      out.description ?? out.scene ?? out.summary ?? "",
+    ).trim();
+    if (desc) out.sceneDescription = desc;
+  }
   if (!String(out.lighting ?? "").trim()) {
     out.lighting = DEFAULT_V2_LIGHTING;
   }
@@ -110,6 +117,13 @@ export function coercePro2ProductionScriptEnvelopeForParse(
     );
     o.schemaVersion = schemaVersion >= 2 ? schemaVersion : PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION;
   }
+  if (Array.isArray(patch.characters) && patch.characters.length > 0) {
+    patch.characters = patch.characters.map((c) =>
+      c && typeof c === "object" && !Array.isArray(c)
+        ? enrichPro2CharacterRecordForParse(c as Record<string, unknown>)
+        : c,
+    );
+  }
   o.patch = patch;
   return o;
 }
@@ -156,9 +170,16 @@ export function hasHumanReadableProductionPackSections(text: string): boolean {
   const hasStyle =
     /(?:^|\n)\s*(?:##\s*)?视觉风格总纲\s*$/im.test(t);
   const hasPackSection =
-    /(?:^|\n)\s*(?:##\s*)?(?:场景视觉辞典|角色视觉辞典|核心冲突与结构摘要|核心冲突|分镜脚本|下一步交接清单)\s*$/im.test(
+    /(?:^|\n)\s*(?:##\s*)?(?:场景视觉辞典|角色视觉辞典|核心冲突与结构摘要|核心冲突|分镜脚本|下一步交接清单|道具视觉辞典)\s*$/im.test(
       t,
     );
+  const hasCharacterTable =
+    /角色视觉辞典/.test(t) && /\|\s*姓名\s*\|/.test(t);
+  const hasSceneTable =
+    /场景视觉辞典/.test(t) && /\|\s*场景名\s*\|/.test(t);
+  const hasStoryboardTable =
+    /分镜脚本/.test(t) && /\|\s*镜号\s*\|/.test(t);
+  if (hasCharacterTable || hasSceneTable || hasStoryboardTable) return true;
   return hasStyle && hasPackSection;
 }
 

@@ -47,6 +47,21 @@ export type StoryProFinalizedScriptSnapshot = {
   storyboardMd: string;
 };
 
+/** LLM 首次/重生成返回的原始剧本快照（immutable 真源 · 用户编辑改工作副本） */
+export type StoryProProductionScriptOrigin = {
+  savedAt: string;
+  taskId?: string;
+  section: import("./story-workspace-types").StoryLlmSection;
+  step?: string;
+  /** 模型原始输出（人读 MD + JSON 围栏） */
+  rawTextOutput: string;
+  outlineMd?: string;
+  characterMd?: string;
+  sceneMd?: string;
+  storyboardMd?: string;
+  productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
+};
+
 export type StoryProStyleRefImage = StoryRefImage & {
   kind?: "character" | "scene" | "atmosphere";
   note?: string;
@@ -109,6 +124,14 @@ export type StoryProScriptHubNodeData = {
   visualStylePack?: import("./story-pro-visual-style-pack").StoryProVisualStylePack;
   /** 2.0 · LLM 结构化 JSON 胖结构真源（schemaVersion: 1） */
   productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
+  /** LLM 返回瞬间的原始版本（autosave 立即落库 · 用户编辑不覆盖） */
+  productionScriptOrigin?: StoryProProductionScriptOrigin;
+  /** full_pack 重生成时归档的旧原始版本（最多 3 条） */
+  productionScriptOriginHistory?: StoryProProductionScriptOrigin[];
+  /** 分镜图/视频生成完成后最后一次增量回写 Hub 的时间 */
+  productionScriptMediaRevisionAt?: string;
+  /** 分镜视频行快照（自视频列增量回写） */
+  scriptStudioVideoRows?: StoryProVideoRow[];
   storyboardMd: string;
   /** 点击发送后、段级 pending 写入前：保持「生成中」扫光，避免空态闪一下 */
   hubGenerateIntent?: boolean;

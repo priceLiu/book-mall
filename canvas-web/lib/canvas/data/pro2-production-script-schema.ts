@@ -333,6 +333,20 @@ function validateFullPackBlocks(
   patch: Pro2ProductionScriptPatchBody,
   ctx: z.RefinementCtx,
 ): void {
+  for (const issue of listPro2FullPackPatchIssues(patch)) {
+    const key = issue.replace(/^full_pack 须含非空 /, "");
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: issue,
+      path: ["patch", key],
+    });
+  }
+}
+
+/** Hub outline / full_pack 校验 · 返回可读错误列表 */
+export function listPro2FullPackPatchIssues(
+  patch: Pro2ProductionScriptPatchBody,
+): string[] {
   const required: Array<keyof Pro2ProductionScriptPatchBody> = [
     "visualStyle",
     "coreConflict",
@@ -341,15 +355,135 @@ function validateFullPackBlocks(
     "shots",
     "handoff",
   ];
+  const issues: string[] = [];
   for (const key of required) {
     const val = patch[key];
     if (val == null || (Array.isArray(val) && val.length === 0)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `full_pack 须含非空 ${key}`,
-        path: ["patch", key],
-      });
+      issues.push(`full_pack 须含非空 ${key}`);
     }
+  }
+  return issues;
+}
+
+const PRO2_DIALOGUE_FORMAT_RE =
+  /^[^（(：:\n]+[（(][^）)]+[）)]\s*[：:]\s*[""「].+[""」]$/u;
+
+function countPro2TraitItems(traits?: string): number {
+  const t = traits?.trim() ?? "";
+  if (!t) return 0;
+  const numbered = t.match(/[①②③④⑤⑥⑦⑧⑨⑩]/gu);
+  if (numbered && numbered.length >= 3) return numbered.length;
+  return t.split(/[，,、；;\n]/u).map((s) => s.trim()).filter(Boolean).length;
+}
+
+function imagePromptHasRequiredBlocks(prompt?: string): boolean {
+  const p = prompt?.trim() ?? "";
+  if (!p) return false;
+  return p.includes("构图规范") && /\[视觉风格：/.test(p);
+}
+
+function characterHasSignatureAction(c: {
+  appearance?: string;
+  traits?: string;
+  description?: string;
+}): boolean {
+  const blob = [c.appearance, c.traits, c.description].filter(Boolean).join("\n");
+  return /标志性动作/u.test(blob);
+}
+
+/** characters[] 语义校验 · JSON-only v13 */
+export function listPro2CharacterPatchIssues(
+  characters: Pro2ProductionScriptPatchBody["characters"],
+): string[] {
+  const issues: string[] = [];
+  if (!characters?.length) return issues;
+  for (const c of characters) {
+    const label = c.name?.trim() || c.id;
+    if (characterHasSignatureAction(c)) {
+      issues.push(`角色 ${label} 禁止含「标志性动作」，须写 traits（≥3 项固定特征）`);
+    }
+    const traitText = c.traits?.trim() ?? "";
+    const appearanceTraits = /③\s*特征[：:]/u.test(c.appearance ?? "")
+      ? c.appearance
+      : "";
+    const traitCount = Math.max(
+      countPro2TraitItems(traitText),
+      countPro2TraitItems(appearanceTraits ?? ""),
+    );
+    if (traitCount < 3) {
+      issues.push(`角色 ${label} traits 须 ≥3 项（或 appearance 含 ③ 特征）`);
+    }
+    if (!imagePromptHasRequiredBlocks(c.imagePrompt)) {
+      issues.push(`角色 ${label} imagePrompt 须含「构图规范」与 [视觉风格：…]`);
+    }
+  }
+  return issues;
+}
+
+/** shots[].dialogue 格式校验 */
+export function listPro2ShotDialogueIssues(
+  shots: Pro2ProductionScriptPatchBody["shots"],
+): string[] {
+  const issues: string[] = [];
+  if (!shots?.length) return issues;
+  for (const s of shots) {
+    const d = (s.dialogue ?? "").trim();
+    if (!d || d === "—" || d === "-") continue;
+    if (!PRO2_DIALOGUE_FORMAT_RE.test(d)) {
+      issues.push(
+        `镜 ${s.index} 对白须为 角色名（情绪/语气）："台词" 格式，无对白写「—」`,
+      );
+    }
+  }
+  return issues;
+}
+
+function listPro2AssetImagePromptIssues(
+  patch: Pro2ProductionScriptPatchBody,
+): string[] {
+  const issues: string[] = [];
+  for (const s of patch.scenes ?? []) {
+    if (!imagePromptHasRequiredBlocks(s.imagePrompt)) {
+      issues.push(`场景 ${s.name} imagePrompt 须含「构图规范」与 [视觉风格：…]`);
+    }
+  }
+  for (const p of patch.props ?? []) {
+    if (p.imagePrompt && !imagePromptHasRequiredBlocks(p.imagePrompt)) {
+      issues.push(`道具 ${p.name} imagePrompt 须含「构图规范」与 [视觉风格：…]`);
+    }
+  }
+  return issues;
+}
+
+/** full_pack / character / storyboard 语义校验汇总 */
+export function listPro2SemanticPatchIssues(
+  patch: Pro2ProductionScriptPatchBody,
+  step: Pro2ProductionScriptStep,
+): string[] {
+  const issues: string[] = [];
+  if (step === "full_pack" || step === "character" || step === "outline") {
+    issues.push(...listPro2CharacterPatchIssues(patch.characters));
+  }
+  if (step === "full_pack" || step === "storyboard") {
+    issues.push(...listPro2ShotDialogueIssues(patch.shots));
+  }
+  if (step === "full_pack" || step === "scene") {
+    issues.push(...listPro2AssetImagePromptIssues(patch));
+  }
+  return issues;
+}
+
+function validateSemanticPatchBody(
+  patch: Pro2ProductionScriptPatchBody,
+  step: Pro2ProductionScriptStep,
+  ctx: z.RefinementCtx,
+): void {
+  for (const issue of listPro2SemanticPatchIssues(patch, step)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: issue,
+      path: ["patch"],
+    });
   }
 }
 
@@ -365,6 +499,19 @@ export const pro2ProductionScriptPatchSchema = z
 
     if (step === "full_pack") {
       validateFullPackBlocks(patch, ctx);
+      validateSemanticPatchBody(patch, step, ctx);
+    }
+
+    if (step === "character") {
+      validateSemanticPatchBody(patch, step, ctx);
+    }
+
+    if (step === "scene") {
+      validateSemanticPatchBody(patch, step, ctx);
+    }
+
+    if (step === "storyboard") {
+      validateSemanticPatchBody(patch, step, ctx);
     }
 
     if (

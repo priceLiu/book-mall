@@ -48,6 +48,7 @@ import {
   type CanvasProjectEdition,
 } from "@/lib/canvas/project-edition";
 import { pro2CreateNeedsScriptPackageStep } from "@/lib/canvas/pro2-create-script-package-step";
+import { withPro2ScriptFormatV13Meta } from "@/lib/canvas/pro2-project-format";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { listPickableScriptPackages } from "@/lib/canvas/list-pickable-script-packages";
 import {
@@ -434,6 +435,9 @@ function Inner() {
           ensureGraphMetaEdition(graph.nodes ?? [], graph.meta ?? null) ??
           graph.meta,
       };
+      if (pickerEdition === "pro2") {
+        graph = withPro2ScriptFormatV13Meta(graph);
+      }
       const finalName = name.trim() || defaultCanvasProjectName();
       const created = await createCanvasProject(base, {
         name: finalName,

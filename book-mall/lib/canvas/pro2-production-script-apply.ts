@@ -6,6 +6,7 @@ import { mergeProductionScriptPatch } from "./data/pro2-production-script-schema
 import {
   PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
   type Pro2ProductionScript,
+  type Pro2ProductionScriptPatch,
 } from "./data/pro2-production-script-schema";
 import {
   enrichStoryboardMdShotFields,
@@ -24,8 +25,11 @@ import {
 } from "./pro2-production-script-structured";
 import {
   convertPro2HumanTabMarkdownToGfm,
+  extractCharacterSectionFromOutline,
   extractPro2HumanStoryboardMd,
   normalizeStoryboardSectionFromOutline,
+  parseCharacterRows,
+  parseSceneVisualDictionaryRows,
   promotePro2HumanGfmToHubFields,
   parseStoryboardRows,
   storyboardMdHasParseableRows,
@@ -35,6 +39,10 @@ import {
   pro2PlaceholderSlug,
   stripPro2AnchorPlaceholders,
 } from "./pro2-chinese-prompt-normalize";
+import {
+  characterAppearanceNeedsStructuredCoerce,
+  enrichPro2CharacterRecordForParse,
+} from "./pro2-character-script-fields";
 import { syncStoryProColumnRows } from "./story-pro-column-sync";
 import type { StoryProVisualStylePack } from "./story-pro-visual-style-pack";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
@@ -106,7 +114,7 @@ function productionScriptToHubRows(
       key: a.id,
       name: a.name,
       description: a.description ?? "",
-      prompt: "",
+      prompt: a.description?.trim() ?? "",
       frameKey: a.frameIndex != null ? String(a.frameIndex) : undefined,
     })) ?? hubData.scriptStudioAudioRows;
 
@@ -140,20 +148,8 @@ export function applyProductionScriptPatchToHub(
 
   const { step } = envelope;
 
-  const humanGfm = sourceText?.trim()
-    ? convertPro2HumanTabMarkdownToGfm(
-        extractPro2HumanProductionPackPrefix(sourceText),
-      )
-    : "";
-  const humanFields =
-    humanGfm && hasHumanReadableProductionPackSections(humanGfm)
-      ? promotePro2HumanGfmToHubFields(humanGfm)
-      : null;
-
   if (step === "full_pack" || step === "outline") {
-    const outlineMd =
-      humanFields?.outlineMd?.trim() ||
-      renderHubOutlineDisplayMd(productionScript);
+    const outlineMd = renderHubOutlineDisplayMd(productionScript);
     if (outlineMd.trim()) {
       patch.outlineMd = outlineMd;
       patch.outlineHistory = pushStoryRevision(data.outlineHistory, outlineMd);
@@ -163,9 +159,7 @@ export function applyProductionScriptPatchToHub(
   }
 
   if (step === "full_pack" || step === "character") {
-    const characterMd =
-      humanFields?.characterMd?.trim() ||
-      renderProductionScriptCharacterMd(productionScript);
+    const characterMd = renderProductionScriptCharacterMd(productionScript);
     if (characterMd.trim()) {
       patch.characterMd = characterMd;
       patch.characterHistory = pushStoryRevision(
@@ -176,9 +170,7 @@ export function applyProductionScriptPatchToHub(
   }
 
   if (step === "full_pack" || step === "scene") {
-    const sceneMd =
-      humanFields?.sceneMd?.trim() ||
-      renderProductionScriptSceneMd(productionScript);
+    const sceneMd = renderProductionScriptSceneMd(productionScript);
     if (sceneMd.trim()) {
       patch.sceneMd = sceneMd;
       patch.sceneHistory = pushStoryRevision(data.sceneHistory, sceneMd);
@@ -189,7 +181,7 @@ export function applyProductionScriptPatchToHub(
     const jsonStoryboard = renderProductionScriptStoryboardMd(productionScript);
     const storyboardMd = enrichStoryboardMdShotFields(
       jsonStoryboard,
-      humanFields?.storyboardMd?.trim() || undefined,
+      undefined,
       productionScript,
     );
     if (storyboardMd.trim()) {
@@ -205,7 +197,7 @@ export function applyProductionScriptPatchToHub(
     const jsonStoryboard = renderProductionScriptStoryboardMd(productionScript);
     const storyboardMd = enrichStoryboardMdShotFields(
       jsonStoryboard,
-      humanFields?.storyboardMd?.trim() || undefined,
+      data.storyboardMd?.trim() || undefined,
       productionScript,
     );
     if (storyboardMd.trim()) {
@@ -221,6 +213,29 @@ export function applyProductionScriptPatchToHub(
     ...mergedHub,
     ...patch,
   };
+
+  let finalScript = (patch.productionScript ?? productionScript) as Pro2ProductionScript;
+  const enrichedShots = enrichProductionScriptShotsFromSources(finalScript, hubForRows);
+  if ((enrichedShots.shots?.length ?? 0) > (finalScript.shots?.length ?? 0)) {
+    finalScript = enrichedShots;
+    patch.productionScript = finalScript;
+    hubForRows.productionScript = finalScript;
+    const jsonStoryboard = renderProductionScriptStoryboardMd(finalScript);
+    const storyboardMd = enrichStoryboardMdShotFields(
+      jsonStoryboard,
+      hubForRows.storyboardMd || data.storyboardMd,
+      finalScript,
+    );
+    if (storyboardMd.trim()) {
+      patch.storyboardMd = storyboardMd;
+      patch.storyboardHistory = pushStoryRevision(
+        data.storyboardHistory,
+        storyboardMd,
+      );
+      hubForRows.storyboardMd = storyboardMd;
+    }
+  }
+
   Object.assign(patch, productionScriptToHubRows(hubForRows, scriptHubId));
 
   return patch;
@@ -346,6 +361,27 @@ export function tryRepairHubFromStoredProductionJson(
     const repaired = reapplyStoredProductionScript(data, stored, scriptHubId);
     if (repaired) return repaired;
   }
+  if (
+    stored &&
+    (stored.characters ?? []).some((c) =>
+      characterAppearanceNeedsStructuredCoerce(c.appearance),
+    )
+  ) {
+    const repaired = reapplyStoredProductionScript(data, stored, scriptHubId);
+    if (repaired) return repaired;
+  }
+  if (
+    stored &&
+    (stored.characters?.length ?? 0) > 0 &&
+    !(stored.shots?.length ?? 0)
+  ) {
+    const resolved = resolveHubProductionScript(data);
+    if ((resolved?.shots?.length ?? 0) > 0) {
+      return { productionScript: resolved! };
+    }
+    const reapply = reapplyStoredProductionScript(data, stored, scriptHubId);
+    if ((reapply?.productionScript?.shots?.length ?? 0) > 0) return reapply;
+  }
 
   const outlineBlob = isUnparsedPro2ProductionJsonBlob(data.outlineMd ?? "");
   const storyboardBlob = isUnparsedPro2ProductionJsonBlob(data.storyboardMd ?? "");
@@ -390,18 +426,7 @@ export function tryRepairHubFromStoredProductionJson(
         humanRows.length > storedRows.length ||
         (humanHasPropNames && !storedHasPropNames));
     const humanOutline = promotePro2HumanGfmToHubFields(humanGfm).outlineMd;
-    const needsHumanOutlineRepair =
-      humanOutline.trim().length > (data.outlineMd ?? "").trim().length * 1.2;
-    const envelope = extractPro2ProductionScriptPatch(raw);
-    if (!envelope) continue;
-    const needsShotsRepair =
-      (stored?.shots?.length ?? 0) === 0 &&
-      (envelope.patch.shots?.length ?? 0) > 0;
-    if (
-      !needsHumanStoryboardRepair &&
-      !needsHumanOutlineRepair &&
-      !needsShotsRepair
-    ) {
+    const needsHumanStoryboardRepair =
       continue;
     }
     return applyProductionScriptPatchToHub(data, envelope, scriptHubId, raw);
@@ -674,6 +699,14 @@ export function trySyncResolvedProductionScriptToHub(
   if (!productionScriptHasDisplayContent(resolved)) return null;
 
   const stored = data.productionScript;
+  if (
+    stored &&
+    productionScriptHasDisplayContent(stored) &&
+    !(stored.shots?.length ?? 0) &&
+    (resolved?.shots?.length ?? 0) > 0
+  ) {
+    return { productionScript: resolved! };
+  }
   if (!productionScriptHasDisplayContent(stored)) {
     return { productionScript: resolved! };
   }
@@ -722,6 +755,52 @@ function isStrictStoredProductionScript(
   return envelope.ok;
 }
 
+/** 从已解析 GFM Tab 补建 productionScript（JSON 围栏失败时的兜底） */
+function buildProductionScriptPatchFromHubMarkdown(
+  data: StoryProScriptHubNodeData,
+): Pro2ProductionScriptPatch | null {
+  const characterSource =
+    data.characterMd?.trim() ||
+    extractCharacterSectionFromOutline(data.outlineMd ?? "");
+  const sceneSource = data.sceneMd?.trim() || "";
+  const charRows = parseCharacterRows(characterSource);
+  const sceneRows = parseSceneVisualDictionaryRows(sceneSource);
+  if (!charRows.length && !sceneRows.length) return null;
+
+  const patch: Pro2ProductionScriptPatch["patch"] = {};
+  if (charRows.length) {
+    patch.characters = charRows.map((c) => {
+      const enriched = enrichPro2CharacterRecordForParse({
+        id: pro2PlaceholderSlug(c.name),
+        name: c.name,
+        role: c.role || "—",
+        appearance: c.appearance,
+        personality: c.personality || "—",
+        imagePrompt: c.aiImagePrompt?.trim() || c.appearance,
+      });
+      return enriched as Pro2ProductionScriptPatch["patch"]["characters"] extends (infer T)[]
+        ? T
+        : never;
+    });
+  }
+  if (sceneRows.length) {
+    patch.scenes = sceneRows.map((s) => ({
+      id: pro2PlaceholderSlug(s.name),
+      name: stripPro2AnchorPlaceholders(s.name),
+      environmentTimeMood: s.envTimeMood?.trim() || s.name,
+      imagePrompt: s.imageKeywords?.trim() || s.name,
+      negativePrompt: s.negativePrompt?.trim() || "—",
+    }));
+  }
+
+  return {
+    schemaVersion: PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
+    tier: "pro",
+    step: patch.characters?.length && !patch.scenes?.length ? "character" : "outline",
+    patch,
+  };
+}
+
 /** 运行时解析：优先已落库且通过严格校验的 productionScript，否则从 raw JSON 推断 */
 export function resolveHubProductionScript(
   data: StoryProScriptHubNodeData,
@@ -764,6 +843,10 @@ export function resolveHubProductionScript(
     const envelope = extractPro2ProductionScriptPatch(raw);
     if (!envelope) continue;
     return finish(mergeProductionScriptPatch(stored, envelope));
+  }
+  const fromMd = buildProductionScriptPatchFromHubMarkdown(data);
+  if (fromMd) {
+    return finish(mergeProductionScriptPatch(stored, fromMd));
   }
   if (storedStrictUsable) return finish(stored!);
   if (storedLenientUsable) return finish(stored!);

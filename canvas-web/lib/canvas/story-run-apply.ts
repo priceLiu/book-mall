@@ -43,11 +43,16 @@ import {
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
 import { syncPro2VideoBoardFromRows } from "./pro2-spawn-video-board-group";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
+import { requestCanvasGraphPersistFlush } from "./canvas-persist-request";
+import { buildProductionScriptOriginPatch } from "./pro2-production-script-origin";
+import { tryPersistPro2HubMediaFromColumns } from "./pro2-hub-media-persist";
 import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
   StoryProSceneRow,
+  StoryProScriptHubNodeData,
+  StoryProVideoRow,
 } from "./story-pro-workspace-types";
 import {
   findStarterByHubId,
@@ -581,7 +586,28 @@ export function storyApplyTaskResult(
       task.textOutput ?? undefined,
     );
     if (!hubSectionPatchChanged(prev, ctx.llmSection, patch)) return;
-    updateNodeData(node.id, patch);
+    let hubPatch = patch as Partial<StoryProScriptHubNodeData>;
+    if (
+      task.status === "SUCCEEDED" &&
+      task.textOutput?.trim() &&
+      node.type === "story-pro2-script-hub"
+    ) {
+      const originPatch = buildProductionScriptOriginPatch(
+        prev as StoryProScriptHubNodeData,
+        ctx.llmSection,
+        runtime,
+        task.textOutput,
+        hubPatch,
+      );
+      hubPatch = { ...hubPatch, ...originPatch };
+    }
+    updateNodeData(node.id, hubPatch);
+    if (
+      task.status === "SUCCEEDED" &&
+      node.type === "story-pro2-script-hub"
+    ) {
+      requestCanvasGraphPersistFlush({ immediate: true });
+    }
     if (
       task.status === "SUCCEEDED" ||
       task.status === "FAILED" ||
@@ -590,7 +616,7 @@ export function storyApplyTaskResult(
       updateNodeData(node.id, { hubGenerateIntent: undefined });
       const mergedNode: CanvasFlowNode = {
         ...node,
-        data: { ...node.data, ...patch },
+        data: { ...node.data, ...hubPatch },
       };
       const stillRunning = (
         ["outline", "character", "scene", "storyboard"] as const
@@ -610,11 +636,11 @@ export function storyApplyTaskResult(
     )?.workspaceIds;
     if (ws?.scriptHubId === node.id && task.textOutput) {
       const nodesAfterHub = allNodes.map((n) =>
-        n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
+        n.id === node.id ? { ...n, data: { ...n.data, ...hubPatch } } : n,
       );
       const mergedHubData = {
         ...node.data,
-        ...patch,
+        ...hubPatch,
       } as import("./story-pro-workspace-types").StoryProScriptHubNodeData;
 
       if (
@@ -828,6 +854,18 @@ export function storyApplyTaskResult(
         updateNodeData(ws.videoColumnId, downstream.videoPatch);
         updateNodeData(ws.frameColumnId, downstream.framePatch);
       }
+      if (runtime.status === "done") {
+        const videoCol = nodesAfter.find((n) => n.id === ws.videoColumnId);
+        const videoRows =
+          (videoCol?.data as { rows?: StoryProVideoRow[] })?.rows ?? [];
+        tryPersistPro2HubMediaFromColumns(
+          nodesAfter,
+          ws.scriptHubId,
+          nextRows as StoryProFrameRow[],
+          videoRows,
+          updateNodeData,
+        );
+      }
     }
     if (starterFrame && runtime.status === "done") {
       updateNodeData(starterFrame.id, { pipelineStage: "frames_done" });
@@ -859,6 +897,33 @@ export function storyApplyTaskResult(
       nextRows as never,
       updateNodeData,
     );
+    const hubId = (node.data as { hubNodeId?: string }).hubNodeId?.trim();
+    if (hubId && runtime.status === "done") {
+      const nodesAfter = allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
+      );
+      const starterVid = findStarterByHubId(allNodes, hubId);
+      const ws = (
+        starterVid?.data as {
+          workspaceIds?: {
+            frameColumnId?: string;
+            videoColumnId?: string;
+          };
+        }
+      )?.workspaceIds;
+      const frameCol = ws?.frameColumnId
+        ? nodesAfter.find((n) => n.id === ws.frameColumnId)
+        : undefined;
+      const frameRows =
+        (frameCol?.data as { rows?: StoryProFrameRow[] })?.rows ?? [];
+      tryPersistPro2HubMediaFromColumns(
+        nodesAfter,
+        hubId,
+        frameRows,
+        nextRows as StoryProVideoRow[],
+        updateNodeData,
+      );
+    }
     const starterVid = findStarterByHubId(
       allNodes,
       (node.data as { hubNodeId?: string }).hubNodeId ?? "",

@@ -74,9 +74,16 @@ describe("pro2 lazy media prompts", () => {
         prompt: "",
       },
     ];
-    const out = applyPro2CharacterMediaPromptsForKeys(rows, ["b"]);
+    const out = applyPro2CharacterMediaPromptsForKeys(
+      rows,
+      ["b"],
+      {
+        era: "架空唐代",
+        visualStyle: "国风二次元厚涂，2D动漫媒介",
+      },
+    );
     expect(out[0]?.prompt?.trim() || "").toBe("");
-    expect(out[1]?.prompt).toContain("乙");
-    expect(out[1]?.prompt).toContain("【任务】");
+    expect(out[1]?.prompt).toContain("名称：乙，配角");
+    expect(out[1]?.prompt).toContain("[视觉风格：");
   });
 });

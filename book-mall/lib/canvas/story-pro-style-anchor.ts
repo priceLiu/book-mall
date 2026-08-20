@@ -11,7 +11,12 @@ export type StoryProStyleAnchorInput = {
 export function promptHasEmbeddedStoryProStyleAnchor(prompt: string): boolean {
   const t = prompt.trim();
   if (!t) return false;
-  return t.includes("【全片视觉") || t.includes("【全局视觉风格") || t.includes("[Global visual style]");
+  return (
+    t.includes("【全片视觉") ||
+    t.includes("【全局视觉风格") ||
+    t.includes("[Global visual style]") ||
+    t.includes("[视觉风格：")
+  );
 }
 
 export function prependStoryProStyleAnchor(

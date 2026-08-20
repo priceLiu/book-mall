@@ -18,6 +18,7 @@ import {
   resolvePro2PropNamesCell,
   stripPro2AnchorPlaceholders,
 } from "./pro2-chinese-prompt-normalize";
+import { formatPro2CharacterAppearanceCell } from "./pro2-character-script-fields";
 import {
   formatStoryboardTableMarkdown,
   parseStoryboardRows,
@@ -107,7 +108,7 @@ export function renderCharactersSection(script: Pro2ProductionScript): string {
     STORY_PRO2_CHARACTER_TABLE_HEADER,
     ...chars.map(
       (c) =>
-        `| ${escCell(stripPro2AnchorPlaceholders(c.name))} | ${escCell(c.role)} | ${escCell(c.appearance)} | ${escCell(c.personality || "—")} | ${escCell(c.imagePrompt)} |`,
+        `| ${escCell(stripPro2AnchorPlaceholders(c.name))} | ${escCell(c.role)} | ${escCell(formatPro2CharacterAppearanceCell(c))} | ${escCell(c.personality || "—")} | ${escCell(c.imagePrompt)} |`,
     ),
   ];
   return lines.join("\n");

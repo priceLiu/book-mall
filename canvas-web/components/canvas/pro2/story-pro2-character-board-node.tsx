@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { isPro2CharacterBoardColumnVisualPlaceholder } from "@/lib/canvas/pro2-resolve-character-board-group";
 import type { NodeProps } from "@xyflow/react";
 import { Users } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
@@ -28,8 +29,12 @@ export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
     rows?: StoryProCharacterRow[];
     hubNodeId?: string;
     pro2VisualGroupId?: string;
+    pro2PendingSyncGroupId?: string;
   };
-  const isVisualGroupPlaceholder = Boolean(d.pro2VisualGroupId);
+  const isVisualGroupPlaceholder = useMemo(
+    () => isPro2CharacterBoardColumnVisualPlaceholder(id, nodes),
+    [id, nodes],
+  );
 
   const label = useMemo(() => {
     const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");

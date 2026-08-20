@@ -36,7 +36,7 @@ describe("pro2ScriptCategoryPreset", () => {
     expect(doc).toContain("| 场景名 | 环境 | 时间 | 气氛 | 生图关键词 |");
     const pack = storyPro2GuFengHubPromptPack();
     expect(pack.promptStoryboard).toContain("高密度糖点");
-    expect(pack.promptStoryboard).toContain("Seedance");
+    expect(pack.promptStoryboard).toContain("json-only-v13");
     expect(pack.promptStoryboard).toContain("禁止照抄示例剧名");
   });
 });
@@ -53,7 +53,7 @@ describe("resolvePro2HubPromptPack", () => {
     const pack = resolvePro2HubPromptPack({} as StoryProScriptHubNodeData);
     expect(pack.promptOutline).not.toContain("高密度糖点");
     expect(pack.promptStoryboard).toContain("【起始】");
-    expect(pack.promptStoryboard).toContain("Seedance");
+    expect(pack.promptStoryboard).toContain("json-only-v13");
   });
 
   it("default-master uses default pack", () => {
@@ -62,7 +62,7 @@ describe("resolvePro2HubPromptPack", () => {
     } as StoryProScriptHubNodeData);
     expect(pack.promptStoryboard).toContain("【起始】");
     expect(pack.promptStoryboard).not.toContain("古风甜宠");
-    expect(pack.promptStoryboard).toContain("核心冲突 GFM 表");
+    expect(pack.promptStoryboard).toContain("json-only-v13");
   });
 });
 

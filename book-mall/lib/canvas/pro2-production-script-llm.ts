@@ -11,6 +11,7 @@ import {
 import { findPro2UnwantedEnglishFields } from "./pro2-chinese-prompt-normalize";
 import { STORY_PRO2_JSON_FIELD_RULES, STORY_PRO2_PACK_LANGUAGE_RULES } from "./data/pro2-production-pack-standard";
 import type { Pro2ProductionScriptPatch } from "./data/pro2-production-script-schema";
+import { listPro2FullPackPatchIssues, listPro2SemanticPatchIssues } from "./data/pro2-production-script-schema";
 
 const PRO2_HUB_SECTIONS = new Set([
   "outline",
@@ -60,6 +61,24 @@ export function validatePro2ProductionScriptLlmOutput(
     };
   }
   const section = storyScope?.llmSection;
+  if (section === "outline" && patchRaw.step !== "full_pack") {
+    return {
+      ok: false,
+      error: `Hub 制作包须 step=full_pack（含 scenes/characters/shots/handoff），当前 step=${patchRaw.step}`,
+    };
+  }
+  if (section === "outline" && patchRaw.step === "full_pack") {
+    const fullPackIssues = [
+      ...listPro2FullPackPatchIssues(patchRaw.patch),
+      ...listPro2SemanticPatchIssues(patchRaw.patch, "full_pack"),
+    ];
+    if (fullPackIssues.length) {
+      return {
+        ok: false,
+        error: fullPackIssues.slice(0, 4).join("；"),
+      };
+    }
+  }
   if (
     section &&
     PRO2_HUB_SECTIONS.has(section) &&
@@ -99,11 +118,12 @@ export function buildPro2StructuredRetryUserMessage(error: string): string {
     STORY_PRO2_PACK_LANGUAGE_RULES,
     "",
     "要求：",
-    "1. 输出合法 JSON（schemaVersion: 1 · tier: pro · step · patch）",
-    "2. step 须与当前任务段一致；full_pack 须含 visualStyle/coreConflict/scenes/characters/shots/handoff",
-    "3. 字段名须与契约完全一致，禁止 identity/aiImagePrompt/environment/keywords 等 alias",
-    "4. scenes[].negativePrompt 须中文顿号列表，禁止 [Negative: …] 英文",
-    "5. 可包在 ```pro2-production-script 围栏内；禁止尾逗号与 // 注释",
+    "1. **只输出** ```pro2-production-script``` JSON 围栏；禁止 Markdown/GFM/说明文字",
+    "2. schemaVersion: 2 · tier: pro · step 与当前任务一致",
+    "3. Hub 大纲段须 step=full_pack，且 patch 须含 visualStyle/coreConflict/scenes/characters/props/shots/handoff",
+    "4. characters[].traits ≥3 项；禁止「标志性动作」；imagePrompt 须含构图规范与 [视觉风格：…]",
+    "5. shots[].dialogue 非 — 时须 角色名（情绪）：\"台词\"",
+    "6. 禁止尾逗号与 // 注释",
   ].join("\n");
 }
 

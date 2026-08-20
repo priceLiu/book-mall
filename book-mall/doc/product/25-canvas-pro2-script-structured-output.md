@@ -1,6 +1,6 @@
 # 画布剧本结构化输出（Pro2）· 需求真源
 
-> **状态**：v1 已实施（2026-08-19）· **v2 分镜 spawn / Pass2 实施中（2026-08-20）**  
+> **状态**：v1 已实施（2026-08-19）· **v13 JSON-only 已实施（2026-08-20）**  
 > **范围**：影视专业版 2.0（`story-pro2`）· `story-pro2-starter` / `story-pro2-script-hub` / 剧组公告栏  
 > **非范围**：Story-Pro 1.0、分镜视频 1.0（sbv1）、电商跨站 adapter、Prisma 新表  
 > **关联**：[Pro2剧本结构化.md](../../../docs/Pro2剧本结构化.md) · [画布提示词.md](../../../docs/画布提示词.md) · [story-pro2-workflow-canonical.md](../../../canvas-web/docs/story-pro2-workflow-canonical.md) · [pro2-production-pack-standard.ts](../../../canvas-web/lib/canvas/data/pro2-production-pack-standard.ts)
@@ -11,17 +11,17 @@
 
 Pro2 制作包 v7 以 **GFM Markdown 表** 为 LLM 返回契约，程序经 `parse-md-tables` 解析后写入 Hub 与公告栏。表头字面依赖强，模型稍改列名即导致下游 spawn 失败。
 
-**目标**：固定 **JSON 胖结构** 为机器可读真源；LLM 回复末尾附 ` ```pro2-production-script ` 围栏；Zod 校验通过后 merge 至 Hub；**Markdown 由 JSON 渲染**供人读，并保留 **无围栏时 MD 回退**。
+**目标（v13）**：LLM **只输出**唯一 ` ```pro2-production-script ` JSON 围栏；Zod + 语义校验通过后 merge 至 Hub；**Markdown 一律由 JSON 渲染**供人读；**无 GFM / MD 回退主路径**。
+
+**旧项目退役**：凡 `edition=pro2`、画布 **曾使用剧本链路**（含 `story-pro2-script-hub` 或 `meta.linkedScriptPackageAssetId`），且 `meta` 无 `pro2ScriptFormat=json-only-v13` 的项目，列表/API 视为不存在（DB 不删）。**未接入剧本 Hub 的 2.0 项目（如纯 starter/生图）仍可正常打开。** 新建 Pro2 画布自动写入 v13 标记。
 
 **输入不变**：上传剧本、参考图、Skill/类别创意正文、Gateway `messages` 形态均不改。
 
 ---
 
-## 2. 交付机制
+## 2. 交付机制（JSON-only v13）
 
 ```
-[可选 · 人读 Markdown 六章节]
-
 ```pro2-production-script
 { "schemaVersion": 1, "tier": "pro", "step": "...", "patch": { ... } }
 ```
@@ -30,9 +30,11 @@ Pro2 制作包 v7 以 **GFM Markdown 表** 为 LLM 返回契约，程序经 `par
 | 规则 | 说明 |
 |------|------|
 | 围栏语言标记 | 必须为 `pro2-production-script` |
-| 机器可读源 | **仅 JSON**；缺围栏或 Zod 失败 → 走 legacy MD 解析 |
+| 机器可读源 | **仅 JSON**；缺围栏、Zod 或语义校验失败 → 任务失败 `PRO2_SCRIPT_JSON_INVALID`，**不走 legacy MD 解析** |
+| Prompt 版本 | `STORY_PRO2_PACK_PROMPT_VERSION=13` · 禁止 GFM 六章节与表头字面契约 |
 | step | `full_pack` · `outline` · `character` · `scene` · `storyboard` · **`shot_prompts`**（v2 · Pass 2 按镜润色） |
 | tier | `standard` · `pro` · `fine`（控制必填字段） |
+| 新建项目 | `meta.pro2ScriptFormat=json-only-v13`（create 路径写入，**不** migrate 旧 graph） |
 
 实现：`canvas-web/lib/canvas/pro2-production-script-structured.ts` · `pro2-production-script-schema.ts`
 

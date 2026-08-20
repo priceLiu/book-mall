@@ -1,6 +1,31 @@
 import type { Pro2ProductionScriptPatch } from "@/lib/canvas/data/pro2-production-script-schema";
+import { PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC } from "@/lib/canvas/data/pro2-production-pack-standard";
 
-/** 精简 fixture · v2 Pass1 导演表结构 */
+const VIS_STYLE = "[视觉风格：电影级写实古装]";
+
+function charImagePrompt(name: string, role: string): string {
+  return [
+    `名称：${name}，${role}`,
+    "描述：18岁东方女性，鹅蛋脸，杏眼",
+    "服装：鹅黄古装，金线滚边",
+    "特征：①杏眼 ②鹅蛋脸 ③青丝及腰",
+    `构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`,
+    VIS_STYLE,
+  ].join("\n");
+}
+
+function sceneImagePrompt(name: string): string {
+  return [
+    `名称：${name}`,
+    "描述：电影级古代朱雀大街，青石板路，红灯笼",
+    "前背景：旗幡与摊位",
+    "氛围：正午暖金阳光",
+    "构图规范：高质量场景设定图，2×2网格四视角，纯白背景分割",
+    VIS_STYLE,
+  ].join("\n");
+}
+
+/** 精简 fixture · v2 Pass1 导演表结构 · JSON-only v13 语义校验通过 */
 export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
   schemaVersion: 2,
   tier: "pro",
@@ -27,7 +52,7 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         id: "scene-a",
         name: "长安主街·日",
         environmentTimeMood: "正午暖金阳光，百姓攒动",
-        imagePrompt: "电影级古代朱雀大街，青石板路，红灯笼",
+        imagePrompt: sceneImagePrompt("长安主街·日"),
         negativePrompt: "动画风、动漫风",
       },
     ],
@@ -36,9 +61,10 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         id: "char-heroine",
         name: "沈知意",
         role: "富商之女",
-        appearance: "鹅蛋脸，杏眼，鹅黄裙装",
+        appearance: "① 外貌：鹅蛋脸，杏眼\n② 服装：鹅黄裙装\n③ 特征：①杏眼 ②鹅蛋脸 ③青丝及腰",
         personality: "表面乖巧实则胆大",
-        imagePrompt: "18岁女子，鹅黄古装，电影级写实，2K",
+        traits: "①杏眼 ②鹅蛋脸 ③青丝及腰",
+        imagePrompt: charImagePrompt("沈知意", "富商之女"),
       },
     ],
     props: [
@@ -56,7 +82,7 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         cameraMove: "缓慢摇移推进，前景旗幡遮挡增加层次",
         sceneDescription: "【起始】朱雀大街人声鼎沸。【结束】女主举婚书立于外廊。",
         propIds: ["prop-book"],
-        dialogue: "百姓甲：「她要退婚？」",
+        dialogue: '百姓甲（议论）："她要退婚？"',
         durationSec: 10,
         sfxNote: "人群议论声、旗幡猎猎",
         audioNote: "群杂收音",
@@ -90,10 +116,17 @@ export function fixtureWithFence(patch: Pro2ProductionScriptPatch): string {
   return [
     "## 视觉风格总纲",
     "",
-    "（人读 Markdown 可选）",
+    "（人读 Markdown 可选 · JSON-only v13 真源为围栏）",
     "",
     "```pro2-production-script",
     JSON.stringify(patch, null, 2),
     "```",
   ].join("\n");
+}
+
+/** JSON-only v13 · 纯围栏（无 GFM 前缀） */
+export function fixtureJsonOnlyFence(patch: Pro2ProductionScriptPatch): string {
+  return ["```pro2-production-script", JSON.stringify(patch, null, 2), "```"].join(
+    "\n",
+  );
 }

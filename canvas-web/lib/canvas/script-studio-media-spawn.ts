@@ -3,6 +3,8 @@
  */
 import type { CanvasFlowNode } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
+import { buildPro2PropMediaPrompt } from "./pro2-lazy-media-prompts";
+import { resolveHubVisualStylePackFromHubData } from "./story-pro-visual-style-pack";
 import type {
   StoryProAudioRow,
   StoryProMoodRow,
@@ -64,6 +66,7 @@ export function spawnScriptStudioMediaCardsFromWorkspace(args: {
   if (!hub) return { spawned: 0, skipped: 0 };
 
   const hubData = hub.data as StoryProScriptHubNodeData;
+  const visualPack = resolveHubVisualStylePackFromHubData(hubData);
   const baseX = (hub.position?.x ?? 400) + 420;
   const baseY = hub.position?.y ?? 120;
 
@@ -83,12 +86,19 @@ export function spawnScriptStudioMediaCardsFromWorkspace(args: {
       }
 
       const size = NODE_DEFAULT_SIZE[NODE_TYPE[kind]];
+      const dockInput =
+        kind === "prop"
+          ? buildPro2PropMediaPrompt(row as StoryProPropRow, visualPack) ||
+            row.prompt?.trim() ||
+            row.description?.trim() ||
+            ""
+          : row.prompt?.trim() || row.description?.trim() || "";
       const nodeId = args.addNode(
         NODE_TYPE[kind],
         { x: baseX, y: baseY + yCursor },
         {
           label: row.name,
-          dockInput: row.prompt?.trim() || row.description?.trim() || "",
+          dockInput,
           scriptStudioSourceRowKey: row.key,
           scriptStudioMediaKind: kind,
           hubNodeId: hub.id,

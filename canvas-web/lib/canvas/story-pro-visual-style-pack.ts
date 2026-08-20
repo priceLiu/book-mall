@@ -303,7 +303,8 @@ export function promptHasEmbeddedVisualStyleBlock(prompt: string): boolean {
   return (
     t.includes("【全局视觉风格") ||
     t.includes("【全片视觉") ||
-    t.includes("[Global visual style]")
+    t.includes("[Global visual style]") ||
+    t.includes("[视觉风格：")
   );
 }
 
@@ -356,6 +357,24 @@ export function appendVisualStylePackToPrompt(
   return lines.join("");
 }
 
+/** Hub data · 优先 visualStylePack，否则从故事大纲「视觉风格总纲」解析 */
+export function resolveHubVisualStylePackFromHubData(
+  d:
+    | {
+        visualStylePack?: StoryProVisualStylePack | null;
+        outlineMd?: string | null;
+      }
+    | null
+    | undefined,
+): StoryProVisualStylePack | null {
+  if (!d) return null;
+  if (d.visualStylePack) return d.visualStylePack;
+  if (d.outlineMd?.trim()) {
+    return parseVisualStylePackFromOutline(d.outlineMd) ?? null;
+  }
+  return null;
+}
+
 /** 从脚本 hub 读取全片视觉 pack（节点 data 优先，否则解析 outline） */
 export function readHubVisualStylePack(
   hubNodeId: string | undefined,
@@ -364,13 +383,10 @@ export function readHubVisualStylePack(
   if (!hubNodeId?.trim()) return null;
   const hub = nodes.find((n) => n.id === hubNodeId);
   if (!hub) return null;
-  const d = (hub.data ?? {}) as {
-    visualStylePack?: StoryProVisualStylePack;
-    outlineMd?: string;
-  };
-  if (d.visualStylePack) return d.visualStylePack;
-  if (d.outlineMd?.trim()) {
-    return parseVisualStylePackFromOutline(d.outlineMd) ?? null;
-  }
-  return null;
+  return resolveHubVisualStylePackFromHubData(
+    hub.data as {
+      visualStylePack?: StoryProVisualStylePack;
+      outlineMd?: string;
+    },
+  );
 }

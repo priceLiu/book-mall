@@ -3,6 +3,7 @@ import { ensureGraphMetaEdition } from "@/lib/canvas/canvas-layout-mode";
 import { cloneGraphForNewProject } from "@/lib/canvas/clone";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { STORY_PRO2_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
+import { withPro2ScriptFormatV13Meta } from "@/lib/canvas/pro2-project-format";
 import { BLANK_CANVAS, BUILTIN_CANVAS_TEMPLATES } from "@/lib/canvas/templates";
 import type { CanvasGraph } from "@/lib/canvas/types";
 
@@ -19,14 +20,11 @@ export async function createPro2BlankCanvasProject(
   );
   graph = {
     ...graph,
-    meta: { ...(graph.meta ?? {}), edition: "pro2" },
-  };
-  graph = {
-    ...graph,
     meta:
       ensureGraphMetaEdition(graph.nodes ?? [], graph.meta ?? null) ??
       graph.meta,
   };
+  graph = withPro2ScriptFormatV13Meta(graph);
   const created = await createCanvasProject(base, {
     name: name?.trim() || defaultCanvasProjectName(),
     canvas: graph,

@@ -4,6 +4,7 @@ import {
   listProjectAssets,
 } from "@/lib/canvas-api";
 import { exportScriptPackageDraft } from "./export-script-package";
+import { isRetiredLegacyPro2FromListHints } from "./pro2-project-format";
 import type { NewProjectScriptPackageAsset } from "./pro2-new-project-script-package";
 import type {
   StoryProScriptHubNodeData,
@@ -55,7 +56,11 @@ export async function listPickableScriptPackages(
   }
 
   const projects = (await listMyCanvasProjects(base))
-    .filter((p) => p.edition === "pro2")
+    .filter(
+      (p) =>
+        p.edition === "pro2" &&
+        !isRetiredLegacyPro2FromListHints(p.meta, p.nodeTypes),
+    )
     .sort(
       (a, b) =>
         new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),

@@ -26,13 +26,12 @@ describe("pro2 gu-feng DeepSeek full pack", () => {
     expect(PRO2_GU_FENG_DEEPSEEK_SYSTEM_PROMPT).toContain(
       "精通古风甜宠与短视频节奏",
     );
-    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain("道具六视图生成");
+    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain("JSON-only v13");
     expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain(
-      "场景名 | 环境/时间/气氛 | 生图关键词(英文) | 固定反向提示词",
+      "pro2-production-script",
     );
-    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain(
-      "画面描述（含起始→终止站位）",
-    );
+    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain("12–18 镜");
+    expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).toContain("traits");
     expect(PRO2_GU_FENG_DEEPSEEK_FULL_PACK_USER_PROMPT).not.toContain(
       "# 任务：场景视觉提示词",
     );
@@ -43,7 +42,7 @@ describe("pro2 gu-feng DeepSeek full pack", () => {
     expect(user).toContain("镜数与时长预算");
     expect(user).toContain("不得少于 **12** 镜");
     const story = formatPro2GuFengFullPackStoryInput("第一集《未婚夫…》");
-    expect(story).toContain("【以下为故事大纲，请严格按上述规则生成完整制作包】");
+    expect(story).toContain("【以下为故事大纲，请严格按上述规则生成完整制作包 JSON】");
     expect(story).toContain("第一集");
   });
 
@@ -54,7 +53,7 @@ describe("pro2 gu-feng DeepSeek full pack", () => {
       "# 任务：故事剧本 · 大纲段",
     );
     expect(resolved).not.toContain("# 任务：故事剧本 · 大纲段");
-    expect(resolved).toContain("道具六视图生成");
+    expect(resolved).toContain("JSON-only v13");
     expect(isPro2GuFengFullPackRun("gu-feng-tian-chong", "3分钟")).toBe(true);
     expect(isPro2GuFengFullPackRun("gu-feng-tian-chong", "")).toBe(false);
   });

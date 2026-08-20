@@ -10,10 +10,26 @@ import {
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import {
+  hubSectionIsRunning,
+  hubSectionRuntime,
+} from "./story-hub-runtime";
+import { storyApplyTaskResult } from "./story-run-apply";
+import {
   pickActiveServerInflightTask,
+  pickPreferredCanvasTaskForScope,
   runtimePatchFromCanvasTask,
+  storyRunContextFromScope,
 } from "./task-pick";
+import { isAnyStoryScriptHubType } from "./story-workspace-resolver";
+import type { StoryLlmSection } from "./story-workspace-types";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
+
+const HUB_LLM_SECTIONS: StoryLlmSection[] = [
+  "outline",
+  "character",
+  "scene",
+  "storyboard",
+];
 
 function nodeTasksForRestore(
   node: CanvasFlowNode,
@@ -50,6 +66,37 @@ function shouldRestoreInflight(
   return !bound || bound !== inflight.id;
 }
 
+function restoreScriptHubSectionRuntimes(
+  node: CanvasFlowNode,
+  tasks: CanvasTaskRecord[],
+  allNodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+  for (const section of HUB_LLM_SECTIONS) {
+    const rt = hubSectionRuntime(node, section);
+    const scope = { llmSection: section };
+    const inflight = pickPreferredCanvasTaskForScope(
+      nodeTasks,
+      scope,
+      rt,
+      node.id,
+    );
+    if (!inflight) continue;
+    if (hubSectionIsRunning(node, section) && rt?.taskId === inflight.id) {
+      continue;
+    }
+    if (!shouldRestoreInflight(rt, inflight)) continue;
+    storyApplyTaskResult(
+      node,
+      inflight,
+      storyRunContextFromScope(node.id, scope),
+      updateNodeData,
+      allNodes,
+    );
+  }
+}
+
 /** 刷新 / 轮询后：服务端仍有 QUEUED…SUBMITTED，但节点 runtime 已 idle 或未绑定 taskId 时，
  * 从任务表恢复「生成中」态，避免 UI 与 Gateway 日志脱节。
  * 跳过已超时孤儿任务（旧项目误显示生成中）。
@@ -61,6 +108,11 @@ export function restoreServerInflightNodeRuntimes(
   setNodeRuntime: (id: string, patch: Partial<CanvasNodeRuntime>) => void,
 ): void {
   for (const node of nodes) {
+    if (isAnyStoryScriptHubType(node.type ?? "")) {
+      restoreScriptHubSectionRuntimes(node, tasks, nodes, updateNodeData);
+      continue;
+    }
+
     if (node.type === "sbv1-video-engine") {
       const localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
       const scoped = nodeTasksForRestore(node, tasks);

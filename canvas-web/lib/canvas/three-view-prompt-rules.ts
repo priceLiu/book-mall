@@ -6,6 +6,15 @@
  */
 import { formatThreeViewVisualStyleSection } from "./story-pro-visual-style-pack";
 import type { StoryProVisualStylePack } from "./story-pro-visual-style-pack";
+import {
+  isPro2ProductionPackCharacterImagePrompt,
+  isLegacyWrappedMediaPrompt,
+  resolvePro2CharacterImagePromptFromRow,
+  finalizePro2CharacterImageDockPrompt,
+} from "./pro2-production-pack-prompt";
+import { buildPro2CharacterImagePromptFromStructuredFields } from "./pro2-character-script-fields";
+
+export { isPro2ProductionPackCharacterImagePrompt } from "./pro2-production-pack-prompt";
 
 export const THREE_VIEW_TASK_ZH = `【任务】
 生成主角的标准三视图设计稿。`;
@@ -31,10 +40,11 @@ export const THREE_VIEW_SYSTEM_SUFFIX_ZH = THREE_VIEW_SYSTEM_PREFIX_ZH;
 /** @deprecated 兼容旧引用 */
 export const THREE_VIEW_IMAGE_RULES_ZH = THREE_VIEW_SYSTEM_PREFIX_ZH;
 
-/** 一行英文补强（置于全局视觉块之后） */
+/** 一行英文补强（置于全局视觉块之后 · 仅 legacy 三视图模板使用） */
 export const THREE_VIEW_TURNAROUND_REQUIREMENT_EN =
   "White-bg turnaround: front, side, back full-body only; no props in hands, no labels or panel borders.";
 
+/** @deprecated 兼容旧引用 */
 export const THREE_VIEW_ENGINE_PROMPT_INTRO_ZH =
   "生成角色标准三视图 turnaround sheet：正/侧/背各一，人设原画稿，三视角比例与服饰一致";
 
@@ -172,13 +182,66 @@ export function shouldRebuildPro2CharacterRowPrompt(
   next: Pro2CharacterTablePromptFields,
 ): boolean {
   if (!prev.prompt?.trim()) return true;
+  if (isLegacyWrappedMediaPrompt(prev.prompt)) return true;
   return (
     pro2CharacterTablePromptFingerprint(prev) !==
     pro2CharacterTablePromptFingerprint(next)
   );
 }
 
-/** 完整三视图 prompt 组装 */
+/**
+ * Pro2 三视图生图 prompt · 优先透传 LLM 制作包 imagePrompt，勿套 legacy 模板。
+ * aiImagePrompt（Hub）> 非 legacy row.prompt（Dock 编辑）> appearance bullet + 系统块。
+ */
+export function resolvePro2ThreeViewRunPrompt(
+  row: {
+    name: string;
+    role: string;
+    appearance: string;
+    personality?: string;
+    aiImagePrompt?: string;
+    prompt?: string;
+    visualStyleTag?: string;
+  },
+  visualStylePack?: StoryProVisualStylePack | null,
+): string {
+  const finalizeOpts = {
+    visualStylePack: visualStylePack ?? null,
+    visualStyleTag: row.visualStyleTag,
+  };
+
+  const passthrough = resolvePro2CharacterImagePromptFromRow(row);
+  if (passthrough) {
+    return finalizePro2CharacterImageDockPrompt(passthrough, finalizeOpts);
+  }
+
+  const saved = row.prompt?.trim();
+  if (saved && !isLegacyWrappedMediaPrompt(saved)) {
+    return finalizePro2CharacterImageDockPrompt(saved, finalizeOpts);
+  }
+
+  const structured = buildPro2CharacterImagePromptFromStructuredFields(
+    {
+      name: row.name,
+      role: row.role,
+      appearance: row.appearance,
+      personality: row.personality,
+      aiImagePrompt: row.aiImagePrompt,
+      imagePrompt: row.prompt,
+      visualStyleTag: row.visualStyleTag,
+    },
+    visualStylePack ?? null,
+    { finalizeDock: true },
+  );
+  if (structured?.trim()) return structured;
+
+  return assembleThreeViewPrompt(
+    buildThreeViewCharacterBody(row),
+    visualStylePack ?? null,
+  );
+}
+
+/** legacy 三视图 prompt 组装（appearance bullet · 三视图 · 非制作包四视图） */
 export function assembleThreeViewPrompt(
   characterBody: string,
   visualStylePack?: StoryProVisualStylePack | null,
@@ -265,14 +328,54 @@ export function normalizeThreeViewDockPrompt(
   visualStylePack?: StoryProVisualStylePack | null,
 ): string {
   const trimmed = prompt.trim();
-  if (!trimmed) return assembleThreeViewPrompt("", visualStylePack ?? null);
+  if (!trimmed) {
+    return (
+      buildPro2CharacterImagePromptFromStructuredFields(
+        { name: "未命名角色", role: "角色", appearance: "" },
+        visualStylePack ?? null,
+        { finalizeDock: true },
+      ) ?? assembleThreeViewPrompt("", visualStylePack ?? null)
+    );
+  }
+  if (isPro2ProductionPackCharacterImagePrompt(trimmed)) {
+    return finalizePro2CharacterImageDockPrompt(trimmed, {
+      visualStylePack: visualStylePack ?? null,
+    });
+  }
 
   const legacy = parseLegacyFlatCharacterPrompt(trimmed);
   if (legacy) {
-    return assembleThreeViewPrompt(
-      buildThreeViewCharacterBody(legacy),
-      visualStylePack ?? null,
+    return (
+      buildPro2CharacterImagePromptFromStructuredFields(
+        legacy,
+        visualStylePack ?? null,
+        { finalizeDock: true },
+      ) ??
+      assembleThreeViewPrompt(
+        buildThreeViewCharacterBody(legacy),
+        visualStylePack ?? null,
+      )
     );
+  }
+
+  if (isLegacyWrappedMediaPrompt(trimmed)) {
+    const stripped = stripThreeViewSystemBlocks(trimmed);
+    const headerMatch = stripped.match(
+      /^【角色设定：([^-\n]+)\s*-\s*([^\n]+)】\n([\s\S]*)$/m,
+    );
+    if (headerMatch) {
+      return (
+        buildPro2CharacterImagePromptFromStructuredFields(
+          {
+            name: headerMatch[1]!.trim(),
+            role: headerMatch[2]!.trim(),
+            appearance: headerMatch[3]!.trim(),
+          },
+          visualStylePack ?? null,
+          { finalizeDock: true },
+        ) ?? assembleThreeViewPrompt(stripped, visualStylePack ?? null)
+      );
+    }
   }
 
   const character = stripThreeViewSystemBlocks(trimmed);
@@ -291,11 +394,11 @@ export function formatThreeViewPromptFromCharacterDescription(
   },
   visualStylePack?: StoryProVisualStylePack | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody({
+  return resolvePro2ThreeViewRunPrompt(
+    {
       ...c,
       aiImagePrompt: characterDescription.trim() || c.aiImagePrompt,
-    }),
+    },
     visualStylePack ?? null,
   );
 }
@@ -308,13 +411,11 @@ export function formatCharacterRowThreeViewPrompt(
     appearance: string;
     personality?: string;
     aiImagePrompt?: string;
+    prompt?: string;
   },
   visualStylePack?: StoryProVisualStylePack | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody(c),
-    visualStylePack ?? null,
-  );
+  return resolvePro2ThreeViewRunPrompt(c, visualStylePack ?? null);
 }
 
 export function resolveCharacterRowThreeViewPrompt(
@@ -324,13 +425,14 @@ export function resolveCharacterRowThreeViewPrompt(
     appearance: string;
     personality?: string;
     aiImagePrompt?: string;
+    prompt?: string;
   },
   visualStylePack?: StoryProVisualStylePack | null,
 ): string {
   return formatCharacterRowThreeViewPrompt(c, visualStylePack ?? null);
 }
 
-/** Pro2 三视图 Dock · 角色表 + 系统块 + 全片视觉 */
+/** Pro2 三视图 Dock · 制作包 imagePrompt 透传，或 legacy 组装 */
 export function buildPro2ThreeViewDockPrompt(
   row: {
     name: string;
@@ -342,10 +444,7 @@ export function buildPro2ThreeViewDockPrompt(
   },
   visualStylePack?: StoryProVisualStylePack | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody(row),
-    visualStylePack ?? undefined,
-  );
+  return resolvePro2ThreeViewRunPrompt(row, visualStylePack ?? undefined);
 }
 
 export function formatBatchThreeViewPrompt(
@@ -355,11 +454,9 @@ export function formatBatchThreeViewPrompt(
     appearance: string;
     personality?: string;
     aiImagePrompt?: string;
+    prompt?: string;
   },
   visualStylePack?: StoryProVisualStylePack | null,
 ): string {
-  return assembleThreeViewPrompt(
-    buildThreeViewCharacterBody(c),
-    visualStylePack ?? null,
-  );
+  return resolvePro2ThreeViewRunPrompt(c, visualStylePack ?? null);
 }

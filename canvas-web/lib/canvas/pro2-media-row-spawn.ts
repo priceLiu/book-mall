@@ -3,6 +3,7 @@ import type {
   StoryProFrameRow,
   StoryProSceneRow,
 } from "./story-pro-workspace-types";
+import { isLegacyWrappedMediaPrompt } from "./pro2-production-pack-prompt";
 import { shouldRebuildPro2CharacterRowPrompt } from "./three-view-prompt-rules";
 
 function isFrameScriptPrompt(prompt: string): boolean {

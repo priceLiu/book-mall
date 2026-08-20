@@ -292,8 +292,29 @@ export function Pro2ScriptHubEditorModal({
     isUnparsedPro2ProductionJsonBlob(hubData?.storyboardMd ?? "");
   const scriptTabUsesStructuredPreview =
     tab === "script" &&
-    (scriptForPreview.shots?.length ?? 0) > 0 &&
-    (!canTable || storyboardShowsJsonBlob);
+    hasStructuredPreview &&
+    ((scriptForPreview.shots?.length ?? 0) > 0 ||
+      storyboardShowsJsonBlob ||
+      !canTable);
+  const characterUsesStructuredPreview =
+    tab === "character" &&
+    hasStructuredPreview &&
+    (scriptForPreview.characters?.length ?? 0) > 0;
+  const sceneUsesStructuredPreview =
+    tab === "scene" &&
+    hasStructuredPreview &&
+    (scriptForPreview.scenes?.length ?? 0) > 0;
+  const outlineUsesStructuredPreview =
+    tab === "outline" && hasStructuredPreview && !outlineShowsJsonBlob;
+
+  const structuredPreviewHint = (
+    <div className="mx-auto mb-6 max-w-2xl rounded-xl border border-violet-200 bg-violet-50/80 px-4 py-3 text-center">
+      <p className="text-[12px] font-medium text-violet-900">JSON 结构化预览</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-violet-800/80">
+        请使用「结构化」Tab 编辑剧本；Markdown 由 productionScript 自动渲染，勿在此直接改表。
+      </p>
+    </div>
+  );
 
   return createPortal(
     <div
@@ -370,6 +391,17 @@ export function Pro2ScriptHubEditorModal({
               </p>
             </div>
           </div>
+        ) : outlineUsesStructuredPreview ? (
+        <div
+          className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
+        >
+          {structuredPreviewHint}
+          <Pro2ProductionScriptHtmlPreview
+            script={scriptForPreview}
+            tab="outline"
+            variant="document"
+          />
+        </div>
         ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
           <div
@@ -455,6 +487,15 @@ export function Pro2ScriptHubEditorModal({
             />
           ) : readOnly ? (
             <StoryHubReadonlyPane md={tableDraft} />
+          ) : characterUsesStructuredPreview || sceneUsesStructuredPreview ? (
+            <>
+              {structuredPreviewHint}
+              <Pro2ProductionScriptHtmlPreview
+                script={scriptForPreview}
+                tab={tab === "scene" ? "scene" : "character"}
+                variant="document"
+              />
+            </>
           ) : scriptTabUsesStructuredPreview ? (
             <Pro2ProductionScriptHtmlPreview
               script={scriptForPreview}
@@ -479,6 +520,17 @@ export function Pro2ScriptHubEditorModal({
                 onChange={setTableDraft}
               />
             ) : null
+          ) : tab === "script" && hasStructuredPreview ? (
+            <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-white p-6 text-center">
+              <p className="text-[13px] font-medium text-neutral-800">
+                暂无分镜数据
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                当前 productionScript 缺少 shots[]（多为模型返回了 step=outline
+                且未含分镜表）。请点顶部「重新生成」；服务端现已强制要求
+                step=full_pack 且含分镜 JSON。
+              </p>
+            </div>
           ) : (
             <textarea
               className="nodrag min-h-[60vh] w-full resize-y rounded-lg border border-neutral-200 bg-white p-4 font-mono text-[13px] text-neutral-800"

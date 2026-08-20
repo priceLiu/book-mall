@@ -115,6 +115,31 @@ function clearInflightRuntime(
   };
 }
 
+function hasServerInflightForNode(
+  tasks: CanvasTaskRecord[],
+  nodeId: string,
+): boolean {
+  const nodeTasks = tasks.filter((t) => t.nodeId === nodeId);
+  return nodeTasks.some(
+    (t) =>
+      isServerInflightTaskStatus(t.status) &&
+      !isStaleServerInflightTask(t, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(t),
+  );
+}
+
+function shouldDeferHubSectionOrphanClear(
+  node: CanvasFlowNode,
+  tasks: CanvasTaskRecord[],
+): boolean {
+  if (shouldDeferLibtvOrphanReconcile(node.id)) return true;
+  if (isCanvasNodeRunSessionActive(node.id)) return true;
+  if (hasServerInflightForNode(tasks, node.id)) return true;
+  const d = node.data as { hubGenerateIntent?: boolean };
+  if (d.hubGenerateIntent) return true;
+  return false;
+}
+
 function reconcileHubSection(
   node: CanvasFlowNode,
   section: StoryLlmSection,
@@ -154,30 +179,16 @@ function reconcileHubSection(
   }
 
   if (rt?.status === "pending" && !rt?.taskId) {
-    // 无服务端任务可对齐：保留旧 MD 扫光底图，勿误判 done；但上方 pick 已在会话内写回 SUCCEEDED
-    if (
-      shouldDeferLibtvOrphanReconcile(node.id) ||
-      isCanvasNodeRunSessionActive(node.id)
-    ) {
-      return;
-    }
-    const md = hubSectionMd(node, section).trim();
-    if (md) {
-      updateNodeData(node.id, {
-        [rtKey]: clearInflightRuntime({ ...rt, status: "done" }),
-      });
-    }
+    // 顺序链占位 / 乐观 pending：Gateway 仍在跑或会话未结束时勿清
+    if (shouldDeferHubSectionOrphanClear(node, tasks)) return;
     return;
   }
 
   if (rt?.taskId && !nodeTasks.some((t) => t.id === rt.taskId)) {
-    if (
-      shouldDeferLibtvOrphanReconcile(node.id) ||
-      isCanvasNodeRunSessionActive(node.id)
-    ) {
-      return;
-    }
+    if (shouldDeferHubSectionOrphanClear(node, tasks)) return;
   }
+
+  if (shouldDeferHubSectionOrphanClear(node, tasks)) return;
 
   const md = hubSectionMd(node, section);
   updateNodeData(node.id, {
