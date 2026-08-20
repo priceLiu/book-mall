@@ -62,7 +62,7 @@ export function ModelOpsPresentationTab() {
   async function batchKie() {
     if (!base) return;
     setMsg(null);
-    const r = await financeApiPost(base, "/api/finance/admin/model-presentation", {
+    const r = await financeApiPost<{ count: number }>(base, "/api/finance/admin/model-presentation", {
       batchKieToThirdParty: true,
     });
     if (r.ok) {

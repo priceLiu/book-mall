@@ -30,7 +30,6 @@ import {
   normalizeStoryboardSectionFromOutline,
   parseCharacterRows,
   parseSceneVisualDictionaryRows,
-  promotePro2HumanGfmToHubFields,
   parseStoryboardRows,
   storyboardMdHasParseableRows,
   type StoryboardTableRow,
@@ -425,8 +424,12 @@ export function tryRepairHubFromStoredProductionJson(
       (!storyboardMdHasParseableRows(storedStoryboard) ||
         humanRows.length > storedRows.length ||
         (humanHasPropNames && !storedHasPropNames));
-    const humanOutline = promotePro2HumanGfmToHubFields(humanGfm).outlineMd;
-    const needsHumanStoryboardRepair =
+    const envelope = extractPro2ProductionScriptPatch(raw);
+    if (!envelope) continue;
+    const needsShotsRepair =
+      (stored?.shots?.length ?? 0) === 0 &&
+      (envelope.patch.shots?.length ?? 0) > 0;
+    if (!needsHumanStoryboardRepair && !needsShotsRepair) {
       continue;
     }
     return applyProductionScriptPatchToHub(data, envelope, scriptHubId, raw);
