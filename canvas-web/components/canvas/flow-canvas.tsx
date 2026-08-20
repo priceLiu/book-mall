@@ -2179,6 +2179,7 @@ function FlowCanvasInner({
                   );
                   return;
                 }
+                useCanvasStore.getState().setLibtvInputDockFocused(false);
                 useCanvasStore.getState().setLibtvFloatingDockSelection(
                   node.id,
                   node.type ?? null,

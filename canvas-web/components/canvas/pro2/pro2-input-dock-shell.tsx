@@ -21,6 +21,7 @@ import {
   LIBTV_INPUT_DOCK_SHELL_CLASS,
 } from "@/lib/canvas/libtv-node-chrome";
 import { useLibtvDockWheelScroll } from "@/lib/canvas/use-libtv-dock-wheel-scroll";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { CANVAS_RF_VIEWPORT_READY_EVENT } from "@/lib/canvas/canvas-rf-sync";
 import { cn } from "@/lib/utils";
@@ -138,6 +139,9 @@ export function Pro2InputDockShell({
         }}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
+        onPointerDownCapture={() => {
+          useCanvasStore.getState().setLibtvInputDockFocused(true);
+        }}
       >
         <div
           className={cn(
@@ -335,6 +339,9 @@ export function Pro2EmbeddedInputDock({
           className,
         )}
         data-libtv-input-dock=""
+        onPointerDownCapture={() => {
+          useCanvasStore.getState().setLibtvInputDockFocused(true);
+        }}
       >
         {header}
         <div

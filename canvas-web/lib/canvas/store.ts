@@ -311,6 +311,8 @@ type CanvasState = {
   /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
   libtvFloatingDockNodeId: string | null;
   libtvFloatingDockNodeType: string | null;
+  /** 用户正在操作输入坞：隐藏节点顶栏，避免遮挡 Dock */
+  libtvInputDockFocused: boolean;
   /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
   hoveredMediaGroupId: string | null;
   setConnectingFrom: (id: string | null, handleId?: string | null) => void;
@@ -330,6 +332,7 @@ type CanvasState = {
     nodeId: string | null,
     nodeType: string | null,
   ) => void;
+  setLibtvInputDockFocused: (focused: boolean) => void;
 
   /** 故事大纲审阅弹窗（全局，避免节点重渲染丢失 open 状态） */
   storyHubReview: { hubId: string; section: HubPreviewSection } | null;
@@ -560,6 +563,7 @@ export const useCanvasStore = create<CanvasState>()(
       canvasMultiSelectActive: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
+      libtvInputDockFocused: false,
       setConnectingFrom: (id, handleId = null) =>
         set({
           connectingFromNodeId: id,
@@ -580,6 +584,7 @@ export const useCanvasStore = create<CanvasState>()(
           dragHoverGroupId: null,
           libtvFloatingDockNodeId: null,
           libtvFloatingDockNodeType: null,
+          libtvInputDockFocused: false,
           canvasGeometryDragging: false,
           canvasDraggingNodeId: null,
           canvasMarqueeSelecting: false,
@@ -607,6 +612,8 @@ export const useCanvasStore = create<CanvasState>()(
           libtvFloatingDockNodeId: nodeId,
           libtvFloatingDockNodeType: nodeType,
         }),
+      setLibtvInputDockFocused: (focused) =>
+        set({ libtvInputDockFocused: focused }),
 
       storyHubReview: null,
       openStoryHubReview: (hubId, section) =>

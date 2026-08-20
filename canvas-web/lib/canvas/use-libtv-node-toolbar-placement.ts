@@ -30,7 +30,7 @@ export function useStableLibtvNodeToolbarScreenPlacement(
   return placement ?? lastRef.current;
 }
 
-/** 拖动所属节点、或全屏详情编辑打开时隐藏顶栏（与浮动 Dock 同一规则） */
+/** 拖动所属节点、全屏详情编辑打开、或用户正在操作输入坞时隐藏顶栏 */
 export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
   const dragHidden = useCanvasStore((s) =>
     libtvFloatingDockHidden(s.canvasDraggingNodeId, nodeId),
@@ -40,7 +40,8 @@ export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
       s.pro2ScriptTableEditorNodeId === nodeId ||
       s.pro2TextOutlineEditorNodeId === nodeId,
   );
-  return dragHidden || detailOpen;
+  const dockFocused = useCanvasStore((s) => s.libtvInputDockFocused);
+  return dragHidden || detailOpen || dockFocused;
 }
 
 /** 节点顶栏 · 屏幕坐标（portal 固定定位，避免组内/相邻节点 z 轴夹住工具条） */

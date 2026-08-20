@@ -355,6 +355,9 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   --canvas-edge-stroke-width-active: 3;
   --canvas-edge-stroke-width-sweep: 3.5;
   --canvas-edge-stroke-width-connecting: 2.5;
+  /* 框选 / 多选外框 · 保留 React Flow 点线蓝，仅加粗到 2px */
+  --xy-selection-border: 2px dotted rgba(0, 89, 220, 0.8);
+  --xy-selection-background-color: rgba(0, 89, 220, 0.08);
 }
 
 .react-flow__edge .react-flow__edge-interaction {
