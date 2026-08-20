@@ -209,4 +209,4 @@ export function batchRunStoryRowsSequential(
   );
 }
 
-export { busEnqueueStoryRun };
+export { busEnqueueStoryRun, busEnqueueStoryRunsSequential };

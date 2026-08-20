@@ -57,6 +57,7 @@ const TAB_LABEL: Record<HubPreviewSection, string> = {
   character: "角色设定",
   scene: "场景设定",
   storyboard: "分镜脚本",
+  shot_prompts: "镜头提示词",
   dialogue: "对白",
 };
 

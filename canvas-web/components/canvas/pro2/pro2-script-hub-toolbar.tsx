@@ -81,29 +81,9 @@ function pro2HubBatchStore() {
   return {
     nodes: state.nodes,
     edges: state.edges,
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-scene"
-        | "story-pro2-frame"
-        | "story-pro2-video"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "sbv1-video-engine"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => state.addNode(type, position, data),
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view" | "sbv1-video-engine",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => state.addNodeInGroup(type, groupId, relativePosition, data),
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => state.createGroupContaining(childIds, opts),
+    addNode: state.addNode,
+    addNodeInGroup: state.addNodeInGroup,
+    createGroupContaining: state.createGroupContaining,
     setEdges: state.setEdges,
     updateNodeData: state.updateNodeData,
     setNodes: state.setNodes,

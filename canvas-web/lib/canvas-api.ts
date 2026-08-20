@@ -69,6 +69,9 @@ export type CanvasProjectSummary = {
   edition: "pro" | "pro2" | "sbv1" | "standard";
   /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
   collaborationLocked?: boolean;
+  /** 列表接口可选 · 用于退役 Pro2 画布过滤 */
+  meta?: unknown;
+  nodeTypes?: string[] | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -961,7 +964,7 @@ export async function runCanvasNode(
     };
     /** 阶段 4：跳过缓存，强制创建新任务（"重新生成"） */
     forceFresh?: boolean;
-    llmSection?: "outline" | "character" | "scene" | "storyboard";
+    llmSection?: "outline" | "character" | "scene" | "storyboard" | "shot_prompts";
     rowKey?: string;
     mediaKind?:
       | "threeView"

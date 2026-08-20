@@ -188,7 +188,14 @@ export function buildShotPromptPolishBundle(
     tier: "pro",
     step: "shot_prompts",
     patch: {
-      shots: [{ index: shotIndex }],
+      shots: [
+        {
+          index: shotIndex,
+          sceneDescription: "—",
+          dialogue: "—",
+          audioNote: "",
+        },
+      ],
     },
   };
   return {

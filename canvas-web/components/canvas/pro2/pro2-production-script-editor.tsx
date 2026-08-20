@@ -6,12 +6,26 @@ import type {
   Pro2ProductionScriptPatchBody,
 } from "@/lib/canvas/data/pro2-production-script-schema";
 import { PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION } from "@/lib/canvas/data/pro2-production-script-schema";
-import { Pro2ColorBlockPicker } from "./pro2-color-block-picker";
+import { Pro2ColorBlockPicker, type Pro2ColorBlockValue } from "./pro2-color-block-picker";
 
 const INPUT =
   "nodrag w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-[12px] text-neutral-800";
 const TEXTAREA =
   "nodrag w-full resize-y rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-[12px] text-neutral-800";
+
+function toScriptColorBlock(
+  value: Pro2ColorBlockValue,
+): NonNullable<Pro2ProductionScriptPatchBody["scenes"]>[number]["colorBlock"] {
+  const primary = value.primary?.trim();
+  if (!primary) return undefined;
+  return {
+    primary,
+    secondary: value.secondary,
+    highlight: value.highlight,
+    shadow: value.shadow,
+    notes: value.notes,
+  };
+}
 
 function Section({
   title,
@@ -209,7 +223,7 @@ export function Pro2ProductionScriptEditor({
                 value={scene.colorBlock}
                 onChange={(colorBlock) => {
                   const scenes = [...(value.scenes ?? [])];
-                  scenes[i] = { ...scene, colorBlock };
+                  scenes[i] = { ...scene, colorBlock: toScriptColorBlock(colorBlock) };
                   patch({ scenes });
                 }}
               />
@@ -330,7 +344,7 @@ export function Pro2ProductionScriptEditor({
                 value={shot.colorBlock}
                 onChange={(colorBlock) => {
                   const shots = [...(value.shots ?? [])];
-                  shots[i] = { ...shot, colorBlock };
+                  shots[i] = { ...shot, colorBlock: toScriptColorBlock(colorBlock) };
                   patch({ shots });
                 }}
               />

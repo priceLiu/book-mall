@@ -397,6 +397,7 @@ export function formatThreeViewPromptFromCharacterDescription(
   return resolvePro2ThreeViewRunPrompt(
     {
       ...c,
+      appearance: c.appearance ?? "",
       aiImagePrompt: characterDescription.trim() || c.aiImagePrompt,
     },
     visualStylePack ?? null,

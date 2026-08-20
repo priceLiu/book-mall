@@ -478,11 +478,7 @@ export function Pro2ScriptHubEditorModal({
           {readOnly && hasStructuredPreview ? (
             <Pro2ProductionScriptHtmlPreview
               script={scriptForPreview}
-              tab={
-                tab === "outline" || tab === "scene" || tab === "character"
-                  ? tab
-                  : "script"
-              }
+              tab={tab === "scene" || tab === "character" ? tab : "script"}
               variant="document"
             />
           ) : readOnly ? (

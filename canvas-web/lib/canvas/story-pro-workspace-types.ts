@@ -122,6 +122,8 @@ export type StoryProScriptHubNodeData = {
   };
   /** 2.0 · 从大纲「视觉风格总纲」解析的全片视觉锚定（生图统一风格） */
   visualStylePack?: import("./story-pro-visual-style-pack").StoryProVisualStylePack;
+  /** 制作包 prompt 版本 · ≥13 为 JSON-only */
+  storyPro2PackPromptVersion?: number;
   /** 2.0 · LLM 结构化 JSON 胖结构真源（schemaVersion: 1） */
   productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
   /** LLM 返回瞬间的原始版本（autosave 立即落库 · 用户编辑不覆盖） */
@@ -248,6 +250,8 @@ export type StoryProSceneRow = {
   imageKeywords?: string;
   /** 场景辞典 · 固定反向提示词 */
   negativePrompt?: string;
+  /** 制作包 scenes[].visualStyleTag */
+  visualStyleTag?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];

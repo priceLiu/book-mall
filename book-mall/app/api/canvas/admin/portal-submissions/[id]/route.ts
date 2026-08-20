@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       submissionId: id,
       reviewerUserId: guard.user.id,
       approve,
-      approvedKind: approve ? approvedKind : undefined,
+      approvedKind: approve ? (approvedKind ?? undefined) : undefined,
       adminNote: typeof adminNoteRaw === "string" ? adminNoteRaw : undefined,
     });
     return NextResponse.json({ submission }, { headers: jsonHeaders(request) });

@@ -14,7 +14,30 @@ import type { Pro2SceneBatchImagePick } from "./pro2-scene-batch-image";
 import { resolveHubStoryboardMd } from "./story-hub-runtime";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+
+type KickoffStoreSlice = {
+  nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
+  addNode: (
+    type: CanvasNodeType,
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  addNodeInGroup: (
+    type: CanvasNodeType,
+    groupId: string,
+    relativePosition: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  createGroupContaining: (
+    childIds: string[],
+    opts: { label: string; color: string },
+  ) => string | null;
+  setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
+};
 
 export function downloadPro2ScriptMarkdown(md: string, title: string): void {
   const safe = (title.trim() || "脚本").replace(/[/\\?%*:|"<>]/g, "_");
@@ -60,33 +83,7 @@ export function generatePro2FrameBoardFromHub(
   dockInput: string,
   dockRefImages: StoryRefImage[],
   providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
-  getStore: () => {
-    nodes: CanvasFlowNode[];
-    edges: CanvasFlowEdge[];
-    addNode: (
-      type:
-        | "story-pro2-frame"
-        | "story-pro2-video"
-        | "story-pro2-image"
-        | "sbv1-video-engine"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view" | "sbv1-video-engine",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => string | null;
-    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
-  },
+  getStore: () => KickoffStoreSlice,
   selectedFrameIndices?: number[],
   batchImage?: {
     providerId: string;
@@ -128,33 +125,7 @@ export function generatePro2CharacterThreeViewFromHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
   providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
-  getStore: () => {
-    nodes: CanvasFlowNode[];
-    edges: CanvasFlowEdge[];
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-frame"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => string | null;
-    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
-  },
+  getStore: () => KickoffStoreSlice,
   selectedCharacterKeys?: string[],
   batchImage?: Pro2ThreeViewBatchImagePick,
 ): boolean {
@@ -184,34 +155,7 @@ export function generatePro2SceneImageFromHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
   providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
-  getStore: () => {
-    nodes: CanvasFlowNode[];
-    edges: CanvasFlowEdge[];
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-scene"
-        | "story-pro2-frame"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => string | null;
-    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
-  },
+  getStore: () => KickoffStoreSlice,
   selectedSceneKeys?: string[],
   batchImage?: Pro2SceneBatchImagePick,
 ): boolean {

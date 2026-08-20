@@ -107,6 +107,8 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   engine?: CanvasEnginePick;
   imageMode?: string;
   pro2MediaRole?: Pro2ImageMediaRole | string;
+  /** 数据锚点列节点 id（story-pro2-frame / story-pro2-character） */
+  pro2ControllerNodeId?: string;
   gridSplit?: LibtvImageGridSplitState;
   gridSplitCrop?: GridSplitCrop;
 };

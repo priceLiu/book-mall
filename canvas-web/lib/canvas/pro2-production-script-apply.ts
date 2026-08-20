@@ -600,7 +600,7 @@ function buildProductionScriptShotsFromHumanStoryboard(
     durationSec: parseStoryboardDurationSec(row.duration),
     lighting: row.lighting || undefined,
     sfxNote: row.sfxNote || undefined,
-    audioNote: row.lipSyncNote || undefined,
+    audioNote: row.lipSyncNote || "",
     frameImagePrompt: row.frameImagePrompt || row.aiImagePrompt || undefined,
     videoPrompt: row.videoPrompt || row.aiVideoPrompt || undefined,
     propIds: resolvePropNamesToIds(row.propNames ?? "", script),
