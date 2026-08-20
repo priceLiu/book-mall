@@ -8,6 +8,7 @@ import {
   PRO2_CARD_TITLE_CLASS,
   pro2NodeBorderColor,
 } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_NODE_BORDER_DEFAULT_WIDTH } from "@/lib/canvas/libtv-node-chrome";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 
 export type Pro2ThinCardShellProps = {
@@ -42,7 +43,10 @@ export function Pro2ThinCardShell({
         "flex h-full min-h-0 flex-col overflow-hidden",
         className,
       )}
-      style={{ borderColor: pro2NodeBorderColor(!!selected) }}
+      style={{
+        borderColor: pro2NodeBorderColor(!!selected),
+        borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
+      }}
     >
       {inputs.map((h) => (
         <Handle

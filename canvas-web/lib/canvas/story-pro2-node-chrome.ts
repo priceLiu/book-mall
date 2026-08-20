@@ -7,6 +7,7 @@ import {
   LIBTV_INPUT_DOCK_BORDER,
   LIBTV_INPUT_DOCK_DIVIDER,
   LIBTV_INPUT_DOCK_TEXTAREA_CLASS,
+  LIBTV_NODE_BORDER_DEFAULT_COLOR,
   LIBTV_SQUARE_IMAGE_NODE_HEIGHT,
   LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT,
   LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH,
@@ -16,8 +17,8 @@ import { CANVAS_SEMANTIC_TITLE_CLASS } from "./canvas-chrome-semantics";
 
 export const PRO2_NODE_ACCENT = "#9f8fef";
 export const PRO2_NODE_ACCENT_SOFT = "rgba(159, 143, 239, 0.1)";
-/** 节点卡片描边 · 低对比灰紫（未选中 · 图 4） */
-export const PRO2_NODE_BORDER = "rgba(255, 255, 255, 0.1)";
+/** 节点卡片描边 · 默认与 LibTV hover 灰一致 */
+export const PRO2_NODE_BORDER = LIBTV_NODE_BORDER_DEFAULT_COLOR;
 /** 节点选中描边 · 仅边框高亮（图 3） */
 export const PRO2_NODE_BORDER_SELECTED = "rgba(255, 255, 255, 0.42)";
 

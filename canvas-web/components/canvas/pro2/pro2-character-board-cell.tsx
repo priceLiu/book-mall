@@ -66,7 +66,7 @@ export function Pro2CharacterBoardCell({
         "nodrag relative flex min-h-[140px] w-full flex-col overflow-hidden rounded-xl border bg-[#141418] text-left transition",
         focused
           ? "border-white/40 ring-1 ring-white/12"
-          : "border-white/10 hover:border-white/22",
+          : "border-[#A2A2A2] hover:border-[3px] hover:border-white",
       )}
     >
       <span className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white/85">

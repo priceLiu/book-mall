@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 /** 内层卡片（非媒体 · 文本 / 脚本 / 薄卡等） */
 export const LIBTV_CONTROL_CARD_BG = "#141418";
 export const LIBTV_CONTROL_CARD_SHELL_CLASS =
-  "libtv-control-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 shadow-lg";
+  "libtv-control-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-solid shadow-lg";
 
 /** 内层卡片（挂在外层 overflow-visible 容器上，避免 + 被裁切） */
 export const LIBTV_CARD_SHELL_CLASS = LIBTV_CONTROL_CARD_SHELL_CLASS;
@@ -17,7 +17,7 @@ export const LIBTV_CARD_SHELL_CLASS = LIBTV_CONTROL_CARD_SHELL_CLASS;
 /** 媒体节点卡片（图片 / 视频 / 三视图） */
 export const LIBTV_MEDIA_CARD_BG = "#262626";
 export const LIBTV_MEDIA_CARD_SHELL_CLASS =
-  "libtv-media-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 shadow-lg";
+  "libtv-media-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-solid shadow-lg";
 
 /** 媒体节点预览区（与卡片同色） */
 export const LIBTV_MEDIA_STAGE_CLASS =
@@ -98,8 +98,12 @@ export function libtvMediaNodeHeightForWidth(width: number): number {
 /** 整卡拖动光标（须配合无 dragHandle 节点） */
 export const LIBTV_CARD_DRAG_CLASS = "cursor-grab active:cursor-grabbing";
 
-/** LibTV 节点壳层交互描边 · hover 2px #A2A2A2；选中 2px 保留版别色 */
-export const LIBTV_NODE_BORDER_HOVER_COLOR = "#A2A2A2";
+/** LibTV 节点壳层交互描边 · 默认 #A2A2A2；hover 亮白加粗；选中保留版别色 */
+export const LIBTV_NODE_BORDER_DEFAULT_COLOR = "#A2A2A2";
+export const LIBTV_NODE_BORDER_HOVER_COLOR = "#FFFFFF";
+export const LIBTV_NODE_BORDER_DEFAULT_WIDTH = 1.5;
+export const LIBTV_NODE_BORDER_HOVER_WIDTH = 3;
+export const LIBTV_NODE_BORDER_SELECTED_WIDTH = 1.5;
 
 const LIBTV_NODE_BORDER_SELECTED_PRO2 = "rgba(167, 139, 250, 0.45)";
 const LIBTV_NODE_BORDER_SELECTED_SBV1 = "rgba(34, 211, 238, 0.5)";
@@ -111,7 +115,7 @@ export function libtvNodeBorderStyle(options: {
   selected?: boolean;
   hovered?: boolean;
   edition?: LibtvNodeBorderEdition;
-}): CSSProperties | undefined {
+}): CSSProperties {
   const { selected, hovered, edition = "pro2" } = options;
   if (selected) {
     const borderColor =
@@ -120,26 +124,32 @@ export function libtvNodeBorderStyle(options: {
         : edition === "neutral"
           ? LIBTV_NODE_BORDER_SELECTED_NEUTRAL
           : LIBTV_NODE_BORDER_SELECTED_PRO2;
-    return { borderWidth: 1.5, borderColor, borderStyle: "solid" };
+    return {
+      borderWidth: LIBTV_NODE_BORDER_SELECTED_WIDTH,
+      borderColor,
+      borderStyle: "solid",
+    };
   }
   if (hovered) {
     return {
-      borderWidth: 1.5,
+      borderWidth: LIBTV_NODE_BORDER_HOVER_WIDTH,
       borderColor: LIBTV_NODE_BORDER_HOVER_COLOR,
       borderStyle: "solid",
     };
   }
-  return undefined;
+  return {
+    borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
+    borderColor: LIBTV_NODE_BORDER_DEFAULT_COLOR,
+    borderStyle: "solid",
+  };
 }
 
-export function libtvNodeInteractiveBorderClass(options: {
+export function libtvNodeInteractiveBorderClass(_options: {
   selected?: boolean;
   hovered?: boolean;
   edition?: LibtvNodeBorderEdition;
 }): string {
-  const style = libtvNodeBorderStyle(options);
-  if (!style) return "border border-white/10";
-  return "border-solid";
+  return "border border-solid";
 }
 
 /** 媒体节点壳层 className（含 hover / 选中描边） */
@@ -150,12 +160,10 @@ export function libtvMediaNodeShellClass(options: {
   className?: string;
 }): string {
   const { selected, hovered, edition, className } = options;
-  const borderStyle = libtvNodeBorderStyle({ selected, hovered, edition });
   return cn(
     LIBTV_MEDIA_CARD_SHELL_CLASS,
     LIBTV_CARD_DRAG_CLASS,
     libtvNodeInteractiveBorderClass({ selected, hovered, edition }),
-    !borderStyle && "border border-white/10",
     className,
   );
 }
