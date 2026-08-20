@@ -16,6 +16,7 @@ import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
 import { ProjectAssetMediaPreviewGrid } from "./project-asset-grid-card";
 
 const VISIBILITY_KEY = "canvas.projectAsset.visibility";
+const SCOPE_KEY = "canvas.projectAsset.scope";
 
 const SAVE_ASSET_OPEN_EVENT = "canvas:open-save-project-asset";
 
@@ -38,7 +39,7 @@ export function SaveProjectAssetDialog({
   const { alert } = useDialogs();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<ProjectAssetKind>("STORYBOARD_IMAGE");
-  const [scope, setScope] = useState<"project" | "user" | "library">("project");
+  const [scope, setScope] = useState<"project" | "user" | "library">("user");
   const [visibility, setVisibility] = useState<AssetVisibility>("PRIVATE");
   const [busy, setBusy] = useState(false);
 
@@ -46,12 +47,17 @@ export function SaveProjectAssetDialog({
     if (!open || !draft) return;
     setName(draft.displayName);
     setKind(draft.kind);
-    setScope(draft.sourceProjectId ? "project" : "user");
     try {
+      const savedScope = localStorage.getItem(SCOPE_KEY);
+      if (savedScope === "project" || savedScope === "user" || savedScope === "library") {
+        setScope(savedScope);
+      } else {
+        setScope("user");
+      }
       const saved = localStorage.getItem(VISIBILITY_KEY) as AssetVisibility | null;
       if (saved === "PRIVATE" || saved === "TEAM_PUBLIC") setVisibility(saved);
     } catch {
-      /* ignore */
+      setScope("user");
     }
   }, [open, draft]);
 
@@ -79,15 +85,22 @@ export function SaveProjectAssetDialog({
       });
       try {
         localStorage.setItem(VISIBILITY_KEY, vis);
+        localStorage.setItem(SCOPE_KEY, scope);
       } catch {
         /* ignore */
       }
       notifyProjectAssetsChanged();
       onSaved?.();
       onClose();
+      const scopeHint =
+        scope === "project"
+          ? "已标记来源为当前画布；本人所有画布的项目资产面板均可插入。"
+          : scope === "library"
+            ? "已写入租户复用库，团队成员可见。"
+            : "本人所有画布均可插入使用。";
       await alert({
         title: "已保存",
-        message: "资产已写入项目资产库。",
+        message: `资产已写入项目资产库。${scopeHint}`,
         variant: "success",
       });
     } catch (e) {
@@ -170,7 +183,9 @@ export function SaveProjectAssetDialog({
               />
               <span>
                 <span className="block text-white/85">本项目</span>
-                <span className="text-[10px] text-white/40">仅当前画布的项目资产可见</span>
+                <span className="text-[10px] text-white/40">
+                  标记来源为当前画布；仍可在其他画布的项目资产面板中使用
+                </span>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-1.5">

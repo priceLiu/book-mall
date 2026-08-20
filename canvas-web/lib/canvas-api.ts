@@ -2225,6 +2225,8 @@ export async function patchProjectAsset(
     visibility?: import("@/lib/canvas/project-asset-types").AssetVisibility;
     locked?: boolean;
     payload?: Record<string, unknown>;
+    /** 设为 null：提升为「我的空间可用」，跨画布可见 */
+    sourceProjectId?: null;
   },
 ): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
   const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(

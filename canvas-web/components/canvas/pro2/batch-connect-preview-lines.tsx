@@ -2,6 +2,7 @@
 
 import { getBezierPath, Position } from "@xyflow/react";
 import { batchConnectSourceClientPoint } from "@/lib/canvas/batch-connect-preview-anchors";
+import { CANVAS_EDGE_STROKE_WIDTH_CONNECTING } from "@/lib/canvas/canvas-edge-layer-z";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 const PREVIEW_STROKE = "#60a5fa";
@@ -81,7 +82,7 @@ export function BatchConnectPreviewLines({
           d={d}
           fill="none"
           stroke={PREVIEW_STROKE}
-          strokeWidth={2}
+          strokeWidth={CANVAS_EDGE_STROKE_WIDTH_CONNECTING}
         />
       ))}
     </svg>

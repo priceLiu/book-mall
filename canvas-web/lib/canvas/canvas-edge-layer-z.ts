@@ -2,6 +2,12 @@ import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
+/** 画布连线描边（px）· 与 globals.css `--canvas-edge-*` 保持一致 */
+export const CANVAS_EDGE_STROKE_WIDTH = 2.5;
+export const CANVAS_EDGE_STROKE_WIDTH_ACTIVE = 3;
+export const CANVAS_EDGE_STROKE_WIDTH_SWEEP = 3.5;
+export const CANVAS_EDGE_STROKE_WIDTH_CONNECTING = 2.5;
+
 /** 高于组框 (5)、低于媒体子节点 (22) · 组内/入组连线在此层可见 */
 export const CANVAS_EDGE_Z_NODE_GAP = 12;
 /** @deprecated 用 CANVAS_EDGE_Z_NODE_GAP */

@@ -227,7 +227,7 @@ export function Pro2SelectionToolbar({
           description: draft.description,
           thumbnailUrl: draft.thumbnailUrl,
           visibility: "PRIVATE",
-          sourceProjectId: projectId ?? null,
+          sourceProjectId: null,
           sourceNodeId: live.id,
           sourceEdition: edition,
           payload: draft.payload,

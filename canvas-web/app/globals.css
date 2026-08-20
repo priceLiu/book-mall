@@ -350,6 +350,13 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 /* ----------------------------------------
  * 连线 · 宽命中带 + 悬停 1s 剪断（剪刀 portal 在 body）
  * ---------------------------------------- */
+.canvas-flow-wrap {
+  --canvas-edge-stroke-width: 2.5;
+  --canvas-edge-stroke-width-active: 3;
+  --canvas-edge-stroke-width-sweep: 3.5;
+  --canvas-edge-stroke-width-connecting: 2.5;
+}
+
 .react-flow__edge .react-flow__edge-interaction {
   stroke-width: 40 !important;
   pointer-events: stroke !important;
@@ -392,7 +399,7 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   }
 }
 .react-flow__edge.pro2-edge-active .react-flow__edge-path:not(.pro2-edge-sweep-overlay) {
-  stroke-width: 1.5 !important;
+  stroke-width: var(--canvas-edge-stroke-width-active, 3) !important;
   stroke-dasharray: none;
   animation: none;
   transition:
@@ -406,7 +413,7 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.5));
 }
 .react-flow__edge-path.pro2-edge-sweep-overlay {
-  stroke-width: 2.5;
+  stroke-width: var(--canvas-edge-stroke-width-sweep, 3.5);
   stroke-linecap: round;
   stroke-dasharray: 20 60;
   animation: canvas-edge-sweep 1.35s ease-in-out infinite;
@@ -420,7 +427,7 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.75));
 }
 .react-flow__connection-path {
-  stroke-width: 1 !important;
+  stroke-width: var(--canvas-edge-stroke-width-connecting, 2.5) !important;
   stroke-dasharray: 4 6;
 }
 .react-flow__edge .react-flow__edge-path {
@@ -430,6 +437,7 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 /* 静止连线 · 白线（选中高亮 pro2-edge-active 保持原色与流动动效） */
 .canvas-flow-wrap .react-flow__edge:not(.pro2-edge-active) .react-flow__edge-path {
   stroke: #ffffff !important;
+  stroke-width: var(--canvas-edge-stroke-width, 2.5) !important;
 }
 
 /* Pro2 脚本 / 大纲节点 · 横纵滚动条（避开右侧连线 Handle 热区） */

@@ -77,7 +77,7 @@ export async function savePortraitToProjectAssets(
     displayName,
     description: input.assetUri,
     thumbnailUrl: input.imageUrl,
-    sourceProjectId: input.projectId ?? null,
+    sourceProjectId: null,
     sourceNodeId: input.nodeId ?? null,
     sourceEdition: input.edition,
     payload: {

@@ -90,6 +90,9 @@ import {
 } from "@/lib/canvas/canvas-rf-sync";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import {
+  CANVAS_EDGE_STROKE_WIDTH,
+  CANVAS_EDGE_STROKE_WIDTH_ACTIVE,
+  CANVAS_EDGE_STROKE_WIDTH_CONNECTING,
   CANVAS_EDGE_Z_NODE_GAP,
   canvasEdgeLayerClassName,
   resolveLibtvCanvasEdgeZIndex,
@@ -195,7 +198,10 @@ const edgeTypes = {
 
 /** 连线 zIndex：组内 24 · 跨组 4 · 画布外 12 · 须配合 zIndexMode="manual" */
 const CANVAS_EDGE_Z_INDEX = 12;
-const CANVAS_DEFAULT_EDGE_OPTIONS = { zIndex: CANVAS_EDGE_Z_INDEX } as const;
+const CANVAS_DEFAULT_EDGE_OPTIONS = {
+  zIndex: CANVAS_EDGE_Z_INDEX,
+  style: { strokeWidth: CANVAS_EDGE_STROKE_WIDTH },
+} as const;
 
 export const canvasFlowNodeTypes = memoizedNodeTypes;
 export const canvasFlowEdgeTypes = edgeTypes;
@@ -1734,7 +1740,7 @@ function FlowCanvasInner({
           ...e,
           zIndex: CANVAS_EDGE_Z_NODE_GAP,
           className,
-          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 1.5 },
+          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: CANVAS_EDGE_STROKE_WIDTH_ACTIVE },
         };
       }
       if (focusEdgeIds.has(e.source)) {
@@ -1752,7 +1758,7 @@ function FlowCanvasInner({
           ...e,
           zIndex: CANVAS_EDGE_Z_NODE_GAP,
           className,
-          style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: 1.5 },
+          style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: CANVAS_EDGE_STROKE_WIDTH_ACTIVE },
         };
       }
       // 勿批量压低非关联连线 opacity — 单选时全图 SVG 重绘导致明显屏闪
@@ -2240,7 +2246,10 @@ function FlowCanvasInner({
         maxZoom={CANVAS_VIEWPORT_MAX_ZOOM}
         connectionRadius={160}
         connectOnClick={false}
-        connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}
+        connectionLineStyle={{
+          strokeWidth: CANVAS_EDGE_STROKE_WIDTH_CONNECTING,
+          stroke: "#60a5fa",
+        }}
       >
         <CanvasViewportToolbar
           pro2Canvas={pro2FloatingInspector}

@@ -98,7 +98,7 @@ function Inner() {
         {loading ? (
           <p className="text-sm text-[var(--canvas-muted)]">加载项目列表…</p>
         ) : (
-          <UnifiedProjectAssetsView projectId={projectId || null} />
+          <UnifiedProjectAssetsView projectId={null} />
         )}
       </div>
     </div>
