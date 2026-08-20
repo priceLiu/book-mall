@@ -11,6 +11,7 @@ import {
   PRO2_SCENE_FOUR_VIEW_COMPOSITION_SPEC,
   PRO2_PROP_SIX_VIEW_COMPOSITION_SPEC,
 } from "./data/pro2-production-pack-standard";
+import { getActiveAssetCompositionSpecSync } from "./pro2-template-resolver";
 
 /** Dock 视觉风格输入（与 StoryProVisualStylePack 字段兼容） */
 export type Pro2CharacterDockVisualStyleInput = {
@@ -174,7 +175,7 @@ export function buildPro2CharacterVisualStyleTag(
 
 /** 角色 Dock · 统一「构图规范」为金标准四视图全文（补齐或替换 LLM 截断/旧三视图文案） */
 export function upsertPro2CharacterFourViewCompositionSpec(text: string): string {
-  const canonical = `构图规范：${PRO2_CHARACTER_FOUR_VIEW_COMPOSITION_SPEC}`;
+  const canonical = `构图规范：${getActiveAssetCompositionSpecSync("CHARACTER_FOUR_VIEW")}`;
   let t = text.trim();
   if (!t) return canonical;
 
@@ -221,7 +222,7 @@ export function finalizePro2CharacterImageDockPrompt(
 
 /** 场景 Dock · 统一「构图规范」为金标准 2×2 四视角全文（补齐或替换 LLM 截断/旧文案） */
 export function upsertPro2SceneFourViewCompositionSpec(text: string): string {
-  const canonical = `构图规范：${PRO2_SCENE_FOUR_VIEW_COMPOSITION_SPEC}`;
+  const canonical = `构图规范：${getActiveAssetCompositionSpecSync("SCENE_FOUR_PANORAMA")}`;
   let t = text.trim();
   if (!t) return canonical;
 
@@ -269,7 +270,7 @@ export function finalizePro2SceneImageDockPrompt(
 
 /** 道具 Dock · 统一「构图规范」为金标准六视图全文（补齐或替换 LLM 截断/旧文案） */
 export function upsertPro2PropSixViewCompositionSpec(text: string): string {
-  const canonical = `构图规范：${PRO2_PROP_SIX_VIEW_COMPOSITION_SPEC}`;
+  const canonical = `构图规范：${getActiveAssetCompositionSpecSync("PROP_SIX_VIEW")}`;
   let t = text.trim();
   if (!t) return canonical;
 

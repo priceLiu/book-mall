@@ -12,6 +12,7 @@ import {
   PRO2_GU_FENG_CATEGORY_DOC_TITLE,
 } from "./pro2-script-category-doc";
 import { PRO2_TEXT_NODE_WIDTH } from "./story-pro2-node-chrome";
+import { getPro2HubPromptPackFromSyncCache } from "./pro2-template-resolver";
 import type { CanvasFlowNode } from "./types";
 
 export type Pro2ScriptCategoryId =
@@ -102,10 +103,22 @@ export function pro2ScriptCategoryPreset(
   return PRO2_SCRIPT_CATEGORY_PRESETS.find((p) => p.id === id);
 }
 
-/** 按 hub 剧本类别选择 LLM 段 prompt pack（未设类别 → 默认 v5 pack） */
+/** 按 hub 剧本类别选择 LLM 段 prompt pack（DB 缓存优先 · 未预热则 TS fallback） */
 export function resolvePro2HubPromptPack(
-  hubData: Pick<{ scriptCategoryId?: Pro2ScriptCategoryId }, "scriptCategoryId"> | undefined,
+  hubData: Pick<
+    { scriptCategoryId?: Pro2ScriptCategoryId; templatePackKey?: string },
+    "scriptCategoryId" | "templatePackKey"
+  > | undefined,
 ): ReturnType<typeof storyPro2HubDefaultPromptPack> {
+  const cached = getPro2HubPromptPackFromSyncCache(hubData);
+  if (cached) {
+    return {
+      promptOutline: cached.promptOutline,
+      promptCharacter: cached.promptCharacter,
+      promptScene: cached.promptScene,
+      promptStoryboard: cached.promptStoryboard,
+    };
+  }
   if (hubData?.scriptCategoryId === "gu-feng-tian-chong") {
     return storyPro2GuFengHubPromptPack();
   }

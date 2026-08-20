@@ -351,14 +351,15 @@ export function PortalAdminClient() {
   }
 
   return (
-    <div className="canvas-page py-8">
-      <header className="mb-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden px-4 py-6 sm:px-6 md:px-8">
+      <header className="mb-4 shrink-0">
         <h1 className="text-xl font-semibold text-white">工作流管理</h1>
         <p className="mt-1 text-sm text-[var(--canvas-muted)]">
           审核用户投稿、管理首页精选 / 案例 / 社区模板的上下架与禁用。
         </p>
       </header>
 
+      <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-6 flex gap-2">
         <button
           type="button"
@@ -565,6 +566,8 @@ export function PortalAdminClient() {
           })}
         </ul>
       )}
+
+      </div>
 
       {preview?.kind === "project" ? (
         <TemplatePreviewDialog

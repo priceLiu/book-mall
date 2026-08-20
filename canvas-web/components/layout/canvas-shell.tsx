@@ -61,15 +61,15 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
             })}
             {isAdmin ? (
               <Link
-                href="/admin/portal"
+                href="/admin"
                 className={cn(
                   "canvas-sans shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold tracking-tight transition sm:px-3 sm:text-sm",
-                  pathname.startsWith("/admin/portal")
+                  pathname.startsWith("/admin")
                     ? "bg-white/12 text-white ring-1 ring-white/15"
                     : "text-white/70 hover:bg-white/10 hover:text-white",
                 )}
               >
-                工作流管理
+                管理中心
               </Link>
             ) : null}
           </nav>

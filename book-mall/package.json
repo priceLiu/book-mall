@@ -130,6 +130,7 @@
     "gateway:audit-no-vendor-direct": "tsx scripts/audit-no-vendor-direct.ts",
     "seed:sbv1-video-credits": "dotenv -e .env.local -- tsx scripts/seed-sbv1-video-credit-prices.ts",
     "seed:lib-nano-pro-credits": "dotenv -e .env.local -- tsx scripts/seed-lib-nano-pro-credit-prices.ts",
+    "seed:pro2-templates": "dotenv -e .env.local -- tsx scripts/seed-pro2-prompt-templates.ts",
     "seed:ecom-image-processing-credits": "dotenv -e .env.local -- tsx scripts/seed-ecom-image-processing-credit-prices.ts",
     "setup:seedream-5-volcengine": "dotenv -e .env.local -- tsx scripts/setup-seedream-5-volcengine-gateway.ts",
     "gateway:auto-publish": "dotenv -e .env.local -- tsx scripts/auto-publish-platform-offerings.ts",

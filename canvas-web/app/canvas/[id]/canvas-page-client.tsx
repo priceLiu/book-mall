@@ -129,6 +129,7 @@ import {
   flushPendingCanvasImageUploadPersist,
 } from "@/lib/canvas/canvas-pending-image-uploads";
 import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
+import { warmPro2TemplateCache } from "@/lib/canvas/pro2-template-resolver";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
 function Inner({ projectId }: { projectId: string }) {
@@ -142,6 +143,7 @@ function Inner({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     prefetchUserProviders(base);
+    void warmPro2TemplateCache(base).catch(() => {});
   }, [base]);
 
   useEffect(() => {

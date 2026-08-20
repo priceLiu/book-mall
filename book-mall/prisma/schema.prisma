@@ -2332,6 +2332,72 @@ enum CanvasPromptEngineKind {
   IMAGE
 }
 
+/// Pro2 平台提示词模板 · 剧本 LLM 或节点资产 Dock（见 docs/画布管理中心.md）
+enum Pro2PromptTemplateRegistry {
+  SCRIPT
+  ASSET
+}
+
+enum Pro2PromptTemplatePassKind {
+  OUTLINE
+  CHARACTER
+  SCENE
+  STORYBOARD
+  CHARACTER_FOUR_VIEW
+  SCENE_FOUR_PANORAMA
+  PROP_SIX_VIEW
+}
+
+model Pro2PromptTemplate {
+  id          String                     @id @default(cuid())
+  registry    Pro2PromptTemplateRegistry
+  passKind    Pro2PromptTemplatePassKind
+  templateKey String                     @unique
+  name        String
+  description String?                    @db.Text
+  version     String                     @default("1")
+  enabled     Boolean                    @default(true)
+  blocks      Json                       @default("[]")
+  sortOrder   Int                        @default(0)
+  deletedAt   DateTime?
+
+  outlinePacks     Pro2TemplatePack[] @relation("PackOutlineTemplate")
+  characterPacks   Pro2TemplatePack[] @relation("PackCharacterTemplate")
+  scenePacks       Pro2TemplatePack[] @relation("PackSceneTemplate")
+  storyboardPacks  Pro2TemplatePack[] @relation("PackStoryboardTemplate")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([registry, passKind, enabled])
+  @@index([deletedAt])
+}
+
+model Pro2TemplatePack {
+  id                  String  @id @default(cuid())
+  packKey             String  @unique
+  name                String
+  enabled             Boolean @default(true)
+  categoryDocTitle    String? @db.Text
+  categoryDocBody     String? @db.Text
+  outlineTemplateId   String
+  outlineTemplate     Pro2PromptTemplate @relation("PackOutlineTemplate", fields: [outlineTemplateId], references: [id])
+  characterTemplateId String
+  characterTemplate   Pro2PromptTemplate @relation("PackCharacterTemplate", fields: [characterTemplateId], references: [id])
+  sceneTemplateId     String
+  sceneTemplate       Pro2PromptTemplate @relation("PackSceneTemplate", fields: [sceneTemplateId], references: [id])
+  storyboardTemplateId String
+  storyboardTemplate  Pro2PromptTemplate @relation("PackStoryboardTemplate", fields: [storyboardTemplateId], references: [id])
+  sortOrder           Int     @default(0)
+  deletedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([deletedAt])
+}
+
 /// 画布节点级 KIE 任务表（mirror StoryGenerationTask，加 nodeId / inputHash 实现节点缓存）
 model CanvasGenerationTask {
   id        String        @id @default(cuid())

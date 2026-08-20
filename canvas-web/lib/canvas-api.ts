@@ -2294,3 +2294,102 @@ export async function mapProjectAssetInsert(
   );
   return j.insert;
 }
+
+export type {
+  Pro2ActiveTemplatesSnapshot,
+  Pro2HubPromptPackResolved,
+  Pro2PromptBlock,
+  Pro2PromptTemplatePassKind,
+  Pro2PromptTemplateRecord,
+  Pro2PromptTemplateRegistry,
+  Pro2TemplatePackRecord,
+} from "@/lib/canvas/pro2-prompt-template-types";
+
+export async function listAdminPro2Templates(
+  base: string,
+  filter?: {
+    registry?: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRegistry;
+    passKind?: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplatePassKind;
+    enabled?: boolean;
+  },
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord[]> {
+  const qs = new URLSearchParams();
+  if (filter?.registry) qs.set("registry", filter.registry);
+  if (filter?.passKind) qs.set("passKind", filter.passKind);
+  if (filter?.enabled != null) qs.set("enabled", String(filter.enabled));
+  const j = await call<{
+    templates: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord[];
+  }>(base, `/api/canvas/admin/pro2-templates?${qs.toString()}`);
+  return Array.isArray(j.templates) ? j.templates : [];
+}
+
+export async function patchAdminPro2Template(
+  base: string,
+  id: string,
+  patch: Partial<{
+    name: string;
+    description: string | null;
+    version: string;
+    enabled: boolean;
+    blocks: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptBlock[];
+    sortOrder: number;
+  }>,
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord> {
+  const j = await call<{
+    template: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord;
+  }>(base, `/api/canvas/admin/pro2-templates/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return j.template;
+}
+
+export async function deleteAdminPro2Template(base: string, id: string): Promise<void> {
+  await call(base, `/api/canvas/admin/pro2-templates/${id}`, { method: "DELETE" });
+}
+
+export async function listAdminPro2TemplatePacks(
+  base: string,
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord[]> {
+  const j = await call<{
+    packs: import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord[];
+  }>(base, "/api/canvas/admin/pro2-template-packs");
+  return Array.isArray(j.packs) ? j.packs : [];
+}
+
+export async function patchAdminPro2TemplatePack(
+  base: string,
+  id: string,
+  patch: Partial<{
+    name: string;
+    enabled: boolean;
+    categoryDocTitle: string | null;
+    categoryDocBody: string | null;
+    outlineTemplateId: string;
+    characterTemplateId: string;
+    sceneTemplateId: string;
+    storyboardTemplateId: string;
+    sortOrder: number;
+  }>,
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord> {
+  const j = await call<{
+    pack: import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord;
+  }>(base, `/api/canvas/admin/pro2-template-packs/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return j.pack;
+}
+
+export async function fetchActivePro2Templates(
+  base: string,
+  packKey?: string,
+): Promise<{
+  snapshot: import("@/lib/canvas/pro2-prompt-template-types").Pro2ActiveTemplatesSnapshot;
+  pack: import("@/lib/canvas/pro2-prompt-template-types").Pro2HubPromptPackResolved | null;
+}> {
+  const qs = packKey ? `?packKey=${encodeURIComponent(packKey)}` : "";
+  return call(base, `/api/canvas/pro2-templates/active${qs}`);
+}

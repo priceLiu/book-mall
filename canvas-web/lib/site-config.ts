@@ -12,6 +12,12 @@ export const CANVAS_NAV_ITEMS: CanvasNavItem[] = [
   { href: "/projects", label: "我的画布" },
 ];
 
+/** 管理中心 · 子导航（仅 /admin/* 页） */
+export const CANVAS_ADMIN_SUB_NAV: CanvasNavItem[] = [
+  { href: "/admin/portal", label: "工作流管理" },
+  { href: "/admin/templates", label: "模板管理" },
+];
+
 /** 「我的画布」内页居中子导航（原顶栏二级入口） */
 export const CANVAS_PROJECTS_SUB_NAV: CanvasNavItem[] = [
   { href: "/assets", label: "项目资产" },
