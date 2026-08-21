@@ -187,7 +187,7 @@ export function AdminPendingFeaturesClient() {
       const list = items.filter(
         (i) => !i.completed && isAdminPendingFeatureRoadmapTitle(i.title),
       );
-      const order = new Map(
+      const order = new Map<string, number>(
         ADMIN_PENDING_FEATURE_ROADMAP_TITLES.map((t, i) => [t, i]),
       );
       return list.sort(
