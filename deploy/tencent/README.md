@@ -244,3 +244,13 @@ docker compose up -d --build
 本地手动：`pnpm --dir book-mall platform-assistant:ai-news-generate`，或 **book-mall 管理驾驶舱** →「立即生成今日热闻」（无需额外 Key，走 Gateway DeepSeek）。
 
 读路径：`GET /api/platform-assistant/ai-news` **只读 DB**；保留最近 3 天。详见 `book-mall/doc/product/platform-assistant-ai-news-and-canvas-portal.md`。
+
+---
+
+## 九、全站访问统计（Phase 1）
+
+各子应用 middleware 异步 `POST book-mall/api/internal/platform-traffic/hit`。
+
+**零新增 env**：鉴权复用 SSO 部署已有变量 — `Authorization: Bearer <TOOLS_SSO_SERVER_SECRET>` 或 `GATEWAY_SSO_SERVER_SECRET`（Gateway 控制台仅后者；book 侧两者皆可）。上报目标 Book Origin 复用 `MAIN_SITE_ORIGIN` / `NEXT_PUBLIC_BOOK_MALL_URL` / `BOOK_MALL_URL` / `NEXTAUTH_URL` 等已有变量。
+
+管理后台：**book-mall** `/admin/traffic`。IP 明细保留 90 天（`pnpm --dir book-mall tsx scripts/platform-traffic-purge-old.ts`）。详见 `book-mall/doc/product/26-platform-traffic-analytics.md`。

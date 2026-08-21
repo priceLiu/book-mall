@@ -27,6 +27,8 @@
 
 订阅、充值、消耗占比、分层用户、活跃度、产品热度等；支持导出（实施阶段定）。
 
+**全站访问统计**（Phase 1）：路径 `/admin/traffic`。按应用（appKey）查看每日 PV、UV（IP 去重）、同一 IP 访问频次与 14 天趋势。各子应用 middleware 异步上报，Book 汇聚入库。详见 [**26-platform-traffic-analytics.md**](./26-platform-traffic-analytics.md)。
+
 ## 5.5 系统管理
 
 公告、反馈处理、**管理员与权限**、**操作审计日志**。

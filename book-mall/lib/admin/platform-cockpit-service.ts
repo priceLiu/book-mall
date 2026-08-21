@@ -16,6 +16,7 @@ import {
   type AssistantFeedbackListItem,
 } from "@/lib/platform-assistant/feedback-service";
 import { listRecentAiNewsDaily } from "@/lib/platform-assistant/ai-news-service";
+import { getTodayTrafficTotals } from "@/lib/site-traffic/queries";
 
 function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -93,39 +94,45 @@ export type PlatformCockpitSnapshot = {
     items: AssistantFeedbackListItem[];
   };
   assistantAiNews: Awaited<ReturnType<typeof listRecentAiNewsDaily>>;
+  traffic: {
+    todayPageViews: number;
+    todayUniqueIps: number;
+  };
 };
 
-export async function getPlatformCockpitSnapshot(
-  now: Date = new Date(),
-): Promise<PlatformCockpitSnapshot> {
+export type PlatformCockpitCreditOpsSection = Pick<
+  PlatformCockpitSnapshot,
+  "creditOps" | "creditOpsAlerts"
+>;
+
+export type PlatformCockpitAssistantSection = Pick<
+  PlatformCockpitSnapshot,
+  "assistantFeedback" | "assistantAiNews"
+>;
+
+export type PlatformCockpitMetricsSection = Pick<
+  PlatformCockpitSnapshot,
+  | "generatedAt"
+  | "businessDateCst"
+  | "users"
+  | "courseSubscriptions"
+  | "credits"
+  | "teams"
+  | "gateway"
+  | "generation"
+  | "walletLegacy"
+  | "platformHealth"
+  | "charts"
+  | "traffic"
+>;
+
+async function fetchCockpitCountMetrics(now: Date) {
   const dayStart = startOfUtcDay(now);
   const monthStart = startOfUtcMonth(now);
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [
-    userCount,
-    platformCreditUsers,
-    byokUsers,
-    newUsersToday,
-    activeSubscriptions,
-    creditAgg,
-    subscriptionAccountCount,
-    creditConsumeAll,
-    creditConsumeToday,
-    activeTenants,
-    activeMembers,
-    gwTodayOk,
-    gwTodayFail,
-    gwTodayRun,
-    gwMonthOk,
-    canvasInFlight,
-    canvasFailToday,
-    balanceSum,
-    rechargeSum,
-    rechargeTxCount,
-    unresolvedErrors,
-    errorsLast24h,
-  ] = await prisma.$transaction([
+  // 并行 count/aggregate，避免 $transaction 长时间占连接（PgBouncer 下更易 P2028）。
+  return Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { billingPersona: "PLATFORM_CREDIT" } }),
     prisma.user.count({ where: { billingPersona: "BYOK" } }),
@@ -177,25 +184,39 @@ export async function getPlatformCockpitSnapshot(
     prisma.walletEntry.count({ where: { type: WalletEntryType.RECHARGE } }),
     prisma.platformErrorLog.count({ where: { resolvedAt: null } }),
     prisma.platformErrorLog.count({ where: { createdAt: { gte: last24h } } }),
-  ]);
+  ] as const);
+}
 
-  const [creditOpsDashboard, alerts, creditTrendLedgers, assistantFeedbackSummary, assistantFeedbackItems, assistantAiNewsRows] =
-    await Promise.all([
-    getCreditOpsDashboard({ now }),
-    getCreditOpsAlerts(now),
-    prisma.creditLedger.findMany({
-      where: {
-        type: { in: ["CONSUME", "SETTLE"] },
-        createdAt: {
-          gte: new Date(now.getTime() - CREDIT_TREND_DAYS * 24 * 60 * 60 * 1000),
-        },
-      },
-      select: { createdAt: true, credits: true },
-    }),
-    getAssistantFeedbackSummary(),
-    listOpenAssistantFeedback(20),
-    listRecentAiNewsDaily(3),
-  ]);
+function buildMetricsSectionFromCounts(
+  now: Date,
+  counts: Awaited<ReturnType<typeof fetchCockpitCountMetrics>>,
+  creditTrendLedgers: Array<{ createdAt: Date; credits: number }>,
+  trafficToday: { pageViews: number; uniqueIps: number },
+): PlatformCockpitMetricsSection {
+  const [
+    userCount,
+    platformCreditUsers,
+    byokUsers,
+    newUsersToday,
+    activeSubscriptions,
+    creditAgg,
+    subscriptionAccountCount,
+    creditConsumeAll,
+    creditConsumeToday,
+    activeTenants,
+    activeMembers,
+    gwTodayOk,
+    gwTodayFail,
+    gwTodayRun,
+    gwMonthOk,
+    canvasInFlight,
+    canvasFailToday,
+    balanceSum,
+    rechargeSum,
+    rechargeTxCount,
+    unresolvedErrors,
+    errorsLast24h,
+  ] = counts;
 
   const trendKeys = lastNCstDateKeys(CREDIT_TREND_DAYS, now);
   const trendBuckets = new Map<string, number>(trendKeys.map((k) => [k, 0]));
@@ -204,12 +225,6 @@ export async function getPlatformCockpitSnapshot(
     if (!trendBuckets.has(key)) continue;
     trendBuckets.set(key, (trendBuckets.get(key) ?? 0) + Math.abs(row.credits));
   }
-
-  const userTotal = userCount;
-  const platformCredit = platformCreditUsers;
-  const byok = byokUsers;
-  const activeSubs = activeSubscriptions;
-  const newToday = newUsersToday;
 
   return {
     generatedAt: now.toISOString(),
@@ -248,21 +263,16 @@ export async function getPlatformCockpitSnapshot(
       unresolvedErrors,
       errorsLast24h,
     },
-    creditOps: creditOpsDashboard,
-    creditOpsAlerts: alerts,
     charts: {
       userIdentity: [
-        { label: "注册用户", value: userTotal },
-        { label: "平台代付", value: platformCredit },
-        { label: "BYOK", value: byok },
-        { label: "有效课程订阅", value: activeSubs },
-        { label: "今日新增", value: newToday },
+        { label: "注册用户", value: userCount },
+        { label: "平台代付", value: platformCreditUsers },
+        { label: "BYOK", value: byokUsers },
+        { label: "有效课程订阅", value: activeSubscriptions },
+        { label: "今日新增", value: newUsersToday },
       ],
       creditsBilling: [
-        {
-          label: "积分池余额",
-          value: creditAgg._sum.balanceCredits ?? 0,
-        },
+        { label: "积分池余额", value: creditAgg._sum.balanceCredits ?? 0 },
         { label: "今日消耗", value: Math.abs(creditConsumeToday._sum.credits ?? 0) },
         { label: "累计消耗", value: Math.abs(creditConsumeAll._sum.credits ?? 0) },
         { label: "钱包余额", value: balanceSum._sum.balancePoints ?? 0 },
@@ -272,10 +282,68 @@ export async function getPlatformCockpitSnapshot(
         value: trendBuckets.get(date) ?? 0,
       })),
     },
-    assistantFeedback: {
-      summary: assistantFeedbackSummary,
-      items: assistantFeedbackItems,
+    traffic: {
+      todayPageViews: trafficToday.pageViews,
+      todayUniqueIps: trafficToday.uniqueIps,
     },
-    assistantAiNews: assistantAiNewsRows,
+  };
+}
+
+/** 积分清零运维（驾驶舱首屏优先块） */
+export async function fetchPlatformCockpitCreditOpsSection(
+  now: Date = new Date(),
+): Promise<PlatformCockpitCreditOpsSection> {
+  const [creditOps, creditOpsAlerts] = await Promise.all([
+    getCreditOpsDashboard({ now }),
+    getCreditOpsAlerts(now),
+  ]);
+  return { creditOps, creditOpsAlerts };
+}
+
+/** 小智反馈 + AI 热闻 */
+export async function fetchPlatformCockpitAssistantSection(): Promise<PlatformCockpitAssistantSection> {
+  const [summary, items, assistantAiNews] = await Promise.all([
+    getAssistantFeedbackSummary(),
+    listOpenAssistantFeedback(20),
+    listRecentAiNewsDaily(3),
+  ]);
+  return {
+    assistantFeedback: { summary, items },
+    assistantAiNews,
+  };
+}
+
+/** KPI、图表、Gateway、访问统计 */
+export async function fetchPlatformCockpitMetricsSection(
+  now: Date = new Date(),
+): Promise<PlatformCockpitMetricsSection> {
+  const trendSince = new Date(now.getTime() - CREDIT_TREND_DAYS * 24 * 60 * 60 * 1000);
+  const [counts, creditTrendLedgers, trafficToday] = await Promise.all([
+    fetchCockpitCountMetrics(now),
+    prisma.creditLedger.findMany({
+      where: {
+        type: { in: ["CONSUME", "SETTLE"] },
+        createdAt: { gte: trendSince },
+      },
+      select: { createdAt: true, credits: true },
+    }),
+    getTodayTrafficTotals(now),
+  ]);
+  return buildMetricsSectionFromCounts(now, counts, creditTrendLedgers, trafficToday);
+}
+
+export async function getPlatformCockpitSnapshot(
+  now: Date = new Date(),
+): Promise<PlatformCockpitSnapshot> {
+  const [creditOpsSection, assistantSection, metricsSection] = await Promise.all([
+    fetchPlatformCockpitCreditOpsSection(now),
+    fetchPlatformCockpitAssistantSection(),
+    fetchPlatformCockpitMetricsSection(now),
+  ]);
+
+  return {
+    ...metricsSection,
+    ...creditOpsSection,
+    ...assistantSection,
   };
 }

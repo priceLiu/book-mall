@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 function incomingHost(request: NextRequest): string {
   const xf = request.headers.get("x-forwarded-host");
@@ -69,6 +70,8 @@ function buildAuthRedirectUrl(request: NextRequest): URL {
 }
 
 export function middleware(request: NextRequest) {
+  fireTrafficHitFromRequest("quick-replica", request);
+
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {

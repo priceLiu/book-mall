@@ -4,6 +4,7 @@ import {
   shouldEnforceProductionHttps,
 } from "@/lib/production-origin";
 import { getToolsSitePublicOrigin } from "@/lib/site-origin";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 /**
  * 生产环境下：若已配置公网工具站 Origin（TOOLS_PUBLIC_ORIGIN），但请求仍落在
@@ -43,6 +44,8 @@ function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | nu
 }
 
 export function middleware(request: NextRequest) {
+  fireTrafficHitFromRequest("tool", request);
+
   const httpsRedirect = enforceProductionHttpsRedirect(request);
   if (httpsRedirect) return httpsRedirect;
 

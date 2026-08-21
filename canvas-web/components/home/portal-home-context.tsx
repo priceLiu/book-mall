@@ -22,7 +22,15 @@ import {
 } from "@/lib/canvas-api";
 import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
 
+const PORTAL_HOME_FETCH_TIMEOUT_MS = 25_000;
 const SECONDARY_DELAY_MS = 400;
+
+function portalHomeFetchSignal(): AbortSignal | undefined {
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
+    return AbortSignal.timeout(PORTAL_HOME_FETCH_TIMEOUT_MS);
+  }
+  return undefined;
+}
 
 type PortalHomeContextValue = {
   viewerUserId: string | null;
@@ -57,7 +65,7 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
       return;
     }
     setViewerLoading(true);
-    void fetchCanvasViewerUser(base)
+    void fetchCanvasViewerUser(base, portalHomeFetchSignal())
       .then((u) => setViewerUserId(u?.id ?? null))
       .catch(() => setViewerUserId(null))
       .finally(() => setViewerLoading(false));
@@ -70,7 +78,7 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
       return;
     }
     setFeaturedLoading(true);
-    void listPortalFeaturedProjects(base)
+    void listPortalFeaturedProjects(base, { signal: portalHomeFetchSignal() })
       .then((list) => {
         const arr = Array.isArray(list) ? list : [];
         setFeatured(arr.filter((p) => p.edition === "pro2"));
@@ -83,9 +91,10 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
     if (!base?.trim() || secondaryStarted.current) return;
     secondaryStarted.current = true;
     setSecondaryLoading(true);
+    const signal = portalHomeFetchSignal();
     void Promise.allSettled([
-      listCanvasTemplates(base, "public"),
-      listPortalCaseProjects(base, "pro2"),
+      listCanvasTemplates(base, "public", signal ? { signal } : undefined),
+      listPortalCaseProjects(base, "pro2", signal ? { signal } : undefined),
     ])
       .then(([tplRes, caseRes]) => {
         if (tplRes.status === "fulfilled") {

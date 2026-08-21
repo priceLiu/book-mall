@@ -1,5 +1,11 @@
 import Link from "next/link";
-import type { PlatformCockpitSnapshot } from "@/lib/admin/platform-cockpit-service";
+import type {
+  PlatformCockpitAssistantSection,
+  PlatformCockpitCreditOpsSection,
+  PlatformCockpitMetricsSection,
+  PlatformCockpitSnapshot,
+} from "@/lib/admin/platform-cockpit-service";
+import { cstBusinessDate } from "@/lib/billing/credit-ops-service";
 import { AdminAssistantAiNewsPanel } from "@/components/admin/admin-assistant-ai-news-panel";
 import { AdminAssistantFeedbackPanel } from "@/components/admin/admin-assistant-feedback-panel";
 import { AdminCreditOpsCockpitPanel } from "@/components/admin/admin-credit-ops-cockpit-panel";
@@ -78,59 +84,106 @@ function Section({
   );
 }
 
-export function AdminPlatformCockpit({ data }: { data: PlatformCockpitSnapshot }) {
+export function AdminPlatformCockpitHeader({
+  businessDateCst,
+  generatedAt,
+}: {
+  businessDateCst?: string;
+  generatedAt?: string;
+}) {
+  const businessDate = businessDateCst ?? cstBusinessDate(new Date());
+
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[#d1d9e0] pb-6">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-[#656d76]">
-            Book 管理后台
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#1f2328] sm:text-3xl">
-            平台驾驶舱
-          </h1>
-          <p className="mt-2 text-sm text-[#656d76]">
-            业务日 {data.businessDateCst}（CST）· 快照{" "}
-            {new Date(data.generatedAt).toLocaleString("zh-CN")}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/admin/finance/credit-expiry-ops"
-            className="rounded-md border border-[#0969da] bg-[#0969da] px-3 py-1.5 font-medium text-white hover:bg-[#0550ae]"
-          >
-            积分清零控制台
-          </Link>
-          <Link
-            href="/admin/errors"
-            className="rounded-md border border-[#d1d9e0] bg-white px-3 py-1.5 font-medium text-[#1f2328] hover:border-[#0969da]"
-          >
-            平台错误
-          </Link>
-          <Link
-            href="/pricing-disclosure"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-md border border-[#d1d9e0] bg-white px-3 py-1.5 font-medium text-[#1f2328] hover:border-[#0969da]"
-          >
-            价格公示
-          </Link>
-        </div>
-      </header>
+    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[#d1d9e0] pb-6">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-[#656d76]">
+          Book 管理后台
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#1f2328] sm:text-3xl">
+          平台驾驶舱
+        </h1>
+        <p className="mt-2 text-sm text-[#656d76]">
+          业务日 {businessDate}（CST）
+          {generatedAt ? (
+            <>
+              {" "}
+              · 快照 {new Date(generatedAt).toLocaleString("zh-CN")}
+            </>
+          ) : (
+            <span className="text-[#8c959f]"> · 指标加载中…</span>
+          )}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2 text-sm">
+        <Link
+          href="/admin/finance/credit-expiry-ops"
+          className="rounded-md border border-[#0969da] bg-[#0969da] px-3 py-1.5 font-medium text-white hover:bg-[#0550ae]"
+        >
+          积分清零控制台
+        </Link>
+        <Link
+          href="/admin/errors"
+          className="rounded-md border border-[#d1d9e0] bg-white px-3 py-1.5 font-medium text-[#1f2328] hover:border-[#0969da]"
+        >
+          平台错误
+        </Link>
+        <Link
+          href="/pricing-disclosure"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-md border border-[#d1d9e0] bg-white px-3 py-1.5 font-medium text-[#1f2328] hover:border-[#0969da]"
+        >
+          价格公示
+        </Link>
+      </div>
+    </header>
+  );
+}
 
-      <AdminCreditOpsCockpitPanel
-        dashboard={data.creditOps}
-        alerts={data.creditOpsAlerts}
-      />
+export function AdminPlatformCockpitCreditOps({
+  creditOps,
+  creditOpsAlerts,
+}: PlatformCockpitCreditOpsSection) {
+  return <AdminCreditOpsCockpitPanel dashboard={creditOps} alerts={creditOpsAlerts} />;
+}
 
+export function AdminPlatformCockpitAssistant({
+  assistantFeedback,
+  assistantAiNews,
+}: PlatformCockpitAssistantSection) {
+  return (
+    <>
       <AdminAssistantFeedbackPanel
-        initialItems={data.assistantFeedback.items}
-        summary={data.assistantFeedback.summary}
+        initialItems={assistantFeedback.items}
+        summary={assistantFeedback.summary}
       />
+      <AdminAssistantAiNewsPanel rows={assistantAiNews} />
+    </>
+  );
+}
 
-      <AdminAssistantAiNewsPanel rows={data.assistantAiNews} />
-
+export function AdminPlatformCockpitMetrics({ data }: { data: PlatformCockpitMetricsSection }) {
+  return (
+    <>
       <AdminPlatformCockpitCharts data={data} />
+
+      <Section title="全站访问">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="今日全站 PV"
+            value={fmt(data.traffic.todayPageViews)}
+            href="/admin/traffic"
+            hrefLabel="访问统计 →"
+          />
+          <KpiCard
+            label="今日全站 UV"
+            value={fmt(data.traffic.todayUniqueIps)}
+            hint="按 IP 日去重"
+            href="/admin/traffic"
+            hrefLabel="按应用查看 →"
+          />
+        </div>
+      </Section>
 
       <Section title="Gateway 与生成">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -175,6 +228,29 @@ export function AdminPlatformCockpit({ data }: { data: PlatformCockpitSnapshot }
           />
         </div>
       </Section>
+    </>
+  );
+}
+
+export function AdminPlatformCockpit({ data }: { data: PlatformCockpitSnapshot }) {
+  return (
+    <div className="space-y-8">
+      <AdminPlatformCockpitHeader
+        businessDateCst={data.businessDateCst}
+        generatedAt={data.generatedAt}
+      />
+
+      <AdminPlatformCockpitCreditOps
+        creditOps={data.creditOps}
+        creditOpsAlerts={data.creditOpsAlerts}
+      />
+
+      <AdminPlatformCockpitAssistant
+        assistantFeedback={data.assistantFeedback}
+        assistantAiNews={data.assistantAiNews}
+      />
+
+      <AdminPlatformCockpitMetrics data={data} />
     </div>
   );
 }

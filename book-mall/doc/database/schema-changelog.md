@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-21 — 全站访问统计（SiteTrafficDaily / SiteTrafficIpDaily）
+
+- **迁移目录**：`prisma/migrations/20260821200000_platform_traffic_daily/`
+- **新表**：
+  - `SiteTrafficDaily`——按 CST 日 + appKey 汇总 PV；`@@unique([dateCst, appKey])`。
+  - `SiteTrafficIpDaily`——按 CST 日 + appKey + IP 明细（hitCount、首末访）；UV 由 distinct IP 计数；`userId` 可选关联 `User`。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **逻辑**：详见 `doc/product/26-platform-traffic-analytics.md`。
+
+---
+
 ## 2026-05-16 — 按秒计费（WalletHold）+ 模型校准（ModelCatalog / ModelAlias）
 
 - **迁移目录**：`prisma/migrations/20260516220000_per_second_billing_and_model_calibration/`

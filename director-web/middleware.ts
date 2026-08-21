@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 function incomingHost(request: NextRequest): string {
   const xf = request.headers.get("x-forwarded-host");
@@ -31,6 +32,8 @@ function getCanonicalOrigin(): string | null {
  * 登录仅经 `/auth/sso/callback` 可选换票；此处仅在生产做规范域名跳转。
  */
 export function middleware(request: NextRequest) {
+  fireTrafficHitFromRequest("director", request);
+
   if (process.env.NODE_ENV !== "production") {
     return NextResponse.next();
   }

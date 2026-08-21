@@ -140,6 +140,7 @@ model User {
   aiSpaceComposeTasks              AiSpaceComposeTask[]
   aiSpaceBroadcastProjects         AiSpaceBroadcastProject[]
   platformAssistantFeedbacks       PlatformAssistantFeedback[]
+  siteTrafficIpDaily               SiteTrafficIpDaily[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -2865,6 +2866,34 @@ model PlatformErrorLog {
   @@index([code])
   @@index([fingerprint, createdAt(sort: Desc)])
   @@index([resolvedAt])
+}
+
+/// 全站访问统计 · 按 CST 日 + appKey 汇总 PV
+model SiteTrafficDaily {
+  id        String @id @default(cuid())
+  dateCst   String
+  appKey    String
+  pageViews Int    @default(0)
+
+  @@unique([dateCst, appKey])
+  @@index([dateCst])
+}
+
+/// 全站访问统计 · 按 CST 日 + appKey + IP 明细（UV 去重来源）
+model SiteTrafficIpDaily {
+  id          String   @id @default(cuid())
+  dateCst     String
+  appKey      String
+  ip          String   @db.VarChar(45)
+  hitCount    Int      @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  userId      String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([dateCst, appKey, ip])
+  @@index([dateCst, appKey, hitCount(sort: Desc)])
 }
 
 /// Gen-HotCold-R2 Phase 5A：GatewayRequestLog 历史归档（只读冷数据）。

@@ -1,4 +1,28 @@
+export function isNonRetryableBookMallProxyError(
+  status: number,
+  message: string,
+): boolean {
+  const t = message.trim();
+  if (
+    t.includes("book_mall_url_missing") ||
+    t.includes("book_mall_route_missing") ||
+    t.includes("未配置主站地址")
+  ) {
+    return true;
+  }
+  try {
+    const j = JSON.parse(t) as { error?: string };
+    return (
+      j.error === "book_mall_url_missing" ||
+      j.error === "book_mall_route_missing"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isTransientDbApiError(status: number, message: string): boolean {
+  if (isNonRetryableBookMallProxyError(status, message)) return false;
   const t = message.trim();
   return (
     status === 502 ||

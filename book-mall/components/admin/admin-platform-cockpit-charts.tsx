@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { PlatformCockpitSnapshot } from "@/lib/admin/platform-cockpit-service";
+import type { PlatformCockpitMetricsSection } from "@/lib/admin/platform-cockpit-service";
 import { formatPointsAsYuan } from "@/lib/currency";
 import {
   Card,
@@ -42,7 +42,7 @@ function fmt(n: number) {
   return n.toLocaleString("zh-CN");
 }
 
-export function AdminPlatformCockpitCharts({ data }: { data: PlatformCockpitSnapshot }) {
+export function AdminPlatformCockpitCharts({ data }: { data: PlatformCockpitMetricsSection }) {
   const trendTotal = data.charts.creditConsumptionTrend.reduce((s, d) => s + d.value, 0);
 
   return (

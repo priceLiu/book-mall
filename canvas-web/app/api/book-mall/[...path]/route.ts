@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+import { isBookMallPortalPublicGetProxy } from "@/lib/book-mall-portal-public-proxy";
 import {
   callBookMallRefreshToken,
   decodeJwtSub,
@@ -46,11 +47,15 @@ function attachRefreshedToolsCookie(
   return response;
 }
 
+const PORTAL_PUBLIC_UPSTREAM_TIMEOUT_MS = 30_000;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 180_000;
+
 async function fetchUpstream(
   request: NextRequest,
   upstream: string,
   bearer: string | null,
   body: ArrayBuffer | undefined,
+  timeoutMs: number,
 ): Promise<Response> {
   const headers = new Headers();
   const cookie = request.headers.get("cookie");
@@ -64,7 +69,7 @@ async function fetchUpstream(
     headers,
     body,
     cache: "no-store",
-    signal: AbortSignal.timeout(180_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 
@@ -82,6 +87,14 @@ async function proxyToBookMall(
 
   const path = pathSegments.join("/");
   const upstream = `${base}/${path}${request.nextUrl.search}`;
+  const isPortalPublicRead = isBookMallPortalPublicGetProxy(
+    request.method,
+    path,
+    request.nextUrl.search,
+  );
+  const upstreamTimeoutMs = isPortalPublicRead
+    ? PORTAL_PUBLIC_UPSTREAM_TIMEOUT_MS
+    : DEFAULT_UPSTREAM_TIMEOUT_MS;
 
   const body =
     request.method === "GET" || request.method === "HEAD"
@@ -89,22 +102,30 @@ async function proxyToBookMall(
       : await request.arrayBuffer();
 
   let { bearer, refreshed } = { bearer: null as string | null, refreshed: null as ProxyToolsTokenRefresh | null };
-  try {
-    ({ bearer, refreshed } = await ensureProxyToolsBearer(request));
-  } catch {
-    return NextResponse.json(
-      {
-        error: "book_mall_proxy_failed",
-        message: "主站鉴权暂时不可用，请稍后重试",
-      },
-      { status: 502 },
-    );
+  if (!isPortalPublicRead) {
+    try {
+      ({ bearer, refreshed } = await ensureProxyToolsBearer(request));
+    } catch {
+      return NextResponse.json(
+        {
+          error: "book_mall_proxy_failed",
+          message: "主站鉴权暂时不可用，请稍后重试",
+        },
+        { status: 502 },
+      );
+    }
   }
 
   try {
-    let r = await fetchUpstream(request, upstream, bearer, body);
+    let r = await fetchUpstream(
+      request,
+      upstream,
+      bearer,
+      body,
+      upstreamTimeoutMs,
+    );
 
-    if (r.status === 401) {
+    if (!isPortalPublicRead && r.status === 401) {
       const forced = await callBookMallRefreshToken(
         request,
         bearer ?? request.cookies.get("tools_token")?.value?.trim() ?? null,
@@ -113,7 +134,13 @@ async function proxyToBookMall(
       if (forced && forced.accessToken !== bearer) {
         bearer = forced.accessToken;
         refreshed = forced;
-        r = await fetchUpstream(request, upstream, bearer, body);
+        r = await fetchUpstream(
+          request,
+          upstream,
+          bearer,
+          body,
+          upstreamTimeoutMs,
+        );
       }
     }
 

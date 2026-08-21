@@ -51,6 +51,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
       label: "Book 运营",
       items: [
         { label: "支付核对", href: "/admin/payments" },
+        { label: "访问统计", href: "/admin/traffic" },
         { label: "课程订阅", href: "/admin/billing" },
         { label: "提现审核", href: "/admin/refunds" },
         { label: "积分清零控制台", href: "/admin/finance/credit-expiry-ops" },

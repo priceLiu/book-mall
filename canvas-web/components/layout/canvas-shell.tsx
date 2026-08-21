@@ -9,7 +9,13 @@ import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import { CANVAS_NAV_ITEMS, CANVAS_SITE_BRAND_NAME } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
 
-export function CanvasShell({ children }: { children: React.ReactNode }) {
+export function CanvasShell({
+  children,
+  bookOrigin,
+}: {
+  children: React.ReactNode;
+  bookOrigin: string | null;
+}) {
   const pathname = usePathname() || "/";
   const isCanvasEditor = pathname.startsWith("/canvas/");
   const isAdmin = useCanvasAdmin();
@@ -76,7 +82,7 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
 
           <div className="min-w-0 flex-1" aria-hidden />
 
-          <PortalNav current="canvas" />
+          <PortalNav current="canvas" bookOrigin={bookOrigin} />
 
           <CanvasShellAuthSlot />
         </div>

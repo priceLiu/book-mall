@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 function incomingHost(request: NextRequest): string {
   const xf = request.headers.get("x-forwarded-host");
@@ -51,6 +52,8 @@ function buildReEnterUrl(request: NextRequest): string | null {
 }
 
 export function middleware(request: NextRequest) {
+  fireTrafficHitFromRequest("prompt-optimizer", request);
+
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {

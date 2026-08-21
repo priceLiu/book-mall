@@ -4,6 +4,8 @@ import { CanvasAuthGate } from "@/components/auth/canvas-auth-gate";
 import { CanvasShell } from "@/components/layout/canvas-shell";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+import { getBookMallOrigin } from "@/lib/site-config";
+import { getMainSiteOrigin } from "@/lib/site-origin";
 import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
@@ -23,7 +25,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const bookMallBaseUrl = getBookMallBaseUrlServer();
+  const bookMallBaseUrl = getBookMallBaseUrlServer() || getBookMallOrigin();
+  const bookOrigin = getMainSiteOrigin() || bookMallBaseUrl || null;
 
   return (
     <html lang="zh-CN">
@@ -31,7 +34,7 @@ export default function RootLayout({
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
           <DialogProvider>
             <CanvasAuthGate>
-              <CanvasShell>{children}</CanvasShell>
+              <CanvasShell bookOrigin={bookOrigin}>{children}</CanvasShell>
             </CanvasAuthGate>
           </DialogProvider>
         </BookMallBaseUrlProvider>

@@ -308,10 +308,12 @@ export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
 /** 门户首页 · 精选示例项目（与「我的画布」同源 thumbnailUrl） */
 export async function listPortalFeaturedProjects(
   base: string,
+  init?: RequestInit,
 ): Promise<PortalFeaturedProjectSummary[]> {
   const j = await call<{ projects: PortalFeaturedProjectSummary[] }>(
     base,
     "/api/canvas/projects/portal-featured",
+    init,
   );
   return Array.isArray(j.projects) ? j.projects : [];
 }
@@ -422,6 +424,7 @@ export async function duplicatePortalFilmShowcaseProject(
 export async function listPortalCaseProjects(
   base: string,
   edition?: "pro2" | "sbv1",
+  init?: RequestInit,
 ): Promise<PortalCaseProjectSummary[]> {
   const qs =
     edition === "pro2" || edition === "sbv1"
@@ -430,6 +433,7 @@ export async function listPortalCaseProjects(
   const j = await call<{ projects: PortalCaseProjectSummary[] }>(
     base,
     `/api/canvas/projects/portal-cases${qs}`,
+    init,
   );
   return Array.isArray(j.projects) ? j.projects : [];
 }
@@ -1269,11 +1273,13 @@ export type CanvasTemplateRecord = {
 export async function listCanvasTemplates(
   base: string,
   scope?: "featured" | "public" | "my" | "all",
+  init?: RequestInit,
 ): Promise<CanvasTemplateRecord[]> {
   const qs = scope && scope !== "all" ? `?scope=${encodeURIComponent(scope)}` : "";
   const j = await call<{ templates: CanvasTemplateRecord[] }>(
     base,
     `/api/canvas/templates${qs}`,
+    init,
   );
   return Array.isArray(j.templates) ? j.templates : [];
 }
