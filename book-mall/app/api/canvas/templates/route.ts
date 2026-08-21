@@ -38,10 +38,15 @@ function templateSelect() {
 
 /** GET：scope=featured|public|my|all（默认 all = builtin + 自己的） */
 export async function GET(request: NextRequest) {
-  const guard = await requireSessionUser(request);
-  if (!guard.ok) return guard.response;
-
   const scope = request.nextUrl.searchParams.get("scope")?.trim() || "all";
+  const isPublicScope = scope === "public" || scope === "featured";
+
+  let ownerUserId: string | undefined;
+  if (!isPublicScope) {
+    const guard = await requireSessionUser(request);
+    if (!guard.ok) return guard.response;
+    ownerUserId = guard.user.id;
+  }
 
   let where: Prisma.CanvasTemplateWhereInput;
   if (scope === "featured") {
@@ -52,10 +57,10 @@ export async function GET(request: NextRequest) {
   } else if (scope === "public") {
     where = { visibility: "public", builtin: false, edition: "pro2" };
   } else if (scope === "my") {
-    where = { ownerUserId: guard.user.id };
+    where = { ownerUserId: ownerUserId! };
   } else {
     where = {
-      OR: [{ builtin: true }, { ownerUserId: guard.user.id }],
+      OR: [{ builtin: true }, { ownerUserId: ownerUserId! }],
     };
   }
 

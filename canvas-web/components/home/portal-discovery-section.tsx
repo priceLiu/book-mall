@@ -373,11 +373,7 @@ export function PortalDiscoverySection() {
           <Loader2 className="size-4 animate-spin" />
           加载发现内容…
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-          暂无内容。精选、社区模板与管理员审核通过的案例会展示在这里。
-        </p>
-      ) : (
+      ) : filtered.length > 0 ? (
         <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {
             const own = isOwnItem(item, viewerUserId);

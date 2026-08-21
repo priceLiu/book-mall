@@ -5,17 +5,14 @@ import {
   canvasErrorToResponse,
   corsOptionsResponse,
   jsonHeaders,
-  requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
 }
 
-/** GET · 门户影视案例：分镜视频 1.0 已入库图片/视频 */
+/** GET · 门户影视案例：分镜视频 1.0 已入库图片/视频（公开，无需登录） */
 export async function GET(request: NextRequest) {
-  const guard = await requireSessionUser(request);
-  if (!guard.ok) return guard.response;
   try {
     const raw = request.nextUrl.searchParams.get("limit");
     const limit = raw ? Number.parseInt(raw, 10) : undefined;

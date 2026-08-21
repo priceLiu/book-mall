@@ -99,6 +99,8 @@ export function PortalFilmCasesSection() {
     [viewerUserId],
   );
 
+  if (!loading && items.length === 0 && !error) return null;
+
   return (
     <section className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8">
       <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -128,13 +130,7 @@ export function PortalFilmCasesSection() {
           <Loader2 className="size-4 animate-spin" />
           加载视频作品…
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="mt-8 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-          {items.length === 0
-            ? "暂无视频作品。管理员将分镜 1.0 项目设为「视频作品」后，其已入库成片与分镜图会展示在这里。"
-            : "没有匹配的视频作品，请换个关键词试试。"}
-        </p>
-      ) : (
+      ) : filtered.length > 0 ? (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
           {filtered.map((item) => {
             const own =
@@ -201,7 +197,7 @@ export function PortalFilmCasesSection() {
             );
           })}
         </ul>
-      )}
+      ) : null}
 
       {preview ? (
         <TemplatePreviewDialog
