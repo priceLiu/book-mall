@@ -15,6 +15,7 @@ import {
   listPortalFilmShowcase,
   type PortalFilmShowcaseMedia,
 } from "@/lib/canvas-api";
+import { isPortalGuestAuthLoadError } from "@/lib/canvas/portal-load-errors";
 
 function ownerLabel(
   owner?: { id: string; name: string | null; email: string | null } | null,
@@ -53,7 +54,10 @@ export function PortalFilmCasesSection() {
       .then(setItems)
       .catch((e) => {
         setItems([]);
-        setError(e instanceof Error ? e.message : "视频作品加载失败，请稍后重试");
+        const msg = e instanceof Error ? e.message : "视频作品加载失败，请稍后重试";
+        if (!isPortalGuestAuthLoadError(msg)) {
+          setError(msg);
+        }
       })
       .finally(() => setLoading(false));
   }, [base]);

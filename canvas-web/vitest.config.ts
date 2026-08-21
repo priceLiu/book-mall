@@ -83,6 +83,7 @@ export default defineConfig({
       "test/unit/pro2-production-pack-prompt.test.ts",
       "test/unit/pro2-template-resolver.test.ts",
       "test/unit/admin-sub-nav.test.ts",
+      "test/unit/canvas-public-paths.test.ts",
       "test/unit/pro2-template-admin-validate.test.ts",
       "test/unit/canvas-task-generating-state.test.ts",
       "test/unit/canvas-generation-cancel.test.ts",

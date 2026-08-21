@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { resolveListThumbnailUrl } from "@/lib/canvas/resolve-list-thumbnail";
+import { isPublicCanvasTemplatesListScope } from "@/lib/canvas/portal-public-read";
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
@@ -39,7 +40,7 @@ function templateSelect() {
 /** GET：scope=featured|public|my|all（默认 all = builtin + 自己的） */
 export async function GET(request: NextRequest) {
   const scope = request.nextUrl.searchParams.get("scope")?.trim() || "all";
-  const isPublicScope = scope === "public" || scope === "featured";
+  const isPublicScope = isPublicCanvasTemplatesListScope(scope);
 
   let ownerUserId: string | undefined;
   if (!isPublicScope) {

@@ -28,6 +28,10 @@ import { cloneGraphForNewProject } from "@/lib/canvas/clone";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
+import {
+  isPortalGuestAuthLoadError,
+  portalLoadErrorMessage,
+} from "@/lib/canvas/portal-load-errors";
 
 type DiscoveryKind = "featured" | "template" | "case";
 
@@ -164,11 +168,10 @@ export function PortalDiscoverySection() {
       const failures = [featRes, pubRes, caseRes].filter((r) => r.status === "rejected");
       if (failures.length === 3) {
         const first = failures[0] as PromiseRejectedResult;
-        setError(
-          first.reason instanceof Error
-            ? first.reason.message
-            : "发现内容加载失败，请稍后重试",
-        );
+        const msg = portalLoadErrorMessage(first.reason, "发现内容加载失败，请稍后重试");
+        if (!isPortalGuestAuthLoadError(msg)) {
+          setError(msg);
+        }
       }
 
       setLoading(false);
@@ -448,7 +451,7 @@ export function PortalDiscoverySection() {
             );
           })}
         </ul>
-      )}
+      ) : null}
 
       {preview?.kind === "template" ? (
         <TemplatePreviewDialog
