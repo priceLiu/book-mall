@@ -693,6 +693,7 @@ export function sbv1VideoSettingsTriggerLabel(
   data: Sbv1VideoEngineNodeData,
   providers: CanvasProviderDto[],
 ): string {
+  const engineKey = data.engine?.modelKey?.trim();
   const smartMulti = data.referenceMode === "smart_multi";
   const maxDur = engineKey === "wan3.0-video" ? 30 : 15;
   const durationLabel =
@@ -702,7 +703,6 @@ export function sbv1VideoSettingsTriggerLabel(
         ? " · 智能多帧"
         : "";
 
-  const engineKey = data.engine?.modelKey?.trim();
   if (engineKey) {
     // 跨 provider 解析显示名（Volcengine / KIE / 百炼），并隐藏 KIE 厂商名
     let gwName = "";
