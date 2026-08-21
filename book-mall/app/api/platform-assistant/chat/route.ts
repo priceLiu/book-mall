@@ -123,10 +123,11 @@ async function logFeedbackSafe(input: Parameters<typeof createPlatformAssistantF
 }
 
 export async function POST(request: Request) {
-  const userId = await resolveUserId(request);
-  if (!userId) {
+  const userIdOrNull = await resolveUserId(request);
+  if (!userIdOrNull) {
     return Response.json({ error: "请先登录" }, { status: 401 });
   }
+  const userId = userIdOrNull;
 
   if (rateLimited(userId)) {
     return Response.json(
