@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
-import { Marquee } from "@devnomic/marquee";
-import "@devnomic/marquee/dist/index.css";
 
+import { SiteHomeInfiniteMarquee } from "@/components/layout/site-home/site-home-infinite-marquee";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
@@ -142,16 +141,17 @@ export function SiteHomeFeaturedProductsMarquee({ items }: Props) {
 
   return (
     <div className="site-home-featured-marquee-track">
-      <Marquee
-        className="site-home-featured-marquee gap-6"
+      <SiteHomeInfiniteMarquee
+        className="site-home-featured-marquee"
         innerClassName="gap-6"
+        duration="65s"
         fade
         pauseOnHover
       >
         {items.map((item) => (
           <ShowcaseCard key={item.id} item={item} />
         ))}
-      </Marquee>
+      </SiteHomeInfiniteMarquee>
     </div>
   );
 }

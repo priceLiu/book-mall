@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Marquee } from "@devnomic/marquee";
-import "@devnomic/marquee/dist/index.css";
 
+import { SiteHomeInfiniteMarquee } from "@/components/layout/site-home/site-home-infinite-marquee";
 import type { MarketShowcaseItem } from "@/lib/gateway/market-catalog";
 
 const ROLE_BADGE: Record<string, string> = {
@@ -81,16 +80,17 @@ export function SiteHomeGatewayModelsMarquee({ models, gatewayOrigin }: Props) {
 
   return (
     <div className="site-home-models-track">
-      <Marquee
-        className="site-home-models-marquee gap-4 sm:gap-5"
+      <SiteHomeInfiniteMarquee
+        className="site-home-models-marquee"
         innerClassName="gap-4 sm:gap-5"
+        duration="55s"
         fade
         pauseOnHover
       >
         {models.map((model) => (
           <ModelCard key={model.canonicalKey} model={model} gatewayOrigin={gatewayOrigin} />
         ))}
-      </Marquee>
+      </SiteHomeInfiniteMarquee>
     </div>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui/icon";
-import { Marquee } from "@devnomic/marquee";
-import "@devnomic/marquee/dist/index.css";
+import { SiteHomeInfiniteMarquee } from "@/components/layout/site-home/site-home-infinite-marquee";
 import { icons } from "lucide-react";
 
 const logoItems = [
@@ -48,16 +47,17 @@ export function SiteHomeLogoMarquee() {
     <section id="more-ai-apps" className="site-home-logos w-full">
       <p className="site-home-logos-label">更多的 AI 应用</p>
       <div className="site-home-logos-track">
-        <Marquee
-          className="site-home-marquee gap-16 md:gap-24"
+        <SiteHomeInfiniteMarquee
+          className="site-home-marquee"
           innerClassName="gap-16 md:gap-24"
+          duration="45s"
           fade
           pauseOnHover
         >
           {logoItems.map((item) => (
             <LogoItem key={item.name} {...item} />
           ))}
-        </Marquee>
+        </SiteHomeInfiniteMarquee>
       </div>
     </section>
   );
