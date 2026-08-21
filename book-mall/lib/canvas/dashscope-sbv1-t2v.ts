@@ -115,14 +115,14 @@ export function buildDashscopeWan30Media(opts: {
   const last = opts.lastFrameUrl?.trim() ?? "";
   const refs = (opts.referenceImageUrls ?? [])
     .map((u) => u.trim())
-    .filter((u) => u.length > 0);
-  if (first || last) {
-    const media: DashscopeWan30MediaItem[] = [];
-    if (first) media.push({ type: "first_frame", url: first });
-    if (last) media.push({ type: "last_frame", url: last });
-    return media;
+    .filter((u) => u.length > 0 && u !== first && u !== last);
+  const media: DashscopeWan30MediaItem[] = [];
+  if (first) media.push({ type: "first_frame", url: first });
+  if (last) media.push({ type: "last_frame", url: last });
+  for (const url of refs) {
+    media.push({ type: "reference_image", url });
   }
-  return refs.slice(0, 10).map((url) => ({ type: "reference_image", url }));
+  return media.slice(0, 10);
 }
 
 export function buildDashscopeWan30VideoBody(opts: {

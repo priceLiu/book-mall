@@ -112,6 +112,29 @@ export function isDashscopeWan30VideoModelKey(model: string): boolean {
   return model.trim().toLowerCase() === WAN30_VIDEO_MODEL_KEY;
 }
 
+/** 可灵 3.0 视频 · 与万相 3.0 相同须走华北2业务空间 MAAS 域名 */
+export function isDashscopeKlingV3VideoModelKey(model: string): boolean {
+  const k = model.trim().toLowerCase();
+  if (k === "kling-3.0/video" || k === "kling-3.0") return true;
+  return (
+    k.startsWith("kling/kling-v3") &&
+    k.includes("video") &&
+    !k.includes("image")
+  );
+}
+
+export function isDashscopeMaasWorkspaceVideoModelKey(model: string): boolean {
+  return (
+    isDashscopeWan30VideoModelKey(model) ||
+    isDashscopeKlingV3VideoModelKey(model)
+  );
+}
+
+export const KLING_V3_MISSING_WORKSPACE_ERROR =
+  "可灵 3.0 视频须使用华北2（北京）业务空间 API Key（sk-ws- 开头），" +
+  "并走 {WorkspaceId}.cn-beijing.maas.aliyuncs.com。" +
+  "请在 Gateway 绑定 DashScope / 百炼凭证，并在百炼控制台开通可灵视频模型。";
+
 /**
  * 万相 3.0 创建/轮询根域名：优先凭证已配的 *.maas.aliyuncs.com，否则从 sk-ws- Key 解析华北2 业务空间。
  * 北京 S2V 凭证常把 baseUrl 存成 dashscope.aliyuncs.com（S2V 不能走 MAAS），此处须忽略该误配。
@@ -132,12 +155,15 @@ export function resolveDashscopeVideoCreateUrl(opts: {
   apiKey: string;
   baseUrl?: string | null;
 }): { ok: true; url: string } | { ok: false; error: string } {
-  if (!isDashscopeWan30VideoModelKey(opts.model)) {
+  if (!isDashscopeMaasWorkspaceVideoModelKey(opts.model)) {
     return { ok: true, url: VIDEO_CREATE_URL };
   }
   const root = resolveDashscopeWan30VideoApiRoot(opts.apiKey, opts.baseUrl);
   if (!root) {
-    return { ok: false, error: WAN30_MISSING_WORKSPACE_ERROR };
+    const err = isDashscopeKlingV3VideoModelKey(opts.model)
+      ? KLING_V3_MISSING_WORKSPACE_ERROR
+      : WAN30_MISSING_WORKSPACE_ERROR;
+    return { ok: false, error: err };
   }
   return { ok: true, url: `${root}${VIDEO_CREATE_PATH}` };
 }
@@ -148,7 +174,7 @@ export function resolveDashscopeVideoTaskPollBaseUrl(opts: {
   apiKey: string;
   storedBaseUrl?: string | null;
 }): string | null {
-  if (!isDashscopeWan30VideoModelKey(opts.model ?? "")) {
+  if (!isDashscopeMaasWorkspaceVideoModelKey(opts.model ?? "")) {
     return opts.storedBaseUrl ?? null;
   }
   return resolveDashscopeWan30VideoApiRoot(opts.apiKey, opts.storedBaseUrl);

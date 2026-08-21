@@ -11,6 +11,7 @@ import {
   canvasGwCreateDashscopeWan27ImageJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
+  canvasGwVolcengineImageGenerations,
 } from "@/lib/canvas/canvas-gateway-client";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 import { buildKieImageCreateArgs } from "@/lib/canvas/providers/kie";
@@ -30,6 +31,14 @@ import {
   isDashscopeMultimodalImageGenModel,
   isZImageTurboModel,
 } from "@/lib/gateway/qwen-image-edit-proxy";
+import {
+  buildVolcengineSeedreamImageCall,
+  isVolcengineSeedreamImageModelKey,
+} from "@/lib/gateway/volcengine-chat-models";
+import {
+  scheduleCanvasBufferOssBackfill,
+  scheduleCanvasKieImageOssBackfill,
+} from "@/lib/canvas/canvas-oss-backfill";
 
 function resolveKlingImageAspectFromParams(
   params: Record<string, unknown>,
@@ -115,10 +124,22 @@ export async function prepareCanvasImagePayload(input: {
   return { payload: next, prepared: true };
 }
 
+type CanvasImageSubmitResult = {
+  taskId: string;
+  logId: string;
+  payloadPatch: Record<string, unknown>;
+  immediate?: {
+    ephemeralUrl: string;
+    sourceUrl?: string;
+    b64?: string;
+    imageCount: number;
+  };
+};
+
 async function submitCanvasImageToGateway(
   task: CanvasGenerationTask & { project: { userId: string } },
   payload: Record<string, unknown>,
-): Promise<{ taskId: string; logId: string; payloadPatch: Record<string, unknown> }> {
+): Promise<CanvasImageSubmitResult> {
   const userId = task.project.userId;
   const modelKey = String(payload.modelKey ?? task.model ?? "");
   const providerId = String(payload.providerId ?? "");
@@ -138,6 +159,51 @@ async function submitCanvasImageToGateway(
 
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
+
+  if (isVolcengineSeedreamImageModelKey(modelKey)) {
+    const call = buildVolcengineSeedreamImageCall({
+      prompt,
+      imageUrls,
+      params,
+    });
+    const { images, logId } = await canvasGwVolcengineImageGenerations(userId, {
+      model: modelKey,
+      prompt: call.prompt,
+      image: call.image,
+      parameters: call.parameters,
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
+    });
+    const first = images[0];
+    const url = first?.url?.trim() ?? "";
+    const b64 = first?.b64?.trim() ?? "";
+    if (!url && !b64) {
+      throw new Error("火山方舟 Seedream 未返回可用图像");
+    }
+    return {
+      taskId: logId,
+      logId,
+      payloadPatch: {
+        kind: engineKind,
+        prompt,
+        params,
+        providerId,
+        modelKey,
+        imageUrls,
+        clientPage,
+        gatewayLogId: logId,
+        providerKind: "VOLCENGINE",
+        syncGatewaySubmit: true,
+      },
+      immediate: {
+        ephemeralUrl: url || `data:image/png;base64,${b64}`,
+        sourceUrl: url || undefined,
+        b64: url ? undefined : b64,
+        imageCount: images.length,
+      },
+    };
+  }
 
   if (isHunyuan) {
     const job = await canvasGwCreateHunyuanJob(userId, {
@@ -358,7 +424,7 @@ async function submitCanvasImageToGateway(
 async function submitCanvasImageToGatewayWithTimeout(
   task: CanvasGenerationTask & { project: { userId: string } },
   payload: Record<string, unknown>,
-): Promise<{ taskId: string; logId: string; payloadPatch: Record<string, unknown> }> {
+): Promise<CanvasImageSubmitResult> {
   const timeoutMs = getDispatchSubmitTimeoutMs();
   return Promise.race([
     submitCanvasImageToGateway(task, payload),
@@ -523,6 +589,52 @@ export async function dispatchCanvasImageQueuedTask(
       Object.keys(workingPayload).length ? workingPayload : submitPayload,
     );
     vendorJob = { taskId: job.taskId, logId: job.logId };
+
+    if (job.immediate) {
+      const submitted = await prisma.canvasGenerationTask.updateMany({
+        where: { id: task.id, status: "DISPATCHING" },
+        data: {
+          status: "SUCCEEDED",
+          ephemeralUrl: job.immediate.ephemeralUrl,
+          submittedAt: new Date(),
+          completedAt: new Date(),
+          inputPayload: clearDispatchStaleRetryInPayload({
+            ...taskInputPayload(claimedTask!),
+            ...job.payloadPatch,
+            gatewayKieSubmitClaimed: true,
+            syncGatewaySubmit: true,
+            trafficScopeKey: scopeKey,
+          }) as Prisma.InputJsonValue,
+          resultPayload: {
+            imageCount: job.immediate.imageCount,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      if (submitted.count === 0) {
+        await deps.releaseTrafficSlot(scopeKey);
+        return "skipped";
+      }
+      if (job.immediate.sourceUrl) {
+        scheduleCanvasKieImageOssBackfill(
+          task.id,
+          job.immediate.sourceUrl,
+          task.projectId,
+          "node-image",
+        );
+      } else if (job.immediate.b64) {
+        scheduleCanvasBufferOssBackfill({
+          taskId: task.id,
+          buf: Buffer.from(job.immediate.b64, "base64"),
+          contentType: "image/png",
+          kind: "node-image",
+          projectId: task.projectId,
+          userId: task.project.userId,
+          ext: "png",
+        });
+      }
+      await deps.releaseTrafficSlot(scopeKey);
+      return "dispatched";
+    }
 
     const submitted = await prisma.canvasGenerationTask.updateMany({
       where: { id: task.id, status: "DISPATCHING" },

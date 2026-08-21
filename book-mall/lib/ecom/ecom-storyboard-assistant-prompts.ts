@@ -188,7 +188,7 @@ cast 必填至少 1 名主角，appearance 须写清可拍的外貌与穿搭，�
 视频模型（勿与生图/助手模型混列；仅多图参考整图成片）：
 - doubao-seedance-2.0（火山 Seedance 2.0，推荐）
 - bytedance/seedance-2（KIE Seedance 2）
-- kling-3.0/video（KIE 可灵 3.0，首帧+element 多图参考）
+- kling-3.0/video（百炼可灵 3.0，首帧 + 参考图）
 - happyhorse-1.0-r2v（百炼 HappyHorse 参考生视频）
 - wan2.7-r2v（百炼万相 2.7 参考生视频）
 - wan2.6-r2v（百炼万相 2.6 参考生视频）

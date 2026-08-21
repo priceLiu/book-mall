@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import {
   Check,
@@ -623,21 +628,6 @@ function CrewBulletinPhaseFullscreen({
   onClose: () => void;
   children: ReactNode;
 }) {
-  useEffect(() => {
-    if (!open) {
-      document.body.style.overflow = "";
-      return;
-    }
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
 
   if (!open || typeof document === "undefined") return null;
 

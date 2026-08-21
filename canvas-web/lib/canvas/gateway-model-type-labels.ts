@@ -19,6 +19,9 @@ export function getGatewayModelTypeLabels(args: {
   const k = key.toLowerCase();
 
   if (isStoryLlmVideoUnderstandingModel(key)) {
+    if (k === "qwen3.8-max") {
+      return ["文本模型", "图片反推", "视频理解"];
+    }
     return ["视频理解", "图片反推"];
   }
   if (isStoryLlmVisionModel(key)) {

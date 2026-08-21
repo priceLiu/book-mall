@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -50,20 +55,17 @@ export function Pro2TextNodeOutlineModal({
 
   useEffect(() => {
     if (!open) {
-      document.body.style.overflow = "";
       return;
     }
     skipNextSaveRef.current = true;
     setDraft(value);
     setSavedHint(false);
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
   }, [open, value, onClose]);
 
@@ -119,7 +121,7 @@ export function Pro2TextNodeOutlineModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1600] flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-[#0c0a14]/92 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1600]`}
       role="dialog"
       aria-modal="true"
       aria-label={title}

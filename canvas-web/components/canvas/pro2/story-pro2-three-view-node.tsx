@@ -86,6 +86,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const errorMessage = hasRuntimeError
     ? d.runtime?.failMessage?.trim() || "生成失败"
     : d.uploadError?.trim() || "生成失败";
+  const imageModelKey = d.engine?.modelKey;
   useLibtvRuntimeErrorAlert({
     nodeId: id,
     status: d.runtime?.status,
@@ -93,6 +94,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: imageModelKey,
     enabled: !isMislabeledVendorSuccessError(
       d.runtime?.failCode,
       d.runtime?.failMessage,

@@ -6,6 +6,11 @@ import { LayoutGrid, X } from "lucide-react";
 
 import { StyleLibraryGrid } from "./style-library-grid";
 import { StoryMediaPreviewModal } from "./story-column-media-panel";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { useApplyStyleLibraryPreset } from "@/lib/canvas/style-library/use-apply-style-library";
 import type { StyleLibraryPreset } from "@/lib/canvas/style-library/catalog";
 
@@ -36,20 +41,13 @@ export function StyleLibraryModal({
   );
   const [hint, setHint] = useState<string | null>(null);
 
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
+
   useEffect(() => {
     if (!open) return;
     setHint(null);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
+  }, [open]);
 
   const handleSelect = useCallback(
     async (preset: StyleLibraryPreset) => {
@@ -70,7 +68,7 @@ export function StyleLibraryModal({
 
   const node = (
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1200]`}
       style={{ zIndex: STYLE_LIBRARY_MODAL_Z }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();

@@ -6,6 +6,14 @@
   },
   "imageToVideo": [
     {
+      "id": "wan30-video-i2v",
+      "apiModel": "wan3.0-video",
+      "title": "万相 3.0 · 图生视频",
+      "description": "万相 3.0 All-in-One · 首帧/首尾帧/多参考图 · 480P–1080P · 最长 30s（华北2 业务空间）。",
+      "icon": "✦",
+      "defaultParameters": { "resolution": "720P", "duration": 5 }
+    },
+    {
       "id": "grok-imagine-i2v",
       "apiModel": "grok-imagine/image-to-video",
       "title": "Grok Imagine · 图生视频",
@@ -79,6 +87,14 @@
   ],
   "textToVideo": [
     {
+      "id": "wan30-video-t2v",
+      "apiModel": "wan3.0-video",
+      "title": "万相 3.0 · 文生视频",
+      "description": "万相 3.0 All-in-One · 纯文本即可生成 · 480P–1080P · 最长 30s。",
+      "icon": "✦",
+      "defaultParameters": { "resolution": "720P", "duration": 5 }
+    },
+    {
       "id": "happyhorse-1-0-t2v",
       "apiModel": "happyhorse-1.0-t2v",
       "title": "HappyHorse-1.0-T2V",
@@ -133,6 +149,14 @@
     }
   ],
   "referenceToVideo": [
+    {
+      "id": "wan30-video-r2v",
+      "apiModel": "wan3.0-video",
+      "title": "万相 3.0 · 参考生视频",
+      "description": "万相 3.0 All-in-One · 最多 10 张参考图 · 480P–1080P · 最长 30s。",
+      "icon": "✦",
+      "defaultParameters": { "resolution": "720P", "duration": 5 }
+    },
     {
       "id": "happyhorse-1-0-r2v",
       "apiModel": "happyhorse-1.0-r2v",

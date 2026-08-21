@@ -22,6 +22,7 @@ import {
   isStoryboardKling30KieVideoModel,
   isStoryboardMinimaxVideoModel,
   isStoryboardVolcengineVideoModel,
+  isStoryboardWan30VideoModel,
   resolveStoryboardVideoProvider,
 } from "@/lib/ecom/ecom-storyboard-video-models";
 import { resolveMinimaxVideoModel } from "@/lib/gateway/minimax-video-models";
@@ -51,7 +52,7 @@ export type StoryboardVideoRefPackStrategy =
 
 export type StoryboardVideoInvokeRules = {
   modelKey: string;
-  provider: "volcengine" | "kie" | "bailian" | "minimax";
+  provider: "volcengine" | "kie" | "bailian" | "minimax" | "dashscope";
   strategy: StoryboardVideoRefPackStrategy;
   /** 参考图总上限（含首帧或 flat 数组全部条目） */
   maxTotalImages: number;
@@ -104,6 +105,20 @@ function dedupeUrls(urls: string[], exclude?: Set<string>): string[] {
 export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideoInvokeRules {
   const key = modelKey.trim();
   const provider = resolveStoryboardVideoProvider(key);
+
+  if (isStoryboardWan30VideoModel(key)) {
+    return {
+      modelKey: key,
+      provider: "dashscope",
+      strategy: "volcengine_sheet_plus_identity",
+      maxTotalImages: 10,
+      supportsFullSheet: true,
+      hasFirstFrameRole: true,
+      apiMaxDurationSec: 30,
+      strategyNote:
+        "万相 3.0 All-in-One：首帧=故事版；其余产品/角色/场景作 reference_image（最多 10 张）。",
+    };
+  }
 
   if (isStoryboardKling30KieVideoModel(key)) {
     return {

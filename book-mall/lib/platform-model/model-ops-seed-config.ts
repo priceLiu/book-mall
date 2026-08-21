@@ -175,6 +175,31 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "image-out-painting",
     "doubao-seedream-5-0-lite",
   ],
+  "ecom-storyboard-chat": [
+    "qwen3.8-max",
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+    "qwen-turbo",
+    "qwen3-vl-plus",
+  ],
+  "ecom-storyboard-video": [
+    "doubao-seedance-2.0",
+    "doubao-seedance-1.5-pro",
+    "bytedance/seedance-2",
+    "kling-3.0/video",
+    "happyhorse-1.0-r2v",
+    "happyhorse-1.1-r2v",
+    "wan2.7-r2v",
+    "wan2.6-r2v",
+    "wan2.6-r2v-flash",
+    "wan3.0-video",
+    "MiniMax/MiniMax-H3-t2v",
+    "MiniMax/MiniMax-H3-i2v",
+    "MiniMax/MiniMax-H3-fl2v",
+    "MiniMax/MiniMax-H3-r2v",
+    "MiniMax/MiniMax-H3-s2v",
+  ],
 } as const;
 
 export const SCENE_SHELF_SPECS: SceneShelfSpec[] = [

@@ -54,6 +54,20 @@ describe("wan3.0-video", () => {
       { type: "first_frame", url: "https://oss.example/first.png" },
     ]);
   });
+
+  it("keeps first_frame and extra refs as reference_image", () => {
+    const media = buildDashscopeWan30Media({
+      firstFrameUrl: "https://oss.example/first.png",
+      referenceImageUrls: [
+        "https://oss.example/first.png",
+        "https://oss.example/product.png",
+      ],
+    });
+    expect(media).toEqual([
+      { type: "first_frame", url: "https://oss.example/first.png" },
+      { type: "reference_image", url: "https://oss.example/product.png" },
+    ]);
+  });
 });
 
 describe("resolveDashscopeT2vRefMismatchMessage", () => {

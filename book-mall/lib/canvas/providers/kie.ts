@@ -1168,6 +1168,22 @@ function normalizeKieAudioParamsSchema(
   });
 }
 
+function isKieGptImageModelKey(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "4o-image" || k.startsWith("gpt-image");
+}
+
+/**
+ * KIE GPT Image 暂不支持 4:5 / 5:4（createTask 422）。
+ * 竖版就近 3:4，横版就近 4:3。
+ */
+export function resolveKieGptImageAspectRatio(raw: string | undefined): string {
+  const r = String(raw ?? "1:1").trim() || "1:1";
+  if (r === "4:5") return "3:4";
+  if (r === "5:4") return "4:3";
+  return r;
+}
+
 /** 画布 modelKey → KIE createTask 的 model + input（含 gpt-image-1 映射） */
 export function buildKieImageCreateArgs(args: {
   modelKey: string;
@@ -1176,7 +1192,12 @@ export function buildKieImageCreateArgs(args: {
   params?: Record<string, unknown>;
 }): { model: string; input: Record<string, unknown> } {
   const params = args.params ?? {};
-  const aspect = (params.aspect_ratio as KieAspectRatio | undefined) ?? "1:1";
+  const aspectRaw = String(params.aspect_ratio ?? "1:1").trim() || "1:1";
+  const aspect = (
+    isKieGptImageModelKey(args.modelKey)
+      ? resolveKieGptImageAspectRatio(aspectRaw)
+      : aspectRaw
+  ) as KieAspectRatio;
   const imageUrls = (args.imageUrls ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
   );

@@ -94,6 +94,32 @@ export function sbv1ImageQualityLabel(q: Sbv1ImageQuality): string {
   return SBV1_IMAGE_QUALITIES.find((x) => x.value === q)?.label ?? q;
 }
 
+function isKieGptImageModelKey(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "4o-image" || k.startsWith("gpt-image");
+}
+
+/** Dock 比例列表：GPT Image 暂不可选 4:5 / 5:4（KIE 422）。 */
+export function sbv1ImageAspectOptionsForModel(modelKey: string): {
+  value: Sbv1ImageAspectRatio;
+  label: string;
+}[] {
+  const all = SBV1_IMAGE_ASPECT_RATIOS.filter((r) => r.value !== "auto");
+  if (!isKieGptImageModelKey(modelKey)) return all;
+  return all.filter((r) => r.value !== "4:5" && r.value !== "5:4");
+}
+
+/** 选 GPT 时把暂不可用比例就近落到 3:4 / 4:3。 */
+export function coerceSbv1ImageAspectForModel(
+  modelKey: string,
+  aspect: Sbv1ImageAspectRatio,
+): Sbv1ImageAspectRatio {
+  if (!isKieGptImageModelKey(modelKey)) return aspect;
+  if (aspect === "4:5") return "3:4";
+  if (aspect === "5:4") return "4:3";
+  return aspect;
+}
+
 /** 写入 Gateway / KIE createTask params */
 export function buildSbv1ImageEngineParams(data: {
   aspectRatio?: Sbv1ImageAspectRatio;

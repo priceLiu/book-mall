@@ -101,3 +101,14 @@ export function pickPersistableProjectThumbnailUrl(graph: CanvasGraph): string {
 export function isProjectThumbnailVideoUrl(url: string): boolean {
   return /\.(mp4|webm|mov)(\?|#|$)/i.test(url.trim());
 }
+
+/** 从画布收集全部可用图片 URL（原图 OSS，供门户 Hero 等大图场景） */
+export function collectProjectImageUrls(graph: CanvasGraph): string[] {
+  const urls = new Set<string>();
+  for (const n of graph.nodes ?? []) {
+    if (!n.type || !IMAGE_THUMBNAIL_NODE_TYPES.has(n.type)) continue;
+    const url = displayMediaUrlFromNodeData(n.data);
+    if (url && !isProjectThumbnailVideoUrl(url)) urls.add(url);
+  }
+  return [...urls];
+}

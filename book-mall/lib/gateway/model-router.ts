@@ -187,6 +187,16 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }
 
+  if (
+    m === "kling-3.0/video" ||
+    m === "kling-3.0" ||
+    (m.startsWith("kling/kling-v3") &&
+      m.includes("video") &&
+      !m.includes("image"))
+  ) {
+    return { providerKind: "DASHSCOPE", requestKind: "VIDEO" };
+  }
+
   if (m.startsWith("wanx") || m.includes("wanx")) {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }

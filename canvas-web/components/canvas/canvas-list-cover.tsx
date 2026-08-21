@@ -14,6 +14,10 @@ export const CANVAS_LIST_COVER_HEIGHT = 190;
 export const CANVAS_LIST_COVER_CLASS =
   "relative aspect-[340/190] w-full overflow-hidden rounded-xl bg-[var(--canvas-surface-2)]";
 
+/** 首页最近项目 / 发现 / 我的画布 · 宽屏每行 5 个 */
+export const CANVAS_LIST_GRID_CLASS =
+  "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+
 type Props = {
   /** 与项目列表 `thumbnailUrl` 同名字段，直接复用 */
   url?: string | null;

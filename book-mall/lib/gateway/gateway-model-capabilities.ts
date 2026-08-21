@@ -74,6 +74,7 @@ export function marketTaskTagsForModel(input: {
   if (k === "4o-image") return ["text-to-image", "image-to-image"];
   if (k === "nano-banana-2") return ["text-to-image", "image-to-image"];
 
+  if (k === "wan3.0-video") return ["image-to-video"];
   if (k === "bytedance/seedance-2") return ["image-to-video", "video-to-video"];
   if (k === "bytedance/seedance-2-mini") return ["image-to-video", "video-to-video"];
 
@@ -152,6 +153,8 @@ export function gatewayRouteDisplayName(
     "MiniMax/MiniMax-H3-context-ir": "MiniMax H3 Context-IR",
     "kling/v2-5-turbo-image-to-video-pro": "Kling 2.5 Turbo I2V",
     "kling/v2-5-turbo-text-to-video-pro": "Kling 2.5 Turbo T2V",
+    "wan3.0-video": "万相 3.0 · 文生/图生/参考生视频",
+    "qwen3.8-max": "Qwen3.8 Max · 文本/视觉/视频理解",
     "suno/generate": "Suno API · 文生音乐",
     "elevenlabs/text-to-dialogue-v3": "ElevenLabs V3",
     "elevenlabs/text-to-speech-multilingual-v2": "ElevenLabs Text to Speech",

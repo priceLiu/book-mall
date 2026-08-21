@@ -3,6 +3,14 @@
 import { buildCanvasVideoKieInput } from "@/lib/canvas/canvas-video-kie";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
 import {
+  buildDashscopeSbv1T2vVideoBody,
+  buildDashscopeWan30Media,
+} from "@/lib/canvas/dashscope-sbv1-t2v";
+import {
+  buildDashscopeKlingV3VideoBody,
+  resolveDashscopeKlingV3UpstreamModel,
+} from "@/lib/canvas/dashscope-kling-v3-video";
+import {
   buildKieGrokImageToVideoCreateArgs,
 } from "@/lib/canvas/kie-grok-builders";
 
@@ -221,19 +229,24 @@ export function buildQrTextToVideoCreateArgs(args: {
       urls.length === 2 && !args.mode?.includes("multi")
         ? urls[1]
         : undefined;
-    return buildCanvasVideoKieInput({
-      modelKey: model,
-      prompt,
-      imageUrl: urls[0] ?? null,
+    const referUrls =
+      urls.length > 2 ? urls.slice(2) : urls.length === 1 ? [] : [];
+    const upstreamModel = resolveDashscopeKlingV3UpstreamModel({
+      firstFrameUrl: urls[0] ?? null,
       lastFrameUrl: lastFrame ?? null,
-      aspectRatio: aspect,
-      options: {
-        duration: args.duration,
-        mode: args.mode === "std" || args.mode === "pro" ? args.mode : "pro",
-        sound: args.sound !== false,
-        generateAudio: args.sound !== false,
-      },
+      referImageUrls: referUrls,
     });
+    const body = buildDashscopeKlingV3VideoBody({
+      prompt,
+      firstFrameUrl: urls[0] ?? null,
+      lastFrameUrl: lastFrame ?? null,
+      referImageUrls: referUrls,
+      aspectRatio: aspect,
+      durationSec: args.duration,
+      mode: args.mode === "std" || args.mode === "pro" ? args.mode : "pro",
+      audio: args.sound !== false,
+    });
+    return { model: upstreamModel, input: body };
   }
 
   if (model === "grok-imagine/image-to-video") {
@@ -245,6 +258,23 @@ export function buildQrTextToVideoCreateArgs(args: {
       resolution: args.resolution,
       aspectRatio: args.aspectRatio,
     });
+  }
+
+  if (model === "wan3.0-video") {
+    const media = buildDashscopeWan30Media({
+      firstFrameUrl: imageUrls[0],
+      lastFrameUrl: imageUrls.length >= 2 ? imageUrls[1] : undefined,
+      referenceImageUrls: imageUrls.slice(imageUrls.length >= 2 ? 2 : 1),
+    });
+    const body = buildDashscopeSbv1T2vVideoBody({
+      prompt,
+      aspectRatio: args.aspectRatio ?? "16:9",
+      resolution: args.resolution ?? "720P",
+      durationSec: args.duration ?? 15,
+      modelKey: "wan3.0-video",
+      media,
+    });
+    return { model: "wan3.0-video", input: body };
   }
 
   if (model === "wan/2-7-text-to-video") {

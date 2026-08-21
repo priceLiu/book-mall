@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { formatCanvasTaskError } from "./friendly-task-error";
+
 const STORAGE_PREFIX = "canvas-libtv-error-alert:";
 
 export function buildLibtvRuntimeErrorAlertKey(input: {
@@ -96,6 +98,7 @@ export function useLibtvRuntimeErrorAlert(opts: {
   failCode?: string;
   failMessage?: string;
   dismissedFailTaskId?: string;
+  modelKey?: string;
   enabled?: boolean;
   onAlert: (payload: { message: string; failCode?: string }) => void;
 }): void {
@@ -160,7 +163,10 @@ export function useLibtvRuntimeErrorAlert(opts: {
     if (lastAlertedRef.current === storageKey) return;
     lastAlertedRef.current = storageKey;
     markLibtvRuntimeErrorAlertShown(storageKey);
-    onAlertRef.current({ message: msg, failCode: opts.failCode });
+    onAlertRef.current({
+      message: formatCanvasTaskError(opts.failCode, msg, opts.modelKey),
+      failCode: opts.failCode,
+    });
   }, [
     opts.enabled,
     opts.nodeId,
@@ -169,5 +175,6 @@ export function useLibtvRuntimeErrorAlert(opts: {
     opts.failCode,
     opts.failMessage,
     opts.dismissedFailTaskId,
+    opts.modelKey,
   ]);
 }

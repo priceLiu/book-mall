@@ -24,18 +24,18 @@ export function StoryPro2TagExpandModal({
   const [draft, setDraft] = useState(value);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const mounted = useClientPortalMounted();
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
   }, [open, value, onClose]);
 
@@ -43,7 +43,7 @@ export function StoryPro2TagExpandModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1200] flex flex-col bg-[#0c0a14]/92 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1200]`}
       role="dialog"
       aria-modal="true"
       aria-label={title}

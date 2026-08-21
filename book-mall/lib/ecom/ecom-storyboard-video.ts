@@ -6,16 +6,22 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { buildCanvasVideoKieInput } from "@/lib/canvas/canvas-video-kie";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
 import {
+  buildDashscopeSbv1T2vVideoBody,
+  buildDashscopeWan30Media,
+} from "@/lib/canvas/dashscope-sbv1-t2v";
+import {
   buildCanvasVideoMinimaxInput,
   minimaxResolutionFromEcom,
 } from "@/lib/gateway/minimax-video-body";
 import { resolveMinimaxVideoModel } from "@/lib/gateway/minimax-video-models";
 import {
   ecomGwCreateBailianR2vJob,
+  ecomGwCreateDashscopeJob,
   ecomGwCreateKieJob,
   ecomGwCreateMinimaxVideoJob,
   ecomGwCreateVolcengineVideoJob,
   ecomGwPollBailianR2v,
+  ecomGwPollDashscope,
   ecomGwPollKie,
   ecomGwPollMinimax,
   ecomGwPollVolcengine,
@@ -55,10 +61,10 @@ import {
   resolveStoryboardPanelVideoRefPlan,
   resolveStoryboardVideoRefPlan,
 } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
-import { buildEcomStoryboardKling30VideoInput } from "@/lib/ecom/ecom-storyboard-video-kie";
+import { buildEcomStoryboardKling30DashscopeVideoJob } from "@/lib/canvas/dashscope-kling-v3-video";
 import {
-  isStoryboardBailianR2vVideoModel,
-  isStoryboardKling30KieVideoModel,
+  isStoryboardKling30VideoModel,
+  isStoryboardWan30VideoModel,
   resolveStoryboardKieVideoUpstreamModel,
   resolveStoryboardVideoModel,
   resolveStoryboardVideoProvider,
@@ -69,7 +75,7 @@ type PendingFullVideoJob = {
   taskId: string;
   logId: string;
   modelKey: string;
-  provider: "volcengine" | "kie" | "bailian" | "minimax";
+  provider: "volcengine" | "kie" | "bailian" | "minimax" | "dashscope";
   durationSec: number;
   startedAt: string;
   prompt: string;
@@ -98,6 +104,12 @@ async function pollFullVideoGatewayJob(
       gatewayLogId: pending.logId,
     });
   }
+  if (pending.provider === "dashscope") {
+    return ecomGwPollDashscope(userId, {
+      taskId: pending.taskId,
+      gatewayLogId: pending.logId,
+    });
+  }
   return ecomGwPollVolcengine(userId, {
     taskId: pending.taskId,
     gatewayLogId: pending.logId,
@@ -120,7 +132,8 @@ function readPendingFullVideoJob(meta: unknown): PendingFullVideoJob | null {
       j.provider === "kie" ||
       j.provider === "volcengine" ||
       j.provider === "bailian" ||
-      j.provider === "minimax"
+      j.provider === "minimax" ||
+      j.provider === "dashscope"
         ? j.provider
         : resolveStoryboardVideoProvider(
             typeof j.modelKey === "string" ? j.modelKey : "",
@@ -302,7 +315,12 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     panelImages,
   });
 
-  const durationMin = provider === "bailian" ? 3 : provider === "minimax" ? 4 : 4;
+  const durationMin =
+    provider === "bailian" || provider === "dashscope"
+      ? 3
+      : provider === "minimax"
+        ? 4
+        : 4;
   const durationCap = refPlan.rules.apiMaxDurationSec ?? 15;
   const durationSec = Math.max(
     durationMin,
@@ -327,7 +345,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
       }));
     }
     const { url: sizedUrl } =
-      provider === "bailian"
+      provider === "bailian" || provider === "dashscope"
         ? await ensureStoryboardBailianR2vRefImage({
             userId: opts.userId,
             imageUrl: aspectUrl,
@@ -360,45 +378,14 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   let logId: string;
 
   if (provider === "kie") {
-    const aspect = opts.aspectRatio ?? "9:16";
-    const klingAspect: "16:9" | "9:16" | "1:1" =
-      aspect === "16:9" ? "16:9" : aspect === "1:1" ? "1:1" : "9:16";
-    const { model, input } = isStoryboardKling30KieVideoModel(modelKey)
-      ? await (async () => {
-          const klingFirst = (
-            await ensureStoryboardRefImageForWan27({
-              userId: opts.userId,
-              imageUrl: firstFrameUrl,
-            })
-          ).url;
-          const klingRefs = await Promise.all(
-            opts.references.map(async (ref) => ({
-              ...ref,
-              ossUrl: (
-                await ensureStoryboardRefImageForWan27({
-                  userId: opts.userId,
-                  imageUrl: ref.ossUrl,
-                })
-              ).url,
-            })),
-          );
-          return buildEcomStoryboardKling30VideoInput({
-            prompt,
-            firstFrameUrl: klingFirst,
-            references: klingRefs,
-            aspectRatio: klingAspect,
-            durationSec,
-            sound: true,
-          });
-        })()
-      : buildCanvasVideoKieInput({
-          modelKey: resolveStoryboardKieVideoUpstreamModel(modelKey),
-          prompt,
-          imageUrl: videoImageUrl,
-          referenceImageUrls: normalizedReferenceImageUrls,
-          options: { resolution, duration: durationSec, generateAudio: true },
-          aspectRatio: videoAspect,
-        });
+    const { model, input } = buildCanvasVideoKieInput({
+      modelKey: resolveStoryboardKieVideoUpstreamModel(modelKey),
+      prompt,
+      imageUrl: videoImageUrl,
+      referenceImageUrls: normalizedReferenceImageUrls,
+      options: { resolution, duration: durationSec, generateAudio: true },
+      aspectRatio: videoAspect,
+    });
     const created = await ecomGwCreateKieJob(opts.userId, {
       model,
       input,
@@ -461,6 +448,66 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     });
     taskId = created.taskId;
     logId = created.logId;
+  } else if (provider === "dashscope") {
+    if (isStoryboardKling30VideoModel(modelKey)) {
+      const aspect = opts.aspectRatio ?? "9:16";
+      const klingAspect: "16:9" | "9:16" | "1:1" =
+        aspect === "16:9" ? "16:9" : aspect === "1:1" ? "1:1" : "9:16";
+      const klingFirst = (
+        await ensureStoryboardRefImageForWan27({
+          userId: opts.userId,
+          imageUrl: firstFrameUrl,
+        })
+      ).url;
+      const klingRefs = await Promise.all(
+        opts.references.map(async (ref) => ({
+          ...ref,
+          ossUrl: (
+            await ensureStoryboardRefImageForWan27({
+              userId: opts.userId,
+              imageUrl: ref.ossUrl,
+            })
+          ).url,
+        })),
+      );
+      const { model, videoBody } = buildEcomStoryboardKling30DashscopeVideoJob({
+        prompt,
+        firstFrameUrl: klingFirst,
+        references: klingRefs,
+        aspectRatio: klingAspect,
+        durationSec,
+        sound: true,
+      });
+      const created = await ecomGwCreateDashscopeJob(opts.userId, {
+        kind: "video",
+        model,
+        body: videoBody,
+        clientPage,
+      });
+      taskId = created.taskId;
+      logId = created.logId;
+    } else {
+      const media = buildDashscopeWan30Media({
+        firstFrameUrl,
+        referenceImageUrls: normalizedReferenceImageUrls,
+      });
+      const { input, parameters } = buildDashscopeSbv1T2vVideoBody({
+        prompt,
+        aspectRatio: videoAspect,
+        resolution,
+        durationSec,
+        modelKey: "wan3.0-video",
+        media,
+      });
+      const created = await ecomGwCreateDashscopeJob(opts.userId, {
+        kind: "video",
+        model: "wan3.0-video",
+        body: { input, parameters },
+        clientPage,
+      });
+      taskId = created.taskId;
+      logId = created.logId;
+    }
   } else {
     const { body } = buildCanvasVideoVolcengineInput({
       modelKey,
@@ -644,6 +691,67 @@ async function runVolcengineVideoJob(opts: {
   return { ossUrl, taskId, chargePoints: null };
 }
 
+async function runDashscopeWan30VideoJob(opts: {
+  userId: string;
+  projectId: string;
+  prompt: string;
+  firstFrameUrl: string;
+  referenceImageUrls: string[];
+  durationSec: number;
+  aspectRatio: "16:9" | "9:16";
+  resolution?: EcomStoryboardVideoResolution;
+}): Promise<{ ossUrl: string; taskId: string; chargePoints: number | null }> {
+  const resolution = opts.resolution ?? "720p";
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const media = buildDashscopeWan30Media({
+    firstFrameUrl: opts.firstFrameUrl,
+    referenceImageUrls: opts.referenceImageUrls,
+  });
+  const { input, parameters } = buildDashscopeSbv1T2vVideoBody({
+    prompt: opts.prompt,
+    aspectRatio: opts.aspectRatio,
+    resolution,
+    durationSec: opts.durationSec,
+    modelKey: "wan3.0-video",
+    media,
+  });
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "video",
+    model: "wan3.0-video",
+    body: { input, parameters },
+    clientPage,
+  });
+
+  let videoUrl: string | null = null;
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const polled = await ecomGwPollDashscope(opts.userId, {
+      taskId,
+      gatewayLogId: logId,
+    });
+    if (polled.status === "SUCCEEDED" && polled.outputUrl) {
+      videoUrl = polled.outputUrl;
+      break;
+    }
+    if (polled.status === "FAILED") {
+      throw new Error(polled.failMessage ?? "视频任务失败");
+    }
+  }
+  if (!videoUrl) throw new Error("视频生成超时");
+
+  const res = await fetch(videoUrl);
+  if (!res.ok) throw new Error(`下载视频失败 HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: "mp4",
+    buf,
+    contentType: "video/mp4",
+  });
+  return { ossUrl, taskId, chargePoints: null };
+}
+
 export async function ecomGenerateStoryboardPanelVideo(opts: {
   userId: string;
   projectId: string;
@@ -668,10 +776,13 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
 
   const modelKey = opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL;
   const resolution = resolveVideoResolution(opts.resolution);
+  const panelDurationCap = isStoryboardWan30VideoModel(modelKey)
+    ? 30
+    : 8;
   const durationSec = Math.max(
     2,
     Math.min(
-      8,
+      panelDurationCap,
       Math.round(
         typeof opts.durationSec === "number"
           ? opts.durationSec
@@ -701,24 +812,35 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   const refUrls = panelRefPlan.referenceImageUrls.map(norm);
   const panelFirstFrame = norm(panelRefPlan.firstFrameUrl);
 
-  const { ossUrl, taskId, chargePoints } = await runVolcengineVideoJob({
-    userId: opts.userId,
-    projectId: opts.projectId,
-    modelKey,
-    prompt,
-    imageUrl: panelFirstFrame,
-    referenceImageUrls: refUrls,
-    durationSec,
-    aspectRatio: opts.aspectRatio ?? "9:16",
-    resolution,
-    meta: {
-      projectId: opts.projectId,
-      panelIndex: panel.index,
-      kind: "panel_video",
-      resolution,
-      durationSec,
-    },
-  });
+  const { ossUrl, taskId, chargePoints } = isStoryboardWan30VideoModel(modelKey)
+    ? await runDashscopeWan30VideoJob({
+        userId: opts.userId,
+        projectId: opts.projectId,
+        prompt,
+        firstFrameUrl: panelFirstFrame,
+        referenceImageUrls: refUrls,
+        durationSec,
+        aspectRatio: opts.aspectRatio ?? "9:16",
+        resolution,
+      })
+    : await runVolcengineVideoJob({
+        userId: opts.userId,
+        projectId: opts.projectId,
+        modelKey,
+        prompt,
+        imageUrl: panelFirstFrame,
+        referenceImageUrls: refUrls,
+        durationSec,
+        aspectRatio: opts.aspectRatio ?? "9:16",
+        resolution,
+        meta: {
+          projectId: opts.projectId,
+          panelIndex: panel.index,
+          kind: "panel_video",
+          resolution,
+          durationSec,
+        },
+      });
 
   const updatedPanels = sheet.panels.map((p) =>
     p.index === panel.index ? { ...p, videoUrl: ossUrl } : p,

@@ -2,6 +2,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+/** 画布弹层遮罩：纯色底，不用 backdrop-blur（背后 RF 重绘会闪屏） */
+export const CANVAS_MODAL_BACKDROP_CLASS =
+  "canvas-modal-backdrop fixed inset-0 flex items-center justify-center bg-black/78 p-4";
+
 /** 弹层 scroll lock 引用计数 · 避免多弹层 / effect 重跑时 overflow 来回切换 */
 let modalScrollLockCount = 0;
 let savedBodyOverflow = "";

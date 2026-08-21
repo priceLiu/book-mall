@@ -135,6 +135,23 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "qwen3.8-max",
+    displayName: "Qwen3.8 Max",
+    description:
+      "千问 3.8 Max · 文本生成 / 深度思考 / 图片理解 / 长视频理解 · 1M 上下文",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 10.5,
+    primaryVendor: "aliyun",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen3.8-max", providerKind: "BAILIAN" },
+    ]),
+  },
+  {
     canonicalModelKey: "qwen-turbo",
     displayName: "Qwen Turbo Flash",
     mediaKind: "TEXT_LLM",
@@ -408,17 +425,19 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "kling-3.0-video",
     displayName: "Kling 3.0 I2V/T2V",
-    description: "KIE · 可灵 3.0 · 图生/文生视频，多镜头 + 元素引用。",
+    description: "百炼 · 可灵 3.0 · 图生/文生视频，首帧/首尾帧 + 参考图。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
     appTags: [...VISUAL_APPS],
     sortOrder: 31,
-    primaryVendor: "kie",
+    primaryVendor: "aliyun",
     billingKind: "PER_SECOND",
     unitLabel: "元/秒",
     routes: dedupeRoutes([
-      { vendor: "kie", modelKey: "kling-3.0/video", providerKind: "KIE" },
+      { vendor: "aliyun", modelKey: "kling-3.0/video", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "kling/kling-v3-video-generation", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "kling/kling-v3-omni-video-generation", providerKind: "DASHSCOPE" },
     ]),
   },
   {
@@ -520,7 +539,8 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "wan3.0-video",
     displayName: "Wan 3.0 Video",
-    description: "万相 3.0 · 输入+输出视频秒数计费",
+    description:
+      "万相 3.0 All-in-One · 文生视频 / 图生视频（首帧·首尾帧）/ 参考生视频 · 480P–1080P · 最长 30s",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",

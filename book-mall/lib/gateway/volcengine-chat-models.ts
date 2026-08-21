@@ -211,6 +211,35 @@ export function isVolcengineSeedreamImageModelKey(modelKey: string): boolean {
   );
 }
 
+/** 火山方舟 Seedream 同步 /images/generations 入参 */
+export function buildVolcengineSeedreamImageCall(args: {
+  prompt: string;
+  imageUrls?: string[];
+  params?: Record<string, unknown>;
+}): {
+  prompt: string;
+  image?: string;
+  parameters: { size: string; n: number; watermark: false };
+} {
+  const params = args.params ?? {};
+  const resolution = typeof params.resolution === "string" ? params.resolution.trim() : "";
+  const sizeFromParams = typeof params.size === "string" ? params.size.trim() : "";
+  const size =
+    sizeFromParams ||
+    (resolution === "1K" || resolution === "2K" || resolution === "4K"
+      ? resolution
+      : "2K");
+  const n = Math.min(4, Math.max(1, Number(params.n ?? 1) || 1));
+  const image = (args.imageUrls ?? []).find(
+    (u) => typeof u === "string" && /^https?:\/\//.test(u),
+  );
+  return {
+    prompt: args.prompt,
+    ...(image ? { image } : {}),
+    parameters: { size, n, watermark: false },
+  };
+}
+
 export const VOLCENGINE_CHAT_MODEL_KEYS = new Set(
   VOLCENGINE_CHAT_KNOWN_MODELS.map((m) => m.modelKey.toLowerCase()),
 );

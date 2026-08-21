@@ -72,7 +72,10 @@ import {
   scheduleCanvasBufferOssBackfill,
   scheduleCanvasKieImageOssBackfill,
 } from "./canvas-oss-backfill";
-import { isVolcengineSeedreamImageModelKey } from "@/lib/gateway/volcengine-chat-models";
+import {
+  buildVolcengineSeedreamImageCall,
+  isVolcengineSeedreamImageModelKey,
+} from "@/lib/gateway/volcengine-chat-models";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
   buildCanvasRefVideoKieInput,
@@ -97,6 +100,11 @@ import {
   isDashscopeWan30VideoModel,
   resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
+import {
+  buildDashscopeKlingV3VideoBody,
+  isDashscopeKlingV3VideoGatewayModel,
+  resolveDashscopeKlingV3UpstreamModel,
+} from "./dashscope-kling-v3-video";
 import {
   parseTopazFrameInterpolation,
   parseTopazSlowmoFactor,
@@ -851,23 +859,18 @@ export async function runImageEngineNode(
 
       if (isVolcengineSeedream) {
         const promptText = clipPrompt(expandedPrompt);
-        const resolution =
-          typeof params.resolution === "string" ? params.resolution.trim() : "";
-        const sizeFromParams =
-          typeof params.size === "string" ? params.size.trim() : "";
-        const size =
-          sizeFromParams ||
-          (resolution === "1K" || resolution === "2K" || resolution === "4K"
-            ? resolution
-            : "2K");
-        const n = Math.min(4, Math.max(1, Number(params.n ?? 1) || 1));
+        const call = buildVolcengineSeedreamImageCall({
+          prompt: promptText,
+          imageUrls,
+          params,
+        });
         const { images, logId } = await canvasGwVolcengineImageGenerations(
           userId,
           {
             model: modelKey,
-            prompt: promptText,
-            image: imageUrls[0],
-            parameters: { size, n, watermark: false },
+            prompt: call.prompt,
+            image: call.image,
+            parameters: call.parameters,
             clientPage: gwClientPage,
             projectId,
             canvasTaskId: created.id,
@@ -1846,13 +1849,17 @@ export async function runVideoEngineNode(
           ? buildDashscopeWan30Media({
               firstFrameUrl: kieMainFrame,
               lastFrameUrl: kieLastFrame,
+              referenceImageUrls: kieReferenceImageUrls,
             })
           : dockMode === "i2v"
             ? buildDashscopeWan30Media({
                 firstFrameUrl: kieMainFrame,
               })
             : buildDashscopeWan30Media({
-                referenceImageUrls: [kieMainFrame, ...kieReferenceImageUrls],
+                firstFrameUrl: "",
+                referenceImageUrls: [kieMainFrame, ...kieReferenceImageUrls].filter(
+                  Boolean,
+                ),
               })
         : undefined;
       dashscopeVideoBody = buildDashscopeSbv1T2vVideoBody({
@@ -1892,6 +1899,55 @@ export async function runVideoEngineNode(
         watermark: params.watermark === true,
       });
       model = effectiveModelKey;
+      input = dashscopeVideoBody;
+      videoProviderKind = "DASHSCOPE";
+    } catch (e) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  } else if (isDashscopeKlingV3VideoGatewayModel(effectiveModelKey)) {
+    try {
+      const aspectRaw = String(
+        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      );
+      const aspectRatio =
+        aspectRaw === "9:16"
+          ? "9:16"
+          : aspectRaw === "1:1"
+            ? "1:1"
+            : "16:9";
+      const durationSec = Number(params.duration ?? data.durationSec ?? 5);
+      const modeRaw = String(params.mode ?? "pro");
+      const mode =
+        modeRaw === "std" || modeRaw === "pro" || modeRaw === "4k"
+          ? modeRaw
+          : "pro";
+      const multiShot = params.multi_shots === true;
+      const audio =
+        params.sound !== false &&
+        params.generate_audio !== false &&
+        params.generateAudio !== false;
+      const upstreamModel = resolveDashscopeKlingV3UpstreamModel({
+        firstFrameUrl: isKlingT2v ? null : kieMainFrame,
+        lastFrameUrl: kieLastFrame,
+        referImageUrls: kieReferenceImageUrls,
+        multiShot,
+      });
+      dashscopeVideoBody = buildDashscopeKlingV3VideoBody({
+        prompt: expandedPrompt,
+        firstFrameUrl: isKlingT2v ? null : kieMainFrame,
+        lastFrameUrl: kieLastFrame,
+        referImageUrls: kieReferenceImageUrls,
+        aspectRatio,
+        durationSec,
+        mode,
+        audio,
+        watermark: params.watermark === true,
+        multiShot,
+      });
+      model = upstreamModel;
       input = dashscopeVideoBody;
       videoProviderKind = "DASHSCOPE";
     } catch (e) {

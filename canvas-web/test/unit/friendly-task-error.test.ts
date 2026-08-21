@@ -16,6 +16,16 @@ describe("isGatewayImageModelKey", () => {
 });
 
 describe("formatCanvasTaskError", () => {
+  it("maps vendor unsafe image rejection to Chinese hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "IMAGE_ENGINE_FAILED",
+        "The generated images appear to be unsafe. Try modifying the prompts.",
+        "nano-banana-pro",
+      ),
+    ).toBe("内容被安全策略拦截，请修改提示词或参考图后重试。");
+  });
+
   it("maps auth failures to re-login hint", () => {
     expect(
       formatCanvasTaskError(
@@ -93,14 +103,14 @@ describe("formatCanvasTaskError", () => {
     ).toBe("DeepSeek 服务暂时不可用，请稍后重试。");
   });
 
-  it("short KIE video timeout message", () => {
+  it("Kling video timeout uses generic service message (DashScope route)", () => {
     expect(
       formatCanvasTaskError(
         "VIDEO_ENGINE_FAILED",
         "KIE API 连接超时，请稍后重试。",
         "kling-3.0/video",
       ),
-    ).toBe("KIE 视频服务暂时不可用，请稍后重试。");
+    ).toBe("模型服务暂时不可用，请稍后重试。");
   });
 
   it("KIE quota on image model shows balance hint", () => {
@@ -121,6 +131,50 @@ describe("formatCanvasTaskError", () => {
         "nano-banana-pro",
       ),
     ).toContain("平台积分不足");
+  });
+
+  it("Kling image product-not-activated points to Bailian not KIE", () => {
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "createTask code=422 msg=The product is not activated",
+        "kling-3.0-image",
+      ),
+    ).toContain("阿里云百炼");
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "createTask code=422 msg=The product is not activated",
+        "kling-3.0-image",
+      ),
+    ).not.toContain("KIE 控制台");
+  });
+
+  it("Kling video product-not-activated points to Bailian", () => {
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "The product is not activated",
+        "kling-3.0/video",
+      ),
+    ).toContain("阿里云百炼");
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "The product is not activated",
+        "kling-3.0/video",
+      ),
+    ).not.toContain("KIE 控制台");
+  });
+
+  it("Kling motion-control product-not-activated still points to KIE", () => {
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "The product is not activated",
+        "kling-3.0/motion-control",
+      ),
+    ).toContain("KIE 控制台");
   });
 
   it("strips long gateway technical messages", () => {

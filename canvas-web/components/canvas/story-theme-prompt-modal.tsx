@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { Save, X } from "lucide-react";
 
@@ -158,28 +163,6 @@ export function StoryThemePromptModal({
     );
   }, [activeTab, draft, value, templateId, templates]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) {
-      document.body.style.overflow = "";
-      return;
-    }
-    setActiveTab(initialTab ?? templateId ?? "custom");
-    setSavedHint(false);
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onClose intentionally omitted
-  }, [open, initialTab, templateId]);
 
   useEffect(() => {
     if (!open) return;
@@ -220,7 +203,7 @@ export function StoryThemePromptModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-neutral-600/90 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100]`}
       role="dialog"
       aria-modal="true"
       aria-label={dialogTitle}

@@ -3,12 +3,13 @@
 import { useMemo } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import {
-  SBV1_IMAGE_ASPECT_RATIOS,
   SBV1_IMAGE_MODEL_KEYS,
   SBV1_IMAGE_OUTPUT_COUNTS,
   SBV1_IMAGE_QUALITIES,
   SBV1_IMAGE_RESOLUTIONS,
   buildSbv1ImageEngineParams,
+  coerceSbv1ImageAspectForModel,
+  sbv1ImageAspectOptionsForModel,
   sbv1ImageAspectRatioLabel,
   sbv1ImageQualityLabel,
   type Sbv1ImageAspectRatio,
@@ -29,10 +30,6 @@ import {
   LibtvDockImageParamsPanel,
 } from "../libtv-dock-image-params-panel";
 import { LibtvDockEngineModelPicker } from "../libtv-dock-engine-model-picker";
-
-const IMAGE_PARAM_ASPECT_OPTIONS = SBV1_IMAGE_ASPECT_RATIOS.filter(
-  (r) => r.value !== "auto",
-);
 
 const IMAGE_PARAM_COUNT_OPTIONS = SBV1_IMAGE_OUTPUT_COUNTS.filter((n) =>
   [1, 2, 4].includes(n),
@@ -96,11 +93,15 @@ function patchImageSettings(
   const modelKey = (next.modelKey ?? data.engine?.modelKey ?? "").trim();
   if (!providerId || !modelKey) return;
   const engineParams = next.engineParams ?? data.engine?.params ?? {};
+  const aspectRatio = coerceSbv1ImageAspectForModel(
+    modelKey,
+    next.aspectRatio ?? data.aspectRatio ?? "auto",
+  );
   onPatch(
     buildSbv1ImageEngineSettingsPatch({
       imageQuality: next.imageQuality ?? data.imageQuality ?? "standard",
       resolution: next.resolution ?? data.resolution ?? "2K",
-      aspectRatio: next.aspectRatio ?? data.aspectRatio ?? "auto",
+      aspectRatio,
       outputCount: next.outputCount ?? data.outputCount ?? 1,
       outputFormat:
         next.outputFormat ?? readOutputFormat(engineParams),
@@ -194,15 +195,19 @@ export function Sbv1ImageDockParamsPicker({
   const setOpen = onOpenChange ?? setInternalOpen;
   const { fontPx, minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
   const hasModel = Boolean(data.engine?.modelKey?.trim());
+  const modelKey = data.engine?.modelKey?.trim() ?? "";
+  const aspectOptions = sbv1ImageAspectOptionsForModel(modelKey);
   const label = sbv1ImageParamsTriggerLabel(data);
   const outputFormat = useMemo(
     () => readOutputFormat(data.engine?.params ?? {}),
     [data.engine?.params],
   );
-  const aspectValue =
+  const aspectValue = coerceSbv1ImageAspectForModel(
+    modelKey,
     data.aspectRatio && data.aspectRatio !== "auto"
       ? data.aspectRatio
-      : "16:9";
+      : "16:9",
+  );
 
   return (
     <>
@@ -253,7 +258,7 @@ export function Sbv1ImageDockParamsPicker({
               resolution: id as Sbv1ImageResolution,
             })
           }
-          aspectOptions={IMAGE_PARAM_ASPECT_OPTIONS.map((r) => ({
+          aspectOptions={aspectOptions.map((r) => ({
             id: r.value,
             label: r.label,
           }))}

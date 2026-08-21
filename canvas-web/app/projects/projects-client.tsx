@@ -6,7 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import {
+  CanvasListCover,
+  CANVAS_LIST_GRID_CLASS,
+} from "@/components/canvas/canvas-list-cover";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import {
   createCanvasProject,
@@ -986,7 +989,7 @@ function ProjectsSection({
           此分区暂无画布。
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <ul className={CANVAS_LIST_GRID_CLASS}>
           {projects.map((p) => (
             <li
               key={p.id}

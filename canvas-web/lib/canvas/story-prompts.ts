@@ -268,6 +268,7 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "happyhorse/image-to-video",
   "grok-imagine/image-to-video",
   "grok-imagine-video-1-5-preview",
+  "wan3.0-video",
   "MiniMax/MiniMax-H3-t2v",
   "MiniMax/MiniMax-H3-i2v",
   "MiniMax/MiniMax-H3-fl2v",

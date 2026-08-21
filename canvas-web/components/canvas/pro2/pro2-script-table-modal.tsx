@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { Megaphone, X } from "lucide-react";
 
@@ -162,10 +167,8 @@ export function Pro2ScriptHubEditorModal({
   useEffect(() => {
     if (!open) {
       wasOpenRef.current = false;
-      document.body.style.overflow = "";
       return;
     }
-    document.body.style.overflow = "hidden";
     if (!wasOpenRef.current) {
       wasOpenRef.current = true;
       skipNextSaveRef.current = true;
@@ -187,7 +190,6 @@ export function Pro2ScriptHubEditorModal({
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
     // 仅随 open 开关初始化 draft；勿依赖 md props（store 轮询/自动保存会触发整页闪屏）
     // eslint-disable-next-line react-hooks/exhaustive-deps -- outlineMd/sceneMd/characterMd/storyboardMd intentionally omitted
@@ -248,6 +250,8 @@ export function Pro2ScriptHubEditorModal({
     });
   }, [open, hasStructuredPreview, resolvedStructuredFingerprint, scriptForPreview]);
 
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
   if (!open) return null;
 
   const subtitle =
@@ -318,7 +322,7 @@ export function Pro2ScriptHubEditorModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-[#0c0a14]/92 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100]`}
       role="dialog"
       aria-modal="true"
       aria-label={title}

@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -44,13 +49,11 @@ export function Pro2ScriptCategoryDocModal({
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = "";
       window.removeEventListener("keydown", onKey);
     };
   }, [open, value, onClose]);
@@ -59,7 +62,7 @@ export function Pro2ScriptCategoryDocModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[12000] flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-[#0c0a14]/92 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[12000]`}
       role="dialog"
       aria-modal="true"
       aria-label={title}

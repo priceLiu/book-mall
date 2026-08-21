@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import {
   Check,
@@ -132,18 +137,8 @@ export function Sbv1PortraitLivenessModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅 open / 已有认证变化时重建
   }, [open, existingGroupId]);
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   const copyLink = useCallback(async () => {
     if (!h5Link) return;
@@ -169,7 +164,7 @@ export function Sbv1PortraitLivenessModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS}`}
       style={{ zIndex: MODAL_Z }}
       role="dialog"
       aria-modal="true"

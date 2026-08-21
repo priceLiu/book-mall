@@ -275,15 +275,25 @@ html[data-canvas-toolbar-popover-open] [data-pro2-selection-toolbar-popover] {
   z-index: 9999;
 }
 
-/* 弹层打开时暂停画布指针交互，避免背后 hover / pan 触发重绘导致 backdrop 闪烁 */
+/* 弹层打开时暂停画布指针交互，避免背后 hover / pan 触发重绘导致遮罩闪烁 */
 html[data-canvas-modal-open] .canvas-flow-wrap,
-html[data-canvas-modal-open] .pro2-input-dock {
-  pointer-events: none;
+html[data-canvas-modal-open] .pro2-input-dock,
+html[data-canvas-modal-open] .react-flow__renderer,
+html[data-canvas-modal-open] .react-flow__viewport,
+html[data-canvas-modal-open] .react-flow__pane {
+  pointer-events: none !important;
 }
 
-/* 节点顶栏 portal 到 body（z-1500），弹层打开时须整条收起而非靠 z 压制 */
+/* 节点顶栏 portal 到 body（z-1500），弹层打开时收起；visibility 比 display:none 少闪一下 */
 html[data-canvas-modal-open] .libtv-node-toolbar-portal {
-  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* 画布弹层遮罩 · 纯色底（禁止 backdrop-blur，否则 RF 动画时每帧重算模糊会闪屏） */
+.canvas-modal-backdrop {
+  isolation: isolate;
+  contain: layout paint style;
 }
 
 /* 拖动对齐辅助线 · 高于普通节点 (15) 与 dragging (1000) */
@@ -941,4 +951,13 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 
 .canvas-toolbar-side-panel-aside-enter {
   animation: canvas-toolbar-panel-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes portalHeroFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

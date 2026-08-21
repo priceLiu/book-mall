@@ -5,7 +5,10 @@ import Link from "next/link";
 import { Loader2, Search } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import {
+  CanvasListCover,
+  CANVAS_LIST_GRID_CLASS,
+} from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
 import {
@@ -368,7 +371,7 @@ export function PortalDiscoverySection() {
           暂无内容。精选、社区模板与管理员审核通过的案例会展示在这里。
         </p>
       ) : (
-        <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {
             const own = isOwnItem(item, viewerUserId);
             const busy =

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildQrTextToVideoCreateArgs } from "@/lib/canvas/kie-video-tool-builders";
+import { KLING_V3_VIDEO_MODEL } from "@/lib/canvas/dashscope-kling-v3-video";
 import {
   getQrTextToVideoModelDef,
   QR_TEXT_TO_VIDEO_MODELS,
@@ -96,7 +97,7 @@ describe("buildQrTextToVideoCreateArgs", () => {
     expect(out.input.reference_image).toEqual(["https://example.com/a.jpg"]);
   });
 
-  it("builds kling 3.0 text-to-video without empty image_urls", () => {
+  it("builds kling 3.0 text-to-video without media", () => {
     const out = buildQrTextToVideoCreateArgs({
       modelKey: "kling-3.0/video",
       prompt: "冰锁",
@@ -106,14 +107,15 @@ describe("buildQrTextToVideoCreateArgs", () => {
       mode: "pro",
       sound: true,
     });
-    expect(out.model).toBe("kling-3.0/video");
-    expect(out.input.prompt).toBe("冰锁");
-    expect(out.input.image_urls).toBeUndefined();
+    expect(out.model).toBe(KLING_V3_VIDEO_MODEL);
     expect(out.input).toMatchObject({
-      duration: "5",
-      aspect_ratio: "16:9",
-      mode: "pro",
-      multi_shots: false,
+      input: { prompt: "冰锁" },
+      parameters: {
+        duration: 5,
+        aspect_ratio: "16:9",
+        mode: "pro",
+        audio: true,
+      },
     });
   });
 
@@ -128,10 +130,12 @@ describe("buildQrTextToVideoCreateArgs", () => {
       aspectRatio: "9:16",
       mode: "std",
     });
-    expect(out.input.image_urls).toEqual([
-      "https://example.com/first.jpg",
-      "https://example.com/last.jpg",
-    ]);
+    expect(out.input.input).toMatchObject({
+      media: [
+        { type: "first_frame", url: "https://example.com/first.jpg" },
+        { type: "last_frame", url: "https://example.com/last.jpg" },
+      ],
+    });
   });
 
   it("builds seedance 2.0 text-to-video without refs", () => {

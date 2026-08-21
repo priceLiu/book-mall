@@ -5,22 +5,21 @@ import { useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import {
+  CanvasListCover,
+  CANVAS_LIST_GRID_CLASS,
+} from "@/components/canvas/canvas-list-cover";
 import {
   listMyCanvasProjects,
   type CanvasProjectSummary,
 } from "@/lib/canvas-api";
 
-const RECENT_LIMIT = 4;
+const RECENT_LIMIT = 5;
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return d.toLocaleString("zh-CN");
 }
 
 export function RecentProjectsSection() {
@@ -67,26 +66,18 @@ export function RecentProjectsSection() {
           加载最近项目…
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className={CANVAS_LIST_GRID_CLASS}>
           {projects.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={`/canvas/${p.id}`}
-                className="flex items-center gap-3 rounded-xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-3 transition hover:border-[var(--canvas-accent)]/35"
-              >
-                <div className="size-14 shrink-0 overflow-hidden rounded-lg border border-white/10">
-                  <CanvasListCover
-                    url={p.thumbnailUrl}
-                    name={p.name}
-                    className="!aspect-square !rounded-lg !border-0"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{p.name}</p>
-                  <p className="mt-1 text-xs text-[var(--canvas-muted)]">
-                    {formatDate(p.updatedAt)}
-                  </p>
-                </div>
+            <li
+              key={p.id}
+              className="group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
+            >
+              <Link href={`/canvas/${p.id}`} className="block" prefetch>
+                <CanvasListCover url={p.thumbnailUrl} name={p.name} />
+                <p className="mt-3 truncate text-sm font-medium text-white">{p.name}</p>
+                <p className="mt-3 text-[11px] text-[var(--canvas-muted)]/80">
+                  更新于 {formatDate(p.updatedAt)}
+                </p>
               </Link>
             </li>
           ))}

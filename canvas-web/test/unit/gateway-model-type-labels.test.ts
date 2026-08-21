@@ -35,6 +35,28 @@ describe("getGatewayModelTypeLabels · IMAGE", () => {
   });
 });
 
+describe("getGatewayModelTypeLabels · LLM", () => {
+  it("labels qwen3.8-max as All-in-One 文本/图片/视频理解", () => {
+    expect(
+      getGatewayModelTypeLabels({
+        modelKey: "qwen3.8-max",
+        role: "LLM",
+      }),
+    ).toEqual(["文本模型", "图片反推", "视频理解"]);
+  });
+});
+
+describe("getGatewayModelTypeLabels · VIDEO", () => {
+  it("labels wan3.0-video as All-in-One 文生/图生/参考生", () => {
+    expect(
+      getGatewayModelTypeLabels({
+        modelKey: "wan3.0-video",
+        role: "VIDEO",
+      }),
+    ).toEqual(["文生视频", "图生视频", "参考生视频", "多参考图"]);
+  });
+});
+
 describe("SBV1_IMAGE_MODEL_KEYS", () => {
   it("includes image-edit models for the image node picker", () => {
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("qwen-image-edit");

@@ -254,6 +254,7 @@ export function LibtvImageNode({
   const errorMessage = hasRuntimeError
     ? d.runtime?.failMessage?.trim() || "生成失败"
     : d.uploadError?.trim() || "生成失败";
+  const imageModelKey = d.engine?.modelKey;
   const errorBanner = useLibtvRuntimeErrorBanner({
     nodeId: id,
     status: d.runtime?.status,
@@ -261,6 +262,7 @@ export function LibtvImageNode({
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: imageModelKey,
     hasMedia: Boolean(hasImage && !hasRuntimeError),
   });
   useLibtvRuntimeErrorAlert({
@@ -270,6 +272,7 @@ export function LibtvImageNode({
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: imageModelKey,
     enabled: !isMislabeledVendorSuccessError(
       d.runtime?.failCode,
       d.runtime?.failMessage,

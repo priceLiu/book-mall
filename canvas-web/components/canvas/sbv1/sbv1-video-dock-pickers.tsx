@@ -107,13 +107,14 @@ function useSbv1VideoSettingsDerived(data: Sbv1VideoEngineNodeData) {
   );
   const effectiveDurationSec = useMemo(() => {
     if (smartMulti) return 0;
+    const maxDur = modelKey === "wan3.0-video" ? 30 : 15;
     const fromParams = Number(engineParams.duration);
-    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= 15) {
+    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       return fromParams;
     }
-    if (data.durationSec >= 3 && data.durationSec <= 15) return data.durationSec;
-    return 15;
-  }, [smartMulti, engineParams.duration, data.durationSec]);
+    if (data.durationSec >= 3 && data.durationSec <= maxDur) return data.durationSec;
+    return Math.min(15, maxDur);
+  }, [smartMulti, engineParams.duration, data.durationSec, modelKey]);
   const generateAudio = engineParams.generate_audio !== false;
   const watermark = Boolean(engineParams.watermark);
   return {
@@ -187,13 +188,14 @@ function patchVideoSettings(
   if (smartMulti) {
     effectiveDurationSec = 0;
   } else {
+    const maxDur = modelKey === "wan3.0-video" ? 30 : 15;
     const fromParams = Number(engineParams.duration);
-    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= 15) {
+    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       effectiveDurationSec = fromParams;
-    } else if (durationSec >= 3 && durationSec <= 15) {
+    } else if (durationSec >= 3 && durationSec <= maxDur) {
       effectiveDurationSec = durationSec;
     } else {
-      effectiveDurationSec = 15;
+      effectiveDurationSec = Math.min(15, maxDur);
     }
   }
   onPatch(

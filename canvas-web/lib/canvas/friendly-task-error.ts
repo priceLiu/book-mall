@@ -28,6 +28,7 @@ export function isGatewayImageModelKey(modelKey?: string | null): boolean {
     m.startsWith("gpt-image") ||
     m.startsWith("seedream") ||
     m.startsWith("flux-") ||
+    m === "kling-3.0-image" ||
     m.startsWith("kling/") ||
     m.includes("text-to-image") ||
     m.includes("image-to-image") ||
@@ -44,10 +45,43 @@ export function isGatewayImageModelKey(modelKey?: string | null): boolean {
 
 type LlmVendorHint = "kie" | "deepseek" | "bailian" | "volcengine" | "unknown";
 
-/** Gateway KIE 异步视频（Kling / Seedance / Grok video 等） */
+/** 画布 / 电商可灵 3.0 视频 · 阿里云百炼 DashScope */
+export function isDashscopeKlingVideoModelKey(modelKey?: string | null): boolean {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  if (!m) return false;
+  return (
+    m === "kling-3.0/video" ||
+    m === "kling-3.0" ||
+    (m.startsWith("kling/kling-v3") &&
+      m.includes("video") &&
+      !m.includes("image"))
+  );
+}
+
+/** KIE 仍可用的可灵 SKU（Turbo / Motion Control 等） */
+export function isKieOnlyKlingVideoModelKey(modelKey?: string | null): boolean {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  if (!m.includes("kling")) return false;
+  if (isDashscopeKlingImageModelKey(m)) return false;
+  if (isDashscopeKlingVideoModelKey(m)) return false;
+  return true;
+}
+
+/** 画布 / 电商可灵 3.0 生图 · 阿里云百炼 DashScope，不是 KIE */
+export function isDashscopeKlingImageModelKey(modelKey?: string | null): boolean {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  if (!m) return false;
+  return (
+    m === "kling-3.0-image" ||
+    (m.startsWith("kling/kling-v3") && m.includes("image"))
+  );
+}
+
+/** Gateway KIE 异步视频（Seedance / Grok video 等；可灵 3.0 标准视频已迁百炼） */
 export function isKieVideoModelKey(modelKey?: string | null): boolean {
   const m = (modelKey ?? "").trim().toLowerCase();
   if (!m) return false;
+  if (isDashscopeKlingVideoModelKey(m)) return false;
   if (m.startsWith("kling") && (m.includes("video") || m.includes("motion-control"))) {
     return true;
   }
@@ -157,6 +191,25 @@ function isMislabeledInsufficientCredits(input: {
 const STALE_INSUFFICIENT_HINT =
   "若为历史失败且账户已充值，请关闭错误提示后点「重新生成」。";
 
+function isContentSafetyRejection(blob: string): boolean {
+  return (
+    blob.includes("flagged as sensitive") ||
+    blob.includes("sensitive content") ||
+    blob.includes("content policy") ||
+    blob.includes("content filter") ||
+    blob.includes("appear to be unsafe") ||
+    blob.includes("generated images appear") ||
+    blob.includes("image may contain") ||
+    blob.includes("moderation") ||
+    blob.includes("安全") ||
+    blob.includes("违规")
+  );
+}
+
+function contentSafetyRejectionMessage(): string {
+  return "内容被安全策略拦截，请修改提示词或参考图后重试。";
+}
+
 function networkFailureMessage(modelKey?: string | null): string {
   if (isGatewayImageModelKey(modelKey)) {
     return "生图服务暂时不可用，请稍后重试。";
@@ -238,6 +291,10 @@ export function formatCanvasTaskError(
 
   if (isMislabeledVendorSuccessError(code, msg)) {
     return "视频已生成但未写入节点，请刷新画布或重新打开项目后重试。";
+  }
+
+  if (isContentSafetyRejection(blob)) {
+    return contentSafetyRejectionMessage();
   }
 
   if (
@@ -382,11 +439,17 @@ export function formatCanvasTaskError(
 
   if (
     blob.includes("product is not activated") ||
-    blob.includes("not activated") && blob.includes("product")
+    (blob.includes("not activated") && blob.includes("product"))
   ) {
     const m = (modelKey ?? "").trim().toLowerCase();
-    if (m.includes("kling")) {
-      return "可灵（Kling）产品未开通或已停用。请在 KIE 控制台确认已激活对应生图/生视频产品，并在 Gateway 绑定有效凭证后重试。";
+    if (isDashscopeKlingImageModelKey(m)) {
+      return "可灵 3.0 生图走阿里云百炼（DashScope），不是 KIE。请在百炼控制台开通可灵图像模型，并在 Gateway 绑定 DashScope / 百炼凭证后重试。";
+    }
+    if (isDashscopeKlingVideoModelKey(m)) {
+      return "可灵 3.0 视频走阿里云百炼（DashScope），不是 KIE。请在百炼控制台开通可灵视频模型，并在 Gateway 绑定华北2 业务空间 DashScope 凭证（sk-ws-）后重试。";
+    }
+    if (isKieOnlyKlingVideoModelKey(m)) {
+      return "可灵（Kling）视频产品未开通或已停用。请在 KIE 控制台确认已激活对应生视频产品，并在 Gateway 绑定有效凭证后重试。";
     }
     return "厂商产品未开通，请在对应控制台激活产品并检查 Gateway 凭证后重试。";
   }
@@ -431,17 +494,6 @@ export function formatCanvasTaskError(
     (blob.includes("422") && blob.includes("image"))
   ) {
     return "参考图尺寸过小（需至少 300×300 像素）。请换更大参考图或重新生成图片后再试。";
-  }
-
-  if (
-    blob.includes("flagged as sensitive") ||
-    blob.includes("sensitive content") ||
-    blob.includes("content policy") ||
-    blob.includes("content filter") ||
-    blob.includes("安全") ||
-    blob.includes("违规")
-  ) {
-    return "内容被安全策略拦截，请修改提示词后重试。";
   }
 
   if (

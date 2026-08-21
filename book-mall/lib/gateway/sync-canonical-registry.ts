@@ -196,6 +196,83 @@ async function ensureImageEditModelShelves(): Promise<void> {
 let syncInFlight: Promise<void> | null = null;
 let nextSyncAllowedAt = 0;
 let imageEditShelvesEnsured = false;
+let wan30VideoShelvesEnsured = false;
+let qwen38MaxShelvesEnsured = false;
+
+const WAN30_VIDEO_SHELF_SCOPES: Array<{ appTag: string; sceneKey: string }> = [
+  { appTag: "canvas", sceneKey: "" },
+  { appTag: "canvas", sceneKey: "pro2-video" },
+  { appTag: "canvas", sceneKey: "sbv1-video" },
+  { appTag: "story", sceneKey: "" },
+  { appTag: "ecom", sceneKey: "" },
+  { appTag: "ecom", sceneKey: "ecom-storyboard-video" },
+  { appTag: "quick-replica", sceneKey: "" },
+  { appTag: "quick-replica", sceneKey: "qr-t2v" },
+  { appTag: "tool", sceneKey: "" },
+];
+
+async function ensureWan30VideoShelves(): Promise<void> {
+  if (wan30VideoShelvesEnsured) return;
+  await prisma.appModelShelf.createMany({
+    data: WAN30_VIDEO_SHELF_SCOPES.map((scope) => ({
+      appTag: scope.appTag,
+      sceneKey: scope.sceneKey,
+      canonicalModelKey: "wan3.0-video",
+      status: "ACTIVE" as const,
+      sortOrder: 0,
+    })),
+    skipDuplicates: true,
+  });
+  invalidateGatewayModelListCache();
+  wan30VideoShelvesEnsured = true;
+}
+
+const QWEN38_MAX_SHELF_SCOPES: Array<{ appTag: string; sceneKey: string }> = [
+  { appTag: "canvas", sceneKey: "" },
+  { appTag: "canvas", sceneKey: "pro2-llm" },
+  { appTag: "story", sceneKey: "" },
+  { appTag: "ecom", sceneKey: "" },
+  { appTag: "ecom", sceneKey: "ecom-storyboard-chat" },
+  { appTag: "quick-replica", sceneKey: "" },
+  { appTag: "tool", sceneKey: "" },
+  { appTag: "prompt-optimizer", sceneKey: "" },
+];
+
+const QWEN38_MAX_CATALOG_NOTE =
+  "千问 3.8 Max · 文本生成 / 深度思考 / 图片理解 / 长视频理解 · 1M 上下文";
+
+async function ensureQwen38MaxShelves(): Promise<void> {
+  if (qwen38MaxShelvesEnsured) return;
+  await prisma.modelCatalog.updateMany({
+    where: { canonicalKey: "qwen3.8-max" },
+    data: {
+      displayName: "Qwen3.8 Max",
+      note: QWEN38_MAX_CATALOG_NOTE,
+      appTags: [
+        "canvas",
+        "story",
+        "tool",
+        "ecom",
+        "prompt-optimizer",
+        "quick-replica",
+      ],
+      active: true,
+      gatewayPublished: true,
+    },
+  });
+  await prisma.appModelShelf.createMany({
+    data: QWEN38_MAX_SHELF_SCOPES.map((scope) => ({
+      appTag: scope.appTag,
+      sceneKey: scope.sceneKey,
+      canonicalModelKey: "qwen3.8-max",
+      status: "ACTIVE" as const,
+      sortOrder: 0,
+    })),
+    skipDuplicates: true,
+  });
+  invalidateGatewayModelListCache();
+  qwen38MaxShelvesEnsured = true;
+}
 
 /** 全量 upsert 约 380 次串行往返，冷却期内不重复触发，避免打爆连接池 */
 const SYNC_COOLDOWN_MS = 10 * 60 * 1000;
@@ -225,6 +302,8 @@ export async function ensureGatewayCanonicalRegistrySynced(): Promise<void> {
   });
   if (dbCount >= registryKeys.length) {
     await ensureImageEditModelShelves();
+    await ensureWan30VideoShelves();
+    await ensureQwen38MaxShelves();
     return;
   }
 
@@ -233,6 +312,8 @@ export async function ensureGatewayCanonicalRegistrySynced(): Promise<void> {
   syncInFlight = syncGatewayCanonicalRegistryToDb()
     .then(async () => {
       await ensureImageEditModelShelves();
+      await ensureWan30VideoShelves();
+      await ensureQwen38MaxShelves();
     })
     .finally(() => {
       syncInFlight = null;

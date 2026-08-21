@@ -516,6 +516,13 @@ export const TEXT_TO_VIDEO_MODELS = [
     maxRefImages: 0,
     paramProfile: "wan_t2v" as const,
   },
+  {
+    modelKey: "wan3.0-video",
+    label: "万相 3.0",
+    subtitle: "文生 / 图生 / 参考生视频",
+    maxRefImages: 10,
+    paramProfile: "wan_t2v" as const,
+  },
 ] as const;
 
 export const TEXT_TO_VIDEO_DEFAULT_MODEL_KEY = "grok-imagine/image-to-video";

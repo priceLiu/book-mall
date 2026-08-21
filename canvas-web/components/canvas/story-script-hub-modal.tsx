@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { Save, X, Play, RefreshCw } from "lucide-react";
 
@@ -184,29 +189,6 @@ export function StoryScriptHubModal({
         ? "本段生成中…"
         : undefined;
 
-  useEffect(() => {
-    if (!open) {
-      wasOpenRef.current = false;
-      document.body.style.overflow = "";
-      return;
-    }
-    document.body.style.overflow = "hidden";
-    if (!wasOpenRef.current) {
-      wasOpenRef.current = true;
-      setSection(initialSection);
-      setSavedHint(false);
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-    // 仅随 open 开关重置 Tab；勿依赖 onClose / initialSection 每次渲染
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onClose intentionally omitted
-  }, [open]);
 
   useEffect(() => {
     if (!open || !wasOpenRef.current) return;
@@ -294,11 +276,13 @@ export function StoryScriptHubModal({
       ? { minHeight: Math.min(previewBodyH, 2400) }
       : undefined;
 
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
   if (!open) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-neutral-600/90 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100]`}
       role="dialog"
       aria-modal="true"
       aria-label="故事大纲 · 审阅"

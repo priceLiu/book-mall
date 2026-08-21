@@ -267,13 +267,14 @@ export function Sbv1VideoGenerateSettingsModal({
 
   const effectiveDurationSec = useMemo(() => {
     if (smartMulti) return 0;
+    const maxDur = modelKey === "wan3.0-video" ? 30 : 15;
     const fromParams = Number(engineParams.duration);
-    if (Number.isFinite(fromParams) && fromParams >= 4 && fromParams <= 15) {
+    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       return fromParams;
     }
-    if (durationSec >= 4 && durationSec <= 15) return durationSec;
-    return 15;
-  }, [smartMulti, engineParams.duration, durationSec]);
+    if (durationSec >= 3 && durationSec <= maxDur) return durationSec;
+    return Math.min(15, maxDur);
+  }, [smartMulti, engineParams.duration, durationSec, modelKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -693,8 +694,9 @@ export function sbv1VideoSettingsTriggerLabel(
   providers: CanvasProviderDto[],
 ): string {
   const smartMulti = data.referenceMode === "smart_multi";
+  const maxDur = engineKey === "wan3.0-video" ? 30 : 15;
   const durationLabel =
-    !smartMulti && data.durationSec >= 4 && data.durationSec <= 15
+    !smartMulti && data.durationSec >= 3 && data.durationSec <= maxDur
       ? ` · ${data.durationSec}s`
       : smartMulti
         ? " · 智能多帧"

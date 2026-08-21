@@ -27,6 +27,7 @@ import {
   STORYBOARD_R2V_RATIO_OPTIONS,
   isStoryboardBailianR2vModel,
   isStoryboardKling30KieVideoModel,
+  isStoryboardWan30VideoModel,
   isStoryboardWanR2vModel,
   resolveStoryboardVideoFullSheetDurationRange,
   resolveStoryboardVideoPanelDurationRange,
@@ -138,6 +139,10 @@ function countAdjustableParams(
   if (mode === "image") return 1;
   let n = 2; // 视频分辨率 + 时长
   const isBailianR2v = isStoryboardBailianR2vModel(modelKey);
+  if (isStoryboardWan30VideoModel(modelKey)) {
+    n += 1; // 画面比例
+    return n;
+  }
   if (isBailianR2v) {
     n += 2; // 画布比例 + 随机种子
     if (isStoryboardWanR2vModel(modelKey)) n += 1; // 智能扩写

@@ -161,7 +161,8 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     modelKey: "wan3.0-video",
     displayName: "Wan 3.0 Video",
     role: "VIDEO",
-    description: "DashScope wan3.0-video · 万相 3.0 文生视频（480P/720P/1080P · 最长 30s）",
+    description:
+      "DashScope wan3.0-video · 万相 3.0 All-in-One 文生/图生/参考生视频（480P/720P/1080P · 最长 30s）",
     paramsSchema: WAN30_PARAMS_SCHEMA,
     defaultParams: {
       ratio: "16:9",

@@ -196,6 +196,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const stageVideoFitClass =
     stageVideoFit === "cover" ? "object-cover" : "object-contain";
 
+  const videoModelKey = d.engine?.modelKey;
   const errorBanner = useLibtvRuntimeErrorBanner({
     nodeId: id,
     status: d.runtime?.status,
@@ -203,6 +204,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: videoModelKey,
     hasMedia: hasVideo,
   });
 
@@ -213,6 +215,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: videoModelKey,
     enabled: !hasVideo && !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
     onAlert: ({ message, failCode }) => {
       void alert({

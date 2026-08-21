@@ -270,19 +270,28 @@ export async function ecomSubmitSeedVideoDirectJob(opts: {
       durationSec: opts.durationSec ?? opts.directVideo.durationSec ?? ECOM_SEED_VIDEO_DEFAULT_TARGET_DURATION_SEC,
       directVideo: opts.directVideo,
     });
+    if (!isDashscopeWan30VideoModel(modelKey) && !modelKey.includes("wan")) {
+      throw new Error(
+        `方案①直接成片暂不支持模型「${modelKey}」，请选用 wan2.7-r2v 或 wan3.0-video`,
+      );
+    }
+    const referenceImageUrls = isDashscopeWan30VideoModel(modelKey)
+      ? await collectSeedMaterialRefUrls({
+          userId: opts.userId,
+          projectId: opts.projectId,
+          modelKey,
+        })
+      : [];
     const { parameters, input } = buildDashscopeSbv1T2vVideoBody({
       prompt,
       aspectRatio,
       resolution,
       durationSec,
       modelKey,
+      media: isDashscopeWan30VideoModel(modelKey)
+        ? referenceImageUrls.map((url) => ({ type: "reference_image" as const, url }))
+        : undefined,
     });
-
-    if (!isDashscopeWan30VideoModel(modelKey) && !modelKey.includes("wan")) {
-      throw new Error(
-        `方案①直接成片暂不支持模型「${modelKey}」，请选用 wan2.7-r2v 或 wan3.0-video`,
-      );
-    }
 
     const created = await ecomGwCreateDashscopeJob(opts.userId, {
       kind: "video",
