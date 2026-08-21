@@ -23,13 +23,22 @@ function formatDate(iso: string): string {
   return d.toLocaleString("zh-CN");
 }
 
+const RECENT_DEFER_MS = 600;
+
 export function RecentProjectsSection() {
   const base = useBookMallBaseUrl();
   const [projects, setProjects] = useState<CanvasProjectSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (!base?.trim()) {
+    const t = window.setTimeout(() => setEnabled(true), RECENT_DEFER_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || !base?.trim()) {
+      if (!enabled) return;
       setLoading(false);
       return;
     }
@@ -44,7 +53,9 @@ export function RecentProjectsSection() {
       })
       .catch(() => setProjects([]))
       .finally(() => setLoading(false));
-  }, [base]);
+  }, [base, enabled]);
+
+  if (!enabled) return null;
 
   if (!loading && projects.length === 0) return null;
 

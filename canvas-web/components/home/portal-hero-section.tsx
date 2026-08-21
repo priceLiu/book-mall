@@ -5,22 +5,14 @@ import { Copy, Loader2, Plus } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import { usePortalHome } from "@/components/home/portal-home-context";
 import { createPro2BlankCanvasProject } from "@/lib/canvas/create-pro2-blank-project";
 import {
   duplicatePortalFeaturedProject,
-  listCanvasTemplates,
-  listPortalCaseProjects,
-  listPortalFeaturedProjects,
-  type CanvasTemplateRecord,
-  type PortalCaseProjectSummary,
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
 import { pickRandomItems } from "@/lib/pick-random";
-import {
-  collectProjectImageUrls,
-  isProjectThumbnailVideoUrl,
-} from "@/lib/canvas/project-thumbnail";
-import type { CanvasGraph } from "@/lib/canvas/types";
+import { isProjectThumbnailVideoUrl } from "@/lib/canvas/project-thumbnail";
 
 const CHIP_COUNT = 3;
 const BG_ROTATE_MS = 3000;
@@ -47,20 +39,13 @@ function addImageUrl(pool: Set<string>, url?: string | null) {
 
 function collectPortalHeroImagePool(args: {
   featured: PortalFeaturedProjectSummary[];
-  templates: CanvasTemplateRecord[];
-  cases: PortalCaseProjectSummary[];
+  templateThumbs: string[];
+  caseThumbs: string[];
 }): string[] {
   const pool = new Set<string>();
   for (const p of args.featured) addImageUrl(pool, p.thumbnailUrl);
-  for (const c of args.cases) addImageUrl(pool, c.thumbnailUrl);
-  for (const t of args.templates) {
-    addImageUrl(pool, t.thumbnailUrl ?? t.thumbnail);
-    if (t.canvas) {
-      for (const url of collectProjectImageUrls(t.canvas as CanvasGraph)) {
-        pool.add(url);
-      }
-    }
-  }
+  for (const url of args.caseThumbs) addImageUrl(pool, url);
+  for (const url of args.templateThumbs) addImageUrl(pool, url);
   return [...pool];
 }
 
@@ -117,27 +102,37 @@ function PortalHeroBackdrop({
 
 export function PortalHeroSection() {
   const base = useBookMallBaseUrl();
-  const [allFeatured, setAllFeatured] = useState<PortalFeaturedProjectSummary[]>([]);
-  const [publicTemplates, setPublicTemplates] = useState<CanvasTemplateRecord[]>([]);
-  const [portalCases, setPortalCases] = useState<PortalCaseProjectSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { featured, templates, cases, featuredLoading } = usePortalHome();
   const [starting, setStarting] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const chips = useMemo(
-    () => pickRandomItems(allFeatured, CHIP_COUNT),
-    [allFeatured],
+    () => pickRandomItems(featured, CHIP_COUNT),
+    [featured],
+  );
+
+  const templateThumbs = useMemo(
+    () =>
+      templates
+        .map((t) => t.thumbnailUrl ?? t.thumbnail ?? "")
+        .filter(Boolean),
+    [templates],
+  );
+
+  const caseThumbs = useMemo(
+    () => cases.map((c) => c.thumbnailUrl).filter(Boolean),
+    [cases],
   );
 
   const imagePool = useMemo(() => {
     const pool = collectPortalHeroImagePool({
-      featured: allFeatured,
-      templates: publicTemplates,
-      cases: portalCases,
+      featured,
+      templateThumbs,
+      caseThumbs,
     });
     return pickRandomItems(pool, pool.length);
-  }, [allFeatured, publicTemplates, portalCases]);
+  }, [featured, templateThumbs, caseThumbs]);
 
   const [leftIndex, setLeftIndex] = useState(0);
   const [rightIndex, setRightIndex] = useState(1);
@@ -186,38 +181,6 @@ export function PortalHeroSection() {
 
   const leftUrl = poolUrlAt(imagePool, leftIndex);
   const rightUrl = poolUrlAt(imagePool, rightIndex);
-
-  useEffect(() => {
-    if (!base?.trim()) return;
-    setLoading(true);
-    void Promise.allSettled([
-      listPortalFeaturedProjects(base),
-      listCanvasTemplates(base, "public"),
-      listPortalCaseProjects(base),
-    ])
-      .then(([featRes, tplRes, caseRes]) => {
-        if (featRes.status === "fulfilled") {
-          const list = Array.isArray(featRes.value) ? featRes.value : [];
-          setAllFeatured(list.filter((p) => p.edition === "pro2"));
-        } else {
-          setAllFeatured([]);
-        }
-
-        if (tplRes.status === "fulfilled") {
-          setPublicTemplates(Array.isArray(tplRes.value) ? tplRes.value : []);
-        } else {
-          setPublicTemplates([]);
-        }
-
-        if (caseRes.status === "fulfilled") {
-          const list = Array.isArray(caseRes.value) ? caseRes.value : [];
-          setPortalCases(list.filter((c) => c.edition === "pro2"));
-        } else {
-          setPortalCases([]);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [base]);
 
   const onStartCreate = useCallback(async () => {
     if (!base?.trim()) {
@@ -275,7 +238,7 @@ export function PortalHeroSection() {
             开始我的创作
           </button>
 
-          {loading ? (
+          {featuredLoading && chips.length === 0 ? (
             <p className="mt-6 flex items-center gap-2 text-sm text-[var(--canvas-muted)]">
               <Loader2 className="size-4 animate-spin" />
               加载精选工作流…

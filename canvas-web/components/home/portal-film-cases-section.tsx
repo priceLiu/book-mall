@@ -7,7 +7,7 @@ import { Clapperboard, Loader2, Search } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FilmShowcaseCardMedia } from "@/components/home/film-showcase-card-media";
 import { ShowcaseMediaKindBadge } from "@/components/home/showcase-media-kind-badge";
-import { usePortalViewer } from "@/components/home/portal-viewer-context";
+import { usePortalHome } from "@/components/home/portal-home-context";
 import { useInViewOnce } from "@/components/home/use-in-view-once";
 import { CANVAS_LIST_GRID_CLASS } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
@@ -31,7 +31,7 @@ function ownerLabel(
 
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
-  const { viewerUserId } = usePortalViewer();
+  const { viewerUserId } = usePortalHome();
   const { ref: sectionRef, inView } = useInViewOnce("200px");
   const [items, setItems] = useState<PortalFilmShowcaseMedia[]>([]);
   const [loading, setLoading] = useState(false);

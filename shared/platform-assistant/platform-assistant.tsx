@@ -674,9 +674,15 @@ export function PlatformAssistant({
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  /** 全站 layout mount：后台预取热闻（读 book-mall DB，不阻塞 UI）。 */
+  /** 全站 layout mount：空闲时再预取热闻，避免与首页 portal 列表抢带宽。 */
   useEffect(() => {
-    void prefetchAiNews(newsEndpoint);
+    const run = () => void prefetchAiNews(newsEndpoint);
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(run, { timeout: 4000 });
+      return () => cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(run, 2000);
+    return () => window.clearTimeout(t);
   }, [newsEndpoint]);
 
   const send = useCallback(async () => {

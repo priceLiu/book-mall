@@ -10,14 +10,11 @@ import {
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
-import { usePortalViewer } from "@/components/home/portal-viewer-context";
+import { usePortalHome } from "@/components/home/portal-home-context";
 import {
   duplicatePortalCaseProject,
   duplicatePortalFeaturedProject,
   forkCanvasTemplate,
-  listCanvasTemplates,
-  listPortalCaseProjects,
-  listPortalFeaturedProjects,
   createCanvasProject,
   type CanvasTemplateRecord,
   type PortalCaseProjectSummary,
@@ -27,12 +24,6 @@ import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-
 import { cloneGraphForNewProject } from "@/lib/canvas/clone";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
-import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
-import {
-  didPortalListLoadFail,
-  isPortalGuestAuthLoadError,
-  portalLoadErrorMessage,
-} from "@/lib/canvas/portal-load-errors";
 
 type DiscoveryKind = "featured" | "template" | "case";
 
@@ -104,98 +95,22 @@ function templateItem(t: CanvasTemplateRecord): DiscoveryItem {
   };
 }
 
-const SECONDARY_LOAD_DELAY_MS = 300;
-
 export function PortalDiscoverySection() {
   const base = useBookMallBaseUrl();
-  const { viewerUserId } = usePortalViewer();
-  const [featuredProjects, setFeaturedProjects] = useState<PortalFeaturedProjectSummary[]>([]);
-  const [publicTemplates, setPublicTemplates] = useState<CanvasTemplateRecord[]>([]);
-  const [cases, setCases] = useState<PortalCaseProjectSummary[]>([]);
-  const [featuredLoading, setFeaturedLoading] = useState(false);
-  const [secondaryLoading, setSecondaryLoading] = useState(false);
-  const [secondaryLoaded, setSecondaryLoaded] = useState(false);
+  const {
+    viewerUserId,
+    featured: featuredProjects,
+    templates: publicTemplates,
+    cases,
+    featuredLoading,
+    secondaryLoading,
+    loadSecondary,
+  } = usePortalHome();
   const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [forkingId, setForkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-
-  useEffect(() => {
-    if (!base?.trim()) return;
-    setFeaturedLoading(true);
-    setError(null);
-    setLoadFailed(false);
-
-    void listPortalFeaturedProjects(base)
-      .then((list) => {
-        const arr = Array.isArray(list) ? list : [];
-        setFeaturedProjects(arr.filter((p) => p.edition === "pro2"));
-      })
-      .catch((reason) => {
-        setFeaturedProjects([]);
-        setLoadFailed(true);
-        console.warn("[portal-discovery] portal featured failed", reason);
-        const msg = portalLoadErrorMessage(reason, "发现内容加载失败，请稍后重试");
-        if (!isPortalGuestAuthLoadError(msg)) setError(msg);
-      })
-      .finally(() => setFeaturedLoading(false));
-  }, [base]);
-
-  const loadSecondary = useCallback(() => {
-    if (!base?.trim() || secondaryLoaded || secondaryLoading) return;
-    setSecondaryLoading(true);
-    void (async () => {
-      const [pubRes, caseRes] = await Promise.allSettled([
-        listCanvasTemplates(base, "public"),
-        listPortalCaseProjects(base, "pro2"),
-      ]);
-
-      if (pubRes.status === "fulfilled") {
-        const list = Array.isArray(pubRes.value) ? pubRes.value : [];
-        setPublicTemplates(
-          list.filter(
-            (t) =>
-              t.edition === "pro2" ||
-              canvasEditionFromTemplateCanvas(t.canvas) === "pro2",
-          ),
-        );
-      } else {
-        setPublicTemplates([]);
-        console.warn("[portal-discovery] public templates failed", pubRes.reason);
-      }
-
-      if (caseRes.status === "fulfilled") {
-        const list = Array.isArray(caseRes.value) ? caseRes.value : [];
-        setCases(list);
-      } else {
-        setCases([]);
-        console.warn("[portal-discovery] portal cases failed", caseRes.reason);
-      }
-
-      const results = [pubRes, caseRes];
-      if (didPortalListLoadFail(results) && featuredProjects.length === 0) {
-        setLoadFailed(true);
-        const first = results.find((r) => r.status === "rejected") as
-          | PromiseRejectedResult
-          | undefined;
-        if (first) {
-          const msg = portalLoadErrorMessage(first.reason, "发现内容加载失败，请稍后重试");
-          if (!isPortalGuestAuthLoadError(msg)) setError(msg);
-        }
-      }
-
-      setSecondaryLoaded(true);
-      setSecondaryLoading(false);
-    })();
-  }, [base, secondaryLoaded, secondaryLoading, featuredProjects.length]);
-
-  useEffect(() => {
-    if (!base?.trim() || secondaryLoaded) return;
-    const t = window.setTimeout(() => loadSecondary(), SECONDARY_LOAD_DELAY_MS);
-    return () => window.clearTimeout(t);
-  }, [base, secondaryLoaded, loadSecondary]);
 
   useEffect(() => {
     if (activeTab === TAB_TEMPLATE || activeTab === TAB_CASE) {
@@ -404,7 +319,7 @@ export function PortalDiscoverySection() {
           <Loader2 className="size-4 animate-spin" />
           加载发现内容…
         </div>
-      ) : loadFailed && filtered.length === 0 ? (
+      ) : !featuredLoading && filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
           暂时无法加载内容，请稍后刷新页面。
         </p>
