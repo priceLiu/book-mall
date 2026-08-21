@@ -6,6 +6,7 @@ import type { GatewayProviderKind } from "@prisma/client";
 
 import { BAILIAN_R2V_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-r2v";
 import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
+import { BAILIAN_IMAGE_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-image";
 import {
   VOLCENGINE_CHAT_KNOWN_MODELS,
   VOLCENGINE_IMAGE_KNOWN_MODELS,
@@ -446,6 +447,9 @@ export function buildGatewayModelCatalog(
       ),
       ...BAILIAN_R2V_KNOWN_MODELS.map((m) =>
         fromListed(m, "BAILIAN", ["Canvas"]),
+      ),
+      ...BAILIAN_IMAGE_KNOWN_MODELS.map((m) =>
+        fromListed(m, "BAILIAN", ["Canvas", "Story", "电商工具箱"]),
       ),
     ]),
   );

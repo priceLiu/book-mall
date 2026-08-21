@@ -62,6 +62,14 @@ export function marketTaskTagsForModel(input: {
   if (k.includes("topaz") || k.includes("upscale")) return ["video-upscale"];
 
   if (k === "google/nano-banana-edit") return ["image-to-image"];
+  if (
+    k === "qwen-image-edit" ||
+    k === "qwen-image-edit-max" ||
+    k.startsWith("qwen-image-edit")
+  ) {
+    return ["image-to-image"];
+  }
+  if (k === "wan2.6-image") return ["text-to-image", "image-to-image"];
   if (k === "google/nano-banana") return ["text-to-image", "image-to-image"];
   if (k === "4o-image") return ["text-to-image", "image-to-image"];
   if (k === "nano-banana-2") return ["text-to-image", "image-to-image"];

@@ -48,6 +48,7 @@ export const GATEWAY_ALI_PRICE_BY_MODEL_KEY: Record<string, GatewayAliPriceSpec>
   // —— 生图 ——
   "wan2.7-image": { kind: "image", yuanPerImage: 0.2, section: "万相图像生成" },
   "wan2.7-image-pro": { kind: "image", yuanPerImage: 0.5, section: "万相图像生成" },
+  "wan2.6-image": { kind: "image", yuanPerImage: 0.2, section: "万相图像编辑" },
   "kling-3.0-image": { kind: "image", yuanPerImage: 0.2, section: "图像生成-第三方" },
   "qwen-image-3.0-pro": { kind: "image", yuanPerImage: 0.5, section: "千问图像生成" },
   "z-image-turbo": { kind: "image", yuanPerImage: 0.1, section: "千问图像生成" },

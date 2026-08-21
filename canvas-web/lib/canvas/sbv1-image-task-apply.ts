@@ -163,7 +163,9 @@ export function sbv1VideoPatchFromTask(
       uploadError: undefined,
       runtime: {
         status:
-          task.status === "QUEUED" || task.status === "PENDING"
+          task.status === "QUEUED" ||
+          task.status === "PENDING" ||
+          task.status === "DISPATCHING"
             ? "pending"
             : "running",
         taskId: task.id,

@@ -1,7 +1,9 @@
 /**
  * canvas v2 · 工作流模板清洗
  *
- * - 始终清除瞬时态（blob、上传中、任务 id、ephemeral）
+ * - 始终清除瞬时态（blob、上传中、ephemeral）
+ * - 已入队的生成：保留 runtime.taskId + pending/running，刷新后仍显示扫光
+ * - 无 taskId 的乐观 pending：落盘改 idle，避免刷新后假扫光
  * - keepPersistableMedia=false：再清 ossUrl（空白结构模板）
  * - keepPersistableMedia=true：保留 OSS / runtime.ossUrl / poster（社区分享预览与 fork）
  */
@@ -17,28 +19,83 @@ const TRANSIENT_KEYS = [
   "mediaRenderInFlight",
 ] as const;
 
+const INFLIGHT_RUNTIME_STATUSES = new Set(["running", "pending", "queued"]);
+
+const NODE_RUNTIME_KEYS = [
+  "runtime",
+  "themeOutlineRuntime",
+  "outlineRuntime",
+  "characterRuntime",
+  "sceneRuntime",
+  "storyboardRuntime",
+] as const;
+
+const ROW_RUNTIME_KEYS = ["runtime", "videoRuntime", "ttsRuntime"] as const;
+
+function persistRuntimeObject(
+  rt: Record<string, unknown>,
+  keepBoundInflight: boolean,
+): Record<string, unknown> {
+  const runtime = { ...rt };
+  delete runtime.ephemeralUrl;
+  const taskId =
+    typeof runtime.taskId === "string" ? runtime.taskId.trim() : "";
+  const status =
+    typeof runtime.status === "string" ? runtime.status : "";
+  const inflight = INFLIGHT_RUNTIME_STATUSES.has(status);
+  if (inflight && keepBoundInflight && taskId) {
+    runtime.taskId = taskId;
+    return runtime;
+  }
+  if (inflight) {
+    runtime.status = "idle";
+  }
+  delete runtime.taskId;
+  return runtime;
+}
+
+function persistNestedRuntimes(
+  data: Record<string, unknown>,
+  keepBoundInflight: boolean,
+): Record<string, unknown> {
+  const next = { ...data };
+  for (const key of NODE_RUNTIME_KEYS) {
+    const rt = next[key];
+    if (rt && typeof rt === "object" && !Array.isArray(rt)) {
+      next[key] = persistRuntimeObject(
+        rt as Record<string, unknown>,
+        keepBoundInflight,
+      );
+    }
+  }
+  if (Array.isArray(next.rows)) {
+    next.rows = next.rows.map((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+      const r = { ...(row as Record<string, unknown>) };
+      for (const key of ROW_RUNTIME_KEYS) {
+        const rt = r[key];
+        if (rt && typeof rt === "object" && !Array.isArray(rt)) {
+          r[key] = persistRuntimeObject(
+            rt as Record<string, unknown>,
+            keepBoundInflight,
+          );
+        }
+      }
+      return r;
+    });
+  }
+  return next;
+}
+
 function stripTransientRuntime(
   data: Record<string, unknown>,
+  keepBoundInflight: boolean,
 ): Record<string, unknown> {
   const next = { ...data };
   for (const k of TRANSIENT_KEYS) {
     delete next[k];
   }
-  const rt = next.runtime;
-  if (rt && typeof rt === "object" && !Array.isArray(rt)) {
-    const runtime = { ...(rt as Record<string, unknown>) };
-    delete runtime.ephemeralUrl;
-    delete runtime.taskId;
-    if (
-      runtime.status === "running" ||
-      runtime.status === "pending" ||
-      runtime.status === "queued"
-    ) {
-      runtime.status = "idle";
-    }
-    next.runtime = runtime;
-  }
-  return next;
+  return persistNestedRuntimes(next, keepBoundInflight);
 }
 
 function stripPersistableMedia(
@@ -64,9 +121,10 @@ function stripNodeRuntime(
   n: CanvasFlowNode,
   keepPersistableMedia: boolean,
 ): CanvasFlowNode {
-  let data = stripTransientRuntime({
-    ...(n.data ?? {}),
-  } as Record<string, unknown>);
+  let data = stripTransientRuntime(
+    { ...(n.data ?? {}) } as Record<string, unknown>,
+    keepPersistableMedia,
+  );
   if (!keepPersistableMedia) {
     data = stripPersistableMedia(data);
   }

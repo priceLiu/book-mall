@@ -142,8 +142,60 @@ export async function syncGatewayCanonicalRegistryToDb(): Promise<{
   };
 }
 
+/** 图片编辑模型 · 画布 / 电商货架（skipDuplicates，不覆盖管理员下架） */
+const IMAGE_EDIT_SHELF_CANONICALS = [
+  "qwen-image-edit",
+  "qwen-image-edit-max",
+  "wan2.6-image",
+  "google-nano-banana-i2i",
+] as const;
+
+const IMAGE_EDIT_SHELF_SCOPES: Array<{ appTag: string; sceneKey: string }> = [
+  { appTag: "canvas", sceneKey: "" },
+  { appTag: "canvas", sceneKey: "pro2-image" },
+  { appTag: "canvas", sceneKey: "sbv1-image" },
+  { appTag: "story", sceneKey: "" },
+  { appTag: "ecom", sceneKey: "" },
+  { appTag: "ecom", sceneKey: "ecom-storyboard-image" },
+  { appTag: "quick-replica", sceneKey: "" },
+];
+
+async function ensureImageEditModelShelves(): Promise<void> {
+  if (imageEditShelvesEnsured) return;
+  const existing = await prisma.appModelShelf.findMany({
+    where: {
+      appTag: "canvas",
+      sceneKey: "",
+      canonicalModelKey: { in: [...IMAGE_EDIT_SHELF_CANONICALS] },
+    },
+    select: { canonicalModelKey: true },
+  });
+  const have = new Set(existing.map((r) => r.canonicalModelKey));
+  const missing = IMAGE_EDIT_SHELF_CANONICALS.filter((k) => !have.has(k));
+  if (missing.length === 0) {
+    imageEditShelvesEnsured = true;
+    return;
+  }
+
+  await prisma.appModelShelf.createMany({
+    data: missing.flatMap((canonicalModelKey) =>
+      IMAGE_EDIT_SHELF_SCOPES.map((scope) => ({
+        appTag: scope.appTag,
+        sceneKey: scope.sceneKey,
+        canonicalModelKey,
+        status: "ACTIVE" as const,
+        sortOrder: 0,
+      })),
+    ),
+    skipDuplicates: true,
+  });
+  invalidateGatewayModelListCache();
+  imageEditShelvesEnsured = true;
+}
+
 let syncInFlight: Promise<void> | null = null;
 let nextSyncAllowedAt = 0;
+let imageEditShelvesEnsured = false;
 
 /** 全量 upsert 约 380 次串行往返，冷却期内不重复触发，避免打爆连接池 */
 const SYNC_COOLDOWN_MS = 10 * 60 * 1000;
@@ -171,12 +223,17 @@ export async function ensureGatewayCanonicalRegistrySynced(): Promise<void> {
       active: true,
     },
   });
-  if (dbCount >= registryKeys.length) return;
+  if (dbCount >= registryKeys.length) {
+    await ensureImageEditModelShelves();
+    return;
+  }
 
   // 无论同步成功与否都进入冷却：失败或仍未补齐时按冷却周期重试，不是每请求重试
   nextSyncAllowedAt = Date.now() + SYNC_COOLDOWN_MS;
   syncInFlight = syncGatewayCanonicalRegistryToDb()
-    .then(() => undefined)
+    .then(async () => {
+      await ensureImageEditModelShelves();
+    })
     .finally(() => {
       syncInFlight = null;
     });

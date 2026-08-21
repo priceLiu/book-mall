@@ -36,23 +36,30 @@ export function getGatewayModelTypeLabels(args: {
     k.includes("t2i") ||
     (k.includes("image") && !k.includes("video") && !k.includes("i2v"))
   ) {
-    const labels = ["文生图"];
-    if (
-      k.includes("seedream") ||
-      k.includes("edit") ||
+    const labels: string[] = [];
+    const isDedicatedEdit =
+      k.includes("image-edit") ||
+      k === "google/nano-banana-edit" ||
+      (k.includes("nano-banana") && k.includes("-edit")) ||
       k.includes("i2i") ||
-      k.includes("img2img") ||
-      k.includes("kontext") ||
-      k.includes("nano-banana") ||
-      /wan2\.\d+-image/.test(k) ||
-      k === "kling-3.0-image" ||
-      k === "wan2.6-image" ||
-      k === "qwen-image-3.0-pro" ||
-      k === "qwen-image-edit" ||
-      k === "qwen-image-edit-max" ||
-      k.startsWith("qwen-image-edit")
-    ) {
-      labels.push("图生图");
+      k.includes("img2img");
+
+    if (isDedicatedEdit) {
+      labels.push("图片编辑");
+    } else {
+      labels.push("文生图");
+      if (
+        k.includes("seedream") ||
+        k.includes("edit") ||
+        k.includes("kontext") ||
+        k.includes("nano-banana") ||
+        /wan2\.\d+-image/.test(k) ||
+        k === "kling-3.0-image" ||
+        k === "wan2.6-image" ||
+        k === "qwen-image-3.0-pro"
+      ) {
+        labels.push("图生图");
+      }
     }
     return labels;
   }

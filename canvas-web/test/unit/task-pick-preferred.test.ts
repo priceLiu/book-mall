@@ -217,4 +217,88 @@ describe("restoreServerInflightNodeRuntimes", () => {
       }),
     );
   });
+
+  it("已有成片时仍把服务端进行中任务挂回生图节点", () => {
+    const node: CanvasFlowNode = {
+      id: "img-1",
+      type: "sbv1-image",
+      position: { x: 0, y: 0 },
+      data: {
+        ossUrl: "https://cdn.example/old.png",
+        runtime: {
+          status: "done",
+          ossUrl: "https://cdn.example/old.png",
+        },
+      },
+    };
+    const updateNodeData = vi.fn();
+    restoreServerInflightNodeRuntimes(
+      [node],
+      [
+        task({
+          id: "old-ok",
+          nodeId: "img-1",
+          status: "SUCCEEDED",
+          completedAt: minsAgo(20),
+          updatedAt: minsAgo(20),
+          ossUrl: "https://cdn.example/old.png",
+        }),
+        task({
+          id: "regen",
+          nodeId: "img-1",
+          status: "DISPATCHING",
+          createdAt: minsAgo(1),
+          submittedAt: minsAgo(1),
+        }),
+      ],
+      updateNodeData,
+      vi.fn(),
+    );
+    expect(updateNodeData).toHaveBeenCalledWith(
+      "img-1",
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          status: "pending",
+          taskId: "regen",
+        }),
+      }),
+    );
+  });
+
+  it("已有成片时仍把服务端进行中任务挂回生视频节点", () => {
+    const node: CanvasFlowNode = {
+      id: "video-1",
+      type: "sbv1-video-engine",
+      position: { x: 0, y: 0 },
+      data: {
+        runtime: {
+          status: "idle",
+          ossUrl: "https://cdn.example/old.mp4",
+        },
+      },
+    };
+    const updateNodeData = vi.fn();
+    restoreServerInflightNodeRuntimes(
+      [node],
+      [
+        task({
+          id: "regen-v",
+          nodeId: "video-1",
+          status: "QUEUED",
+          createdAt: minsAgo(1),
+        }),
+      ],
+      updateNodeData,
+      vi.fn(),
+    );
+    expect(updateNodeData).toHaveBeenCalledWith(
+      "video-1",
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          status: "pending",
+          taskId: "regen-v",
+        }),
+      }),
+    );
+  });
 });

@@ -16,6 +16,7 @@ const ALREADY_SEEDED = new Set([
   "z-image-turbo",
   "wan2.7-image",
   "wan2.7-image-pro",
+  "wan2.6-image",
   "kling-3.0-image",
   "seedance-2.0",
   "wanxiang-video-2.7-i2v",

@@ -75,21 +75,19 @@ export function isStaleServerInflightTask(
 export function pickActiveServerInflightTask(
   nodeTasks: CanvasTaskRecord[],
   boundTaskId?: string | null,
-  runtime?: CanvasNodeRuntime | null,
+  _runtime?: CanvasNodeRuntime | null,
 ): CanvasTaskRecord | undefined {
   const boundId = boundTaskId?.trim();
-  const hasRtMedia = Boolean(
-    runtime?.ossUrl?.trim() || runtime?.ephemeralUrl?.trim(),
-  );
 
   if (boundId) {
     const bound = nodeTasks.find((t) => t.id === boundId);
-    if (bound && isServerInflightTaskStatus(bound.status)) {
-      if (isStaleServerInflightTask(bound, nodeTasks) || hasRtMedia) {
-        // fall through
-      } else {
-        return bound;
-      }
+    if (
+      bound &&
+      isServerInflightTaskStatus(bound.status) &&
+      !isStaleServerInflightTask(bound, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(bound)
+    ) {
+      return bound;
     }
   }
 
@@ -100,7 +98,6 @@ export function pickActiveServerInflightTask(
       !isAbandonedCanvasInflightTask(t),
   );
   if (!inflight.length) return undefined;
-  if (hasRtMedia && !boundId) return undefined;
   return [...inflight].sort(
     (a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

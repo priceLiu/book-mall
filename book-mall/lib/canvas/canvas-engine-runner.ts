@@ -132,7 +132,7 @@ import {
 import { resolveKlingV3Resolution, resolveWan27ImageSize } from "@/lib/ecom/ecom-storyboard-gen-params";
 import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
 import {
-  isQwenImage30ProModel,
+  isDashscopeMultimodalImageGenModel,
   isZImageTurboModel,
 } from "@/lib/gateway/qwen-image-edit-proxy";
 
@@ -555,8 +555,7 @@ export async function runImageEngineNode(
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
   const isKlingImage = isStoryboardKlingImageModel(modelKey);
   const isDashscopeWanImage = isStoryboardDashscopeImageModel(modelKey);
-  const isMultimodalSyncImage =
-    isQwenImage30ProModel(modelKey) || isZImageTurboModel(modelKey);
+  const isMultimodalSyncImage = isDashscopeMultimodalImageGenModel(modelKey);
   const isVolcengineSeedream = isVolcengineSeedreamImageModelKey(modelKey);
   await shouldCanvasUseGateway(userId, providerId, modelKey);
 

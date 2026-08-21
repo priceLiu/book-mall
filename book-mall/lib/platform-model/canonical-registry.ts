@@ -248,6 +248,22 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "wan2.6-image",
+    displayName: "Wan 2.6 Image Edit",
+    description: "通义万相 2.6 · 多图参考 / 图像编辑（非纯文生图）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 21.5,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "wan2.6-image", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
     canonicalModelKey: "qwen-image-3.0-pro",
     displayName: "Qwen Image 3.0 Pro",
     description: "千问图像 3.0 Pro · 文生图 / 图生图（最多 3 张参考）· 小字与版面",

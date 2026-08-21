@@ -77,4 +77,73 @@ describe("mediaRenderInFlight persist", () => {
     expect(stripped.nodes[0]!.data).not.toHaveProperty("mediaRenderInFlight");
     expect(stripped.nodes[0]!.data).toMatchObject({ label: "自动成片" });
   });
+
+  it("persists bound image/video generating runtime for refresh restore", () => {
+    const graph: CanvasGraph = {
+      schemaVersion: 2,
+      nodes: [
+        {
+          id: "img-1",
+          type: "sbv1-image",
+          position: { x: 0, y: 0 },
+          data: {
+            uploading: true,
+            blobUrl: "blob:local",
+            ossUrl: "https://cdn.example/old.png",
+            runtime: {
+              status: "pending",
+              taskId: "task-img",
+              ossUrl: "https://cdn.example/old.png",
+              ephemeralUrl: "https://tmp/ephemeral.png",
+            },
+          },
+        },
+        {
+          id: "vid-1",
+          type: "sbv1-video-engine",
+          position: { x: 0, y: 0 },
+          data: {
+            runtime: {
+              status: "running",
+              taskId: "task-vid",
+              ossUrl: "https://cdn.example/old.mp4",
+            },
+          },
+        },
+        {
+          id: "orphan",
+          type: "story-pro2-image",
+          position: { x: 0, y: 0 },
+          data: {
+            uploading: true,
+            runtime: { status: "pending" },
+          },
+        },
+      ],
+      edges: [],
+    };
+    const stripped = stripGraphForPersist(graph);
+    expect(stripped.nodes[0]!.data).toMatchObject({
+      ossUrl: "https://cdn.example/old.png",
+      runtime: {
+        status: "pending",
+        taskId: "task-img",
+        ossUrl: "https://cdn.example/old.png",
+      },
+    });
+    expect(stripped.nodes[0]!.data).not.toHaveProperty("uploading");
+    expect(stripped.nodes[0]!.data).not.toHaveProperty("blobUrl");
+    expect(
+      (stripped.nodes[0]!.data as { runtime: { ephemeralUrl?: string } }).runtime,
+    ).not.toHaveProperty("ephemeralUrl");
+    expect(stripped.nodes[1]!.data).toMatchObject({
+      runtime: { status: "running", taskId: "task-vid" },
+    });
+    expect(stripped.nodes[2]!.data).toMatchObject({
+      runtime: { status: "idle" },
+    });
+    expect(
+      (stripped.nodes[2]!.data as { runtime: { taskId?: string } }).runtime,
+    ).not.toHaveProperty("taskId");
+  });
 });

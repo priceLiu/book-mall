@@ -120,6 +120,7 @@ export default defineConfig({
       "test/unit/libtv-plain-text-display.test.ts",
       "test/unit/libtv-node-border.test.ts",
       "test/unit/hide-kie-vendor-label.test.ts",
+      "test/unit/gateway-model-type-labels.test.ts",
       "test/unit/deferred-text-commit-source.test.ts",
       "test/unit/task-pick-preferred.test.ts",
       "test/unit/canvas-rf-sync.test.ts",

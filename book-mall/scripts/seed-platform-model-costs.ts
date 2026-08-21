@@ -77,6 +77,14 @@ const EXTRA_COSTS: CostSeed[] = [
     discountRate: 0.1,
   },
   {
+    canonicalModelKey: "wan2.6-image",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.2,
+    discountRate: 0.1,
+    note: "万相 2.6 图像编辑 · 官方 0.20 元/张",
+  },
+  {
     canonicalModelKey: "wan2.7-image-pro",
     vendor: "aliyun",
     unit: "PER_IMAGE",

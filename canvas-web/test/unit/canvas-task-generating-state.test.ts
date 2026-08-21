@@ -28,6 +28,19 @@ describe("resolveLibtvMediaGeneratingState", () => {
     ).toBe(true);
   });
 
+  it("pending runtime over existing image is still generating", () => {
+    expect(
+      resolveLibtvMediaGeneratingState({
+        ossUrl: "https://cdn.example/old.png",
+        runtime: {
+          status: "pending",
+          taskId: "t2",
+          ossUrl: "https://cdn.example/old.png",
+        },
+      }).isGenerating,
+    ).toBe(true);
+  });
+
   it("done runtime stops generating even if uploading flag stale", () => {
     expect(
       resolveLibtvMediaGeneratingState({
