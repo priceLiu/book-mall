@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { MarkdownView } from "@/components/canvas/markdown-view";
 import { LibtvMarkdownFormatToolbar } from "../libtv-markdown-format-toolbar";
 
@@ -30,14 +35,7 @@ export function StoryPro2TagExpandModal({
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, value, onClose]);
+  }, [open, value]);
 
   if (!mounted || !open) return null;
 
