@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import { buildCanvasVideoKieInput } from "@/lib/canvas/canvas-video-kie";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
 import { buildEcomStoryboardKling30DashscopeVideoJob } from "@/lib/canvas/dashscope-kling-v3-video";
 import { bailianResolutionFromEcom } from "@/lib/ecom/ecom-storyboard-gen-params";
@@ -225,17 +226,14 @@ export async function ecomGenerateSeedVideoShot(opts: {
   let taskId: string;
 
   if (provider === "kie") {
-    const { model, input } = {
-      model: resolveStoryboardKieVideoUpstreamModel(modelKey),
-      input: buildCanvasVideoKieInput({
-        modelKey: resolveStoryboardKieVideoUpstreamModel(modelKey),
-        prompt,
-        imageUrl: firstFrame,
-        referenceImageUrls: refUrls,
-        options: { resolution, duration: durationSec, generateAudio: true },
-        aspectRatio,
-      }).input,
-    };
+    const { model, input } = buildCanvasVideoKieInput({
+      modelKey: resolveStoryboardKieVideoUpstreamModel(modelKey),
+      prompt,
+      imageUrl: firstFrame,
+      referenceImageUrls: refUrls,
+      options: { resolution, duration: durationSec, generateAudio: true },
+      aspectRatio,
+    });
     const created = await ecomGwCreateKieJob(opts.userId, {
       model,
       input,
