@@ -83,6 +83,16 @@ describe("formatCanvasTaskError", () => {
     ).toBe("文本模型服务暂时不可用，请稍后重试。");
   });
 
+  it("maps DeepSeek TLS handshake drop to DeepSeek unavailable", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        "DEEPSEEK API 请求失败: Client network socket disconnected before secure TLS connection was established",
+        "deepseek-v4-flash",
+      ),
+    ).toBe("DeepSeek 服务暂时不可用，请稍后重试。");
+  });
+
   it("short KIE video timeout message", () => {
     expect(
       formatCanvasTaskError(

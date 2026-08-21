@@ -26,9 +26,7 @@ export function resolvePro2StarterDockLinkLabel(
   const custom = d.label?.trim();
   if (custom) return custom;
   if (d.pro2TextPurpose === "story-outline") return "故事大纲";
-  if (d.generatedOutlineMd?.trim() || d.uploadedScriptMd?.trim()) {
-    return "故事大纲";
-  }
+  if (d.uploadedScriptMd?.trim()) return "已上传剧本";
   return "文本";
 }
 
@@ -102,7 +100,10 @@ function linkFromSource(
       return {
         id: `up-script-${source.id}`,
         kind: "outline",
-        label: d.uploadedScriptMeta?.fileName?.trim() || "已上传剧本",
+        label:
+          d.label?.trim() ||
+          d.uploadedScriptMeta?.fileName?.trim() ||
+          "已上传剧本",
         previewMd: uploaded.slice(0, 800),
         sourceNodeId: source.id,
       };
@@ -111,7 +112,7 @@ function linkFromSource(
       return {
         id: `up-outline-${source.id}`,
         kind: "outline",
-        label: "故事大纲",
+        label: resolvePro2StarterDockLinkLabel(d),
         previewMd: storyThemePromptDisplayMd(outline),
         sourceNodeId: source.id,
       };

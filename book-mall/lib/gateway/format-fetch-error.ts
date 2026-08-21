@@ -108,11 +108,11 @@ export function formatGatewayFetchError(
       : cause != null
         ? String(cause)
         : "";
-  const isTimeout = isConnectTimeoutError(err);
+  const isTransient = isTransientUpstreamConnectError(err);
 
   if (ctx?.hop === "internal") {
     return new Error(
-      isTimeout
+      isTransient
         ? "Gateway 内部链路超时（book-mall 自调用 /api/gw/v1）。开发环境 mall 编译中时会偶发，请稍候重试。"
         : `Gateway 内部链路失败：${causeMsg || "fetch failed"}`,
     );
@@ -120,13 +120,13 @@ export function formatGatewayFetchError(
 
   const provider = ctx?.providerKind?.trim() || "模型厂商";
   return new Error(
-    isTimeout
+    isTransient
       ? formatUpstreamTimeoutMessage(provider)
       : `${provider} API 请求失败：${causeMsg || "fetch failed"}`,
   );
 }
 
-function isConnectTimeoutError(err: unknown): boolean {
+function collectFetchErrorBlob(err: unknown): string {
   const cause =
     err instanceof Error && err.cause != null ? err.cause : err;
   const causeMsg =
@@ -135,13 +135,31 @@ function isConnectTimeoutError(err: unknown): boolean {
       : cause != null
         ? String(cause)
         : "";
+  const errMsg = err instanceof Error ? err.message : "";
+  const causeCode =
+    cause != null && typeof cause === "object"
+      ? String((cause as { code?: string }).code ?? "")
+      : "";
+  const errCode =
+    err != null && typeof err === "object"
+      ? String((err as { code?: string }).code ?? "")
+      : "";
+  return `${errMsg} ${causeMsg} ${causeCode} ${errCode}`;
+}
+
+/**
+ * 上游握手/断线可重试：超时、TLS 未建立就断开、socket reset。
+ * 不含 ECONNREFUSED（多为地址/IPv6 问题，立即重试通常同样失败）。
+ */
+export function isTransientUpstreamConnectError(err: unknown): boolean {
+  const blob = collectFetchErrorBlob(err);
   return (
     /timeout|timed out|connect timeout|ssl connection timeout|socket timeout/i.test(
-      causeMsg,
+      blob,
     ) ||
-    (cause as { code?: string })?.code === "UND_ERR_CONNECT_TIMEOUT" ||
-    (cause as { code?: string })?.code === "UND_ERR_HEADERS_TIMEOUT" ||
-    (cause as { code?: string })?.code === "UND_ERR_BODY_TIMEOUT"
+    /socket disconnected|secure TLS connection|ECONNRESET|EPIPE|UND_ERR_SOCKET|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_BODY_TIMEOUT/i.test(
+      blob,
+    )
   );
 }
 
@@ -157,7 +175,7 @@ export async function gatewayFetch(
   try {
     return await fetch(url, reqInit);
   } catch (e) {
-    if (ctx?.hop === "upstream" && isConnectTimeoutError(e)) {
+    if (ctx?.hop === "upstream" && isTransientUpstreamConnectError(e)) {
       try {
         return await fetch(url, reqInit);
       } catch (retryErr) {

@@ -78,6 +78,10 @@ export function Pro2ScriptInputDock() {
 
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
+  useEffect(() => {
+    setDockMenu(null);
+  }, [dockNodeId]);
+
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
   const dockInput = d.dockInput ?? "";
   const dockRefImages = (d.dockRefImages ?? []) as StoryRefImage[];
@@ -272,6 +276,7 @@ export function Pro2ScriptInputDock() {
   return (
     <>
     <Pro2InputDockShell
+      key={storeNode.id}
       flowAnchor={placement}
       dockClassName="pro2-script-dock"
       hidden={dockHidden}
@@ -350,6 +355,8 @@ export function Pro2ScriptInputDock() {
         maxImages={12}
       >
         <MentionsEditable
+          key={storeNode.id}
+          sourceId={storeNode.id}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,

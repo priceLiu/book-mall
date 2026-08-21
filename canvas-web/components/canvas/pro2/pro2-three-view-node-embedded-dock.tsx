@@ -316,6 +316,8 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
         }
       >
         <MentionsEditable
+          key={nodeId}
+          sourceId={nodeId}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,

@@ -277,6 +277,8 @@ export function Pro2ImageNodeEmbeddedDock({
         maxImages={12}
       >
         <MentionsEditable
+          key={nodeId}
+          sourceId={nodeId}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,

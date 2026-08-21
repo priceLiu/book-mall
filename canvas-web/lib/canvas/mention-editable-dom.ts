@@ -57,6 +57,23 @@ export function createMentionBadge(
   return badge;
 }
 
+/** 上游改名后刷新已插入徽标的展示名（不重建 DOM，避免打乱光标） */
+export function syncMentionBadgeLabels(
+  root: HTMLElement,
+  mentionables: MentionableItem[],
+): void {
+  const byId = new Map(mentionables.map((m) => [m.id, m] as const));
+  for (const el of root.querySelectorAll(`[${MENTION_BADGE_ATTR}]`)) {
+    const id = el.getAttribute(MENTION_BADGE_ATTR);
+    if (!id) continue;
+    const item = byId.get(id);
+    if (!item?.label) continue;
+    if (el instanceof HTMLElement) el.dataset.mentionLabel = item.label;
+    const labelEl = el.querySelector("span.min-w-0");
+    if (labelEl) labelEl.textContent = `@${item.label}`;
+  }
+}
+
 /** 把一段普通文本（含换行）写入 fragment：换行用 <br> */
 function appendTextWithBreaks(target: DocumentFragment, text: string): void {
   const parts = text.split("\n");

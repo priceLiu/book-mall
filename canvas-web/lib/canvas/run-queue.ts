@@ -1354,6 +1354,27 @@ export function useCanvasRunner(
           : data;
 
         if (
+          node.type === "story-pro2-starter" ||
+          node.type === "story-pro-starter"
+        ) {
+          const links = resolvePro2DockUpstreamLinks(
+            nodeId,
+            node.type ?? "",
+            state.nodes,
+            state.edges,
+          );
+          const dockPrompt = String(
+            (runData as { themeInput?: string }).themeInput ?? "",
+          );
+          const { prompt: cleanedPrompt } = resolveDockRunPrompt(
+            dockPrompt,
+            links,
+          );
+          if (cleanedPrompt !== dockPrompt) {
+            runData = { ...runData, themeInput: cleanedPrompt };
+          }
+        }
+        if (
           node.type === "sbv1-image" ||
           node.type === "story-pro2-image" ||
           node.type === "story-pro2-three-view"

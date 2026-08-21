@@ -662,6 +662,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
           ) : (
             <MentionsEditable
               key={nodeId}
+              sourceId={nodeId}
               className={cn(
                 SBV1_CHAT_INPUT_TEXTAREA_CLASS,
                 RF_FORM_CONTROL,

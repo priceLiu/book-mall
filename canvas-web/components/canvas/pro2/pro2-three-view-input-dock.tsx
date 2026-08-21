@@ -79,6 +79,10 @@ export function Pro2ThreeViewInputDock() {
   const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-three-view");
 
+  useEffect(() => {
+    setDockMenu(null);
+  }, [dockNodeId]);
+
   const storeNode = useMemo(() => {
     if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
@@ -362,6 +366,7 @@ export function Pro2ThreeViewInputDock() {
   return (
     <>
       <Pro2InputDockShell
+        key={storeNode.id}
         flowAnchor={placement}
         dockClassName="pro2-three-view-dock"
         hidden={dockHidden}
@@ -404,6 +409,8 @@ export function Pro2ThreeViewInputDock() {
         }
       >
         <MentionsEditable
+          key={storeNode.id}
+          sourceId={storeNode.id}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,

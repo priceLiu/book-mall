@@ -98,12 +98,15 @@ export function libtvMediaNodeHeightForWidth(width: number): number {
 /** 整卡拖动光标（须配合无 dragHandle 节点） */
 export const LIBTV_CARD_DRAG_CLASS = "cursor-grab active:cursor-grabbing";
 
-/** LibTV 节点壳层交互描边 · 默认 #A2A2A2；hover 亮白加粗；选中保留版别色 */
+/** LibTV 节点壳层交互描边 · 默认 #A2A2A2；hover 亮白加粗向外扩，不挤内部 */
 export const LIBTV_NODE_BORDER_DEFAULT_COLOR = "#A2A2A2";
 export const LIBTV_NODE_BORDER_HOVER_COLOR = "#FFFFFF";
 export const LIBTV_NODE_BORDER_DEFAULT_WIDTH = 1.5;
+/** 视觉目标描边（含向外扩的一圈）· 布局仍用 DEFAULT_WIDTH */
 export const LIBTV_NODE_BORDER_HOVER_WIDTH = 3;
 export const LIBTV_NODE_BORDER_SELECTED_WIDTH = 1.5;
+export const LIBTV_NODE_BORDER_HOVER_OUTSET =
+  LIBTV_NODE_BORDER_HOVER_WIDTH - LIBTV_NODE_BORDER_DEFAULT_WIDTH;
 
 const LIBTV_NODE_BORDER_SELECTED_PRO2 = "rgba(167, 139, 250, 0.45)";
 const LIBTV_NODE_BORDER_SELECTED_SBV1 = "rgba(34, 211, 238, 0.5)";
@@ -132,9 +135,10 @@ export function libtvNodeBorderStyle(options: {
   }
   if (hovered) {
     return {
-      borderWidth: LIBTV_NODE_BORDER_HOVER_WIDTH,
+      borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
       borderColor: LIBTV_NODE_BORDER_HOVER_COLOR,
       borderStyle: "solid",
+      boxShadow: `0 0 0 ${LIBTV_NODE_BORDER_HOVER_OUTSET}px ${LIBTV_NODE_BORDER_HOVER_COLOR}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`,
     };
   }
   return {

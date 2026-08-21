@@ -37,6 +37,17 @@ describe("resolveDockRunPrompt", () => {
     expect(prompt).toBe("参考 生成海报");
     expect(extraText).toEqual(["AURORA 品牌调性：冷色科技 + 琥珀点缀"]);
   });
+
+  it("keeps user instruction after stripping text @ mention", () => {
+    const { prompt, extraText } = resolveDockRunPrompt(
+      "@<up-tag-1>\nExtract Pose 1 from the received text\n输出请转换为中文",
+      links,
+    );
+    expect(prompt).toContain("Extract Pose 1 from the received text");
+    expect(prompt).toContain("输出请转换为中文");
+    expect(prompt).not.toContain("@<up-tag-1>");
+    expect(extraText).toEqual(["AURORA 品牌调性：冷色科技 + 琥珀点缀"]);
+  });
 });
 
 describe("resolveSbv1VideoEngineRunPrompt", () => {

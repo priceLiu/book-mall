@@ -13,6 +13,7 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
@@ -124,20 +125,7 @@ function framePromptPlaceholder(role?: string): string {
 
 /** LibTV 统一图片节点 · 底部浮动输入坞（分镜 1.0 · 影视专业 2.0） */
 export function LibtvImageInputDock() {
-  const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
-  const { providers } = useUserProviders();
   const rfNodes = useNodes();
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
-  const setPro2StyleLibImageNodeId = useCanvasStore(
-    (s) => s.setPro2StyleLibImageNodeId,
-  );
-
-  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
-
   const suppressDock = useLibtvShouldSuppressFloatingDock();
   const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
   const pro2DockNodeId = useMemo(() => {
@@ -156,13 +144,46 @@ export function LibtvImageInputDock() {
   }, [rfNodes, suppressDock]);
 
   const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
-
-  const storeNode = useMemo(() => {
-    if (!dockNodeId) return null;
-    return nodes.find((n) => n.id === dockNodeId) ?? null;
-  }, [dockNodeId, nodes]);
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
+
+  if (suppressDock || !dockNodeId || !dockActive || !placement) return null;
+
+  return (
+    <LibtvImageInputDockBody
+      key={dockNodeId}
+      dockNodeId={dockNodeId}
+      placement={placement}
+      dockHidden={dockHidden}
+    />
+  );
+}
+
+function LibtvImageInputDockBody({
+  dockNodeId,
+  placement,
+  dockHidden,
+}: {
+  dockNodeId: string;
+  placement: LibtvDockFlowPlacement;
+  dockHidden: boolean;
+}) {
+  const base = useBookMallBaseUrl();
+  const { alert } = useDialogs();
+  const { providers } = useUserProviders();
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
+  const setPro2StyleLibImageNodeId = useCanvasStore(
+    (s) => s.setPro2StyleLibImageNodeId,
+  );
+
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
+
+  const storeNode = useMemo(() => {
+    return nodes.find((n) => n.id === dockNodeId) ?? null;
+  }, [dockNodeId, nodes]);
 
   const nodeType = (storeNode?.type ?? "sbv1-image") as DockImageNodeType;
   const isPro2 = isLibtvPro2ImageDockNodeType(nodeType);
@@ -505,7 +526,7 @@ export function LibtvImageInputDock() {
     ],
   );
 
-  if (suppressDock || !storeNode || !dockActive || !placement) return null;
+  if (!storeNode) return null;
 
   const usesEmbedded =
     nodeType === "sbv1-image"
@@ -623,6 +644,8 @@ export function LibtvImageInputDock() {
             <Pro2VisualStylePackBar hubNodeId={pro2Data.pro2HubNodeId} />
           ) : null}
           <MentionsEditable
+            key={storeNode.id}
+            sourceId={storeNode.id}
             className={cn(
               PRO2_DOCK_TEXTAREA_CLASS,
               RF_FORM_CONTROL,

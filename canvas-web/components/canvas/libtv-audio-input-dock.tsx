@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { ENGINE_PICKER_EMPTY_PARAMS } from "@/components/canvas/engine-picker";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -58,6 +58,10 @@ export function LibtvAudioInputDock() {
     if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
   }, [dockNodeId, nodes]);
+
+  useEffect(() => {
+    setDockMenu(null);
+  }, [dockNodeId]);
 
   const { placement, hidden: dockHidden } = useLibtvFloatingDock(dockNodeId);
 
@@ -168,6 +172,7 @@ export function LibtvAudioInputDock() {
 
   return (
     <Pro2InputDockShell
+      key={storeNode.id}
       flowAnchor={placement}
       dockClassName="pro2-audio-dock"
       hidden={dockHidden}
@@ -219,6 +224,8 @@ export function LibtvAudioInputDock() {
       }
     >
       <MentionsEditable
+        key={storeNode.id}
+        sourceId={storeNode.id}
         className={cn(
           PRO2_DOCK_TEXTAREA_CLASS,
           RF_FORM_CONTROL,

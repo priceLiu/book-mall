@@ -29,6 +29,7 @@ import {
   scriptStudioBatchRange,
 } from "./script-studio-prompts";
 import { isPro2GeneralTextNode, isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
+import { composeStoryProGeneralTextUserPrompt } from "./pro2-general-text-prompt";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 import { isLikelyVideoUrl } from "./media-url-kind";
 
@@ -189,9 +190,15 @@ export async function runStoryProStarterGeneralText(
   );
   const videoUrls = mediaUrls.filter((u) => isLikelyVideoUrl(u));
   const imageUrls = mediaUrls.filter((u) => !isLikelyVideoUrl(u));
-  let prompt =
-    (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
-    (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
+  const themeInput =
+    typeof data.themeInput === "string" ? data.themeInput : "";
+  const upstreamText = (args.node.textInputs ?? []).filter(
+    (s): s is string => typeof s === "string" && Boolean(s.trim()),
+  );
+  let prompt = composeStoryProGeneralTextUserPrompt({
+    themeInput,
+    textInputs: upstreamText,
+  });
   const preset = String(data.pro2PresetKind ?? "").trim();
   if (!prompt && preset === "image-to-prompt" && imageUrls.length > 0) {
     prompt = STORY_PRO2_IMAGE_TO_PROMPT_USER;
@@ -227,6 +234,8 @@ export async function runStoryProStarterGeneralText(
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "story-outline-engine",
+    // 上游正文已写入 prompt，避免 runStoryLlmEngineNode 再拼一遍 textInputs
+    textInputs: [],
     data: {
       ...data,
       prompt,

@@ -278,7 +278,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gemini-3-flash",
-    displayName: "Gemini 3 Flash (KIE · 多模态)",
+    displayName: "Gemini 3 Flash (KIE)",
     role: "LLM",
     description:
       "多模态视觉理解 + 文本生成。上游连接产品图 / 风格图 / 参数即可直接出设计方案。",
@@ -348,7 +348,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "flux-2-pro",
-    displayName: "Flux-2 Pro (KIE · 文生图)",
+    displayName: "Flux-2 Pro (KIE)",
     role: "IMAGE",
     description: "Black Forest Labs Flux-2 Pro · 高质量写实；有参考图时走图生图。",
     paramsSchema: [
@@ -368,7 +368,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "seedream-5-lite",
-    displayName: "Seedream 5.0 Lite (KIE · 文生图)",
+    displayName: "Seedream 5.0 Lite (KIE)",
     role: "IMAGE",
     description: "字节 Seedream 5 Lite · 写实文生图；有参考图时自动走图生图。",
     paramsSchema: SEEDREAM_ASPECT_SCHEMA,
@@ -376,7 +376,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "seedream-4.5",
-    displayName: "Seedream 4.5 (KIE · 文生图)",
+    displayName: "Seedream 4.5 (KIE)",
     role: "IMAGE",
     description: "Seedream 4.5 · 高质量写实；有参考图时走 Edit。",
     paramsSchema: SEEDREAM_ASPECT_SCHEMA,
@@ -429,7 +429,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gpt-image-2",
-    displayName: "GPT Image 2 (KIE · 文生图)",
+    displayName: "GPT Image 2 (KIE)",
     role: "IMAGE",
     description: "OpenAI GPT Image 2 · 海报 / 排版；有参考图时走图生图。",
     paramsSchema: [
@@ -451,7 +451,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gpt-image-1",
-    displayName: "GPT Image 1.5 (KIE · 文生图)",
+    displayName: "GPT Image 1.5 (KIE)",
     role: "IMAGE",
     description: "GPT Image 1.5 · 排版 / 平面海报；有参考图时走图生图。",
     paramsSchema: [
@@ -471,7 +471,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "qwen-text-to-image",
-    displayName: "Qwen (KIE · 文生图)",
+    displayName: "Qwen (KIE)",
     role: "IMAGE",
     description: "通义 Qwen 写实文生图；有参考图时走图生图。",
     paramsSchema: [
@@ -864,7 +864,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "bytedance/seedance-2",
-    displayName: "Seedance 2 (KIE · 图生视频)",
+    displayName: "Seedance 2 (KIE)",
     role: "VIDEO",
     description: "字节豆包 · 分镜图驱动视频。",
     paramsSchema: [
@@ -917,7 +917,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "bytedance/seedance-2-mini",
-    displayName: "Seedance 2.0 Mini (KIE · 图/视频生视频)",
+    displayName: "Seedance 2.0 Mini (KIE)",
     role: "VIDEO",
     description: "字节 Seedance 2 Mini · 轻量图/视频参考生视频。",
     paramsSchema: [

@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -23,6 +24,7 @@ import {
   createMentionBadge,
   MENTION_BADGE_ATTR,
   serializeEditable,
+  syncMentionBadgeLabels,
 } from "@/lib/canvas/mention-editable-dom";
 import {
   resolveCaretTextAnchor,
@@ -79,6 +81,8 @@ export type MentionsEditableProps = {
   /** LibTV Dock 内 placeholder 与正文共用 inset（默认 Pro2 大左侧留白） */
   dockInsetClassName?: string;
   commitHandleRef?: Ref<MentionsTextareaCommitHandle>;
+  /** 浮动 Dock 所属节点 id · 切换时强制重建，避免两个节点共用同一 contenteditable */
+  sourceId?: string;
 };
 
 type TriggerAnchor = {
@@ -144,6 +148,7 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       mentionEdition = "pro2",
       dockInsetClassName,
       commitHandleRef,
+      sourceId,
     },
     ref,
   ) {
@@ -184,7 +189,12 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
     );
 
     const { schedule, flush, onFocus, onBlur: deferOnBlur } =
-      useDeferredTextCommit(value, (store, meta) => emit(store, meta.commit));
+      useDeferredTextCommit(
+        value,
+        (store, meta) => emit(store, meta.commit),
+        undefined,
+        sourceId,
+      );
 
     /** 把当前 DOM 序列化并调度提交 */
     const syncFromDom = useCallback(
@@ -199,6 +209,26 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       },
       [flush, schedule],
     );
+
+    const sourceIdRef = useRef(sourceId);
+    useLayoutEffect(() => {
+      if (sourceId === sourceIdRef.current) return;
+      sourceIdRef.current = sourceId;
+      focusedRef.current = false;
+      const root = editorRef.current;
+      if (!root) return;
+      root.replaceChildren(
+        buildEditableFragment(value, mentionablesRef.current, mentionEdition),
+      );
+      lastValueRef.current = value;
+      setIsEmpty(value.length === 0);
+    }, [sourceId, value, mentionEdition]);
+
+    useEffect(() => {
+      const root = editorRef.current;
+      if (!root) return;
+      syncMentionBadgeLabels(root, mentionables);
+    }, [mentionables]);
 
     /** 外部 value / mentionables 变化时重建 DOM（聚焦中不动，避免破坏光标） */
     useEffect(() => {
