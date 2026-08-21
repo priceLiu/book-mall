@@ -26,6 +26,8 @@ type BillingDetailsPayload = {
   source?: string;
   tab?: "usage" | "charge";
   balanceCredits?: number;
+  /** @deprecated 与 balanceCredits 同义，兼容旧 API */
+  balancePoints?: number;
   totalCalls?: number;
   succeededCalls?: number;
   failedCalls?: number;

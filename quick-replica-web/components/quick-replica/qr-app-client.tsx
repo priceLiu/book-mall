@@ -843,9 +843,7 @@ export function QrAppClient({
         <button
           type="button"
           onClick={onHome}
-          className={`flex flex-col items-center gap-1 rounded-full px-3 py-1 text-[10px] ${
-            navMode === "home" ? "qr-nav-category-active" : "text-[var(--qr-text-muted)]"
-          }`}
+          className="flex flex-col items-center gap-1 rounded-full px-3 py-1 text-[10px] text-[var(--qr-text-muted)]"
         >
           <Home className="h-4 w-4" />
           首页

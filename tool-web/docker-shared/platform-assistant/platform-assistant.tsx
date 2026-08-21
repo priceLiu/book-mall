@@ -94,6 +94,20 @@ function renderInlineBold(text: string, keyPrefix: string) {
   });
 }
 
+/** 行首 emoji（不依赖 \\p{}，兼容 finance-web 等未设 target 的 tsconfig）。 */
+function lineStartsWithEmoji(s: string): boolean {
+  const cp = s.codePointAt(0);
+  if (cp == null) return false;
+  return (
+    (cp >= 0x1f300 && cp <= 0x1faff) ||
+    (cp >= 0x2600 && cp <= 0x27bf) ||
+    (cp >= 0x1f1e6 && cp <= 0x1f1ff) ||
+    (cp >= 0x2300 && cp <= 0x23ff) ||
+    cp === 0x2b50 ||
+    cp === 0x2728
+  );
+}
+
 function AssistantRichText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
@@ -103,8 +117,7 @@ function AssistantRichText({ text }: { text: string }) {
         if (!trimmed) return <div key={`ln-${i}`} className="pa-rich-gap" />;
         const isCategory =
           (/^【.+】$/.test(trimmed) ||
-            (/^[\p{Extended_Pictographic}]/u.test(trimmed) &&
-              !/^\d+\./.test(trimmed)));
+            (lineStartsWithEmoji(trimmed) && !/^\d+\./.test(trimmed)));
         const isNumbered = /^\d+\.\s/.test(trimmed);
         const isSubField =
           /^(核心事实|热度依据|简要点评)[：:]/.test(trimmed) ||
