@@ -1,8 +1,11 @@
 import { extractManagedOssObjectKey } from "@/lib/oss-delete-object";
 import { readOssEnv } from "@/lib/oss-client";
+import { canvasProjectEditionFromGraph } from "@/lib/canvas/canvas-story-edition";
 import {
   pickPersistableProjectThumbnailUrl,
+  pickPersistableProjectThumbnailUrlPreferVideo,
   pickProjectThumbnailUrl,
+  pickProjectThumbnailUrlPreferVideo,
 } from "./pick-project-thumbnail";
 
 function isTrustworthyStoredThumbnail(url: string): boolean {
@@ -21,11 +24,18 @@ export function resolveListThumbnailUrl(args: {
   canvas: unknown;
 }): string {
   const stored = args.storedUrl?.trim() ?? "";
-  const persistable = pickPersistableProjectThumbnailUrl(args.canvas);
+  const preferVideo = canvasProjectEditionFromGraph(args.canvas) === "sbv1";
+  const pickPersistable = preferVideo
+    ? pickPersistableProjectThumbnailUrlPreferVideo
+    : pickPersistableProjectThumbnailUrl;
+  const pickDisplay = preferVideo
+    ? pickProjectThumbnailUrlPreferVideo
+    : pickProjectThumbnailUrl;
+  const persistable = pickPersistable(args.canvas);
 
   if (persistable && (!stored || !isTrustworthyStoredThumbnail(stored))) {
     return persistable;
   }
   if (stored) return stored;
-  return pickProjectThumbnailUrl(args.canvas);
+  return pickDisplay(args.canvas);
 }

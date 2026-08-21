@@ -21,10 +21,16 @@ import {
 import { getActiveTenantContext } from "@/lib/tenant/context";
 import {
   pickPersistableProjectThumbnailUrl,
+  pickPersistableProjectThumbnailUrlPreferVideo,
   pickProjectThumbnailUrl,
+  pickProjectThumbnailUrlPreferVideo,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
 import { isPortalFilmShowcaseProject } from "@/lib/canvas/sbv1-film-showcase";
+import {
+  LIST_COVER_MEDIA_NODE_TYPES,
+  projectListCoverSummaryFields,
+} from "@/lib/canvas/canvas-project-list-cover";
 import {
   applyCanvasDelta,
   assertCanvasDeltaBaseUpdatedAt,
@@ -66,6 +72,12 @@ export type CanvasProjectSummary = {
   description: string;
   thumbnailUrl: string;
   edition: CanvasProjectEdition;
+  /** sbv1 · 列表封面媒体类型（成片 / 分镜图） */
+  coverMediaKind?: "image" | "video";
+  /** sbv1 · 悬停播放的成片 URL */
+  coverVideoUrl?: string;
+  /** sbv1 · 成片静态封面 */
+  coverPosterUrl?: string;
   /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
   collaborationLocked: boolean;
   createdAt: string;
@@ -91,13 +103,20 @@ function resolveThumbnailUrl(p: {
   canvas: unknown;
 }): string {
   const stored = p.thumbnailUrl?.trim() ?? "";
-  const persistable = pickPersistableProjectThumbnailUrl(p.canvas);
+  const preferVideo = canvasProjectEditionFromGraph(p.canvas) === "sbv1";
+  const pickPersistable = preferVideo
+    ? pickPersistableProjectThumbnailUrlPreferVideo
+    : pickPersistableProjectThumbnailUrl;
+  const pickDisplay = preferVideo
+    ? pickProjectThumbnailUrlPreferVideo
+    : pickProjectThumbnailUrl;
+  const persistable = pickPersistable(p.canvas);
 
   if (persistable && (!stored || !isTrustworthyStoredThumbnail(stored))) {
     return persistable;
   }
   if (stored) return stored;
-  return pickProjectThumbnailUrl(p.canvas);
+  return pickDisplay(p.canvas);
 }
 
 function duplicateProjectName(sourceName: string): string {
@@ -106,6 +125,21 @@ function duplicateProjectName(sourceName: string): string {
   const next = `${base}${suffix}`;
   if (next.length <= MAX_NAME) return next;
   return `${base.slice(0, MAX_NAME - suffix.length)}${suffix}`;
+}
+
+function enrichSummaryWithListCover(
+  summary: CanvasProjectSummary,
+  canvas: unknown,
+): CanvasProjectSummary {
+  const cover = projectListCoverSummaryFields(canvas);
+  if (!cover.coverMediaKind) return summary;
+  return {
+    ...summary,
+    thumbnailUrl: cover.thumbnailUrl ?? summary.thumbnailUrl,
+    coverMediaKind: cover.coverMediaKind,
+    coverVideoUrl: cover.coverVideoUrl,
+    coverPosterUrl: cover.coverPosterUrl,
+  };
 }
 
 function toSummary(p: {
@@ -121,12 +155,16 @@ function toSummary(p: {
     p.canvas && typeof p.canvas === "object"
       ? (p.canvas as { meta?: unknown })
       : null;
+  const sbv1Cover = projectListCoverSummaryFields(p.canvas);
   return {
     id: p.id,
     name: p.name,
     description: p.description,
-    thumbnailUrl: resolveThumbnailUrl(p),
+    thumbnailUrl: sbv1Cover.thumbnailUrl ?? resolveThumbnailUrl(p),
     edition: canvasProjectEditionFromGraph(p.canvas),
+    coverMediaKind: sbv1Cover.coverMediaKind,
+    coverVideoUrl: sbv1Cover.coverVideoUrl,
+    coverPosterUrl: sbv1Cover.coverPosterUrl,
     collaborationLocked: canvasProjectHasCollaboration(canvas?.meta),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
@@ -147,6 +185,12 @@ type CanvasProjectListRow = {
 function parseListNodeTypes(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   return raw.filter((t): t is string => typeof t === "string");
+}
+
+function rowNeedsListCoverEnrichment(row: CanvasProjectListRow): boolean {
+  const types = parseListNodeTypes(row.nodeTypes);
+  if (!types?.length) return false;
+  return types.some((t) => LIST_COVER_MEDIA_NODE_TYPES.has(t));
 }
 
 function listRowToSummary(row: CanvasProjectListRow): CanvasProjectSummary {
@@ -191,15 +235,31 @@ export async function listCanvasProjectsForUser(
     ORDER BY cp."updatedAt" DESC
     LIMIT 200
   `;
-  return rows
-    .map(listRowToSummary)
-    .filter(
-      (_, i) =>
-        !isRetiredLegacyPro2FromListHints(
-          rows[i]!.meta,
-          parseListNodeTypes(rows[i]!.nodeTypes),
-        ),
-    );
+  const filtered = rows.filter(
+    (_, i) =>
+      !isRetiredLegacyPro2FromListHints(
+        rows[i]!.meta,
+        parseListNodeTypes(rows[i]!.nodeTypes),
+      ),
+  );
+
+  const enrichIds = filtered
+    .filter((row) => rowNeedsListCoverEnrichment(row))
+    .map((row) => row.id);
+  const canvasRows =
+    enrichIds.length > 0
+      ? await prisma.canvasProject.findMany({
+          where: { id: { in: enrichIds } },
+          select: { id: true, canvas: true },
+        })
+      : [];
+  const canvasById = new Map(canvasRows.map((row) => [row.id, row.canvas]));
+
+  return filtered.map((row) => {
+    const summary = listRowToSummary(row);
+    const canvas = canvasById.get(row.id);
+    return canvas ? enrichSummaryWithListCover(summary, canvas) : summary;
+  });
 }
 
 function defaultCanvasProjectName(now = new Date()): string {
@@ -549,7 +609,7 @@ export async function duplicatePortalCaseProjectForUser(
   };
 }
 
-/** 从影视案例墙复制 sbv1 项目（首页案例 / 精选 / 平台示范） */
+/** 从影视案例墙复制 sbv1 项目（portalCase 分镜 1.0） */
 export async function duplicatePortalFilmShowcaseProjectForUser(
   userId: string,
   sourceProjectId: string,

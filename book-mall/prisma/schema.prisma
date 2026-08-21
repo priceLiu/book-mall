@@ -1974,6 +1974,10 @@ model CanvasProject {
   portalCaseSort  Int     @default(0)
   portalCaseBlurb String  @default("") @db.Text
 
+  /// 门户首页影视案例（分镜视频 1.0 · 团队客户案例媒体墙）
+  portalFilmCase      Boolean @default(false)
+  portalFilmCaseSort  Int     @default(0)
+
   deletedAt DateTime?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
@@ -1993,6 +1997,7 @@ model CanvasProject {
   @@index([tenantId, visibility, updatedAt])
   @@index([portalFeatured, portalFeaturedSort])
   @@index([portalCase, portalCaseSort])
+  @@index([portalFilmCase, portalFilmCaseSort])
 }
 
 /// 用户提交画布 → 管理员审核 → 案例 / 精选 / 模板

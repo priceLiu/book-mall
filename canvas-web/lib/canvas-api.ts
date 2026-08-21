@@ -67,6 +67,12 @@ export type CanvasProjectSummary = {
   description: string;
   thumbnailUrl: string;
   edition: "pro" | "pro2" | "sbv1" | "standard";
+  /** sbv1 · 列表封面媒体类型 */
+  coverMediaKind?: "image" | "video";
+  /** sbv1 · 悬停播放的成片 URL */
+  coverVideoUrl?: string;
+  /** sbv1 · 成片静态封面 */
+  coverPosterUrl?: string;
   /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
   collaborationLocked?: boolean;
   /** 列表接口可选 · 用于退役 Pro2 画布过滤 */
@@ -350,6 +356,7 @@ export type PortalFilmShowcaseMedia = {
   id: string;
   url: string;
   kind: "image" | "video";
+  posterUrl?: string;
   sourceKind: "project" | "template";
   sourceId: string;
   projectName: string;

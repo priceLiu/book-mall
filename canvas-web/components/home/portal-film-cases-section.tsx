@@ -2,33 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clapperboard, Film, ImageIcon, Loader2, Search } from "lucide-react";
+import { Clapperboard, Loader2, Search } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { ProjectCoverMedia } from "@/components/canvas/project-cover-media";
+import { FilmShowcaseCardMedia } from "@/components/home/film-showcase-card-media";
+import { ShowcaseMediaKindBadge } from "@/components/home/showcase-media-kind-badge";
 import { CANVAS_LIST_GRID_CLASS } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
 import {
   duplicatePortalFilmShowcaseProject,
-  forkCanvasTemplate,
   listPortalFilmShowcase,
-  createCanvasProject,
   type PortalFilmShowcaseMedia,
 } from "@/lib/canvas-api";
-import { cloneGraphForNewProject } from "@/lib/canvas/clone";
-import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
-import type { CanvasGraph } from "@/lib/canvas/types";
 
 function ownerLabel(
   owner?: { id: string; name: string | null; email: string | null } | null,
 ): string {
-  if (!owner) return "社区用户";
+  if (!owner) return "团队客户";
   const name = owner.name?.trim();
   if (name) return name;
   const email = owner.email?.trim();
   if (email) return email.split("@")[0] ?? email;
-  return "用户";
+  return "团队客户";
 }
 
 export function PortalFilmCasesSection() {
@@ -53,11 +49,11 @@ export function PortalFilmCasesSection() {
     setLoading(true);
     setError(null);
 
-    void listPortalFilmShowcase(base, 48)
+    void listPortalFilmShowcase(base)
       .then(setItems)
       .catch((e) => {
         setItems([]);
-        setError(e instanceof Error ? e.message : "影视案例加载失败，请稍后重试");
+        setError(e instanceof Error ? e.message : "视频作品加载失败，请稍后重试");
       })
       .finally(() => setLoading(false));
   }, [base]);
@@ -82,16 +78,6 @@ export function PortalFilmCasesSection() {
       setCopyingId(item.sourceId);
       setError(null);
       try {
-        if (item.sourceKind === "template") {
-          const forked = await forkCanvasTemplate(base, item.sourceId);
-          const graph = migrateGraphV1ToV2(forked.canvas as CanvasGraph);
-          const created = await createCanvasProject(base, {
-            name: `${item.projectName} 画布`,
-            canvas: cloneGraphForNewProject(graph),
-          });
-          window.location.href = `/canvas/${created.id}`;
-          return;
-        }
         const created = await duplicatePortalFilmShowcaseProject(base, item.sourceId);
         window.location.href = `/canvas/${created.id}`;
       } catch (e) {
@@ -104,11 +90,7 @@ export function PortalFilmCasesSection() {
 
   const openItem = useCallback(
     (item: PortalFilmShowcaseMedia) => {
-      if (
-        item.sourceKind === "project" &&
-        viewerUserId &&
-        item.owner?.id === viewerUserId
-      ) {
+      if (viewerUserId && item.owner?.id === viewerUserId) {
         window.location.href = `/canvas/${item.sourceId}`;
         return;
       }
@@ -125,10 +107,7 @@ export function PortalFilmCasesSection() {
             <Clapperboard className="size-4 text-cyan-400/90" />
             Storyboard Video 1.0
           </p>
-          <h2 className="mt-2 text-xl font-semibold text-white">影视案例</h2>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--canvas-muted)]">
-            分镜视频 1.0 已入库的分镜图与成片，按项目内 OSS 媒体展示；预览后可复制到你的画布继续编辑。
-          </p>
+          <h2 className="mt-2 text-xl font-semibold text-white">视频作品</h2>
         </div>
         <div className="relative w-full max-w-xs shrink-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--canvas-muted)]" />
@@ -136,7 +115,7 @@ export function PortalFilmCasesSection() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索影视案例"
+            placeholder="搜索视频作品"
             className="w-full rounded-full border border-[var(--canvas-border)] bg-[var(--canvas-surface)] py-2 pl-9 pr-4 text-sm text-white placeholder:text-[var(--canvas-muted)] focus:border-cyan-400/40 focus:outline-none"
           />
         </div>
@@ -147,41 +126,34 @@ export function PortalFilmCasesSection() {
       {loading ? (
         <div className="mt-8 flex items-center gap-2 py-12 text-sm text-[var(--canvas-muted)]">
           <Loader2 className="size-4 animate-spin" />
-          加载影视案例…
+          加载视频作品…
         </div>
       ) : filtered.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
           {items.length === 0
-            ? "暂无影视案例。在分镜视频 1.0 画布中生成并入库的图片/视频会自动展示在这里。"
-            : "没有匹配的影视案例，请换个关键词试试。"}
+            ? "暂无视频作品。管理员将分镜 1.0 项目设为「视频作品」后，其已入库成片与分镜图会展示在这里。"
+            : "没有匹配的视频作品，请换个关键词试试。"}
         </p>
       ) : (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
           {filtered.map((item) => {
             const own =
-              item.sourceKind === "project" &&
-              viewerUserId != null &&
-              item.owner?.id === viewerUserId;
+              viewerUserId != null && item.owner?.id === viewerUserId;
             const busy = copyingId === item.sourceId;
 
             const cardInner = (
               <>
                 <div className="relative aspect-[340/190] w-full overflow-hidden rounded-xl bg-[var(--canvas-surface-2)]">
                   <div className="absolute inset-0 size-full">
-                    <ProjectCoverMedia
+                    <FilmShowcaseCardMedia
                       url={item.url}
                       alt={item.projectName}
+                      kind={item.kind}
+                      posterUrl={item.posterUrl}
                       placeholderLetter={item.projectName}
                     />
                   </div>
-                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] text-white/90 backdrop-blur-sm">
-                    {item.kind === "video" ? (
-                      <Film className="size-3" aria-hidden />
-                    ) : (
-                      <ImageIcon className="size-3" aria-hidden />
-                    )}
-                    {item.kind === "video" ? "视频" : "分镜图"}
-                  </span>
+                  <ShowcaseMediaKindBadge kind={item.kind} />
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <span
@@ -197,9 +169,6 @@ export function PortalFilmCasesSection() {
                     分镜 1.0
                   </span>
                 </div>
-                <h3 className="mt-2 line-clamp-2 text-sm font-medium text-white">
-                  {item.projectName}
-                </h3>
                 {busy ? (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-cyan-300/90">
                     <Loader2 className="size-3 animate-spin" />
@@ -239,6 +208,8 @@ export function PortalFilmCasesSection() {
           name={preview.projectName}
           description={preview.description}
           thumbnailUrl={preview.url}
+          mediaKind={preview.kind}
+          posterUrl={preview.posterUrl}
           onClose={() => setPreview(null)}
           onCopy={() => void onCopy(preview)}
           copying={copyingId === preview.sourceId}

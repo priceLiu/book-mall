@@ -23,7 +23,7 @@ import {
   type PortalCaseProjectSummary,
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
-import { cloneGraphForNewProject } from "@/lib/canvas/clone";
+import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
@@ -76,6 +76,12 @@ function isOwnItem(item: DiscoveryItem, viewerUserId: string | null): boolean {
   if (item.ownerId === viewerUserId) return true;
   if (item.template && templateOwnerId(item.template) === viewerUserId) return true;
   return false;
+}
+
+function discoveryListCoverProps(item: DiscoveryItem) {
+  const project = item.featuredProject ?? item.caseProject;
+  if (project) return canvasListCoverPropsFromProject(project);
+  return { url: item.thumbnailUrl };
 }
 
 function templateItem(t: CanvasTemplateRecord): DiscoveryItem {
@@ -384,9 +390,9 @@ export function PortalDiscoverySection() {
             const cardInner = (
               <>
                 <CanvasListCover
-                  url={item.thumbnailUrl}
                   name={item.name}
                   graph={item.template?.canvas as CanvasGraph | undefined}
+                  {...discoveryListCoverProps(item)}
                 />
                 <div className="mt-3 flex items-center gap-2">
                   <span
@@ -463,7 +469,9 @@ export function PortalDiscoverySection() {
         <TemplatePreviewDialog
           name={preview.item.name}
           description={preview.item.portalFeaturedBlurb || preview.item.description}
-          thumbnailUrl={preview.item.thumbnailUrl}
+          thumbnailUrl={preview.item.coverVideoUrl ?? preview.item.thumbnailUrl}
+          mediaKind={preview.item.coverMediaKind}
+          posterUrl={preview.item.coverPosterUrl}
           onClose={() => setPreview(null)}
           onCopy={() => void onCopyFeatured(preview.item)}
           copying={forkingId === preview.item.id}
@@ -474,7 +482,9 @@ export function PortalDiscoverySection() {
         <TemplatePreviewDialog
           name={preview.item.name}
           description={preview.item.portalCaseBlurb || preview.item.description}
-          thumbnailUrl={preview.item.thumbnailUrl}
+          thumbnailUrl={preview.item.coverVideoUrl ?? preview.item.thumbnailUrl}
+          mediaKind={preview.item.coverMediaKind}
+          posterUrl={preview.item.coverPosterUrl}
           onClose={() => setPreview(null)}
           onCopy={() => void onCopyCase(preview.item)}
           copying={forkingId === preview.item.id}

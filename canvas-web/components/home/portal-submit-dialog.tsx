@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { CanvasPortalPublishKind } from "@/lib/canvas-api";
+import type { CanvasProjectEdition } from "@/lib/canvas/project-edition";
 
-const USER_REVIEW_OPTIONS: {
+type PublishOption = {
   kind: CanvasPortalPublishKind;
   label: string;
   hint: string;
-}[] = [
+};
+
+const PRO2_USER_OPTIONS: PublishOption[] = [
   {
     kind: "PUBLIC_TEMPLATE",
     label: "社区模板",
@@ -22,20 +25,55 @@ const USER_REVIEW_OPTIONS: {
   },
 ];
 
-const ADMIN_OPTIONS: {
-  kind: CanvasPortalPublishKind;
-  label: string;
-  hint: string;
-}[] = [
+const SBV1_USER_OPTIONS: PublishOption[] = [
+  {
+    kind: "CASE",
+    label: "视频作品",
+    hint: "提交后由管理员审核，通过后展示在首页「视频作品」成片",
+  },
+  {
+    kind: "PUBLIC_TEMPLATE",
+    label: "社区模板",
+    hint: "立即公开到首页「模板」，他人可复制到你的画布",
+  },
+];
+
+const PRO2_ADMIN_OPTIONS: PublishOption[] = [
   { kind: "CASE", label: "案例墙", hint: "立即发布到首页「案例」" },
   { kind: "FEATURED", label: "精选工作流", hint: "立即发布到首页「精选」" },
   { kind: "PUBLIC_TEMPLATE", label: "社区模板", hint: "立即公开，他人可复制" },
   { kind: "TEMPLATE", label: "私有模板", hint: "仅自己可用的工作流模板" },
 ];
 
+const SBV1_ADMIN_OPTIONS: PublishOption[] = [
+  {
+    kind: "CASE",
+    label: "视频作品",
+    hint: "立即发布到首页「视频作品」，展示项目内已入库成片",
+  },
+  { kind: "PUBLIC_TEMPLATE", label: "社区模板", hint: "立即公开，他人可复制" },
+  { kind: "TEMPLATE", label: "私有模板", hint: "仅自己可用的工作流模板" },
+];
+
+function resolveOptions(
+  edition: CanvasProjectEdition | undefined,
+  isAdmin: boolean,
+): PublishOption[] {
+  if (edition === "sbv1") {
+    return isAdmin ? SBV1_ADMIN_OPTIONS : SBV1_USER_OPTIONS;
+  }
+  return isAdmin ? PRO2_ADMIN_OPTIONS : PRO2_USER_OPTIONS;
+}
+
+function defaultKind(options: PublishOption[], isAdmin: boolean): CanvasPortalPublishKind {
+  if (options.some((o) => o.kind === "CASE")) return "CASE";
+  return isAdmin ? "CASE" : "PUBLIC_TEMPLATE";
+}
+
 type Props = {
   open: boolean;
   projectName: string;
+  edition?: CanvasProjectEdition;
   isAdmin?: boolean;
   /** 画布内分享 vs 项目列表投稿 */
   context?: "canvas" | "projects";
@@ -46,15 +84,23 @@ type Props = {
 export function PortalSubmitDialog({
   open,
   projectName,
+  edition,
   isAdmin = false,
   context = "projects",
   onClose,
   onSubmit,
 }: Props) {
-  const options = isAdmin ? ADMIN_OPTIONS : USER_REVIEW_OPTIONS;
-  const [kind, setKind] = useState<CanvasPortalPublishKind>(options[0].kind);
+  const options = useMemo(
+    () => resolveOptions(edition, isAdmin),
+    [edition, isAdmin],
+  );
+  const [kind, setKind] = useState<CanvasPortalPublishKind>(() =>
+    defaultKind(options, isAdmin),
+  );
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const isSbv1 = edition === "sbv1";
 
   const dialogTitle = isAdmin
     ? context === "canvas"
@@ -66,11 +112,19 @@ export function PortalSubmitDialog({
 
   useEffect(() => {
     if (!open) return;
-    setKind(isAdmin ? "CASE" : "PUBLIC_TEMPLATE");
+    setKind(defaultKind(options, isAdmin));
     setNote("");
-  }, [open, isAdmin]);
+  }, [open, isAdmin, options]);
 
   if (!open) return null;
+
+  const canvasHint = isAdmin
+    ? isSbv1
+      ? "管理员可直接发布到首页「视频作品」或「模板」；发布前已自动保存当前画布。"
+      : "管理员可直接发布到首页「精选」「案例」或「模板」；发布前已自动保存当前画布。"
+    : isSbv1
+      ? "视频作品需管理员审核通过后，在首页展示已入库成片。"
+      : "社区模板即时公开；精选与案例需管理员审核通过后展示。";
 
   return (
     <div
@@ -89,11 +143,7 @@ export function PortalSubmitDialog({
           项目：{projectName}
         </p>
         {context === "canvas" ? (
-          <p className="mt-2 text-xs text-[var(--canvas-muted)]">
-            {isAdmin
-              ? "管理员可直接发布到首页「精选」「案例」或「模板」；发布前已自动保存当前画布。"
-              : "社区模板即时公开；精选与案例需管理员审核通过后展示。"}
-          </p>
+          <p className="mt-2 text-xs text-[var(--canvas-muted)]">{canvasHint}</p>
         ) : null}
 
         <ul className="mt-4 space-y-2">

@@ -15,7 +15,13 @@ import {
   type CanvasProjectSummary,
   getCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";
-import { pickPersistableProjectThumbnailUrl, pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
+import {
+  pickPersistableProjectThumbnailUrl,
+  pickPersistableProjectThumbnailUrlPreferVideo,
+  pickProjectThumbnailUrl,
+  pickProjectThumbnailUrlPreferVideo,
+} from "@/lib/canvas/pick-project-thumbnail";
+import { projectListCoverSummaryFields } from "@/lib/canvas/canvas-project-list-cover";
 
 export type PortalCaseProjectSummary = CanvasProjectSummary & {
   portalCaseBlurb: string;
@@ -71,14 +77,24 @@ function toSummaryWithEdition(p: {
     p.canvas && typeof p.canvas === "object"
       ? (p.canvas as { meta?: unknown })
       : null;
+  const edition = canvasProjectEditionFromGraph(p.canvas);
   const stored = p.thumbnailUrl?.trim() ?? "";
-  const thumbnailUrl = stored || pickProjectThumbnailUrl(p.canvas) || "";
+  const listCover = projectListCoverSummaryFields(p.canvas);
+  const fromCanvas =
+    listCover.thumbnailUrl ||
+    pickPersistableProjectThumbnailUrlPreferVideo(p.canvas) ||
+    pickProjectThumbnailUrlPreferVideo(p.canvas) ||
+    pickProjectThumbnailUrl(p.canvas);
+  const thumbnailUrl = fromCanvas || stored || "";
   return {
     id: p.id,
     name: p.name,
     description: p.description,
     thumbnailUrl,
-    edition: canvasProjectEditionFromGraph(p.canvas),
+    edition,
+    coverMediaKind: listCover.coverMediaKind,
+    coverVideoUrl: listCover.coverVideoUrl,
+    coverPosterUrl: listCover.coverPosterUrl,
     collaborationLocked: canvasProjectHasCollaboration(canvas?.meta),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
@@ -97,10 +113,28 @@ function matchesPortalCaseEdition(
   return resolved === "pro2" && !isRetiredLegacyPro2Canvas(canvas);
 }
 
-/** 门户首页 · 案例墙项目（默认 pro2；传 edition=sbv1 供「影视案例」区块） */
+/** 门户首页 · 案例墙项目（默认 pro2；传 edition=sbv1 为影视案例项目列表） */
 export async function listPortalCaseCanvasProjects(opts?: {
   edition?: CanvasProjectEdition;
 }): Promise<PortalCaseProjectSummary[]> {
+  if (opts?.edition === "sbv1") {
+    const rows = await prisma.canvasProject.findMany({
+      where: { portalFilmCase: true, deletedAt: null },
+      orderBy: [{ portalFilmCaseSort: "asc" }, { updatedAt: "desc" }],
+      take: 100,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+    return rows
+      .filter((p) => matchesPortalCaseEdition(p.canvas, "sbv1"))
+      .map((p) => ({
+        ...toSummaryWithEdition(p),
+        portalCaseBlurb: portalCaseBlurbOf(p),
+        owner: p.user,
+      }));
+  }
+
   const rows = await prisma.canvasProject.findMany({
     where: { portalCase: true, deletedAt: null },
     orderBy: [{ portalCaseSort: "asc" }, { updatedAt: "desc" }],
@@ -118,7 +152,7 @@ export async function listPortalCaseCanvasProjects(opts?: {
     }));
 }
 
-/** 管理员 · 设置/取消门户案例 */
+/** 管理员 · 设置/取消门户案例（Pro2 案例墙 / sbv1 影视案例） */
 export async function setCanvasProjectPortalCase(args: {
   projectId: string;
   case: boolean;
@@ -131,13 +165,24 @@ export async function setCanvasProjectPortalCase(args: {
   });
   if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
 
+  const edition = canvasProjectEditionFromGraph(p.canvas);
+  const isFilmCase = edition === "sbv1";
+
   const updated = await prisma.canvasProject.update({
     where: { id: args.projectId },
-    data: {
-      portalCase: args.case,
-      ...(typeof args.sort === "number" ? { portalCaseSort: args.sort } : {}),
-      ...(typeof args.blurb === "string" ? { portalCaseBlurb: args.blurb } : {}),
-    },
+    data: isFilmCase
+      ? {
+          portalFilmCase: args.case,
+          ...(typeof args.sort === "number"
+            ? { portalFilmCaseSort: args.sort }
+            : {}),
+          ...(typeof args.blurb === "string" ? { portalCaseBlurb: args.blurb } : {}),
+        }
+      : {
+          portalCase: args.case,
+          ...(typeof args.sort === "number" ? { portalCaseSort: args.sort } : {}),
+          ...(typeof args.blurb === "string" ? { portalCaseBlurb: args.blurb } : {}),
+        },
     include: { user: { select: { id: true, name: true, email: true } } },
   });
   return {
@@ -264,12 +309,21 @@ async function applyPortalPublication(
   if (!project) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
 
   switch (kind) {
-    case "CASE":
-      await prisma.canvasProject.update({
-        where: { id: projectId },
-        data: { portalCase: true },
-      });
+    case "CASE": {
+      const edition = canvasProjectEditionFromGraph(project.canvas);
+      if (edition === "sbv1") {
+        await prisma.canvasProject.update({
+          where: { id: projectId },
+          data: { portalFilmCase: true },
+        });
+      } else {
+        await prisma.canvasProject.update({
+          where: { id: projectId },
+          data: { portalCase: true },
+        });
+      }
       break;
+    }
     case "FEATURED":
       await prisma.canvasProject.update({
         where: { id: projectId },

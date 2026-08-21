@@ -30,13 +30,13 @@ const HERO_BG_LAYERS = [
   {
     key: "left",
     className: "inset-y-0 left-0 w-[58%] [mask-image:linear-gradient(to_right,black_55%,transparent)]",
-    opacity: 0.48,
+    opacity: 0.58,
   },
   {
     key: "right",
     className:
       "inset-y-0 right-0 w-[58%] [mask-image:linear-gradient(to_left,black_55%,transparent)]",
-    opacity: 0.42,
+    opacity: 0.52,
   },
 ] as const;
 
@@ -109,8 +109,8 @@ function PortalHeroBackdrop({
           </div>
         );
       })}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_60%_at_50%_50%,var(--canvas-surface)_0%,var(--canvas-surface)_38%,transparent_100%)]" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[var(--canvas-surface)]/55 via-[var(--canvas-surface)]/20 to-[var(--canvas-surface)]/55" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_60%_at_50%_50%,color-mix(in_srgb,var(--canvas-surface)_72%,transparent)_0%,color-mix(in_srgb,var(--canvas-surface)_28%,transparent)_38%,transparent_100%)]" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[var(--canvas-surface)]/28 via-[var(--canvas-surface)]/8 to-[var(--canvas-surface)]/28" />
     </div>
   );
 }
@@ -257,7 +257,7 @@ export function PortalHeroSection() {
   return (
     <section className="canvas-page pt-8 pb-4">
       <div
-        className="relative flex min-h-[22rem] items-center justify-center overflow-hidden rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] px-6 py-16 sm:min-h-[28rem] sm:px-10 sm:py-20"
+        className="relative flex min-h-[22rem] items-center justify-center overflow-hidden rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)]/35 px-6 py-16 backdrop-blur-[2px] sm:min-h-[28rem] sm:px-10 sm:py-20"
       >
         <PortalHeroBackdrop leftUrl={leftUrl} rightUrl={rightUrl} />
         <div className="relative z-10 flex flex-col items-center text-center">

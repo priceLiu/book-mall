@@ -1,5 +1,5 @@
 /**
- * 门户「影视案例」：从分镜视频 1.0 画布提取已入库 OSS 图片/视频。
+ * 门户「影视案例」：仅展示已标记 portalFilmCase 的分镜视频 1.0 项目内已入库 OSS 图片/视频。
  */
 import {
   canvasProjectEditionFromGraph,
@@ -8,12 +8,12 @@ import {
 import {
   isProjectThumbnailVideoUrl,
   pickPersistableProjectThumbnailUrl,
-  pickProjectThumbnailUrl,
+  pickPersistableProjectThumbnailUrlPreferVideo,
 } from "@/lib/canvas/pick-project-thumbnail";
-import { getPlatformGatewayAdminEmails } from "@/lib/gateway/platform-credential-copy";
 import { prisma } from "@/lib/prisma";
 
-const SBV1_MEDIA_NODE_TYPES = new Set(["sbv1-image", "sbv1-video-engine"]);
+const SBV1_IMAGE_NODE = "sbv1-image";
+const SBV1_VIDEO_NODE = "sbv1-video-engine";
 
 export type PortalFilmShowcaseMediaKind = "image" | "video";
 
@@ -21,12 +21,19 @@ export type PortalFilmShowcaseMedia = {
   id: string;
   url: string;
   kind: PortalFilmShowcaseMediaKind;
-  /** project | template */
-  sourceKind: "project" | "template";
+  /** 视频封面（悬停播放前展示） */
+  posterUrl?: string;
+  sourceKind: "project";
   sourceId: string;
   projectName: string;
   description: string;
   owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+type Sbv1ShowcaseMediaEntry = {
+  url: string;
+  kind: PortalFilmShowcaseMediaKind;
+  posterUrl?: string;
 };
 
 function readRuntime(data: Record<string, unknown>) {
@@ -36,65 +43,141 @@ function readRuntime(data: Record<string, unknown>) {
     : undefined;
 }
 
-/** 仅稳定 OSS / poster，避免 ephemeral 过期 */
-function persistableUrlFromNodeData(data: unknown): string {
+/** 分镜图节点：优先 poster / ossUrl / imageUrl */
+function persistableImageUrlFromNodeData(data: unknown): string {
   if (!data || typeof data !== "object") return "";
   const d = data as Record<string, unknown>;
   const runtime = readRuntime(d);
 
   const poster = runtime?.posterUrl?.trim();
-  if (poster?.startsWith("http")) return poster;
+  if (poster?.startsWith("http") && !isProjectThumbnailVideoUrl(poster)) {
+    return poster;
+  }
 
   const direct = typeof d.ossUrl === "string" ? d.ossUrl.trim() : "";
-  if (direct.startsWith("http")) return direct;
+  if (direct.startsWith("http") && !isProjectThumbnailVideoUrl(direct)) return direct;
 
   const fromRuntime = runtime?.ossUrl?.trim();
-  if (fromRuntime?.startsWith("http")) return fromRuntime;
+  if (fromRuntime?.startsWith("http") && !isProjectThumbnailVideoUrl(fromRuntime)) {
+    return fromRuntime;
+  }
 
   const imageUrl = typeof d.imageUrl === "string" ? d.imageUrl.trim() : "";
   if (imageUrl.startsWith("http")) return imageUrl;
 
-  const videoUrl = typeof d.videoUrl === "string" ? d.videoUrl.trim() : "";
-  if (videoUrl.startsWith("http")) return videoUrl;
-
   return "";
 }
 
-function mediaKindFromUrl(url: string): PortalFilmShowcaseMediaKind {
-  return isProjectThumbnailVideoUrl(url) ? "video" : "image";
+/** 视频节点：优先 runtime.ossUrl / videoUrl，poster 仅作封面 */
+function persistableVideoFromNodeData(data: unknown): {
+  videoUrl: string;
+  posterUrl?: string;
+} {
+  if (!data || typeof data !== "object") return { videoUrl: "" };
+  const d = data as Record<string, unknown>;
+  const runtime = readRuntime(d);
+  const poster = runtime?.posterUrl?.trim();
+  const posterUrl =
+    poster?.startsWith("http") && !isProjectThumbnailVideoUrl(poster)
+      ? poster
+      : undefined;
+
+  const candidates = [
+    runtime?.ossUrl,
+    typeof d.videoUrl === "string" ? d.videoUrl : "",
+    typeof d.ossUrl === "string" ? d.ossUrl : "",
+  ]
+    .map((raw) => (typeof raw === "string" ? raw : "").trim())
+    .filter((url) => url.startsWith("http"));
+
+  const videoUrl =
+    candidates.find((url) => isProjectThumbnailVideoUrl(url)) ?? candidates[0] ?? "";
+
+  return { videoUrl, posterUrl };
 }
 
-/** 从 sbv1 节点收集全部已持久化媒体 URL（去重，保持节点顺序） */
-export function collectSbv1PersistableMediaUrls(canvas: unknown): string[] {
+/** 从 sbv1 媒体节点收集展示条目（按节点顺序，视频与分镜图分轨） */
+export function collectSbv1ShowcaseMediaEntries(canvas: unknown): Sbv1ShowcaseMediaEntry[] {
   if (!canvas || typeof canvas !== "object") return [];
   const nodes = (canvas as { nodes?: unknown[] }).nodes;
   if (!Array.isArray(nodes)) return [];
 
-  const urls: string[] = [];
+  const out: Sbv1ShowcaseMediaEntry[] = [];
   const seen = new Set<string>();
+
   for (const raw of nodes) {
     if (!raw || typeof raw !== "object") continue;
     const n = raw as { type?: string; data?: unknown };
-    if (!n.type || !SBV1_MEDIA_NODE_TYPES.has(n.type)) continue;
-    const url = persistableUrlFromNodeData(n.data);
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    urls.push(url);
+
+    if (n.type === SBV1_IMAGE_NODE) {
+      const url = persistableImageUrlFromNodeData(n.data);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      out.push({ url, kind: "image" });
+      continue;
+    }
+
+    if (n.type === SBV1_VIDEO_NODE) {
+      const { videoUrl, posterUrl } = persistableVideoFromNodeData(n.data);
+      if (videoUrl && !seen.has(videoUrl)) {
+        seen.add(videoUrl);
+        out.push({ url: videoUrl, kind: "video", posterUrl });
+        continue;
+      }
+      if (posterUrl && !seen.has(posterUrl)) {
+        seen.add(posterUrl);
+        out.push({ url: posterUrl, kind: "image" });
+      }
+    }
   }
-  return urls;
+
+  return out;
+}
+
+/** 从 sbv1 节点收集全部已持久化媒体 URL（去重，保持节点顺序） */
+export function collectSbv1PersistableMediaUrls(canvas: unknown): string[] {
+  return collectSbv1ShowcaseMediaEntries(canvas).map((entry) => entry.url);
+}
+
+/** sbv1 列表封面：优先最近成片（悬停播放），无成片时用分镜图 */
+export function resolveSbv1ProjectListCover(canvas: unknown): {
+  coverUrl: string;
+  coverKind: PortalFilmShowcaseMediaKind;
+  posterUrl?: string;
+  hoverVideoUrl?: string;
+} {
+  const entries = collectSbv1ShowcaseMediaEntries(canvas);
+  const videos = entries.filter((e) => e.kind === "video");
+  const images = entries.filter((e) => e.kind === "image");
+  const latestVideo = videos.at(-1);
+  if (latestVideo) {
+    const poster = latestVideo.posterUrl?.trim();
+    return {
+      coverUrl: poster || latestVideo.url,
+      coverKind: "video",
+      posterUrl: poster || undefined,
+      hoverVideoUrl: latestVideo.url,
+    };
+  }
+  const latestImage = images.at(-1);
+  if (latestImage) {
+    return { coverUrl: latestImage.url, coverKind: "image" };
+  }
+  return { coverUrl: "", coverKind: "image" };
 }
 
 function blurbOf(p: {
   portalCaseBlurb: string;
-  portalFeaturedBlurb: string;
   description: string;
 }): string {
-  return (
-    p.portalCaseBlurb?.trim() ||
-    p.portalFeaturedBlurb?.trim() ||
-    p.description?.trim() ||
-    ""
-  );
+  return p.portalCaseBlurb?.trim() || p.description?.trim() || "";
+}
+
+function pinnedFilmShowcaseProjectIds(): string[] {
+  return (process.env.PORTAL_FILM_SHOWCASE_PROJECT_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 type ProjectRow = {
@@ -103,21 +186,11 @@ type ProjectRow = {
   description: string;
   thumbnailUrl: string;
   portalCaseBlurb: string;
-  portalFeaturedBlurb: string;
   canvas: unknown;
-  portalCase: boolean;
-  portalFeatured: boolean;
-  portalCaseSort: number;
-  portalFeaturedSort: number;
+  portalFilmCaseSort: number;
   updatedAt: Date;
   user: { id: string; name: string | null; email: string | null };
 };
-
-function projectPriority(p: ProjectRow): number {
-  if (p.portalCase) return 0;
-  if (p.portalFeatured) return 1;
-  return 2;
-}
 
 function flattenProjectMedia(
   p: ProjectRow,
@@ -127,22 +200,32 @@ function flattenProjectMedia(
 ): void {
   if (out.length >= limit) return;
 
-  const urls = collectSbv1PersistableMediaUrls(p.canvas);
-  const thumb = p.thumbnailUrl?.trim() || pickPersistableProjectThumbnailUrl(p.canvas);
-  if (thumb && !urls.includes(thumb)) urls.unshift(thumb);
-  if (urls.length === 0) {
-    const display = pickProjectThumbnailUrl(p.canvas);
-    if (display && !urls.includes(display)) urls.push(display);
+  const entries = collectSbv1ShowcaseMediaEntries(p.canvas);
+  const thumb =
+    p.thumbnailUrl?.trim() ||
+    pickPersistableProjectThumbnailUrlPreferVideo(p.canvas) ||
+    pickPersistableProjectThumbnailUrl(p.canvas);
+  if (thumb && !entries.some((e) => e.url === thumb)) {
+    entries.unshift({
+      url: thumb,
+      kind: isProjectThumbnailVideoUrl(thumb) ? "video" : "image",
+    });
   }
 
+  // 成片优先排列，分镜图一并展示
+  const videos = entries.filter((e) => e.kind === "video");
+  const images = entries.filter((e) => e.kind === "image");
+  const ordered = [...videos, ...images];
+
   const description = blurbOf(p);
-  for (const url of urls) {
-    if (out.length >= limit || seenUrls.has(url)) continue;
-    seenUrls.add(url);
+  for (const entry of ordered) {
+    if (out.length >= limit || seenUrls.has(entry.url)) continue;
+    seenUrls.add(entry.url);
     out.push({
-      id: `${p.id}:${url}`,
-      url,
-      kind: mediaKindFromUrl(url),
+      id: `${p.id}:${entry.url}`,
+      url: entry.url,
+      kind: entry.kind,
+      posterUrl: entry.posterUrl,
       sourceKind: "project",
       sourceId: p.id,
       projectName: p.name,
@@ -152,156 +235,53 @@ function flattenProjectMedia(
   }
 }
 
-async function fetchSbv1ProjectCandidates(): Promise<ProjectRow[]> {
-  const adminEmails = getPlatformGatewayAdminEmails();
-
-  const [portalRows, adminRows] = await Promise.all([
-    prisma.canvasProject.findMany({
-      where: {
-        deletedAt: null,
-        OR: [{ portalCase: true }, { portalFeatured: true }],
-      },
-      orderBy: [{ portalCaseSort: "asc" }, { portalFeaturedSort: "asc" }, { updatedAt: "desc" }],
-      take: 120,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        thumbnailUrl: true,
-        portalCaseBlurb: true,
-        portalFeaturedBlurb: true,
-        canvas: true,
-        portalCase: true,
-        portalFeatured: true,
-        portalCaseSort: true,
-        portalFeaturedSort: true,
-        updatedAt: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
-    }),
-    prisma.canvasProject.findMany({
-      where: {
-        deletedAt: null,
-        user: { email: { in: adminEmails, mode: "insensitive" } },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 80,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        thumbnailUrl: true,
-        portalCaseBlurb: true,
-        portalFeaturedBlurb: true,
-        canvas: true,
-        portalCase: true,
-        portalFeatured: true,
-        portalCaseSort: true,
-        portalFeaturedSort: true,
-        updatedAt: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
-    }),
-  ]);
-
-  const byId = new Map<string, ProjectRow>();
-  for (const row of [...portalRows, ...adminRows]) {
-    if (canvasProjectEditionFromGraph(row.canvas) !== ("sbv1" satisfies CanvasProjectEdition)) {
-      continue;
-    }
-    if (!byId.has(row.id)) byId.set(row.id, row as ProjectRow);
-  }
-
-  return [...byId.values()].sort((a, b) => {
-    const pa = projectPriority(a);
-    const pb = projectPriority(b);
-    if (pa !== pb) return pa - pb;
-    const sortA = a.portalCase ? a.portalCaseSort : a.portalFeaturedSort;
-    const sortB = b.portalCase ? b.portalCaseSort : b.portalFeaturedSort;
-    if (sortA !== sortB) return sortA - sortB;
-    return b.updatedAt.getTime() - a.updatedAt.getTime();
-  });
+function isSbv1Canvas(canvas: unknown): boolean {
+  return canvasProjectEditionFromGraph(canvas) === ("sbv1" satisfies CanvasProjectEdition);
 }
 
-type TemplateRow = {
-  id: string;
-  name: string;
-  description: string;
-  thumbnail: string;
-  canvas: unknown;
-  owner: { id: string; name: string | null; email: string | null } | null;
-};
-
-async function fetchSbv1TemplateCandidates(): Promise<TemplateRow[]> {
-  const rows = await prisma.canvasTemplate.findMany({
+async function fetchPortalFilmCaseSbv1Projects(): Promise<ProjectRow[]> {
+  const pinned = pinnedFilmShowcaseProjectIds();
+  const rows = await prisma.canvasProject.findMany({
     where: {
-      edition: "sbv1",
-      OR: [{ visibility: "public" }, { featured: true }, { builtin: true }],
+      deletedAt: null,
+      OR: [
+        { portalFilmCase: true },
+        ...(pinned.length > 0 ? [{ id: { in: pinned } }] : []),
+      ],
     },
-    orderBy: [{ featured: "desc" }, { forkCount: "desc" }, { updatedAt: "desc" }],
-    take: 40,
+    orderBy: [{ portalFilmCaseSort: "asc" }, { updatedAt: "desc" }],
+    take: 20,
     select: {
       id: true,
       name: true,
       description: true,
-      thumbnail: true,
+      thumbnailUrl: true,
+      portalCaseBlurb: true,
       canvas: true,
-      owner: { select: { id: true, name: true, email: true } },
+      portalFilmCaseSort: true,
+      updatedAt: true,
+      user: { select: { id: true, name: true, email: true } },
     },
   });
-  return rows as TemplateRow[];
+
+  return rows.filter((row) => isSbv1Canvas(row.canvas)) as ProjectRow[];
 }
 
-function flattenTemplateMedia(
-  t: TemplateRow,
-  seenUrls: Set<string>,
-  limit: number,
-  out: PortalFilmShowcaseMedia[],
-): void {
-  if (out.length >= limit) return;
+const DEFAULT_LIMIT = 500;
+const MAX_SHOWCASE_ITEMS = 500;
 
-  const urls = collectSbv1PersistableMediaUrls(t.canvas);
-  const thumb = t.thumbnail?.trim() || pickPersistableProjectThumbnailUrl(t.canvas);
-  if (thumb && !urls.includes(thumb)) urls.unshift(thumb);
-
-  for (const url of urls) {
-    if (out.length >= limit || seenUrls.has(url)) continue;
-    seenUrls.add(url);
-    out.push({
-      id: `tpl-${t.id}:${url}`,
-      url,
-      kind: mediaKindFromUrl(url),
-      sourceKind: "template",
-      sourceId: t.id,
-      projectName: t.name,
-      description: t.description?.trim() ?? "",
-      owner: t.owner,
-    });
-  }
-}
-
-const DEFAULT_LIMIT = 48;
-
-/** 门户首页 · 影视案例媒体墙（sbv1 已入库 OSS 图/视频） */
+/** 门户首页 · 影视案例媒体墙（portalFilmCase 分镜 1.0） */
 export async function listPortalFilmShowcaseMedia(
   limit = DEFAULT_LIMIT,
 ): Promise<PortalFilmShowcaseMedia[]> {
-  const cap = Math.min(Math.max(limit, 1), 96);
+  const cap = Math.min(Math.max(limit, 1), MAX_SHOWCASE_ITEMS);
   const seenUrls = new Set<string>();
   const out: PortalFilmShowcaseMedia[] = [];
 
-  const projects = await fetchSbv1ProjectCandidates();
+  const projects = await fetchPortalFilmCaseSbv1Projects();
   for (const p of projects) {
     flattenProjectMedia(p, seenUrls, cap, out);
     if (out.length >= cap) break;
-  }
-
-  if (out.length < cap) {
-    const templates = await fetchSbv1TemplateCandidates();
-    for (const t of templates) {
-      flattenTemplateMedia(t, seenUrls, cap, out);
-      if (out.length >= cap) break;
-    }
   }
 
   return out;
@@ -309,18 +289,21 @@ export async function listPortalFilmShowcaseMedia(
 
 /** 是否允许作为影视案例复制到用户账户 */
 export async function isPortalFilmShowcaseProject(projectId: string): Promise<boolean> {
+  const pinned = pinnedFilmShowcaseProjectIds();
   const p = await prisma.canvasProject.findFirst({
-    where: { id: projectId, deletedAt: null },
-    select: {
-      canvas: true,
-      portalCase: true,
-      portalFeatured: true,
-      user: { select: { email: true } },
+    where: {
+      id: projectId,
+      deletedAt: null,
+      OR: [{ portalFilmCase: true }, ...(pinned.length > 0 ? [{ id: { in: pinned } }] : [])],
     },
+    select: { canvas: true },
   });
   if (!p) return false;
-  if (canvasProjectEditionFromGraph(p.canvas) !== "sbv1") return false;
-  if (p.portalCase || p.portalFeatured) return true;
-  const email = p.user.email?.trim().toLowerCase() ?? "";
-  return getPlatformGatewayAdminEmails().includes(email);
+  return isSbv1Canvas(p.canvas);
+}
+
+/** 管理员 · 影视案例项目列表（分镜 1.0） */
+export async function listPortalFilmCaseProjectIds(): Promise<string[]> {
+  const projects = await fetchPortalFilmCaseSbv1Projects();
+  return projects.map((p) => p.id);
 }

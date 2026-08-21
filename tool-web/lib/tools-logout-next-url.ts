@@ -66,5 +66,3 @@ export function appendSsoReenterSuppressCookie(res: {
   if (secure) parts.push("Secure");
   res.headers.append("Set-Cookie", parts.join("; "));
 }
-
-export { isSsoReenterSuppressedClient, markSsoReenterSuppressed } from "@private/federated-portal-logout";

@@ -9,6 +9,8 @@ type Props = {
   name: string;
   description?: string;
   thumbnailUrl?: string | null;
+  mediaKind?: "image" | "video";
+  posterUrl?: string;
   graph?: CanvasGraph;
   onClose: () => void;
   onCopy?: () => void;
@@ -20,6 +22,8 @@ export function TemplatePreviewDialog({
   name,
   description,
   thumbnailUrl,
+  mediaKind,
+  posterUrl,
   graph,
   onClose,
   onCopy,
@@ -72,12 +76,28 @@ export function TemplatePreviewDialog({
         </div>
 
         <div className="flex-1 overflow-auto p-4">
-          <CanvasListCover
-            url={thumbnailUrl}
-            name={name}
-            graph={graph}
-            className="w-full"
-          />
+          {mediaKind === "video" && thumbnailUrl?.trim() ? (
+            <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
+              <video
+                src={thumbnailUrl}
+                poster={posterUrl?.trim() || undefined}
+                className="size-full object-contain"
+                controls
+                autoPlay
+                muted
+                playsInline
+                loop
+                preload="metadata"
+              />
+            </div>
+          ) : (
+            <CanvasListCover
+              url={thumbnailUrl}
+              name={name}
+              graph={graph}
+              className="w-full"
+            />
+          )}
         </div>
       </div>
     </div>

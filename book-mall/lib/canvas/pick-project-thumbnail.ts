@@ -73,6 +73,37 @@ function pickFromNodes(
   return "";
 }
 
+/** 视频节点：优先取成片 URL（非 poster） */
+function persistableVideoUrlFromNodeData(data: unknown): string {
+  if (!data || typeof data !== "object") return "";
+  const d = data as Record<string, unknown>;
+  const runtime = readRuntime(d);
+  const candidates = [
+    runtime?.ossUrl,
+    typeof d.videoUrl === "string" ? d.videoUrl : "",
+    typeof d.ossUrl === "string" ? d.ossUrl : "",
+  ]
+    .map((raw) => (typeof raw === "string" ? raw : "").trim())
+    .filter((url) => url.startsWith("http"));
+
+  return (
+    candidates.find((url) => isProjectThumbnailVideoUrl(url)) ?? candidates[0] ?? ""
+  );
+}
+
+function displayVideoUrlFromNodeData(data: unknown): string {
+  const stable = persistableVideoUrlFromNodeData(data);
+  if (stable) return stable;
+
+  if (!data || typeof data !== "object") return "";
+  const runtime = readRuntime(data as Record<string, unknown>);
+  const ephemeral = runtime?.ephemeralUrl?.trim();
+  if (ephemeral?.startsWith("http") && isProjectThumbnailVideoUrl(ephemeral)) {
+    return ephemeral;
+  }
+  return "";
+}
+
 export function pickProjectThumbnailUrl(canvas: unknown): string {
   if (!canvas || typeof canvas !== "object") return "";
   const nodes = (canvas as { nodes?: unknown[] }).nodes;
@@ -105,6 +136,44 @@ export function pickPersistableProjectThumbnailUrl(canvas: unknown): string {
   );
 }
 
+/** 列表封面：优先最近一条成片，无成片再回退分镜图 */
+export function pickProjectThumbnailUrlPreferVideo(canvas: unknown): string {
+  if (!canvas || typeof canvas !== "object") return "";
+  const nodes = (canvas as { nodes?: unknown[] }).nodes;
+  if (!Array.isArray(nodes)) return "";
+
+  const reversed = [...nodes].reverse() as Array<{
+    type?: string;
+    data?: unknown;
+  }>;
+
+  return (
+    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, displayVideoUrlFromNodeData) ||
+    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData) ||
+    pickFromNodes(reversed, IMAGE_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData)
+  );
+}
+
+export function pickPersistableProjectThumbnailUrlPreferVideo(canvas: unknown): string {
+  if (!canvas || typeof canvas !== "object") return "";
+  const nodes = (canvas as { nodes?: unknown[] }).nodes;
+  if (!Array.isArray(nodes)) return "";
+
+  const reversed = [...nodes].reverse() as Array<{
+    type?: string;
+    data?: unknown;
+  }>;
+
+  return (
+    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, persistableVideoUrlFromNodeData) ||
+    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData) ||
+    pickFromNodes(reversed, IMAGE_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData)
+  );
+}
+
 export function isProjectThumbnailVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov)(\?|#|$)/i.test(url.trim());
+  const u = url.trim();
+  if (/\.(mp4|webm|mov)(\?|#|$)/i.test(u)) return true;
+  if (/\/node-video\//i.test(u)) return true;
+  return false;
 }

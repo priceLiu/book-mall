@@ -9,6 +9,7 @@ import {
   CanvasListCover,
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
+import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import {
   listMyCanvasProjects,
   type CanvasProjectSummary,
@@ -73,7 +74,7 @@ export function RecentProjectsSection() {
               className="group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
             >
               <Link href={`/canvas/${p.id}`} className="block" prefetch>
-                <CanvasListCover url={p.thumbnailUrl} name={p.name} />
+                <CanvasListCover name={p.name} {...canvasListCoverPropsFromProject(p)} />
                 <p className="mt-3 truncate text-sm font-medium text-white">{p.name}</p>
                 <p className="mt-3 text-[11px] text-[var(--canvas-muted)]/80">
                   更新于 {formatDate(p.updatedAt)}

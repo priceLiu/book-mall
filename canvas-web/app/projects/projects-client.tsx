@@ -29,6 +29,7 @@ import {
   type CanvasProjectSummary,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
+import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import {
   BLANK_CANVAS,
   BUILTIN_CANVAS_TEMPLATES,
@@ -90,9 +91,13 @@ function Inner() {
   const [portalCaseIds, setPortalCaseIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [portalFilmCaseIds, setPortalFilmCaseIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [submitTarget, setSubmitTarget] = useState<{
     id: string;
     name: string;
+    edition: CanvasProjectEdition;
   } | null>(null);
   const [userTemplates, setUserTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,13 +186,19 @@ function Inner() {
   const refreshPortalCaseIds = useCallback(async () => {
     if (!base?.trim() || !isAdmin) {
       setPortalCaseIds(new Set());
+      setPortalFilmCaseIds(new Set());
       return;
     }
     try {
-      const list = await listPortalCaseProjects(base);
-      setPortalCaseIds(new Set(list.map((p) => p.id)));
+      const [pro2Cases, sbv1Cases] = await Promise.all([
+        listPortalCaseProjects(base, "pro2"),
+        listPortalCaseProjects(base, "sbv1"),
+      ]);
+      setPortalCaseIds(new Set(pro2Cases.map((p) => p.id)));
+      setPortalFilmCaseIds(new Set(sbv1Cases.map((p) => p.id)));
     } catch {
       setPortalCaseIds(new Set());
+      setPortalFilmCaseIds(new Set());
     }
   }, [base, isAdmin]);
 
@@ -222,7 +233,10 @@ function Inner() {
       if (result.appliedImmediately) {
         await dialogs.alert({
           title: "已发布",
-          message: "作品已按所选类型对外展示。",
+          message:
+            kind === "CASE" && submitTarget.edition === "sbv1"
+              ? "作品已发布到首页「视频作品」。"
+              : "作品已按所选类型对外展示。",
           variant: "success",
         });
         if (kind === "FEATURED") await refreshPortalFeaturedIds();
@@ -642,10 +656,12 @@ function Inner() {
             onCreate={() => onOpenPicker("sbv1")}
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
-            portalCaseIds={portalCaseIds}
+            portalCaseIds={portalFilmCaseIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
             onTogglePortalCase={onTogglePortalCase}
-            onOpenSubmit={(id, name) => setSubmitTarget({ id, name })}
+            onOpenSubmit={(id, name) =>
+              setSubmitTarget({ id, name, edition: "sbv1" })
+            }
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
@@ -664,7 +680,9 @@ function Inner() {
             portalCaseIds={portalCaseIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
             onTogglePortalCase={onTogglePortalCase}
-            onOpenSubmit={(id, name) => setSubmitTarget({ id, name })}
+            onOpenSubmit={(id, name) =>
+              setSubmitTarget({ id, name, edition: "pro2" })
+            }
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
@@ -683,7 +701,9 @@ function Inner() {
             portalCaseIds={portalCaseIds}
             onTogglePortalFeatured={onTogglePortalFeatured}
             onTogglePortalCase={onTogglePortalCase}
-            onOpenSubmit={(id, name) => setSubmitTarget({ id, name })}
+            onOpenSubmit={(id, name) =>
+              setSubmitTarget({ id, name, edition: "pro" })
+            }
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
@@ -915,6 +935,7 @@ function Inner() {
       <PortalSubmitDialog
         open={submitTarget != null}
         projectName={submitTarget?.name ?? ""}
+        edition={submitTarget?.edition}
         isAdmin={isAdmin}
         onClose={() => setSubmitTarget(null)}
         onSubmit={onSubmitPortalReview}
@@ -1003,7 +1024,7 @@ function ProjectsSection({
                 onMouseEnter={() => onPrefetchProject(p.id)}
                 onClick={() => onOpeningProject(p.id)}
               >
-                <CanvasListCover url={p.thumbnailUrl} name={p.name} />
+                <CanvasListCover name={p.name} {...canvasListCoverPropsFromProject(p)} />
                 {openingProjectId === p.id ? (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--canvas-accent)]">
                     <Loader2 className="size-3 animate-spin" />
@@ -1033,15 +1054,25 @@ function ProjectsSection({
                     className={cn(
                       "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
                       portalCaseIds?.has(p.id)
-                        ? "border-violet-400/40 text-violet-200 hover:border-violet-400/60"
-                        : "border-white/10 text-[var(--canvas-muted)] hover:border-violet-400/35 hover:text-violet-200/90",
+                        ? edition === "sbv1"
+                          ? "border-cyan-400/40 text-cyan-200 hover:border-cyan-400/60"
+                          : "border-violet-400/40 text-violet-200 hover:border-violet-400/60"
+                        : edition === "sbv1"
+                          ? "border-white/10 text-[var(--canvas-muted)] hover:border-cyan-400/35 hover:text-cyan-200/90"
+                          : "border-white/10 text-[var(--canvas-muted)] hover:border-violet-400/35 hover:text-violet-200/90",
                     )}
                     title={
-                      portalCaseIds?.has(p.id) ? "取消首页案例" : "设为首页案例"
+                      portalCaseIds?.has(p.id)
+                        ? edition === "sbv1"
+                          ? "取消视频作品"
+                          : "取消首页案例"
+                        : edition === "sbv1"
+                          ? "设为视频作品"
+                          : "设为首页案例"
                     }
                   >
                     <Clapperboard className="size-3" />
-                    案例
+                    {edition === "sbv1" ? "视频作品" : "案例"}
                   </button>
                 ) : null}
                 {isAdmin && onTogglePortalFeatured ? (

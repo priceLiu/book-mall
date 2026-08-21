@@ -1409,7 +1409,9 @@ function Inner({ projectId }: { projectId: string }) {
                 : kind === "FEATURED"
                   ? "作品已发布到首页「精选」。"
                   : kind === "CASE"
-                    ? "作品已发布到首页「案例」。"
+                    ? project?.edition === "sbv1"
+                      ? "作品已发布到首页「视频作品」。"
+                      : "作品已发布到首页「案例」。"
                     : "作品已按所选类型对外展示。",
             variant: "success",
           });
@@ -1643,6 +1645,7 @@ function Inner({ projectId }: { projectId: string }) {
       <PortalSubmitDialog
         open={shareDialogOpen}
         projectName={project.name}
+        edition={project.edition}
         isAdmin={isCanvasPortalAdmin}
         context="canvas"
         onClose={() => setShareDialogOpen(false)}
