@@ -3,7 +3,7 @@ const animate = require("tailwindcss-animate");
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
-  safelist: ["dark"],
+  safelist: ["dark", "animate-site-home-marquee"],
   prefix: "",
 
   content: [
@@ -191,6 +191,10 @@ module.exports = {
           "0%, 100%": { transform: "translate(0%, 0%) scale(1)" },
           "50%": { transform: "translate(-20%, -25%) scale(1.2)" },
         },
+        "site-home-marquee": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -222,6 +226,8 @@ module.exports = {
         "gradient-2": "gradient-2 12s ease-in-out infinite alternate",
         "gradient-3": "gradient-3 12s ease-in-out infinite alternate",
         "gradient-4": "gradient-4 12s ease-in-out infinite alternate",
+        "site-home-marquee":
+          "site-home-marquee var(--duration, 55s) linear infinite",
       },
     },
   },

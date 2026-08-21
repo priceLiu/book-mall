@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { PROJECT_COVER_MEDIA_FILL_CLASS } from "@/components/canvas/project-cover-media";
+import { makeVideoAudible, muteVideo } from "@/lib/canvas/hover-video-audio";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 
 type Props = {
@@ -24,7 +25,7 @@ function MediaPlaceholder({ letter, hint }: { letter?: string; hint?: string }) 
   );
 }
 
-/** 影视案例卡片媒体：视口内才加载；视频悬停自动播放 */
+/** 影视案例卡片媒体：视口内才加载；悬停自动播放并出声 */
 export function FilmShowcaseCardMedia({
   url,
   alt,
@@ -39,14 +40,13 @@ export function FilmShowcaseCardMedia({
   const onEnter = useCallback(() => {
     const el = videoRef.current;
     if (!el) return;
-    void el.play().catch(() => {
-      /* 浏览器策略或加载中，忽略 */
-    });
+    makeVideoAudible(el);
   }, []);
 
   const onLeave = useCallback(() => {
     const el = videoRef.current;
     if (!el) return;
+    muteVideo(el);
     el.pause();
     el.currentTime = 0;
   }, []);

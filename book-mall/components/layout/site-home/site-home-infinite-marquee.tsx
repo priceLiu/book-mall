@@ -1,5 +1,7 @@
 "use client";
 
+import { Children, cloneElement, isValidElement } from "react";
+
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -13,7 +15,8 @@ type Props = {
 };
 
 /**
- * 首页全宽无限走马灯：双份内容 + translateX(-50%)，不依赖 @devnomic/marquee 的独立 CSS。
+ * 首页全宽无限走马灯：内容复制一份，translateX(-50%) 无缝循环。
+ * 动画走 Tailwind（globals 打包），不依赖第三方 marquee CSS。
  */
 export function SiteHomeInfiniteMarquee({
   className,
@@ -23,23 +26,37 @@ export function SiteHomeInfiniteMarquee({
   fade = true,
   children,
 }: Props) {
+  const items = Children.toArray(children);
+  const loop = [...items, ...items];
+
   return (
     <div
       className={cn(
-        "site-home-infinite-marquee",
+        "site-home-infinite-marquee w-full overflow-hidden",
         fade && "site-home-infinite-marquee--fade",
         pauseOnHover && "site-home-infinite-marquee--pause-hover",
         className,
       )}
-      style={{ ["--duration" as string]: duration }}
+      style={{ "--duration": duration } as React.CSSProperties}
     >
-      <div className="site-home-infinite-marquee__track">
-        <div className={cn("site-home-infinite-marquee__group", innerClassName)}>
-          {children}
-        </div>
-        <div className={cn("site-home-infinite-marquee__group", innerClassName)} aria-hidden>
-          {children}
-        </div>
+      <div
+        className={cn(
+          "site-home-infinite-marquee__track flex w-max shrink-0 animate-site-home-marquee",
+          innerClassName,
+        )}
+      >
+        {loop.map((child, index) => {
+          if (isValidElement(child)) {
+            return cloneElement(child, {
+              key: `${String(child.key ?? "item")}-${index}`,
+            } as { key: string });
+          }
+          return (
+            <div key={index} className="shrink-0">
+              {child}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
