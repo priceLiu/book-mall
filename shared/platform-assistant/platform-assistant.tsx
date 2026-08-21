@@ -13,6 +13,7 @@ import {
   buildAssistantGreeting,
   parseDisplayName,
 } from "./greeting";
+import type { PlatformAppLink } from "./platform-apps";
 import {
   getPrefetchedAiNews,
   prefetchAiNews,
@@ -43,11 +44,23 @@ type Redirect = {
   url: string;
 };
 
+/** SSE / 后端卡片 · app 字段映射为 PlatformAppLink.key */
+function normalizeAppLinks(
+  links: Array<{ app?: string; key?: string; title: string; description: string; url: string }>,
+): PlatformAppLink[] {
+  return links.map((l) => ({
+    key: l.key ?? l.app ?? l.title,
+    title: l.title,
+    description: l.description,
+    url: l.url,
+  }));
+}
+
 type Msg = {
   role: "user" | "assistant";
   content: string;
   redirect?: Redirect | null;
-  appLinks?: Redirect[];
+  appLinks?: PlatformAppLink[];
   /** 热闻 · Markdown（与问候同条消息，显示在导航上方） */
   newsContent?: string;
   newsStale?: boolean;
@@ -790,7 +803,15 @@ export function PlatformAssistant({
               continue;
             }
             if (Array.isArray(json.assistantAppLinks)) {
-              const links = json.assistantAppLinks as Redirect[];
+              const links = normalizeAppLinks(
+                json.assistantAppLinks as Array<{
+                  app?: string;
+                  key?: string;
+                  title: string;
+                  description: string;
+                  url: string;
+                }>,
+              );
               appendToLast((m) => ({ ...m, appLinks: links }));
               continue;
             }
@@ -983,16 +1004,9 @@ export function PlatformAssistant({
                       )}
                       {m.appLinks && m.appLinks.length > 0 ? (
                         <div className="pa-app-links">
-                          {m.appLinks.map((link) => {
-                            const linkKey =
-                              "app" in link && link.app
-                                ? link.app
-                                : "key" in link
-                                  ? String((link as { key: string }).key)
-                                  : link.title;
-                            return (
+                          {m.appLinks.map((link) => (
                             <a
-                              key={linkKey}
+                              key={link.key}
                               className="pa-card"
                               href={link.url}
                               target="_blank"
@@ -1001,8 +1015,7 @@ export function PlatformAssistant({
                             >
                               <div className="pa-card-title">{link.title}</div>
                             </a>
-                            );
-                          })}
+                          ))}
                         </div>
                       ) : null}
                     </div>
