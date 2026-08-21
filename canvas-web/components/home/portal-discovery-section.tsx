@@ -24,6 +24,7 @@ import {
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
 import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
+import { cloneGraphForNewProject } from "@/lib/canvas/clone";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
