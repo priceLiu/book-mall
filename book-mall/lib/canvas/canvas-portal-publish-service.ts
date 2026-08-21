@@ -85,8 +85,22 @@ function toSummaryWithEdition(p: {
   };
 }
 
-/** 门户首页 · 案例墙项目 */
-export async function listPortalCaseCanvasProjects(): Promise<PortalCaseProjectSummary[]> {
+function matchesPortalCaseEdition(
+  canvas: unknown,
+  edition?: CanvasProjectEdition,
+): boolean {
+  const resolved = canvasProjectEditionFromGraph(canvas);
+  if (edition === "sbv1") return resolved === "sbv1";
+  if (edition === "pro2") {
+    return resolved === "pro2" && !isRetiredLegacyPro2Canvas(canvas);
+  }
+  return resolved === "pro2" && !isRetiredLegacyPro2Canvas(canvas);
+}
+
+/** 门户首页 · 案例墙项目（默认 pro2；传 edition=sbv1 供「影视案例」区块） */
+export async function listPortalCaseCanvasProjects(opts?: {
+  edition?: CanvasProjectEdition;
+}): Promise<PortalCaseProjectSummary[]> {
   const rows = await prisma.canvasProject.findMany({
     where: { portalCase: true, deletedAt: null },
     orderBy: [{ portalCaseSort: "asc" }, { updatedAt: "desc" }],
@@ -96,11 +110,7 @@ export async function listPortalCaseCanvasProjects(): Promise<PortalCaseProjectS
     },
   });
   return rows
-    .filter(
-      (p) =>
-        canvasProjectEditionFromGraph(p.canvas) === "pro2" &&
-        !isRetiredLegacyPro2Canvas(p.canvas),
-    )
+    .filter((p) => matchesPortalCaseEdition(p.canvas, opts?.edition))
     .map((p) => ({
       ...toSummaryWithEdition(p),
       portalCaseBlurb: portalCaseBlurbOf(p),

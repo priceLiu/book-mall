@@ -11,8 +11,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "无效请求体" }, { status: 400 });
   }
 
-  const result = await forwardToBook("/api/auth/sms/send", {
+  const result = await forwardToBook("/api/sso/portal/sms/send", {
     method: "POST",
+    withServerSecret: true,
     body,
   });
 

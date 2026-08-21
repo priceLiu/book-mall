@@ -4,7 +4,7 @@ import { forwardToBook } from "@/lib/portal-auth-bff";
 export const dynamic = "force-dynamic";
 
 /**
- * 门户短信 BFF：转发 Book /api/auth/sms/send（复用主站短信服务）。
+ * 门户短信 BFF：经 Book 服务端密钥调用 /api/sso/portal/sms/send。
  * dev 环境会回传 mockCode，便于本地联调。
  */
 export async function POST(req: Request) {
@@ -20,8 +20,9 @@ export async function POST(req: Request) {
       ? body.purpose
       : "LOGIN";
 
-  const result = await forwardToBook("/api/auth/sms/send", {
+  const result = await forwardToBook("/api/sso/portal/sms/send", {
     method: "POST",
+    withServerSecret: true,
     body: { phone: body?.phone, purpose },
   });
 

@@ -121,7 +121,7 @@ export function PortalDiscoverySection() {
       const [featRes, pubRes, caseRes] = await Promise.allSettled([
         listPortalFeaturedProjects(base),
         listCanvasTemplates(base, "public"),
-        listPortalCaseProjects(base),
+        listPortalCaseProjects(base, "pro2"),
       ]);
 
       if (featRes.status === "fulfilled") {
@@ -148,7 +148,7 @@ export function PortalDiscoverySection() {
 
       if (caseRes.status === "fulfilled") {
         const list = Array.isArray(caseRes.value) ? caseRes.value : [];
-        setCases(list.filter((c) => c.edition === "pro2"));
+        setCases(list);
       } else {
         setCases([]);
         console.warn("[portal-discovery] portal cases failed", caseRes.reason);

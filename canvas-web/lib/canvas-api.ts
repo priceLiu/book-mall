@@ -372,13 +372,18 @@ export type PortalSubmissionRecord = {
   user: { id: string; name: string | null; email: string | null };
 };
 
-/** 门户首页 · 案例墙 */
+/** 门户首页 · 案例墙（edition=sbv1 为分镜视频 1.0 影视案例） */
 export async function listPortalCaseProjects(
   base: string,
+  edition?: "pro2" | "sbv1",
 ): Promise<PortalCaseProjectSummary[]> {
+  const qs =
+    edition === "pro2" || edition === "sbv1"
+      ? `?edition=${encodeURIComponent(edition)}`
+      : "";
   const j = await call<{ projects: PortalCaseProjectSummary[] }>(
     base,
-    "/api/canvas/projects/portal-cases",
+    `/api/canvas/projects/portal-cases${qs}`,
   );
   return Array.isArray(j.projects) ? j.projects : [];
 }
