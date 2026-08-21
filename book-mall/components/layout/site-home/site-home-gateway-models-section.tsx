@@ -25,7 +25,7 @@ export async function SiteHomeGatewayModelsSection() {
       <div className="site-home-models-header mb-8 flex flex-col items-center gap-2 text-center sm:mb-10">
         <h2 className="text-lg md:text-xl">模型市场</h2>
         <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-          Gateway 已上架 {models.length} 个视频、图像、音乐与 LLM 模型，开箱即用或通过 API
+          Gateway 已发布 {models.length} 个视频、图像、音乐与 LLM 模型，开箱即用或通过 API
           统一调用。
         </p>
         <Link

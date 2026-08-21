@@ -684,6 +684,59 @@
   text-decoration: none;
 }
 
+/* —— 平台应用导航（约 25dvh 横滑 Dock） —— */
+[data-site-home] .site-home-platform-nav {
+  width: 100%;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.45);
+}
+
+[data-site-home] .site-home-platform-nav-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 25dvh;
+  padding-block: clamp(1.5rem, 4dvh, 2.5rem);
+}
+
+[data-site-home] .site-home-platform-nav-track {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 4%,
+    black 96%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 4%,
+    black 96%,
+    transparent
+  );
+}
+
+[data-site-home] .site-home-platform-nav-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: clamp(1rem, 3vw, 2rem);
+  padding-inline: clamp(1rem, 3vw, 2rem);
+  scrollbar-width: none;
+}
+
+[data-site-home] .site-home-platform-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+[data-site-home] .site-home-platform-app-card {
+  text-decoration: none;
+}
+
 /* —— 推荐产品 · 大卡片走马灯（全屏宽，尺寸与原先 grid 单列一致） —— */
 [data-site-home] .site-home-featured-products {
   width: 100%;

@@ -411,40 +411,69 @@ export type MarketShowcaseItem = {
   coverUrl: string;
 };
 
-/** 首页模型走马灯：公开读取 ACTIVE 平台代付上架模型，无需 Gateway 登录态。 */
+/** 首页模型走马灯：公开读取 Gateway 已发布 catalog（与注册表一致），无需登录。 */
 export async function listPublicMarketShowcaseModels(
   limit?: number,
 ): Promise<MarketShowcaseItem[]> {
+  const routes = await listActiveRoutes();
+
   const offerings = await prisma.appModelOffering.findMany({
     where: { status: "ACTIVE", activeModelKey: { not: null } },
-    orderBy: [{ sortOrder: "asc" }, { displayName: "asc" }],
+    select: {
+      canonicalModelKey: true,
+      displayName: true,
+      role: true,
+      publishedCreditsPerUnit: true,
+      activeVendor: true,
+    },
   });
+  const offeringByKey = new Map(offerings.map((o) => [o.canonicalModelKey, o]));
+
   const prices = await prisma.modelCreditPrice.findMany({
     where: { active: true },
     select: { canonicalModelKey: true, creditsPerUnit: true },
   });
   const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, p.creditsPerUnit]));
 
+  const seen = new Set<string>();
   const items: MarketShowcaseItem[] = [];
-  for (const o of offerings) {
-    const price = resolveOfferingCredits(
-      o.canonicalModelKey,
-      priceMap,
-      o.publishedCreditsPerUnit,
-    );
-    if (!price || !o.activeModelKey) continue;
-    const def = canonicalByKey(o.canonicalModelKey);
+
+  for (const { route, catalog } of routes) {
+    const canonicalKey = catalog.canonicalKey;
+    if (seen.has(canonicalKey)) continue;
+    seen.add(canonicalKey);
+
+    const offering = offeringByKey.get(canonicalKey);
+    const credits = offering
+      ? resolveOfferingCredits(
+          canonicalKey,
+          priceMap,
+          offering.publishedCreditsPerUnit,
+        )
+      : (priceMap.get(canonicalKey) ?? null);
+
+    const def = canonicalByKey(canonicalKey);
+    const rawDisplayName = offering
+      ? offering.displayName
+      : gatewayRouteDisplayName(
+          { displayName: catalog.displayName, canonicalKey },
+          route.modelKey,
+        );
+
     items.push({
-      canonicalKey: o.canonicalModelKey,
-      displayName: showcaseDisplayNameFor(o.displayName),
+      canonicalKey,
+      displayName: showcaseDisplayNameFor(rawDisplayName),
       description: def?.description ?? "",
       vendorLabel: showcaseVendorLabelFor(
-        o.canonicalModelKey,
-        o.activeVendor ?? "kie",
+        canonicalKey,
+        offering?.activeVendor ?? route.vendor ?? "kie",
       ),
-      role: o.role,
-      creditsPerUnit: o.publishedCreditsPerUnit ?? price,
-      coverUrl: showcaseCoverUrlFor(o.canonicalModelKey),
+      role: offering?.role ?? catalog.role ?? "LLM",
+      creditsPerUnit:
+        offering?.publishedCreditsPerUnit != null
+          ? Number(offering.publishedCreditsPerUnit)
+          : credits,
+      coverUrl: showcaseCoverUrlFor(canonicalKey),
     });
   }
 
@@ -452,7 +481,9 @@ export async function listPublicMarketShowcaseModels(
   const featured = featuredKeys
     .map((k) => items.find((m) => m.canonicalKey === k))
     .filter((m): m is MarketShowcaseItem => Boolean(m));
-  const rest = items.filter((m) => !featuredKeys.includes(m.canonicalKey));
+  const rest = items
+    .filter((m) => !featuredKeys.includes(m.canonicalKey))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "zh-CN"));
   const ordered = [...featured, ...rest];
   if (limit != null && limit > 0) return ordered.slice(0, limit);
   return ordered;
