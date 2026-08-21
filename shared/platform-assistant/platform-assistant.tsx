@@ -16,6 +16,7 @@ import {
 import {
   getPrefetchedAiNews,
   prefetchAiNews,
+  type PrefetchedAiNews,
 } from "./ai-news-prefetch";
 
 export type PlatformAssistantProps = {
@@ -47,9 +48,12 @@ type Msg = {
   content: string;
   redirect?: Redirect | null;
   appLinks?: Redirect[];
-  /** 热闻区块 · 使用 Markdown 轻渲染 */
-  richMarkdown?: boolean;
+  /** 热闻 · Markdown（与问候同条消息，显示在导航上方） */
+  newsContent?: string;
+  newsStale?: boolean;
   newsLoading?: boolean;
+  /** @deprecated 保留兼容；新逻辑用 newsContent */
+  richMarkdown?: boolean;
 };
 
 const DEFAULT_ENDPOINT = "/api/book-mall/api/platform-assistant/chat";
@@ -298,6 +302,7 @@ function useInjectStyles(accent: string) {
 .pa-row-user { justify-content: flex-end; }
 .pa-row-assistant { justify-content: flex-start; }
 .pa-msg-wrap { max-width: 82%; }
+.pa-msg-wrap-wide { max-width: 100%; width: 100%; }
 .pa-msg-row { display: flex; align-items: flex-end; gap: 8px; }
 .pa-msg-row-user { flex-direction: row-reverse; }
 .pa-msg-avatar {
@@ -366,12 +371,42 @@ function useInjectStyles(accent: string) {
   margin-top: 2px;
 }
 .pa-app-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.pa-app-links .pa-card {
+  margin-top: 0;
+  aspect-ratio: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  max-height: 240px;
-  overflow-y: auto;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+}
+.pa-app-links .pa-card-title {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #c7d2fe;
+}
+.pa-app-links .pa-card-desc {
+  display: none;
+}
+.pa-news-block {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(24,24,27,.75);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.pa-news-block-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4e7;
+  margin-bottom: 8px;
 }
 .pa-rich {
   font-size: 13px;
@@ -589,53 +624,35 @@ export function PlatformAssistant({
 
     let cancelled = false;
     void (async () => {
-      const loadNews = async (baseMessages: Msg[]) => {
+      const loadNews = async (baseMsg: Msg) => {
+        const applyNews = (news: PrefetchedAiNews | null, loading: boolean): Msg => ({
+          ...baseMsg,
+          newsLoading: loading && !news?.content,
+          newsContent: news?.content,
+          newsStale: news?.stale,
+        });
+
         const cached = getPrefetchedAiNews();
         if (cached?.content) {
-          setMessages([
-            ...baseMessages,
-            {
-              role: "assistant",
-              content: `📰 ${cached.stale ? "AI 热闻（昨日）" : "今日 AI 热闻"}\n\n${cached.content}`,
-              richMarkdown: true,
-            },
-          ]);
+          setMessages([applyNews(cached, false)]);
           return;
         }
 
-        setMessages([
-          ...baseMessages,
-          { role: "assistant", content: "", newsLoading: true },
-        ]);
+        setMessages([applyNews(null, true)]);
         try {
           const data = await prefetchAiNews(newsEndpoint);
           if (cancelled) return;
-          if (data?.content) {
-            setMessages((prev) => {
-              const next = [...prev];
-              const newsIdx = next.findIndex((m) => m.newsLoading);
-              const newsMsg: Msg = {
-                role: "assistant",
-                content: `📰 ${data.stale ? "AI 热闻（昨日）" : "今日 AI 热闻"}\n\n${data.content}`,
-                richMarkdown: true,
-              };
-              if (newsIdx >= 0) next[newsIdx] = newsMsg;
-              else next.push(newsMsg);
-              return next;
-            });
-            return;
-          }
-          setMessages((prev) => prev.filter((m) => !m.newsLoading));
+          setMessages([applyNews(data, false)]);
         } catch {
           if (!cancelled) {
-            setMessages((prev) => prev.filter((m) => !m.newsLoading));
+            setMessages([{ ...baseMsg, newsLoading: false }]);
           }
         }
       };
 
       if (greeting) {
         if (!cancelled) {
-          await loadNews([{ role: "assistant", content: greeting }]);
+          await loadNews({ role: "assistant", content: greeting });
         }
         return;
       }
@@ -653,13 +670,11 @@ export function PlatformAssistant({
       }
       if (cancelled) return;
       const built = buildAssistantGreeting(displayName);
-      await loadNews([
-        {
-          role: "assistant",
-          content: built.content,
-          appLinks: built.appLinks,
-        },
-      ]);
+      await loadNews({
+        role: "assistant",
+        content: built.content,
+        appLinks: built.appLinks,
+      });
     })();
     return () => {
       cancelled = true;
@@ -669,7 +684,11 @@ export function PlatformAssistant({
 
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const last = messages[messages.length - 1];
+    if (last?.role === "user" || streaming) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages, streaming]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -898,12 +917,13 @@ export function PlatformAssistant({
             >
               {messages.map((m, i) => {
                 const isUser = m.role === "user";
+                const wide = !isUser && (m.appLinks?.length ?? 0) > 0;
                 return (
                   <div
                     key={i}
                     className={`pa-row ${isUser ? "pa-row-user" : "pa-row-assistant"}`}
                   >
-                    <div className="pa-msg-wrap">
+                    <div className={`pa-msg-wrap ${wide ? "pa-msg-wrap-wide" : ""}`}>
                       <div
                         className={`pa-msg-row ${isUser ? "pa-msg-row-user" : ""}`}
                       >
@@ -917,17 +937,8 @@ export function PlatformAssistant({
                             isUser ? "pa-bubble-user" : "pa-bubble-assistant"
                           }`}
                         >
-                          {m.richMarkdown && m.content ? (
-                            <AssistantRichText text={m.content} />
-                          ) : m.content ? (
+                          {m.content ? (
                             <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
-                          ) : m.newsLoading ? (
-                            <span className="pa-news-loading">
-                              正在联网整理 AI 热闻…
-                              <span className="pa-dot" style={{ animationDelay: "0s" }} />
-                              <span className="pa-dot" style={{ animationDelay: ".2s" }} />
-                              <span className="pa-dot" style={{ animationDelay: ".4s" }} />
-                            </span>
                           ) : streaming && m.role === "assistant" ? (
                             <span>
                               <span className="pa-dot" style={{ animationDelay: "0s" }} />
@@ -939,6 +950,24 @@ export function PlatformAssistant({
                           )}
                         </div>
                       </div>
+                      {!isUser && m.newsLoading ? (
+                        <div className="pa-news-block">
+                          <div className="pa-news-loading">
+                            正在加载 AI 热闻…
+                            <span className="pa-dot" style={{ animationDelay: "0s" }} />
+                            <span className="pa-dot" style={{ animationDelay: ".2s" }} />
+                            <span className="pa-dot" style={{ animationDelay: ".4s" }} />
+                          </div>
+                        </div>
+                      ) : null}
+                      {!isUser && m.newsContent ? (
+                        <div className="pa-news-block">
+                          <div className="pa-news-block-title">
+                            📰 {m.newsStale ? "AI 热闻（昨日）" : "今日 AI 热闻"}
+                          </div>
+                          <AssistantRichText text={m.newsContent} />
+                        </div>
+                      ) : null}
                       {m.redirect && (
                         <a
                           className="pa-card"
@@ -954,18 +983,26 @@ export function PlatformAssistant({
                       )}
                       {m.appLinks && m.appLinks.length > 0 ? (
                         <div className="pa-app-links">
-                          {m.appLinks.map((link) => (
+                          {m.appLinks.map((link) => {
+                            const linkKey =
+                              "app" in link && link.app
+                                ? link.app
+                                : "key" in link
+                                  ? String((link as { key: string }).key)
+                                  : link.title;
+                            return (
                             <a
-                              key={link.app}
+                              key={linkKey}
                               className="pa-card"
                               href={link.url}
                               target="_blank"
                               rel="noopener noreferrer"
+                              title={link.description}
                             >
-                              <div className="pa-card-title">{link.title} →</div>
-                              <div className="pa-card-desc">{link.description}</div>
+                              <div className="pa-card-title">{link.title}</div>
                             </a>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : null}
                     </div>

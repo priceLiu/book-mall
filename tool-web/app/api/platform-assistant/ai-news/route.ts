@@ -4,7 +4,7 @@ import { getMainSiteOrigin } from "@/lib/site-origin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** 平台 AI 小智 · tool-web 热闻代理 */
+/** 平台 AI 小智 · tool-web 热闻代理（只读 DB，无需登录） */
 export async function GET() {
   const origin = getMainSiteOrigin()?.replace(/\/$/, "");
   if (!origin) {
@@ -15,13 +15,12 @@ export async function GET() {
   }
 
   const token = cookies().get("tools_token")?.value?.trim();
-  if (!token) {
-    return Response.json({ error: "请先登录工具站" }, { status: 401 });
-  }
+  const headers: HeadersInit = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const upstream = await fetch(`${origin}/api/platform-assistant/ai-news`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
     cache: "no-store",
     signal: AbortSignal.timeout(90_000),
   });
