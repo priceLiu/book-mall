@@ -6,8 +6,8 @@ import type { Prisma } from "@prisma/client";
 
 import {
   applyCanvasDashscopeImagePollResult,
-  type DashscopeTaskOutput,
 } from "@/lib/canvas/canvas-task-service";
+import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 import { prisma } from "@/lib/prisma";
 
 function readSyncOutput(

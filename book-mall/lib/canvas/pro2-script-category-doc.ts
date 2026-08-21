@@ -41,6 +41,8 @@ export function scopePro2CategoryDocForSection(
       "请根据用户提供的 **故事大纲**，**仅输出 ## 场景视觉提示词 + 一张 6 列 GFM 表**；不要输出分镜/角色/视觉风格等其他章节。",
     storyboard:
       "请根据用户提供的 **故事大纲、角色设定、场景提示词**，**仅输出 ## 分镜脚本 + 一张 10 列 GFM 表**（12–18 镜，总时长 175–185 秒，每镜 10–15 秒，含光影/道具/音效与【起始】…【结束】）；Pass1 禁止 AI 列；不要输出其他章节或镜数规划小表。",
+    shot_prompts:
+      "请根据已定稿分镜，**仅输出** step=shot_prompts 的 JSON patch（每镜 frameImagePrompt / videoPrompt）；不要改写 Pass1 镜号与对白。",
   };
 
   scoped = scoped.replace(

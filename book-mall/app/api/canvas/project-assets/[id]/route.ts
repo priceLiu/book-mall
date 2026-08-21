@@ -40,8 +40,8 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
     const parsed = await readJsonBody(request);
     if (!parsed.ok) return parsed.response;
     const body = parsed.body;
-    const sourceProjectId =
-      body.sourceProjectId === null ? (null as const) : undefined;
+    const sourceProjectId: null | undefined =
+      body.sourceProjectId === null ? null : undefined;
     const asset = await patchProjectAsset(guard.user.id, ctx.params.id, {
       displayName: body.displayName as string | undefined,
       description: body.description as string | undefined,

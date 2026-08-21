@@ -219,6 +219,12 @@ export async function listMarketModelsForGatewayUser(input: {
         credentialBound: true,
         creditsPerUnit: null,
         platformOffering: false,
+        sourceLabel: resolveSourceLabel({
+          canonicalModelKey: catalog.canonicalKey,
+          providerKind: route.providerKind,
+          vendor: route.vendor,
+        }),
+        sortOrder: 0,
       });
     }
   } else {
@@ -262,6 +268,12 @@ export async function listMarketModelsForGatewayUser(input: {
         ),
         creditsPerUnit: o.publishedCreditsPerUnit ?? price,
         platformOffering: true,
+        sourceLabel: resolveSourceLabel({
+          canonicalModelKey: o.canonicalModelKey,
+          providerKind: o.activeProviderKind ?? "KIE",
+          vendor: o.activeVendor ?? "kie",
+        }),
+        sortOrder: 0,
       });
     }
   }
