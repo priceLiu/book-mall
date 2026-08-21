@@ -139,6 +139,7 @@ model User {
   aiSpaceVideoMaterials            AiSpaceVideoMaterial[]
   aiSpaceComposeTasks              AiSpaceComposeTask[]
   aiSpaceBroadcastProjects         AiSpaceBroadcastProject[]
+  platformAssistantFeedbacks       PlatformAssistantFeedback[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -4220,4 +4221,61 @@ model PlatformDocChunk {
 
   @@unique([source, heading, contentHash])
   @@index([category])
+}
+
+enum PlatformAssistantFeedbackCategory {
+  BUG
+  QUESTION
+  FEATURE_REQUEST
+  OTHER
+}
+
+enum PlatformAssistantFeedbackStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+}
+
+/// AI 小智 · 用户反馈 / Bug / 未能解答的问题（管理员驾驶舱可见）
+model PlatformAssistantFeedback {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category PlatformAssistantFeedbackCategory
+  status   PlatformAssistantFeedbackStatus   @default(OPEN)
+
+  userMessage    String  @db.Text
+  assistantReply String? @db.Text
+  sourceApp      String?
+  pageUrl        String? @db.Text
+  adminNote      String? @db.Text
+  reviewedAt     DateTime?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum PlatformAssistantAiNewsStatus {
+  READY
+  FAILED
+}
+
+/// AI 小智 · 每日热闻（Cron 预生成，全平台只读）
+model PlatformAssistantAiNewsDaily {
+  id           String                        @id @default(cuid())
+  dateKey      String                        @unique
+  content      String                        @db.Text
+  status       PlatformAssistantAiNewsStatus @default(READY)
+  errorMessage String?                       @db.Text
+  generatedAt  DateTime                      @default(now())
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @updatedAt
+
+  @@index([dateKey(sort: Desc)])
+  @@index([status, generatedAt(sort: Desc)])
 }

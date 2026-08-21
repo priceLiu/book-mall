@@ -13,10 +13,16 @@ import {
   buildAssistantGreeting,
   parseDisplayName,
 } from "./greeting";
+import {
+  getPrefetchedAiNews,
+  prefetchAiNews,
+} from "./ai-news-prefetch";
 
 export type PlatformAssistantProps = {
   /** 对话端点。子站默认经 BFF 代理到主站。 */
   chatEndpoint?: string;
+  /** AI 热闻端点；默认由 chatEndpoint 推导（/chat → /ai-news）。 */
+  aiNewsEndpoint?: string;
   /** 读取当前用户昵称/用户名（子站默认 tools-session；主站传 /api/auth/session）。 */
   userSessionEndpoint?: string;
   /** 悬浮球头像图片 URL（不传则用默认渐变头像）。 */
@@ -40,10 +46,69 @@ type Msg = {
   role: "user" | "assistant";
   content: string;
   redirect?: Redirect | null;
+  appLinks?: Redirect[];
+  /** 热闻区块 · 使用 Markdown 轻渲染 */
+  richMarkdown?: boolean;
+  newsLoading?: boolean;
 };
 
 const DEFAULT_ENDPOINT = "/api/book-mall/api/platform-assistant/chat";
 const DEFAULT_USER_SESSION = "/api/tools-session";
+
+function resolveAiNewsEndpoint(chatEndpoint: string, explicit?: string): string {
+  if (explicit?.trim()) return explicit.trim();
+  if (chatEndpoint.endsWith("/chat")) {
+    return `${chatEndpoint.slice(0, -"/chat".length)}/ai-news`;
+  }
+  return "/api/book-mall/api/platform-assistant/ai-news";
+}
+
+function renderInlineBold(text: string, keyPrefix: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={`${keyPrefix}-b-${i}`} className="pa-rich-strong">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
+function AssistantRichText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="pa-rich">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={`ln-${i}`} className="pa-rich-gap" />;
+        const isCategory =
+          (/^【.+】$/.test(trimmed) ||
+            (/^[\p{Extended_Pictographic}]/u.test(trimmed) &&
+              !/^\d+\./.test(trimmed)));
+        const isNumbered = /^\d+\.\s/.test(trimmed);
+        const isSubField =
+          /^(核心事实|热度依据|简要点评)[：:]/.test(trimmed) ||
+          trimmed.startsWith("🔥今日头条");
+        const isDisclaimer = trimmed.startsWith("*") && trimmed.endsWith("*");
+        let cls = "pa-rich-line";
+        if (isCategory) cls = "pa-rich-category";
+        else if (isNumbered) cls = "pa-rich-item";
+        else if (isSubField) cls = "pa-rich-sub";
+        else if (isDisclaimer) cls = "pa-rich-disclaimer";
+        return (
+          <p key={`ln-${i}`} className={cls}>
+            {isDisclaimer
+              ? trimmed.slice(1, -1)
+              : renderInlineBold(line, `ln-${i}`)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 const STYLE_ID = "platform-assistant-styles";
 const POSITION_KEY = "platform-assistant-ball-pos";
@@ -300,6 +365,54 @@ function useInjectStyles(accent: string) {
   color: rgba(255,255,255,.5);
   margin-top: 2px;
 }
+.pa-app-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.pa-rich {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255,255,255,.88);
+}
+.pa-rich-gap {
+  height: 6px;
+}
+.pa-rich-category {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4e7;
+}
+.pa-rich-item {
+  margin: 0 0 6px;
+  padding-left: 2px;
+  color: rgba(255,255,255,.82);
+}
+.pa-rich-sub {
+  margin: 0 0 4px;
+  padding-left: 12px;
+  font-size: 12px;
+  color: rgba(255,255,255,.62);
+  line-height: 1.5;
+}
+.pa-rich-strong {
+  color: #f4f4f5;
+  font-weight: 600;
+}
+.pa-rich-disclaimer {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255,255,255,.38);
+  font-style: italic;
+}
+.pa-news-loading {
+  font-size: 12px;
+  color: rgba(255,255,255,.55);
+}
 .pa-input-bar {
   border-top: 1px solid rgba(255,255,255,.06);
   padding: 12px;
@@ -369,17 +482,19 @@ function useInjectStyles(accent: string) {
 
 export function PlatformAssistant({
   chatEndpoint = DEFAULT_ENDPOINT,
+  aiNewsEndpoint,
   userSessionEndpoint = DEFAULT_USER_SESSION,
   avatarSrc,
   title = "AI 小智",
   accentColor = "#4f46e5",
   greeting,
 }: PlatformAssistantProps) {
+  const newsEndpoint = resolveAiNewsEndpoint(chatEndpoint, aiNewsEndpoint);
   const [open, setOpen] = useState(false);
+  const [openGeneration, setOpenGeneration] = useState(0);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [greetingReady, setGreetingReady] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -463,18 +578,64 @@ export function PlatformAssistant({
         return p;
       });
     } else {
+      setOpenGeneration((g) => g + 1);
       setOpen(true);
     }
   };
 
   useEffect(() => {
-    if (!open || messages.length > 0 || greetingReady) return;
+    if (!open) return;
+    if (messages.some((m) => m.role === "user")) return;
+
     let cancelled = false;
     void (async () => {
+      const loadNews = async (baseMessages: Msg[]) => {
+        const cached = getPrefetchedAiNews();
+        if (cached?.content) {
+          setMessages([
+            ...baseMessages,
+            {
+              role: "assistant",
+              content: `📰 ${cached.stale ? "AI 热闻（昨日）" : "今日 AI 热闻"}\n\n${cached.content}`,
+              richMarkdown: true,
+            },
+          ]);
+          return;
+        }
+
+        setMessages([
+          ...baseMessages,
+          { role: "assistant", content: "", newsLoading: true },
+        ]);
+        try {
+          const data = await prefetchAiNews(newsEndpoint);
+          if (cancelled) return;
+          if (data?.content) {
+            setMessages((prev) => {
+              const next = [...prev];
+              const newsIdx = next.findIndex((m) => m.newsLoading);
+              const newsMsg: Msg = {
+                role: "assistant",
+                content: `📰 ${data.stale ? "AI 热闻（昨日）" : "今日 AI 热闻"}\n\n${data.content}`,
+                richMarkdown: true,
+              };
+              if (newsIdx >= 0) next[newsIdx] = newsMsg;
+              else next.push(newsMsg);
+              return next;
+            });
+            return;
+          }
+          setMessages((prev) => prev.filter((m) => !m.newsLoading));
+        } catch {
+          if (!cancelled) {
+            setMessages((prev) => prev.filter((m) => !m.newsLoading));
+          }
+        }
+      };
+
       if (greeting) {
         if (!cancelled) {
-          setMessages([{ role: "assistant", content: greeting }]);
-          setGreetingReady(true);
+          await loadNews([{ role: "assistant", content: greeting }]);
         }
         return;
       }
@@ -491,15 +652,20 @@ export function PlatformAssistant({
         /* 未登录或子站无 session 端点时仍给出通用问候 */
       }
       if (cancelled) return;
-      setMessages([
-        { role: "assistant", content: buildAssistantGreeting(displayName) },
+      const built = buildAssistantGreeting(displayName);
+      await loadNews([
+        {
+          role: "assistant",
+          content: built.content,
+          appLinks: built.appLinks,
+        },
       ]);
-      setGreetingReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, messages.length, greeting, greetingReady, userSessionEndpoint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在新开对话轮次刷新问候
+  }, [open, openGeneration, greeting, userSessionEndpoint, newsEndpoint]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -507,6 +673,11 @@ export function PlatformAssistant({
   }, [messages, streaming]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  /** 全站 layout mount：后台预取热闻（读 book-mall DB，不阻塞 UI）。 */
+  useEffect(() => {
+    void prefetchAiNews(newsEndpoint);
+  }, [newsEndpoint]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -544,7 +715,11 @@ export function PlatformAssistant({
       const res = await fetch(chatEndpoint, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Platform-App":
+            typeof window !== "undefined" ? window.location.hostname : "",
+        },
         body: JSON.stringify({ messages: outgoing }),
         signal: controller.signal,
       });
@@ -587,6 +762,11 @@ export function PlatformAssistant({
             if (json.assistantRedirect) {
               const r = json.assistantRedirect as Redirect;
               appendToLast((m) => ({ ...m, redirect: r }));
+              continue;
+            }
+            if (Array.isArray(json.assistantAppLinks)) {
+              const links = json.assistantAppLinks as Redirect[];
+              appendToLast((m) => ({ ...m, appLinks: links }));
               continue;
             }
             const delta = json.choices?.[0]?.delta?.content;
@@ -731,16 +911,26 @@ export function PlatformAssistant({
                             isUser ? "pa-bubble-user" : "pa-bubble-assistant"
                           }`}
                         >
-                          {m.content ||
-                            (streaming && m.role === "assistant" ? (
-                              <span>
-                                <span className="pa-dot" style={{ animationDelay: "0s" }} />
-                                <span className="pa-dot" style={{ animationDelay: ".2s" }} />
-                                <span className="pa-dot" style={{ animationDelay: ".4s" }} />
-                              </span>
-                            ) : (
-                              ""
-                            ))}
+                          {m.richMarkdown && m.content ? (
+                            <AssistantRichText text={m.content} />
+                          ) : m.content ? (
+                            <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                          ) : m.newsLoading ? (
+                            <span className="pa-news-loading">
+                              正在联网整理 AI 热闻…
+                              <span className="pa-dot" style={{ animationDelay: "0s" }} />
+                              <span className="pa-dot" style={{ animationDelay: ".2s" }} />
+                              <span className="pa-dot" style={{ animationDelay: ".4s" }} />
+                            </span>
+                          ) : streaming && m.role === "assistant" ? (
+                            <span>
+                              <span className="pa-dot" style={{ animationDelay: "0s" }} />
+                              <span className="pa-dot" style={{ animationDelay: ".2s" }} />
+                              <span className="pa-dot" style={{ animationDelay: ".4s" }} />
+                            </span>
+                          ) : (
+                            ""
+                          )}
                         </div>
                       </div>
                       {m.redirect && (
@@ -756,6 +946,22 @@ export function PlatformAssistant({
                           <div className="pa-card-desc">{m.redirect.description}</div>
                         </a>
                       )}
+                      {m.appLinks && m.appLinks.length > 0 ? (
+                        <div className="pa-app-links">
+                          {m.appLinks.map((link) => (
+                            <a
+                              key={link.app}
+                              className="pa-card"
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <div className="pa-card-title">{link.title} →</div>
+                              <div className="pa-card-desc">{link.description}</div>
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 );

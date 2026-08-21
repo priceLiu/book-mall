@@ -228,3 +228,19 @@ docker compose up -d --build
 运维监控：finance-web **`/admin/credit-expiry-ops`**（见 `docs/积分清零控制台.md`）。
 
 `vercel.json` 中同名 cron 仅作 Vercel 部署备用，**不以之为 CloudBase 唯一依赖**。
+
+---
+
+## 八、book-mall AI 小智热闻 Cron（全平台共用）
+
+生产 **CloudBase 定时 HTTP**（鉴权 `Authorization: Bearer <CRON_SECRET>`）：
+
+| 时间 (CST) | 路径 | 说明 |
+|------------|------|------|
+| 06:30 | `POST /api/internal/platform-assistant/ai-news/generate` | 预生成当日 AI 热闻（Gateway DeepSeek） |
+| 12:30 | 同上 | 覆盖刷新当日热闻 |
+| 18:30 | 同上 | 覆盖刷新当日热闻 |
+
+本地手动：`pnpm --dir book-mall platform-assistant:ai-news-generate`，或 **book-mall 管理驾驶舱** →「立即生成今日热闻」（无需额外 Key，走 Gateway DeepSeek）。
+
+读路径：`GET /api/platform-assistant/ai-news` **只读 DB**；保留最近 3 天。详见 `book-mall/doc/product/platform-assistant-ai-news-and-canvas-portal.md`。

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { PlatformCockpitSnapshot } from "@/lib/admin/platform-cockpit-service";
+import { AdminAssistantAiNewsPanel } from "@/components/admin/admin-assistant-ai-news-panel";
+import { AdminAssistantFeedbackPanel } from "@/components/admin/admin-assistant-feedback-panel";
 import { AdminCreditOpsCockpitPanel } from "@/components/admin/admin-credit-ops-cockpit-panel";
 import { AdminPlatformCockpitCharts } from "@/components/admin/admin-platform-cockpit-charts";
 import {
@@ -120,6 +122,13 @@ export function AdminPlatformCockpit({ data }: { data: PlatformCockpitSnapshot }
         dashboard={data.creditOps}
         alerts={data.creditOpsAlerts}
       />
+
+      <AdminAssistantFeedbackPanel
+        initialItems={data.assistantFeedback.items}
+        summary={data.assistantFeedback.summary}
+      />
+
+      <AdminAssistantAiNewsPanel rows={data.assistantAiNews} />
 
       <AdminPlatformCockpitCharts data={data} />
 

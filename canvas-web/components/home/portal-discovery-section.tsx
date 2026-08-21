@@ -10,7 +10,7 @@ import {
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
-import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
+import { usePortalViewer } from "@/components/home/portal-viewer-context";
 import {
   duplicatePortalCaseProject,
   duplicatePortalFeaturedProject,
@@ -104,13 +104,17 @@ function templateItem(t: CanvasTemplateRecord): DiscoveryItem {
   };
 }
 
+const SECONDARY_LOAD_DELAY_MS = 300;
+
 export function PortalDiscoverySection() {
   const base = useBookMallBaseUrl();
+  const { viewerUserId } = usePortalViewer();
   const [featuredProjects, setFeaturedProjects] = useState<PortalFeaturedProjectSummary[]>([]);
   const [publicTemplates, setPublicTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [cases, setCases] = useState<PortalCaseProjectSummary[]>([]);
-  const [viewerUserId, setViewerUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [secondaryLoading, setSecondaryLoading] = useState(false);
+  const [secondaryLoaded, setSecondaryLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PreviewState | null>(null);
@@ -120,31 +124,33 @@ export function PortalDiscoverySection() {
 
   useEffect(() => {
     if (!base?.trim()) return;
-    void fetchCanvasViewerUser(base)
-      .then((u) => setViewerUserId(u?.id ?? null))
-      .catch(() => setViewerUserId(null));
-  }, [base]);
-
-  useEffect(() => {
-    if (!base?.trim()) return;
-    setLoading(true);
+    setFeaturedLoading(true);
     setError(null);
     setLoadFailed(false);
 
+    void listPortalFeaturedProjects(base)
+      .then((list) => {
+        const arr = Array.isArray(list) ? list : [];
+        setFeaturedProjects(arr.filter((p) => p.edition === "pro2"));
+      })
+      .catch((reason) => {
+        setFeaturedProjects([]);
+        setLoadFailed(true);
+        console.warn("[portal-discovery] portal featured failed", reason);
+        const msg = portalLoadErrorMessage(reason, "发现内容加载失败，请稍后重试");
+        if (!isPortalGuestAuthLoadError(msg)) setError(msg);
+      })
+      .finally(() => setFeaturedLoading(false));
+  }, [base]);
+
+  const loadSecondary = useCallback(() => {
+    if (!base?.trim() || secondaryLoaded || secondaryLoading) return;
+    setSecondaryLoading(true);
     void (async () => {
-      const [featRes, pubRes, caseRes] = await Promise.allSettled([
-        listPortalFeaturedProjects(base),
+      const [pubRes, caseRes] = await Promise.allSettled([
         listCanvasTemplates(base, "public"),
         listPortalCaseProjects(base, "pro2"),
       ]);
-
-      if (featRes.status === "fulfilled") {
-        const list = Array.isArray(featRes.value) ? featRes.value : [];
-        setFeaturedProjects(list.filter((p) => p.edition === "pro2"));
-      } else {
-        setFeaturedProjects([]);
-        console.warn("[portal-discovery] portal featured failed", featRes.reason);
-      }
 
       if (pubRes.status === "fulfilled") {
         const list = Array.isArray(pubRes.value) ? pubRes.value : [];
@@ -168,20 +174,34 @@ export function PortalDiscoverySection() {
         console.warn("[portal-discovery] portal cases failed", caseRes.reason);
       }
 
-      const results = [featRes, pubRes, caseRes];
-      const failures = results.filter((r) => r.status === "rejected");
-      if (didPortalListLoadFail(results)) {
+      const results = [pubRes, caseRes];
+      if (didPortalListLoadFail(results) && featuredProjects.length === 0) {
         setLoadFailed(true);
-        const first = failures[0] as PromiseRejectedResult;
-        const msg = portalLoadErrorMessage(first.reason, "发现内容加载失败，请稍后重试");
-        if (!isPortalGuestAuthLoadError(msg)) {
-          setError(msg);
+        const first = results.find((r) => r.status === "rejected") as
+          | PromiseRejectedResult
+          | undefined;
+        if (first) {
+          const msg = portalLoadErrorMessage(first.reason, "发现内容加载失败，请稍后重试");
+          if (!isPortalGuestAuthLoadError(msg)) setError(msg);
         }
       }
 
-      setLoading(false);
+      setSecondaryLoaded(true);
+      setSecondaryLoading(false);
     })();
-  }, [base]);
+  }, [base, secondaryLoaded, secondaryLoading, featuredProjects.length]);
+
+  useEffect(() => {
+    if (!base?.trim() || secondaryLoaded) return;
+    const t = window.setTimeout(() => loadSecondary(), SECONDARY_LOAD_DELAY_MS);
+    return () => window.clearTimeout(t);
+  }, [base, secondaryLoaded, loadSecondary]);
+
+  useEffect(() => {
+    if (activeTab === TAB_TEMPLATE || activeTab === TAB_CASE) {
+      loadSecondary();
+    }
+  }, [activeTab, loadSecondary]);
 
   const items = useMemo((): DiscoveryItem[] => {
     const projectIds = new Set<string>();
@@ -362,7 +382,10 @@ export function PortalDiscoverySection() {
           <button
             key={tab}
             type="button"
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              if (tab === TAB_TEMPLATE || tab === TAB_CASE) loadSecondary();
+            }}
             className={
               activeTab === tab
                 ? "rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white"
@@ -376,16 +399,17 @@ export function PortalDiscoverySection() {
 
       {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
-      {loading ? (
+      {featuredLoading && filtered.length === 0 ? (
         <div className="flex items-center gap-2 py-12 text-sm text-[var(--canvas-muted)]">
           <Loader2 className="size-4 animate-spin" />
           加载发现内容…
         </div>
-      ) : loadFailed ? (
+      ) : loadFailed && filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
           暂时无法加载内容，请稍后刷新页面。
         </p>
       ) : filtered.length > 0 ? (
+        <>
         <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {
             const own = isOwnItem(item, viewerUserId);
@@ -460,6 +484,13 @@ export function PortalDiscoverySection() {
             );
           })}
         </ul>
+        {secondaryLoading ? (
+          <p className="mt-4 flex items-center gap-2 text-xs text-[var(--canvas-muted)]">
+            <Loader2 className="size-3 animate-spin" />
+            正在加载模板与案例…
+          </p>
+        ) : null}
+        </>
       ) : null}
 
       {preview?.kind === "template" ? (

@@ -7,9 +7,10 @@ import { Clapperboard, Loader2, Search } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FilmShowcaseCardMedia } from "@/components/home/film-showcase-card-media";
 import { ShowcaseMediaKindBadge } from "@/components/home/showcase-media-kind-badge";
+import { usePortalViewer } from "@/components/home/portal-viewer-context";
+import { useInViewOnce } from "@/components/home/use-in-view-once";
 import { CANVAS_LIST_GRID_CLASS } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
-import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
 import {
   duplicatePortalFilmShowcaseProject,
   listPortalFilmShowcase,
@@ -30,24 +31,20 @@ function ownerLabel(
 
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
+  const { viewerUserId } = usePortalViewer();
+  const { ref: sectionRef, inView } = useInViewOnce("200px");
   const [items, setItems] = useState<PortalFilmShowcaseMedia[]>([]);
-  const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [fetchStarted, setFetchStarted] = useState(false);
 
   useEffect(() => {
-    if (!base?.trim()) return;
-    void fetchCanvasViewerUser(base)
-      .then((u) => setViewerUserId(u?.id ?? null))
-      .catch(() => setViewerUserId(null));
-  }, [base]);
-
-  useEffect(() => {
-    if (!base?.trim()) return;
+    if (!base?.trim() || !inView || fetchStarted) return;
+    setFetchStarted(true);
     setLoading(true);
     setError(null);
     setLoadFailed(false);
@@ -63,7 +60,7 @@ export function PortalFilmCasesSection() {
         }
       })
       .finally(() => setLoading(false));
-  }, [base]);
+  }, [base, inView, fetchStarted]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -106,10 +103,23 @@ export function PortalFilmCasesSection() {
     [viewerUserId],
   );
 
+  if (!inView && !fetchStarted) {
+    return (
+      <section
+        ref={sectionRef}
+        className="canvas-page min-h-[120px] border-t border-[var(--canvas-border)] pb-16 pt-8"
+        aria-hidden
+      />
+    );
+  }
+
   if (!loading && items.length === 0 && !error && !loadFailed) return null;
 
   return (
-    <section className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8">
+    <section
+      ref={sectionRef}
+      className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8"
+    >
       <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="twenty-eyebrow flex items-center gap-2">

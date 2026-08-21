@@ -3,6 +3,12 @@
 export const ASSISTANT_CHAT_MODEL =
   process.env.PLATFORM_ASSISTANT_CHAT_MODEL?.trim() || "deepseek-chat";
 
+/** AI 热闻简报 · DeepSeek V4 */
+export const ASSISTANT_NEWS_MODEL =
+  process.env.PLATFORM_ASSISTANT_NEWS_MODEL?.trim() || "deepseek-v4-flash";
+
+export const ASSISTANT_NEWS_MAX_TOKENS = 4096;
+
 export const ASSISTANT_EMBED_MODEL =
   process.env.PLATFORM_ASSISTANT_EMBED_MODEL?.trim() || "text-embedding-v3";
 

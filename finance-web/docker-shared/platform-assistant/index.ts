@@ -4,5 +4,17 @@ export {
   buildAssistantGreeting,
   buildDailyOpener,
   parseDisplayName,
+  pickRandomJoke,
 } from "./greeting";
-export type { GreetingUser } from "./greeting";
+export type { AssistantGreeting, GreetingUser } from "./greeting";
+export {
+  buildPlatformAppLinks,
+  PLATFORM_APP_DEFINITIONS,
+} from "./platform-apps";
+export type { PlatformAppLink } from "./platform-apps";
+export {
+  clearPrefetchedAiNewsForTests,
+  getPrefetchedAiNews,
+  prefetchAiNews,
+} from "./ai-news-prefetch";
+export type { PrefetchedAiNews } from "./ai-news-prefetch";

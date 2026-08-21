@@ -1,17 +1,22 @@
 /**
  * 平台 AI 导览助手 · 对话端点（SSE 流式）。
- * 面向全部注册用户，平台代付 DeepSeek，无积分、无订阅门禁。
- * 价格/财务护栏 + pgvector 检索 + 图片/视频引导卡。
  */
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
+import {
+  classifyUserFeedbackCategory,
+  shouldLogUnansweredQuestion,
+} from "@/lib/platform-assistant/feedback-classifier";
+import { createPlatformAssistantFeedback } from "@/lib/platform-assistant/feedback-service";
 import {
   isSensitiveTopic,
   sensitiveTopicReply,
 } from "@/lib/platform-assistant/guardrails";
 import {
   isGenerationIntent,
+  isPlatformOverviewIntent,
+  listAllPlatformAppLinks,
   matchRedirect,
 } from "@/lib/platform-assistant/redirect-map";
 import { retrieveChunks } from "@/lib/platform-assistant/retriever";
@@ -35,7 +40,6 @@ type ChatMessage = { role: string; content: string };
 
 const encoder = new TextEncoder();
 
-/** 进程内每用户限流（简单滑动窗口）。 */
 const rateBuckets = new Map<string, number[]>();
 function rateLimited(userId: string): boolean {
   const now = Date.now();
@@ -54,13 +58,11 @@ function sseLine(obj: unknown): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
-/** 作为一段 assistant 内容增量发送（用于本地固定话术 / 错误提示）。 */
 function contentDelta(text: string): Uint8Array {
   return sseLine({ choices: [{ delta: { content: text }, index: 0 }] });
 }
 
 const DONE = encoder.encode("data: [DONE]\n\n");
-/** SSE 心跳注释：立即刷出首字节，前端马上显示「正在输入」。 */
 const HEARTBEAT = encoder.encode(": open\n\n");
 
 function sseResponse(body: ReadableStream<Uint8Array>, status = 200): Response {
@@ -75,12 +77,49 @@ function sseResponse(body: ReadableStream<Uint8Array>, status = 200): Response {
   });
 }
 
-/** 优先工具站 Bearer（子站经 BFF）；主站浏览器无 Bearer 时回退 NextAuth 会话。 */
 async function resolveUserId(request: Request): Promise<string | null> {
   const auth = verifyToolsBearer(request);
   if (auth.ok) return auth.userId;
   const session = await getServerSession(authOptions);
   return session?.user?.id ?? null;
+}
+
+function parseSourceMeta(request: Request): {
+  sourceApp: string | null;
+  pageUrl: string | null;
+} {
+  const sourceApp = request.headers.get("x-platform-app")?.trim() || null;
+  const pageUrl = request.headers.get("referer")?.trim() || null;
+  return { sourceApp, pageUrl };
+}
+
+function extractContentDeltaFromChunk(chunk: Uint8Array): string {
+  const text = new TextDecoder().decode(chunk);
+  let out = "";
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (!t.startsWith("data:")) continue;
+    const payload = t.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      const json = JSON.parse(payload) as {
+        choices?: { delta?: { content?: string } }[];
+      };
+      const delta = json.choices?.[0]?.delta?.content;
+      if (typeof delta === "string") out += delta;
+    } catch {
+      /* partial */
+    }
+  }
+  return out;
+}
+
+async function logFeedbackSafe(input: Parameters<typeof createPlatformAssistantFeedback>[0]) {
+  try {
+    await createPlatformAssistantFeedback(input);
+  } catch (e) {
+    console.error("[platform-assistant] feedback log failed:", (e as Error).message);
+  }
 }
 
 export async function POST(request: Request) {
@@ -121,34 +160,81 @@ export async function POST(request: Request) {
     return Response.json({ error: "缺少用户消息" }, { status: 400 });
   }
 
-  // 立即返回 SSE 流：先刷心跳（前端秒显「正在输入」），检索与大模型调用都在流内进行。
+  const { sourceApp, pageUrl } = parseSourceMeta(request);
+  const isOverview = isPlatformOverviewIntent(query);
+  const isGreeting = isPureGreeting(query);
+  let chunkCount = 0;
+  let assistantReply = "";
+
+  async function logFeedbackAfterReply() {
+    const userCategory = classifyUserFeedbackCategory(query);
+    if (userCategory === "BUG" || userCategory === "FEATURE_REQUEST") {
+      await logFeedbackSafe({
+        userId,
+        category: userCategory,
+        userMessage: query,
+        assistantReply,
+        sourceApp,
+        pageUrl,
+      });
+      return;
+    }
+    if (
+      shouldLogUnansweredQuestion({
+        query,
+        chunkCount,
+        isOverview,
+        isGreeting,
+        assistantReply,
+      })
+    ) {
+      await logFeedbackSafe({
+        userId,
+        category: "QUESTION",
+        userMessage: query,
+        assistantReply,
+        sourceApp,
+        pageUrl,
+      });
+    }
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const finish = () => {
+      const finish = async () => {
         controller.enqueue(DONE);
         controller.close();
+        await logFeedbackAfterReply();
       };
+
       try {
         controller.enqueue(HEARTBEAT);
 
-        // 护栏：价格/财务/计算规则一律不进模型
         if (isSensitiveTopic(query)) {
-          controller.enqueue(contentDelta(sensitiveTopicReply()));
-          finish();
+          assistantReply = sensitiveTopicReply();
+          controller.enqueue(contentDelta(assistantReply));
+          await finish();
           return;
         }
 
-        // 图片/视频生成诉求 → 引导卡（不在助手内执行）
+        if (isOverview) {
+          const links = listAllPlatformAppLinks();
+          controller.enqueue(sseLine({ assistantAppLinks: links }));
+          assistantReply = "我们平台主要有以下应用，点击卡片可在新标签页打开：";
+          controller.enqueue(contentDelta(assistantReply));
+          await finish();
+          return;
+        }
+
         const redirect = isGenerationIntent(query) ? matchRedirect(query) : null;
         if (redirect) controller.enqueue(sseLine({ assistantRedirect: redirect }));
 
-        // 纯寒暄跳过检索，避免无谓 embedding 往返
         let chunks: Awaited<ReturnType<typeof retrieveChunks>> = [];
-        if (!isPureGreeting(query)) {
+        if (!isGreeting) {
           try {
             chunks = await retrieveChunks(query);
+            chunkCount = chunks.length;
           } catch (e) {
-            // 检索失败（向量库/embedding 异常）降级为无知识回答，仍受护栏约束
             console.error(
               "[platform-assistant] retrieve failed:",
               (e as Error).message,
@@ -169,17 +255,14 @@ export async function POST(request: Request) {
           });
         } catch (e) {
           if (e instanceof PlatformAssistantGatewayError) {
-            controller.enqueue(
-              contentDelta(
-                redirect
-                  ? `${redirect.description}\n\n打开：${redirect.url}`
-                  : `助手暂时不可用：${e.message}`,
-              ),
-            );
+            assistantReply = redirect
+              ? `${redirect.description}\n\n打开：${redirect.url}`
+              : `助手暂时不可用：${e.message}`;
           } else {
-            controller.enqueue(contentDelta(`助手出错了：${(e as Error).message}`));
+            assistantReply = `助手出错了：${(e as Error).message}`;
           }
-          finish();
+          controller.enqueue(contentDelta(assistantReply));
+          await finish();
           return;
         }
 
@@ -188,19 +271,16 @@ export async function POST(request: Request) {
           const { done, value } = await reader.read();
           if (done) break;
           controller.enqueue(value);
+          assistantReply += extractContentDeltaFromChunk(value);
         }
-        controller.close();
+        await finish();
       } catch (err) {
         try {
           controller.enqueue(contentDelta("连接中断，请重试。"));
           controller.enqueue(DONE);
-        } catch {
-          /* controller 可能已关闭 */
-        }
-        try {
           controller.close();
         } catch {
-          /* already closed */
+          /* */
         }
         console.error("[platform-assistant] stream error:", (err as Error).message);
       }

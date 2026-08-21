@@ -116,6 +116,7 @@
     "gateway:stats-reconcile": "dotenv -e .env.local -- tsx scripts/gateway-stats-counter-reconcile.ts",
     "hotcold:archive": "dotenv -e .env.local -- tsx scripts/hotcold-archive.ts",
     "hotcold:archive:dry-run": "dotenv -e .env.local -- tsx scripts/hotcold-archive.ts --dry-run",
+    "platform-assistant:ai-news-generate": "dotenv -e .env.local -- tsx scripts/platform-assistant-ai-news-generate.ts",
     "gateway:seed-registry": "dotenv -e .env.local -- tsx scripts/seed-gateway-model-registry.ts --confirm",
     "gateway:seed-model-ops": "dotenv -e .env.local -- tsx scripts/seed-model-operations-center.ts --confirm",
     "gateway:seed-model-ops:preview": "dotenv -e .env.local -- tsx scripts/seed-model-operations-center.ts",

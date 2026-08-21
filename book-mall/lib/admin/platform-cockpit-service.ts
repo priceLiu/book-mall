@@ -10,6 +10,12 @@ import {
   cstBusinessDate,
 } from "@/lib/billing/credit-ops-service";
 import type { CreditOpsAlert } from "@/lib/billing/credit-ops-alerts";
+import {
+  getAssistantFeedbackSummary,
+  listOpenAssistantFeedback,
+  type AssistantFeedbackListItem,
+} from "@/lib/platform-assistant/feedback-service";
+import { listRecentAiNewsDaily } from "@/lib/platform-assistant/ai-news-service";
 
 function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -82,6 +88,11 @@ export type PlatformCockpitSnapshot = {
     creditsBilling: CockpitChartDatum[];
     creditConsumptionTrend: CockpitTrendDatum[];
   };
+  assistantFeedback: {
+    summary: Awaited<ReturnType<typeof getAssistantFeedbackSummary>>;
+    items: AssistantFeedbackListItem[];
+  };
+  assistantAiNews: Awaited<ReturnType<typeof listRecentAiNewsDaily>>;
 };
 
 export async function getPlatformCockpitSnapshot(
@@ -168,7 +179,8 @@ export async function getPlatformCockpitSnapshot(
     prisma.platformErrorLog.count({ where: { createdAt: { gte: last24h } } }),
   ]);
 
-  const [creditOpsDashboard, alerts, creditTrendLedgers] = await Promise.all([
+  const [creditOpsDashboard, alerts, creditTrendLedgers, assistantFeedbackSummary, assistantFeedbackItems, assistantAiNewsRows] =
+    await Promise.all([
     getCreditOpsDashboard({ now }),
     getCreditOpsAlerts(now),
     prisma.creditLedger.findMany({
@@ -180,6 +192,9 @@ export async function getPlatformCockpitSnapshot(
       },
       select: { createdAt: true, credits: true },
     }),
+    getAssistantFeedbackSummary(),
+    listOpenAssistantFeedback(20),
+    listRecentAiNewsDaily(3),
   ]);
 
   const trendKeys = lastNCstDateKeys(CREDIT_TREND_DAYS, now);
@@ -257,5 +272,10 @@ export async function getPlatformCockpitSnapshot(
         value: trendBuckets.get(date) ?? 0,
       })),
     },
+    assistantFeedback: {
+      summary: assistantFeedbackSummary,
+      items: assistantFeedbackItems,
+    },
+    assistantAiNews: assistantAiNewsRows,
   };
 }

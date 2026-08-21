@@ -10,6 +10,7 @@ import {
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import {
+  gatewayV1ChatCompletions,
   gatewayV1ChatCompletionsStream,
   gatewayV1Embeddings,
   gatewayV1ClientMeta,
@@ -175,4 +176,48 @@ export async function platformChatStream(opts: {
     );
   }
   return { status: res.status, body: res.body };
+}
+
+/** 平台代付：DeepSeek 非流式对话，返回 assistant 文本。 */
+export async function platformChatCompletion(opts: {
+  model: string;
+  messages: { role: string; content: string }[];
+  maxTokens?: number;
+  temperature?: number;
+  clientPage?: string;
+}): Promise<string> {
+  const apiKeyId = await resolvePlatformApiKeyId();
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages: opts.messages,
+    stream: false,
+    max_tokens: opts.maxTokens ?? 1024,
+    temperature: opts.temperature ?? 0.5,
+  };
+  const res = await gatewayV1ChatCompletions({
+    apiKeyId,
+    body,
+    meta: gatewayV1ClientMeta("TOOL", {
+      clientPage: opts.clientPage ?? "platform-assistant/completion",
+    }),
+  });
+  if (res.status < 200 || res.status >= 300) {
+    throw new PlatformAssistantGatewayError(
+      `对话失败 (HTTP ${res.status}): ${res.text.slice(0, 200)}`,
+      502,
+    );
+  }
+  let parsed: unknown = null;
+  try {
+    parsed = res.text ? JSON.parse(res.text) : null;
+  } catch {
+    parsed = null;
+  }
+  const choice = (parsed as { choices?: { message?: { content?: string } }[] })
+    ?.choices?.[0];
+  const text =
+    typeof choice?.message?.content === "string"
+      ? choice.message.content
+      : res.text;
+  return text.trim();
 }
