@@ -265,14 +265,4 @@ html {
   .site-home-infinite-marquee__track {
     will-change: transform;
   }
-
-  .site-home-infinite-marquee--pause-hover:hover .site-home-infinite-marquee__track {
-    animation-play-state: paused;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .site-home-infinite-marquee__track {
-      animation-duration: 120s !important;
-    }
-  }
 }

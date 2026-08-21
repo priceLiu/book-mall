@@ -83,7 +83,7 @@ export function SiteHomeGatewayModelsMarquee({ models, gatewayOrigin }: Props) {
       <SiteHomeInfiniteMarquee
         className="site-home-models-marquee"
         innerClassName="gap-4 sm:gap-5"
-        duration="55s"
+        speed={52}
         fade
         pauseOnHover
       >

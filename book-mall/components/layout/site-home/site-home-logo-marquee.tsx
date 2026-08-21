@@ -50,7 +50,7 @@ export function SiteHomeLogoMarquee() {
         <SiteHomeInfiniteMarquee
           className="site-home-marquee"
           innerClassName="gap-16 md:gap-24"
-          duration="45s"
+          speed={40}
           fade
           pauseOnHover
         >

@@ -413,7 +413,7 @@ export type MarketShowcaseItem = {
 
 /** 首页模型走马灯：公开读取 ACTIVE 平台代付上架模型，无需 Gateway 登录态。 */
 export async function listPublicMarketShowcaseModels(
-  limit = 16,
+  limit?: number,
 ): Promise<MarketShowcaseItem[]> {
   const offerings = await prisma.appModelOffering.findMany({
     where: { status: "ACTIVE", activeModelKey: { not: null } },
@@ -453,5 +453,7 @@ export async function listPublicMarketShowcaseModels(
     .map((k) => items.find((m) => m.canonicalKey === k))
     .filter((m): m is MarketShowcaseItem => Boolean(m));
   const rest = items.filter((m) => !featuredKeys.includes(m.canonicalKey));
-  return [...featured, ...rest].slice(0, limit);
+  const ordered = [...featured, ...rest];
+  if (limit != null && limit > 0) return ordered.slice(0, limit);
+  return ordered;
 }

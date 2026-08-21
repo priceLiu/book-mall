@@ -144,7 +144,7 @@ export function SiteHomeFeaturedProductsMarquee({ items }: Props) {
       <SiteHomeInfiniteMarquee
         className="site-home-featured-marquee"
         innerClassName="gap-6"
-        duration="65s"
+        speed={36}
         fade
         pauseOnHover
       >
