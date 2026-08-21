@@ -6,3 +6,10 @@ export function isPortalGuestAuthLoadError(message: string): boolean {
 export function portalLoadErrorMessage(reason: unknown, fallback: string): string {
   return reason instanceof Error ? reason.message : fallback;
 }
+
+/** 三路门户列表是否全部请求失败 */
+export function didPortalListLoadFail(
+  results: PromiseSettledResult<unknown>[],
+): boolean {
+  return results.length > 0 && results.every((r) => r.status === "rejected");
+}

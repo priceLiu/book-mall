@@ -37,6 +37,7 @@ export function PortalFilmCasesSection() {
   const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!base?.trim()) return;
@@ -49,11 +50,13 @@ export function PortalFilmCasesSection() {
     if (!base?.trim()) return;
     setLoading(true);
     setError(null);
+    setLoadFailed(false);
 
     void listPortalFilmShowcase(base)
       .then(setItems)
       .catch((e) => {
         setItems([]);
+        setLoadFailed(true);
         const msg = e instanceof Error ? e.message : "视频作品加载失败，请稍后重试";
         if (!isPortalGuestAuthLoadError(msg)) {
           setError(msg);
@@ -103,7 +106,7 @@ export function PortalFilmCasesSection() {
     [viewerUserId],
   );
 
-  if (!loading && items.length === 0 && !error) return null;
+  if (!loading && items.length === 0 && !error && !loadFailed) return null;
 
   return (
     <section className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8">
@@ -134,6 +137,10 @@ export function PortalFilmCasesSection() {
           <Loader2 className="size-4 animate-spin" />
           加载视频作品…
         </div>
+      ) : loadFailed ? (
+        <p className="mt-8 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
+          暂时无法加载视频作品，请稍后刷新页面。
+        </p>
       ) : filtered.length > 0 ? (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
           {filtered.map((item) => {

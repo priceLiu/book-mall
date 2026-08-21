@@ -29,6 +29,7 @@ import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
 import {
+  didPortalListLoadFail,
   isPortalGuestAuthLoadError,
   portalLoadErrorMessage,
 } from "@/lib/canvas/portal-load-errors";
@@ -115,6 +116,7 @@ export function PortalDiscoverySection() {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [forkingId, setForkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!base?.trim()) return;
@@ -127,6 +129,7 @@ export function PortalDiscoverySection() {
     if (!base?.trim()) return;
     setLoading(true);
     setError(null);
+    setLoadFailed(false);
 
     void (async () => {
       const [featRes, pubRes, caseRes] = await Promise.allSettled([
@@ -165,8 +168,10 @@ export function PortalDiscoverySection() {
         console.warn("[portal-discovery] portal cases failed", caseRes.reason);
       }
 
-      const failures = [featRes, pubRes, caseRes].filter((r) => r.status === "rejected");
-      if (failures.length === 3) {
+      const results = [featRes, pubRes, caseRes];
+      const failures = results.filter((r) => r.status === "rejected");
+      if (didPortalListLoadFail(results)) {
+        setLoadFailed(true);
         const first = failures[0] as PromiseRejectedResult;
         const msg = portalLoadErrorMessage(first.reason, "发现内容加载失败，请稍后重试");
         if (!isPortalGuestAuthLoadError(msg)) {
@@ -376,6 +381,10 @@ export function PortalDiscoverySection() {
           <Loader2 className="size-4 animate-spin" />
           加载发现内容…
         </div>
+      ) : loadFailed ? (
+        <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
+          暂时无法加载内容，请稍后刷新页面。
+        </p>
       ) : filtered.length > 0 ? (
         <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {
