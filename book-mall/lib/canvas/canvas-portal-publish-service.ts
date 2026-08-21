@@ -22,10 +22,17 @@ import {
   pickProjectThumbnailUrlPreferVideo,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { projectListCoverSummaryFields } from "@/lib/canvas/canvas-project-list-cover";
+import { collectSbv1ShowcaseMediaEntries } from "@/lib/canvas/sbv1-film-showcase";
 
 export type PortalCaseProjectSummary = CanvasProjectSummary & {
   portalCaseBlurb: string;
   owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export type AdminPortalFilmProjectSummary = PortalCaseProjectSummary & {
+  portalFilmCase: boolean;
+  portalFilmCaseSort: number;
+  mediaCount: number;
 };
 
 export type PortalSubmissionRow = {
@@ -149,6 +156,31 @@ export async function listPortalCaseCanvasProjects(opts?: {
       ...toSummaryWithEdition(p),
       portalCaseBlurb: portalCaseBlurbOf(p),
       owner: p.user,
+    }));
+}
+
+/** 管理员 · 分镜 1.0 影视作品列表（含未上架，用于首页上下架管理） */
+export async function listAdminPortalFilmProjects(): Promise<
+  AdminPortalFilmProjectSummary[]
+> {
+  const rows = await prisma.canvasProject.findMany({
+    where: { deletedAt: null },
+    orderBy: [{ portalFilmCaseSort: "asc" }, { updatedAt: "desc" }],
+    take: 500,
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return rows
+    .filter((p) => canvasProjectEditionFromGraph(p.canvas) === "sbv1")
+    .map((p) => ({
+      ...toSummaryWithEdition(p),
+      portalCaseBlurb: portalCaseBlurbOf(p),
+      owner: p.user,
+      portalFilmCase: p.portalFilmCase,
+      portalFilmCaseSort: p.portalFilmCaseSort,
+      mediaCount: collectSbv1ShowcaseMediaEntries(p.canvas).length,
     }));
 }
 
@@ -455,6 +487,7 @@ export type AdminPortalProjectPreview = {
   edition: CanvasProjectEdition;
   portalFeatured: boolean;
   portalCase: boolean;
+  portalFilmCase: boolean;
   portalFeaturedBlurb: string;
   portalCaseBlurb: string;
   canvas: unknown;
@@ -479,6 +512,7 @@ export async function getAdminPortalProjectPreview(
     edition: summary.edition,
     portalFeatured: p.portalFeatured,
     portalCase: p.portalCase,
+    portalFilmCase: p.portalFilmCase,
     portalFeaturedBlurb:
       p.portalFeaturedBlurb?.trim() || p.description?.trim() || "",
     portalCaseBlurb: portalCaseBlurbOf(p),

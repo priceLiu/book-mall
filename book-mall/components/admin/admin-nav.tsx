@@ -23,6 +23,7 @@ import {
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import {
   ADMIN_TOP_LEVEL_LINKS,
+  ADMIN_TRAILING_TOP_LEVEL_LINKS,
   adminNavGroupsForDesktop,
   buildAdminNavGroups,
   type AdminNavGroup,
@@ -234,6 +235,18 @@ function AdminNavSheet({
               </div>
             </div>
           ))}
+          {ADMIN_TRAILING_TOP_LEVEL_LINKS.map((link) => {
+            const active = pathname.startsWith(link.href);
+            return (
+              <NavLinkItem
+                key={link.href}
+                item={link}
+                active={active}
+                onNavigate={() => setOpen(false)}
+                className={SHEET_ITEM}
+              />
+            );
+          })}
         </nav>
       </SheetContent>
     </Sheet>
@@ -267,6 +280,22 @@ export function AdminNav({
         ))}
         {desktopGroups.map((group) => (
           <AdminNavDropdown key={group.id} group={group} />
+        ))}
+        {ADMIN_TRAILING_TOP_LEVEL_LINKS.map((link) => (
+          <Button
+            key={link.href}
+            variant="ghost"
+            size="sm"
+            className={cn(
+              ADMIN_NAV_GHOST,
+              pathname.startsWith(link.href) && "site-app-nav-link-active",
+            )}
+            asChild
+          >
+            <Link href={link.href} aria-current={pathname.startsWith(link.href) ? "page" : undefined}>
+              {link.label}
+            </Link>
+          </Button>
         ))}
       </div>
 

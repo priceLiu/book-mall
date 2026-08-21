@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Check, Eye, Loader2, ShieldOff, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
@@ -402,7 +404,15 @@ export function PortalAdminClient() {
                 key={row.id}
                 className="rounded-xl border border-white/10 bg-[var(--canvas-surface)] p-4"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start gap-4">
+                  <div className="w-32 shrink-0 overflow-hidden rounded-lg">
+                    <CanvasListCover
+                      name={row.project.name}
+                      url={row.project.thumbnailUrl}
+                      className="!rounded-lg"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-white">{row.project.name}</p>
                     <p className="mt-1 text-xs text-[var(--canvas-muted)]">
@@ -461,6 +471,7 @@ export function PortalAdminClient() {
                       驳回
                     </button>
                   </div>
+                  </div>
                 </div>
               </li>
             ))}
@@ -480,8 +491,26 @@ export function PortalAdminClient() {
             return (
               <li
                 key={row.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[var(--canvas-surface)] p-4"
+                className="rounded-xl border border-white/10 bg-[var(--canvas-surface)] p-4"
               >
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="w-32 shrink-0 overflow-hidden rounded-lg">
+                    {row.kind === "template" ? (
+                      <CanvasListCover
+                        name={row.name}
+                        url={row.thumbnailUrl}
+                        graph={row.template.canvas as CanvasGraph}
+                        className="!rounded-lg"
+                      />
+                    ) : (
+                      <CanvasListCover
+                        name={row.name}
+                        {...canvasListCoverPropsFromProject(row.project)}
+                        className="!rounded-lg"
+                      />
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-white">{row.name}</span>
@@ -560,6 +589,8 @@ export function PortalAdminClient() {
                       </button>
                     </>
                   ) : null}
+                </div>
+                  </div>
                 </div>
               </li>
             );

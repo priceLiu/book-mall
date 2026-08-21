@@ -7,9 +7,10 @@ function isCanvasAdminSubNavActive(pathname: string, href: string): boolean {
 }
 
 describe("CANVAS_ADMIN_SUB_NAV", () => {
-  it("includes workflow and templates routes", () => {
+  it("includes workflow, film, and templates routes", () => {
     const hrefs = CANVAS_ADMIN_SUB_NAV.map((i) => i.href);
     expect(hrefs).toContain("/admin/portal");
+    expect(hrefs).toContain("/admin/film");
     expect(hrefs).toContain("/admin/templates");
   });
 });

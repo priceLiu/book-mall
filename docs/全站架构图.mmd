@@ -3,8 +3,8 @@ flowchart TB
     U[User]
   end
 
-  subgraph platform ["Platform book-mall :3000"]
-    BM["book-mall<br/>NextAuth / Wallet / Credits / Platform API / Prisma"]
+  subgraph platform ["Platform book-mall :3000 · book.ai-code8.com"]
+    BM["book-mall<br/>NextAuth · SMS/Captcha · Checkout<br/>Wallet · Credits · Platform API · Prisma"]
     GWAPI["/api/gw/v1/* Gateway API<br/>ONLY vendor HTTP boundary"]
     DB[(PostgreSQL)]
     OSS[(Aliyun OSS)]
@@ -13,7 +13,7 @@ flowchart TB
     BM --> OSS
   end
 
-  subgraph tools ["Tool Apps - separate CloudBase"]
+  subgraph tools ["Tool Apps · separate CloudBase services"]
     TW["tool-web :3001"]
     FW["finance-web :3002"]
     SW["story-web :3003"]
@@ -22,9 +22,9 @@ flowchart TB
     PO["prompt-optimizer :3006"]
     EC["e-commerce-toolkit :3007"]
     QR["quick-replica-web :3008"]
-    DR["director-web :3009 3D导演台"]
-    CT["common-tools :3010 常用工具"]
-    PW["publisher-web :3011 一键发布"]
+    DR["director-web :3009 3D"]
+    CT["common-tools :3010"]
+    PW["publisher-web :3011"]
   end
 
   subgraph bg ["Async / Background"]
@@ -39,12 +39,12 @@ flowchart TB
 
   TW & CW & SW & PO & EC & QR & DR & CT & PW -->|"Book SSO tools_token"| BM
   TW & CW & SW & PO & EC & QR & CT -->|"introspect / gateway proxy"| BM
-  DR -.->|"iframe embed + screenshot postMessage"| CW
+  DR -.->|"iframe + screenshot"| CW
   BM -->|"gateway-v1-http-client"| GWAPI
   GWAPI -->|"BYOK vendor credentials"| VEND
 
   FW -->|"billing API"| BM
-  GWC -->|"Gateway SSO manage sk-gw"| BM
+  GWC -->|"Gateway SSO · manage sk-gw"| BM
 
   SCF -->|"POST /api/gw/v1/jobs/recordInfo"| GWAPI
   POLL -->|"runGatewayPollWorker"| GWAPI

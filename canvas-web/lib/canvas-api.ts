@@ -528,11 +528,28 @@ export type AdminPortalProjectPreview = {
   edition: CanvasProjectSummary["edition"];
   portalFeatured: boolean;
   portalCase: boolean;
+  portalFilmCase: boolean;
   portalFeaturedBlurb: string;
   portalCaseBlurb: string;
   canvas: unknown;
   owner?: { id: string; name: string | null; email: string | null } | null;
 };
+
+export type AdminPortalFilmProjectSummary = PortalCaseProjectSummary & {
+  portalFilmCase: boolean;
+  portalFilmCaseSort: number;
+  mediaCount: number;
+};
+
+export async function listAdminPortalFilmProjects(
+  base: string,
+): Promise<AdminPortalFilmProjectSummary[]> {
+  const j = await call<{ projects: AdminPortalFilmProjectSummary[] }>(
+    base,
+    "/api/canvas/admin/portal-film-projects",
+  );
+  return Array.isArray(j.projects) ? j.projects : [];
+}
 
 export async function getAdminPortalProjectPreview(
   base: string,

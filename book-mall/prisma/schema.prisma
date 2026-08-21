@@ -2896,6 +2896,22 @@ model SiteTrafficIpDaily {
   @@index([dateCst, appKey, hitCount(sort: Desc)])
 }
 
+/// 管理后台 · 待开发功能清单（产品路线图）
+model AdminPendingFeature {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("") @db.Text
+  /// 仓库根目录相对路径，如 docs/一键发布平台.md
+  docPath     String   @default("")
+  completed   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([completed, sortOrder])
+  @@index([sortOrder])
+}
+
 /// Gen-HotCold-R2 Phase 5A：GatewayRequestLog 历史归档（只读冷数据）。
 /// 终态且过保留期的日志从主表搬迁至此，主表只留「在飞 + 近期」热数据。
 /// 与主表同结构但**无外键/无 updatedAt 触发**、索引精简；报表按时间在主表/归档表间路由。

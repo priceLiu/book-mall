@@ -15,6 +15,7 @@ export const CANVAS_NAV_ITEMS: CanvasNavItem[] = [
 /** 管理中心 · 子导航（仅 /admin/* 页） */
 export const CANVAS_ADMIN_SUB_NAV: CanvasNavItem[] = [
   { href: "/admin/portal", label: "工作流管理" },
+  { href: "/admin/film", label: "影视作品" },
   { href: "/admin/templates", label: "模板管理" },
 ];
 

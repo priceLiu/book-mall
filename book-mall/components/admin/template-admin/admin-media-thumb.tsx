@@ -10,11 +10,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import {
-  IMAGE_ZOOM_BUTTON_STEP,
-  ImageZoomControls,
-} from "@/components/media/image-zoom-controls";
-import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
+import { FullscreenImagePreview } from "@/components/media/fullscreen-image-preview";
 
 const HOVER_WIDTH = 360;
 const HOVER_GAP = 12;
@@ -42,54 +38,7 @@ function FullscreenPreview({
   title?: string;
   onClose: () => void;
 }) {
-  const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(src);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center overflow-hidden bg-black/90"
-      onClick={onClose}
-    >
-      <div
-        {...stageProps}
-        className="relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={title ?? ""}
-          draggable={false}
-          className="max-h-[92vh] max-w-[92vw] object-contain"
-        />
-      </div>
-      <ImageZoomControls
-        zoom={zoom}
-        onZoomIn={() => zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
-        onZoomOut={() => zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
-        onReset={reset}
-      />
-      <button
-        type="button"
-        className="absolute right-4 top-4 z-20 rounded-full bg-black/75 px-3 py-1.5 text-xs text-white hover:bg-black"
-        onClick={onClose}
-      >
-        关闭
-      </button>
-      {title ? (
-        <span className="pointer-events-none absolute left-4 top-4 z-20 max-w-[50vw] truncate rounded-md bg-black/60 px-2.5 py-1 text-xs text-white">
-          {title}
-        </span>
-      ) : null}
-    </div>
-  );
+  return <FullscreenImagePreview src={src} title={title} onClose={onClose} />;
 }
 
 export function AdminMediaThumb({

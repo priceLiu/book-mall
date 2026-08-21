@@ -348,6 +348,16 @@
 
 ---
 
+## 2026-08-21 — 管理后台待做功能（AdminPendingFeature）
+
+- **迁移目录**：`prisma/migrations/20260821210000_admin_pending_feature/`
+- **新表**：`AdminPendingFeature`——title、description、docPath（仓库相对路径）、completed、sortOrder。
+- **页面**：`/admin/pending-features`（Book 运营 → 待做功能）。
+- **种子**：`pnpm exec dotenv -e .env.local -- tsx scripts/seed-admin-pending-features.ts`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

@@ -114,6 +114,11 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
   ];
 }
 
+/** 桌面顶栏：下拉分组之后的单链（如待做功能） */
+export const ADMIN_TRAILING_TOP_LEVEL_LINKS = [
+  { label: "待做功能", href: "/admin/pending-features" },
+] as const;
+
 /** 桌面顶栏：单链 + 下拉分组（不含对外公示，改由概览页链出） */
 export const ADMIN_TOP_LEVEL_LINKS = [
   { label: "驾驶舱", href: "/admin" },
