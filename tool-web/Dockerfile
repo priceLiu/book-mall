@@ -6,6 +6,7 @@ WORKDIR /app
 # package.json 的 file:../shared/* 在镜像里解析为 /shared/*，故把快照拷到该路径。
 # 刷新快照（改 shared/ 后、发版前）：node scripts/sync-docker-shared.mjs
 FROM base AS with-shared
+COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
 COPY docker-shared/platform-assistant /shared/platform-assistant
 
 FROM with-shared AS deps

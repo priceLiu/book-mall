@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
     "@private/platform-assistant": "file:../shared/platform-assistant",
     "@xyflow/react": "^12.3.5",

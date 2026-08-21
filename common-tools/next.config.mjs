@@ -14,8 +14,15 @@ function resolveShared(pkg) {
 
 const nextConfig = {
   output: "standalone",
-  transpilePackages: ["@private/federated-portal-nav", "@private/platform-assistant"],
+  transpilePackages: [
+    "@private/federated-portal-logout",
+    "@private/federated-portal-nav",
+    "@private/platform-assistant",
+  ],
   webpack: (config) => {
+    config.resolve.alias["@private/federated-portal-logout"] = resolveShared(
+      "federated-portal-logout",
+    );
     config.resolve.alias["@private/federated-portal-nav"] = resolveShared(
       "federated-portal-nav",
     );

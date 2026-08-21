@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
     "@private/platform-assistant": "file:../shared/platform-assistant",
     "@radix-ui/react-dialog": "^1.0.5",

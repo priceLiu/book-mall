@@ -271,7 +271,8 @@ function flattenTemplateMedia(
       id: `tpl-${t.id}:${url}`,
       url,
       kind: mediaKindFromUrl(url),
-      projectId: t.id,
+      sourceKind: "template",
+      sourceId: t.id,
       projectName: t.name,
       description: t.description?.trim() ?? "",
       owner: t.owner,
@@ -304,4 +305,22 @@ export async function listPortalFilmShowcaseMedia(
   }
 
   return out;
+}
+
+/** 是否允许作为影视案例复制到用户账户 */
+export async function isPortalFilmShowcaseProject(projectId: string): Promise<boolean> {
+  const p = await prisma.canvasProject.findFirst({
+    where: { id: projectId, deletedAt: null },
+    select: {
+      canvas: true,
+      portalCase: true,
+      portalFeatured: true,
+      user: { select: { email: true } },
+    },
+  });
+  if (!p) return false;
+  if (canvasProjectEditionFromGraph(p.canvas) !== "sbv1") return false;
+  if (p.portalCase || p.portalFeatured) return true;
+  const email = p.user.email?.trim().toLowerCase() ?? "";
+  return getPlatformGatewayAdminEmails().includes(email);
 }

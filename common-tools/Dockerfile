@@ -6,6 +6,7 @@ WORKDIR /app
 # 刷新快照（改 shared/ 后、发版前）：
 #   cp -R ../shared/federated-portal-nav ../shared/platform-assistant docker-shared/
 FROM base AS with-shared
+COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
 COPY docker-shared/platform-assistant /shared/platform-assistant
 

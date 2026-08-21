@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { navigatePortalLogout } from "@private/federated-portal-logout";
 import {
   createContext,
   useCallback,
@@ -651,9 +652,13 @@ export function ToolShellClient({
             <div className="tool-user">
               {userSlot}
               {hasTokenCookie ? (
-                <a href="/api/tools-logout" className="tool-logout">
+                <button
+                  type="button"
+                  className="tool-logout"
+                  onClick={() => navigatePortalLogout("/api/auth/logout")}
+                >
                   退出
-                </a>
+                </button>
               ) : null}
               {renewHref && !loading ? (
                 hasTokenCookie && session.active ? (

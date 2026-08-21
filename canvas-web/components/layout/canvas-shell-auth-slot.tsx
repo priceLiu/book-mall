@@ -2,9 +2,16 @@
 
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { navigatePortalLogout } from "@private/federated-portal-logout";
 
 import { useCanvasShellSession } from "@/lib/canvas/use-canvas-shell-session";
 import { getBookAccountUrl } from "@/lib/site-origin";
+import { clearCachedToolsSession } from "@/lib/tools-session-client-cache";
+
+function handleCanvasLogout() {
+  clearCachedToolsSession();
+  navigatePortalLogout("/api/auth/logout");
+}
 
 export function CanvasShellAuthSlot() {
   const bookAccountUrl = getBookAccountUrl();
@@ -48,9 +55,13 @@ export function CanvasShellAuthSlot() {
           个人中心
         </a>
       ) : null}
-      <a href="/api/auth/logout" className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
+      <button
+        type="button"
+        onClick={handleCanvasLogout}
+        className="twenty-btn-ghost !px-3 !py-1.5 !text-xs"
+      >
         退出
-      </a>
+      </button>
     </div>
   );
 }

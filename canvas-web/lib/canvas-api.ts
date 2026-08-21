@@ -346,6 +346,17 @@ export type PortalCaseProjectSummary = CanvasProjectSummary & {
   owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
+export type PortalFilmShowcaseMedia = {
+  id: string;
+  url: string;
+  kind: "image" | "video";
+  sourceKind: "project" | "template";
+  sourceId: string;
+  projectName: string;
+  description: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
 export type CanvasPortalPublishKind =
   | "CASE"
   | "FEATURED"
@@ -371,6 +382,34 @@ export type PortalSubmissionRecord = {
   };
   user: { id: string; name: string | null; email: string | null };
 };
+
+/** 门户首页 · 影视案例媒体墙（sbv1 已入库图/视频） */
+export async function listPortalFilmShowcase(
+  base: string,
+  limit?: number,
+): Promise<PortalFilmShowcaseMedia[]> {
+  const qs =
+    typeof limit === "number" && Number.isFinite(limit)
+      ? `?limit=${encodeURIComponent(String(limit))}`
+      : "";
+  const j = await call<{ items: PortalFilmShowcaseMedia[] }>(
+    base,
+    `/api/canvas/projects/portal-film-showcase${qs}`,
+  );
+  return Array.isArray(j.items) ? j.items : [];
+}
+
+export async function duplicatePortalFilmShowcaseProject(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const j = await call<{ project: CanvasProjectDetail }>(
+    base,
+    `/api/canvas/projects/portal-film-showcase/${id}/duplicate`,
+    { method: "POST" },
+  );
+  return j.project;
+}
 
 /** 门户首页 · 案例墙（edition=sbv1 为分镜视频 1.0 影视案例） */
 export async function listPortalCaseProjects(

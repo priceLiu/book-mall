@@ -24,6 +24,7 @@ import {
   pickProjectThumbnailUrl,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
+import { isPortalFilmShowcaseProject } from "@/lib/canvas/sbv1-film-showcase";
 import {
   applyCanvasDelta,
   assertCanvasDeltaBaseUpdatedAt,
@@ -524,6 +525,44 @@ export async function duplicatePortalCaseProjectForUser(
   const source = await getPortalCaseCanvasProjectRow(sourceProjectId);
   if (isRetiredLegacyPro2Canvas(source.canvas)) {
     throw new CanvasProjectError("NOT_FOUND", "portal case project not found", 404);
+  }
+  const canvas = cloneCanvasGraphForDuplicate(source.canvas);
+  const thumbnailUrl =
+    resolveThumbnailUrl({
+      thumbnailUrl: source.thumbnailUrl,
+      canvas: source.canvas,
+    }) || "";
+  const created = await createCanvasProjectForUser(userId, {
+    name: duplicateProjectName(source.name),
+    description: source.description,
+    canvas,
+  });
+  if (!thumbnailUrl) return created;
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: created.id },
+    data: { thumbnailUrl },
+  });
+  return {
+    ...toSummary(updated),
+    canvas: updated.canvas,
+  };
+}
+
+/** 从影视案例墙复制 sbv1 项目（首页案例 / 精选 / 平台示范） */
+export async function duplicatePortalFilmShowcaseProjectForUser(
+  userId: string,
+  sourceProjectId: string,
+): Promise<CanvasProjectDetail> {
+  const allowed = await isPortalFilmShowcaseProject(sourceProjectId);
+  if (!allowed) {
+    throw new CanvasProjectError("NOT_FOUND", "film showcase project not found", 404);
+  }
+  const source = await prisma.canvasProject.findFirst({
+    where: { id: sourceProjectId, deletedAt: null },
+  });
+  if (!source) {
+    throw new CanvasProjectError("NOT_FOUND", "film showcase project not found", 404);
   }
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =

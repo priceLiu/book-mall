@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { navigatePortalLogout } from "@private/federated-portal-logout";
 
 import {
   attemptColdStartSso,
@@ -87,6 +88,15 @@ export function AppShell({
               >
                 充值
               </a>
+              {user ? (
+                <button
+                  type="button"
+                  className="text-[#6e6e73] hover:text-[#1d1d1f]"
+                  onClick={() => navigatePortalLogout("/api/auth/logout")}
+                >
+                  退出
+                </button>
+              ) : null}
             </div>
           </div>
           <PortalNav current="common-tools" />
@@ -98,9 +108,18 @@ export function AppShell({
               会员与充值
             </a>
             {user ? (
-              <a href={accountUrl} className="text-[#1d1d1f] hover:text-[#0071e3]">
-                {user.name}
-              </a>
+              <>
+                <a href={accountUrl} className="text-[#1d1d1f] hover:text-[#0071e3]">
+                  {user.name}
+                </a>
+                <button
+                  type="button"
+                  className="text-[#6e6e73] hover:text-[#1d1d1f]"
+                  onClick={() => navigatePortalLogout("/api/auth/logout")}
+                >
+                  退出
+                </button>
+              </>
             ) : (
               <a href={pricingUrl} className="text-[#0071e3] hover:underline">
                 登录

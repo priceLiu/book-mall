@@ -1,5 +1,6 @@
 "use client";
 
+import { isSsoReenterSuppressedClient } from "@private/federated-portal-logout";
 import { getBookOriginClient } from "@/lib/auth";
 import {
   bumpSsoReenterAttempts,
@@ -61,6 +62,7 @@ export function attemptColdStartSso(opts: {
   pathname?: string;
 }): void {
   if (typeof window === "undefined") return;
+  if (isSsoReenterSuppressedClient()) return;
   const pathname =
     opts.pathname ?? `${window.location.pathname}${window.location.search}`;
   if (isPublicSsoPath(window.location.pathname)) return;

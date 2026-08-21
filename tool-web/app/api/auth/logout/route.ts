@@ -1,14 +1,14 @@
 import { type NextRequest } from "next/server";
 
 import { createPortalLogoutResponse } from "@private/federated-portal-logout";
-import { getAppPublicOrigin, getMainSiteOrigin } from "@/lib/site-origin";
+import { getMainSiteOrigin, getToolsSitePublicOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
 
-/** 门户登出：与 book 联邦 full-signout 同一套。 */
+/** 工具站门户登出：与 book 联邦 full-signout 同一套。 */
 export async function GET(request: NextRequest) {
   return createPortalLogoutResponse(request, {
-    appPublicOrigin: getAppPublicOrigin(),
+    appPublicOrigin: getToolsSitePublicOrigin(),
     mainSiteOrigin: getMainSiteOrigin(),
   });
 }

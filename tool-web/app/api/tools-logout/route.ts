@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { resolveToolsLogoutNextUrl, appendSsoReenterSuppressCookie } from "@/lib/tools-logout-next-url";
+import { appendSsoReenterSuppressCookie } from "@private/federated-portal-logout";
+import { resolveToolsLogoutNextUrl } from "@/lib/tools-logout-next-url";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";

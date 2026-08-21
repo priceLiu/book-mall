@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/app-web-origins", () => ({
   getCanvasWebOrigin: () => "https://canvas.example.com",
+  getCommonToolsOrigin: () => "https://common-tools.example.com",
   getEcommerceWebOrigin: () => "https://ecom.example.com",
   getPromptOptimizerOrigin: () => "https://prompt.example.com",
   getQuickReplicaOrigin: () => "https://qr.example.com",

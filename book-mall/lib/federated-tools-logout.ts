@@ -1,6 +1,7 @@
 import {
   buildAppWebUrl,
   getCanvasWebOrigin,
+  getCommonToolsOrigin,
   getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
   getQuickReplicaOrigin,
@@ -31,6 +32,7 @@ function listAllFederatedToolsLogoutCandidates(): string[] {
     getPromptOptimizerOrigin(),
     getQuickReplicaOrigin(),
     getEcommerceWebOrigin(),
+    getCommonToolsOrigin(),
   ];
   for (const raw of candidates) {
     const o = trimOrigin(raw);
@@ -117,13 +119,15 @@ export function buildFederatedLogoutStepUrl(
  * CloudBase：Set-Cookie × 外链 Location 同包会 502；子站链路由 `/api/auth/federated-logout` 继续。
  */
 export function buildFederatedLogoutRelativeEntry(
-  callbackPath: string,
+  callback: string,
 ): string | null {
   if (!shouldUseFederatedToolsLogoutChain()) return null;
   if (listFederatedToolsLogoutOrigins().length === 0) return null;
-  const path =
-    callbackPath.startsWith("/") && !callbackPath.startsWith("//")
-      ? callbackPath
-      : "/";
-  return `/api/auth/federated-logout?step=0&final=${encodeURIComponent(path)}`;
+  const final =
+    callback.startsWith("http://") || callback.startsWith("https://")
+      ? callback
+      : callback.startsWith("/") && !callback.startsWith("//")
+        ? callback
+        : "/";
+  return `/api/auth/federated-logout?step=0&final=${encodeURIComponent(final)}`;
 }

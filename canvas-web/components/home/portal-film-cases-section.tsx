@@ -2,23 +2,26 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clapperboard, Loader2, Search } from "lucide-react";
+import { Clapperboard, Film, ImageIcon, Loader2, Search } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import {
-  CanvasListCover,
-  CANVAS_LIST_GRID_CLASS,
-} from "@/components/canvas/canvas-list-cover";
+import { ProjectCoverMedia } from "@/components/canvas/project-cover-media";
+import { CANVAS_LIST_GRID_CLASS } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
 import {
-  duplicatePortalCaseProject,
-  listPortalCaseProjects,
-  type PortalCaseProjectSummary,
+  duplicatePortalFilmShowcaseProject,
+  forkCanvasTemplate,
+  listPortalFilmShowcase,
+  createCanvasProject,
+  type PortalFilmShowcaseMedia,
 } from "@/lib/canvas-api";
+import { cloneGraphForNewProject } from "@/lib/canvas/clone";
+import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
+import type { CanvasGraph } from "@/lib/canvas/types";
 
 function ownerLabel(
-  owner?: { name: string | null; email: string | null } | null,
+  owner?: { id: string; name: string | null; email: string | null } | null,
 ): string {
   if (!owner) return "社区用户";
   const name = owner.name?.trim();
@@ -30,11 +33,11 @@ function ownerLabel(
 
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
-  const [cases, setCases] = useState<PortalCaseProjectSummary[]>([]);
+  const [items, setItems] = useState<PortalFilmShowcaseMedia[]>([]);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [preview, setPreview] = useState<PortalCaseProjectSummary | null>(null);
+  const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,10 +53,10 @@ export function PortalFilmCasesSection() {
     setLoading(true);
     setError(null);
 
-    void listPortalCaseProjects(base, "sbv1")
-      .then(setCases)
+    void listPortalFilmShowcase(base, 48)
+      .then(setItems)
       .catch((e) => {
-        setCases([]);
+        setItems([]);
         setError(e instanceof Error ? e.message : "影视案例加载失败，请稍后重试");
       })
       .finally(() => setLoading(false));
@@ -61,30 +64,35 @@ export function PortalFilmCasesSection() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return cases;
-    return cases.filter((item) => {
-      const haystack = [
-        item.name,
-        item.description,
-        item.portalCaseBlurb,
-        ownerLabel(item.owner),
-      ]
+    if (!q) return items;
+    return items.filter((item) => {
+      const haystack = [item.projectName, item.description, ownerLabel(item.owner)]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [cases, search]);
+  }, [items, search]);
 
   const onCopy = useCallback(
-    async (item: PortalCaseProjectSummary) => {
+    async (item: PortalFilmShowcaseMedia) => {
       if (!base?.trim()) {
         setError("未配置主站地址");
         return;
       }
-      setCopyingId(item.id);
+      setCopyingId(item.sourceId);
       setError(null);
       try {
-        const created = await duplicatePortalCaseProject(base, item.id);
+        if (item.sourceKind === "template") {
+          const forked = await forkCanvasTemplate(base, item.sourceId);
+          const graph = migrateGraphV1ToV2(forked.canvas as CanvasGraph);
+          const created = await createCanvasProject(base, {
+            name: `${item.projectName} 画布`,
+            canvas: cloneGraphForNewProject(graph),
+          });
+          window.location.href = `/canvas/${created.id}`;
+          return;
+        }
+        const created = await duplicatePortalFilmShowcaseProject(base, item.sourceId);
         window.location.href = `/canvas/${created.id}`;
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
@@ -95,9 +103,13 @@ export function PortalFilmCasesSection() {
   );
 
   const openItem = useCallback(
-    (item: PortalCaseProjectSummary) => {
-      if (viewerUserId && item.owner?.id === viewerUserId) {
-        window.location.href = `/canvas/${item.id}`;
+    (item: PortalFilmShowcaseMedia) => {
+      if (
+        item.sourceKind === "project" &&
+        viewerUserId &&
+        item.owner?.id === viewerUserId
+      ) {
+        window.location.href = `/canvas/${item.sourceId}`;
         return;
       }
       setPreview(item);
@@ -115,7 +127,7 @@ export function PortalFilmCasesSection() {
           </p>
           <h2 className="mt-2 text-xl font-semibold text-white">影视案例</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--canvas-muted)]">
-            分镜视频 1.0 成片与分镜图示例，封面与项目内媒体同源；预览后可复制到你的画布继续编辑。
+            分镜视频 1.0 已入库的分镜图与成片，按项目内 OSS 媒体展示；预览后可复制到你的画布继续编辑。
           </p>
         </div>
         <div className="relative w-full max-w-xs shrink-0">
@@ -139,19 +151,38 @@ export function PortalFilmCasesSection() {
         </div>
       ) : filtered.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-          {cases.length === 0
-            ? "暂无影视案例。管理员可将分镜视频 1.0 项目设为首页案例后展示在这里。"
+          {items.length === 0
+            ? "暂无影视案例。在分镜视频 1.0 画布中生成并入库的图片/视频会自动展示在这里。"
             : "没有匹配的影视案例，请换个关键词试试。"}
         </p>
       ) : (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
           {filtered.map((item) => {
-            const own = viewerUserId != null && item.owner?.id === viewerUserId;
-            const busy = copyingId === item.id;
+            const own =
+              item.sourceKind === "project" &&
+              viewerUserId != null &&
+              item.owner?.id === viewerUserId;
+            const busy = copyingId === item.sourceId;
 
             const cardInner = (
               <>
-                <CanvasListCover url={item.thumbnailUrl} name={item.name} />
+                <div className="relative aspect-[340/190] w-full overflow-hidden rounded-xl bg-[var(--canvas-surface-2)]">
+                  <div className="absolute inset-0 size-full">
+                    <ProjectCoverMedia
+                      url={item.url}
+                      alt={item.projectName}
+                      placeholderLetter={item.projectName}
+                    />
+                  </div>
+                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] text-white/90 backdrop-blur-sm">
+                    {item.kind === "video" ? (
+                      <Film className="size-3" aria-hidden />
+                    ) : (
+                      <ImageIcon className="size-3" aria-hidden />
+                    )}
+                    {item.kind === "video" ? "视频" : "分镜图"}
+                  </span>
+                </div>
                 <div className="mt-3 flex items-center gap-2">
                   <span
                     className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white/80"
@@ -167,13 +198,8 @@ export function PortalFilmCasesSection() {
                   </span>
                 </div>
                 <h3 className="mt-2 line-clamp-2 text-sm font-medium text-white">
-                  {item.name}
+                  {item.projectName}
                 </h3>
-                {item.portalCaseBlurb ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-[var(--canvas-muted)]">
-                    {item.portalCaseBlurb}
-                  </p>
-                ) : null}
                 {busy ? (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-cyan-300/90">
                     <Loader2 className="size-3 animate-spin" />
@@ -189,7 +215,7 @@ export function PortalFilmCasesSection() {
                 className="group rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-3 transition hover:border-cyan-400/35"
               >
                 {own ? (
-                  <Link href={`/canvas/${item.id}`} className="block w-full text-left">
+                  <Link href={`/canvas/${item.sourceId}`} className="block w-full text-left">
                     {cardInner}
                   </Link>
                 ) : (
@@ -210,12 +236,12 @@ export function PortalFilmCasesSection() {
 
       {preview ? (
         <TemplatePreviewDialog
-          name={preview.name}
-          description={preview.portalCaseBlurb || preview.description}
-          thumbnailUrl={preview.thumbnailUrl}
+          name={preview.projectName}
+          description={preview.description}
+          thumbnailUrl={preview.url}
           onClose={() => setPreview(null)}
           onCopy={() => void onCopy(preview)}
-          copying={copyingId === preview.id}
+          copying={copyingId === preview.sourceId}
         />
       ) : null}
     </section>

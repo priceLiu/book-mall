@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@private/federated-portal-logout':
+        specifier: file:../shared/federated-portal-logout
+        version: file:../shared/federated-portal-logout
       '@private/platform-assistant':
         specifier: file:../shared/platform-assistant
         version: file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -228,6 +231,9 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@private/federated-portal-logout@file:../shared/federated-portal-logout':
+    resolution: {directory: ../shared/federated-portal-logout, type: directory}
 
   '@private/platform-assistant@file:../shared/platform-assistant':
     resolution: {directory: ../shared/platform-assistant, type: directory}
@@ -2485,6 +2491,8 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@private/federated-portal-logout@file:../shared/federated-portal-logout': {}
 
   '@private/platform-assistant@file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
