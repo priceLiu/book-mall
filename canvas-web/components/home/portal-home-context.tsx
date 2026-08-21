@@ -45,7 +45,7 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
   const [featured, setFeatured] = useState<PortalFeaturedProjectSummary[]>([]);
   const [templates, setTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [cases, setCases] = useState<PortalCaseProjectSummary[]>([]);
-  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
   const [secondaryLoading, setSecondaryLoading] = useState(false);
   const [secondaryLoaded, setSecondaryLoaded] = useState(false);
   const secondaryStarted = useRef(false);
@@ -64,7 +64,11 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
   }, [base]);
 
   useEffect(() => {
-    if (!base?.trim()) return;
+    if (!base?.trim()) {
+      setFeatured([]);
+      setFeaturedLoading(false);
+      return;
+    }
     setFeaturedLoading(true);
     void listPortalFeaturedProjects(base)
       .then((list) => {

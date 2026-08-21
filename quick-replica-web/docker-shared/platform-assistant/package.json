@@ -1,9 +1,24 @@
 {
   "name": "@private/platform-assistant",
-  "version": "0.1.5",
+  "version": "0.1.9",
   "private": true,
   "main": "./index.ts",
   "types": "./index.ts",
+  "files": [
+    "index.ts",
+    "platform-assistant.tsx",
+    "greeting.ts",
+    "platform-apps.ts",
+    "ai-news-prefetch.ts",
+    "package.json"
+  ],
+  "exports": {
+    ".": "./index.ts",
+    "./platform-assistant": "./platform-assistant.tsx",
+    "./greeting": "./greeting.ts",
+    "./platform-apps": "./platform-apps.ts",
+    "./ai-news-prefetch": "./ai-news-prefetch.ts"
+  },
   "peerDependencies": {
     "react": "^18",
     "react-dom": "^18"

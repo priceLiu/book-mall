@@ -206,6 +206,25 @@ function useInjectStyles(accent: string) {
     const css = `
 @keyframes pa-pop { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
 @keyframes pa-slide { from { transform: translateX(24px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+@keyframes pa-drawer-in {
+  from { transform: translateX(100%); opacity: 0.85; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes pa-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pa-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pa-ball-hint {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 6px 24px rgba(99,102,241,.45), 0 0 0 0 rgba(99,102,241,.35);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 10px 36px rgba(99,102,241,.65), 0 0 0 14px rgba(99,102,241,0);
+  }
+}
 @keyframes pa-blink { 0%,80%,100% { opacity: .2 } 40% { opacity: 1 } }
 .pa-root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
 .pa-ball {
@@ -223,11 +242,15 @@ function useInjectStyles(accent: string) {
   z-index: 2147483000;
   animation: pa-pop .25s ease;
 }
+.pa-ball-hint {
+  animation: pa-ball-hint 1.8s ease-in-out infinite;
+}
 .pa-backdrop {
   position: fixed;
   inset: 0;
   z-index: 2147482999;
   background: rgba(15, 23, 42, 0.35);
+  animation: pa-backdrop-in .22s ease;
 }
 .pa-drawer {
   position: fixed;
@@ -238,11 +261,53 @@ function useInjectStyles(accent: string) {
   display: flex;
   flex-direction: column;
   z-index: 2147483000;
-  animation: pa-slide .22s ease;
+  animation: pa-drawer-in .36s cubic-bezier(0.22, 1, 0.36, 1);
   background: linear-gradient(to bottom, #18181b, #09090b);
   color: #f4f4f5;
   border-left: 1px solid rgba(255,255,255,.08);
   box-shadow: -8px 0 40px rgba(0,0,0,.45);
+}
+.pa-drawer-enter .pa-header {
+  animation: pa-fade-up .42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: .05s;
+}
+.pa-drawer-first {
+  animation: pa-drawer-in .38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pa-drawer-first .pa-header {
+  animation: pa-fade-up .4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: .06s;
+}
+.pa-intro-stagger > .pa-msg-row {
+  animation: pa-fade-up .42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: .1s;
+}
+.pa-intro-stagger > .pa-news-block {
+  animation: pa-fade-up .42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: .18s;
+}
+.pa-intro-stagger > .pa-app-links {
+  animation: pa-fade-up .42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: .26s;
+}
+.pa-intro-stagger > .pa-card:not(.pa-app-links .pa-card) {
+  animation: pa-fade-up .42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: .26s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pa-ball-hint,
+  .pa-drawer,
+  .pa-drawer-enter .pa-header,
+  .pa-drawer-first,
+  .pa-drawer-first .pa-header,
+  .pa-intro-stagger > .pa-msg-row,
+  .pa-intro-stagger > .pa-news-block,
+  .pa-intro-stagger > .pa-app-links,
+  .pa-intro-stagger > .pa-card {
+    animation: none !important;
+  }
+  .pa-backdrop { animation: none; }
+  .pa-drawer { animation: pa-slide .15s ease; }
 }
 .pa-header {
   display: flex;
@@ -540,6 +605,7 @@ export function PlatformAssistant({
   const newsEndpoint = resolveAiNewsEndpoint(chatEndpoint, aiNewsEndpoint);
   const [open, setOpen] = useState(false);
   const [openGeneration, setOpenGeneration] = useState(0);
+  const [drawerEnterFx, setDrawerEnterFx] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -559,6 +625,19 @@ export function PlatformAssistant({
   } | null>(null);
 
   useInjectStyles(accentColor);
+
+  const openDrawer = useCallback(() => {
+    setDrawerEnterFx(true);
+    setOpenGeneration((g) => g + 1);
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) setDrawerEnterFx(false);
+  }, [open]);
+
+  const showIntroStagger =
+    open && drawerEnterFx && !messages.some((m) => m.role === "user");
 
   useEffect(() => {
     try {
@@ -626,8 +705,7 @@ export function PlatformAssistant({
         return p;
       });
     } else {
-      setOpenGeneration((g) => g + 1);
-      setOpen(true);
+      openDrawer();
     }
   };
 
@@ -852,7 +930,7 @@ export function PlatformAssistant({
         <button
           ref={ballRef}
           type="button"
-          className="pa-ball"
+          className={`pa-ball${!open ? " pa-ball-hint" : ""}`}
           aria-label={`打开${title}`}
           title={`${title}（可拖动）`}
           onPointerDown={onBallPointerDown}
@@ -899,7 +977,7 @@ export function PlatformAssistant({
             ref={drawerRef}
             role="dialog"
             aria-label={title}
-            className="pa-drawer"
+            className={`pa-drawer${drawerEnterFx ? " pa-drawer-enter" : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="pa-header">
@@ -944,7 +1022,7 @@ export function PlatformAssistant({
                     key={i}
                     className={`pa-row ${isUser ? "pa-row-user" : "pa-row-assistant"}`}
                   >
-                    <div className={`pa-msg-wrap ${wide ? "pa-msg-wrap-wide" : ""}`}>
+                    <div className={`pa-msg-wrap ${wide ? "pa-msg-wrap-wide" : ""}${showIntroStagger ? " pa-intro-stagger" : ""}`}>
                       <div
                         className={`pa-msg-row ${isUser ? "pa-msg-row-user" : ""}`}
                       >
