@@ -8,6 +8,7 @@ export const CANVAS_PORTAL_PUBLIC_GET_PATHS = [
   "api/canvas/projects/portal-film-showcase",
   "api/canvas/templates",
   "api/canvas/viewer-session",
+  "api/public/static-snapshots/canvas-home",
 ] as const;
 
 /** templates GET 仅 scope=public|featured 可匿名；其余 scope 须登录。 */

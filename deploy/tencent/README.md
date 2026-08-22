@@ -263,8 +263,8 @@ docker compose up -d --build
 
 | 时间 (CST) | 路径 | 说明 |
 |------------|------|------|
-| 05:30 | `POST /api/internal/static-snapshots/generate?pageKey=site-home` | 预生成当日首页快照（Hero / 平台应用 / Gateway 模型） |
+| 05:30 | `POST /api/internal/static-snapshots/generate?pageKey=all` | 预生成当日 **主站首页** + **画布门户首页** 快照 |
 
-本地手动：`pnpm --dir book-mall site-home:snapshot-generate`，或 **book-mall 管理后台** `/admin/static-snapshots` →「立即生成首页快照」。
+本地手动：`pnpm --dir book-mall site-home:snapshot-generate` / `canvas-home:snapshot-generate`，或 **book-mall 管理后台** `/admin/static-snapshots`。
 
-读路径：首页 ISR 只读 `StaticPageSnapshot`；公开 API `GET /api/public/static-snapshots/site-home`。详见 `book-mall/doc/product/site-home-static-snapshot.md`。
+读路径：主站 ISR + 画布门户 SSR 读 `StaticPageSnapshot`；公开 API `GET /api/public/static-snapshots/site-home` · `canvas-home`。详见 `book-mall/doc/product/site-home-static-snapshot.md`。

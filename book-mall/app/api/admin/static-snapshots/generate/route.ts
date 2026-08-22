@@ -3,9 +3,10 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
 import {
-  runSiteHomeSnapshotGeneration,
-  SITE_HOME_PAGE_KEY,
-} from "@/lib/static-snapshots/site-home-snapshot-service";
+  isStaticSnapshotPageKey,
+  runStaticSnapshotGeneration,
+} from "@/lib/static-snapshots/static-snapshot-run";
+import { SITE_HOME_PAGE_KEY } from "@/lib/static-snapshots/site-home-payload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,12 +35,13 @@ export async function POST(req: Request) {
     // empty body ok
   }
 
-  if (pageKey !== SITE_HOME_PAGE_KEY) {
+  if (!isStaticSnapshotPageKey(pageKey)) {
     return NextResponse.json({ error: "不支持的 pageKey" }, { status: 400 });
   }
 
   try {
-    const result = await runSiteHomeSnapshotGeneration({
+    const result = await runStaticSnapshotGeneration({
+      pageKey,
       trigger: "ADMIN",
       triggeredByUserId: admin.id,
     });

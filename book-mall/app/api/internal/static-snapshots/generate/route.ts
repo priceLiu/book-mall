@@ -5,9 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeInternalCron } from "@/lib/platform-assistant/internal-cron-auth";
 import {
-  runSiteHomeSnapshotGeneration,
-  SITE_HOME_PAGE_KEY,
-} from "@/lib/static-snapshots/site-home-snapshot-service";
+  isStaticSnapshotPageKey,
+  runAllStaticSnapshotGenerations,
+  runStaticSnapshotGeneration,
+} from "@/lib/static-snapshots/static-snapshot-run";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,13 +20,29 @@ async function handleGenerate(req: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const pageKey = req.nextUrl.searchParams.get("pageKey") ?? SITE_HOME_PAGE_KEY;
-  if (pageKey !== SITE_HOME_PAGE_KEY) {
-    return NextResponse.json({ error: "不支持的 pageKey" }, { status: 400 });
-  }
+  const pageKeyParam = req.nextUrl.searchParams.get("pageKey");
+  const pageKey = pageKeyParam ?? "all";
 
   try {
-    const result = await runSiteHomeSnapshotGeneration({ trigger: "CRON" });
+    if (pageKey === "all") {
+      const results = await runAllStaticSnapshotGenerations({ trigger: "CRON" });
+      return NextResponse.json({
+        ok: true,
+        via: auth.via,
+        results: results.map((r) => ({
+          pageKey: r.snapshot.pageKey,
+          dateKey: r.dateKey,
+          summary: r.summary,
+          generatedAt: r.snapshot.generatedAt.toISOString(),
+        })),
+      });
+    }
+
+    if (!isStaticSnapshotPageKey(pageKey)) {
+      return NextResponse.json({ error: "不支持的 pageKey" }, { status: 400 });
+    }
+
+    const result = await runStaticSnapshotGeneration({ pageKey, trigger: "CRON" });
     return NextResponse.json({
       ok: true,
       via: auth.via,

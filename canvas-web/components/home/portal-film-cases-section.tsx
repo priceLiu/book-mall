@@ -31,9 +31,11 @@ function ownerLabel(
 
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
-  const { viewerUserId } = usePortalHome();
+  const { viewerUserId, filmShowcase: snapshotItems, filmShowcaseLoaded } = usePortalHome();
   const { ref: sectionRef, inView } = useInViewOnce("200px");
-  const [items, setItems] = useState<PortalFilmShowcaseMedia[]>([]);
+  const [items, setItems] = useState<PortalFilmShowcaseMedia[]>(
+    filmShowcaseLoaded ? snapshotItems : [],
+  );
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
@@ -43,6 +45,10 @@ export function PortalFilmCasesSection() {
   const [fetchStarted, setFetchStarted] = useState(false);
 
   useEffect(() => {
+    if (filmShowcaseLoaded) {
+      setItems(snapshotItems);
+      return;
+    }
     if (!base?.trim() || !inView || fetchStarted) return;
     setFetchStarted(true);
     setLoading(true);
@@ -60,7 +66,7 @@ export function PortalFilmCasesSection() {
         }
       })
       .finally(() => setLoading(false));
-  }, [base, inView, fetchStarted]);
+  }, [base, inView, fetchStarted, filmShowcaseLoaded, snapshotItems]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -103,7 +109,7 @@ export function PortalFilmCasesSection() {
     [viewerUserId],
   );
 
-  if (!inView && !fetchStarted) {
+  if (!inView && !fetchStarted && !filmShowcaseLoaded) {
     return (
       <section
         ref={sectionRef}

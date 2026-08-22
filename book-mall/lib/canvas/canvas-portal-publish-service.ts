@@ -280,6 +280,11 @@ export async function submitCanvasProjectPortalReview(args: {
       user: { select: { id: true, name: true, email: true } },
     },
   });
+  // 分享/投稿也算项目活动，便于首页「最近项目」按 updatedAt 排序
+  await prisma.canvasProject.update({
+    where: { id: args.projectId },
+    data: { updatedAt: new Date() },
+  });
   return { appliedImmediately: false, submission: mapSubmissionRow(row) };
 }
 

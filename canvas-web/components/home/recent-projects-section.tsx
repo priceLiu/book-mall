@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -10,6 +10,11 @@ import {
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
 import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
+import {
+  consumeRecentProjectsStale,
+  isRecentProjectsStale,
+  subscribeRecentProjectsInvalidate,
+} from "@/lib/canvas/recent-projects-invalidate";
 import {
   listMyCanvasProjects,
   type CanvasProjectSummary,
@@ -25,6 +30,7 @@ function formatDate(iso: string): string {
 
 const RECENT_DEFER_MS = 600;
 
+/** 登录用户项目列表 · 不走门户静态快照，始终实时拉取 */
 export function RecentProjectsSection() {
   const base = useBookMallBaseUrl();
   const [projects, setProjects] = useState<CanvasProjectSummary[]>([]);
@@ -36,24 +42,44 @@ export function RecentProjectsSection() {
     return () => window.clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    if (!enabled || !base?.trim()) {
-      if (!enabled) return;
+  const loadProjects = useCallback(async () => {
+    if (!base?.trim()) {
+      setProjects([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    void listMyCanvasProjects(base)
-      .then((list) => {
-        const sorted = [...list].sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        );
-        setProjects(sorted.slice(0, RECENT_LIMIT));
-      })
-      .catch(() => setProjects([]))
-      .finally(() => setLoading(false));
-  }, [base, enabled]);
+    try {
+      const list = await listMyCanvasProjects(base);
+      const sorted = [...list].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+      setProjects(sorted.slice(0, RECENT_LIMIT));
+    } catch {
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [base]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    consumeRecentProjectsStale();
+    void loadProjects();
+  }, [enabled, loadProjects]);
+
+  useEffect(() => subscribeRecentProjectsInvalidate(() => void loadProjects()), [loadProjects]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || !enabled) return;
+      if (!isRecentProjectsStale()) return;
+      consumeRecentProjectsStale();
+      void loadProjects();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [enabled, loadProjects]);
 
   if (!enabled) return null;
 

@@ -14,7 +14,7 @@
       "schedule": "30 0 * * *"
     },
     {
-      "path": "/api/internal/static-snapshots/generate?pageKey=site-home",
+      "path": "/api/internal/static-snapshots/generate?pageKey=all",
       "schedule": "30 21 * * *"
     }
   ]

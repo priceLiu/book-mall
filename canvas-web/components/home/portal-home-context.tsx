@@ -12,6 +12,7 @@ import {
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
+import type { CanvasHomeSnapshotPayload } from "@/lib/canvas-home-snapshot-types";
 import {
   listCanvasTemplates,
   listPortalCaseProjects,
@@ -19,6 +20,7 @@ import {
   type CanvasTemplateRecord,
   type PortalCaseProjectSummary,
   type PortalFeaturedProjectSummary,
+  type PortalFilmShowcaseMedia,
 } from "@/lib/canvas-api";
 import { canvasEditionFromTemplateCanvas } from "@/lib/canvas/project-edition";
 
@@ -38,25 +40,43 @@ type PortalHomeContextValue = {
   featured: PortalFeaturedProjectSummary[];
   templates: CanvasTemplateRecord[];
   cases: PortalCaseProjectSummary[];
+  filmShowcase: PortalFilmShowcaseMedia[];
   featuredLoading: boolean;
   secondaryLoading: boolean;
   secondaryLoaded: boolean;
+  filmShowcaseLoaded: boolean;
   loadSecondary: () => void;
 };
 
 const PortalHomeContext = createContext<PortalHomeContextValue | null>(null);
 
-export function PortalHomeProvider({ children }: { children: ReactNode }) {
+export function PortalHomeProvider({
+  children,
+  initialSnapshot,
+}: {
+  children: ReactNode;
+  initialSnapshot?: CanvasHomeSnapshotPayload | null;
+}) {
   const base = useBookMallBaseUrl();
+  const hasStaticSnapshot = initialSnapshot != null;
+
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [viewerLoading, setViewerLoading] = useState(true);
-  const [featured, setFeatured] = useState<PortalFeaturedProjectSummary[]>([]);
-  const [templates, setTemplates] = useState<CanvasTemplateRecord[]>([]);
-  const [cases, setCases] = useState<PortalCaseProjectSummary[]>([]);
-  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featured, setFeatured] = useState<PortalFeaturedProjectSummary[]>(
+    initialSnapshot?.featured ?? [],
+  );
+  const [templates, setTemplates] = useState<CanvasTemplateRecord[]>(
+    initialSnapshot?.templates ?? [],
+  );
+  const [cases, setCases] = useState<PortalCaseProjectSummary[]>(initialSnapshot?.cases ?? []);
+  const [filmShowcase, setFilmShowcase] = useState<PortalFilmShowcaseMedia[]>(
+    initialSnapshot?.filmShowcase ?? [],
+  );
+  const [featuredLoading, setFeaturedLoading] = useState(!hasStaticSnapshot);
   const [secondaryLoading, setSecondaryLoading] = useState(false);
-  const [secondaryLoaded, setSecondaryLoaded] = useState(false);
-  const secondaryStarted = useRef(false);
+  const [secondaryLoaded, setSecondaryLoaded] = useState(hasStaticSnapshot);
+  const [filmShowcaseLoaded, setFilmShowcaseLoaded] = useState(hasStaticSnapshot);
+  const secondaryStarted = useRef(hasStaticSnapshot);
 
   useEffect(() => {
     if (!base?.trim()) {
@@ -72,9 +92,11 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
   }, [base]);
 
   useEffect(() => {
-    if (!base?.trim()) {
-      setFeatured([]);
-      setFeaturedLoading(false);
+    if (hasStaticSnapshot || !base?.trim()) {
+      if (!base?.trim()) {
+        setFeatured([]);
+        setFeaturedLoading(false);
+      }
       return;
     }
     setFeaturedLoading(true);
@@ -85,10 +107,10 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => setFeatured([]))
       .finally(() => setFeaturedLoading(false));
-  }, [base]);
+  }, [base, hasStaticSnapshot]);
 
   const loadSecondary = useCallback(() => {
-    if (!base?.trim() || secondaryStarted.current) return;
+    if (hasStaticSnapshot || !base?.trim() || secondaryStarted.current) return;
     secondaryStarted.current = true;
     setSecondaryLoading(true);
     const signal = portalHomeFetchSignal();
@@ -119,13 +141,13 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
         setSecondaryLoaded(true);
         setSecondaryLoading(false);
       });
-  }, [base]);
+  }, [base, hasStaticSnapshot]);
 
   useEffect(() => {
-    if (!base?.trim() || secondaryLoaded) return;
+    if (hasStaticSnapshot || !base?.trim() || secondaryLoaded) return;
     const t = window.setTimeout(() => loadSecondary(), SECONDARY_DELAY_MS);
     return () => window.clearTimeout(t);
-  }, [base, secondaryLoaded, loadSecondary]);
+  }, [base, secondaryLoaded, loadSecondary, hasStaticSnapshot]);
 
   return (
     <PortalHomeContext.Provider
@@ -135,9 +157,11 @@ export function PortalHomeProvider({ children }: { children: ReactNode }) {
         featured,
         templates,
         cases,
+        filmShowcase,
         featuredLoading,
         secondaryLoading,
         secondaryLoaded,
+        filmShowcaseLoaded,
         loadSecondary,
       }}
     >

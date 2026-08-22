@@ -93,6 +93,7 @@ import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout
 import { reflowStoryPro2Workspace } from "@/lib/canvas/story-pro2-workspace-layout";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { pickPersistableProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import {
   captureCanvasViewportSnapshotUrl,
   resolveCanvasHistoryThumbnailUrl,
@@ -1403,6 +1404,7 @@ function Inner({ projectId }: { projectId: string }) {
           userNote: note || undefined,
         });
         if (result.appliedImmediately) {
+          markRecentProjectsStale();
           await dialogs.alert({
             title: "已发布",
             message:
@@ -1421,6 +1423,7 @@ function Inner({ projectId }: { projectId: string }) {
             setTemplatesRefreshKey((k) => k + 1);
           }
         } else {
+          markRecentProjectsStale();
           await dialogs.alert({
             title: "已提交",
             message: "管理员审核通过后将展示在首页相应位置。",

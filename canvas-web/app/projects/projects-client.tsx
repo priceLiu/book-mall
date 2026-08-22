@@ -29,6 +29,7 @@ import {
   type CanvasProjectSummary,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
+import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import {
   BLANK_CANVAS,
@@ -230,6 +231,7 @@ function Inner() {
         requestKind: kind,
         userNote: note || undefined,
       });
+      markRecentProjectsStale();
       if (result.appliedImmediately) {
         await dialogs.alert({
           title: "已发布",

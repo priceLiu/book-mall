@@ -6,6 +6,7 @@ const PORTAL_PUBLIC_GET_PATHS = [
   "api/canvas/projects/portal-cases",
   "api/canvas/projects/portal-film-showcase",
   "api/canvas/viewer-session",
+  "api/public/static-snapshots/canvas-home",
 ] as const;
 
 export function isBookMallPortalPublicGetProxy(

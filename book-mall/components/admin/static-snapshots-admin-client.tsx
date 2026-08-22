@@ -6,9 +6,16 @@ import { Loader2 } from "lucide-react";
 import type { StaticSnapshotStatus, StaticSnapshotTrigger } from "@prisma/client";
 
 import {
+  isCanvasHomeSnapshotPayload,
+  summarizeCanvasHomePayload,
+  CANVAS_HOME_PAGE_KEY,
+} from "@/lib/static-snapshots/canvas-home-payload";
+import {
   isSiteHomeSnapshotPayload,
   summarizeSiteHomePayload,
+  SITE_HOME_PAGE_KEY,
 } from "@/lib/static-snapshots/site-home-payload";
+import type { StaticSnapshotPageKey } from "@/lib/static-snapshots/static-snapshot-run";
 
 const STATUS_LABEL: Record<StaticSnapshotStatus, string> = {
   READY: "成功",
@@ -20,6 +27,29 @@ const TRIGGER_LABEL: Record<StaticSnapshotTrigger, string> = {
   ADMIN: "管理后台",
   CLI: "CLI",
 };
+
+const PAGE_TABS: {
+  pageKey: StaticSnapshotPageKey;
+  title: string;
+  description: string;
+  generateLabel: string;
+  emptyHint: string;
+}[] = [
+  {
+    pageKey: SITE_HOME_PAGE_KEY,
+    title: "主站首页（site-home）",
+    description: "Hero、平台应用 showcase、Gateway 模型市场",
+    generateLabel: "立即生成主站首页快照",
+    emptyHint: "尚无快照，请点击生成或运行 pnpm site-home:snapshot-generate",
+  },
+  {
+    pageKey: CANVAS_HOME_PAGE_KEY,
+    title: "画布首页（canvas-home）",
+    description: "精选 / 模板 / 案例 / 分镜视频作品墙",
+    generateLabel: "立即生成画布首页快照",
+    emptyHint: "尚无快照，请点击生成或运行 pnpm canvas-home:snapshot-generate",
+  },
+];
 
 function fmtTime(d: Date | string) {
   return new Date(d).toLocaleString("zh-CN");
@@ -38,32 +68,58 @@ type RunRow = {
   summary: unknown;
 };
 
-type SnapshotInfo = {
+export type SnapshotInfo = {
   pageKey: string;
   dateKey: string;
   status: StaticSnapshotStatus;
   generatedAt: string;
   errorMessage: string | null;
-  summary: {
-    platformAppCount: number;
-    showcaseItemCount: number;
-    gatewayModelCount: number;
-    heroClipCount: number;
-  } | null;
+  summaryText: string | null;
 };
 
+function summaryTextFromPayload(pageKey: string, payload: unknown): string | null {
+  if (pageKey === SITE_HOME_PAGE_KEY && isSiteHomeSnapshotPayload(payload)) {
+    const s = summarizeSiteHomePayload(payload);
+    return `${s.platformAppCount} 应用 · ${s.gatewayModelCount} 模型 · ${s.showcaseItemCount} 作品`;
+  }
+  if (pageKey === CANVAS_HOME_PAGE_KEY && isCanvasHomeSnapshotPayload(payload)) {
+    const s = summarizeCanvasHomePayload(payload);
+    return `${s.featuredCount} 精选 · ${s.templateCount} 模板 · ${s.caseCount} 案例 · ${s.filmShowcaseCount} 视频`;
+  }
+  return null;
+}
+
+function runSummaryText(pageKey: string, summary: unknown): string {
+  if (pageKey === SITE_HOME_PAGE_KEY) {
+    const s = summary as { platformAppCount?: number; gatewayModelCount?: number } | null;
+    return `${s?.platformAppCount ?? "—"} 应用 · ${s?.gatewayModelCount ?? "—"} 模型`;
+  }
+  if (pageKey === CANVAS_HOME_PAGE_KEY) {
+    const s = summary as {
+      featuredCount?: number;
+      templateCount?: number;
+      filmShowcaseCount?: number;
+    } | null;
+    return `${s?.featuredCount ?? "—"} 精选 · ${s?.templateCount ?? "—"} 模板 · ${s?.filmShowcaseCount ?? "—"} 视频`;
+  }
+  return "—";
+}
+
 export function StaticSnapshotsAdminClient({
-  pageKey,
-  latestSnapshot,
-  initialRuns,
+  snapshots,
+  runsByPageKey,
 }: {
-  pageKey: string;
-  latestSnapshot: SnapshotInfo | null;
-  initialRuns: RunRow[];
+  snapshots: Record<StaticSnapshotPageKey, SnapshotInfo | null>;
+  runsByPageKey: Record<StaticSnapshotPageKey, RunRow[]>;
 }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<StaticSnapshotPageKey>(SITE_HOME_PAGE_KEY);
   const [generating, setGenerating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const tab = PAGE_TABS.find((t) => t.pageKey === activeTab)!;
+  const latestSnapshot = snapshots[activeTab];
+  const initialRuns = runsByPageKey[activeTab];
 
   const onGenerate = async () => {
     setGenerating(true);
@@ -73,7 +129,7 @@ export function StaticSnapshotsAdminClient({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageKey }),
+        body: JSON.stringify({ pageKey: activeTab }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -92,17 +148,33 @@ export function StaticSnapshotsAdminClient({
       <div>
         <h1 className="text-2xl font-bold text-[#1f2328]">静态资源管理</h1>
         <p className="mt-2 text-sm text-[#656d76]">
-          首页等大流量页由 Cron / 手动预生成快照，用户访问只读 DB 或 ISR 缓存，不实时查库。
+          大流量页由 Cron / 手动预生成快照，用户访问只读 DB 或缓存，不实时查库。Cron 建议每日 05:30
+          CST。
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {PAGE_TABS.map((t) => (
+          <button
+            key={t.pageKey}
+            type="button"
+            onClick={() => setActiveTab(t.pageKey)}
+            className={
+              activeTab === t.pageKey
+                ? "rounded-lg bg-[#0969da] px-4 py-2 text-sm font-medium text-white"
+                : "rounded-lg border border-[#d1d9e0] bg-white px-4 py-2 text-sm text-[#656d76] hover:bg-[#f6f8fa]"
+            }
+          >
+            {t.title}
+          </button>
+        ))}
       </div>
 
       <section className="space-y-4 rounded-xl border border-[#d1d9e0] bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-[#1f2328]">首页快照（site-home）</h2>
-            <p className="mt-0.5 text-sm text-[#656d76]">
-              含 Hero、平台应用 showcase、Gateway 模型市场；Cron 建议每日 05:30 CST
-            </p>
+            <h2 className="text-lg font-semibold text-[#1f2328]">{tab.title}</h2>
+            <p className="mt-0.5 text-sm text-[#656d76]">{tab.description}</p>
           </div>
           <button
             type="button"
@@ -111,7 +183,7 @@ export function StaticSnapshotsAdminClient({
             className="inline-flex items-center gap-2 rounded-lg bg-[#0969da] px-4 py-2 text-sm font-medium text-white hover:bg-[#0550ae] disabled:opacity-60"
           >
             {generating ? <Loader2 className="size-4 animate-spin" /> : null}
-            {generating ? "正在生成…" : "立即生成首页快照"}
+            {generating ? "正在生成…" : tab.generateLabel}
           </button>
         </div>
 
@@ -140,15 +212,13 @@ export function StaticSnapshotsAdminClient({
             <div>
               <dt className="text-[#656d76]">摘要</dt>
               <dd className="font-medium tabular-nums text-[#1f2328]">
-                {latestSnapshot.summary
-                  ? `${latestSnapshot.summary.platformAppCount} 应用 · ${latestSnapshot.summary.gatewayModelCount} 模型 · ${latestSnapshot.summary.showcaseItemCount} 作品`
-                  : "—"}
+                {latestSnapshot.summaryText ?? "—"}
               </dd>
             </div>
           </dl>
         ) : (
           <p className="rounded-lg border border-dashed border-[#d1d9e0] px-4 py-6 text-center text-sm text-[#656d76]">
-            尚无快照记录，请点击上方按钮生成（或运行 pnpm site-home:snapshot-generate）
+            {tab.emptyHint}
           </p>
         )}
 
@@ -175,30 +245,24 @@ export function StaticSnapshotsAdminClient({
                 </tr>
               </thead>
               <tbody>
-                {initialRuns.map((r) => {
-                  const summary = r.summary as {
-                    platformAppCount?: number;
-                    gatewayModelCount?: number;
-                  } | null;
-                  return (
-                    <tr key={r.id} className="border-t border-[#eaeef2]">
-                      <td className="whitespace-nowrap px-3 py-2 text-[#656d76]">
-                        {fmtTime(r.startedAt)}
-                      </td>
-                      <td className="px-3 py-2 tabular-nums">{r.dateKey}</td>
-                      <td className="px-3 py-2">{TRIGGER_LABEL[r.trigger]}</td>
-                      <td className="px-3 py-2">{STATUS_LABEL[r.status]}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-[#656d76]">
-                        {r.durationMs != null ? `${(r.durationMs / 1000).toFixed(1)}s` : "—"}
-                      </td>
-                      <td className="max-w-xs truncate px-3 py-2 text-[#656d76]">
-                        {r.status === "READY" && summary
-                          ? `${summary.platformAppCount ?? "—"} 应用 · ${summary.gatewayModelCount ?? "—"} 模型`
-                          : (r.errorMessage ?? "—")}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {initialRuns.map((r) => (
+                  <tr key={r.id} className="border-t border-[#eaeef2]">
+                    <td className="whitespace-nowrap px-3 py-2 text-[#656d76]">
+                      {fmtTime(r.startedAt)}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">{r.dateKey}</td>
+                    <td className="px-3 py-2">{TRIGGER_LABEL[r.trigger]}</td>
+                    <td className="px-3 py-2">{STATUS_LABEL[r.status]}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[#656d76]">
+                      {r.durationMs != null ? `${(r.durationMs / 1000).toFixed(1)}s` : "—"}
+                    </td>
+                    <td className="max-w-xs truncate px-3 py-2 text-[#656d76]">
+                      {r.status === "READY"
+                        ? runSummaryText(activeTab, r.summary)
+                        : (r.errorMessage ?? "—")}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -216,13 +280,12 @@ export function snapshotInfoFromRow(row: {
   errorMessage: string | null;
   payload: unknown;
 }): SnapshotInfo {
-  const payload = isSiteHomeSnapshotPayload(row.payload) ? row.payload : null;
   return {
     pageKey: row.pageKey,
     dateKey: row.dateKey,
     status: row.status,
     generatedAt: row.generatedAt.toISOString(),
     errorMessage: row.errorMessage,
-    summary: payload ? summarizeSiteHomePayload(payload) : null,
+    summaryText: summaryTextFromPayload(row.pageKey, row.payload),
   };
 }

@@ -18,7 +18,7 @@
 | `StaticPageSnapshot` | `pageKey` + `dateKey`(CST) 唯一；`payload` Json |
 | `StaticSnapshotGenerationRun` | 每次生成一条流水（CRON / ADMIN / CLI） |
 
-Phase 1 仅 `pageKey = site-home`。
+Phase 1 仅 `pageKey = site-home`；**画布门户首页** `canvas-home` 已接入同一套表与 Cron。
 
 ## 3. payload 结构
 
@@ -33,9 +33,9 @@ Phase 1 仅 `pageKey = site-home`。
 
 | 入口 | 路径 / 命令 |
 |------|-------------|
-| Cron | `POST /api/internal/static-snapshots/generate?pageKey=site-home`（`CRON_SECRET`） |
+| Cron | `POST /api/internal/static-snapshots/generate?pageKey=all`（`CRON_SECRET`，依次生成 site-home + canvas-home） |
 | 管理后台 | `/admin/static-snapshots` → 立即生成 |
-| CLI | `pnpm --dir book-mall site-home:snapshot-generate` |
+| CLI | `pnpm --dir book-mall site-home:snapshot-generate` · `canvas-home:snapshot-generate` |
 
 **CloudBase 定时（CST 05:30）**：见 `deploy/tencent/README.md` §九。
 
@@ -44,7 +44,7 @@ Phase 1 仅 `pageKey = site-home`。
 ## 5. 读路径
 
 - 首页：`getSiteHomeSnapshotForRender()` → 当日 READY → 昨日 → `buildSiteHomeSnapshotFallback`
-- 公开 API：`GET /api/public/static-snapshots/site-home`（CDN 友好 Cache-Control）
+- 画布门户：`canvas-web` 首页 SSR 读 `canvas-home` 快照；**「最近项目」不在快照内**，始终实时 `GET /api/canvas/projects`，分享成功后主动刷新。
 
 ## 6. showcase 来源（静态 gallery）
 
@@ -68,4 +68,5 @@ Phase 1 仅 `pageKey = site-home`。
 
 | 日期 | 说明 |
 |------|------|
+| 2026-08-22 | canvas-home：画布门户首页快照 + 管理页 Tab + canvas-web 读公开 API |
 | 2026-08-22 | Phase 1：首页 ISR + 快照 CMS + 管理页 + Cron |
