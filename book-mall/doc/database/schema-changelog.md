@@ -62,6 +62,14 @@
 - **回滚**：开发环境可 `DROP SCHEMA public CASCADE` 后重建（**生产禁止**）；生产需逆向迁移或备份后操作。  
 - **本机应用**：`pnpm run db:deploy`（依赖 `.env.local` 中 `DATABASE_URL`），然后 `pnpm run db:seed`。当前团队环境使用 Neon 默认库 **`neondb`** 亦可。
 
+## 2026-08-22 — 首页静态快照 CMS（Phase 1）
+
+- **迁移目录**：`prisma/migrations/20260822233000_static_page_snapshot/`
+- **新表**：`StaticPageSnapshot`（`pageKey` + `dateKey` 唯一；`payload` Json）、`StaticSnapshotGenerationRun`（生成流水）
+- **枚举**：`StaticSnapshotStatus`、`StaticSnapshotTrigger`
+- **逻辑**：Cron/管理后台/CLI 预生成首页快照；ISR 只读；详见 `doc/product/site-home-static-snapshot.md`
+- **应用**：`pnpm db:apply-pending`，`pnpm db:generate`
+
 ## 2026-05-10 — 初始化
 
 - **库名（逻辑）**：文档曾用 `ai_mall`；**Neon 控制台默认 database 多为 `neondb`**，将 `DATABASE_URL` 指向实际库名即可（见 `doc/tech/stack-and-environment.md`）。  

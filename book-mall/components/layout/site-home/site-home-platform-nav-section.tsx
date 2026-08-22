@@ -1,14 +1,17 @@
 import Link from "next/link";
 
-import { SiteHomePlatformAppCard } from "@/components/layout/site-home/site-home-platform-app-card";
-import { buildSiteHomePlatformApps } from "@/lib/site-home/platform-apps";
+import { SiteHomePlatformAppCardRotator } from "@/components/layout/site-home/site-home-platform-app-card-rotator";
+import type { SiteHomePlatformAppSnapshot } from "@/lib/static-snapshots/site-home-payload";
 
-export function SiteHomePlatformNavSection() {
-  const apps = buildSiteHomePlatformApps();
-  if (apps.length === 0) return null;
+export function SiteHomePlatformNavSection({
+  platformApps,
+}: {
+  platformApps: SiteHomePlatformAppSnapshot[];
+}) {
+  if (platformApps.length === 0) return null;
 
-  const primaryRow = apps.slice(0, 5);
-  const secondaryRow = apps.slice(5);
+  const primaryRow = platformApps.slice(0, 5);
+  const secondaryRow = platformApps.slice(5);
 
   return (
     <section id="platform-apps" className="site-home-platform-nav py-16 sm:py-20">
@@ -28,24 +31,22 @@ export function SiteHomePlatformNavSection() {
           </Link>
         </div>
 
-        {/* 手机 / 平板：自适应网格 */}
         <div className="site-home-platform-nav-grid site-home-platform-nav-grid--compact xl:hidden">
-          {apps.map((app) => (
-            <SiteHomePlatformAppCard key={app.key} app={app} />
+          {platformApps.map((app) => (
+            <SiteHomePlatformAppCardRotator key={app.key} app={app} />
           ))}
         </div>
 
-        {/* 桌面：第一行 5 + 第二行 4（居中） */}
         <div className="hidden xl:flex xl:flex-col xl:gap-5">
           <div className="site-home-platform-nav-grid site-home-platform-nav-grid--primary">
             {primaryRow.map((app) => (
-              <SiteHomePlatformAppCard key={app.key} app={app} />
+              <SiteHomePlatformAppCardRotator key={app.key} app={app} />
             ))}
           </div>
           {secondaryRow.length > 0 ? (
             <div className="site-home-platform-nav-grid site-home-platform-nav-grid--secondary">
               {secondaryRow.map((app) => (
-                <SiteHomePlatformAppCard key={app.key} app={app} />
+                <SiteHomePlatformAppCardRotator key={app.key} app={app} />
               ))}
             </div>
           ) : null}

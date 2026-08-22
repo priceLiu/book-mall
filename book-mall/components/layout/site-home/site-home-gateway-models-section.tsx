@@ -1,24 +1,16 @@
 import Link from "next/link";
 
 import { SiteHomeGatewayModelsMarquee } from "@/components/layout/site-home/site-home-gateway-models-marquee";
-import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
-import { listPublicMarketShowcaseModels } from "@/lib/gateway/market-catalog";
-import { getGatewayPublicOrigin } from "@/lib/gateway/env";
+import type { MarketShowcaseItem } from "@/lib/gateway/market-catalog";
 
-export async function SiteHomeGatewayModelsSection() {
-  const gatewayOrigin = getGatewayPublicOrigin();
-  if (!gatewayOrigin) return null;
-
-  let models: Awaited<ReturnType<typeof listPublicMarketShowcaseModels>> = [];
-  try {
-    models = await listPublicMarketShowcaseModels();
-  } catch (e) {
-    if (!isPrismaConnectionUnavailable(e)) throw e;
-    logDbUnavailable("SiteHomeGatewayModelsSection", e);
-    return null;
-  }
-
-  if (models.length === 0) return null;
+export function SiteHomeGatewayModelsSection({
+  models,
+  gatewayOrigin,
+}: {
+  models: MarketShowcaseItem[];
+  gatewayOrigin: string | null;
+}) {
+  if (!gatewayOrigin || models.length === 0) return null;
 
   return (
     <section id="gateway-models" className="site-home-models py-12 sm:py-16">

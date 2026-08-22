@@ -5,11 +5,10 @@ import { SiteHomeGatewayModelsSection } from "@/components/layout/site-home/site
 import { SiteHomePlatformNavSection } from "@/components/layout/site-home/site-home-platform-nav-section";
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
-import { pickRandomStoryHeroBackground, pickRandomStoryVideoClips } from "@/lib/story-theater-videos";
+import { getSiteHomeSnapshotForRender } from "@/lib/static-snapshots/site-home-snapshot-service";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 86400;
 
 export const metadata = {
   title: "智选 AI Mall｜找AI上智选",
@@ -42,16 +41,21 @@ export const metadata = {
   },
 };
 
-export default function Home() {
-  const heroClips = pickRandomStoryVideoClips(3);
-  const heroBackground = pickRandomStoryHeroBackground();
+export default async function Home() {
+  const snapshot = await getSiteHomeSnapshotForRender();
 
   return (
     <>
-      <SiteHomeHeroSection clips={heroClips} background={heroBackground} />
-      <SiteHomePlatformNavSection />
+      <SiteHomeHeroSection
+        clips={snapshot.payload.hero.clips}
+        background={snapshot.payload.hero.background}
+      />
+      <SiteHomePlatformNavSection platformApps={snapshot.payload.platformApps} />
       <div className="site-home-below-hero">
-        <SiteHomeGatewayModelsSection />
+        <SiteHomeGatewayModelsSection
+          models={snapshot.payload.gatewayModels}
+          gatewayOrigin={snapshot.payload.gatewayOrigin}
+        />
         <BenefitsSection />
         <FeaturesSection />
         <TestimonialSection />

@@ -254,3 +254,17 @@ docker compose up -d --build
 **零新增 env**：鉴权复用 SSO 部署已有变量 — `Authorization: Bearer <TOOLS_SSO_SERVER_SECRET>` 或 `GATEWAY_SSO_SERVER_SECRET`（Gateway 控制台仅后者；book 侧两者皆可）。上报目标 Book Origin 复用 `MAIN_SITE_ORIGIN` / `NEXT_PUBLIC_BOOK_MALL_URL` / `BOOK_MALL_URL` / `NEXTAUTH_URL` 等已有变量。
 
 管理后台：**book-mall** `/admin/traffic`。IP 明细保留 90 天（`pnpm --dir book-mall tsx scripts/platform-traffic-purge-old.ts`）。详见 `book-mall/doc/product/26-platform-traffic-analytics.md`。
+
+---
+
+## 十、book-mall 首页静态快照 Cron
+
+生产 **CloudBase 定时 HTTP**（鉴权 `Authorization: Bearer <CRON_SECRET>`）：
+
+| 时间 (CST) | 路径 | 说明 |
+|------------|------|------|
+| 05:30 | `POST /api/internal/static-snapshots/generate?pageKey=site-home` | 预生成当日首页快照（Hero / 平台应用 / Gateway 模型） |
+
+本地手动：`pnpm --dir book-mall site-home:snapshot-generate`，或 **book-mall 管理后台** `/admin/static-snapshots` →「立即生成首页快照」。
+
+读路径：首页 ISR 只读 `StaticPageSnapshot`；公开 API `GET /api/public/static-snapshots/site-home`。详见 `book-mall/doc/product/site-home-static-snapshot.md`。
