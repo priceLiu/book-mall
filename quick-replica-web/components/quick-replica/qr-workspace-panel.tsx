@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
 import { QrAudioMiddlePanel } from "@/components/quick-replica/qr-audio-middle-panel";
+import { QrCreateImageForm } from "@/components/quick-replica/qr-create-image-workspace";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrMotionSyncForm } from "@/components/quick-replica/qr-motion-sync-workspace";
 import { QrTextToVideoForm } from "@/components/quick-replica/qr-text-to-video-workspace";

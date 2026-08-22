@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
+import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { extractImageFilesFromClipboard } from "@/lib/qr-image-upload-paste";
 import {
   QR_DEFAULT_WORLD_MODEL_KEY,
