@@ -23,6 +23,7 @@ import {
   isKieRecordFail,
   isKieRecordSuccess,
   type KieRecordResponse,
+  type KieRecordState,
 } from "@/lib/story/kie-client";
 
 type KieGatewayLogRow = Pick<
@@ -51,7 +52,7 @@ async function pollKieVendorForGatewayLog(opts: {
   if (isKieSunoModelKey(opts.model)) {
     const suno = await getKieSunoTaskWithKey(cred.apiKey, opts.taskId, baseUrl);
     const st = (suno.status ?? "").trim().toLowerCase();
-    const state =
+    const state: KieRecordState =
       st === "success" || st === "succeeded"
         ? "success"
         : st === "fail" || st === "failed"

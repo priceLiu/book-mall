@@ -30,4 +30,21 @@ describe("kie record terminal detection", () => {
       }),
     ).toBe(true);
   });
+
+  it("accepts non-canonical vendor state strings", () => {
+    expect(
+      isKieRecordComplete({
+        state: "SUCCEEDED",
+        completeTime: undefined,
+        resultJson: undefined,
+      }),
+    ).toBe(true);
+    expect(
+      isKieRecordComplete({
+        state: "running",
+        completeTime: Date.now(),
+        resultJson: '{"resultUrls":["https://x/a.png"]}',
+      }),
+    ).toBe(true);
+  });
 });

@@ -338,7 +338,11 @@ export function isKieRecordFail(state: string | undefined | null): boolean {
 }
 
 /** 厂商 state 未收口但已有 completeTime + resultJson 时视为成功（KIE recordInfo 偶发滞后）。 */
-export function isKieRecordComplete(record: KieRecordResponse): boolean {
+export function isKieRecordComplete(record: {
+  state?: string | null;
+  completeTime?: number | null;
+  resultJson?: string;
+}): boolean {
   if (isKieRecordSuccess(record.state)) return true;
   return Boolean(record.completeTime && record.resultJson?.trim());
 }

@@ -14,7 +14,12 @@ import {
 import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
-import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
+import {
+  createKieTaskWithKey,
+  getKieTaskWithKey,
+  type KieRecordResponse,
+  type KieRecordState,
+} from "@/lib/story/kie-client";
 import {
   createKieSunoTaskWithKey,
   getKieSunoTaskWithKey,
@@ -839,7 +844,7 @@ export async function pollKieTaskForLog(opts: {
   credentialId: string;
   taskId: string;
   model?: string;
-}) {
+}): Promise<KieRecordResponse> {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
   const { resolveKieApiRoot } = await import("@/lib/gateway/model-router");
@@ -847,7 +852,7 @@ export async function pollKieTaskForLog(opts: {
   if (opts.model && isKieSunoModelKey(opts.model)) {
     const suno = await getKieSunoTaskWithKey(cred.apiKey, opts.taskId, baseUrl);
     const st = (suno.status ?? "").trim().toLowerCase();
-    const state =
+    const state: KieRecordState =
       st === "success" || st === "succeeded"
         ? "success"
         : st === "fail" || st === "failed"
