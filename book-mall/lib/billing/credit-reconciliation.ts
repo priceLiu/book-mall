@@ -19,6 +19,7 @@ import { buildTeamGatewayUsageWhere } from "@/lib/gateway/log-query-scope";
 import {
   fetchTeamGatewayTokenUsage,
   gatewayTokenUsageToRecord,
+  GATEWAY_USAGE_LOG_SELECT,
   resolveBillableUsageForLog,
 } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { getTenantOverview } from "@/lib/tenant/tenant-service";
@@ -57,20 +58,9 @@ export async function aggregateInternalCostByModel(periodKey: string): Promise<I
       status: "SUCCEEDED",
     },
     select: {
-      canonicalModelKey: true,
-      model: true,
+      ...GATEWAY_USAGE_LOG_SELECT,
       costSnapshotYuan: true,
       estimatedVendorCostYuan: true,
-      status: true,
-      requestKind: true,
-      billingCategory: true,
-      inputSummary: true,
-      resultSummary: true,
-      promptTokens: true,
-      completionTokens: true,
-      totalTokens: true,
-      hasTokenUsage: true,
-      pricingTierRaw: true,
     },
   });
 

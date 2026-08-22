@@ -86,7 +86,7 @@ export function QrMyWorksPreviewPanel({
           <Copy className="h-4 w-4" />
           复制到工作区
         </button>
-        {onShare && template.source === "user" ? (
+        {onShare ? (
           <button
             type="button"
             className="qr-btn-secondary flex items-center justify-center gap-1 px-3"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
+import { canShareQrTemplate } from "@/lib/qr-workflow-share-eligibility";
 import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
 
 import {
@@ -749,7 +749,11 @@ export function QrAppClient({
             template={myWorksPreview}
             onSelectTemplate={setMyWorksPreview}
             onCopy={onCopyTemplate}
-            onShare={(t) => setShareTemplate(t)}
+            onShare={
+              myWorksPreview && canShareQrTemplate(myWorksPreview, canManageFeatured)
+                ? (t) => setShareTemplate(t)
+                : undefined
+            }
             onDelete={(t) => void handleDeleteTemplate(t)}
           />
         </div>
@@ -977,6 +981,14 @@ export function QrAppClient({
         open={previewTemplate !== null}
         onClose={() => setPreviewTemplate(null)}
         onCopy={onCopyTemplate}
+        onShare={
+          previewTemplate && canShareQrTemplate(previewTemplate, canManageFeatured)
+            ? (t) => {
+                setShareTemplate(t);
+                setPreviewTemplate(null);
+              }
+            : undefined
+        }
         allowDelete={navMode === "my-works" || navMode === "generate-history"}
         onDelete={
           navMode === "my-works" || navMode === "generate-history"

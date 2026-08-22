@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Copy, Trash2, X } from "lucide-react";
+import { Copy, Link2, Trash2, X } from "lucide-react";
 
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
@@ -15,6 +15,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onCopy: (template: QrTemplate) => void;
+  onShare?: (template: QrTemplate) => void;
   allowDelete?: boolean;
   onDelete?: (template: QrTemplate) => void;
 };
@@ -57,6 +58,7 @@ export function QrTemplatePreviewModal({
   open,
   onClose,
   onCopy,
+  onShare,
   allowDelete = false,
   onDelete,
 }: Props) {
@@ -304,6 +306,16 @@ export function QrTemplatePreviewModal({
             >
               复制
             </button>
+            {onShare ? (
+              <button
+                type="button"
+                className="qr-btn-secondary inline-flex w-full items-center justify-center gap-2"
+                onClick={() => onShare(template)}
+              >
+                <Link2 className="h-4 w-4" />
+                分享工作流
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

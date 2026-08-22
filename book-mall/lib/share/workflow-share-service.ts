@@ -16,7 +16,10 @@ import {
 } from "@/lib/canvas/canvas-project-service";
 import { createEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import { prisma } from "@/lib/prisma";
-import { rowToJson } from "@/lib/quick-replica/qr-template-service";
+import {
+  assertCanShareQrTemplate,
+  cloneQrTemplateForShareClaim,
+} from "@/lib/quick-replica/qr-template-service";
 import { getReferralEligibility } from "@/lib/referral/referral-service";
 
 import {
@@ -43,6 +46,9 @@ export async function createWorkflowShareLink(input: {
   maxClaims?: number | null;
 }): Promise<{ token: string; id: string }> {
   await assertWorkflowShareEligible(input.sharerUserId);
+  if (input.app === "QUICK_REPLICA") {
+    await assertCanShareQrTemplate(input.sharerUserId, input.resourceId);
+  }
 
   for (let i = 0; i < 5; i += 1) {
     const token = generateShareToken();
@@ -157,29 +163,9 @@ async function duplicateEcomForShareClaim(
 async function duplicateQrForShareClaim(
   claimerUserId: string,
   sourceTemplateId: string,
-  sharerUserId: string,
+  _sharerUserId: string,
 ): Promise<string> {
-  const source = await prisma.qrTemplate.findFirst({
-    where: { id: sourceTemplateId, ownerUserId: sharerUserId, deletedAt: null },
-  });
-  if (!source) throw new Error("模板不存在或无权分享");
-
-  const row = await prisma.qrTemplate.create({
-    data: {
-      ownerUserId: claimerUserId,
-      category: source.category,
-      kind: source.kind,
-      toolKey: source.toolKey,
-      title: `${source.title}（分享副本）`.slice(0, 120),
-      thumbnailUrl: source.thumbnailUrl,
-      badges: source.badges ?? [],
-      visibility: "private",
-      reference: source.reference as Prisma.InputJsonValue,
-      output: source.output ? (source.output as Prisma.InputJsonValue) : undefined,
-      sortOrder: 0,
-    },
-  });
-  return rowToJson(row).id;
+  return cloneQrTemplateForShareClaim(claimerUserId, sourceTemplateId);
 }
 
 async function cloneResourceForShare(input: {

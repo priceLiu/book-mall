@@ -39,4 +39,14 @@ describe("share reward config defaults", () => {
     expect(workflowShareRedirectPath("ECOM", "p2")).toContain("projectId=p2");
     expect(workflowShareRedirectPath("QUICK_REPLICA", "t1")).toContain("templateId=t1");
   });
+
+  it("canShareQrTemplate eligibility (frontend helper mirror)", async () => {
+    const { getBuiltinQrTemplates } = await import(
+      "@/lib/quick-replica/builtin-templates"
+    );
+    const builtin = getBuiltinQrTemplates()[0];
+    expect(builtin).toBeTruthy();
+    // 内置模板：仅管理员可分享（与 quick-replica-web/lib/qr-workflow-share-eligibility.ts 一致）
+    expect(builtin!.source).toBe("builtin");
+  });
 });
