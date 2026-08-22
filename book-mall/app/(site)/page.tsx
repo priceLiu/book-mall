@@ -1,12 +1,10 @@
 import { BenefitsSection } from "@/components/layout/sections/benefits";
 import { CommunitySection } from "@/components/layout/sections/community";
 import { FeaturesSection } from "@/components/layout/sections/features";
-import { FeaturedProductsSection } from "@/components/layout/sections/featured-products";
 import { SiteHomeGatewayModelsSection } from "@/components/layout/site-home/site-home-gateway-models-section";
 import { SiteHomePlatformNavSection } from "@/components/layout/site-home/site-home-platform-nav-section";
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
-import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
 import { pickRandomStoryHeroBackground, pickRandomStoryVideoClips } from "@/lib/story-theater-videos";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
@@ -51,11 +49,9 @@ export default function Home() {
   return (
     <>
       <SiteHomeHeroSection clips={heroClips} background={heroBackground} />
-      <SiteHomeLogoMarquee />
+      <SiteHomePlatformNavSection />
       <div className="site-home-below-hero">
-        <FeaturedProductsSection />
         <SiteHomeGatewayModelsSection />
-        <SiteHomePlatformNavSection />
         <BenefitsSection />
         <FeaturesSection />
         <TestimonialSection />
