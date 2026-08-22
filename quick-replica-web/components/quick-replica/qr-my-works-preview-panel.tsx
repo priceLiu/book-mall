@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Link2, Trash2 } from "lucide-react";
 
 import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-generate-preview";
 import { getKindDef, templateToWorkspaceDraft, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
@@ -11,6 +11,7 @@ type Props = {
   template: QrTemplate | null;
   onSelectTemplate: (template: QrTemplate) => void;
   onCopy: (template: QrTemplate) => void;
+  onShare?: (template: QrTemplate) => void;
   onDelete?: (template: QrTemplate) => void;
 };
 
@@ -27,6 +28,7 @@ export function QrMyWorksPreviewPanel({
   category,
   template,
   onCopy,
+  onShare,
   onDelete,
 }: Props) {
   if (!template) {
@@ -84,6 +86,16 @@ export function QrMyWorksPreviewPanel({
           <Copy className="h-4 w-4" />
           复制到工作区
         </button>
+        {onShare && template.source === "user" ? (
+          <button
+            type="button"
+            className="qr-btn-secondary flex items-center justify-center gap-1 px-3"
+            onClick={() => onShare(template)}
+            aria-label="分享工作流"
+          >
+            <Link2 className="h-4 w-4" />
+          </button>
+        ) : null}
         {onDelete && template.source === "user" ? (
           <button
             type="button"

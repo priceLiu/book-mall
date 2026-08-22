@@ -21,6 +21,7 @@ import {
 import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { orderTypeForProductKind } from "@/lib/payments/product-labels";
+import { markShareRewardFirstPaid } from "@/lib/share/share-reward-service";
 import { prisma } from "@/lib/prisma";
 import { createTeamTenant } from "@/lib/tenant/tenant-service";
 import { canTenant } from "@/lib/tenant/permission";
@@ -391,6 +392,16 @@ export async function fulfillPaymentCheckout(input: {
     action: input.confirmMode === "ADMIN_INSTANT" ? "ADMIN_INSTANT" : "ADMIN_CONFIRM",
     payload: { orderId: order.id, adminNote: input.adminNote ?? null },
   });
+
+  if (
+    checkout.productKind === "CREDIT_TOPUP" ||
+    checkout.productKind === "MEMBERSHIP_PERSONAL" ||
+    checkout.productKind === "MEMBERSHIP_TEAM"
+  ) {
+    markShareRewardFirstPaid(checkout.userId).catch((e) => {
+      console.warn("[fulfill-checkout] share reward first paid hook failed", e);
+    });
+  }
 
   return { checkoutId: checkout.id, orderId: order.id, alreadyPaid: false };
 }

@@ -2,6 +2,11 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
+import {
+  countPendingShareRewards,
+  sumShareRewardCreditsGranted,
+} from "@/lib/share/share-reward-service";
+import { getShareRewardConfig } from "@/lib/share/share-reward-config";
 
 /**
  * 分享返佣 · 领域服务（分享链接 1.0）
@@ -240,13 +245,23 @@ export type ReferredUserRow = {
 export type ReferralDashboard = {
   code: string;
   enabled: boolean;
-  commissionRate: number; // 0~1
+  /** @deprecated 分享规则 2.0 已改积分奖励；保留字段兼容旧 UI */
+  commissionRate: number;
   shareUrl: string;
   referredCount: number;
   totalPlanAmountYuan: number;
   totalRechargeAmountYuan: number;
   totalAmountYuan: number;
-  estimatedCommissionYuan: number; // total * rate（未设比例时为 0）
+  /** @deprecated 改用 creditsGranted */
+  estimatedCommissionYuan: number;
+  /** 分享规则 2.0 · 已获积分奖励合计 */
+  creditsGranted: number;
+  /** 待完成（已归因未发奖）人数 */
+  pendingRewardCount: number;
+  /** 邀请链路奖励积分（配置） */
+  referralRewardCredits: number;
+  /** 工作流链路奖励积分（配置） */
+  workflowShareRewardCredits: number;
   rows: ReferredUserRow[];
 };
 
@@ -305,6 +320,11 @@ export async function getReferralDashboard(
   );
   const totalAmountYuan = totalPlanAmountYuan + totalRechargeAmountYuan;
   const commissionRate = Number(profile.commissionRate);
+  const [creditsGranted, pendingRewardCount, shareCfg] = await Promise.all([
+    sumShareRewardCreditsGranted(userId),
+    countPendingShareRewards(userId),
+    getShareRewardConfig(),
+  ]);
 
   return {
     code: profile.code,
@@ -316,6 +336,10 @@ export async function getReferralDashboard(
     totalRechargeAmountYuan,
     totalAmountYuan,
     estimatedCommissionYuan: Math.round(totalAmountYuan * commissionRate * 100) / 100,
+    creditsGranted,
+    pendingRewardCount,
+    referralRewardCredits: shareCfg.referralRewardCredits,
+    workflowShareRewardCredits: shareCfg.workflowShareRewardCredits,
     rows,
   };
 }

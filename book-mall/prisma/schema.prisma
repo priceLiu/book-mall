@@ -175,6 +175,12 @@ model User {
   referralProfile  ReferralProfile? @relation("ReferralProfileOwner")
   /// 分享返佣：作为分享人的历史返佣单
   referralPayouts  ReferralPayout[] @relation("ReferralPayoutOwner")
+  /// 分享规则 2.0
+  shareRewardAsInvitee   ShareRewardAttribution? @relation("ShareRewardInvitee")
+  shareRewardsAsReferrer ShareRewardAttribution[] @relation("ShareRewardReferrer")
+  shareRewardProgress    ShareRewardProgress?    @relation("ShareRewardProgressInvitee")
+  workflowShareLinks     WorkflowShareLink[]     @relation("WorkflowShareLinkOwner")
+  workflowShareClaims    WorkflowShareClaim[]    @relation("WorkflowShareClaimer")
 
   /// 个人空间 Gateway 提交 burst 档位（团队项目走 Tenant）
   generationSubmitTier          GenerationSubmitTier?
@@ -249,6 +255,98 @@ model ReferralPayout {
   @@unique([referrerUserId, periodKey])
   @@index([periodKey])
   @@index([status])
+}
+
+/// 分享规则 2.0 · 归因渠道
+enum ShareRewardChannel {
+  REFERRAL
+  WORKFLOW
+}
+
+/// 分享规则 2.0 · 工作流分享所属应用
+enum WorkflowShareApp {
+  CANVAS
+  ECOM
+  QUICK_REPLICA
+}
+
+/// 分享规则 2.0 · 被邀请人归因（先到先得，终身一条）
+model ShareRewardAttribution {
+  id              String              @id @default(cuid())
+  inviteeUserId   String              @unique
+  invitee         User                @relation("ShareRewardInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+  channel         ShareRewardChannel
+  referrerUserId  String
+  referrer        User                @relation("ShareRewardReferrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referralCode    String?
+  workflowClaimId String?             @unique
+  workflowClaim   WorkflowShareClaim? @relation(fields: [workflowClaimId], references: [id], onDelete: SetNull)
+  lockedAt        DateTime            @default(now())
+
+  @@index([referrerUserId])
+  @@index([channel])
+}
+
+/// 分享规则 2.0 · 被邀请人进度（首笔生成 / 首笔付费）
+model ShareRewardProgress {
+  inviteeUserId   String    @id
+  invitee         User      @relation("ShareRewardProgressInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+  firstBillableAt DateTime?
+  firstPaidAt     DateTime?
+  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+}
+
+/// 分享规则 2.0 · 已发放奖励（幂等）
+model ShareRewardGrant {
+  id             String             @id @default(cuid())
+  inviteeUserId  String
+  referrerUserId String
+  channel        ShareRewardChannel
+  credits        Int
+  idempotencyKey String             @unique
+  grantedAt      DateTime           @default(now())
+
+  @@index([referrerUserId, grantedAt])
+  @@index([inviteeUserId])
+}
+
+/// 分享规则 2.0 · 工作流分享链接
+model WorkflowShareLink {
+  id           String               @id @default(cuid())
+  token        String               @unique
+  app          WorkflowShareApp
+  resourceType String
+  resourceId   String
+  sharerUserId String
+  sharer       User                 @relation("WorkflowShareLinkOwner", fields: [sharerUserId], references: [id], onDelete: Cascade)
+  title        String?
+  enabled      Boolean              @default(true)
+  expiresAt    DateTime?
+  maxClaims    Int?
+  claimCount   Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  claims       WorkflowShareClaim[]
+
+  @@index([sharerUserId])
+  @@index([app, resourceId])
+}
+
+/// 分享规则 2.0 · 工作流 claim 记录
+model WorkflowShareClaim {
+  id               String                  @id @default(cuid())
+  shareLinkId      String
+  shareLink        WorkflowShareLink       @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  claimerUserId    String
+  claimer          User                    @relation("WorkflowShareClaimer", fields: [claimerUserId], references: [id], onDelete: Cascade)
+  clonedResourceId String
+  claimedAt        DateTime                @default(now())
+  rewardGrantedAt  DateTime?
+  attribution      ShareRewardAttribution?
+
+  @@unique([shareLinkId, claimerUserId])
+  @@index([claimerUserId])
 }
 
 /// 按用户 + 模型 + 账期累计用量（用于云厂商阶梯价，如 aitryon-refiner 按生成张数分档）。
@@ -3240,6 +3338,14 @@ model PlatformPricingConfig {
   welcomeGiftGeneralCredits Int  @default(600) // 注册赠送积分（单池）
   // 分享返佣默认比例（0~1）：新建分享档案时的初始返佣（建议 0.05 保 20% 毛利）
   referralDefaultRate       Decimal @default("0.05") @db.Decimal(5, 4)
+  /// 分享规则 2.0 · 邀请链路奖励积分（注册+首笔付费）
+  referralRewardCredits           Int @default(20)
+  /// 分享规则 2.0 · 工作流链路奖励积分（首次生成+首笔付费）
+  workflowShareRewardCredits      Int @default(40)
+  /// 分享奖励 FREE 批次有效天数
+  shareRewardCreditsExpireDays    Int @default(90)
+  /// 单分享人每日奖励积分上限（0=不限）
+  shareRewardDailyCapPerReferrer  Int @default(0)
   updatedAt           DateTime @updatedAt
   createdAt           DateTime @default(now())
 }

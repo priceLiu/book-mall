@@ -8,6 +8,7 @@ import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import { AlertTriangle, GripVertical, ImageIcon } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { confirmOpenTopupCheckout } from "@/lib/platform-billing/open-topup-checkout";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
@@ -156,7 +157,7 @@ export function LibtvImageNode({
 }: LibtvImageNodeProps) {
   const chrome = EDITION_CHROME[edition];
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -282,6 +283,14 @@ export function LibtvImageNode({
         Boolean(d.pro2ControllerNodeId?.trim())
       ),
     onAlert: ({ message, failCode }) => {
+      if (
+        failCode === "INSUFFICIENT_CREDITS" ||
+        message.includes("积分不足") ||
+        message.includes("积分不够")
+      ) {
+        void confirmOpenTopupCheckout(confirm);
+        return;
+      }
       void alert({
         title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),
         message,

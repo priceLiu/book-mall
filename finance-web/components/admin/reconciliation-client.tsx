@@ -46,9 +46,6 @@ type V2Summary = {
   totalPlatformRevenueYuan: number;
   okCount: number;
   issueCount: number;
-  periodFrom?: string;
-  periodTo?: string;
-  periodKey?: string;
   statusCounts?: Record<ReconStatus, number>;
   internalTotalYuan?: number;
   cloudTotalPayableYuan?: number;
@@ -79,13 +76,24 @@ type V2Line = {
   cloudAccountId?: string | null;
 };
 
-type RunResult = {
-  runId: string;
-  summary: Partial<V2Summary> & { engineVersion?: string; totalVendorListYuan?: number };
-  lines: Partial<V2Line>[];
+type RunResultSummaryPayload = Omit<Partial<V2Summary>, "monthsCovered"> & {
+  engineVersion?: string;
+  monthsCovered?: string[] | string;
 };
 
-function normalizeSummary(raw: RunResult["summary"]): V2Summary {
+type RunResultPayload = {
+  runId: string;
+  summary?: RunResultSummaryPayload;
+  lines?: Partial<V2Line>[];
+};
+
+type NormalizedRunResult = {
+  runId: string;
+  summary: V2Summary;
+  lines: V2Line[];
+};
+
+function normalizeSummary(raw: RunResultSummaryPayload): V2Summary {
   return {
     engineVersion: raw.engineVersion as "v2" | undefined,
     vendor: raw.vendor,
@@ -242,7 +250,7 @@ export function ReconciliationClient() {
   const [billPeriodFrom, setBillPeriodFrom] = useState(defaultBillPeriod.from);
   const [billPeriodTo, setBillPeriodTo] = useState(defaultBillPeriod.to);
   const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<RunResult | null>(null);
+  const [result, setResult] = useState<NormalizedRunResult | null>(null);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bindModal, setBindModal] = useState<{ cloudAccountId: string; cloudAccountName: string | null } | null>(
@@ -299,7 +307,7 @@ export function ReconciliationClient() {
       const res = await fetch(url, init);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || res.statusText);
-      const payload = json as RunResult;
+      const payload = json as RunResultPayload;
       const normalized = normalizeSummary(payload.summary ?? {});
       if (normalized.periodFrom && normalized.periodTo) {
         setBillPeriodFrom(normalized.periodFrom);

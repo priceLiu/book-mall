@@ -15,6 +15,7 @@ import {
 } from "@/components/quick-replica/qr-generate-preview-modal";
 import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
 import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
+import { QrWorkflowShareDialog } from "@/components/quick-replica/qr-workflow-share-dialog";
 import { QrHomeHeroPanel } from "@/components/quick-replica/qr-home-hero-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
@@ -109,6 +110,7 @@ export function QrAppClient({
   const [voiceGalleryFocus, setVoiceGalleryFocus] = useState(false);
   const [myWorksCategory, setMyWorksCategory] = useState<QrCategory>("audio");
   const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
+  const [shareTemplate, setShareTemplate] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
   const voiceGalleryFocusTimerRef = useRef<number | null>(null);
   const focusedGenerate = generateSessions.find((s) => s.id === focusedGenerateId);
@@ -126,6 +128,31 @@ export function QrAppClient({
     navMode === "category" && category === "world" && middleMode === "browse";
 
   const bookAccountUrl = getBookAccountUrl();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const templateId = new URLSearchParams(window.location.search)
+      .get("templateId")
+      ?.trim();
+    if (!templateId) return;
+
+    void (async () => {
+      try {
+        const res = await fetchQrPlatform(
+          `/api/book-mall/api/platform/v1/quick-replica/templates/${encodeURIComponent(templateId)}`,
+        );
+        if (!res.ok) return;
+        const template = (await res.json()) as QrTemplate;
+        setDraft(templateToWorkspaceDraft(template));
+        setCategory(template.category);
+        setSelectedKind(template.kind);
+        setMiddleMode("workspace");
+        setNavMode("category");
+      } catch {
+        /* ignore deep-link load errors */
+      }
+    })();
+  }, []);
 
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
@@ -722,6 +749,7 @@ export function QrAppClient({
             template={myWorksPreview}
             onSelectTemplate={setMyWorksPreview}
             onCopy={onCopyTemplate}
+            onShare={(t) => setShareTemplate(t)}
             onDelete={(t) => void handleDeleteTemplate(t)}
           />
         </div>
@@ -994,6 +1022,13 @@ export function QrAppClient({
           setGenerateSessions((prev) => prev.filter((s) => s.id !== id));
           setFocusedGenerateId((current) => (current === id ? null : current));
         }}
+      />
+
+      <QrWorkflowShareDialog
+        templateId={shareTemplate?.id ?? ""}
+        templateTitle={shareTemplate?.title ?? "我的作品"}
+        open={Boolean(shareTemplate)}
+        onClose={() => setShareTemplate(null)}
       />
 
       <QrToast message={copyToast} onDismiss={dismissCopyToast} />

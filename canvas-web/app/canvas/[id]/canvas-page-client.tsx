@@ -106,6 +106,7 @@ import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-pane
 import { MyCanvasGenerationRecordsPanel } from "@/components/canvas/my-canvas-generation-records-panel";
 import { MyPromptHistoryPanel } from "@/components/canvas/my-prompt-history-panel";
 import { PortalSubmitDialog } from "@/components/home/portal-submit-dialog";
+import { WorkflowShareLinkDialog } from "@/components/canvas/workflow-share-link-dialog";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import { SaveProjectAssetDialogHost } from "@/components/canvas/save-project-asset-dialog";
 import { PortraitImportProgressHost } from "@/components/canvas/portrait-import-progress-dialog";
@@ -310,6 +311,7 @@ function Inner({ projectId }: { projectId: string }) {
   const [myGenerationRecordsOpen, setMyGenerationRecordsOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const [sharePreparing, setSharePreparing] = useState(false);
   const isCanvasPortalAdmin = useCanvasAdmin();
 
@@ -1576,6 +1578,7 @@ function Inner({ projectId }: { projectId: string }) {
             }
             onSaveTemplate={() => void onSaveTemplate()}
             onShareTemplate={() => void onOpenShareDialog()}
+            onShareWorkflow={() => setWorkflowShareOpen(true)}
             shareIsAdmin={isCanvasPortalAdmin}
             sharePreparing={sharePreparing}
             inflightTaskCount={inflightTaskCount}
@@ -1650,6 +1653,12 @@ function Inner({ projectId }: { projectId: string }) {
         context="canvas"
         onClose={() => setShareDialogOpen(false)}
         onSubmit={onSubmitPortalShare}
+      />
+      <WorkflowShareLinkDialog
+        open={workflowShareOpen}
+        projectId={projectId}
+        projectTitle={project.name}
+        onClose={() => setWorkflowShareOpen(false)}
       />
       <div className="relative z-0 flex min-h-0 min-w-0 w-full max-w-full flex-1 overflow-hidden isolate">
         {isStoryProCanvas && project ? (

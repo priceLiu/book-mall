@@ -20,16 +20,21 @@ export function MembershipCheckoutClient({
   planLabel,
   seats,
   isTeam,
+  successRedirect,
 }: {
   planId: string;
   planLabel: string;
   priceYuan: number;
   seats?: number;
   isTeam?: boolean;
+  successRedirect?: string;
 }) {
   const { data: session } = useSession();
   const adminInstant = canUseAdminInstantCheckout(session?.user?.role);
   const [teamName, setTeamName] = useState("");
+  const redirectTarget =
+    successRedirect ??
+    (isTeam ? "/account/team?success=1" : "/account/billing?success=membership");
 
   const createPayload = isTeam
     ? {
@@ -64,9 +69,7 @@ export function MembershipCheckoutClient({
         <WechatPersonalCheckout
           createPayload={createPayload}
           adminInstant={adminInstant}
-          successRedirect={
-            isTeam ? "/account/team?success=1" : "/account/billing?success=membership"
-          }
+          successRedirect={redirectTarget}
         />
         <Button variant="outline" className="w-full" asChild>
           <Link href="/pricing">返回定价页</Link>

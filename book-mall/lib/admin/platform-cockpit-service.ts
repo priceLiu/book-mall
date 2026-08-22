@@ -8,7 +8,18 @@ import {
   getCreditOpsAlerts,
   getCreditOpsDashboard,
   cstBusinessDate,
+  cstDayStartUtc,
 } from "@/lib/billing/credit-ops-service";
+import {
+  buildCockpitCommerceMonthKpis,
+  type CockpitCommerceMonthKpis,
+} from "@/lib/admin/platform-cockpit-commerce-kpis";
+import {
+  buildCockpitModelUsageSnapshot,
+  type CockpitModelUsageSnapshot,
+  type CockpitModelUsageTrendDatum,
+} from "@/lib/admin/platform-cockpit-model-usage";
+import { currentPeriodKey, periodBounds } from "@/lib/finance/team-finance-guard";
 import type { CreditOpsAlert } from "@/lib/billing/credit-ops-alerts";
 import {
   getAssistantFeedbackSummary,
@@ -22,12 +33,10 @@ import {
   type CockpitFinanceKpis,
 } from "@/lib/admin/platform-cockpit-finance-kpis";
 
-function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-function startOfUtcMonth(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+function cstDayBounds(now: Date): { start: Date; end: Date } {
+  const businessDate = cstBusinessDate(now);
+  const start = cstDayStartUtc(businessDate);
+  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
 }
 
 const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -49,6 +58,9 @@ function lastNCstDateKeys(n: number, now: Date): string[] {
 export type CockpitChartDatum = { label: string; value: number };
 export type CockpitTrendDatum = { date: string; value: number };
 
+export type { CockpitModelUsageTrendDatum };
+export type { CockpitCommerceMonthKpis };
+
 export type PlatformCockpitFinanceSection = {
   finance: CockpitFinanceKpis;
 };
@@ -61,7 +73,10 @@ export type PlatformCockpitSnapshot = {
     platformCredit: number;
     byok: number;
     newToday: number;
+    newTodayPlatformCredit: number;
   };
+  commerce: CockpitCommerceMonthKpis;
+  modelUsage: CockpitModelUsageSnapshot;
   courseSubscriptions: { active: number };
   credits: {
     accountCount: number;
@@ -96,6 +111,7 @@ export type PlatformCockpitSnapshot = {
     userIdentity: CockpitChartDatum[];
     creditsBilling: CockpitChartDatum[];
     creditConsumptionTrend: CockpitTrendDatum[];
+    modelUsageTrend: CockpitModelUsageTrendDatum[];
   };
   assistantFeedback: {
     summary: Awaited<ReturnType<typeof getAssistantFeedbackSummary>>;
@@ -123,6 +139,8 @@ export type PlatformCockpitMetricsSection = Pick<
   | "generatedAt"
   | "businessDateCst"
   | "users"
+  | "commerce"
+  | "modelUsage"
   | "courseSubscriptions"
   | "credits"
   | "teams"
@@ -135,16 +153,21 @@ export type PlatformCockpitMetricsSection = Pick<
 >;
 
 async function fetchCockpitCountMetrics(now: Date) {
-  const dayStart = startOfUtcDay(now);
-  const monthStart = startOfUtcMonth(now);
+  const { start: dayStart, end: dayEnd } = cstDayBounds(now);
+  const periodKey = currentPeriodKey(now);
+  const { from: monthStart, to: monthEnd } = periodBounds(periodKey);
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const todayCreatedAt = { gte: dayStart, lt: dayEnd };
 
   // 并行 count/aggregate，避免 $transaction 长时间占连接（PgBouncer 下更易 P2028）。
   return Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { billingPersona: "PLATFORM_CREDIT" } }),
     prisma.user.count({ where: { billingPersona: "BYOK" } }),
-    prisma.user.count({ where: { createdAt: { gte: dayStart } } }),
+    prisma.user.count({ where: { createdAt: todayCreatedAt } }),
+    prisma.user.count({
+      where: { createdAt: todayCreatedAt, billingPersona: "PLATFORM_CREDIT" },
+    }),
     prisma.subscription.count({
       where: { status: "ACTIVE", currentPeriodEnd: { gt: now } },
     }),
@@ -158,22 +181,22 @@ async function fetchCockpitCountMetrics(now: Date) {
       _sum: { credits: true },
     }),
     prisma.creditLedger.aggregate({
-      where: { type: { in: ["CONSUME", "SETTLE"] }, createdAt: { gte: dayStart } },
+      where: { type: { in: ["CONSUME", "SETTLE"] }, createdAt: todayCreatedAt },
       _sum: { credits: true },
     }),
     prisma.tenant.count({ where: { status: "ACTIVE" } }),
     prisma.tenantMember.count({ where: { status: "ACTIVE" } }),
     prisma.gatewayRequestLog.count({
-      where: { status: "SUCCEEDED", submittedAt: { gte: dayStart } },
+      where: { status: "SUCCEEDED", submittedAt: todayCreatedAt },
     }),
     prisma.gatewayRequestLog.count({
-      where: { status: "FAILED", submittedAt: { gte: dayStart } },
+      where: { status: "FAILED", submittedAt: todayCreatedAt },
     }),
     prisma.gatewayRequestLog.count({
       where: { status: { in: ["PENDING", "RUNNING"] } },
     }),
     prisma.gatewayRequestLog.count({
-      where: { status: "SUCCEEDED", submittedAt: { gte: monthStart } },
+      where: { status: "SUCCEEDED", submittedAt: { gte: monthStart, lt: monthEnd } },
     }),
     prisma.canvasGenerationTask.count({
       where: {
@@ -182,7 +205,7 @@ async function fetchCockpitCountMetrics(now: Date) {
       },
     }),
     prisma.canvasGenerationTask.count({
-      where: { status: "FAILED", updatedAt: { gte: dayStart }, deletedAt: null },
+      where: { status: "FAILED", updatedAt: todayCreatedAt, deletedAt: null },
     }),
     prisma.wallet.aggregate({ _sum: { balancePoints: true } }),
     prisma.walletEntry.aggregate({
@@ -200,12 +223,15 @@ function buildMetricsSectionFromCounts(
   counts: Awaited<ReturnType<typeof fetchCockpitCountMetrics>>,
   creditTrendLedgers: Array<{ createdAt: Date; credits: number }>,
   trafficToday: { pageViews: number; uniqueIps: number },
+  commerce: CockpitCommerceMonthKpis,
+  modelUsage: CockpitModelUsageSnapshot,
 ): PlatformCockpitMetricsSection {
   const [
     userCount,
     platformCreditUsers,
     byokUsers,
     newUsersToday,
+    newUsersTodayPlatformCredit,
     activeSubscriptions,
     creditAgg,
     subscriptionAccountCount,
@@ -242,7 +268,10 @@ function buildMetricsSectionFromCounts(
       platformCredit: platformCreditUsers,
       byok: byokUsers,
       newToday: newUsersToday,
+      newTodayPlatformCredit: newUsersTodayPlatformCredit,
     },
+    commerce,
+    modelUsage,
     courseSubscriptions: { active: activeSubscriptions },
     credits: {
       accountCount: creditAgg._count.id,
@@ -289,6 +318,7 @@ function buildMetricsSectionFromCounts(
         date,
         value: trendBuckets.get(date) ?? 0,
       })),
+      modelUsageTrend: modelUsage.trend,
     },
     traffic: {
       todayPageViews: trafficToday.pageViews,
@@ -335,7 +365,7 @@ export async function fetchPlatformCockpitMetricsSection(
   now: Date = new Date(),
 ): Promise<PlatformCockpitMetricsSection> {
   const trendSince = new Date(now.getTime() - CREDIT_TREND_DAYS * 24 * 60 * 60 * 1000);
-  const [counts, creditTrendLedgers, trafficToday] = await Promise.all([
+  const [counts, creditTrendLedgers, trafficToday, commerce, modelUsage] = await Promise.all([
     fetchCockpitCountMetrics(now),
     prisma.creditLedger.findMany({
       where: {
@@ -345,8 +375,17 @@ export async function fetchPlatformCockpitMetricsSection(
       select: { createdAt: true, credits: true },
     }),
     getTodayTrafficTotals(now),
+    buildCockpitCommerceMonthKpis({ now }),
+    buildCockpitModelUsageSnapshot({ now }),
   ]);
-  return buildMetricsSectionFromCounts(now, counts, creditTrendLedgers, trafficToday);
+  return buildMetricsSectionFromCounts(
+    now,
+    counts,
+    creditTrendLedgers,
+    trafficToday,
+    commerce,
+    modelUsage,
+  );
 }
 
 export async function getPlatformCockpitSnapshot(

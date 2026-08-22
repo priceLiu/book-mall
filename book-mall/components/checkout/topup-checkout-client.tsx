@@ -23,6 +23,7 @@ export function TopupCheckoutClient({
   tenantId,
   verifyToken,
   forceRealPayment = false,
+  successRedirect = "/account/billing?success=topup",
 }: {
   packId: string;
   packLabel: string;
@@ -32,6 +33,7 @@ export function TopupCheckoutClient({
   tenantId?: string;
   verifyToken?: string;
   forceRealPayment?: boolean;
+  successRedirect?: string;
 }) {
   const { data: session } = useSession();
   const adminInstant =
@@ -61,7 +63,7 @@ export function TopupCheckoutClient({
             ...(verifyToken ? { verifyToken } : {}),
           }}
           adminInstant={adminInstant}
-          successRedirect="/account/billing?success=topup"
+          successRedirect={successRedirect}
         />
         <Button variant="outline" className="w-full" asChild>
           <Link href="/account/billing">返回购买页</Link>

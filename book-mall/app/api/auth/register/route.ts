@@ -15,6 +15,7 @@ import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
 import { grantWelcomeGift } from "@/lib/billing/welcome-gift";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
+import { lockReferralAttribution } from "@/lib/share/share-reward-service";
 import { tryApiDbUnavailableResponse } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
@@ -152,6 +153,18 @@ export async function POST(request: Request) {
       await grantWelcomeGift(createdUserId);
     } catch (giftErr) {
       console.warn("[register] grantWelcomeGift failed", giftErr);
+    }
+
+    if (referredByUserId) {
+      try {
+        await lockReferralAttribution({
+          inviteeUserId: createdUserId,
+          referrerUserId: referredByUserId,
+          referralCode,
+        });
+      } catch (refErr) {
+        console.warn("[register] lockReferralAttribution failed", refErr);
+      }
     }
 
     // 免密注册场景：返回一次性自动登录票据，客户端据此建立会话（无需二次短信）。

@@ -7,6 +7,14 @@ export type CockpitChartDatum = { label: string; value: number };
 
 export type CockpitTrendDatum = { date: string; value: number };
 
+export type CockpitMultiSeriesTrendDatum = {
+  date: string;
+  image: number;
+  video: number;
+  other: number;
+  total: number;
+};
+
 function isDarkTheme() {
   return (
     typeof document !== "undefined" &&
@@ -293,6 +301,75 @@ export function AdminCockpitLineChart({ data }: { data: CockpitTrendDatum[] }) {
 
   if (data.length === 0) return <ChartEmpty />;
   return <div ref={hostRef} className="h-[280px] w-full min-w-0" />;
+}
+
+const MODEL_USAGE_SERIES = [
+  { key: "image" as const, label: "图片", colorLight: "#8b5cf6", colorDark: "#a78bfa" },
+  { key: "video" as const, label: "视频", colorLight: "#0284c7", colorDark: "#38bdf8" },
+  { key: "other" as const, label: "其他", colorLight: "#64748b", colorDark: "#94a3b8" },
+  { key: "total" as const, label: "合计", colorLight: "#389e0d", colorDark: "#73d13d" },
+];
+
+/** 模型用量 · 多折线趋势图（图片 / 视频 / 其他 / 合计） */
+export function AdminCockpitMultiLineChart({ data }: { data: CockpitMultiSeriesTrendDatum[] }) {
+  const hostRef = useEchartsHost(data.length, (chart, isDark) => {
+    const colors = axisColors(isDark);
+    const dates = data.map((d) => d.date.slice(5));
+
+    chart.setOption(
+      {
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: colors.tooltipBg,
+          borderColor: colors.tooltipBorder,
+          textStyle: { color: isDark ? "#fafafa" : "#1f2328" },
+        },
+        legend: {
+          top: 0,
+          textStyle: { color: colors.axis, fontSize: 11 },
+        },
+        grid: { left: "2%", right: "3%", bottom: "2%", top: "18%", containLabel: true },
+        xAxis: {
+          type: "category",
+          boundaryGap: false,
+          data: dates,
+          axisLine: { lineStyle: { color: colors.axis } },
+          axisLabel: { color: colors.axis, fontSize: 11 },
+        },
+        yAxis: {
+          type: "value",
+          minInterval: 1,
+          axisLine: { show: false },
+          axisLabel: {
+            color: colors.axis,
+            formatter: (v: number) =>
+              v >= 10000 ? `${Math.round(v / 1000) / 10}万` : String(v),
+          },
+          splitLine: { lineStyle: { type: "dashed", color: colors.split } },
+        },
+        series: MODEL_USAGE_SERIES.map((s) => ({
+          name: s.label,
+          type: "line",
+          smooth: 0.35,
+          symbol: "circle",
+          symbolSize: s.key === "total" ? 6 : 5,
+          data: data.map((d) => d[s.key]),
+          lineStyle: {
+            width: s.key === "total" ? 2.5 : 2,
+            type: s.key === "total" ? "dashed" : "solid",
+            color: isDark ? s.colorDark : s.colorLight,
+          },
+          itemStyle: {
+            color: isDark ? s.colorDark : s.colorLight,
+          },
+        })),
+      },
+      true,
+    );
+  });
+
+  if (data.length === 0) return <ChartEmpty />;
+  return <div ref={hostRef} className="h-[300px] w-full min-w-0" />;
 }
 
 function ChartEmpty() {

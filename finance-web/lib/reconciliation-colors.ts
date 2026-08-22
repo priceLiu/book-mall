@@ -58,7 +58,7 @@ export function groupReconciliationLinesByVendor<T extends ReconciliationGroupLi
     map.set(key, bucket);
   }
 
-  return [...map.entries()]
+  return Array.from(map.entries())
     .map(([vendorDisplayName, groupLines]) => {
       const sorted = [...groupLines].sort(
         (a, b) => Math.abs(b.amountDiffYuan) - Math.abs(a.amountDiffYuan),

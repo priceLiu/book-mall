@@ -7,12 +7,15 @@ export function buildLoginRedirectForCheckout(pathWithSearch: string): string {
 export function buildMembershipCheckoutPath(input: {
   planId?: string | null;
   seats?: string | number | null;
+  returnTo?: string | null;
 }): string {
   const q = new URLSearchParams();
   const planId = input.planId?.toString().trim();
   if (planId) q.set("planId", planId);
   const seats = input.seats?.toString().trim();
   if (seats) q.set("seats", seats);
+  const returnTo = input.returnTo?.trim();
+  if (returnTo) q.set("returnTo", returnTo);
   const search = q.toString();
   return `/checkout/membership${search ? `?${search}` : ""}`;
 }

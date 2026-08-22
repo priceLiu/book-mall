@@ -42,6 +42,7 @@ import {
   resolveMembershipPeriodCredits,
 } from "@/lib/pricing/pricing-highlight-estimate";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
+import { ShareRewardsPromo } from "@/components/pricing/share-rewards-promo";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
 import { PricingModeTabs } from "@/components/pricing/pricing-mode-tabs";
 import { PricingPlanCreditsBlock } from "@/components/pricing/pricing-plan-credits-block";
@@ -252,6 +253,8 @@ export function PricingPageClient({
             </span>
           </div>
         ) : null}
+
+        <ShareRewardsPromo isLoggedIn={isLoggedIn} />
 
         {checkoutErrorMessage ? (
           <div

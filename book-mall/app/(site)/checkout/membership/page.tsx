@@ -9,6 +9,7 @@ import {
   buildLoginRedirectForCheckout,
   buildMembershipCheckoutPath,
 } from "@/lib/payments/checkout-login-redirect";
+import { checkoutSuccessRedirect } from "@/lib/payments/checkout-return-to";
 import { MembershipCheckoutClient } from "@/components/checkout/membership-checkout-client";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function CheckoutMembershipPage({
   searchParams,
 }: {
-  searchParams?: { planId?: string; seats?: string };
+  searchParams?: { planId?: string; seats?: string; returnTo?: string };
 }) {
   const session = await getServerSession(authOptions);
   const checkoutPath = buildMembershipCheckoutPath(searchParams ?? {});
@@ -56,6 +57,11 @@ export default async function CheckoutMembershipPage({
 
   const interval = plan.interval === "YEAR" ? "年付" : "月付";
   const planLabel = `${isTeam ? "团队" : "个人"} · ${plan.tier}（${interval}）`;
+  const returnTo = searchParams?.returnTo;
+  const successRedirect = checkoutSuccessRedirect(
+    returnTo,
+    isTeam ? "/account/team?success=1" : "/account/billing?success=membership",
+  );
 
   return (
     <main className="mx-auto max-w-lg px-4 py-12">
@@ -65,6 +71,7 @@ export default async function CheckoutMembershipPage({
         priceYuan={priceYuan}
         seats={isTeam ? seats : undefined}
         isTeam={isTeam}
+        successRedirect={successRedirect}
       />
     </main>
   );

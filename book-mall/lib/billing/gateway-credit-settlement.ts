@@ -43,6 +43,7 @@ import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } 
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
+import { markShareRewardFirstBillable } from "@/lib/share/share-reward-service";
 
 export function creditBillingEnabled(): boolean {
   return isUnifiedCreditBillingActive();
@@ -321,90 +322,98 @@ export async function settleSucceededGatewayLog(input: {
   const costSnap = input.snapshot;
   const isVideo = isVideoLog(input.log, costSnap?.unit ?? null);
 
-  // 视频：以 RESERVE 流水为唯一真值结算，避免「冻结额 ≠ 结算额」造成幻影冻结/重复扣。
+  let charged = 0;
+
   if (isVideo) {
-    return settleVideoFromReserve(target, input.log, costSnap, input.metrics);
-  }
-
-  // 文本/图像：需有报价快照才扣费。
-  if (!costSnap) return 0;
-
-  const accountSnap = await getAccountCreditBalances(target.ref);
-  const unitMetrics = {
-    ...input.metrics,
-    isVideo: isVideoLog(input.log, costSnap.unit ?? null),
-    isAsr: isAsrCanonical(costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
-    isWan30: isWan30Model(input.log.model, costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
-  };
-  const units = billableUnitCount(costSnap.unit, unitMetrics);
-  const credits = computeChargeCredits({
-    snapshot: costSnap,
-    units,
-    pricePerCreditYuan: accountSnap.pricePerCreditYuan,
-    promptTokens: input.metrics.promptTokens,
-    completionTokens: input.metrics.completionTokens,
-    totalTokens: input.metrics.totalTokens,
-    unit: costSnap.unit,
-  });
-  if (credits === 0) {
-    await recordBillingSettlement({
-      log: input.log,
-      ref: target.ref,
-      settlementKind: "NONE",
-      creditsCharged: 0,
-      billingCategory: classifyBillingCategory(input.log),
-    }).catch(() => undefined);
+    charged = await settleVideoFromReserve(target, input.log, costSnap, input.metrics);
+  } else if (!costSnap) {
     return 0;
-  }
-
-  try {
-    if (target.kind === "TEAM") {
-      const teamRes = await consumeTeamCredits({
-        tenantId: target.ref.ownerId,
-        actorUserId: target.actorUserId ?? target.ref.ownerId,
-        credits,
-        seatId: target.seatId,
-        gatewayLogId: input.log.id,
-        canonicalModelKey: costSnap.canonicalModelKey,
-        costSnapshotYuan: costSnap.netCostYuan,
-        marginSnapshot: costSnap.marginRate,
-        periodStart: monthStartUtc(),
-        allowNegative: true,
-      });
+  } else {
+    const accountSnap = await getAccountCreditBalances(target.ref);
+    const unitMetrics = {
+      ...input.metrics,
+      isVideo: isVideoLog(input.log, costSnap.unit ?? null),
+      isAsr: isAsrCanonical(costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
+      isWan30: isWan30Model(input.log.model, costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
+    };
+    const units = billableUnitCount(costSnap.unit, unitMetrics);
+    const credits = computeChargeCredits({
+      snapshot: costSnap,
+      units,
+      pricePerCreditYuan: accountSnap.pricePerCreditYuan,
+      promptTokens: input.metrics.promptTokens,
+      completionTokens: input.metrics.completionTokens,
+      totalTokens: input.metrics.totalTokens,
+      unit: costSnap.unit,
+    });
+    if (credits === 0) {
       await recordBillingSettlement({
         log: input.log,
         ref: target.ref,
-        settlementKind: "PLATFORM_CREDIT",
-        creditsCharged: credits,
-        creditLedgerId: teamRes.ledger.id,
+        settlementKind: "NONE",
+        creditsCharged: 0,
         billingCategory: classifyBillingCategory(input.log),
       }).catch(() => undefined);
-    } else {
-      const consumeRes = await consumeCredits({
-        ref: target.ref,
-        credits,
-        actorUserId: target.actorUserId,
-        gatewayLogId: input.log.id,
-        canonicalModelKey: costSnap.canonicalModelKey,
-        costSnapshotYuan: costSnap.netCostYuan,
-        marginSnapshot: costSnap.marginRate,
-        description: platformConsumeDescription(input.log, units),
-        allowNegative: true,
-      });
-      await recordBillingSettlement({
-        log: input.log,
-        ref: target.ref,
-        settlementKind: "PLATFORM_CREDIT",
-        creditsCharged: credits,
-        creditLedgerId: consumeRes.ledger.id,
-        billingCategory: classifyBillingCategory(input.log),
-      }).catch(() => undefined);
+      return 0;
     }
-    return credits;
-  } catch (e) {
-    console.error("[credit-settlement] settle/consume 失败", input.log.id, e);
-    return 0;
+
+    try {
+      if (target.kind === "TEAM") {
+        const teamRes = await consumeTeamCredits({
+          tenantId: target.ref.ownerId,
+          actorUserId: target.actorUserId ?? target.ref.ownerId,
+          credits,
+          seatId: target.seatId,
+          gatewayLogId: input.log.id,
+          canonicalModelKey: costSnap.canonicalModelKey,
+          costSnapshotYuan: costSnap.netCostYuan,
+          marginSnapshot: costSnap.marginRate,
+          periodStart: monthStartUtc(),
+          allowNegative: true,
+        });
+        await recordBillingSettlement({
+          log: input.log,
+          ref: target.ref,
+          settlementKind: "PLATFORM_CREDIT",
+          creditsCharged: credits,
+          creditLedgerId: teamRes.ledger.id,
+          billingCategory: classifyBillingCategory(input.log),
+        }).catch(() => undefined);
+      } else {
+        const consumeRes = await consumeCredits({
+          ref: target.ref,
+          credits,
+          actorUserId: target.actorUserId,
+          gatewayLogId: input.log.id,
+          canonicalModelKey: costSnap.canonicalModelKey,
+          costSnapshotYuan: costSnap.netCostYuan,
+          marginSnapshot: costSnap.marginRate,
+          description: platformConsumeDescription(input.log, units),
+          allowNegative: true,
+        });
+        await recordBillingSettlement({
+          log: input.log,
+          ref: target.ref,
+          settlementKind: "PLATFORM_CREDIT",
+          creditsCharged: credits,
+          creditLedgerId: consumeRes.ledger.id,
+          billingCategory: classifyBillingCategory(input.log),
+        }).catch(() => undefined);
+      }
+      charged = credits;
+    } catch (e) {
+      console.error("[credit-settlement] settle/consume 失败", input.log.id, e);
+      return 0;
+    }
   }
+
+  if (charged > 0 && target.actorUserId) {
+    markShareRewardFirstBillable(target.actorUserId).catch((e) => {
+      console.warn("[credit-settlement] share reward first billable hook failed", e);
+    });
+  }
+
+  return charged;
 }
 
 /**

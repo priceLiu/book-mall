@@ -12,6 +12,7 @@ import {
   History,
   LayoutGrid,
   LayoutTemplate,
+  Link2,
   Loader2,
   Maximize2,
   Minimize2,
@@ -71,6 +72,7 @@ export function CanvasToolbar({
   onSave,
   onSaveTemplate,
   onShareTemplate,
+  onShareWorkflow,
   shareIsAdmin = false,
   sharePreparing = false,
   onOpenMyTemplates,
@@ -99,6 +101,8 @@ export function CanvasToolbar({
   onSave: () => void;
   onSaveTemplate?: () => void;
   onShareTemplate?: () => void;
+  /** 分享工作流链接（复制画布 + 积分奖励） */
+  onShareWorkflow?: () => void;
   /** 管理员可在画布内直接发布精选 / 案例 / 模板 */
   shareIsAdmin?: boolean;
   sharePreparing?: boolean;
@@ -472,6 +476,15 @@ export function CanvasToolbar({
             onClick={onSaveTemplate}
           >
             <BookmarkPlus className="size-3.5" />
+          </CanvasToolbarIconButton>
+        ) : null}
+        {onShareWorkflow ? (
+          <CanvasToolbarIconButton
+            label="分享链接"
+            hint="生成工作流分享链接，好友复制画布后你可获积分奖励"
+            onClick={onShareWorkflow}
+          >
+            <Link2 className="size-3.5" />
           </CanvasToolbarIconButton>
         ) : null}
         {onShareTemplate ? (

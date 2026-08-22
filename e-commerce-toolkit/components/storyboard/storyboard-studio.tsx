@@ -15,6 +15,7 @@ import {
   StoryboardSettingsDialog,
   type StoryboardSettingsValue,
 } from "@/components/storyboard/storyboard-settings-dialog";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import {
   attachStoryboardRefsFromAssets,
@@ -87,6 +88,7 @@ export function StoryboardStudio() {
   const [generateFullVideoToken, setGenerateFullVideoToken] = useState(0);
   const [mergePanelVideosToken, setMergePanelVideosToken] = useState(0);
   const [assistantWide, setAssistantWide] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
 
   const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
@@ -195,10 +197,15 @@ export function StoryboardStudio() {
 
     (async () => {
       try {
-        const savedId =
+        const urlProjectId =
           typeof window !== "undefined"
-            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
+            ? new URLSearchParams(window.location.search).get("projectId")?.trim()
             : null;
+        const savedId =
+          urlProjectId ||
+          (typeof window !== "undefined"
+            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
+            : null);
 
         let resolved: { id: string; project?: StoryboardProject };
         if (savedId) {
@@ -456,6 +463,7 @@ export function StoryboardStudio() {
           onNewProject={() => void handleNewProject()}
           loadProjectList={loadProjectList}
           onOpenProject={(id) => void handleOpenProject(id)}
+          onShareWorkflow={() => setWorkflowShareOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           refBusy={refBusy}
           uploadRole={uploadRole}
@@ -582,6 +590,13 @@ export function StoryboardStudio() {
         }}
         chatModels={chatModels}
         onConfirm={() => setSettingsOpen(false)}
+      />
+
+      <WorkflowShareLinkDialog
+        projectId={project.id}
+        projectTitle={project.title?.trim() || "微剧故事版"}
+        open={workflowShareOpen}
+        onClose={() => setWorkflowShareOpen(false)}
       />
 
       <EcomVideoPreviewDialog

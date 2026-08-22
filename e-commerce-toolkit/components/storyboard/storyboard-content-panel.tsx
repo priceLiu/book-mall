@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Images, Settings2, Download } from "lucide-react";
+import { Loader2, Images, Settings2, Download, Link2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -70,6 +70,7 @@ type Props = {
   onNewProject?: () => void | Promise<void>;
   loadProjectList?: () => Promise<EcomProjectListItem[]>;
   onOpenProject?: (id: string) => void | Promise<void>;
+  onShareWorkflow?: () => void;
   onOpenSettings?: () => void;
   refBusy?: boolean;
   uploadRole?: StoryboardUploadRole;
@@ -148,6 +149,7 @@ export function StoryboardContentPanel({
   onNewProject,
   loadProjectList,
   onOpenProject,
+  onShareWorkflow,
   onOpenSettings,
   refBusy = false,
   uploadRole = "product",
@@ -884,6 +886,12 @@ export function StoryboardContentPanel({
                 <Images className="h-3.5 w-3.5 shrink-0" />
                 我的资产
               </EcomButtonSecondary>
+              {onShareWorkflow ? (
+                <EcomButtonSecondary size="sm" type="button" dark onClick={onShareWorkflow}>
+                  <Link2 className="h-3.5 w-3.5 shrink-0" />
+                  分享工作流
+                </EcomButtonSecondary>
+              ) : null}
               {onOpenSettings ? (
                 <EcomButtonSecondary
                   size="sm"

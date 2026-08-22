@@ -178,7 +178,7 @@ export function AdminPlatformCockpitMetrics({ data }: { data: PlatformCockpitMet
           <KpiCard
             label="今日全站 UV"
             value={fmt(data.traffic.todayUniqueIps)}
-            hint="按 IP 日去重"
+            hint="各应用内 IP 日去重后相加；同一 IP 访问多应用会计多次"
             href="/admin/traffic"
             hrefLabel="按应用查看 →"
           />
