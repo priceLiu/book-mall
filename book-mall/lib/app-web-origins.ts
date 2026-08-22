@@ -3,6 +3,15 @@ function trimOrigin(raw: string | undefined, fallback: string): string {
   return v || fallback;
 }
 
+export function getToolWebOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_TOOL_WEB_ORIGIN ?? process.env.TOOLS_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://tool.ai-code8.com"
+      : "http://localhost:3001",
+  );
+}
+
 export function getStoryWebOrigin(): string {
   return trimOrigin(
     process.env.NEXT_PUBLIC_STORY_WEB_ORIGIN,

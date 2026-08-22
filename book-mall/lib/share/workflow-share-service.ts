@@ -8,9 +8,9 @@ import { Prisma } from "@prisma/client";
 
 import {
   cloneCanvasGraphForDuplicate,
-  duplicateProjectName,
-  pickProjectThumbnailUrl,
 } from "@/lib/canvas/clone-canvas-graph";
+import { duplicateProjectName } from "@/lib/canvas/canvas-project-service";
+import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
 import {
   createCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";

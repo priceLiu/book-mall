@@ -6,6 +6,7 @@ import {
   publishModelCreditPrice,
   loadPricingConfig,
   computeCreditPrice,
+  refreshCreditPriceIfStale,
   resolveModelMarginM,
 } from "@/lib/pricing/credit-pricing-engine";
 import { prisma } from "@/lib/prisma";

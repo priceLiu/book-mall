@@ -119,7 +119,7 @@ function resolveThumbnailUrl(p: {
   return pickDisplay(p.canvas);
 }
 
-function duplicateProjectName(sourceName: string): string {
+export function duplicateProjectName(sourceName: string): string {
   const suffix = " 副本";
   const base = sourceName.trim() || defaultCanvasProjectName();
   const next = `${base}${suffix}`;

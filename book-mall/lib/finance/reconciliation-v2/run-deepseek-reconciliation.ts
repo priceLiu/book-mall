@@ -18,6 +18,7 @@ import {
 import { aggregatePlatformUsageForReconciliation } from "./platform-usage-aggregator";
 import { countByStatus, reconcileVendorAndPlatform } from "./reconcile-engine";
 import { buildJoinKey } from "./billable-units";
+import { mapStoredReconciliationLine } from "./stored-run-lines";
 import type { ReconciliationV2Result, ReconciliationV2Summary } from "./types";
 import type { ReconciliationPeriod } from "./period-range";
 
@@ -38,12 +39,6 @@ function dateOnly(iso: string): Date {
 
 function round4(n: number): number {
   return Math.round(n * 1e4) / 1e4;
-}
-
-function num(v: unknown, fallback = 0): number {
-  if (v == null) return fallback;
-  const n = typeof v === "number" ? v : Number(v.toString());
-  return Number.isFinite(n) ? n : fallback;
 }
 
 export async function runDeepseekReconciliationV2(
@@ -225,39 +220,9 @@ async function loadDeepseekRunResult(runId: string): Promise<ReconciliationV2Res
   });
   const summary = run.summary as unknown as ReconciliationV2Summary;
   const importVendor = run.vendor ?? "deepseek";
-  const linesRaw = run.lines.map((l) => ({
-    vendor: (l.vendor ?? "deepseek") as string,
-    importVendor,
-    joinKey:
-      l.joinKey ??
-      buildJoinKey({
-        vendor: l.vendor ?? "deepseek",
-        modelKey: l.modelKey,
-        tierRaw: l.tierRaw,
-        unitKind: (l.unitKind ?? l.billingKind) as import("./types").UnitKind,
-        tokenDirection: (l.tokenDirection ?? "none") as import("./types").TokenDirection,
-        month: l.periodMonth ?? run.monthsCovered.split(",")[0] ?? "",
-      }),
-    month: l.periodMonth ?? run.monthsCovered.split(",")[0] ?? "",
-    userId: l.userId,
-    cloudAccountId: l.cloudAccountId,
-    modelKey: l.modelKey,
-    tierRaw: l.tierRaw,
-    unitKind: (l.unitKind ?? l.billingKind) as import("./types").UnitKind,
-    tokenDirection: (l.tokenDirection ?? "none") as import("./types").TokenDirection,
-    vendorUnits: num(l.vendorUnits ?? l.cloudCount),
-    platformUnits: num(l.platformUnits ?? l.internalCount),
-    usageDiff: num(l.usageDiff),
-    listUnitYuan: num(l.listUnitYuan),
-    vendorListYuan: num(l.vendorListYuan ?? l.cloudPayableYuan),
-    platformListYuan: num(l.platformListYuan ?? l.internalYuan),
-    amountDiffYuan: num(l.amountDiffYuan ?? l.diffYuan),
-    platformCredits: num(l.platformCredits),
-    platformRevenueYuan: num(l.platformRevenueYuan),
-    reconStatus: (l.reconStatus ?? "OK") as import("./types").ReconStatus,
-    issueReason: l.issueReason,
-    sampleLogIds: Array.isArray(l.sampleLogIds) ? (l.sampleLogIds as string[]) : [],
-  }));
+  const linesRaw = run.lines.map((l) =>
+    mapStoredReconciliationLine(l, run, summary, importVendor),
+  );
 
   await upsertReconciliationMasterLines({
     runId: run.id,

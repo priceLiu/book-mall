@@ -1,7 +1,7 @@
 /**
  * 对账专用计费用量（与 Gateway 扣费用量可对齐厂商 CSV）。
  */
-import type { GatewayRequestKind, GatewayRequestStatus } from "@prisma/client";
+import type { BillingCategory, GatewayRequestKind, GatewayRequestStatus } from "@prisma/client";
 
 import { resolveBillingCategory } from "@/lib/billing/billing-category";
 import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
@@ -190,7 +190,14 @@ export type ReconciliationUsage = {
 
 export function resolveReconciliationUsage(log: ReconciliationLogRow): ReconciliationUsage {
   const model = (log.canonicalModelKey ?? log.model ?? "").toLowerCase();
-  const category = resolveBillingCategory(log, log.billingCategory as never);
+  const category = resolveBillingCategory(
+    {
+      requestKind: log.requestKind ?? "OTHER",
+      inputSummary: log.inputSummary,
+      model: log.model,
+    },
+    log.billingCategory as BillingCategory | null | undefined,
+  );
   const tierRaw = resolveReconciliationTier(log);
 
   if (model.includes("asr") || model.includes("qwen3-asr")) {

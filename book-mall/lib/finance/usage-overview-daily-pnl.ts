@@ -86,6 +86,7 @@ export async function buildUsageOverviewDailyPnl(input: {
       ? await prisma.gatewayRequestLog.findMany({
           where: { id: { in: logIds } },
           select: {
+            id: true,
             ...GATEWAY_USAGE_LOG_SELECT,
             costSnapshotYuan: true,
             estimatedVendorCostYuan: true,
