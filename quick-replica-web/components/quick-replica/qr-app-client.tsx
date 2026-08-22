@@ -46,7 +46,7 @@ import {
   runQrGenerateJob,
   watchQrGenerateJob,
 } from "@/lib/run-qr-generate-job";
-import { formatQrPlatformError } from "@/lib/qr-platform-fetch";
+import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
 import { PortalNav } from "@/components/portal-nav";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import {
