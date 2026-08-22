@@ -5,7 +5,11 @@ import {
   buildSiteHomeSnapshotFallback,
 } from "@/lib/static-snapshots/build-site-home-snapshot";
 import { hashDateKeySeed, seededShuffle } from "@/lib/static-snapshots/cst-date";
-import { summarizeSiteHomePayload } from "@/lib/static-snapshots/site-home-payload";
+import {
+  isSiteHomeSnapshotPayload,
+  normalizePlatformAppReEnterHref,
+  summarizeSiteHomePayload,
+} from "@/lib/static-snapshots/site-home-payload";
 
 describe("hashDateKeySeed", () => {
   it("is deterministic for same inputs", () => {
@@ -55,5 +59,36 @@ describe("buildSiteHomeSnapshotFallback", () => {
     const a = buildSiteHomeSnapshotFallback("2026-08-22");
     const b = buildSiteHomeSnapshotFallback("2026-08-22");
     expect(a.hero.background.url).toBe(b.hero.background.url);
+  });
+
+  it("platform app hrefs are relative re-enter paths", () => {
+    const payload = buildSiteHomeSnapshotFallback("2026-08-22");
+    for (const app of payload.platformApps) {
+      expect(app.href.startsWith("/api/sso/tools/re-enter")).toBe(true);
+      expect(app.href).not.toContain("localhost");
+    }
+  });
+});
+
+describe("normalizePlatformAppReEnterHref", () => {
+  it("strips localhost absolute re-enter URLs", () => {
+    expect(
+      normalizePlatformAppReEnterHref(
+        "http://localhost:3000/api/sso/tools/re-enter?app=canvas&redirect=%2Fprojects",
+      ),
+    ).toBe("/api/sso/tools/re-enter?app=canvas&redirect=%2Fprojects");
+  });
+
+  it("strips production book origin", () => {
+    expect(
+      normalizePlatformAppReEnterHref(
+        "https://book.ai-code8.com/api/sso/tools/re-enter?app=story&redirect=%2F",
+      ),
+    ).toBe("/api/sso/tools/re-enter?app=story&redirect=%2F");
+  });
+
+  it("leaves relative paths unchanged", () => {
+    const href = "/api/sso/tools/re-enter?app=tool&redirect=%2Ffitting-room";
+    expect(normalizePlatformAppReEnterHref(href)).toBe(href);
   });
 });

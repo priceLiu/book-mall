@@ -79,26 +79,22 @@ const APP_DEFAULT_REDIRECT: Partial<Record<SiteHomePlatformAppKey, string>> = {
   tool: "/fitting-room",
 };
 
-function bookReEnterHref(
-  bookOrigin: string,
-  app: SiteHomePlatformAppKey | PortalKey,
-  redirect: string,
-): string {
+/** 相对路径：快照与 SSR 不绑定生成环境 origin，避免本地快照写入 localhost。 */
+function bookReEnterHref(app: SiteHomePlatformAppKey | PortalKey, redirect: string): string {
   const params = new URLSearchParams({ redirect });
   if (app !== "tool") params.set("app", app);
-  return `${bookOrigin.replace(/\/$/, "")}/api/sso/tools/re-enter?${params.toString()}`;
+  return `/api/sso/tools/re-enter?${params.toString()}`;
 }
 
 function resolvePlatformAppHref(
   key: SiteHomePlatformAppKey,
-  bookOrigin: string,
   portalByKey: Map<PortalKey, BookPortalNavItem>,
 ): string | null {
   if (!portalByKey.has(key as PortalKey) && key !== "prompt-optimizer" && key !== "director") {
     return null;
   }
   const redirect = APP_DEFAULT_REDIRECT[key] ?? "/";
-  return bookReEnterHref(bookOrigin, key, redirect);
+  return bookReEnterHref(key, redirect);
 }
 
 function resolvePlatformAppMedia(key: SiteHomePlatformAppKey): PlatformAppMedia {
@@ -137,7 +133,7 @@ export function buildSiteHomePlatformApps(
 
   const apps: SiteHomePlatformApp[] = [];
   for (const def of PLATFORM_APP_DEFS) {
-    const href = resolvePlatformAppHref(def.key, origin, portalByKey);
+    const href = resolvePlatformAppHref(def.key, portalByKey);
     if (!href) continue;
     apps.push(withMedia(def, href));
   }

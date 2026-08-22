@@ -18,6 +18,7 @@ import {
 } from "@/lib/static-snapshots/cst-date";
 import {
   isSiteHomeSnapshotPayload,
+  normalizeSiteHomeSnapshotPayload,
   SITE_HOME_PAGE_KEY,
   summarizeSiteHomePayload,
   type SiteHomeSnapshotPayload,
@@ -42,7 +43,7 @@ async function readReadySnapshot(
   });
   if (!row || row.status !== "READY") return null;
   if (!isSiteHomeSnapshotPayload(row.payload)) return null;
-  return row.payload;
+  return normalizeSiteHomeSnapshotPayload(row.payload);
 }
 
 export async function getSiteHomeSnapshotForRender(
@@ -66,7 +67,7 @@ export async function getSiteHomeSnapshotForRender(
         };
       }
       return {
-        payload: buildSiteHomeSnapshotFallback(today),
+        payload: normalizeSiteHomeSnapshotPayload(buildSiteHomeSnapshotFallback(today)),
         dateKey: today,
         stale: true,
         source: "fallback" as const,
@@ -91,7 +92,7 @@ export async function getPublicSiteHomeSnapshot(
     return { payload: prev, dateKey: previousCstDateKey(key), stale: true, source: "snapshot" };
   }
   return {
-    payload: buildSiteHomeSnapshotFallback(key),
+    payload: normalizeSiteHomeSnapshotPayload(buildSiteHomeSnapshotFallback(key)),
     dateKey: key,
     stale: true,
     source: "fallback",
