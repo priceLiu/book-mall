@@ -19,7 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ADMIN_PENDING_FEATURE_ROADMAP_TITLES,
-  isAdminPendingFeatureRoadmapTitle,
+  resolveAdminPendingFeatureListKind,
+  type AdminPendingFeatureListKind,
 } from "@/lib/admin/pending-feature-roadmap";
 
 export type PendingFeatureItem = {
@@ -27,6 +28,7 @@ export type PendingFeatureItem = {
   title: string;
   description: string;
   docPath: string;
+  listKind?: AdminPendingFeatureListKind | null;
   completed: boolean;
   sortOrder: number;
   createdAt: string;
@@ -64,23 +66,67 @@ function AdminFlashToast({ notice }: { notice: FlashNotice | null }) {
   );
 }
 
+function ListKindSelector({
+  value,
+  onChange,
+}: {
+  value: AdminPendingFeatureListKind;
+  onChange: (v: AdminPendingFeatureListKind) => void;
+}) {
+  return (
+    <div>
+      <Label className="text-xs">分类</Label>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        {(
+          [
+            ["FEATURE", "待做功能"],
+            ["PENDING", "待处理"],
+          ] as const
+        ).map(([kind, label]) => (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onChange(kind)}
+            className={
+              value === kind
+                ? "rounded-full bg-[#0969da] px-3 py-1 text-xs font-medium text-white"
+                : "rounded-full border border-[#d0d7de] bg-white px-3 py-1 text-xs text-[#656d76] hover:border-[#0969da]/40"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FeatureEditFields({
   title,
   description,
   docPath,
+  listKind,
+  showListKind,
   onTitle,
   onDescription,
   onDocPath,
+  onListKind,
 }: {
   title: string;
   description: string;
   docPath: string;
+  listKind?: AdminPendingFeatureListKind;
+  showListKind?: boolean;
   onTitle: (v: string) => void;
   onDescription: (v: string) => void;
   onDocPath: (v: string) => void;
+  onListKind?: (v: AdminPendingFeatureListKind) => void;
 }) {
   return (
     <div className="mt-2 grid gap-2">
+      {showListKind && listKind && onListKind ? (
+        <ListKindSelector value={listKind} onChange={onListKind} />
+      ) : null}
       <div>
         <Label className="text-xs">功能名称</Label>
         <Input value={title} onChange={(e) => onTitle(e.target.value)} className="mt-1 h-8" />
@@ -122,12 +168,14 @@ export function AdminPendingFeaturesClient() {
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formDocPath, setFormDocPath] = useState("");
+  const [formListKind, setFormListKind] = useState<AdminPendingFeatureListKind>("FEATURE");
   const [saving, setSaving] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editDocPath, setEditDocPath] = useState("");
+  const [editListKind, setEditListKind] = useState<AdminPendingFeatureListKind>("PENDING");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,12 +220,15 @@ export function AdminPendingFeaturesClient() {
     };
   }, []);
 
+  const itemListKind = (item: PendingFeatureItem) =>
+    resolveAdminPendingFeatureListKind(item);
+
   const featuresCount = useMemo(
-    () => items.filter((i) => !i.completed && isAdminPendingFeatureRoadmapTitle(i.title)).length,
+    () => items.filter((i) => !i.completed && itemListKind(i) === "FEATURE").length,
     [items],
   );
   const pendingCount = useMemo(
-    () => items.filter((i) => !i.completed && !isAdminPendingFeatureRoadmapTitle(i.title)).length,
+    () => items.filter((i) => !i.completed && itemListKind(i) === "PENDING").length,
     [items],
   );
   const doneCount = items.filter((i) => i.completed).length;
@@ -185,7 +236,7 @@ export function AdminPendingFeaturesClient() {
   const filtered = useMemo(() => {
     if (tab === "features") {
       const list = items.filter(
-        (i) => !i.completed && isAdminPendingFeatureRoadmapTitle(i.title),
+        (i) => !i.completed && itemListKind(i) === "FEATURE",
       );
       const order = new Map<string, number>(
         ADMIN_PENDING_FEATURE_ROADMAP_TITLES.map((t, i) => [t, i]),
@@ -197,7 +248,7 @@ export function AdminPendingFeaturesClient() {
     }
     if (tab === "pending") {
       return items.filter(
-        (i) => !i.completed && !isAdminPendingFeatureRoadmapTitle(i.title),
+        (i) => !i.completed && itemListKind(i) === "PENDING",
       );
     }
     if (tab === "done") return items.filter((i) => i.completed);
@@ -229,6 +280,7 @@ export function AdminPendingFeaturesClient() {
     setEditTitle(item.title);
     setEditDescription(item.description);
     setEditDocPath(item.docPath);
+    setEditListKind(itemListKind(item));
     setShowForm(false);
   };
 
@@ -253,6 +305,7 @@ export function AdminPendingFeaturesClient() {
           title,
           description: editDescription.trim(),
           docPath: editDocPath.trim(),
+          listKind: editListKind,
         }),
       });
       if (!res.ok) {
@@ -289,6 +342,7 @@ export function AdminPendingFeaturesClient() {
           title,
           description: formDescription.trim(),
           docPath: formDocPath.trim(),
+          listKind: formListKind,
         }),
       });
       if (!res.ok) {
@@ -298,8 +352,9 @@ export function AdminPendingFeaturesClient() {
       setFormTitle("");
       setFormDescription("");
       setFormDocPath("");
+      setFormListKind("FEATURE");
       setShowForm(false);
-      setTab(isAdminPendingFeatureRoadmapTitle(title) ? "features" : "pending");
+      setTab(formListKind === "FEATURE" ? "features" : "pending");
       await load();
       showFlash("新增成功", "success", 2500);
     } catch (e) {
@@ -387,7 +442,14 @@ export function AdminPendingFeaturesClient() {
             <RotateCcw className="mr-1 size-3.5" />
             刷新
           </Button>
-          <Button type="button" size="sm" onClick={() => setShowForm((v) => !v)}>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setFormListKind(tab === "pending" ? "PENDING" : "FEATURE");
+              setShowForm((v) => !v);
+            }}
+          >
             <Plus className="mr-1 size-3.5" />
             新增
           </Button>
@@ -402,14 +464,17 @@ export function AdminPendingFeaturesClient() {
 
       {showForm ? (
         <div className="space-y-3 rounded-xl border border-[#d0d7de] bg-[#f6f8fa] p-4">
-          <h2 className="text-sm font-semibold text-[#1f2328]">新增待做功能</h2>
+          <h2 className="text-sm font-semibold text-[#1f2328]">新增条目</h2>
           <FeatureEditFields
             title={formTitle}
             description={formDescription}
             docPath={formDocPath}
+            listKind={formListKind}
+            showListKind
             onTitle={setFormTitle}
             onDescription={setFormDescription}
             onDocPath={setFormDocPath}
+            onListKind={setFormListKind}
           />
           <p className="text-xs text-[#656d76]">
             关联文档路径相对仓库根目录，须以 docs/ 或 book-mall/doc/ 开头。
@@ -481,9 +546,12 @@ export function AdminPendingFeaturesClient() {
                           title={editTitle}
                           description={editDescription}
                           docPath={editDocPath}
+                          listKind={editListKind}
+                          showListKind
                           onTitle={setEditTitle}
                           onDescription={setEditDescription}
                           onDocPath={setEditDocPath}
+                          onListKind={setEditListKind}
                         />
                         <div className="mt-2 flex gap-2">
                           <Button
@@ -522,7 +590,7 @@ export function AdminPendingFeaturesClient() {
                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
                               已完成
                             </span>
-                          ) : isAdminPendingFeatureRoadmapTitle(item.title) ? (
+                          ) : itemListKind(item) === "FEATURE" ? (
                             <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-900">
                               待做功能
                             </span>

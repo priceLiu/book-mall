@@ -270,9 +270,12 @@ function useInjectStyles(accent: string) {
   top: 0;
   right: 0;
   height: 100vh;
+  height: 100dvh;
   width: min(400px, 92vw);
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   z-index: 2147483000;
   animation: pa-drawer-in .36s cubic-bezier(0.22, 1, 0.36, 1);
   background: linear-gradient(to bottom, #18181b, #09090b);
@@ -326,6 +329,7 @@ function useInjectStyles(accent: string) {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
   padding: 14px 16px;
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
@@ -373,7 +377,8 @@ function useInjectStyles(accent: string) {
   background: rgba(255,255,255,.08);
 }
 .pa-scroll {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
@@ -540,6 +545,7 @@ function useInjectStyles(accent: string) {
   color: rgba(255,255,255,.55);
 }
 .pa-input-bar {
+  flex-shrink: 0;
   border-top: 1px solid rgba(255,255,255,.06);
   padding: 12px;
   background: rgba(24,24,27,.95);
@@ -856,7 +862,7 @@ export function PlatformAssistant({
       if (res.status === 401) {
         appendToLast((m) => ({
           ...m,
-          content: "请先登录后再使用助手。",
+          content: "助手暂不可用，请稍后重试。",
         }));
         return;
       }

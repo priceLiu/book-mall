@@ -140,6 +140,7 @@ async function main() {
         title: item.title,
         description: item.description,
         docPath: item.docPath ?? "",
+        listKind: "FEATURE",
         sortOrder: item.sortOrder,
         completed: false,
       },

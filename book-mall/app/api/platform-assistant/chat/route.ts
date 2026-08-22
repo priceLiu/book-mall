@@ -1,9 +1,6 @@
 /**
  * 平台 AI 导览助手 · 对话端点（SSE 流式）。
  */
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import {
   classifyUserFeedbackCategory,
   shouldLogUnansweredQuestion,
@@ -29,8 +26,10 @@ import {
   ASSISTANT_CHAT_MODEL,
   ASSISTANT_MAX_TOKENS,
   ASSISTANT_RATE_LIMIT,
+  ASSISTANT_GUEST_RATE_LIMIT,
   isPureGreeting,
 } from "@/lib/platform-assistant/config";
+import { resolveAssistantActor } from "@/lib/platform-assistant/assistant-actor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,16 +40,19 @@ type ChatMessage = { role: string; content: string };
 const encoder = new TextEncoder();
 
 const rateBuckets = new Map<string, number[]>();
-function rateLimited(userId: string): boolean {
+function rateLimited(
+  key: string,
+  limit: { windowMs: number; max: number },
+): boolean {
   const now = Date.now();
-  const { windowMs, max } = ASSISTANT_RATE_LIMIT;
-  const arr = (rateBuckets.get(userId) ?? []).filter((t) => now - t < windowMs);
+  const { windowMs, max } = limit;
+  const arr = (rateBuckets.get(key) ?? []).filter((t) => now - t < windowMs);
   if (arr.length >= max) {
-    rateBuckets.set(userId, arr);
+    rateBuckets.set(key, arr);
     return true;
   }
   arr.push(now);
-  rateBuckets.set(userId, arr);
+  rateBuckets.set(key, arr);
   return false;
 }
 
@@ -75,13 +77,6 @@ function sseResponse(body: ReadableStream<Uint8Array>, status = 200): Response {
       Connection: "keep-alive",
     },
   });
-}
-
-async function resolveUserId(request: Request): Promise<string | null> {
-  const auth = verifyToolsBearer(request);
-  if (auth.ok) return auth.userId;
-  const session = await getServerSession(authOptions);
-  return session?.user?.id ?? null;
 }
 
 function parseSourceMeta(request: Request): {
@@ -123,13 +118,11 @@ async function logFeedbackSafe(input: Parameters<typeof createPlatformAssistantF
 }
 
 export async function POST(request: Request) {
-  const userIdOrNull = await resolveUserId(request);
-  if (!userIdOrNull) {
-    return Response.json({ error: "请先登录" }, { status: 401 });
-  }
-  const userId = userIdOrNull;
+  const actor = await resolveAssistantActor(request);
+  const userId = actor.userId;
 
-  if (rateLimited(userId)) {
+  const limit = actor.isGuest ? ASSISTANT_GUEST_RATE_LIMIT : ASSISTANT_RATE_LIMIT;
+  if (rateLimited(actor.rateLimitKey, limit)) {
     return Response.json(
       { error: "请求过于频繁，请稍后再试" },
       { status: 429 },
@@ -168,6 +161,7 @@ export async function POST(request: Request) {
   let assistantReply = "";
 
   async function logFeedbackAfterReply() {
+    if (!userId) return;
     const userCategory = classifyUserFeedbackCategory(query);
     if (userCategory === "BUG" || userCategory === "FEATURE_REQUEST") {
       await logFeedbackSafe({

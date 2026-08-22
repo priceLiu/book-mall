@@ -42,6 +42,7 @@ import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
 import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
+import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
 
 export function creditBillingEnabled(): boolean {
   return isUnifiedCreditBillingActive();
@@ -301,6 +302,7 @@ export async function settleSucceededGatewayLog(input: {
 }): Promise<number> {
   if (!creditBillingEnabled()) return 0;
   if (input.log.clientPage === "media-render-asr") return 0;
+  if (await isPlatformOperationalApiKey(input.log.apiKeyId)) return 0;
 
   const target = await resolveLogBillingTarget(input.log);
   if (!target) return 0;
@@ -560,6 +562,7 @@ export async function refundFailedGatewayLog(
  */
 export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise<number> {
   if (!creditBillingEnabled()) return 0;
+  if (await isPlatformOperationalApiKey(log.apiKeyId)) return 0;
   if (!isVideoLog(log)) return 0;
 
   const canonical =

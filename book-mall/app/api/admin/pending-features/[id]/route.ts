@@ -24,6 +24,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     title?: string;
     description?: string;
     docPath?: string;
+    listKind?: "FEATURE" | "PENDING";
     completed?: boolean;
     sortOrder?: number;
   } = {};
@@ -31,6 +32,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (typeof b.title === "string") patch.title = b.title;
   if (typeof b.description === "string") patch.description = b.description;
   if (typeof b.docPath === "string") patch.docPath = b.docPath;
+  if (b.listKind === "FEATURE" || b.listKind === "PENDING") {
+    patch.listKind = b.listKind;
+  }
   if (typeof b.completed === "boolean") patch.completed = b.completed;
   if (typeof b.sortOrder === "number") patch.sortOrder = b.sortOrder;
 

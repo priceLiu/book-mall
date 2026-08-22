@@ -29,17 +29,17 @@ const POLL_LOOPS = [
   {
     name: "story-poll",
     color: "red",
-    cmd: "pnpm --filter book-mall run story:poll-loop",
+    cmd: "pnpm --dir book-mall run story:poll-loop",
   },
   {
     name: "canvas-poll",
     color: "gray",
-    cmd: "pnpm --filter book-mall run canvas:poll-loop",
+    cmd: "pnpm --dir book-mall run canvas:poll-loop",
   },
   {
     name: "gateway-poll",
     color: "gray",
-    cmd: "pnpm --filter book-mall run gateway:poll-loop",
+    cmd: "pnpm --dir book-mall run gateway:poll-loop",
   },
 ];
 
@@ -83,7 +83,6 @@ if (withPoll) {
 }
 
 const args = [
-  "-k",
   "-n",
   names.join(","),
   "-c",

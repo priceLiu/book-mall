@@ -21,6 +21,8 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
   if (cookie) headers.set("cookie", cookie);
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
+  const platformApp = request.headers.get("x-platform-app");
+  if (platformApp) headers.set("x-platform-app", platformApp);
   const auth = request.headers.get("authorization");
   if (auth) {
     headers.set("authorization", auth);

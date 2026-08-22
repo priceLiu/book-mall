@@ -16,6 +16,7 @@ import {
   normalizeKieRecordForToolLab,
   type ToolLabKiePollOutput,
 } from "@/lib/gateway/kie-tool-gateway";
+import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { finalizeRequestLog, pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { getKindDef } from "@/lib/quick-replica/qr-kinds";
@@ -475,6 +476,38 @@ export async function qrPollGenerateJob(
 
   if (!log.externalTaskId) {
     return { status: "PENDING" };
+  }
+
+  if (log.providerKind === "KIE" && log.credentialId) {
+    const synced = await syncKieGatewayLogFromVendorPoll(logId);
+    const normalized: ToolLabKiePollOutput = normalizeKieRecordForToolLab(
+      synced.record,
+    );
+
+    if (normalized.task_status === "SUCCEEDED") {
+      const outputUrl =
+        normalized.video_url ?? extractKieResultUrl(synced.record) ?? undefined;
+      if (outputUrl) {
+        return { status: "SUCCEEDED", outputUrl };
+      }
+      if (synced.status === "SUCCEEDED") {
+        return { status: "SUCCEEDED" };
+      }
+      return { status: "RUNNING" };
+    }
+
+    if (normalized.task_status === "FAILED") {
+      return { status: "FAILED", error: normalized.message ?? "生成失败" };
+    }
+
+    return {
+      status:
+        normalized.task_status === "PENDING"
+          ? "PENDING"
+          : normalized.task_status === "RUNNING"
+            ? "RUNNING"
+            : "RUNNING",
+    };
   }
 
   const auth = await requireGatewayAuth(userId);

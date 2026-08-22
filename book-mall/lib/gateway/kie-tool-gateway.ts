@@ -7,6 +7,7 @@ import { buildKieToolI2vCreateArgs } from "@/lib/canvas/kie-grok-builders";
 import { buildKieToolVideoCreateArgs } from "@/lib/canvas/kie-video-tool-builders";
 import {
   extractKieResultUrl,
+  isKieRecordComplete,
   isKieRecordFail,
   isKieRecordSuccess,
   type KieRecordResponse,
@@ -48,7 +49,7 @@ export type ToolLabKiePollOutput = {
 export function normalizeKieRecordForToolLab(
   record: KieRecordResponse,
 ): ToolLabKiePollOutput {
-  if (isKieRecordSuccess(record.state)) {
+  if (isKieRecordSuccess(record.state) || isKieRecordComplete(record)) {
     const video_url = extractKieResultUrl(record) ?? undefined;
     return { task_status: "SUCCEEDED", video_url };
   }

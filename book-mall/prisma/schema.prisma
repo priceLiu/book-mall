@@ -2896,19 +2896,28 @@ model SiteTrafficIpDaily {
   @@index([dateCst, appKey, hitCount(sort: Desc)])
 }
 
+enum AdminPendingFeatureListKind {
+  /// 待做功能（产品路线图）
+  FEATURE
+  /// 待处理（docs 导入 / 日常 backlog）
+  PENDING
+}
+
 /// 管理后台 · 待开发功能清单（产品路线图）
 model AdminPendingFeature {
-  id          String   @id @default(cuid())
+  id          String                      @id @default(cuid())
   title       String
-  description String   @default("") @db.Text
+  description String                      @default("") @db.Text
   /// 仓库根目录相对路径，如 docs/一键发布平台.md
-  docPath     String   @default("")
-  completed   Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  docPath     String                      @default("")
+  listKind    AdminPendingFeatureListKind @default(PENDING)
+  completed   Boolean                     @default(false)
+  sortOrder   Int                         @default(0)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
 
   @@index([completed, sortOrder])
+  @@index([listKind, completed, sortOrder])
   @@index([sortOrder])
 }
 

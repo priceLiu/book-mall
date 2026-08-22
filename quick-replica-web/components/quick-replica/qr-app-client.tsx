@@ -110,6 +110,7 @@ export function QrAppClient({
   const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
   const voiceGalleryFocusTimerRef = useRef<number | null>(null);
+  const generateInFlightRef = useRef(false);
 
   const templateScope =
     navMode === "my-works" || navMode === "generate-history" ? "my" : "all";
@@ -483,6 +484,8 @@ export function QrAppClient({
   };
 
   const handleGenerate = useCallback(async (draftToRun: QrWorkspaceDraft) => {
+    if (generateInFlightRef.current) return;
+    generateInFlightRef.current = true;
     setGenerating(true);
     setGenerateModalOpen(true);
     setGeneratePhase("generating");
@@ -512,6 +515,7 @@ export function QrAppClient({
       setGeneratePhase("failed");
       setCopyToast(formatQrPlatformError(message));
     } finally {
+      generateInFlightRef.current = false;
       setGenerating(false);
     }
   }, []);

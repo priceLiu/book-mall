@@ -11,6 +11,7 @@ import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { resolveBillingCanonicalKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
 import { computeUnifiedChargeCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 import { resolveTeamBillingFallbackTenantId } from "./resolve-team-billing-fallback";
+import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
 
 export async function resolveBillingRef(input: {
   tenantId?: string | null;
@@ -54,6 +55,9 @@ export async function assertCreditsBeforeGenerate(input: {
   inputSummary?: unknown;
 }): Promise<void> {
   if (!isUnifiedCreditBillingActive()) return;
+
+  // 平台代付（AI 小智、AI 资讯等）走 Platform Admin Key，不扣用户积分
+  if (await isPlatformOperationalApiKey(input.apiKeyId)) return;
 
   // 私域人像库入库走火山 AK/SK · 不计平台积分
   if (input.model.trim().startsWith("portrait:")) return;

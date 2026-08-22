@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import {
+  isAdminPendingFeatureListKind,
+  type AdminPendingFeatureListKind,
+} from "@/lib/admin/pending-feature-roadmap";
+import {
   getRepoDocFileTimes,
   isAllowedRepoDocPath,
   scanRepoDocsMarkdownFiles,
@@ -10,6 +14,7 @@ export type AdminPendingFeatureRow = {
   title: string;
   description: string;
   docPath: string;
+  listKind: AdminPendingFeatureListKind;
   completed: boolean;
   sortOrder: number;
   createdAt: string;
@@ -23,6 +28,7 @@ function mapRow(row: {
   title: string;
   description: string;
   docPath: string;
+  listKind: AdminPendingFeatureListKind;
   completed: boolean;
   sortOrder: number;
   createdAt: Date;
@@ -33,6 +39,7 @@ function mapRow(row: {
     title: row.title,
     description: row.description,
     docPath: row.docPath,
+    listKind: row.listKind,
     completed: row.completed,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
@@ -74,6 +81,7 @@ export async function createAdminPendingFeature(input: {
   title: string;
   description?: string;
   docPath?: string;
+  listKind?: AdminPendingFeatureListKind;
   sortOrder?: number;
 }): Promise<AdminPendingFeatureRow> {
   const title = input.title.trim();
@@ -83,6 +91,11 @@ export async function createAdminPendingFeature(input: {
   if (docPath && !isAllowedRepoDocPath(docPath)) {
     throw new Error("文档路径须以 docs/ 或 book-mall/doc/ 开头");
   }
+
+  const listKind =
+    input.listKind && isAdminPendingFeatureListKind(input.listKind)
+      ? input.listKind
+      : "PENDING";
 
   let sortOrder = input.sortOrder;
   if (typeof sortOrder !== "number" || !Number.isFinite(sortOrder)) {
@@ -97,6 +110,7 @@ export async function createAdminPendingFeature(input: {
       title,
       description: input.description?.trim() ?? "",
       docPath,
+      listKind,
       sortOrder,
     },
   });
@@ -109,6 +123,7 @@ export async function updateAdminPendingFeature(
     title?: string;
     description?: string;
     docPath?: string;
+    listKind?: AdminPendingFeatureListKind;
     completed?: boolean;
     sortOrder?: number;
   },
@@ -120,6 +135,7 @@ export async function updateAdminPendingFeature(
     title?: string;
     description?: string;
     docPath?: string;
+    listKind?: AdminPendingFeatureListKind;
     completed?: boolean;
     sortOrder?: number;
   } = {};
@@ -138,6 +154,9 @@ export async function updateAdminPendingFeature(
       throw new Error("文档路径须以 docs/ 或 book-mall/doc/ 开头");
     }
     data.docPath = docPath;
+  }
+  if (patch.listKind && isAdminPendingFeatureListKind(patch.listKind)) {
+    data.listKind = patch.listKind;
   }
   if (typeof patch.completed === "boolean") {
     data.completed = patch.completed;
@@ -198,6 +217,7 @@ export async function importAdminPendingFeaturesFromDocs(): Promise<{
         title: doc.title,
         description: doc.description,
         docPath: doc.docPath,
+        listKind: "PENDING",
         completed: false,
         sortOrder: sortBase + (i + 1) * 10,
       },

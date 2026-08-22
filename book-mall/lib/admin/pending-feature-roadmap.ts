@@ -29,3 +29,20 @@ export function isAdminPendingFeatureRoadmapTitle(title: string): boolean {
   const t = title.trim();
   return (ADMIN_PENDING_FEATURE_ROADMAP_TITLES as readonly string[]).includes(t);
 }
+
+export type AdminPendingFeatureListKind = "FEATURE" | "PENDING";
+
+export function isAdminPendingFeatureListKind(
+  value: unknown,
+): value is AdminPendingFeatureListKind {
+  return value === "FEATURE" || value === "PENDING";
+}
+
+/** 列表分区：优先读库内 listKind，旧数据按标题路线图兜底。 */
+export function resolveAdminPendingFeatureListKind(item: {
+  listKind?: string | null;
+  title: string;
+}): AdminPendingFeatureListKind {
+  if (isAdminPendingFeatureListKind(item.listKind)) return item.listKind;
+  return isAdminPendingFeatureRoadmapTitle(item.title) ? "FEATURE" : "PENDING";
+}

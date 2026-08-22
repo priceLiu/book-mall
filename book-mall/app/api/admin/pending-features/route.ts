@@ -43,12 +43,15 @@ export async function POST(request: Request) {
   const docPath = typeof b.docPath === "string" ? b.docPath : undefined;
   const sortOrder =
     typeof b.sortOrder === "number" ? b.sortOrder : undefined;
+  const listKind =
+    b.listKind === "FEATURE" || b.listKind === "PENDING" ? b.listKind : undefined;
 
   try {
     const item = await createAdminPendingFeature({
       title,
       description,
       docPath,
+      listKind,
       sortOrder,
     });
     return NextResponse.json({ item }, { status: 201 });

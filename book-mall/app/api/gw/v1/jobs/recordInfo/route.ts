@@ -15,6 +15,8 @@ import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 import {
+  extractKieResultUrl,
+  isKieRecordComplete,
   isKieRecordFail,
   isKieRecordSuccess,
 } from "@/lib/story/kie-client";
@@ -461,7 +463,7 @@ export async function GET(request: NextRequest) {
       model: log?.model ?? undefined,
     });
     if (log) {
-      if (isKieRecordSuccess(data.state)) {
+      if (isKieRecordSuccess(data.state) || isKieRecordComplete(data)) {
         await finalizeRequestLog(log.id, {
           status: "SUCCEEDED",
           durationMs: log.submittedAt
@@ -471,7 +473,7 @@ export async function GET(request: NextRequest) {
             "costTime" in data && typeof data.costTime === "number"
               ? Math.round(data.costTime * 1000)
               : undefined,
-          resultSummary: { state: data.state, resultJson: data.resultJson },
+          resultSummary: { state: "success", resultJson: data.resultJson },
           externalTaskId: data.taskId,
           model: data.model || log.model,
         });

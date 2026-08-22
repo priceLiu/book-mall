@@ -1,12 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { isAdminPendingFeatureRoadmapTitle } from "@/lib/admin/pending-feature-roadmap";
+import { resolveAdminPendingFeatureListKind } from "@/lib/admin/pending-feature-roadmap";
 
 async function main() {
   const rows = await prisma.adminPendingFeature.findMany({
     where: { completed: false },
-    select: { title: true },
+    select: { title: true, listKind: true },
   });
-  const features = rows.filter((r) => isAdminPendingFeatureRoadmapTitle(r.title));
+  const features = rows.filter(
+    (r) => resolveAdminPendingFeatureListKind(r) === "FEATURE",
+  );
   console.log({
     features: features.length,
     featureTitles: features.map((r) => r.title),

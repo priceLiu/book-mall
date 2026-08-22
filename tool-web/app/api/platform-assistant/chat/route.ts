@@ -18,17 +18,13 @@ export async function POST(req: Request) {
   }
 
   const token = cookies().get("tools_token")?.value?.trim();
-  if (!token) {
-    return Response.json({ error: "请先登录工具站" }, { status: 401 });
-  }
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const body = await req.text();
   const upstream = await fetch(`${origin}/api/platform-assistant/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
     body,
     cache: "no-store",
     signal: AbortSignal.timeout(120_000),

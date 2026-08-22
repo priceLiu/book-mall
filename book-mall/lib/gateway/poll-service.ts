@@ -11,6 +11,7 @@ import {
   recoverMisclassifiedVolcengineStallLogs,
   recoverVolcengineGatewayLogFromVendor,
 } from "@/lib/gateway/volcengine-stall-recover";
+import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
@@ -365,6 +366,8 @@ const POLL_ROW_SELECT = {
   status: true,
   apiKeyId: true,
   externalTaskId: true,
+  providerKind: true,
+  credentialId: true,
 } as const;
 
 /** 公平调度：最久未 poll 的先 poll（null 即从未 poll，最优先），杜绝按 submittedAt 的尾部饿死。 */
@@ -378,15 +381,62 @@ type PollableGatewayRow = {
   status: string;
   apiKeyId: string | null;
   externalTaskId: string | null;
+  providerKind: string | null;
+  credentialId: string | null;
 };
 
 async function pollGatewayLogWithTimeout(
   row: PollableGatewayRow,
   timeoutMs: number,
 ): Promise<"updated" | "pending" | "skipped"> {
-  if (!row.externalTaskId || !row.apiKeyId) return "skipped";
+  if (!row.externalTaskId) return "skipped";
   const beforeStatus = row.status;
   let resultSummary: unknown = null;
+
+  if (row.providerKind === "KIE" && row.credentialId) {
+    try {
+      await syncKieGatewayLogFromVendorPoll(row.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const logRow = await prisma.gatewayRequestLog.findUnique({
+        where: { id: row.id },
+        select: { resultSummary: true },
+      });
+      resultSummary = logRow?.resultSummary ?? null;
+      await recordGatewayPollLastAttempt({
+        logId: row.id,
+        resultSummary,
+        ok: false,
+        kind: /connection pool|timed out fetching/i.test(msg) ? "db" : "vendor",
+        error: msg,
+      }).catch(() => undefined);
+    }
+    try {
+      await prisma.gatewayRequestLog.update({
+        where: { id: row.id },
+        data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+      });
+    } catch (dbErr) {
+      const dbMsg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+      await recordGatewayPollLastAttempt({
+        logId: row.id,
+        resultSummary,
+        ok: false,
+        kind: "db",
+        error: dbMsg,
+      }).catch(() => undefined);
+    }
+    const after = await prisma.gatewayRequestLog.findUnique({
+      where: { id: row.id },
+      select: { status: true },
+    });
+    if (beforeStatus === "RUNNING" && after?.status !== "RUNNING") {
+      return "updated";
+    }
+    return "pending";
+  }
+
+  if (!row.apiKeyId) return "skipped";
   try {
     await Promise.race([
       gatewayV1RecordInfo({
@@ -659,6 +709,21 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
   } catch (e) {
     console.warn(
       "[gateway-poll] gateway video watchdog skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  try {
+    const { runGatewayKieWatchdog } = await import(
+      "@/lib/gateway/gateway-kie-watchdog"
+    );
+    const kie = await runGatewayKieWatchdog({ source: "gateway-poll-worker" });
+    if (kie.ran && ((kie.recovered ?? 0) > 0 || (kie.failed ?? 0) > 0)) {
+      console.info("[gateway-kie-watchdog] poll-worker tick", kie);
+    }
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] gateway kie watchdog skipped",
       e instanceof Error ? e.message : String(e),
     );
   }

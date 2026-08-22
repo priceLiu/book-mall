@@ -6,6 +6,7 @@ import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-servi
 import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
 import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
+import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { prisma } from "@/lib/prisma";
@@ -47,8 +48,29 @@ async function fastGatewayRecordInfo(row: {
   id: string;
   apiKeyId: string | null;
   externalTaskId: string | null;
+  providerKind?: string | null;
+  credentialId?: string | null;
 }): Promise<boolean> {
-  if (!row.apiKeyId || !row.externalTaskId) return false;
+  if (!row.externalTaskId) return false;
+
+  if (row.providerKind === "KIE" && row.credentialId) {
+    try {
+      await syncKieGatewayLogFromVendorPoll(row.id);
+      await prisma.gatewayRequestLog.update({
+        where: { id: row.id },
+        data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+      });
+      return true;
+    } catch {
+      await prisma.gatewayRequestLog.update({
+        where: { id: row.id },
+        data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+      });
+      return false;
+    }
+  }
+
+  if (!row.apiKeyId) return false;
   try {
     await Promise.race([
       gatewayV1RecordInfo({
@@ -88,6 +110,8 @@ export async function releasePollPoolGatewayLog(
       failCode: true,
       apiKeyId: true,
       externalTaskId: true,
+      credentialId: true,
+      providerKind: true,
       submittedAt: true,
       resultSummary: true,
     },

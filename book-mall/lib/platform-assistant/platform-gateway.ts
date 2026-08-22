@@ -15,6 +15,7 @@ import {
   gatewayV1Embeddings,
   gatewayV1ClientMeta,
 } from "@/lib/gateway/gateway-v1-http-client";
+import { resolveAssistantChatModels } from "@/lib/platform-assistant/config";
 
 export class PlatformAssistantGatewayError extends Error {
   constructor(
@@ -144,7 +145,12 @@ export async function platformEmbedTextsInProcess(
   return parseEmbeddingResponse(result.text, inputs);
 }
 
-/** 平台代付：DeepSeek 流式对话，返回可直接透传的 SSE ReadableStream。 */
+function isVendorInsufficientBalance(status: number, errText: string): boolean {
+  if (status !== 402) return false;
+  return /insufficient|余额|balance|quota|credit/i.test(errText);
+}
+
+/** 平台代付：流式对话，返回可直接透传的 SSE ReadableStream。 */
 export async function platformChatStream(opts: {
   model: string;
   messages: { role: string; content: string }[];
@@ -153,32 +159,49 @@ export async function platformChatStream(opts: {
   clientPage?: string;
 }): Promise<{ status: number; body: ReadableStream<Uint8Array> }> {
   const apiKeyId = await resolvePlatformApiKeyId();
-  const body: Record<string, unknown> = {
-    model: opts.model,
-    messages: opts.messages,
-    stream: true,
-    stream_options: { include_usage: true },
-    max_tokens: opts.maxTokens ?? 1024,
-    temperature: opts.temperature ?? 0.4,
-  };
-  const res = await gatewayV1ChatCompletionsStream({
-    apiKeyId,
-    body,
-    meta: gatewayV1ClientMeta("TOOL", {
-      clientPage: opts.clientPage ?? "platform-assistant/chat",
-    }),
-  });
-  if (!res.body || res.status >= 300) {
+  const models = resolveAssistantChatModels(opts.model);
+  let lastErr = "";
+
+  for (const model of models) {
+    const body: Record<string, unknown> = {
+      model,
+      messages: opts.messages,
+      stream: true,
+      stream_options: { include_usage: true },
+      max_tokens: opts.maxTokens ?? 1024,
+      temperature: opts.temperature ?? 0.4,
+    };
+    const res = await gatewayV1ChatCompletionsStream({
+      apiKeyId,
+      body,
+      meta: gatewayV1ClientMeta("TOOL", {
+        clientPage: opts.clientPage ?? "platform-assistant/chat",
+      }),
+    });
+    if (res.body && res.status < 300) {
+      return { status: res.status, body: res.body };
+    }
     const errText = res.body ? await new Response(res.body).text() : `HTTP ${res.status}`;
+    lastErr = errText;
+    if (isVendorInsufficientBalance(res.status, errText) && model !== models.at(-1)) {
+      console.warn(
+        `[platform-assistant] chat model ${model} insufficient balance, trying fallback`,
+      );
+      continue;
+    }
     throw new PlatformAssistantGatewayError(
       `对话失败 (HTTP ${res.status}): ${errText.slice(0, 200)}`,
       502,
     );
   }
-  return { status: res.status, body: res.body };
+
+  throw new PlatformAssistantGatewayError(
+    `对话失败：厂商余额不足，请稍后再试。${lastErr.slice(0, 120)}`,
+    502,
+  );
 }
 
-/** 平台代付：DeepSeek 非流式对话，返回 assistant 文本。 */
+/** 平台代付：非流式对话，返回 assistant 文本。 */
 export async function platformChatCompletion(opts: {
   model: string;
   messages: { role: string; content: string }[];
@@ -187,37 +210,54 @@ export async function platformChatCompletion(opts: {
   clientPage?: string;
 }): Promise<string> {
   const apiKeyId = await resolvePlatformApiKeyId();
-  const body: Record<string, unknown> = {
-    model: opts.model,
-    messages: opts.messages,
-    stream: false,
-    max_tokens: opts.maxTokens ?? 1024,
-    temperature: opts.temperature ?? 0.5,
-  };
-  const res = await gatewayV1ChatCompletions({
-    apiKeyId,
-    body,
-    meta: gatewayV1ClientMeta("TOOL", {
-      clientPage: opts.clientPage ?? "platform-assistant/completion",
-    }),
-  });
-  if (res.status < 200 || res.status >= 300) {
+  const models = resolveAssistantChatModels(opts.model);
+  let lastErr = "";
+
+  for (const model of models) {
+    const body: Record<string, unknown> = {
+      model,
+      messages: opts.messages,
+      stream: false,
+      max_tokens: opts.maxTokens ?? 1024,
+      temperature: opts.temperature ?? 0.5,
+    };
+    const res = await gatewayV1ChatCompletions({
+      apiKeyId,
+      body,
+      meta: gatewayV1ClientMeta("TOOL", {
+        clientPage: opts.clientPage ?? "platform-assistant/completion",
+      }),
+    });
+    if (res.status >= 200 && res.status < 300) {
+      let parsed: unknown = null;
+      try {
+        parsed = res.text ? JSON.parse(res.text) : null;
+      } catch {
+        parsed = null;
+      }
+      const choice = (parsed as { choices?: { message?: { content?: string } }[] })
+        ?.choices?.[0];
+      const text =
+        typeof choice?.message?.content === "string"
+          ? choice.message.content
+          : res.text;
+      return text.trim();
+    }
+    lastErr = res.text;
+    if (isVendorInsufficientBalance(res.status, res.text) && model !== models.at(-1)) {
+      console.warn(
+        `[platform-assistant] chat model ${model} insufficient balance, trying fallback`,
+      );
+      continue;
+    }
     throw new PlatformAssistantGatewayError(
       `对话失败 (HTTP ${res.status}): ${res.text.slice(0, 200)}`,
       502,
     );
   }
-  let parsed: unknown = null;
-  try {
-    parsed = res.text ? JSON.parse(res.text) : null;
-  } catch {
-    parsed = null;
-  }
-  const choice = (parsed as { choices?: { message?: { content?: string } }[] })
-    ?.choices?.[0];
-  const text =
-    typeof choice?.message?.content === "string"
-      ? choice.message.content
-      : res.text;
-  return text.trim();
+
+  throw new PlatformAssistantGatewayError(
+    `对话失败：厂商余额不足，请稍后再试。${lastErr.slice(0, 120)}`,
+    502,
+  );
 }

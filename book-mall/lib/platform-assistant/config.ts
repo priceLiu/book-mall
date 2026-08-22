@@ -1,7 +1,31 @@
 /** 平台 AI 导览助手 · 运行时配置（模型 / 维度 / 检索参数）。 */
 
+/** 平台代付对话主模型（百炼 · 输入成本最低档之一）。 */
 export const ASSISTANT_CHAT_MODEL =
-  process.env.PLATFORM_ASSISTANT_CHAT_MODEL?.trim() || "deepseek-chat";
+  process.env.PLATFORM_ASSISTANT_CHAT_MODEL?.trim() || "qwen3.5-27b";
+
+/** 主模型厂商余额不足时依次尝试（默认百炼 flash，与 embedding 同池）。 */
+export const ASSISTANT_CHAT_FALLBACK_MODELS = (() => {
+  const raw = process.env.PLATFORM_ASSISTANT_CHAT_FALLBACK_MODELS?.trim();
+  if (raw) {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return ["qwen3.5-flash"];
+})();
+
+export function resolveAssistantChatModels(primary?: string): string[] {
+  const first = (primary?.trim() || ASSISTANT_CHAT_MODEL).trim();
+  const models = [first];
+  for (const model of ASSISTANT_CHAT_FALLBACK_MODELS) {
+    if (model && model !== first && !models.includes(model)) {
+      models.push(model);
+    }
+  }
+  return models;
+}
 
 /** AI 热闻简报 · DeepSeek V4 */
 export const ASSISTANT_NEWS_MODEL =
@@ -25,6 +49,9 @@ export const ASSISTANT_MAX_TOKENS = 1024;
 
 /** 每用户限流：窗口内最大请求数 */
 export const ASSISTANT_RATE_LIMIT = { windowMs: 60_000, max: 20 };
+
+/** 匿名访客（按 IP）略严 */
+export const ASSISTANT_GUEST_RATE_LIMIT = { windowMs: 60_000, max: 12 };
 
 /**
  * 纯寒暄/无意义问候，跳过 embedding 检索以降低首字延迟。
