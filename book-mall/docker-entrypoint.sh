@@ -31,8 +31,8 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
   patch_origin_env CANVAS_WEB_ORIGINS "https://canvas.ai-code8.com"
   patch_origin_env NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN "https://prompt.ai-code8.com"
   patch_origin_env PROMPT_OPTIMIZER_PUBLIC_ORIGIN "https://prompt.ai-code8.com"
-  patch_origin_env NEXT_PUBLIC_QUICK_REPLICA_ORIGIN "https://rp.ai-code8.com"
-  patch_origin_env QUICK_REPLICA_PUBLIC_ORIGIN "https://rp.ai-code8.com"
+  patch_origin_env NEXT_PUBLIC_QUICK_REPLICA_ORIGIN "https://cp.ai-code8.com"
+  patch_origin_env QUICK_REPLICA_PUBLIC_ORIGIN "https://cp.ai-code8.com"
   case "${NEXTAUTH_COOKIE_DOMAIN:-}" in
     "")
       export NEXTAUTH_COOKIE_DOMAIN=".ai-code8.com"

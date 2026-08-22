@@ -38,5 +38,5 @@
 
 ## 生产部署
 
-目标目录 `quick-replica-web`，容器端口 **3008**，域名目标 `rp.ai-code8.com`。  
+目标目录 `quick-replica-web`，容器端口 **3008**，域名目标 `cp.ai-code8.com`。  
 环境变量模板：`deploy/tencent/quick-replica-web.env.example`。

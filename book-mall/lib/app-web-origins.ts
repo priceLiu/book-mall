@@ -46,7 +46,7 @@ export function getQuickReplicaOrigin(): string {
     process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN ??
       process.env.QUICK_REPLICA_PUBLIC_ORIGIN,
     process.env.NODE_ENV === "production"
-      ? "https://rp.ai-code8.com"
+      ? "https://cp.ai-code8.com"
       : "http://localhost:3008",
   );
 }

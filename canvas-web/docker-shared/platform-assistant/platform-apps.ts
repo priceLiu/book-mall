@@ -43,7 +43,7 @@ const APP_DEFS: AppDef[] = [
     key: "replica",
     title: "快速复刻",
     description: "按示例模板快速复刻图像 / 视频 / 场景。",
-    fallback: "https://rp.ai-code8.com",
+    fallback: "https://cp.ai-code8.com",
   },
   {
     key: "prompt",

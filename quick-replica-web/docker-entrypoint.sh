@@ -24,8 +24,8 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
       ;;
   esac
   case "${QUICK_REPLICA_PUBLIC_ORIGIN:-}" in
-    ""|*"sh.run.tcloudbase.com"*|*"replica.ai-code8.com"*)
-      export QUICK_REPLICA_PUBLIC_ORIGIN="https://rp.ai-code8.com"
+    ""|*"sh.run.tcloudbase.com"*|*"replica.ai-code8.com"*|*"rp.ai-code8.com"*)
+      export QUICK_REPLICA_PUBLIC_ORIGIN="https://cp.ai-code8.com"
       export NEXT_PUBLIC_QUICK_REPLICA_ORIGIN="${QUICK_REPLICA_PUBLIC_ORIGIN}"
       echo "[quick-replica-web] QUICK_REPLICA_PUBLIC_ORIGIN -> ${QUICK_REPLICA_PUBLIC_ORIGIN}"
       ;;
