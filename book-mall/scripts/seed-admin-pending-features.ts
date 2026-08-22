@@ -121,6 +121,13 @@ const SEED_ITEMS: {
     docPath: "docs/域名静态化管理方案.md",
     sortOrder: 110,
   },
+  {
+    title: "模型与应用管理",
+    description:
+      "模型调用地图：全站应用×页面×功能点的模型清单、用量统计与分级配置（L6 调用点绑定）。",
+    docPath: "docs/模型与应用管理.md",
+    sortOrder: 125,
+  },
 ];
 
 async function main() {

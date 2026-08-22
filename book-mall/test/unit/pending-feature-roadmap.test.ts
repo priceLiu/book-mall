@@ -8,7 +8,7 @@ import {
 
 describe("isAdminPendingFeatureRoadmapTitle", () => {
   it("matches the roadmap titles", () => {
-    expect(ADMIN_PENDING_FEATURE_ROADMAP_TITLES).toHaveLength(20);
+    expect(ADMIN_PENDING_FEATURE_ROADMAP_TITLES).toHaveLength(21);
     for (const title of ADMIN_PENDING_FEATURE_ROADMAP_TITLES) {
       expect(isAdminPendingFeatureRoadmapTitle(title)).toBe(true);
     }

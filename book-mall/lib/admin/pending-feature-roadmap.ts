@@ -20,6 +20,7 @@ export const ADMIN_PENDING_FEATURE_ROADMAP_TITLES = [
   "v2.5",
   "Gateway 统一注册登录",
   "域名静态化管理",
+  "模型与应用管理",
 ] as const;
 
 export type AdminPendingFeatureRoadmapTitle =
