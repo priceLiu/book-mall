@@ -12,6 +12,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { importModelCostProfileVersioned } from "@/lib/pricing/import-model-cost-profile-versioned";
 import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
@@ -208,22 +209,17 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
 
   // 4) 模型成本档（确定性 id 便于幂等）+ 发布报价
   for (const c of COST_SEEDS) {
-    const netCost = c.listCostYuan * (1 - c.discountRate);
     const id = `seed-${c.canonicalModelKey}-CHANNEL`;
-    const data: Prisma.ModelCostProfileUncheckedCreateInput = {
-      id,
-      vendor: c.vendor,
+    await importModelCostProfileVersioned({
       canonicalModelKey: c.canonicalModelKey,
-      channel: "CHANNEL",
+      vendor: c.vendor,
       unit: c.unit,
       tierRaw: c.tierRaw ?? null,
       listCostYuan: c.listCostYuan,
       discountRate: c.discountRate,
-      netCostYuan: netCost,
-      active: true,
       note: "seed 占位成本档",
-    };
-    await prisma.modelCostProfile.upsert({ where: { id }, create: data, update: data });
+      seedId: id,
+    });
   }
 
   const published: SeedSummary["published"] = [];

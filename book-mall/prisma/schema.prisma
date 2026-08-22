@@ -868,12 +868,24 @@ model BillingReconciliationRun {
   csvFilename      String
   /// CSV 内涉及的账单月份（多月情形以逗号分隔）
   monthsCovered    String
+  /// 对账日历区间起（含）
+  periodFrom       DateTime? @db.Date
+  /// 对账日历区间止（含）
+  periodTo         DateTime? @db.Date
+  /// joinKey 末段：YYYYMMDD_YYYYMMDD
+  periodKey        String?
   /// 触发此批次的管理员 User.id
   importedByUserId String
   /// 自动统计摘要（JSON）：内/外行数、内/外总金额、差额、verdict、unbound 账号列表等
   summary          Json
   /// 状态：READY（已生成报告）、CLAWED_BACK（已补扣过任意行）、ARCHIVED（管理员归档）
   status           String   @default("READY")
+  /// v2：厂商 aliyun / kie / …
+  vendor           String?  @default("aliyun")
+  /// v2：list=挂牌价 payable=应付
+  priceMode        String?  @default("list")
+  /// v2：v1 旧引擎 / v2 Gateway 对账
+  engineVersion    String?  @default("v2")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -903,6 +915,27 @@ model BillingReconciliationLine {
   /// BOTH / INTERNAL_ONLY / CLOUD_ONLY / UNBOUND
   matchKind        String
 
+  /// v2 对账扩展
+  vendor              String?
+  tierRaw             String?
+  unitKind            String?
+  tokenDirection      String?
+  vendorUnits         Decimal? @db.Decimal(18, 6)
+  platformUnits       Decimal? @db.Decimal(18, 6)
+  usageDiff           Decimal? @db.Decimal(18, 6)
+  listUnitYuan        Decimal? @db.Decimal(18, 8)
+  vendorListYuan      Decimal? @db.Decimal(18, 4)
+  platformListYuan    Decimal? @db.Decimal(18, 4)
+  amountDiffYuan      Decimal? @db.Decimal(18, 4)
+  platformCredits     Int?
+  platformRevenueYuan Decimal? @db.Decimal(18, 4)
+  reconStatus         String?
+  issueReason         String?
+  sampleLogIds        Json?
+  /// v2：对账 joinKey 与账单月份（总表 upsert 用）
+  joinKey             String?
+  periodMonth         String?
+
   /// 已补扣的金额（点）；null 表示未补扣
   clawbackPoints  Int?
   /// 补扣对应的 WalletEntry.id；用于审计
@@ -913,6 +946,57 @@ model BillingReconciliationLine {
 
   @@index([runId, userId])
   @@index([runId, matchKind])
+}
+
+/// 对账总表：跨厂商、跨批次 upsert 的持久明细（joinKey 唯一）。
+/// 每次导入厂商 CSV 成功后，按 joinKey 合并更新对应行。
+model BillingReconciliationMasterLine {
+  id                 String   @id @default(cuid())
+  /// vendor|modelKey|tier|unitKind|tokenDirection|month
+  joinKey            String   @unique
+  periodMonth        String
+  /// 对账日历区间起（含）YYYY-MM-DD
+  periodFrom         DateTime? @db.Date
+  /// 对账日历区间止（含）
+  periodTo           DateTime? @db.Date
+  /// YYYYMMDD_YYYYMMDD，与 joinKey 末段一致
+  periodKey          String?
+  /// 账单 CSV 来源厂商（aliyun / kie / …）
+  importVendor       String
+  /// ModelCatalog.vendor 展示名（如 阿里云）
+  vendorDisplayName  String?
+  modelKey           String
+  modelDisplayName   String?
+  tierRaw            String?
+  unitKind           String
+  tokenDirection     String   @default("none")
+  userId             String?
+  cloudAccountId     String?
+  vendorUnits        Decimal? @db.Decimal(18, 6)
+  platformUnits      Decimal? @db.Decimal(18, 6)
+  usageDiff          Decimal? @db.Decimal(18, 6)
+  listUnitYuan       Decimal? @db.Decimal(18, 8)
+  vendorListYuan     Decimal? @db.Decimal(18, 4)
+  platformListYuan   Decimal? @db.Decimal(18, 4)
+  amountDiffYuan     Decimal? @db.Decimal(18, 4)
+  platformCredits    Int?
+  platformRevenueYuan Decimal? @db.Decimal(18, 4)
+  /// Gateway 用量 × 净成本单价（costSnapshot / ModelCostProfile.netCost）
+  platformNetCostYuan Decimal? @db.Decimal(18, 4)
+  reconStatus        String?
+  issueReason        String?
+  sampleLogIds       Json?
+  sourceRunId        String
+  sourceImportedAt   DateTime
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  @@index([periodMonth])
+  @@index([periodKey])
+  @@index([importVendor, periodMonth])
+  @@index([importVendor, periodKey])
+  @@index([reconStatus])
+  @@index([modelKey])
 }
 
 /// 版本间 diff（历史审计）。

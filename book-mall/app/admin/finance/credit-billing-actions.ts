@@ -13,6 +13,7 @@ import {
   marginPassesGuard,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
+import { upsertModelCostProfileVersioned } from "@/lib/pricing/upsert-model-cost-profile-versioned";
 import { SCENARIO_LAB_USAGE_SECONDS } from "@/lib/billing/scenario-lab";
 import { VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
 import { DEFAULT_VIDEO_MIN_MARGIN_GUARD } from "@/lib/pricing/credit-pricing-formulas";
@@ -98,9 +99,18 @@ export async function upsertModelCostAction(formData: FormData): Promise<ActionR
 
   if (!vendor || !canonicalModelKey) return { ok: false, error: "厂商与归口模型键必填" };
   if (listCostYuan < 0) return { ok: false, error: "成本不能为负" };
-  const netCostYuan = listCostYuan * (1 - discountRate);
 
-  const data = {
+  if (id && !active) {
+    await prisma.modelCostProfile.update({
+      where: { id },
+      data: { active: false, effectiveTo: new Date() },
+    });
+    revalidatePath("/admin/finance/model-cost");
+    revalidatePath("/admin/finance/credit-pricing");
+    return { ok: true };
+  }
+
+  const result = await upsertModelCostProfileVersioned({
     vendor,
     canonicalModelKey,
     channel: channel || "CHANNEL",
@@ -109,16 +119,17 @@ export async function upsertModelCostAction(formData: FormData): Promise<ActionR
     tierRaw,
     listCostYuan,
     discountRate,
-    netCostYuan,
     note,
-    active,
-  };
+    seedId: id || undefined,
+  });
 
-  if (id) {
-    await prisma.modelCostProfile.update({ where: { id }, data });
-  } else {
-    await prisma.modelCostProfile.create({ data });
+  if (result.action === "unchanged" && id) {
+    await prisma.modelCostProfile.update({
+      where: { id: result.profileId },
+      data: { note, credentialId },
+    });
   }
+
   revalidatePath("/admin/finance/model-cost");
   revalidatePath("/admin/finance/credit-pricing");
   return { ok: true };
@@ -176,8 +187,6 @@ export async function importModelCostsAction(
     const channel = (raw.channel ?? "CHANNEL") as CreditChannel;
     const unit = (raw.unit ?? "PER_IMAGE") as CreditCostUnit;
     const tierRaw = raw.tierRaw?.trim() || null;
-    const netCostYuan = listCostYuan * (1 - discountRate);
-    const active = raw.active !== false;
 
     const existing = await prisma.modelCostProfile.findFirst({
       where: {
@@ -186,10 +195,12 @@ export async function importModelCostsAction(
         channel,
         unit,
         tierRaw,
+        active: true,
+        effectiveTo: null,
       },
     });
 
-    const data = {
+    const result = await upsertModelCostProfileVersioned({
       vendor,
       canonicalModelKey,
       channel,
@@ -198,17 +209,10 @@ export async function importModelCostsAction(
       tierRaw,
       listCostYuan,
       discountRate,
-      netCostYuan,
       note: raw.note?.trim() || null,
-      active,
-    };
-
-    if (existing) {
-      await prisma.modelCostProfile.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.modelCostProfile.create({ data });
-    }
-    imported++;
+      seedId: existing ? undefined : `import-${vendor}-${canonicalModelKey}-${tierRaw ?? "default"}-${channel}`,
+    });
+    if (result.action !== "unchanged") imported++;
   }
 
   revalidatePath("/admin/finance/model-cost");

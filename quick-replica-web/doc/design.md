@@ -25,11 +25,13 @@
 | `QrWorkspacePanel` | 中栏工作区 + 产生 |
 | `QrTemplateGallery` | 右栏模板 |
 | `QrTemplatePreviewModal` | 预览 + 复制（80% 正方形弹层） |
-| `QrGeneratePreviewModal` | 产生完成 |
+| `QrGeneratePreviewModal` | 产生中 / 完成 |
+| `QrGenerateDock` | 生成中缩小到右下角（对齐画布后台视频小窗） |
 | `QrModal` | portal 弹层 |
 
 ## 交互
 
 - 右栏点模板 → 预览 → **复制** → 中栏 workspace
 - 中栏 **产生** → 轮询 → 预览 → 入库 prepend 右栏
+- 产生中点关闭 / Esc / 遮罩 → **缩小到右下角**继续生成，可再开其它任务；点小窗展开
 - 禁止 `window.alert` → `QrModal`

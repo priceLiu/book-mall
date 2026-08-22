@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Minimize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -30,6 +30,8 @@ type Props = {
   /** 已在「我的作品」中保存过则关闭时不再提示 */
   alreadySaved?: boolean;
   onClose: () => void;
+  /** 生成中点关闭 / 遮罩 / Esc：缩到右下角继续跑 */
+  onMinimize?: () => void;
   onSaved: (template: NonNullable<QrGenerateJobResult["template"]>) => void;
 };
 
@@ -63,6 +65,7 @@ export function QrGeneratePreviewModal({
   generateDraft,
   alreadySaved = false,
   onClose,
+  onMinimize,
   onSaved,
 }: Props) {
   const [saving, setSaving] = useState(false);
@@ -122,7 +125,10 @@ export function QrGeneratePreviewModal({
   };
 
   const requestClose = () => {
-    if (generating) return;
+    if (generating) {
+      onMinimize?.();
+      return;
+    }
     if (needsSavePrompt && !confirmDiscard) {
       setConfirmDiscard(true);
       return;
@@ -143,12 +149,12 @@ export function QrGeneratePreviewModal({
   const loadingEta =
     generateDraft?.category === "world"
       ? "3D 场景通常需要数分钟，请保持此窗口打开"
-      : "通常需要 1～3 分钟，请保持此窗口打开";
+      : "通常需要 1～3 分钟。可缩小到右下角继续操作";
 
   return (
     <QrModal
       open={open}
-      onClose={generating ? () => {} : requestClose}
+      onClose={requestClose}
       title={audioGenerating ? undefined : title}
       variant={audioGenerating ? "audio-track" : isAudio ? "audio" : "square"}
       hideHeader={audioGenerating}
@@ -161,7 +167,19 @@ export function QrGeneratePreviewModal({
         }
       >
         {audioGenerating && generateDraft ? (
-          <QrAudioGenerateGenerating draft={generateDraft} />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <QrAudioGenerateGenerating draft={generateDraft} />
+            <div className="flex justify-end px-4 pb-3">
+              <button
+                type="button"
+                className="qr-btn-secondary inline-flex items-center gap-1.5 text-xs"
+                onClick={requestClose}
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+                缩小到右下角
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {generating && !isAudio ? (
@@ -182,6 +200,14 @@ export function QrGeneratePreviewModal({
                 <Loader2 className="h-10 w-10 animate-spin text-[var(--qr-brand)]" />
                 <p className="text-sm text-white/90">{loadingHint}</p>
                 <p className="px-4 text-center text-xs text-white/55">{loadingEta}</p>
+                <button
+                  type="button"
+                  className="qr-btn-secondary mt-1 inline-flex items-center gap-1.5 text-xs"
+                  onClick={requestClose}
+                >
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  缩小到右下角
+                </button>
               </div>
             </div>
           </div>

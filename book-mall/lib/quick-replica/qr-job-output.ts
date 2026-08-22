@@ -1,4 +1,11 @@
+import { dashscopeExtractTaskImageUrl } from "@/lib/gateway/dashscope-client";
 import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-client";
+
+function firstHttpUrl(values: unknown): string | null {
+  if (!Array.isArray(values)) return null;
+  const first = values.find((u) => typeof u === "string" && /^https?:\/\//i.test(u.trim()));
+  return typeof first === "string" ? first.trim() : null;
+}
 
 /** 从 GatewayRequestLog.resultSummary 解析媒体输出 URL（兼容多种终态结构） */
 export function extractQrJobOutputUrl(resultSummary: unknown): {
@@ -19,6 +26,14 @@ export function extractQrJobOutputUrl(resultSummary: unknown): {
   }
   if (typeof root.image_url === "string" && root.image_url.trim()) {
     return { url: root.image_url.trim(), mediaType: "image" };
+  }
+  const imageUrls = firstHttpUrl(root.imageUrls) ?? firstHttpUrl(root.images);
+  if (imageUrls) {
+    return { url: imageUrls, mediaType: "image" };
+  }
+  const dashscopeImage = dashscopeExtractTaskImageUrl(root);
+  if (dashscopeImage) {
+    return { url: dashscopeImage, mediaType: "image" };
   }
   if (typeof root.url === "string" && root.url.trim()) {
     const url = root.url.trim();

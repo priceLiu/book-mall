@@ -4,6 +4,7 @@
  *   pnpm exec dotenv -e .env.local -- tsx scripts/seed-lib-nano-pro-credit-prices.ts
  */
 import { publishModelCreditPrice } from "../lib/pricing/credit-pricing-engine";
+import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { prisma } from "../lib/prisma";
 
 const TIERS = [
@@ -31,32 +32,17 @@ const TIERS = [
 ] as const;
 
 async function upsertCost(row: (typeof TIERS)[number]) {
-  const netCostYuan = row.listCostYuan * (1 - row.discountRate);
-  const id = `seed_lib_nano_${row.canonicalModelKey}`;
-  await prisma.modelCostProfile.upsert({
-    where: { id },
-    create: {
-      id,
-      canonicalModelKey: row.canonicalModelKey,
-      vendor: "kie",
-      channel: "CHANNEL",
-      unit: "PER_IMAGE",
-      tierRaw: row.tierRaw,
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-lib-nano-pro-credit-prices",
-    },
-    update: {
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-lib-nano-pro-credit-prices",
-    },
+  const result = await importModelCostProfileVersioned({
+    canonicalModelKey: row.canonicalModelKey,
+    vendor: "kie",
+    unit: "PER_IMAGE",
+    tierRaw: row.tierRaw,
+    listCostYuan: row.listCostYuan,
+    discountRate: row.discountRate,
+    note: "seed-lib-nano-pro-credit-prices",
+    seedId: `seed_lib_nano_${row.canonicalModelKey}`,
   });
-  console.log(`[cost] ${row.canonicalModelKey}`);
+  console.log(`[${result.action}] ${row.canonicalModelKey}`);
 }
 
 async function syncOfferingCredits(defaultTierKey: string) {

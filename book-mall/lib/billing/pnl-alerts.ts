@@ -9,6 +9,8 @@
  *
  * 阈值判定为纯函数（可单测）；指标聚合走 GatewayRequestLog / CreditLedger。
  */
+import { estimateGatewayLogNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
+import { GATEWAY_USAGE_LOG_SELECT } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { prisma } from "@/lib/prisma";
 
 export const PNL_THRESHOLDS = {
@@ -103,12 +105,17 @@ function dayBounds(daysAgo: number): { from: Date; to: Date } {
 async function marginFromLogs(where: Record<string, unknown>): Promise<number | null> {
   const logs = await prisma.gatewayRequestLog.findMany({
     where: where as never,
-    select: { costSnapshotYuan: true, marginSnapshot: true },
+    select: {
+      ...GATEWAY_USAGE_LOG_SELECT,
+      costSnapshotYuan: true,
+      marginSnapshot: true,
+      estimatedVendorCostYuan: true,
+    },
   });
   let totalCost = 0;
   let totalRevenue = 0;
   for (const l of logs) {
-    const cost = num(l.costSnapshotYuan);
+    const cost = estimateGatewayLogNetCostYuan(l);
     const margin = l.marginSnapshot != null ? num(l.marginSnapshot) : null;
     if (cost <= 0 || margin == null || margin >= 1) continue;
     totalCost += cost;
@@ -119,11 +126,15 @@ async function marginFromLogs(where: Record<string, unknown>): Promise<number | 
 }
 
 async function videoCostBetween(from: Date, to: Date): Promise<number> {
-  const agg = await prisma.gatewayRequestLog.aggregate({
+  const logs = await prisma.gatewayRequestLog.findMany({
     where: { requestKind: "VIDEO", status: "SUCCEEDED", completedAt: { gte: from, lt: to } } as never,
-    _sum: { costSnapshotYuan: true },
+    select: {
+      ...GATEWAY_USAGE_LOG_SELECT,
+      costSnapshotYuan: true,
+      estimatedVendorCostYuan: true,
+    },
   });
-  return num(agg._sum.costSnapshotYuan);
+  return logs.reduce((sum, l) => sum + estimateGatewayLogNetCostYuan(l), 0);
 }
 
 /** 积分损耗率 = (退款 + 解冻) ÷ (冻结 + 消费)。 */

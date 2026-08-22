@@ -10,7 +10,6 @@ import {
 import {
   gatewayV1ClientMeta,
   gatewayV1CreateTask,
-  gatewayV1RecordInfo,
 } from "@/lib/gateway/gateway-v1-http-client";
 import {
   normalizeKieRecordForToolLab,
@@ -47,6 +46,15 @@ import { readQrDraftFromInputSummary } from "@/lib/quick-replica/qr-log-draft";
 import { resolveQrGenerateThumbnailUrl } from "@/lib/quick-replica/qr-video-thumbnail";
 import { getQrAudioVoiceDef } from "@/lib/quick-replica/qr-audio-catalog";
 import { findMinimaxVoiceById } from "@/lib/quick-replica/minimax-voice-catalog";
+import {
+  dashscopeExtractTaskImageUrl,
+  dashscopeGetTask,
+  isDashscopeTaskFailed,
+  isDashscopeTaskSuccess,
+} from "@/lib/gateway/dashscope-client";
+import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import { extractKieResultUrl } from "@/lib/story/kie-client";
+import { prisma } from "@/lib/prisma";
 
 function isQrTextToImageCharacterKind(kind: string): boolean {
   return kind === "create-character" || kind === "character-image";
@@ -62,8 +70,6 @@ function isQrTextToAudioKind(draft: QrWorkspaceDraft): boolean {
       draft.kind === "voice-changer")
   );
 }
-import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-client";
-import { prisma } from "@/lib/prisma";
 
 const CLIENT_SOURCE = "QUICK_REPLICA" as const;
 
@@ -468,6 +474,7 @@ export async function qrPollGenerateJob(
     if (out?.url) {
       return { status: "SUCCEEDED", outputUrl: out.url };
     }
+    return { status: "FAILED", error: "任务已完成，但未解析到输出地址" };
   }
 
   if (log.status === "FAILED") {
@@ -476,6 +483,57 @@ export async function qrPollGenerateJob(
 
   if (!log.externalTaskId) {
     return { status: "PENDING" };
+  }
+
+  if (log.providerKind === "DASHSCOPE") {
+    if (log.externalTaskId === log.id) {
+      return { status: "RUNNING" };
+    }
+    if (!log.credentialId) {
+      return { status: "RUNNING" };
+    }
+    const cred = await getDecryptedCredentialApiKey(log.credentialId);
+    if (!cred) {
+      return { status: "FAILED", error: "凭证不可用" };
+    }
+    const polled = await dashscopeGetTask({
+      apiKey: cred.apiKey,
+      taskId: log.externalTaskId,
+      baseUrl: cred.baseUrl,
+    });
+    if (!polled.ok) {
+      return { status: "RUNNING" };
+    }
+    const output = polled.output as Record<string, unknown>;
+    const taskStatus =
+      typeof output.task_status === "string" ? output.task_status : undefined;
+    if (isDashscopeTaskSuccess(taskStatus)) {
+      const outputUrl = dashscopeExtractTaskImageUrl(output);
+      if (!outputUrl) {
+        return { status: "FAILED", error: "任务已完成，但未解析到图片地址" };
+      }
+      await finalizeRequestLog(logId, {
+        status: "SUCCEEDED",
+        durationMs: log.submittedAt ? Date.now() - log.submittedAt.getTime() : 0,
+        resultSummary: { output, image_url: outputUrl, imageUrls: [outputUrl] },
+        model: log.model,
+      });
+      return { status: "SUCCEEDED", outputUrl };
+    }
+    if (isDashscopeTaskFailed(taskStatus)) {
+      const failMessage =
+        (typeof output.message === "string" && output.message) ||
+        (typeof output.code === "string" && output.code) ||
+        "生成失败";
+      await finalizeRequestLog(logId, {
+        status: "FAILED",
+        durationMs: log.submittedAt ? Date.now() - log.submittedAt.getTime() : 0,
+        failMessage,
+        model: log.model,
+      });
+      return { status: "FAILED", error: failMessage };
+    }
+    return { status: "RUNNING" };
   }
 
   if (log.providerKind === "KIE" && log.credentialId) {
@@ -491,7 +549,7 @@ export async function qrPollGenerateJob(
         return { status: "SUCCEEDED", outputUrl };
       }
       if (synced.status === "SUCCEEDED") {
-        return { status: "SUCCEEDED" };
+        return { status: "FAILED", error: "任务已完成，但未解析到输出地址" };
       }
       return { status: "RUNNING" };
     }
@@ -510,54 +568,7 @@ export async function qrPollGenerateJob(
     };
   }
 
-  const auth = await requireGatewayAuth(userId);
-  const polled = await gatewayV1RecordInfo({
-    apiKeyId: auth.id,
-    taskId: log.externalTaskId,
-    meta: gatewayV1ClientMeta(CLIENT_SOURCE, { bookUserId: userId }),
-  });
-
-  const record = polled.data as KieRecordResponse;
-  const normalized: ToolLabKiePollOutput = normalizeKieRecordForToolLab(record);
-
-  if (normalized.task_status === "SUCCEEDED") {
-    const outputUrl =
-      normalized.video_url ?? extractKieResultUrl(record) ?? undefined;
-    if (outputUrl) {
-      const mediaType = log.requestKind === "IMAGE" ? "image" : "video";
-      await finalizeRequestLog(logId, {
-        status: "SUCCEEDED",
-        durationMs: log.submittedAt ? Date.now() - log.submittedAt.getTime() : 0,
-        resultSummary:
-          mediaType === "image"
-            ? { url: outputUrl, image_url: outputUrl }
-            : { video_url: outputUrl },
-        model: log.model,
-      });
-      return { status: "SUCCEEDED", outputUrl };
-    }
-    return { status: "RUNNING" };
-  }
-
-  if (normalized.task_status === "FAILED") {
-    await finalizeRequestLog(logId, {
-      status: "FAILED",
-      durationMs: log.submittedAt ? Date.now() - log.submittedAt.getTime() : 0,
-      failMessage: normalized.message ?? "生成失败",
-      failCode: normalized.code,
-      model: log.model,
-    });
-    return { status: "FAILED", error: normalized.message ?? "生成失败" };
-  }
-
-  return {
-    status:
-      normalized.task_status === "PENDING"
-        ? "PENDING"
-        : normalized.task_status === "RUNNING"
-          ? "RUNNING"
-          : "RUNNING",
-  };
+  return { status: "RUNNING" };
 }
 
 export function resolveGenerateHandlerKind(kind: string): string {

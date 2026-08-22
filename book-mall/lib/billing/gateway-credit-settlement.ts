@@ -67,8 +67,11 @@ export function computeVideoChargeCredits(input: {
 
 function resolveVideoDurationSec(
   log: GatewayRequestLog,
-  metrics: { durationSec?: number | null },
+  metrics: { durationSec?: number | null; outputVideoSec?: number | null },
 ): number {
+  if (metrics.outputVideoSec != null && metrics.outputVideoSec > 0) {
+    return videoBillableSeconds(metrics.outputVideoSec);
+  }
   if (metrics.durationSec != null && metrics.durationSec > 0) {
     return videoBillableSeconds(metrics.durationSec);
   }
@@ -103,8 +106,19 @@ interface BillingTarget {
 
 /** 按日志解析视频应扣积分（回补 / 预览共用）。 */
 export async function computeExpectedVideoCreditsForLog(
-  log: Pick<GatewayRequestLog, "id" | "model" | "canonicalModelKey" | "inputSummary" | "tenantId" | "actorBookUserId" | "apiKeyId">,
-  metrics?: { durationSec?: number | null },
+  log: Pick<
+    GatewayRequestLog,
+    | "id"
+    | "model"
+    | "canonicalModelKey"
+    | "inputSummary"
+    | "resultSummary"
+    | "requestKind"
+    | "tenantId"
+    | "actorBookUserId"
+    | "apiKeyId"
+  >,
+  metrics?: { durationSec?: number | null; outputVideoSec?: number | null },
 ): Promise<{ units: number; credits: number } | null> {
   const target = await resolveLogBillingTarget(log as GatewayRequestLog);
   if (!target) return null;
@@ -118,10 +132,7 @@ export async function computeExpectedVideoCreditsForLog(
   const costSnap = await resolveCostSnapshot(canonical);
   if (!costSnap) return null;
   const accountSnap = await getAccountCreditBalances(target.ref);
-  const durationSec =
-    metrics?.durationSec != null && metrics.durationSec > 0
-      ? videoBillableSeconds(metrics.durationSec)
-      : resolveBillableVideoSecondsFromLog(log);
+  const durationSec = resolveVideoDurationSec(log as GatewayRequestLog, metrics ?? {});
   return computeVideoChargeCredits({
     snapshot: costSnap,
     durationSec,
@@ -265,7 +276,7 @@ export function billableUnitCount(
       if (metrics.isAsr || metrics.isVideo === false) {
         return audioBillableSeconds(metrics.durationSec ?? null);
       }
-      return videoBillableSeconds(metrics.durationSec ?? null);
+      return videoBillableSeconds(metrics.outputVideoSec ?? metrics.durationSec ?? null);
     case "PER_IMAGE":
       return Math.max(1, Math.round(metrics.images ?? 1));
     case "PER_KTOKEN":
@@ -405,7 +416,12 @@ async function settleVideoFromReserve(
   target: BillingTarget,
   log: GatewayRequestLog,
   snap: CostSnapshot | null,
-  metrics: { durationSec?: number | null; images?: number | null; totalTokens?: number | null },
+  metrics: {
+    durationSec?: number | null;
+    outputVideoSec?: number | null;
+    images?: number | null;
+    totalTokens?: number | null;
+  },
 ): Promise<number> {
   const billableSec = resolveVideoDurationSec(log, metrics);
   const accountSnap = await getAccountCreditBalances(target.ref);

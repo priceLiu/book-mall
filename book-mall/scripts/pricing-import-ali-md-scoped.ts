@@ -10,6 +10,7 @@ import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 
 import { prisma } from "../lib/prisma";
+import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { collectGatewayAliyunRoutes } from "../lib/pricing/collect-gateway-aliyun-routes";
 import {
   GATEWAY_ALI_PRICE_BY_MODEL_KEY,
@@ -49,45 +50,18 @@ async function upsertCostProfile(args: {
   outputListCostYuan?: number;
   note: string;
 }) {
-  const discountRate = 0;
-  const netCostYuan = args.listCostYuan * (1 - discountRate);
   const id = profileId(args.canonicalModelKey, args.tierRaw ?? "");
-  await prisma.modelCostProfile.upsert({
-    where: { id },
-    create: {
-      id,
-      vendor: args.vendor,
-      canonicalModelKey: args.canonicalModelKey,
-      channel: "CHANNEL",
-      unit: args.unit,
-      tierRaw: args.tierRaw ?? null,
-      listCostYuan: args.listCostYuan,
-      inputListCostYuan: args.inputListCostYuan ?? null,
-      outputListCostYuan: args.outputListCostYuan ?? null,
-      discountRate,
-      netCostYuan,
-      active: true,
-      note: args.note,
-    },
-    update: {
-      listCostYuan: args.listCostYuan,
-      inputListCostYuan: args.inputListCostYuan ?? null,
-      outputListCostYuan: args.outputListCostYuan ?? null,
-      discountRate,
-      netCostYuan,
-      active: true,
-      note: args.note,
-    },
-  });
-  await prisma.modelCostProfile.updateMany({
-    where: {
-      canonicalModelKey: args.canonicalModelKey,
-      unit: args.unit,
-      tierRaw: args.tierRaw ?? null,
-      id: { not: id },
-      active: true,
-    },
-    data: { active: false, note: "superseded by pricing-import-ali-md-scoped" },
+  await importModelCostProfileVersioned({
+    canonicalModelKey: args.canonicalModelKey,
+    vendor: args.vendor,
+    unit: args.unit,
+    tierRaw: args.tierRaw ?? null,
+    listCostYuan: args.listCostYuan,
+    inputListCostYuan: args.inputListCostYuan ?? null,
+    outputListCostYuan: args.outputListCostYuan ?? null,
+    discountRate: 0,
+    note: args.note,
+    seedId: id,
   });
 }
 

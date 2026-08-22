@@ -40,6 +40,16 @@ describe("log-billing-metrics", () => {
     ).toBe(2);
   });
 
+  it("VIDEO prefers output duration from resultSummary", () => {
+    expect(
+      resolveBillableVideoSecondsFromLog({
+        requestKind: "VIDEO",
+        inputSummary: { input: { duration: 5 } },
+        resultSummary: { usage: { output_video_duration: 12.4 } },
+      }),
+    ).toBe(12);
+  });
+
   it("VIDEO counts reference duration as seconds", () => {
     expect(
       resolveBillableVideoSecondsFromLog({

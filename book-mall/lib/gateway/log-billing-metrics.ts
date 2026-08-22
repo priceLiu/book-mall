@@ -68,12 +68,44 @@ export function resolveBillableImageCountFromLog(log: {
   return 1;
 }
 
-/** 视频：从 inputSummary 解析用户选择时长，封顶 15s；缺省 15s。 */
+function positiveNum(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  if (typeof v === "string" && v.trim()) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/** 从 resultSummary 解析成片时长（优先于请求参数时长）。 */
+export function parseOutputVideoSecondsFromResult(resultSummary: unknown): number | null {
+  const fromWan = parseWan30OutputVideoSec(resultSummary);
+  if (fromWan != null) return fromWan;
+  const result = resultRecord(resultSummary);
+  if (!result) return null;
+  const usage = result.usage;
+  if (usage && typeof usage === "object" && !Array.isArray(usage)) {
+    const u = usage as Record<string, unknown>;
+    const fromOutput =
+      positiveNum(u.output_video_duration) ??
+      positiveNum(u.outputVideoDuration) ??
+      positiveNum(u.output_duration);
+    if (fromOutput != null) return Math.round(fromOutput);
+    const fromDur = positiveNum(u.duration);
+    if (fromDur != null) return Math.round(fromDur);
+  }
+  return null;
+}
+
+/** 视频：优先 resultSummary 成片秒数，否则 input 请求时长，封顶 15s；缺省 15s。 */
 export function resolveBillableVideoSecondsFromLog(log: {
   requestKind?: string | null;
   inputSummary?: unknown;
+  resultSummary?: unknown;
 }): number {
   if (log.requestKind !== "VIDEO") return 1;
+  const outputSec = parseOutputVideoSecondsFromResult(log.resultSummary);
+  if (outputSec != null) return videoBillableSeconds(outputSec);
   const hints = parseVideoPricingHints(log.inputSummary);
   return videoBillableSeconds(hints.durationSec);
 }
@@ -99,6 +131,13 @@ export function resolveBillableAudioSecondsFromLog(
   const result = resultRecord(resultSummary);
   const fromResult = positiveInt(result?.audioDurationSec);
   if (fromResult != null) return fromResult;
+  const usage = result?.usage;
+  if (usage && typeof usage === "object" && !Array.isArray(usage)) {
+    const fromUsage = positiveInt((usage as Record<string, unknown>).seconds);
+    if (fromUsage != null) return fromUsage;
+    const fromDur = positiveInt((usage as Record<string, unknown>).duration);
+    if (fromDur != null) return fromDur;
+  }
   const input = inputRecord(log.inputSummary);
   return positiveInt(input?.audioDurationSec) ?? positiveInt(input?.durationSec);
 }

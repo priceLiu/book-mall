@@ -3,15 +3,26 @@ import type { QrGenerateJobResult } from "@/components/quick-replica/qr-workspac
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_MS = 15 * 60 * 1000;
+const CREATE_TIMEOUT_MS = 4 * 60 * 1000;
+const POLL_TIMEOUT_MS = 25_000;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  try {
+    return AbortSignal.timeout(ms);
+  } catch {
+    return undefined;
+  }
 }
 
 async function pollOnce(logId: string): Promise<QrGenerateJobResult> {
   try {
     const pollRes = await fetchQrPlatform(
       `/api/book-mall/api/platform/v1/quick-replica/jobs/${encodeURIComponent(logId)}`,
+      { signal: timeoutSignal(POLL_TIMEOUT_MS) },
     );
     const body = (await pollRes.json().catch(() => ({}))) as QrGenerateJobResult & {
       error?: string;
@@ -24,6 +35,11 @@ async function pollOnce(logId: string): Promise<QrGenerateJobResult> {
     }
     return body;
   } catch (e) {
+    const aborted =
+      e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError");
+    if (aborted) {
+      return { status: "RUNNING" };
+    }
     return {
       status: "FAILED",
       error: e instanceof Error ? e.message : "轮询请求失败",
@@ -44,14 +60,29 @@ export type QrGenerateJobRun = QrGenerateJobResult & { logId?: string };
 export async function runQrGenerateJob(
   draft: import("@/lib/qr-template-types").QrWorkspaceDraft,
 ): Promise<QrGenerateJobRun> {
-  const createRes = await fetchQrPlatform(
-    "/api/book-mall/api/platform/v1/quick-replica/jobs/generate",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
-    },
-  );
+  let createRes: Response;
+  try {
+    createRes = await fetchQrPlatform(
+      "/api/book-mall/api/platform/v1/quick-replica/jobs/generate",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+        signal: timeoutSignal(CREATE_TIMEOUT_MS),
+      },
+    );
+  } catch (e) {
+    const aborted =
+      e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError");
+    return {
+      status: "FAILED",
+      error: aborted
+        ? "创建任务超时，请到「生成记录」查看是否已提交"
+        : e instanceof Error
+          ? e.message
+          : "创建任务失败",
+    };
+  }
   if (!createRes.ok) {
     const body = (await createRes.json().catch(() => ({}))) as { error?: string };
     return {
@@ -61,6 +92,10 @@ export async function runQrGenerateJob(
   }
   const created = (await createRes.json()) as { logId: string };
   const logId = created.logId;
+  return watchQrGenerateJob(logId);
+}
+
+export async function watchQrGenerateJob(logId: string): Promise<QrGenerateJobRun> {
   const deadline = Date.now() + MAX_POLL_MS;
 
   while (Date.now() < deadline) {

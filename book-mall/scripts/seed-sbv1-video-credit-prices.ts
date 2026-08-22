@@ -5,6 +5,7 @@
  */
 import { VIDEO_MODEL_SEEDS } from "../lib/billing/video-model-seeds";
 import { publishModelCreditPrice } from "../lib/pricing/credit-pricing-engine";
+import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { prisma } from "../lib/prisma";
 
 const SBV1_CANONICAL_KEYS = [
@@ -16,32 +17,17 @@ const SBV1_CANONICAL_KEYS = [
 ] as const;
 
 async function upsertCost(row: (typeof VIDEO_MODEL_SEEDS)[number]) {
-  const netCostYuan = row.listCostYuan * (1 - row.discountRate);
-  const id = `seed_sbv1_${row.canonicalModelKey}`;
-  await prisma.modelCostProfile.upsert({
-    where: { id },
-    create: {
-      id,
-      canonicalModelKey: row.canonicalModelKey,
-      vendor: row.vendor,
-      channel: "CHANNEL",
-      unit: "PER_SEC",
-      tierRaw: row.tierRaw,
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-sbv1-video-credit-prices",
-    },
-    update: {
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-sbv1-video-credit-prices",
-    },
+  const result = await importModelCostProfileVersioned({
+    canonicalModelKey: row.canonicalModelKey,
+    vendor: row.vendor,
+    unit: "PER_SEC",
+    tierRaw: row.tierRaw,
+    listCostYuan: row.listCostYuan,
+    discountRate: row.discountRate,
+    note: "seed-sbv1-video-credit-prices",
+    seedId: `seed_sbv1_${row.canonicalModelKey}`,
   });
-  console.log(`[cost] ${row.canonicalModelKey}`);
+  console.log(`[${result.action}] ${row.canonicalModelKey}`);
 }
 
 async function main() {

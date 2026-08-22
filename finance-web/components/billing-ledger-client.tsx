@@ -5,13 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatLedgerCredits, LEDGER_TYPE_LABEL } from "@/lib/ledger-display";
 
 type LedgerRow = {
   id: string;
   type: string;
   credits: number;
   balanceAfter: number;
-  pool: string;
   actorUserId: string | null;
   refType: string | null;
   refId: string | null;
@@ -28,17 +28,7 @@ type LedgerResponse = {
   tenantName?: string;
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  GRANT: "发放",
-  CONSUME: "消耗",
-  REFUND: "返还",
-  EXPIRE: "过期清零",
-  TOPUP: "充值",
-  ADJUST: "人工校正",
-  RESERVE: "冻结",
-  SETTLE: "结算",
-  RELEASE: "解冻",
-};
+const TYPE_LABEL = LEDGER_TYPE_LABEL;
 
 const PERSONA_LABEL: Record<string, string> = {
   PLATFORM_CREDIT: "平台代付",
@@ -113,7 +103,6 @@ export function BillingLedgerClient({
               <th className="py-2 pr-3 text-right">积分</th>
               <th className="py-2 pr-3 text-right">余额后</th>
               {scope === "team" ? <th className="py-2 pr-3">操作人</th> : null}
-              <th className="py-2 pr-3">池</th>
               <th className="py-2">说明</th>
             </tr>
           </thead>
@@ -124,12 +113,11 @@ export function BillingLedgerClient({
                   {new Date(row.createdAt).toLocaleString("zh-CN")}
                 </td>
                 <td className="py-2 pr-3">{TYPE_LABEL[row.type] ?? row.type}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{row.credits}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{formatLedgerCredits(row.credits)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{row.balanceAfter}</td>
                 {scope === "team" ? (
                   <td className="py-2 pr-3 font-mono text-xs">{row.actorUserId?.slice(0, 8) ?? "—"}</td>
                 ) : null}
-                <td className="py-2 pr-3">{row.pool}</td>
                 <td className="py-2 max-w-xs truncate" title={row.description ?? undefined}>
                   {row.description ?? "—"}
                   {row.billingPersonaSnap ? (

@@ -9,6 +9,8 @@ const SEED_ITEMS: {
   description: string;
   docPath?: string;
   sortOrder: number;
+  listKind?: "FEATURE" | "PENDING";
+  completed?: boolean;
 }[] = [
   {
     title: "运营中心",
@@ -128,10 +130,83 @@ const SEED_ITEMS: {
     docPath: "docs/模型与应用管理.md",
     sortOrder: 125,
   },
+  // —— 对账 Phase 2（待处理 · 见 docs/对账需求.md）——
+  {
+    title: "对账需求 · 总规格",
+    description: "两阶段预算/对账/收益框架、口径对照与验收标准（SSOT）。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 200,
+    listKind: "PENDING",
+  },
+  {
+    title: "AR-106 总表预估净成本列",
+    description: "Gateway 用量 × 净成本（costSnapshot/ModelCostProfile.netCost）汇总列。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 210,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-107 总表用户实收与行级毛利",
+    description: "展示 platformRevenueYuan 与 实收−净成本；与驾驶舱/P&L 一致。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 220,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-108 对账列头口径说明",
+    description: "区分挂牌预算、对账差额、用户实收；消除平台挂牌误读。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 230,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-109 对账总表顶栏 KPI",
+    description: "预算净成本、已对账差额、实收、毛利四象限汇总。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 240,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-103 费用概览按日 P&L",
+    description: "usage-overview 增加按日损益 Tab，与 P&L 同源。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 250,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-104 ASR 历史秒数回填",
+    description: "回填 Gateway 日志 audioDurationSec，收敛 ASR UNDER_PLATFORM。",
+    docPath: "docs/阿里对账.md",
+    sortOrder: 260,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-105 S2V 非 Gateway 缺口排查",
+    description: "wan2.2-s2v 等平台用量与阿里 CSV 59.3s 缺口根因。",
+    docPath: "docs/阿里对账.md",
+    sortOrder: 270,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-110 成本档关旧开新 · 全量脚本",
+    description: "seed/价目导入脚本统一走 upsertModelCostProfileVersioned。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 280,
+    listKind: "PENDING",
+    completed: true,
+  },
 ];
 
 async function main() {
   let created = 0;
+  let updated = 0;
   let skipped = 0;
 
   for (const item of SEED_ITEMS) {
@@ -139,7 +214,16 @@ async function main() {
       where: { title: item.title },
     });
     if (existing) {
-      skipped += 1;
+      if (item.completed === true && !existing.completed) {
+        await prisma.adminPendingFeature.update({
+          where: { id: existing.id },
+          data: { completed: true },
+        });
+        updated += 1;
+        console.log(`[pending-feature] ✓ ${item.title}`);
+      } else {
+        skipped += 1;
+      }
       continue;
     }
     await prisma.adminPendingFeature.create({
@@ -147,9 +231,9 @@ async function main() {
         title: item.title,
         description: item.description,
         docPath: item.docPath ?? "",
-        listKind: "FEATURE",
+        listKind: item.listKind ?? "FEATURE",
         sortOrder: item.sortOrder,
-        completed: false,
+        completed: item.completed ?? false,
       },
     });
     created += 1;
@@ -157,7 +241,7 @@ async function main() {
   }
 
   console.log(
-    `[pending-feature] 完成：新增 ${created}，已存在 ${skipped}，合计 ${SEED_ITEMS.length}`,
+    `[pending-feature] 完成：新增 ${created}，标记完成 ${updated}，已存在 ${skipped}，合计 ${SEED_ITEMS.length}`,
   );
 }
 

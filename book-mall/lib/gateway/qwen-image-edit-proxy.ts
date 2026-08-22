@@ -194,14 +194,19 @@ export async function qwenImageEditGenerate(
     parameters,
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${req.apiKey}`,
-      "Content-Type": "application/json",
+  const { gatewayFetch } = await import("@/lib/gateway/format-fetch-error");
+  const response = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${req.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+    { hop: "upstream", providerKind: "DASHSCOPE" },
+  );
 
   const text = await response.text();
   let data: Record<string, unknown> = {};

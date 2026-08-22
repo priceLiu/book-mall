@@ -1010,7 +1010,7 @@ export type DashscopeAsrSentence = {
   text: string;
 };
 
-function parseAsrSentencesFromTranscriptionJson(
+export function parseAsrSentencesFromTranscriptionJson(
   raw: unknown,
 ): DashscopeAsrSentence[] {
   const root = raw as Record<string, unknown> | null;

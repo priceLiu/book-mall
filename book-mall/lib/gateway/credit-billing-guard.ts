@@ -18,6 +18,7 @@ import {
   computeBaseMarginRate,
   DEFAULT_CREDIT_ANCHOR_YUAN,
 } from "@/lib/pricing/credit-pricing-formulas";
+import { refreshCreditPriceIfStale } from "@/lib/pricing/credit-pricing-engine";
 
 /** providerKind → 财务口径 vendor（与 ModelCatalog.vendor / ModelCostProfile.vendor 对齐） */
 export function vendorForProviderKind(kind: GatewayProviderKind): string {
@@ -155,6 +156,13 @@ export interface CostSnapshot {
  * 找不到成本档返回 null（由调用方决定是否阻断）。
  */
 export async function resolveCostSnapshot(canonicalModelKey: string): Promise<CostSnapshot | null> {
+  await refreshCreditPriceIfStale({
+    canonicalModelKey,
+    publishedBy: "resolveCostSnapshot",
+  }).catch(() => {
+    /* 无成本档或毛利护栏失败时沿用旧报价 */
+  });
+
   const now = new Date();
   const profiles = await prisma.modelCostProfile.findMany({
     where: {

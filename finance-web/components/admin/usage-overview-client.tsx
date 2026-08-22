@@ -43,10 +43,33 @@ type OverviewData = {
   exportRows: Array<Record<string, unknown>>;
   exportRangeLabel: string;
   packageReconciliation?: PackageReconciliationData | null;
+  scannedLogCount?: number;
+  effectiveSince?: string;
+  dailyPnl?: Array<{
+    day: string;
+    revenueYuan: number;
+    costYuan: number;
+    profitYuan: number;
+    marginRate: number | null;
+    consumeCredits: number;
+    callCount: number;
+  }>;
+  dailyPnlTotals?: {
+    revenueYuan: number;
+    costYuan: number;
+    profitYuan: number;
+    consumeCredits: number;
+    callCount: number;
+  };
 };
 
 const inputCls =
   "rounded border border-[#d9d9d9] px-2 py-1.5 text-sm focus:border-[#1890ff] focus:outline-none";
+
+function defaultSinceMonth(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
 
 function monthLabel(yyyymm: string): string {
   if (!/^\d{6}$/.test(yyyymm)) return yyyymm;
@@ -125,7 +148,8 @@ function AggList({
 
 export function UsageOverviewClient() {
   const base = useBookMallBaseUrl();
-  const [since, setSince] = useState("");
+  const [activeTab, setActiveTab] = useState<"usage" | "pnl">("usage");
+  const [since, setSince] = useState(defaultSinceMonth);
   const [tool, setTool] = useState("");
   const [userId, setUserId] = useState("");
   const [billingPersona, setBillingPersona] = useState("");
@@ -166,7 +190,7 @@ export function UsageOverviewClient() {
         <div>
           <h1 className="text-lg font-medium">费用多维度概览</h1>
           <p className="mt-1 text-sm text-[#8c8c8c]">
-            来源 GatewayRequestLog（财务 2.0）。含 0 积分成功调用；扣积分行另计锚定金额。
+            来源 GatewayRequestLog（财务 2.0）。默认当月；聚合基于最近 {data.scannedLogCount ?? "—"} 条成功调用。
           </p>
         </div>
         <button
@@ -182,7 +206,7 @@ export function UsageOverviewClient() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
             <span className="text-[#8c8c8c]">起始月份 YYYYMM</span>
-            <input className={`${inputCls} w-36`} value={since} onChange={(e) => setSince(e.target.value)} placeholder="202512" />
+            <input className={`${inputCls} w-36`} value={since} onChange={(e) => setSince(e.target.value)} placeholder={defaultSinceMonth()} />
           </label>
           <label className="text-sm">
             <span className="text-[#8c8c8c]">工具</span>
@@ -230,6 +254,95 @@ export function UsageOverviewClient() {
         </div>
       </section>
 
+      <div className="flex gap-1 border-b border-[#e8e8e8]">
+        {(
+          [
+            { id: "usage" as const, label: "用量聚合" },
+            { id: "pnl" as const, label: "按日 P&L" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`border-b-2 px-3 py-2 text-sm ${
+              activeTab === tab.id
+                ? "border-[#1890ff] font-medium text-[#1890ff]"
+                : "border-transparent text-[#595959] hover:text-[#262626]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "pnl" ? (
+        <section className="rounded border border-[#e8e8e8] bg-white p-4">
+          <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-medium">按日损益</h2>
+              <p className="text-xs text-[#8c8c8c]">
+                与 P&L 报表同源（CreditLedger 实收 + Gateway 净成本）；自 {monthLabel(data.effectiveSince ?? since)} 起。
+              </p>
+            </div>
+            {data.dailyPnlTotals ? (
+              <p className="text-xs text-[#595959]">
+                合计 实收 ¥{data.dailyPnlTotals.revenueYuan.toFixed(2)} · 净成本 ¥
+                {data.dailyPnlTotals.costYuan.toFixed(2)} · 毛利 ¥
+                {data.dailyPnlTotals.profitYuan.toFixed(2)}
+              </p>
+            ) : null}
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-[#fafafa]">
+                <tr>
+                  <th className="px-2 py-2 text-left">日期</th>
+                  <th className="px-2 py-2 text-right">用户实收</th>
+                  <th className="px-2 py-2 text-right">净成本</th>
+                  <th className="px-2 py-2 text-right">毛利</th>
+                  <th className="px-2 py-2 text-right">毛利率</th>
+                  <th className="px-2 py-2 text-right">消耗积分</th>
+                  <th className="px-2 py-2 text-right">Gateway 调用</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data.dailyPnl ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-2 py-6 text-center text-[#8c8c8c]">
+                      该区间暂无积分消耗流水
+                    </td>
+                  </tr>
+                ) : null}
+                {(data.dailyPnl ?? []).map((row) => (
+                  <tr key={row.day} className="border-t hover:bg-[#fafafa]">
+                    <td className="px-2 py-1.5">{row.day}</td>
+                    <td className="px-2 py-1.5 text-right">¥{row.revenueYuan.toFixed(2)}</td>
+                    <td className="px-2 py-1.5 text-right">¥{row.costYuan.toFixed(2)}</td>
+                    <td
+                      className={`px-2 py-1.5 text-right ${
+                        row.profitYuan > 0
+                          ? "text-[#52c41a]"
+                          : row.profitYuan < 0
+                            ? "text-[#ff4d4f]"
+                            : ""
+                      }`}
+                    >
+                      ¥{row.profitYuan.toFixed(2)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {row.marginRate != null ? `${(row.marginRate * 100).toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">{row.consumeCredits}</td>
+                    <td className="px-2 py-1.5 text-right">{row.callCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : (
+        <>
       {data.packageReconciliation ? (
         <PackageReconciliationPanel data={data.packageReconciliation} />
       ) : null}
@@ -307,6 +420,8 @@ export function UsageOverviewClient() {
           </tbody>
         </table>
       </section>
+        </>
+      )}
     </FinancePageShell>
   );
 }

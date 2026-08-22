@@ -20,6 +20,24 @@ describe("extractQrJobOutputUrl", () => {
     ).toEqual({ url: "https://cdn.example.com/motion.mp4", mediaType: "video" });
   });
 
+  it("reads Dashscope sync imageUrls", () => {
+    expect(
+      extractQrJobOutputUrl({
+        sync: true,
+        imageUrls: ["https://cdn.example.com/qwen.png"],
+        imageCount: 1,
+        output: {
+          task_status: "SUCCEEDED",
+          choices: [
+            {
+              message: { content: [{ image: "https://cdn.example.com/qwen.png" }] },
+            },
+          ],
+        },
+      }),
+    ).toEqual({ url: "https://cdn.example.com/qwen.png", mediaType: "image" });
+  });
+
   it("reads demo_audio from voice clone summary", () => {
     expect(
       extractQrJobOutputUrl({

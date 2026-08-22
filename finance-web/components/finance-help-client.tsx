@@ -114,7 +114,8 @@ export function FinanceHelpClient() {
               ["/admin/model-cost", "模型成本", "厂商挂牌价与渠道折扣（仅财务）"],
               ["/admin/credit-pricing", "积分报价", "发布各模型对外积分价"],
               ["/admin/membership-plans", "会员套餐", "五档套餐与席位带"],
-              ["/admin/reconciliation", "云账单对账", "上传阿里云 CSV 对账与补扣"],
+              ["/admin/reconciliation", "对账总账", "平台底表 + 厂商 CSV/Excel 对账"],
+              ["/admin/reconciliation/payments", "用户支付明细", "微信 Checkout 与积分流水"],
               ["/admin/billing/users", "用户明细", "31 列费用明细（含成本/M）"],
             ].map(([href, title, desc]) => (
               <tr key={href} className="border-t">

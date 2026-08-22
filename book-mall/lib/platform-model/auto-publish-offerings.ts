@@ -140,6 +140,11 @@ export async function autoPublishPlatformOfferings(input?: {
     }
 
     try {
+      await refreshCreditPriceIfStale({
+        canonicalModelKey: def.canonicalModelKey,
+        displayName: def.displayName,
+        publishedBy: input?.publishedBy ?? "autoPublishPlatformOfferings",
+      });
       if (def.canonicalModelKey === "lib-nano-pro") {
         await publishModelCreditPrice({
           canonicalModelKey: pricingCanonicalKey,

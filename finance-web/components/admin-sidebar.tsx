@@ -74,9 +74,16 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: "/admin/reconciliation",
-        label: "云账单对账",
+        label: "对账总账",
         icon: CloudUpload,
-        prefix: "/admin/reconciliation",
+        exact: true,
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
+        href: "/admin/reconciliation/payments",
+        label: "用户支付明细",
+        icon: Coins,
+        prefix: "/admin/reconciliation/payments",
         show: (v) => canViewFinanceCost(v.user.role),
       },
       {

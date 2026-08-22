@@ -247,3 +247,46 @@ export async function publishModelCreditPrice(input: {
     netCostYuan: toNum(saved.netCostYuan),
   };
 }
+
+/** 成本档晚于积分报价发布 → 视为过期，生成前应重发报价 */
+export async function isCreditPriceStale(canonicalModelKey: string): Promise<boolean> {
+  const price = await prisma.modelCreditPrice.findUnique({
+    where: { canonicalModelKey },
+    select: { publishedAt: true },
+  });
+  if (!price) return true;
+
+  const profile = await prisma.modelCostProfile.findFirst({
+    where: { canonicalModelKey, active: true },
+    orderBy: { updatedAt: "desc" },
+    select: { updatedAt: true },
+  });
+  if (!profile) return false;
+  return profile.updatedAt.getTime() > price.publishedAt.getTime();
+}
+
+/** 积分报价过期则按最新成本档重发；返回是否执行了重发 */
+export async function refreshCreditPriceIfStale(input: {
+  canonicalModelKey: string;
+  displayName?: string;
+  publishedBy?: string;
+}): Promise<boolean> {
+  const stale = await isCreditPriceStale(input.canonicalModelKey);
+  if (!stale) return false;
+
+  const existing = await prisma.modelCreditPrice.findUnique({
+    where: { canonicalModelKey: input.canonicalModelKey },
+    select: { displayName: true },
+  });
+  const displayName =
+    input.displayName ??
+    existing?.displayName ??
+    input.canonicalModelKey.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  await publishModelCreditPrice({
+    canonicalModelKey: input.canonicalModelKey,
+    displayName,
+    publishedBy: input.publishedBy ?? "refreshCreditPriceIfStale",
+  });
+  return true;
+}

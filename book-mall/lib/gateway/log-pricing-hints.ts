@@ -50,15 +50,17 @@ export function parseVideoPricingHints(
     );
 
   let tierRaw: string | undefined;
-  const resolution = input.resolution ?? input.video_resolution;
+  const params =
+    input.parameters && typeof input.parameters === "object" && !Array.isArray(input.parameters)
+      ? (input.parameters as Record<string, unknown>)
+      : null;
+  const resolution =
+    input.resolution ??
+    input.video_resolution ??
+    (typeof params?.resolution === "string" ? params.resolution : undefined);
   if (typeof resolution === "string" && resolution.trim()) {
-    tierRaw = resolution.trim().toUpperCase();
-  } else if (typeof input.resolution === "string") {
-    tierRaw = input.resolution.trim().toLowerCase().includes("1080")
-      ? "1080P"
-      : input.resolution.trim().toLowerCase().includes("720")
-        ? "720P"
-        : undefined;
+    const r = resolution.trim().toUpperCase();
+    tierRaw = r.endsWith("P") ? r : r.includes("1080") ? "1080P" : r.includes("720") ? "720P" : r;
   }
 
   return { durationSec, tierRaw };

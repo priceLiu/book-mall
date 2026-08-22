@@ -4,8 +4,8 @@ import {
   QWEN3_ASR_FLASH_FILETRANS_MODEL,
   dashscopeTranscribePublicFileUrl,
   isDashscopeAsrNoSpeechOutcome,
-  type DashscopeAsrSentence,
 } from "@/lib/gateway/dashscope-client";
+import { audioDurationSecFromSentences } from "@/lib/finance/infer-asr-audio-duration";
 import {
   isGatewayAuthResponse,
   requireGatewayV1Auth,
@@ -22,12 +22,6 @@ import {
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 
 export const dynamic = "force-dynamic";
-
-function audioDurationSecFromSentences(sentences: DashscopeAsrSentence[]): number {
-  if (sentences.length === 0) return 1;
-  const maxMs = Math.max(...sentences.map((s) => s.endMs));
-  return Math.max(1, Math.ceil(maxMs / 1000));
-}
 
 export async function POST(request: NextRequest) {
   const authOrResp = await requireGatewayV1Auth(request);

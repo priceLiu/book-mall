@@ -5,6 +5,11 @@ import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
 import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
 
 import {
+  QrGenerateDock,
+  newQrGenerateSessionId,
+  type QrGenerateSession,
+} from "@/components/quick-replica/qr-generate-dock";
+import {
   QrGeneratePreviewModal,
   type QrGenerateModalPhase,
 } from "@/components/quick-replica/qr-generate-preview-modal";
@@ -35,7 +40,11 @@ import {
   type QrWorkspaceDraft,
   templateToWorkspaceDraft,
 } from "@/lib/qr-template-types";
-import { runQrGenerateJob, deleteQrUserTemplate } from "@/lib/run-qr-generate-job";
+import {
+  deleteQrUserTemplate,
+  runQrGenerateJob,
+  watchQrGenerateJob,
+} from "@/lib/run-qr-generate-job";
 import { formatQrPlatformError } from "@/lib/qr-platform-fetch";
 import { PortalNav } from "@/components/portal-nav";
 import { getBookAccountUrl } from "@/lib/site-origin";
@@ -81,16 +90,8 @@ export function QrAppClient({
   const [kindItems, setKindItems] = useState<QrKindBrowseItem[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<QrTemplate | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
-  const [generateResult, setGenerateResult] = useState<QrGenerateJobResult | null>(null);
-  const [generatePhase, setGeneratePhase] = useState<QrGenerateModalPhase>("generating");
-  const [generateModalOpen, setGenerateModalOpen] = useState(false);
-  const [generateLogId, setGenerateLogId] = useState<string | null>(null);
-  const [generateAlreadySaved, setGenerateAlreadySaved] = useState(false);
-  const [generatePreviewImage, setGeneratePreviewImage] = useState<string | undefined>();
-  const [generateDraftSnapshot, setGenerateDraftSnapshot] = useState<QrWorkspaceDraft | null>(
-    null,
-  );
-  const [generating, setGenerating] = useState(false);
+  const [generateSessions, setGenerateSessions] = useState<QrGenerateSession[]>([]);
+  const [focusedGenerateId, setFocusedGenerateId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [homeCategoryCards, setHomeCategoryCards] = useState<QrHomeCategoryCard[]>(() =>
@@ -110,7 +111,13 @@ export function QrAppClient({
   const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
   const voiceGalleryFocusTimerRef = useRef<number | null>(null);
-  const generateInFlightRef = useRef(false);
+  const focusedGenerate = generateSessions.find((s) => s.id === focusedGenerateId);
+  const focusedGenerating =
+    Boolean(focusedGenerate) &&
+    !focusedGenerate?.minimized &&
+    focusedGenerate?.phase === "generating";
+  const dockSessions = generateSessions.filter((s) => s.minimized);
+  const showGenerateModal = Boolean(focusedGenerate && !focusedGenerate.minimized);
 
   const templateScope =
     navMode === "my-works" || navMode === "generate-history" ? "my" : "all";
@@ -483,42 +490,78 @@ export function QrAppClient({
     );
   };
 
+  const patchGenerateSession = useCallback(
+    (id: string, patch: Partial<QrGenerateSession>) => {
+      setGenerateSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      );
+    },
+    [],
+  );
+
   const handleGenerate = useCallback(async (draftToRun: QrWorkspaceDraft) => {
-    if (generateInFlightRef.current) return;
-    generateInFlightRef.current = true;
-    setGenerating(true);
-    setGenerateModalOpen(true);
-    setGeneratePhase("generating");
-    setGenerateResult(null);
-    setGenerateLogId(null);
-    setGenerateAlreadySaved(false);
-    setGenerateDraftSnapshot(draftToRun);
-    setGeneratePreviewImage(
+    const id = newQrGenerateSessionId();
+    const previewImageUrl =
       draftToRun.targetImageUrl.trim() ||
-        draftToRun.sceneImageUrls.find((u) => u.trim()) ||
-        undefined,
-    );
+      draftToRun.sceneImageUrls.find((u) => u.trim()) ||
+      undefined;
+    const session: QrGenerateSession = {
+      id,
+      logId: null,
+      phase: "generating",
+      result: null,
+      draft: draftToRun,
+      previewImageUrl,
+      alreadySaved: false,
+      minimized: false,
+      startedAt: Date.now(),
+    };
+    setGenerateSessions((prev) => [
+      ...prev.map((s) =>
+        s.phase === "generating" && !s.minimized ? { ...s, minimized: true } : s,
+      ),
+      session,
+    ]);
+    setFocusedGenerateId(id);
 
     try {
       const job = await runQrGenerateJob(draftToRun);
-      setGenerateLogId(job.logId ?? null);
-      setGenerateResult(job);
-      setGeneratePhase(
-        job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed",
-      );
+      const phase: QrGenerateModalPhase =
+        job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed";
+      setGenerateSessions((prev) => {
+        const othersBusy = prev.some(
+          (s) => s.id !== id && !s.minimized && s.phase === "generating",
+        );
+        return prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                logId: job.logId ?? s.logId,
+                result: job,
+                phase,
+                minimized: othersBusy ? s.minimized : false,
+              }
+            : s,
+        );
+      });
+      setFocusedGenerateId((current) => {
+        if (current && current !== id) return current;
+        return id;
+      });
       if (job.status === "FAILED" && job.error) {
         setCopyToast(formatQrPlatformError(job.error));
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "生成请求失败";
-      setGenerateResult({ status: "FAILED", error: message });
-      setGeneratePhase("failed");
+      patchGenerateSession(id, {
+        result: { status: "FAILED", error: message },
+        phase: "failed",
+        minimized: false,
+      });
+      setFocusedGenerateId(id);
       setCopyToast(formatQrPlatformError(message));
-    } finally {
-      generateInFlightRef.current = false;
-      setGenerating(false);
     }
-  }, []);
+  }, [patchGenerateSession]);
 
   const onGenerateSaved = (template: QrTemplate) => {
     setTemplates((prev) => [template, ...prev.filter((x) => x.id !== template.id)]);
@@ -555,13 +598,40 @@ export function QrAppClient({
       alreadySaved?: boolean;
       generateDraft?: QrWorkspaceDraft;
     }) => {
-      setGenerateLogId(args.logId);
-      setGenerateResult(args.result);
-      setGeneratePhase(args.phase);
-      setGeneratePreviewImage(args.previewImageUrl);
-      setGenerateAlreadySaved(Boolean(args.alreadySaved));
-      setGenerateDraftSnapshot(args.generateDraft ?? null);
-      setGenerateModalOpen(true);
+      let sessionId = "";
+      setGenerateSessions((prev) => {
+        const existing = prev.find((s) => s.logId === args.logId);
+        sessionId = existing?.id ?? newQrGenerateSessionId();
+        const next: QrGenerateSession = {
+          id: sessionId,
+          logId: args.logId,
+          phase: args.phase,
+          result: args.result,
+          draft:
+            args.generateDraft ??
+            existing?.draft ??
+            defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
+          previewImageUrl: args.previewImageUrl,
+          alreadySaved: Boolean(args.alreadySaved),
+          minimized: false,
+          startedAt: existing?.startedAt ?? Date.now(),
+        };
+        return [...prev.filter((s) => s.id !== sessionId && s.logId !== args.logId), next];
+      });
+      setFocusedGenerateId(sessionId);
+      if (args.phase !== "generating") return;
+      void watchQrGenerateJob(args.logId).then((job) => {
+        const phase: QrGenerateModalPhase =
+          job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed";
+        setGenerateSessions((prev) =>
+          prev.map((s) =>
+            s.logId === args.logId || s.id === sessionId
+              ? { ...s, logId: job.logId ?? args.logId, result: job, phase, minimized: false }
+              : s,
+          ),
+        );
+        setFocusedGenerateId((current) => current ?? sessionId);
+      });
     },
     [],
   );
@@ -605,7 +675,7 @@ export function QrAppClient({
         <QrWorkspacePanel
           draft={draft}
           onDraftChange={setDraft}
-          generating={generating}
+          generating={focusedGenerating}
           onGenerate={(d) => void handleGenerate(d)}
           onBackToBrowse={
             navMode === "category" || navMode === "my-works"
@@ -776,7 +846,7 @@ export function QrAppClient({
               onOmniboxExpandedChange={setWorldOmniboxExpanded}
               onApplyTemplate={applyWorldTemplate}
               onGenerate={(d) => void handleGenerate(d)}
-              generating={generating}
+              generating={focusedGenerating}
               onToast={setCopyToast}
             />
           </main>
@@ -888,24 +958,41 @@ export function QrAppClient({
       />
 
       <QrGeneratePreviewModal
-        open={generateModalOpen}
-        phase={generatePhase}
-        result={generateResult}
-        logId={generateLogId}
-        previewImageUrl={generatePreviewImage}
-        generateDraft={generateDraftSnapshot}
-        alreadySaved={generateAlreadySaved}
+        open={showGenerateModal}
+        phase={focusedGenerate?.phase ?? "generating"}
+        result={focusedGenerate?.result ?? null}
+        logId={focusedGenerate?.logId}
+        previewImageUrl={focusedGenerate?.previewImageUrl}
+        generateDraft={focusedGenerate?.draft ?? null}
+        alreadySaved={focusedGenerate?.alreadySaved ?? false}
+        onMinimize={() => {
+          if (!focusedGenerateId) return;
+          patchGenerateSession(focusedGenerateId, { minimized: true });
+          setFocusedGenerateId(null);
+        }}
         onClose={() => {
-          if (generating) return;
-          setGenerateModalOpen(false);
-          setGenerateResult(null);
-          setGenerateLogId(null);
-          setGenerateAlreadySaved(false);
-          setGenerateDraftSnapshot(null);
+          if (!focusedGenerateId) return;
+          const id = focusedGenerateId;
+          setFocusedGenerateId(null);
+          setGenerateSessions((prev) => prev.filter((s) => s.id !== id));
         }}
         onSaved={(template) => {
-          setGenerateAlreadySaved(true);
+          if (focusedGenerateId) {
+            patchGenerateSession(focusedGenerateId, { alreadySaved: true });
+          }
           onGenerateSaved(template);
+        }}
+      />
+
+      <QrGenerateDock
+        sessions={dockSessions}
+        onExpand={(id) => {
+          patchGenerateSession(id, { minimized: false });
+          setFocusedGenerateId(id);
+        }}
+        onDismiss={(id) => {
+          setGenerateSessions((prev) => prev.filter((s) => s.id !== id));
+          setFocusedGenerateId((current) => (current === id ? null : current));
         }}
       />
 

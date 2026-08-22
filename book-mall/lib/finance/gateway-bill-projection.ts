@@ -16,7 +16,8 @@ import {
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
 import { BILLING_TASK_KIND_LABEL } from "@/lib/billing/gateway-log-classifier";
-import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
+import { resolveBillableUsageForLog } from "@/lib/gateway/gateway-token-usage-aggregate";
+import { estimateGatewayLogNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
 import {
   ALL_DISPLAY_KEYS,
   K_CREDITS_CONSUMED,
@@ -63,6 +64,15 @@ export type GatewayLogBillInput = Pick<
   | "credentialId"
   | "credentialAliasSnapshot"
   | "inputSummary"
+  | "resultSummary"
+  | "totalTokens"
+  | "promptTokens"
+  | "completionTokens"
+  | "hasTokenUsage"
+  | "metricsSource"
+  | "tenantId"
+  | "apiKeyId"
+  | "estimatedVendorCostYuan"
   | "failCode"
   | "failMessage"
 >;
@@ -180,7 +190,7 @@ export function projectGatewayLogToBillRow(
   const displayName = modelDisplayNames.get(modelKey) ?? modelKey;
   const toolLabel = clientPageToToolLabel(log.clientPage);
   const credits = settlement?.creditsCharged ?? log.creditsCharged ?? 0;
-  const costYuan = log.costSnapshotYuan != null ? Number(log.costSnapshotYuan) : null;
+  const lineNetCost = estimateGatewayLogNetCostYuan(log);
   const margin = log.marginSnapshot != null ? Number(log.marginSnapshot) : null;
   const submitted = log.submittedAt;
   const modelName =
@@ -234,14 +244,11 @@ export function projectGatewayLogToBillRow(
 
   row["平台账单/费用说明"] = feeDescription(log, settlement);
 
-  const usageUnits =
-    log.requestKind === "VIDEO"
-      ? resolveBillableVideoSecondsFromLog(log)
-      : resolveBillableImageCountFromLog(log);
+  const { amount: usageUnits } = resolveBillableUsageForLog(log);
   row["平台用量/用量"] = String(usageUnits);
   row["平台用量/用量单位"] = requestKindUnit(log.requestKind, billingCategory);
 
-  row["财务核算/净成本(元)"] = costYuan != null ? costYuan.toFixed(6) : "—";
+  row["财务核算/净成本(元)"] = lineNetCost > 0 ? lineNetCost.toFixed(6) : "—";
   row["财务核算/毛利率"] = formatMargin(margin);
 
   return row;

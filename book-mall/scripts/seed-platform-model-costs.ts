@@ -8,6 +8,7 @@
  */
 import { MISSING_MODEL_COST_SEEDS } from "../lib/finance/missing-model-cost-seeds";
 import { autoPublishPlatformOfferings } from "../lib/platform-model/auto-publish-offerings";
+import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { prisma } from "../lib/prisma";
 
 type CostSeed = {
@@ -314,55 +315,21 @@ function seedId(row: CostSeed): string {
   return `seed_${row.canonicalModelKey}_${row.vendor}${tier}`;
 }
 
-/** 同 canonical + vendor 只保留本次 seed 档，避免旧手工档净成本更低导致误发布。 */
-async function deactivateSupersededCosts(row: CostSeed) {
-  const keepId = seedId(row);
-  const r = await prisma.modelCostProfile.updateMany({
-    where: {
-      canonicalModelKey: row.canonicalModelKey,
-      vendor: row.vendor,
-      id: { not: keepId },
-      active: true,
-    },
-    data: {
-      active: false,
-      note: "superseded by seed-platform-model-costs",
-    },
-  });
-  if (r.count > 0) {
-    console.log(
-      `[deactivate] ${row.canonicalModelKey} (${row.vendor}): ${r.count} legacy profile(s)`,
-    );
-  }
-}
-
+/** 同 canonical + vendor + tier 关旧开新（不再 in-place 覆盖）。 */
 async function upsertCost(row: CostSeed) {
-  const netCostYuan = row.listCostYuan * (1 - row.discountRate);
-  const id = seedId(row);
-  await prisma.modelCostProfile.upsert({
-    where: { id },
-    create: {
-      id,
-      canonicalModelKey: row.canonicalModelKey,
-      vendor: row.vendor,
-      unit: row.unit,
-      tierRaw: row.tierRaw ?? null,
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-platform-model-costs (kie.ai/pricing)",
-    },
-    update: {
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-platform-model-costs (kie.ai/pricing)",
-    },
+  const result = await importModelCostProfileVersioned({
+    canonicalModelKey: row.canonicalModelKey,
+    vendor: row.vendor,
+    unit: row.unit,
+    tierRaw: row.tierRaw ?? null,
+    listCostYuan: row.listCostYuan,
+    discountRate: row.discountRate,
+    note: "seed-platform-model-costs (kie.ai/pricing)",
+    seedId: seedId(row),
   });
-  console.log(`[ok] ${row.canonicalModelKey} (${row.vendor}${row.tierRaw ? ` · ${row.tierRaw}` : ""})`);
-  await deactivateSupersededCosts(row);
+  console.log(
+    `[${result.action}] ${row.canonicalModelKey} (${row.vendor}${row.tierRaw ? ` · ${row.tierRaw}` : ""})`,
+  );
 }
 
 function chunk<T>(items: T[], size: number): T[][] {

@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
             idempotencyKey: true,
             type: true,
             credits: true,
+            description: true,
             createdAt: true,
           },
         })
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
           ? {
               type: ledger.type,
               credits: ledger.credits,
+              description: ledger.description,
               createdAt: ledger.createdAt.toISOString(),
             }
           : null,

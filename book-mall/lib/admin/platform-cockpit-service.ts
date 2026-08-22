@@ -17,6 +17,10 @@ import {
 } from "@/lib/platform-assistant/feedback-service";
 import { listRecentAiNewsDaily } from "@/lib/platform-assistant/ai-news-service";
 import { getTodayTrafficTotals } from "@/lib/site-traffic/queries";
+import {
+  buildCockpitFinanceKpis,
+  type CockpitFinanceKpis,
+} from "@/lib/admin/platform-cockpit-finance-kpis";
 
 function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -44,6 +48,10 @@ function lastNCstDateKeys(n: number, now: Date): string[] {
 
 export type CockpitChartDatum = { label: string; value: number };
 export type CockpitTrendDatum = { date: string; value: number };
+
+export type PlatformCockpitFinanceSection = {
+  finance: CockpitFinanceKpis;
+};
 
 export type PlatformCockpitSnapshot = {
   generatedAt: string;
@@ -287,6 +295,15 @@ function buildMetricsSectionFromCounts(
       todayUniqueIps: trafficToday.uniqueIps,
     },
   };
+}
+
+/** 本月经营三角：应付厂商 / 用户实收 / 毛利 */
+export async function fetchPlatformCockpitFinanceSection(input?: {
+  periodKey?: string;
+  now?: Date;
+}): Promise<PlatformCockpitFinanceSection> {
+  const finance = await buildCockpitFinanceKpis(input);
+  return { finance };
 }
 
 /** 积分清零运维（驾驶舱首屏优先块） */

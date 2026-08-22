@@ -226,14 +226,6 @@ export function LoginForm() {
         </BoxReveal>
 
         <LoginLegacyGuide />
-
-        {process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_ALLOW_DEV_AUTH === "1" ? (
-          <p className="text-center text-xs text-neutral-500">
-            <Link href="/dev/auth" className="underline">
-              开发测试登录入口
-            </Link>
-          </p>
-        ) : null}
       </section>
     </AuthAnimatedScreen>
   );

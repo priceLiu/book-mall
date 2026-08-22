@@ -51,7 +51,7 @@ import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-re
 import { gatewayFetch } from "./format-fetch-error";
 import {
   parseWan30InputVideoSec,
-  parseWan30OutputVideoSec,
+  parseOutputVideoSecondsFromResult,
   resolveBillableAudioSecondsFromLog,
   resolveBillableImageCountFromLog,
 } from "./log-billing-metrics";
@@ -442,15 +442,14 @@ export async function finalizeRequestLog(
           metrics: {
             durationSec:
               resolveBillableAudioSecondsFromLog(settledLog, patch.resultSummary) ??
+              parseOutputVideoSecondsFromResult(patch.resultSummary) ??
               videoHints.durationSec,
             totalTokens: tokenMetrics.totalTokens ?? undefined,
             promptTokens: tokenMetrics.promptTokens ?? undefined,
             completionTokens: tokenMetrics.completionTokens ?? undefined,
             images: resolveBillableImageCountFromLog(settledLog),
             inputVideoSec: parseWan30InputVideoSec(settledLog.inputSummary),
-            outputVideoSec:
-              videoHints.durationSec ??
-              parseWan30OutputVideoSec(patch.resultSummary),
+            outputVideoSec: parseOutputVideoSecondsFromResult(patch.resultSummary),
           },
         });
       } else if (patch.status === "FAILED") {

@@ -17,7 +17,8 @@ const cards = [
   { href: "/admin/vip-ops", title: "VIP 大额预充", desc: "充值测算、开通账号、合同/凭证、席位与积分运维。" },
   { href: "/admin/referrals", title: "分享返佣", desc: "分享人业绩汇总 · 逐人录入返佣比例。" },
   { href: "/admin/referral-payouts", title: "返佣结算 · 返佣单", desc: "按月计算返佣、生成返佣单、标记打款、导出 CSV。" },
-  { href: "/admin/reconciliation", title: "云账单对账", desc: "上传 CSV 对账与补扣。" },
+  { href: "/admin/reconciliation", title: "对账总账", desc: "平台 Gateway 底表 + 厂商账单导入对账。" },
+  { href: "/admin/reconciliation/payments", title: "用户支付明细", desc: "微信 Checkout 与订单、积分流水联查。" },
   { href: "/admin/models/coefficients", title: "模型 / 零售系数", desc: "逐工具独立配置系数 M。" },
   { href: "/admin/pricing-disclosure", title: "价格公示", desc: "与前台公示页共用价目表。" },
 ];

@@ -58,7 +58,7 @@ export const EMPTY_GATEWAY_USAGE: GatewayUsageSummary = {
 
 export const EMPTY_GATEWAY_TOKEN_USAGE = EMPTY_GATEWAY_USAGE;
 
-const GATEWAY_USAGE_LOG_SELECT = {
+export const GATEWAY_USAGE_LOG_SELECT = {
   status: true,
   requestKind: true,
   inputSummary: true,

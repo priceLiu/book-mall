@@ -22,6 +22,10 @@ import {
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  inferS2vVideoSecondsFromLog,
+  mergeS2vDurationIntoResultSummary,
+} from "@/lib/finance/infer-s2v-video-seconds";
 import { pollDashscopeTaskForLog } from "@/lib/gateway/poll-service";
 import {
   createRequestLog,
@@ -386,10 +390,21 @@ async function runS2vStage(taskId: string): Promise<void> {
         ephemeralUrl: videoUrl,
         userId: task.userId,
       });
+      const rawSummary = buildGatewayTaskResultSummary(polled.raw, {
+        videoUrl: persisted.videoUrl,
+      });
+      const durationSec =
+        inferS2vVideoSecondsFromLog({
+          model: S2V_MODEL_KEY,
+          canonicalModelKey: S2V_MODEL_KEY,
+          requestKind: "VIDEO",
+          resultSummary: rawSummary,
+          audioDurationSecFallback: audio.durationSec,
+        }) ?? audio.durationSec;
       await finalizeRequestLog(log.id, {
         status: "SUCCEEDED",
         durationMs: Date.now() - started,
-        resultSummary: buildGatewayTaskResultSummary(polled.raw, {
+        resultSummary: mergeS2vDurationIntoResultSummary(rawSummary, durationSec, {
           videoUrl: persisted.videoUrl,
         }),
         externalTaskId: created.taskId,

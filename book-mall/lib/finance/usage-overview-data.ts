@@ -11,7 +11,7 @@ import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formula
 import { clientPageToToolKey } from "@/lib/finance/client-page-tool";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
 import type { UserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
-import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
+import { buildUsageOverviewDailyPnl, type DailyPnlRow } from "@/lib/finance/usage-overview-daily-pnl";
 import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
 import {
   K_INCLUDED_REMAINING,
@@ -87,9 +87,29 @@ export type UsageOverviewPayload = {
   exportRangeLabel: string;
   /** 筛选单用户时附带套餐/积分对帐摘要 */
   packageReconciliation?: UserPackageReconciliation | null;
+  /** 实际扫描的 Gateway 日志条数（上限见 OVERVIEW_MAX_LOGS） */
+  scannedLogCount: number;
+  /** 聚合默认起始月份 YYYYMM */
+  effectiveSince: string;
+  dailyPnl: DailyPnlRow[];
+  dailyPnlTotals: {
+    revenueYuan: number;
+    costYuan: number;
+    profitYuan: number;
+    consumeCredits: number;
+    callCount: number;
+  };
 };
 
-const GATEWAY_SELECT = {
+/** 单次概览最多扫描的成功调用数，避免连接池长查询超时 */
+const OVERVIEW_MAX_LOGS = 2000;
+
+function defaultSinceMonth(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+const GATEWAY_SELECT_LIGHT = {
   id: true,
   actorBookUserId: true,
   clientSource: true,
@@ -115,6 +135,14 @@ const GATEWAY_SELECT = {
   credentialId: true,
   credentialAliasSnapshot: true,
   inputSummary: true,
+  resultSummary: true,
+  totalTokens: true,
+  promptTokens: true,
+  completionTokens: true,
+  hasTokenUsage: true,
+  metricsSource: true,
+  tenantId: true,
+  estimatedVendorCostYuan: true,
   failCode: true,
   failMessage: true,
 } as const;
@@ -179,21 +207,18 @@ const REQUEST_KIND_LABEL: Record<string, string> = {
 export async function buildUsageOverviewData(
   filters: UsageOverviewFilters,
 ): Promise<UsageOverviewPayload> {
-  const sinceMonth = (filters.since || "").trim();
+  const sinceMonth = (filters.since || "").trim() || defaultSinceMonth();
   const onlyTool = (filters.tool || "").trim().toLowerCase();
   const onlyUserId = (filters.userId || "").trim();
   const persona = (filters.billingPersona || "").trim();
   const staffFlag = (filters.staffFlag || "").trim();
   const tenantId = (filters.tenantId || "").trim();
 
-  const now = new Date();
-  const defaultSince = new Date(now.getUTCFullYear(), now.getUTCMonth() - 5, 1);
-  const sinceCutoff =
-    sinceMonth && /^\d{6}$/.test(sinceMonth)
-      ? new Date(
-          Date.UTC(parseInt(sinceMonth.slice(0, 4), 10), parseInt(sinceMonth.slice(4), 10) - 1, 1),
-        )
-      : defaultSince;
+  const sinceCutoff = /^\d{6}$/.test(sinceMonth)
+    ? new Date(
+        Date.UTC(parseInt(sinceMonth.slice(0, 4), 10), parseInt(sinceMonth.slice(4), 10) - 1, 1),
+      )
+    : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
 
   const gatewayWhere = await buildGatewayLogOverviewWhere({
     tenantId: tenantId || undefined,
@@ -208,9 +233,9 @@ export async function buildUsageOverviewData(
 
   const gatewayLogs = await prisma.gatewayRequestLog.findMany({
     where: gatewayWhere,
-    select: GATEWAY_SELECT,
+    select: GATEWAY_SELECT_LIGHT,
     orderBy: { submittedAt: "desc" },
-    take: 5000,
+    take: OVERVIEW_MAX_LOGS,
   });
 
   const userIds = [
@@ -376,6 +401,26 @@ export async function buildUsageOverviewData(
     ? await fetchUserPackageReconciliation(onlyUserId)
     : null;
 
+  const dailyPnl = await buildUsageOverviewDailyPnl({
+    sinceMonth,
+    userId: onlyUserId || undefined,
+    billingPersona: persona || undefined,
+    staffFlag: staffFlag || undefined,
+  });
+  const dailyPnlTotals = dailyPnl.reduce(
+    (acc, row) => ({
+      revenueYuan: acc.revenueYuan + row.revenueYuan,
+      costYuan: acc.costYuan + row.costYuan,
+      profitYuan: acc.profitYuan + row.profitYuan,
+      consumeCredits: acc.consumeCredits + row.consumeCredits,
+      callCount: acc.callCount + row.callCount,
+    }),
+    { revenueYuan: 0, costYuan: 0, profitYuan: 0, consumeCredits: 0, callCount: 0 },
+  );
+  dailyPnlTotals.revenueYuan = Number(dailyPnlTotals.revenueYuan.toFixed(2));
+  dailyPnlTotals.costYuan = Number(dailyPnlTotals.costYuan.toFixed(2));
+  dailyPnlTotals.profitYuan = Number(dailyPnlTotals.profitYuan.toFixed(2));
+
   return {
     filters: { since: sinceMonth, tool: onlyTool, userId: onlyUserId },
     totalYuan: Number(totalYuan.toFixed(2)),
@@ -403,5 +448,9 @@ export async function buildUsageOverviewData(
     exportRows,
     exportRangeLabel,
     packageReconciliation,
+    scannedLogCount: gatewayLogs.length,
+    effectiveSince: sinceMonth,
+    dailyPnl,
+    dailyPnlTotals,
   };
 }

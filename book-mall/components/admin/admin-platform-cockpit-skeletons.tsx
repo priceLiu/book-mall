@@ -21,6 +21,20 @@ function SectionSkeleton({
   );
 }
 
+export function AdminCockpitFinanceSkeleton() {
+  return (
+    <section className="space-y-4" aria-hidden>
+      <PulseBlock className="h-6 w-40" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <PulseBlock className="h-28" />
+        <PulseBlock className="h-28" />
+        <PulseBlock className="h-28" />
+      </div>
+      <PulseBlock className="h-48 w-full rounded-xl" />
+    </section>
+  );
+}
+
 export function AdminCockpitCreditOpsSkeleton() {
   return <PulseBlock className="h-48 w-full rounded-xl" />;
 }
@@ -60,6 +74,7 @@ export function AdminDashboardLoading() {
         </div>
       </header>
       <AdminCockpitCreditOpsSkeleton />
+      <AdminCockpitFinanceSkeleton />
       <AdminCockpitAssistantSkeleton />
       <AdminCockpitMetricsSkeleton />
       <p className="text-sm text-[#656d76]">正在加载驾驶舱数据…</p>

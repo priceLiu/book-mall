@@ -32,6 +32,14 @@ describe("resolveUpstreamChatTimeoutMs", () => {
     expect(ms).toBe(120_000);
   });
 
+  it("uses long timeout for DashScope multimodal image sync", () => {
+    const ms = resolveUpstreamChatTimeoutMs(
+      "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      { method: "POST", body: "{}" },
+    );
+    expect(ms).toBeGreaterThanOrEqual(600_000);
+  });
+
   it("uses story timeout for KIE codex responses (GPT-5.5 剧本)", () => {
     const ms = resolveUpstreamChatTimeoutMs("https://api.kie.ai/codex/v1/responses", {
       method: "POST",

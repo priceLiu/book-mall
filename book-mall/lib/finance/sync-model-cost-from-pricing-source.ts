@@ -1,8 +1,9 @@
 /**
- * PricingSourceLine → ModelCostProfile 联动同步。
+ * PricingSourceLine → ModelCostProfile 联动同步（关旧开新）。
  */
-import type { PricingBillingKind } from "@prisma/client";
+import { CreditChannel, type PricingBillingKind } from "@prisma/client";
 
+import { upsertModelCostProfileVersioned } from "@/lib/pricing/upsert-model-cost-profile-versioned";
 import { prisma } from "@/lib/prisma";
 
 const UNIT_BY_KIND: Partial<Record<PricingBillingKind, "PER_SEC" | "PER_IMAGE" | "PER_KTOKEN">> = {
@@ -36,32 +37,23 @@ export async function syncModelCostFromPricingSource(versionId: string): Promise
     }
     if (!(listCostYuan > 0)) continue;
     const discountRate = Number(line.effectiveDiscount ?? 0);
-    const netCostYuan = listCostYuan * (1 - Math.min(1, Math.max(0, discountRate)));
-    const id = `sync-${canonicalModelKey}-${line.tierRaw ?? "default"}-CHANNEL`;
-    await prisma.modelCostProfile.upsert({
-      where: { id },
-      create: {
-        id,
-        vendor: "aliyun",
-        canonicalModelKey,
-        channel: "CHANNEL",
-        unit,
-        tierRaw: line.tierRaw,
-        listCostYuan,
-        discountRate,
-        netCostYuan,
-        active: true,
-        note: `sync from PricingSourceLine ${line.id}`,
-      },
-      update: {
-        listCostYuan,
-        discountRate,
-        netCostYuan,
-        active: true,
-        note: `sync from PricingSourceLine ${line.id}`,
-      },
+    const seedId = `sync-${canonicalModelKey}-${line.tierRaw ?? "default"}-CHANNEL`;
+    const existing = await prisma.modelCostProfile.findUnique({
+      where: { id: seedId },
+      select: { id: true },
     });
-    upserted += 1;
+    const result = await upsertModelCostProfileVersioned({
+      vendor: "aliyun",
+      canonicalModelKey,
+      channel: CreditChannel.CHANNEL,
+      unit,
+      tierRaw: line.tierRaw,
+      listCostYuan,
+      discountRate,
+      note: `sync from PricingSourceLine ${line.id}`,
+      seedId: existing ? undefined : seedId,
+    });
+    if (result.action !== "unchanged") upserted += 1;
   }
   return { upserted };
 }

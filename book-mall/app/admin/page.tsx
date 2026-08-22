@@ -4,11 +4,13 @@ import { AdminPlatformCockpitHeader } from "@/components/admin/admin-platform-co
 import {
   AdminCockpitAssistantSection,
   AdminCockpitCreditOpsSection,
+  AdminCockpitFinanceSection,
   AdminCockpitMetricsSection,
 } from "@/components/admin/admin-platform-cockpit-sections";
 import {
   AdminCockpitAssistantSkeleton,
   AdminCockpitCreditOpsSkeleton,
+  AdminCockpitFinanceSkeleton,
   AdminCockpitMetricsSkeleton,
 } from "@/components/admin/admin-platform-cockpit-skeletons";
 
@@ -19,6 +21,10 @@ export default function AdminDashboardPage() {
 
       <Suspense fallback={<AdminCockpitCreditOpsSkeleton />}>
         <AdminCockpitCreditOpsSection />
+      </Suspense>
+
+      <Suspense fallback={<AdminCockpitFinanceSkeleton />}>
+        <AdminCockpitFinanceSection />
       </Suspense>
 
       <Suspense fallback={<AdminCockpitAssistantSkeleton />}>
