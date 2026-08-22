@@ -17,6 +17,18 @@ import { isProjectThumbnailVideoUrl } from "@/lib/canvas/project-thumbnail";
 const CHIP_COUNT = 3;
 const BG_ROTATE_MS = 3000;
 
+function stableFeaturedChips(featured: PortalFeaturedProjectSummary[]) {
+  return featured.slice(0, CHIP_COUNT);
+}
+
+function stableHeroImagePool(args: {
+  featured: PortalFeaturedProjectSummary[];
+  templateThumbs: string[];
+  caseThumbs: string[];
+}): string[] {
+  return collectPortalHeroImagePool(args);
+}
+
 /** 左右大图槽：全高 cover，仅两侧露出 */
 const HERO_BG_LAYERS = [
   {
@@ -102,15 +114,10 @@ function PortalHeroBackdrop({
 
 export function PortalHeroSection() {
   const base = useBookMallBaseUrl();
-  const { featured, templates, cases, featuredLoading } = usePortalHome();
+  const { featured, templates, cases } = usePortalHome();
   const [starting, setStarting] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const chips = useMemo(
-    () => pickRandomItems(featured, CHIP_COUNT),
-    [featured],
-  );
 
   const templateThumbs = useMemo(
     () =>
@@ -125,22 +132,34 @@ export function PortalHeroSection() {
     [cases],
   );
 
-  const imagePool = useMemo(() => {
-    const pool = collectPortalHeroImagePool({
-      featured,
-      templateThumbs,
-      caseThumbs,
-    });
-    return pickRandomItems(pool, pool.length);
-  }, [featured, templateThumbs, caseThumbs]);
+  const stablePool = useMemo(
+    () =>
+      stableHeroImagePool({
+        featured,
+        templateThumbs,
+        caseThumbs,
+      }),
+    [featured, templateThumbs, caseThumbs],
+  );
 
+  /** SSR/水合用稳定顺序；挂载后再随机，避免 hydration mismatch */
+  const [chips, setChips] = useState<PortalFeaturedProjectSummary[]>(() =>
+    stableFeaturedChips(featured),
+  );
+  const [imagePool, setImagePool] = useState<string[]>(() => stablePool);
   const [leftIndex, setLeftIndex] = useState(0);
-  const [rightIndex, setRightIndex] = useState(1);
-  const cursorRef = useRef(0);
+  const [rightIndex, setRightIndex] = useState(() =>
+    stablePool.length > 1 ? 1 : 0,
+  );
+  const cursorRef = useRef(stablePool.length > 1 ? 2 % stablePool.length : 0);
   const updateLeftRef = useRef(true);
 
   useEffect(() => {
-    const len = imagePool.length;
+    setChips(pickRandomItems(featured, CHIP_COUNT));
+    const pool = pickRandomItems(stablePool, stablePool.length);
+    setImagePool(pool);
+
+    const len = pool.length;
     if (len === 0) {
       setLeftIndex(0);
       setRightIndex(0);
@@ -153,7 +172,7 @@ export function PortalHeroSection() {
     setRightIndex(len > 1 ? (start + 1) % len : start);
     cursorRef.current = len > 1 ? (start + 2) % len : start;
     updateLeftRef.current = true;
-  }, [imagePool]);
+  }, [featured, stablePool]);
 
   useEffect(() => {
     if (imagePool.length <= 1) return;
@@ -238,12 +257,7 @@ export function PortalHeroSection() {
             开始我的创作
           </button>
 
-          {featuredLoading && chips.length === 0 ? (
-            <p className="mt-6 flex items-center gap-2 text-sm text-[var(--canvas-muted)]">
-              <Loader2 className="size-4 animate-spin" />
-              加载精选工作流…
-            </p>
-          ) : chips.length > 0 ? (
+          {chips.length > 0 ? (
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               {chips.map((item) => (
                 <button

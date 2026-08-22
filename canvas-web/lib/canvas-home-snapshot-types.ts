@@ -31,3 +31,13 @@ export function isCanvasHomeSnapshotPayload(value: unknown): value is CanvasHome
     Array.isArray(v.filmShowcase)
   );
 }
+
+export function emptyCanvasHomeSnapshotPayload(): CanvasHomeSnapshotPayload {
+  return {
+    version: 1,
+    featured: [],
+    templates: [],
+    cases: [],
+    filmShowcase: [],
+  };
+}

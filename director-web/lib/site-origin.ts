@@ -18,7 +18,12 @@ export function getMainSiteOrigin(): string | null {
     process.env.MAIN_SITE_ORIGIN?.trim() ||
     process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
     process.env.BOOK_MALL_URL?.trim();
-  if (!raw) return null;
+  if (!raw) {
+    if (process.env.NODE_ENV === "development") {
+      return "http://localhost:3000";
+    }
+    return null;
+  }
   const u = normalizeHttpOriginUrl(raw);
   return u?.origin ?? null;
 }
@@ -27,7 +32,12 @@ export function getAppPublicOrigin(): string | null {
   const raw =
     process.env.DIRECTOR_WEB_PUBLIC_ORIGIN?.trim() ||
     process.env.NEXT_PUBLIC_DIRECTOR_WEB_ORIGIN?.trim();
-  if (!raw) return null;
+  if (!raw) {
+    if (process.env.NODE_ENV === "development") {
+      return "http://localhost:3009";
+    }
+    return null;
+  }
   const u = normalizeHttpOriginUrl(raw);
   return u?.origin ?? null;
 }

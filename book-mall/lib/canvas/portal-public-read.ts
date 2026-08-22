@@ -1,13 +1,10 @@
 /**
  * 门户首页 · 匿名可读 GET API（book-mall /api/canvas/*）。
- * 写操作（duplicate / portal-submit / admin）仍须 requireSessionUser。
+ * 首页 portal 列表已改静态快照；此处保留 viewer-session 与 templates scope 供非首页入口。
  */
 export const CANVAS_PORTAL_PUBLIC_GET_PATHS = [
-  "api/canvas/projects/portal-featured",
-  "api/canvas/projects/portal-cases",
-  "api/canvas/projects/portal-film-showcase",
-  "api/canvas/templates",
   "api/canvas/viewer-session",
+  "api/canvas/templates",
   "api/public/static-snapshots/canvas-home",
 ] as const;
 

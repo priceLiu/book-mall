@@ -1,12 +1,9 @@
 /**
- * 门户首页匿名可读 GET — BFF 代理可跳过 tools_token refresh（与 book-mall portal-public-read 对齐）。
+ * 门户首页匿名可读 GET — BFF 代理可跳过 tools_token refresh。
+ * 首页发现/视频墙已静态快照化，不再经此列表拉 portal-* / templates。
  */
 const PORTAL_PUBLIC_GET_PATHS = [
-  "api/canvas/projects/portal-featured",
-  "api/canvas/projects/portal-cases",
-  "api/canvas/projects/portal-film-showcase",
   "api/canvas/viewer-session",
-  "api/public/static-snapshots/canvas-home",
 ] as const;
 
 export function isBookMallPortalPublicGetProxy(

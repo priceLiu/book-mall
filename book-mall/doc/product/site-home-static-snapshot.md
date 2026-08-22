@@ -1,6 +1,7 @@
 # 首页静态快照（Phase 1）
 
 > **状态**：Phase 1 已实施  
+> **SSOT**：[`docs/静态化.md`](../../docs/静态化.md)（需求、ST-* 台账、验收）  
 > **管理页**：`/admin/static-snapshots`  
 > **公开读 API**：`GET /api/public/static-snapshots/site-home`
 
@@ -44,7 +45,7 @@ Phase 1 仅 `pageKey = site-home`；**画布门户首页** `canvas-home` 已接�
 ## 5. 读路径
 
 - 首页：`getSiteHomeSnapshotForRender()` → 当日 READY → 昨日 → `buildSiteHomeSnapshotFallback`
-- 画布门户：`canvas-web` 首页 SSR 读 `canvas-home` 快照；**「最近项目」不在快照内**，始终实时 `GET /api/canvas/projects`，分享成功后主动刷新。
+- 画布门户：`canvas-web` 首页 SSR 读 `canvas-home` 快照；**「最近项目」**实时 API；**发现/视频墙**不再客户端拉 portal-* 列表。
 
 ## 6. showcase 来源（静态 gallery）
 

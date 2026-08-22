@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { Clapperboard, Loader2, Search } from "lucide-react";
 
@@ -8,15 +8,12 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FilmShowcaseCardMedia } from "@/components/home/film-showcase-card-media";
 import { ShowcaseMediaKindBadge } from "@/components/home/showcase-media-kind-badge";
 import { usePortalHome } from "@/components/home/portal-home-context";
-import { useInViewOnce } from "@/components/home/use-in-view-once";
 import { CANVAS_LIST_GRID_CLASS } from "@/components/canvas/canvas-list-cover";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import {
   duplicatePortalFilmShowcaseProject,
-  listPortalFilmShowcase,
   type PortalFilmShowcaseMedia,
 } from "@/lib/canvas-api";
-import { isPortalGuestAuthLoadError } from "@/lib/canvas/portal-load-errors";
 
 function ownerLabel(
   owner?: { id: string; name: string | null; email: string | null } | null,
@@ -31,42 +28,11 @@ function ownerLabel(
 
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
-  const { viewerUserId, filmShowcase: snapshotItems, filmShowcaseLoaded } = usePortalHome();
-  const { ref: sectionRef, inView } = useInViewOnce("200px");
-  const [items, setItems] = useState<PortalFilmShowcaseMedia[]>(
-    filmShowcaseLoaded ? snapshotItems : [],
-  );
-  const [loading, setLoading] = useState(false);
+  const { viewerUserId, filmShowcase: items } = usePortalHome();
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [fetchStarted, setFetchStarted] = useState(false);
-
-  useEffect(() => {
-    if (filmShowcaseLoaded) {
-      setItems(snapshotItems);
-      return;
-    }
-    if (!base?.trim() || !inView || fetchStarted) return;
-    setFetchStarted(true);
-    setLoading(true);
-    setError(null);
-    setLoadFailed(false);
-
-    void listPortalFilmShowcase(base)
-      .then(setItems)
-      .catch((e) => {
-        setItems([]);
-        setLoadFailed(true);
-        const msg = e instanceof Error ? e.message : "视频作品加载失败，请稍后重试";
-        if (!isPortalGuestAuthLoadError(msg)) {
-          setError(msg);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [base, inView, fetchStarted, filmShowcaseLoaded, snapshotItems]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -109,23 +75,10 @@ export function PortalFilmCasesSection() {
     [viewerUserId],
   );
 
-  if (!inView && !fetchStarted && !filmShowcaseLoaded) {
-    return (
-      <section
-        ref={sectionRef}
-        className="canvas-page min-h-[120px] border-t border-[var(--canvas-border)] pb-16 pt-8"
-        aria-hidden
-      />
-    );
-  }
-
-  if (!loading && items.length === 0 && !error && !loadFailed) return null;
+  if (items.length === 0) return null;
 
   return (
-    <section
-      ref={sectionRef}
-      className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8"
-    >
+    <section className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8">
       <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="twenty-eyebrow flex items-center gap-2">
@@ -148,20 +101,10 @@ export function PortalFilmCasesSection() {
 
       {error ? <p className="mb-4 mt-4 text-sm text-red-300/90">{error}</p> : null}
 
-      {loading ? (
-        <div className="mt-8 flex items-center gap-2 py-12 text-sm text-[var(--canvas-muted)]">
-          <Loader2 className="size-4 animate-spin" />
-          加载视频作品…
-        </div>
-      ) : loadFailed ? (
-        <p className="mt-8 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-          暂时无法加载视频作品，请稍后刷新页面。
-        </p>
-      ) : filtered.length > 0 ? (
+      {filtered.length > 0 ? (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
           {filtered.map((item) => {
-            const own =
-              viewerUserId != null && item.owner?.id === viewerUserId;
+            const own = viewerUserId != null && item.owner?.id === viewerUserId;
             const busy = copyingId === item.sourceId;
 
             const cardInner = (

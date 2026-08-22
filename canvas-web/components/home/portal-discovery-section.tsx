@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, Search } from "lucide-react";
 
@@ -102,21 +102,12 @@ export function PortalDiscoverySection() {
     featured: featuredProjects,
     templates: publicTemplates,
     cases,
-    featuredLoading,
-    secondaryLoading,
-    loadSecondary,
   } = usePortalHome();
   const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [forkingId, setForkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeTab === TAB_TEMPLATE || activeTab === TAB_CASE) {
-      loadSecondary();
-    }
-  }, [activeTab, loadSecondary]);
 
   const items = useMemo((): DiscoveryItem[] => {
     const projectIds = new Set<string>();
@@ -297,10 +288,7 @@ export function PortalDiscoverySection() {
           <button
             key={tab}
             type="button"
-            onClick={() => {
-              setActiveTab(tab);
-              if (tab === TAB_TEMPLATE || tab === TAB_CASE) loadSecondary();
-            }}
+            onClick={() => setActiveTab(tab)}
             className={
               activeTab === tab
                 ? "rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white"
@@ -314,17 +302,11 @@ export function PortalDiscoverySection() {
 
       {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
-      {featuredLoading && filtered.length === 0 ? (
-        <div className="flex items-center gap-2 py-12 text-sm text-[var(--canvas-muted)]">
-          <Loader2 className="size-4 animate-spin" />
-          加载发现内容…
-        </div>
-      ) : !featuredLoading && filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-          暂时无法加载内容，请稍后刷新页面。
+          暂无匹配内容。
         </p>
-      ) : filtered.length > 0 ? (
-        <>
+      ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {
             const own = isOwnItem(item, viewerUserId);
@@ -399,14 +381,7 @@ export function PortalDiscoverySection() {
             );
           })}
         </ul>
-        {secondaryLoading ? (
-          <p className="mt-4 flex items-center gap-2 text-xs text-[var(--canvas-muted)]">
-            <Loader2 className="size-3 animate-spin" />
-            正在加载模板与案例…
-          </p>
-        ) : null}
-        </>
-      ) : null}
+      )}
 
       {preview?.kind === "template" ? (
         <TemplatePreviewDialog

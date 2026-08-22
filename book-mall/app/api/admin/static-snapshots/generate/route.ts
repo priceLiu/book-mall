@@ -27,10 +27,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  let pageKey = SITE_HOME_PAGE_KEY;
+  let pageKey: string = SITE_HOME_PAGE_KEY;
   try {
     const body = (await req.json()) as { pageKey?: string };
-    if (body.pageKey) pageKey = body.pageKey;
+    if (body.pageKey?.trim()) pageKey = body.pageKey.trim();
   } catch {
     // empty body ok
   }
