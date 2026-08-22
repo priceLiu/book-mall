@@ -66,7 +66,7 @@ export function getCommonToolsOrigin(): string {
     process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN ??
       process.env.COMMON_TOOLS_PUBLIC_ORIGIN,
     process.env.NODE_ENV === "production"
-      ? "https://common.ai-code8.com"
+      ? "https://com.ai-code8.com"
       : "http://localhost:3010",
   );
 }

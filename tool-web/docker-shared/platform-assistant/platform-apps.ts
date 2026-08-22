@@ -61,7 +61,7 @@ const APP_DEFS: AppDef[] = [
     key: "common",
     title: "常用工具",
     description: "修图、扩图、抠图、表情包等图像小工具。",
-    fallback: "https://common.ai-code8.com",
+    fallback: "https://com.ai-code8.com",
   },
   {
     key: "publisher",

@@ -12,8 +12,8 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
   export MAIN_SITE_ORIGIN="${MAIN_SITE_ORIGIN:-$BOOK_MALL_URL}"
 
   case "${NEXT_PUBLIC_COMMON_TOOLS_ORIGIN:-}" in
-    ""|*"sh.run.tcloudbase.com"*)
-      export NEXT_PUBLIC_COMMON_TOOLS_ORIGIN="https://common.ai-code8.com"
+    ""|*"sh.run.tcloudbase.com"*|*"common.ai-code8.com"*)
+      export NEXT_PUBLIC_COMMON_TOOLS_ORIGIN="https://com.ai-code8.com"
       echo "[common-tools] NEXT_PUBLIC_COMMON_TOOLS_ORIGIN -> ${NEXT_PUBLIC_COMMON_TOOLS_ORIGIN}"
       ;;
   esac
