@@ -9,7 +9,7 @@ import {
   getStoryWebOrigin,
   getToolWebOrigin,
 } from "@/lib/app-web-origins";
-import { getBookMallOrigin } from "@/lib/book-mall-origin";
+import { getBookMallOrigin } from "@/lib/gateway/env";
 import {
   buildMembershipCheckoutHref,
   buildTopupHref,
