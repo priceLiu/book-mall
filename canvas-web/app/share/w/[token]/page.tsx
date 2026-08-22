@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { RequireAuth } from "@/components/auth/require-auth";
-import { getBookMallApiBase } from "@/lib/canvas-api";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 
 type ShareMeta = {
   token: string;
@@ -23,32 +24,37 @@ export default function WorkflowSharePage({
 }) {
   const token = params.token?.trim();
   const router = useRouter();
+  const base = useBookMallBaseUrl();
   const [meta, setMeta] = useState<ShareMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    const base = getBookMallApiBase();
-    fetch(`${base}/api/platform/workflow-share/${encodeURIComponent(token)}`)
+    if (!token || !base) return;
+    const { url, init } = resolveBookMallBrowserRequest(
+      base,
+      `/api/platform/workflow-share/${encodeURIComponent(token)}`,
+    );
+    fetch(url, init)
       .then(async (r) => {
         if (!r.ok) throw new Error("分享不存在或已失效");
         return r.json() as Promise<ShareMeta>;
       })
       .then(setMeta)
       .catch((e) => setError(e instanceof Error ? e.message : "加载失败"));
-  }, [token]);
+  }, [token, base]);
 
   const claim = useCallback(async () => {
-    if (!token) return;
+    if (!token || !base) return;
     setClaiming(true);
     setError(null);
     try {
-      const base = getBookMallApiBase();
-      const r = await fetch(
-        `${base}/api/platform/workflow-share/${encodeURIComponent(token)}/claim`,
-        { method: "POST", credentials: "include" },
+      const { url, init } = resolveBookMallBrowserRequest(
+        base,
+        `/api/platform/workflow-share/${encodeURIComponent(token)}/claim`,
+        { method: "POST" },
       );
+      const r = await fetch(url, init);
       const data = (await r.json()) as {
         ok?: boolean;
         error?: string;
@@ -63,7 +69,7 @@ export default function WorkflowSharePage({
     } finally {
       setClaiming(false);
     }
-  }, [token, router]);
+  }, [token, router, base]);
 
   return (
     <RequireAuth>

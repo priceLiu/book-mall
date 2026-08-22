@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Copy, Link2 } from "lucide-react";
 
-import { getBookMallApiBase } from "@/lib/canvas-api";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 
 export function WorkflowShareLinkDialog({
   projectId,
@@ -20,15 +21,18 @@ export function WorkflowShareLinkDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const base = useBookMallBaseUrl();
 
   async function createLink() {
+    if (!base) {
+      setError("未配置主站地址");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const base = getBookMallApiBase();
-      const r = await fetch(`${base}/api/platform/workflow-share`, {
+      const { url, init } = resolveBookMallBrowserRequest(base, "/api/platform/workflow-share", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           app: "CANVAS",
@@ -37,6 +41,7 @@ export function WorkflowShareLinkDialog({
           title: projectTitle,
         }),
       });
+      const r = await fetch(url, init);
       const data = (await r.json()) as { token?: string; error?: string };
       if (!r.ok || !data.token) throw new Error(data.error ?? "创建失败");
       const origin =
