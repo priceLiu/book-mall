@@ -17,7 +17,7 @@
 | 端口 | 3008 |
 | SSO `app=` | `quick-replica` |
 | navKey | `quick-replica` |
-| 生产域名（目标） | `replica.ai-code8.com` |
+| 生产域名（目标） | `rp.ai-code8.com` |
 
 ## 2. 界面与参考图
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 
 import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
+import { QrCreateMusicForm } from "@/components/quick-replica/qr-create-music-workspace";
 import { QrCreateSfxForm } from "@/components/quick-replica/qr-create-sfx-workspace";
 import { QrCreateVoiceoverForm } from "@/components/quick-replica/qr-create-voiceover-workspace";
 import { QrVoiceChangerForm } from "@/components/quick-replica/qr-voice-changer-workspace";

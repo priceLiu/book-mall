@@ -55,7 +55,7 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 | **目标目录** | `book-mall` | `tool-web` | `finance-web` | `story-web` | `canvas-web` | `gateway-web` | **`prompt-optimizer-platform`** | **`e-commerce-toolkit`** | **`quick-replica-web`** | **`director-web`** | **`common-tools`** |
 | **Dockerfile** | 默认 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
 | **容器监听端口** | **3000** | **3001** | **3002** | **3003** | **3004** | **3005** | **3006** | **3007** | **3008** | **3009** | **3010** |
-| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** | **`ecom.ai-code8.com`** | **`replica.ai-code8.com`** | **`director.ai-code8.com`** | **`common.ai-code8.com`** |
+| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** | **`ecom.ai-code8.com`** | **`rp.ai-code8.com`** | **`director.ai-code8.com`** | **`common.ai-code8.com`** |
 
 要点：
 
