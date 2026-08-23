@@ -16,8 +16,13 @@ export function AccountOverviewSkeleton() {
     <section className="grid items-stretch gap-4 md:grid-cols-2" aria-busy="true">
       <Card className="md:col-span-2">
         <CardHeader className="pb-3">
-          <Bone className="h-5 w-24" />
-          <Bone className="mt-2 h-3 w-64" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <Bone className="h-5 w-24" />
+              <Bone className="mt-2 h-3 w-64" />
+            </div>
+            <Bone className="h-9 w-28 shrink-0 rounded-md" />
+          </div>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Bone className="h-8 w-40 rounded-full" />

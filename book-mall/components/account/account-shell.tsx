@@ -28,11 +28,13 @@ export function AccountShell({
   appsMenuHint,
   billingPersona,
   showReferral,
+  shellMetaLoading = false,
   children,
 }: {
   profile: { image: string | null; name: string | null; phone: string | null };
   isAdmin: boolean;
   showReferral?: boolean;
+  shellMetaLoading?: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
   canLaunchCanvas: boolean;
@@ -67,6 +69,7 @@ export function AccountShell({
     appsMenuHint,
     billingPersona,
     showReferral,
+    shellMetaLoading,
   };
 
   const pathname = usePathname();

@@ -8,18 +8,26 @@ import { CreditLotBreakdown } from "@/components/account/credit-lot-breakdown";
 import type { AccountOverviewJson } from "@/lib/account/load-account-overview";
 import type { CreditSource } from "@prisma/client";
 
+type OverviewPayload = AccountOverviewJson & {
+  referralEligibility?: {
+    eligible: boolean;
+    planLabel: string | null;
+    reason: string | null;
+  };
+};
+
 type LoadState = "loading" | "ready" | "error";
 
 export function AccountOverviewSection() {
   const [state, setState] = useState<LoadState>("loading");
-  const [data, setData] = useState<AccountOverviewJson | null>(null);
+  const [data, setData] = useState<OverviewPayload | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/account/overview", { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
-        return (await res.json()) as AccountOverviewJson;
+        return (await res.json()) as OverviewPayload;
       })
       .then((payload) => {
         if (!cancelled) {
@@ -36,7 +44,11 @@ export function AccountOverviewSection() {
   }, []);
 
   if (state === "loading") {
-    return <AccountOverviewSkeleton />;
+    return (
+      <div aria-busy="true" aria-live="polite">
+        <AccountOverviewSkeleton />
+      </div>
+    );
   }
 
   if (state === "error" || !data) {
@@ -85,6 +97,7 @@ export function AccountOverviewSection() {
         usageSummary={data.usageSummary}
         packageUsageRows={data.packageUsageRows}
         isTeamSharedPool={data.isTeamSharedPool}
+        showReferralShare={data.referralEligibility?.eligible ?? false}
       />
       <CreditLotBreakdown lots={lots} />
     </>

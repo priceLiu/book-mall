@@ -347,6 +347,14 @@ const SEED_ITEMS: {
     listKind: "PENDING",
     completed: true,
   },
+  {
+    title: "SC-309 个人中心分享弹层",
+    description: "概览/侧栏「分享得积分」ReferralShareDialog；明细页异步；pricing 分享说明弹层。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 420,
+    listKind: "PENDING",
+    completed: true,
+  },
   // —— 大流量页静态快照（见 docs/静态化.md）——
   {
     title: "静态化 · 总规格",

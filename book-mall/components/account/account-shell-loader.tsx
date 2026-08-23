@@ -60,6 +60,7 @@ export function AccountShellLoader({
   const canvasOriginConfigured = meta?.canvasLaunch.canvasOriginConfigured ?? false;
   const ecomAccess = meta?.ecomAccess ?? false;
   const showReferral = meta?.referralEligibility.eligible ?? false;
+  const shellMetaLoading = meta === null;
 
   const canLaunchTools = env.toolsSsoReady && (isAdmin || hasMembership);
   const canLaunchCanvas = canLaunchTools;
@@ -120,6 +121,7 @@ export function AccountShellLoader({
       appsMenuHint={appsMenuHint}
       billingPersona={billingPersona}
       showReferral={showReferral}
+      shellMetaLoading={shellMetaLoading}
     >
       {children}
     </AccountShell>

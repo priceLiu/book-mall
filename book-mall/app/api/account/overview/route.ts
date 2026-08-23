@@ -6,6 +6,7 @@ import {
   loadAccountOverview,
   serializeAccountOverview,
 } from "@/lib/account/load-account-overview";
+import { getReferralEligibility } from "@/lib/referral/referral-service";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,14 @@ export async function GET() {
   }
 
   try {
-    const overview = await loadAccountOverview(session.user.id);
-    return NextResponse.json(serializeAccountOverview(overview));
+    const [overview, referralEligibility] = await Promise.all([
+      loadAccountOverview(session.user.id),
+      getReferralEligibility(session.user.id),
+    ]);
+    return NextResponse.json({
+      ...serializeAccountOverview(overview),
+      referralEligibility,
+    });
   } catch (e) {
     console.error("[account/overview]", e);
     return NextResponse.json({ error: "加载失败" }, { status: 500 });

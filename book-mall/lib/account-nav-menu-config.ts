@@ -22,6 +22,7 @@ import {
   Activity,
   Gift,
   Wand2,
+  Users,
 } from "lucide-react";
 
 export type AccountNavLinkItem = {
@@ -81,7 +82,7 @@ function financeNavItem(
 export function buildAccountNavMenuGroups(input: {
   isAdmin: boolean;
   billingPersona: BillingPersona | null;
-  /** 任意有效订阅（个人套餐或团队 OWNER）显示分享返佣入口；团队非 OWNER 成员不显示 */
+  /** 任意有效订阅（个人套餐或团队 OWNER）显示分享入口；团队 ADMIN/MEMBER 不显示 */
   showReferral?: boolean;
 }): AccountNavMenuGroup[] {
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
@@ -120,10 +121,16 @@ export function buildAccountNavMenuGroups(input: {
   });
   if (input.showReferral) {
     billingItems.push({
+      kind: "action",
+      id: "referral-share",
+      label: "分享得积分",
+      icon: Gift,
+    });
+    billingItems.push({
       kind: "link",
       href: "/account/referral",
-      label: "分享返佣",
-      icon: Gift,
+      label: "邀请明细",
+      icon: Users,
     });
   }
 

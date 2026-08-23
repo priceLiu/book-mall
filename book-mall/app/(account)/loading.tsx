@@ -1,4 +1,10 @@
-/** 子路由切换时的轻量占位；壳层（侧栏/顶栏）由 layout 即时渲染。 */
+import { AccountOverviewSkeleton } from "@/components/account/account-overview-skeleton";
+
+/** 个人中心子路由切换 · 概览骨架（壳层 layout 已即时渲染）。 */
 export default function AccountLoading() {
-  return null;
+  return (
+    <div aria-busy="true" aria-live="polite">
+      <AccountOverviewSkeleton />
+    </div>
+  );
 }

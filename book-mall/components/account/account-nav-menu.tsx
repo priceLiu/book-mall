@@ -35,6 +35,7 @@ import {
   type AccountNavMenuGroup,
   type AccountNavMenuItem,
 } from "@/lib/account-nav-menu-config";
+import { ReferralShareDialog } from "@/components/account/referral-share-dialog";
 
 const itemClass = "account-nav-item";
 const itemActiveClass = "account-nav-item-active";
@@ -62,6 +63,7 @@ type NavRuntimeProps = {
   onAction: (id: string) => void;
   onNavigate?: () => void;
   compact?: boolean;
+  shellMetaLoading?: boolean;
 };
 
 /** 侧栏常驻导航（不用 Ark Menu，避免 Positioner 撑满视口） */
@@ -71,6 +73,7 @@ function AccountSidebarNav({
   onAction,
   onNavigate,
   compact = false,
+  shellMetaLoading = false,
 }: NavRuntimeProps) {
   function renderLink(item: AccountNavLinkItem) {
     const active = isAccountNavLinkActive(pathname, item.href, item.exact);
@@ -174,7 +177,45 @@ function AccountSidebarNav({
           >
             {group.label}
           </p>
-          <div className="min-w-0 space-y-0.5">{group.items.map((item) => renderItem(item))}</div>
+          <div className="min-w-0 space-y-0.5">
+            {group.items.map((item) => renderItem(item))}
+            {group.id === "billing" && shellMetaLoading ? (
+              <>
+                <div
+                  className={cn(
+                    itemClass,
+                    "pointer-events-none animate-pulse opacity-60",
+                    compact && "account-nav-item-compact justify-center px-2",
+                  )}
+                  aria-hidden
+                >
+                  <span className="h-4 w-4 shrink-0 rounded bg-[#eaeef2]" />
+                  <span
+                    className={cn(
+                      "h-3 rounded bg-[#eaeef2] transition-[opacity,max-width] duration-300 ease-out",
+                      compact ? "max-w-0 opacity-0" : "w-20 opacity-100",
+                    )}
+                  />
+                </div>
+                <div
+                  className={cn(
+                    itemClass,
+                    "pointer-events-none animate-pulse opacity-60",
+                    compact && "account-nav-item-compact justify-center px-2",
+                  )}
+                  aria-hidden
+                >
+                  <span className="h-4 w-4 shrink-0 rounded bg-[#eaeef2]" />
+                  <span
+                    className={cn(
+                      "h-3 rounded bg-[#eaeef2] transition-[opacity,max-width] duration-300 ease-out",
+                      compact ? "max-w-0 opacity-0" : "w-16 opacity-100",
+                    )}
+                  />
+                </div>
+              </>
+            ) : null}
+          </div>
           {index < groups.length - 1 ? (
             <div
               className={cn(separatorClass, compact && "mx-1")}
@@ -205,6 +246,7 @@ export function AccountNavMenu({
   appsMenuHint,
   billingPersona,
   showReferral = false,
+  shellMetaLoading = false,
   placement = "sidebar",
   compact = false,
 }: {
@@ -212,6 +254,7 @@ export function AccountNavMenu({
   isAdmin: boolean;
   billingPersona: import("@prisma/client").BillingPersona | null;
   showReferral?: boolean;
+  shellMetaLoading?: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
   canLaunchCanvas: boolean;
@@ -231,6 +274,7 @@ export function AccountNavMenu({
   const pathname = usePathname();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [referralShareOpen, setReferralShareOpen] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -306,6 +350,10 @@ export function AccountNavMenu({
         return;
       }
     }
+    if (id === "referral-share") {
+      setReferralShareOpen(true);
+      return;
+    }
     if (id === "launch-tools") {
       const r = await openToolsAppInNewTab("/fitting-room");
       if (!r.ok) setActionMsg(r.message);
@@ -337,6 +385,7 @@ export function AccountNavMenu({
     pathname,
     onAction: (id) => void runAction(id),
     onNavigate: () => setMobileOpen(false),
+    shellMetaLoading,
   };
 
   if (isSidebar) {
@@ -370,18 +419,25 @@ export function AccountNavMenu({
             ) : null}
           </span>
         </div>
-        <nav id="account-sidebar-nav" className="min-w-0">
+        <nav
+          id="account-sidebar-nav"
+          className="min-w-0"
+          aria-busy={shellMetaLoading || undefined}
+          aria-live={shellMetaLoading ? "polite" : undefined}
+        >
           <AccountSidebarNav {...navProps} compact={compact} />
         </nav>
         {actionMsg ? (
           <p className="px-1 text-xs leading-relaxed text-destructive">{actionMsg}</p>
         ) : null}
+        <ReferralShareDialog open={referralShareOpen} onClose={() => setReferralShareOpen(false)} />
       </div>
     );
   }
 
   return (
     <>
+      <ReferralShareDialog open={referralShareOpen} onClose={() => setReferralShareOpen(false)} />
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
           <button

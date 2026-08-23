@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Wallet, BadgeCheck } from "lucide-react";
 import type { BillingPersona } from "@prisma/client";
+import { AccountReferralShareEntry } from "@/components/account/account-referral-share-entry";
 import {
   Card,
   CardContent,
@@ -42,6 +43,8 @@ type Props = {
   packageUsageRows?: PackageUsageRow[];
   /** 当前在团队空间：积分/用量展示团队共享池总量 */
   isTeamSharedPool?: boolean;
+  /** 是否展示分享得积分入口（概览弹层） */
+  showReferralShare?: boolean;
 };
 
 function personaLabel(persona: BillingPersona | null): string {
@@ -74,6 +77,7 @@ export function AccountOverviewCards({
   usageSummary = null,
   packageUsageRows = [],
   isTeamSharedPool = false,
+  showReferralShare = false,
 }: Props) {
   const textLink = accountBodyTextLinkClass();
   const financeUsageUrl = getFinanceFeesRedirectUrl("/fees/usage") ?? "/account/usage";
@@ -84,10 +88,15 @@ export function AccountOverviewCards({
       {/* 账户身份 */}
       <Card className="flex h-full flex-col md:col-span-2">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">账户身份</CardTitle>
-          <CardDescription className="text-xs">
-            订阅会员通过积分套餐使用 AI；下方为当前套餐与用量。
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-base">账户身份</CardTitle>
+              <CardDescription className="text-xs">
+                订阅会员通过积分套餐使用 AI；下方为当前套餐与用量。
+              </CardDescription>
+            </div>
+            {showReferralShare ? <AccountReferralShareEntry /> : null}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-2">

@@ -45,8 +45,8 @@ export function ShareGuideDialog({ onClose }: { onClose: () => void }) {
               </h3>
               <ol className="list-decimal space-y-2 pl-6 text-left [list-style-position:outside]">
                 <li className="pl-1">
-                  登录后进入 <strong className="text-[#1f2328]">个人中心 → 分享返佣</strong>
-                  ，查看你的
+                  登录后点击 <strong className="text-[#1f2328]">个人中心 → 分享得积分</strong>
+                  （或侧栏同入口），查看你的
                   <strong className="text-[#1f2328]"> 8 位邀请码</strong>、主站链接与微信二维码。
                 </li>
                 <li className="pl-1">将码、链接或二维码发给好友（微信私聊、群聊、口头报码均可）。</li>
