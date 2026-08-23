@@ -1,9 +1,13 @@
 /**
  * KIE Gateway 日志 · 进程内 vendor poll + finalize（避免 book-mall HTTP 自调用 recordInfo 漏收口）。
  */
-import type { GatewayRequestLog } from "@prisma/client";
+import type { GatewayRequestLog, Prisma } from "@prisma/client";
 
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import {
+  attachKieWatchdogChannelMeta,
+  readKieWatchdogChannelMeta,
+} from "@/lib/gateway/gateway-kie-watchdog-policy";
 import { isKieSunoModelKey } from "@/lib/gateway/kie-audio-models";
 import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import {
@@ -17,6 +21,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getKieSunoTaskWithKey,
 } from "@/lib/story/kie-suno-client";
+import { extractQrJobOutputUrl } from "@/lib/quick-replica/qr-job-output";
 import {
   getKieTaskWithKey,
   isKieRecordComplete,
@@ -187,4 +192,53 @@ export async function syncKieGatewayLogFromVendorPoll(
     }),
   );
   return { record: data, status: "RUNNING" };
+}
+
+/**
+ * 已 SUCCEEDED 但 resultSummary 被看门狗误覆盖时，回源 KIE 补写 resultJson。
+ */
+export async function repairKieGatewayLogResultSummaryIfMissing(
+  logId: string,
+): Promise<boolean> {
+  const row = await prisma.gatewayRequestLog.findUnique({
+    where: { id: logId },
+    select: {
+      status: true,
+      model: true,
+      credentialId: true,
+      externalTaskId: true,
+      resultSummary: true,
+    },
+  });
+  if (!row || row.status !== "SUCCEEDED") return false;
+  if (extractQrJobOutputUrl(row.resultSummary)) return true;
+  if (!row.externalTaskId?.trim() || !row.credentialId) return false;
+
+  let data: KieRecordResponse;
+  try {
+    data = await pollKieVendorForGatewayLog({
+      credentialId: row.credentialId,
+      taskId: row.externalTaskId,
+      model: row.model,
+    });
+  } catch {
+    return false;
+  }
+  if (!isKieRecordSuccess(data.state) && !isKieRecordComplete(data)) {
+    return false;
+  }
+
+  const nextSummary = attachKieWatchdogChannelMeta(
+    { state: "success", resultJson: data.resultJson },
+    {
+      ...readKieWatchdogChannelMeta(row.resultSummary),
+      lastVendorState: "success",
+      lastVendorStateAt: new Date().toISOString(),
+    },
+  );
+  await prisma.gatewayRequestLog.update({
+    where: { id: logId },
+    data: { resultSummary: nextSummary as Prisma.InputJsonValue },
+  });
+  return Boolean(extractQrJobOutputUrl(nextSummary));
 }

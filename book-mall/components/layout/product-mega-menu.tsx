@@ -2,8 +2,8 @@ import Image from "next/image";
 import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS } from "@/lib/portal-nav";
 
 /** 顶栏「产品」下拉：与各子站 federated 门户菜单一致 */
-export function ProductMegaMenuContent() {
-  const items = buildBookPortalNavItems();
+export function ProductMegaMenuContent({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+  const items = buildBookPortalNavItems(undefined, isLoggedIn);
 
   return (
     <div className="flex gap-6 p-4">

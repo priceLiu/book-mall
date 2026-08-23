@@ -15,7 +15,7 @@ import {
   normalizeKieRecordForToolLab,
   type ToolLabKiePollOutput,
 } from "@/lib/gateway/kie-tool-gateway";
-import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
+import { syncKieGatewayLogFromVendorPoll, repairKieGatewayLogResultSummaryIfMissing } from "@/lib/gateway/kie-gateway-log-sync";
 import { finalizeRequestLog, pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { getKindDef } from "@/lib/quick-replica/qr-kinds";
@@ -470,7 +470,20 @@ export async function qrPollGenerateJob(
   }
 
   if (log.status === "SUCCEEDED") {
-    const out = extractOutputUrl(log);
+    let currentLog = log;
+    let out = extractOutputUrl(currentLog);
+    if (!out?.url && currentLog.providerKind === "KIE") {
+      const repaired = await repairKieGatewayLogResultSummaryIfMissing(logId);
+      if (repaired) {
+        const refreshed = await prisma.gatewayRequestLog.findFirst({
+          where: { id: logId, actorBookUserId: userId },
+        });
+        if (refreshed) {
+          currentLog = refreshed;
+          out = extractOutputUrl(refreshed);
+        }
+      }
+    }
     if (out?.url) {
       return { status: "SUCCEEDED", outputUrl: out.url };
     }

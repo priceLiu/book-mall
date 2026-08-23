@@ -1,7 +1,10 @@
+import type { PortalKey } from "@private/federated-portal-nav";
 import {
   buildPortalNavItems,
   type PortalNavItem,
 } from "@private/federated-portal-nav";
+
+import { buildBookPortalOpenPageHref } from "@/lib/platform-portal-entry";
 
 export type { PortalNavItem };
 
@@ -13,6 +16,11 @@ export const BOOK_PORTAL_EXTERNAL_LINK_PROPS = {
   target: "_blank",
   rel: "noopener noreferrer",
 } as const;
+
+const PORTAL_DEFAULT_REDIRECT: Partial<Record<PortalKey, string>> = {
+  canvas: "/projects",
+  tool: "/fitting-room",
+};
 
 export function marketingHomeSectionUrl(
   origin: string,
@@ -42,9 +50,16 @@ export function resolveBookOrigin(): string | null {
 /** 主站顶栏「产品」与各子站 federated 菜单共用条目 */
 export function buildBookPortalNavItems(
   bookOrigin?: string | null,
+  loggedIn = false,
 ): BookPortalNavItem[] {
   const origin = bookOrigin ?? resolveBookOrigin();
-  return buildPortalNavItems(origin).filter(
+  const items = buildPortalNavItems(origin).filter(
     (item): item is BookPortalNavItem => Boolean(item.href),
   );
+  if (!loggedIn) return items;
+  return items.map((item) => {
+    const redirect = PORTAL_DEFAULT_REDIRECT[item.key] ?? "/";
+    const openHref = buildBookPortalOpenPageHref(item.key, redirect);
+    return openHref ? { ...item, href: openHref } : item;
+  });
 }

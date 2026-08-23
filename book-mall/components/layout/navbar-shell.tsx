@@ -62,7 +62,13 @@ function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function NavbarShell({ children }: { children: React.ReactNode }) {
+export function NavbarShell({
+  children,
+  isLoggedIn = false,
+}: {
+  children: React.ReactNode;
+  isLoggedIn?: boolean;
+}) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [productMenuOpen, setProductMenuOpen] = React.useState(false);
   const pathname = usePathname();
@@ -103,7 +109,7 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
       {
         name: NAV_PRODUCT_LABEL,
         icon: Layers,
-        dropdown: <ProductMegaMenuContent />,
+        dropdown: <ProductMegaMenuContent isLoggedIn={isLoggedIn} />,
         onDropdownOpenChange: setProductMenuOpen,
       },
       ...routeList.map((r) => ({
@@ -112,7 +118,7 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
         icon: icons[r.label] ?? Monitor,
       })),
     ];
-  }, []);
+  }, [isLoggedIn]);
 
   const handleTubelightNavigate = React.useCallback(
     (item: TubelightNavItem) => {
@@ -183,7 +189,7 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
 
               <div className="flex flex-col gap-2">
                 <p className="px-2 text-xs font-medium text-muted-foreground">产品</p>
-                {buildBookPortalNavItems().map((item) => (
+                {buildBookPortalNavItems(undefined, isLoggedIn).map((item) => (
                   <Button
                     key={item.key}
                     onClick={() => setIsOpen(false)}

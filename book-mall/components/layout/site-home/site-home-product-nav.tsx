@@ -16,16 +16,18 @@ const splitBtnClass =
 
 /** 顶栏「产品」：与各子站 federated 门户菜单一致 */
 export function SiteHomeProductNav({
+  isLoggedIn = false,
   variant = "button",
   linkClassName = "site-home-nav-link",
   linkActiveClassName = "site-home-nav-link-active",
 }: {
+  isLoggedIn?: boolean;
   variant?: "button" | "link";
   linkClassName?: string;
   linkActiveClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const items = buildBookPortalNavItems();
+  const items = buildBookPortalNavItems(undefined, isLoggedIn);
 
   const menuLinks = (
     <div className="flex flex-col gap-0.5 p-1">

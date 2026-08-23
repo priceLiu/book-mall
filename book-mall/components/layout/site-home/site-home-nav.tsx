@@ -60,8 +60,8 @@ const centerNavIcons: Record<string, TubelightNavItem["icon"]> = {
   "API 价格": Braces,
 };
 
-function ProductNavDropdown() {
-  const items = buildBookPortalNavItems();
+function ProductNavDropdown({ isLoggedIn }: { isLoggedIn: boolean }) {
+  const items = buildBookPortalNavItems(undefined, isLoggedIn);
   return (
     <div className="flex flex-col gap-0.5 p-1">
       {items.map((item) => (
@@ -148,7 +148,7 @@ export function SiteHomeNav({
       {
         name: "产品",
         icon: Layers,
-        dropdown: <ProductNavDropdown />,
+        dropdown: <ProductNavDropdown isLoggedIn={isLoggedIn} />,
         onDropdownOpenChange: setProductOpen,
       },
       ...centerNavLinks.map((item) => ({
@@ -157,7 +157,7 @@ export function SiteHomeNav({
         icon: centerNavIcons[item.label] ?? Monitor,
       })),
     ];
-  }, []);
+  }, [isLoggedIn]);
 
   const handleTubelightNavigate = (item: TubelightNavItem) => {
     if (item.url) navigate(item.url);
@@ -200,7 +200,7 @@ export function SiteHomeNav({
             </SheetHeader>
             <div className="mt-6 flex flex-col gap-1">
               <p className="px-3 text-xs font-medium text-muted-foreground">产品</p>
-              {buildBookPortalNavItems().map((item) => (
+              {buildBookPortalNavItems(undefined, isLoggedIn).map((item) => (
                 <a
                   key={item.key}
                   href={item.href}

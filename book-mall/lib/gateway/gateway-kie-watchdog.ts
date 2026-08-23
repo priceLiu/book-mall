@@ -51,6 +51,14 @@ async function markWatchdogRecoverAttempt(
   });
 }
 
+async function loadLogResultSummary(logId: string): Promise<unknown> {
+  const row = await prisma.gatewayRequestLog.findUnique({
+    where: { id: logId },
+    select: { resultSummary: true },
+  });
+  return row?.resultSummary ?? null;
+}
+
 async function patchChannelMeta(
   logId: string,
   resultSummary: unknown,
@@ -226,17 +234,22 @@ export async function runGatewayKieWatchdog(opts?: {
       async (row) => {
         try {
           const synced = await syncKieGatewayLogFromVendorPoll(row.id);
-          await markWatchdogRecoverAttempt(row.id, row.resultSummary);
 
           if (synced.status === "SUCCEEDED" || synced.status === "FAILED") {
             recovered += 1;
+            const freshSummary = await loadLogResultSummary(row.id);
             await clearChannelFailures(
               row.id,
-              row.resultSummary,
+              freshSummary,
               synced.record.state,
             );
             return;
           }
+
+          await markWatchdogRecoverAttempt(
+            row.id,
+            await loadLogResultSummary(row.id),
+          );
 
           const afterVerdict = classifyKieGatewayWatchdogRow({
             ...row,
@@ -248,7 +261,7 @@ export async function runGatewayKieWatchdog(opts?: {
             continued += 1;
             await clearChannelFailures(
               row.id,
-              row.resultSummary,
+              await loadLogResultSummary(row.id),
               synced.record.state,
             );
             logVerdict(opts?.source, row.id, afterVerdict);
@@ -269,7 +282,7 @@ export async function runGatewayKieWatchdog(opts?: {
             continued += 1;
             await clearChannelFailures(
               row.id,
-              row.resultSummary,
+              await loadLogResultSummary(row.id),
               synced.record.state,
             );
           }
