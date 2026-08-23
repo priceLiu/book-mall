@@ -44,7 +44,7 @@ export const metadata = {
 
 export default async function Home() {
   const snapshot = await getSiteHomeSnapshotForRender();
-  const liveHrefByKey = new Map(
+  const liveHrefByKey = new Map<string, string>(
     buildSiteHomePlatformApps().map((app) => [app.key, app.href]),
   );
   const platformApps = snapshot.payload.platformApps.map((app) => ({

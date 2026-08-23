@@ -12,6 +12,7 @@ import {
   isCommonToolsPublicBrowsePath,
 } from "@/lib/silent-sso";
 import { PortalNav } from "@/components/portal-nav";
+import { setRuntimeBookOrigin } from "@/lib/auth";
 import { buildLoginUrl } from "@/lib/portal-auth-links";
 import type { ShellUser } from "@/lib/session.server";
 
