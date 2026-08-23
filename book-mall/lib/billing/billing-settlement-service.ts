@@ -93,7 +93,8 @@ export async function recordBillingSettlement(input: RecordBillingSettlementInpu
   const quotaDelta = input.quotaDelta ?? 0;
   const periodKey = `${log.submittedAt.getUTCFullYear()}-${String(log.submittedAt.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  const line = await prisma.$transaction(async (tx) => {
+  const line = await prisma.$transaction(
+    async (tx) => {
     let created;
     try {
       created = await tx.billingSettlementLine.create({
@@ -148,7 +149,9 @@ export async function recordBillingSettlement(input: RecordBillingSettlementInpu
     });
 
     return created;
-  });
+    },
+    { timeout: 60_000, maxWait: 15_000 },
+  );
 
   return line;
 }

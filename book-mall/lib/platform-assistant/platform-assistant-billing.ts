@@ -49,10 +49,18 @@ function buildPlatformAssistantFeeDescription(log: GatewayRequestLog): string {
 }
 
 /** 成功调用写入 METER_ONLY 结算流水（幂等，owner=虚拟 AI 小智）。 */
-export async function recordPlatformAssistantMeterSettlement(log: GatewayRequestLog) {
+export async function recordPlatformAssistantMeterSettlement(
+  log: GatewayRequestLog,
+  opts?: { skipOperationalKeyCheck?: boolean },
+) {
   if (!isPlatformAssistantClientPage(log.clientPage)) return null;
   if (log.status !== "SUCCEEDED") return null;
-  if (!(await isPlatformOperationalApiKey(log.apiKeyId))) return null;
+  if (
+    !opts?.skipOperationalKeyCheck &&
+    !(await isPlatformOperationalApiKey(log.apiKeyId))
+  ) {
+    return null;
+  }
 
   return recordBillingSettlement({
     log,
