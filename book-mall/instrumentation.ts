@@ -17,5 +17,17 @@ export async function register() {
         e instanceof Error ? e.message : String(e),
       );
     }
+
+    try {
+      const { startResidentGatewayHealthScanner } = await import(
+        "./lib/gateway/gateway-health-scheduler"
+      );
+      startResidentGatewayHealthScanner();
+    } catch (e) {
+      console.warn(
+        "[gateway-health] resident scanner init skipped",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
   }
 }

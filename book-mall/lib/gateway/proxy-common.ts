@@ -314,6 +314,9 @@ export async function finalizeRequestLog(
 ) {
   const log = await prisma.gatewayRequestLog.findUnique({ where: { id: logId } });
   if (!log) return;
+  if (log.status === "SUCCEEDED" || log.status === "FAILED" || log.status === "CANCELLED") {
+    return;
+  }
 
   const completedAt =
     patch.completedAt ??

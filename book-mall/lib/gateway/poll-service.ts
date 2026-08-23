@@ -52,6 +52,7 @@ import {
 } from "./qwen-image-edit-proxy";
 
 import { SUBMIT_ORPHAN_FAIL } from "@/lib/gateway/gateway-submit-error-policy";
+import { staleChatStreamMs } from "@/lib/gateway/gateway-health-policy";
 import {
   auditGatewayPollStallAfterBatch,
   countSlowRunningGatewayLogs,
@@ -125,6 +126,24 @@ export async function expireStaleGatewayLogs(): Promise<number> {
       status: "FAILED",
       failCode: "STALE_ORPHAN",
       failMessage: "请求未成功提交厂商任务（无 taskId），已自动关闭",
+      completedAt: new Date(),
+    },
+  });
+
+  // 流式 CHAT 无 externalTaskId（同步 SSE）。3min orphan 会误杀剧本长流，
+  // 但必须有独立超时，否则进程重启后日志永远 RUNNING。
+  const chatCutoff = new Date(now - staleChatStreamMs());
+  const r1c = await prisma.gatewayRequestLog.updateMany({
+    where: {
+      status: "RUNNING",
+      requestKind: "CHAT",
+      externalTaskId: null,
+      submittedAt: { lt: chatCutoff },
+    },
+    data: {
+      status: "FAILED",
+      failCode: "STALE_CHAT_ORPHAN",
+      failMessage: "流式 Chat 长时间未收口（超过 15 分钟），已自动关闭",
       completedAt: new Date(),
     },
   });
@@ -215,7 +234,15 @@ export async function expireStaleGatewayLogs(): Promise<number> {
   }
 
   return (
-    r0.count + r1.count + r2.count + r2b.count + r3a.count + r3 + r3b.count + r4
+    r0.count +
+    r1.count +
+    r1c.count +
+    r2.count +
+    r2b.count +
+    r3a.count +
+    r3 +
+    r3b.count +
+    r4
   );
 }
 

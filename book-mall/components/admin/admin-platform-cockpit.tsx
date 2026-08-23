@@ -117,6 +117,12 @@ export function AdminPlatformCockpitHeader({
       </div>
       <div className="flex flex-wrap gap-2 text-sm">
         <Link
+          href="/admin/gateway/health"
+          className="rounded-md border border-[#d1d9e0] bg-white px-3 py-1.5 font-medium text-[#1f2328] hover:border-[#0969da]"
+        >
+          Gateway 阻塞预警
+        </Link>
+        <Link
           href="/admin/finance/credit-expiry-ops"
           className="rounded-md border border-[#0969da] bg-[#0969da] px-3 py-1.5 font-medium text-white hover:bg-[#0550ae]"
         >

@@ -106,6 +106,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         { label: "工具菜单", href: "/admin/tool-apps/tool-menu" },
         { label: "Platform SSO 客户端", href: "/admin/sso-clients" },
         { label: "Gateway 平台凭证池", href: "/admin/gateway/platform" },
+        { label: "Gateway 阻塞预警", href: "/admin/gateway/health" },
         { label: "平台错误日志", href: "/admin/errors" },
         { label: "生成频率配额", href: "/admin/generation-quota" },
         { label: "工具管理", href: "/admin/tool-apps/manage" },

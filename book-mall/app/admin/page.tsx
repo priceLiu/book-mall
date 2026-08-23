@@ -5,6 +5,7 @@ import {
   AdminCockpitAssistantSection,
   AdminCockpitCreditOpsSection,
   AdminCockpitFinanceSection,
+  AdminCockpitGatewayHealthSection,
   AdminCockpitMetricsSection,
 } from "@/components/admin/admin-platform-cockpit-sections";
 import {
@@ -18,6 +19,10 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <AdminPlatformCockpitHeader />
+
+      <Suspense fallback={<AdminCockpitCreditOpsSkeleton />}>
+        <AdminCockpitGatewayHealthSection />
+      </Suspense>
 
       <Suspense fallback={<AdminCockpitCreditOpsSkeleton />}>
         <AdminCockpitCreditOpsSection />
