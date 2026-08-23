@@ -4,6 +4,7 @@ import type { WorkflowShareApp } from "@prisma/client";
 import { z } from "zod";
 
 import { resolvePlatformUser } from "@/lib/platform-auth";
+import { resolveBookMallOrigin } from "@/lib/platform-traffic/book-mall-origin";
 import { createWorkflowShareLink } from "@/lib/share/workflow-share-service";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       resourceId: parsed.data.resourceId,
       title: parsed.data.title,
       maxClaims: parsed.data.maxClaims,
+      mainSiteOrigin: resolveBookMallOrigin() ?? request.nextUrl.origin,
     });
     return NextResponse.json({ ok: true, ...link });
   } catch (e) {

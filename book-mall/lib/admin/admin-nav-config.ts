@@ -113,6 +113,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         { label: "资源库（图/视频）", href: "/admin/tool-libraries" },
         { label: "模板管理", href: "/admin/templates" },
         { label: "工具站跳转测试", href: "/admin/tools-sso-test" },
+        { label: "分享码前缀", href: "/admin/share-code-prefixes" },
       ],
     },
   ];

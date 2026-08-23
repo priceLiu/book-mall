@@ -313,9 +313,25 @@ model ShareRewardGrant {
 }
 
 /// 分享规则 2.0 · 工作流分享链接
+/// 分享码 3.0 · 前缀注册表（仅管理员可见映射）
+model ShareCodePrefix {
+  id        String              @id @default(cuid())
+  prefix    String              @unique
+  kind      ShareRewardChannel
+  app       WorkflowShareApp?
+  enabled   Boolean             @default(true)
+  note      String              @default("")
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([kind, enabled])
+}
+
 model WorkflowShareLink {
   id           String               @id @default(cuid())
   token        String               @unique
+  /// 分享码 3.0 · 10 位短码（4 前缀 + 6 随机）
+  shortCode    String?              @unique
   app          WorkflowShareApp
   resourceType String
   resourceId   String

@@ -1,4 +1,3 @@
-import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
@@ -7,6 +6,10 @@ import {
   sumShareRewardCreditsGranted,
 } from "@/lib/share/share-reward-service";
 import { getShareRewardConfig } from "@/lib/share/share-reward-config";
+import {
+  buildShareCodePageUrl,
+  generateReferralShareCode,
+} from "@/lib/share/share-code-service";
 
 /**
  * 分享返佣 · 领域服务（分享链接 1.0）
@@ -124,16 +127,9 @@ export async function getReferralDefaultRate(): Promise<number> {
   }
 }
 
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 去掉易混淆 I O 0 1
-const CODE_LENGTH = 8;
 
-function generateReferralCode(): string {
-  const bytes = randomBytes(CODE_LENGTH);
-  let out = "";
-  for (let i = 0; i < CODE_LENGTH; i += 1) {
-    out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
-  }
-  return out;
+async function generateReferralCode(): Promise<string> {
+  return generateReferralShareCode();
 }
 
 export type EnsureReferralProfileResult =
@@ -168,7 +164,7 @@ export async function ensureReferralProfile(
   const defaultRate = await getReferralDefaultRate();
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const code = generateReferralCode();
+    const code = await generateReferralCode();
     try {
       const created = await prisma.referralProfile.create({
         data: { referrerUserId: userId, code, commissionRate: defaultRate },
@@ -248,6 +244,8 @@ export type ReferralDashboard = {
   /** @deprecated 分享规则 2.0 已改积分奖励；保留字段兼容旧 UI */
   commissionRate: number;
   shareUrl: string;
+  shareCodeUrl: string;
+  legacyShareUrl: string;
   referredCount: number;
   totalPlanAmountYuan: number;
   totalRechargeAmountYuan: number;
@@ -330,7 +328,9 @@ export async function getReferralDashboard(
     code: profile.code,
     enabled: profile.enabled,
     commissionRate,
-    shareUrl: `${shareBaseUrl.replace(/\/$/, "")}/r/${profile.code}`,
+    shareUrl: buildShareCodePageUrl(shareBaseUrl, profile.code),
+    shareCodeUrl: buildShareCodePageUrl(shareBaseUrl, profile.code),
+    legacyShareUrl: `${shareBaseUrl.replace(/\/$/, "")}/r/${profile.code}`,
     referredCount: rows.length,
     totalPlanAmountYuan,
     totalRechargeAmountYuan,

@@ -17,8 +17,10 @@ import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 export function RegisterForm({
   welcomeGift,
+  initialReferralCode,
 }: {
   welcomeGift?: { generalCredits: number } | null;
+  initialReferralCode?: string;
 } = {}) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -26,6 +28,7 @@ export function RegisterForm({
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [referralCode, setReferralCode] = useState(initialReferralCode?.trim().toUpperCase() ?? "");
   const billingPersona: BillingPersona = "PLATFORM_CREDIT";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +47,7 @@ export function RegisterForm({
           password,
           name: name || undefined,
           billingPersona,
+          ...(referralCode ? { referralCode } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -128,6 +132,15 @@ export function RegisterForm({
                 placeholder: "至少 8 位",
                 value: password,
                 onChange: (e) => setPassword(e.target.value),
+              },
+              {
+                name: "referralCode",
+                label: "邀请码（选填）",
+                type: "text",
+                placeholder: "8 位邀请码",
+                value: referralCode,
+                onChange: (e) => setReferralCode(e.target.value.toUpperCase()),
+                required: false,
               },
             ]}
             passwordVisible={showPassword}

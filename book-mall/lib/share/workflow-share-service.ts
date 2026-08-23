@@ -7,6 +7,12 @@ import type { WorkflowShareApp } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 import {
+  buildAppWebUrl,
+  getCanvasWebOrigin,
+  getEcommerceWebOrigin,
+  getQuickReplicaOrigin,
+} from "@/lib/app-web-origins";
+import {
   cloneCanvasGraphForDuplicate,
 } from "@/lib/canvas/clone-canvas-graph";
 import { duplicateProjectName } from "@/lib/canvas/canvas-project-service";
@@ -22,6 +28,10 @@ import {
 } from "@/lib/quick-replica/qr-template-service";
 import { getReferralEligibility } from "@/lib/referral/referral-service";
 
+import {
+  buildShareCodePageUrl,
+  generateWorkflowShareShortCode,
+} from "./share-code-service";
 import {
   lockWorkflowAttribution,
 } from "./share-reward-service";
@@ -44,7 +54,8 @@ export async function createWorkflowShareLink(input: {
   resourceId: string;
   title?: string | null;
   maxClaims?: number | null;
-}): Promise<{ token: string; id: string }> {
+  mainSiteOrigin?: string;
+}): Promise<{ token: string; id: string; shortCode: string; shareUrl: string }> {
   await assertWorkflowShareEligible(input.sharerUserId);
   if (input.app === "QUICK_REPLICA") {
     await assertCanShareQrTemplate(input.sharerUserId, input.resourceId);
@@ -52,10 +63,12 @@ export async function createWorkflowShareLink(input: {
 
   for (let i = 0; i < 5; i += 1) {
     const token = generateShareToken();
+    const shortCode = await generateWorkflowShareShortCode(input.app);
     try {
       const row = await prisma.workflowShareLink.create({
         data: {
           token,
+          shortCode,
           app: input.app,
           resourceType: input.resourceType,
           resourceId: input.resourceId,
@@ -63,9 +76,17 @@ export async function createWorkflowShareLink(input: {
           title: input.title?.trim() || null,
           maxClaims: input.maxClaims ?? null,
         },
-        select: { id: true, token: true },
+        select: { id: true, token: true, shortCode: true },
       });
-      return row;
+      const shareUrl = input.mainSiteOrigin
+        ? buildShareCodePageUrl(input.mainSiteOrigin, row.shortCode ?? shortCode)
+        : `/code/${row.shortCode ?? shortCode}`;
+      return {
+        id: row.id,
+        token: row.token,
+        shortCode: row.shortCode ?? shortCode,
+        shareUrl,
+      };
     } catch (e) {
       if ((e as { code?: string }).code === "P2002") continue;
       throw e;
@@ -205,12 +226,17 @@ export type WorkflowShareClaimResult = {
 };
 
 export async function claimWorkflowShare(input: {
-  token: string;
+  token?: string;
+  shortCode?: string;
   claimerUserId: string;
 }): Promise<WorkflowShareClaimResult> {
-  const link = await prisma.workflowShareLink.findUnique({
-    where: { token: input.token },
-  });
+  const token = input.token?.trim();
+  const shortCode = input.shortCode?.trim().toUpperCase();
+  if (!token && !shortCode) throw new Error("分享链接无效");
+
+  const link = token
+    ? await prisma.workflowShareLink.findUnique({ where: { token } })
+    : await prisma.workflowShareLink.findUnique({ where: { shortCode } });
   if (!link || !link.enabled) throw new Error("分享链接无效");
   if (link.expiresAt && link.expiresAt < new Date()) throw new Error("分享链接已过期");
   if (link.maxClaims != null && link.claimCount >= link.maxClaims) {
@@ -282,4 +308,27 @@ export function workflowShareRedirectPath(
     default:
       return "/";
   }
+}
+
+export function workflowShareAppOrigin(app: WorkflowShareApp): string {
+  switch (app) {
+    case "CANVAS":
+      return getCanvasWebOrigin();
+    case "ECOM":
+      return getEcommerceWebOrigin();
+    case "QUICK_REPLICA":
+      return getQuickReplicaOrigin();
+    default:
+      return getCanvasWebOrigin();
+  }
+}
+
+export function workflowShareAbsoluteRedirectUrl(
+  app: WorkflowShareApp,
+  clonedResourceId: string,
+): string {
+  return buildAppWebUrl(
+    workflowShareAppOrigin(app),
+    workflowShareRedirectPath(app, clonedResourceId),
+  );
 }
