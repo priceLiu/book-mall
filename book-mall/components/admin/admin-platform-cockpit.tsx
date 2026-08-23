@@ -251,6 +251,7 @@ export function AdminPlatformCockpit({ data }: { data: PlatformCockpitSnapshot }
       <AdminPlatformCockpitAssistant
         assistantFeedback={data.assistantFeedback}
         assistantAiNews={data.assistantAiNews}
+        assistantModelConfig={data.assistantModelConfig}
       />
 
       <AdminPlatformCockpitMetrics data={data} />

@@ -88,7 +88,7 @@ export function listAssistantLlmCandidates(): AssistantModelCandidate[] {
     out.push({
       modelKey: model.modelKey,
       displayName: model.displayName,
-      description: model.description,
+      description: model.description ?? "",
       vendor: "阿里云百炼",
     });
   }
@@ -99,7 +99,7 @@ export function listAssistantLlmCandidates(): AssistantModelCandidate[] {
     out.push({
       modelKey: model.modelKey,
       displayName: model.displayName,
-      description: model.description,
+      description: model.description ?? "",
       vendor: "DeepSeek",
     });
   }
