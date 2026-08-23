@@ -7,6 +7,34 @@ function appendSsoReenterSuppressCookie(res: { headers: Headers }): void {
   res.headers.append("Set-Cookie", parts.join("; "));
 }
 
+/** 登出后回跳：优先 returnTo（当前页），否则子站首页。 */
+function resolvePortalLogoutReturnUrl(
+  request: NextRequest,
+  appPublicOrigin: string | null,
+): string {
+  const base = (appPublicOrigin?.trim() || request.nextUrl.origin).replace(
+    /\/$/,
+    "",
+  );
+  const raw = request.nextUrl.searchParams.get("returnTo")?.trim();
+  if (!raw) return `${base}/`;
+
+  if (raw.startsWith("/") && !raw.startsWith("//")) {
+    return `${base}${raw}`;
+  }
+
+  try {
+    const u = new URL(raw);
+    if (u.origin.replace(/\/$/, "") === new URL(`${base}/`).origin.replace(/\/$/, "")) {
+      return u.toString();
+    }
+  } catch {
+    /* invalid URL */
+  }
+
+  return `${base}/`;
+}
+
 /**
  * 子站门户登出（与 book `/api/auth/full-signout` 联邦链路配套）：
  * 清本域 tools_token → 写 sso_reenter_suppress → 302 到主站 full-signout。
@@ -18,15 +46,14 @@ export function createPortalLogoutResponse(
     mainSiteOrigin: string | null;
   },
 ): NextResponse {
-  const base = opts.appPublicOrigin?.trim() || request.nextUrl.origin;
-  const homeUrl = new URL("/", base).toString();
+  const returnUrl = resolvePortalLogoutReturnUrl(request, opts.appPublicOrigin);
   const book = opts.mainSiteOrigin?.trim().replace(/\/$/, "") ?? "";
   const target = book
     ? new URL(
-        `/api/auth/full-signout?callbackUrl=${encodeURIComponent(homeUrl)}`,
+        `/api/auth/full-signout?callbackUrl=${encodeURIComponent(returnUrl)}`,
         book,
       )
-    : new URL("/", base);
+    : new URL(returnUrl);
 
   const res = NextResponse.redirect(target);
   res.cookies.set("tools_token", "", {
@@ -58,7 +85,15 @@ export function isSsoReenterSuppressedClient(): boolean {
 /** 客户端统一退出入口（须配合各子站 `/api/auth/logout`）。 */
 export function navigatePortalLogout(logoutPath = "/api/auth/logout"): void {
   markSsoReenterSuppressed();
-  window.location.href = logoutPath;
+  const returnTo =
+    typeof window !== "undefined"
+      ? `${window.location.pathname}${window.location.search}`
+      : "/";
+  const url = new URL(logoutPath, window.location.origin);
+  if (returnTo && returnTo !== "/") {
+    url.searchParams.set("returnTo", returnTo);
+  }
+  window.location.href = url.toString();
 }
 
 export {

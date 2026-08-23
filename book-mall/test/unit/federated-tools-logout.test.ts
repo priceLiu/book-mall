@@ -15,6 +15,18 @@ vi.mock("@/lib/sso-tools-env", () => ({
   getToolsPublicOrigin: () => "https://tool.example.com",
 }));
 
+vi.mock("@/lib/gateway/env", () => ({
+  getBookMallOrigin: () => "https://book.example.com",
+}));
+
+vi.mock("@/lib/platform-web-origins", () => ({
+  listPlatformWebOrigins: () => [
+    "https://book.example.com",
+    "https://tool.example.com",
+    "https://canvas.example.com",
+  ],
+}));
+
 describe("federated-tools-logout", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -58,5 +70,20 @@ describe("federated-tools-logout", () => {
       "https://story.example.com",
       "https://tool.example.com",
     ]);
+  });
+
+  it("resolveBookMallCallbackUrl preserves allowed cross-origin final URLs", async () => {
+    const { resolveBookMallCallbackUrl } = await import(
+      "@/lib/federated-tools-logout"
+    );
+    expect(
+      resolveBookMallCallbackUrl("https://canvas.example.com/canvas/proj_1"),
+    ).toBe("https://canvas.example.com/canvas/proj_1");
+    expect(resolveBookMallCallbackUrl("/account")).toBe(
+      "https://book.example.com/account",
+    );
+    expect(resolveBookMallCallbackUrl("https://evil.example.com/")).toBe(
+      "https://book.example.com/",
+    );
   });
 });

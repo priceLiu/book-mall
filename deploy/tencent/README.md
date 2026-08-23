@@ -189,6 +189,7 @@ docker compose up -d --build
 - **story-web** 使用 Node 22，结构与 finance-web 相同。
 - **book-mall** 云端自动剪辑（Media Render）与电商分镜合并依赖容器内 **ffmpeg** / **ffprobe**；镜像须预装（与历史 `ecomMergeStoryboardPanelVideos` 相同）。定时清理过期成片：`pnpm media-render:expire`。
 - **Gateway 模型注册表**：`migrate deploy` 后若出现「模型未在 Gateway 注册」500（如试衣 `aitryon`），在 book-mall 执行一次 `pnpm gateway:seed-registry`（脚本内带 `--confirm`）。日常核查：`pnpm gateway:audit-gaps`、`pnpm gateway:verify-registry`。用户操作见 `docs/自动剪辑.md`。
+- **DeepSeek 凭证归口**：平台代付 DEEPSEEK 仅在 **Gateway 控制台**（`:3005/dashboard/models`）绑定厂商 Key；**勿**在 book-mall `.env` 配置 `DEEPSEEK_API_KEY` 直连。DeepSeek 控制台若存在历史 **`canvas`** 命名 Key（曾大量直连、未进 Gateway 日志），应 **轮换/禁用**；业务统一走 Gateway 绑定的 Key（如 **`bilibili`**），便于云账单与 `GatewayRequestLog` 对账。
 
 ---
 

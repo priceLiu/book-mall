@@ -8,6 +8,7 @@ import {
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
 import { getBookMallOrigin } from "@/lib/gateway/env";
+import { listPlatformWebOrigins } from "@/lib/platform-web-origins";
 import { getToolsPublicOrigin } from "@/lib/sso-tools-env";
 
 function trimOrigin(raw: string | null | undefined): string | null {
@@ -92,10 +93,21 @@ export function resolveBookMallCallbackUrl(
   callbackPath: string,
   requestOrigin?: string,
 ): string {
+  const trimmed = callbackPath.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      const u = new URL(trimmed);
+      const allowed = new Set(listPlatformWebOrigins(requestOrigin));
+      if (allowed.has(u.origin.replace(/\/$/, ""))) {
+        return u.toString();
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
   const path =
-    callbackPath.startsWith("/") && !callbackPath.startsWith("//")
-      ? callbackPath
-      : "/";
+    trimmed.startsWith("/") && !trimmed.startsWith("//") ? trimmed : "/";
   const book = trimOrigin(getBookMallOrigin()) ?? trimOrigin(requestOrigin);
   if (book) return buildAppWebUrl(book, path);
   return path;
