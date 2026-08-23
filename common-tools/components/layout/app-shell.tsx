@@ -12,7 +12,7 @@ import {
   isCommonToolsPublicBrowsePath,
 } from "@/lib/silent-sso";
 import { PortalNav } from "@/components/portal-nav";
-import { setRuntimeBookOrigin } from "@/lib/auth";
+import { buildLoginUrl } from "@/lib/portal-auth-links";
 import type { ShellUser } from "@/lib/session.server";
 
 const SESSION_HEARTBEAT_MS = 60_000;
@@ -123,9 +123,9 @@ export function AppShell({
                 </button>
               </>
             ) : (
-              <Link href="/login" className="text-[#0071e3] hover:underline">
+              <a href={buildLoginUrl(pathname || "/")} className="text-[#0071e3] hover:underline">
                 登录
-              </Link>
+              </a>
             )}
           </div>
         </div>

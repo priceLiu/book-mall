@@ -15,13 +15,11 @@ import {
 } from "@/lib/story-viewer-session";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 
-/** 未登录跳本域品牌登录/注册页，保留 redirect 回跳。 */
-function localAuthHref(kind: "login" | "register"): string {
-  const path =
-    typeof window !== "undefined"
-      ? window.location.pathname + window.location.search
-      : "/";
-  return `/${kind}?redirect=${encodeURIComponent(path || "/")}`;
+import { storyLoginHref, storyRegisterHref } from "@/lib/portal-auth-links";
+
+function shellReturnPath(): string {
+  if (typeof window === "undefined") return "/";
+  return window.location.pathname + window.location.search || "/";
 }
 
 function ShellAuthSlot() {
@@ -58,10 +56,10 @@ function ShellAuthSlot() {
   if (!user) {
     return (
       <div className="flex shrink-0 items-center gap-2">
-        <a href={localAuthHref("login")} className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
+        <a href={storyLoginHref(shellReturnPath())} className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
           登录
         </a>
-        <a href={localAuthHref("register")} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
+        <a href={storyRegisterHref(shellReturnPath())} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
           注册
         </a>
       </div>

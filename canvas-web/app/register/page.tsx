@@ -1,14 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { CanvasRegisterForm } from "@/components/auth/canvas-register-form";
 import { fetchToolsSession } from "@/lib/tools-introspect";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+import { canvasRegisterHref } from "@/lib/portal-auth-links";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "注册",
-  description: "注册 canvas-web AI 海报画布，免费开始可视化节点创作。",
 };
 
 function safeRedirect(raw: string | string[] | undefined): string {
@@ -26,10 +24,5 @@ export default async function RegisterPage({
   const token = cookies().get("tools_token")?.value;
   const session = await fetchToolsSession(token);
   if (session.active) redirect(target);
-
-  return (
-    <main className="flex min-h-[70vh] w-full items-center justify-center px-4 py-12">
-      <CanvasRegisterForm bookOrigin={getMainSiteOrigin()} redirect={target} />
-    </main>
-  );
+  redirect(canvasRegisterHref(target));
 }

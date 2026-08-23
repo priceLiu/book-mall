@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PortalNav } from "@/components/portal-nav";
+import { publisherLoginHref } from "@/lib/portal-auth-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 const AUTH_PREFIXES = ["/login", "/register", "/auth/"];
@@ -67,9 +68,9 @@ export function PublisherShell({ children }: { children: React.ReactNode }) {
                 连接扩展
               </a>
             ) : null}
-            <Link href="/login" className="rounded-full bg-[var(--pub-primary)] px-3 py-1.5 text-white">
+            <a href={publisherLoginHref(pathname)} className="rounded-full bg-[var(--pub-primary)] px-3 py-1.5 text-white">
               登录
-            </Link>
+            </a>
           </div>
         </div>
       </header>

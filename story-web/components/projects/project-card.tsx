@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { storyLoginHref } from "@/lib/portal-auth-links";
 import type { ComicProjectListItem } from "@/lib/projects/types";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,7 @@ export function ProjectCard({
     project.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video";
   const cover = project.coverImageUrl || project.styleFallbackUrl;
   const href = guestBrowse
-    ? `/login?redirect=${encodeURIComponent(`/project/${project.id}`)}`
+    ? storyLoginHref(`/project/${project.id}`)
     : `/project/${project.id}`;
 
   return (

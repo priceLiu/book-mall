@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { PublisherLoginForm } from "@/components/auth/publisher-login-form";
 import { getPublisherToolsToken } from "@/lib/publisher-session.server";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+import { publisherLoginHref } from "@/lib/portal-auth-links";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +19,12 @@ export default async function LoginPage({
   const client = Array.isArray(searchParams?.client)
     ? searchParams?.client[0]
     : searchParams?.client;
-  const loopback = Array.isArray(searchParams?.loopback)
-    ? searchParams?.loopback[0]
-    : searchParams?.loopback;
   const token = await getPublisherToolsToken();
   if (token && !client) redirect(target);
   if (token && client) redirect(`/auth/client-callback?client=${client}`);
 
-  return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <PublisherLoginForm
-        bookOrigin={getMainSiteOrigin()}
-        redirect={target}
-        client={client}
-        loopback={loopback}
-      />
-    </main>
-  );
+  const redirectPath = client
+    ? `/login?client=${encodeURIComponent(client)}`
+    : target;
+  redirect(publisherLoginHref(redirectPath));
 }

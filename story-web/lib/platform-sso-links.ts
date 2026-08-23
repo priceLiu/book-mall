@@ -1,3 +1,4 @@
+import { buildBookPortalLoginHref } from "@private/federated-portal-nav";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export function bookMallReEnterHref(redirectPath: string, app: "canvas" | "story"): string | null {
@@ -7,8 +8,8 @@ export function bookMallReEnterHref(redirectPath: string, app: "canvas" | "story
   return `${origin}/api/sso/tools/re-enter?${q}`;
 }
 
-export function bookMallLoginHref(returnTo: string): string | null {
+export function bookMallLoginHref(redirectPath: string): string | null {
   const origin = getMainSiteOrigin();
   if (!origin) return null;
-  return `${origin}/login?callbackUrl=${encodeURIComponent(returnTo)}`;
+  return buildBookPortalLoginHref(origin, "story", redirectPath);
 }

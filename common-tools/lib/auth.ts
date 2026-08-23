@@ -30,10 +30,7 @@ export function getBookOriginClient(): string {
   return raw || "http://localhost:3000";
 }
 
-export function buildLoginUrl(returnPath = "/"): string {
-  const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
-  return `/login?redirect=${encodeURIComponent(path)}`;
-}
+export { buildLoginUrl, buildRegisterUrl } from "@/lib/portal-auth-links";
 
 export function throwIfUnauthorized(res: Response, data: Record<string, unknown>): void {
   if (res.status !== 401) return;

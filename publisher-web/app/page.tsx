@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publisherLoginHref } from "@/lib/portal-auth-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default function HomePage() {
             新建发布
           </Link>
           <Link
-            href="/login"
+            href={publisherLoginHref("/")}
             className="rounded-xl border border-black/10 px-4 py-2 text-sm"
           >
             登录

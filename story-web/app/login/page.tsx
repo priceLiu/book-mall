@@ -1,14 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { StoryLoginForm } from "@/components/auth/story-login-form";
 import { fetchToolsSession } from "@/lib/tools-introspect";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+import { storyLoginHref } from "@/lib/portal-auth-links";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "登录",
-  description: "登录 story-web 漫剧创作空间，继续你的故事、分镜与影像创作。",
 };
 
 function safeRedirect(raw: string | string[] | undefined): string {
@@ -26,10 +24,5 @@ export default async function LoginPage({
   const token = cookies().get("tools_token")?.value;
   const session = await fetchToolsSession(token);
   if (session.active) redirect(target);
-
-  return (
-    <main className="flex min-h-dvh w-full items-center justify-center overflow-y-auto bg-[var(--story-bg)] px-4 py-10">
-      <StoryLoginForm bookOrigin={getMainSiteOrigin()} redirect={target} />
-    </main>
-  );
+  redirect(storyLoginHref(target));
 }

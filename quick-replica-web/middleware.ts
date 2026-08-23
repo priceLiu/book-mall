@@ -64,8 +64,8 @@ function buildAuthRedirectUrl(request: NextRequest): URL {
     reEnter.searchParams.set("redirect", redirectPath);
     return reEnter;
   }
-  const url = new URL("/login", request.url);
-  url.searchParams.set("redirect", redirectPath);
+  const url = new URL("/sso-error", request.url);
+  url.searchParams.set("reason", "missing_main_origin");
   return url;
 }
 

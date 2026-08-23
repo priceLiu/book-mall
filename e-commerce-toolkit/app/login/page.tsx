@@ -1,13 +1,11 @@
 import { redirect } from "next/navigation";
-import { EcomLoginForm } from "@/components/auth/ecom-login-form";
 import { getEcomShellUser } from "@/lib/ecom-session.server";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+import { buildEcomLoginUrl } from "@/lib/portal-auth-links";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "登录",
-  description: "登录电商工具箱，生成主图、详情、带货视频与品牌 VI。",
 };
 
 function safeRedirect(raw: string | string[] | undefined): string {
@@ -24,10 +22,5 @@ export default async function LoginPage({
   const target = safeRedirect(searchParams?.redirect);
   const user = await getEcomShellUser();
   if (user) redirect(target);
-
-  return (
-    <main className="flex min-h-[70vh] w-full items-center justify-center bg-white px-4 py-12">
-      <EcomLoginForm bookOrigin={getMainSiteOrigin()} redirect={target} />
-    </main>
-  );
+  redirect(buildEcomLoginUrl(target));
 }

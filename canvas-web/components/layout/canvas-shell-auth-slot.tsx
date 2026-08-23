@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { navigatePortalLogout } from "@private/federated-portal-logout";
 
 import { useCanvasShellSession } from "@/lib/canvas/use-canvas-shell-session";
+import { canvasLoginHref, canvasRegisterHref } from "@/lib/portal-auth-links";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { clearCachedToolsSession } from "@/lib/tools-session-client-cache";
 
@@ -29,12 +29,12 @@ export function CanvasShellAuthSlot() {
   if (!session.active) {
     return (
       <div className="flex shrink-0 items-center gap-2">
-        <Link href="/login" className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
+        <a href={canvasLoginHref()} className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
           登录
-        </Link>
-        <Link href="/register" className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
+        </a>
+        <a href={canvasRegisterHref()} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
           注册
-        </Link>
+        </a>
       </div>
     );
   }

@@ -26,9 +26,7 @@ const GROUPS: { ratio: AspectRatio; label: string; gridClass: string }[] = [
   },
 ];
 
-function localAuthHref(path: string): string {
-  return `/login?redirect=${encodeURIComponent(path)}`;
-}
+import { storyLoginHref, storyRegisterHref } from "@/lib/portal-auth-links";
 
 function ProjectGroup({
   label,
@@ -144,7 +142,7 @@ export function ProjectsPageClient() {
             新增项目
           </Link>
         ) : (
-          <a href={localAuthHref("/projects/new")} className="twenty-btn shrink-0">
+          <a href={storyLoginHref("/projects/new")} className="twenty-btn shrink-0">
             <Plus className="mr-1.5 size-4" />
             登录后新建
           </a>
@@ -176,13 +174,10 @@ export function ProjectsPageClient() {
           </p>
           {guestBrowse ? (
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <a href={localAuthHref("/")} className="twenty-btn">
+              <a href={storyLoginHref("/")} className="twenty-btn">
                 登录
               </a>
-              <a
-                href={`/register?redirect=${encodeURIComponent("/")}`}
-                className="twenty-btn-ghost"
-              >
+              <a href={storyRegisterHref("/")} className="twenty-btn-ghost">
                 注册
               </a>
             </div>

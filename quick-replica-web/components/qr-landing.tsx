@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { qrLoginHref, qrRegisterHref } from "@/lib/portal-auth-links";
 import { QrLandingHome } from "@/components/qr-landing-home";
 
 /** 公开落地页（可被搜索引擎收录）；未登录访问 `/` 时展示。 */
@@ -15,12 +15,12 @@ export function QrLanding() {
             </span>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Link href="/login" className="qr-btn-secondary">
+            <a href={qrLoginHref("/")} className="qr-btn-secondary">
               登录
-            </Link>
-            <Link href="/register" className="qr-btn-primary">
+            </a>
+            <a href={qrRegisterHref("/")} className="qr-btn-primary">
               免费注册
-            </Link>
+            </a>
           </div>
         </div>
       </header>

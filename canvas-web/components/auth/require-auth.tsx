@@ -10,6 +10,7 @@ import {
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-revoked";
 import { bookMallReEnterHref } from "@/lib/platform-sso-links";
+import { canvasLoginHref } from "@/lib/portal-auth-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
   buildSilentReEnterHref,
@@ -160,13 +161,12 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }, [mainOrigin]);
 
-  // 未认证兜底：跳本域品牌登录页（保留回跳），不再弹主站登录。
   const localLoginHref = useCallback(() => {
     const path =
       typeof window !== "undefined"
         ? window.location.pathname + window.location.search
         : "/projects";
-    return `/login?redirect=${encodeURIComponent(path || "/projects")}`;
+    return canvasLoginHref(path || "/projects");
   }, []);
 
   const redirectToSso = useCallback(() => {

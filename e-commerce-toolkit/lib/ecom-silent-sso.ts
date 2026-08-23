@@ -1,6 +1,7 @@
 "use client";
 
-import { buildEcomLoginUrl, getBookOriginClient } from "@/lib/ecom-auth";
+import { buildEcomLoginUrl } from "@/lib/portal-auth-links";
+import { getBookOriginClient } from "@/lib/ecom-auth";
 import { isEcomPublicSsoPath } from "@/lib/ecom-public-paths";
 import {
   bumpEcomSsoReenterAttempts,

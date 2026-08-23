@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { bookMallReEnterHref } from "@/lib/platform-sso-links";
+import { storyLoginHref } from "@/lib/portal-auth-links";
 import { isSsoReenterSuppressedClient } from "@/lib/tools-logout-next-url";
 import {
   bumpSsoReenterAttempts,
@@ -11,13 +12,13 @@ import {
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
 
-/** 未认证跳本域品牌登录页（不再弹主站），保留 redirect 回跳。 */
-function localLoginHref(): string {
+/** 未认证：跳转 Book 登录（经 re-enter 回子应用）。 */
+function bookLoginHref(): string {
   const path =
     typeof window !== "undefined"
       ? window.location.pathname + window.location.search
       : "/";
-  return `/login?redirect=${encodeURIComponent(path || "/")}`;
+  return storyLoginHref(path || "/");
 }
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -60,7 +61,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           window.location.href = reEnter;
           return;
         }
-        window.location.href = localLoginHref();
+        window.location.href = bookLoginHref();
       } catch {
         if (!cancelled) setNeedsLogin(true);
       }
@@ -85,7 +86,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white"
           onClick={() => {
             clearSsoReenterAttempts();
-            window.location.href = localLoginHref();
+            window.location.href = bookLoginHref();
           }}
         >
           登录 / 注册

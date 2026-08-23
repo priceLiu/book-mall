@@ -9,7 +9,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { navigatePortalLogout } from "@private/federated-portal-logout";
-import { buildEcomLoginUrl } from "@/lib/ecom-auth";
+import { buildEcomLoginUrl } from "@/lib/portal-auth-links";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
 import {
   buildEcomSidebarNavItems,

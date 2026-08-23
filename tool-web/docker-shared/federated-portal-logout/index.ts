@@ -7,7 +7,7 @@ function appendSsoReenterSuppressCookie(res: { headers: Headers }): void {
   res.headers.append("Set-Cookie", parts.join("; "));
 }
 
-/** 登出后回跳：优先 returnTo（当前页），否则子站首页。 */
+/** 登出后回跳：始终回到子站首页（公开浏览），避免落在需登录页。 */
 function resolvePortalLogoutReturnUrl(
   request: NextRequest,
   appPublicOrigin: string | null,
@@ -16,22 +16,6 @@ function resolvePortalLogoutReturnUrl(
     /\/$/,
     "",
   );
-  const raw = request.nextUrl.searchParams.get("returnTo")?.trim();
-  if (!raw) return `${base}/`;
-
-  if (raw.startsWith("/") && !raw.startsWith("//")) {
-    return `${base}${raw}`;
-  }
-
-  try {
-    const u = new URL(raw);
-    if (u.origin.replace(/\/$/, "") === new URL(`${base}/`).origin.replace(/\/$/, "")) {
-      return u.toString();
-    }
-  } catch {
-    /* invalid URL */
-  }
-
   return `${base}/`;
 }
 
@@ -85,15 +69,7 @@ export function isSsoReenterSuppressedClient(): boolean {
 /** 客户端统一退出入口（须配合各子站 `/api/auth/logout`）。 */
 export function navigatePortalLogout(logoutPath = "/api/auth/logout"): void {
   markSsoReenterSuppressed();
-  const returnTo =
-    typeof window !== "undefined"
-      ? `${window.location.pathname}${window.location.search}`
-      : "/";
-  const url = new URL(logoutPath, window.location.origin);
-  if (returnTo && returnTo !== "/") {
-    url.searchParams.set("returnTo", returnTo);
-  }
-  window.location.href = url.toString();
+  window.location.href = new URL(logoutPath, window.location.origin).toString();
 }
 
 export {

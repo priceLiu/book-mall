@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { qrRegisterHref } from "@/lib/portal-auth-links";
 import {
   buildHomeCategoryCards,
   QR_HOME_CARD_CATEGORIES,
@@ -58,7 +59,7 @@ export function QrLandingHome({ onCategoryClick }: Props) {
           onCategoryClick();
           return;
         }
-        window.location.href = "/register";
+        window.location.href = qrRegisterHref("/");
       }}
     />
   );
