@@ -10,7 +10,12 @@ type ShellMeta = {
   hasMembership: boolean;
   canvasLaunch: { gatewayLinked: boolean; canvasOriginConfigured: boolean };
   ecomAccess: boolean;
-  referralEligibility: { eligible: boolean; planLabel: string | null; reason: string | null };
+  referralEligibility: {
+    eligible: boolean;
+    planLabel: string | null;
+    reason: string | null;
+    sharePersona?: "personal" | "team_owner" | null;
+  };
 };
 
 type EnvConfig = {
@@ -60,6 +65,8 @@ export function AccountShellLoader({
   const canvasOriginConfigured = meta?.canvasLaunch.canvasOriginConfigured ?? false;
   const ecomAccess = meta?.ecomAccess ?? false;
   const showReferral = meta?.referralEligibility.eligible ?? false;
+  const sharePersona =
+    meta?.referralEligibility.sharePersona === "team_owner" ? "team_owner" : "personal";
   const shellMetaLoading = meta === null;
 
   const canLaunchTools = env.toolsSsoReady && (isAdmin || hasMembership);
@@ -121,6 +128,7 @@ export function AccountShellLoader({
       appsMenuHint={appsMenuHint}
       billingPersona={billingPersona}
       showReferral={showReferral}
+      sharePersona={sharePersona}
       shellMetaLoading={shellMetaLoading}
     >
       {children}

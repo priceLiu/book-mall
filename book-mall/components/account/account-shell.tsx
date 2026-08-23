@@ -28,12 +28,14 @@ export function AccountShell({
   appsMenuHint,
   billingPersona,
   showReferral,
+  sharePersona = "personal",
   shellMetaLoading = false,
   children,
 }: {
   profile: { image: string | null; name: string | null; phone: string | null };
   isAdmin: boolean;
   showReferral?: boolean;
+  sharePersona?: import("@/lib/referral/referral-share-persona").ReferralSharePersona;
   shellMetaLoading?: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
@@ -69,6 +71,7 @@ export function AccountShell({
     appsMenuHint,
     billingPersona,
     showReferral,
+    sharePersona,
     shellMetaLoading,
   };
 

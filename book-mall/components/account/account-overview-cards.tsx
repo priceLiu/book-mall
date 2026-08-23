@@ -45,6 +45,7 @@ type Props = {
   isTeamSharedPool?: boolean;
   /** 是否展示分享得积分入口（概览弹层） */
   showReferralShare?: boolean;
+  sharePersona?: import("@/lib/referral/referral-share-persona").ReferralSharePersona;
 };
 
 function personaLabel(persona: BillingPersona | null): string {
@@ -78,6 +79,7 @@ export function AccountOverviewCards({
   packageUsageRows = [],
   isTeamSharedPool = false,
   showReferralShare = false,
+  sharePersona = "personal",
 }: Props) {
   const textLink = accountBodyTextLinkClass();
   const financeUsageUrl = getFinanceFeesRedirectUrl("/fees/usage") ?? "/account/usage";
@@ -95,7 +97,9 @@ export function AccountOverviewCards({
                 订阅会员通过积分套餐使用 AI；下方为当前套餐与用量。
               </CardDescription>
             </div>
-            {showReferralShare ? <AccountReferralShareEntry /> : null}
+            {showReferralShare ? (
+              <AccountReferralShareEntry sharePersona={sharePersona} />
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>

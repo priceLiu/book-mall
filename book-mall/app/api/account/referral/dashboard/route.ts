@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       eligible: false,
       reason: eligibility.reason ?? "不满足分享门禁",
+      sharePersona: eligibility.sharePersona,
     });
   }
 
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     eligible: true,
+    sharePersona: eligibility.sharePersona,
     dashboard: serializeReferralDashboard(dashboard, eligibility.planLabel),
   });
 }

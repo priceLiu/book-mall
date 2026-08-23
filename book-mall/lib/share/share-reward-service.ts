@@ -10,6 +10,7 @@ import type { ShareRewardChannel } from "@prisma/client";
 
 import { topupCredits } from "@/lib/billing/credit-account-service";
 import { prisma } from "@/lib/prisma";
+import { isActiveTeamOwner } from "@/lib/referral/referral-share-persona";
 
 import {
   getShareRewardConfig,
@@ -171,6 +172,14 @@ export async function tryGrantShareReward(inviteeUserId: string): Promise<boolea
     where: { inviteeUserId },
   });
   if (!attribution) return false;
+
+  // 团队主账号 · 工作流分享：只加成员，不发分享积分（与 8 位对外邀请码分流）
+  if (
+    attribution.channel === "WORKFLOW" &&
+    (await isActiveTeamOwner(attribution.referrerUserId))
+  ) {
+    return false;
+  }
 
   const progress = await prisma.shareRewardProgress.findUnique({
     where: { inviteeUserId },

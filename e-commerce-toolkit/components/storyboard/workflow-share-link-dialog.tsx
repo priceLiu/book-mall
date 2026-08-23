@@ -27,6 +27,7 @@ export function WorkflowShareLinkDialog({
   const [shortCode, setShortCode] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [legacyUrl, setLegacyUrl] = useState<string | null>(null);
+  const [teamMemberShare, setTeamMemberShare] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<"code" | "url" | null>(null);
@@ -50,6 +51,7 @@ export function WorkflowShareLinkDialog({
         token?: string;
         shortCode?: string;
         shareUrl?: string;
+        teamMemberShare?: boolean;
         error?: string;
       };
       if (!r.ok || !data.shortCode || !data.shareUrl) {
@@ -59,6 +61,7 @@ export function WorkflowShareLinkDialog({
         typeof window !== "undefined" ? window.location.origin : "";
       setShortCode(data.shortCode);
       setShareUrl(data.shareUrl);
+      setTeamMemberShare(Boolean(data.teamMemberShare));
       setLegacyUrl(`${origin}/share/w/${data.token}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "创建失败");
@@ -85,10 +88,12 @@ export function WorkflowShareLinkDialog({
       <div className="w-full max-w-md rounded-xl border border-[#e8e8ed] bg-white p-5 shadow-xl">
         <h2 className="flex items-center gap-2 text-base font-semibold text-[#1d1d1f]">
           <Link2 className="size-4" />
-          分享工作流
+          {teamMemberShare ? "邀请成员体验" : "分享工作流"}
         </h2>
         <p className="mt-2 text-xs text-[#6e6e73]">
-          分享 10 位码或主站链接；好友扫码后在主站领取分镜副本。
+          {teamMemberShare
+            ? "分享 10 位码或主站链接；好友领取副本后将加入你的团队（不发分享积分）。"
+            : "分享 10 位码或主站链接；好友扫码后在主站领取分镜副本。首次成功生成并首笔付费后，你将获得积分奖励。"}
         </p>
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
         {shortCode && shareUrl ? (

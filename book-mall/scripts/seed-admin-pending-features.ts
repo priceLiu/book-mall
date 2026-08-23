@@ -348,10 +348,10 @@ const SEED_ITEMS: {
     completed: true,
   },
   {
-    title: "SC-309 个人中心分享弹层",
-    description: "概览/侧栏「分享得积分」ReferralShareDialog；明细页异步；pricing 分享说明弹层。",
+    title: "SC-310 团队分享分流",
+    description: "OWNER 工作流 claim 加成员不发奖；sharePersona 文案；概览邀请明细链接。",
     docPath: "docs/分享链接.md",
-    sortOrder: 420,
+    sortOrder: 425,
     listKind: "PENDING",
     completed: true,
   },

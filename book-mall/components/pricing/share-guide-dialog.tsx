@@ -45,8 +45,9 @@ export function ShareGuideDialog({ onClose }: { onClose: () => void }) {
               </h3>
               <ol className="list-decimal space-y-2 pl-6 text-left [list-style-position:outside]">
                 <li className="pl-1">
-                  登录后点击 <strong className="text-[#1f2328]">个人中心 → 分享得积分</strong>
-                  （或侧栏同入口），查看你的
+                  登录后点击 <strong className="text-[#1f2328]">个人中心 → 分享得积分 / 分享邀请</strong>
+                  （团队主账号为「分享邀请」），或侧栏同入口；下方有
+                  <strong className="text-[#1f2328]"> 邀请明细</strong> 链接。在弹层中查看
                   <strong className="text-[#1f2328]"> 8 位邀请码</strong>、主站链接与微信二维码。
                 </li>
                 <li className="pl-1">将码、链接或二维码发给好友（微信私聊、群聊、口头报码均可）。</li>
@@ -65,6 +66,10 @@ export function ShareGuideDialog({ onClose }: { onClose: () => void }) {
               <h3 className="mb-2 text-left font-semibold text-[#1f2328]">
                 二、分享工作流（10 位工作流码）
               </h3>
+              <p className="mb-2 text-left text-xs text-[#656d76]">
+                <strong className="text-[#1f2328]">个人用户</strong>：工作流分享可获积分奖励。
+                <strong className="text-[#1f2328]">团队主账号</strong>：工作流用于邀请成员加入团队，不发分享积分；团队外好友请用 8 位邀请码。
+              </p>
               <ol className="list-decimal space-y-2 pl-6 text-left [list-style-position:outside]">
                 <li className="pl-1">
                   在 <strong className="text-[#1f2328]">画布 / 电商分镜 / 快速复刻</strong>
@@ -87,7 +92,24 @@ export function ShareGuideDialog({ onClose }: { onClose: () => void }) {
 
             <section className="text-left">
               <h3 className="mb-2 text-left font-semibold text-[#1f2328]">
-                三、好友如何操作（领取方）
+                三、团队场景（主账号 / 成员）
+              </h3>
+              <ul className="list-disc space-y-2 pl-6 text-left [list-style-position:outside]">
+                <li className="pl-1">
+                  <strong className="text-[#1f2328]">团队成员（ADMIN/MEMBER）</strong>：不可对外分享。
+                </li>
+                <li className="pl-1">
+                  <strong className="text-[#1f2328]">团队主账号</strong>：8 位码邀请<strong className="text-[#1f2328]">团队外</strong>好友，规则与个人用户相同（首笔付费得 20 积分）。
+                </li>
+                <li className="pl-1">
+                  <strong className="text-[#1f2328]">团队邀请链接</strong>（团队中心按手机号邀请）与工作流「邀请成员体验」用于<strong className="text-[#1f2328]">加成员</strong>，不发分享积分。
+                </li>
+              </ul>
+            </section>
+
+            <section className="text-left">
+              <h3 className="mb-2 text-left font-semibold text-[#1f2328]">
+                四、好友如何操作（领取方）
               </h3>
               <ul className="list-disc space-y-2 pl-6 text-left [list-style-position:outside]">
                 <li className="pl-1">

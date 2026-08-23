@@ -10,6 +10,7 @@ import {
   buildShareCodePageUrl,
   generateReferralShareCode,
 } from "@/lib/share/share-code-service";
+import type { ReferralSharePersona } from "@/lib/referral/referral-share-persona";
 
 /**
  * 分享返佣 · 领域服务（分享链接 1.0）
@@ -39,6 +40,8 @@ export type ReferralEligibility = {
   eligible: boolean;
   planLabel: string | null;
   reason: string | null;
+  /** 可分享时：personal=个人订阅；team_owner=团队主账号 */
+  sharePersona: ReferralSharePersona | null;
 };
 
 /**
@@ -63,7 +66,12 @@ export async function getReferralEligibility(
     select: { id: true },
   });
   if (teamNonOwner) {
-    return { eligible: false, planLabel: null, reason: "团队成员不可分享" };
+    return {
+      eligible: false,
+      planLabel: null,
+      reason: "团队成员不可分享",
+      sharePersona: null,
+    };
   }
 
   // 2) 有效个人套餐（任意档，已取消 ¥599/¥1490 门槛）。
@@ -80,7 +88,12 @@ export async function getReferralEligibility(
       });
       if (plan?.family === "PERSONAL") {
         const planLabel = `个人 · ${plan.tier}（${plan.interval === "YEAR" ? "年付" : "月付"}）`;
-        return { eligible: true, planLabel, reason: null };
+        return {
+          eligible: true,
+          planLabel,
+          reason: null,
+          sharePersona: "personal",
+        };
       }
     }
   }
@@ -104,11 +117,23 @@ export async function getReferralEligibility(
     const t = ownerMembership.tenant;
     const intervalLabel = t.interval === "YEAR" ? "年付" : "月付";
     const planLabel = `团队 · ${t.name}${t.packageLevel ? `（${t.packageLevel} · ${intervalLabel}）` : ""}`;
-    return { eligible: true, planLabel, reason: null };
+    return {
+      eligible: true,
+      planLabel,
+      reason: null,
+      sharePersona: "team_owner",
+    };
   }
 
-  return { eligible: false, planLabel: null, reason: "无有效订阅" };
+  return {
+    eligible: false,
+    planLabel: null,
+    reason: "无有效订阅",
+    sharePersona: null,
+  };
 }
+
+export { getActiveTeamOwnerTenantId, isActiveTeamOwner } from "@/lib/referral/referral-share-persona";
 
 /** 读取分享返佣默认比例（财务可在 PlatformPricingConfig 调；缺省 0.05）。 */
 export async function getReferralDefaultRate(): Promise<number> {

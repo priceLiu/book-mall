@@ -246,6 +246,7 @@ export function AccountNavMenu({
   appsMenuHint,
   billingPersona,
   showReferral = false,
+  sharePersona = "personal",
   shellMetaLoading = false,
   placement = "sidebar",
   compact = false,
@@ -254,6 +255,7 @@ export function AccountNavMenu({
   isAdmin: boolean;
   billingPersona: import("@prisma/client").BillingPersona | null;
   showReferral?: boolean;
+  sharePersona?: import("@/lib/referral/referral-share-persona").ReferralSharePersona;
   shellMetaLoading?: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
@@ -316,8 +318,9 @@ export function AccountNavMenu({
         isAdmin,
         billingPersona,
         showReferral,
+        sharePersona,
       }),
-    [isAdmin, billingPersona, showReferral],
+    [isAdmin, billingPersona, showReferral, sharePersona],
   );
 
   async function runAction(id: string) {
@@ -430,14 +433,22 @@ export function AccountNavMenu({
         {actionMsg ? (
           <p className="px-1 text-xs leading-relaxed text-destructive">{actionMsg}</p>
         ) : null}
-        <ReferralShareDialog open={referralShareOpen} onClose={() => setReferralShareOpen(false)} />
+        <ReferralShareDialog
+          open={referralShareOpen}
+          onClose={() => setReferralShareOpen(false)}
+          sharePersona={sharePersona}
+        />
       </div>
     );
   }
 
   return (
     <>
-      <ReferralShareDialog open={referralShareOpen} onClose={() => setReferralShareOpen(false)} />
+      <ReferralShareDialog
+        open={referralShareOpen}
+        onClose={() => setReferralShareOpen(false)}
+        sharePersona={sharePersona}
+      />
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
           <button

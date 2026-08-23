@@ -8,15 +8,18 @@ import { ShareGuideDialog } from "@/components/pricing/share-guide-dialog";
 import { ShareCodeBundle } from "@/components/share/share-code-bundle";
 import { Button } from "@/components/ui/button";
 import type { ReferralDashboardJson } from "@/lib/account/referral-dashboard-json";
+import type { ReferralSharePersona } from "@/lib/referral/referral-share-persona";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 export function ReferralShareDialog({
   open,
   onClose,
+  sharePersona = "personal",
 }: {
   open: boolean;
   onClose: () => void;
+  sharePersona?: ReferralSharePersona;
 }) {
   const [state, setState] = useState<LoadState>("idle");
   const [dashboard, setDashboard] = useState<ReferralDashboardJson | null>(null);
@@ -71,6 +74,12 @@ export function ReferralShareDialog({
 
   if (!open) return null;
 
+  const isTeamOwner = sharePersona === "team_owner";
+  const title = isTeamOwner ? "分享邀请" : "分享得积分";
+  const subtitle = isTeamOwner
+    ? "8 位邀请码面向团队外好友：注册并首笔付费后你得积分。画布等工作流分享用于邀请成员加入团队，不发分享积分。"
+    : `复制邀请码或扫码分享；好友首笔订阅/充值后你获 ${dashboard?.referralRewardCredits ?? 20} 积分，工作流分享最高 ${dashboard?.workflowShareRewardCredits ?? 40} 积分。`;
+
   const qrUrl = dashboard
     ? `/api/platform/share-code/qr?code=${encodeURIComponent(dashboard.code)}`
     : "";
@@ -95,7 +104,7 @@ export function ReferralShareDialog({
                 className="flex items-center gap-2 text-left text-lg font-semibold text-[#1f2328]"
               >
                 <Gift className="size-5 shrink-0 text-violet-600" />
-                分享得积分
+                {title}
               </h2>
               <button
                 type="button"
@@ -106,11 +115,7 @@ export function ReferralShareDialog({
                 <X className="size-5" />
               </button>
             </div>
-            <p className="mt-1 text-left text-xs text-[#656d76]">
-              复制邀请码或扫码分享；好友首笔订阅/充值后你获{" "}
-              {dashboard?.referralRewardCredits ?? 20} 积分，工作流分享最高{" "}
-              {dashboard?.workflowShareRewardCredits ?? 40} 积分。
-            </p>
+            <p className="mt-1 text-left text-xs text-[#656d76]">{subtitle}</p>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-left">

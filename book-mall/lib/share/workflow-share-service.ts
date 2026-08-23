@@ -26,7 +26,8 @@ import {
   assertCanShareQrTemplate,
   cloneQrTemplateForShareClaim,
 } from "@/lib/quick-replica/qr-template-service";
-import { getReferralEligibility } from "@/lib/referral/referral-service";
+import { getReferralEligibility, isActiveTeamOwner } from "@/lib/referral/referral-service";
+import { tryEnrollWorkflowClaimerInSharerTeam } from "@/lib/tenant/workflow-team-enroll";
 
 import {
   buildShareCodePageUrl,
@@ -55,8 +56,16 @@ export async function createWorkflowShareLink(input: {
   title?: string | null;
   maxClaims?: number | null;
   mainSiteOrigin?: string;
-}): Promise<{ token: string; id: string; shortCode: string; shareUrl: string }> {
+}): Promise<{
+  token: string;
+  id: string;
+  shortCode: string;
+  shareUrl: string;
+  /** 团队主账号工作流：用于邀请成员体验，不发分享积分 */
+  teamMemberShare: boolean;
+}> {
   await assertWorkflowShareEligible(input.sharerUserId);
+  const teamMemberShare = await isActiveTeamOwner(input.sharerUserId);
   if (input.app === "QUICK_REPLICA") {
     await assertCanShareQrTemplate(input.sharerUserId, input.resourceId);
   }
@@ -86,6 +95,7 @@ export async function createWorkflowShareLink(input: {
         token: row.token,
         shortCode: row.shortCode ?? shortCode,
         shareUrl,
+        teamMemberShare,
       };
     } catch (e) {
       if ((e as { code?: string }).code === "P2002") continue;
@@ -281,11 +291,21 @@ export async function claimWorkflowShare(input: {
     return created;
   });
 
-  await lockWorkflowAttribution({
-    inviteeUserId: input.claimerUserId,
-    referrerUserId: link.sharerUserId,
-    workflowClaimId: claim.id,
-  });
+  const sharerIsTeamOwner = await isActiveTeamOwner(link.sharerUserId);
+  if (sharerIsTeamOwner) {
+    await tryEnrollWorkflowClaimerInSharerTeam({
+      sharerUserId: link.sharerUserId,
+      claimerUserId: input.claimerUserId,
+    }).catch((e) => {
+      console.warn("[workflow-share] team enroll failed", e);
+    });
+  } else {
+    await lockWorkflowAttribution({
+      inviteeUserId: input.claimerUserId,
+      referrerUserId: link.sharerUserId,
+      workflowClaimId: claim.id,
+    });
+  }
 
   return {
     claimId: claim.id,

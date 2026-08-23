@@ -13,6 +13,7 @@ type OverviewPayload = AccountOverviewJson & {
     eligible: boolean;
     planLabel: string | null;
     reason: string | null;
+    sharePersona?: "personal" | "team_owner" | null;
   };
 };
 
@@ -44,11 +45,7 @@ export function AccountOverviewSection() {
   }, []);
 
   if (state === "loading") {
-    return (
-      <div aria-busy="true" aria-live="polite">
-        <AccountOverviewSkeleton />
-      </div>
-    );
+    return <AccountOverviewSkeleton />;
   }
 
   if (state === "error" || !data) {
@@ -98,6 +95,11 @@ export function AccountOverviewSection() {
         packageUsageRows={data.packageUsageRows}
         isTeamSharedPool={data.isTeamSharedPool}
         showReferralShare={data.referralEligibility?.eligible ?? false}
+        sharePersona={
+          data.referralEligibility?.sharePersona === "team_owner"
+            ? "team_owner"
+            : "personal"
+        }
       />
       <CreditLotBreakdown lots={lots} />
     </>

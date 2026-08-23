@@ -25,6 +25,8 @@ import {
   Users,
 } from "lucide-react";
 
+import type { ReferralSharePersona } from "@/lib/referral/referral-share-persona";
+
 export type AccountNavLinkItem = {
   kind: "link";
   href: string;
@@ -84,6 +86,7 @@ export function buildAccountNavMenuGroups(input: {
   billingPersona: BillingPersona | null;
   /** 任意有效订阅（个人套餐或团队 OWNER）显示分享入口；团队 ADMIN/MEMBER 不显示 */
   showReferral?: boolean;
+  sharePersona?: ReferralSharePersona;
 }): AccountNavMenuGroup[] {
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
 
@@ -120,10 +123,12 @@ export function buildAccountNavMenuGroups(input: {
     icon: Wallet,
   });
   if (input.showReferral) {
+    const shareLabel =
+      input.sharePersona === "team_owner" ? "分享邀请" : "分享得积分";
     billingItems.push({
       kind: "action",
       id: "referral-share",
-      label: "分享得积分",
+      label: shareLabel,
       icon: Gift,
     });
     billingItems.push({
