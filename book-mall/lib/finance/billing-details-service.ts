@@ -569,16 +569,20 @@ async function buildPlatformAssistantGatewayRows(input: {
     input.tab === "usage"
       ? await Promise.all([
           prisma.gatewayRequestLog.count({
-            where: buildPlatformAssistantGatewayLogWhere({
-              status: "SUCCEEDED",
-              ...periodFilters,
-            }),
+            where: buildPlatformAssistantGatewayLogWhere(
+              mergePlatformAssistantTabFilters({
+                status: "SUCCEEDED",
+                ...periodFilters,
+              }),
+            ),
           }),
           prisma.gatewayRequestLog.count({
-            where: buildPlatformAssistantGatewayLogWhere({
-              status: "FAILED",
-              ...periodFilters,
-            }),
+            where: buildPlatformAssistantGatewayLogWhere(
+              mergePlatformAssistantTabFilters({
+                status: "FAILED",
+                ...periodFilters,
+              }),
+            ),
           }),
         ])
       : [0, 0];
