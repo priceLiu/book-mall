@@ -9,6 +9,7 @@ WORKDIR /app
 FROM base AS with-shared
 COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
+COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
 
 FROM with-shared AS deps

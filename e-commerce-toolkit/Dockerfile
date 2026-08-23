@@ -7,6 +7,7 @@ WORKDIR /app
 #   cp -R ../shared/federated-portal-nav ../shared/platform-assistant ../shared/publisher-client docker-shared/
 FROM base AS with-shared
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
+COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
 COPY docker-shared/publisher-client /shared/publisher-client
 

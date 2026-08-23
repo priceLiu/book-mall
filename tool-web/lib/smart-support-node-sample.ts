@@ -1,31 +1,25 @@
-/** 实现逻辑页展示：由 doc/multi-rounded-chat.MD 中 Python 示例改写的 Node.js 多轮调用（非流式）。 */
-export const SMART_SUPPORT_MULTI_ROUND_NODE_SAMPLE = `// 多轮对话（Node.js / OpenAI SDK）
+/** 实现逻辑页展示：经 Book SSO Gateway BFF 的多轮对话（非流式）。 */
+export const SMART_SUPPORT_MULTI_ROUND_NODE_SAMPLE = `// 多轮对话（Node.js · 经 Gateway BFF，勿直连厂商 Key）
 // DeepSeek 为无状态 API：每次请求需携带完整 history（含助手上一轮正文）。
-// 文档：doc/multi-rounded-chat.MD
 
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: "https://api.deepseek.com",
+const res1 = await fetch("/api/smart-support/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    messages: [{ role: "user", content: "世界上最高的山是什么？" }],
+    model: "deepseek-v4-flash",
+  }),
 });
 
-// Round 1
-let messages = [
+// Round 2：追加 assistant + 新 user 消息后再次 POST
+const data1 = await res1.json();
+const messages = [
   { role: "user", content: "世界上最高的山是什么？" },
+  { role: "assistant", content: data1.text },
+  { role: "user", content: "第二高的是哪座？" },
 ];
-const res1 = await client.chat.completions.create({
-  model: "deepseek-chat",
-  messages,
-});
-messages.push(res1.choices[0].message);
-
-// Round 2：先追加助手回复，再追加新用户句
-messages.push({ role: "user", content: "第二高的是哪座？" });
-const res2 = await client.chat.completions.create({
-  model: "deepseek-chat",
-  messages,
-});
-messages.push(res2.choices[0].message);
-
-// 流式版：create({ ..., stream: true }) 后用 for await 拼 assistant content`;
+await fetch("/api/smart-support/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ messages, model: "deepseek-v4-flash" }),
+});`;

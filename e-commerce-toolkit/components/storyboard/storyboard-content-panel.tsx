@@ -3,6 +3,11 @@
 import { Loader2, Images, Settings2, Download, Link2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DEFAULT_SUBTITLE_STYLE,
+  SubtitleBurnInFields,
+  type SubtitleBurnInStyle,
+} from "@private/media-render-subtitle-style";
 
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
@@ -194,6 +199,9 @@ export function StoryboardContentPanel({
   /** 已结束（失败/idle）的任务 id，防止 useEffect 反复自动轮询 */
   const videoPollDismissedTaskIdRef = useRef<string | null>(null);
   const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeBurnIn, setMergeBurnIn] = useState(false);
+  const [mergeSubtitleStyle, setMergeSubtitleStyle] =
+    useState<SubtitleBurnInStyle>(DEFAULT_SUBTITLE_STYLE);
   const [savingPanel, setSavingPanel] = useState(false);
   const [regeneratingPanel, setRegeneratingPanel] = useState<number | null>(null);
   const [panelVidBusy, setPanelVidBusy] = useState<number | null>(null);
@@ -734,7 +742,16 @@ export function StoryboardContentPanel({
   async function handleMergePanelVideos() {
     setMergeBusy(true);
     try {
-      const submitted = await renderStoryboardPanelVideos(project.id);
+      const profile = mergeBurnIn
+        ? {
+            subtitle: {
+              mode: "script" as const,
+              burnIn: true,
+              style: mergeSubtitleStyle,
+            },
+          }
+        : undefined;
+      const submitted = await renderStoryboardPanelVideos(project.id, { profile });
       const job = await waitStoryboardMediaRender(submitted.id);
       if (job.status !== "SUCCEEDED" || !job.downloadUrl) {
         throw new Error(job.errorMessage ?? "视频合并失败");
@@ -1044,6 +1061,10 @@ export function StoryboardContentPanel({
                 imageGenBusy={imgBusy || regeneratingPanel != null}
                 sheetPngBusy={sheetPngBusy}
                 mergeBusy={mergeBusy}
+                mergeBurnIn={mergeBurnIn}
+                mergeSubtitleStyle={mergeSubtitleStyle}
+                onMergeBurnInChange={setMergeBurnIn}
+                onMergeSubtitleStyleChange={setMergeSubtitleStyle}
                 snapshotBusy={snapshotBusy}
                 hasDeliverableSnapshot={Boolean(deliverableSnapshot)}
                 onGenerateFullVideo={() => openVideoPicker({ fullSheet: true })}

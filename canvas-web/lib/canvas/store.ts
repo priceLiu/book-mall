@@ -137,6 +137,7 @@ const CANVAS_DRAFT_DATA_FIELDS = new Set([
   "prompt",
   "dockInput",
   "themeInput",
+  "body",
 ]);
 
 function isCanvasDraftDataPatch(

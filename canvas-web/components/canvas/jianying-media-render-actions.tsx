@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_SUBTITLE_STYLE,
+  SubtitleBurnInFields,
+  type SubtitleBurnInStyle,
+} from "@private/media-render-subtitle-style";
 import { Clapperboard, Download } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -133,6 +138,9 @@ export function JianyingMediaRenderActions({
   const [subtitleMode, setSubtitleMode] = useState<"script" | "asr">(
     inFlight?.subtitleMode ?? "script",
   );
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleBurnInStyle>(
+    inFlight?.subtitleStyle ?? DEFAULT_SUBTITLE_STYLE,
+  );
   const { confirmedUnlinked: gatewayBlocked, accountUrl: gatewayAccountUrl } =
     useGatewayLinkStatus();
   const [doneUrl, setDoneUrl] = useState<string | null>(
@@ -161,6 +169,7 @@ export function JianyingMediaRenderActions({
     scaleMode,
     burnIn,
     subtitleMode,
+    subtitleStyle,
   });
   const downloadableRef = useRef<string | null>(doneUrl);
   const doneUrlRef = useRef<string | null>(doneUrl);
@@ -177,6 +186,7 @@ export function JianyingMediaRenderActions({
     scaleMode,
     burnIn,
     subtitleMode,
+    subtitleStyle,
   };
   doneUrlRef.current = doneUrl;
   progressRef.current = progress;
@@ -246,6 +256,7 @@ export function JianyingMediaRenderActions({
       if (inFlight?.scaleMode) setScaleMode(inFlight.scaleMode);
       if (typeof inFlight?.burnIn === "boolean") setBurnIn(inFlight.burnIn);
       if (inFlight?.subtitleMode) setSubtitleMode(inFlight.subtitleMode);
+      if (inFlight?.subtitleStyle) setSubtitleStyle(inFlight.subtitleStyle);
       return;
     }
     if (inFlight?.status === "FAILED") {
@@ -446,6 +457,7 @@ export function JianyingMediaRenderActions({
           scaleMode: settings.scaleMode,
           burnIn: settings.burnIn,
           subtitleMode: settings.subtitleMode,
+          subtitleStyle: settings.subtitleStyle,
         });
       }
     },
@@ -728,6 +740,7 @@ export function JianyingMediaRenderActions({
           scaleMode,
           burnIn,
           subtitleMode,
+          subtitleStyle,
         },
       },
       { sessionOnly: true },
@@ -748,6 +761,7 @@ export function JianyingMediaRenderActions({
           subtitle: {
             mode: burnIn ? subtitleMode : "none",
             burnIn,
+            ...(burnIn ? { style: subtitleStyle } : {}),
           },
           video: { scaleMode },
         },
@@ -1056,55 +1070,25 @@ export function JianyingMediaRenderActions({
           : "border-t border-white/10 pt-2",
       )}
     >
-      <label
-        className={cn(
-          "flex items-center gap-2 text-white/70",
-          isDock ? "text-[13px]" : "text-[10px]",
-        )}
-      >
-        <input
-          type="checkbox"
-          checked={burnIn}
-          disabled={settingsLocked}
-          onChange={(e) => setBurnIn(e.target.checked)}
-        />
-        烧录台词字幕
-      </label>
-      {burnIn ? (
-        <fieldset
-          className={cn(
-            "mt-1.5 space-y-1 border-0 p-0",
-            isDock ? "pl-6 text-[13px] text-white/75" : "pl-5 text-[10px] text-white/60",
-          )}
-        >
-          <legend className="sr-only">字幕来源</legend>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="radio"
-              checked={subtitleMode === "script"}
-              disabled={settingsLocked}
-              onChange={() => setSubtitleMode("script")}
-            />
-            分镜对白（脚本表）
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="radio"
-              checked={subtitleMode === "asr"}
-              disabled={settingsLocked}
-              onChange={() => setSubtitleMode("asr")}
-            />
-            从视频音频识别（ASR）
-          </label>
-        </fieldset>
-      ) : null}
+      <SubtitleBurnInFields
+        variant="canvas-dark"
+        density="compact"
+        burnIn={burnIn}
+        onBurnInChange={setBurnIn}
+        style={subtitleStyle}
+        onStyleChange={setSubtitleStyle}
+        disabled={settingsLocked}
+        subtitleMode={subtitleMode}
+        onSubtitleModeChange={setSubtitleMode}
+        showSubtitleMode
+      />
     </div>
   );
 
   if (isDock) {
     return (
       <div className="flex h-full min-h-0 flex-col text-[13px] text-white/80">
-        <div className="nodrag flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 py-2.5">
+        <div className="nodrag flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-4 py-2">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] pb-1.5">
             <p className="text-[13px] text-white/70">
               已连接 <strong className="text-white">{connectedCount}</strong>

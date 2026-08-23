@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { inferVendorCodeFromModelKey, resolveVendorCodeForModel } from "@/lib/finance/infer-vendor-code";
+import {
+  inferVendorCodeFromModelKey,
+  resolveReconciliationVendorCode,
+  resolveVendorCodeForModel,
+} from "@/lib/finance/infer-vendor-code";
 import { formatBillingVendorLabel } from "@/lib/finance/billing-vendor-label";
 
 describe("infer-vendor-code", () => {
@@ -16,6 +20,16 @@ describe("infer-vendor-code", () => {
 
   it("prefers catalog vendor over inference", () => {
     expect(resolveVendorCodeForModel("minimax-h3-2k", "kie")).toBe("kie");
+  });
+
+  it("resolveReconciliationVendorCode uses providerKind for DEEPSEEK", () => {
+    expect(
+      resolveReconciliationVendorCode({
+        providerKind: "DEEPSEEK",
+        modelKey: "deepseek-v4-flash",
+        catalogVendor: "aliyun",
+      }),
+    ).toBe("deepseek");
   });
 
   it("does not return 其他 as label", () => {

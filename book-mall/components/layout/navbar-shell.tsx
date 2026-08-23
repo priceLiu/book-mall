@@ -1,12 +1,12 @@
 "use client";
 
-import { Braces, CreditCard, Layers, Menu, MessageSquareText, Monitor } from "lucide-react";
+import { Braces, CreditCard, Layers, LayoutGrid, Menu, MessageSquareText, Monitor } from "lucide-react";
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ProductMegaMenuContent } from "@/components/layout/product-mega-menu";
-import { buildBookPortalNavItems } from "@/lib/portal-nav";
+import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS, marketingHomeSectionUrl } from "@/lib/portal-nav";
 import {
   Sheet,
   SheetContent,
@@ -36,6 +36,7 @@ interface RouteProps {
 
 const routeList: RouteProps[] = [
   { href: "#hero-video", label: "主屏" },
+  { href: "#platform-apps", label: "平台应用" },
   { href: "#testimonials", label: "客户评价" },
   { href: "/pricing", label: "订阅价格" },
   { href: "/pricing/api", label: "API 价格" },
@@ -93,6 +94,7 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
   const tubelightItems = React.useMemo((): TubelightNavItem[] => {
     const icons: Record<string, TubelightNavItem["icon"]> = {
       主屏: Monitor,
+      平台应用: LayoutGrid,
       客户评价: MessageSquareText,
       订阅价格: CreditCard,
       "API 价格": Braces,
@@ -120,6 +122,15 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
       if (item.url.startsWith("#")) {
         setHash(item.url);
         const sectionId = item.url.slice(1);
+
+        if (pathname !== "/") {
+          window.open(
+            marketingHomeSectionUrl(window.location.origin, item.url),
+            "_blank",
+            "noopener,noreferrer",
+          );
+          return;
+        }
 
         if (pathname === "/") {
           void router.push(`/${item.url}`, { scroll: false });
@@ -180,7 +191,9 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     className="justify-start text-base"
                   >
-                    <a href={item.href}>{item.label}</a>
+                    <a href={item.href} {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}>
+                      {item.label}
+                    </a>
                   </Button>
                 ))}
               </div>
@@ -194,7 +207,16 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     className="justify-start text-base"
                   >
-                    <Link href={href.startsWith("#") ? `/${href}` : href}>{label}</Link>
+                    {href.startsWith("#") && pathname !== "/" ? (
+                      <a
+                        href={marketingHomeSectionUrl(window.location.origin, href)}
+                        {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
+                      >
+                        {label}
+                      </a>
+                    ) : (
+                      <Link href={href.startsWith("#") ? `/${href}` : href}>{label}</Link>
+                    )}
                   </Button>
                 ))}
               </div>

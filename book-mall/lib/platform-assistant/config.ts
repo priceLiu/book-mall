@@ -1,45 +1,6 @@
-/** 平台 AI 导览助手 · 运行时配置（模型 / 维度 / 检索参数）。 */
-
-/** 平台代付对话主模型（百炼 · 输入成本最低档之一）。 */
-export const ASSISTANT_CHAT_MODEL =
-  process.env.PLATFORM_ASSISTANT_CHAT_MODEL?.trim() || "qwen3.5-27b";
-
-/** 主模型厂商余额不足时依次尝试（默认百炼 flash，与 embedding 同池）。 */
-export const ASSISTANT_CHAT_FALLBACK_MODELS = (() => {
-  const raw = process.env.PLATFORM_ASSISTANT_CHAT_FALLBACK_MODELS?.trim();
-  if (raw) {
-    return raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  return ["qwen3.5-flash"];
-})();
-
-export function resolveAssistantChatModels(primary?: string): string[] {
-  const first = (primary?.trim() || ASSISTANT_CHAT_MODEL).trim();
-  const models = [first];
-  for (const model of ASSISTANT_CHAT_FALLBACK_MODELS) {
-    if (model && model !== first && !models.includes(model)) {
-      models.push(model);
-    }
-  }
-  return models;
-}
-
-/** AI 热闻简报 · DeepSeek V4 */
-export const ASSISTANT_NEWS_MODEL =
-  process.env.PLATFORM_ASSISTANT_NEWS_MODEL?.trim() || "deepseek-v4-flash";
+/** 平台 AI 导览助手 · 运行时配置（检索参数 / 限流；模型见 DB 配置）。 */
 
 export const ASSISTANT_NEWS_MAX_TOKENS = 4096;
-
-export const ASSISTANT_EMBED_MODEL =
-  process.env.PLATFORM_ASSISTANT_EMBED_MODEL?.trim() || "text-embedding-v3";
-
-export const ASSISTANT_EMBED_DIM = (() => {
-  const raw = Number(process.env.PLATFORM_ASSISTANT_EMBED_DIM);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1024;
-})();
 
 /** 检索 top-k（提高召回，覆盖跨应用/总览类问题） */
 export const ASSISTANT_TOP_K = 8;

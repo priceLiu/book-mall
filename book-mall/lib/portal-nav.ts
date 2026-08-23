@@ -8,6 +8,21 @@ export type { PortalNavItem };
 /** 过滤掉未配置 origin 的条目后 href 必然存在，调用方可直接用作链接 */
 export type BookPortalNavItem = PortalNavItem & { href: string };
 
+/** 主站「产品」菜单跳转子站 / SSO，统一新标签打开 */
+export const BOOK_PORTAL_EXTERNAL_LINK_PROPS = {
+  target: "_blank",
+  rel: "noopener noreferrer",
+} as const;
+
+export function marketingHomeSectionUrl(
+  origin: string,
+  hash: string,
+): string {
+  const base = origin.replace(/\/$/, "");
+  const fragment = hash.startsWith("#") ? hash : `#${hash}`;
+  return `${base}/${fragment}`;
+}
+
 export function resolveBookOrigin(): string | null {
   if (typeof window !== "undefined") {
     return window.location.origin;

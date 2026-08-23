@@ -48,6 +48,7 @@ export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
 export function useLibtvNodeToolbarScreenPlacement(
   nodeId: string,
   visible: boolean,
+  toolbarHeightEstimate = NODE_TOOLBAR_HEIGHT,
 ): LibtvNodeToolbarScreenPlacement | null {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const flowNode = useCanvasStore((s) => s.nodes.find((n) => n.id === nodeId));
@@ -85,7 +86,10 @@ export function useLibtvNodeToolbarScreenPlacement(
     const cx = pos.x + w / 2;
     const top = flowToScreenPosition({ x: cx, y: pos.y });
     const bottom = flowToScreenPosition({ x: cx, y: pos.y + pro2NodeBoxSize(flowNode).h });
-    if (top.y - NODE_TOOLBAR_HEIGHT - NODE_TOOLBAR_GAP < NODE_TOOLBAR_HEADER_RESERVED) {
+    if (
+      top.y - toolbarHeightEstimate - NODE_TOOLBAR_GAP <
+      NODE_TOOLBAR_HEADER_RESERVED
+    ) {
       return { x: bottom.x, y: bottom.y + NODE_TOOLBAR_GAP, place: "below" };
     }
     return { x: top.x, y: top.y - NODE_TOOLBAR_GAP, place: "above" };
@@ -98,5 +102,6 @@ export function useLibtvNodeToolbarScreenPlacement(
     flowToScreenPosition,
     flowNode,
     allNodes,
+    toolbarHeightEstimate,
   ]);
 }

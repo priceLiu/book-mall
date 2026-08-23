@@ -124,7 +124,7 @@ export function LibtvAudioInputDock() {
       revert();
       await alert({
         title: "请选择模型",
-        message: "请先在语音模型中选择 ElevenLabs V3 或 ElevenLabs Text to Speech。",
+        message: "请先在语音模型中选择 Qwen3 TTS、ElevenLabs 或其它 Gateway TTS 模型。",
         variant: "warning",
       });
       return;
@@ -132,8 +132,8 @@ export function LibtvAudioInputDock() {
     if (!prompt) {
       revert();
       await alert({
-        title: "请输入提示词",
-        message: "描述要合成的对白或旁白文本后再生成。",
+        title: "请输入旁白",
+        message: "输入要合成的旁白或对白文本后再生成。",
         variant: "warning",
       });
       return;
@@ -232,7 +232,7 @@ export function LibtvAudioInputDock() {
           RF_NO_WHEEL,
           PRO2_DOCK_TEXTAREA_INSET_CLASS,
         )}
-        placeholder="描述对白、旁白或配音风格；输入 @ 引用上游文本…"
+        placeholder="输入旁白或对白；输入 @ 引用上游文本…"
         value={dockInput}
         mentionables={mentionables}
         disabled={isRunning}

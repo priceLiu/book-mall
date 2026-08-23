@@ -76,7 +76,7 @@ export function AdminAssistantAiNewsPanel({
 
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-[#d1d9e0] px-4 py-8 text-center text-sm text-[#656d76]">
-          尚无热闻记录，点击上方按钮生成（需 Gateway 已登记 DeepSeek 模型）
+          尚无热闻记录，点击上方按钮生成（需 Gateway 已登记百炼 LLM，默认 qwen3.5-27b）
         </p>
       ) : (
         <ul className="space-y-2">

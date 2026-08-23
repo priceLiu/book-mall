@@ -27,10 +27,12 @@ import {
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
 import {
+  PRO2_IMAGE_NODE_HEIGHT,
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
-  PRO2_IMAGE_NODE_HEIGHT,
   PRO2_IMAGE_NODE_WIDTH,
+  PRO2_AUDIO_NODE_HEIGHT,
+  PRO2_AUDIO_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import type { CanvasFlowNode } from "./types";
 import { groupHasSbv1VideoChildren } from "./sbv1-media-group-meta";
@@ -121,7 +123,26 @@ function factoryLibtvMediaNodeBox(node: Pick<CanvasFlowNode, "type">): LibtvMedi
   if (node.type === "sbv1-image" || node.type === "story-pro2-image") {
     return { width: SBV1_IMAGE_NODE_WIDTH, height: SBV1_IMAGE_NODE_HEIGHT };
   }
+  if (node.type === "story-pro2-audio") {
+    return { width: PRO2_AUDIO_NODE_WIDTH, height: PRO2_AUDIO_NODE_HEIGHT };
+  }
   return { width: PRO2_IMAGE_NODE_WIDTH, height: PRO2_IMAGE_NODE_HEIGHT };
+}
+
+/** 旧音频节点外框（方卡 354×398 或偏短横条）→ 迁移为音轨条 */
+function isLegacyPro2AudioNodeBox(width: number, height: number): boolean {
+  return (
+    height > PRO2_AUDIO_NODE_HEIGHT * 1.15 ||
+    width < PRO2_AUDIO_NODE_WIDTH * 0.82
+  );
+}
+
+function pro2AudioTrackBoxNeedsMigrate(node: CanvasFlowNode): boolean {
+  if (node.type !== "story-pro2-audio") return false;
+  const d = node.data as { manualSize?: boolean };
+  if (d.manualSize) return false;
+  const box = readNodeMeasuredBox(node);
+  return isLegacyPro2AudioNodeBox(box.width, box.height);
 }
 
 /**
@@ -210,7 +231,10 @@ export function libtvMediaNodesNeedViewportReflow(
       continue;
     }
 
-    if (!n.type || !LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(n.type)) continue;
+    if (!n.type || !LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(n.type)) {
+      if (pro2AudioTrackBoxNeedsMigrate(n)) return true;
+      continue;
+    }
     if (shouldSkipLibtvMediaAspectPresetForNaturalMedia(n)) continue;
 
     const version = d.mediaAspectPresetSizeVersion ?? 0;
@@ -255,6 +279,12 @@ export function reconcileLibtvMediaNodeBoxSizes(
         }
         expected = best;
       }
+    } else if (n.type === "story-pro2-audio") {
+      if (!pro2AudioTrackBoxNeedsMigrate(n)) return n;
+      expected = {
+        width: PRO2_AUDIO_NODE_WIDTH,
+        height: PRO2_AUDIO_NODE_HEIGHT,
+      };
     } else if (n.type && LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(n.type)) {
       if (shouldSkipLibtvMediaAspectPresetForNaturalMedia(n)) {
         return n;
@@ -304,7 +334,7 @@ export function reconcileLibtvMediaNodeBoxSizes(
     if (sizeOk && metaOk) return n;
 
     changed = true;
-    if (n.type === "jianying-auto-render-pro2") {
+    if (n.type === "jianying-auto-render-pro2" || n.type === "story-pro2-audio") {
       return {
         ...n,
         width: expected.width,

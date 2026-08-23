@@ -1938,11 +1938,18 @@ export function resolveMediaRenderDownloadUrl(
   return null;
 }
 
+import type { SubtitleBurnInStyle } from "@private/media-render-subtitle-style/subtitle-style-options";
+
 export type MediaRenderScaleMode = "source" | "fit720p" | "fit1080p";
 
 export type MediaRenderProfile = {
   transition?: { type: "xfade"; durationSec: number } | { type: "none" };
-  subtitle?: { mode: "script" | "asr" | "none"; burnIn?: boolean; asrModelKey?: string };
+  subtitle?: {
+    mode: "script" | "asr" | "none";
+    burnIn?: boolean;
+    asrModelKey?: string;
+    style?: SubtitleBurnInStyle;
+  };
   video?: { scaleMode?: MediaRenderScaleMode };
 };
 

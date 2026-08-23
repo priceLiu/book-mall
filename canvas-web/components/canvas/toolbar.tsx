@@ -483,6 +483,7 @@ export function CanvasToolbar({
             label="分享链接"
             hint="生成工作流分享链接，好友复制画布后你可获积分奖励"
             onClick={onShareWorkflow}
+            className="border-orange-400/55 hover:border-orange-400/85"
           >
             <Link2 className="size-3.5" />
           </CanvasToolbarIconButton>

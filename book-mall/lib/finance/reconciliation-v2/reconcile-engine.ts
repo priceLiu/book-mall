@@ -27,10 +27,14 @@ function deriveIssueReason(input: {
   usageDiff: number;
   vendorUnits: number;
   platformUnits: number;
+  vendorListYuan?: number;
 }): string | null {
-  const { status, unitKind, usageDiff, vendorUnits, platformUnits } = input;
+  const { status, unitKind, usageDiff, vendorUnits, platformUnits, vendorListYuan = 0 } = input;
   if (status === "OK") return null;
   if (status === "MISSING_PLATFORM") {
+    if (vendorUnits <= 0 && vendorListYuan > 0) {
+      return "厂商 CSV 有费用但 Gateway 无对应成功日志（可能为非 Gateway 直连或 cost-only 行）";
+    }
     return `厂商有 ${vendorUnits} ${unitKind}，Gateway 无对应成功日志`;
   }
   if (status === "MISSING_VENDOR") {
@@ -73,7 +77,14 @@ function resolveStatus(input: {
     toleranceRate,
   } = input;
 
-  if (vendorUnits <= 0 && platformUnits <= 0) return "OK";
+  if (vendorUnits <= 0 && platformUnits <= 0) {
+    if (vendorListYuan > 0 || platformListYuan > 0) {
+      const amountOk = relDiff(vendorListYuan, platformListYuan) <= toleranceRate;
+      if (amountOk) return "OK";
+      return platformListYuan > vendorListYuan ? "OVER_PLATFORM" : "UNDER_PLATFORM";
+    }
+    return "OK";
+  }
   if (vendorUnits > 0 && platformUnits <= 0) return "MISSING_PLATFORM";
   if (platformUnits > 0 && vendorUnits <= 0) return "MISSING_VENDOR";
 
@@ -138,6 +149,7 @@ export function reconcileVendorAndPlatform(
       usageDiff,
       vendorUnits,
       platformUnits,
+      vendorListYuan,
     });
 
     rows.push({

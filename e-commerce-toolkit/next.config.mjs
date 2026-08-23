@@ -26,6 +26,7 @@ const nextConfig = {
   output: "standalone",
   transpilePackages: [
     "@private/federated-portal-nav",
+    "@private/media-render-subtitle-style",
     "@private/publisher-client",
     "@private/platform-assistant",
   ],
@@ -38,6 +39,9 @@ const nextConfig = {
     );
     config.resolve.alias["@private/federated-portal-nav"] = resolveShared(
       "federated-portal-nav",
+    );
+    config.resolve.alias["@private/media-render-subtitle-style"] = resolveShared(
+      "media-render-subtitle-style",
     );
     return config;
   },

@@ -124,6 +124,13 @@ const SEED_ITEMS: {
     sortOrder: 110,
   },
   {
+    title: "自动成片升级",
+    description: "统一烧录字幕字体/字号、三端 UI、轻量剪辑台前置协议。",
+    docPath: "docs/自动成片升级方案.md",
+    sortOrder: 102,
+    listKind: "PENDING",
+  },
+  {
     title: "模型与应用管理",
     description:
       "模型调用地图：全站应用×页面×功能点的模型清单、用量统计与分级配置（L6 调用点绑定）。",

@@ -39,11 +39,18 @@ export function collectLibtvDockEngineModels(
     if (providerIdSet && !providerIdSet.has(provider.id)) continue;
     for (const model of provider.models) {
       if (!model.enabled) continue;
-      if (model.role !== opts.role) continue;
-      if (opts.role === "IMAGE" && !isImageGenerationModelKey(model.modelKey)) {
+      if (allowedSet) {
+        if (!allowedSet.has(model.modelKey)) continue;
+      } else if (model.role !== opts.role) {
         continue;
       }
-      if (allowedSet && !allowedSet.has(model.modelKey)) continue;
+      if (
+        opts.role === "IMAGE" &&
+        !allowedSet &&
+        !isImageGenerationModelKey(model.modelKey)
+      ) {
+        continue;
+      }
       if (
         reqCaps?.length &&
         !modelHasStoryCapabilities(model.modelKey, reqCaps)

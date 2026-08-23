@@ -6,6 +6,7 @@ import {
   Braces,
   CreditCard,
   Layers,
+  LayoutGrid,
   Menu,
   MessageSquareText,
   Monitor,
@@ -14,7 +15,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 import { cn } from "@/lib/utils";
-import { buildBookPortalNavItems } from "@/lib/portal-nav";
+import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS, marketingHomeSectionUrl } from "@/lib/portal-nav";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,7 @@ type NavItem = {
 
 const centerNavLinks: NavItem[] = [
   { label: "主屏", href: "#hero-video" },
+  { label: "平台应用", href: "#platform-apps" },
   { label: "客户评价", href: "#testimonials" },
   {
     label: "订阅价格",
@@ -52,6 +54,7 @@ const centerNavLinks: NavItem[] = [
 
 const centerNavIcons: Record<string, TubelightNavItem["icon"]> = {
   主屏: Monitor,
+  平台应用: LayoutGrid,
   客户评价: MessageSquareText,
   订阅价格: CreditCard,
   "API 价格": Braces,
@@ -65,6 +68,7 @@ function ProductNavDropdown() {
         <a
           key={item.key}
           href={item.href}
+          {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
           className="site-home-nav-sheet-item rounded-md px-3 py-2.5 hover:bg-muted"
         >
           {item.label}
@@ -105,6 +109,15 @@ export function SiteHomeNav({
   const navigate = (href: string) => {
     setOpen(false);
     if (href.startsWith("#")) {
+      const openMarketingInNewTab = isAccount || pathname !== "/";
+      if (openMarketingInNewTab) {
+        window.open(
+          marketingHomeSectionUrl(window.location.origin, href),
+          "_blank",
+          "noopener,noreferrer",
+        );
+        return;
+      }
       if (pathname === "/") {
         document.getElementById(href.slice(1))?.scrollIntoView({ behavior: "smooth" });
         window.history.replaceState(null, "", href);
@@ -124,6 +137,7 @@ export function SiteHomeNav({
     if (pricing?.isActive?.(pathname)) return "订阅价格";
     if (pathname === "/") {
       if (hash === "#testimonials") return "客户评价";
+      if (hash === "#platform-apps") return "平台应用";
       return "主屏";
     }
     return "主屏";
@@ -190,6 +204,7 @@ export function SiteHomeNav({
                 <a
                   key={item.key}
                   href={item.href}
+                  {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
                   className="site-home-nav-sheet-item flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-muted"
                   onClick={() => setOpen(false)}
                 >

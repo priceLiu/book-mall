@@ -13,7 +13,9 @@ const ROOT = path.resolve(__dirname, "../..");
 const SCAN_DIRS = [
   path.join(ROOT, "book-mall/lib/canvas"),
   path.join(ROOT, "book-mall/app/api/canvas"),
+  path.join(ROOT, "book-mall/lib/gateway"),
   path.join(ROOT, "canvas-web"),
+  path.join(ROOT, "tool-web/lib"),
 ];
 
 const ALLOWLIST_PREFIXES = [
@@ -23,16 +25,19 @@ const ALLOWLIST_PREFIXES = [
   "book-mall/lib/canvas/canvas-video-bailian-r2v.ts",
   "book-mall/lib/canvas/canvas-constants.ts",
   "book-mall/lib/canvas/secret.ts",
+  "book-mall/lib/gateway/",
   "canvas-web/app/settings/providers/providers-client.tsx",
   "canvas-web/app/auth/",
   "canvas-web/app/api/tools-session/",
   "canvas-web/lib/book-mall-proxy-auth.ts",
   "canvas-web/lib/portal-auth-bff.ts",
   "canvas-web/lib/tools-introspect.ts",
+  "tool-web/lib/smart-support-node-sample.ts",
 ];
 
 const VENDOR_ENV_RE =
   /process\.env\.(?:DEEPSEEK|MOONSHOT|BAILIAN|DASHSCOPE|KIE|VOLC|OPENAI|GEMINI|HUNYUAN|ARK|MINIMAX)[A-Z0-9_]*(?:API_KEY|SECRET)/g;
+const DEEPSEEK_ENV_RE = /process\.env\.DEEPSEEK_API_KEY/g;
 const VENDOR_HOST_RE =
   /https?:\/\/(?:api\.moonshot\.cn|dashscope\.aliyuncs\.com|api\.deepseek\.com|ark\.cn-beijing\.volces\.com)/g;
 
@@ -65,12 +70,14 @@ function main() {
     for (const file of walk(dir)) {
       const r = rel(file);
       if (isAllowlisted(r)) continue;
+      if (r.includes("/test/") || r.includes(".test.")) continue;
       const text = fs.readFileSync(file, "utf8");
-      if (VENDOR_ENV_RE.test(text)) {
+      const envRe = r.startsWith("book-mall/lib/gateway/") ? DEEPSEEK_ENV_RE : VENDOR_ENV_RE;
+      if (envRe.test(text)) {
         violations.push(`${r}: runtime vendor API key env`);
       }
-      VENDOR_ENV_RE.lastIndex = 0;
-      if (VENDOR_HOST_RE.test(text) && !r.includes("test/") && !r.includes(".test.")) {
+      envRe.lastIndex = 0;
+      if (!r.startsWith("book-mall/lib/gateway/") && VENDOR_HOST_RE.test(text)) {
         violations.push(`${r}: hardcoded vendor host URL in active path`);
       }
       VENDOR_HOST_RE.lastIndex = 0;

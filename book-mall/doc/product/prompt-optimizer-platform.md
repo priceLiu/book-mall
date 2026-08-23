@@ -69,8 +69,8 @@ Book 注册 / 登录
 | `gemini-2.5-flash` | KIE | Google Gemini 2.5 Flash（百炼无 Gemini 价目） |
 | `gemini-3-flash` | KIE | Gemini 3 Flash · Story 同款 |
 
-DeepSeek 凭证：`DEEPSEEK_API_KEY` → `https://api.deepseek.com/v1`  
-百炼凭证：`DASHSCOPE_API_KEY` → `https://dashscope.aliyuncs.com/compatible-mode/v1`
+DeepSeek 凭证：在 **Gateway 控制台**（`:3005/dashboard/models`）绑定 DEEPSEEK 厂商 Key；平台部署经 Book SSO Gateway BFF，**勿**在业务 env 配置 `DEEPSEEK_API_KEY` 直连。  
+百炼凭证：Gateway UI 绑定 `DASHSCOPE` / BAILIAN（bootstrap 脚本 `seed-pilot-gateway.ts` 仅作本地初始化，不含 DeepSeek env 导入）。
 
 试点账号本地 seed：`cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/seed-pilot-gateway.ts`
 

@@ -10,7 +10,11 @@ const nextConfig = {
     /** archiver@8 的 package exports 与 webpack 不兼容，服务端 API 外置加载 */
     serverComponentsExternalPackages: ["archiver"],
   },
-  transpilePackages: ["@private/federated-portal-nav", "@private/platform-assistant"],
+  transpilePackages: [
+    "@private/federated-portal-nav",
+    "@private/media-render-subtitle-style",
+    "@private/platform-assistant",
+  ],
   images: {
     remotePatterns: [
       {

@@ -83,6 +83,17 @@ export const LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH = 220;
 export const LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT = 220;
 
 /**
+ * LibTV 音频轨节点（Pro2 · 横条 · 比 16:9 横版略宽，便于展示长波形）
+ * 宽 840 × 高 96（标题 44 + 波形区 52）
+ */
+export const LIBTV_AUDIO_TRACK_NODE_WIDTH = 840;
+export const LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT = 52;
+export const LIBTV_AUDIO_TRACK_NODE_HEIGHT =
+  LIBTV_IMAGE_NODE_HEADER_HEIGHT + LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT;
+export const LIBTV_AUDIO_TRACK_NODE_MIN_WIDTH = 360;
+export const LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT = 72;
+
+/**
  * LibTV 横版视频媒体卡（Pro2 分镜视频组格 · sbv1 视频合成 · ≈3:2）
  */
 export const LIBTV_VIDEO_MEDIA_NODE_WIDTH = 350;

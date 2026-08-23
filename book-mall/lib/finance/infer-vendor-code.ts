@@ -1,3 +1,7 @@
+import type { GatewayProviderKind } from "@prisma/client";
+
+import { findDeepseekListPrice } from "@/lib/pricing/deepseek-v4-pricing";
+
 /**
  * modelKey / ModelCatalog.vendor → 对账用厂商 code（aliyun / kie / minimax …）。
  * 展示名见 formatBillingVendorLabel。
@@ -59,4 +63,21 @@ export function resolveVendorCodeForModel(
   const fromCatalog = catalogVendor?.trim().toLowerCase();
   if (fromCatalog) return fromCatalog;
   return inferVendorCodeFromModelKey(modelKey);
+}
+
+/** Gateway 路由优先：DEEPSEEK 直连对 deepseek CSV；百炼代销 deepseek 仍归 aliyun。 */
+export function resolveReconciliationVendorCode(input: {
+  providerKind?: GatewayProviderKind | null;
+  modelKey: string;
+  catalogVendor?: string | null;
+}): string {
+  const pk = input.providerKind;
+  if (pk === "DEEPSEEK") return "deepseek";
+  if (
+    (pk === "BAILIAN" || pk === "DASHSCOPE") &&
+    findDeepseekListPrice(input.modelKey)
+  ) {
+    return "aliyun";
+  }
+  return resolveVendorCodeForModel(input.modelKey, input.catalogVendor);
 }

@@ -23,12 +23,12 @@ import {
   PlatformAssistantGatewayError,
 } from "@/lib/platform-assistant/platform-gateway";
 import {
-  ASSISTANT_CHAT_MODEL,
   ASSISTANT_MAX_TOKENS,
   ASSISTANT_RATE_LIMIT,
   ASSISTANT_GUEST_RATE_LIMIT,
   isPureGreeting,
 } from "@/lib/platform-assistant/config";
+import { getAssistantChatRuntimeConfig } from "@/lib/platform-assistant/platform-assistant-model-config-service";
 import { resolveAssistantActor } from "@/lib/platform-assistant/assistant-actor";
 
 export const runtime = "nodejs";
@@ -159,6 +159,10 @@ export async function POST(request: Request) {
   const isGreeting = isPureGreeting(query);
   let chunkCount = 0;
   let assistantReply = "";
+  const chatConfig = await getAssistantChatRuntimeConfig();
+  if (!chatConfig.enabled) {
+    return Response.json({ error: "AI 小智对话已在管理后台关闭" }, { status: 503 });
+  }
 
   async function logFeedbackAfterReply() {
     if (!userId) return;
@@ -243,7 +247,8 @@ export async function POST(request: Request) {
         let streamed;
         try {
           streamed = await platformChatStream({
-            model: ASSISTANT_CHAT_MODEL,
+            model: chatConfig.modelKey,
+            fallbackModels: chatConfig.fallbackModelKeys,
             messages,
             maxTokens: ASSISTANT_MAX_TOKENS,
             clientPage: "platform-assistant/chat",

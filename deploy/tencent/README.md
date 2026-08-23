@@ -141,6 +141,14 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 - **`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（与主站完全一致；缺则 SSO `missing_exchange_secret`）**
 - `NEXT_PUBLIC_STORY_WEB_ORIGIN=https://story.ai-code8.com`
 
+**AI 海报画布 `canvas-web`**（至少）：
+
+- `MAIN_SITE_ORIGIN=https://book.ai-code8.com`
+- `NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com`
+- **`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（与主站完全一致；缺则门户登录 503 / 退出 federated 链异常）**
+- `NEXT_PUBLIC_CANVAS_WEB_ORIGIN=https://canvas.ai-code8.com`
+- `CANVAS_PUBLIC_ORIGIN=https://canvas.ai-code8.com`
+
 **提示词优化器 `prompt-optimizer-platform`**（至少）：
 
 - `MAIN_SITE_ORIGIN=https://book.ai-code8.com`
@@ -148,7 +156,7 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 - `PROMPT_OPTIMIZER_PUBLIC_ORIGIN=https://prompt.ai-code8.com`
 - `NEXT_PUBLIC_GATEWAY_WEB_ORIGIN=https://gateway.ai-code8.com`
 
-对照文件：`deploy/tencent/book-mall.env.example`、`tool-web.env.example`、**`finance-web.env.example`**、**`story-web.env.example`**、**`prompt-optimizer-platform.env.example`**。  
+对照文件：`deploy/tencent/book-mall.env.example`、`tool-web.env.example`、**`finance-web.env.example`**、**`story-web.env.example`**、**`canvas-web.env.example`**、**`prompt-optimizer-platform.env.example`**。  
 更全说明见仓库根目录 [`DEPLOY.md`](../../DEPLOY.md)。
 
 ### 3. SSO / 域名要点
@@ -237,11 +245,11 @@ docker compose up -d --build
 
 | 时间 (CST) | 路径 | 说明 |
 |------------|------|------|
-| 06:30 | `POST /api/internal/platform-assistant/ai-news/generate` | 预生成当日 AI 热闻（Gateway DeepSeek） |
+| 06:30 | `POST /api/internal/platform-assistant/ai-news/generate` | 预生成当日 AI 热闻（Gateway 百炼） |
 | 12:30 | 同上 | 覆盖刷新当日热闻 |
 | 18:30 | 同上 | 覆盖刷新当日热闻 |
 
-本地手动：`pnpm --dir book-mall platform-assistant:ai-news-generate`，或 **book-mall 管理驾驶舱** →「立即生成今日热闻」（无需额外 Key，走 Gateway DeepSeek）。
+本地手动：`pnpm --dir book-mall platform-assistant:ai-news-generate`，或 **book-mall 管理驾驶舱** →「立即生成今日热闻」（无需额外 Key，走 Gateway 百炼 LLM）。
 
 读路径：`GET /api/platform-assistant/ai-news` **只读 DB**；保留最近 3 天。详见 `book-mall/doc/product/platform-assistant-ai-news-and-canvas-portal.md`。
 

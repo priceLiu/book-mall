@@ -6,9 +6,8 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { platformEmbedTexts } from "@/lib/platform-assistant/platform-gateway";
+import { getAssistantEmbedRuntimeConfig } from "@/lib/platform-assistant/platform-assistant-model-config-service";
 import {
-  ASSISTANT_EMBED_DIM,
-  ASSISTANT_EMBED_MODEL,
   ASSISTANT_TOP_K,
 } from "@/lib/platform-assistant/config";
 
@@ -31,11 +30,17 @@ const EMBED_CACHE = new Map<string, number[]>();
 const EMBED_CACHE_MAX = 256;
 
 async function embedQueryCached(q: string): Promise<number[]> {
-  const cached = EMBED_CACHE.get(q);
+  const embedConfig = await getAssistantEmbedRuntimeConfig();
+  if (!embedConfig.enabled) {
+    return [];
+  }
+
+  const cacheKey = `${embedConfig.modelKey}:${embedConfig.embedDim}:${q}`;
+  const cached = EMBED_CACHE.get(cacheKey);
   if (cached) {
     // 触达即刷新到队尾（LRU）
-    EMBED_CACHE.delete(q);
-    EMBED_CACHE.set(q, cached);
+    EMBED_CACHE.delete(cacheKey);
+    EMBED_CACHE.set(cacheKey, cached);
     return cached;
   }
   // DashScope 偶发瞬时 TLS 断连；重试一次以保证检索/知识落地（前端已显示「正在输入」）。
@@ -43,8 +48,8 @@ async function embedQueryCached(q: string): Promise<number[]> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const [embedding] = await platformEmbedTexts([q], {
-        model: ASSISTANT_EMBED_MODEL,
-        dimensions: ASSISTANT_EMBED_DIM,
+        model: embedConfig.modelKey,
+        dimensions: embedConfig.embedDim,
         clientPage: "platform-assistant/retrieve",
         timeoutMs: 20_000,
       });
@@ -59,7 +64,7 @@ async function embedQueryCached(q: string): Promise<number[]> {
     }
   }
   if (vec.length > 0) {
-    EMBED_CACHE.set(q, vec);
+    EMBED_CACHE.set(cacheKey, vec);
     if (EMBED_CACHE.size > EMBED_CACHE_MAX) {
       const oldest = EMBED_CACHE.keys().next().value;
       if (oldest !== undefined) EMBED_CACHE.delete(oldest);

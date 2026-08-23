@@ -1,5 +1,10 @@
 /** 合成台 · 客户端可安全引用的类型与常量（不含 prisma） */
 
+import {
+  DEFAULT_SUBTITLE_STYLE,
+  type SubtitleBurnInStyle,
+} from "@private/media-render-subtitle-style/subtitle-style-options";
+
 import type { ComposeProgressStep } from "./ai-space-compose-progress";
 
 export type { ComposeProgressStep } from "./ai-space-compose-progress";
@@ -34,6 +39,8 @@ export type AiSpaceComposeOverlayOptions = {
   marginPx: number;
   /** 烧录台词字幕 */
   burnSubtitle: boolean;
+  /** burnSubtitle 为 true 时生效 */
+  subtitleStyle?: SubtitleBurnInStyle;
   resolution: "480P" | "720P";
   /** 相对本镜/本段起点，数字人小窗开始显示（秒） */
   appearFromSec?: number;
@@ -46,6 +53,7 @@ export const AI_SPACE_COMPOSE_DEFAULT_OPTIONS: AiSpaceComposeOverlayOptions = {
   position: "bottom-right",
   marginPx: 20,
   burnSubtitle: false,
+  subtitleStyle: DEFAULT_SUBTITLE_STYLE,
   resolution: "480P",
 };
 

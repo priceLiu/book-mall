@@ -466,15 +466,26 @@ export type MediaRenderJobDto = {
   errorMessage: string | null;
 };
 
+export type EcomMediaRenderProfileInput = {
+  transition?: { type: "xfade"; durationSec: number } | { type: "none" };
+  subtitle?: {
+    mode?: "script" | "asr" | "none";
+    burnIn?: boolean;
+    style?: import("@private/media-render-subtitle-style/subtitle-style-options").SubtitleBurnInStyle;
+  };
+  video?: { scaleMode?: "source" | "fit720p" | "fit1080p" };
+};
+
 export async function renderStoryboardPanelVideos(
   projectId: string,
+  opts?: { profile?: EcomMediaRenderProfileInput },
 ): Promise<MediaRenderJobDto> {
   const data = await ecomBookFetch(
     `api/sso/tools/ecom/storyboard/projects/${projectId}/video/render`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(opts?.profile ? { profile: opts.profile } : {}),
     },
   );
   return data.job as MediaRenderJobDto;

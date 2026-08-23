@@ -7,6 +7,7 @@ export * from "./run-aliyun-reconciliation";
 export * from "./run-kie-reconciliation";
 export * from "./run-deepseek-reconciliation";
 export * from "./deepseek-usage-v2-adapter";
+export * from "./deepseek-platform-rollup";
 export * from "./master-table";
 export * from "./master-usage-summary";
 export * from "./kie-usage-v2-adapter";

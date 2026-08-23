@@ -28,7 +28,7 @@
 
 1. `runFfmpegMediaRender`（`mode === "asr" && burnIn`）
 2. `transcribeClipViaGateway` → `gatewayV1AsrTranscribe`
-3. `buildAsrSubtitleSrt` → SRT 文件 → `renderXfade` burn-in
+3. `buildAsrSubtitleSrt` → SRT 文件 → `renderXfade` burn-in（`buildSubtitlesFilterExpr` 强制 CJK 字体，避免 Arial 方框）
 
 ## 前端
 

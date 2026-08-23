@@ -4572,3 +4572,20 @@ model PlatformAssistantAiNewsDaily {
   @@index([dateKey(sort: Desc)])
   @@index([status, generatedAt(sort: Desc)])
 }
+
+/// AI 小智 · 模型配置（Book 管理后台可编辑，单行 default）
+model PlatformAssistantModelConfig {
+  id                    String   @id @default("default")
+  chatEnabled           Boolean  @default(true)
+  chatModelKey          String   @default("qwen3.5-27b")
+  chatFallbackModelKeys String[] @default(["qwen3.5-flash"])
+  newsEnabled           Boolean  @default(true)
+  newsModelKey          String   @default("qwen3.5-27b")
+  newsFallbackModelKeys String[] @default(["qwen3.5-flash"])
+  embedEnabled          Boolean  @default(true)
+  embedModelKey         String   @default("text-embedding-v3")
+  embedDim              Int      @default(1024)
+  updatedByUserId       String?
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+}

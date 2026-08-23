@@ -15,7 +15,7 @@ import {
   gatewayV1Embeddings,
   gatewayV1ClientMeta,
 } from "@/lib/gateway/gateway-v1-http-client";
-import { resolveAssistantChatModels } from "@/lib/platform-assistant/config";
+import { resolveModelChain } from "@/lib/platform-assistant/platform-assistant-model-config-service";
 
 export class PlatformAssistantGatewayError extends Error {
   constructor(
@@ -153,13 +153,14 @@ function isVendorInsufficientBalance(status: number, errText: string): boolean {
 /** 平台代付：流式对话，返回可直接透传的 SSE ReadableStream。 */
 export async function platformChatStream(opts: {
   model: string;
+  fallbackModels?: string[];
   messages: { role: string; content: string }[];
   maxTokens?: number;
   temperature?: number;
   clientPage?: string;
 }): Promise<{ status: number; body: ReadableStream<Uint8Array> }> {
   const apiKeyId = await resolvePlatformApiKeyId();
-  const models = resolveAssistantChatModels(opts.model);
+  const models = resolveModelChain(opts.model, opts.fallbackModels ?? []);
   let lastErr = "";
 
   for (const model of models) {
@@ -204,13 +205,14 @@ export async function platformChatStream(opts: {
 /** 平台代付：非流式对话，返回 assistant 文本。 */
 export async function platformChatCompletion(opts: {
   model: string;
+  fallbackModels?: string[];
   messages: { role: string; content: string }[];
   maxTokens?: number;
   temperature?: number;
   clientPage?: string;
 }): Promise<string> {
   const apiKeyId = await resolvePlatformApiKeyId();
-  const models = resolveAssistantChatModels(opts.model);
+  const models = resolveModelChain(opts.model, opts.fallbackModels ?? []);
   let lastErr = "";
 
   for (const model of models) {

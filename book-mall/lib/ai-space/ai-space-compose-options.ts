@@ -1,4 +1,9 @@
 import {
+  DEFAULT_SUBTITLE_STYLE,
+  normalizeSubtitleBurnInStyle,
+} from "@private/media-render-subtitle-style/subtitle-style-options";
+
+import {
   AI_SPACE_COMPOSE_DEFAULT_OPTIONS,
   type AiSpaceComposeOverlayOptions,
 } from "./ai-space-compose-types";
@@ -28,6 +33,9 @@ export function parseAiSpaceComposeOverlayOptions(
     marginPx,
     position,
     burnSubtitle: o.burnSubtitle === true,
+    subtitleStyle: normalizeSubtitleBurnInStyle(
+      o.subtitleStyle ?? DEFAULT_SUBTITLE_STYLE,
+    ),
     resolution: o.resolution === "720P" ? "720P" : "480P",
     appearFromSec:
       typeof o.appearFromSec === "number" && o.appearFromSec >= 0

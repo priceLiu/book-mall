@@ -22,6 +22,11 @@ import {
   MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
 } from "@/lib/media/render-limits";
 import { FFMPEG_USER_MESSAGE } from "@/lib/media/ffmpeg-preflight";
+import {
+  buildSubtitlesFilterExpr,
+  buildSubtitleBurnInFilterOverrides,
+  resolveSubtitleFontByKey,
+} from "@/lib/media/subtitle-ffmpeg-style";
 import type {
   CompositeOverlay,
   MediaTimelineV1,
@@ -385,24 +390,21 @@ async function concatCopy(partPaths: string[], outPath: string): Promise<void> {
   ]);
 }
 
-function escapeFfmpegSubtitlesPath(srtPath: string): string {
-  return srtPath.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "'\\''");
-}
-
 /** 对已合并视频烧录 SRT（单镜 concat 与多镜 xfade 共用）。 */
 async function burnSubtitlesIntoVideo(
   inputPath: string,
   srtPath: string,
   outPath: string,
+  profile: RenderProfile,
 ): Promise<void> {
-  const escaped = escapeFfmpegSubtitlesPath(srtPath);
+  const styleOverrides = buildSubtitleBurnInFilterOverrides(profile.subtitle.style);
   const withAudio = await clipHasAudio(inputPath);
   const args = [
     "-y",
     "-i",
     inputPath,
     "-vf",
-    `subtitles='${escaped}'`,
+    buildSubtitlesFilterExpr(srtPath, styleOverrides),
     "-c:v",
     "libx264",
     "-preset",
@@ -436,7 +438,7 @@ async function renderXfade(
   if (transitionSec <= 0 || normPaths.length === 1) {
     await concatCopy(normPaths, mergedPath);
     if (needBurn) {
-      await burnSubtitlesIntoVideo(mergedPath, srtPath!, outPath);
+      await burnSubtitlesIntoVideo(mergedPath, srtPath!, outPath, profile);
     }
     return;
   }
@@ -453,8 +455,8 @@ async function renderXfade(
   let complex = filter;
   let mapVideo = videoLabel;
   if (needBurn) {
-    const escaped = escapeFfmpegSubtitlesPath(srtPath!);
-    complex += `;[${videoLabel}]subtitles='${escaped}'[vfinal]`;
+    const styleOverrides = buildSubtitleBurnInFilterOverrides(profile.subtitle.style);
+    complex += `;[${videoLabel}]${buildSubtitlesFilterExpr(srtPath!, styleOverrides)}[vfinal]`;
     mapVideo = "vfinal";
   }
   const args = [
@@ -570,27 +572,26 @@ export function buildCompositeSrt(text: string, durationSec: number): string {
 
 /**
  * 底部小窗会压住默认位置的字幕，此时把字幕抬到小窗上沿之上。
- * 返回可直接拼进 `subtitles=` 滤镜的 `:force_style='…'` 片段（无需调整时为空串）。
+ * 返回 ASS `MarginV`（脚本坐标）；无需抬高时为 undefined。
  */
-async function subtitleStyleForOverlay(args: {
+async function subtitleMarginVForOverlay(args: {
   foregroundPath: string;
   overlay: CompositeOverlay;
   targetWidth: number;
   targetHeight: number;
   hasBackground: boolean;
-}): Promise<string> {
-  if (!args.hasBackground) return "";
-  if (!args.overlay.position.startsWith("bottom")) return "";
+}): Promise<number | undefined> {
+  if (!args.hasBackground) return undefined;
+  if (!args.overlay.position.startsWith("bottom")) return undefined;
 
   const fgSize = await ffprobeVideoSize(args.foregroundPath).catch(() => null);
-  if (!fgSize || fgSize.w <= 0) return "";
+  if (!fgSize || fgSize.w <= 0) return undefined;
 
   const overlayW = Math.max(2, Math.round(args.targetWidth * args.overlay.scale));
   const overlayH = Math.round((overlayW * fgSize.h) / fgSize.w);
   const marginPx = args.overlay.marginPx + overlayH + SUBTITLE_OVERLAY_GAP_PX;
   // MarginV 用的是 ASS 脚本坐标，需按 SRT→ASS 的默认画布高度换算回去
-  const marginV = Math.round((marginPx * ASS_DEFAULT_PLAY_RES_Y) / args.targetHeight);
-  return `:force_style='MarginV=${marginV}'`;
+  return Math.round((marginPx * ASS_DEFAULT_PLAY_RES_Y) / args.targetHeight);
 }
 
 /**
@@ -606,6 +607,7 @@ async function runCompositeFfmpeg(args: {
   targetSize: { w: number; h: number };
   foregroundDurationSec: number;
   srtPath: string | null;
+  subtitleStyle?: RenderProfile["subtitle"]["style"];
   outPath: string;
 }): Promise<void> {
   const { targetSize, overlay } = args;
@@ -646,7 +648,7 @@ async function runCompositeFfmpeg(args: {
 
   let videoLabel = "vmix";
   if (args.srtPath) {
-    const style = await subtitleStyleForOverlay({
+    const marginV = await subtitleMarginVForOverlay({
       foregroundPath: args.foregroundPath,
       overlay,
       targetWidth: targetSize.w,
@@ -654,7 +656,7 @@ async function runCompositeFfmpeg(args: {
       hasBackground: Boolean(args.backgroundPath),
     });
     filters.push(
-      `[vmix]subtitles='${escapeFfmpegSubtitlesPath(args.srtPath)}'${style}[vout]`,
+      `[vmix]${buildSubtitlesFilterExpr(args.srtPath, buildSubtitleBurnInFilterOverrides(args.subtitleStyle, { MarginV: marginV }))}[vout]`,
     );
     videoLabel = "vout";
   }
@@ -775,6 +777,13 @@ export async function runCompositeRender(args: {
       if (srtContent.trim()) {
         srtPath = join(tmp, "subs.srt");
         await writeFile(srtPath, srtContent, "utf8");
+        const style = args.profile.subtitle.style;
+        const font = resolveSubtitleFontByKey(
+          style?.fontKey ?? "heiti",
+        );
+        console.info(
+          `[media-render] 烧录字幕字体 ${font.fontName} (${style?.fontKey ?? "heiti"}/${style?.sizeKey ?? "large"}) @ ${font.fontFile}`,
+        );
       }
     }
 
@@ -791,6 +800,7 @@ export async function runCompositeRender(args: {
       targetSize,
       foregroundDurationSec: fgDuration,
       srtPath,
+      subtitleStyle: args.profile.subtitle.style,
       outPath,
     });
 
@@ -1003,6 +1013,13 @@ export async function runFfmpegMediaRender(args: {
       args.onProgress?.(68, "生成字幕文件");
       srtPath = join(tmp, "subs.srt");
       await writeFile(srtPath, srtContent, "utf8");
+      if (profile.subtitle.burnIn) {
+        const style = profile.subtitle.style;
+        const font = resolveSubtitleFontByKey(style?.fontKey ?? "heiti");
+        console.info(
+          `[media-render] 烧录字幕字体 ${font.fontName} (${style?.fontKey ?? "heiti"}/${style?.sizeKey ?? "large"}) @ ${font.fontFile}`,
+        );
+      }
     }
 
     const outPath = join(tmp, "merged.mp4");

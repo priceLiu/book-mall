@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { ModelAliasSource } from "@prisma/client";
 import { buildReconciliationVendorCodeMap } from "./resolve-model-vendor-map";
 import { canonicalKeysByAliases } from "@/lib/model-catalog/resolve";
+import { resolveReconciliationVendorCode } from "@/lib/finance/infer-vendor-code";
+import { resolveDeepseekReconciliationModelKey } from "@/lib/pricing/deepseek-v4-pricing";
 
 import {
   buildJoinKey,
@@ -101,6 +103,7 @@ export async function aggregatePlatformUsageForReconciliation(
       estimatedVendorCostYuan: true,
       submittedAt: true,
       actorBookUserId: true,
+      providerKind: true,
     },
   });
 
@@ -250,8 +253,18 @@ export async function aggregatePlatformUsageForReconciliation(
     if (!log.submittedAt || !logInPeriod(log.submittedAt, period)) continue;
     const row = log as ReconciliationLogRow;
     const usage = resolveReconciliationUsage(row);
-    const modelKey = resolveLogModelKey(log);
-    const vendorCode = vendorCodeMap.get(modelKey) ?? "unknown";
+    const rawModelKey = resolveLogModelKey(log);
+    const catalogVendor = vendorCodeMap.get(rawModelKey);
+    const vendorCode = resolveReconciliationVendorCode({
+      providerKind: log.providerKind,
+      modelKey: rawModelKey,
+      catalogVendor,
+    });
+    const modelKey =
+      vendorCode === "deepseek"
+        ? resolveDeepseekReconciliationModelKey(rawModelKey)
+        : rawModelKey;
+    const tierForJoin = vendorCode === "deepseek" ? null : usage.tierRaw;
 
     const directions: TokenDirection[] =
       usage.unitKind === "KTOKEN"
@@ -279,7 +292,7 @@ export async function aggregatePlatformUsageForReconciliation(
       const joinKey = buildJoinKey({
         vendor: vendorCode,
         modelKey,
-        tierRaw: usage.tierRaw,
+        tierRaw: tierForJoin,
         unitKind: usage.unitKind,
         tokenDirection,
         periodKey: pk,
@@ -308,7 +321,7 @@ export async function aggregatePlatformUsageForReconciliation(
           periodKey: pk,
           userId: log.actorBookUserId ?? log.userId,
           modelKey,
-          tierRaw: usage.tierRaw,
+          tierRaw: tierForJoin,
           unitKind: usage.unitKind,
           tokenDirection,
           platformUnits: 0,

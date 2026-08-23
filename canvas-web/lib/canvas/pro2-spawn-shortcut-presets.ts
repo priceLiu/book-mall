@@ -1,4 +1,6 @@
 import {
+  LIBTV_AUDIO_TRACK_NODE_HEIGHT,
+  LIBTV_AUDIO_TRACK_NODE_WIDTH,
   LIBTV_SQUARE_IMAGE_NODE_WIDTH,
   LIBTV_SQUARE_IMAGE_NODE_HEIGHT,
 } from "./libtv-node-chrome";
@@ -233,8 +235,8 @@ export function spawnPro2ShortcutPreset(
   const maxH = Math.max(PRO2_TEXT_NODE_HEIGHT, SBV1_VIDEO_ENGINE_HEIGHT);
   const y = center.y - maxH / 2;
   if (preset === "text-to-music") {
-    const audioW = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
-    const audioH = 220;
+    const audioW = LIBTV_AUDIO_TRACK_NODE_WIDTH;
+    const audioH = LIBTV_AUDIO_TRACK_NODE_HEIGHT;
     const totalMusicW = textW + gap + audioW;
     const musicY = center.y - Math.max(PRO2_TEXT_NODE_HEIGHT, audioH) / 2;
     const textId = store.addNode(

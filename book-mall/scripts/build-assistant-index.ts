@@ -17,10 +17,7 @@ import {
 } from "@/lib/platform-assistant/knowledge-allowlist";
 import { platformEmbedTextsInProcess } from "@/lib/platform-assistant/platform-gateway";
 import { toVectorLiteral } from "@/lib/platform-assistant/retriever";
-import {
-  ASSISTANT_EMBED_DIM,
-  ASSISTANT_EMBED_MODEL,
-} from "@/lib/platform-assistant/config";
+import { getAssistantEmbedRuntimeConfig } from "@/lib/platform-assistant/platform-assistant-model-config-service";
 
 const REPO_ROOT = path.resolve(process.cwd(), "..");
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -104,8 +101,14 @@ async function loadSource(src: KnowledgeSource): Promise<Chunk[]> {
 }
 
 async function main() {
+  const embedConfig = await getAssistantEmbedRuntimeConfig();
+  if (!embedConfig.enabled) {
+    console.error("[assistant:index] 向量检索已在管理后台关闭，无法入库。");
+    process.exit(1);
+  }
+
   console.log(
-    `[assistant:index] embed model=${ASSISTANT_EMBED_MODEL} dim=${ASSISTANT_EMBED_DIM} dryRun=${DRY_RUN}`,
+    `[assistant:index] embed model=${embedConfig.modelKey} dim=${embedConfig.embedDim} dryRun=${DRY_RUN}`,
   );
 
   type Pending = {
@@ -150,8 +153,8 @@ async function main() {
         vecs = await platformEmbedTextsInProcess(
           batch.map((p) => p.content),
           {
-            model: ASSISTANT_EMBED_MODEL,
-            dimensions: ASSISTANT_EMBED_DIM,
+            model: embedConfig.modelKey,
+            dimensions: embedConfig.embedDim,
           },
         );
         break;

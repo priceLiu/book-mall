@@ -8,7 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { buildBookPortalNavItems } from "@/lib/portal-nav";
+import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS } from "@/lib/portal-nav";
 import { cn } from "@/lib/utils";
 
 const splitBtnClass =
@@ -33,6 +33,7 @@ export function SiteHomeProductNav({
         <a
           key={item.key}
           href={item.href}
+          {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
           className="site-home-nav-sheet-item rounded-md px-3 py-2.5 hover:bg-muted"
           onClick={() => setOpen(false)}
         >

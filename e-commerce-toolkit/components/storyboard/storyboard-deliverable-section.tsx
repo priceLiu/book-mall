@@ -1,6 +1,12 @@
 "use client";
 
-import { Clapperboard, Eye, Film, RefreshCw } from "lucide-react";
+import { ChevronDown, Clapperboard, Eye, Film, RefreshCw } from "lucide-react";
+import { useState } from "react";
+
+import {
+  SubtitleBurnInFields,
+  type SubtitleBurnInStyle,
+} from "@private/media-render-subtitle-style";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { StoryboardFullSheetCard } from "@/components/storyboard/storyboard-full-sheet-card";
@@ -26,6 +32,10 @@ type Props = {
   imageGenBusy: boolean;
   sheetPngBusy: boolean;
   mergeBusy: boolean;
+  mergeBurnIn?: boolean;
+  mergeSubtitleStyle?: SubtitleBurnInStyle;
+  onMergeBurnInChange?: (value: boolean) => void;
+  onMergeSubtitleStyleChange?: (style: SubtitleBurnInStyle) => void;
   snapshotBusy: boolean;
   hasDeliverableSnapshot: boolean;
   onGenerateFullVideo: () => void;
@@ -57,6 +67,10 @@ export function StoryboardDeliverableSection({
   imageGenBusy,
   sheetPngBusy,
   mergeBusy,
+  mergeBurnIn = false,
+  mergeSubtitleStyle,
+  onMergeBurnInChange,
+  onMergeSubtitleStyleChange,
   snapshotBusy,
   hasDeliverableSnapshot,
   onGenerateFullVideo,
@@ -69,6 +83,7 @@ export function StoryboardDeliverableSection({
   onPreviewVideo,
 }: Props) {
   const resolvedVideo = isStoryboardVideoUrl(videoUrl) ? videoUrl!.trim() : null;
+  const [mergeSettingsOpen, setMergeSettingsOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -169,14 +184,44 @@ export function StoryboardDeliverableSection({
       </div>
 
       {canMergePanels ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-[#e8e8ed] bg-white px-4 py-2.5">
-          <span className="text-xs text-[#6e6e73]">
-            <Clapperboard className="mr-1 inline h-3.5 w-3.5" />
-            已有 {panelVideoCount} 个镜头视频可拼接
-          </span>
-          <EcomButtonSecondary size="sm" type="button" disabled={mergeBusy} onClick={onMergePanelVideos}>
-            {mergeBusy ? "合并中…" : "合并分镜视频"}
-          </EcomButtonSecondary>
+        <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-white px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-[#6e6e73]">
+              <Clapperboard className="mr-1 inline h-3.5 w-3.5" />
+              已有 {panelVideoCount} 个镜头视频可拼接
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {onMergeBurnInChange && onMergeSubtitleStyleChange && mergeSubtitleStyle ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs text-[#0071e3] hover:underline"
+                  onClick={() => setMergeSettingsOpen((v) => !v)}
+                >
+                  合并设置
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition ${mergeSettingsOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+              ) : null}
+              <EcomButtonSecondary size="sm" type="button" disabled={mergeBusy} onClick={onMergePanelVideos}>
+                {mergeBusy ? "合并中…" : "合并分镜视频"}
+              </EcomButtonSecondary>
+            </div>
+          </div>
+          {mergeSettingsOpen &&
+          onMergeBurnInChange &&
+          onMergeSubtitleStyleChange &&
+          mergeSubtitleStyle ? (
+            <SubtitleBurnInFields
+              variant="ecom-light"
+              burnIn={mergeBurnIn}
+              onBurnInChange={onMergeBurnInChange}
+              style={mergeSubtitleStyle}
+              onStyleChange={onMergeSubtitleStyleChange}
+              disabled={mergeBusy}
+              burnInLabel="合并时烧录台词字幕"
+            />
+          ) : null}
         </div>
       ) : null}
     </div>

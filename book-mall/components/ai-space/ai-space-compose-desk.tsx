@@ -4,6 +4,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SubtitleBurnInFields } from "@private/media-render-subtitle-style";
 
 import {
   AiSpaceComposeFavoriteAudio,
@@ -365,16 +366,20 @@ export function AiSpaceComposeDesk({
           </label>
         </div>
 
-        <label className="mt-3 flex items-center gap-2 text-xs text-[#656d76]">
-          <input
-            type="checkbox"
-            checked={options.burnSubtitle}
-            onChange={(e) =>
-              setOptions((p) => ({ ...p, burnSubtitle: e.target.checked }))
+        <div className="mt-3">
+          <SubtitleBurnInFields
+            variant="book-account"
+            burnIn={options.burnSubtitle}
+            onBurnInChange={(burnSubtitle) =>
+              setOptions((p) => ({ ...p, burnSubtitle }))
             }
+            style={options.subtitleStyle ?? AI_SPACE_COMPOSE_DEFAULT_OPTIONS.subtitleStyle!}
+            onStyleChange={(subtitleStyle) =>
+              setOptions((p) => ({ ...p, subtitleStyle }))
+            }
+            burnInLabel="烧录台词字幕（仅对有台词文本的合成音频有效，按时长均分）"
           />
-          烧录台词字幕（仅对有台词文本的合成音频有效，按时长均分）
-        </label>
+        </div>
 
         <div className="mt-4 flex items-center gap-3">
           <Button type="button" disabled={!canSubmit} onClick={() => void submit()}>

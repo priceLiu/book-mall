@@ -1,14 +1,14 @@
 /**
  * AI 小智 · 每日 AI 热闻（Cron 预生成 + DB 持久化，全平台只读）。
- * 生成仅经 Gateway DeepSeek，无需额外搜索 API Key。
+ * 生成经 Gateway 百炼 LLM（默认 qwen3.5-27b，失败时走对话兜底链）。
  */
 import type { PlatformAssistantAiNewsStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
   ASSISTANT_NEWS_MAX_TOKENS,
-  ASSISTANT_NEWS_MODEL,
 } from "@/lib/platform-assistant/config";
+import { getAssistantNewsRuntimeConfig } from "@/lib/platform-assistant/platform-assistant-model-config-service";
 import {
   platformChatCompletion,
   PlatformAssistantGatewayError,
@@ -40,7 +40,7 @@ export function pruneCutoffDateKey(now = new Date()): string {
   return `${cst.getUTCFullYear()}-${String(cst.getUTCMonth() + 1).padStart(2, "0")}-${String(cst.getUTCDate()).padStart(2, "0")}`;
 }
 
-/** 热闻整理提示词（DeepSeek via Gateway，无第三方搜索 Key）。 */
+/** 热闻整理提示词（Gateway 百炼 LLM，无第三方搜索 Key）。 */
 export function buildAiNewsPrompt(now = new Date()): string {
   const date = cstDateLabel(now);
 
@@ -75,12 +75,18 @@ export function buildAiNewsPrompt(now = new Date()): string {
 请按以上要求生成最终结果，语言简洁有力，适合直接阅读。`;
 }
 
-/** Cron / CLI / 管理后台：Gateway DeepSeek 生成当日 Markdown。 */
+/** Cron / CLI / 管理后台：Gateway 百炼 LLM 生成当日 Markdown。 */
 export async function generateAiNewsBriefNow(now = new Date()): Promise<string> {
+  const newsConfig = await getAssistantNewsRuntimeConfig();
+  if (!newsConfig.enabled) {
+    throw new PlatformAssistantGatewayError("AI 热闻已在管理后台关闭", 503);
+  }
+
   const userPrompt = buildAiNewsPrompt(now);
 
   const content = await platformChatCompletion({
-    model: ASSISTANT_NEWS_MODEL,
+    model: newsConfig.modelKey,
+    fallbackModels: newsConfig.fallbackModelKeys,
     messages: [
       {
         role: "system",

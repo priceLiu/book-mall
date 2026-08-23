@@ -28,6 +28,7 @@ const nextConfig = {
   transpilePackages: [
     "@private/federated-portal-logout",
     "@private/federated-portal-nav",
+    "@private/media-render-subtitle-style",
     "@private/platform-assistant",
   ],
   webpack: (config) => {
@@ -36,6 +37,9 @@ const nextConfig = {
     );
     config.resolve.alias["@private/federated-portal-nav"] = resolveShared(
       "federated-portal-nav",
+    );
+    config.resolve.alias["@private/media-render-subtitle-style"] = resolveShared(
+      "media-render-subtitle-style",
     );
     config.resolve.alias["@private/platform-assistant"] = resolveShared(
       "platform-assistant",

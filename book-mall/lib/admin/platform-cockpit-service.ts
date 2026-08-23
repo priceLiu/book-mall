@@ -27,6 +27,11 @@ import {
   type AssistantFeedbackListItem,
 } from "@/lib/platform-assistant/feedback-service";
 import { listRecentAiNewsDaily } from "@/lib/platform-assistant/ai-news-service";
+import {
+  getPlatformAssistantModelConfigView,
+  listAssistantEmbedCandidates,
+  listAssistantLlmCandidates,
+} from "@/lib/platform-assistant/platform-assistant-model-config-service";
 import { getTodayTrafficTotals } from "@/lib/site-traffic/queries";
 import {
   buildCockpitFinanceKpis,
@@ -118,6 +123,11 @@ export type PlatformCockpitSnapshot = {
     items: AssistantFeedbackListItem[];
   };
   assistantAiNews: Awaited<ReturnType<typeof listRecentAiNewsDaily>>;
+  assistantModelConfig: {
+    config: Awaited<ReturnType<typeof getPlatformAssistantModelConfigView>>;
+    llmCandidates: ReturnType<typeof listAssistantLlmCandidates>;
+    embedCandidates: ReturnType<typeof listAssistantEmbedCandidates>;
+  };
   traffic: {
     todayPageViews: number;
     todayUniqueIps: number;
@@ -131,7 +141,7 @@ export type PlatformCockpitCreditOpsSection = Pick<
 
 export type PlatformCockpitAssistantSection = Pick<
   PlatformCockpitSnapshot,
-  "assistantFeedback" | "assistantAiNews"
+  "assistantFeedback" | "assistantAiNews" | "assistantModelConfig"
 >;
 
 export type PlatformCockpitMetricsSection = Pick<
@@ -347,16 +357,22 @@ export async function fetchPlatformCockpitCreditOpsSection(
   return { creditOps, creditOpsAlerts };
 }
 
-/** 小智反馈 + AI 热闻 */
+/** 小智反馈 + AI 热闻 + 模型配置 */
 export async function fetchPlatformCockpitAssistantSection(): Promise<PlatformCockpitAssistantSection> {
-  const [summary, items, assistantAiNews] = await Promise.all([
+  const [summary, items, assistantAiNews, config] = await Promise.all([
     getAssistantFeedbackSummary(),
     listOpenAssistantFeedback(20),
     listRecentAiNewsDaily(3),
+    getPlatformAssistantModelConfigView(),
   ]);
   return {
     assistantFeedback: { summary, items },
     assistantAiNews,
+    assistantModelConfig: {
+      config,
+      llmCandidates: listAssistantLlmCandidates(),
+      embedCandidates: listAssistantEmbedCandidates(),
+    },
   };
 }
 

@@ -7,6 +7,7 @@ import type {
 } from "@/lib/admin/platform-cockpit-service";
 import { cstBusinessDate } from "@/lib/billing/credit-ops-service";
 import { AdminAssistantAiNewsPanel } from "@/components/admin/admin-assistant-ai-news-panel";
+import { AdminAssistantModelConfigPanel } from "@/components/admin/admin-assistant-model-config-panel";
 import { AdminAssistantFeedbackPanel } from "@/components/admin/admin-assistant-feedback-panel";
 import { AdminCreditOpsCockpitPanel } from "@/components/admin/admin-credit-ops-cockpit-panel";
 import { AdminPlatformCockpitCharts } from "@/components/admin/admin-platform-cockpit-charts";
@@ -150,9 +151,11 @@ export function AdminPlatformCockpitCreditOps({
 export function AdminPlatformCockpitAssistant({
   assistantFeedback,
   assistantAiNews,
+  assistantModelConfig,
 }: PlatformCockpitAssistantSection) {
   return (
     <>
+      <AdminAssistantModelConfigPanel initial={assistantModelConfig} />
       <AdminAssistantFeedbackPanel
         initialItems={assistantFeedback.items}
         summary={assistantFeedback.summary}

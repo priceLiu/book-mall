@@ -1,7 +1,7 @@
 /** 自动成片 Dock · 恒定屏幕尺寸（px · 随画布 zoom 逆缩放保持恒定） */
 export const JIANYING_AUTO_RENDER_DOCK_SCREEN_W = 800;
-/** 含顺序条 + 转场 + 烧录字幕 + 进度 + 底栏按钮（屏高固定，尽量不出现滚动条） */
-export const JIANYING_AUTO_RENDER_DOCK_SCREEN_H = 560;
+/** 含顺序条 + 转场 + 烧录字幕 + 进度 + 底栏按钮（屏高固定，不出现滚动条） */
+export const JIANYING_AUTO_RENDER_DOCK_SCREEN_H = 600;
 
 /** flow 坐标基准（与屏宽 1:1 · 由 inverse-scale 抵消 zoom） */
 export const JIANYING_AUTO_RENDER_DOCK_FLOW_W = JIANYING_AUTO_RENDER_DOCK_SCREEN_W;

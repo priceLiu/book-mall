@@ -102,8 +102,9 @@ export type StoryPro2StyleAssetNodeData = {
   renderQuality?: import("./story-pro-workspace-types").StoryProRenderQuality;
 };
 
-/** 2.0 标签节点 · 画布注释（Markdown · 无 Dock · 无 Gateway） */
+/** 2.0 标签节点 · 画布注释（TipTap HTML · 无 Dock · 仅展示） */
 export type StoryPro2TagNodeData = {
+  /** 富文本 HTML（TipTap） */
   body: string;
   label?: string;
 };

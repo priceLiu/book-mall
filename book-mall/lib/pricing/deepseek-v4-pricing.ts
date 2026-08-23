@@ -57,6 +57,11 @@ export const DEEPSEEK_V4_LIST_PRICES: DeepseekV4PriceRow[] = [
 /** 兼容旧档 deepseek-chat → 与 v4-flash 同价 */
 export const DEEPSEEK_LEGACY_CHAT_ALIASES = ["deepseek-chat"] as const;
 
+/** 对账 joinKey：deepseek-chat / deepseek-reasoner → deepseek-v4-flash */
+export function resolveDeepseekReconciliationModelKey(modelKey: string): string {
+  return findDeepseekListPrice(modelKey)?.canonicalModelKey ?? modelKey.trim();
+}
+
 export function findDeepseekListPrice(modelKey: string): DeepseekV4PriceRow | null {
   const k = modelKey.trim().toLowerCase();
   for (const row of DEEPSEEK_V4_LIST_PRICES) {

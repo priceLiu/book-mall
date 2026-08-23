@@ -11,6 +11,7 @@ import { syncVendorListPricesFromBillLines } from "@/lib/pricing/sync-vendor-lis
 import { DEEPSEEK_V4_LIST_PRICES } from "@/lib/pricing/deepseek-v4-pricing";
 
 import { parseDeepseekUsageBillCsv } from "./deepseek-usage-v2-adapter";
+import { rollupDeepseekPlatformLinesForCostMatch } from "./deepseek-platform-rollup";
 import {
   enrichReconciliationLines,
   upsertReconciliationMasterLines,
@@ -111,9 +112,13 @@ export async function runDeepseekReconciliationV2(
     publishedBy: "deepseek-reconciliation-v2",
   });
 
-  const platformLines = (
+  let platformLines = (
     await aggregatePlatformUsageForReconciliation({ period: parsed.period })
   ).filter((p) => p.vendor === "deepseek");
+
+  if (parsed.source === "cost") {
+    platformLines = rollupDeepseekPlatformLinesForCostMatch(platformLines, parsed.lines);
+  }
 
   const resultLines = reconcileVendorAndPlatform(parsed.lines, platformLines, {
     toleranceRate: opts.toleranceRate ?? 0.05,

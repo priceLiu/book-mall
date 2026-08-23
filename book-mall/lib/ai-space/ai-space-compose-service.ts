@@ -492,7 +492,11 @@ async function runComposeStage(taskId: string): Promise<void> {
       },
       profile: {
         transition: { type: "none" },
-        subtitle: { mode: "script", burnIn: options.burnSubtitle },
+        subtitle: {
+          mode: "script",
+          burnIn: options.burnSubtitle,
+          style: options.burnSubtitle ? options.subtitleStyle : undefined,
+        },
         // 画布按背景比例缩放，长边封顶 1280；口播分辨率由 S2V 的 resolution 决定
         video: { scaleMode: "fit720p" },
       },

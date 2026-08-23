@@ -20,7 +20,7 @@ import {
 import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 
-/** 2.0 · 自动成片浮动 Dock（800×560 · 恒定屏上尺寸） */
+/** 2.0 · 自动成片浮动 Dock（800×600 · 恒定屏上尺寸） */
 export function JianyingAutoRenderFloatingDock() {
   const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("jianying-auto-render-pro2");

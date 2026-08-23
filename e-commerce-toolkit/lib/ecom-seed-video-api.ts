@@ -288,11 +288,14 @@ export async function generateSeedVideoTts(opts: {
   return data as { shots: unknown[] };
 }
 
-export async function renderSeedVideo(projectId: string): Promise<{ jobId: string }> {
+export async function renderSeedVideo(
+  projectId: string,
+  opts?: { profile?: import("@/lib/ecom-storyboard-api").EcomMediaRenderProfileInput },
+): Promise<{ jobId: string }> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/video/render`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(opts?.profile ? { profile: opts.profile } : {}),
   });
   return data as { jobId: string };
 }

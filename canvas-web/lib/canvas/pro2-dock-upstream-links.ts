@@ -14,7 +14,6 @@ import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
 } from "./story-pro-workspace-types";
-import type { StoryPro2TagNodeData } from "./story-pro2-workspace-types";
 
 /** 上游文本/大纲 chip 与 @ 引用展示名 · 优先节点标题 */
 export function resolvePro2StarterDockLinkLabel(
@@ -145,20 +144,6 @@ function linkFromSource(
     return null;
   }
 
-  if (source.type === "story-pro2-tag") {
-    const d = source.data as unknown as StoryPro2TagNodeData;
-    const body = d.body?.trim();
-    if (!body) return null;
-    const label = d.label?.trim() || "标签";
-    return {
-      id: `up-tag-${source.id}`,
-      kind: "text",
-      label,
-      previewMd: body,
-      sourceNodeId: source.id,
-    };
-  }
-
   if (source.type === "story-pro2-style-asset") {
     const d = source.data as { styleName?: string; label?: string; stylePrompt?: string };
     const name = d.styleName?.trim() || d.label?.trim() || "风格";
@@ -214,7 +199,6 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
 ]);
 
 const TEXT_UPSTREAM_SOURCE_TYPES = new Set([
-  "story-pro2-tag",
   "story-pro2-starter",
   "story-pro2-script-hub",
 ]);

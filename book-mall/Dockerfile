@@ -1,8 +1,10 @@
 # Prisma 6.19+ 需要 node:sqlite（Node 22.5+，实验开关见 NODE_OPTIONS）
 FROM node:22-bookworm-slim AS base
 ENV NODE_OPTIONS="--experimental-sqlite"
+# fonts-wqy-microhei：烧录中文字幕；仅装 ffmpeg 时 libass 默认 Arial，中文会变成空心方框
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg \
+  && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg fontconfig fonts-wqy-microhei \
+  && fc-cache -f \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
@@ -12,6 +14,7 @@ WORKDIR /app
 #   cp -R ../shared/federated-portal-nav ../shared/platform-assistant docker-shared/
 FROM base AS with-shared
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
+COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
 
 FROM with-shared AS deps

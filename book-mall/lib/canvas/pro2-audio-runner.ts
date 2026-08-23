@@ -1,12 +1,14 @@
 /**
- * Pro2 / LibTV 音频节点 runner（KIE ElevenLabs TTS · Suno 音乐）
+ * Pro2 / LibTV 音频节点 runner（Gateway 同步 TTS · KIE ElevenLabs TTS · Suno 音乐）
  */
 import { CanvasProjectError } from "./canvas-project-service";
 import {
   runKieAudioEngineNode,
+  runTtsEngineNode,
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import { isPro2GatewaySyncTtsModelKey } from "./pro2-audio-tts-models";
 
 export async function runPro2AudioNode(
   args: RunEngineNodeArgs,
@@ -35,6 +37,23 @@ export async function runPro2AudioNode(
     (engine.params as Record<string, unknown> | undefined) ??
     (data.params as Record<string, unknown> | undefined) ??
     {};
+
+  if (isPro2GatewaySyncTtsModelKey(modelKey)) {
+    return runTtsEngineNode({
+      ...args,
+      node: {
+        ...args.node,
+        type: "tts-engine",
+        data: {
+          ...data,
+          providerId,
+          modelKey,
+          text: mergedPrompt,
+          params,
+        },
+      },
+    });
+  }
 
   return runKieAudioEngineNode({
     ...args,

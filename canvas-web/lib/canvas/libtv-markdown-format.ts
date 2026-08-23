@@ -1,5 +1,8 @@
 /** 标签 / 轻量 Markdown 编辑 · 选区格式化 */
 
+import { stripTagInlineStyleMarkers } from "./libtv-markdown-inline-style";
+import { getTextLineRange } from "./libtv-textarea-selection";
+
 export type MarkdownFormatAction =
   | "clear"
   | "h1"
@@ -47,7 +50,10 @@ export function applyMarkdownFormatAction(
 ): { next: string; selectionStart: number; selectionEnd: number } {
   const start = Math.min(selectionStart, selectionEnd);
   const end = Math.max(selectionStart, selectionEnd);
-  const hasSelection = end > start;
+
+  /** 无选区时块级/清除仅作用于光标行，避免一改全文 */
+  const resolveBlockRange = () =>
+    end > start ? { start, end } : getTextLineRange(value, start);
 
   if (action === "hr") {
     const insert = start === end ? "\n---\n" : `\n---\n`;
@@ -80,41 +86,40 @@ export function applyMarkdownFormatAction(
               : "";
 
   if (block) {
-    const target = hasSelection ? value.slice(start, end) : value;
+    const { start: bStart, end: bEnd } = resolveBlockRange();
+    const target = value.slice(bStart, bEnd);
     const formatted = prefixLines(target, block);
-    const next = hasSelection
-      ? `${value.slice(0, start)}${formatted}${value.slice(end)}`
-      : formatted;
-    const pos = hasSelection ? start + formatted.length : next.length;
-    return { next, selectionStart: start, selectionEnd: pos };
+    const next = `${value.slice(0, bStart)}${formatted}${value.slice(bEnd)}`;
+    const pos = bStart + formatted.length;
+    return { next, selectionStart: bStart, selectionEnd: pos };
   }
 
   if (action === "paragraph") {
-    const target = hasSelection ? value.slice(start, end) : value;
+    const { start: bStart, end: bEnd } = resolveBlockRange();
+    const target = value.slice(bStart, bEnd);
     const formatted = target
       .split("\n")
       .map((line) => line.replace(/^#+\s*/, "").replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, ""))
       .join("\n");
-    const next = hasSelection
-      ? `${value.slice(0, start)}${formatted}${value.slice(end)}`
-      : formatted;
-    const pos = hasSelection ? start + formatted.length : next.length;
-    return { next, selectionStart: start, selectionEnd: pos };
+    const next = `${value.slice(0, bStart)}${formatted}${value.slice(bEnd)}`;
+    const pos = bStart + formatted.length;
+    return { next, selectionStart: bStart, selectionEnd: pos };
   }
 
   if (action === "clear") {
-    const target = hasSelection ? value.slice(start, end) : value;
-    const formatted = target
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/^#+\s+/gm, "")
-      .replace(/^[-*]\s+/gm, "")
-      .replace(/^\d+\.\s+/gm, "");
-    const next = hasSelection
-      ? `${value.slice(0, start)}${formatted}${value.slice(end)}`
-      : formatted;
-    const pos = hasSelection ? start + formatted.length : next.length;
-    return { next, selectionStart: start, selectionEnd: pos };
+    const { start: bStart, end: bEnd } = resolveBlockRange();
+    const target = value.slice(bStart, bEnd);
+    const formatted = stripTagInlineStyleMarkers(
+      target
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\*(.+?)\*/g, "$1")
+        .replace(/^#+\s+/gm, "")
+        .replace(/^[-*]\s+/gm, "")
+        .replace(/^\d+\.\s+/gm, ""),
+    );
+    const next = `${value.slice(0, bStart)}${formatted}${value.slice(bEnd)}`;
+    const pos = bStart + formatted.length;
+    return { next, selectionStart: bStart, selectionEnd: pos };
   }
 
   return { next: value, selectionStart: start, selectionEnd: end };

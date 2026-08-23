@@ -26,7 +26,7 @@ export function ffmpegOperatorHint(): string {
     return "本地开发：在 book-mall 目录执行 pnpm media-render:setup-ffmpeg（或 brew install ffmpeg）后重启 dev:all";
   }
   if (process.platform === "linux") {
-    return "服务器：apt-get install -y ffmpeg（book-mall Docker 镜像已内置）";
+    return "服务器：apt-get install -y ffmpeg fonts-wqy-microhei（book-mall Docker 镜像已内置）";
   }
   return "请在本机 PATH 安装 ffmpeg 与 ffprobe：https://ffmpeg.org/download.html";
 }

@@ -2,6 +2,7 @@ import type {
   MediaRenderJob,
   MediaRenderScaleMode,
 } from "@/lib/canvas-api";
+import type { SubtitleBurnInStyle } from "@private/media-render-subtitle-style/subtitle-style-options";
 import { waitMediaRenderJob } from "@/lib/canvas-api";
 
 export type JianyingMediaRenderTransitionKind = "xfade" | "none";
@@ -18,6 +19,7 @@ export type JianyingMediaRenderInFlight = {
   scaleMode?: MediaRenderScaleMode;
   burnIn?: boolean;
   subtitleMode?: "script" | "asr";
+  subtitleStyle?: SubtitleBurnInStyle;
 };
 
 const activePolls = new Map<string, string>();

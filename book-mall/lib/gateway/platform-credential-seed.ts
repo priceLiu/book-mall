@@ -37,12 +37,6 @@ const CREDENTIALS: Array<{
 }> = [
   { kind: "KIE", alias: "KIE", env: "KIE_API_KEY" },
   {
-    kind: "DEEPSEEK",
-    alias: "DeepSeek",
-    env: "DEEPSEEK_API_KEY",
-    baseUrl: "https://api.deepseek.com/v1",
-  },
-  {
     kind: "MOONSHOT",
     alias: "Kimi",
     env: "MOONSHOT_API_KEY",

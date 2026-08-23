@@ -3,7 +3,7 @@
  */
 import { parse as parseCsv } from "csv-parse/sync";
 
-import { findDeepseekListPrice } from "@/lib/pricing/deepseek-v4-pricing";
+import { findDeepseekListPrice, resolveDeepseekReconciliationModelKey } from "@/lib/pricing/deepseek-v4-pricing";
 
 import { buildJoinKey } from "./billable-units";
 import {
@@ -44,8 +44,7 @@ export function isDeepseekAmountBillCsv(csvText: string): boolean {
 }
 
 function resolveModelKey(raw: string): string {
-  const k = raw.trim();
-  return findDeepseekListPrice(k)?.canonicalModelKey ?? k;
+  return resolveDeepseekReconciliationModelKey(raw);
 }
 
 function tokenDirectionFromType(type: string): TokenDirection {

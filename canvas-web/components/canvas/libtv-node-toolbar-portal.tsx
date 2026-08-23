@@ -27,10 +27,13 @@ export function LibtvNodeToolbarPortal({
   nodeId,
   visible,
   children,
+  toolbarHeightEstimate,
 }: {
   nodeId: string;
   visible: boolean;
   children: React.ReactNode;
+  /** 顶栏预估高度（多行工具条须加大，以便靠近画布顶部时翻转到节点下方） */
+  toolbarHeightEstimate?: number;
 }) {
   const mounted = useClientPortalMounted();
   const marqueeSelecting = useCanvasMarqueeSelecting();
@@ -38,6 +41,7 @@ export function LibtvNodeToolbarPortal({
   const rawPlacement = useLibtvNodeToolbarScreenPlacement(
     nodeId,
     effectiveVisible,
+    toolbarHeightEstimate,
   );
   const placement = useStableLibtvNodeToolbarScreenPlacement(rawPlacement);
   const hidden = useLibtvNodeToolbarHidden(nodeId);

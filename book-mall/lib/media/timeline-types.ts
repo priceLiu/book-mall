@@ -1,3 +1,7 @@
+import {
+  SUBTITLE_FONT_KEYS,
+  SUBTITLE_SIZE_KEYS,
+} from "@private/media-render-subtitle-style/subtitle-style-options";
 import { z } from "zod";
 
 /** Media Render Timeline v1 — 与业务解耦的剪辑时间线 */
@@ -27,6 +31,13 @@ export const renderProfileSchema = z.object({
       mode: z.enum(["script", "asr", "none"]).default("script"),
       burnIn: z.boolean().default(false),
       asrModelKey: z.string().optional(),
+      /** burnIn 为 true 时生效；缺省等价 heiti + large */
+      style: z
+        .object({
+          fontKey: z.enum(SUBTITLE_FONT_KEYS).default("heiti"),
+          sizeKey: z.enum(SUBTITLE_SIZE_KEYS).default("large"),
+        })
+        .optional(),
     })
     .default({ mode: "script", burnIn: false }),
   audio: z

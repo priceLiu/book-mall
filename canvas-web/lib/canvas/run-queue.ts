@@ -28,6 +28,7 @@ import {
 import { materializeImageInputsForRun } from "./materialize-image-inputs-for-run";
 import { resolveHdGridSplitImageInputs } from "./resolve-hd-grid-split-image-inputs";
 import { directPredecessors } from "./topo";
+import { tagRichTextToPlainText } from "./tag-rich-text-migrate";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
 import { parseReferencedIds } from "./dock-mention-parse";
 import type { StoryRefImage } from "./story-ref-image";
@@ -842,7 +843,7 @@ function resolveTextInputs(
       }
     } else if (p.type === "story-pro2-tag") {
       const d = p.data as { body?: string };
-      if (d.body?.trim()) out.push(d.body.trim());
+      if (d.body?.trim()) out.push(tagRichTextToPlainText(d.body));
     } else if (isAnyStoryScriptHubType(p.type ?? "")) {
       const d = p.data as {
         outlineMd?: string;

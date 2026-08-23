@@ -11,6 +11,9 @@ importers:
       '@private/federated-portal-nav':
         specifier: file:../shared/federated-portal-nav
         version: file:../shared/federated-portal-nav(react@18.3.1)
+      '@private/media-render-subtitle-style':
+        specifier: file:../shared/media-render-subtitle-style
+        version: file:../shared/media-render-subtitle-style(react@18.3.1)
       '@private/platform-assistant':
         specifier: file:../shared/platform-assistant
         version: file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -225,6 +228,11 @@ packages:
 
   '@private/federated-portal-nav@file:../shared/federated-portal-nav':
     resolution: {directory: ../shared/federated-portal-nav, type: directory}
+    peerDependencies:
+      react: ^18
+
+  '@private/media-render-subtitle-style@file:../shared/media-render-subtitle-style':
+    resolution: {directory: ../shared/media-render-subtitle-style, type: directory}
     peerDependencies:
       react: ^18
 
@@ -2192,6 +2200,10 @@ snapshots:
     optional: true
 
   '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+
+  '@private/media-render-subtitle-style@file:../shared/media-render-subtitle-style(react@18.3.1)':
     dependencies:
       react: 18.3.1
 

@@ -20,13 +20,14 @@ const CHECK_ONLY = process.argv.includes("--check");
 
 /** 每个应用需要打包进 docker-shared 的 shared 子包列表 */
 const APP_SHARED_MAP = {
-  "book-mall": ["federated-portal-nav", "platform-assistant"],
-  "canvas-web": ["federated-portal-logout", "federated-portal-nav", "platform-assistant"],
+  "book-mall": ["federated-portal-nav", "media-render-subtitle-style", "platform-assistant"],
+  "canvas-web": ["federated-portal-logout", "federated-portal-nav", "media-render-subtitle-style", "platform-assistant"],
   "story-web": ["federated-portal-nav", "platform-assistant"],
   "common-tools": ["federated-portal-logout", "federated-portal-nav", "platform-assistant"],
   "quick-replica-web": ["federated-portal-nav", "platform-assistant"],
   "e-commerce-toolkit": [
     "federated-portal-nav",
+    "media-render-subtitle-style",
     "platform-assistant",
     "publisher-client",
   ],
