@@ -1,6 +1,7 @@
 "use client";
 
 import { buildEcomLoginUrl, getBookOriginClient } from "@/lib/ecom-auth";
+import { isEcomPublicSsoPath } from "@/lib/ecom-public-paths";
 import {
   bumpEcomSsoReenterAttempts,
   clearEcomSsoReenterAttempts,
@@ -30,17 +31,19 @@ function buildReEnterUrl(args: {
   )}`;
 }
 
-const ECOM_SSO_INTERNAL_PATH_PREFIXES = [
-  "/sso-error",
-  "/auth/sso/callback",
-  "/auth/sso/silent-done",
-] as const;
-
-export function isEcomPublicSsoPath(pathname: string): boolean {
-  return ECOM_SSO_INTERNAL_PATH_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+/** 首页静默换票（与 quick-replica `buildSilentReEnterHref` 一致）。 */
+export function buildEcomSilentReEnterHref(
+  mainOrigin: string | null,
+  redirectPath: string,
+): string | null {
+  if (!mainOrigin?.trim()) return null;
+  return buildReEnterUrl({
+    bookOrigin: mainOrigin,
+    redirectPath: redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`,
+  });
 }
+
+export { isEcomPublicSsoPath } from "@/lib/ecom-public-paths";
 
 /**
  * 全页换票：走主站 re-enter（与 tool-web / canvas 一致，避免 iframe 第三方 Cookie 被拦）。
@@ -82,6 +85,14 @@ export function attemptEcomColdStartSso(opts: {
 
   void (async () => {
     if (await refreshEcomToolsSessionClient()) return;
+
+    // 无 tools_token：允许匿名浏览工作台，生成时再登录。
+    if (
+      typeof document !== "undefined" &&
+      !document.cookie.includes("tools_token=")
+    ) {
+      return;
+    }
 
     const book = resolveBookOrigin(opts.bookOrigin);
     if (!book) return;

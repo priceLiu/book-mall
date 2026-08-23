@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { getServerSession } from "next-auth";
+
+import { authOptions } from "@/lib/auth";
 import { sanitizeAppRedirectPath } from "@/lib/sanitize-app-redirect-path";
+import { resolveBookAppOpenTargetUrl } from "@/lib/platform-portal-entry";
 import { EcomOpenClient } from "./ecom-open-client";
 
 export const metadata: Metadata = {
@@ -7,13 +11,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function EcomOpenPage({
+export default async function EcomOpenPage({
   searchParams,
 }: {
   searchParams: { path?: string };
 }) {
   const path = sanitizeAppRedirectPath(searchParams.path, "/");
-  const reEnterPath = `/api/sso/tools/re-enter?app=e-commerce&redirect=${encodeURIComponent(path)}`;
+  const session = await getServerSession(authOptions);
+  const targetUrl = resolveBookAppOpenTargetUrl({
+    app: "e-commerce",
+    path,
+    loggedIn: Boolean(session?.user?.id),
+  });
 
-  return <EcomOpenClient reEnterPath={reEnterPath} />;
+  return <EcomOpenClient reEnterPath={targetUrl} />;
 }

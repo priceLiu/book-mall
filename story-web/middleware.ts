@@ -27,8 +27,7 @@ function getCanonicalOrigin(): string | null {
 }
 
 /**
- * story-web 首页/空间为公开落地页（Book 观众会话，非 tools_token），
- * 受保护路径（/projects、/project/*）由客户端 RequireAuth 负责静默 re-enter
+ * story-web 首页为公开项目列表；/project/*、/projects/new 等由 RequireAuth 门禁。
  * 并在耗尽后跳本域 /login。因此这里不做 tools_token 硬闸，
  * 仅在生产做规范域名（canonical host）重定向，避免默认云托管域名暴露。
  */

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { getServerSession } from "next-auth";
 
+import { authOptions } from "@/lib/auth";
 import { sanitizeAppRedirectPath } from "@/lib/sanitize-app-redirect-path";
+import { resolveBookAppOpenTargetUrl } from "@/lib/platform-portal-entry";
 import { CanvasOpenClient } from "./canvas-open-client";
 
 export const metadata: Metadata = {
@@ -8,13 +11,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function CanvasOpenPage({
+export default async function CanvasOpenPage({
   searchParams,
 }: {
   searchParams: { path?: string };
 }) {
   const path = sanitizeAppRedirectPath(searchParams.path, "/projects");
-  const reEnterPath = `/api/sso/tools/re-enter?app=canvas&redirect=${encodeURIComponent(path)}`;
+  const session = await getServerSession(authOptions);
+  const targetUrl = resolveBookAppOpenTargetUrl({
+    app: "canvas",
+    path,
+    loggedIn: Boolean(session?.user?.id),
+  });
 
-  return <CanvasOpenClient reEnterPath={reEnterPath} />;
+  return <CanvasOpenClient reEnterPath={targetUrl} />;
 }

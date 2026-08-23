@@ -2,6 +2,7 @@
 
 import { isSsoReenterSuppressedClient } from "@private/federated-portal-logout";
 import { getBookOriginClient } from "@/lib/auth";
+import { isCommonToolsPublicSsoPath } from "@/lib/common-tools-public-paths";
 import {
   bumpSsoReenterAttempts,
   clearSsoReenterAttempts,
@@ -28,17 +29,11 @@ function buildReEnterUrl(args: {
   )}`;
 }
 
-const SSO_INTERNAL_PATH_PREFIXES = [
-  "/sso-error",
-  "/auth/sso/callback",
-  "/auth/sso/silent-done",
-] as const;
-
 export function isPublicSsoPath(pathname: string): boolean {
-  return SSO_INTERNAL_PATH_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  return isCommonToolsPublicSsoPath(pathname);
 }
+
+export { isCommonToolsPublicBrowsePath } from "@/lib/common-tools-public-paths";
 
 export function redirectSessionRefresh(
   returnPath?: string,
@@ -70,6 +65,14 @@ export function attemptColdStartSso(opts: {
 
   void (async () => {
     if (await refreshToolsSessionClient()) return;
+
+    // 无 tools_token：允许匿名浏览工具页，使用功能时再登录。
+    if (
+      typeof document !== "undefined" &&
+      !document.cookie.includes("tools_token=")
+    ) {
+      return;
+    }
 
     const book = resolveBookOrigin(opts.bookOrigin);
     if (!book) return;

@@ -12,6 +12,7 @@ import {
   clearEcomSsoReenterAttempts,
   ensureEcomSessionFresh,
 } from "@/lib/ecom-silent-sso";
+import { isEcomPublicBrowsePath } from "@/lib/ecom-public-paths";
 import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
@@ -33,6 +34,7 @@ export function EcomAppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const isPublicBrowse = isEcomPublicBrowsePath(pathname);
   const [navCollapsed, setNavCollapsed] = React.useState(false);
 
   React.useEffect(() => {
@@ -66,10 +68,11 @@ export function EcomAppShell({
       coldStartAttemptedRef.current = false;
       return;
     }
+    if (isPublicBrowse) return;
     if (coldStartAttemptedRef.current) return;
     coldStartAttemptedRef.current = true;
     attemptEcomColdStartSso({ bookOrigin, pathname });
-  }, [user, bookOrigin, pathname]);
+  }, [user, bookOrigin, pathname, isPublicBrowse]);
 
   React.useEffect(() => {
     const onRefreshed = () => {
@@ -121,6 +124,10 @@ export function EcomAppShell({
   const collapseNavOnWorkspaceClick = React.useCallback(() => {
     if (!navCollapsed) setCollapsed(true);
   }, [navCollapsed, setCollapsed]);
+
+  if (!user && isPublicBrowse) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#0c0c0e] p-3 md:p-5">

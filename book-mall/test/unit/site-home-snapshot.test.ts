@@ -61,11 +61,15 @@ describe("buildSiteHomeSnapshotFallback", () => {
     expect(a.hero.background.url).toBe(b.hero.background.url);
   });
 
-  it("platform app hrefs are relative re-enter paths", () => {
+  it("platform app hrefs use open pages or re-enter", () => {
     const payload = buildSiteHomeSnapshotFallback("2026-08-22");
     for (const app of payload.platformApps) {
-      expect(app.href.startsWith("/api/sso/tools/re-enter")).toBe(true);
       expect(app.href).not.toContain("localhost");
+      if (app.key === "quick-replica" || app.key === "e-commerce" || app.key === "common-tools") {
+        expect(app.href).toMatch(/^\/(quick-replica|ecom|common-tools)-open\?path=/);
+      } else {
+        expect(app.href.startsWith("/api/sso/tools/re-enter")).toBe(true);
+      }
     }
   });
 });

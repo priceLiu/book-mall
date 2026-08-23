@@ -8,6 +8,7 @@ import {
   ChevronRight,
   LogOut,
 } from "lucide-react";
+import { navigatePortalLogout } from "@private/federated-portal-logout";
 import { buildEcomLoginUrl } from "@/lib/ecom-auth";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
 import {
@@ -334,10 +335,7 @@ export function EcomProfileSidebar({
         : [];
 
   function signOut() {
-    if (typeof document !== "undefined") {
-      document.cookie = "sso_reenter_suppress=1; Path=/; Max-Age=300; SameSite=Lax";
-    }
-    window.location.href = `${bookOrigin}/api/auth/full-signout?callbackUrl=${encodeURIComponent("/")}`;
+    navigatePortalLogout("/api/auth/logout");
   }
 
   const collapseDetail = () => onCollapsedChange?.(true);
@@ -467,9 +465,14 @@ export function EcomProfileSidebar({
         {railQuickBottom.map(renderRailQuickLink)}
 
         {user ? (
-          <div className="px-1">
-            <EcomCreditsBalanceChip collapsed />
-          </div>
+          <>
+            <div className="px-1">
+              <EcomCreditsBalanceChip collapsed />
+            </div>
+            <RailIconButton title="退出登录" onClick={signOut}>
+              <LogOut className="size-4" />
+            </RailIconButton>
+          </>
         ) : null}
       </div>
 
@@ -521,26 +524,16 @@ export function EcomProfileSidebar({
             ))}
           </nav>
 
-          <div className="mt-3 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">
-            {!user ? (
+          {!user ? (
+            <div className="mt-3 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">
               <a
                 href={buildEcomLoginUrl(pathname || "/")}
-                className={ecomPrimaryLinkClass("sm", "mb-2 max-w-none")}
+                className={ecomPrimaryLinkClass("sm", "max-w-none")}
               >
                 登录
               </a>
-            ) : null}
-            <button
-              type="button"
-              onClick={signOut}
-              className="group flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-[#e8847a] transition-colors hover:bg-[#e8847a]/10"
-            >
-              <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center">
-                <LogOut className="h-full w-full" />
-              </span>
-              <span>退出登录</span>
-            </button>
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

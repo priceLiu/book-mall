@@ -31,19 +31,8 @@ export function getBookOriginClient(): string {
 }
 
 export function buildLoginUrl(returnPath = "/"): string {
-  const origin = getBookOriginClient();
   const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
-  return `${origin.replace(/\/$/, "")}/login?redirect=${encodeURIComponent(
-    `${getAppOpenRedirect(path)}`,
-  )}`;
-}
-
-function getAppOpenRedirect(path: string): string {
-  const appOrigin =
-    process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN?.trim() ||
-    process.env.COMMON_TOOLS_PUBLIC_ORIGIN?.trim() ||
-    "http://localhost:3010";
-  return `${appOrigin.replace(/\/$/, "")}${path}`;
+  return `/login?redirect=${encodeURIComponent(path)}`;
 }
 
 export function throwIfUnauthorized(res: Response, data: Record<string, unknown>): void {

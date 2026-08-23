@@ -25,12 +25,16 @@ function ossHostPatterns() {
 const nextConfig = {
   output: "standalone",
   transpilePackages: [
+    "@private/federated-portal-logout",
     "@private/federated-portal-nav",
     "@private/media-render-subtitle-style",
     "@private/publisher-client",
     "@private/platform-assistant",
   ],
   webpack: (config) => {
+    config.resolve.alias["@private/federated-portal-logout"] = resolveShared(
+      "federated-portal-logout",
+    );
     config.resolve.alias["@private/publisher-client"] = resolveShared(
       "publisher-client",
     );

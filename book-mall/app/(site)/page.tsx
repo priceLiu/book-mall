@@ -6,6 +6,7 @@ import { SiteHomePlatformNavSection } from "@/components/layout/site-home/site-h
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
 import { getSiteHomeSnapshotForRender } from "@/lib/static-snapshots/site-home-snapshot-service";
+import { buildSiteHomePlatformApps } from "@/lib/site-home/platform-apps";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
 export const revalidate = 86400;
@@ -43,6 +44,13 @@ export const metadata = {
 
 export default async function Home() {
   const snapshot = await getSiteHomeSnapshotForRender();
+  const liveHrefByKey = new Map(
+    buildSiteHomePlatformApps().map((app) => [app.key, app.href]),
+  );
+  const platformApps = snapshot.payload.platformApps.map((app) => ({
+    ...app,
+    href: liveHrefByKey.get(app.key) ?? app.href,
+  }));
 
   return (
     <>
@@ -50,7 +58,7 @@ export default async function Home() {
         clips={snapshot.payload.hero.clips}
         background={snapshot.payload.hero.background}
       />
-      <SiteHomePlatformNavSection platformApps={snapshot.payload.platformApps} />
+      <SiteHomePlatformNavSection platformApps={platformApps} />
       <div className="site-home-below-hero">
         <SiteHomeGatewayModelsSection
           models={snapshot.payload.gatewayModels}

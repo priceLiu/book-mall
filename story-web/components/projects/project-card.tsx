@@ -23,14 +23,24 @@ function formatUpdatedAt(iso: string): string {
   });
 }
 
-export function ProjectCard({ project }: { project: ComicProjectListItem }) {
+export function ProjectCard({
+  project,
+  guestBrowse = false,
+}: {
+  project: ComicProjectListItem;
+  /** 未登录浏览：点击卡片引导登录 */
+  guestBrowse?: boolean;
+}) {
   const aspectClass =
     project.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video";
   const cover = project.coverImageUrl || project.styleFallbackUrl;
+  const href = guestBrowse
+    ? `/login?redirect=${encodeURIComponent(`/project/${project.id}`)}`
+    : `/project/${project.id}`;
 
   return (
     <Link
-      href={`/project/${project.id}`}
+      href={href}
       className="group block overflow-hidden rounded-xl border border-white/10 bg-[var(--story-surface)] transition hover:border-white/20 hover:shadow-lg hover:shadow-black/30"
     >
       <div

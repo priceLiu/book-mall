@@ -5,7 +5,6 @@ export type StoryNavItem = {
 
 export const STORY_NAV_ITEMS: StoryNavItem[] = [
   { href: "/", label: "首页" },
-  { href: "/projects", label: "创作室" },
   { href: "/media", label: "影像室" },
   { href: "/models", label: "模型配置" },
 ];

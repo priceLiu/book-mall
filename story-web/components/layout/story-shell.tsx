@@ -117,10 +117,8 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
             {STORY_NAV_ITEMS.map(({ href, label }) => {
               const active =
                 href === "/"
-                  ? pathname === "/"
-                  : href === "/projects"
-                    ? pathname.startsWith("/projects")
-                    : pathname.startsWith(href);
+                  ? pathname === "/" || pathname.startsWith("/projects")
+                  : pathname.startsWith(href);
               return (
                 <Link
                   key={href}

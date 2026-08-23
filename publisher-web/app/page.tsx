@@ -1,14 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getPublisherToolsToken } from "@/lib/publisher-session.server";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const token = await getPublisherToolsToken();
-  if (!token) redirect("/login");
-
+export default function HomePage() {
   const book = getMainSiteOrigin();
 
   return (
@@ -33,6 +28,12 @@ export default async function HomePage() {
             className="rounded-xl bg-[var(--pub-primary)] px-4 py-2 text-sm font-medium text-white"
           >
             新建发布
+          </Link>
+          <Link
+            href="/login"
+            className="rounded-xl border border-black/10 px-4 py-2 text-sm"
+          >
+            登录
           </Link>
           {book ? (
             <a

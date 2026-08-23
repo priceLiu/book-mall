@@ -1,5 +1,7 @@
 "use client";
 
+import { navigatePortalLogout } from "@private/federated-portal-logout";
+import Link from "next/link";
 import { PortalNav } from "@/components/portal-nav";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { EcomButtonSecondaryLink } from "@/components/ui/ecom-button";
@@ -30,6 +32,22 @@ export function EcomPortalTopBar({ authed = true, bookOrigin = null }: Props) {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center justify-end gap-2 md:ml-0 md:min-w-[9.5rem]">
+          {!authed ? (
+            <>
+              <Link
+                href="/login"
+                className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
+              >
+                登录
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full bg-[var(--ecom-primary)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+              >
+                免费注册
+              </Link>
+            </>
+          ) : null}
           {authed && bookAccountUrl ? (
             <EcomButtonSecondaryLink
               href={bookAccountUrl}
@@ -41,12 +59,13 @@ export function EcomPortalTopBar({ authed = true, bookOrigin = null }: Props) {
             </EcomButtonSecondaryLink>
           ) : null}
           {authed ? (
-            <a
-              href="/api/auth/logout"
+            <button
+              type="button"
+              onClick={() => navigatePortalLogout("/api/auth/logout")}
               className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
             >
               退出
-            </a>
+            </button>
           ) : null}
         </div>
       </div>

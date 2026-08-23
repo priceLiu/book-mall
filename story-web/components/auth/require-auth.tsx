@@ -30,18 +30,24 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     void (async () => {
       try {
         const r = await fetch("/api/tools-session", { cache: "no-store" });
-        const j = (await r.json().catch(() => null)) as { active?: boolean } | null;
+        const j = (await r.json().catch(() => null)) as {
+          active?: boolean;
+          hasCookie?: boolean;
+        } | null;
         if (cancelled) return;
         if (j?.active) {
           clearSsoReenterAttempts();
           setReady(true);
           return;
         }
+        if (!j?.hasCookie) {
+          setNeedsLogin(true);
+          return;
+        }
         if (isSsoReenterSuppressedClient()) {
           setNeedsLogin(true);
           return;
         }
-        // 静默自动换票：连续 MAX 次仍未建立会话才停下并跳本域品牌登录页
         if (readSsoReenterAttempts() >= MAX_SSO_REENTER_ATTEMPTS) {
           setExhausted(true);
           setNeedsLogin(true);
@@ -72,7 +78,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         <p className="text-sm">
           {exhausted
             ? "多次自动连接账号均未成功，请重新登录后继续使用。"
-            : "会话已退出，请重新登录。"}
+            : "使用此功能需要登录。"}
         </p>
         <button
           type="button"

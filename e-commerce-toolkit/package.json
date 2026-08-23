@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
     "@private/media-render-subtitle-style": "file:../shared/media-render-subtitle-style",
     "@private/platform-assistant": "file:../shared/platform-assistant",

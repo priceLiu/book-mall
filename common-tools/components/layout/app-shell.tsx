@@ -9,6 +9,7 @@ import {
   attemptColdStartSso,
   clearSsoReenterAttempts,
   ensureSessionFresh,
+  isCommonToolsPublicBrowsePath,
 } from "@/lib/silent-sso";
 import { PortalNav } from "@/components/portal-nav";
 import { setRuntimeBookOrigin } from "@/lib/auth";
@@ -41,6 +42,7 @@ export function AppShell({
       return;
     }
     if (coldStartAttemptedRef.current) return;
+    if (isCommonToolsPublicBrowsePath(pathname)) return;
     coldStartAttemptedRef.current = true;
     attemptColdStartSso({ bookOrigin, pathname });
   }, [user, bookOrigin, pathname]);
@@ -121,9 +123,9 @@ export function AppShell({
                 </button>
               </>
             ) : (
-              <a href={pricingUrl} className="text-[#0071e3] hover:underline">
+              <Link href="/login" className="text-[#0071e3] hover:underline">
                 登录
-              </a>
+              </Link>
             )}
           </div>
         </div>

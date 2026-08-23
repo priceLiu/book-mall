@@ -129,6 +129,18 @@ export async function apiListProjects(base: string): Promise<ProjectListItemDto[
   return data.projects;
 }
 
+/** 未登录门户首页 · 公开作品列表 */
+export async function apiListDiscoverProjects(
+  base: string,
+): Promise<ProjectListItemDto[]> {
+  const data = await callApi<{ projects: ProjectListItemDto[] }>(
+    base,
+    "/api/story/projects/discover",
+    { method: "GET" },
+  );
+  return data.projects;
+}
+
 export async function apiCreateProject(
   base: string,
   input: CreateProjectInput,

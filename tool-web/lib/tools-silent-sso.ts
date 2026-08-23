@@ -24,6 +24,7 @@ export function shouldAttemptSilentSso(opts: {
   if (isSsoReenterSuppressedClient()) return false;
   if (opts.isPublicPath) return false;
   if (opts.loading) return false;
+  if (!opts.hasTokenCookie) return false;
   if (opts.hasTokenCookie && opts.sessionActive) return false;
   return true;
 }

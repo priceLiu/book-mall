@@ -5,8 +5,11 @@ import Link from "next/link";
 import { Loader2, Plus } from "lucide-react";
 import { ProjectCard } from "@/components/projects/project-card";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { RequireAuth } from "@/components/auth/require-auth";
-import { apiListProjects, BookMallApiError } from "@/lib/projects/api";
+import {
+  apiListDiscoverProjects,
+  apiListProjects,
+  BookMallApiError,
+} from "@/lib/projects/api";
 import type { AspectRatio, ComicProjectListItem } from "@/lib/projects/types";
 
 const GROUPS: { ratio: AspectRatio; label: string; gridClass: string }[] = [
@@ -23,14 +26,20 @@ const GROUPS: { ratio: AspectRatio; label: string; gridClass: string }[] = [
   },
 ];
 
+function localAuthHref(path: string): string {
+  return `/login?redirect=${encodeURIComponent(path)}`;
+}
+
 function ProjectGroup({
   label,
   projects,
   gridClass,
+  guestBrowse,
 }: {
   label: string;
   projects: ComicProjectListItem[];
   gridClass: string;
+  guestBrowse?: boolean;
 }) {
   if (projects.length === 0) return null;
   return (
@@ -44,7 +53,7 @@ function ProjectGroup({
       <ul className={gridClass}>
         {projects.map((project) => (
           <li key={project.id}>
-            <ProjectCard project={project} />
+            <ProjectCard project={project} guestBrowse={guestBrowse} />
           </li>
         ))}
       </ul>
@@ -52,16 +61,36 @@ function ProjectGroup({
   );
 }
 
-function ProjectsPageInner() {
+export function ProjectsPageClient() {
   const base = useBookMallBaseUrl();
+  const [sessionActive, setSessionActive] = useState<boolean | null>(null);
   const [projects, setProjects] = useState<ComicProjectListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch("/api/tools-session", { cache: "no-store" });
+        const j = (await r.json().catch(() => null)) as { active?: boolean } | null;
+        if (cancelled) return;
+        setSessionActive(Boolean(j?.active));
+      } catch {
+        if (!cancelled) setSessionActive(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const refresh = useCallback(async () => {
-    if (!base) return;
+    if (!base || sessionActive === null) return;
     setError(null);
     try {
-      const list = await apiListProjects(base);
+      const list = sessionActive
+        ? await apiListProjects(base)
+        : await apiListDiscoverProjects(base);
       setProjects(list);
     } catch (e) {
       const msg =
@@ -73,11 +102,13 @@ function ProjectsPageInner() {
       setError(msg);
       setProjects([]);
     }
-  }, [base]);
+  }, [base, sessionActive]);
 
   useEffect(() => {
+    if (sessionActive === null) return;
+    setProjects(null);
     void refresh();
-  }, [refresh]);
+  }, [sessionActive, refresh]);
 
   const grouped = useMemo(() => {
     const map: Record<AspectRatio, ComicProjectListItem[]> = {
@@ -90,6 +121,9 @@ function ProjectsPageInner() {
     return map;
   }, [projects]);
 
+  const loading = sessionActive === null || projects === null;
+  const guestBrowse = sessionActive === false;
+
   return (
     <div className="story-shell-page py-10 sm:py-14">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -99,16 +133,25 @@ function ProjectsPageInner() {
             创作室
           </h1>
           <p className="twenty-body mt-2 max-w-xl">
-            管理你的 AI 漫剧项目：从故事设定到分镜生成，全流程在此开始。
+            {guestBrowse
+              ? "浏览精选漫剧作品；登录后可创建与管理你的项目。"
+              : "管理你的 AI 漫剧项目：从故事设定到分镜生成，全流程在此开始。"}
           </p>
         </div>
-        <Link href="/projects/new" className="twenty-btn shrink-0">
-          <Plus className="mr-1.5 size-4" />
-          新增项目
-        </Link>
+        {sessionActive ? (
+          <Link href="/projects/new" className="twenty-btn shrink-0">
+            <Plus className="mr-1.5 size-4" />
+            新增项目
+          </Link>
+        ) : (
+          <a href={localAuthHref("/projects/new")} className="twenty-btn shrink-0">
+            <Plus className="mr-1.5 size-4" />
+            登录后新建
+          </a>
+        )}
       </div>
 
-      {projects === null ? (
+      {loading ? (
         <div className="mt-10 flex items-center justify-center rounded-xl border border-dashed border-white/15 py-16 text-[var(--story-muted)]">
           <Loader2 className="mr-2 size-4 animate-spin" />
           加载项目列表…
@@ -127,8 +170,23 @@ function ProjectsPageInner() {
       ) : projects.length === 0 ? (
         <div className="mt-10 rounded-xl border border-dashed border-white/15 py-16 text-center">
           <p className="text-[var(--story-muted)]">
-            还没有项目，点击「新增项目」开始创作。
+            {guestBrowse
+              ? "暂无公开展示作品，登录后即可创建你的第一个项目。"
+              : "还没有项目，点击「新增项目」开始创作。"}
           </p>
+          {guestBrowse ? (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <a href={localAuthHref("/")} className="twenty-btn">
+                登录
+              </a>
+              <a
+                href={`/register?redirect=${encodeURIComponent("/")}`}
+                className="twenty-btn-ghost"
+              >
+                注册
+              </a>
+            </div>
+          ) : null}
         </div>
       ) : (
         GROUPS.map(({ ratio, label, gridClass }) => (
@@ -137,17 +195,10 @@ function ProjectsPageInner() {
             label={label}
             projects={grouped[ratio]}
             gridClass={gridClass}
+            guestBrowse={guestBrowse}
           />
         ))
       )}
     </div>
-  );
-}
-
-export function ProjectsPageClient() {
-  return (
-    <RequireAuth>
-      <ProjectsPageInner />
-    </RequireAuth>
   );
 }

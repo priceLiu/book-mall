@@ -26,6 +26,7 @@ const APP_SHARED_MAP = {
   "common-tools": ["federated-portal-logout", "federated-portal-nav", "platform-assistant"],
   "quick-replica-web": ["federated-portal-nav", "platform-assistant"],
   "e-commerce-toolkit": [
+    "federated-portal-logout",
     "federated-portal-nav",
     "media-render-subtitle-style",
     "platform-assistant",

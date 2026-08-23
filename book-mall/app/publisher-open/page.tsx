@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { getServerSession } from "next-auth";
+
+import { authOptions } from "@/lib/auth";
 import { resolvePublisherReEnterRedirect } from "@/lib/publisher/publisher-open-path";
+import { resolveBookAppOpenTargetUrl } from "@/lib/platform-portal-entry";
 import { PublisherOpenClient } from "./publisher-open-client";
 
 export const metadata: Metadata = {
@@ -7,13 +11,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function PublisherOpenPage({
+export default async function PublisherOpenPage({
   searchParams,
 }: {
   searchParams: { path?: string; client?: string };
 }) {
   const path = resolvePublisherReEnterRedirect(searchParams);
-  const reEnterPath = `/api/sso/tools/re-enter?app=publisher&redirect=${encodeURIComponent(path)}`;
+  const session = await getServerSession(authOptions);
+  const targetUrl = resolveBookAppOpenTargetUrl({
+    app: "publisher",
+    path,
+    loggedIn: Boolean(session?.user?.id),
+  });
 
-  return <PublisherOpenClient reEnterPath={reEnterPath} />;
+  return <PublisherOpenClient reEnterPath={targetUrl} />;
 }

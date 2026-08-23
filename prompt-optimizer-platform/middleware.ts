@@ -31,6 +31,7 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/auth/sso/callback")) return true;
   if (pathname.startsWith("/sso-error")) return true;
   if (pathname.startsWith("/_next/")) return true;
+  if (pathname === "/" || pathname === "/login" || pathname === "/register") return true;
   if (pathname === "/favicon.ico" || pathname === "/robots.txt") return true;
   if (/\.[a-z0-9]+$/i.test(pathname)) return true;
   return false;

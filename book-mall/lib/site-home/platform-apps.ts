@@ -2,6 +2,11 @@ import type { PortalKey } from "@private/federated-portal-nav";
 
 import { getStoryWebOrigin } from "@/lib/app-web-origins";
 import {
+  buildBookPortalOpenPageHref,
+  isPublicBrowsePortalApp,
+  resolvePortalAppOrigin,
+} from "@/lib/platform-portal-entry";
+import {
   buildBookPortalNavItems,
   resolveBookOrigin,
   type BookPortalNavItem,
@@ -86,6 +91,18 @@ function bookReEnterHref(app: SiteHomePlatformAppKey | PortalKey, redirect: stri
   return `/api/sso/tools/re-enter?${params.toString()}`;
 }
 
+function resolveLivePublicPortalHref(
+  key: SiteHomePlatformAppKey,
+  redirect: string,
+): string | null {
+  if (!isPublicBrowsePortalApp(key as PortalKey)) return null;
+  const openHref = buildBookPortalOpenPageHref(key as PortalKey, redirect);
+  if (openHref) return openHref;
+  const origin = resolvePortalAppOrigin(key as PortalKey)?.replace(/\/$/, "");
+  if (!origin?.startsWith("http")) return null;
+  return `${origin}${redirect}`;
+}
+
 function resolvePlatformAppHref(
   key: SiteHomePlatformAppKey,
   portalByKey: Map<PortalKey, BookPortalNavItem>,
@@ -94,7 +111,9 @@ function resolvePlatformAppHref(
     return null;
   }
   const redirect = APP_DEFAULT_REDIRECT[key] ?? "/";
-  return bookReEnterHref(key, redirect);
+  return (
+    resolveLivePublicPortalHref(key, redirect) ?? bookReEnterHref(key, redirect)
+  );
 }
 
 function resolvePlatformAppMedia(key: SiteHomePlatformAppKey): PlatformAppMedia {
