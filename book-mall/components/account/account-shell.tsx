@@ -84,7 +84,7 @@ export function AccountShell({
       <div className="flex w-full">
         <aside
           className={cn(
-            "site-app-sidebar relative z-[410] hidden shrink-0 overflow-hidden bg-white transition-[width,box-shadow] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:sticky md:top-14 md:block md:max-h-[calc(100dvh-3.5rem)] md:self-start md:overscroll-y-contain",
+            "site-app-sidebar relative z-[410] hidden shrink-0 bg-white transition-[width,box-shadow] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:sticky md:top-14 md:flex md:h-[calc(100dvh-3.5rem)] md:max-h-[calc(100dvh-3.5rem)] md:flex-col md:overflow-hidden md:self-start",
             sidebarExpanded
               ? "w-[15.5rem] shadow-lg shadow-black/5"
               : "account-sidebar-rail w-12",
@@ -94,7 +94,7 @@ export function AccountShell({
           aria-expanded={sidebarExpanded}
         >
           <div
-            className="account-sidebar-panel h-full overflow-y-auto overscroll-y-contain px-2 py-4"
+            className="account-sidebar-panel min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-4"
             style={{ width: ACCOUNT_SIDEBAR_EXPANDED_W }}
           >
             <AccountNavMenu
