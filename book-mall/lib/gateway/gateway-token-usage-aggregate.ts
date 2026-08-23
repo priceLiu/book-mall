@@ -24,6 +24,10 @@ import {
   buildFinancePeriodSubmittedAt,
   FINANCE_USAGE_AGGREGATE_STATUS,
 } from "@/lib/gateway/finance-log-query";
+import {
+  buildPlatformAssistantGatewayLogWhere,
+  excludePlatformAssistantClientPageFilter,
+} from "@/lib/platform-assistant/platform-assistant-billing";
 import { prisma } from "@/lib/prisma";
 
 /** 与 finance-web FinanceGatewayUsage 字段对齐。 */
@@ -292,6 +296,7 @@ export async function fetchUserGatewayTokenUsage(input: {
   const where: Prisma.GatewayRequestLogWhereInput = {
     AND: [
       { actorBookUserId: input.bookUserId },
+      excludePlatformAssistantClientPageFilter(),
       buildFinancePeriodSubmittedAt(input.submittedFrom, input.submittedTo),
       { status: FINANCE_USAGE_AGGREGATE_STATUS },
     ],
@@ -354,6 +359,7 @@ export async function batchAggregateUserGatewayTokenUsage(input: {
     where: {
       AND: [
         { actorBookUserId: { in: input.bookUserIds } },
+        excludePlatformAssistantClientPageFilter(),
         buildFinancePeriodSubmittedAt(input.submittedFrom, input.submittedTo),
         { status: FINANCE_USAGE_AGGREGATE_STATUS },
       ],
@@ -375,6 +381,22 @@ export async function batchAggregateUserGatewayTokenUsage(input: {
   }
 
   return result;
+}
+
+export async function fetchPlatformAssistantGatewayTokenUsage(input: {
+  submittedFrom: Date;
+  submittedTo: Date;
+}) {
+  const logs = await prisma.gatewayRequestLog.findMany({
+    where: buildPlatformAssistantGatewayLogWhere({
+      AND: [
+        buildFinancePeriodSubmittedAt(input.submittedFrom, input.submittedTo),
+        { status: FINANCE_USAGE_AGGREGATE_STATUS },
+      ],
+    }),
+    select: GATEWAY_USAGE_LOG_SELECT,
+  });
+  return aggregateGatewayTokenUsageFromLogs(logs);
 }
 
 export function gatewayTokenUsageToRecord(

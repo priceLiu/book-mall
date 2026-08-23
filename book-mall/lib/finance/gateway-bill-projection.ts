@@ -90,7 +90,7 @@ const SETTLEMENT_KIND_LABEL: Record<BillingSettlementKind, string> = {
   BYOK_QUOTA_OVERAGE: "历史结算（超额）",
   PLATFORM_CREDIT: "平台代付扣积分",
   PLATFORM_VIDEO: "平台代付视频",
-  METER_ONLY: "历史计量",
+  METER_ONLY: "平台计量（不扣积分）",
   NONE: "无扣费/扣次",
 };
 

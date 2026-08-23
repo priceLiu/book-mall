@@ -11,6 +11,7 @@ import { buildVideoBackgroundWaitWhere } from "@/lib/gateway/video-task-wait-pol
 
 import { phoneFromGatewayEmail } from "@/lib/auth/user-display";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
+import { excludePlatformAssistantClientPageFilter } from "@/lib/platform-assistant/platform-assistant-billing";
 import { prisma } from "@/lib/prisma";
 
 export type GatewayLogScopeInput = {
@@ -126,7 +127,12 @@ export async function buildGatewayLogScopeForBookUser(
   ]);
 
   const or: Prisma.GatewayRequestLogWhereInput[] = [
-    { actorBookUserId: bookUserId },
+    {
+      AND: [
+        { actorBookUserId: bookUserId },
+        excludePlatformAssistantClientPageFilter(),
+      ],
+    },
   ];
   if (gatewayUser) {
     or.push({ userId: gatewayUser.id });

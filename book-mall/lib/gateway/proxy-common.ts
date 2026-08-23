@@ -334,6 +334,7 @@ export async function finalizeRequestLog(
     inputSummary: log.inputSummary,
     resultSummary: patch.resultSummary,
     requestKind: log.requestKind,
+    allowPlatformEstimate: patch.failCode !== "STALE_CHAT_ORPHAN",
   });
 
   const videoHints =

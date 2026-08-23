@@ -43,6 +43,7 @@ import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } 
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
+import { recordPlatformAssistantMeterSettlement } from "@/lib/platform-assistant/platform-assistant-billing";
 import { markShareRewardFirstBillable } from "@/lib/share/share-reward-service";
 
 export function creditBillingEnabled(): boolean {
@@ -314,7 +315,16 @@ export async function settleSucceededGatewayLog(input: {
 }): Promise<number> {
   if (!creditBillingEnabled()) return 0;
   if (input.log.clientPage === "media-render-asr") return 0;
-  if (await isPlatformOperationalApiKey(input.log.apiKeyId)) return 0;
+  if (await isPlatformOperationalApiKey(input.log.apiKeyId)) {
+    await recordPlatformAssistantMeterSettlement(input.log).catch((e) => {
+      console.warn(
+        "[credit-settlement] platform-assistant meter failed",
+        input.log.id,
+        e instanceof Error ? e.message : e,
+      );
+    });
+    return 0;
+  }
 
   const target = await resolveLogBillingTarget(input.log);
   if (!target) return 0;

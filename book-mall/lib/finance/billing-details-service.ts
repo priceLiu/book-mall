@@ -20,10 +20,17 @@ import {
   financePeriodFromKey,
 } from "@/lib/gateway/finance-log-query";
 import {
+  fetchPlatformAssistantGatewayTokenUsage,
   fetchTeamGatewayTokenUsage,
   fetchUserGatewayTokenUsage,
   gatewayTokenUsageToRecord,
 } from "@/lib/gateway/gateway-token-usage-aggregate";
+import {
+  buildPlatformAssistantGatewayLogWhere,
+  isPlatformAssistantClientPage,
+  PLATFORM_ASSISTANT_BILLING_USER_ID,
+  PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+} from "@/lib/platform-assistant/platform-assistant-billing";
 import { currentPeriodKey } from "@/lib/finance/team-finance-guard";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -283,8 +290,13 @@ async function buildGatewayRows(input: {
   );
 
   const rows = logs.map((log) => {
-    const uid = log.actorBookUserId ?? input.userId ?? "";
-    const label = userMap.get(uid) ?? userMap.get(input.userId ?? "") ?? uid;
+    const isAssistant = isPlatformAssistantClientPage(log.clientPage);
+    const uid = isAssistant
+      ? PLATFORM_ASSISTANT_BILLING_USER_ID
+      : (log.actorBookUserId ?? input.userId ?? "");
+    const label = isAssistant
+      ? PLATFORM_ASSISTANT_BILLING_USER_LABEL
+      : (userMap.get(uid) ?? userMap.get(input.userId ?? "") ?? uid);
     return projectGatewayLogToBillRow(
       log,
       uid || (input.userId ?? ""),
@@ -333,6 +345,10 @@ export async function fetchBillingDetailsForUser(input: {
   tab: BillingDetailsTab;
   take?: number;
 }) {
+  if (input.userId === PLATFORM_ASSISTANT_BILLING_USER_ID) {
+    return fetchBillingDetailsForPlatformAssistant(input);
+  }
+
   const take = Math.min(2000, Math.max(1, input.take ?? 500));
   const periodKey = currentPeriodKey();
   const { from, to } = financePeriodFromKey(periodKey);
@@ -451,6 +467,155 @@ export async function fetchBillingDetailsForTenant(input: {
     tenant: { id: tenant.id, name: tenant.name },
     balancePoints: balanceCredits,
     balanceCredits,
+    totalCalls: gatewayPart.totalCalls,
+    succeededCalls: gatewayPart.succeededCalls,
+    failedCalls: gatewayPart.failedCalls,
+    totalPoints: totalCredits,
+    totalCredits,
+    rows: gatewayPart.rows,
+    packageReconciliation: null,
+    returned: gatewayPart.returned,
+    take,
+    truncated: gatewayPart.returned >= take,
+    periodKey,
+    tokenUsage: gatewayTokenUsageToRecord(tokenUsageRaw),
+  };
+}
+
+function mergePlatformAssistantTabFilters(
+  filters: GatewayLogFilterInput,
+): Prisma.GatewayRequestLogWhereInput {
+  const extra: Prisma.GatewayRequestLogWhereInput = {};
+  if (filters.status) extra.status = filters.status;
+  if (filters.statuses?.length) extra.status = { in: filters.statuses };
+  if (filters.submittedFrom || filters.submittedBefore) {
+    extra.submittedAt = {
+      ...(filters.submittedFrom ? { gte: filters.submittedFrom } : {}),
+      ...(filters.submittedBefore ? { lt: filters.submittedBefore } : {}),
+    };
+  }
+  if (filters.creditsChargedGt != null) {
+    extra.creditsCharged = { gt: filters.creditsChargedGt };
+  }
+  return extra;
+}
+
+async function buildPlatformAssistantGatewayRows(input: {
+  tab: BillingDetailsTab;
+  take: number;
+  periodKey?: string;
+}): Promise<{
+  rows: Record<string, string>[];
+  totalCalls: number;
+  succeededCalls: number;
+  failedCalls: number;
+  returned: number;
+}> {
+  const periodKey = input.periodKey ?? currentPeriodKey();
+  const { from, to } = financePeriodFromKey(periodKey);
+  const periodFilters: GatewayLogFilterInput = {
+    submittedFrom: from,
+    submittedBefore: to,
+  };
+
+  const tabFilters: GatewayLogFilterInput =
+    input.tab === "usage"
+      ? { statuses: [...USAGE_TAB_STATUSES], ...periodFilters }
+      : { creditsChargedGt: 0, ...periodFilters };
+
+  const where = buildPlatformAssistantGatewayLogWhere(
+    mergePlatformAssistantTabFilters(tabFilters),
+  );
+
+  const logs = await prisma.gatewayRequestLog.findMany({
+    where,
+    orderBy: { submittedAt: "desc" },
+    take: input.take,
+    select: GATEWAY_SELECT,
+  });
+
+  const modelKeys = logs.map((l) => l.canonicalModelKey ?? l.model ?? "");
+  const [catalogMaps, settlements] = await Promise.all([
+    loadModelCatalogBillMaps(modelKeys, prisma),
+    loadBillingSettlementsByLogIds(logs.map((l) => l.id)),
+  ]);
+
+  const keyLabelMap = await loadGatewayLogKeyLabels(
+    logs.map((log) => ({
+      apiKeyId: log.apiKeyId,
+      credentialId: log.credentialId,
+      credentialAliasSnapshot: log.credentialAliasSnapshot,
+    })),
+  );
+
+  const rows = logs.map((log) =>
+    projectGatewayLogToBillRow(
+      log,
+      PLATFORM_ASSISTANT_BILLING_USER_ID,
+      PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+      catalogMaps.displayNames,
+      settlements.get(log.id) ?? null,
+      catalogMaps.vendors,
+      null,
+      pickGatewayLogKeyLabels(keyLabelMap, {
+        apiKeyId: log.apiKeyId,
+        credentialId: log.credentialId,
+        credentialAliasSnapshot: log.credentialAliasSnapshot,
+      }),
+    ),
+  );
+
+  const [succeededCalls, failedCalls] =
+    input.tab === "usage"
+      ? await Promise.all([
+          prisma.gatewayRequestLog.count({
+            where: buildPlatformAssistantGatewayLogWhere({
+              status: "SUCCEEDED",
+              ...periodFilters,
+            }),
+          }),
+          prisma.gatewayRequestLog.count({
+            where: buildPlatformAssistantGatewayLogWhere({
+              status: "FAILED",
+              ...periodFilters,
+            }),
+          }),
+        ])
+      : [0, 0];
+
+  const totalCalls = input.tab === "usage" ? succeededCalls + failedCalls : logs.length;
+
+  return { rows, totalCalls, succeededCalls, failedCalls, returned: logs.length };
+}
+
+export async function fetchBillingDetailsForPlatformAssistant(input: {
+  tab: BillingDetailsTab;
+  take?: number;
+}) {
+  const take = Math.min(2000, Math.max(1, input.take ?? 500));
+  const periodKey = currentPeriodKey();
+  const { from, to } = financePeriodFromKey(periodKey);
+
+  const [gatewayPart, tokenUsageRaw] = await Promise.all([
+    buildPlatformAssistantGatewayRows({ tab: input.tab, take, periodKey }),
+    fetchPlatformAssistantGatewayTokenUsage({
+      submittedFrom: from,
+      submittedTo: to,
+    }),
+  ]);
+
+  const totalCredits = sumCredits(gatewayPart.rows);
+
+  return {
+    source: "finance-2.0",
+    tab: input.tab,
+    user: {
+      id: PLATFORM_ASSISTANT_BILLING_USER_ID,
+      name: PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+      email: null,
+    },
+    balancePoints: 0,
+    balanceCredits: 0,
     totalCalls: gatewayPart.totalCalls,
     succeededCalls: gatewayPart.succeededCalls,
     failedCalls: gatewayPart.failedCalls,
