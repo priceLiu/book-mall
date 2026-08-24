@@ -406,6 +406,7 @@ function Pro2StarterInputDockBody({
       flowAnchor={placement}
       dockClassName="pro2-starter-dock"
       hidden={dockHidden}
+      anchorNodeId={storeNode.id}
       header={
         <Pro2DockHeader
           refRow={

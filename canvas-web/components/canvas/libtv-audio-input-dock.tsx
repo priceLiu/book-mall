@@ -176,6 +176,7 @@ export function LibtvAudioInputDock() {
       flowAnchor={placement}
       dockClassName="pro2-audio-dock"
       hidden={dockHidden}
+      anchorNodeId={storeNode.id}
       footer={
         <Pro2DockToolbar className="gap-2">
           <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">

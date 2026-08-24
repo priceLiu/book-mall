@@ -113,6 +113,7 @@ export function Pro2FrameCellInputDock() {
       flowAnchor={placement}
       dockClassName="pro2-frame-cell-dock"
       hidden={dockHidden}
+      anchorNodeId={storeNode.id}
       footer={
         <Pro2DockToolbar>
           <div className="min-w-0 flex-1" />

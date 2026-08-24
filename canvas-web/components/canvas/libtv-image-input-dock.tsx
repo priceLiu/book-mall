@@ -577,6 +577,7 @@ function LibtvImageInputDockBody({
         flowAnchor={placement}
         dockClassName={isPro2 ? "pro2-image-dock" : "sbv1-image-dock"}
         hidden={dockHidden}
+        anchorNodeId={storeNode.id}
         header={
           <Pro2DockUpstreamHeader
             refRow={

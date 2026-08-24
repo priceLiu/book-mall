@@ -63,7 +63,7 @@ export function useLibtvFloatingDock(
   );
   const marqueeSelecting = useCanvasMarqueeSelecting();
 
-  const rawPlacement = useLibtvDockFlowPlacement(dockNodeId, placementOpts);
+  const rawPlacement = useLibtvDockFlowPlacement(dockNodeId, placementOpts, hidden);
   const stablePlacement = useStableLibtvDockFlowPlacement(rawPlacement);
 
   const pinRef = useRef<{
@@ -71,7 +71,7 @@ export function useLibtvFloatingDock(
     placement: LibtvDockFlowPlacement;
   } | null>(null);
 
-  if (dockNodeId && stablePlacement) {
+  if (dockNodeId && stablePlacement && !hidden) {
     pinRef.current = { nodeId: dockNodeId, placement: stablePlacement };
   } else if (!dockNodeId) {
     pinRef.current = null;

@@ -4,11 +4,7 @@ import { createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "@xyflow/react";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
-import {
-  useLibtvNodeToolbarHidden,
-  useLibtvNodeToolbarScreenPlacement,
-  useStableLibtvNodeToolbarScreenPlacement,
-} from "@/lib/canvas/use-libtv-node-toolbar-placement";
+import { useLibtvNodeToolbarHidden, useLibtvNodeToolbarScreenPlacement, useStableLibtvNodeToolbarScreenPlacement } from "@/lib/canvas/use-libtv-node-toolbar-placement";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import {
   computeLibtvPortaledToolbarScale,
@@ -58,17 +54,19 @@ export function LibtvNodeToolbarPortal({
   return createPortal(
     <LibtvToolbarPortaledContext.Provider value={true}>
       <div
-        className="libtv-node-toolbar-portal fixed z-[1500] flex max-w-[92vw] justify-center"
+        className="libtv-node-toolbar-portal pointer-events-none fixed z-[1500] flex max-w-[92vw] justify-center"
         style={{
           left: placement.x,
           top: placement.y,
           transform: `translate(-50%, ${translateY}) scale(${toolbarScale})`,
           transformOrigin: placement.place === "below" ? "center top" : "center bottom",
           visibility: hidden ? "hidden" : "visible",
-          pointerEvents: hidden ? "none" : "auto",
+          pointerEvents: hidden ? "none" : undefined,
         }}
       >
-        {children}
+        <div className="pointer-events-none [&_button]:pointer-events-auto [&_a]:pointer-events-auto [&_[role=menuitem]]:pointer-events-auto [&_[data-libtv-toolbar-interactive]]:pointer-events-auto">
+          {children}
+        </div>
       </div>
     </LibtvToolbarPortaledContext.Provider>,
     document.body,

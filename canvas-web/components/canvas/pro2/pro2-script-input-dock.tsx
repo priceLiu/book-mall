@@ -297,6 +297,7 @@ export function Pro2ScriptInputDock() {
       flowAnchor={placement}
       dockClassName="pro2-script-dock"
       hidden={dockHidden}
+      anchorNodeId={storeNode.id}
       header={
         <Pro2DockHeader
           refRow={

@@ -90,6 +90,7 @@ import {
   mergeStoreNodesIntoRf,
 } from "@/lib/canvas/canvas-rf-sync";
 import { commitLibtvRfNodeSelection } from "@/lib/canvas/select-libtv-node";
+import { useLibtvCanvasOverlayClickThrough } from "@/lib/canvas/use-libtv-canvas-overlay-click-through";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import {
   CANVAS_EDGE_STROKE_WIDTH,
@@ -417,6 +418,7 @@ function FlowCanvasInner({
     hasLibtvMediaCanvasNodes(rfNodes);
   const enablePaneContextMenu = libtvCanvas;
   const enableDragSnapGuides = libtvCanvas;
+  useLibtvCanvasOverlayClickThrough(libtvCanvas);
 
   const resolveGuideViewport = useCallback((): FlowViewportRect | undefined => {
     const el = wrapRef.current;
@@ -1311,7 +1313,6 @@ function FlowCanvasInner({
     (_event: React.MouseEvent, node: { id: string; type?: string }) => {
       isNodeDraggingRef.current = true;
       deferStoreGraphSyncRef.current = true;
-      setIsNodeDragging(true);
       setCanvasGeometryDragging(true);
       setCanvasDraggingNodeId(node.id);
       if (libtvCanvas) {
@@ -1324,27 +1325,32 @@ function FlowCanvasInner({
       } else {
         libtvMultiNodeDragRef.current = false;
       }
-      setSnapGuides([]);
-      lastSnapGuideKeyRef.current = "";
-      if (dragSnapRafRef.current !== null) {
-        cancelAnimationFrame(dragSnapRafRef.current);
-        dragSnapRafRef.current = null;
-      }
-      if (enableDragSnapGuides) {
-        const all = getNodes() as CanvasFlowNode[];
-        const dragging = all.find((n) => n.id === node.id);
-        snapOthersRef.current = dragging
-          ? buildDragSnapCandidates(dragging, all)
-          : [];
-      } else {
-        snapOthersRef.current = [];
-      }
-      if (dragUndoPausedRef.current) return;
-      useCanvasStore.temporal.getState().pause();
-      dragUndoPausedRef.current = true;
       if (node.type !== "group") {
         liftGroupChildrenExtent(node.id);
       }
+
+      // 非关键路径延后一帧，避免拖动手感「鼠标先走、节点后追」
+      requestAnimationFrame(() => {
+        setIsNodeDragging(true);
+        setSnapGuides([]);
+        lastSnapGuideKeyRef.current = "";
+        if (dragSnapRafRef.current !== null) {
+          cancelAnimationFrame(dragSnapRafRef.current);
+          dragSnapRafRef.current = null;
+        }
+        if (enableDragSnapGuides) {
+          const all = getNodes() as CanvasFlowNode[];
+          const dragging = all.find((n) => n.id === node.id);
+          snapOthersRef.current = dragging
+            ? buildDragSnapCandidates(dragging, all)
+            : [];
+        } else {
+          snapOthersRef.current = [];
+        }
+        if (dragUndoPausedRef.current) return;
+        useCanvasStore.temporal.getState().pause();
+        dragUndoPausedRef.current = true;
+      });
     },
     [enableDragSnapGuides, getNodes, liftGroupChildrenExtent, setCanvasGeometryDragging, setCanvasDraggingNodeId, libtvCanvas],
   );
@@ -2143,7 +2149,9 @@ function FlowCanvasInner({
         }
         onPaneClick={
           pro2FloatingInspector || sbv1Canvas
-            ? () => {
+            ? (event) => {
+                const target = event.target as HTMLElement | null;
+                if (target?.closest?.(".react-flow__node")) return;
                 closePaneMenu();
                 if (ignoreNextPaneClickRef.current) {
                   ignoreNextPaneClickRef.current = false;
@@ -2182,6 +2190,7 @@ function FlowCanvasInner({
         onNodeClick={
           pro2FloatingInspector || sbv1Canvas
             ? (e, node) => {
+                ignoreNextPaneClickRef.current = true;
                 if (node.type === "group") {
                   const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
                   const hit = all.find((n) => n.id === node.id);

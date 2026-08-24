@@ -107,6 +107,7 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
       flowAnchor={placement}
       hidden={hidden}
       hideExpand
+      anchorNodeId={nodeId}
       flowSize={{
         w: JIANYING_AUTO_RENDER_DOCK_FLOW_W,
         h: JIANYING_AUTO_RENDER_DOCK_FLOW_H,

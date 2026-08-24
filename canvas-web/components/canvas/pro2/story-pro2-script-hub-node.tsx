@@ -36,7 +36,6 @@ import {
   LibtvTryActionRow,
 } from "../libtv-thin-node-try-row";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { dispatchCanvasRfSelectNode } from "@/lib/canvas/canvas-rf-sync";
 import { PRO2_SCRIPT_HUB_NODE_LABEL } from "@/lib/canvas/story-pro2-node-chrome";
 import {
   PRO2_CARD_SHELL_CLASS,
@@ -477,11 +476,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       data-pro2-dock-anchor={id}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
-      onPointerDownCapture={(e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-        if (selected) return;
-        dispatchCanvasRfSelectNode(id);
-      }}
     >
       <Pro2NodeResizer
         isVisible={!!selected}

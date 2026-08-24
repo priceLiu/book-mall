@@ -617,6 +617,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         flowAnchor={placement}
         dockClassName="sbv1-image-dock"
         hidden={hidden}
+        anchorNodeId={nodeId}
         header={dockHeader}
         footer={toolbar}
       >

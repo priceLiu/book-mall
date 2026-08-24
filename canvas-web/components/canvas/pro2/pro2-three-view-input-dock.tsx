@@ -370,6 +370,7 @@ export function Pro2ThreeViewInputDock() {
         flowAnchor={placement}
         dockClassName="pro2-three-view-dock"
         hidden={dockHidden}
+        anchorNodeId={storeNode.id}
         header={
           <Pro2DockHeader
             refRow={
