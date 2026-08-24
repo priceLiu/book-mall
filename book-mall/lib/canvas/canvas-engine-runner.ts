@@ -37,8 +37,13 @@ import {
   ensurePro2ProductionScriptFence,
   isPro2StructuredLlmScope,
   mergePro2StructuredLlmParams,
+  PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
   validatePro2ProductionScriptLlmOutput,
 } from "./pro2-production-script-llm";
+import {
+  voidGatewayLogForPro2ValidationFailure,
+  PRO2_GATEWAY_VALIDATION_FAIL_CODE,
+} from "./pro2-gateway-validation-void";
 import {
   assertNoProjectInflightByInputHash,
   claimCanvasTaskKieSubmit,
@@ -46,10 +51,11 @@ import {
 import {
   createStoryScopedCanvasTask,
   extractStoryScopeFromInputPayload,
+  shouldSkipInflightScopeConflictForRun,
   storyScopesConflict,
 } from "./canvas-story-scope";
 import {
-  canvasGwChat,
+  canvasGwChatWithOverloadRetry,
   canvasGwCreateBailianR2vJob,
   canvasGwCreateDashscopeKlingImageJob,
   canvasGwCreateDashscopeMultimodalImageSyncJob,
@@ -63,11 +69,12 @@ import {
   canvasGwTts,
   canvasGwVolcengineImageGenerations,
 } from "./canvas-gateway-client";
-import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
+import { engineOverloadedUserHintZh, isEngineOverloadedMessage } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   assertCanvasProviderMatchesModelRoute,
   shouldCanvasUseGateway,
 } from "./canvas-gateway-run";
+import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
 import {
   scheduleCanvasBufferOssBackfill,
   scheduleCanvasKieImageOssBackfill,
@@ -396,7 +403,7 @@ export async function runAiEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: "SUBMITTED",
     data: {
       kind: "TEXT",
@@ -445,7 +452,7 @@ export async function runAiEngineNode(
           : userContent,
     });
 
-    const resp = await canvasGwChat(userId, {
+    const resp = await canvasGwChatWithOverloadRetry(userId, {
       modelKey,
       messages,
       params,
@@ -620,7 +627,7 @@ export async function runImageEngineNode(
     nodeId,
     storyScope: args.storyScope,
     actorUserId: userId,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: trafficQueued ? "QUEUED" : undefined,
     data: {
       kind: "IMAGE",
@@ -1202,7 +1209,7 @@ async function executeStoryLlmEngineTask(
       ? mergePro2StructuredLlmParams(params)
       : params;
 
-    let resp = await canvasGwChat(userId, {
+    let resp = await canvasGwChatWithOverloadRetry(userId, {
       modelKey,
       messages,
       params: llmParams,
@@ -1215,39 +1222,89 @@ async function executeStoryLlmEngineTask(
     let pro2Validation: ReturnType<
       typeof validatePro2ProductionScriptLlmOutput
     > | null = null;
-    let pro2Retried = false;
+    let pro2AttemptCount = 0;
+    const pro2GatewayLogIds: string[] = [];
 
-    if (structuredPro2 && outputText) {
-      pro2Validation = validatePro2ProductionScriptLlmOutput(
-        outputText,
-        storyScope,
-      );
-      if (!pro2Validation.ok) {
-        pro2Retried = true;
-        const retryResp = await canvasGwChat(userId, {
-          modelKey,
-          messages: [
-            ...messages,
-            { role: "assistant", content: outputText },
+    if (structuredPro2) {
+      let chatMessages = messages;
+      let lastError = "结构化 JSON 校验失败";
+
+      for (
+        let attempt = 1;
+        attempt <= PRO2_STRUCTURED_LLM_MAX_ATTEMPTS;
+        attempt++
+      ) {
+        pro2AttemptCount = attempt;
+        if (attempt > 1) {
+          resp = await canvasGwChatWithOverloadRetry(userId, {
+            modelKey,
+            messages: chatMessages,
+            params: llmParams,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: taskId,
+          });
+        }
+        if (resp.logId) pro2GatewayLogIds.push(resp.logId);
+
+        outputText = (resp.text ?? "").trim();
+        if (!outputText) {
+          lastError = "模型返回空内容";
+          if (resp.logId) {
+            await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+              error: lastError,
+              attempt,
+              maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+              canvasTaskId: taskId,
+            });
+          }
+          if (attempt >= PRO2_STRUCTURED_LLM_MAX_ATTEMPTS) {
+            pro2Validation = { ok: false, error: lastError };
+            break;
+          }
+          chatMessages = [
+            ...chatMessages,
             {
-              role: "user",
-              content: buildPro2StructuredRetryUserMessage(
-                pro2Validation.error ?? "校验失败",
-              ),
+              role: "user" as const,
+              content:
+                "上一回复为空。请只输出 ```pro2-production-script``` JSON 围栏，禁止说明文字。",
             },
-          ],
-          params: llmParams,
-          clientPage: gwClientPage,
-          projectId,
-          canvasTaskId: taskId,
-        });
-        outputText = (retryResp.text ?? "").trim();
-        resp = retryResp;
-        pro2Validation = outputText
-          ? validatePro2ProductionScriptLlmOutput(outputText, storyScope)
-          : { ok: false, error: "重试后仍为空" };
+          ];
+          continue;
+        }
+
+        pro2Validation = validatePro2ProductionScriptLlmOutput(
+          outputText,
+          storyScope,
+        );
+        if (pro2Validation.ok) {
+          outputText = ensurePro2ProductionScriptFence(outputText);
+          break;
+        }
+
+        lastError = pro2Validation.error ?? "校验失败";
+        if (resp.logId) {
+          await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+            error: lastError,
+            attempt,
+            maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+            canvasTaskId: taskId,
+          });
+        }
+
+        if (attempt >= PRO2_STRUCTURED_LLM_MAX_ATTEMPTS) break;
+
+        chatMessages = [
+          ...chatMessages,
+          { role: "assistant" as const, content: outputText },
+          {
+            role: "user" as const,
+            content: buildPro2StructuredRetryUserMessage(lastError, attempt),
+          },
+        ];
       }
-      if (outputText) {
+
+      if (pro2Validation && !pro2Validation.ok && outputText) {
         outputText = ensurePro2ProductionScriptFence(outputText);
       }
     }
@@ -1257,16 +1314,18 @@ async function executeStoryLlmEngineTask(
         where: { id: taskId },
         data: {
           status: "FAILED",
-          failCode: "PRO2_SCRIPT_JSON_INVALID",
+          failCode: PRO2_GATEWAY_VALIDATION_FAIL_CODE,
           failMessage:
             pro2Validation.error?.slice(0, 500) ??
-            "结构化 JSON 校验失败，请重试或更换文本模型",
+            `结构化 JSON 校验失败（已尝试 ${pro2AttemptCount} 次）`,
           completedAt: new Date(),
           resultPayload: {
             pro2ScriptValidation: {
               ok: false,
               error: pro2Validation.error,
-              retried: pro2Retried,
+              attempts: pro2AttemptCount,
+              maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+              gatewayLogIds: pro2GatewayLogIds,
             },
           } as Prisma.InputJsonValue,
         },
@@ -1308,7 +1367,9 @@ async function executeStoryLlmEngineTask(
                 pro2ScriptValidation: {
                   ok: pro2Validation?.ok ?? false,
                   error: pro2Validation?.error,
-                  retried: pro2Retried,
+                  attempts: pro2AttemptCount,
+                  maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+                  gatewayLogIds: pro2GatewayLogIds,
                 },
               }
             : {}),
@@ -1346,6 +1407,9 @@ async function executeStoryLlmEngineTask(
 
 function storyLlmUserFailMessage(raw: string): string {
   const msg = raw.trim();
+  if (isEngineOverloadedMessage(msg)) {
+    return engineOverloadedUserHintZh();
+  }
   if (/aborted due to timeout|timed out|timeout/i.test(msg)) {
     return "文本模型生成超时（长剧本/大输出较慢，约需数分钟）。请直接重试；若仍失败可缩短上游剧本或暂时换更快模型。";
   }
@@ -1433,7 +1497,7 @@ export async function runStoryLlmEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: "SUBMITTED",
     data: {
       kind: "TEXT",
@@ -2018,7 +2082,7 @@ export async function runVideoEngineNode(
     nodeId,
     storyScope: args.storyScope,
     actorUserId: userId,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: isTrafficControlEnabled() ? "QUEUED" : "PENDING",
     data: {
       kind: "IMAGE",
@@ -2269,7 +2333,7 @@ export async function runKieAudioEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: "PENDING",
     data: {
       kind: "IMAGE",

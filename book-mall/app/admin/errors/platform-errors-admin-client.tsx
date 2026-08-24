@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 
+import { PLATFORM_ERROR_APP_FILTER_OPTIONS } from "@/lib/admin/platform-error-app-filter";
+
 type PlatformErrorRow = {
   id: string;
   createdAt: string;
@@ -16,16 +18,6 @@ type PlatformErrorRow = {
   resolvedNote: string | null;
 };
 
-const SOURCE_OPTIONS = [
-  { value: "", label: "全部来源" },
-  { value: "CANVAS", label: "Canvas" },
-  { value: "GATEWAY", label: "Gateway" },
-  { value: "STORY", label: "Story" },
-  { value: "BOOK", label: "Book" },
-  { value: "TOOL", label: "Tool" },
-  { value: "SYSTEM", label: "System" },
-];
-
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleString("zh-CN", { hour12: false });
@@ -37,6 +29,7 @@ function formatTime(iso: string): string {
 function contextSummary(ctx: Record<string, unknown> | null): string {
   if (!ctx) return "—";
   const parts: string[] = [];
+  if (typeof ctx.clientPage === "string") parts.push(ctx.clientPage);
   if (typeof ctx.projectId === "string") parts.push(`project ${ctx.projectId.slice(0, 8)}…`);
   if (typeof ctx.nodeId === "string") parts.push(`node ${ctx.nodeId.slice(0, 8)}…`);
   if (typeof ctx.modelKey === "string") parts.push(ctx.modelKey);
@@ -46,7 +39,7 @@ function contextSummary(ctx: Record<string, unknown> | null): string {
 
 export function PlatformErrorsAdminClient() {
   const [items, setItems] = useState<PlatformErrorRow[]>([]);
-  const [source, setSource] = useState("");
+  const [appFilter, setAppFilter] = useState("");
   const [unresolvedOnly, setUnresolvedOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +50,7 @@ export function PlatformErrorsAdminClient() {
     setError(null);
     try {
       const q = new URLSearchParams();
-      if (source) q.set("source", source);
+      if (appFilter) q.set("appKey", appFilter);
       if (unresolvedOnly) q.set("unresolved", "1");
       q.set("take", "80");
       const r = await fetch(`/api/admin/platform-errors?${q.toString()}`);
@@ -69,7 +62,7 @@ export function PlatformErrorsAdminClient() {
     } finally {
       setBusy(false);
     }
-  }, [source, unresolvedOnly]);
+  }, [appFilter, unresolvedOnly]);
 
   useEffect(() => {
     void load();
@@ -95,21 +88,29 @@ export function PlatformErrorsAdminClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">来源</span>
-          <select
-            className="rounded-md border border-secondary bg-background px-3 py-2 text-sm"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-          >
-            {SOURCE_OPTIONS.map((o) => (
-              <option key={o.value || "all"} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">应用</span>
+        {PLATFORM_ERROR_APP_FILTER_OPTIONS.map((opt) => {
+          const active = appFilter === opt.value;
+          return (
+            <button
+              key={opt.value || "all"}
+              type="button"
+              disabled={busy}
+              className={`rounded-full border px-3 py-1 text-sm transition-colors disabled:opacity-50 ${
+                active
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-secondary hover:bg-muted/50"
+              }`}
+              onClick={() => setAppFilter(opt.value)}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"

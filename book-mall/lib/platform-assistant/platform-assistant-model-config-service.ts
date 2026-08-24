@@ -50,11 +50,21 @@ const CONFIG_CACHE_MS = 30_000;
 let cachedConfig: PlatformAssistantModelConfig | null = null;
 let cachedAt = 0;
 
+const LEGACY_ASSISTANT_CHAT_MODEL_ALIASES: Record<string, string> = {
+  "deepseek-chat": "deepseek-v4-flash",
+};
+
+/** 小智 chat/news 主模型：legacy deepseek-chat → deepseek-v4-flash（UM-107） */
+export function normalizeAssistantLlmModelKey(modelKey: string): string {
+  const key = modelKey.trim();
+  return LEGACY_ASSISTANT_CHAT_MODEL_ALIASES[key] ?? key;
+}
+
 export function resolveModelChain(primary: string, fallbacks: string[]): string[] {
-  const first = primary.trim();
+  const first = normalizeAssistantLlmModelKey(primary);
   const models = first ? [first] : [];
   for (const model of fallbacks) {
-    const key = model.trim();
+    const key = normalizeAssistantLlmModelKey(model);
     if (key && key !== first && !models.includes(key)) {
       models.push(key);
     }
@@ -190,21 +200,25 @@ export async function getPlatformAssistantModelConfigView(): Promise<PlatformAss
 
 export async function getAssistantChatRuntimeConfig() {
   const row = await getPlatformAssistantModelConfig();
+  const modelKey = normalizeAssistantLlmModelKey(row.chatModelKey);
+  const fallbackModelKeys = row.chatFallbackModelKeys.map(normalizeAssistantLlmModelKey);
   return {
     enabled: row.chatEnabled,
-    modelKey: row.chatModelKey,
-    fallbackModelKeys: row.chatFallbackModelKeys,
-    modelChain: resolveModelChain(row.chatModelKey, row.chatFallbackModelKeys),
+    modelKey,
+    fallbackModelKeys,
+    modelChain: resolveModelChain(modelKey, fallbackModelKeys),
   };
 }
 
 export async function getAssistantNewsRuntimeConfig() {
   const row = await getPlatformAssistantModelConfig();
+  const modelKey = normalizeAssistantLlmModelKey(row.newsModelKey);
+  const fallbackModelKeys = row.newsFallbackModelKeys.map(normalizeAssistantLlmModelKey);
   return {
     enabled: row.newsEnabled,
-    modelKey: row.newsModelKey,
-    fallbackModelKeys: row.newsFallbackModelKeys,
-    modelChain: resolveModelChain(row.newsModelKey, row.newsFallbackModelKeys),
+    modelKey,
+    fallbackModelKeys,
+    modelChain: resolveModelChain(modelKey, fallbackModelKeys),
   };
 }
 

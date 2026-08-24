@@ -1,6 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import {
+  AdminCockpitHorizontalBarChart,
+  AdminCockpitLineChart,
+  AdminCockpitMultiLineChart,
+  AdminCockpitVerticalBarChart,
+} from "@/components/admin/admin-cockpit-charts";
 import type { PlatformCockpitMetricsSection } from "@/lib/admin/platform-cockpit-service";
 import { formatPointsAsYuan } from "@/lib/currency";
 import {
@@ -10,41 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const ChartLoading = () => (
-  <div className="flex h-[260px] items-center justify-center text-sm text-[#656d76]">
-    图表加载中…
-  </div>
-);
-
-const AdminCockpitHorizontalBarChart = dynamic(
-  () =>
-    import("@/components/admin/admin-cockpit-charts").then(
-      (m) => m.AdminCockpitHorizontalBarChart,
-    ),
-  { ssr: false, loading: ChartLoading },
-);
-
-const AdminCockpitVerticalBarChart = dynamic(
-  () =>
-    import("@/components/admin/admin-cockpit-charts").then(
-      (m) => m.AdminCockpitVerticalBarChart,
-    ),
-  { ssr: false, loading: ChartLoading },
-);
-
-const AdminCockpitMultiLineChart = dynamic(
-  () =>
-    import("@/components/admin/admin-cockpit-charts").then(
-      (m) => m.AdminCockpitMultiLineChart,
-    ),
-  { ssr: false, loading: ChartLoading },
-);
-
-const AdminCockpitLineChart = dynamic(
-  () => import("@/components/admin/admin-cockpit-charts").then((m) => m.AdminCockpitLineChart),
-  { ssr: false, loading: ChartLoading },
-);
 
 function fmtYuan(n: number) {
   return new Intl.NumberFormat("zh-CN", {

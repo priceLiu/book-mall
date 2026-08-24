@@ -66,6 +66,16 @@ export function optimisticPro2FrameBatchStart(
   );
 }
 
+function frameImageNodeDockPatch(row: StoryProFrameRow): {
+  dockInput: string;
+  dockRefImages: StoryProFrameRow["refImages"];
+} {
+  return {
+    dockInput: row.prompt ?? "",
+    dockRefImages: row.refImages ?? [],
+  };
+}
+
 function frameRowPreview(row: StoryProFrameRow): {
   ossUrl?: string;
   uploading?: boolean;
@@ -223,7 +233,7 @@ export function ensurePro2FrameImageGroup(
     if (existing) {
       args.updateNodeData(existing.id, {
         label,
-        dockInput: row.prompt ?? "",
+        ...frameImageNodeDockPatch(row),
         ...preview,
         pro2MediaRole: "frame",
         pro2RowKey: row.key,
@@ -238,7 +248,7 @@ export function ensurePro2FrameImageGroup(
     const rel = pro2MediaGridLayout(i, frameCell, cols);
     const data = {
       ...buildPro2ImageNodeData({ label }),
-      dockInput: row.prompt ?? "",
+      ...frameImageNodeDockPatch(row),
       ...preview,
       pro2MediaRole: "frame",
       pro2RowKey: row.key,
@@ -306,6 +316,13 @@ export function ensurePro2FrameImageGroup(
   args.updateNodeData(args.frameColumnId, framePatch);
 
   if (groupId) {
+    args.setNodes((prev) =>
+      prev.map((n) =>
+        n.id === args.frameColumnId
+          ? { ...n, selectable: false, focusable: false }
+          : n,
+      ),
+    );
     relayoutPro2MediaGroup(args.setNodes, groupId, { resetOrigin: true });
     if (args.setEdges) {
       ensurePro2HubToMediaGroupChildEdges(
@@ -333,7 +350,7 @@ export function syncPro2FrameImagesFromRows(
     const preview = frameRowPreview(row);
     const patch = {
       label: `镜 ${row.frameIndex}`,
-      dockInput: row.prompt ?? "",
+      ...frameImageNodeDockPatch(row),
       ...preview,
     };
     if (

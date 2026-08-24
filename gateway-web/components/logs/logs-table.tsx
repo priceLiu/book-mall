@@ -375,7 +375,7 @@ async function fetchGatewayLogs(params: {
   fromDate: string;
   toDate: string;
   statusFilter: string;
-  sourceFilter: string;
+  appFilter: string;
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
@@ -398,7 +398,7 @@ async function fetchGatewayLogs(params: {
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
-  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.appFilter) qs.set("appKey", params.appFilter);
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
@@ -442,7 +442,7 @@ async function fetchGatewayLogFacets(params: {
   fromDate: string;
   toDate: string;
   statusFilter: string;
-  sourceFilter: string;
+  appFilter: string;
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
@@ -459,7 +459,7 @@ async function fetchGatewayLogFacets(params: {
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
-  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.appFilter) qs.set("appKey", params.appFilter);
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
@@ -523,7 +523,7 @@ async function fetchGatewayLogsDelta(params: {
   fromDate: string;
   toDate: string;
   statusFilter: string;
-  sourceFilter: string;
+  appFilter: string;
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
@@ -535,7 +535,7 @@ async function fetchGatewayLogsDelta(params: {
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
-  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.appFilter) qs.set("appKey", params.appFilter);
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
@@ -1052,7 +1052,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [facets, setFacets] = useState<GatewayLogFacets>(
     initialData.facets ?? { models: [], providerKinds: [], credentialKeys: [] },
   );
-  const [sourceFilter, setSourceFilter] = useState("");
+  const [appFilter, setAppFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
   const [credentialIdFilter, setCredentialIdFilter] = useState("");
@@ -1145,7 +1145,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       fromDate,
       toDate,
       statusFilter,
-      sourceFilter,
+      appFilter,
       providerFilter,
       modelFilter,
       credentialIdFilter,
@@ -1155,7 +1155,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       fromDate,
       toDate,
       statusFilter,
-      sourceFilter,
+      appFilter,
       providerFilter,
       modelFilter,
       credentialIdFilter,
@@ -1164,7 +1164,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   );
 
   const filtersAreDefault =
-    !sourceFilter &&
+    !appFilter &&
     !providerFilter &&
     !modelFilter &&
     !credentialIdFilter &&
@@ -1370,7 +1370,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           fromDate,
           toDate,
           statusFilter,
-          sourceFilter,
+          appFilter,
           providerFilter,
           modelFilter,
           credentialIdFilter,
@@ -1401,7 +1401,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       fromDate,
       toDate,
       statusFilter,
-      sourceFilter,
+      appFilter,
       providerFilter,
       modelFilter,
       credentialIdFilter,
@@ -1622,9 +1622,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   const activeFilterLabels = useMemo(() => {
     const labels: string[] = [];
-    if (sourceFilter) {
-      const opt = LOG_APP_FILTER_OPTIONS.find((o) => o.value === sourceFilter);
-      labels.push(`应用: ${opt?.label ?? sourceFilter}`);
+    if (appFilter) {
+      const opt = LOG_APP_FILTER_OPTIONS.find((o) => o.value === appFilter);
+      labels.push(`应用: ${opt?.label ?? appFilter}`);
     }
     if (fromDate || toDate) {
       labels.push(
@@ -1651,7 +1651,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     }
     return labels;
   }, [
-    sourceFilter,
+    appFilter,
     fromDate,
     toDate,
     statusFilter,
@@ -1773,14 +1773,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <span className="mx-1 text-zinc-700">|</span>
             <span className="mr-1 shrink-0 text-xs text-[var(--gw-muted)]">应用</span>
             {LOG_APP_FILTER_OPTIONS.map((opt) => {
-              const active = sourceFilter === opt.value;
+              const active = appFilter === opt.value;
               return (
                 <button
                   key={opt.value || "all"}
                   type="button"
                   className={logFilterChipClass(active)}
                   onClick={() => {
-                    setSourceFilter(opt.value);
+                    setAppFilter(opt.value);
                     resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}

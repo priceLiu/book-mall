@@ -247,6 +247,17 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
     }
   }
 
+  /** KIE nano-banana / 部分生图模型 */
+  if (Array.isArray(input.image_input)) {
+    let idx = items.length + 1;
+    for (const u of input.image_input) {
+      if (isLogImageRef(u)) {
+        push(u, imageLabel(idx, "reference"), "reference");
+        idx += 1;
+      }
+    }
+  }
+
   if (Array.isArray(input.media)) {
     let idx = items.length + 1;
     for (const row of input.media) {

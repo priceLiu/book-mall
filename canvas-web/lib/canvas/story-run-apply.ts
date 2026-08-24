@@ -12,6 +12,7 @@ import {
   syncColumnsFromHub,
   syncDownstreamMediaColumns,
 } from "./story-column-sync";
+import { syncProductionScaffoldDataToHubFromStore } from "./hydrate-production-scaffold";
 import {
   hubSectionIsRunning,
   hubSectionRuntime,
@@ -148,6 +149,7 @@ export function storyRunPendingPatch(
     if (ctx.llmSection === "outline") return { outlineRuntime: rt };
     if (ctx.llmSection === "character") return { characterRuntime: rt };
     if (ctx.llmSection === "scene") return { sceneRuntime: rt };
+    if (ctx.llmSection === "shot_prompts") return null;
     return { storyboardRuntime: rt };
   }
   if (isAnyStorySceneColumnType(node.type ?? "") && ctx?.rowKey) {
@@ -228,6 +230,7 @@ export function storyRunCancelPatch(
     if (ctx.llmSection === "outline") return { outlineRuntime: idle };
     if (ctx.llmSection === "character") return { characterRuntime: idle };
     if (ctx.llmSection === "scene") return { sceneRuntime: idle };
+    if (ctx.llmSection === "shot_prompts") return null;
     return { storyboardRuntime: idle };
   }
   if (isAnyStorySceneColumnType(node.type ?? "") && ctx?.rowKey) {
@@ -572,20 +575,25 @@ export function storyApplyTaskResult(
     return;
   }
 
-  if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
-    if (shouldSkipHubSectionInflightTaskApply(node, ctx.llmSection, task)) {
+  const hubLlmSection =
+    ctx?.llmSection ??
+    (task.storyScope?.llmSection as StoryLlmSection | undefined) ??
+    (node.type === "story-pro2-script-hub" ? ("outline" as const) : undefined);
+
+  if (isAnyStoryScriptHubType(node.type ?? "") && hubLlmSection) {
+    if (shouldSkipHubSectionInflightTaskApply(node, hubLlmSection, task)) {
       return;
     }
-    const prevRt = hubSectionRuntime(node, ctx.llmSection);
+    const prevRt = hubSectionRuntime(node, hubLlmSection);
     if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const prev = node.data as unknown as StoryScriptHubNodeData;
     const patch = applyHubSectionFromTask(
       prev,
-      ctx.llmSection,
+      hubLlmSection,
       runtime,
       task.textOutput ?? undefined,
     );
-    if (!hubSectionPatchChanged(prev, ctx.llmSection, patch)) return;
+    if (!hubSectionPatchChanged(prev, hubLlmSection, patch)) return;
     let hubPatch = patch as Partial<StoryProScriptHubNodeData>;
     if (
       task.status === "SUCCEEDED" &&
@@ -594,29 +602,32 @@ export function storyApplyTaskResult(
     ) {
       const originPatch = buildProductionScriptOriginPatch(
         prev as StoryProScriptHubNodeData,
-        ctx.llmSection,
+        hubLlmSection,
         runtime,
         task.textOutput,
         hubPatch,
       );
       hubPatch = { ...hubPatch, ...originPatch };
     }
-    updateNodeData(node.id, hubPatch);
+    const terminalHubTask =
+      task.status === "SUCCEEDED" ||
+      task.status === "FAILED" ||
+      task.status === "CANCELLED";
+    const hubPatchWithIntentClear = terminalHubTask
+      ? ({ ...hubPatch, hubGenerateIntent: undefined } as typeof hubPatch)
+      : hubPatch;
+    updateNodeData(node.id, hubPatchWithIntentClear);
     if (
       task.status === "SUCCEEDED" &&
       node.type === "story-pro2-script-hub"
     ) {
       requestCanvasGraphPersistFlush({ immediate: true });
+      syncProductionScaffoldDataToHubFromStore(node.id);
     }
-    if (
-      task.status === "SUCCEEDED" ||
-      task.status === "FAILED" ||
-      task.status === "CANCELLED"
-    ) {
-      updateNodeData(node.id, { hubGenerateIntent: undefined });
+    if (terminalHubTask) {
       const mergedNode: CanvasFlowNode = {
         ...node,
-        data: { ...node.data, ...hubPatch },
+        data: { ...node.data, ...hubPatchWithIntentClear },
       };
       const stillRunning = (
         ["outline", "character", "scene", "storyboard"] as const
@@ -668,7 +679,7 @@ export function storyApplyTaskResult(
         const stage = (starter.data as { pipelineStage?: string }).pipelineStage;
         if (stage === "finalized") {
           /* 已定稿后不再改阶段 */
-        } else if (ctx.llmSection === "storyboard") {
+        } else if (hubLlmSection === "storyboard") {
           updateNodeData(starter.id, { pipelineStage: "llm_done" });
         }
       }

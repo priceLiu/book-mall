@@ -87,13 +87,16 @@ const characterSchema = z.object({
   traits: z.string().optional(),
   compositionSpec: z.string().optional(),
   visualStyleTag: z.string().optional(),
+  /** 可选声线说明/参考 · Step2 首次 TTS 可绑定 */
+  voiceRefNote: z.string().optional(),
 });
 
 const shotSchema = z.object({
   index: z.number().int().positive(),
   shotSize: z.string().optional(),
   cameraMove: z.string().optional(),
-  sceneDescription: z.string().min(1),
+  /** Pass1 必填 · shot_prompts patch 可省略 */
+  sceneDescription: z.string().optional(),
   dialogue: z.string().default("—"),
   durationSec: z.number().positive().optional(),
   /** v1 Pass2 分镜图 · v2 用 frameImagePrompt */
@@ -193,9 +196,14 @@ export function ensurePro2ProductionScriptSchemaVersion(
     (s) =>
       Boolean(s.lighting?.trim()) ||
       Boolean(s.sfxNote?.trim()) ||
-      Boolean(s.propIds?.length),
+      Boolean(s.propIds?.length) ||
+      Boolean(s.sceneId?.trim()),
   );
-  if (hasV2Shots || (script.props?.length ?? 0) > 0) {
+  if (
+    hasV2Shots ||
+    (script.props?.length ?? 0) > 0 ||
+    (script.scenes?.length ?? 0) > 0
+  ) {
     return {
       ...script,
       schemaVersion: PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
@@ -262,6 +270,7 @@ function validateProTierShotsV2Pass1(
   }
   for (const [i, shot] of shots.entries()) {
     const missing: string[] = [];
+    if (!shot.sceneDescription?.trim()) missing.push("sceneDescription");
     if (!shot.shotSize?.trim()) missing.push("shotSize");
     if (!shot.lighting?.trim()) missing.push("lighting");
     if (!shot.cameraMove?.trim() || shot.cameraMove.trim().length < 12) {
@@ -280,10 +289,50 @@ function validateProTierShotsV2Pass1(
   }
 }
 
+export type ShotPromptPolishMode = "frame" | "video" | "both";
+
+function inferShotPromptPolishMode(
+  shot: z.infer<typeof shotSchema>,
+): ShotPromptPolishMode {
+  const frame =
+    shot.frameImagePrompt?.trim() || shot.imagePrompt?.trim() || "";
+  const video = shot.videoPrompt?.trim() || "";
+  if (frame && !video) return "frame";
+  if (video && !frame) return "video";
+  return "both";
+}
+
+export function listShotPromptsPass2Issues(
+  shots: z.infer<typeof shotSchema>[] | undefined,
+  mode: ShotPromptPolishMode = "both",
+): string[] {
+  if (!shots?.length) return ["shot_prompts step 须含 shots"];
+  const issues: string[] = [];
+  for (const shot of shots) {
+    const effectiveMode =
+      mode === "both" ? inferShotPromptPolishMode(shot) : mode;
+    const frame =
+      shot.frameImagePrompt?.trim() || shot.imagePrompt?.trim() || "";
+    const video = shot.videoPrompt?.trim() || "";
+    const missing: string[] = [];
+    if (effectiveMode === "frame" || effectiveMode === "both") {
+      if (!frame) missing.push("frameImagePrompt");
+    }
+    if (effectiveMode === "video" || effectiveMode === "both") {
+      if (!video) missing.push("videoPrompt");
+    }
+    if (missing.length) {
+      issues.push(`分镜 ${shot.index} Pass2 缺少：${missing.join(", ")}`);
+    }
+  }
+  return issues;
+}
+
 function validateShotPromptsPass2(
   shots: z.infer<typeof shotSchema>[] | undefined,
   ctx: z.RefinementCtx,
   pathPrefix: (string | number)[],
+  mode: ShotPromptPolishMode = "both",
 ): void {
   if (!shots?.length) {
     ctx.addIssue({
@@ -294,12 +343,18 @@ function validateShotPromptsPass2(
     return;
   }
   for (const [i, shot] of shots.entries()) {
+    const effectiveMode =
+      mode === "both" ? inferShotPromptPolishMode(shot) : mode;
     const frame =
       shot.frameImagePrompt?.trim() || shot.imagePrompt?.trim() || "";
     const video = shot.videoPrompt?.trim() || "";
     const missing: string[] = [];
-    if (!frame) missing.push("frameImagePrompt");
-    if (!video) missing.push("videoPrompt");
+    if (effectiveMode === "frame" || effectiveMode === "both") {
+      if (!frame) missing.push("frameImagePrompt");
+    }
+    if (effectiveMode === "video" || effectiveMode === "both") {
+      if (!video) missing.push("videoPrompt");
+    }
     if (missing.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -455,6 +510,138 @@ function listPro2AssetImagePromptIssues(
   return issues;
 }
 
+const SCENE_TIME_MOOD_KEYWORDS = [
+  "深夜",
+  "白日",
+  "黄昏",
+  "日内",
+  "夜间",
+  "清晨",
+  "入夜",
+  "凌晨",
+  "正午",
+  "傍晚",
+  "白天",
+  "夜晚",
+];
+
+/** lighting 是否与 sceneId 绑定（多场景时强制含 canonical name） */
+function shotLightingMatchesSceneBinding(
+  lighting: string,
+  scene: { name: string; environmentTimeMood?: string },
+  multiScene: boolean,
+): boolean {
+  const lit = lighting.trim();
+  if (!lit) return false;
+  const name = scene.name.trim();
+  if (multiScene) return name.length >= 2 && lit.includes(name);
+  if (name.length >= 2 && lit.includes(name)) return true;
+  const mood = scene.environmentTimeMood?.trim() ?? "";
+  if (mood && lit.includes(mood)) return true;
+  for (const token of mood.split(/[,，、]/).map((t) => t.trim()).filter(Boolean)) {
+    if (token.length >= 2 && lit.includes(token)) return true;
+  }
+  for (const kw of SCENE_TIME_MOOD_KEYWORDS) {
+    if (mood.includes(kw) && lit.includes(kw)) return true;
+  }
+  return false;
+}
+
+/** shots[] 实体关联校验 · sceneId / propIds / characterIds */
+export function listPro2ShotEntityLinkIssues(
+  patch: Pro2ProductionScriptPatchBody,
+): string[] {
+  const issues: string[] = [];
+  const shots = patch.shots;
+  if (!shots?.length) return issues;
+
+  const isV2Pass1 = shots.some(
+    (s) =>
+      Boolean(s.lighting?.trim()) ||
+      Boolean(s.sfxNote?.trim()) ||
+      Boolean(s.propIds?.length) ||
+      (patch.props?.length ?? 0) > 0,
+  );
+  if (!isV2Pass1) return issues;
+
+  const scenes = patch.scenes ?? [];
+  const props = patch.props ?? [];
+  const characters = patch.characters ?? [];
+  const sceneIdSet = new Set(scenes.map((s) => s.id));
+  const propIdSet = new Set(props.map((p) => p.id));
+  const charIdSet = new Set(characters.map((c) => c.id));
+
+  for (const shot of shots) {
+    const label = `镜 ${shot.index}`;
+    if (scenes.length > 0 && !shot.sceneId?.trim()) {
+      issues.push(`${label} 缺少 sceneId（须引用 scenes[].id）`);
+    }
+    if (shot.sceneId?.trim() && scenes.length > 0 && !sceneIdSet.has(shot.sceneId)) {
+      issues.push(`${label} sceneId=${shot.sceneId} 不存在于 scenes[]`);
+    }
+    if (shot.sceneId?.trim() && scenes.length > 0) {
+      const scene = scenes.find((s) => s.id === shot.sceneId);
+      const lighting = shot.lighting?.trim() ?? "";
+      if (scene && lighting && !shotLightingMatchesSceneBinding(lighting, scene, scenes.length >= 2)) {
+        if (scenes.length >= 2) {
+          issues.push(
+            `${label} lighting 须含场景 canonical name「${scene.name}」（多场景剧本须与 sceneId 一致）`,
+          );
+        } else {
+          issues.push(
+            `${label} lighting 须含场景 name 或 environmentTimeMood 关键词（与 sceneId 一致）`,
+          );
+        }
+      }
+    }
+    for (const id of shot.characterIds ?? []) {
+      if (characters.length > 0 && !charIdSet.has(id)) {
+        issues.push(`${label} characterIds 含无效 id ${id}`);
+      }
+    }
+    for (const id of shot.propIds ?? []) {
+      if (props.length > 0 && !propIdSet.has(id)) {
+        const normalized = id.replace(/_/g, "-");
+        const bySlug = props.find((p) => p.id === normalized || p.id === id);
+        if (!bySlug) {
+          issues.push(`${label} propIds 含无效 id ${id}`);
+        }
+      }
+    }
+    const dialogue = (shot.dialogue ?? "").trim();
+    if (
+      dialogue &&
+      dialogue !== "—" &&
+      dialogue !== "-" &&
+      characters.length > 0 &&
+      !(shot.characterIds?.length)
+    ) {
+      issues.push(`${label} 有对白但缺少 characterIds`);
+    }
+    const desc = shot.sceneDescription ?? "";
+    if (props.length > 0 && !(shot.propIds?.length)) {
+      for (const p of props) {
+        const name = p.name?.trim();
+        if (name && desc.includes(name)) {
+          issues.push(`${label} 画面描述含道具「${name}」但 propIds 为空`);
+          break;
+        }
+      }
+    }
+  }
+
+  if (scenes.length >= 2 && shots.length > 1) {
+    const boundIds = shots.map((s) => s.sceneId?.trim()).filter(Boolean);
+    if (boundIds.length === shots.length && new Set(boundIds).size === 1) {
+      issues.push(
+        `多场景剧本（${scenes.length} 个场景）禁止全片 ${shots.length} 镜共用同一 sceneId=${boundIds[0]}`,
+      );
+    }
+  }
+
+  return issues;
+}
+
 /** full_pack / character / storyboard 语义校验汇总 */
 export function listPro2SemanticPatchIssues(
   patch: Pro2ProductionScriptPatchBody,
@@ -466,6 +653,7 @@ export function listPro2SemanticPatchIssues(
   }
   if (step === "full_pack" || step === "storyboard") {
     issues.push(...listPro2ShotDialogueIssues(patch.shots));
+    issues.push(...listPro2ShotEntityLinkIssues(patch));
   }
   if (step === "full_pack" || step === "scene") {
     issues.push(...listPro2AssetImagePromptIssues(patch));

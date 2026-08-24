@@ -21,6 +21,8 @@ export type CanvasTaskStoryScope = {
   rowKey?: string;
   mediaKind?: string;
   llmSection?: string;
+  /** Pass2 单镜润色：frame / video / both · 参与 scope 键与校验 */
+  polishMode?: "frame" | "video" | "both";
 };
 
 export function extractStoryScopeFromInputPayload(
@@ -34,14 +36,32 @@ export function extractStoryScopeFromInputPayload(
   if (typeof s.rowKey === "string") out.rowKey = s.rowKey;
   if (typeof s.mediaKind === "string") out.mediaKind = s.mediaKind;
   if (typeof s.llmSection === "string") out.llmSection = s.llmSection;
+  if (s.polishMode === "frame" || s.polishMode === "video" || s.polishMode === "both") {
+    out.polishMode = s.polishMode;
+  }
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export function storyScopeKey(scope?: CanvasTaskStoryScope): string {
   if (!scope) return "";
-  return [scope.llmSection, scope.rowKey, scope.mediaKind]
+  return [scope.llmSection, scope.rowKey, scope.mediaKind, scope.polishMode]
     .filter(Boolean)
     .join(":");
+}
+
+/** forceFresh 时是否允许 supersede 同 scope 进行中任务（单镜 shot_prompts 禁止） */
+export function shouldSkipInflightScopeConflictForRun(args: {
+  forceFresh?: boolean;
+  storyScope?: CanvasTaskStoryScope;
+}): boolean {
+  if (args.forceFresh !== true) return false;
+  if (
+    args.storyScope?.llmSection === "shot_prompts" &&
+    args.storyScope.rowKey?.trim()
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** 同一 nodeId 上两任务是否互斥（同 scope 或 legacy 无 scope） */

@@ -149,6 +149,7 @@ export function Sbv1ImageDockModelPicker({
   onPatch,
   open,
   onOpenChange,
+  dropdownPlacement = "auto",
 }: {
   data: Sbv1ImageNodeData;
   allowedModelKeys?: readonly string[];
@@ -156,6 +157,7 @@ export function Sbv1ImageDockModelPicker({
   onPatch: (patch: Partial<Sbv1ImageNodeData>) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  dropdownPlacement?: import("./sbv1-toolbar-anchor-popover").Sbv1ToolbarDropdownPlacement;
 }) {
   const { providers } = useUserProviders();
 
@@ -169,6 +171,7 @@ export function Sbv1ImageDockModelPicker({
       disabled={disabled}
       open={open}
       onOpenChange={onOpenChange}
+      dropdownPlacement={dropdownPlacement}
       onSelect={({ providerId, modelKey }) => {
         patchImageSettings(data, onPatch, { providerId, modelKey });
       }}
@@ -182,12 +185,14 @@ export function Sbv1ImageDockParamsPicker({
   onPatch,
   open,
   onOpenChange,
+  dropdownPlacement = "auto",
 }: {
   data: Sbv1ImageNodeData;
   disabled?: boolean;
   onPatch: (patch: Partial<Sbv1ImageNodeData>) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  dropdownPlacement?: import("./sbv1-toolbar-anchor-popover").Sbv1ToolbarDropdownPlacement;
 }) {
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
     useSbv1ToolbarAnchor(open);
@@ -231,7 +236,7 @@ export function Sbv1ImageDockParamsPicker({
         open={effectiveOpen && hasModel}
         setOpen={setOpen}
         rect={rect}
-        placement="auto"
+        placement={dropdownPlacement}
         estimatedHeight={420}
         className={LIBTV_DOCK_IMAGE_PARAMS_POPOVER_CLASS}
       >

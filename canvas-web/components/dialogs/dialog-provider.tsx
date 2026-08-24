@@ -29,6 +29,7 @@ import {
   CANVAS_MODAL_BACKDROP_CLASS,
   useModalBodyScrollLock,
 } from "@/lib/canvas/use-modal-portal-effects";
+import { CANVAS_DIALOG_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
 
 export type ConfirmOptions = {
   title?: ReactNode;
@@ -224,7 +225,8 @@ function DialogShell({
 
   return (
     <div
-      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1700]`}
+      className={CANVAS_MODAL_BACKDROP_CLASS}
+      style={{ zIndex: CANVAS_DIALOG_MODAL_Z }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}

@@ -3,7 +3,9 @@
  */
 import {
   CONTENT_POLICY_MARKERS,
+  engineOverloadedUserHintZh,
   isContentPolicySubmitMessage,
+  isEngineOverloadedMessage,
 } from "@/lib/gateway/gateway-submit-error-policy";
 import { isMislabeledInsufficientCreditsLog } from "@/lib/billing/billing-failure-map";
 
@@ -72,6 +74,9 @@ export function inferGatewayFailCode(input: {
   if (blob.includes("timeout") || blob.includes("timed out")) {
     return "STALE_TIMEOUT";
   }
+  if (isEngineOverloadedMessage(input.failMessage)) {
+    return "ENGINE_OVERLOADED";
+  }
   return undefined;
 }
 
@@ -106,6 +111,15 @@ export function gatewayFailMessageDisplay(
   }
   if (isContentPolicyFailMessage(raw)) {
     return "内容被模型安全策略拦截。请修改提示词（减少敏感、暴力描述）后重试，或更换模型。";
+  }
+  if (isEngineOverloadedMessage(raw) || failCode?.trim() === "ENGINE_OVERLOADED") {
+    return engineOverloadedUserHintZh();
+  }
+  if (failCode?.trim() === "PRO2_SCRIPT_JSON_INVALID") {
+    return (
+      raw ||
+      "模型返回未通过 pro2-production-script 结构化校验；本次不计用户积分，可修改提示后重试。"
+    );
   }
   if (
     /transaction already closed|interactive transaction timeout|prisma\./i.test(raw) ||

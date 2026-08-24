@@ -8,6 +8,7 @@ const cards = [
   { href: "/admin/billing/users", title: "按用户查看账单明细", desc: "财务管理员 · 31 列费用明细。" },
   { href: "/admin/billing/all", title: "费用明细（全部）", desc: "财务管理员 · 全站云级账单行。" },
   { href: "/admin/usage-overview", title: "费用多维度概览", desc: "按月份/工具/模型/用户聚合。" },
+  { href: "/admin/usage-management", title: "用量对账中心", desc: "Gateway 日聚合 vs DeepSeek 厂商 CSV，按应用/Key 对账。" },
   { href: "/admin/pnl-alerts", title: "盈亏预警中心", desc: "综合毛利 / 视频毛利 / 成本环比。" },
   { href: "/admin/plan-change", title: "调价测算与审批", desc: "运营→财务→超管审批流。" },
   { href: "/admin/model-cost", title: "模型成本", desc: "仅财务管理员 · 渠道折扣与净成本。" },

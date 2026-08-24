@@ -38,6 +38,7 @@ import {
   pro2PlaceholderSlug,
   stripPro2AnchorPlaceholders,
 } from "./pro2-chinese-prompt-normalize";
+import { reconcileProductionScriptEntityLinks } from "./pro2-shot-entity-reconcile";
 import {
   characterAppearanceNeedsStructuredCoerce,
   enrichPro2CharacterRecordForParse,
@@ -134,9 +135,8 @@ export function applyProductionScriptPatchToHub(
   scriptHubId?: string,
   sourceText?: string,
 ): Partial<StoryProScriptHubNodeData> {
-  const productionScript = mergeProductionScriptPatch(
-    data.productionScript,
-    envelope,
+  const productionScript = reconcileProductionScriptEntityLinks(
+    mergeProductionScriptPatch(data.productionScript, envelope),
   );
   const mergedHub: StoryProScriptHubNodeData = {
     ...data,
@@ -591,6 +591,10 @@ function mergeShotDirectorFieldsFromFallback(
       next.propIds = fb.propIds;
       changed = true;
     }
+    if (!(next.sceneId?.trim()) && fb.sceneId?.trim()) {
+      next.sceneId = fb.sceneId.trim();
+      changed = true;
+    }
     if (isEmptyCell(next.sfxNote) && !isEmptyCell(fb.sfxNote)) {
       next.sfxNote = fb.sfxNote!.trim();
       changed = true;
@@ -616,38 +620,39 @@ function enrichProductionScriptShotsDirectorFields(
   const needsEnrich = script.shots!.some(
     (s) =>
       !(s.propIds?.length) ||
+      (!(s.sceneId?.trim()) && (script.scenes?.length ?? 0) > 0) ||
       isEmptyCell(s.sfxNote) ||
       isEmptyCell(s.audioNote),
   );
-  if (!needsEnrich) return script;
-
-  const sources = [
-    data.outlineRuntime?.textOutput,
-    data.storyboardRuntime?.textOutput,
-    data.outlineMd,
-    data.storyboardMd,
-  ];
   let result = script;
-  for (const raw of sources) {
-    if (!raw?.trim()) continue;
+  if (needsEnrich) {
+    const sources = [
+      data.outlineRuntime?.textOutput,
+      data.storyboardRuntime?.textOutput,
+      data.outlineMd,
+      data.storyboardMd,
+    ];
+    for (const raw of sources) {
+      if (!raw?.trim()) continue;
 
-    const envelope = extractPro2ProductionScriptPatch(raw);
-    if (envelope?.patch.shots?.length) {
-      const merged = mergeProductionScriptPatch(result, envelope);
-      const fromJson = mergeShotDirectorFieldsFromFallback(
-        result,
-        merged.shots ?? [],
-      );
-      if (fromJson) result = fromJson;
-    }
+      const envelope = extractPro2ProductionScriptPatch(raw);
+      if (envelope?.patch.shots?.length) {
+        const merged = mergeProductionScriptPatch(result, envelope);
+        const fromJson = mergeShotDirectorFieldsFromFallback(
+          result,
+          merged.shots ?? [],
+        );
+        if (fromJson) result = fromJson;
+      }
 
-    const fromHuman = buildProductionScriptShotsFromHumanStoryboard(result, raw);
-    if (fromHuman?.length) {
-      const merged = mergeShotDirectorFieldsFromFallback(result, fromHuman);
-      if (merged) return merged;
+      const fromHuman = buildProductionScriptShotsFromHumanStoryboard(result, raw);
+      if (fromHuman?.length) {
+        const merged = mergeShotDirectorFieldsFromFallback(result, fromHuman);
+        if (merged) result = merged;
+      }
     }
   }
-  return result;
+  return reconcileProductionScriptEntityLinks(result);
 }
 
 /** 已落库 productionScript 缺 shots 时，从 runtime / 人读分镜表补全 */

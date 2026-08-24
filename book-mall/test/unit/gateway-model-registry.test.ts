@@ -21,15 +21,16 @@ describe("resolveKnownGatewayModelRegistration", () => {
     });
   });
 
-  it("resolves Kimi K3 via canonical registry (Moonshot 主路由)", () => {
+  it("resolves Kimi K3 via canonical registry（百炼代销）", () => {
     expect(resolveKnownGatewayModelRegistration("kimi-k3")).toMatchObject({
       canonicalModelKey: "kimi-k3",
-      providerKind: "MOONSHOT",
-      vendor: "moonshot",
+      providerKind: "BAILIAN",
+      vendor: "aliyun",
     });
     expect(resolveKnownGatewayModelRegistration("kimi/kimi-k3")).toMatchObject({
       canonicalModelKey: "kimi-k3",
       providerKind: "BAILIAN",
+      vendor: "aliyun",
     });
   });
 

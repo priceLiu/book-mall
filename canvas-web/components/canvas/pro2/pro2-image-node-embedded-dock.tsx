@@ -72,6 +72,7 @@ export function Pro2ImageNodeEmbeddedDock({
   const { actionBtnPx, logoIconPx, logoLabelFontPx } = useLibtvDockRefThumbMetrics();
   const d = (storeNode?.data ?? {}) as StoryPro2ImageNodeData;
   const dockInput = d.dockInput ?? "";
+  const dockRefImages = (d.dockRefImages ?? []) as import("@/lib/canvas/story-ref-image").StoryRefImage[];
   const mediaRole = d.pro2MediaRole ?? "generic";
   const isRunning = Boolean(d.uploading);
 
@@ -91,8 +92,8 @@ export function Pro2ImageNodeEmbeddedDock({
   );
 
   const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
+    () => buildPro2DockMentionables(upstreamLinks, dockRefImages),
+    [upstreamLinks, dockRefImages],
   );
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),
@@ -237,8 +238,11 @@ export function Pro2ImageNodeEmbeddedDock({
                 </button>
               ) : null}
               <Pro2DockRefImages
-                refs={[]}
-                onChange={() => {}}
+                refs={dockRefImages}
+                onChange={(next) => {
+                  updateNodeData(storeNode.id, { dockRefImages: next });
+                  syncFrameRowPrompt(dockInput);
+                }}
                 disabled={isRunning}
                 pasteActive={false}
                 spawnAnchor={{

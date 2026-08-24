@@ -10,9 +10,10 @@ import {
   type SyntheticEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { Eye, Upload, X } from "lucide-react";
+import { Eye, Play, Upload, X } from "lucide-react";
 import {
   useClientPortalMounted,
+  CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS,
   useModalBodyScrollLock,
   useModalCompareArrowKeys,
   useModalEscapeClose,
@@ -39,6 +40,8 @@ import {
   IMAGE_ZOOM_BUTTON_STEP,
 } from "@/components/media/image-zoom-controls";
 import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
+import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
+import { WizardPromptReadonly } from "@/components/canvas/mentions/wizard-prompt-readonly";
 import {
   readElementShortSide,
   resolveCanvasMediaPreviewChrome,
@@ -46,7 +49,12 @@ import {
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
-  return /\.(mp4|webm|mov|m4v|avi)(\?|#|$)/i.test(url);
+  const u = url.trim();
+  if (!u) return false;
+  return (
+    /\.(mp4|webm|mov|m4v|avi)(\?|#|$)/i.test(u) ||
+    u.includes("/node-video/")
+  );
 }
 
 export type MediaHoverBoxProps = {
@@ -69,6 +77,8 @@ export type MediaHoverBoxProps = {
   compareContext?: MediaCompareContext;
   /** 分镜图预览：左侧展示 Prompt */
   prompt?: string;
+  /** 与 prompt 内 @<wiz-*> 对应的 mention 列表（向导分镜图预览绿色 @） */
+  promptMentionables?: MentionableItem[];
   /** 打开时默认视图 */
   initialView?: "single" | "compare";
   /** 悬停预览 Eye 尺寸 · 图片节点用 lg（约 2×） */
@@ -107,6 +117,7 @@ export function MediaHoverBox({
   clickToPreview: _clickToPreview = false,
   compareContext,
   prompt,
+  promptMentionables,
   initialView = "single",
   previewIconSize = "default",
   previewChrome = "canvas",
@@ -159,6 +170,8 @@ export function MediaHoverBox({
   );
   const kind =
     mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
+  const previewActionLabel = kind === "video" ? "播放" : "预览";
+  const PreviewOverlayIcon = kind === "video" ? Play : Eye;
   const canPreview = !!src;
   const showUpload = variant === "uploadable" && (!!onUpload || !!onImageFile);
   const acceptImageFile = useCallback(
@@ -293,8 +306,8 @@ export function MediaHoverBox({
               previewChrome === "ecom" ? (
                 <button
                   type="button"
-                  title="预览大图"
-                  aria-label="预览"
+                  title={kind === "video" ? "播放视频" : "预览大图"}
+                  aria-label={previewActionLabel}
                   onClick={openPreview}
                   className={ecomPreviewChrome.btnClass}
                   style={{
@@ -302,8 +315,12 @@ export function MediaHoverBox({
                     height: ecomPreviewChrome.btnSizePx,
                   }}
                 >
-                  <Eye
-                    className="pointer-events-none shrink-0"
+                  <PreviewOverlayIcon
+                    className={
+                      kind === "video"
+                        ? "pointer-events-none shrink-0 translate-x-px"
+                        : "pointer-events-none shrink-0"
+                    }
                     style={{
                       width: ecomPreviewChrome.iconSizePx,
                       height: ecomPreviewChrome.iconSizePx,
@@ -314,12 +331,19 @@ export function MediaHoverBox({
               ) : (
                 <button
                   type="button"
-                  title="预览大图"
-                  aria-label="预览"
+                  title={kind === "video" ? "播放视频" : "预览大图"}
+                  aria-label={previewActionLabel}
                   onClick={openPreview}
                   className={overlayBtnClass}
                 >
-                  <Eye className={overlayIconClass} strokeWidth={1.75} />
+                  <PreviewOverlayIcon
+                    className={
+                      kind === "video"
+                        ? `${overlayIconClass} translate-x-px`
+                        : overlayIconClass
+                    }
+                    strokeWidth={1.75}
+                  />
                 </button>
               )
             ) : null}
@@ -348,6 +372,7 @@ export function MediaHoverBox({
           posterUrl={posterUrl}
           compareContext={compareContext}
           prompt={prompt}
+          promptMentionables={promptMentionables}
           initialView={initialView}
           onClose={() => setPreviewOpen(false)}
         />
@@ -364,6 +389,7 @@ export function MediaPreviewLightbox({
   posterUrl,
   compareContext,
   prompt,
+  promptMentionables,
   initialView = "single",
   onClose,
 }: {
@@ -374,6 +400,7 @@ export function MediaPreviewLightbox({
   compareContext?: MediaCompareContext;
   /** 分镜图等：单图预览时左侧展示 Prompt（约 30% 宽） */
   prompt?: string;
+  promptMentionables?: MentionableItem[];
   initialView?: "single" | "compare";
   onClose: () => void;
 }) {
@@ -422,15 +449,14 @@ export function MediaPreviewLightbox({
 
   return createPortal(
     <div
-      className="canvas-media-preview-lightbox pointer-events-auto fixed inset-0 z-[2000] flex h-[100dvh] w-screen flex-col bg-black/88 backdrop-blur-md"
-      style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
+      className={CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS}
       role="dialog"
       aria-modal="true"
       aria-label={view === "compare" ? "图片对比" : "媒体预览"}
       onClick={onClose}
     >
       <header
-        className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-white/10 bg-black/75 px-3 py-2 backdrop-blur-sm sm:px-4"
+        className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#0a0a0c] px-3 py-2 sm:px-4"
         onClick={(e) => e.stopPropagation()}
       >
         {showCompare ? (
@@ -507,8 +533,17 @@ export function MediaPreviewLightbox({
               <p className="mb-2 shrink-0 text-[11px] uppercase tracking-wider text-white/50">
                 Prompt
               </p>
-              <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/90">
-                {prompt}
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {promptMentionables?.length ? (
+                  <WizardPromptReadonly
+                    value={prompt ?? ""}
+                    mentionables={promptMentionables}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-white/90">
+                    {prompt}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">

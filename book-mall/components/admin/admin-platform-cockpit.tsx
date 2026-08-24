@@ -6,9 +6,6 @@ import type {
   PlatformCockpitSnapshot,
 } from "@/lib/admin/platform-cockpit-service";
 import { cstBusinessDate } from "@/lib/billing/credit-ops-service";
-import { AdminAssistantAiNewsPanel } from "@/components/admin/admin-assistant-ai-news-panel";
-import { AdminAssistantModelConfigPanel } from "@/components/admin/admin-assistant-model-config-panel";
-import { AdminAssistantFeedbackPanel } from "@/components/admin/admin-assistant-feedback-panel";
 import { AdminCreditOpsCockpitPanel } from "@/components/admin/admin-credit-ops-cockpit-panel";
 import { AdminPlatformCockpitCharts } from "@/components/admin/admin-platform-cockpit-charts";
 import {
@@ -160,14 +157,50 @@ export function AdminPlatformCockpitAssistant({
   assistantModelConfig,
 }: PlatformCockpitAssistantSection) {
   return (
-    <>
-      <AdminAssistantModelConfigPanel initial={assistantModelConfig} />
-      <AdminAssistantFeedbackPanel
-        initialItems={assistantFeedback.items}
-        summary={assistantFeedback.summary}
-      />
-      <AdminAssistantAiNewsPanel rows={assistantAiNews} />
-    </>
+    <section className="space-y-4 rounded-lg border border-[#d1d9e0] bg-[#f6f8fa]/60 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-[#1f2328]">AI 小智</h2>
+          <p className="mt-0.5 text-sm text-[#656d76]">
+            固定问答、用户反馈与模型配置已迁移至独立管理页。
+          </p>
+        </div>
+        <a
+          href="/admin/platform-assistant"
+          className="rounded-md bg-[#0969da] px-3 py-2 text-sm font-medium text-white hover:bg-[#0860ca]"
+        >
+          打开 AI 小智管理 →
+        </a>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="rounded-lg border border-[#d1d9e0] bg-white px-4 py-3">
+          <p className="text-xs text-[#656d76]">待处理反馈</p>
+          <p className="text-2xl font-semibold tabular-nums">
+            {assistantFeedback.summary.openTotal}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#d1d9e0] bg-white px-4 py-3">
+          <p className="text-xs text-[#656d76]">未能解答</p>
+          <p className="text-2xl font-semibold tabular-nums">
+            {assistantFeedback.summary.openQuestion}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#d1d9e0] bg-white px-4 py-3">
+          <p className="text-xs text-[#656d76]">对话模型</p>
+          <p className="truncate text-sm font-medium text-[#1f2328]">
+            {assistantModelConfig.config.chatEnabled
+              ? assistantModelConfig.config.chatModelKey
+              : "已关闭"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#d1d9e0] bg-white px-4 py-3">
+          <p className="text-xs text-[#656d76]">最新热闻</p>
+          <p className="text-sm font-medium text-[#1f2328]">
+            {assistantAiNews[0]?.dateKey ?? "—"}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 

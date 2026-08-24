@@ -186,4 +186,14 @@ describe("formatCanvasTaskError", () => {
       ),
     ).toBe("生图服务暂时不可用，请稍后重试。");
   });
+
+  it("maps Kimi EngineOverloadedError to retry hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        '{"error":{"message":"The engine is currently overloaded, please try again later","type":"EngineOverloadedError","code":"EngineOverloadedError"}}',
+        "kimi-k3",
+      ),
+    ).toContain("引擎繁忙");
+  });
 });

@@ -44,6 +44,10 @@ export const GATEWAY_ALI_PRICE_BY_MODEL_KEY: Record<string, GatewayAliPriceSpec>
   // Kimi · 百炼 Kimi-月之暗面
   "kimi/kimi-k3": { kind: "token", inputYuanPerMillion: 20, outputYuanPerMillion: 100, section: "Kimi-月之暗面" },
   "kimi-k3": { kind: "token", inputYuanPerMillion: 20, outputYuanPerMillion: 100, section: "Kimi-月之暗面" },
+  "kimi/kimi-k2.6": { kind: "token", inputYuanPerMillion: 6.5, outputYuanPerMillion: 27, section: "Kimi-月之暗面" },
+  "kimi-k2.6": { kind: "token", inputYuanPerMillion: 6.5, outputYuanPerMillion: 27, section: "Kimi-月之暗面" },
+  "kimi/kimi-k2.7-code": { kind: "token", inputYuanPerMillion: 6.5, outputYuanPerMillion: 27, section: "Kimi-月之暗面" },
+  "kimi-k2.7-code": { kind: "token", inputYuanPerMillion: 6.5, outputYuanPerMillion: 27, section: "Kimi-月之暗面" },
 
   // —— 生图 ——
   "wan2.7-image": { kind: "image", yuanPerImage: 0.2, section: "万相图像生成" },

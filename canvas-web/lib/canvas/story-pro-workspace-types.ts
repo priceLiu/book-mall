@@ -176,6 +176,20 @@ export type StoryProScriptHubNodeData = {
   feasibility?: StoryProFeasibilityAssessment;
   /** 剧本创作 · 工业化分批（与 starter 同步） */
   scriptStudioMode?: boolean;
+  /** 生产向导 v2 · 全屏两步向导（见 docs/剧本可视化功能.md） */
+  productionWizardMode?: boolean;
+  /** 生产向导 · 资产卡草稿（prompt / 参考图 / 模型 / 出图占位） */
+  productionWizardAssetDrafts?: Record<
+    string,
+    import("./pro2-production-wizard-assets").Pro2ProductionWizardAssetDraft
+  >;
+  /** 生产向导 Step3 · 分镜图/视频 draft（key: frame:1 / video:1） */
+  productionWizardShotDrafts?: Record<
+    string,
+    import("./pro2-production-wizard-shot-drafts").Pro2ProductionWizardShotDraft
+  >;
+  /** hub 入口 · 工作区 ID（无 starter 时挂 hub） */
+  workspaceIds?: StoryProWorkspaceIds;
   /** 小白生剧 / 上传剧本 */
   scriptStudioInputMode?: StoryProStarterMode;
   /** 剧本创作 · 主题或描述（hub 入口） */

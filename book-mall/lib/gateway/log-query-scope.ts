@@ -11,6 +11,10 @@ import { buildVideoBackgroundWaitWhere } from "@/lib/gateway/video-task-wait-pol
 
 import { phoneFromGatewayEmail } from "@/lib/auth/user-display";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
+import {
+  buildGatewayLogAppWhere,
+  type GatewayLogAppKey,
+} from "@/lib/gateway/gateway-log-app-filter";
 import { excludePlatformAssistantClientPageFilter } from "@/lib/platform-assistant/platform-assistant-billing";
 import { prisma } from "@/lib/prisma";
 
@@ -39,6 +43,8 @@ export type GatewayLogFilterInput = {
   model?: string;
   providerKind?: string;
   credentialId?: string;
+  /** 应用 Tab（优先于 clientSource 枚举筛选） */
+  appKey?: GatewayLogAppKey;
   clientSource?: string;
   creditsChargedGt?: number;
   /** 耗时 ≥ GENERATION_SLOW_WARN_MS（默认 800s）或进行中已超该阈值 */
@@ -248,7 +254,9 @@ export function mergeGatewayLogFilters(
       filters.providerKind as Prisma.EnumGatewayProviderKindFilter;
   }
   if (filters.credentialId) extra.credentialId = filters.credentialId;
-  if (filters.clientSource) {
+  if (filters.appKey) {
+    parts.push(buildGatewayLogAppWhere(filters.appKey));
+  } else if (filters.clientSource) {
     extra.clientSource =
       filters.clientSource as Prisma.EnumGatewayClientSourceFilter;
   }

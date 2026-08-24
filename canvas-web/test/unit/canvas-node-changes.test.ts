@@ -5,6 +5,7 @@ import {
   canvasNodesSelectionAndZEqual,
   extractNodeRemoveChanges,
   extractResizeCommitIds,
+  extractSelectNodeChanges,
   filterStoreBoundNodeChanges,
   findGroupResizeSessionId,
   hasNodeRemoveChanges,
@@ -26,6 +27,18 @@ function node(
     ...patch,
   } as CanvasFlowNode;
 }
+
+describe("extractSelectNodeChanges", () => {
+  it("keeps only select changes", () => {
+    const changes: NodeChange[] = [
+      { id: "a", type: "select", selected: true },
+      { id: "b", type: "position", position: { x: 0, y: 0 } },
+    ];
+    expect(extractSelectNodeChanges(changes)).toEqual([
+      { id: "a", type: "select", selected: true },
+    ]);
+  });
+});
 
 describe("canvasNodesSelectionAndZEqual", () => {
   it("returns true when selection and zIndex match", () => {

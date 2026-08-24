@@ -109,47 +109,44 @@ export function libtvMediaNodeHeightForWidth(width: number): number {
 /** 整卡拖动光标（须配合无 dragHandle 节点） */
 export const LIBTV_CARD_DRAG_CLASS = "cursor-grab active:cursor-grabbing";
 
-/** LibTV 节点壳层交互描边 · 默认 #A2A2A2；hover 亮白加粗向外扩，不挤内部 */
+/** LibTV 节点壳层交互描边 · 默认 #A2A2A2；选中时亮边加粗向外扩；hover 不改变描边 */
 export const LIBTV_NODE_BORDER_DEFAULT_COLOR = "#A2A2A2";
 export const LIBTV_NODE_BORDER_HOVER_COLOR = "#FFFFFF";
 export const LIBTV_NODE_BORDER_DEFAULT_WIDTH = 1.5;
-/** 视觉目标描边（含向外扩的一圈）· 布局仍用 DEFAULT_WIDTH */
+/** 选中时视觉目标描边（含向外扩的一圈）· 布局仍用 DEFAULT_WIDTH */
 export const LIBTV_NODE_BORDER_HOVER_WIDTH = 3;
 export const LIBTV_NODE_BORDER_SELECTED_WIDTH = 1.5;
-export const LIBTV_NODE_BORDER_HOVER_OUTSET =
+export const LIBTV_NODE_BORDER_SELECTED_RING_OUTSET =
   LIBTV_NODE_BORDER_HOVER_WIDTH - LIBTV_NODE_BORDER_DEFAULT_WIDTH;
+/** @deprecated 别名 · 选中外扩环 */
+export const LIBTV_NODE_BORDER_HOVER_OUTSET =
+  LIBTV_NODE_BORDER_SELECTED_RING_OUTSET;
 
-const LIBTV_NODE_BORDER_SELECTED_PRO2 = "rgba(167, 139, 250, 0.45)";
-const LIBTV_NODE_BORDER_SELECTED_SBV1 = "rgba(34, 211, 238, 0.5)";
-const LIBTV_NODE_BORDER_SELECTED_NEUTRAL = "rgba(255, 255, 255, 0.42)";
+const LIBTV_NODE_BORDER_SELECTED_PRO2 = "#FFFFFF";
+const LIBTV_NODE_BORDER_SELECTED_SBV1 = "#22d3ee";
+const LIBTV_NODE_BORDER_SELECTED_NEUTRAL = "#FFFFFF";
 
 export type LibtvNodeBorderEdition = "pro2" | "sbv1" | "neutral";
+
+function libtvNodeSelectedRingColor(edition: LibtvNodeBorderEdition): string {
+  if (edition === "sbv1") return LIBTV_NODE_BORDER_SELECTED_SBV1;
+  if (edition === "neutral") return LIBTV_NODE_BORDER_SELECTED_NEUTRAL;
+  return LIBTV_NODE_BORDER_SELECTED_PRO2;
+}
 
 export function libtvNodeBorderStyle(options: {
   selected?: boolean;
   hovered?: boolean;
   edition?: LibtvNodeBorderEdition;
 }): CSSProperties {
-  const { selected, hovered, edition = "pro2" } = options;
+  const { selected, edition = "pro2" } = options;
   if (selected) {
-    const borderColor =
-      edition === "sbv1"
-        ? LIBTV_NODE_BORDER_SELECTED_SBV1
-        : edition === "neutral"
-          ? LIBTV_NODE_BORDER_SELECTED_NEUTRAL
-          : LIBTV_NODE_BORDER_SELECTED_PRO2;
-    return {
-      borderWidth: LIBTV_NODE_BORDER_SELECTED_WIDTH,
-      borderColor,
-      borderStyle: "solid",
-    };
-  }
-  if (hovered) {
+    const ringColor = libtvNodeSelectedRingColor(edition);
     return {
       borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
-      borderColor: LIBTV_NODE_BORDER_HOVER_COLOR,
+      borderColor: ringColor,
       borderStyle: "solid",
-      boxShadow: `0 0 0 ${LIBTV_NODE_BORDER_HOVER_OUTSET}px ${LIBTV_NODE_BORDER_HOVER_COLOR}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`,
+      boxShadow: `0 0 0 ${LIBTV_NODE_BORDER_SELECTED_RING_OUTSET}px ${ringColor}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`,
     };
   }
   return {

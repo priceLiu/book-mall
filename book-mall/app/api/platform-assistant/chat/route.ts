@@ -5,11 +5,17 @@ import {
   classifyUserFeedbackCategory,
   shouldLogUnansweredQuestion,
 } from "@/lib/platform-assistant/feedback-classifier";
+import {
+  appendAssistantUnansweredFollowUp,
+  assistantUnansweredFollowUp,
+  needsAssistantUnansweredFollowUp,
+} from "@/lib/platform-assistant/unanswered-follow-up";
 import { createPlatformAssistantFeedback } from "@/lib/platform-assistant/feedback-service";
 import {
   isSensitiveTopic,
   sensitiveTopicReply,
 } from "@/lib/platform-assistant/guardrails";
+import { resolveCuratedAssistantAnswer } from "@/lib/platform-assistant/qa-service";
 import {
   isGenerationIntent,
   isPlatformOverviewIntent,
@@ -201,6 +207,20 @@ export async function POST(request: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const finish = async () => {
+        if (
+          shouldLogUnansweredQuestion({
+            query,
+            chunkCount,
+            isOverview,
+            isGreeting,
+            assistantReply,
+          }) &&
+          needsAssistantUnansweredFollowUp(assistantReply)
+        ) {
+          const block = `\n\n${assistantUnansweredFollowUp()}`;
+          assistantReply = appendAssistantUnansweredFollowUp(assistantReply);
+          controller.enqueue(contentDelta(block));
+        }
         controller.enqueue(DONE);
         controller.close();
         await logFeedbackAfterReply();
@@ -212,6 +232,14 @@ export async function POST(request: Request) {
         if (isSensitiveTopic(query)) {
           assistantReply = sensitiveTopicReply();
           controller.enqueue(contentDelta(assistantReply));
+          await finish();
+          return;
+        }
+
+        const curatedAnswer = await resolveCuratedAssistantAnswer(query);
+        if (curatedAnswer) {
+          assistantReply = curatedAnswer;
+          controller.enqueue(contentDelta(curatedAnswer));
           await finish();
           return;
         }

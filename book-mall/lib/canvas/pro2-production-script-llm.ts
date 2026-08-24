@@ -11,7 +11,11 @@ import {
 import { findPro2UnwantedEnglishFields } from "./pro2-chinese-prompt-normalize";
 import { STORY_PRO2_JSON_FIELD_RULES, STORY_PRO2_PACK_LANGUAGE_RULES } from "./data/pro2-production-pack-standard";
 import type { Pro2ProductionScriptPatch } from "./data/pro2-production-script-schema";
-import { listPro2FullPackPatchIssues, listPro2SemanticPatchIssues } from "./data/pro2-production-script-schema";
+import {
+  listPro2FullPackPatchIssues,
+  listPro2SemanticPatchIssues,
+  listShotPromptsPass2Issues,
+} from "./data/pro2-production-script-schema";
 
 const PRO2_HUB_SECTIONS = new Set([
   "outline",
@@ -20,6 +24,9 @@ const PRO2_HUB_SECTIONS = new Set([
   "storyboard",
   "shot_prompts",
 ]);
+
+/** 单次 Canvas 任务内 · Pro2 结构化 LLM 最多尝试次数（含首次） */
+export const PRO2_STRUCTURED_LLM_MAX_ATTEMPTS = 5;
 
 export function isPro2StructuredLlmScope(
   storyScope?: CanvasTaskStoryScope | null,
@@ -92,6 +99,19 @@ export function validatePro2ProductionScriptLlmOutput(
       error: `JSON step=${patchRaw.step} 与当前段 llmSection=${section} 不匹配`,
     };
   }
+  if (section === "shot_prompts" && patchRaw.step === "shot_prompts") {
+    const polishMode = storyScope?.polishMode ?? "both";
+    const pass2Issues = listShotPromptsPass2Issues(
+      patchRaw.patch.shots,
+      polishMode,
+    );
+    if (pass2Issues.length) {
+      return {
+        ok: false,
+        error: pass2Issues.slice(0, 4).join("；"),
+      };
+    }
+  }
   const englishIssues = findPro2UnwantedEnglishFields(patchRaw);
   if (englishIssues.length) {
     return {
@@ -106,10 +126,18 @@ export function validatePro2ProductionScriptLlmOutput(
   return { ok: true, patch };
 }
 
-export function buildPro2StructuredRetryUserMessage(error: string): string {
+export function buildPro2StructuredRetryUserMessage(
+  error: string,
+  attempt?: number,
+): string {
+  const attemptLine =
+    attempt != null && attempt > 0
+      ? `当前为第 ${attempt + 1} 次生成（至多 ${PRO2_STRUCTURED_LLM_MAX_ATTEMPTS} 次）。`
+      : "";
   return [
     "【系统 · 结构化 JSON 重试】",
     "上一回复未通过 pro2-production-script 严格校验，请重新输出。",
+    attemptLine,
     "",
     `校验错误：${error.slice(0, 600)}`,
     "",
@@ -123,7 +151,10 @@ export function buildPro2StructuredRetryUserMessage(error: string): string {
     "3. Hub 大纲段须 step=full_pack，且 patch 须含 visualStyle/coreConflict/scenes/characters/props/shots/handoff",
     "4. characters[].traits ≥3 项；禁止「标志性动作」；imagePrompt 须含构图规范与 [视觉风格：…]",
     "5. shots[].dialogue 非 — 时须 角色名（情绪）：\"台词\"",
-    "6. 禁止尾逗号与 // 注释",
+    "6. 每镜须含 sceneId（引用 scenes[].id）；有对白角色时须 characterIds；画面出现道具时 propIds 不得空",
+    "6a. **场景绑定（硬性）**：scenes[]≥2 时禁止全片同一 sceneId；每镜 lighting 首句须含该镜 scenes[].name（canonical name），且 sceneId 须随场景切换而变更",
+    "7. sceneDescription 中角色/场景/道具名称须与辞典 canonical name 一致",
+    "8. 禁止尾逗号与 // 注释",
   ].join("\n");
 }
 

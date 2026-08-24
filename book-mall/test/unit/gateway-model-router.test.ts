@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { routeGatewayModel, isBailianR2vGatewayModel, resolveDeepseekChatCompletionsBody } from "@/lib/gateway/model-router";
+import {
+  routeGatewayModel,
+  isBailianR2vGatewayModel,
+  resolveDeepseekChatCompletionsBody,
+  resolveBailianChatModelKey,
+  resolveKimiChatCompletionsBody,
+} from "@/lib/gateway/model-router";
+import { resolveGatewayChatCompletionsBody } from "@/lib/gateway/proxy-common";
 
 describe("routeGatewayModel · 百炼 R2V", () => {
   it("happyhorse-1.0-r2v 走 BAILIAN 而非 DASHSCOPE 前缀", () => {
@@ -71,19 +78,81 @@ describe("routeGatewayModel · MiniMax H3", () => {
   });
 });
 
-describe("routeGatewayModel · Kimi K3", () => {
-  it("kimi-k3 走 Moonshot 直连（非百炼 kimi/kimi-k3）", () => {
+describe("routeGatewayModel · Kimi", () => {
+  it("kimi-k3 走百炼代销（非 Moonshot 直连）", () => {
     expect(routeGatewayModel("kimi-k3")).toEqual({
-      providerKind: "MOONSHOT",
+      providerKind: "BAILIAN",
       requestKind: "CHAT",
     });
   });
 
-  it("kimi/kimi-k3 仍走百炼第三方区", () => {
+  it("kimi/kimi-k3 走百炼", () => {
     expect(routeGatewayModel("kimi/kimi-k3")).toEqual({
       providerKind: "BAILIAN",
       requestKind: "CHAT",
     });
+  });
+
+  it("kimi-k2.6 走百炼", () => {
+    expect(routeGatewayModel("kimi-k2.6")).toEqual({
+      providerKind: "BAILIAN",
+      requestKind: "CHAT",
+    });
+  });
+
+  it("moonshot-v1-128k 仍走 Moonshot legacy", () => {
+    expect(routeGatewayModel("moonshot-v1-128k")).toEqual({
+      providerKind: "MOONSHOT",
+      requestKind: "CHAT",
+    });
+  });
+});
+
+describe("resolveBailianChatModelKey · Kimi", () => {
+  it("maps short Kimi ids to 百炼 upstream ids", () => {
+    expect(resolveBailianChatModelKey("kimi-k3")).toBe("kimi/kimi-k3");
+    expect(resolveBailianChatModelKey("kimi-k2.6")).toBe("kimi/kimi-k2.6");
+    expect(resolveBailianChatModelKey("kimi-k2.7-code")).toBe("kimi/kimi-k2.7-code");
+  });
+});
+
+describe("resolveKimiChatCompletionsBody", () => {
+  it("strips temperature/top_p for kimi-k3", () => {
+    const body = resolveKimiChatCompletionsBody({
+      model: "kimi-k3",
+      temperature: 0.7,
+      top_p: 0.9,
+      max_tokens: 24000,
+      reasoning_effort: "low",
+    });
+    expect(body.temperature).toBeUndefined();
+    expect(body.top_p).toBeUndefined();
+    expect(body.max_tokens).toBe(24000);
+    expect(body.reasoning_effort).toBe("low");
+  });
+});
+
+describe("resolveGatewayChatCompletionsBody · Kimi 百炼", () => {
+  it("DASHSCOPE 凭证路由 + kimi-k3 仍剥离 temperature 并映射 upstream model", () => {
+    const body = resolveGatewayChatCompletionsBody("DASHSCOPE", {
+      model: "kimi-k3",
+      temperature: 0.7,
+      max_tokens: 24000,
+      messages: [],
+    });
+    expect(body.model).toBe("kimi/kimi-k3");
+    expect(body.temperature).toBeUndefined();
+  });
+
+  it("BAILIAN 路由 + kimi-k3 同样剥离 temperature", () => {
+    const body = resolveGatewayChatCompletionsBody("BAILIAN", {
+      model: "kimi-k3",
+      temperature: 0.7,
+      max_tokens: 8000,
+      messages: [],
+    });
+    expect(body.model).toBe("kimi/kimi-k3");
+    expect(body.temperature).toBeUndefined();
   });
 });
 

@@ -14,7 +14,7 @@ import {
 } from "@/lib/gateway/proxy-common";
 import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
 import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
-import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { routeGatewayModel, isKimiChatModelKey } from "@/lib/gateway/model-router";
 import {
   buildGatewayChatResultSummary,
   buildGatewayStreamChatResultSummary,
@@ -23,6 +23,7 @@ import {
   GatewayV1ChatError,
   runGatewayV1ChatCompletions,
 } from "@/lib/gateway/gateway-v1-chat-service";
+import { isEngineOverloadedMessage } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   GatewayV1KieTaskError,
   runGatewayV1KieCreateTask,
@@ -134,6 +135,13 @@ export async function canvasGwChat(
   if (route.providerKind === "VOLCENGINE") {
     delete chatParams.reasoning_effort;
   }
+  if (isKimiChatModelKey(model)) {
+    delete chatParams.temperature;
+    delete chatParams.top_p;
+    delete chatParams.n;
+    delete chatParams.presence_penalty;
+    delete chatParams.frequency_penalty;
+  }
 
   const body: Record<string, unknown> = {
     ...chatParams,
@@ -196,6 +204,42 @@ export async function canvasGwChat(
     usage,
     logId: result.logId ?? "",
   };
+}
+
+const GW_CHAT_OVERLOAD_RETRY_DELAYS_MS = [0, 3_000, 8_000] as const;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** LLM chat · 厂商 EngineOverloaded 时有限退避重试 */
+export async function canvasGwChatWithOverloadRetry(
+  userId: string,
+  opts: Parameters<typeof canvasGwChat>[1],
+): Promise<CanvasGwChatResult> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < GW_CHAT_OVERLOAD_RETRY_DELAYS_MS.length; attempt++) {
+    const delay = GW_CHAT_OVERLOAD_RETRY_DELAYS_MS[attempt];
+    if (delay > 0) await sleepMs(delay);
+    try {
+      return await canvasGwChat(userId, opts);
+    } catch (e) {
+      lastError = e;
+      const msg =
+        e instanceof CanvasProjectError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : String(e);
+      if (
+        !isEngineOverloadedMessage(msg) ||
+        attempt >= GW_CHAT_OVERLOAD_RETRY_DELAYS_MS.length - 1
+      ) {
+        throw e;
+      }
+    }
+  }
+  throw lastError;
 }
 
 export type CanvasGwJobResult = {

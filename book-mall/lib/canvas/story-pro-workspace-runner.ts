@@ -23,6 +23,7 @@ import {
   STORY_PRO2_THEME_OUTLINE_SYSTEM,
   STORY_PRO2_THEME_OUTLINE_USER_PREFIX,
 } from "./story-pro2-theme-outline-prompt";
+import { resolveShotPromptPolishQueuePrompt } from "./pro2-shot-prompt-polish";
 import {
   buildScriptStudioContinuationPrompt,
   buildScriptStudioFirstRoundPrompt,
@@ -64,8 +65,11 @@ function hashSalt(args: {
   rowKey?: string;
   llmSection?: string;
   mediaKind?: string;
+  polishMode?: string;
 }): string {
-  return [args.llmSection, args.rowKey, args.mediaKind].filter(Boolean).join(":");
+  return [args.llmSection, args.rowKey, args.mediaKind, args.polishMode]
+    .filter(Boolean)
+    .join(":");
 }
 
 /** 2.0 文本/脚本节点 · 主题 → 工业化剧本批次（不自动 spawn 下游列） */
@@ -308,8 +312,15 @@ export async function runStoryProScriptHubSection(
   if (args.llmSection === "shot_prompts") {
     const rowKey = args.storyScope?.rowKey?.trim();
     const queue = data.shotPromptPolishQueue as Record<string, string> | undefined;
-    if (rowKey && queue?.[rowKey]?.trim()) {
-      prompt = queue[rowKey]!.trim();
+    const queued = rowKey
+      ? resolveShotPromptPolishQueuePrompt(
+          queue,
+          rowKey,
+          args.storyScope?.polishMode,
+        )
+      : undefined;
+    if (queued) {
+      prompt = queued;
     }
     const system = String(
       data.shotPromptPolishSystemPrompt ?? data.outlineSystemPrompt ?? "",
@@ -318,7 +329,11 @@ export async function runStoryProScriptHubSection(
       (data as Record<string, unknown>).outlineSystemPrompt = system;
     }
   }
-  const salt = hashSalt({ llmSection: args.llmSection, rowKey: args.storyScope?.rowKey });
+  const salt = hashSalt({
+    llmSection: args.llmSection,
+    rowKey: args.storyScope?.rowKey,
+    polishMode: args.storyScope?.polishMode,
+  });
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "story-outline-engine",

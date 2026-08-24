@@ -43,6 +43,7 @@ import {
   isCanvasPositionCommitOnly,
   isCanvasDimensionCommitOnly,
   isResizeRelatedChange,
+  extractSelectNodeChanges,
   filterStoreBoundNodeChanges,
   readGroupResizeGeometry,
   type GroupResizeFrozenAbs,
@@ -88,6 +89,7 @@ import {
   CANVAS_RF_VIEWPORT_READY_EVENT,
   mergeStoreNodesIntoRf,
 } from "@/lib/canvas/canvas-rf-sync";
+import { commitLibtvRfNodeSelection } from "@/lib/canvas/select-libtv-node";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import {
   CANVAS_EDGE_STROKE_WIDTH,
@@ -659,9 +661,10 @@ function FlowCanvasInner({
       const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail
         ?.nodeId;
       if (!nodeId) return;
-      setRfNodes((prev) =>
-        prev.map((n) => ({ ...n, selected: n.id === nodeId })),
-      );
+      const nodeType =
+        useCanvasStore.getState().nodes.find((n) => n.id === nodeId)?.type ??
+        null;
+      commitLibtvRfNodeSelection(setRfNodes, nodeId, nodeType);
     };
     window.addEventListener(CANVAS_RF_SELECT_NODE_EVENT, onRfSelect);
     return () =>
@@ -903,6 +906,15 @@ function FlowCanvasInner({
           rfChanges,
           rfBeforeChange,
         ) as CanvasFlowNode[];
+      } else {
+        const selectChanges = extractSelectNodeChanges(rfChanges);
+        if (selectChanges.length > 0) {
+          onRfNodesChange(selectChanges);
+          rfAfterChange = applyNodeChanges(
+            selectChanges,
+            rfAfterChange,
+          ) as CanvasFlowNode[];
+        }
       }
 
       if (
@@ -959,6 +971,13 @@ function FlowCanvasInner({
       if (syncingGraphFromStoreRef.current) {
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
+        const selectChanges = extractSelectNodeChanges(rfChanges);
+        if (selectChanges.length > 0) {
+          onRfNodesChange(selectChanges);
+          if (libtvCanvas) {
+            syncLibtvFloatingDockPinFromRf();
+          }
+        }
         if (hasNodeRemoveChanges(storeChanges)) {
           deferStoreGraphSyncRef.current = false;
           storeOnNodesChange(extractNodeRemoveChanges(storeChanges));
@@ -1504,12 +1523,11 @@ function FlowCanvasInner({
           useCanvasStore.getState().setLibtvFloatingDockSelection(null, null);
           useCanvasStore.getState().setCanvasSelectionDragging(false);
         } else {
-          setRfNodes((prev) =>
-            prev.map((n) => ({ ...n, selected: n.id === node.id })),
-          );
-          useCanvasStore.getState().setLibtvFloatingDockSelection(
+          const dragged = getNodes().find((n) => n.id === node.id);
+          commitLibtvRfNodeSelection(
+            setRfNodes,
             node.id,
-            node.type,
+            dragged?.type ?? node.type ?? null,
           );
         }
         libtvMultiNodeDragRef.current = false;
@@ -2163,7 +2181,7 @@ function FlowCanvasInner({
         zoomOnDoubleClick={enablePaneContextMenu ? false : undefined}
         onNodeClick={
           pro2FloatingInspector || sbv1Canvas
-            ? (_e, node) => {
+            ? (e, node) => {
                 if (node.type === "group") {
                   const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
                   const hit = all.find((n) => n.id === node.id);
@@ -2174,16 +2192,28 @@ function FlowCanvasInner({
                   ) {
                     return;
                   }
-                  setRfNodes((prev) =>
-                    prev.map((n) => ({ ...n, selected: n.id === node.id })),
+                  commitLibtvRfNodeSelection(
+                    setRfNodes,
+                    node.id,
+                    node.type ?? null,
                   );
                   return;
                 }
                 useCanvasStore.getState().setLibtvInputDockFocused(false);
-                useCanvasStore.getState().setLibtvFloatingDockSelection(
-                  node.id,
-                  node.type ?? null,
-                );
+                const additive =
+                  e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+                if (!additive) {
+                  commitLibtvRfNodeSelection(
+                    setRfNodes,
+                    node.id,
+                    node.type ?? null,
+                  );
+                } else {
+                  useCanvasStore.getState().setLibtvFloatingDockSelection(
+                    node.id,
+                    node.type ?? null,
+                  );
+                }
               }
             : undefined
         }

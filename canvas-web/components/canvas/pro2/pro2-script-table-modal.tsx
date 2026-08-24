@@ -7,10 +7,11 @@ import {
   useModalEscapeClose,
 } from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
-import { Megaphone, X } from "lucide-react";
+import { Megaphone, RefreshCw, X } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { runPro2ScriptPublishFlow } from "@/lib/canvas/pro2-script-publish-flow";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
@@ -43,6 +44,7 @@ import {
   resolveHubProductionScript,
   productionScriptHasDisplayContent,
 } from "@/lib/canvas/pro2-production-script-apply";
+import { pro2HubIsGenerating } from "@/lib/canvas/pro2-script-hub-helpers";
 import { isUnparsedPro2ProductionJsonBlob } from "@/lib/canvas/pro2-production-script-structured";
 import {
   Pro2ProductionScriptEditor,
@@ -102,6 +104,25 @@ export function Pro2ScriptHubEditorModal({
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId) ?? "";
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const liveHubNode = useCanvasStore((s) =>
+    hubId ? s.nodes.find((n) => n.id === hubId) : undefined,
+  );
+  const { history: hubTasks } = useNodeTaskHistory(hubId);
+  const hubIsGenerating = useMemo(() => {
+    if (!hubId || readOnly) return false;
+    const data =
+      (liveHubNode?.data as StoryProScriptHubNodeData | undefined) ?? hubData;
+    if (!data) return false;
+    return pro2HubIsGenerating(
+      {
+        id: hubId,
+        type: "story-pro2-script-hub",
+        data,
+        position: liveHubNode?.position ?? { x: 0, y: 0 },
+      } as never,
+      hubTasks,
+    );
+  }, [hubId, hubData, hubTasks, liveHubNode, readOnly]);
   const [draftOutline, setDraftOutline] = useState(outlineMd);
   const [draftScene, setDraftScene] = useState(sceneMd);
   const [draftCharacter, setDraftCharacter] = useState(characterMd);
@@ -322,7 +343,7 @@ export function Pro2ScriptHubEditorModal({
 
   return createPortal(
     <div
-      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100]`}
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100] flex flex-col items-stretch justify-start p-0`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -335,6 +356,11 @@ export function Pro2ScriptHubEditorModal({
             </p>
             {savedHint ? (
               <p className="text-[11px] text-violet-300/70">已自动保存</p>
+            ) : hubIsGenerating ? (
+              <p className="flex items-center gap-1 text-[11px] text-violet-300/80">
+                <RefreshCw className="size-3 animate-spin" />
+                剧本生成中…
+              </p>
             ) : (
               <p className="text-[11px] text-white/40">{subtitle}</p>
             )}

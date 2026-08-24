@@ -38,6 +38,7 @@ import {
 } from "./story-hub-runtime";
 import { syncStoryProColumnRows } from "./story-pro-column-sync";
 import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
+import { hubHasServerInflightLlmTask } from "./task-pick";
 import {
   batchRunPro2ThreeViewRows,
   batchRunStoryRows,
@@ -350,7 +351,9 @@ export function enqueuePro2ShotPromptPolish(
   let systemPrompt = hubData.shotPromptPolishSystemPrompt;
   for (const index of sorted) {
     const prev = [...sorted.filter((n) => n < index)].pop();
-    const bundle = buildShotPromptPolishBundle(index, script, prev);
+    const bundle = buildShotPromptPolishBundle(index, script, {
+      prevShotIndex: prev,
+    });
     if (!bundle) continue;
     queue[String(index)] = bundle.userPrompt;
     systemPrompt = bundle.systemPrompt;
@@ -448,9 +451,16 @@ export function pro2ScriptHubHasLinkedOutlineContent(
   );
 }
 
-export function pro2HubIsGenerating(node: CanvasFlowNode): boolean {
+export function pro2HubIsGenerating(
+  node: CanvasFlowNode,
+  hubTasks?: import("@/lib/canvas-api").CanvasTaskRecord[],
+): boolean {
   const d = node.data as unknown as StoryProScriptHubNodeData;
-  return hubShowsGeneratingUi(node, d.hubGenerateIntent);
+  const serverInflight =
+    hubTasks != null && hubTasks.length > 0
+      ? hubHasServerInflightLlmTask(node.id, hubTasks)
+      : false;
+  return hubShowsGeneratingUi(node, d.hubGenerateIntent, serverInflight);
 }
 
 export { stripStaleHubGenerateIntent } from "./story-hub-runtime";
@@ -1493,9 +1503,10 @@ export function pro2HubCanSendScriptPhase(
   ctx?: {
     nodes?: CanvasFlowNode[];
     edges?: CanvasFlowEdge[];
+    hubTasks?: import("@/lib/canvas-api").CanvasTaskRecord[];
   },
 ): boolean {
-  if (pro2HubIsGenerating(node)) return false;
+  if (pro2HubIsGenerating(node, ctx?.hubTasks)) return false;
   if (pro2HubHasScriptTable(d)) return false;
   if (!d.providerId?.trim() || !d.modelKey?.trim()) return false;
   if (d.dockInput?.trim()) return true;

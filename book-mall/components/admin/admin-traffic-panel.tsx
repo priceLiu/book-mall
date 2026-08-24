@@ -1,7 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
+import { AdminCockpitLineChart } from "@/components/admin/admin-cockpit-charts";
 import type { TrafficDashboardSnapshot } from "@/lib/site-traffic/queries";
 import {
   PLATFORM_TRAFFIC_APP_KEYS,
@@ -15,17 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const ChartLoading = () => (
-  <div className="flex h-[260px] items-center justify-center text-sm text-[#656d76]">
-    图表加载中…
-  </div>
-);
-
-const AdminCockpitLineChart = dynamic(
-  () => import("@/components/admin/admin-cockpit-charts").then((m) => m.AdminCockpitLineChart),
-  { ssr: false, loading: ChartLoading },
-);
 
 function fmt(n: number) {
   return n.toLocaleString("zh-CN");

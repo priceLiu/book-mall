@@ -1,25 +1,43 @@
 /** Gateway 请求日志 · 展示用文案（与 book-mall GatewayRequestLog 枚举对齐） */
 
+/** 应用 Tab 筛选 key（与 book-mall gateway-log-app-filter 对齐） */
+export type GatewayLogAppKey =
+  | "assistant"
+  | "book"
+  | "tool"
+  | "quick-replica"
+  | "prompt-optimizer"
+  | "canvas"
+  | "story"
+  | "e-commerce"
+  | "gateway-console"
+  | "external";
+
 export type LogClientSource =
   | "CANVAS"
   | "STORY"
   | "TOOL"
+  | "QUICK_REPLICA"
   | "GATEWAY_CONSOLE"
   | "EXTERNAL"
   | string;
 
-/** 日志页 · 按工具应用筛选（value 空 = 全部） */
+/** 日志页 · 按应用 Tab 筛选（value 空 = 全部） */
 export const LOG_APP_FILTER_OPTIONS: {
-  value: "" | LogClientSource;
+  value: "" | GatewayLogAppKey;
   label: string;
 }[] = [
   { value: "", label: "全部" },
-  { value: "CANVAS", label: "画布" },
-  { value: "TOOL", label: "工具站" },
-  { value: "STORY", label: "漫剧" },
-  { value: "E_COMMERCE", label: "电商工具箱" },
-  { value: "GATEWAY_CONSOLE", label: "控制台" },
-  { value: "EXTERNAL", label: "外部 API" },
+  { value: "assistant", label: "AI 小智" },
+  { value: "book", label: "主站 Book" },
+  { value: "tool", label: "日常工具" },
+  { value: "quick-replica", label: "快速复刻" },
+  { value: "prompt-optimizer", label: "提示词" },
+  { value: "canvas", label: "画布" },
+  { value: "story", label: "故事版" },
+  { value: "e-commerce", label: "电商工具箱" },
+  { value: "gateway-console", label: "控制台" },
+  { value: "external", label: "外部 API" },
 ];
 
 export type LogProviderKind =
@@ -41,8 +59,9 @@ export type LogRequestStatus =
 
 const CLIENT_SOURCE_LABEL: Record<string, string> = {
   CANVAS: "Canvas 画布",
-  STORY: "Story 漫剧",
+  STORY: "Story 故事版",
   E_COMMERCE: "电商工具箱",
+  QUICK_REPLICA: "快速复刻",
   GATEWAY_CONSOLE: "控制台调试",
   EXTERNAL: "外部 API",
 };
@@ -50,8 +69,9 @@ const CLIENT_SOURCE_LABEL: Record<string, string> = {
 /** 日志表 Source 列 · 短标签 */
 const CLIENT_SOURCE_SHORT: Record<string, string> = {
   CANVAS: "画布",
-  STORY: "漫剧",
+  STORY: "故事版",
   TOOL: "工具站",
+  QUICK_REPLICA: "快速复刻",
   E_COMMERCE: "电商",
   GATEWAY_CONSOLE: "控制台",
   EXTERNAL: "外部 API",
@@ -333,13 +353,26 @@ export function formatLogOriginLabel(
   return `${src} · ${vendor}`;
 }
 
-/** 日志表 Source 列 · 含页面 slug，如「工具站 · image-to-video」 */
+/** 日志表 Source 列 · 含页面 slug；AI 小智 / 主站 Book 优先按 clientPage 展示 */
 export function formatLogPageLabel(
   clientSource: LogClientSource,
   clientPage?: string | null,
 ): string {
-  const src = formatClientSourceShortLabel(clientSource);
   const page = clientPage?.trim();
+  if (page?.startsWith("platform-assistant/")) {
+    const tail = page.slice("platform-assistant/".length);
+    return tail ? `AI 小智 · ${tail}` : "AI 小智";
+  }
+  if (page?.startsWith("account/")) {
+    return `主站 Book · ${page}`;
+  }
+  if (page?.startsWith("prompt-optimizer")) {
+    return "提示词";
+  }
+  if (page?.startsWith("quick-replica")) {
+    return `快速复刻 · ${page.replace(/^quick-replica\/?/, "") || "—"}`;
+  }
+  const src = formatClientSourceShortLabel(clientSource);
   if (page) return `${src} · ${page}`;
   return src;
 }

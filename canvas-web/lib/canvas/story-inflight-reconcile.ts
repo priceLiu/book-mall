@@ -160,9 +160,53 @@ function reconcileHubSection(
     | CanvasNodeRuntime
     | undefined;
   const scope = { llmSection: section };
+  const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+
+  if (rt?.status === "error") {
+    if (hasServerInflightForScope(tasks, node.id, scope)) {
+      const pick = pickPreferredCanvasTaskForScope(
+        nodeTasks,
+        scope,
+        rt,
+        node.id,
+      );
+      if (pick && isServerInflightTaskStatus(pick.status)) {
+        storyApplyTaskResult(
+          node,
+          pick,
+          storyRunContextFromScope(node.id, scope),
+          updateNodeData,
+          allNodes,
+        );
+        return;
+      }
+    }
+    const terminalPick = pickPreferredCanvasTaskForScope(
+      nodeTasks,
+      scope,
+      rt,
+      node.id,
+    );
+    if (
+      terminalPick &&
+      (terminalPick.status === "SUCCEEDED" ||
+        terminalPick.status === "FAILED" ||
+        terminalPick.status === "CANCELLED") &&
+      !shouldSkipStoryRowTaskApply(rt, terminalPick, node.id)
+    ) {
+      storyApplyTaskResult(
+        node,
+        terminalPick,
+        storyRunContextFromScope(node.id, scope),
+        updateNodeData,
+        allNodes,
+      );
+      return;
+    }
+  }
+
   if (!isInflightStatus(rt?.status)) return;
 
-  const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
   if (hasServerInflightForScope(tasks, node.id, scope)) return;
 
   const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope, rt, node.id);

@@ -1,6 +1,13 @@
 /** 画布保存 · 分步阶段（顶栏提示 + 失败文案） */
 
 import { formatCanvasApiError } from "@/lib/canvas-api";
+import {
+  isTransientDbApiError,
+  isTransientNetworkFetchError,
+} from "@/lib/fetch-with-db-retry";
+
+/** 顶栏 · 主站短暂不可达时的轻量提示（与其它 chip 同字号，勿用长错误句） */
+export const CANVAS_AUTOSAVE_RECONNECT_HINT = "自动重连中…";
 
 export type CanvasSavePhase =
   | "idle"
@@ -55,11 +62,40 @@ export function canvasSavePhaseLabel(
   }
 }
 
-/** 按失败时所在步骤拼接可读错误（顶栏） */
+/** 主站超时 / 503 / 网络抖动等 · 自动重试，顶栏勿吓用户 */
+export function isCanvasAutosaveReconnectError(raw: string): boolean {
+  const t = raw.trim();
+  if (!t) return false;
+  if (isTransientNetworkFetchError(t)) return true;
+  const status = Number((/\b(\d{3})\b/.exec(t) ?? [])[1]) || 0;
+  if (isTransientDbApiError(status, t)) return true;
+  if (/\b(502|503|429)\b/.test(t)) return true;
+  if (t.includes("save_timeout") || t.includes("save_wait_timeout")) return true;
+  if (/operation was aborted|The user aborted|AbortError/i.test(t)) return true;
+  if (t.includes("DATABASE_UNAVAILABLE")) return true;
+  return false;
+}
+
+/** 顶栏 autosave 失败文案：可恢复 → 自动重连；否则短句，不带「整图保存失败」前缀 */
+export function formatCanvasAutosaveUserHint(raw: string): string {
+  if (isCanvasAutosaveReconnectError(raw)) {
+    return CANVAS_AUTOSAVE_RECONNECT_HINT;
+  }
+  const detail = formatCanvasApiError(raw);
+  if (detail.length > 40) {
+    return "保存未成功，请稍后重试";
+  }
+  return detail;
+}
+
+/** @deprecated 顶栏请用 formatCanvasAutosaveUserHint，避免「整图保存失败：…」长句 */
 export function formatCanvasSaveStepError(
   phase: CanvasSavePhase,
   raw: string,
 ): string {
+  if (isCanvasAutosaveReconnectError(raw)) {
+    return CANVAS_AUTOSAVE_RECONNECT_HINT;
+  }
   const detail = formatCanvasApiError(raw);
   if (phase === "retry" || phase === "idle" || phase === "done") {
     return detail;

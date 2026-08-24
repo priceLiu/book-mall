@@ -107,8 +107,8 @@ export function batchRunPro2ThreeViewRows(
   if (options?.forceFresh) {
     const col = nodesAfterClear.find((n) => n.id === columnNodeId);
     const rows =
-      (col?.data as { rows?: import("./story-pro-workspace-types").StoryProCharacterRow[] })
-        .rows ?? [];
+      (col?.data as { rows?: import("./story-pro-workspace-types").StoryProCharacterRow[] } | undefined)
+        ?.rows ?? [];
     const allowed = new Set(keys);
     const cleared = rows.map((r) =>
       allowed.has(r.key) ? { ...r, runtime: undefined } : r,
@@ -156,8 +156,8 @@ export function batchRunPro2FrameRows(
   if (options?.forceFresh) {
     const col = nodesAfterClear.find((n) => n.id === columnNodeId);
     const rows =
-      (col?.data as { rows?: import("./story-pro-workspace-types").StoryProFrameRow[] })
-        .rows ?? [];
+      (col?.data as { rows?: import("./story-pro-workspace-types").StoryProFrameRow[] } | undefined)
+        ?.rows ?? [];
     const allowed = new Set(keys);
     const cleared = rows.map((r) =>
       allowed.has(r.key) ? { ...r, runtime: undefined } : r,

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
@@ -10,6 +9,10 @@ import {
   CanvasListCover,
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
+import {
+  CanvasProjectOpenLink,
+  CanvasProjectOpeningOverlay,
+} from "@/components/canvas/canvas-project-open-link";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import {
   createCanvasProject,
@@ -942,6 +945,8 @@ function Inner() {
         onClose={() => setSubmitTarget(null)}
         onSubmit={onSubmitPortalReview}
       />
+
+      <CanvasProjectOpeningOverlay visible={Boolean(openingProjectId)} />
     </div>
   );
 }
@@ -1017,22 +1022,15 @@ function ProjectsSection({
             <li
               key={p.id}
               className="group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
+              onMouseEnter={() => onPrefetchProject(p.id)}
             >
-              <Link
-                href={`/canvas/${p.id}`}
-                className="block"
-                prefetch
-                onPointerDown={() => onPrefetchProject(p.id)}
-                onMouseEnter={() => onPrefetchProject(p.id)}
-                onClick={() => onOpeningProject(p.id)}
+              <CanvasProjectOpenLink
+                projectId={p.id}
+                openingProjectId={openingProjectId}
+                onOpeningProject={onOpeningProject}
+                onPrefetchProject={onPrefetchProject}
               >
                 <CanvasListCover name={p.name} {...canvasListCoverPropsFromProject(p)} />
-                {openingProjectId === p.id ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--canvas-accent)]">
-                    <Loader2 className="size-3 animate-spin" />
-                    正在打开…
-                  </p>
-                ) : null}
                 <ProjectNameEditor
                   name={p.name}
                   onSave={(next) => void onRename(p.id, next)}
@@ -1045,7 +1043,7 @@ function ProjectsSection({
                 <p className="mt-3 text-[11px] text-[var(--canvas-muted)]/80">
                   更新于 {formatProjectUpdatedAt(p.updatedAt)}
                 </p>
-              </Link>
+              </CanvasProjectOpenLink>
               <div className="mt-3 flex items-center justify-end gap-2">
                 {isAdmin && onTogglePortalCase ? (
                   <button
@@ -1205,6 +1203,7 @@ function ProjectNameEditor({
           }
         }}
         onClick={(e) => e.preventDefault()}
+        onPointerDown={(e) => e.stopPropagation()}
         maxLength={80}
         autoFocus
         className="nodrag mt-3 w-full rounded-md border border-[var(--canvas-accent)]/40 bg-black/30 px-2 py-1 text-sm font-medium text-white focus:outline-none"
@@ -1215,8 +1214,10 @@ function ProjectNameEditor({
   return (
     <button
       type="button"
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         setEditing(true);
       }}
       className="mt-3 block w-full truncate text-left text-sm font-medium text-white hover:text-[var(--canvas-accent-soft)]"

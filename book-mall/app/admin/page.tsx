@@ -7,6 +7,7 @@ import {
   AdminCockpitFinanceSection,
   AdminCockpitGatewayHealthSection,
   AdminCockpitMetricsSection,
+  AdminCockpitUsageAuditSection,
 } from "@/components/admin/admin-platform-cockpit-sections";
 import {
   AdminCockpitAssistantSkeleton,
@@ -31,6 +32,8 @@ export default function AdminDashboardPage() {
       <Suspense fallback={<AdminCockpitFinanceSkeleton />}>
         <AdminCockpitFinanceSection />
       </Suspense>
+
+      <AdminCockpitUsageAuditSection />
 
       <Suspense fallback={<AdminCockpitAssistantSkeleton />}>
         <AdminCockpitAssistantSection />

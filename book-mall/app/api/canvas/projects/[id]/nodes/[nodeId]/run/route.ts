@@ -102,9 +102,14 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "generalText"
     | "music"
     | undefined;
+  const polishMode = body.body.polishMode as
+    | "frame"
+    | "video"
+    | "both"
+    | undefined;
   const storyScope =
-    rowKey || mediaKind || llmSection
-      ? { rowKey, mediaKind, llmSection }
+    rowKey || mediaKind || llmSection || polishMode
+      ? { rowKey, mediaKind, llmSection, polishMode }
       : undefined;
   const isPro2 = isStoryPro2PipelineNodeType(node.type);
   const isSbv1 = isSbv1PipelineNodeType(node.type);

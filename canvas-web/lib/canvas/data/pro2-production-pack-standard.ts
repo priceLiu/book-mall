@@ -104,6 +104,7 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
   { index, shotSize, lighting, cameraMove, sceneDescription, propIds?, dialogue, durationSec, sfxNote, audioNote, sceneId?, characterIds? }
   - **禁止** Pass1 写 imagePrompt / videoPrompt / frameImagePrompt（Pass2 shot_prompts 才写）
   - cameraMove 须 ≥12 字中文运镜描述；须含机位状态+运动方向+速度+视觉目的；禁止单/双字如「固定」「推」
+  - **sceneId 每镜必填**；须引用 scenes[].id；scenes[]≥2 时 **禁止全片同一 sceneId**；每镜 lighting 须与同镜 sceneId 绑定（多场景时 lighting **须含 scenes[].name** canonical name）
   - 禁止 description / aiImagePrompt / duration 等 alias
 - shots[] v1 legacy：{ index, shotSize, cameraMove, sceneDescription, dialogue, durationSec, imagePrompt, videoPrompt, audioNote, sceneId?, characterIds? }
 - handoff[]：{ index, item, owner, note } 对象数组，禁止字符串数组`;
@@ -133,9 +134,16 @@ export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
     "scenes": [
       {
         "id": "scene-office",
-        "name": "现代办公室",
+        "name": "现代深夜办公室",
         "environmentTimeMood": "深夜，极低饱和冷蓝，压抑",
-        "imagePrompt": "名称：现代办公室，深夜开放式办公区。描述：室内，宏观，高度约3米，宽度约15米。前背景：工位隔板、显示器、键盘。氛围：压抑沉闷。构图规范：（2×2四视角场景规范全文）。[视觉风格：…]",
+        "imagePrompt": "名称：现代深夜办公室，深夜开放式办公区。描述：室内，宏观，高度约3米，宽度约15米。前背景：工位隔板、显示器、键盘。氛围：压抑沉闷。构图规范：（2×2四视角场景规范全文）。[视觉风格：…]",
+        "negativePrompt": "动画风、游戏CG、插画风、水印"
+      },
+      {
+        "id": "scene-palace",
+        "name": "盛唐金銮殿",
+        "environmentTimeMood": "盛唐，白日，暖金朱红高饱和，威严",
+        "imagePrompt": "名称：盛唐金銮殿。描述：…。构图规范：（2×2四视角场景规范全文）。[视觉风格：…]",
         "negativePrompt": "动画风、游戏CG、插画风、水印"
       }
     ],
@@ -165,7 +173,7 @@ export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
       {
         "index": 1,
         "shotSize": "特写",
-        "lighting": "深夜室内，极低饱和度的冷蓝光影，压抑沉闷的社畜氛围",
+        "lighting": "现代深夜办公室，极低饱和度的冷蓝光影，压抑沉闷的社畜氛围",
         "cameraMove": "固定机位，微小手持晃动增加压抑感",
         "sceneDescription": "【起始】在伏案加班，双手飞速敲击着，屏幕刺眼的蓝光照在她苍白的脸上。【结束】保持伏案姿势，视线锁定屏幕",
         "propIds": ["prop-computer"],
@@ -175,6 +183,20 @@ export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
         "audioNote": "—",
         "sceneId": "scene-office",
         "characterIds": ["char-heroine"]
+      },
+      {
+        "index": 2,
+        "shotSize": "全景",
+        "lighting": "盛唐金銮殿，白日暖金朱红高饱和，威严恢宏",
+        "cameraMove": "缓慢横移，揭示殿内柱廊纵深与金漆细节",
+        "sceneDescription": "【起始】空镜扫过金銮殿柱廊。【结束】定格于御座方向",
+        "propIds": [],
+        "dialogue": "—",
+        "durationSec": 12,
+        "sfxNote": "远处朝臣低语与甲胄轻响",
+        "audioNote": "—",
+        "sceneId": "scene-palace",
+        "characterIds": []
       }
     ],
     "handoff": [
@@ -372,7 +394,8 @@ export const STORY_PRO2_PACK_OUTPUT_RULES = `【制作包硬性约束 · JSON-on
 2. 须 **完整保留** 上传剧本中已有场景、人物与对白，只做结构化整理，不得压缩成梗概。
 3. full_pack patch 须含：meta · visualStyle · coreConflict · scenes · characters · props[]（≥1）· shots · handoff（≥6 行）。
 4. **分镜 Pass1** 须 **12–18 镜**（总时长 175–185 秒）；每镜 **10–15 秒**整数；shots[] **禁止** imagePrompt / videoPrompt / frameImagePrompt。
-5. 每镜必填：shotSize · lighting(≥8字) · cameraMove(≥12字) · sceneDescription（【起始】…【结束】≥30字）· propIds/道具 · dialogue · durationSec · sfxNote · audioNote。
+5. 每镜必填：shotSize · lighting(≥8字) · cameraMove(≥12字) · sceneDescription（【起始】…【结束】≥30字）· **sceneId**（须引用 scenes[].id）· **characterIds**（有对白角色时必填）· **propIds**（画面出现可交互道具时必填，须引用 props[].id）· dialogue · durationSec · sfxNote · audioNote；sceneDescription 中出现角色/场景/道具时须使用资产辞典 **canonical name**（与 sceneId/characterIds/propIds 一致）。
+5a. **场景绑定**：每镜 **sceneId 唯一对应当镜主场景**；剧本有多场景时 **禁止** 全片共用同一 sceneId。lighting 首句须含该镜 scenes[].**name** 或 environmentTimeMood 中的 **时代+时段** 关键词（如「深夜」「白日」「黄昏」），且与同镜 sceneId 一致；场景切换后 sceneId 必须变更。
 6. characters[] 须 description · clothing · traits（≥3 项）；imagePrompt 须含四视图构图规范 + [视觉风格：…]（见 docs/画布提示词.md）。
 7. scenes[] / props[] 的 imagePrompt 须含对应构图规范 + [视觉风格：…]。
 8. 「对白」撰写规范：
@@ -391,7 +414,7 @@ export const PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE = `# Pass1 导演表字段（v2 
 ${STORY_PRO2_CAMERA_MOVE_COLUMN_RULES}
 
 ## 光影
-深夜室内，极低饱和度的冷蓝光影，压抑沉闷的社畜氛围（须 ≥8 字）
+深夜室内，极低饱和度的冷蓝光影，压抑沉闷的社畜氛围（须 ≥8 字；**首句须含本镜 scenes[].name 或 environmentTimeMood 的时代/时段词**，与同镜 sceneId 一致）
 
 ## 画面描述（→ sceneDescription）
 【起始】在伏案加班，双手飞速敲击着，屏幕刺眼的蓝光照在她苍白的脸上。【结束】保持伏案姿势，视线锁定屏幕（须含【起始】…【结束】，≥30 字）
@@ -400,7 +423,10 @@ ${STORY_PRO2_CAMERA_MOVE_COLUMN_RULES}
 急促而沉重的键盘敲击声，微弱的空调底噪
 
 ## 道具（→ 道具列写名称 · JSON propIds）
-电脑（须在 props[] / 道具视觉辞典 中定义）
+电脑（须在 props[] / 道具视觉辞典 中定义；propIds 须引用 props[].id）
+
+## 场景（→ JSON sceneId）
+现代深夜办公室（须在 scenes[] 中定义 canonical name；sceneId 须引用 scenes[].id；**每镜必填**；多场景剧本须按镜切换 sceneId）
 
 ## 对白
 沈昭昭（内心OS，疲惫）："又……加班……"（无对白写「—」）

@@ -18,6 +18,7 @@ function fmtTime(d: Date | string) {
 export function AdminAssistantFeedbackPanel({
   initialItems,
   summary,
+  onAddAsQa,
 }: {
   initialItems: AssistantFeedbackListItem[];
   summary: {
@@ -26,6 +27,7 @@ export function AdminAssistantFeedbackPanel({
     openQuestion: number;
     last24h: number;
   };
+  onAddAsQa?: (item: AssistantFeedbackListItem) => void;
 }) {
   const [items, setItems] = useState(initialItems);
 
@@ -90,13 +92,24 @@ export function AdminAssistantFeedbackPanel({
                     <span className="text-[#656d76]">· {item.sourceApp}</span>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void markReviewed(item.id)}
-                  className="rounded-md border border-[#d1d9e0] px-2.5 py-1 text-xs font-medium text-[#1f2328] hover:border-[#0969da] hover:text-[#0969da]"
-                >
-                  标为已阅
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {item.category === "QUESTION" && onAddAsQa ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddAsQa(item)}
+                      className="rounded-md border border-[#0969da] px-2.5 py-1 text-xs font-medium text-[#0969da] hover:bg-[#f0f6ff]"
+                    >
+                      添加为问答
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void markReviewed(item.id)}
+                    className="rounded-md border border-[#d1d9e0] px-2.5 py-1 text-xs font-medium text-[#1f2328] hover:border-[#0969da] hover:text-[#0969da]"
+                  >
+                    标为已阅
+                  </button>
+                </div>
               </div>
               <p className="mt-2 text-sm font-medium text-[#1f2328]">
                 {item.user.name || item.user.email || item.user.id}

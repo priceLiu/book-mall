@@ -53,6 +53,8 @@ export type ScriptStudioMediaSpawnResult = {
 
 export function spawnScriptStudioMediaCardsFromWorkspace(args: {
   nodes: CanvasFlowNode[];
+  /** 指定 hub；缺省则找 scriptStudioMode hub */
+  hubNodeId?: string;
   addNode: (
     type: "story-pro2-prop" | "story-pro2-mood" | "story-pro2-audio",
     position: { x: number; y: number },
@@ -62,8 +64,12 @@ export function spawnScriptStudioMediaCardsFromWorkspace(args: {
   kinds?: MediaKind[];
 }): ScriptStudioMediaSpawnResult {
   const kinds = args.kinds ?? (["prop", "mood", "audio"] as MediaKind[]);
-  const hub = findScriptStudioHub(args.nodes);
-  if (!hub) return { spawned: 0, skipped: 0 };
+  const hub = args.hubNodeId
+    ? args.nodes.find((n) => n.id === args.hubNodeId)
+    : findScriptStudioHub(args.nodes);
+  if (!hub || hub.type !== "story-pro2-script-hub") {
+    return { spawned: 0, skipped: 0 };
+  }
 
   const hubData = hub.data as StoryProScriptHubNodeData;
   const visualPack = resolveHubVisualStylePackFromHubData(hubData);

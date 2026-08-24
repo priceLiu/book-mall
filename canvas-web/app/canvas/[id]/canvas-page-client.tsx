@@ -9,6 +9,7 @@ import {
 } from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
+import { installCanvasBrowserNavBlock } from "@/lib/canvas/canvas-block-browser-nav";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import {
@@ -121,7 +122,8 @@ import { registerCanvasGraphPersistFlush, registerCanvasGraphDirtyCheck, registe
 import { flushCanvasNodePositions } from "@/lib/canvas/canvas-commit-node-positions";
 import {
   canvasSavePhaseLabel,
-  formatCanvasSaveStepError,
+  formatCanvasAutosaveUserHint,
+  isCanvasAutosaveReconnectError,
   type CanvasSavePhase,
 } from "@/lib/canvas/canvas-save-phase";
 import {
@@ -353,6 +355,8 @@ function Inner({ projectId }: { projectId: string }) {
       document.removeEventListener("wheel", onWheel, { capture: true });
   }, []);
 
+  useEffect(() => installCanvasBrowserNavBlock(), []);
+
   useEffect(() => {
     const open = () => {
       closeAllToolbarPanels();
@@ -387,6 +391,7 @@ function Inner({ projectId }: { projectId: string }) {
   const savePhaseRef = useRef<CanvasSavePhase>("idle");
   /** 保存硬失败后冷却，避免 dirty 状态下「增量/重试」死循环 */
   const autosaveFailCooldownUntilRef = useRef(0);
+  const autosaveReconnectTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow;
@@ -777,6 +782,10 @@ function Inner({ projectId }: { projectId: string }) {
         setLastSavedAt(new Date());
         setSaveError(null);
         autosaveFailCooldownUntilRef.current = 0;
+        if (autosaveReconnectTimerRef.current !== null) {
+          window.clearTimeout(autosaveReconnectTimerRef.current);
+          autosaveReconnectTimerRef.current = null;
+        }
         if (saveGen === saveGenerationRef.current) {
           saveMarkedDone = true;
           setSavePhase("done");
@@ -837,9 +846,22 @@ function Inner({ projectId }: { projectId: string }) {
           autosaveFailCooldownUntilRef.current =
             Date.now() + CANVAS_AUTOSAVE_FAIL_COOLDOWN_MS;
           autosavePendingRef.current = false;
-          setSaveError(
-            formatCanvasSaveStepError(savePhaseRef.current, errMsg),
-          );
+          setSaveError(formatCanvasAutosaveUserHint(errMsg));
+          if (isCanvasAutosaveReconnectError(errMsg)) {
+            if (autosaveReconnectTimerRef.current !== null) {
+              window.clearTimeout(autosaveReconnectTimerRef.current);
+            }
+            autosaveReconnectTimerRef.current = window.setTimeout(() => {
+              autosaveReconnectTimerRef.current = null;
+              if (
+                canvasReadyRef.current &&
+                isCanvasDirty() &&
+                Date.now() >= autosaveFailCooldownUntilRef.current
+              ) {
+                void runAutosave(false);
+              }
+            }, CANVAS_AUTOSAVE_FAIL_COOLDOWN_MS + 100);
+          }
           setSavePhase("idle");
           savePhaseRef.current = "idle";
           setSaving(false);
@@ -1082,6 +1104,10 @@ function Inner({ projectId }: { projectId: string }) {
         window.clearInterval(autosaveIntervalRef.current);
         autosaveIntervalRef.current = null;
       }
+      if (autosaveReconnectTimerRef.current !== null) {
+        window.clearTimeout(autosaveReconnectTimerRef.current);
+        autosaveReconnectTimerRef.current = null;
+      }
     };
   }, [project, base, projectId, loading]);
 
@@ -1216,7 +1242,7 @@ function Inner({ projectId }: { projectId: string }) {
     } catch (e) {
       if (saveGen === saveGenerationRef.current) {
         const errMsg = e instanceof Error ? e.message : "保存失败";
-        setSaveError(formatCanvasSaveStepError(savePhaseRef.current, errMsg));
+        setSaveError(formatCanvasAutosaveUserHint(errMsg));
         savePhaseRef.current = "idle";
         setSavePhase("idle");
         setSaving(false);
@@ -1482,7 +1508,11 @@ function Inner({ projectId }: { projectId: string }) {
   let body: React.ReactNode;
   if (loading) {
     body = (
-      <div className="fixed inset-0 z-[200] flex h-[100dvh] items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
+      <div
+        className="fixed inset-0 z-[200] flex h-[100dvh] items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]"
+        data-canvas-editor
+        data-canvas-block-nav-gesture
+      >
         <Loader2 className="mr-2 size-5 animate-spin" />
         加载画布…
       </div>

@@ -97,16 +97,19 @@ export function applyHubSectionFromTask(
         const withSync = syncPatch
           ? { ...structured, ...syncPatch }
           : structured;
+        const sectionRuntime: CanvasNodeRuntime = {
+          ...runtime,
+          textOutput: undefined,
+        };
         return {
           ...withSync,
-          outlineRuntime: {
-            ...runtime,
-            textOutput: undefined,
-          },
-          ...(withSync.characterMd != null ? { characterRuntime: runtime } : {}),
-          ...(withSync.sceneMd != null ? { sceneRuntime: runtime } : {}),
+          outlineRuntime: sectionRuntime,
+          ...(withSync.characterMd != null
+            ? { characterRuntime: sectionRuntime }
+            : {}),
+          ...(withSync.sceneMd != null ? { sceneRuntime: sectionRuntime } : {}),
           ...(withSync.storyboardMd != null
-            ? { storyboardRuntime: runtime }
+            ? { storyboardRuntime: sectionRuntime }
             : {}),
         } as Partial<StoryScriptHubNodeData>;
       }
@@ -282,13 +285,22 @@ export function applyHubSectionFromTask(
       patch.sceneHistory = pushStoryRevision(data.sceneHistory, sceneMd);
     }
   } else if (section === "shot_prompts") {
+    patch.storyboardRuntime =
+      runtime.status === "error"
+        ? runtime
+        : { status: "idle", taskId: undefined, failCode: undefined, failMessage: undefined };
     if (textOutput?.trim()) {
       const structured = tryApplyStructuredProductionScript(
         data as StoryProScriptHubNodeData,
         section,
         textOutput,
       );
-      if (structured) return structured;
+      if (structured) {
+        return {
+          ...structured,
+          storyboardRuntime: patch.storyboardRuntime,
+        };
+      }
       if (isPro2JsonOnlyHub(data)) {
         return pro2SectionFailedRuntime(section, runtime, textOutput);
       }

@@ -121,7 +121,7 @@ export function isEditablePasteTarget(target: EventTarget | null): boolean {
 
 /** 输入坞参考图/粘贴区；图片节点走 data-image-paste-host + pickPointerImagePasteHandler */
 const IMAGE_PASTE_SLOT_SELECTOR =
-  ".pro2-dock-ref-zone, .pro2-dock-paste-zone";
+  ".pro2-dock-ref-zone, .pro2-dock-paste-zone, .pro2-wizard-ref-zone";
 
 let lastPointerClient = { x: 0, y: 0 };
 let pointerTrackerInstalled = false;

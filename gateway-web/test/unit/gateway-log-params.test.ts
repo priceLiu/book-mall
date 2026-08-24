@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveLogDisplayDurationMs } from "@/lib/gateway-log-params";
+import { resolveLogDisplayDurationMs, extractLogInputImages } from "@/lib/gateway-log-params";
 
 describe("resolveLogDisplayDurationMs", () => {
   it("in-progress uses phase sum (not gateway wall clock)", () => {
@@ -44,5 +44,23 @@ describe("resolveLogDisplayDurationMs", () => {
       nowMs: null,
     });
     expect(ms).toBe(295_000);
+  });
+});
+
+describe("extractLogInputImages", () => {
+  it("reads KIE image_input reference URLs", () => {
+    const images = extractLogInputImages({
+      model: "nano-banana-pro",
+      input: {
+        prompt: "scene",
+        image_input: [
+          "https://cdn.example/a.png",
+          "https://cdn.example/b.png",
+        ],
+      },
+    });
+    expect(images).toHaveLength(2);
+    expect(images[0]?.url).toBe("https://cdn.example/a.png");
+    expect(images[0]?.previewable).toBe(true);
   });
 });

@@ -51,6 +51,10 @@ export function isCanvasSelectionOnlyChange(changes: NodeChange[]): boolean {
   return changes.length > 0 && changes.every((c) => c.type === "select");
 }
 
+export function extractSelectNodeChanges(changes: NodeChange[]): NodeChange[] {
+  return changes.filter((c) => c.type === "select");
+}
+
 /** RF 回写选中 / zIndex 与 store 一致时跳过 set，避免 store↔RF 无限循环 */
 export function canvasNodesSelectionAndZEqual(
   prev: CanvasFlowNode[],

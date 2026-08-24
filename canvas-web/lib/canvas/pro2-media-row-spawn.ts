@@ -3,7 +3,7 @@ import type {
   StoryProFrameRow,
   StoryProSceneRow,
 } from "./story-pro-workspace-types";
-import { isLegacyWrappedMediaPrompt } from "./pro2-production-pack-prompt";
+import { buildPro2FrameMediaPrompt } from "./pro2-lazy-media-prompts";
 import { shouldRebuildPro2CharacterRowPrompt } from "./three-view-prompt-rules";
 
 function isFrameScriptPrompt(prompt: string): boolean {
@@ -63,15 +63,45 @@ function pro2FrameTableFingerprint(row: StoryProFrameRow): string {
     row.description,
     row.dialogue ?? "",
     row.aiImagePrompt ?? "",
+    row.frameImagePrompt ?? "",
     row.videoPrompt ?? "",
   ].join("\x1e");
+}
+
+function resolvePro2FrameRowPrompt(
+  prev: StoryProFrameRow | undefined,
+  next: StoryProFrameRow,
+): string {
+  const nextPass2 =
+    next.frameImagePrompt?.trim() || next.aiImagePrompt?.trim() || "";
+  const nextBuilt = buildPro2FrameMediaPrompt(next);
+
+  if (nextPass2) {
+    if (!prev?.prompt?.trim() || isFrameScriptPrompt(prev.prompt)) {
+      return nextPass2;
+    }
+    if (pro2FrameTableFingerprint(prev) !== pro2FrameTableFingerprint(next)) {
+      return nextBuilt;
+    }
+    if (prev.prompt.trim() !== nextPass2) return nextPass2;
+  }
+
+  if (!prev?.prompt?.trim()) return nextBuilt;
+
+  if (pro2FrameTableFingerprint(prev) === pro2FrameTableFingerprint(next)) {
+    return prev.prompt.trim();
+  }
+  return nextBuilt;
 }
 
 /** 剧本 hub 同步后保留已生成 prompt；表字段变更则清空，等待用户再次点「生成」 */
 export function preservePro2MediaRowPrompt<
   T extends StoryProCharacterRow | StoryProSceneRow | StoryProFrameRow,
 >(prev: T | undefined, next: T, kind: Pro2MediaRowKind): string {
-  if (!prev?.prompt?.trim()) return "";
+  if (kind === "frame") {
+    return resolvePro2FrameRowPrompt(prev as StoryProFrameRow | undefined, next as StoryProFrameRow);
+  }
+  if (!prev?.prompt?.trim()) return next.prompt?.trim() ?? "";
   if (kind === "character") {
     return shouldRebuildPro2CharacterRowPrompt(
       prev as StoryProCharacterRow,
@@ -87,8 +117,5 @@ export function preservePro2MediaRowPrompt<
       ? prev.prompt.trim()
       : "";
   }
-  return pro2FrameTableFingerprint(prev as StoryProFrameRow) ===
-    pro2FrameTableFingerprint(next as StoryProFrameRow)
-    ? prev.prompt.trim()
-    : "";
+  return "";
 }

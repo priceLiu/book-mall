@@ -10,8 +10,37 @@ const STORE_TOKEN_RE = /@<([^>\s]+)>/g;
 
 export const MENTION_BADGE_ATTR = "data-mention-id";
 
-export function mentionBadgeBorderClass(edition: "pro2" | "sbv1"): string {
+export function mentionBadgeBorderClass(
+  edition: "pro2" | "sbv1" | "wizard",
+): string {
+  if (edition === "wizard") return "";
   return edition === "sbv1" ? "border-cyan-400/70" : "border-violet-400/70";
+}
+
+export function mentionBadgeTextClass(
+  edition: "pro2" | "sbv1" | "wizard",
+): string {
+  return edition === "wizard" ? "text-emerald-300" : "text-white/90";
+}
+
+const MENTION_BADGE_SHELL_BASE =
+  "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 select-none items-center rounded-lg px-1 py-[1px] text-[1em] leading-none";
+
+/** wizard · 分镜编辑：绿字 + 深色底，无边框 */
+export function mentionBadgeShellClass(
+  edition: "pro2" | "sbv1" | "wizard",
+): string {
+  if (edition === "wizard") {
+    return [MENTION_BADGE_SHELL_BASE, mentionBadgeTextClass("wizard")].join(
+      " ",
+    );
+  }
+  return [
+    MENTION_BADGE_SHELL_BASE,
+    "border border-white/10",
+    mentionBadgeTextClass(edition),
+    mentionBadgeBorderClass(edition),
+  ].join(" ");
 }
 
 /**
@@ -21,17 +50,14 @@ export function mentionBadgeBorderClass(edition: "pro2" | "sbv1"): string {
 export function createMentionBadge(
   id: string,
   item: MentionableItem | undefined,
-  edition: "pro2" | "sbv1",
+  edition: "pro2" | "sbv1" | "wizard",
 ): HTMLElement {
   const badge = document.createElement("span");
   badge.contentEditable = "false";
   badge.setAttribute(MENTION_BADGE_ATTR, id);
   badge.setAttribute("draggable", "false");
   badge.dataset.mentionLabel = item?.label ?? "";
-  badge.className = [
-    "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 select-none items-center rounded-lg border border-white/10 px-1 py-[1px] text-[1em] leading-none text-white/90",
-    mentionBadgeBorderClass(edition),
-  ].join(" ");
+  badge.className = mentionBadgeShellClass(edition);
   badge.style.backgroundColor = LIBTV_INPUT_DOCK_BG;
   badge.style.gap = `${INLINE_MENTION_BADGE_GAP_PX}px`;
   badge.style.marginInline = "1px";
@@ -87,7 +113,7 @@ function appendTextWithBreaks(target: DocumentFragment, text: string): void {
 export function buildEditableFragment(
   value: string,
   mentionables: MentionableItem[],
-  edition: "pro2" | "sbv1",
+  edition: "pro2" | "sbv1" | "wizard",
 ): DocumentFragment {
   const frag = document.createDocumentFragment();
   if (!value) return frag;

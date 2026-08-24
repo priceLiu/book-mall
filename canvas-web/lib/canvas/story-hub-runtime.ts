@@ -664,14 +664,23 @@ export function hubAggregateStatus(
 export function hubShowsGeneratingUi(
   node: CanvasFlowNode,
   hubGenerateIntent?: boolean,
+  serverHubInflight?: boolean,
 ): boolean {
   const sections = ["outline", "character", "scene", "storyboard"] as const;
   if (sections.some((s) => hubSectionIsRunning(node, s))) return true;
+  if (serverHubInflight) return true;
+  if (isCanvasNodeRunSessionActive(node.id)) return true;
   if (!hubGenerateIntent) return false;
-  const anySectionTouched = sections.some((s) => {
-    const st = hubSectionRuntime(node, s)?.status;
-    return st != null && st !== "idle";
-  });
+
+  const statuses = sections.map((s) => hubSectionRuntime(node, s)?.status);
+  const anyError = statuses.some((st) => st === "error");
+  const allIdleOrTerminal = statuses.every(
+    (st) => !st || st === "idle" || st === "done" || st === "error",
+  );
+  // 换模型重试：上一轮 error 但尚无新的 pending/running
+  if (anyError && allIdleOrTerminal) return true;
+
+  const anySectionTouched = statuses.some((st) => st != null && st !== "idle");
   return !anySectionTouched;
 }
 

@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveModelChain } from "@/lib/platform-assistant/platform-assistant-model-config-service";
+import {
+  normalizeAssistantLlmModelKey,
+  resolveModelChain,
+} from "@/lib/platform-assistant/platform-assistant-model-config-service";
 
 describe("resolveModelChain", () => {
+  it("normalizes legacy deepseek-chat to deepseek-v4-flash", () => {
+    expect(normalizeAssistantLlmModelKey("deepseek-chat")).toBe("deepseek-v4-flash");
+    const models = resolveModelChain("deepseek-chat", ["qwen3.5-flash"]);
+    expect(models[0]).toBe("deepseek-v4-flash");
+    expect(models).toContain("qwen3.5-flash");
+  });
+
   it("includes primary then fallbacks without duplicates", () => {
-    const models = resolveModelChain("deepseek-chat", ["qwen3.5-flash", "qwen-plus"]);
-    expect(models[0]).toBe("deepseek-chat");
+    const models = resolveModelChain("deepseek-v4-flash", ["qwen3.5-flash", "qwen-plus"]);
+    expect(models[0]).toBe("deepseek-v4-flash");
     expect(models).toContain("qwen3.5-flash");
     expect(models).toContain("qwen-plus");
     expect(new Set(models).size).toBe(models.length);

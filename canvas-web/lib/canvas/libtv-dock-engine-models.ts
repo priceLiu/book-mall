@@ -39,11 +39,8 @@ export function collectLibtvDockEngineModels(
     if (providerIdSet && !providerIdSet.has(provider.id)) continue;
     for (const model of provider.models) {
       if (!model.enabled) continue;
-      if (allowedSet) {
-        if (!allowedSet.has(model.modelKey)) continue;
-      } else if (model.role !== opts.role) {
-        continue;
-      }
+      if (model.role !== opts.role) continue;
+      if (allowedSet && !allowedSet.has(model.modelKey)) continue;
       if (
         opts.role === "IMAGE" &&
         !allowedSet &&

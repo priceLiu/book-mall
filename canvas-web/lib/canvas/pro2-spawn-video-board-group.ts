@@ -68,6 +68,10 @@ export function ensurePro2VideoBoardGroup(
   const videoNode = args.nodes.find((n) => n.id === args.videoColumnId);
   if (!videoNode) return null;
 
+  args.updateNodeData(args.videoColumnId, {
+    pro2VisualGroupDismissed: false,
+  });
+
   const existingGroup = args.nodes.find(
     (n) =>
       n.type === "group" &&
@@ -296,7 +300,9 @@ function pro2VideoBoardNeedsRepair(
     hubNodeId?: string;
     frameColumnId?: string;
     pro2VisualGroupId?: string;
+    pro2VisualGroupDismissed?: boolean;
   };
+  if (d.pro2VisualGroupDismissed) return false;
   const rows = d.rows ?? [];
   if (!rows.length) return false;
   if (!d.hubNodeId?.trim() || !d.frameColumnId?.trim()) return false;
@@ -343,6 +349,107 @@ export type RepairPro2VideoBoardStore = {
   setEdges: EnsurePro2VideoBoardGroupArgs["setEdges"];
 };
 
+/** 用户删除分镜视频组 · 标记列控制器并清理组内格，防止 hydrate repair 重建 */
+export function applyPro2VideoBoardGroupRemoval(
+  prev: CanvasFlowNode[],
+  next: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  const nextIds = new Set(next.map((n) => n.id));
+  const removedGroups = prev.filter(
+    (n) =>
+      n.type === "group" &&
+      !nextIds.has(n.id) &&
+      (n.data as { pro2Kind?: string }).pro2Kind === "video-board",
+  );
+  if (!removedGroups.length) return next;
+
+  const removedGroupIds = new Set(removedGroups.map((g) => g.id));
+  const controllerIds = new Set(
+    removedGroups
+      .map(
+        (g) =>
+          (g.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId?.trim(),
+      )
+      .filter(Boolean) as string[],
+  );
+
+  let nodes = next.filter((n) => {
+    if (n.type !== "sbv1-video-engine") return true;
+    const d = n.data as {
+      pro2MediaRole?: string;
+      pro2ControllerNodeId?: string;
+      pro2GroupId?: string;
+    };
+    if (d.pro2MediaRole !== "video") return true;
+    if (d.pro2GroupId && removedGroupIds.has(d.pro2GroupId)) return false;
+    if (
+      d.pro2ControllerNodeId &&
+      controllerIds.has(d.pro2ControllerNodeId.trim())
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  nodes = nodes.map((n) => {
+    if (n.type !== "story-pro2-video") return n;
+    const visualId = (n.data as { pro2VisualGroupId?: string }).pro2VisualGroupId?.trim();
+    const shouldDismiss =
+      controllerIds.has(n.id) ||
+      (visualId ? removedGroupIds.has(visualId) : false);
+    if (!shouldDismiss) return n;
+    return {
+      ...n,
+      data: {
+        ...(n.data as Record<string, unknown>),
+        pro2VisualGroupId: undefined,
+        pro2PendingSyncGroupId: undefined,
+        pro2VisualGroupDismissed: true,
+      },
+    };
+  });
+
+  return nodes;
+}
+
+function markLegacyDismissedPro2VideoBoardIfNeeded(
+  videoNode: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  updateNodeData: RepairPro2VideoBoardStore["updateNodeData"],
+): boolean {
+  const d = videoNode.data as {
+    pro2VisualGroupDismissed?: boolean;
+    pro2VisualGroupId?: string;
+  };
+  if (d.pro2VisualGroupDismissed) return true;
+
+  const groupId = d.pro2VisualGroupId?.trim();
+  const group = groupId ? nodes.find((n) => n.id === groupId) : undefined;
+  const groupByController = nodes.find(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+        videoNode.id &&
+      (n.data as { pro2Kind?: string }).pro2Kind === "video-board",
+  );
+  if (group || groupByController) return false;
+
+  const childVideos = nodes.filter(
+    (n) =>
+      n.type === "sbv1-video-engine" &&
+      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+        videoNode.id,
+  );
+  if (!groupId && childVideos.length === 0) return false;
+
+  updateNodeData(videoNode.id, {
+    pro2VisualGroupId: undefined,
+    pro2PendingSyncGroupId: undefined,
+    pro2VisualGroupDismissed: true,
+  });
+  return true;
+}
+
 /** hydrate / 旧列数据迁移 · 补齐「组 + sbv1-video-engine」视觉层 */
 export function repairPro2VideoBoardVisualGroups(
   getStore: () => RepairPro2VideoBoardStore,
@@ -358,8 +465,60 @@ export function repairPro2VideoBoardVisualGroups(
       rows?: StoryProVideoRow[];
       hubNodeId?: string;
       frameColumnId?: string;
+      pro2VisualGroupDismissed?: boolean;
     };
     const rows = d.rows ?? [];
+    if (d.pro2VisualGroupDismissed) {
+      collapsePro2VideoColumnAnchor(store.setNodes, col.id);
+      continue;
+    }
+
+    const staleGroupId = (
+      videoNode.data as { pro2VisualGroupId?: string }
+    ).pro2VisualGroupId?.trim();
+    const staleGroup = staleGroupId
+      ? store.nodes.find((n) => n.id === staleGroupId)
+      : undefined;
+    const liveGroup = store.nodes.find(
+      (n) =>
+        n.type === "group" &&
+        (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+          col.id &&
+        (n.data as { pro2Kind?: string }).pro2Kind === "video-board",
+    );
+    if (staleGroupId && !staleGroup && !liveGroup) {
+      store.setNodes((prev) =>
+        prev.filter((n) => {
+          if (n.type !== "sbv1-video-engine") return true;
+          const cd = n.data as {
+            pro2MediaRole?: string;
+            pro2ControllerNodeId?: string;
+          };
+          return !(
+            cd.pro2MediaRole === "video" &&
+            cd.pro2ControllerNodeId === col.id
+          );
+        }),
+      );
+      store.updateNodeData(col.id, {
+        pro2VisualGroupId: undefined,
+        pro2PendingSyncGroupId: undefined,
+        pro2VisualGroupDismissed: true,
+      });
+      collapsePro2VideoColumnAnchor(store.setNodes, col.id);
+      continue;
+    }
+
+    if (
+      markLegacyDismissedPro2VideoBoardIfNeeded(
+        videoNode,
+        store.nodes,
+        store.updateNodeData,
+      )
+    ) {
+      collapsePro2VideoColumnAnchor(store.setNodes, col.id);
+      continue;
+    }
     if (!rows.length || !d.hubNodeId?.trim() || !d.frameColumnId?.trim()) {
       collapsePro2VideoColumnAnchor(store.setNodes, col.id);
       continue;

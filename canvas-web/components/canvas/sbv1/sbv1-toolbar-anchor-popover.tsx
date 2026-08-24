@@ -137,7 +137,11 @@ export function Sbv1ToolbarDropdown({
   if (!open || !rect || typeof document === "undefined") return null;
 
   const gap = 6;
+  const spaceAbove = rect.top - gap;
+  const spaceBelow = window.innerHeight - rect.bottom - gap;
   const side = resolveToolbarDropdownSide(rect, placement, estimatedHeight);
+  const available = side === "above" ? spaceAbove : spaceBelow;
+  const panelMaxHeight = Math.max(160, Math.min(estimatedHeight, available));
   const left =
     align === "center"
       ? rect.left + rect.width / 2
@@ -168,6 +172,8 @@ export function Sbv1ToolbarDropdown({
         top,
         transform,
         zIndex: baseZ + 1,
+        maxHeight: panelMaxHeight,
+        overflowY: "auto",
       }}
     >
       {children}

@@ -18,6 +18,7 @@ import {
   parseLogSubmittedFromParam,
   parseLogSubmittedToParam,
 } from "@/lib/gateway/log-query-params";
+import { parseGatewayLogAppKey } from "@/lib/gateway/gateway-log-app-filter";
 import {
   buildGatewayLogScopeForGatewaySessionUser,
   buildGatewayLogWhereForTeamTenant,
@@ -91,12 +92,21 @@ export function parseDashboardFiltersFromSearchParams(
       ? (statusRaw.toUpperCase() as GatewayRequestStatus)
       : undefined;
 
+  const appKey =
+    parseGatewayLogAppKey(params.get("appKey")) ??
+    parseGatewayLogAppKey(params.get("clientSource"));
+  const legacyClientSource =
+    !appKey && params.get("clientSource")?.trim()
+      ? params.get("clientSource")!.trim()
+      : undefined;
+
   return {
     status,
     statuses,
     submittedFrom: submittedFrom ?? undefined,
     submittedTo: submittedTo ?? undefined,
-    clientSource: params.get("clientSource")?.trim() || undefined,
+    appKey,
+    clientSource: legacyClientSource,
     providerKind: params.get("providerKind")?.trim() || undefined,
     model: params.get("model")?.trim() || undefined,
     credentialId: params.get("credentialId")?.trim() || undefined,
@@ -140,6 +150,7 @@ export function isLiveDashboardQuery(query: DashboardQueryParams): boolean {
     (!f.statuses || f.statuses.length === 0) &&
     !f.submittedFrom &&
     !f.submittedTo &&
+    !f.appKey &&
     !f.clientSource &&
     !f.providerKind &&
     !f.model &&

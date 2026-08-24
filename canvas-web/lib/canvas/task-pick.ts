@@ -16,11 +16,15 @@ import {
   pickTaskResultMediaUrl,
   taskHasDisplayableResult,
 } from "./task-media-url";
+import { isCanvasInflightStatus } from "./story-column-runtime";
+import type { StoryScriptHubNodeData } from "./story-workspace-types";
+import { isAnyStoryScriptHubType } from "./story-workspace-resolver";
 
 export type CanvasTaskStoryScope = {
   rowKey?: string;
   mediaKind?: string;
   llmSection?: string;
+  polishMode?: "frame" | "video" | "both";
 };
 
 function taskHasSuccessPayload(task: CanvasTaskRecord): boolean {
@@ -301,6 +305,7 @@ export function tasksMatchStoryScope(
   if (scope.rowKey && t.rowKey !== scope.rowKey) return false;
   if (scope.mediaKind && t.mediaKind !== scope.mediaKind) return false;
   if (scope.llmSection && t.llmSection !== scope.llmSection) return false;
+  if (scope.polishMode && t.polishMode !== scope.polishMode) return false;
   return true;
 }
 
@@ -412,6 +417,36 @@ function isInflightRuntimeStatus(status?: string): boolean {
   return status === "queued" || status === "pending" || status === "running";
 }
 
+/** run-queue · preferredTasksByNode 用段级 runtime（Hub 无顶层 runtime 字段） */
+export function hubNodeLocalRuntimeForTaskPick(
+  node: CanvasFlowNode,
+): CanvasNodeRuntime | undefined {
+  const d = node.data as unknown as StoryScriptHubNodeData;
+  for (const rt of [
+    d.outlineRuntime,
+    d.characterRuntime,
+    d.sceneRuntime,
+    d.storyboardRuntime,
+  ]) {
+    if (isCanvasInflightStatus(rt?.status)) return rt;
+  }
+  return d.outlineRuntime;
+}
+
+/** 服务端仍有 LLM 任务在途（刷新后本地 runtime 可能尚未 restore） */
+export function hubHasServerInflightLlmTask(
+  nodeId: string,
+  tasks: CanvasTaskRecord[],
+): boolean {
+  const nodeTasks = tasks.filter((t) => t.nodeId === nodeId);
+  return nodeTasks.some(
+    (t) =>
+      isServerInflightTaskStatus(t.status) &&
+      !isStaleServerInflightTask(t, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(t),
+  );
+}
+
 /** 行级 scope · 最新成功成片（展示 URL，不受后续失败重试覆盖） */
 export function pickStoryRowSucceededTask(
   tasks: CanvasTaskRecord[],
@@ -509,9 +544,15 @@ export function preferredTasksByNode(
   const out = new Map<string, CanvasTaskRecord>();
   for (const [nodeId, list] of Array.from(grouped.entries())) {
     const node = nodes?.find((n) => n.id === nodeId);
-    const localRt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
-      ?.runtime;
-    const pick = pickPreferredCanvasTask(list, { localRuntime: localRt });
+    const localRt = node
+      ? isAnyStoryScriptHubType(node.type ?? "")
+        ? hubNodeLocalRuntimeForTaskPick(node)
+        : (node.data as { runtime?: CanvasNodeRuntime }).runtime
+      : undefined;
+    const pick = pickPreferredCanvasTask(list, {
+      localRuntime: localRt,
+      nodeId,
+    });
     if (pick) out.set(nodeId, pick);
   }
   return out;

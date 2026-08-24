@@ -18,6 +18,7 @@ import {
   syncFrameRowCharacterRefs,
 } from "./story-column-sync";
 import { preservePro2MediaRowPrompt } from "./pro2-media-row-spawn";
+import { buildPro2FrameMediaPrompt } from "./pro2-lazy-media-prompts";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
 import {
   compactGfmTables,
@@ -245,7 +246,7 @@ function buildProFrameRowsFromProductionScript(
       charCompat,
       shot.characterIds,
     );
-    return {
+    const row: StoryProFrameRow = {
       ...base,
       frameImagePrompt,
       aiImagePrompt: frameImagePrompt,
@@ -258,6 +259,10 @@ function buildProFrameRowsFromProductionScript(
       cameraMove: shot.cameraMove,
       durationSec: shot.durationSec,
       sceneRefId: sceneName || undefined,
+    };
+    return {
+      ...row,
+      prompt: buildPro2FrameMediaPrompt(row),
     };
   });
 }
@@ -321,9 +326,11 @@ function mergeProFrameRows(
       prompt: preservePro2MediaRowPrompt(prev, row, "frame"),
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
-      refImages: prev.refImages,
-      refImageUrls: prev.refImageUrls,
-      referencedNodeIds: prev.referencedNodeIds,
+      refImages: prev.refImages?.length ? prev.refImages : row.refImages,
+      refImageUrls: prev.refImageUrls?.length ? prev.refImageUrls : row.refImageUrls,
+      referencedNodeIds: prev.referencedNodeIds?.length
+        ? prev.referencedNodeIds
+        : row.referencedNodeIds,
       frameApprovedAt: prev.frameApprovedAt,
       frameRejectedReason: prev.frameRejectedReason,
     };

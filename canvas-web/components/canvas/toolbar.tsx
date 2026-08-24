@@ -26,7 +26,6 @@ import {
 import { cn } from "@/lib/utils";
 import { CANVAS_PROJECT_HISTORY_MAX } from "@/lib/canvas/canvas-autosave-settings";
 import {
-  CANVAS_SEMANTIC_ERROR_CLASS,
   CANVAS_SEMANTIC_TITLE_CLASS,
   CANVAS_TOOLBAR_META_CHIP_CLASS,
   CANVAS_TOOLBAR_META_TEXT_CLASS,
@@ -46,6 +45,7 @@ import {
 } from "@/components/canvas/canvas-toolbar-dropdown";
 import { CanvasToolbarIconButton } from "@/components/canvas/canvas-toolbar-icon-button";
 import {
+  CANVAS_AUTOSAVE_RECONNECT_HINT,
   canvasSavePhaseLabel,
   type CanvasSavePhase,
 } from "@/lib/canvas/canvas-save-phase";
@@ -334,21 +334,32 @@ export function CanvasToolbar({
             {leavingProject ? "正在保存并离开…" : saveStatusLabel}
           </span>
         ) : !saveBusy && !imageUploadPending && (lastSavedAt || saveError) ? (
-          <span
-            className={cn(
-              "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate lg:inline",
-              saveError ? CANVAS_SEMANTIC_ERROR_CLASS : CANVAS_TOOLBAR_META_TEXT_CLASS,
-            )}
-            title={saveError ?? undefined}
-          >
-            {saveError ? (
-              <>{saveError}</>
-            ) : lastSavedAt ? (
-              `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
-            ) : (
-              ""
-            )}
-          </span>
+          saveError === CANVAS_AUTOSAVE_RECONNECT_HINT ? (
+            <span
+              className={cn("hidden lg:inline-flex", CANVAS_TOOLBAR_META_CHIP_CLASS)}
+              title="主站连接恢复后将自动保存"
+            >
+              <Loader2 className="size-3 animate-spin" />
+              {CANVAS_AUTOSAVE_RECONNECT_HINT}
+            </span>
+          ) : (
+            <span
+              className={cn(
+                "hidden min-w-0 max-w-[min(220px,28vw)] shrink truncate lg:inline",
+                CANVAS_TOOLBAR_META_TEXT_CLASS,
+                saveError && "text-white/45",
+              )}
+              title={saveError ?? undefined}
+            >
+              {saveError ? (
+                <>{saveError}</>
+              ) : lastSavedAt ? (
+                `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
+              ) : (
+                ""
+              )}
+            </span>
+          )
         ) : null}
       </div>
       <div className="flex min-w-0 items-center justify-center gap-2">

@@ -77,7 +77,7 @@ export type MentionsEditableProps = {
   /** 兼容旧 API：contenteditable 下内联缩略图始终开启，无需该开关 */
   mentionInlineThumb?: boolean;
   mentionInlineThumbHoverOnText?: boolean;
-  mentionEdition?: "pro2" | "sbv1";
+  mentionEdition?: "pro2" | "sbv1" | "wizard";
   /** LibTV Dock 内 placeholder 与正文共用 inset（默认 Pro2 大左侧留白） */
   dockInsetClassName?: string;
   commitHandleRef?: Ref<MentionsTextareaCommitHandle>;

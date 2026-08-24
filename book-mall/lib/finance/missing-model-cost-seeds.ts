@@ -30,8 +30,8 @@ const TENCENT = 0.1;
 export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   // —— CORE · TEXT_LLM ——
   { canonicalModelKey: "kimi-k3", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(20), discountRate: 0, note: "百炼 kimi/kimi-k3 输入 20/M · 输出 100/M" },
-  { canonicalModelKey: "kimi-k2.6", vendor: "moonshot", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(6.5), discountRate: MOON },
-  { canonicalModelKey: "kimi-k2.7-code", vendor: "moonshot", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(6.5), discountRate: MOON },
+  { canonicalModelKey: "kimi-k2.6", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(6.5), discountRate: ALI, note: "百炼 kimi/kimi-k2.6 输入 6.5/M · 输出 27/M" },
+  { canonicalModelKey: "kimi-k2.7-code", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(6.5), discountRate: ALI, note: "百炼 kimi/kimi-k2.7-code 输入 6.5/M · 输出 27/M" },
   { canonicalModelKey: "gpt-5-5-chat", vendor: "kie", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(2.8), discountRate: KIE, note: "kie.ai gpt-5.6 档输入约 $0.56/M" },
   { canonicalModelKey: "doubao-seed-2.1-pro", vendor: "volcengine", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(8), discountRate: VOLC },
   { canonicalModelKey: "doubao-seed-2.0", vendor: "volcengine", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(8), discountRate: VOLC },

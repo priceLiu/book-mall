@@ -374,6 +374,22 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
     expect(hubShowsGeneratingUi(node, true)).toBe(false);
   });
 
+  it("shows generating when intent persisted during active run session", () => {
+    markCanvasNodeRunSession("hub-1");
+    const node = hubNode(
+      {
+        hubGenerateIntent: true,
+        outlineRuntime: { status: "done", taskId: "t1" },
+        characterRuntime: { status: "done", taskId: "t2" },
+        sceneRuntime: { status: "done", taskId: "t3" },
+        storyboardRuntime: { status: "done", taskId: "t4" },
+      },
+      "hub-1",
+    );
+    expect(hubShowsGeneratingUi(node, true)).toBe(true);
+    clearCanvasNodeRunSession("hub-1");
+  });
+
   it("stripStaleHubGenerateIntent clears intent when aggregate is done", () => {
     const nodes = stripStaleHubGenerateIntent([
       hubNode({
@@ -399,6 +415,29 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
       hubGenerateIntent: undefined,
     });
     expect(hubShowsGeneratingUi(node, false)).toBe(true);
+  });
+
+  it("shows generating when server task inflight but local runtimes are done", () => {
+    const node = hubNode({
+      outlineRuntime: { status: "done", taskId: "old" },
+      characterRuntime: { status: "done", taskId: "old" },
+      storyboardRuntime: { status: "done", taskId: "old" },
+      storyboardMd: "| 镜号 | 画面 |",
+    });
+    expect(hubShowsGeneratingUi(node, false, true)).toBe(true);
+    expect(hubShowsGeneratingUi(node, false, false)).toBe(false);
+  });
+
+  it("shows generating when retrying after section error with hubGenerateIntent", () => {
+    const node = hubNode({
+      hubGenerateIntent: true,
+      outlineRuntime: {
+        status: "error",
+        taskId: "failed-kimi",
+        failMessage: "引擎繁忙",
+      },
+    });
+    expect(hubShowsGeneratingUi(node, true)).toBe(true);
   });
 });
 

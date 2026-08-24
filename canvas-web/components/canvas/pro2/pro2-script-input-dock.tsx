@@ -6,6 +6,7 @@ import { Pro2LlmDockCreditsBadge } from "./pro2-llm-dock-credits-badge";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
 import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
@@ -31,6 +32,7 @@ import {
 import { applyPro2ScriptCategoryFromHub } from "@/lib/canvas/spawn-pro2-script-category-from-hub";
 import type { Pro2ScriptCategoryId } from "@/lib/canvas/pro2-script-category-presets";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
@@ -83,6 +85,7 @@ export function Pro2ScriptInputDock() {
   }, [dockNodeId]);
 
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
+  const { history: hubTasks } = useNodeTaskHistory(storeNode?.id);
   const dockInput = d.dockInput ?? "";
   const dockRefImages = (d.dockRefImages ?? []) as StoryRefImage[];
   const phase = pro2HubScriptPhaseLabel(d, {
@@ -156,9 +159,11 @@ export function Pro2ScriptInputDock() {
       } as const)
     : null;
 
-  const isGenerating = hubRfNode ? pro2HubIsGenerating(hubRfNode as never) : false;
+  const isGenerating = hubRfNode
+    ? pro2HubIsGenerating(hubRfNode as never, hubTasks)
+    : false;
   const canSendScript = hubRfNode
-    ? pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges })
+    ? pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges, hubTasks })
     : false;
   const isCustomPrompt = d.scriptCategoryId === "custom-prompt";
   const canSend = isCustomPrompt
@@ -179,6 +184,17 @@ export function Pro2ScriptInputDock() {
       params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     });
   }, [storeNode, d.providerId, providers, updateNodeData]);
+
+  useEffect(() => {
+    if (!storeNode) return;
+    const modelKey = d.modelKey?.trim() ?? "";
+    const providerId = d.providerId?.trim() ?? "";
+    if (!modelKey.startsWith("kimi-")) return;
+    if (providerId === "gateway:bailian") return;
+    const bailian = providers.find((p) => p.id === "gateway:bailian" && p.active);
+    if (!bailian?.models.some((m) => m.modelKey === modelKey && m.enabled)) return;
+    updateNodeData(storeNode.id, { providerId: "gateway:bailian" });
+  }, [storeNode, d.modelKey, d.providerId, providers, updateNodeData]);
 
   const onPickEngine = useCallback(
     (next: {
@@ -240,6 +256,7 @@ export function Pro2ScriptInputDock() {
         pro2HubCanSendScriptPhase(freshRfNode as never, fd, {
           nodes: freshNodes,
           edges: freshEdges,
+          hubTasks,
         });
     if (!canRun) {
       await alert({
@@ -420,6 +437,7 @@ function Pro2ScriptDockFooter({
           providerId={providerId}
           modelKey={modelKey}
           params={params}
+          allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
           externalProviders={providers}
           disabled={isGenerating}
           open={dockMenu === "model"}

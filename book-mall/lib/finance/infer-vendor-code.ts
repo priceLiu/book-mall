@@ -28,7 +28,8 @@ export function inferVendorCodeFromModelKey(modelKey: string | null | undefined)
     return "volcengine";
   }
   if (k.startsWith("baichuan")) return "baichuan";
-  if (k.startsWith("moonshot") || k.startsWith("kimi")) return "moonshot";
+  if (k.startsWith("kimi")) return "aliyun";
+  if (k.startsWith("moonshot")) return "moonshot";
   if (k.startsWith("deepseek")) return "deepseek";
   if (k.startsWith("glm") || k.startsWith("chatglm") || k.startsWith("zhipu")) return "zhipu";
   if (k.startsWith("ernie") || k.startsWith("wenxin")) return "baidu";

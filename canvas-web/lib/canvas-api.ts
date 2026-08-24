@@ -123,6 +123,7 @@ export type CanvasTaskStoryScope = {
   rowKey?: string;
   mediaKind?: string;
   llmSection?: string;
+  polishMode?: "frame" | "video" | "both";
 };
 
 export type CanvasTaskRecord = {
@@ -134,6 +135,10 @@ export type CanvasTaskRecord = {
   ossUrl: string | null;
   ephemeralUrl: string | null;
   posterUrl?: string | null;
+  /** 列表 API 解析后的主预览 URL（视频/图片） */
+  previewUrl?: string | null;
+  thumbnailUrl?: string | null;
+  previewKind?: "image" | "video" | null;
   textOutput: string | null;
   failCode: string | null;
   failMessage: string | null;
@@ -1038,6 +1043,7 @@ export async function runCanvasNode(
     forceFresh?: boolean;
     llmSection?: "outline" | "character" | "scene" | "storyboard" | "shot_prompts";
     rowKey?: string;
+    polishMode?: "frame" | "video" | "both";
     mediaKind?:
       | "threeView"
       | "frameImage"
@@ -1166,7 +1172,7 @@ export async function uploadCanvasImage(
   return uploadCanvasFile(base, ensureCanvasUploadFileMeta(file));
 }
 
-const UPLOAD_FETCH_TIMEOUT_MS = 60_000;
+const UPLOAD_FETCH_TIMEOUT_MS = 120_000;
 
 export async function uploadCanvasFile(
   base: string,

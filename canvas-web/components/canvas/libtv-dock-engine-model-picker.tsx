@@ -33,6 +33,8 @@ export type LibtvDockEngineModelPickerProps = {
   disabled?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** 嵌在屏幕底部弹层 footer 时传 above，避免下拉被 Dock 挡住 */
+  dropdownPlacement?: import("./sbv1/sbv1-toolbar-anchor-popover").Sbv1ToolbarDropdownPlacement;
   onSelect: (next: {
     providerId: string;
     modelKey: string;
@@ -52,6 +54,7 @@ export function LibtvDockEngineModelPicker({
   disabled,
   open: controlledOpen,
   onOpenChange,
+  dropdownPlacement = "auto",
   onSelect,
 }: LibtvDockEngineModelPickerProps) {
   const { providers: hookProviders } = useUserProviders();
@@ -99,8 +102,8 @@ export function LibtvDockEngineModelPicker({
         open={open}
         setOpen={setOpen}
         rect={rect}
-        placement="auto"
-        estimatedHeight={280}
+        placement={dropdownPlacement}
+        estimatedHeight={360}
         className={LIBTV_DOCK_POPOVER_CLASS}
       >
         <p className="px-3 pb-1.5 pt-0.5 text-[13px] font-medium text-white/75">

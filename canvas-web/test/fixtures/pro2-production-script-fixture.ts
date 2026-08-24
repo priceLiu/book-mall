@@ -78,7 +78,7 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
       {
         index: 1,
         shotSize: "全景",
-        lighting: "正午暖金侧逆光，明暗对比强烈",
+        lighting: "长安主街·日，正午暖金侧逆光，明暗对比强烈",
         cameraMove: "缓慢摇移推进，前景旗幡遮挡增加层次",
         sceneDescription: "【起始】朱雀大街人声鼎沸。【结束】女主举婚书立于外廊。",
         propIds: ["prop-book"],
@@ -92,13 +92,14 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
       {
         index: 2,
         shotSize: "中景",
-        lighting: "暖金侧光打亮人物轮廓",
+        lighting: "长安主街·日，暖金侧光打亮人物轮廓",
         cameraMove: "固定机位平拍，缓慢推近，人物入画",
         sceneDescription: "【起始】承接上镜举书姿势。【结束】男主现身楼下。",
         dialogue: "—",
         durationSec: 8,
         sfxNote: "远处马蹄声",
         audioNote: "男主台词同期",
+        sceneId: "scene-a",
       },
     ],
     handoff: [

@@ -33,16 +33,32 @@ const DEEPSEEK_MODELS = new Set([
   "deepseek-coder",
 ]);
 
-const MOONSHOT_MODELS = new Set([
+/** Kimi 全系经百炼代销（平台代付 · DashScope compatible-mode） */
+const KIMI_CHAT_MODELS = new Set([
   "kimi-k3",
   "kimi-k2.6",
   "kimi-k2.5",
   "kimi-k2.7-code",
   "kimi-k2.7-code-highspeed",
+  "kimi/kimi-k3",
+  "kimi/kimi-k2.6",
+  "kimi/kimi-k2.5",
+  "kimi/kimi-k2.7-code",
+  "kimi/kimi-k2.7-code-highspeed",
+]);
+
+const MOONSHOT_LEGACY_MODELS = new Set([
   "moonshot-v1-8k",
   "moonshot-v1-32k",
   "moonshot-v1-128k",
 ]);
+
+export function isKimiChatModelKey(modelKey: string): boolean {
+  const m = modelKey.trim().toLowerCase();
+  if (m.startsWith("kimi/")) return true;
+  if (m.startsWith("kimi-")) return true;
+  return KIMI_CHAT_MODELS.has(m);
+}
 
 const KIE_CHAT_MODELS = new Set([
   "gemini-3-flash",
@@ -224,15 +240,11 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DEEPSEEK", requestKind: "CHAT" };
   }
 
-  if (m === "kimi/kimi-k3") {
+  if (isKimiChatModelKey(m)) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
-  if (
-    MOONSHOT_MODELS.has(m) ||
-    m.startsWith("kimi-") ||
-    m.startsWith("moonshot-")
-  ) {
+  if (MOONSHOT_LEGACY_MODELS.has(m) || m.startsWith("moonshot-")) {
     return { providerKind: "MOONSHOT", requestKind: "CHAT" };
   }
 
@@ -501,8 +513,14 @@ export function resolveMoonshotBaseUrl(
   return raw;
 }
 
+function normalizeKimiModelSlug(model: string): string {
+  const m = model.trim().toLowerCase();
+  if (m.startsWith("kimi/kimi-")) return m.slice("kimi/".length);
+  return m;
+}
+
 /** Kimi 模型 temperature / top_p 等为固定值；K2.6 thinking_mode → thinking 对象。 */
-export function resolveMoonshotChatCompletionsBody(
+export function resolveKimiChatCompletionsBody(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...body };
@@ -513,7 +531,7 @@ export function resolveMoonshotChatCompletionsBody(
   delete out.frequency_penalty;
 
   const model =
-    typeof out.model === "string" ? out.model.trim().toLowerCase() : "";
+    typeof out.model === "string" ? normalizeKimiModelSlug(out.model) : "";
   const thinkingMode = out.thinking_mode;
   if (typeof thinkingMode === "string" && model === "kimi-k2.6") {
     out.thinking = { type: thinkingMode === "disabled" ? "disabled" : "enabled" };
@@ -534,6 +552,9 @@ export function resolveMoonshotChatCompletionsBody(
 
   return out;
 }
+
+/** @deprecated 使用 resolveKimiChatCompletionsBody（Moonshot 直连仅保留 legacy v1） */
+export const resolveMoonshotChatCompletionsBody = resolveKimiChatCompletionsBody;
 
 /**
  * 将用户填写的 DashScope 根域名规范为 compatible-mode/v1，避免请求 /chat/completions 404。
@@ -607,12 +628,16 @@ export {
   resolveKieCodexUpstreamModel,
 } from "@/lib/gateway/kie-codex-chat";
 
-/** 百炼 compatible-mode 上游 model 字段（MiniMax 官方 ID 带 MiniMax/ 前缀） */
+/** 百炼 compatible-mode 上游 model 字段（MiniMax / Kimi 官方 ID 带前缀） */
 export function resolveBailianChatModelKey(modelKey: string): string {
   const raw = modelKey.trim();
   const aliases: Record<string, string> = {
     "MiniMax-M2.7": "MiniMax/MiniMax-M2.7",
     "kimi-k3": "kimi/kimi-k3",
+    "kimi-k2.6": "kimi/kimi-k2.6",
+    "kimi-k2.5": "kimi/kimi-k2.5",
+    "kimi-k2.7-code": "kimi/kimi-k2.7-code",
+    "kimi-k2.7-code-highspeed": "kimi/kimi-k2.7-code-highspeed",
   };
   return aliases[raw] ?? raw;
 }

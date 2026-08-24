@@ -121,6 +121,13 @@ const NAV_GROUPS: NavGroup[] = [
         show: (v) => canViewFinanceCost(v.user.role),
       },
       {
+        href: "/admin/usage-management",
+        label: "用量对账中心",
+        icon: ClipboardList,
+        prefix: "/admin/usage-management",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
         href: "/admin/pnl-alerts",
         label: "盈亏预警",
         icon: AlertTriangle,

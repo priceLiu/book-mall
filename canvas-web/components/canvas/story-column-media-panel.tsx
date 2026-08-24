@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
 import {
+  CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS,
   useClientPortalMounted,
   useModalBodyScrollLock,
   useModalEscapeClose,
@@ -391,8 +392,7 @@ export function StoryMediaPreviewModal({
 
   return createPortal(
     <div
-      className="canvas-media-preview-lightbox pointer-events-auto fixed inset-0 z-[2000] flex flex-col bg-black/88 backdrop-blur-md"
-      style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
+      className={CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS}
       onClick={onClose}
     >
       <div

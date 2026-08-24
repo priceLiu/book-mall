@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { canvasSavePhaseLabel } from "@/lib/canvas/canvas-save-phase";
+import {
+  CANVAS_AUTOSAVE_RECONNECT_HINT,
+  canvasSavePhaseLabel,
+  formatCanvasAutosaveUserHint,
+  isCanvasAutosaveReconnectError,
+} from "@/lib/canvas/canvas-save-phase";
 
 describe("canvasSavePhaseLabel", () => {
   it("shows step-specific busy labels", () => {
@@ -13,5 +18,20 @@ describe("canvasSavePhaseLabel", () => {
   it("returns empty for idle and saved for done", () => {
     expect(canvasSavePhaseLabel("idle")).toBe("");
     expect(canvasSavePhaseLabel("done")).toBe("已保存");
+  });
+});
+
+describe("formatCanvasAutosaveUserHint", () => {
+  it("shows reconnect hint for transient save timeout", () => {
+    expect(isCanvasAutosaveReconnectError("save_timeout")).toBe(true);
+    expect(
+      formatCanvasAutosaveUserHint("save_timeout"),
+    ).toBe(CANVAS_AUTOSAVE_RECONNECT_HINT);
+  });
+
+  it("shows short message for non-transient errors", () => {
+    expect(
+      formatCanvasAutosaveUserHint("INVALID_INPUT something"),
+    ).toBe("INVALID_INPUT something");
   });
 });

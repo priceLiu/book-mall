@@ -4,6 +4,7 @@ import {
   ensurePro2ProductionScriptFence,
   isPro2StructuredLlmScope,
   mergePro2StructuredLlmParams,
+  PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
   validatePro2ProductionScriptLlmOutput,
 } from "@/lib/canvas/pro2-production-script-llm";
 
@@ -55,10 +56,11 @@ const FULL_PACK_FIXTURE = {
         sceneDescription: "【起始】开场【结束】结束",
         dialogue: "—",
         durationSec: 10,
-        lighting: "自然光，场景氛围与画面描述一致",
+        lighting: "场景A，自然光，日内氛围与画面描述一致",
         cameraMove: "固定机位，镜头平稳推进，画面稳定",
         sfxNote: "—",
         audioNote: "—",
+        sceneId: "s1",
       },
     ],
     handoff: [
@@ -190,5 +192,29 @@ describe("pro2-production-script-llm", () => {
     const msg = buildPro2StructuredRetryUserMessage("缺少 shots");
     expect(msg).toContain("缺少 shots");
     expect(msg).toContain("重试");
+  });
+
+  it("buildPro2StructuredRetryUserMessage includes attempt budget", () => {
+    const msg = buildPro2StructuredRetryUserMessage("缺少 frameImagePrompt", 2);
+    expect(msg).toContain(`第 3 次`);
+    expect(msg).toContain(String(PRO2_STRUCTURED_LLM_MAX_ATTEMPTS));
+  });
+
+  it("shot_prompts frame mode passes validation with polishMode", () => {
+    const patch = {
+      schemaVersion: 2,
+      tier: "pro",
+      step: "shot_prompts",
+      patch: {
+        shots: [{ index: 1, frameImagePrompt: "特写，雨夜街头，角色回眸" }],
+      },
+    };
+    const text = `\`\`\`pro2-production-script\n${JSON.stringify(patch)}\n\`\`\``;
+    const v = validatePro2ProductionScriptLlmOutput(text, {
+      llmSection: "shot_prompts",
+      polishMode: "frame",
+      rowKey: "1",
+    });
+    expect(v.ok, v.error).toBe(true);
   });
 });

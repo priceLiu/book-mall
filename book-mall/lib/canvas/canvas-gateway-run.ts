@@ -12,7 +12,7 @@ import {
 } from "@/lib/platform-gateway-entitlement";
 import type { GatewayProviderKind } from "@prisma/client";
 
-import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { routeGatewayModel, isKimiChatModelKey } from "@/lib/gateway/model-router";
 import { CanvasProjectError } from "./canvas-project-service";
 import {
   GATEWAY_BAILIAN_PROVIDER_ID,
@@ -131,6 +131,10 @@ export function canvasProviderIdForGateway(
   modelKey?: string,
 ): string {
   const key = modelKey?.trim() ?? "";
+  // Kimi K* 已统一经百炼；节点若仍存 gateway:moonshot 须归一，否则 assert 拦截且日志不出现
+  if (key && isKimiChatModelKey(key)) {
+    return GATEWAY_BAILIAN_PROVIDER_ID;
+  }
   if (isPlatformOfferingProviderId(providerId) && key) {
     const route = routeGatewayModel(key);
     const expected = resolveExpectedGatewayProviderId(route.providerKind, key);

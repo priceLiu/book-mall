@@ -329,6 +329,14 @@ export function formatCanvasTaskError(
   }
 
   if (
+    blob.includes("engineoverloaded") ||
+    blob.includes("engine is currently overloaded") ||
+    code === "ENGINE_OVERLOADED"
+  ) {
+    return "文本模型引擎繁忙（厂商过载），请等待 1～2 分钟后重试，或暂时更换其它 LLM 模型。";
+  }
+
+  if (
     code === "INSUFFICIENT_CREDITS" ||
     blob.includes("insufficient_credits")
   ) {
@@ -450,6 +458,9 @@ export function formatCanvasTaskError(
     }
     if (isKieOnlyKlingVideoModelKey(m)) {
       return "可灵（Kling）视频产品未开通或已停用。请在 KIE 控制台确认已激活对应生视频产品，并在 Gateway 绑定有效凭证后重试。";
+    }
+    if (m.startsWith("kimi") || m.includes("kimi/")) {
+      return "Kimi 模型走阿里云百炼代销，需在百炼控制台「模型广场」搜索 kimi/kimi-k3 并点击开通；须与 Gateway 平台代付绑定的 DashScope Key 为同一阿里云账号（华北2 北京）。开通后重试。";
     }
     return "厂商产品未开通，请在对应控制台激活产品并检查 Gateway 凭证后重试。";
   }

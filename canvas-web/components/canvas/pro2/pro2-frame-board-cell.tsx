@@ -59,8 +59,8 @@ export function Pro2FrameBoardCell({
       className={cn(
         "nodrag relative flex min-h-[140px] w-full flex-col overflow-hidden rounded-xl border bg-[#141418] text-left transition",
         focused
-          ? "border-white/40 ring-1 ring-white/12"
-          : "border-[#A2A2A2] hover:border-[3px] hover:border-white",
+          ? "border-white shadow-[0_0_0_1.5px_#FFFFFF]"
+          : "border-[#A2A2A2]",
       )}
       onClick={(e) => {
         e.stopPropagation();

@@ -1173,6 +1173,10 @@ function isKieGptImageModelKey(modelKey: string): boolean {
   return k === "4o-image" || k.startsWith("gpt-image");
 }
 
+function isKieNanoBananaModelKey(modelKey: string): boolean {
+  return modelKey.trim().toLowerCase().includes("nano-banana");
+}
+
 /**
  * KIE GPT Image 暂不支持 4:5 / 5:4（createTask 422）。
  * 竖版就近 3:4，横版就近 4:3。
@@ -1184,6 +1188,48 @@ export function resolveKieGptImageAspectRatio(raw: string | undefined): string {
   return r;
 }
 
+/** Nano Banana Pro 等仅支持 1:1 / 16:9 / 9:16（createTask 500）。 */
+export function resolveKieNanoBananaAspectRatio(
+  raw: string | undefined,
+): "1:1" | "16:9" | "9:16" {
+  const r = String(raw ?? "1:1").trim() || "1:1";
+  if (r === "1:1" || r === "16:9" || r === "9:16") {
+    return r as "1:1" | "16:9" | "9:16";
+  }
+  if (
+    r === "3:4" ||
+    r === "2:3" ||
+    r === "4:5" ||
+    r === "9:21" ||
+    r === "1:2"
+  ) {
+    return "9:16";
+  }
+  if (
+    r === "4:3" ||
+    r === "3:2" ||
+    r === "5:4" ||
+    r === "21:9" ||
+    r === "2:1"
+  ) {
+    return "16:9";
+  }
+  return "1:1";
+}
+
+function resolveKieImageAspectForModel(
+  modelKey: string,
+  aspectRaw: string,
+): string {
+  if (isKieGptImageModelKey(modelKey)) {
+    return resolveKieGptImageAspectRatio(aspectRaw);
+  }
+  if (isKieNanoBananaModelKey(modelKey)) {
+    return resolveKieNanoBananaAspectRatio(aspectRaw);
+  }
+  return aspectRaw;
+}
+
 /** 画布 modelKey → KIE createTask 的 model + input（含 gpt-image-1 映射） */
 export function buildKieImageCreateArgs(args: {
   modelKey: string;
@@ -1193,10 +1239,9 @@ export function buildKieImageCreateArgs(args: {
 }): { model: string; input: Record<string, unknown> } {
   const params = args.params ?? {};
   const aspectRaw = String(params.aspect_ratio ?? "1:1").trim() || "1:1";
-  const aspect = (
-    isKieGptImageModelKey(args.modelKey)
-      ? resolveKieGptImageAspectRatio(aspectRaw)
-      : aspectRaw
+  const aspect = resolveKieImageAspectForModel(
+    args.modelKey,
+    aspectRaw,
   ) as KieAspectRatio;
   const imageUrls = (args.imageUrls ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),

@@ -104,7 +104,7 @@ import {
 } from "./pro2-spawn-scene-image-group";
 import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
 import { stripStaleHubGenerateIntent, repairHubEmbeddedPackSections, repairHubStructuredProductionScriptNodes } from "./story-hub-runtime";
-import { repairPro2VideoBoardVisualGroups } from "./pro2-spawn-video-board-group";
+import { repairPro2VideoBoardVisualGroups, applyPro2VideoBoardGroupRemoval } from "./pro2-spawn-video-board-group";
 import { canvasNotify } from "./canvas-notify";
 import {
   canvasNodesLayoutFieldsEqual,
@@ -952,6 +952,7 @@ export const useCanvasStore = create<CanvasState>()(
           return;
         }
         next = detachChildrenOfRemovedGroups(prev, next);
+        next = applyPro2VideoBoardGroupRemoval(prev, next);
         const removedNodeIds = prev
           .filter((n) => !next.some((x) => x.id === n.id))
           .map((n) => n.id);
@@ -1559,7 +1560,10 @@ export const useCanvasStore = create<CanvasState>()(
         }
 
         const edges = prevEdges.filter((e) => e.source !== id && e.target !== id);
-        const filtered = prevNodes.filter((n) => n.id !== id);
+        const filtered = applyPro2VideoBoardGroupRemoval(
+          prevNodes,
+          prevNodes.filter((n) => n.id !== id),
+        );
         const pruned = pruneMentionsAfterNodeRemoval(filtered, id);
         let nodes = pruned.map((n) => {
           const patch = starterUnlinkPatches.get(n.id);

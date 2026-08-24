@@ -664,6 +664,18 @@ export function displayVideoRows(
   stored: StoryVideoRow[],
   edges: CanvasFlowEdge[] = [],
 ): StoryVideoRow[] {
+  return displayVideoRowsInner(nodes, columnId, stored, edges, {
+    allowFrameColumnFallback: true,
+  });
+}
+
+function displayVideoRowsInner(
+  nodes: CanvasFlowNode[],
+  columnId: string,
+  stored: StoryVideoRow[],
+  edges: CanvasFlowEdge[] = [],
+  opts?: { allowFrameColumnFallback?: boolean },
+): StoryVideoRow[] {
   const col = nodes.find((n) => n.id === columnId);
   const hubNodeId = columnHubNodeId(col);
   if (!hubNodeId) return stored;
@@ -674,14 +686,23 @@ export function displayVideoRows(
     !siblings.characterColumnId ||
     !siblings.frameColumnId
   ) {
-    const frameId = pickFrameColumnIdForVideoNode(
-      nodes,
-      edges,
-      columnId,
-      findWorkspaceForColumnId(nodes, edges, columnId),
-    );
-    if (frameId) {
-      return displayVideoRowsForFrameColumn(nodes, columnId, stored, frameId);
+    if (opts?.allowFrameColumnFallback) {
+      const frameId = pickFrameColumnIdForVideoNode(
+        nodes,
+        edges,
+        columnId,
+        findWorkspaceForColumnId(nodes, edges, columnId),
+      );
+      if (frameId) {
+        const frameRows = authoritativeFrameRowsForVideoColumn(
+          nodes,
+          frameId,
+          edges,
+        );
+        if (frameRows.length) {
+          return patchVideoRowsFromFrameRows(stored, frameRows);
+        }
+      }
     }
     return stored;
   }
@@ -764,7 +785,13 @@ export function displayVideoRowsForFrameColumn(
   frameColumnId?: string,
   edges: CanvasFlowEdge[] = [],
 ): StoryVideoRow[] {
-  const video = displayVideoRows(nodes, videoColumnId, storedVideo, edges);
+  const video = displayVideoRowsInner(
+    nodes,
+    videoColumnId,
+    storedVideo,
+    edges,
+    { allowFrameColumnFallback: false },
+  );
   if (!frameColumnId) return video;
   const frameRows = authoritativeFrameRowsForVideoColumn(
     nodes,

@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { restoreServerInflightNodeRuntimes } from "@/lib/canvas/restore-server-inflight-node-runtimes";
-import { pickPreferredCanvasTask, pickPreferredCanvasTaskForScope, pickStoryRowApplyTask, shouldSkipStoryRowTaskApply } from "@/lib/canvas/task-pick";
+import {
+  hubHasServerInflightLlmTask,
+  hubNodeLocalRuntimeForTaskPick,
+  pickPreferredCanvasTask,
+  pickPreferredCanvasTaskForScope,
+  preferredTasksByNode,
+  pickStoryRowApplyTask,
+  shouldSkipStoryRowTaskApply,
+} from "@/lib/canvas/task-pick";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 const now = Date.now();
@@ -300,5 +308,64 @@ describe("restoreServerInflightNodeRuntimes", () => {
         }),
       }),
     );
+  });
+});
+
+describe("script hub task pick", () => {
+  it("hubNodeLocalRuntimeForTaskPick reads section pending runtime", () => {
+    const node: CanvasFlowNode = {
+      id: "hub-1",
+      type: "story-pro2-script-hub",
+      data: {
+        outlineRuntime: { status: "pending" },
+        characterRuntime: { status: "done", taskId: "old" },
+      },
+      position: { x: 0, y: 0 },
+    };
+    expect(hubNodeLocalRuntimeForTaskPick(node)?.status).toBe("pending");
+  });
+
+  it("preferredTasksByNode prefers inflight over stale SUCCEEDED for hub", () => {
+    const node: CanvasFlowNode = {
+      id: "hub-1",
+      type: "story-pro2-script-hub",
+      data: { outlineRuntime: { status: "pending" } },
+      position: { x: 0, y: 0 },
+    };
+    const pick = preferredTasksByNode(
+      [
+        task({
+          id: "old-done",
+          nodeId: "hub-1",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(30),
+          textOutput: "done",
+          storyScope: { llmSection: "outline" },
+        }),
+        task({
+          id: "new-run",
+          nodeId: "hub-1",
+          status: "SUBMITTED",
+          updatedAt: minsAgo(1),
+          submittedAt: minsAgo(1),
+          storyScope: { llmSection: "outline" },
+        }),
+      ],
+      [node],
+    ).get("hub-1");
+    expect(pick?.id).toBe("new-run");
+  });
+
+  it("hubHasServerInflightLlmTask detects active hub LLM tasks", () => {
+    const tasks = [
+      task({
+        id: "run-1",
+        nodeId: "hub-1",
+        status: "SUBMITTED",
+        updatedAt: minsAgo(1),
+      }),
+    ];
+    expect(hubHasServerInflightLlmTask("hub-1", tasks)).toBe(true);
+    expect(hubHasServerInflightLlmTask("hub-2", tasks)).toBe(false);
   });
 });

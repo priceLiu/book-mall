@@ -16,6 +16,8 @@ import {
   resolveBailianChatModelKey,
   resolveDeepseekChatModelKey,
   resolveDeepseekChatCompletionsBody,
+  isKimiChatModelKey,
+  resolveKimiChatCompletionsBody,
   resolveKieApiRoot,
   resolveKieGeminiChatPath,
   resolveMoonshotChatCompletionsBody,
@@ -89,6 +91,10 @@ import {
   SubmitBurstLimitError,
   assertSubmitBurstAllowed,
 } from "@/lib/generation/submit-rate/assert-submit-burst";
+import {
+  ModelDailyLimitError,
+  assertModelDailyLimitAllowed,
+} from "@/lib/gateway/model-daily-limit";
 
 export type { UsageFromResponse };
 
@@ -108,6 +114,9 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
     return { status: 429, error: e.message };
   }
   if (e instanceof SubmitBurstLimitError) {
+    return { status: 429, error: e.message };
+  }
+  if (e instanceof ModelDailyLimitError) {
     return { status: 429, error: e.message };
   }
   const billing = mapGatewayBillingFailure(e);
@@ -169,6 +178,9 @@ export async function createRequestLog(opts: {
     actorUserId: opts.actorBookUserId,
   });
   await assertSubmitBurstAllowed(trafficScope.scopeKey);
+
+  // 平台级保险丝：单模型当日（CST）调用超上限即熔断（GATEWAY_MODEL_DAILY_LIMIT，0=关）
+  await assertModelDailyLimitAllowed(opts.model);
 
   const route = routeGatewayModel(opts.model);
 
@@ -501,12 +513,22 @@ export async function finalizeRequestLog(
   }
 }
 
-function resolveChatCompletionsBody(
+export function resolveGatewayChatCompletionsBody(
   providerKind: GatewayProviderKind,
   body: Record<string, unknown>,
 ): Record<string, unknown> {
   const model = typeof body.model === "string" ? body.model : "";
   if (!model) return body;
+
+  // Kimi 固定参数模型：须先于 providerKind 分支剥离 temperature 等（百炼代销时凭证可能是 DASHSCOPE）
+  if (isKimiChatModelKey(model)) {
+    const mapped =
+      providerKind === "BAILIAN" || providerKind === "DASHSCOPE"
+        ? resolveBailianChatModelKey(model)
+        : model;
+    return resolveKimiChatCompletionsBody({ ...body, model: mapped });
+  }
+
   if (providerKind === "BAILIAN") {
     return { ...body, model: resolveBailianChatModelKey(model) };
   }
@@ -606,7 +628,7 @@ export async function forwardChatCompletions(opts: {
   );
   const url = `${base}/chat/completions`;
 
-  const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  const requestBody = resolveGatewayChatCompletionsBody(opts.providerKind, opts.body);
   const bearerKey =
     cred.providerKind === "VOLCENGINE"
       ? resolveVolcengineArkApiKey(cred.apiKey)
@@ -702,7 +724,7 @@ export async function forwardChatCompletionsStream(opts: {
     }
   }
 
-  let requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  let requestBody = resolveGatewayChatCompletionsBody(opts.providerKind, opts.body);
   if (
     cred.providerKind === "KIE" &&
     typeof opts.body.model === "string" &&

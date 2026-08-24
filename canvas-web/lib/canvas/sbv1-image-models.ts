@@ -99,24 +99,71 @@ function isKieGptImageModelKey(modelKey: string): boolean {
   return k === "4o-image" || k.startsWith("gpt-image");
 }
 
+function isKieNanoBananaModelKey(modelKey: string): boolean {
+  return modelKey.trim().toLowerCase().includes("nano-banana");
+}
+
+const KIE_NANO_BANANA_ASPECTS = new Set<Sbv1ImageAspectRatio>([
+  "1:1",
+  "16:9",
+  "9:16",
+]);
+
+/** Nano Banana Pro 等 KIE 模型仅支持 1:1 / 16:9 / 9:16。 */
+export function resolveKieNanoBananaAspectRatio(
+  raw: Sbv1ImageAspectRatio | string | undefined,
+): "1:1" | "16:9" | "9:16" {
+  const r = String(raw ?? "1:1").trim() as Sbv1ImageAspectRatio;
+  if (KIE_NANO_BANANA_ASPECTS.has(r)) return r as "1:1" | "16:9" | "9:16";
+  if (
+    r === "3:4" ||
+    r === "2:3" ||
+    r === "4:5" ||
+    r === "9:21" ||
+    r === "1:2"
+  ) {
+    return "9:16";
+  }
+  if (
+    r === "4:3" ||
+    r === "3:2" ||
+    r === "5:4" ||
+    r === "21:9" ||
+    r === "2:1"
+  ) {
+    return "16:9";
+  }
+  return "1:1";
+}
+
 /** Dock 比例列表：GPT Image 暂不可选 4:5 / 5:4（KIE 422）。 */
 export function sbv1ImageAspectOptionsForModel(modelKey: string): {
   value: Sbv1ImageAspectRatio;
   label: string;
 }[] {
   const all = SBV1_IMAGE_ASPECT_RATIOS.filter((r) => r.value !== "auto");
-  if (!isKieGptImageModelKey(modelKey)) return all;
-  return all.filter((r) => r.value !== "4:5" && r.value !== "5:4");
+  if (isKieGptImageModelKey(modelKey)) {
+    return all.filter((r) => r.value !== "4:5" && r.value !== "5:4");
+  }
+  if (isKieNanoBananaModelKey(modelKey)) {
+    return all.filter((r) => KIE_NANO_BANANA_ASPECTS.has(r.value));
+  }
+  return all;
 }
 
-/** 选 GPT 时把暂不可用比例就近落到 3:4 / 4:3。 */
+/** 选 GPT / Nano Banana 时把不可用比例就近映射到厂商白名单。 */
 export function coerceSbv1ImageAspectForModel(
   modelKey: string,
   aspect: Sbv1ImageAspectRatio,
 ): Sbv1ImageAspectRatio {
-  if (!isKieGptImageModelKey(modelKey)) return aspect;
-  if (aspect === "4:5") return "3:4";
-  if (aspect === "5:4") return "4:3";
+  if (isKieGptImageModelKey(modelKey)) {
+    if (aspect === "4:5") return "3:4";
+    if (aspect === "5:4") return "4:3";
+    return aspect;
+  }
+  if (isKieNanoBananaModelKey(modelKey)) {
+    return resolveKieNanoBananaAspectRatio(aspect);
+  }
   return aspect;
 }
 

@@ -6,6 +6,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 export const CANVAS_MODAL_BACKDROP_CLASS =
   "canvas-modal-backdrop fixed inset-0 flex items-center justify-center bg-black/78 p-4";
 
+/** 全屏媒体预览 · 纯色底 + paint  containment（禁止 backdrop-blur，向导/RF 动画在后会闪屏） */
+export const CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS =
+  "canvas-media-preview-lightbox canvas-modal-backdrop pointer-events-auto fixed inset-0 z-[2000] flex h-[100dvh] w-screen flex-col bg-[#0a0a0c]";
+
 /** 弹层 scroll lock 引用计数 · 避免多弹层 / effect 重跑时 overflow 来回切换 */
 let modalScrollLockCount = 0;
 let savedBodyOverflow = "";

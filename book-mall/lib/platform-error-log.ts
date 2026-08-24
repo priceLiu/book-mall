@@ -7,6 +7,7 @@ import type {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runtimeInstanceContext } from "@/lib/runtime-instance";
 
 export type PlatformErrorContext = {
   userId?: string;
@@ -62,9 +63,14 @@ export function recordPlatformError(input: RecordPlatformErrorInput): void {
 
   const fingerprint = buildFingerprint({ ...input, message });
   const detail = clip(input.detail, 8000);
+  // 统一注入运行时实例指纹（host / commitSha），多容器并存时可定位来源实例
+  const mergedContext: PlatformErrorContext = {
+    ...input.context,
+    runtime: runtimeInstanceContext(),
+  };
   const context: Prisma.InputJsonValue | undefined =
-    input.context && Object.keys(input.context).length > 0
-      ? (input.context as Prisma.InputJsonValue)
+    Object.keys(mergedContext).length > 0
+      ? (mergedContext as Prisma.InputJsonValue)
       : undefined;
 
   void (async () => {

@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
@@ -35,6 +36,7 @@ import {
   LibtvTryActionRow,
 } from "../libtv-thin-node-try-row";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { dispatchCanvasRfSelectNode } from "@/lib/canvas/canvas-rf-sync";
 import { PRO2_SCRIPT_HUB_NODE_LABEL } from "@/lib/canvas/story-pro2-node-chrome";
 import {
   PRO2_CARD_SHELL_CLASS,
@@ -168,6 +170,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
   const outlineMd = resolveHubOutlineMd(d);
   const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
+  const { history: hubTasks } = useNodeTaskHistory(id);
 
   useEffect(() => {
     const storyboardPatch = buildHubStoryboardBackfillPatch(d);
@@ -228,12 +231,15 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     }
   }, [hasTable, hasCharacter, hasScene, hasOutline, previewTab]);
 
-  const isGenerating = pro2HubIsGenerating({
-    id,
-    data: d,
-    type: "story-pro2-script-hub",
-    position: { x: 0, y: 0 },
-  } as never);
+  const isGenerating = pro2HubIsGenerating(
+    {
+      id,
+      data: d,
+      type: "story-pro2-script-hub",
+      position: liveHubNode?.position ?? { x: 0, y: 0 },
+    } as never,
+    hubTasks,
+  );
   const outlineLinked = pro2HubIsLinkedOutline(nodes, edges, id, d);
   const isLinked = pro2ThinNodeIsLinked(id, edges);
   const displayState = resolveLibtvThinNodeDisplayState({
@@ -471,6 +477,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       data-pro2-dock-anchor={id}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
+      onPointerDownCapture={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (selected) return;
+        dispatchCanvasRfSelectNode(id);
+      }}
     >
       <Pro2NodeResizer
         isVisible={!!selected}
@@ -542,9 +553,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       <div className="relative min-h-0 flex-1 overflow-visible">
       <div
         className={cn(
+          "canvas-node-shell",
           PRO2_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
           "relative flex h-full min-h-0 flex-col overflow-hidden",
+          isGenerating && "canvas-node-generating",
         )}
         style={
           libtvNodeBorderStyle({
@@ -643,7 +656,12 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
           </div>
         )}
         {isGenerating ? (
-          <LibtvMediaGeneratingState variant="violet" className="z-10" cancelNodeId={id} />
+          <LibtvMediaGeneratingState
+            variant="violet"
+            className="z-10"
+            label="生成中…"
+            cancelNodeId={id}
+          />
         ) : null}
       </div>
       </div>

@@ -44,6 +44,23 @@ describe("KIE GPT Image aspect_ratio", () => {
         prompt: "poster",
         params: { aspect_ratio: "4:5", resolution: "2K" },
       }).input.aspect_ratio,
-    ).toBe("4:5");
+    ).toBe("9:16");
+  });
+
+  it("maps 4:3 to 16:9 for nano-banana-pro", () => {
+    expect(
+      buildKieImageCreateArgs({
+        modelKey: "nano-banana-pro",
+        prompt: "character",
+        params: { aspect_ratio: "4:3", resolution: "2K" },
+      }).input.aspect_ratio,
+    ).toBe("16:9");
+    expect(
+      buildKieImageCreateArgs({
+        modelKey: "nano-banana-pro",
+        prompt: "character",
+        params: { aspect_ratio: "2:1", resolution: "2K" },
+      }).input.aspect_ratio,
+    ).toBe("16:9");
   });
 });

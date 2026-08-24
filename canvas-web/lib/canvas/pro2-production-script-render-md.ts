@@ -18,6 +18,7 @@ import {
   resolvePro2PropNamesCell,
   stripPro2AnchorPlaceholders,
 } from "./pro2-chinese-prompt-normalize";
+import { reconcileShotEntityLinks } from "./pro2-shot-entity-reconcile";
 import { formatPro2CharacterAppearanceCell } from "./pro2-character-script-fields";
 import {
   formatStoryboardTableMarkdown,
@@ -134,8 +135,9 @@ export function resolveShotPropNames(
   shot: NonNullable<Pro2ProductionScript["shots"]>[number],
   script: Pro2ProductionScript,
 ): string {
+  const effective = reconcileShotEntityLinks(shot, script);
   const names =
-    shot.propIds
+    effective.propIds
       ?.map((id) => resolvePro2PropIdToName(String(id), script))
       .filter(Boolean) ?? [];
   return names.length ? names.join("、") : "—";

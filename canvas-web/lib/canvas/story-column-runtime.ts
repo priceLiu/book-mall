@@ -1,4 +1,5 @@
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
+import { isCanvasNodeRunSessionActive } from "./canvas-run-session";
 import { hubSectionCountsAsInflight } from "./story-hub-runtime";
 import {
   characterRowCountsAsInflight,
@@ -176,8 +177,20 @@ function storyVideoColumnHasStaleError(node: CanvasFlowNode): boolean {
   );
 }
 
+/** 本地 error 但服务端可能已有新 SUBMITTED 任务（换模型重试后前台未同步） */
+function storyScriptHubHasStaleError(node: CanvasFlowNode): boolean {
+  if (!isAnyStoryScriptHubType(node.type ?? "")) return false;
+  const d = node.data as unknown as StoryScriptHubNodeData;
+  return (
+    d.outlineRuntime?.status === "error" ||
+    d.characterRuntime?.status === "error" ||
+    d.sceneRuntime?.status === "error" ||
+    d.storyboardRuntime?.status === "error"
+  );
+}
+
 /**
- * 任务轮询节点 id：进行中 + 视频列本地失败（便于拉回服务端 SUBMITTED 状态）。
+ * 任务轮询节点 id：进行中 + 视频列/剧本 Hub 本地失败（便于拉回服务端 SUBMITTED/SUCCEEDED）。
  * 返回空数组时 run-queue 会走全量扫描。
  */
 export function collectCanvasTaskPollNodeIds(
@@ -186,6 +199,7 @@ export function collectCanvasTaskPollNodeIds(
   const ids = new Set(collectCanvasInflightNodeIds(nodes));
   for (const node of nodes) {
     if (storyVideoColumnHasStaleError(node)) ids.add(node.id);
+    if (storyScriptHubHasStaleError(node)) ids.add(node.id);
   }
   return [...ids];
 }
@@ -212,8 +226,18 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
       continue;
     }
     if (isAnyStoryScriptHubType(node.type ?? "")) {
-      const d = node.data as unknown as StoryScriptHubNodeData;
-      count += hubSectionInflightCount(d);
+      const d = node.data as unknown as StoryScriptHubNodeData & {
+        hubGenerateIntent?: boolean;
+      };
+      const sectionCount = hubSectionInflightCount(d);
+      if (sectionCount > 0) {
+        count += sectionCount;
+      } else if (
+        d.hubGenerateIntent ||
+        isCanvasNodeRunSessionActive(node.id)
+      ) {
+        count += 1;
+      }
       continue;
     }
     if (node.type === "story-pro-starter" || node.type === "story-pro2-starter") {

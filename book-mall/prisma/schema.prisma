@@ -897,6 +897,19 @@ model PlatformConfig {
   walletHoldDefaultTtlMin    Int      @default(10)
   /// 生成耗时预警（秒）：Gateway 轮询池 / poll 升格；默认 800
   generationSlowWarnSec      Int      @default(800)
+
+  // —— 日志与保险丝（管理后台 /admin/settings 可调；0 = 关闭）——
+  /// 单模型当日（CST）Gateway 调用上限；0 = 关闭保险丝
+  gatewayModelDailyLimit        Int @default(300)
+  /// 按模型覆盖上限 JSON，如 {"deepseek-v4-flash":1000,"kling-x":0}（0=该模型不限）
+  gatewayModelDailyLimitOverrides Json?
+  /// 业务层直连厂商硬阻断 host 列表（["api.deepseek.com"]）；空 = 仅审计 WARN
+  vendorDirectBlockHosts      Json?
+  /// 常驻用量对账扫描开关
+  usageReconResidentEnabled   Boolean @default(true)
+  /// 常驻用量对账扫描间隔（分钟），默认 30
+  usageReconIntervalMin       Int     @default(30)
+
   updatedAt                  DateTime @updatedAt
 }
 
@@ -3016,6 +3029,8 @@ model GatewayRequestLog {
   @@index([status, submittedAt])
   @@index([status, lastPolledAt])
   @@index([clientSource, submittedAt])
+  // 单模型日调用上限（model-daily-limit）：按 model + 当日 submittedAt 计数
+  @@index([model, submittedAt])
   @@index([tenantId, submittedAt])
   @@index([actorBookUserId, submittedAt])
   @@index([channelSnapshot])
@@ -4604,4 +4619,31 @@ model PlatformAssistantModelConfig {
   updatedByUserId       String?
   updatedAt             DateTime @updatedAt
   createdAt             DateTime @default(now())
+}
+
+enum PlatformAssistantQaMatchMode {
+  EXACT
+  CONTAINS
+  KEYWORDS
+}
+
+/// AI 小智 · 管理员维护的问答库（价格/财务类仍走 guardrails，不入库）
+model PlatformAssistantQaEntry {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enabled   Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  question      String                       @db.Text
+  answer        String                       @db.Text
+  matchMode     PlatformAssistantQaMatchMode @default(CONTAINS)
+  matchKeywords String[]                     @default([])
+
+  sourceFeedbackId String?
+  updatedByUserId  String?
+  adminNote        String? @db.Text
+
+  @@index([enabled, sortOrder(sort: Desc), updatedAt(sort: Desc)])
 }

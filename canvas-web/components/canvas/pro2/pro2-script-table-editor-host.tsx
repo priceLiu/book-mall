@@ -25,6 +25,7 @@ import {
   tryRepairHubFromStoredProductionJson,
   trySyncResolvedProductionScriptToHub,
 } from "@/lib/canvas/pro2-production-script-apply";
+import { syncProductionScaffoldDataToHubFromStore } from "@/lib/canvas/hydrate-production-scaffold";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
 import {
@@ -230,6 +231,7 @@ export function Pro2ScriptTableEditorHost() {
       if (!node) return;
       const patch = applyProductionScriptDirectToHub(d, script, node.id);
       updateNodeData(node.id, patch);
+      syncProductionScaffoldDataToHubFromStore(node.id);
     },
     [node, d, updateNodeData],
   );

@@ -26,8 +26,14 @@ import {
   subscriptionCreditPeriodKey,
 } from "@/lib/billing/credit-lot-logic";
 import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
+import {
+  cstBusinessDate,
+  cstDayEndUtc,
+  cstDayStartUtc,
+} from "@/lib/billing/cst-business-date";
 
-const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
+export { cstBusinessDate, cstDayEndUtc, cstDayStartUtc } from "@/lib/billing/cst-business-date";
+
 
 /** dev 热更新后 Prisma Client 可能未含 CreditOps 模型；避免整页崩溃。 */
 export function isCreditOpsPrismaReady(): boolean {
@@ -108,21 +114,6 @@ export function emptyCreditOpsDashboard(date?: string): CreditOpsDashboardSnapsh
     cronRanToday: { expire: false, reset: false },
     lastJobs: [],
   };
-}
-
-export function cstBusinessDate(d: Date = new Date()): string {
-  const cst = new Date(d.getTime() + CST_OFFSET_MS);
-  return `${cst.getUTCFullYear()}-${String(cst.getUTCMonth() + 1).padStart(2, "0")}-${String(cst.getUTCDate()).padStart(2, "0")}`;
-}
-
-export function cstDayStartUtc(businessDate: string): Date {
-  const [y, m, day] = businessDate.split("-").map(Number);
-  return new Date(Date.UTC(y!, m! - 1, day!, -8, 0, 0, 0));
-}
-
-export function cstDayEndUtc(businessDate: string): Date {
-  const start = cstDayStartUtc(businessDate);
-  return new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
 
 type WorkItemUpsert = {
