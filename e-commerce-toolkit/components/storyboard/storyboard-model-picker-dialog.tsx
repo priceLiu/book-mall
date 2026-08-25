@@ -422,8 +422,8 @@ export function StoryboardModelPickerDialog({
   ]);
 
   function handleConfirm() {
-    if (draftKey !== value) onChange(draftKey);
     onConfirm(draftKey);
+    if (draftKey !== value) onChange(draftKey);
   }
 
   const platformFlat = models.some((m) => m.platformOffering);
@@ -446,10 +446,11 @@ export function StoryboardModelPickerDialog({
 
   const hasAnyModel = models.length > 0;
   const filterEmpty = hasAnyModel && visibleModels.length === 0;
+  const selectedDraftModel = models.find((m) => m.modelKey === draftKey) ?? null;
   const canConfirm =
-    visibleModels.some(
-      (m) =>
-        m.modelKey === draftKey && (m.credentialBound || m.platformOffering),
+    Boolean(
+      selectedDraftModel &&
+        (selectedDraftModel.credentialBound || selectedDraftModel.platformOffering),
     ) && !filterEmpty;
 
   const ModeIcon = mode === "image" ? ImageIcon : Video;

@@ -2,6 +2,8 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Prisma } from "@prisma/client";
 
+import { ADMIN_TEMPLATE_PAGE_SIZE, sliceAdminPage } from "@/lib/admin/admin-template-page";
+
 import {
   buildEcomTemplateGalleryOssKey,
   buildEcomTemplateGalleryThumbOssKey,
@@ -190,6 +192,97 @@ function templateDelegate() {
   ).ecomTemplateCatalogEntry;
 }
 
+export type AdminTemplateGalleryPageFilters = {
+  category: string;
+  mediaKind?: "image" | "video" | null;
+  noPromptOnly?: boolean;
+  q?: string | null;
+  limit?: number;
+  offset?: number;
+};
+
+export function matchesAdminTemplateGalleryFilters(
+  t: Pick<EcomTemplateGalleryEntry, "id" | "title" | "mediaKind" | "promptText">,
+  filters: Pick<AdminTemplateGalleryPageFilters, "mediaKind" | "noPromptOnly" | "q">,
+): boolean {
+  if (filters.mediaKind && t.mediaKind !== filters.mediaKind) return false;
+  if (filters.noPromptOnly && (t.promptText ?? "").trim()) return false;
+  const q = (filters.q ?? "").trim().toLowerCase();
+  if (q) {
+    const hay = `${t.title} ${t.id}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+
+export function buildAdminTemplateGalleryWhere(
+  filters: Pick<AdminTemplateGalleryPageFilters, "category" | "mediaKind" | "noPromptOnly" | "q">,
+): Prisma.EcomTemplateCatalogEntryWhereInput {
+  const where: Prisma.EcomTemplateCatalogEntryWhereInput = {
+    deletedAt: null,
+    category: filters.category,
+  };
+  if (filters.mediaKind) where.mediaKind = filters.mediaKind;
+  const and: Prisma.EcomTemplateCatalogEntryWhereInput[] = [];
+  if (filters.noPromptOnly) {
+    and.push({ OR: [{ promptText: null }, { promptText: "" }] });
+  }
+  const q = (filters.q ?? "").trim();
+  if (q) {
+    and.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { id: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (and.length) where.AND = and;
+  return where;
+}
+
+/** 后台模板区分页；须带 category，避免一次拉全部分类 */
+export async function listAdminTemplateGalleryPage(
+  filters: AdminTemplateGalleryPageFilters,
+): Promise<{ templates: EcomTemplateGalleryEntry[]; total: number }> {
+  const category = filters.category.trim();
+  if (!category) return { templates: [], total: 0 };
+  const limit = Math.min(100, Math.max(1, filters.limit ?? ADMIN_TEMPLATE_PAGE_SIZE));
+  const offset = Math.max(0, filters.offset ?? 0);
+  const pageFilters = {
+    category,
+    mediaKind: filters.mediaKind ?? null,
+    noPromptOnly: Boolean(filters.noPromptOnly),
+    q: filters.q ?? null,
+  };
+
+  try {
+    const categoryCount = await prisma.ecomTemplateCatalogEntry.count({
+      where: { deletedAt: null, category },
+    });
+    if (categoryCount > 0) {
+      const where = buildAdminTemplateGalleryWhere(pageFilters);
+      const [rows, total] = await prisma.$transaction([
+        prisma.ecomTemplateCatalogEntry.findMany({
+          where,
+          orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+          skip: offset,
+          take: limit,
+        }),
+        prisma.ecomTemplateCatalogEntry.count({ where }),
+      ]);
+      return { templates: rows.map(rowToEntry), total };
+    }
+  } catch (e) {
+    console.warn("[ecom-template-gallery] admin page from db failed", e);
+  }
+
+  const snapshot = readTemplateGalleryCatalog()
+    .templates.filter((t) => t.category === category)
+    .filter((t) => matchesAdminTemplateGalleryFilters(t, pageFilters));
+  const page = sliceAdminPage(snapshot, offset, limit);
+  return { templates: page.items, total: page.total };
+}
+
 export async function listTemplateGalleryEntriesFromDb(
   category?: string,
 ): Promise<EcomTemplateGalleryEntry[]> {
@@ -209,7 +302,7 @@ export async function listTemplateGalleryEntriesFromDb(
 
 /**
  * 全量 catalog 已达 1400+ 条 / 700KB+，页面按分类取数以免拉满超时。
- * 不传 category 仍返回全量（管理后台与旧客户端依赖）。
+ * 不传 category 仍返回全量（SSO / 导入脚本依赖）。后台列表走分页接口。
  */
 export async function readTemplateGalleryCatalogLive(
   category?: string,

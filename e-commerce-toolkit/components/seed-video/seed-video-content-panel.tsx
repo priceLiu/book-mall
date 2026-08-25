@@ -282,7 +282,9 @@ export function SeedVideoContentPanel({
   const [pickerGenerateAllParallel, setPickerGenerateAllParallel] = useState(false);
   const [pickerSelectedShotIndices, setPickerSelectedShotIndices] = useState<number[]>([]);
   const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
-  const [generatingShots, setGeneratingShots] = useState<Set<number>>(() => new Set());
+  const [generatingShots, setGeneratingShots] = useState<Set<number>>(
+    () => new Set(listPendingShotVideoIndices(project.meta)),
+  );
   const [batchShotBusy, setBatchShotBusy] = useState(false);
   const [ttsBusy, setTtsBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
@@ -309,13 +311,23 @@ export function SeedVideoContentPanel({
     setSelectedShotIndices(new Set());
   }, [project.id]);
 
+  useEffect(() => {
+    setGeneratingShots(new Set(listPendingShotVideoIndices(project.meta)));
+  }, [project.id]);
+
+  useEffect(() => {
+    const pending = listPendingShotVideoIndices(project.meta);
+    if (pending.length === 0) return;
+    setGeneratingShots((prev) => {
+      let next = prev;
+      for (const index of pending) next = addGeneratingShot(next, index);
+      return next;
+    });
+  }, [project.meta]);
+
   const pendingShotIndices = useMemo(
-    () =>
-      listPendingShotVideoIndices(project.meta).filter((idx) => {
-        const local = localShots.find((s) => s.index === idx);
-        return !local?.videoUrl?.trim();
-      }),
-    [project.meta, localShots],
+    () => listPendingShotVideoIndices(project.meta),
+    [project.meta],
   );
 
   const activeGeneratingIndices = useMemo(() => {
@@ -463,8 +475,10 @@ export function SeedVideoContentPanel({
       for (const idx of watch) {
         const remote = fresh.plan?.shots?.find((s) => s.index === idx);
         if (!remote?.videoUrl?.trim()) continue;
-        if (applyRemoteShotVideo(idx, remote)) videoChanged = true;
-        completed.push(idx);
+        if (applyRemoteShotVideo(idx, remote)) {
+          videoChanged = true;
+          completed.push(idx);
+        }
       }
 
       if (completed.length > 0) {

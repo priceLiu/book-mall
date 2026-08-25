@@ -35,6 +35,7 @@ import {
 import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { QrModelPicker, QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
+import { QrHoverVideo } from "@/components/quick-replica/qr-hover-video";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 
 /** HappyHorse 参考图缩略边长（较 h-14 高约 20%） */
@@ -535,11 +536,11 @@ export function QrMotionSyncForm({
                 <span className="text-sm text-[var(--qr-text-secondary)]">视频上传中…</span>
               </div>
             ) : hasReferenceVideo ? (
-              <video
+              <QrHoverVideo
                 key={draft.referenceVideoUrl}
                 src={draft.referenceVideoUrl}
                 controls
-                playsInline
+                resetOnLeave={false}
                 onLoadedMetadata={(e) => {
                   const el = e.currentTarget;
                   if (el.videoWidth > 0 && el.videoHeight > 0) {

@@ -1,8 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AdminListSentinel } from "@/components/admin/template-admin/admin-list-sentinel";
 import { AdminMediaField } from "@/components/admin/template-admin/admin-media-field";
+import { AdminMediaThumb } from "@/components/admin/template-admin/admin-media-thumb";
+import { AdminVideoHoverThumb } from "@/components/admin/template-admin/admin-video-hover-thumb";
+import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
 import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
@@ -16,9 +20,33 @@ import {
   supportsAdminSceneImages,
 } from "@/lib/quick-replica/qr-admin-template-form";
 import { QR_KINDS_BY_CATEGORY } from "@/lib/quick-replica/qr-kinds";
-import { resolveQrTemplatePreviewMedia } from "@/lib/quick-replica/qr-template-preview-media";
+import {
+  resolveQrTemplatePreviewMedia,
+  type QrPreviewMedia,
+} from "@/lib/quick-replica/qr-template-preview-media";
 import type { QrCategory, QrTemplateJson } from "@/lib/quick-replica/qr-types";
 import type { QrAudioPromptTemplateLibrary } from "@/lib/quick-replica/qr-audio-prompt-templates";
+
+/** 图片：悬停 Eye → 全屏自适应预览；视频：悬停自动播放 */
+function QrAdminPreviewThumb({
+  preview,
+  title,
+}: {
+  preview: QrPreviewMedia | null;
+  title?: string;
+}) {
+  if (preview?.kind === "video" && preview.url) {
+    return (
+      <AdminVideoHoverThumb
+        src={preview.url}
+        poster={preview.poster || undefined}
+      />
+    );
+  }
+  const imageSrc =
+    preview?.kind === "image" ? preview.url : (preview?.poster ?? "");
+  return <AdminMediaThumb src={imageSrc} title={title} hoverMode="icon" />;
+}
 
 type AdminPrimaryTab = QrCategory | "motion-sync";
 type AdminView = "catalog" | "user-works";
@@ -135,12 +163,14 @@ function sourceLabel(row: AdminTemplateRow): string {
 }
 
 export function AdminQrTemplatesPanel() {
-  const [primaryTab, setPrimaryTab] = useState<AdminPrimaryTab>("image");
+  const [primaryTab, setPrimaryTab] = useState<AdminPrimaryTab | null>(null);
   const [adminView, setAdminView] = useState<AdminView>("catalog");
-  const [kindFilter, setKindFilter] = useState("");
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
   const [templates, setTemplates] = useState<AdminTemplateRow[]>([]);
   const [userWorks, setUserWorks] = useState<UserWorkRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -151,49 +181,122 @@ export function AdminQrTemplatesPanel() {
   const [audioLibKind, setAudioLibKind] =
     useState<keyof QrAudioPromptTemplateLibrary>("create-voiceover");
   const [audioLibSaving, setAudioLibSaving] = useState(false);
+  const loadMoreLock = useRef(false);
+  const listGen = useRef(0);
 
-  const category: QrCategory = primaryTab === "motion-sync" ? "video" : primaryTab;
-  const effectiveKind = primaryTab === "motion-sync" ? "motion-sync" : kindFilter;
-  const kinds = QR_KINDS_BY_CATEGORY[category] ?? [];
+  const category: QrCategory | null = primaryTab === "motion-sync" ? "video" : primaryTab;
+  const canLoad =
+    primaryTab != null && (primaryTab === "motion-sync" || kindFilter !== null);
+  const effectiveKind =
+    primaryTab === "motion-sync" ? "motion-sync" : kindFilter || null;
+  const kinds = category ? (QR_KINDS_BY_CATEGORY[category] ?? []) : [];
 
-  const load = useCallback(async () => {
-    if (adminView === "user-works") {
-      const qs = new URLSearchParams();
-      if (category) qs.set("category", category);
-      if (effectiveKind) qs.set("kind", effectiveKind);
-      const res = await fetch(`/api/admin/quick-replica/user-templates?${qs}`, {
-        cache: "no-store",
+  const fetchPage = useCallback(
+    async (offset: number, append: boolean, gen?: number) => {
+      if (!canLoad || !category) return;
+      const token = gen ?? listGen.current;
+      const qs = new URLSearchParams({
+        category,
+        limit: String(ADMIN_TEMPLATE_PAGE_SIZE),
+        offset: String(offset),
       });
-      const data = (await res.json()) as { templates?: UserWorkRow[]; error?: string };
+      if (effectiveKind) qs.set("kind", effectiveKind);
+      const path =
+        adminView === "user-works"
+          ? `/api/admin/quick-replica/user-templates?${qs}`
+          : `/api/admin/quick-replica/templates?${qs}`;
+      const res = await fetch(path, { cache: "no-store" });
+      const data = (await res.json()) as {
+        templates?: AdminTemplateRow[] | UserWorkRow[];
+        total?: number;
+        error?: string;
+      };
       if (!res.ok) throw new Error(data.error ?? "加载失败");
-      setUserWorks(Array.isArray(data.templates) ? data.templates : []);
-      return;
+      if (token !== listGen.current) return;
+      const next = Array.isArray(data.templates) ? data.templates : [];
+      const nextTotal = typeof data.total === "number" ? data.total : next.length;
+      if (adminView === "user-works") {
+        setUserWorks((prev) =>
+          append ? [...prev, ...(next as UserWorkRow[])] : (next as UserWorkRow[]),
+        );
+      } else {
+        setTemplates((prev) =>
+          append ? [...prev, ...(next as AdminTemplateRow[])] : (next as AdminTemplateRow[]),
+        );
+      }
+      setTotal(nextTotal);
+    },
+    [adminView, canLoad, category, effectiveKind],
+  );
+
+  const reloadList = useCallback(async () => {
+    if (!canLoad) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await fetchPage(0, false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载失败");
+    } finally {
+      setLoading(false);
     }
-    const qs = new URLSearchParams({ category });
-    if (effectiveKind) qs.set("kind", effectiveKind);
-    const res = await fetch(`/api/admin/quick-replica/templates?${qs}`, { cache: "no-store" });
-    const data = (await res.json()) as { templates?: AdminTemplateRow[]; error?: string };
-    if (!res.ok) throw new Error(data.error ?? "加载失败");
-    setTemplates(Array.isArray(data.templates) ? data.templates : []);
-  }, [adminView, category, effectiveKind]);
+  }, [canLoad, fetchPage]);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLoading(true);
+    if (!canLoad) {
+      listGen.current += 1;
+      setTemplates([]);
+      setUserWorks([]);
+      setTotal(0);
+      setLoading(false);
       setError(null);
+      return;
+    }
+    let cancelled = false;
+    const gen = ++listGen.current;
+    setLoading(true);
+    setError(null);
+    setTemplates([]);
+    setUserWorks([]);
+    setTotal(0);
+    void (async () => {
       try {
-        await load();
+        await fetchPage(0, false, gen);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "加载失败");
+        if (!cancelled && gen === listGen.current) {
+          setError(e instanceof Error ? e.message : "加载失败");
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && gen === listGen.current) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [fetchPage, canLoad]);
+
+  const loadMore = useCallback(() => {
+    if (!canLoad || loading || loadingMore || loadMoreLock.current) return;
+    const loaded = adminView === "user-works" ? userWorks.length : templates.length;
+    if (loaded >= total) return;
+    loadMoreLock.current = true;
+    setLoadingMore(true);
+    void fetchPage(loaded, true)
+      .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
+      .finally(() => {
+        loadMoreLock.current = false;
+        setLoadingMore(false);
+      });
+  }, [
+    adminView,
+    canLoad,
+    fetchPage,
+    loading,
+    loadingMore,
+    templates.length,
+    total,
+    userWorks.length,
+  ]);
 
   useEffect(() => {
     if (category !== "audio") return;
@@ -212,6 +315,7 @@ export function AdminQrTemplatesPanel() {
   );
 
   function openCreate() {
+    if (!category) return;
     const defaultKind =
       primaryTab === "motion-sync"
         ? "motion-sync"
@@ -371,7 +475,7 @@ export function AdminQrTemplatesPanel() {
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "保存失败");
       setFormOpen(false);
-      await load();
+      await reloadList();
       setMessage("已保存");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "保存失败");
@@ -402,7 +506,7 @@ export function AdminQrTemplatesPanel() {
       setMessage(data.error ?? "删除失败");
       return;
     }
-    await load();
+    await reloadList();
     setMessage("已删除");
   }
 
@@ -424,7 +528,7 @@ export function AdminQrTemplatesPanel() {
       setMessage(data.error ?? "删除失败");
       return;
     }
-    await load();
+    await reloadList();
     setMessage("已删除用户作品");
   }
 
@@ -510,7 +614,7 @@ export function AdminQrTemplatesPanel() {
             className={`rounded-md px-3 py-1 text-xs ${primaryTab === c.id ? "bg-[#1f2328] text-white" : "border border-[#d0d7de]"}`}
             onClick={() => {
               setPrimaryTab(c.id);
-              setKindFilter("");
+              setKindFilter(null);
             }}
           >
             {c.label}
@@ -528,11 +632,11 @@ export function AdminQrTemplatesPanel() {
         </button>
       </div>
 
-      {primaryTab !== "motion-sync" ? (
+      {primaryTab && primaryTab !== "motion-sync" ? (
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
-            className={`rounded-full px-2.5 py-0.5 text-[11px] ${!kindFilter ? "bg-[#ddf4ff] text-[#0969da]" : "border border-[#d0d7de]"}`}
+            className={`rounded-full px-2.5 py-0.5 text-[11px] ${kindFilter === "" ? "bg-[#ddf4ff] text-[#0969da]" : "border border-[#d0d7de]"}`}
             onClick={() => setKindFilter("")}
           >
             全部子类
@@ -552,14 +656,21 @@ export function AdminQrTemplatesPanel() {
 
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {loading ? "加载中…" : `共 ${rows.length} 条`}
+          {!primaryTab
+            ? "请选择分类"
+            : !canLoad
+              ? "请选择子类"
+              : loading
+                ? "加载中…"
+                : `已加载 ${rows.length} / 共 ${total} 条`}
           {error ? ` · ${error}` : ""}
           {message ? ` · ${message}` : ""}
         </p>
         {adminView === "catalog" ? (
           <button
             type="button"
-            className="rounded-md bg-[#0969da] px-3 py-1.5 text-xs text-white"
+            className="rounded-md bg-[#0969da] px-3 py-1.5 text-xs text-white disabled:opacity-50"
+            disabled={!category}
             onClick={openCreate}
           >
             新建模板
@@ -579,12 +690,35 @@ export function AdminQrTemplatesPanel() {
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={adminView === "catalog" ? 5 : 4}
+                  className="px-3 py-6 text-center text-[#656d76]"
+                >
+                  {!primaryTab
+                    ? "请选择分类"
+                    : !canLoad
+                      ? "请选择子类"
+                      : loading
+                        ? "加载中…"
+                        : "暂无数据"}
+                </td>
+              </tr>
+            ) : null}
             {adminView === "user-works"
               ? userWorks.map((row) => (
                   <tr key={row.id} className="border-t border-[#d0d7de]">
                     <td className="px-3 py-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={row.thumbnailUrl} alt="" className="h-12 w-10 rounded object-cover" />
+                      {/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(row.thumbnailUrl) ? (
+                        <AdminVideoHoverThumb src={row.thumbnailUrl} />
+                      ) : (
+                        <AdminMediaThumb
+                          src={row.thumbnailUrl}
+                          title={row.title}
+                          hoverMode="icon"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2">{row.title}</td>
                     <td className="px-3 py-2 font-mono">{row.kind}</td>
@@ -609,19 +743,7 @@ export function AdminQrTemplatesPanel() {
                   return (
                     <tr key={row.id} className="border-t border-[#d0d7de]">
                       <td className="px-3 py-2">
-                        {preview?.kind === "video" ? (
-                          <video
-                            src={preview.url}
-                            poster={preview.poster}
-                            className="h-12 w-16 rounded object-cover"
-                            muted
-                          />
-                        ) : preview ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={preview.url} alt="" className="h-12 w-10 rounded object-cover" />
-                        ) : (
-                          "—"
-                        )}
+                        <QrAdminPreviewThumb preview={preview} title={row.title} />
                       </td>
                       <td className="px-3 py-2">{row.title}</td>
                       <td className="px-3 py-2 font-mono">{row.kind}</td>
@@ -656,6 +778,11 @@ export function AdminQrTemplatesPanel() {
           </tbody>
         </table>
       </div>
+      <AdminListSentinel
+        hasMore={canLoad && rows.length < total}
+        loading={loading || loadingMore}
+        onVisible={loadMore}
+      />
 
       {category === "audio" && audioLib ? (
         <div className="space-y-3 rounded-lg border border-[#d0d7de] bg-white p-4">
@@ -798,6 +925,7 @@ export function AdminQrTemplatesPanel() {
               {!characterEdit ? (
                 <>
                   <AdminMediaField
+                    hoverChrome="canvas"
                     label="封面"
                     url={form.thumbnailUrl}
                     accept="image"
@@ -809,6 +937,7 @@ export function AdminQrTemplatesPanel() {
                     }}
                   />
                   <AdminMediaField
+                    hoverChrome="canvas"
                     label="主媒体"
                     url={form.mediaUrl}
                     accept="media"
@@ -824,6 +953,7 @@ export function AdminQrTemplatesPanel() {
               {motion ? (
                 <>
                   <AdminMediaField
+                    hoverChrome="canvas"
                     label="目标人物图"
                     url={form.targetImageUrl}
                     accept="image"
@@ -835,6 +965,7 @@ export function AdminQrTemplatesPanel() {
                     }}
                   />
                   <AdminMediaField
+                    hoverChrome="canvas"
                     label="参考视频"
                     url={form.referenceVideoUrl}
                     accept="video"
@@ -851,6 +982,7 @@ export function AdminQrTemplatesPanel() {
               ) : null}
               {sceneEnabled ? (
                 <AdminMediaField
+                  hoverChrome="canvas"
                   label={`参考图 ${form.sceneImageUrls.length}/${ADMIN_SCENE_IMAGE_MAX}`}
                   urls={form.sceneImageUrls}
                   accept="image"

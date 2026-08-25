@@ -83,7 +83,7 @@ el.addEventListener("wheel", onWheel, { passive: false });
 | canvas-web | `MediaPreviewLightbox`（`media-hover-box.tsx`）· `StoryMediaPreviewModal`（`story-column-media-panel.tsx`） |
 | story-web | `MediaLightbox` |
 | tool-web | 我的图片库 · 我的衣柜 · Visual Lab |
-| quick-replica-web | `QrRefImageThumb` 预览 |
+| quick-replica-web | `QrFullscreenImagePreview`（模板卡 / 参考图 / 作品预览；悬停 Eye，点击全屏 contain + 右下角 +/-） |
 | book-mall | `AdminMediaThumb`（管理后台模板区 / 模特库列表；悬停浮出大图，点击进全屏） |
 
 新增预览入口时优先复用上表组件；确需新写，按「规范实现」挂钩子，并补进本表与 `scripts/sync-image-zoom-pan.mjs` 的 `TARGET_APPS`。

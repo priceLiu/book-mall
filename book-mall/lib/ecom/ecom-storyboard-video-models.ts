@@ -1,4 +1,8 @@
 import { isDashscopeKlingV3VideoGatewayModel } from "@/lib/canvas/dashscope-kling-v3-video";
+import {
+  dashscopeSbv1T2vModelToR2v,
+  isDashscopeHappyhorseImageToVideoModel,
+} from "@/lib/canvas/dashscope-sbv1-t2v";
 import { BAILIAN_R2V_MODEL_IDS } from "@/lib/canvas/providers/bailian-r2v";
 import { isVolcengineStoryVideoModelKey } from "@/lib/canvas/canvas-video-volcengine";
 
@@ -103,12 +107,33 @@ export function resolveStoryboardVideoProvider(
   return "volcengine";
 }
 
+/**
+ * 电商分镜 / 种草 / 拆图复刻：带参考图时，HappyHorse / Wan 的 T2V·I2V 须升 R2V。
+ * 禁止静默落到 doubao-seedance（会误走火山凭证）。
+ */
+export function normalizeEcomStoryboardVideoModelKey(modelKey: string): string {
+  const k = modelKey.trim();
+  if (!k) return "";
+  const fromT2v = dashscopeSbv1T2vModelToR2v(k);
+  if (fromT2v) return fromT2v;
+  if (isDashscopeHappyhorseImageToVideoModel(k)) {
+    return k.replace(/-i2v$/i, "-r2v");
+  }
+  return k;
+}
+
 export function resolveStoryboardVideoModel(modelKey?: string): string {
-  const k = modelKey?.trim() ?? "";
+  const raw = modelKey?.trim() ?? "";
+  const k = normalizeEcomStoryboardVideoModelKey(raw);
+  if (!k) {
+    throw new Error("请选择视频模型");
+  }
   if ((STORYBOARD_VIDEO_MODELS as readonly string[]).includes(k)) return k;
   if (isStoryboardWan30VideoModel(k)) return k;
   if (isStoryboardKling30VideoModel(k)) return "kling-3.0/video";
   if (isStoryboardKieVideoModel(k)) return "bytedance/seedance-2";
   if (isStoryboardBailianR2vVideoModel(k)) return k;
-  return "doubao-seedance-2.0";
+  throw new Error(
+    `视频模型「${raw}」暂不支持电商分镜成片；请在模型列表中选择已绑定的 R2V（如 happyhorse-1.1-r2v、wan2.7-r2v）或 Seedance / Wan 3.0。`,
+  );
 }

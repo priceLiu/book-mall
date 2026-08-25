@@ -5,5 +5,6 @@ export {
   listPendingShotVideoIndices,
   isShotVideoPending,
   markPendingShotVideo,
+  patchPendingShotVideo,
   clearPendingShotVideo,
 } from "@/lib/ecom/ecom-seed-video-pending-shots";

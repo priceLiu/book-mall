@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Pin } from "lucide-react";
 
 import { QrKindBrowseSkeleton } from "@/components/quick-replica/qr-panel-skeletons";
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
+import { QrHoverVideo } from "@/components/quick-replica/qr-hover-video";
 import type { QrCategory, QrKindBrowseItem } from "@/lib/qr-template-types";
 import { QR_CATEGORIES, QR_PINNED_TOOLS } from "@/lib/qr-template-types";
 
@@ -63,44 +65,75 @@ function KindCard({
   }, [imageUrl, videoUrl]);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`qr-card group relative ${selected ? "qr-card-selected" : ""}${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`qr-card group relative cursor-pointer ${selected ? "qr-card-selected" : ""}${
         selected && galleryLoading ? " qr-card-loading" : ""
       }`}
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-900">
+      <div className="group/media relative aspect-[4/3] w-full overflow-hidden bg-zinc-900">
         {!mediaReady && (imageUrl || videoUrl) && !mediaFailed ? (
           <div className="qr-skeleton absolute inset-0" aria-hidden />
         ) : null}
-        {videoUrl && !imageUrl && !mediaFailed ? (
-          <video
-            src={videoUrl}
-            muted
-            playsInline
-            preload="metadata"
-            onLoadedData={() => setMediaReady(true)}
-            onError={() => {
-              setMediaFailed(true);
-              setMediaReady(true);
-            }}
-            className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
-          />
+        {videoUrl && !mediaFailed ? (
+          <>
+            {imageUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={imageUrl}
+                alt={item.label}
+                loading="lazy"
+                decoding="async"
+                onLoad={() => setMediaReady(true)}
+                onError={() => setMediaReady(true)}
+                className={`h-full w-full object-cover transition group-hover:scale-[1.02] group-hover:opacity-0${mediaReady ? " opacity-100" : " opacity-0"}`}
+              />
+            ) : null}
+            <QrHoverVideo
+              src={videoUrl}
+              poster={imageUrl ?? undefined}
+              preload="metadata"
+              onLoadedData={() => setMediaReady(true)}
+              onError={() => {
+                if (!imageUrl) {
+                  setMediaFailed(true);
+                }
+                setMediaReady(true);
+              }}
+              className={`h-full w-full object-cover transition group-hover:scale-[1.02] ${
+                imageUrl
+                  ? "absolute inset-0 opacity-0 group-hover:opacity-100"
+                  : mediaReady
+                    ? "opacity-100"
+                    : "opacity-0"
+              }`}
+            />
+          </>
         ) : imageUrl && !mediaFailed ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={imageUrl}
-            alt={item.label}
-            loading="lazy"
-            decoding="async"
-            onLoad={() => setMediaReady(true)}
-            onError={() => {
-              setMediaFailed(true);
-              setMediaReady(true);
-            }}
-            className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={item.label}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setMediaReady(true)}
+              onError={() => {
+                setMediaFailed(true);
+                setMediaReady(true);
+              }}
+              className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
+            />
+            <QrHoverEyeOverlay src={imageUrl} title={item.label} />
+          </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-1 px-2 text-center text-xs text-zinc-500">
             <span>{item.label}</span>
@@ -122,7 +155,7 @@ function KindCard({
       ) : null}
 
       <div className="px-2 py-2 text-sm font-medium">{item.label}</div>
-    </button>
+    </div>
   );
 }
 

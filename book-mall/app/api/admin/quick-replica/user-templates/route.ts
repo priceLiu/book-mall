@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { parseAdminListPage } from "@/lib/admin/admin-template-page";
 import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
   deleteAdminUserQrTemplate,
@@ -25,9 +26,19 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const category = parseCategory(url.searchParams.get("category"));
   const kind = url.searchParams.get("kind")?.trim() || null;
+  const { limit, offset } = parseAdminListPage(url.searchParams);
 
-  const templates = await listAdminUserQrTemplates({ category, kind });
-  return NextResponse.json({ templates });
+  if (!category) {
+    return NextResponse.json({ templates: [], total: 0 });
+  }
+
+  const { templates, total } = await listAdminUserQrTemplates({
+    category,
+    kind,
+    limit,
+    offset,
+  });
+  return NextResponse.json({ templates, total });
 }
 
 export async function DELETE(request: Request) {

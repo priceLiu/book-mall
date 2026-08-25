@@ -2,6 +2,7 @@
 
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { SeedVideoRefsGalleryStrip } from "@/components/seed-video/seed-video-refs-gallery-strip";
 import { SeedVideoShotRefCell } from "@/components/seed-video/seed-video-shot-ref-cell";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
@@ -26,9 +27,16 @@ type Props = {
   onGenerateSelected?: () => void;
   generateSelectedDisabled?: boolean;
   selectedCount?: number;
-  /** 参考图列可上传 / 粘贴 / 选择；表内视频 Prompt 可 @ 参考图 */
+  /** 逐镜指定参考图（legacy）；拆图复刻等场景请用 hideRefColumn + showRefsGallery */
   editableRefs?: boolean;
+  /** 隐藏「参考图」列（参考图在表头展示或上方上传区统一管理） */
+  hideRefColumn?: boolean;
+  /** 表头下方展示全部参考图及 @图片N */
+  showRefsGallery?: boolean;
+  /** 全局参考图 busy（兼容旧用法，锁定所有参考图格） */
   refBusy?: boolean;
+  /** 仅锁定正在上传/处理的镜号参考图格 */
+  refBusyShotIndices?: ReadonlySet<number>;
   videoPromptMentionRefs?: EcomPromptImageRef[];
   onUploadShotRef?: (shotIndex: number, file: File) => void | Promise<void>;
   onUnassignShotRef?: (shotIndex: number) => void;
@@ -52,7 +60,10 @@ export function SeedVideoShotTable({
   generateSelectedDisabled = false,
   selectedCount = 0,
   editableRefs = false,
+  hideRefColumn = false,
+  showRefsGallery = false,
   refBusy = false,
+  refBusyShotIndices,
   videoPromptMentionRefs,
   onUploadShotRef,
   onUnassignShotRef,
@@ -86,20 +97,34 @@ export function SeedVideoShotTable({
     return { label: "待生成", className: "text-[#86868b]" };
   }
 
+  const showRefColumn = !hideRefColumn;
   const columnCount =
-    6 + (hideVideoColumn ? 0 : 1) + (hideStatusColumn ? 0 : 1);
+    5 +
+    (showRefColumn ? 1 : 0) +
+    (hideVideoColumn ? 0 : 1) +
+    (hideStatusColumn ? 0 : 1);
 
   const generateLabel =
     selectedCount > 0 ? `生成 (${selectedCount})` : "生成";
 
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+      {showRefsGallery ? (
+        <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+            参考图 · 在视频 Prompt 中用 @图片1 … 引用
+          </p>
+          <SeedVideoRefsGalleryStrip references={references} />
+        </div>
+      ) : null}
       <table className="min-w-full text-left text-xs">
         <thead className="bg-[#f5f5f7] text-[#6e6e73]">
           <tr>
             <th className="px-3 py-2 font-medium">镜号</th>
             <th className="px-3 py-2 font-medium">时间</th>
-            <th className="px-3 py-2 font-medium">参考图</th>
+            {showRefColumn ? (
+              <th className="px-3 py-2 font-medium">参考图</th>
+            ) : null}
             {!hideVideoColumn ? (
               <th className="px-3 py-2 font-medium w-[108px]">镜头视频</th>
             ) : null}
@@ -113,7 +138,7 @@ export function SeedVideoShotTable({
           {shots.map((shot) => {
             const thumb = refUrl(shot.refImageId);
             const status = shotStatus(shot);
-            const isGenerating = isShotGenerating(shot.index) && !shot.videoUrl?.trim();
+            const isGenerating = isShotGenerating(shot.index);
             const isSelected = selectedShotIndices?.has(shot.index) ?? false;
             return (
               <tr key={shot.index} className="border-t border-[#e8e8ed] align-top">
@@ -135,6 +160,7 @@ export function SeedVideoShotTable({
                   </div>
                 </td>
                 <td className="px-3 py-2 text-[#6e6e73]">{shot.timeSlice}</td>
+                {showRefColumn ? (
                 <td className="px-3 py-2">
                   {editableRefs && onUploadShotRef ? (
                     <SeedVideoShotRefCell
@@ -143,7 +169,7 @@ export function SeedVideoShotTable({
                       refImageLabel={shot.refImageLabel}
                       references={references}
                       disabled={disabled || isGenerating}
-                      busy={refBusy}
+                      busy={refBusyShotIndices?.has(shot.index) ?? refBusy}
                       onAssign={(refId, refLabel) =>
                         patchShot(shot.index, { refImageId: refId, refImageLabel: refLabel })
                       }
@@ -165,6 +191,7 @@ export function SeedVideoShotTable({
                     <span className="text-[#86868b]">{shot.refImageLabel || "—"}</span>
                   )}
                 </td>
+                ) : null}
                 {!hideVideoColumn ? (
                   <td className="px-3 py-2">
                     <EcomVideoSlot

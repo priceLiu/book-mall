@@ -15,8 +15,9 @@ import {
   resolveStoryboardVideoModel,
   resolveStoryboardVideoProvider,
 } from "@/lib/ecom/ecom-storyboard-video-models";
-import { resolveStoryboardPanelVideoRefPlan } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
+import { resolveStoryboardPanelVideoRefPlan, getStoryboardVideoInvokeRules } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { resolveSeedVideoChatImageUrls } from "@/lib/ecom/ecom-seed-video-mention";
 import {
   ECOM_SEED_VIDEO_MODULE,
   type SeedVideoReference,
@@ -26,8 +27,10 @@ import {
   clearEcomSeedVideoPendingShot,
   getEcomSeedVideoProject,
   markEcomSeedVideoPendingShot,
+  updateEcomSeedVideoPendingShotEntry,
   updateEcomSeedVideoProject,
 } from "@/lib/ecom/ecom-seed-video-service";
+import type { SeedVideoPanelPollProvider } from "@/lib/ecom/ecom-seed-video-panel-resume";
 import { mergeSeedVideoShotsPreserveMedia } from "@/lib/ecom/ecom-seed-video-shot-merge";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_SEED_VIDEO_TOOL_KEY } from "@/lib/ecom/ecom-seed-video-types";
@@ -62,6 +65,7 @@ async function pollVolcengineToOss(opts: {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   resolution: VideoResolution;
+  onSubmitted?: (task: { taskId: string; logId: string }) => void | Promise<void>;
 }): Promise<{ ossUrl: string; taskId: string }> {
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_SEED_VIDEO_TOOL_KEY);
@@ -78,6 +82,7 @@ async function pollVolcengineToOss(opts: {
     body,
     clientPage,
   });
+  await opts.onSubmitted?.({ taskId, logId });
   for (let i = 0; i < 120; i++) {
     await new Promise((r) => setTimeout(r, 3000));
     const polled = await ecomGwPollVolcengine(opts.userId, { taskId, gatewayLogId: logId });
@@ -109,6 +114,7 @@ async function pollBailianToOss(opts: {
   durationSec: number;
   ratio: string;
   resolution: VideoResolution;
+  onSubmitted?: (task: { taskId: string; logId: string }) => void | Promise<void>;
 }): Promise<{ ossUrl: string; taskId: string }> {
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_SEED_VIDEO_TOOL_KEY);
@@ -121,6 +127,7 @@ async function pollBailianToOss(opts: {
     duration: opts.durationSec,
     clientPage,
   });
+  await opts.onSubmitted?.({ taskId, logId });
   for (let i = 0; i < 120; i++) {
     await new Promise((r) => setTimeout(r, 3000));
     const polled = await ecomGwPollBailianR2v(opts.userId, { taskId, gatewayLogId: logId });
@@ -159,12 +166,6 @@ export async function ecomGenerateSeedVideoShot(opts: {
   const shot = opts.shots.find((s) => s.index === opts.shotIndex);
   if (!shot) throw new Error(`找不到镜头 ${opts.shotIndex}`);
 
-  const ref = opts.references.find((r) => r.id === shot.refImageId);
-  const imageUrl = ref?.ossUrl?.trim();
-  if (!imageUrl || !/^https?:\/\//.test(imageUrl)) {
-    throw new Error(`镜头 ${opts.shotIndex} 缺少有效参考素材图`);
-  }
-
   const modelKey = resolveStoryboardVideoModel(
     opts.modelKey ?? ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL,
   );
@@ -183,16 +184,53 @@ export async function ecomGenerateSeedVideoShot(opts: {
   const prompt = shot.videoPrompt.trim();
   if (!prompt) throw new Error("视频提示词不能为空");
 
+  const refRules = getStoryboardVideoInvokeRules(modelKey);
+  const refUrls = resolveSeedVideoChatImageUrls(
+    opts.references,
+    prompt,
+    refRules.maxTotalImages,
+  );
+  const imageUrl = refUrls[0]?.trim();
+  if (!imageUrl || !/^https?:\/\//.test(imageUrl)) {
+    throw new Error(
+      `镜头 ${opts.shotIndex} 缺少参考图：请上传参考图，或在视频 Prompt 中用 @图片1 … 引用`,
+    );
+  }
+
+  const materials = opts.references.filter(
+    (r) => r.role === "seed-material" && r.ossUrl?.trim(),
+  );
+  const refUrlSet = new Set(refUrls.map((u) => u.trim()));
+  const identityMaterials = materials.filter(
+    (m) => refUrlSet.has(m.ossUrl.trim()) && m.ossUrl.trim() !== imageUrl,
+  );
+
   const startedAt = new Date().toISOString();
+  const existingVideoUrl = shot.videoUrl?.trim();
   await markEcomSeedVideoPendingShot(opts.userId, opts.projectId, shot.index, {
     modelKey,
     startedAt,
+    ...(existingVideoUrl ? { supersedesVideoUrl: existingVideoUrl } : {}),
   });
+
+  let gatewaySubmitted = false;
+  async function persistGatewayTask(task: {
+    taskId: string;
+    logId: string;
+    pollProvider: SeedVideoPanelPollProvider;
+  }) {
+    gatewaySubmitted = true;
+    await updateEcomSeedVideoPendingShotEntry(opts.userId, opts.projectId, opts.shotIndex, {
+      taskId: task.taskId,
+      logId: task.logId,
+      pollProvider: task.pollProvider,
+    });
+  }
 
   try {
   const panelRefPlan = resolveStoryboardPanelVideoRefPlan({
     modelKey,
-    references: opts.references.map((r) => ({
+    references: identityMaterials.map((r) => ({
       id: r.id,
       label: r.label,
       role: "product" as const,
@@ -240,6 +278,11 @@ export async function ecomGenerateSeedVideoShot(opts: {
       clientPage: ecomClientPage(opts.userId, opts.projectId, ECOM_SEED_VIDEO_TOOL_KEY),
     });
     taskId = created.taskId;
+    await persistGatewayTask({
+      taskId: created.taskId,
+      logId: created.logId,
+      pollProvider: "kie",
+    });
     for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, 3000));
       const polled = await ecomGwPollKie(opts.userId, {
@@ -272,6 +315,8 @@ export async function ecomGenerateSeedVideoShot(opts: {
       durationSec,
       ratio,
       resolution,
+      onSubmitted: (task) =>
+        persistGatewayTask({ ...task, pollProvider: "bailian" }),
     }));
   } else if (provider === "dashscope" && isStoryboardKling30VideoModel(modelKey)) {
     const klingAspect: "16:9" | "9:16" | "1:1" =
@@ -296,6 +341,11 @@ export async function ecomGenerateSeedVideoShot(opts: {
       clientPage: ecomClientPage(opts.userId, opts.projectId, ECOM_SEED_VIDEO_TOOL_KEY),
     });
     taskId = created.taskId;
+    await persistGatewayTask({
+      taskId: created.taskId,
+      logId: created.logId,
+      pollProvider: "dashscope",
+    });
     for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, 3000));
       const polled = await ecomGwPollDashscope(opts.userId, {
@@ -329,10 +379,14 @@ export async function ecomGenerateSeedVideoShot(opts: {
       durationSec,
       aspectRatio,
       resolution,
+      onSubmitted: (task) =>
+        persistGatewayTask({ ...task, pollProvider: "volcengine" }),
     }));
   }
 
-  const latestProject = await getEcomSeedVideoProject(opts.userId, opts.projectId);
+  const latestProject = await getEcomSeedVideoProject(opts.userId, opts.projectId, {
+    resumePending: false,
+  });
   const updatedShots = (latestProject?.plan?.shots?.length
     ? latestProject.plan.shots
     : opts.shots
@@ -357,9 +411,13 @@ export async function ecomGenerateSeedVideoShot(opts: {
     },
   });
 
+  await clearEcomSeedVideoPendingShot(opts.userId, opts.projectId, shot.index);
   return { videoUrl: ossUrl, shotIndex: shot.index };
-  } finally {
-    await clearEcomSeedVideoPendingShot(opts.userId, opts.projectId, shot.index);
+  } catch (e) {
+    if (!gatewaySubmitted) {
+      await clearEcomSeedVideoPendingShot(opts.userId, opts.projectId, shot.index);
+    }
+    throw e;
   }
 }
 

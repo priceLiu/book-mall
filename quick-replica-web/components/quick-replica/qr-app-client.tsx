@@ -142,7 +142,9 @@ export function QrAppClient({
           `/api/book-mall/api/platform/v1/quick-replica/templates/${encodeURIComponent(templateId)}`,
         );
         if (!res.ok) return;
-        const template = (await res.json()) as QrTemplate;
+        const data = (await res.json()) as QrTemplate | { template?: QrTemplate };
+        const template = "template" in data && data.template ? data.template : (data as QrTemplate);
+        if (!template?.reference?.prompt) return;
         setDraft(templateToWorkspaceDraft(template));
         setCategory(template.category);
         setSelectedKind(template.kind);
@@ -173,17 +175,17 @@ export function QrAppClient({
   const navModeRef = useRef(navMode);
   navModeRef.current = navMode;
 
-  const loadHomeFeed = useCallback(async (force = false) => {
+  const loadHomeFeed = useCallback(async (force = false, silent = false) => {
     if (!force && homeCardsCacheRef.current) {
       setHomeCategoryCards(homeCardsCacheRef.current);
-      setTemplatesLoading(false);
+      if (!silent) setTemplatesLoading(false);
       return;
     }
     if (force) {
       homeCardsCacheRef.current = null;
     }
 
-    setTemplatesLoading(true);
+    if (!silent) setTemplatesLoading(true);
     const requestNav = "home";
     try {
       const results = await Promise.all(
@@ -210,20 +212,23 @@ export function QrAppClient({
     }
   }, []);
 
-  const loadTemplates = useCallback(async () => {
+  const loadTemplates = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (navMode === "home") {
-      await loadHomeFeed();
+      await loadHomeFeed(false, silent);
       return;
     }
 
     const requestKey = browseKeyRef.current;
     const cached = templatesCacheRef.current.get(requestKey);
-    if (cached) {
-      setTemplates(cached);
-    } else {
-      setTemplates([]);
+    if (!silent) {
+      if (cached) {
+        setTemplates(cached);
+      } else {
+        setTemplates([]);
+        setTemplatesLoading(true);
+      }
     }
-    setTemplatesLoading(true);
 
     const qs = new URLSearchParams({ scope: templateScope });
     if (navMode === "my-works") {
@@ -253,7 +258,8 @@ export function QrAppClient({
     }
   }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory, loadHomeFeed]);
 
-  const loadKinds = useCallback(async () => {
+  const loadKinds = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool" || navMode === "generate-history") {
       setKindItems([]);
       setKindsLoading(false);
@@ -262,12 +268,14 @@ export function QrAppClient({
 
     const requestCategory = category;
     const cached = kindsCacheRef.current.get(requestCategory);
-    if (cached) {
-      setKindItems(cached);
-    } else {
-      setKindItems([]);
+    if (!silent) {
+      if (cached) {
+        setKindItems(cached);
+      } else {
+        setKindItems([]);
+        setKindsLoading(true);
+      }
     }
-    setKindsLoading(true);
     try {
       const res = await fetchQrPlatform(
         `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(requestCategory)}`,
@@ -292,6 +300,21 @@ export function QrAppClient({
   useEffect(() => {
     void loadKinds();
   }, [loadKinds]);
+
+  useEffect(() => {
+    const refreshFromServer = () => {
+      if (document.visibilityState === "hidden") return;
+      void loadTemplates({ silent: true });
+      void loadKinds({ silent: true });
+    };
+    const onFocus = () => refreshFromServer();
+    document.addEventListener("visibilitychange", refreshFromServer);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshFromServer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadTemplates, loadKinds]);
 
   useEffect(() => {
     if (navMode !== "category") return;
@@ -397,7 +420,7 @@ export function QrAppClient({
       qrTemplateCacheKey("all", cat),
     );
     setTemplates(cachedTemplates ?? []);
-    setTemplatesLoading(true);
+    setTemplatesLoading(!cachedTemplates);
   };
 
   const onMyWorks = () => {
@@ -432,11 +455,15 @@ export function QrAppClient({
       const cacheKey = qrTemplateCacheKey("all", category);
       const cachedTemplates = templatesCacheRef.current.get(cacheKey);
       setTemplates(cachedTemplates ?? []);
-      setTemplatesLoading(true);
+      setTemplatesLoading(!cachedTemplates);
       return;
     }
 
     setSelectedKind(kind);
+    const featured = kindItems.find((item) => item.kind === kind)?.featuredTemplate;
+    if (featured) {
+      setDraft(templateToWorkspaceDraft(featured));
+    }
     const def = getKindDef(kind);
     setPinnedToolKey(def?.toolKey ?? null);
     const cacheKey = qrTemplateCacheKey("all", category, kind);
@@ -470,7 +497,7 @@ export function QrAppClient({
       cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
     }
     setTemplates(cachedTemplates ?? []);
-    setTemplatesLoading(true);
+    setTemplatesLoading(!cachedTemplates);
   };
 
   const dismissCopyToast = useCallback(() => setCopyToast(null), []);

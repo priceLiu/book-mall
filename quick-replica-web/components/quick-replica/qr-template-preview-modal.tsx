@@ -3,6 +3,8 @@
 import { useCallback, useState } from "react";
 import { Copy, Link2, Trash2, X } from "lucide-react";
 
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
+import { QrHoverVideo } from "@/components/quick-replica/qr-hover-video";
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrToast } from "@/components/quick-replica/qr-toast";
@@ -133,19 +135,22 @@ export function QrTemplatePreviewModal({
                 />
               </div>
             ) : isVideo ? (
-              <video
+              <QrHoverVideo
                 src={previewUrl}
                 controls
+                resetOnLeave={false}
                 className="h-full w-full max-h-full rounded-xl object-contain"
-                playsInline
               />
             ) : (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={previewUrl}
-                alt={template.title}
-                className="h-full w-full max-h-full rounded-xl object-contain"
-              />
+              <div className="group/media relative flex h-full w-full items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt={template.title}
+                  className="h-full w-full max-h-full rounded-xl object-contain"
+                />
+                <QrHoverEyeOverlay src={previewUrl} title={template.title} size="lg" />
+              </div>
             )
           ) : (
             <div className="flex h-full min-h-[12rem] items-center justify-center">

@@ -7,6 +7,7 @@ import {
   getBuiltinQrTemplateById,
   listBuiltinQrTemplates,
 } from "@/lib/quick-replica/builtin-templates";
+import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
 import { filterTemplatesForGallery } from "@/lib/quick-replica/qr-template-catalog";
 import type { QrCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
 
@@ -470,7 +471,8 @@ export async function listAdminUserQrTemplates(filters: {
   category?: QrCategory | null;
   kind?: string | null;
   limit?: number;
-}): Promise<QrTemplateJson[]> {
+  offset?: number;
+}): Promise<{ templates: QrTemplateJson[]; total: number }> {
   const where: Prisma.QrTemplateWhereInput = {
     ownerUserId: { not: null },
     catalogBuiltinId: null,
@@ -478,12 +480,21 @@ export async function listAdminUserQrTemplates(filters: {
   };
   if (filters.category) where.category = filters.category;
   if (filters.kind) where.kind = filters.kind;
-  const rows = await prisma.qrTemplate.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: Math.min(200, Math.max(1, filters.limit ?? 100)),
-  });
-  return rows.map(rowToJson);
+  const offset = Math.max(0, filters.offset ?? 0);
+  const limit = Math.min(
+    100,
+    Math.max(1, filters.limit ?? ADMIN_TEMPLATE_PAGE_SIZE),
+  );
+  const [rows, total] = await prisma.$transaction([
+    prisma.qrTemplate.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+    prisma.qrTemplate.count({ where }),
+  ]);
+  return { templates: rows.map(rowToJson), total };
 }
 
 export function templateToWorkspaceDraft(

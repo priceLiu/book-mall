@@ -6,6 +6,12 @@ export const SEED_VIDEO_PENDING_SHOT_TTL_MS = 25 * 60 * 1000;
 export type SeedVideoPendingShotEntry = {
   modelKey?: string;
   startedAt: string;
+  /** 重新生成时记录旧视频 URL；reconcile 仅在 URL 变化后清除 pending */
+  supersedesVideoUrl?: string;
+  /** Gateway 任务 ID；刷新页面后续查 */
+  taskId?: string;
+  logId?: string;
+  pollProvider?: "kie" | "bailian" | "volcengine" | "dashscope";
 };
 
 export type SeedVideoPendingShotsMap = Record<string, SeedVideoPendingShotEntry>;
@@ -69,7 +75,22 @@ export function markPendingShotVideo(
 ): Record<string, unknown> {
   const next = { ...meta };
   const map = readPendingShotVideos(meta);
-  map[shotKey(shotIndex)] = entry;
+  map[shotKey(shotIndex)] = { ...map[shotKey(shotIndex)], ...entry };
+  next.pendingShotVideos = map;
+  delete next.pendingShotVideo;
+  return next;
+}
+
+export function patchPendingShotVideo(
+  meta: Record<string, unknown>,
+  shotIndex: number,
+  patch: Partial<SeedVideoPendingShotEntry>,
+): Record<string, unknown> {
+  const next = { ...meta };
+  const map = readPendingShotVideos(meta);
+  const prev = map[shotKey(shotIndex)];
+  if (!prev) return meta;
+  map[shotKey(shotIndex)] = { ...prev, ...patch };
   next.pendingShotVideos = map;
   delete next.pendingShotVideo;
   return next;
@@ -115,10 +136,14 @@ export function reconcileSeedVideoPendingShotMeta(opts: {
     if (!entry) continue;
 
     const shot = opts.plan?.shots?.find((s) => s.index === shotIndex);
-    if (shot?.videoUrl?.trim()) {
-      delete nextMap[key];
-      changed = true;
-      continue;
+    const videoUrl = shot?.videoUrl?.trim();
+    if (videoUrl) {
+      const supersedes = entry.supersedesVideoUrl?.trim();
+      if (!supersedes || videoUrl !== supersedes) {
+        delete nextMap[key];
+        changed = true;
+        continue;
+      }
     }
 
     const startedAt = entry.startedAt ? Date.parse(entry.startedAt) : NaN;

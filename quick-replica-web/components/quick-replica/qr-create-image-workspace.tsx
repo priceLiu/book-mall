@@ -10,8 +10,9 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
+import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { QrModelPicker, QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
@@ -168,6 +169,10 @@ export function QrCreateImageForm({
   const profile = selectedModel.paramProfile;
   const maxRefImages = selectedModel.maxRefImages;
   const refImages = draft.sceneImageUrls.filter((u) => u.trim());
+  const imageRefs = useMemo(
+    () => refImages.map((url, index) => ({ url, index: index + 1 })),
+    [refImages],
+  );
 
   const pickModel = (modelKey: string) => {
     const meta = getTextToImageModelDef(modelKey);
@@ -270,15 +275,29 @@ export function QrCreateImageForm({
         >
           提示词
         </label>
-        <textarea
-          id="qr-create-image-prompt"
-          className={`qr-input qr-textarea-resizable mt-3 ${PROMPT_MIN_HEIGHT} w-full flex-1`}
-          value={draft.prompt}
-          maxLength={TEXT_TO_IMAGE_PROMPT_MAX_LENGTH}
-          disabled={busy}
-          placeholder="对所需图像的文本描述…"
-          onChange={(e) => onDraftChange({ ...draft, prompt: e.target.value })}
-        />
+        {maxRefImages > 0 ? (
+          <QrHappyHorsePromptTextarea
+            id="qr-create-image-prompt"
+            value={draft.prompt}
+            maxLength={TEXT_TO_IMAGE_PROMPT_MAX_LENGTH}
+            disabled={busy}
+            referenceImages={imageRefs}
+            minHeightClass={PROMPT_MIN_HEIGHT}
+            placeholder="对所需图像的文本描述… 输入 @ 引用下方参考图"
+            emptyHint="请先在下方上传参考图，再输入 @ 引用"
+            onChange={(prompt) => onDraftChange({ ...draft, prompt })}
+          />
+        ) : (
+          <textarea
+            id="qr-create-image-prompt"
+            className={`qr-input qr-textarea-resizable mt-3 ${PROMPT_MIN_HEIGHT} w-full flex-1`}
+            value={draft.prompt}
+            maxLength={TEXT_TO_IMAGE_PROMPT_MAX_LENGTH}
+            disabled={busy}
+            placeholder="对所需图像的文本描述…"
+            onChange={(e) => onDraftChange({ ...draft, prompt: e.target.value })}
+          />
+        )}
       </section>
 
       {maxRefImages > 0 ? (
@@ -292,7 +311,7 @@ export function QrCreateImageForm({
         >
           <h3 className="text-sm font-semibold text-[var(--qr-text-primary)]">参考图</h3>
           <p className="mt-1 text-xs text-[var(--qr-text-muted)]">
-            {`可选参考图（最多 ${maxRefImages} 张）；不上传则为纯文生图`}
+            {`可选参考图（最多 ${maxRefImages} 张）；不上传则为纯文生图，上传后可用 @ 在提示词中引用`}
           </p>
           <input
             ref={multiImageInputRef}

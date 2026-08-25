@@ -88,13 +88,19 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
       setFetchError(null);
       syncTaskCount(res.tasks.length);
       for (const t of res.tasks) {
-        if (t.kind === "recoverable_stall" && !prevReadyRef.current.has(t.taskId)) {
+        if (
+          (t.kind === "recoverable_stall" || t.kind === "ready_to_load") &&
+          !prevReadyRef.current.has(t.taskId)
+        ) {
           prevReadyRef.current.add(t.taskId);
           setOpen(true);
           syncPanelOpen(true);
           canvasNotify({
-            title: "视频可能已生成",
-            message: `节点「${t.label}」可点右下角工具栏摄像机图标，在「后台视频」中加载到节点。`,
+            title: t.kind === "ready_to_load" ? "视频已生成" : "视频可能已生成",
+            message:
+              t.kind === "ready_to_load"
+                ? `节点「${t.label}」成片已就绪，可在右下角「后台视频」中加载到节点。`
+                : `节点「${t.label}」可点右下角工具栏摄像机图标，在「后台视频」中加载到节点。`,
             variant: "info",
           });
         }
@@ -208,8 +214,8 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
 
         {!fetchError && !hasTasks ? (
           <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
-            暂无后台视频任务。火山 Seedance 等长视频在生成超过约 10
-            分钟后会转入「持续后台生成」，并出现在此列表；可继续编辑画布，成片后点「加载到节点」。
+            暂无后台视频任务。长视频（火山 Seedance、万相 3.0 等）在生成超过约 15
+            分钟后会转入「持续后台生成」，并出现在此列表；可继续编辑画布，成片后将通知您加载到节点。
           </p>
         ) : null}
 
@@ -224,7 +230,11 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
                 <div className="mt-1 text-[11px] leading-snug text-zinc-400">{t.hint}</div>
                 <div className="mt-1 text-[10px] text-zinc-500">
                   已等待 {formatAge(t.ageSec)}
-                  {t.kind === "recoverable_stall" ? " · 可恢复" : " · 后台生成中"}
+                  {t.kind === "recoverable_stall"
+                    ? " · 可恢复"
+                    : t.kind === "ready_to_load"
+                      ? " · 可加载"
+                      : " · 后台生成中"}
                 </div>
                 {t.canRecover ? (
                   <button

@@ -2,6 +2,12 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import {
+  dashscopeExtractTaskVideoUrl,
+  isDashscopeTaskFailed,
+  isDashscopeTaskSuccess,
+} from "@/lib/gateway/dashscope-client";
+import { pollDashscopeTaskForLog } from "@/lib/gateway/poll-service";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import {
   isVolcengineVideoTaskFailed,
@@ -219,6 +225,40 @@ export async function probeCanvasSubmittedTaskAtTimeout(input: {
         videoUrl,
         note: "gateway_log_bailian_r2v_succeeded",
       };
+    }
+  }
+
+  if (providerKind === "DASHSCOPE" && log.credentialId) {
+    const modelKey =
+      typeof payload?.modelKey === "string" ? payload.modelKey.trim() : undefined;
+    try {
+      const polled = await pollDashscopeTaskForLog({
+        credentialId: log.credentialId,
+        taskId: externalTaskId,
+        model: modelKey,
+      });
+      const status = polled.output.task_status ?? "";
+      const videoUrl = dashscopeExtractTaskVideoUrl(
+        polled.output as Record<string, unknown>,
+      );
+      base.vendorStatus = status;
+      base.vendorHasVideoUrl = Boolean(videoUrl?.trim());
+      if (isDashscopeTaskSuccess(status) && videoUrl) {
+        return {
+          ...base,
+          cause: "vendor_already_succeeded",
+          videoUrl,
+          note: log.status === "RUNNING" ? "gateway_log_still_running" : undefined,
+        };
+      }
+      if (isDashscopeTaskFailed(status)) {
+        return { ...base, cause: "vendor_failed", videoUrl: null };
+      }
+      if (!isDashscopeTaskSuccess(status)) {
+        return { ...base, cause: "vendor_still_running", videoUrl: null };
+      }
+    } catch (e) {
+      base.probeError = e instanceof Error ? e.message : String(e);
     }
   }
 

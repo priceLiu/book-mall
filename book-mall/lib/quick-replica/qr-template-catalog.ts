@@ -45,7 +45,7 @@ export function isQrGalleryTemplate(t: Pick<QrTemplateJson, "id">): boolean {
   );
 }
 
-/** 中栏 kind 卡片占位，不进右栏模板区 */
+/** 中栏 kind 卡片占位，默认不进右栏瀑布流 */
 export function isQrKindThumbBuiltin(t: Pick<QrTemplateJson, "id">): boolean {
   return (
     t.id.startsWith("builtin-image-") ||
@@ -56,16 +56,26 @@ export function isQrKindThumbBuiltin(t: Pick<QrTemplateJson, "id">): boolean {
   );
 }
 
+/** 选中某个子类时，把该子类的官方占位（管理后台可改提示词）放进右栏，否则用户无法打开 */
+export function isOfficialKindThumbForFilter(
+  t: QrTemplateJson,
+  filters: QrTemplateListFilters,
+): boolean {
+  return Boolean(filters.kind) && isQrKindThumbBuiltin(t) && t.kind === filters.kind;
+}
+
 export function filterBuiltinsForKindBrowse(templates: QrTemplateJson[]): QrTemplateJson[] {
   return templates.filter((t) => !isQrGalleryTemplate(t));
 }
 
-/** 右栏模板列表：排除 kind 占位；大类未选子类时展示该分类全部 gallery + 运营模板 */
+/** 右栏模板列表：排除其它 kind 占位；当前选中子类的官方示例外放 */
 export function filterTemplatesForGallery(
   templates: QrTemplateJson[],
   filters: QrTemplateListFilters,
 ): QrTemplateJson[] {
-  let items = templates.filter((t) => !isQrKindThumbBuiltin(t));
+  let items = templates.filter(
+    (t) => !isQrKindThumbBuiltin(t) || isOfficialKindThumbForFilter(t, filters),
+  );
 
   const scopeAll = (filters.scope ?? "all") === "all";
   const isMotionSyncBrowse =
@@ -107,7 +117,8 @@ export function filterTemplatesForGallery(
       (t) =>
         isQrUserProducedTemplate(t) ||
         (isQrImageGalleryTemplate(t) && t.kind === filters.kind) ||
-        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind) ||
+        isOfficialKindThumbForFilter(t, filters),
     );
   }
 
@@ -120,7 +131,8 @@ export function filterTemplatesForGallery(
       (t) =>
         isQrUserProducedTemplate(t) ||
         (isQrCharacterGalleryTemplate(t) && t.kind === filters.kind) ||
-        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind) ||
+        isOfficialKindThumbForFilter(t, filters),
     );
   }
 
@@ -167,7 +179,8 @@ export function filterTemplatesForGallery(
       (t) =>
         isQrMotionSyncGalleryTemplate(t) ||
         isQrUserProducedTemplate(t) ||
-        (isQrPlatformCatalogTemplate(t) && t.kind === "motion-sync"),
+        (isQrPlatformCatalogTemplate(t) && t.kind === "motion-sync") ||
+        isOfficialKindThumbForFilter(t, filters),
     );
   }
 
@@ -181,7 +194,8 @@ export function filterTemplatesForGallery(
       (t) =>
         isQrUserProducedTemplate(t) ||
         (isQrVideoGalleryTemplate(t) && t.kind === filters.kind) ||
-        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind),
+        (isQrPlatformCatalogTemplate(t) && t.kind === filters.kind) ||
+        isOfficialKindThumbForFilter(t, filters),
     );
   }
 

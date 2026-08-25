@@ -1,5 +1,5 @@
 /**
- * 视频 · 持续后台生成（≥10min 不占前台焦虑，仍 RUNNING + 继续 poll）。
+ * 视频 · 持续后台生成（≥15min 不占前台焦虑，仍 RUNNING + 继续 poll）。
  * 与 Canvas / Gateway UI 的「后台等待」阈值共用 VIDEO_BACKGROUND_UI_MS。
  */
 import type { Prisma } from "@prisma/client";
@@ -21,6 +21,15 @@ export const VIDEO_BACKGROUND_RECOVER_HINT =
 export const VOLCENGINE_RECOVERABLE_STALL_FAIL_CODES = [
   "VOLCENGINE_GATEWAY_POLL_STALL",
   "STALE_TIMEOUT",
+] as const;
+
+/** 画布 / Gateway 后台视频可尝试恢复（含 canvas 20min 误杀、厂商仍 RUNNING 等） */
+export const VIDEO_BACKGROUND_RECOVERABLE_STALL_FAIL_CODES = [
+  ...VOLCENGINE_RECOVERABLE_STALL_FAIL_CODES,
+  "CANVAS_TASK_TIMEOUT",
+  "timeout_vendor_running",
+  "timeout_gateway_sync",
+  "timeout",
 ] as const;
 
 export type VideoBackgroundGenerationMeta = {
@@ -147,6 +156,15 @@ export function isRecoverableVolcengineStallFailCode(
 ): boolean {
   if (!failCode) return false;
   return (VOLCENGINE_RECOVERABLE_STALL_FAIL_CODES as readonly string[]).includes(
+    failCode,
+  );
+}
+
+export function isRecoverableVideoBackgroundStallFailCode(
+  failCode: string | null | undefined,
+): boolean {
+  if (!failCode) return false;
+  return (VIDEO_BACKGROUND_RECOVERABLE_STALL_FAIL_CODES as readonly string[]).includes(
     failCode,
   );
 }

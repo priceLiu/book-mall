@@ -3,12 +3,7 @@
 import { Download, Eye, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import {
-  ImageZoomControls,
-  IMAGE_ZOOM_BUTTON_STEP,
-} from "@/components/media/image-zoom-controls";
-import { QrModal } from "@/components/quick-replica/qr-modal";
-import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
+import { QrFullscreenImagePreview } from "@/components/quick-replica/qr-fullscreen-image-preview";
 import { downloadImageUrl } from "@/lib/qr-image-upload-paste";
 
 const SIZE_CLASS = {
@@ -35,7 +30,6 @@ export function QrRefImageThumb({
   readonly = false,
 }: Props) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const previewZoom = useImageZoomPan(url);
 
   const handleDownload = useCallback(
     async (event: React.MouseEvent) => {
@@ -95,30 +89,12 @@ export function QrRefImageThumb({
         </div>
       </div>
 
-      <QrModal
-        open={lightboxOpen}
-        onClose={() => setLightboxOpen(false)}
-        variant="square"
-        title="图片预览"
-      >
-        <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
-          <div {...previewZoom.stageProps} className="inline-block leading-none">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt=""
-              draggable={false}
-              className="max-h-full max-w-full object-contain"
-            />
-          </div>
-          <ImageZoomControls
-            zoom={previewZoom.zoom}
-            onZoomIn={() => previewZoom.zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
-            onZoomOut={() => previewZoom.zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
-            onReset={previewZoom.reset}
-          />
-        </div>
-      </QrModal>
+      {lightboxOpen ? (
+        <QrFullscreenImagePreview
+          src={url}
+          onClose={() => setLightboxOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Eye, X } from "lucide-react";
+import { createPortal } from "react-dom";
 
 import { useAdminMediaPasteTarget } from "@/components/admin/template-admin/admin-media-paste-context";
+import { FullscreenImagePreview } from "@/components/media/fullscreen-image-preview";
 
 export type AdminMediaAccept = "image" | "video" | "media";
 
@@ -57,21 +59,80 @@ function MediaPreview({
   url,
   accept,
   className,
+  hoverChrome = "default",
 }: {
   url: string;
   accept: AdminMediaAccept;
   className?: string;
+  hoverChrome?: "default" | "canvas";
 }) {
-  if (isVideoUrl(url, accept)) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const video = isVideoUrl(url, accept);
+
+  if (video) {
     return (
       <video
+        ref={videoRef}
         src={url}
-        controls
+        controls={hoverChrome !== "canvas"}
+        muted={hoverChrome === "canvas"}
+        loop={hoverChrome === "canvas"}
         playsInline
         className={className ?? "max-h-56 w-full rounded-md bg-black object-contain"}
+        onMouseEnter={() => {
+          if (hoverChrome !== "canvas") return;
+          void videoRef.current?.play().catch(() => undefined);
+        }}
+        onMouseLeave={() => {
+          if (hoverChrome !== "canvas") return;
+          const el = videoRef.current;
+          if (!el) return;
+          el.pause();
+          el.currentTime = 0;
+        }}
       />
     );
   }
+
+  if (hoverChrome === "canvas") {
+    return (
+      <>
+        <div className="group/media relative inline-block max-w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt=""
+            className={className ?? "max-h-56 w-full rounded-md object-contain"}
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition group-hover/media:opacity-100">
+            <button
+              type="button"
+              title="预览大图"
+              aria-label="预览大图"
+              className="pointer-events-auto inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFullscreen(true);
+              }}
+            >
+              <Eye className="size-4 pointer-events-none" strokeWidth={1.75} />
+            </button>
+          </div>
+        </div>
+        {fullscreen
+          ? createPortal(
+              <FullscreenImagePreview
+                src={url}
+                onClose={() => setFullscreen(false)}
+              />,
+              document.body,
+            )
+          : null}
+      </>
+    );
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -94,6 +155,8 @@ type Props = {
   accept?: AdminMediaAccept;
   multiple?: boolean;
   disabled?: boolean;
+  /** canvas = 悬停 Eye / 视频悬停播放（快速复制） */
+  hoverChrome?: "default" | "canvas";
 };
 
 export function AdminMediaField({
@@ -107,6 +170,7 @@ export function AdminMediaField({
   accept = "media",
   multiple = false,
   disabled = false,
+  hoverChrome = "default",
 }: Props) {
   const autoId = useId();
   const pasteFieldId = pasteFieldIdProp ?? autoId;
@@ -223,6 +287,7 @@ export function AdminMediaField({
                 <MediaPreview
                   url={src}
                   accept={accept}
+                  hoverChrome={hoverChrome}
                   className={
                     multiple
                       ? "h-20 w-16 rounded-md object-cover"

@@ -644,6 +644,10 @@ export function validateTextToImageDraft(args: {
   if (refs.length > meta.maxRefImages) {
     return `参考图最多 ${meta.maxRefImages} 张`;
   }
+  const maxIdx = maxHappyHorsePromptImageIndex(prompt);
+  if (maxIdx > refs.length) {
+    return `提示词引用了 [Image ${maxIdx}]，但只有 ${refs.length} 张参考图`;
+  }
   return null;
 }
 

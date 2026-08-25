@@ -30,7 +30,7 @@ export function resolveQrTemplatePreviewMedia(input: {
   const refVideo = input.referenceVideoUrl?.trim() ?? "";
 
   if (input.preferVideo) {
-    if (outputUrl && isVideoMediaUrl(outputUrl)) {
+    if (outputUrl && (isVideoMediaUrl(outputUrl) || input.mediaType === "video")) {
       return { url: outputUrl, kind: "video", poster: thumb || undefined };
     }
     if (refVideo && isVideoMediaUrl(refVideo)) {

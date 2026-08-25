@@ -31,6 +31,7 @@ import {
   getCanvasUserInflightMax,
   getGenerationPollBatch,
   isCanvasBailianR2vVideoTaskPayload,
+  isCanvasDashscopeVideoTaskPayload,
   isCanvasKieVideoTaskPayload,
   isCanvasVolcengineVideoTaskPayload,
   isCanvasMinimaxVideoTaskPayload,
@@ -125,6 +126,10 @@ import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-han
 import {
   isSlowGenerationAge,
 } from "@/lib/generation/slow-generation";
+import {
+  resolveCanvasSubmittedTaskTimeoutContext,
+  shouldDeferCanvasBackgroundVideoTimeout,
+} from "@/lib/canvas/canvas-submitted-task-timeout";
 import {
   buildCanvasPollErrorPatch,
   buildCanvasTimeoutFailFields,
@@ -1688,8 +1693,8 @@ async function advanceOneSubmittedCanvasTask(
     return delta;
   }
 
-  const timeoutMs = resolveCanvasSubmittedTaskTimeoutMs(task);
-  const timeoutMin = resolveCanvasSubmittedTaskTimeoutMin(task);
+  const timeoutCtx = await resolveCanvasSubmittedTaskTimeoutContext(task, now);
+  const { timeoutMs, timeoutMin, inBackground } = timeoutCtx;
   const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
   if (now - submittedTs >= timeoutMs) {
     let finalPollError: string | undefined;
@@ -1745,6 +1750,11 @@ async function advanceOneSubmittedCanvasTask(
           },
           raw: { recoveredFromTimeoutProbe: true },
         });
+      } else if (isCanvasDashscopeVideoTaskPayload(payload)) {
+        await applyCanvasDashscopeImagePollResult(task.id, {
+          task_status: "SUCCEEDED",
+          video_url: diagnosis.videoUrl.trim(),
+        });
       } else {
         await applyCanvasVolcengineVideoResult(task.id, diagnosis.videoUrl);
       }
@@ -1761,6 +1771,22 @@ async function advanceOneSubmittedCanvasTask(
         delta.succeeded = 1;
         return finishSubmittedPollDelta(task, delta);
       }
+    }
+
+    if (
+      shouldDeferCanvasBackgroundVideoTimeout({
+        inBackground,
+        cause: diagnosis.cause,
+      })
+    ) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          lastPolledAt: new Date(),
+          pollCount: task.pollCount + 1,
+        },
+      });
+      return finishSubmittedPollDelta(task, delta);
     }
 
     logKieEvent("warn", "[canvas] task timeout", {

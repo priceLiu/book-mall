@@ -626,6 +626,59 @@ export async function ecomGenerateStoryboardVideo(opts: {
   throw new Error("视频生成超时");
 }
 
+async function runBailianR2vVideoJob(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  referenceImageUrls: string[];
+  durationSec: number;
+  aspectRatio: "16:9" | "9:16";
+  resolution?: EcomStoryboardVideoResolution;
+}): Promise<{ ossUrl: string; taskId: string; chargePoints: number | null }> {
+  const resolution = opts.resolution ?? "1080p";
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const { taskId, logId } = await ecomGwCreateBailianR2vJob(opts.userId, {
+    model: opts.modelKey,
+    prompt: opts.prompt,
+    referenceImageUrls: opts.referenceImageUrls,
+    resolution: bailianResolutionFromEcom(resolution),
+    ratio: opts.aspectRatio,
+    duration: opts.durationSec,
+    clientPage,
+  });
+
+  let videoUrl: string | null = null;
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const polled = await ecomGwPollBailianR2v(opts.userId, {
+      taskId,
+      gatewayLogId: logId,
+    });
+    if (polled.status === "SUCCEEDED" && polled.outputUrl) {
+      videoUrl = polled.outputUrl;
+      break;
+    }
+    if (polled.status === "FAILED") {
+      throw new Error(polled.failMessage ?? "视频任务失败");
+    }
+  }
+  if (!videoUrl) throw new Error("视频生成超时");
+
+  const res = await fetch(videoUrl);
+  if (!res.ok) throw new Error(`下载视频失败 HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: "mp4",
+    buf,
+    contentType: "video/mp4",
+  });
+
+  return { ossUrl, taskId, chargePoints: null };
+}
+
 async function runVolcengineVideoJob(opts: {
   userId: string;
   projectId: string;
@@ -775,7 +828,10 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     throw new Error("请先生成该镜头分镜图");
   }
 
-  const modelKey = opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL;
+  const modelKey = resolveStoryboardVideoModel(
+    opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL,
+  );
+  const provider = resolveStoryboardVideoProvider(modelKey);
   const resolution = resolveVideoResolution(opts.resolution);
   const panelDurationCap = isStoryboardWan30VideoModel(modelKey)
     ? 30
@@ -812,37 +868,59 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   });
   const refUrls = panelRefPlan.referenceImageUrls.map(norm);
   const panelFirstFrame = norm(panelRefPlan.firstFrameUrl);
+  const bailianUrls = panelRefPlan.bailianAllUrls.map(norm);
 
-  const { ossUrl, taskId, chargePoints } = isStoryboardWan30VideoModel(modelKey)
-    ? await runDashscopeWan30VideoJob({
-        userId: opts.userId,
+  let ossUrl: string;
+  let taskId: string;
+  let chargePoints: number | null = null;
+
+  if (provider === "bailian") {
+    ({ ossUrl, taskId, chargePoints } = await runBailianR2vVideoJob({
+      userId: opts.userId,
+      projectId: opts.projectId,
+      modelKey,
+      prompt,
+      referenceImageUrls: bailianUrls,
+      durationSec,
+      aspectRatio: opts.aspectRatio ?? "9:16",
+      resolution,
+    }));
+  } else if (provider === "dashscope" && isStoryboardWan30VideoModel(modelKey)) {
+    ({ ossUrl, taskId, chargePoints } = await runDashscopeWan30VideoJob({
+      userId: opts.userId,
+      projectId: opts.projectId,
+      modelKey,
+      prompt,
+      firstFrameUrl: panelFirstFrame,
+      referenceImageUrls: refUrls,
+      durationSec,
+      aspectRatio: opts.aspectRatio ?? "9:16",
+      resolution,
+    }));
+  } else if (provider === "volcengine") {
+    ({ ossUrl, taskId, chargePoints } = await runVolcengineVideoJob({
+      userId: opts.userId,
+      projectId: opts.projectId,
+      modelKey,
+      prompt,
+      imageUrl: panelFirstFrame,
+      referenceImageUrls: refUrls,
+      durationSec,
+      aspectRatio: opts.aspectRatio ?? "9:16",
+      resolution,
+      meta: {
         projectId: opts.projectId,
-        modelKey,
-        prompt,
-        firstFrameUrl: panelFirstFrame,
-        referenceImageUrls: refUrls,
-        durationSec,
-        aspectRatio: opts.aspectRatio ?? "9:16",
+        panelIndex: panel.index,
+        kind: "panel_video",
         resolution,
-      })
-    : await runVolcengineVideoJob({
-        userId: opts.userId,
-        projectId: opts.projectId,
-        modelKey,
-        prompt,
-        imageUrl: panelFirstFrame,
-        referenceImageUrls: refUrls,
         durationSec,
-        aspectRatio: opts.aspectRatio ?? "9:16",
-        resolution,
-        meta: {
-          projectId: opts.projectId,
-          panelIndex: panel.index,
-          kind: "panel_video",
-          resolution,
-          durationSec,
-        },
-      });
+      },
+    }));
+  } else {
+    throw new Error(
+      `单镜头成片暂不支持模型「${modelKey}」；请选用百炼 R2V（如 happyhorse-1.1-r2v）、Wan 3.0 或 Seedance。`,
+    );
+  }
 
   const updatedPanels = sheet.panels.map((p) =>
     p.index === panel.index ? { ...p, videoUrl: ossUrl } : p,

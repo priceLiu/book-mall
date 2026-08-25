@@ -59,7 +59,47 @@ export function isCanvasKieVideoTaskPayload(
 /** SUBMITTED 百炼 R2V 轮询间隔（DashScope 建议约 15s，避免 3s 频繁 recordInfo）。 */
 export const CANVAS_BAILIAN_R2V_POLL_INTERVAL_MS = 15_000;
 
-/** SUBMITTED 任务超时阈值（毫秒）：火山 / 百炼 R2V 视频用更长窗口。 */
+/** DashScope 异步视频（万相 / Kling 等 · wan3.0-video）实测可超过 20min。 */
+export function getCanvasDashscopeVideoTimeoutMin(): number {
+  const raw = Number(process.env.CANVAS_DASHSCOPE_VIDEO_TIMEOUT_MIN ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : 45;
+}
+
+export function isCanvasDashscopeVideoTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  if (payload.providerKind !== "DASHSCOPE") return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  return kind === "video-engine" || kind === "ai-video-engine";
+}
+
+/** KIE 异步视频轮询上限（与火山对齐，默认 45min）。 */
+export function getCanvasKieVideoTimeoutMin(): number {
+  const raw = Number(process.env.CANVAS_KIE_VIDEO_TIMEOUT_MIN ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : 45;
+}
+
+/** 已进入后台生成后的画布轮询硬上限（Gateway STALE_TIMEOUT 对齐，默认 90min）。 */
+export function getCanvasBackgroundVideoTimeoutMin(): number {
+  const raw = Number(process.env.CANVAS_BACKGROUND_VIDEO_TIMEOUT_MIN ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : 90;
+}
+
+/** 画布异步视频引擎任务（可转入后台生成 / 延长 poll）。 */
+export function isCanvasAsyncVideoEngineTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  return (
+    isCanvasVolcengineVideoTaskPayload(payload) ||
+    isCanvasDashscopeVideoTaskPayload(payload) ||
+    isCanvasBailianR2vVideoTaskPayload(payload) ||
+    isCanvasMinimaxVideoTaskPayload(payload) ||
+    isCanvasKieVideoTaskPayload(payload)
+  );
+}
+
+/** SUBMITTED 任务超时阈值（毫秒）：火山 / DashScope / 百炼 R2V 视频用更长窗口。 */
 export function resolveCanvasSubmittedTaskTimeoutMs(input: {
   inputPayload: unknown;
 }): number {
@@ -69,11 +109,15 @@ export function resolveCanvasSubmittedTaskTimeoutMs(input: {
       : null;
   const min = isCanvasVolcengineVideoTaskPayload(payload)
     ? getCanvasVolcengineVideoTimeoutMin()
-    : isCanvasMinimaxVideoTaskPayload(payload)
-      ? getCanvasMinimaxVideoTimeoutMin()
-    : isCanvasBailianR2vVideoTaskPayload(payload)
-      ? getCanvasBailianR2vVideoTimeoutMin()
-      : CANVAS_AI_TASK_TIMEOUT_MIN;
+    : isCanvasDashscopeVideoTaskPayload(payload)
+      ? getCanvasDashscopeVideoTimeoutMin()
+      : isCanvasMinimaxVideoTaskPayload(payload)
+        ? getCanvasMinimaxVideoTimeoutMin()
+        : isCanvasBailianR2vVideoTaskPayload(payload)
+          ? getCanvasBailianR2vVideoTimeoutMin()
+          : isCanvasKieVideoTaskPayload(payload)
+            ? getCanvasKieVideoTimeoutMin()
+            : CANVAS_AI_TASK_TIMEOUT_MIN;
   return min * 60 * 1000;
 }
 

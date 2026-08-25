@@ -13,6 +13,7 @@ import {
   isAudioMediaUrl,
   isImageMediaUrl,
   isVideoMediaUrl,
+  resolveQrTemplatePreviewMedia,
 } from "@/lib/qr-template-preview-media";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
 import {
@@ -20,6 +21,7 @@ import {
   QrMasonryGallerySkeleton,
 } from "@/components/quick-replica/qr-panel-skeletons";
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { downloadQrTemplateOutput } from "@/lib/qr-download-output";
 
 export function useMasonryColumnCount(): number {
@@ -56,6 +58,17 @@ function resolveGalleryThumbnailUrl(thumbnailUrl: string | undefined): string | 
   if (!thumb || isVideoMediaUrl(thumb)) return undefined;
   if (isImageMediaUrl(thumb)) return thumb;
   return thumb;
+}
+
+function resolveGalleryPreviewVideoUrl(template: QrTemplate): string | null {
+  const media = resolveQrTemplatePreviewMedia({
+    thumbnailUrl: template.thumbnailUrl,
+    mediaType: template.output?.mediaType,
+    outputUrl: template.output?.url,
+    referenceVideoUrl: template.reference?.slots?.referenceVideo?.url,
+    preferVideo: true,
+  });
+  return media?.kind === "video" ? media.url : null;
 }
 
 /** 封面优先 thumbnail；若为过期临时 mp4 / 空，回退参考图槽位 */
@@ -174,11 +187,10 @@ export function MasonryTemplateCard({
   /** 保留原图宽高比（瀑布流），不裁切为统一 4:3 */
   naturalAspect?: boolean;
 }) {
-  const { ref: visibilityRef, visible } = useIntersectionVisible<HTMLButtonElement>();
+  const { ref: visibilityRef, visible } = useIntersectionVisible<HTMLDivElement>();
   const [hovering, setHovering] = useState(false);
   const showTitle = template.title && !/^图像灵感 \d+$/.test(template.title);
-  const previewVideoUrl =
-    template.output?.mediaType === "video" ? template.output.url : null;
+  const previewVideoUrl = resolveGalleryPreviewVideoUrl(template);
   const imageThumbUrl = resolveTemplatePosterImageUrl(template);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { ready, setReady, posterMode, setPosterMode, aspectRatio } = useQrMasonryPoster(
@@ -191,10 +203,11 @@ export function MasonryTemplateCard({
   const useVideoFramePoster = Boolean(
     previewVideoUrl && posterMode === "video-frame" && visible,
   );
-  const mountVideo =
-    Boolean(previewVideoUrl) &&
-    visible &&
-    (hovering || useVideoFramePoster);
+  const mountVideo = Boolean(
+    previewVideoUrl && visible && (hovering || useVideoFramePoster),
+  );
+  /** 仅无封面时用 video 撑开瀑布流高度；有封面时 video 绝对叠层，不改变尺寸 */
+  const videoInDocumentFlow = useVideoFramePoster && !imageThumbUrl && ready;
 
   useEffect(() => {
     if (!mountVideo || !useVideoFramePoster || !previewVideoUrl) return;
@@ -224,11 +237,25 @@ export function MasonryTemplateCard({
     };
   }, [mountVideo, useVideoFramePoster, previewVideoUrl, template.id, setReady]);
 
-  const onHoverStart = () => {
-    setHovering(true);
+  useEffect(() => {
+    if (!mountVideo || !hovering) return;
     const video = videoRef.current;
     if (!video) return;
-    void video.play().catch(() => undefined);
+
+    const tryPlay = () => {
+      void video.play().catch(() => undefined);
+    };
+
+    tryPlay();
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      video.addEventListener("canplay", tryPlay, { once: true });
+      return () => video.removeEventListener("canplay", tryPlay);
+    }
+  }, [mountVideo, hovering]);
+
+  const onHoverStart = () => {
+    if (!previewVideoUrl) return;
+    setHovering(true);
   };
 
   const onHoverEnd = () => {
@@ -241,18 +268,28 @@ export function MasonryTemplateCard({
 
   const showSkeleton = visible && !ready;
   const showThumbImg = Boolean(imageThumbUrl && posterMode === "thumbnail" && visible);
+  const hideThumbForVideo = Boolean(previewVideoUrl && hovering);
+
+  const showImagePreviewEye = Boolean(imageThumbUrl) && !previewVideoUrl;
 
   return (
     <div className="group relative w-full">
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       ref={visibilityRef}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       onMouseEnter={previewVideoUrl ? onHoverStart : undefined}
       onMouseLeave={previewVideoUrl ? onHoverEnd : undefined}
       onFocus={previewVideoUrl ? onHoverStart : undefined}
       onBlur={previewVideoUrl ? onHoverEnd : undefined}
-      className="qr-masonry-card group relative flex w-full flex-col gap-[6px] overflow-clip rounded-[16px] p-[6px] text-left transition-opacity duration-200 active:opacity-80"
+      className="qr-masonry-card group relative flex w-full cursor-pointer flex-col gap-[6px] overflow-clip rounded-[16px] p-[6px] text-left transition-opacity duration-200 active:opacity-80"
     >
       <div
         className="pointer-events-none absolute inset-0 opacity-100 transition-opacity duration-200 group-hover:opacity-0"
@@ -276,7 +313,7 @@ export function MasonryTemplateCard({
       />
 
       <div
-        className={`relative w-full overflow-hidden rounded-[10px] bg-zinc-900${naturalAspect ? "" : ""}`}
+        className={`relative w-full overflow-hidden rounded-[10px] bg-zinc-900 group/media${naturalAspect ? "" : ""}`}
         style={
           naturalAspect
             ? undefined
@@ -310,7 +347,7 @@ export function MasonryTemplateCard({
                 setReady(true);
               }
             }}
-            className={`block w-full transition-all duration-300 group-hover:scale-[1.03]${naturalAspect ? " h-auto" : " h-full object-cover"}${previewVideoUrl ? " group-hover:opacity-0" : ""}${ready ? " opacity-100" : " opacity-0"}`}
+            className={`block w-full transition-all duration-300 group-hover:scale-[1.03]${naturalAspect ? " h-auto" : " h-full object-cover"}${ready && !hideThumbForVideo ? " opacity-100" : " opacity-0"}`}
           />
         ) : null}
 
@@ -322,15 +359,17 @@ export function MasonryTemplateCard({
             loop
             muted
             playsInline
-            preload={useVideoFramePoster ? "metadata" : "none"}
+            preload="metadata"
             className={`pointer-events-none object-cover transition-opacity duration-150${
-              useVideoFramePoster
-                ? ready
-                  ? " relative block h-auto w-full opacity-100 group-hover:scale-[1.03]"
-                  : " absolute inset-0 h-full w-full opacity-0"
-                : " absolute inset-0 h-full w-full opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-            }`}
+              videoInDocumentFlow
+                ? " relative block h-auto w-full opacity-100"
+                : ` absolute inset-0 h-full w-full${hovering || useVideoFramePoster ? " opacity-100" : " opacity-0"}`
+            }${!videoInDocumentFlow && hovering ? " scale-[1.03]" : ""}`}
           />
+        ) : null}
+
+        {showImagePreviewEye && imageThumbUrl ? (
+          <QrHoverEyeOverlay src={imageThumbUrl} title={template.title} />
         ) : null}
 
         {!hideRecreateOnHover ? (
@@ -378,7 +417,7 @@ export function MasonryTemplateCard({
           </p>
         </div>
       ) : null}
-    </button>
+    </div>
     {allowDownload ? (
       <TemplateDownloadButton template={template} className="absolute bottom-2 right-2 z-20" />
     ) : null}

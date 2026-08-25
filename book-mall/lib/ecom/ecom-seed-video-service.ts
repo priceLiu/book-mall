@@ -27,10 +27,12 @@ import { backfillSeedVideoPlanShotsFromAssets } from "@/lib/ecom/ecom-seed-video
 import {
   clearPendingShotVideo,
   markPendingShotVideo,
+  patchPendingShotVideo,
   readPendingShotVideos,
   reconcileSeedVideoPendingShotMeta,
   type SeedVideoPendingShotEntry,
 } from "@/lib/ecom/ecom-seed-video-pending-shots";
+import { resumePendingSeedVideoPanelShots } from "@/lib/ecom/ecom-seed-video-panel-resume";
 import {
   backfillSeedVideoDirectVideoFromAssets,
   mergeSeedVideoDirectPlanPreserveMedia,
@@ -170,6 +172,7 @@ export async function createEcomSeedVideoProject(
 export async function getEcomSeedVideoProject(
   userId: string,
   projectId: string,
+  opts?: { resumePending?: boolean },
 ): Promise<EcomSeedVideoProjectDto | null> {
   const row = await prisma.ecomSeedVideoProject.findFirst({
     where: { id: projectId, userId },
@@ -208,7 +211,51 @@ export async function getEcomSeedVideoProject(
     });
     dto = { ...dto, meta: pendingReconcile.meta };
   }
+
+  if (opts?.resumePending === false) {
+    return dto;
+  }
+
+  const resumed = await resumePendingSeedVideoPanelShots({
+    userId,
+    projectId,
+    meta: (dto.meta ?? {}) as Record<string, unknown>,
+    plan: dto.plan,
+  });
+  if (resumed.changed) {
+    await prisma.ecomSeedVideoProject.update({
+      where: { id: projectId },
+      data: {
+        meta: resumed.meta as Prisma.InputJsonValue,
+        plan: resumed.plan as Prisma.InputJsonValue,
+        status: "production",
+      },
+    });
+    dto = { ...dto, meta: resumed.meta, plan: resumed.plan, status: "production" };
+  }
+
   return dto;
+}
+
+export async function updateEcomSeedVideoPendingShotEntry(
+  userId: string,
+  projectId: string,
+  shotIndex: number,
+  patch: Partial<SeedVideoPendingShotEntry>,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.ecomSeedVideoProject.findFirst({
+      where: { id: projectId, userId },
+    });
+    if (!row) throw new Error("项目不存在");
+    const prevMeta = (row.meta as Record<string, unknown> | null) ?? {};
+    await tx.ecomSeedVideoProject.update({
+      where: { id: projectId },
+      data: {
+        meta: patchPendingShotVideo(prevMeta, shotIndex, patch) as Prisma.InputJsonValue,
+      },
+    });
+  });
 }
 
 export async function markEcomSeedVideoPendingShot(

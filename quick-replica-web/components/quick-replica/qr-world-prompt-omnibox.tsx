@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { extractImageFilesFromClipboard } from "@/lib/qr-image-upload-paste";
 import {
@@ -283,9 +284,10 @@ export function QrWorldPromptOmnibox({
           QR_WORLD_REF_VIEWS[i % QR_WORLD_REF_VIEWS.length]!.label;
         return (
           <div key={`${url}-${i}`} className="flex flex-col items-center gap-1">
-            <div className="group relative h-10 w-10 overflow-hidden rounded-md border border-white/10">
+            <div className="group/media group relative h-10 w-10 overflow-hidden rounded-md border border-white/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={url} alt="" className="h-full w-full object-cover" />
+              <QrHoverEyeOverlay src={url} size="sm" />
               <button
                 type="button"
                 aria-label="移除参考图"

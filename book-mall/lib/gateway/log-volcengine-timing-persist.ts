@@ -158,3 +158,4 @@ export {
   expireVolcengineGatewayPollStalledLogs,
   promoteVolcengineTasksToBackgroundGeneration,
 } from "@/lib/gateway/volcengine-background-promote";
+export { promoteVideoTasksToBackgroundGeneration } from "@/lib/gateway/video-background-promote";

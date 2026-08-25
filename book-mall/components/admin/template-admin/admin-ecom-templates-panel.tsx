@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { AdminListSentinel } from "@/components/admin/template-admin/admin-list-sentinel";
 import { AdminMediaField } from "@/components/admin/template-admin/admin-media-field";
 import { AdminMediaPasteProvider } from "@/components/admin/template-admin/admin-media-paste-context";
 import { AdminMediaThumb } from "@/components/admin/template-admin/admin-media-thumb";
+import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
 import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
@@ -230,16 +232,19 @@ export function AdminEcomTemplatesPanel() {
 
 function TemplatesAdmin() {
   const [rows, setRows] = useState<TemplateRow[]>([]);
-  const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [total, setTotal] = useState(0);
+  const [category, setCategory] = useState<string | null>(null);
   const [media, setMedia] = useState<"all" | "image" | "video">("all");
   const [noPromptOnly, setNoPromptOnly] = useState(false);
   const [q, setQ] = useState("");
+  const [qDebounced, setQDebounced] = useState("");
   const [sourceQ, setSourceQ] = useState("");
   const [sourceStem, setSourceStem] = useState<string | null>(null);
   const [sourceRows, setSourceRows] = useState<TemplateRow[] | null>(null);
   const [sourceLoading, setSourceLoading] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateRow | null>(null);
   /** 打开编辑时的原始 id，用于 PATCH 路径（与表单内可改 id 解耦） */
@@ -248,12 +253,20 @@ function TemplatesAdmin() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const loadMoreLock = useRef(false);
+  const listGen = useRef(0);
 
   const sourceSearchActive = sourceQ.trim().length > 0;
+  const canLoad = Boolean(category) && !sourceSearchActive;
 
   useEffect(() => {
     setNoPromptOnly(readNoPromptFilterPreference());
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQDebounced(q.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [q]);
 
   function toggleNoPromptOnly() {
     setNoPromptOnly((prev) => {
@@ -263,41 +276,96 @@ function TemplatesAdmin() {
     });
   }
 
-  // 只取当前分类：全量清单已数千条，后台没必要整包拉下来再前端过滤
+  const fetchPage = useCallback(
+    async (offset: number, append: boolean, gen?: number) => {
+      if (!category) return;
+      const token = gen ?? listGen.current;
+      const qs = new URLSearchParams({
+        category,
+        limit: String(ADMIN_TEMPLATE_PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (media !== "all") qs.set("mediaKind", media);
+      if (noPromptOnly) qs.set("noPromptOnly", "1");
+      if (qDebounced) qs.set("q", qDebounced);
+      const res = await fetch(`/api/admin/ecom/template-gallery/templates?${qs}`, {
+        cache: "no-store",
+      });
+      const text = await res.text();
+      if (!text.trim()) throw new Error("接口无响应");
+      let data: { templates?: TemplateRow[]; total?: number; error?: string };
+      try {
+        data = JSON.parse(text) as { templates?: TemplateRow[]; total?: number; error?: string };
+      } catch {
+        throw new Error("接口返回无效 JSON");
+      }
+      if (!res.ok) throw new Error(data.error ?? "加载失败");
+      if (token !== listGen.current) return;
+      const next = Array.isArray(data.templates) ? data.templates : [];
+      setRows((prev) => (append ? [...prev, ...next] : next));
+      setTotal(typeof data.total === "number" ? data.total : next.length);
+    },
+    [category, media, noPromptOnly, qDebounced],
+  );
+
   const load = useCallback(async () => {
-    const res = await fetch(
-      `/api/admin/ecom/template-gallery/templates?category=${encodeURIComponent(category)}`,
-      { cache: "no-store" },
-    );
-    const text = await res.text();
-    if (!text.trim()) throw new Error("接口无响应");
-    let data: { templates?: TemplateRow[]; error?: string };
+    if (!category) return;
+    setLoading(true);
+    setError(null);
     try {
-      data = JSON.parse(text) as { templates?: TemplateRow[]; error?: string };
-    } catch {
-      throw new Error("接口返回无效 JSON");
+      await fetchPage(0, false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载失败");
+    } finally {
+      setLoading(false);
     }
-    if (!res.ok) throw new Error(data.error ?? "加载失败");
-    setRows(Array.isArray(data.templates) ? data.templates : []);
-  }, [category]);
+  }, [category, fetchPage]);
 
   useEffect(() => {
+    if (!canLoad) {
+      listGen.current += 1;
+      if (!sourceSearchActive) {
+        setRows([]);
+        setTotal(0);
+        setLoading(false);
+        setError(null);
+      }
+      return;
+    }
     let cancelled = false;
+    const gen = ++listGen.current;
+    setLoading(true);
+    setError(null);
+    setRows([]);
+    setTotal(0);
     void (async () => {
-      setLoading(true);
-      setError(null);
       try {
-        await load();
+        await fetchPage(0, false, gen);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "加载失败");
+        if (!cancelled && gen === listGen.current) {
+          setError(e instanceof Error ? e.message : "加载失败");
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && gen === listGen.current) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [canLoad, fetchPage, sourceSearchActive]);
+
+  const loadMore = useCallback(() => {
+    if (!canLoad || loading || loadingMore || loadMoreLock.current) return;
+    if (rows.length >= total) return;
+    loadMoreLock.current = true;
+    setLoadingMore(true);
+    void fetchPage(rows.length, true)
+      .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
+      .finally(() => {
+        loadMoreLock.current = false;
+        setLoadingMore(false);
+      });
+  }, [canLoad, fetchPage, loading, loadingMore, rows.length, total]);
 
   useEffect(() => {
     const raw = sourceQ.trim();
@@ -345,18 +413,15 @@ function TemplatesAdmin() {
     };
   }, [sourceQ]);
 
-  const listRows = sourceSearchActive ? (sourceRows ?? []) : rows;
-
-  const filtered = useMemo(
-    () =>
-      listRows.filter((r) => {
-        if (media !== "all" && r.mediaKind !== media) return false;
-        if (noPromptOnly && templateHasPromptText(r)) return false;
-        if (q && !`${r.title} ${r.id}`.includes(q)) return false;
-        return true;
-      }),
-    [listRows, media, noPromptOnly, q],
-  );
+  const filtered = useMemo(() => {
+    if (!sourceSearchActive) return rows;
+    return (sourceRows ?? []).filter((r) => {
+      if (media !== "all" && r.mediaKind !== media) return false;
+      if (noPromptOnly && templateHasPromptText(r)) return false;
+      if (q && !`${r.title} ${r.id}`.includes(q)) return false;
+      return true;
+    });
+  }, [media, noPromptOnly, q, rows, sourceRows, sourceSearchActive]);
 
   async function uploadField(file: File, field: "ossUrl" | "coverUrl" | "mainImageUrl" | "ref") {
     if (!form) return;
@@ -467,6 +532,7 @@ function TemplatesAdmin() {
   }
 
   function openNewForm() {
+    if (!category) return;
     setEditingEntryId(null);
     setFormNotice(null);
     setForm(
@@ -570,7 +636,8 @@ function TemplatesAdmin() {
         ) : null}
         <button
           type="button"
-          className="rounded-md bg-[#0969da] px-3 py-1 text-xs text-white"
+          className="rounded-md bg-[#0969da] px-3 py-1 text-xs text-white disabled:opacity-50"
+          disabled={!category}
           onClick={openNewForm}
         >
           新建
@@ -584,9 +651,11 @@ function TemplatesAdmin() {
                 : sourceStem
                   ? `源 stem ${sourceStem} · ${filtered.length} 条${filtered.length === 0 ? "（未入库）" : ""}`
                   : `${filtered.length} 条`
-            : loading
-              ? "加载中…"
-              : `${filtered.length} 条`}
+            : !category
+              ? "请选择品类"
+              : loading
+                ? "加载中…"
+                : `已加载 ${rows.length} / 共 ${total} 条`}
           {!sourceSearchActive && error ? ` · ${error}` : ""}
           {message ? ` · ${message}` : ""}
         </span>
@@ -617,9 +686,11 @@ function TemplatesAdmin() {
                 >
                   {sourceSearchActive && !sourceLoading
                     ? "无匹配条目"
-                    : loading
-                      ? "加载中…"
-                      : "暂无数据"}
+                    : !category
+                      ? "请选择品类"
+                      : loading
+                        ? "加载中…"
+                        : "暂无数据"}
                 </td>
               </tr>
             ) : null}
@@ -660,6 +731,13 @@ function TemplatesAdmin() {
           </tbody>
         </table>
       </div>
+      {!sourceSearchActive ? (
+        <AdminListSentinel
+          hasMore={Boolean(category) && rows.length < total}
+          loading={loading || loadingMore}
+          onVisible={loadMore}
+        />
+      ) : null}
 
       {form ? (
         <AdminMediaPasteProvider>

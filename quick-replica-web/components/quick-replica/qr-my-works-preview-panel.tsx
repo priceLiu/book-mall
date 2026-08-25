@@ -3,6 +3,8 @@
 import { Copy, Link2, Trash2 } from "lucide-react";
 
 import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-generate-preview";
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
+import { QrHoverVideo } from "@/components/quick-replica/qr-hover-video";
 import { getKindDef, templateToWorkspaceDraft, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
 import { isAudioMediaUrl, isVideoMediaUrl } from "@/lib/qr-template-preview-media";
 
@@ -68,10 +70,18 @@ export function QrMyWorksPreviewPanel({
         ) : outputUrl ? (
           <div className="overflow-hidden rounded-xl bg-black">
             {isVideo ? (
-              <video src={outputUrl} controls playsInline className="max-h-[min(50vh,480px)] w-full object-contain" />
+              <QrHoverVideo
+                src={outputUrl}
+                controls
+                resetOnLeave={false}
+                className="max-h-[min(50vh,480px)] w-full object-contain"
+              />
             ) : (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={outputUrl} alt={template.title} className="max-h-[min(50vh,480px)] w-full object-contain" />
+              <div className="group/media relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={outputUrl} alt={template.title} className="max-h-[min(50vh,480px)] w-full object-contain" />
+                <QrHoverEyeOverlay src={outputUrl} title={template.title} size="lg" />
+              </div>
             )}
           </div>
         ) : (

@@ -38,8 +38,10 @@ export const MODEL_NOT_FOUND_MARKERS = [
 /** 厂商账户欠费 / 余额不足（非凭证无效）。火山 AccountOverdueError 走 403，须与凭证/权限问题区分 */
 export const UPSTREAM_BALANCE_MARKERS = [
   "overdue balance",
+  "overdue-payment",
   "accountoverdue",
   "account overdue",
+  "account is in good standing",
   "insufficient balance",
   "insufficient_balance",
   "arrears",

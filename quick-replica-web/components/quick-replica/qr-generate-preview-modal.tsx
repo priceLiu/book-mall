@@ -7,6 +7,7 @@ import {
   QrAudioGenerateGenerating,
   QrAudioGenerateSuccess,
 } from "@/components/quick-replica/qr-audio-generate-preview";
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import type { QrGenerateJobResult } from "@/components/quick-replica/qr-workspace-panel";
 import { saveQrGenerateJobToMyWorks } from "@/lib/run-qr-generate-job";
@@ -234,8 +235,11 @@ export function QrGeneratePreviewModal({
                 className="aspect-[9/16] max-h-[min(70vh,640px)] w-full object-contain"
               />
             ) : (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={outputUrl} alt="output" className="w-full object-contain" />
+              <div className="group/media relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={outputUrl} alt="output" className="w-full object-contain" />
+                <QrHoverEyeOverlay src={outputUrl} title="生成结果" size="lg" />
+              </div>
             )}
           </div>
         ) : null}

@@ -5,6 +5,7 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import {
   isCanvasBailianR2vVideoTaskPayload,
+  isCanvasDashscopeVideoTaskPayload,
   isCanvasKieVideoTaskPayload,
   isCanvasVolcengineVideoTaskPayload,
 } from "@/lib/canvas/canvas-constants";
@@ -27,7 +28,8 @@ import {
 } from "@/lib/canvas/canvas-volcengine-recover";
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
-import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
+import { isRecoverableVideoBackgroundStallFailCode } from "@/lib/gateway/video-background-generation";
+import { dashscopeExtractTaskVideoUrl } from "@/lib/gateway/dashscope-client";
 import { backfillCanvasTaskGatewayLink } from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
 import { prisma } from "@/lib/prisma";
 
@@ -61,6 +63,7 @@ function isRecoverableCanvasVideoTask(
   const payload = taskInputPayload(task);
   return (
     isCanvasVolcengineVideoTaskPayload(payload) ||
+    isCanvasDashscopeVideoTaskPayload(payload) ||
     isCanvasBailianR2vVideoTaskPayload(payload) ||
     isCanvasKieVideoTaskPayload(payload)
   );
@@ -76,6 +79,24 @@ function isBailianR2vVideoCanvasTask(
   task: Pick<CanvasGenerationTask, "inputPayload">,
 ): boolean {
   return isCanvasBailianR2vVideoTaskPayload(taskInputPayload(task));
+}
+
+function isDashscopeVideoCanvasTask(
+  task: Pick<CanvasGenerationTask, "inputPayload">,
+): boolean {
+  return isCanvasDashscopeVideoTaskPayload(taskInputPayload(task));
+}
+
+function extractDashscopeVideoUrlFromGatewaySummary(
+  resultSummary: unknown,
+): string | null {
+  if (!resultSummary || typeof resultSummary !== "object") return null;
+  const root = resultSummary as Record<string, unknown>;
+  const output =
+    root.output && typeof root.output === "object"
+      ? (root.output as Record<string, unknown>)
+      : root;
+  return dashscopeExtractTaskVideoUrl(output) ?? null;
 }
 
 /** @deprecated 使用 canvasNodeShowsPersistedMedia */
@@ -131,6 +152,7 @@ export async function recoverCanvasVideoTaskDisplay(
   }
 
   const isBailian = isBailianR2vVideoCanvasTask(task);
+  const isDashscope = isDashscopeVideoCanvasTask(task);
   const isKie = isKieVideoCanvasTask(task);
 
   const base = {
@@ -210,13 +232,23 @@ export async function recoverCanvasVideoTaskDisplay(
       }
       const videoUrl = isBailian
         ? extractBailianR2vVideoUrlFromGatewaySummary(log.resultSummary)
-        : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
+        : isDashscope
+          ? extractDashscopeVideoUrlFromGatewaySummary(log.resultSummary)
+          : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
       if (videoUrl) {
         if (isBailian) {
           await applyCanvasBailianR2vPollResult(task.id, {
             ok: true,
             output: { task_status: "SUCCEEDED", video_url: videoUrl },
             raw: log.resultSummary,
+          });
+        } else if (isDashscope) {
+          const { applyCanvasDashscopeImagePollResult } = await import(
+            "@/lib/canvas/canvas-task-service"
+          );
+          await applyCanvasDashscopeImagePollResult(task.id, {
+            task_status: "SUCCEEDED",
+            video_url: videoUrl,
           });
         } else {
           await applyCanvasVolcengineVideoResult(task.id, videoUrl);
@@ -240,7 +272,7 @@ export async function recoverCanvasVideoTaskDisplay(
     }
     if (
       log?.status === "FAILED" &&
-      isRecoverableVolcengineStallFailCode(log.failCode)
+      isRecoverableVideoBackgroundStallFailCode(log.failCode)
     ) {
       const gw = await recoverVolcengineGatewayLogFromVendor(gatewayLogId);
       if (gw.ok && gw.action === "succeeded") {
@@ -313,13 +345,23 @@ export async function recoverCanvasVideoTaskDisplay(
           }
           const videoUrl = isBailian
             ? extractBailianR2vVideoUrlFromGatewaySummary(log.resultSummary)
-            : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
+            : isDashscope
+              ? extractDashscopeVideoUrlFromGatewaySummary(log.resultSummary)
+              : extractVolcengineVideoUrlFromGatewaySummary(log.resultSummary);
           if (videoUrl) {
             if (isBailian) {
               await applyCanvasBailianR2vPollResult(task.id, {
                 ok: true,
                 output: { task_status: "SUCCEEDED", video_url: videoUrl },
                 raw: log.resultSummary,
+              });
+            } else if (isDashscope) {
+              const { applyCanvasDashscopeImagePollResult } = await import(
+                "@/lib/canvas/canvas-task-service"
+              );
+              await applyCanvasDashscopeImagePollResult(task.id, {
+                task_status: "SUCCEEDED",
+                video_url: videoUrl,
               });
             } else {
               await applyCanvasVolcengineVideoResult(task.id, videoUrl);

@@ -29,7 +29,7 @@ import {
   type SeedVideoRenderProgressState,
 } from "@/lib/seed-video-render-progress";
 import { isShotVideoPending, listPendingShotVideoIndices } from "@/lib/seed-video-pending-shots";
-import { mergeSeedVideoShots } from "@/lib/seed-video-shot-merge";
+import { mergeSeedVideoShotsForPersist } from "@/lib/seed-video-shot-merge";
 import {
   filterVideoModelsForMode,
   resolveSeedVideoVideoModelKey,
@@ -48,10 +48,26 @@ function addGeneratingShot(prev: Set<number>, index: number): Set<number> {
   return next;
 }
 
+function addGeneratingShots(prev: Set<number>, indices: Iterable<number>): Set<number> {
+  let next = prev;
+  for (const index of indices) {
+    next = addGeneratingShot(next, index);
+  }
+  return next;
+}
+
 function removeGeneratingShot(prev: Set<number>, index: number): Set<number> {
   if (!prev.has(index)) return prev;
   const next = new Set(prev);
   next.delete(index);
+  return next;
+}
+
+function removeGeneratingShots(prev: Set<number>, indices: Iterable<number>): Set<number> {
+  let next = prev;
+  for (const index of indices) {
+    next = removeGeneratingShot(next, index);
+  }
   return next;
 }
 
@@ -78,23 +94,36 @@ export function MediaDecomposeReplicaPanel({
   const shots = seedVideo.plan?.shots ?? [];
   const [localShots, setLocalShots] = useState<SeedVideoShot[]>(shots);
   const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
-  const [generatingShots, setGeneratingShots] = useState<Set<number>>(() => new Set());
-  const [refBusy, setRefBusy] = useState(false);
+  const [generatingShots, setGeneratingShots] = useState<Set<number>>(
+    () => new Set(listPendingShotVideoIndices(seedVideo.meta)),
+  );
+  const generatingShotsRef = useRef(generatingShots);
+  generatingShotsRef.current = generatingShots;
+  const [projectRefBusy, setProjectRefBusy] = useState(false);
   const [ttsBusy, setTtsBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSelected, setPickerSelected] = useState<number[]>([]);
+  const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(8);
+  const [pickerConfirming, setPickerConfirming] = useState(false);
   const [renderProgress, setRenderProgress] = useState<SeedVideoRenderProgressState | null>(null);
   const [localFinalUrl, setLocalFinalUrl] = useState<string | null>(
     seedVideo.plan?.render?.finalVideoUrl?.trim() || seedVideo.videoOssUrl?.trim() || null,
   );
+  /** 轮询拉取的最新 meta（pending 等），与父级 seedVideo 同步 */
+  const [syncedProjectMeta, setSyncedProjectMeta] = useState<SeedVideoProject["meta"]>(
+    seedVideo.meta,
+  );
+  const [syncedReferences, setSyncedReferences] = useState(seedVideo.references);
 
   const syncLockRef = useRef(false);
   const onSeedVideoChangeRef = useRef(onSeedVideoChange);
   onSeedVideoChangeRef.current = onSeedVideoChange;
+  const pickerSelectedRef = useRef<number[]>([]);
+  const pickerPanelDurationRef = useRef(8);
 
   useEffect(() => {
-    setLocalShots((prev) => mergeSeedVideoShots(prev, shots));
+    setLocalShots((prev) => mergeSeedVideoShotsForPersist(prev, shots));
   }, [shots, seedVideo.id]);
 
   useEffect(() => {
@@ -107,6 +136,21 @@ export function MediaDecomposeReplicaPanel({
     setSelectedShotIndices(new Set());
   }, [seedVideo.id]);
 
+  useEffect(() => {
+    setSyncedProjectMeta(seedVideo.meta);
+    setSyncedReferences(seedVideo.references);
+  }, [seedVideo.id, seedVideo.meta, seedVideo.references]);
+
+  useEffect(() => {
+    setGeneratingShots(new Set(listPendingShotVideoIndices(seedVideo.meta)));
+  }, [seedVideo.id]);
+
+  useEffect(() => {
+    const pending = listPendingShotVideoIndices(seedVideo.meta);
+    if (pending.length === 0) return;
+    setGeneratingShots((prev) => addGeneratingShots(prev, pending));
+  }, [seedVideo.meta]);
+
   const filteredModels = useMemo(() => {
     const keys = filterVideoModelsForMode(
       videoModels.map((m) => m.modelKey),
@@ -116,17 +160,13 @@ export function MediaDecomposeReplicaPanel({
   }, [videoModels]);
 
   const mentionRefs = useMemo(
-    () => buildSeedVideoMentionRefs(seedVideo.references),
-    [seedVideo.references],
+    () => buildSeedVideoMentionRefs(syncedReferences),
+    [syncedReferences],
   );
 
   const pendingShotIndices = useMemo(
-    () =>
-      listPendingShotVideoIndices(seedVideo.meta).filter((idx) => {
-        const local = localShots.find((s) => s.index === idx);
-        return !local?.videoUrl?.trim();
-      }),
-    [seedVideo.meta, localShots],
+    () => listPendingShotVideoIndices(syncedProjectMeta),
+    [syncedProjectMeta],
   );
 
   const activeGeneratingIndices = useMemo(() => {
@@ -139,12 +179,18 @@ export function MediaDecomposeReplicaPanel({
   const isMultiShot = localShots.length > 1;
   const showCompose = isMultiShot || hasVoiceover;
   const pipelineBusy = ttsBusy || renderBusy;
-  const refLocked = pipelineBusy || refBusy;
+  const refLocked = pipelineBusy || projectRefBusy;
   const anyGenerating = activeGeneratingIndices.size > 0;
-  const idlePendingIndices = localShots
-    .filter((s) => !activeGeneratingIndices.has(s.index) && !s.videoUrl?.trim())
+  const generatingStatusLabel = useMemo(() => {
+    const nums = [...activeGeneratingIndices].sort((a, b) => a - b);
+    if (nums.length === 0) return "";
+    if (nums.length === 1) return `镜头 ${nums[0]} 视频生成中（约 1～3 分钟，Gateway 处理中）…`;
+    return `镜头 ${nums.join("、")} 生成中（约 1～3 分钟，Gateway 处理中）…`;
+  }, [activeGeneratingIndices]);
+  const idleGeneratableIndices = localShots
+    .filter((s) => !activeGeneratingIndices.has(s.index))
     .map((s) => s.index);
-  const selectedIdleIndices = [...selectedShotIndices].filter(
+  const selectedGeneratableIndices = [...selectedShotIndices].filter(
     (index) => !activeGeneratingIndices.has(index),
   );
 
@@ -156,9 +202,11 @@ export function MediaDecomposeReplicaPanel({
 
   const persistShots = useCallback(
     async (next: SeedVideoShot[]) => {
+      const merged = mergeSeedVideoShotsForPersist(next, seedVideo.plan?.shots ?? []);
       await updateSeedVideoProject(seedVideo.id, {
-        plan: { ...(seedVideo.plan ?? {}), shots: mergeSeedVideoShots(next, seedVideo.plan?.shots ?? []) },
+        plan: { ...(seedVideo.plan ?? {}), shots: merged },
       });
+      return merged;
     },
     [seedVideo.id, seedVideo.plan],
   );
@@ -201,14 +249,31 @@ export function MediaDecomposeReplicaPanel({
     syncLockRef.current = true;
     try {
       const fresh = await getSeedVideoProject(seedVideo.id);
-      const remotes = fresh.plan?.shots ?? [];
-      const completed: number[] = [];
-      let videoChanged = false;
-      for (const remote of remotes) {
-        if (!remote.videoUrl?.trim()) continue;
-        if (applyRemoteShotVideo(remote.index, remote)) videoChanged = true;
-        completed.push(remote.index);
+      setSyncedProjectMeta(fresh.meta);
+      setSyncedReferences(fresh.references);
+
+      const serverPending = listPendingShotVideoIndices(fresh.meta);
+      const watch = new Set<number>(generatingShotsRef.current);
+      for (const idx of serverPending) watch.add(idx);
+
+      if (fresh.plan?.shots?.length) {
+        setLocalShots((prev) =>
+          mergeSeedVideoShotsForPersist(prev, fresh.plan?.shots ?? prev),
+        );
       }
+
+      if (watch.size === 0) {
+        await onSeedVideoChangeRef.current();
+        return;
+      }
+
+      const completed: number[] = [];
+      for (const idx of watch) {
+        const remote = fresh.plan?.shots?.find((s) => s.index === idx);
+        if (!remote?.videoUrl?.trim()) continue;
+        if (applyRemoteShotVideo(idx, remote)) completed.push(idx);
+      }
+
       if (completed.length > 0) {
         setGeneratingShots((prev) => {
           let next = prev;
@@ -216,7 +281,12 @@ export function MediaDecomposeReplicaPanel({
           return next;
         });
       }
-      if (videoChanged) await onSeedVideoChangeRef.current();
+
+      if (serverPending.length > 0) {
+        setGeneratingShots((prev) => addGeneratingShots(prev, serverPending));
+      }
+
+      await onSeedVideoChangeRef.current();
     } catch {
       /* ignore */
     } finally {
@@ -233,17 +303,15 @@ export function MediaDecomposeReplicaPanel({
     void syncRemoteShotVideos();
     const timer = window.setInterval(() => void syncRemoteShotVideos(), SHOT_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [generatingShots.size, pendingShotIndices.length, syncRemoteShotVideos]);
-
-  function refLabelForId(refs: SeedVideoProject["references"], refId: string): string {
-    const mats = refs.filter((r) => r.role === "seed-material");
-    const idx = mats.findIndex((r) => r.id === refId);
-    if (idx >= 0) return `@图片${idx + 1}`;
-    return mats.find((r) => r.id === refId)?.label ?? "";
-  }
+  }, [
+    generatingShots.size,
+    pendingShotIndices.length,
+    pendingShotIndices.join(","),
+    syncRemoteShotVideos,
+  ]);
 
   async function handleUploadRef(file: File) {
-    setRefBusy(true);
+    setProjectRefBusy(true);
     try {
       await uploadSeedVideoRef(seedVideo.id, file);
       await onSeedVideoChange();
@@ -254,13 +322,13 @@ export function MediaDecomposeReplicaPanel({
         variant: "error",
       });
     } finally {
-      setRefBusy(false);
+      setProjectRefBusy(false);
     }
   }
 
   async function handleAttachRefs(assetIds: string[]) {
     if (assetIds.length === 0) return;
-    setRefBusy(true);
+    setProjectRefBusy(true);
     try {
       await attachSeedVideoRefsFromAssets(seedVideo.id, assetIds);
       await onSeedVideoChange();
@@ -271,7 +339,7 @@ export function MediaDecomposeReplicaPanel({
         variant: "error",
       });
     } finally {
-      setRefBusy(false);
+      setProjectRefBusy(false);
     }
   }
 
@@ -284,14 +352,9 @@ export function MediaDecomposeReplicaPanel({
       confirmLabel: "删除",
     });
     if (!ok) return;
-    setRefBusy(true);
+    setProjectRefBusy(true);
     try {
       await removeSeedVideoRef(seedVideo.id, refId);
-      setLocalShots((prev) =>
-        prev.map((s) =>
-          s.refImageId === refId ? { ...s, refImageId: "", refImageLabel: "" } : s,
-        ),
-      );
       await onSeedVideoChange();
     } catch (e) {
       await onAlert({
@@ -300,53 +363,26 @@ export function MediaDecomposeReplicaPanel({
         variant: "error",
       });
     } finally {
-      setRefBusy(false);
+      setProjectRefBusy(false);
     }
   }
 
-  async function handleUploadShotRef(shotIndex: number, file: File) {
-    setRefBusy(true);
-    try {
-      const ref = await uploadSeedVideoRef(seedVideo.id, file);
-      const fresh = await getSeedVideoProject(seedVideo.id);
-      const label = refLabelForId(fresh.references, ref.id);
-      setLocalShots((prev) =>
-        prev.map((s) =>
-          s.index === shotIndex
-            ? { ...s, refImageId: ref.id, refImageLabel: label || ref.label }
-            : s,
-        ),
-      );
-      await onSeedVideoChange();
-    } catch (e) {
-      await onAlert({
-        title: "上传失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setRefBusy(false);
-    }
-  }
-
-  function handleUnassignShotRef(shotIndex: number) {
-    setLocalShots((prev) =>
-      prev.map((s) =>
-        s.index === shotIndex ? { ...s, refImageId: "", refImageLabel: "" } : s,
-      ),
-    );
-  }
-
-  async function runPanelGenerate(modelKey: string, panelIndex: number) {
+  async function runPanelGenerate(
+    modelKey: string,
+    panelIndex: number,
+    durationSec?: number,
+    opts?: { skipPersist?: boolean },
+  ) {
     setGeneratingShots((prev) => addGeneratingShot(prev, panelIndex));
     try {
-      await persistShots(mergeSeedVideoShots(localShots, seedVideo.plan?.shots ?? []));
-      const shot = localShots.find((s) => s.index === panelIndex);
+      if (!opts?.skipPersist) {
+        await persistShots(localShots);
+      }
       const result = await generateSeedVideoShot({
         projectId: seedVideo.id,
         shotIndex: panelIndex,
         modelKey,
-        durationSec: shot?.durationSec,
+        durationSec: durationSec ?? pickerPanelDurationRef.current,
         aspectRatio: seedVideo.settings.aspectRatio ?? "9:16",
       });
       setLocalShots((prev) =>
@@ -365,6 +401,7 @@ export function MediaDecomposeReplicaPanel({
       }
       if (fresh && isShotVideoPending(fresh.meta, panelIndex)) {
         void syncRemoteShotVideos();
+        void onSeedVideoChange();
         return;
       }
       setGeneratingShots((prev) => removeGeneratingShot(prev, panelIndex));
@@ -384,11 +421,59 @@ export function MediaDecomposeReplicaPanel({
         if (next !== videoModelKey) onVideoModelChange(next);
       }
     }
+    const firstIndex = indices[0];
+    const firstShot =
+      firstIndex != null ? localShots.find((s) => s.index === firstIndex) : undefined;
+    const durationSec = firstShot?.durationSec ?? 8;
+    pickerSelectedRef.current = [...indices];
+    pickerPanelDurationRef.current = durationSec;
+    setPickerPanelDurationSec(durationSec);
     setPickerSelected(indices);
     setPickerOpen(true);
   }
 
+  async function runSelectedShotsParallel(modelKey: string, shotIndices: number[], durationSec: number) {
+    const unique = [...new Set(shotIndices)].sort((a, b) => a - b);
+    if (unique.length === 0) return;
+    pickerPanelDurationRef.current = durationSec;
+    const saved = await persistShots(localShots);
+    setLocalShots(saved);
+    const fresh = await getSeedVideoProject(seedVideo.id);
+    setLocalShots((prev) => mergeSeedVideoShotsForPersist(prev, fresh.plan?.shots ?? prev));
+    setGeneratingShots((prev) => addGeneratingShots(prev, unique));
+    await Promise.all(
+      unique.map((index) =>
+        runPanelGenerate(modelKey, index, durationSec, { skipPersist: true }),
+      ),
+    );
+  }
+
   async function onPickerConfirm(modelKey: string) {
+    const durationSec = pickerPanelDurationSec;
+    pickerPanelDurationRef.current = durationSec;
+    const indicesFromRef = [...pickerSelectedRef.current];
+    const indicesFromState = pickerSelected.length > 0 ? [...pickerSelected] : [];
+    const indices =
+      indicesFromRef.length > 0
+        ? indicesFromRef
+        : indicesFromState.length > 0
+          ? indicesFromState
+          : localShots
+              .filter((s) => !activeGeneratingIndices.has(s.index))
+              .map((s) => s.index);
+    pickerSelectedRef.current = [];
+    setPickerSelected([]);
+
+    if (indices.length === 0) {
+      await onAlert({
+        title: "无法生成",
+        message: activeGeneratingIndices.size > 0 ? "所选镜头正在生成中，请稍候。" : "暂无可用镜头。",
+      });
+      return;
+    }
+
+    setGeneratingShots((prev) => addGeneratingShots(prev, indices));
+    setPickerConfirming(true);
     setPickerOpen(false);
     onVideoModelChange(modelKey);
     void updateSeedVideoProject(seedVideo.id, {
@@ -396,22 +481,24 @@ export function MediaDecomposeReplicaPanel({
     }).catch(() => {
       /* 模型选择仍用于本次生成 */
     });
-    const indices =
-      pickerSelected.length > 0
-        ? pickerSelected
-        : localShots.filter((s) => !s.videoUrl?.trim()).map((s) => s.index);
-    setPickerSelected([]);
-    if (indices.length === 0) {
-      await onAlert({ title: "无需生成", message: "所选镜头已有视频。" });
-      return;
+
+    try {
+      await runSelectedShotsParallel(modelKey, indices, durationSec);
+    } catch (e) {
+      await onAlert({
+        title: "提交生成失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setPickerConfirming(false);
     }
-    await Promise.all(indices.map((index) => runPanelGenerate(modelKey, index)));
   }
 
   async function runTts() {
     setTtsBusy(true);
     try {
-      await persistShots(mergeSeedVideoShots(localShots, seedVideo.plan?.shots ?? []));
+      await persistShots(localShots);
       await generateSeedVideoTts({ projectId: seedVideo.id });
       await onSeedVideoChange();
     } catch (e) {
@@ -464,7 +551,7 @@ export function MediaDecomposeReplicaPanel({
       phase: "queued",
     });
     try {
-      const merged = mergeSeedVideoShots(localShots, seedVideo.plan?.shots ?? []);
+      const merged = mergeSeedVideoShotsForPersist(localShots, seedVideo.plan?.shots ?? []);
       if (merged.some((s) => !s.videoUrl?.trim())) {
         setRenderProgress(null);
         await onAlert({
@@ -528,16 +615,16 @@ export function MediaDecomposeReplicaPanel({
             <h2 className="text-sm font-semibold text-[#1d1d1f]">一键复刻</h2>
             <p className="mt-0.5 text-[11px] leading-relaxed text-[#6e6e73]">
               {showCompose
-                ? "上传参考图后勾选镜号逐镜生成；视频 Prompt 可 @ 图片。支持 TTS 与合成成片。"
-                : "上传参考图并在视频 Prompt 中 @ 引用，生成后可在表格内预览。"}
+                ? "上传参考图后勾选镜号逐镜生成；各镜在视频 Prompt 用 @图片1 … 指定参考图。支持 TTS 与合成成片。"
+                : "上传参考图并在各镜视频 Prompt 中用 @图片1 … 引用，生成后可在表格内预览。"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <EcomButtonSecondary
               type="button"
               size="sm"
-              disabled={pipelineBusy || idlePendingIndices.length === 0}
-              onClick={() => openGeneratePicker(idlePendingIndices)}
+              disabled={pipelineBusy || idleGeneratableIndices.length === 0}
+              onClick={() => openGeneratePicker(idleGeneratableIndices)}
             >
               逐镜生成视频
             </EcomButtonSecondary>
@@ -565,31 +652,45 @@ export function MediaDecomposeReplicaPanel({
         </div>
 
         <SeedVideoRefUploader
-          references={seedVideo.references}
+          references={syncedReferences}
           onUpload={handleUploadRef}
           onRemove={(id) => void handleRemoveRef(id)}
           onAttachAssets={handleAttachRefs}
           busy={refLocked}
           sectionLabel="参考图"
           requiredMark={false}
-          emptyHint={`上传 1～9 张参考图，表格内可逐镜指定；视频 Prompt 可 @图片1 … 引用。${IMAGE_UPLOAD_DROP_HINT}`}
+          emptyHint={`上传 1～9 张参考图；下方表格会展示全部 @图片N，在各镜视频 Prompt 中引用即可。${IMAGE_UPLOAD_DROP_HINT}`}
           className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3"
         />
 
+        {anyGenerating ? (
+          <div
+            className="flex flex-wrap items-center gap-3 rounded-xl border border-[#0071e3]/25 bg-[#f0f6ff] px-3 py-2.5"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
+            <span className="min-w-0 flex-1 text-xs leading-relaxed text-[#0058c7]">
+              {generatingStatusLabel}
+            </span>
+            <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full min-w-[8rem] sm:w-32">
+              <span />
+            </div>
+          </div>
+        ) : null}
+
         <SeedVideoShotTable
           shots={localShots}
-          references={seedVideo.references}
+          references={syncedReferences}
           onChange={setLocalShots}
           disabled={pipelineBusy}
           generatingIndices={activeGeneratingIndices}
           onPreviewVideo={onPreviewVideo}
           showGenerateActions
           selectDisabled={pipelineBusy}
-          editableRefs
-          refBusy={refBusy}
+          hideRefColumn
+          showRefsGallery
           videoPromptMentionRefs={mentionRefs}
-          onUploadShotRef={handleUploadShotRef}
-          onUnassignShotRef={handleUnassignShotRef}
           selectedShotIndices={selectedShotIndices}
           selectedCount={selectedShotIndices.size}
           onToggleShotSelected={(index, checked) => {
@@ -601,10 +702,10 @@ export function MediaDecomposeReplicaPanel({
             });
           }}
           onGenerateSelected={() => {
-            if (selectedIdleIndices.length === 0) return;
-            openGeneratePicker([...selectedIdleIndices].sort((a, b) => a - b));
+            if (selectedGeneratableIndices.length === 0) return;
+            openGeneratePicker([...selectedGeneratableIndices].sort((a, b) => a - b));
           }}
-          generateSelectedDisabled={selectedIdleIndices.length === 0 || pipelineBusy}
+          generateSelectedDisabled={selectedGeneratableIndices.length === 0 || pipelineBusy}
         />
 
         {finalUrl ? (
@@ -629,7 +730,13 @@ export function MediaDecomposeReplicaPanel({
         value={videoModelKey}
         onChange={onVideoModelChange}
         onConfirm={(key) => void onPickerConfirm(key)}
+        confirming={pickerConfirming}
         aspectRatio={seedVideo.settings.aspectRatio ?? "9:16"}
+        panelDurationSec={pickerPanelDurationSec}
+        onPanelDurationChange={(value) => {
+          pickerPanelDurationRef.current = value;
+          setPickerPanelDurationSec(value);
+        }}
       />
 
       <SeedVideoRenderProgressPanel

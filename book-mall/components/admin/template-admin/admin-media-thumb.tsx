@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Eye } from "lucide-react";
 
 import { FullscreenImagePreview } from "@/components/media/fullscreen-image-preview";
 
@@ -45,10 +46,13 @@ export function AdminMediaThumb({
   src,
   title,
   className = "h-24 w-20",
+  /** float = 悬停浮出大图（电商）；icon = 悬停 Eye，点击全屏（快速复制 / 画布图片节点） */
+  hoverMode = "float",
 }: {
   src: string;
   title?: string;
   className?: string;
+  hoverMode?: "float" | "icon";
 }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -64,7 +68,44 @@ export function AdminMediaThumb({
     );
   }
 
-  const hover = rect && !fullscreen ? hoverPosition(rect) : null;
+  const hover = rect && !fullscreen && hoverMode === "float" ? hoverPosition(rect) : null;
+
+  if (hoverMode === "icon") {
+    return (
+      <>
+        <div
+          className={`group/media relative ${className} overflow-hidden rounded border border-[#d0d7de] bg-[#f6f8fa]`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition group-hover/media:opacity-100">
+            <button
+              type="button"
+              title="预览大图"
+              aria-label="预览大图"
+              className="pointer-events-auto inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm transition hover:scale-[1.03] hover:bg-black/75"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFullscreen(true);
+              }}
+            >
+              <Eye className="size-4 pointer-events-none" strokeWidth={1.75} />
+            </button>
+          </div>
+        </div>
+        {mounted && fullscreen
+          ? createPortal(
+              <FullscreenPreview
+                src={src}
+                title={title}
+                onClose={() => setFullscreen(false)}
+              />,
+              document.body,
+            )
+          : null}
+      </>
+    );
+  }
 
   return (
     <>

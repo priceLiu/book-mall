@@ -4,8 +4,8 @@ import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import {
-  promoteVolcengineTasksToBackgroundGeneration,
-} from "@/lib/gateway/volcengine-background-promote";
+  promoteVideoTasksToBackgroundGeneration,
+} from "@/lib/gateway/video-background-promote";
 import {
   autoRecoverPollStalledVolcengineGatewayLogs,
   recoverMisclassifiedVolcengineStallLogs,
@@ -225,10 +225,10 @@ export async function expireStaleGatewayLogs(): Promise<number> {
 
   let r4 = 0;
   try {
-    r4 = await promoteVolcengineTasksToBackgroundGeneration(now);
+    r4 = await promoteVideoTasksToBackgroundGeneration(now);
   } catch (e) {
     console.warn(
-      "[gateway-poll] promoteVolcengineTasksToBackgroundGeneration skipped",
+      "[gateway-poll] promoteVideoTasksToBackgroundGeneration skipped",
       e instanceof Error ? e.message : String(e),
     );
   }
