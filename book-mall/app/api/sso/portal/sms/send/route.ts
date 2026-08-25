@@ -15,6 +15,11 @@ import { portalClientIpFromRequest } from "@/lib/site-traffic/client-ip";
 
 export const dynamic = "force-dynamic";
 
+const bodySchema = z.object({
+  phone: z.string().min(1),
+  purpose: z.enum(["REGISTER", "LOGIN"]),
+});
+
 /**
  * 门户 BFF 专用短信发送（Bearer TOOLS_SSO_SERVER_SECRET）。
  * 子应用服务端已鉴权，无需浏览器侧图形验证码。
