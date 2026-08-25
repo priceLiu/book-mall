@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "@/lib/canvas/resolve-dock-run-prompt";
+import { resolveSbv1VideoModelRefRunWarning } from "@/lib/canvas/sbv1-video-model-reference";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
 
 const links: Pro2DockUpstreamLink[] = [
@@ -115,5 +116,31 @@ describe("resolveSbv1VideoEngineRunPrompt", () => {
         withVideo,
       ),
     ).toBe("请去掉 右下角水印");
+  });
+});
+
+describe("resolveSbv1VideoModelRefRunWarning · wan3.0", () => {
+  it("does not block All-in-One wan3.0 when refs are connected", () => {
+    expect(
+      resolveSbv1VideoModelRefRunWarning({
+        modelKey: "wan3.0-video",
+        refCount: 2,
+      }),
+    ).toBeNull();
+    expect(
+      resolveSbv1VideoModelRefRunWarning({
+        modelKey: "wan3.0-video-prime",
+        refCount: 5,
+      }),
+    ).toBeNull();
+  });
+
+  it("still blocks legacy happyhorse T2V with refs", () => {
+    expect(
+      resolveSbv1VideoModelRefRunWarning({
+        modelKey: "happyhorse-1.1-t2v",
+        refCount: 2,
+      })?.title,
+    ).toBe("请切换为参考生视频模型");
   });
 });

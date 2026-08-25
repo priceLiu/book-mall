@@ -71,6 +71,13 @@ describe("routeGatewayModel · MiniMax H3", () => {
     });
   });
 
+  it("MiniMax/MiniMax-H3-r2v 走 MINIMAX VIDEO（不得误落 DashScope -r2v 启发式）", () => {
+    expect(routeGatewayModel("MiniMax/MiniMax-H3-r2v")).toEqual({
+      providerKind: "MINIMAX",
+      requestKind: "VIDEO",
+    });
+  });
+
   it("MiniMax/MiniMax-H3-context-ir 走 MINIMAX VIDEO", () => {
     expect(routeGatewayModel("MiniMax/MiniMax-H3-context-ir")).toEqual({
       providerKind: "MINIMAX",

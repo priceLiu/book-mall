@@ -89,7 +89,10 @@ export function resolveSbv1VideoModelRefRunWarning(args: {
     multiShots: args.multiShots,
   });
 
-  if (isDashscopeSbv1TextToVideoModel(modelKey)) {
+  if (
+    isDashscopeSbv1TextToVideoModel(modelKey) &&
+    !isSbv1Wan30VideoModel(modelKey)
+  ) {
     const r2vKey = DASHSCOPE_T2V_TO_R2V[modelKey];
     const r2vHint = r2vKey ? `「${r2vKey}」` : "参考生视频（R2V）模型";
     return {

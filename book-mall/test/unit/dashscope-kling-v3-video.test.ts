@@ -112,14 +112,15 @@ describe("model-router kling video", () => {
 });
 
 describe("resolveDashscopeVideoCreateUrl kling", () => {
-  it("requires workspace key for kling upstream model", () => {
+  it("uses dashscope shared domain without explicit MAAS baseUrl", () => {
     const resolved = resolveDashscopeVideoCreateUrl({
       model: KLING_V3_VIDEO_MODEL,
       apiKey: "sk-plain-key",
+      baseUrl: "https://dashscope.aliyuncs.com",
     });
-    expect(resolved.ok).toBe(false);
-    if (!resolved.ok) {
-      expect(resolved.error).toContain("可灵 3.0 视频");
-    }
+    expect(resolved).toEqual({
+      ok: true,
+      url: "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
+    });
   });
 });

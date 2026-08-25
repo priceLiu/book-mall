@@ -227,11 +227,16 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "BAILIAN", requestKind: "VIDEO" };
   }
 
+  /** MiniMax H3 须在 DashScope `-r2v` 启发式之前（`MiniMax/MiniMax-H3-r2v` 含 `-r2v` 且带 `/`） */
+  if (isMinimaxVideoModelKey(raw) || isMinimaxVideoModelKey(m)) {
+    return { providerKind: "MINIMAX", requestKind: "VIDEO" };
+  }
+
   if (
     DASHSCOPE_VIDEO_PREFIXES.some((p) => m.startsWith(p)) ||
     (m.includes("-i2v") && !m.includes("/")) ||
     (m.includes("-t2v") && !m.includes("/")) ||
-    (m.includes("-r2v") && !BAILIAN_R2V.has(m))
+    (m.includes("-r2v") && !m.includes("/") && !BAILIAN_R2V.has(m))
   ) {
     return { providerKind: "DASHSCOPE", requestKind: "VIDEO" };
   }
@@ -386,10 +391,6 @@ export function routeGatewayModel(model: string): RoutedModel {
 
   if (isMinimaxMusicModelKey(raw) || isMinimaxMusicModelKey(m)) {
     return { providerKind: "MINIMAX", requestKind: "MUSIC" };
-  }
-
-  if (isMinimaxVideoModelKey(raw) || isMinimaxVideoModelKey(m)) {
-    return { providerKind: "MINIMAX", requestKind: "VIDEO" };
   }
 
   if (isElevenLabsStsModelKey(raw) || isElevenLabsStsModelKey(m)) {

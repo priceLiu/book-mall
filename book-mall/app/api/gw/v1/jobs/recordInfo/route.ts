@@ -11,6 +11,11 @@ import {
 } from "@/lib/gateway/log-progress";
 import { persistVolcengineTimingOnPoll, finalizeVolcengineVideoRequestLog } from "@/lib/gateway/log-volcengine-timing-persist";
 import { readVolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
+import {
+  persistDashscopeTimingOnPoll,
+  finalizeDashscopeAsyncRequestLog,
+} from "@/lib/gateway/log-dashscope-timing-persist";
+import { readDashscopeTimingTrace } from "@/lib/gateway/log-dashscope-timing";
 import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
@@ -41,6 +46,101 @@ import {
 } from "@/lib/gateway/volcengine-client";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
+import type { GatewayRequestLog } from "@prisma/client";
+import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
+
+async function syncDashscopePollToGatewayLog(input: {
+  log: GatewayRequestLog;
+  taskId: string;
+  output: DashscopeTaskOutput | Record<string, unknown>;
+  raw: unknown;
+  providerKind: "DASHSCOPE" | "BAILIAN";
+}): Promise<void> {
+  const { log, taskId, output, raw, providerKind } = input;
+  const status = String(
+    (output as DashscopeTaskOutput).task_status ?? "RUNNING",
+  );
+  const polledAtMs = Date.now();
+
+  if (isDashscopeTaskSuccess(status)) {
+    const baseSummary = buildGatewayTaskResultSummary(raw, output);
+    const { resultSummary } = await persistDashscopeTimingOnPoll({
+      log,
+      vendorStatus: status,
+      vendorOutput: output,
+      resultSummaryOverride: baseSummary,
+    });
+    const trace = readDashscopeTimingTrace(resultSummary);
+    if (trace) {
+      await finalizeDashscopeAsyncRequestLog(log.id, {
+        submittedAt: log.submittedAt,
+        status: "SUCCEEDED",
+        trace,
+        resultSummaryBase: resultSummary,
+        fallbackNowMs: polledAtMs,
+        externalTaskId: taskId,
+        model: log.model,
+      });
+    } else {
+      await finalizeRequestLog(log.id, {
+        status: "SUCCEEDED",
+        durationMs: log.submittedAt
+          ? polledAtMs - log.submittedAt.getTime()
+          : 0,
+        completedAt: new Date(polledAtMs),
+        resultSummary: baseSummary,
+        externalTaskId: taskId,
+        model: log.model,
+      });
+    }
+    return;
+  }
+
+  if (isDashscopeTaskFailed(status)) {
+    const out = output as DashscopeTaskOutput;
+    const { resultSummary } = await persistDashscopeTimingOnPoll({
+      log,
+      vendorStatus: status,
+      vendorOutput: output,
+      resultSummaryOverride: buildGatewayTaskResultSummary(raw, output),
+    });
+    const trace = readDashscopeTimingTrace(resultSummary);
+    if (trace) {
+      await finalizeDashscopeAsyncRequestLog(log.id, {
+        submittedAt: log.submittedAt,
+        status: "FAILED",
+        trace,
+        resultSummaryBase: resultSummary,
+        fallbackNowMs: polledAtMs,
+        failMessage: out.message ?? out.code ?? "failed",
+        externalTaskId: taskId,
+        model: log.model,
+      });
+    } else {
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: log.submittedAt
+          ? polledAtMs - log.submittedAt.getTime()
+          : 0,
+        completedAt: new Date(polledAtMs),
+        failMessage: out.message ?? out.code ?? "failed",
+        externalTaskId: taskId,
+        model: log.model,
+      });
+    }
+    return;
+  }
+
+  await persistDashscopeTimingOnPoll({
+    log,
+    vendorStatus: status || "RUNNING",
+    vendorOutput: output,
+    resultSummaryOverride: buildGatewayLogProgressSummary({
+      providerKind,
+      status: status || "RUNNING",
+    }),
+  });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -96,36 +196,13 @@ export async function GET(request: NextRequest) {
       });
       const { output, raw } = polled;
       if (log) {
-        const status = output.task_status;
-        if (isDashscopeTaskSuccess(status)) {
-          await finalizeRequestLog(log.id, {
-            status: "SUCCEEDED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            resultSummary: buildGatewayTaskResultSummary(raw, output),
-            externalTaskId: taskId,
-            model: log.model,
-          });
-        } else if (isDashscopeTaskFailed(status)) {
-          await finalizeRequestLog(log.id, {
-            status: "FAILED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            failMessage: output.message ?? output.code ?? "failed",
-            externalTaskId: taskId,
-            model: log.model,
-          });
-        } else {
-          await touchGatewayLogProgress(
-            log.id,
-            buildGatewayLogProgressSummary({
-              providerKind: "DASHSCOPE",
-              status: String(status ?? "RUNNING"),
-            }),
-          );
-        }
+        await syncDashscopePollToGatewayLog({
+          log,
+          taskId,
+          output,
+          raw,
+          providerKind: "DASHSCOPE",
+        });
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "DASHSCOPE" });
     }
@@ -237,40 +314,13 @@ export async function GET(request: NextRequest) {
       });
       const { output, raw } = polled;
       if (log) {
-        const status = output.task_status?.toUpperCase() ?? "";
-        if (status === "SUCCEEDED" || status === "SUCCESS") {
-          await finalizeRequestLog(log.id, {
-            status: "SUCCEEDED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            resultSummary: buildGatewayTaskResultSummary(raw, output),
-            externalTaskId: taskId,
-            model: log.model,
-          });
-        } else if (
-          status === "FAILED" ||
-          status === "CANCELED" ||
-          status === "UNKNOWN"
-        ) {
-          await finalizeRequestLog(log.id, {
-            status: "FAILED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            failMessage: output.message ?? output.code ?? "failed",
-            externalTaskId: taskId,
-            model: log.model,
-          });
-        } else {
-          await touchGatewayLogProgress(
-            log.id,
-            buildGatewayLogProgressSummary({
-              providerKind: "BAILIAN",
-              status: status || "RUNNING",
-            }),
-          );
-        }
+        await syncDashscopePollToGatewayLog({
+          log,
+          taskId,
+          output,
+          raw,
+          providerKind: "BAILIAN",
+        });
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "BAILIAN" });
     }

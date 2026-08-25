@@ -27,7 +27,8 @@ export const VIDEO_CREATE_PATH =
   "/api/v1/services/aigc/video-generation/video-synthesis";
 
 /**
- * 万相 3.0（邀测）官方要求走业务空间专属域名，打 dashscope.aliyuncs.com 会 403 Access denied。
+ * 万相 3.0（邀测）默认与 wan2.x 相同走 dashscope.aliyuncs.com 共享域名；
+ * 凭证显式配置 `*.maas.aliyuncs.com` 时走业务空间专属域名。
  * @see https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference
  */
 export const WAN30_VIDEO_MODEL_KEY = "wan3.0-video";
@@ -144,18 +145,21 @@ export const KLING_V3_MISSING_WORKSPACE_ERROR =
   "请在 Gateway 绑定 DashScope / 百炼凭证，并在百炼控制台开通可灵视频模型。";
 
 /**
- * 万相 3.0 创建/轮询根域名：优先凭证已配的 *.maas.aliyuncs.com，否则从 sk-ws- Key 解析华北2 业务空间。
- * 北京 S2V 凭证常把 baseUrl 存成 dashscope.aliyuncs.com（S2V 不能走 MAAS），此处须忽略该误配。
+ * 万相 3.0 / 可灵 3.0 视频 · 可选 MAAS 根域名。
+ * 仅当凭证 **显式** 配置 `*.maas.aliyuncs.com` 时使用；否则与 wan2.x / S2V 相同走 dashscope 共享域名。
+ *
+ * sk-ws Key 第二段 **不是** 可靠的 `{WorkspaceId}` 子域（实测 `EPDMLYL.cn-beijing.maas…` → IllegalEndpoint）；
+ * 同一 Key 在 `dashscope.aliyuncs.com` 可正常提交 wan3.0。
  */
 export function resolveDashscopeWan30VideoApiRoot(
-  apiKey: string,
+  _apiKey: string,
   storedBaseUrl?: string | null,
 ): string | null {
   const stored = storedBaseUrl?.trim() ?? "";
   if (/\.maas\.aliyuncs\.com/i.test(stored)) {
     return resolveDashscopeApiRoot(stored);
   }
-  return resolveDashscopeBeijingMaasBaseUrl(apiKey);
+  return null;
 }
 
 export function resolveDashscopeVideoCreateUrl(opts: {
@@ -167,16 +171,13 @@ export function resolveDashscopeVideoCreateUrl(opts: {
     return { ok: true, url: VIDEO_CREATE_URL };
   }
   const root = resolveDashscopeWan30VideoApiRoot(opts.apiKey, opts.baseUrl);
-  if (!root) {
-    const err = isDashscopeKlingV3VideoModelKey(opts.model)
-      ? KLING_V3_MISSING_WORKSPACE_ERROR
-      : WAN30_MISSING_WORKSPACE_ERROR;
-    return { ok: false, error: err };
+  if (root) {
+    return { ok: true, url: `${root}${VIDEO_CREATE_PATH}` };
   }
-  return { ok: true, url: `${root}${VIDEO_CREATE_PATH}` };
+  return { ok: true, url: VIDEO_CREATE_URL };
 }
 
-/** 万相 3.0 轮询须与创建同一 MAAS 根域名；其它 DashScope 视频仍走凭证 baseUrl / 默认 dashscope。 */
+/** 万相 3.0 轮询与创建同根域名；未显式配 MAAS 时与 wan2.x 相同走 dashscope 默认任务 URL。 */
 export function resolveDashscopeVideoTaskPollBaseUrl(opts: {
   model?: string | null;
   apiKey: string;
@@ -294,6 +295,22 @@ export function dashscopeExtractTaskVideoUrl(
   }
 
   return undefined;
+}
+
+/**
+ * 百炼 / DashScope 任务时间戳（如 submit_time）解析为 epoch ms。
+ * 厂商返回北京时间字符串，无时区后缀时按 +08:00 处理。
+ */
+export function parseDashscopeDatetimeMs(value: unknown): number | undefined {
+  if (typeof value !== "string") return undefined;
+  const s = value.trim();
+  if (!s) return undefined;
+  const normalized = s.includes("T") ? s : s.replace(" ", "T");
+  const withTz = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(normalized)
+    ? normalized
+    : `${normalized}+08:00`;
+  const ms = Date.parse(withTz);
+  return Number.isFinite(ms) ? ms : undefined;
 }
 
 export function isDashscopeTaskSuccess(status: string | undefined): boolean {

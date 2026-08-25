@@ -85,6 +85,21 @@ describe("sbv1-video-model-reference", () => {
     expect(w?.message).not.toContain("自动");
   });
 
+  it("resolveSbv1VideoModelRefRunWarning allows wan3.0 All-in-One with refs", () => {
+    expect(
+      resolveSbv1VideoModelRefRunWarning({
+        modelKey: "wan3.0-video",
+        refCount: 2,
+      }),
+    ).toBeNull();
+    expect(
+      resolveSbv1VideoModelRefRunWarning({
+        modelKey: "wan3.0-video-prime",
+        refCount: 5,
+      }),
+    ).toBeNull();
+  });
+
   it("resolveSbv1VideoModelRefRunWarning null without refs", () => {
     expect(
       resolveSbv1VideoModelRefRunWarning({

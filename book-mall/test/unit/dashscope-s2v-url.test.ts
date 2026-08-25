@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   S2V_CREATE_URL,
   VIDEO_CREATE_PATH,
-  WAN30_MISSING_WORKSPACE_ERROR,
   resolveDashscopeS2vCreateUrl,
   resolveDashscopeS2vDetectUrl,
   resolveDashscopeVideoCreateUrl,
@@ -35,12 +34,32 @@ describe("dashscope S2V URLs", () => {
   });
 });
 
-describe("wan3.0-video MAAS endpoint", () => {
-  it("creates on {WorkspaceId}.cn-beijing.maas.aliyuncs.com from sk-ws- key", () => {
+describe("wan3.0-video endpoint", () => {
+  const DASHSCOPE_VIDEO =
+    "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
+
+  it("uses dashscope.aliyuncs.com with sk-ws key when baseUrl is shared domain", () => {
     const resolved = resolveDashscopeVideoCreateUrl({
       model: "wan3.0-video",
       apiKey: SK_WS_KEY,
       baseUrl: "https://dashscope.aliyuncs.com",
+    });
+    expect(resolved).toEqual({ ok: true, url: DASHSCOPE_VIDEO });
+  });
+
+  it("does not derive MAAS from sk-ws key segments (unreliable WorkspaceId)", () => {
+    expect(
+      resolveDashscopeWan30VideoApiRoot(SK_WS_KEY, "https://dashscope.aliyuncs.com"),
+    ).toBeNull();
+  });
+
+  it("uses stored MAAS baseUrl when explicitly configured", () => {
+    const sg = "https://ws-sg.ap-southeast-1.maas.aliyuncs.com";
+    expect(resolveDashscopeWan30VideoApiRoot("sk-abc123", `${sg}/api/v1`)).toBe(sg);
+    const resolved = resolveDashscopeVideoCreateUrl({
+      model: "wan3.0-video",
+      apiKey: "sk-abc123",
+      baseUrl: `${BEIJING}/api/v1`,
     });
     expect(resolved).toEqual({
       ok: true,
@@ -48,27 +67,13 @@ describe("wan3.0-video MAAS endpoint", () => {
     });
   });
 
-  it("ignores S2V dashscope.aliyuncs.com baseUrl when deriving MAAS root", () => {
-    expect(
-      resolveDashscopeWan30VideoApiRoot(SK_WS_KEY, "https://dashscope.aliyuncs.com"),
-    ).toBe(BEIJING);
-  });
-
-  it("uses stored MAAS baseUrl when present", () => {
-    const sg = "https://ws-sg.ap-southeast-1.maas.aliyuncs.com";
-    expect(resolveDashscopeWan30VideoApiRoot("sk-abc123", `${sg}/api/v1`)).toBe(sg);
-  });
-
-  it("rejects generic sk- keys that cannot resolve WorkspaceId", () => {
+  it("allows generic sk- keys on dashscope shared domain", () => {
     const resolved = resolveDashscopeVideoCreateUrl({
       model: "wan3.0-video",
       apiKey: "sk-abc123",
       baseUrl: "https://dashscope.aliyuncs.com",
     });
-    expect(resolved).toEqual({
-      ok: false,
-      error: WAN30_MISSING_WORKSPACE_ERROR,
-    });
+    expect(resolved).toEqual({ ok: true, url: DASHSCOPE_VIDEO });
   });
 
   it("leaves wan2.6-t2v on dashscope.aliyuncs.com", () => {
@@ -76,19 +81,16 @@ describe("wan3.0-video MAAS endpoint", () => {
       model: "wan2.6-t2v",
       apiKey: SK_WS_KEY,
     });
-    expect(resolved).toEqual({
-      ok: true,
-      url: "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis",
-    });
+    expect(resolved).toEqual({ ok: true, url: DASHSCOPE_VIDEO });
   });
 
-  it("polls wan3.0 on the same MAAS root", () => {
+  it("polls wan3.0 on dashscope when no explicit MAAS baseUrl", () => {
     expect(
       resolveDashscopeVideoTaskPollBaseUrl({
         model: "wan3.0-video",
         apiKey: SK_WS_KEY,
         storedBaseUrl: "https://dashscope.aliyuncs.com",
       }),
-    ).toBe(BEIJING);
+    ).toBeNull();
   });
 });

@@ -3,7 +3,10 @@
  */
 import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
 import { isCanvasLlmEngineKind } from "@/lib/canvas/canvas-traffic-kind";
-import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
+import {
+  buildDashscopeCreateTaskInputForLog,
+  buildGatewayInputSummary,
+} from "@/lib/gateway/log-input-summary";
 import { isBailianR2vGatewayModel } from "@/lib/gateway/model-router";
 
 function readPayload(inputPayload: unknown): Record<string, unknown> {
@@ -78,13 +81,33 @@ export function buildCanvasPendingInputSummary(
   }
 
   if (payload.providerKind === "DASHSCOPE") {
+    const videoBody = payload.dashscopeVideoBody;
+    if (videoBody && typeof videoBody === "object" && !Array.isArray(videoBody)) {
+      const input = buildDashscopeCreateTaskInputForLog(
+        { jobKind: "video", videoBody: videoBody as Record<string, unknown> },
+        payload.input as Record<string, unknown> | undefined,
+      );
+      return buildGatewayInputSummary(
+        String(payload.dashscopeModel ?? modelKey),
+        input,
+      );
+    }
     const body =
-      (payload.dashscopeVideoBody as Record<string, unknown>) ??
-      (payload.input as Record<string, unknown>) ??
-      {};
+      (payload.input as Record<string, unknown>) ?? {};
     return buildGatewayInputSummary(
       String(payload.dashscopeModel ?? modelKey),
       body,
+    );
+  }
+
+  if (payload.providerKind === "MINIMAX") {
+    const input =
+      (payload.minimaxInput as Record<string, unknown>) ??
+      (payload.input as Record<string, unknown>) ??
+      {};
+    return buildGatewayInputSummary(
+      String(payload.minimaxModel ?? modelKey),
+      input,
     );
   }
 

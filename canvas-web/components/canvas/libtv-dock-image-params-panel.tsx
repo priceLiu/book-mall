@@ -25,12 +25,12 @@ function segmentButtonClass(active: boolean): string {
 
 function AspectRatioIcon({ ratio }: { ratio: string }) {
   const { w, h } = parseAspectRatioToNumbers(ratio);
-  const max = 16;
+  const max = 20;
   const scale = max / Math.max(w, h);
-  const boxW = Math.max(6, Math.round(w * scale));
-  const boxH = Math.max(6, Math.round(h * scale));
+  const boxW = Math.max(8, Math.round(w * scale));
+  const boxH = Math.max(8, Math.round(h * scale));
   return (
-    <span className="flex size-[17px] items-center justify-center">
+    <span className="flex size-6 shrink-0 items-center justify-center">
       <span
         className="flex-none rounded-[2px] border-[1.5px] border-current"
         style={{ width: boxW, height: boxH }}
@@ -150,7 +150,7 @@ export function LibtvDockAspectRatioGrid({
   options,
   value,
   onChange,
-  columns = 5,
+  columns,
 }: {
   label: string;
   options: { id: string; label: string }[];
@@ -158,6 +158,9 @@ export function LibtvDockAspectRatioGrid({
   onChange: (id: string) => void;
   columns?: 3 | 5;
 }) {
+  const effectiveColumns =
+    columns ?? (options.length <= 3 ? 3 : 5);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-1.5 text-sm font-medium text-white/45">
@@ -166,7 +169,7 @@ export function LibtvDockAspectRatioGrid({
       <div
         className={cn(
           "grid gap-2",
-          columns === 3 ? "grid-cols-3" : "grid-cols-5",
+          effectiveColumns === 3 ? "grid-cols-3" : "grid-cols-5",
         )}
       >
         {options.map((opt) => {
@@ -176,7 +179,7 @@ export function LibtvDockAspectRatioGrid({
               key={opt.id}
               type="button"
               className={cn(
-                "flex flex-col items-center justify-center gap-1 rounded-lg border border-solid px-1 py-3 transition-colors duration-200",
+                "flex min-h-[52px] flex-col items-center justify-center gap-1.5 rounded-lg border border-solid px-1 py-2.5 transition-colors duration-200",
                 active
                   ? "border-white/25 bg-white/[0.12] text-white"
                   : "border-white/10 bg-transparent text-white/45 hover:bg-white/[0.06] hover:text-white/70",
@@ -184,7 +187,7 @@ export function LibtvDockAspectRatioGrid({
               onClick={() => onChange(opt.id)}
             >
               <AspectRatioIcon ratio={opt.id} />
-              <span className="text-xs">{opt.label}</span>
+              <span className="text-[13px] leading-none">{opt.label}</span>
             </button>
           );
         })}
@@ -246,6 +249,7 @@ export function LibtvDockImageParamsPanel({
         options={aspectOptions}
         value={aspectValue}
         onChange={onAspectChange}
+        columns={aspectOptions.length <= 3 ? 3 : 5}
       />
       <LibtvDockImageParamSegmentRow
         label={countLabel}

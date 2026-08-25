@@ -7,9 +7,9 @@ import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { resolveGatewayLogDisplayModelKey } from "@/lib/gateway/gateway-log-display-model";
 import {
-  resolveVendorNativeTimingForLogRow,
-  resolveVolcengineLogTiming,
-} from "@/lib/gateway/log-volcengine-timing";
+  resolveGatewayLogPhaseTiming,
+  resolveGatewayVendorNativeTimingForLogRow,
+} from "@/lib/gateway/log-gateway-phase-timing";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
 import { readPollStallDiagnostic } from "@/lib/gateway/gateway-poll-stall-diagnostics";
@@ -81,14 +81,14 @@ export async function mapGatewayRequestLogsToResponseRows(
         l.actorBookUserId != null
           ? (actorMap.get(l.actorBookUserId) ?? null)
           : null;
-      const timing = resolveVolcengineLogTiming({
+      const timing = resolveGatewayLogPhaseTiming({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
         submittedAt: l.submittedAt,
         completedAt: l.completedAt,
         resultSummary: l.resultSummary,
       });
-      const vendorNative = resolveVendorNativeTimingForLogRow({
+      const vendorNative = resolveGatewayVendorNativeTimingForLogRow({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
         vendorDurationMs: l.vendorDurationMs,

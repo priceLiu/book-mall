@@ -36,6 +36,7 @@ import {
 } from "@/lib/gateway-log-display";
 import {
   hasVolcengineTimingTrace,
+  hasDashscopeTimingTrace,
   liveVolcengineVideoTiming,
   resolveLiveLogPhaseTiming,
   resolveVendorNativeTimingLive,
@@ -729,6 +730,7 @@ const LogsTableRow = memo(function LogsTableRow({
     externalTaskId: l.externalTaskId,
     isInProgress,
     hasVolcengineTrace: hasVolcengineTimingTrace(l.resultSummary),
+    hasDashscopeTrace: hasDashscopeTimingTrace(l.resultSummary),
   });
   const phaseCellTitle = (
     cell: { value: string; title?: string },
@@ -2190,31 +2192,31 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="whitespace-nowrap border-l border-white/10 bg-zinc-800/25 px-2"
-                title="仅火山异步视频 · Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
+                title="百炼/DashScope 异步 · Gateway 提交 → scheduled_time；火山异步视频 · 提交 → 首次 running"
               >
                 排队
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2"
-                title="仅火山异步视频 · 生成阶段秒表：到厂商起按墙钟实时累计，厂商完成时冻结；厂商 GPU 真值见右侧「厂商生成」列。"
+                title="百炼/DashScope：scheduled_time → end_time；火山：生成阶段墙钟 / GPU 真值"
               >
                 生成
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2"
-                title="仅火山异步视频 · 成功任务：updated_at 跳变 → 首次 succeeded；失败为 —"
+                title="火山异步视频 · 成功任务 updated_at 跳变 → 首次 succeeded；百炼/DashScope 一般为 —"
               >
                 后处理
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
-                title="厂商 · 火山 trace created→updated（仅 GPU 生成跨度，不含排队/后处理/我方轮询）。与「生成」列 GPU 真值一致；进行中 updated 未跳变时为 —。"
+                title="厂商原生跨度：DashScope submit→end；火山 created→updated（GPU，不含排队/轮询）"
               >
                 厂商 GPU
               </th>
               <th
                 className="whitespace-nowrap border-r border-white/10 bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
-                title="仅火山异步视频 · 厂商 GPU 真值（updated−created，只读）；与左侧「生成」墙钟对照。未跳变前不计秒。"
+                title="厂商生成真值：DashScope scheduled→end；火山 updated−created"
               >
                 厂商生成
               </th>

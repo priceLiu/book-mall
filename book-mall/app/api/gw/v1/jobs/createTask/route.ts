@@ -13,7 +13,7 @@ import {
 import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
 import { pickAiSpaceS2vCredentialId } from "@/lib/ai-space/ai-space-gateway-auth";
 import { isDashscopeWan30VideoModelKey } from "@/lib/gateway/dashscope-client";
-import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
+import { buildGatewayInputSummary, buildDashscopeCreateTaskInputForLog } from "@/lib/gateway/log-input-summary";
 import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
 import {
   routeGatewayModel,
@@ -247,16 +247,10 @@ export async function POST(request: NextRequest) {
         };
       })()
     : dsForLog && typeof dsForLog === "object"
-      ? {
-          jobKind: dsForLog.jobKind,
-          prompt: dsForLog.prompt,
-          content: dsForLog.content,
-          size: dsForLog.size,
-          n: dsForLog.n,
-          aspectRatio: dsForLog.aspectRatio,
-          resolution: dsForLog.resolution,
-          contentOrder: dsForLog.contentOrder,
-        }
+      ? buildDashscopeCreateTaskInputForLog(
+          dsForLog,
+          body.input as Record<string, unknown> | undefined,
+        )
       : (body.input ?? {});
 
   const storyTaskId = logMeta.storyTaskId?.trim();
