@@ -82,6 +82,7 @@ export const authOptions: NextAuthOptions = {
         autoLoginToken: { label: "自动登录票据", type: "text" },
       },
       async authorize(credentials) {
+        if (!credentials) return null;
         const ip = clientIpFromHeaders(headers());
         const result = await verifyLoginWithThrottle({
           credentials,

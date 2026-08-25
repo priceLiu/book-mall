@@ -21,11 +21,11 @@ export type ThrottledLoginResult =
  * 密码 / 短信登录：先限速再校验。autologin 票据不计入失败窗口。
  */
 export async function verifyLoginWithThrottle(input: {
-  credentials: CredentialsLoginInput;
+  credentials: CredentialsLoginInput | undefined;
   ip: string | null;
 }): Promise<ThrottledLoginResult> {
-  const loginMode = input.credentials.loginMode?.trim() || "password";
-  const phone = normalizePhone(input.credentials.phone);
+  const loginMode = input.credentials?.loginMode?.trim() || "password";
+  const phone = normalizePhone(input.credentials?.phone);
   const throttle = loginMode !== "autologin";
 
   if (throttle) {
