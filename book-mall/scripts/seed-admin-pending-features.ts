@@ -660,6 +660,83 @@ const SEED_ITEMS: {
     listKind: "PENDING",
     completed: true,
   },
+  // —— 短信 / 手机验证码加固（见 docs/短信手机验证码加固.md）——
+  {
+    title: "SEC-100 短信手机验证码加固 · 总规格",
+    description:
+      "公网扫描复盘后：门户 IP 转发、密码登录失败限速、短信 IP 突发限、生产关闭 sso-config-health；扫描 PV 另标。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 560,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-101 门户 BFF 转发真实客户端 IP",
+    description: "x-platform-client-ip；Book portal/verify 与 portal/sms/send 信任并用于限速/短信 sendIp。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 570,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-102 密码登录失败限速",
+    description: "IP 15min/20 次、手机号 15min/8 次；NextAuth + portal/verify + client/login + gateway/login。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 580,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-103 短信 IP 突发限速",
+    description: "在 60s 冷却与日限额之上：同一 IP 10 分钟最多 8 次 issueSmsCode。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 590,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-104 生产关闭 sso-config-health",
+    description: "e-commerce-toolkit / story-web 生产 NODE_ENV=production 返回 404，防配置侦察。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 600,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-105 访问统计扫描路径标明",
+    description: "probeViews/probeHitCount；/admin/traffic 类型列正常/扫描/混合；仍计入 PV。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 610,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-201 部署 book-mall + 数据库迁移",
+    description: "20260825040000_site_traffic_probe_views；db:apply-pending + 重启 book-mall。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 620,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-202 部署各门户 BFF（登录/短信）",
+    description: "ecom / canvas / story / quick-replica / common-tools / publisher；否则 IP 限额仍按子站出口。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 630,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-203 部署 gateway-web 短信/登录代理",
+    description: "gateway-web 转发 x-platform-client-ip 至 book-mall。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 640,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-204 生产验收（短信限速 + 登录锁定 + 统计）",
+    description: "§5 检查清单：429 频控、sendIp 为用户 IP、sso-config-health 404、登录回归。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 650,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {
