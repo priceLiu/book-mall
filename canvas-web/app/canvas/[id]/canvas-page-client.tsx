@@ -64,7 +64,8 @@ import type {
 import {
   clearCanvasProjectTasksForbidden,
   getCanvasProjectCached,
-  invalidateCanvasProjectCache,
+  abandonCanvasProjectInflight,
+  seedCanvasProjectDetailCache,
   isCanvasApiConflictError,
   parseCanvasConflictUpdatedAt,
   formatCanvasApiError,
@@ -135,6 +136,26 @@ import {
 import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
 import { warmPro2TemplateCache } from "@/lib/canvas/pro2-template-resolver";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
+/** 单项目 GET 超时：避免 BFF/DB 挂起时「加载画布…」永不结束 */
+const CANVAS_PROJECT_LOAD_TIMEOUT_MS = 90_000;
+
+function withCanvasProjectLoadTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error("canvas_project_load_timeout"));
+    }, CANVAS_PROJECT_LOAD_TIMEOUT_MS);
+    void promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 function Inner({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
@@ -438,18 +459,30 @@ function Inner({ projectId }: { projectId: string }) {
 
   // Load project
   useEffect(() => {
-    if (!base) return;
+    if (!base?.trim()) {
+      canvasReadyRef.current = false;
+      setProject(null);
+      setLoadError(
+        "未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布。",
+      );
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     canvasReadyRef.current = false;
     generationRecordDeepLinkRef.current = null;
     setProject(null);
     setLoading(true);
-        clearCanvasProjectTasksForbidden(projectId);
-        invalidateCanvasProjectCache(base, projectId);
-        void (async () => {
-          try {
-            const p = await getCanvasProjectCached(base, projectId);
+    clearCanvasProjectTasksForbidden(projectId);
+    // 只放弃卡住的 inflight，保留列表 hover 已拉到的大 JSON 缓存
+    abandonCanvasProjectInflight(base, projectId);
+    void (async () => {
+      try {
+        const p = await withCanvasProjectLoadTimeout(
+          getCanvasProjectCached(base, projectId),
+        );
         if (cancelled) return;
+        seedCanvasProjectDetailCache(base, projectId, p);
         const rawCanvas = p.canvas as { nodes?: unknown[] } | null;
         loadedNodeCountRef.current = Array.isArray(rawCanvas?.nodes)
           ? rawCanvas.nodes.length
@@ -479,7 +512,12 @@ function Inner({ projectId }: { projectId: string }) {
         setLoadError(null);
       } catch (e) {
         if (!cancelled) {
-          setLoadError(e instanceof Error ? e.message : "加载失败");
+          const raw = e instanceof Error ? e.message : "加载失败";
+          const message =
+            raw === "canvas_project_load_timeout"
+              ? "加载画布超时（主站响应过慢）。请确认 book-mall 已启动且数据库可访问，然后刷新重试。"
+              : formatCanvasApiError(raw);
+          setLoadError(message);
         }
       } finally {
         if (!cancelled) setLoading(false);

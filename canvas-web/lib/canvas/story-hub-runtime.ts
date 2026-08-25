@@ -380,6 +380,22 @@ export function repairHubEmbeddedPackSections(
   });
 }
 
+/** 节点 mount 时 repair：仅返回相对现有 data 有变化的字段，避免无 diff 的 updateNodeData 刷 graphRevision */
+export function hubNodeRepairPatchIfChanged<D extends Record<string, unknown>>(
+  data: D,
+  patch: Partial<D> | null | undefined,
+): Partial<D> | null {
+  if (!patch) return null;
+  const changed: Partial<D> = {};
+  for (const key of Object.keys(patch) as (keyof D)[]) {
+    const next = patch[key];
+    if (JSON.stringify(data[key]) !== JSON.stringify(next)) {
+      changed[key] = next;
+    }
+  }
+  return Object.keys(changed).length ? changed : null;
+}
+
 /** 将误写入 outlineMd 的 raw JSON 解析为 productionScript + 各 Tab Markdown */
 export function repairHubStructuredProductionScriptNodes(
   nodes: CanvasFlowNode[],

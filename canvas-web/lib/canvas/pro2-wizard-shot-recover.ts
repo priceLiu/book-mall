@@ -209,7 +209,8 @@ export async function recoverWizardShotDraftsFromTasks(
     }
 
     if (draft?.generateStatus === "running" && draft.taskId?.trim()) {
-      const bound = nodeTasks.find((t) => t.id === draft.taskId.trim());
+      const taskId = draft.taskId.trim();
+      const bound = nodeTasks.find((t) => t.id === taskId);
       if (!bound) {
         patchProductionWizardShotDraft(scriptHubId, mediaKind, shotIndex, {
           generateStatus: "failed",

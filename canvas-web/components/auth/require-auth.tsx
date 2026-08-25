@@ -22,6 +22,7 @@ import {
 } from "@/lib/sso-exchange-fresh";
 import {
   parseToolsSessionInactiveReason,
+  shouldClearToolsTokenOnInactive,
   toolsSessionInactiveUserMessage,
   type ToolsSessionInactiveReason,
 } from "@/lib/tools-session-inactive-reason";
@@ -225,16 +226,23 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         const inactive = parseToolsSessionInactiveReason(data);
         if (background && readyRef.current) {
           if (
-            inactive === "introspect_timeout" ||
-            (inactive === "unknown" && data.hasCookie)
+            inactive === "session_revoked" ||
+            inactive === "jwt_invalid" ||
+            inactive === "tools_access_denied"
           ) {
-            window.setTimeout(() => {
-              if (gen === loadGenRef.current) {
-                void loadSession({ background: true });
-              }
-            }, SESSION_BACKGROUND_REVALIDATE_MS);
+            if (shouldClearToolsTokenOnInactive(data)) {
+              clearCachedToolsSession();
+            }
+            setReady(false);
             return;
           }
+          /** 已在编辑器内：主站 introspect 抖动时保持 ready，避免 silent re-enter 把用户踢回列表 */
+          window.setTimeout(() => {
+            if (gen === loadGenRef.current) {
+              void loadSession({ background: true });
+            }
+          }, SESSION_BACKGROUND_REVALIDATE_MS);
+          return;
         }
         clearCachedToolsSession();
         setReady(false);

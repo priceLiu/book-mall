@@ -63,7 +63,7 @@ import {
   resolveLibtvThinNodeDisplayState,
 } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
-import { resolveHubOutlineMd, resolveHubStoryboardMd, buildHubStoryboardBackfillPatch } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubOutlineMd, resolveHubStoryboardMd, buildHubStoryboardBackfillPatch, hubNodeRepairPatchIfChanged } from "@/lib/canvas/story-hub-runtime";
 import { resolvePro2HubTableTitle } from "@/lib/canvas/pro2-hub-display-title";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -188,7 +188,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
             ...(syncPatch ?? {}),
           }
         : null;
-    if (finalPatch) updateNodeData(id, finalPatch);
+    const changedPatch = hubNodeRepairPatchIfChanged(
+      d as unknown as Record<string, unknown>,
+      finalPatch as Record<string, unknown> | null,
+    );
+    if (changedPatch) updateNodeData(id, changedPatch);
   }, [
     d.outlineMd,
     d.storyboardMd,

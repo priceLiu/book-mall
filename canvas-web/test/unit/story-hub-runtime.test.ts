@@ -25,6 +25,7 @@ import {
   promoteEmbeddedPackFromOutline,
   resolveHubStoryboardMd,
   resolvePro2StoryboardMdFromPackSource,
+  hubNodeRepairPatchIfChanged,
 } from "@/lib/canvas/story-hub-runtime";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
@@ -484,5 +485,13 @@ describe("pro2 human pack · storyboard promote", () => {
     const shot1 = rows.find((r) => r.frameIndex === 1);
     expect(shot1?.propNames).toMatch(/明黄婚书/);
     expect(shot1?.sfxNote).toMatch(/人群议论/);
+  });
+
+  it("hubNodeRepairPatchIfChanged returns null when patch is identical", () => {
+    const data = { outlineMd: "a", storyboardMd: "b" };
+    expect(hubNodeRepairPatchIfChanged(data, { outlineMd: "a" })).toBeNull();
+    expect(
+      hubNodeRepairPatchIfChanged(data, { storyboardMd: "c" }),
+    ).toEqual({ storyboardMd: "c" });
   });
 });

@@ -15,7 +15,7 @@ type CanvasProjectOpenLinkProps = {
   onPrefetchProject?: (id: string) => void;
 };
 
-/** 项目卡片 → 画布编辑器：pointerdown 即显示加载，避免等路由 chunk 才反馈。 */
+/** 项目卡片 → 画布编辑器。预取放 pointerdown；打开态仅在 click 后设置，避免吞掉导航。 */
 export function CanvasProjectOpenLink({
   projectId,
   className,
@@ -36,14 +36,16 @@ export function CanvasProjectOpenLink({
   return (
     <Link
       href={`/canvas/${projectId}`}
-      className={cn("relative block", className, isOpening && "pointer-events-none")}
+      className={cn("relative block", className)}
       prefetch
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        // 仅预取；勿在 pointerdown 里盖遮罩 / pointer-events-none，否则 click 被吞、路由永不跳转
         onPrefetchProject?.(projectId);
+      }}
+      onClick={() => {
         markOpening();
       }}
-      onClick={markOpening}
     >
       {children}
       {isOpening ? (
@@ -72,7 +74,7 @@ export function CanvasProjectOpeningOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col items-center justify-center gap-3 bg-[var(--canvas-bg,#0a0a0f)]"
+      className="pointer-events-none fixed inset-0 z-[300] flex flex-col items-center justify-center gap-3 bg-[var(--canvas-bg,#0a0a0f)]"
       role="status"
       aria-live="polite"
       aria-busy="true"

@@ -329,10 +329,7 @@ export function Pro2ProductionWizardShotStudioModal({
     if (!queued) {
       await alert({
         title: "无法提交生成",
-        message:
-          generateStatus === "running"
-            ? "该镜已在后台生成，请稍候。"
-            : "请检查网络与主站连接，或稍后再试。",
+        message: "请检查网络与主站连接，或稍后再试。",
         variant: "warning",
       });
       return;

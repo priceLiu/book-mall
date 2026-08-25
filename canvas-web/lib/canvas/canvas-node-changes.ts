@@ -51,7 +51,9 @@ export function isCanvasSelectionOnlyChange(changes: NodeChange[]): boolean {
   return changes.length > 0 && changes.every((c) => c.type === "select");
 }
 
-export function extractSelectNodeChanges(changes: NodeChange[]): NodeChange[] {
+export function extractSelectNodeChanges(
+  changes: NodeChange<CanvasFlowNode>[],
+): NodeChange<CanvasFlowNode>[] {
   return changes.filter((c) => c.type === "select");
 }
 

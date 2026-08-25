@@ -239,10 +239,13 @@ export async function getLatestAiNewsForClient(now = new Date()): Promise<{
     };
   }
 
-  throw new PlatformAssistantGatewayError(
-    "热闻正在准备中，请稍后再试",
-    503,
-  );
+  /** 无预生成热闻：返回空内容（200），避免全站 layout 预取在控制台刷 503 */
+  return {
+    content: "",
+    dateKey: todayKey,
+    stale: true,
+    generatedAt: now.toISOString(),
+  };
 }
 
 export async function getPlatformAiNewsBrief(opts?: {

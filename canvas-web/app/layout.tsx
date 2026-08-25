@@ -29,8 +29,8 @@ export default function RootLayout({
   const bookOrigin = getMainSiteOrigin() || bookMallBaseUrl || null;
 
   return (
-    <html lang="zh-CN">
-      <body className="canvas-sans">
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className="canvas-sans" suppressHydrationWarning>
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
           <DialogProvider>
             <CanvasAuthGate>

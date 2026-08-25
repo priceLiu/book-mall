@@ -156,9 +156,9 @@ export function renderStoryboardSection(script: Pro2ProductionScript): string {
     header,
     ...shots.map((s) => {
       if (useV2) {
-        return `| ${s.index} | ${escCell(s.shotSize ?? "—")} | ${escCell(s.lighting ?? "—")} | ${escCell(s.cameraMove ?? "—")} | ${escCell(s.sceneDescription)} | ${escCell(resolveShotPropNames(s, normalized))} | ${escCell(s.dialogue || "—")} | ${s.durationSec ?? "—"} | ${escCell(s.sfxNote ?? "—")} | ${escCell(s.audioNote || "—")} |`;
+        return `| ${s.index} | ${escCell(s.shotSize ?? "—")} | ${escCell(s.lighting ?? "—")} | ${escCell(s.cameraMove ?? "—")} | ${escCell(s.sceneDescription ?? "—")} | ${escCell(resolveShotPropNames(s, normalized))} | ${escCell(s.dialogue || "—")} | ${s.durationSec ?? "—"} | ${escCell(s.sfxNote ?? "—")} | ${escCell(s.audioNote || "—")} |`;
       }
-      return `| ${s.index} | ${escCell(s.shotSize ?? "—")} | ${escCell(s.cameraMove ?? "—")} | ${escCell(s.sceneDescription)} | ${escCell(s.dialogue || "—")} | ${s.durationSec ?? "—"} | ${escCell(s.imagePrompt ?? "—")} | ${escCell(s.videoPrompt ?? "—")} | ${escCell(s.audioNote || "—")} |`;
+      return `| ${s.index} | ${escCell(s.shotSize ?? "—")} | ${escCell(s.cameraMove ?? "—")} | ${escCell(s.sceneDescription ?? "—")} | ${escCell(s.dialogue || "—")} | ${s.durationSec ?? "—"} | ${escCell(s.imagePrompt ?? "—")} | ${escCell(s.videoPrompt ?? "—")} | ${escCell(s.audioNote || "—")} |`;
     }),
   ];
   return lines.join("\n");

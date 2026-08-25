@@ -4,7 +4,7 @@
  */
 import type { Prisma } from "@prisma/client";
 
-import { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-billing";
+import { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-constants";
 
 export const GATEWAY_LOG_APP_KEYS = [
   "assistant",

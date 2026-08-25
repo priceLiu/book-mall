@@ -10,7 +10,7 @@ import {
   isGatewayLogAppKey,
   parseGatewayLogAppKey,
 } from "@/lib/gateway/gateway-log-app-filter";
-import { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-billing";
+import { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-constants";
 
 export type PlatformErrorAppKey = GatewayLogAppKey | "system";
 

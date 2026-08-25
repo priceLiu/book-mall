@@ -41,7 +41,10 @@ import {
   LibtvDockToolbarMetricsContext,
 } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
-import { coerceSbv1ImageAspectForModel } from "@/lib/canvas/sbv1-image-models";
+import {
+  coerceSbv1ImageAspectForModel,
+  type Sbv1ImageAspectRatio,
+} from "@/lib/canvas/sbv1-image-models";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox } from "@/components/canvas/media-hover-box";
@@ -106,7 +109,7 @@ function allowedKeysForKind(kind: Pro2WizardAssetKind): string[] {
   return [...PRO2_SCENE_IMAGE_MODEL_KEYS];
 }
 
-function defaultAspectForKind(kind: Pro2WizardAssetKind): Sbv1ImageNodeData["aspectRatio"] {
+function defaultAspectForKind(kind: Pro2WizardAssetKind): Sbv1ImageAspectRatio {
   if (kind === "character") return "16:9";
   if (kind === "scene") return "16:9";
   return "1:1";

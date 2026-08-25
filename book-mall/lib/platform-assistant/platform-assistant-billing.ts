@@ -11,13 +11,14 @@ import {
 import { recordBillingSettlement } from "@/lib/billing/billing-settlement-service";
 import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
 import { clientPageToToolLabel } from "@/lib/finance/client-page-tool";
+import { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-constants";
 
 /** finance-web / admin 账单明细用的虚拟用户 ID（非 Book User 表行）。 */
 export const PLATFORM_ASSISTANT_BILLING_USER_ID = "platform-assistant";
 
 export const PLATFORM_ASSISTANT_BILLING_USER_LABEL = "AI 小智";
 
-export const PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX = "platform-assistant/";
+export { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-constants";
 
 export function isPlatformAssistantClientPage(
   clientPage: string | null | undefined,

@@ -633,17 +633,28 @@ export function prefetchCanvasProject(base: string, id: string): void {
   void getCanvasProjectCached(base, id).catch(() => undefined);
 }
 
-/** 列表加载后批量预取（限制并发，避免打满 BFF / DB） */
-export function prefetchCanvasProjects(base: string, ids: string[]): void {
+/**
+ * 批量预取项目详情（全量 canvas JSON）。
+ * 默认最多预取前 `limit` 个且并发 1，避免打满腾讯云连接池。
+ * 列表页请勿对全部项目调用；优先用单条 prefetchCanvasProject（hover）。
+ */
+export function prefetchCanvasProjects(
+  base: string,
+  ids: string[],
+  opts?: { limit?: number; maxConcurrent?: number },
+): void {
   if (!base?.trim() || ids.length === 0) return;
-  const pending = ids.filter((id) => {
-    if (!id?.trim()) return false;
-    const key = projectCacheKey(base, id);
-    return !isProjectDetailCacheFresh(key) && !projectDetailInflight.has(key);
-  });
+  const limit = Math.max(0, opts?.limit ?? 3);
+  const maxConcurrent = Math.max(1, opts?.maxConcurrent ?? 1);
+  const pending = ids
+    .filter((id) => {
+      if (!id?.trim()) return false;
+      const key = projectCacheKey(base, id);
+      return !isProjectDetailCacheFresh(key) && !projectDetailInflight.has(key);
+    })
+    .slice(0, limit);
   if (pending.length === 0) return;
 
-  const maxConcurrent = 3;
   let cursor = 0;
   const worker = async () => {
     while (cursor < pending.length) {
@@ -681,7 +692,29 @@ export async function getCanvasProjectCached(
 }
 
 export function invalidateCanvasProjectCache(base: string, id: string): void {
-  projectDetailCache.delete(projectCacheKey(base, id));
+  const key = projectCacheKey(base, id);
+  projectDetailCache.delete(key);
+  projectDetailInflight.delete(key);
+}
+
+/**
+ * 仅丢弃卡住的 in-flight 预取，保留已成功写入的详情缓存。
+ * 打开大剧本画布时：列表 hover 已拉过 JSON，编辑器应命中缓存，勿再清缓存重拉。
+ */
+export function abandonCanvasProjectInflight(base: string, id: string): void {
+  projectDetailInflight.delete(projectCacheKey(base, id));
+}
+
+/** 编辑器首屏拉取成功后写入缓存，供后续 updatedAt / 二次进入复用 */
+export function seedCanvasProjectDetailCache(
+  base: string,
+  id: string,
+  project: CanvasProjectDetail,
+): void {
+  projectDetailCache.set(projectCacheKey(base, id), {
+    at: Date.now(),
+    data: project,
+  });
 }
 
 export type CanvasProjectHistorySummary = {

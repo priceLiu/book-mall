@@ -238,7 +238,7 @@ function buildProFrameRowsFromProductionScript(
         key: String(shot.index),
         scene: sceneName,
         shotSize: shot.shotSize,
-        description: shot.sceneDescription,
+        description: shot.sceneDescription ?? "",
         dialogue: shot.dialogue,
         videoPrompt: shot.videoPrompt ?? "",
         prompt: frameImagePrompt ?? "",

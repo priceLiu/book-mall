@@ -58,10 +58,10 @@ export function patchProductionWizardAssetDraft(
   const drafts = data.productionWizardAssetDrafts ?? {};
   const prev = drafts[key];
   const next: Pro2ProductionWizardAssetDraft = {
-    kind,
-    assetId,
     ...prev,
     ...patch,
+    kind,
+    assetId,
   };
   if (draftFieldsEqual(prev, next)) return;
 

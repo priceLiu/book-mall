@@ -28,7 +28,6 @@ import {
   patchPortalCaseProject,
   submitCanvasPortalReview,
   prefetchCanvasProject,
-  prefetchCanvasProjects,
   type CanvasProjectSummary,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
@@ -137,10 +136,9 @@ function Inner() {
     try {
       const list = await listMyCanvasProjects(base);
       setProjects(Array.isArray(list) ? list : []);
-      prefetchCanvasProjects(
-        base,
-        (Array.isArray(list) ? list : []).map((p) => p.id),
-      );
+      // 禁止列表加载后批量 GET 全量 canvas JSON：会打满远端连接池
+      // （日志里单项目 6s+、列表 12s），导致打开画布 / introspect 一起饿死。
+      // 仅 hover / pointerdown 预取当前点的项目（prefetchCanvasProject）。
       setLoading(false);
       void listCanvasTemplates(base)
         .then((tpl) => {
@@ -161,6 +159,15 @@ function Inner() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** 路由未跳转成功时，避免「正在打开画布…」遮罩一直盖住列表 */
+  useEffect(() => {
+    if (!openingProjectId) return;
+    const timer = window.setTimeout(() => {
+      setOpeningProjectId(null);
+    }, 45_000);
+    return () => window.clearTimeout(timer);
+  }, [openingProjectId]);
 
   const prefetchProject = useCallback(
     (id: string) => {

@@ -653,7 +653,7 @@ export function hydrateShotEntityMentionsForEdit(
       sceneDescription: hydrate(reconciled.sceneDescription),
       lighting: hydrate(reconciled.lighting),
       cameraMove: hydrate(reconciled.cameraMove),
-      dialogue: hydrate(reconciled.dialogue),
+      dialogue: hydrate(reconciled.dialogue) ?? reconciled.dialogue ?? "—",
       sfxNote: hydrate(reconciled.sfxNote),
       frameImagePrompt: hydrate(resolvePro2ShotFrameImagePrompt(reconciled)),
       imagePrompt: hydrate(reconciled.imagePrompt),
