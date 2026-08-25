@@ -1,23 +1,14 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchBookMallViewerUser, type BookMallViewerUser } from "@/lib/book-mall-viewer-session";
 import { isPlatformStaff } from "@/lib/permissions";
-import {
-  FEES_FROM_ACCOUNT_QUERY,
-  FEES_FROM_ACCOUNT_VALUE,
-} from "@/lib/fees-from-account";
 
 export type FinanceAppTopBarScope = "fees" | "admin";
 
 function FinanceAppTopBarInner({ scope }: { scope: FinanceAppTopBarScope }) {
   const base = useBookMallBaseUrl();
-  const searchParams = useSearchParams();
-  const fromPersonalCenter =
-    scope === "fees" && searchParams.get(FEES_FROM_ACCOUNT_QUERY) === FEES_FROM_ACCOUNT_VALUE;
-
   const [viewer, setViewer] = useState<BookMallViewerUser | null | undefined>(undefined);
   const signOutUrl = base
     ? `${base}/api/auth/signout?callbackUrl=${encodeURIComponent(`${base}/login`)}`
@@ -36,9 +27,8 @@ function FinanceAppTopBarInner({ scope }: { scope: FinanceAppTopBarScope }) {
   }, [base]);
 
   const isStaff = isPlatformStaff(viewer?.role);
-  /** 双证：费用区且从个人中心进入 → 始终按普通用户返程；/admin 链路由平台员工角色决定。 */
-  const showUserBack =
-    scope === "admin" ? !isStaff : fromPersonalCenter || !isStaff;
+  /** 个人/团队费用区始终回个人中心；管理后台模块回主站后台。 */
+  const showUserBack = scope === "admin" ? !isStaff : true;
 
   const homeBackHref = base ? (showUserBack ? `${base}/account` : `${base}/admin`) : "#";
   const homeBackLabel = showUserBack ? "返回个人中心" : "返回主站后台";
@@ -82,7 +72,7 @@ function TopBarFallback() {
 }
 
 /**
- * finance-web 顶栏：`scope=fees` 时支持 `?from=account`（个人中心入口），管理员也显示「返回个人中心」。
+ * finance-web 顶栏：个人/团队费用区显示「返回个人中心」；管理后台模块按角色回主站后台。
  */
 export function FinanceAppTopBar({ scope }: { scope: FinanceAppTopBarScope }) {
   return (

@@ -1,4 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  bookAccountHomeUrl,
+  bookAccountRedirectUrl,
+  bookAdminHomeUrl,
+  hasFeesBookEntry,
+} from "@/lib/book-only-entry";
 import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 function incomingHost(request: NextRequest): string {
@@ -28,6 +34,29 @@ function getCanonicalOrigin(): string | null {
 
 export function middleware(request: NextRequest) {
   fireTrafficHitFromRequest("finance", request);
+
+  const pathname = request.nextUrl.pathname;
+  const isDocumentRequest =
+    request.method === "GET" || request.method === "HEAD";
+
+  if (isDocumentRequest && !pathname.startsWith("/api/")) {
+    if (pathname === "/") {
+      const accountUrl = bookAccountHomeUrl();
+      if (accountUrl) return NextResponse.redirect(accountUrl, 307);
+    }
+
+    if (pathname === "/admin" || pathname === "/admin/") {
+      const adminUrl = bookAdminHomeUrl();
+      if (adminUrl) return NextResponse.redirect(adminUrl, 307);
+    }
+
+    if (pathname === "/fees" || pathname.startsWith("/fees/")) {
+      if (!hasFeesBookEntry(request.nextUrl.searchParams)) {
+        const accountUrl = bookAccountRedirectUrl(pathname);
+        if (accountUrl) return NextResponse.redirect(accountUrl, 307);
+      }
+    }
+  }
 
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();

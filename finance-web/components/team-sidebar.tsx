@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ArrowLeft,
   BarChart3,
   LayoutDashboard,
   Receipt,
@@ -10,6 +11,8 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { feesFromAccountQuerySuffix } from "@/lib/fees-from-account";
 
 const nav = [
   { href: "/team", label: "团队驾驶舱", icon: LayoutDashboard, exact: true },
@@ -22,10 +25,29 @@ const nav = [
 
 export function TeamSidebar() {
   const pathname = usePathname();
+  const base = useBookMallBaseUrl();
+  const accountHomeHref = base ? `${base}/account` : "#";
+  const personalFeesHref = `/fees/usage${feesFromAccountQuerySuffix()}`;
+
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[#e8e8e8] bg-[#001529] text-sm text-white/85">
+      <div className="space-y-1 border-b border-white/10 p-2">
+        <a
+          href={accountHomeHref}
+          className="flex items-center gap-2 rounded px-2 py-2 text-white/85 hover:bg-white/10 hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+          返回个人中心
+        </a>
+        <Link
+          href={personalFeesHref}
+          className="flex items-center gap-2 rounded px-2 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white"
+        >
+          个人费用
+        </Link>
+      </div>
       <div className="border-b border-white/10 px-3 py-3 text-base font-semibold text-white">团队财务</div>
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+      <nav className="finance-sidebar-scroll flex-1 space-y-0.5 overflow-y-auto p-2">
         {nav.map((item) => {
           const Icon = item.icon;
           const active =

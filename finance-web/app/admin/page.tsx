@@ -1,45 +1,9 @@
-import Link from "next/link";
-import { FinancePageShell } from "@/components/finance-page-shell";
+import { redirect } from "next/navigation";
+import { bookAdminHomeUrl } from "@/lib/book-only-entry";
 
-const cards = [
-  { href: "/admin/help", title: "财务 2.0 使用说明", desc: "积分换算口径、角色权限、调价流程与模块导航。" },
-  { href: "/admin/credit-expiry-ops", title: "积分清零运维台", desc: "到期清单、自动执行记录、漏跑预警与补跑。" },
-  { href: "/admin/teams", title: "团队财务", desc: "全站团队列表、团队驾驶舱与成员溯源。" },
-  { href: "/admin/billing/users", title: "按用户查看账单明细", desc: "财务管理员 · 31 列费用明细。" },
-  { href: "/admin/billing/all", title: "费用明细（全部）", desc: "财务管理员 · 全站云级账单行。" },
-  { href: "/admin/usage-overview", title: "费用多维度概览", desc: "按月份/工具/模型/用户聚合。" },
-  { href: "/admin/usage-management", title: "用量对账中心", desc: "Gateway 日聚合 vs DeepSeek 厂商 CSV，按应用/Key 对账。" },
-  { href: "/admin/pnl-alerts", title: "盈亏预警中心", desc: "综合毛利 / 视频毛利 / 成本环比。" },
-  { href: "/admin/plan-change", title: "调价测算与审批", desc: "运营→财务→超管审批流。" },
-  { href: "/admin/model-cost", title: "模型成本", desc: "仅财务管理员 · 渠道折扣与净成本。" },
-  { href: "/admin/credit-pricing", title: "积分报价与换算", desc: "全局参数、模型换算发布、已上架报价一览。" },
-  { href: "/admin/test-cases", title: "财务测算", desc: "个人/团队日消耗与月汇总：积分、成本、收入、利润。" },
-  { href: "/admin/membership-plans", title: "会员套餐", desc: "个人/团队套餐与席位带。" },
-  { href: "/admin/vip-ops", title: "VIP 大额预充", desc: "充值测算、开通账号、合同/凭证、席位与积分运维。" },
-  { href: "/admin/referrals", title: "分享返佣", desc: "分享人业绩汇总 · 逐人录入返佣比例。" },
-  { href: "/admin/referral-payouts", title: "返佣结算 · 返佣单", desc: "按月计算返佣、生成返佣单、标记打款、导出 CSV。" },
-  { href: "/admin/reconciliation", title: "对账总账", desc: "平台 Gateway 底表 + 厂商账单导入对账。" },
-  { href: "/admin/reconciliation/payments", title: "用户支付明细", desc: "微信 Checkout 与订单、积分流水联查。" },
-  { href: "/admin/models/coefficients", title: "模型 / 零售系数", desc: "逐工具独立配置系数 M。" },
-  { href: "/admin/pricing-disclosure", title: "价格公示", desc: "与前台公示页共用价目表。" },
-];
-
+/** 无独立 admin 门户 hub：回主站管理后台。 */
 export default function AdminHomePage() {
-  return (
-    <FinancePageShell>
-      <h1 className="text-lg font-medium text-[#262626]">财务控制台 · 系统管理</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {cards.map((c) => (
-          <Link
-            key={c.href}
-            href={c.href}
-            className="block rounded border border-[#e8e8e8] bg-white p-4 hover:border-[#1890ff] hover:shadow-sm"
-          >
-            <div className="mb-1 text-base font-medium text-[#262626]">{c.title} →</div>
-            <div className="text-xs text-[#8c8c8c]">{c.desc}</div>
-          </Link>
-        ))}
-      </div>
-    </FinancePageShell>
-  );
+  const adminUrl = bookAdminHomeUrl();
+  if (adminUrl) redirect(adminUrl);
+  redirect("/admin/credit-expiry-ops");
 }

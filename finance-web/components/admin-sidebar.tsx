@@ -11,10 +11,8 @@ import {
   Coins,
   FileSpreadsheet,
   GitPullRequest,
-  HelpCircle,
   KeyRound,
   Layers,
-  LayoutDashboard,
   ClipboardList,
   Crown,
   ListChecks,
@@ -46,14 +44,6 @@ type NavGroup = {
 };
 
 const NAV_GROUPS: NavGroup[] = [
-  {
-    id: "start",
-    label: "入门",
-    items: [
-      { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
-      { href: "/admin/help", label: "使用说明", icon: HelpCircle, prefix: "/admin/help" },
-    ],
-  },
   {
     id: "finance-console",
     label: "财务控制台",
@@ -309,7 +299,7 @@ export function AdminSidebar() {
           </>
         )}
       </div>
-      <nav className="flex-1 space-y-3 overflow-y-auto p-2">
+      <nav className="finance-sidebar-scroll flex-1 space-y-3 overflow-y-auto p-2">
         {NAV_GROUPS.map((group) => {
           const items = viewer
             ? group.items.filter((item) => !item.show || item.show(viewer))

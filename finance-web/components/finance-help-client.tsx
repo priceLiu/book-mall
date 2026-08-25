@@ -20,8 +20,9 @@ export function FinanceHelpClient() {
       <section className={sectionCls}>
         <h2 className={h2}>一、登录与角色</h2>
         <p className={p}>
-          请先在主站 <code className="rounded bg-[#fafafa] px-1">book-mall</code> 登录，再打开本财务控制台（
-          <code className="rounded bg-[#fafafa] px-1">:3002</code>）。侧栏按角色过滤菜单：
+          财务控制台<strong>无独立门户</strong>，须先在主站{" "}
+          <code className="rounded bg-[#fafafa] px-1">book-mall</code> 登录，再从<strong>管理后台</strong>
+          或<strong>个人中心</strong>进入对应模块。侧栏按角色过滤菜单：
         </p>
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[#595959]">
           <li>
