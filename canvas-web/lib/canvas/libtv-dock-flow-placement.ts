@@ -104,6 +104,15 @@ export function useLibtvDockFlowPlacement(
   freeze = false,
 ): LibtvDockFlowPlacement | null {
   const frozenGeometryRef = useRef<NodeFlowGeometry | null>(null);
+  const defaultNodeWidth = opts?.defaultNodeWidth;
+  const defaultNodeHeight = opts?.defaultNodeHeight;
+  const storePlacementOpts = useMemo(
+    (): PlacementOpts | undefined =>
+      defaultNodeWidth != null || defaultNodeHeight != null
+        ? { defaultNodeWidth, defaultNodeHeight }
+        : undefined,
+    [defaultNodeHeight, defaultNodeWidth],
+  );
 
   const geometry = useStore(
     useCallback(
@@ -117,12 +126,12 @@ export function useLibtvDockFlowPlacement(
         const w =
           node.measured?.width ??
           (typeof node.width === "number" ? node.width : undefined) ??
-          opts?.defaultNodeWidth ??
+          defaultNodeWidth ??
           LIBTV_DOCK_FLOW_WIDTH;
         const h =
           node.measured?.height ??
           (typeof node.height === "number" ? node.height : undefined) ??
-          opts?.defaultNodeHeight ??
+          defaultNodeHeight ??
           280;
         const pos = node.internals?.positionAbsolute ?? node.position;
 
@@ -130,15 +139,15 @@ export function useLibtvDockFlowPlacement(
         frozenGeometryRef.current = next;
         return next;
       },
-      [nodeId, opts?.defaultNodeWidth, opts?.defaultNodeHeight, freeze],
+      [nodeId, defaultNodeWidth, defaultNodeHeight, freeze],
     ),
     geometryEqual,
   );
 
   const storeGeometry = useCanvasStore(
     useCallback(
-      (s) => selectStoreGeometry(s.nodes, nodeId, opts),
-      [nodeId, opts?.defaultNodeWidth, opts?.defaultNodeHeight],
+      (s) => selectStoreGeometry(s.nodes, nodeId, storePlacementOpts),
+      [nodeId, storePlacementOpts],
     ),
     geometryEqual,
   );

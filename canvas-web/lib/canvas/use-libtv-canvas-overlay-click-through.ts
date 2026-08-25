@@ -34,7 +34,8 @@ export function useLibtvCanvasOverlayClickThrough(enabled: boolean): void {
     const root = document.querySelector(".canvas-flow-wrap");
     if (!root) return;
 
-    const onPointerDownCapture = (event: PointerEvent) => {
+    const onPointerDownCapture = (event: Event) => {
+      if (!(event instanceof PointerEvent)) return;
       if (event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
