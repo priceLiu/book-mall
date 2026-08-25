@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${secret}`,
+        ...(request.headers.get("x-forwarded-for")
+          ? { "x-platform-client-ip": request.headers.get("x-forwarded-for")!.split(",")[0]!.trim() }
+          : request.headers.get("x-real-ip")
+            ? { "x-platform-client-ip": request.headers.get("x-real-ip")!.trim() }
+            : {}),
       },
       body: JSON.stringify({ phone, purpose }),
     });

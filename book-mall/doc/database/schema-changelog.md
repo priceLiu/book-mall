@@ -366,6 +366,16 @@
 
 ---
 
+## 2026-08-25 — 访问统计扫描标明 + 认证限速
+
+- **迁移目录**：`prisma/migrations/20260825040000_site_traffic_probe_views/`
+- **字段**：`SiteTrafficDaily.probeViews`、`SiteTrafficIpDaily.probeHitCount`（扫描路径仍计入 `pageViews` / `hitCount`，另计以便后台标明）。
+- **登录/短信**：门户 BFF 转发 `x-platform-client-ip`；密码登录失败按 IP/手机号限速；短信增加每 IP 10 分钟突发上限。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **逻辑**：`doc/product/26-platform-traffic-analytics.md`。
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

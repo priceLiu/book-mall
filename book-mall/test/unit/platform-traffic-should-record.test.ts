@@ -50,4 +50,23 @@ describe("shouldRecordTrafficHit", () => {
       shouldRecordTrafficHit({ method: "POST", pathname: "/", search: "", excludeAdmin: false }),
     ).toBe(false);
   });
+
+  it("still records scanner page paths so they can be labeled", () => {
+    expect(
+      shouldRecordTrafficHit({
+        method: "GET",
+        pathname: "/wp-admin",
+        search: "",
+        excludeAdmin: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRecordTrafficHit({
+        method: "GET",
+        pathname: "/.env",
+        search: "",
+        excludeAdmin: false,
+      }),
+    ).toBe(true);
+  });
 });

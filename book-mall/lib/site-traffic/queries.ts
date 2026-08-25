@@ -5,6 +5,7 @@ import {
   type PlatformTrafficAppKey,
 } from "@/lib/site-traffic/app-keys";
 import { cstDateKey, lastNCstDateKeys } from "@/lib/site-traffic/cst-date";
+import { trafficHitKind, type TrafficHitKind } from "@/lib/platform-traffic/classify-traffic-path";
 
 export type TrafficTrendDatum = { date: string; pv: number; uv: number };
 
@@ -12,13 +13,18 @@ export type TrafficAppBreakdown = {
   appKey: PlatformTrafficAppKey;
   label: string;
   pageViews: number;
+  probeViews: number;
   uniqueIps: number;
 };
+
+export type TrafficIpKind = TrafficHitKind;
 
 export type TrafficIpRow = {
   ip: string;
   appKey: string;
   hitCount: number;
+  probeHitCount: number;
+  kind: TrafficIpKind;
   firstSeenAt: string;
   lastSeenAt: string;
   userId: string | null;
@@ -30,8 +36,10 @@ export type TrafficDashboardSnapshot = {
   compareDateCst: string;
   totals: {
     pageViews: number;
+    probeViews: number;
     uniqueIps: number;
     pageViewsCompare: number;
+    probeViewsCompare: number;
     uniqueIpsCompare: number;
   };
   byApp: TrafficAppBreakdown[];
@@ -57,6 +65,21 @@ async function sumPvForDate(dateCst: string, appKey?: PlatformTrafficAppKey): Pr
   return agg._sum.pageViews ?? 0;
 }
 
+async function sumProbeForDate(dateCst: string, appKey?: PlatformTrafficAppKey): Promise<number> {
+  if (appKey) {
+    const row = await prisma.siteTrafficDaily.findUnique({
+      where: { dateCst_appKey: { dateCst, appKey } },
+      select: { probeViews: true },
+    });
+    return row?.probeViews ?? 0;
+  }
+  const agg = await prisma.siteTrafficDaily.aggregate({
+    where: { dateCst },
+    _sum: { probeViews: true },
+  });
+  return agg._sum.probeViews ?? 0;
+}
+
 async function countUvForDate(dateCst: string, appKey?: PlatformTrafficAppKey): Promise<number> {
   return prisma.siteTrafficIpDaily.count({
     where: { dateCst, ...(appKey ? { appKey } : {}) },
@@ -75,20 +98,24 @@ export async function getTrafficDashboardSnapshot(opts: {
 
   const [
     pageViews,
+    probeViews,
     uniqueIps,
     pageViewsCompare,
+    probeViewsCompare,
     uniqueIpsCompare,
     dailyRows,
     ipCountsByApp,
     trendDates,
   ] = await Promise.all([
     sumPvForDate(selectedDateCst, filterApp),
+    sumProbeForDate(selectedDateCst, filterApp),
     countUvForDate(selectedDateCst, filterApp),
     sumPvForDate(compareDateCst, filterApp),
+    sumProbeForDate(compareDateCst, filterApp),
     countUvForDate(compareDateCst, filterApp),
     prisma.siteTrafficDaily.findMany({
       where: { dateCst: selectedDateCst },
-      select: { appKey: true, pageViews: true },
+      select: { appKey: true, pageViews: true, probeViews: true },
     }),
     prisma.siteTrafficIpDaily.groupBy({
       by: ["appKey"],
@@ -99,12 +126,14 @@ export async function getTrafficDashboardSnapshot(opts: {
   ]);
 
   const pvByApp = new Map(dailyRows.map((r) => [r.appKey, r.pageViews]));
+  const probeByApp = new Map(dailyRows.map((r) => [r.appKey, r.probeViews]));
   const uvByApp = new Map(ipCountsByApp.map((r) => [r.appKey, r._count.ip]));
 
   const byApp: TrafficAppBreakdown[] = PLATFORM_TRAFFIC_APP_KEYS.map((appKey) => ({
     appKey,
     label: PLATFORM_TRAFFIC_APP_LABELS[appKey],
     pageViews: pvByApp.get(appKey) ?? 0,
+    probeViews: probeByApp.get(appKey) ?? 0,
     uniqueIps: uvByApp.get(appKey) ?? 0,
   })).filter((r) => r.pageViews > 0 || r.uniqueIps > 0);
 
@@ -159,6 +188,7 @@ export async function getTrafficDashboardSnapshot(opts: {
     select: {
       ip: true,
       hitCount: true,
+      probeHitCount: true,
       firstSeenAt: true,
       lastSeenAt: true,
       userId: true,
@@ -172,8 +202,10 @@ export async function getTrafficDashboardSnapshot(opts: {
     compareDateCst,
     totals: {
       pageViews,
+      probeViews,
       uniqueIps,
       pageViewsCompare,
+      probeViewsCompare,
       uniqueIpsCompare,
     },
     byApp,
@@ -182,6 +214,8 @@ export async function getTrafficDashboardSnapshot(opts: {
       ip: r.ip,
       appKey: r.appKey,
       hitCount: r.hitCount,
+      probeHitCount: r.probeHitCount,
+      kind: trafficHitKind(r.hitCount, r.probeHitCount),
       firstSeenAt: r.firstSeenAt.toISOString(),
       lastSeenAt: r.lastSeenAt.toISOString(),
       userId: r.userId,
@@ -191,12 +225,14 @@ export async function getTrafficDashboardSnapshot(opts: {
 
 export async function getTodayTrafficTotals(now: Date = new Date()): Promise<{
   pageViews: number;
+  probeViews: number;
   uniqueIps: number;
 }> {
   const dateCst = cstDateKey(now);
-  const [pageViews, uniqueIps] = await Promise.all([
+  const [pageViews, probeViews, uniqueIps] = await Promise.all([
     sumPvForDate(dateCst),
+    sumProbeForDate(dateCst),
     countUvForDate(dateCst),
   ]);
-  return { pageViews, uniqueIps };
+  return { pageViews, probeViews, uniqueIps };
 }

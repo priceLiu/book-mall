@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { isProbeTrafficPath } from "@/lib/platform-traffic/classify-traffic-path";
 import { parsePlatformTrafficAppKey } from "@/lib/site-traffic/app-keys";
 import { clientIpFromRequest } from "@/lib/site-traffic/client-ip";
 import { authorizeTrafficIngest } from "@/lib/site-traffic/ingest-auth";
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
       appKey,
       ip,
       userId: parsed.data.userId,
+      isProbe: isProbeTrafficPath(parsed.data.path ?? ""),
     });
   } catch (e) {
     console.error("[platform-traffic/hit]", e);

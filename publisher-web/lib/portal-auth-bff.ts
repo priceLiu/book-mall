@@ -9,6 +9,15 @@ export function portalServerSecret(): string | null {
   return s && s.length >= 16 ? s : null;
 }
 
+function applyPlatformClientIp(headers: Record<string, string>, request?: Request): void {
+  if (!request) return;
+  const xf = request.headers.get("x-forwarded-for");
+  const first = xf?.split(",")[0]?.trim();
+  const real = request.headers.get("x-real-ip")?.trim();
+  const ip = (first || real || "").slice(0, 45);
+  if (ip) headers["x-platform-client-ip"] = ip;
+}
+
 export async function forwardToBook(
   path: string,
   init: {
@@ -16,6 +25,7 @@ export async function forwardToBook(
     body: unknown;
     withServerSecret?: boolean;
     bearerToken?: string | null;
+    clientRequest?: Request;
   },
 ): Promise<
   | { ok: true; status: number; data: Record<string, unknown> }
@@ -39,6 +49,7 @@ export async function forwardToBook(
   } else if (init.bearerToken?.trim()) {
     headers.Authorization = `Bearer ${init.bearerToken.trim()}`;
   }
+  applyPlatformClientIp(headers, init.clientRequest);
   let res: Response;
   try {
     res = await fetch(`${origin}${path}`, {

@@ -3084,10 +3084,12 @@ model PlatformErrorLog {
 
 /// 全站访问统计 · 按 CST 日 + appKey 汇总 PV
 model SiteTrafficDaily {
-  id        String @id @default(cuid())
-  dateCst   String
-  appKey    String
-  pageViews Int    @default(0)
+  id         String @id @default(cuid())
+  dateCst    String
+  appKey     String
+  pageViews  Int    @default(0)
+  /// 扫描/探测路径次数（计入 pageViews，单独标明）
+  probeViews Int    @default(0)
 
   @@unique([dateCst, appKey])
   @@index([dateCst])
@@ -3095,14 +3097,16 @@ model SiteTrafficDaily {
 
 /// 全站访问统计 · 按 CST 日 + appKey + IP 明细（UV 去重来源）
 model SiteTrafficIpDaily {
-  id          String   @id @default(cuid())
-  dateCst     String
-  appKey      String
-  ip          String   @db.VarChar(45)
-  hitCount    Int      @default(1)
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
-  userId      String?
+  id            String   @id @default(cuid())
+  dateCst       String
+  appKey        String
+  ip            String   @db.VarChar(45)
+  hitCount      Int      @default(1)
+  /// 扫描/探测路径次数（计入 hitCount，单独标明）
+  probeHitCount Int      @default(0)
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  userId        String?
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 

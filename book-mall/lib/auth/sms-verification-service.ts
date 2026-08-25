@@ -16,6 +16,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { sendSmsMessage } from "@/lib/sms/send-sms";
 import { smsProvider } from "@/lib/sms/sms-config";
+import { consumeRateLimit, SMS_BURST_IP } from "@/lib/auth/auth-throttle";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 /** 团队邀请链接内验证码与 TenantInvite 同 TTL（7 天） */
@@ -98,6 +99,9 @@ export async function issueSmsCode(input: {
       where: { sendIp: input.sendIp, createdAt: { gte: dayStart } },
     });
     if (ipDayCount >= MAX_DAILY_PER_IP) {
+      throw new SmsRateLimitError("请求过于频繁，请稍后再试");
+    }
+    if (consumeRateLimit(`sms:ip:${input.sendIp}`, SMS_BURST_IP)) {
       throw new SmsRateLimitError("请求过于频繁，请稍后再试");
     }
   }

@@ -20,6 +20,7 @@ export async function POST(req: Request) {
   const result = await forwardToBook("/api/sso/client/bootstrap", {
     method: "POST",
     bearerToken: token,
+    clientRequest: req,
     body: {
       deviceType: body?.deviceType ?? "WEB",
       deviceName: body?.deviceName,

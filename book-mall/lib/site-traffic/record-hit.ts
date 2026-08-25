@@ -7,6 +7,8 @@ export type RecordTrafficHitInput = {
   ip: string;
   userId?: string | null;
   at?: Date;
+  /** 扫描/探测路径：仍计入 PV，同时累加 probe 计数 */
+  isProbe?: boolean;
 };
 
 export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<void> {
@@ -16,6 +18,7 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
   const at = input.at ?? new Date();
   const dateCst = cstDateKey(at);
   const userId = input.userId?.trim() || null;
+  const isProbe = Boolean(input.isProbe);
 
   await prisma.$transaction(async (tx) => {
     const daily = await tx.siteTrafficDaily.findUnique({
@@ -25,11 +28,19 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
     if (daily) {
       await tx.siteTrafficDaily.update({
         where: { id: daily.id },
-        data: { pageViews: { increment: 1 } },
+        data: {
+          pageViews: { increment: 1 },
+          ...(isProbe ? { probeViews: { increment: 1 } } : {}),
+        },
       });
     } else {
       await tx.siteTrafficDaily.create({
-        data: { dateCst, appKey: input.appKey, pageViews: 1 },
+        data: {
+          dateCst,
+          appKey: input.appKey,
+          pageViews: 1,
+          probeViews: isProbe ? 1 : 0,
+        },
       });
     }
 
@@ -43,6 +54,7 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
         data: {
           hitCount: { increment: 1 },
           lastSeenAt: at,
+          ...(isProbe ? { probeHitCount: { increment: 1 } } : {}),
           ...(userId && !ipRow.userId ? { userId } : {}),
         },
       });
@@ -53,6 +65,7 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
           appKey: input.appKey,
           ip,
           hitCount: 1,
+          probeHitCount: isProbe ? 1 : 0,
           firstSeenAt: at,
           lastSeenAt: at,
           userId,

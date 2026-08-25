@@ -86,8 +86,19 @@ export function AdminTrafficPanel({
             <CardTitle className="text-3xl tabular-nums">{fmt(data.totals.pageViews)}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            较昨日 {pctChange(data.totals.pageViews, data.totals.pageViewsCompare)}（
+            含扫描 · 较昨日 {pctChange(data.totals.pageViews, data.totals.pageViewsCompare)}（
             {fmt(data.totals.pageViewsCompare)}）
+          </CardContent>
+        </Card>
+        <Card className="border-[#d1d9e0]/80 bg-white/90 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardDescription>其中扫描</CardDescription>
+            <CardTitle className="text-3xl tabular-nums">{fmt(data.totals.probeViews)}</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground">
+            漏洞探测路径（仍计入 PV）· 较昨日{" "}
+            {pctChange(data.totals.probeViews, data.totals.probeViewsCompare)}（
+            {fmt(data.totals.probeViewsCompare)}）
           </CardContent>
         </Card>
         <Card className="border-[#d1d9e0]/80 bg-white/90 shadow-sm">
@@ -132,6 +143,7 @@ export function AdminTrafficPanel({
                 <tr className="border-b text-left text-[#656d76]">
                   <th className="pb-2 pr-4 font-medium">应用</th>
                   <th className="pb-2 pr-4 font-medium tabular-nums">PV</th>
+                  <th className="pb-2 pr-4 font-medium tabular-nums">扫描</th>
                   <th className="pb-2 font-medium tabular-nums">UV</th>
                 </tr>
               </thead>
@@ -147,6 +159,9 @@ export function AdminTrafficPanel({
                       </Link>
                     </td>
                     <td className="py-2 pr-4 tabular-nums">{fmt(row.pageViews)}</td>
+                    <td className="py-2 pr-4 tabular-nums text-[#656d76]">
+                      {row.probeViews > 0 ? fmt(row.probeViews) : "—"}
+                    </td>
                     <td className="py-2 tabular-nums">{fmt(row.uniqueIps)}</td>
                   </tr>
                 ))}
@@ -175,7 +190,9 @@ export function AdminTrafficPanel({
                     <th className="pb-2 pr-4 font-medium">应用</th>
                   ) : null}
                   <th className="pb-2 pr-4 font-medium">IP</th>
+                  <th className="pb-2 pr-4 font-medium">类型</th>
                   <th className="pb-2 pr-4 font-medium tabular-nums">次数</th>
+                  <th className="pb-2 pr-4 font-medium tabular-nums">扫描</th>
                   <th className="pb-2 pr-4 font-medium">首次</th>
                   <th className="pb-2 pr-4 font-medium">末次</th>
                   <th className="pb-2 font-medium">用户 ID</th>
@@ -188,7 +205,23 @@ export function AdminTrafficPanel({
                       <td className="py-2 pr-4 text-xs">{PLATFORM_TRAFFIC_APP_LABELS[row.appKey as PlatformTrafficAppKey] ?? row.appKey}</td>
                     ) : null}
                     <td className="py-2 pr-4 font-mono text-xs">{row.ip}</td>
+                    <td className="py-2 pr-4">
+                      {row.kind === "probe" ? (
+                        <span className="rounded bg-[#fff1e5] px-1.5 py-0.5 text-[11px] font-medium text-[#bc4c00]">
+                          扫描
+                        </span>
+                      ) : row.kind === "mixed" ? (
+                        <span className="rounded bg-[#ddf4ff] px-1.5 py-0.5 text-[11px] font-medium text-[#0969da]">
+                          混合
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[#656d76]">正常</span>
+                      )}
+                    </td>
                     <td className="py-2 pr-4 tabular-nums">{fmt(row.hitCount)}</td>
+                    <td className="py-2 pr-4 tabular-nums text-[#656d76]">
+                      {row.probeHitCount > 0 ? fmt(row.probeHitCount) : "—"}
+                    </td>
                     <td className="py-2 pr-4 whitespace-nowrap text-xs text-[#656d76]">
                       {new Date(row.firstSeenAt).toLocaleString("zh-CN")}
                     </td>

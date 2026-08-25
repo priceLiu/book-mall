@@ -11,19 +11,9 @@ import {
 import { withApiDbGuard } from "@/lib/http/api-db-error";
 import { prisma } from "@/lib/prisma";
 import { toolsExchangeAuthorized } from "@/lib/sso-tools-env";
+import { portalClientIpFromRequest } from "@/lib/site-traffic/client-ip";
 
 export const dynamic = "force-dynamic";
-
-const bodySchema = z.object({
-  phone: z.string().min(1),
-  purpose: z.enum(["REGISTER", "LOGIN"]),
-});
-
-function clientIp(request: Request): string | null {
-  const xf = request.headers.get("x-forwarded-for");
-  if (xf) return xf.split(",")[0]?.trim() ?? null;
-  return request.headers.get("x-real-ip");
-}
 
 /**
  * 门户 BFF 专用短信发送（Bearer TOOLS_SSO_SERVER_SECRET）。
@@ -55,7 +45,7 @@ export const POST = withApiDbGuard(async (request) => {
     const result = await issueSmsCode({
       phoneRaw: phone,
       purpose: purpose as SmsVerificationPurpose,
-      sendIp: clientIp(request),
+      sendIp: portalClientIpFromRequest(request),
     });
 
     return NextResponse.json({

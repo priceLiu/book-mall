@@ -214,8 +214,20 @@ export function AdminPlatformCockpitMetrics({ data }: { data: PlatformCockpitMet
           <KpiCard
             label="今日全站 PV"
             value={fmt(data.traffic.todayPageViews)}
+            hint={
+              data.traffic.todayProbeViews > 0
+                ? `含扫描 ${data.traffic.todayProbeViews.toLocaleString("zh-CN")}`
+                : undefined
+            }
             href="/admin/traffic"
             hrefLabel="访问统计 →"
+          />
+          <KpiCard
+            label="今日扫描 PV"
+            value={fmt(data.traffic.todayProbeViews)}
+            hint="漏洞探测路径，已计入全站 PV"
+            href="/admin/traffic"
+            hrefLabel="查看明细 →"
           />
           <KpiCard
             label="今日全站 UV"

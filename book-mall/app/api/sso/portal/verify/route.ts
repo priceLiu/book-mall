@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { toolsExchangeAuthorized } from "@/lib/sso-tools-env";
-import { verifyCredentialsLogin } from "@/lib/auth/verify-credentials";
+import { verifyLoginWithThrottle } from "@/lib/auth/login-with-throttle";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
 import { withApiDbGuard } from "@/lib/http/api-db-error";
+import { portalClientIpFromRequest } from "@/lib/site-traffic/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -34,26 +35,23 @@ export const POST = withApiDbGuard(async (req) => {
     return NextResponse.json({ error: "不支持的登录方式" }, { status: 400 });
   }
 
-  const verified = await verifyCredentialsLogin({
-    phone: body?.phone,
-    password: body?.password,
-    code: body?.code,
-    loginMode,
+  const verified = await verifyLoginWithThrottle({
+    credentials: {
+      phone: body?.phone,
+      password: body?.password,
+      code: body?.code,
+      loginMode,
+    },
+    ip: portalClientIpFromRequest(req),
   });
 
-  if (!verified) {
-    return NextResponse.json(
-      {
-        error:
-          loginMode === "password" ? "手机号或密码错误" : "手机号或验证码错误",
-      },
-      { status: 401 },
-    );
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.error }, { status: verified.status });
   }
 
   let autoLoginToken: string;
   try {
-    autoLoginToken = issueAutoLoginToken(verified.id);
+    autoLoginToken = issueAutoLoginToken(verified.user.id);
   } catch (e) {
     console.error("[portal/verify] issueAutoLoginToken", e);
     return NextResponse.json(
@@ -65,6 +63,6 @@ export const POST = withApiDbGuard(async (req) => {
   return NextResponse.json({
     ok: true,
     autoLoginToken,
-    userId: verified.id,
+    userId: verified.user.id,
   });
 });

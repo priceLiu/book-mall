@@ -63,7 +63,7 @@
 ### 计入
 
 - HTTP 方法：`GET`、`HEAD`。
-- 各应用 **页面路由**（非 API、非 Next 静态资源）。
+- 各应用 **页面路由**（非 API、非 Next 静态资源），**含**扫描器探测路径（`/wp-admin`、`/.env` 等）。
 
 ### 排除
 
@@ -78,6 +78,7 @@
 - 子应用 middleware **fire-and-forget** POST Book `POST /api/internal/platform-traffic/hit`（**含 book 主站**，避免 Edge middleware 直连 Prisma）。
 - **不阻塞**用户响应；上报失败静默忽略。
 - **IP 在 Book 服务端**从 `x-forwarded-for` / `x-real-ip` 解析（子应用转发原始头）。
+- Body `path` 用于判定是否为扫描路径；**扫描仍计入 `pageViews` / `hitCount`**，并另计 `probeViews` / `probeHitCount` 以便后台标明。
 
 ---
 
@@ -89,7 +90,8 @@
 |------|------|
 | dateCst | CST 日期字符串 |
 | appKey | 应用标识 |
-| pageViews | 当日 PV |
+| pageViews | 当日 PV（含扫描） |
+| probeViews | 其中扫描/探测路径次数 |
 
 唯一索引：`(dateCst, appKey)`。
 
@@ -98,7 +100,8 @@
 | 字段 | 说明 |
 |------|------|
 | dateCst, appKey, ip | 复合唯一 |
-| hitCount | 该 IP 当日在该应用的访问次数 |
+| hitCount | 该 IP 当日在该应用的访问次数（含扫描） |
+| probeHitCount | 其中扫描路径次数；后台据此标「扫描 / 混合 / 正常」 |
 | firstSeenAt, lastSeenAt | 首访 / 末访 |
 | userId | 可选；已登录且 middleware 可解析 session 时写入 |
 
@@ -126,10 +129,10 @@
 - **路径**：`/admin/traffic`
 - **权限**：与现有管理后台一致（`ADMIN` / `canViewFinanceCost`）。
 - **能力**：
-  - KPI：选定日全站 / 单 app 的 PV、UV；昨日对比。
+  - KPI：选定日全站 / 单 app 的 PV、**其中扫描**、UV；昨日对比。
   - 14 天 PV/UV 趋势。
-  - 按 appKey 拆分表格。
-  - 选定日与 app 的 IP Top 50（hitCount 降序）。
+  - 按 appKey 拆分表格（PV / 扫描 / UV）。
+  - 选定日与 app 的 IP Top 50（hitCount 降序，类型：正常 / 扫描 / 混合）。
 - 驾驶舱可选挂链：全站今日 PV/UV → `/admin/traffic`。
 
 ---

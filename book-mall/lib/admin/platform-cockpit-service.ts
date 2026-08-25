@@ -130,6 +130,7 @@ export type PlatformCockpitSnapshot = {
   };
   traffic: {
     todayPageViews: number;
+    todayProbeViews: number;
     todayUniqueIps: number;
   };
 };
@@ -232,7 +233,7 @@ function buildMetricsSectionFromCounts(
   now: Date,
   counts: Awaited<ReturnType<typeof fetchCockpitCountMetrics>>,
   creditTrendLedgers: Array<{ createdAt: Date; credits: number }>,
-  trafficToday: { pageViews: number; uniqueIps: number },
+  trafficToday: { pageViews: number; probeViews: number; uniqueIps: number },
   commerce: CockpitCommerceMonthKpis,
   modelUsage: CockpitModelUsageSnapshot,
 ): PlatformCockpitMetricsSection {
@@ -332,6 +333,7 @@ function buildMetricsSectionFromCounts(
     },
     traffic: {
       todayPageViews: trafficToday.pageViews,
+      todayProbeViews: trafficToday.probeViews,
       todayUniqueIps: trafficToday.uniqueIps,
     },
   };

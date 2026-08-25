@@ -14,6 +14,7 @@ const SOURCE_DIR = join(ROOT, "shared/platform-traffic");
 
 const FILES = [
   "should-record-traffic-hit.ts",
+  "classify-traffic-path.ts",
   "decode-tools-token-sub.ts",
   "book-mall-origin.ts",
   "traffic-ingest-secret.ts",

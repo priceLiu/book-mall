@@ -5,5 +5,8 @@ export const dynamic = "force-dynamic";
 
 /** 运维：确认 story-web **运行时** 是否读到 SSO 密钥（不返回明文） */
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   return NextResponse.json(ssoExchangeEnvStatus());
 }

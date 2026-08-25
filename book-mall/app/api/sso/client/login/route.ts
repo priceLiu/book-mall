@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { verifyCredentialsLogin } from "@/lib/auth/verify-credentials";
+import { verifyLoginWithThrottle } from "@/lib/auth/login-with-throttle";
 import {
   issueClientSession,
   parseClientDeviceType,
 } from "@/lib/client-device-service";
 import { withApiDbGuard } from "@/lib/http/api-db-error";
+import { clientIpFromRequest } from "@/lib/site-traffic/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -39,25 +40,22 @@ export const POST = withApiDbGuard(async (req) => {
     return NextResponse.json({ error: "不支持的登录方式" }, { status: 400 });
   }
 
-  const verified = await verifyCredentialsLogin({
-    phone: body?.phone,
-    password: body?.password,
-    code: body?.code,
-    loginMode,
+  const verified = await verifyLoginWithThrottle({
+    credentials: {
+      phone: body?.phone,
+      password: body?.password,
+      code: body?.code,
+      loginMode,
+    },
+    ip: clientIpFromRequest(req),
   });
 
-  if (!verified) {
-    return NextResponse.json(
-      {
-        error:
-          loginMode === "password" ? "手机号或密码错误" : "手机号或验证码错误",
-      },
-      { status: 401 },
-    );
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.error }, { status: verified.status });
   }
 
   const issued = await issueClientSession({
-    userId: verified.id,
+    userId: verified.user.id,
     deviceType,
     deviceName: body?.deviceName,
     userAgent: req.headers.get("user-agent"),
