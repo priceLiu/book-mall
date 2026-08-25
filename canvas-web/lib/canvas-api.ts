@@ -1206,10 +1206,19 @@ export async function uploadCanvasImage(
 }
 
 const UPLOAD_FETCH_TIMEOUT_MS = 120_000;
+const UPLOAD_VIDEO_FETCH_TIMEOUT_MS = 600_000;
+
+export async function uploadCanvasVideo(
+  base: string,
+  file: File,
+): Promise<string> {
+  return uploadCanvasFile(base, file, UPLOAD_VIDEO_FETCH_TIMEOUT_MS);
+}
 
 export async function uploadCanvasFile(
   base: string,
   file: File,
+  timeoutMs = UPLOAD_FETCH_TIMEOUT_MS,
 ): Promise<string> {
   const form = new FormData();
   form.append("file", file);
@@ -1221,7 +1230,7 @@ export async function uploadCanvasFile(
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
     () => controller.abort(),
-    UPLOAD_FETCH_TIMEOUT_MS,
+    timeoutMs,
   );
   let r: Response;
   try {

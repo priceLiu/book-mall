@@ -24,6 +24,7 @@ import {
 import {
   computeLibtvMediaNodeSize,
   loadImageNaturalSize,
+  probeLibtvMediaNaturalSize,
   resolveLibtvMediaNodeBoxSize,
 } from "./libtv-media-node-auto-fit";
 import { useCanvasStore } from "./store";
@@ -194,6 +195,39 @@ export function fitLibtvUploadedImageNaturalSize(
     });
 }
 
+/** 本地视频拖入 · 按视频 natural 尺寸调整 sbv1-video-engine 外框 */
+export function fitLibtvUploadedVideoNaturalSize(
+  nodeId: string,
+  mediaUrl: string,
+): void {
+  const url = mediaUrl.trim();
+  if (!url) return;
+  void probeLibtvMediaNaturalSize(url, "video")
+    .then(({ w, h }) => {
+      const state = useCanvasStore.getState();
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!node?.type || node.type !== "sbv1-video-engine") {
+        return;
+      }
+      if (!shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
+        return;
+      }
+      const size = computeLibtvMediaNodeSize(w, h, "sbv1-video");
+      state.applyLibtvMediaFit(nodeId, size, {
+        mediaAspectPreset: "",
+        mediaFit: true,
+        mediaFitKey: `upload|${url}|sbv1-video`,
+        mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+        mediaNaturalW: w,
+        mediaNaturalH: h,
+        manualSize: false,
+      });
+    })
+    .catch(() => {
+      /* 探测失败时保留当前尺寸 */
+    });
+}
+
 /** 经典 image 节点 · 粘贴/上传后按 natural 比例调整外框 */
 export function fitGenericImageNodeNaturalSize(
   nodeId: string,
@@ -234,10 +268,27 @@ export function maybeApplyLibtvMediaAspectPresetForNewNode(
       return;
     }
     if (node && shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
-      const url = String(
+      const blobUrl = String(
         (node.data as { blobUrl?: string }).blobUrl ?? "",
       ).trim();
-      if (url) fitLibtvUploadedImageNaturalSize(nodeId, url);
+      const videoUrl = String(
+        (
+          node.data as {
+            runtime?: { ossUrl?: string; ephemeralUrl?: string };
+          }
+        ).runtime?.ossUrl ??
+          (
+            node.data as {
+              runtime?: { ossUrl?: string; ephemeralUrl?: string };
+            }
+          ).runtime?.ephemeralUrl ??
+          "",
+      ).trim();
+      if (node.type === "sbv1-video-engine" && videoUrl) {
+        fitLibtvUploadedVideoNaturalSize(nodeId, videoUrl);
+      } else if (blobUrl) {
+        fitLibtvUploadedImageNaturalSize(nodeId, blobUrl);
+      }
       return;
     }
     applyLibtvMediaAspectPreset(nodeId);
@@ -267,13 +318,21 @@ export function useLibtvMediaAspectPresetSync(
       mediaAspectPresetSizeVersion?: number;
       mediaFitKey?: string;
       blobUrl?: string;
+      runtime?: { ossUrl?: string; ephemeralUrl?: string };
     };
 
     if (shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
       const url = String(data.blobUrl ?? "").trim();
+      const videoUrl = String(
+        data.runtime?.ossUrl ?? data.runtime?.ephemeralUrl ?? "",
+      ).trim();
       const mediaFit = (node.data as { mediaFit?: boolean }).mediaFit;
-      if (url && !mediaFit) {
-        fitLibtvUploadedImageNaturalSize(nodeId, url);
+      if (!mediaFit) {
+        if (node.type === "sbv1-video-engine" && videoUrl) {
+          fitLibtvUploadedVideoNaturalSize(nodeId, videoUrl);
+        } else if (url) {
+          fitLibtvUploadedImageNaturalSize(nodeId, url);
+        }
       }
       return;
     }

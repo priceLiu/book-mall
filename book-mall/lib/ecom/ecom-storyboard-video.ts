@@ -496,12 +496,12 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
         aspectRatio: videoAspect,
         resolution,
         durationSec,
-        modelKey: "wan3.0-video",
+        modelKey,
         media,
       });
       const created = await ecomGwCreateDashscopeJob(opts.userId, {
         kind: "video",
-        model: "wan3.0-video",
+        model: modelKey,
         body: { input, parameters },
         clientPage,
       });
@@ -694,6 +694,7 @@ async function runVolcengineVideoJob(opts: {
 async function runDashscopeWan30VideoJob(opts: {
   userId: string;
   projectId: string;
+  modelKey: string;
   prompt: string;
   firstFrameUrl: string;
   referenceImageUrls: string[];
@@ -713,12 +714,12 @@ async function runDashscopeWan30VideoJob(opts: {
     aspectRatio: opts.aspectRatio,
     resolution,
     durationSec: opts.durationSec,
-    modelKey: "wan3.0-video",
+    modelKey: opts.modelKey,
     media,
   });
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "video",
-    model: "wan3.0-video",
+    model: opts.modelKey,
     body: { input, parameters },
     clientPage,
   });

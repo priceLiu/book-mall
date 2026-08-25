@@ -72,6 +72,7 @@ export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {
 };
 
 export type Sbv1VideoEngineNodeData = {
+  label?: string;
   prompt: string;
   /** 与 prompt 同步 · 浮动 Dock 编辑用 */
   dockInput?: string;

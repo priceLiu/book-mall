@@ -421,7 +421,7 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
     pro2MediaRole?: string;
     pro2HdFromGridSplit?: boolean;
     gridSplitCrop?: unknown;
-    runtime?: { status?: string };
+    runtime?: { status?: string; ossUrl?: string; ephemeralUrl?: string };
   };
 
   if (d.pro2HdFromGridSplit || d.gridSplitCrop) return false;
@@ -431,12 +431,20 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
     return false;
   }
 
+  /** 本地上传 / 拖入：须优先于 aspectRatio（视频节点默认 16:9 不应挡住 natural fit） */
+  if (d.uploading || d.imageMode === "upload") return true;
+  if (d.blobUrl?.trim()) return true;
+  if (node.type === "sbv1-video-engine") {
+    const mediaUrl =
+      d.runtime?.ossUrl?.trim() || d.runtime?.ephemeralUrl?.trim();
+    if (mediaUrl) {
+      const rt = d.runtime?.status;
+      if (!rt || rt === "done" || rt === "idle") return true;
+    }
+  }
+
   const ar = d.aspectRatio?.trim();
   if (ar && ar !== "auto") return false;
-
-  if (d.blobUrl?.trim() || d.uploading || d.imageMode === "upload") {
-    return true;
-  }
 
   if (
     d.ossUrl?.trim() &&

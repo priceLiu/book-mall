@@ -31,6 +31,13 @@ export const VIDEO_CREATE_PATH =
  * @see https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference
  */
 export const WAN30_VIDEO_MODEL_KEY = "wan3.0-video";
+export const WAN30_VIDEO_PRIME_MODEL_KEY = "wan3.0-video-prime";
+
+/** 万相 3.0 All-in-One 视频（标准版 + 优速版），均须华北2业务空间 MAAS 域名 */
+export const DASHSCOPE_WAN30_VIDEO_MODEL_KEYS = [
+  WAN30_VIDEO_MODEL_KEY,
+  WAN30_VIDEO_PRIME_MODEL_KEY,
+] as const;
 export const WAN30_MISSING_WORKSPACE_ERROR =
   "万相 3.0 须使用华北2（北京）业务空间 API Key（sk-ws- 开头），" +
   "并走 {WorkspaceId}.cn-beijing.maas.aliyuncs.com。" +
@@ -109,7 +116,8 @@ export function resolveDashscopeBeijingMaasBaseUrl(apiKey: string): string | nul
 }
 
 export function isDashscopeWan30VideoModelKey(model: string): boolean {
-  return model.trim().toLowerCase() === WAN30_VIDEO_MODEL_KEY;
+  const k = model.trim().toLowerCase();
+  return (DASHSCOPE_WAN30_VIDEO_MODEL_KEYS as readonly string[]).includes(k);
 }
 
 /** 可灵 3.0 视频 · 与万相 3.0 相同须走华北2业务空间 MAAS 域名 */

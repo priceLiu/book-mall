@@ -26,6 +26,26 @@ describe("formatCanvasTaskError", () => {
     ).toBe("内容被安全策略拦截，请修改提示词或参考图后重试。");
   });
 
+  it("maps Bailian green net output rejection for R2V video", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        "Green net check failed for image (output): Output data may contain inappropriate content.",
+        "happyhorse-1.1-r2v",
+      ),
+    ).toContain("生成的视频未通过百炼内容安全审核");
+  });
+
+  it("maps Bailian green net input rejection", () => {
+    expect(
+      formatCanvasTaskError(
+        "DataInspectionFailed",
+        "Green net check failed for image input",
+        "happyhorse-1.1-r2v",
+      ),
+    ).toContain("参考图或提示词未通过百炼内容安全审核");
+  });
+
   it("maps auth failures to re-login hint", () => {
     expect(
       formatCanvasTaskError(

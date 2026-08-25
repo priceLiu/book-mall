@@ -51,32 +51,69 @@ describe("resolveDockRunPrompt", () => {
 });
 
 describe("resolveSbv1VideoEngineRunPrompt", () => {
-  it("inlines sbv1 text upstream @ into final prompt", () => {
-    const upstream: Pro2DockUpstreamLink[] = [
+  const upstream: Pro2DockUpstreamLink[] = [
+    {
+      id: "sbv1-text-t1",
+      kind: "text",
+      label: "文本 1",
+      previewMd: "小木和小芽去火山探险的完整脚本……",
+      sourceNodeId: "t1",
+    },
+    {
+      id: "sbv1-ref-img1",
+      kind: "image",
+      label: "图片 1",
+      previewUrl: "https://cdn.example/a.png",
+      sourceNodeId: "img1",
+    },
+    {
+      id: "sbv1-ref-img2",
+      kind: "image",
+      label: "图片 2",
+      previewUrl: "https://cdn.example/b.png",
+      sourceNodeId: "img2",
+    },
+  ];
+
+  it("inlines text @ and maps image @ to [Image N] for HappyHorse R2V", () => {
+    expect(
+      resolveSbv1VideoEngineRunPrompt(
+        "角色: 小蓝 @<sbv1-ref-img1> , 小红 @<sbv1-ref-img2>\n请根据 @<sbv1-text-t1> 生成",
+        upstream,
+        { modelKey: "happyhorse-1.1-r2v" },
+      ),
+    ).toBe(
+      "角色: 小蓝 [Image 1] , 小红 [Image 2]\n请根据 小木和小芽去火山探险的完整脚本…… 生成",
+    );
+  });
+
+  it("uses 图N tokens for wan2.7-r2v image mentions", () => {
+    expect(
+      resolveSbv1VideoEngineRunPrompt(
+        "开场 @<sbv1-ref-img1> 请根据 @<sbv1-text-t1> 生成",
+        upstream,
+        { modelKey: "wan2.7-r2v" },
+      ),
+    ).toBe(
+      "开场 图1 请根据 小木和小芽去火山探险的完整脚本…… 生成",
+    );
+  });
+
+  it("strips video @ tokens (video passed via in_motion_video edge)", () => {
+    const withVideo: Pro2DockUpstreamLink[] = [
       {
-        id: "sbv1-text-t1",
-        kind: "text",
-        label: "文本 1",
-        previewMd: "小木和小芽去火山探险的完整脚本……",
-        sourceNodeId: "t1",
+        id: "sbv1-motion-v1",
+        kind: "video",
+        label: "拖入的视频",
+        previewUrl: "https://cdn.example/poster.jpg",
+        sourceNodeId: "v1",
       },
     ];
     expect(
       resolveSbv1VideoEngineRunPrompt(
-        "开场 @<sbv1-text-t1> 请根据 @<sbv1-ref-img1> 生成",
-        [
-          ...upstream,
-          {
-            id: "sbv1-ref-img1",
-            kind: "image",
-            label: "图片 1",
-            previewUrl: "https://cdn.example/a.png",
-            sourceNodeId: "img1",
-          },
-        ],
+        "请去掉 @<sbv1-motion-v1> 右下角水印",
+        withVideo,
       ),
-    ).toBe(
-      "开场 请根据 生成\n\n小木和小芽去火山探险的完整脚本……",
-    );
+    ).toBe("请去掉 右下角水印");
   });
 });

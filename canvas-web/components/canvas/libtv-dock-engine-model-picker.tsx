@@ -17,7 +17,7 @@ import {
   useSbv1ToolbarAnchor,
 } from "./sbv1/sbv1-toolbar-anchor-popover";
 import {
-  LIBTV_DOCK_POPOVER_CLASS,
+  LIBTV_DOCK_MODEL_POPOVER_CLASS,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
   libtvDockModelItemClassName,
 } from "./libtv-dock-picker-chrome";
@@ -104,7 +104,7 @@ export function LibtvDockEngineModelPicker({
         rect={rect}
         placement={dropdownPlacement}
         estimatedHeight={360}
-        className={LIBTV_DOCK_POPOVER_CLASS}
+        className={LIBTV_DOCK_MODEL_POPOVER_CLASS}
       >
         <p className="px-3 pb-1.5 pt-0.5 text-[13px] font-medium text-white/75">
           选择模型

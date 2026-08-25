@@ -295,7 +295,7 @@ export async function ecomSubmitSeedVideoDirectJob(opts: {
 
     const created = await ecomGwCreateDashscopeJob(opts.userId, {
       kind: "video",
-      model: isDashscopeWan30VideoModel(modelKey) ? "wan3.0-video" : modelKey,
+      model: modelKey,
       body: { input, parameters },
       clientPage,
     });

@@ -21,10 +21,15 @@ export const STORYBOARD_KLING30_VIDEO_MODELS = [
 export const STORYBOARD_BAILIAN_R2V_VIDEO_MODELS = BAILIAN_R2V_MODEL_IDS;
 
 /** 万相 3.0 All-in-One（DashScope · 文生/图生/参考生） */
-export const STORYBOARD_WAN30_VIDEO_MODELS = ["wan3.0-video"] as const;
+export const STORYBOARD_WAN30_VIDEO_MODELS = [
+  "wan3.0-video",
+  "wan3.0-video-prime",
+] as const;
 
 export function isStoryboardWan30VideoModel(modelKey: string): boolean {
-  return modelKey.trim() === "wan3.0-video";
+  return (STORYBOARD_WAN30_VIDEO_MODELS as readonly string[]).includes(
+    modelKey.trim(),
+  );
 }
 
 export function isStoryboardKling30VideoModel(modelKey: string): boolean {
@@ -101,7 +106,7 @@ export function resolveStoryboardVideoProvider(
 export function resolveStoryboardVideoModel(modelKey?: string): string {
   const k = modelKey?.trim() ?? "";
   if ((STORYBOARD_VIDEO_MODELS as readonly string[]).includes(k)) return k;
-  if (isStoryboardWan30VideoModel(k)) return "wan3.0-video";
+  if (isStoryboardWan30VideoModel(k)) return k;
   if (isStoryboardKling30VideoModel(k)) return "kling-3.0/video";
   if (isStoryboardKieVideoModel(k)) return "bytedance/seedance-2";
   if (isStoryboardBailianR2vVideoModel(k)) return k;

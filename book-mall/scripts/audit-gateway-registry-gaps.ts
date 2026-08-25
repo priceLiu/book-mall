@@ -34,6 +34,7 @@ const EXTRA_INVOKE_MODEL_KEYS = [
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
   "wan3.0-video",
+  "wan3.0-video-prime",
   "wan2.5-i2v-preview",
   "wan2.5-t2v-preview",
   "pixverse-c1-it2v",

@@ -23,13 +23,14 @@ import {
   defaultSbv1DockInputModeForModel,
   dockInputModeToPatch,
   getSbv1VideoModelRefCaps,
+  isSbv1Wan30VideoModel,
   resolveSbv1VideoModelRefLinkBlock,
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { getSbv1VideoModelTypeLabels } from "@/lib/canvas/story-model-capabilities";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
 import {
-  LIBTV_DOCK_POPOVER_CLASS,
+  LIBTV_DOCK_MODEL_POPOVER_CLASS,
   LIBTV_DOCK_PARAMS_POPOVER_CLASS,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
   libtvDockModelItemClassName,
@@ -107,7 +108,7 @@ function useSbv1VideoSettingsDerived(data: Sbv1VideoEngineNodeData) {
   );
   const effectiveDurationSec = useMemo(() => {
     if (smartMulti) return 0;
-    const maxDur = modelKey === "wan3.0-video" ? 30 : 15;
+    const maxDur = isSbv1Wan30VideoModel(modelKey) ? 30 : 15;
     const fromParams = Number(engineParams.duration);
     if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       return fromParams;
@@ -188,7 +189,7 @@ function patchVideoSettings(
   if (smartMulti) {
     effectiveDurationSec = 0;
   } else {
-    const maxDur = modelKey === "wan3.0-video" ? 30 : 15;
+    const maxDur = isSbv1Wan30VideoModel(modelKey) ? 30 : 15;
     const fromParams = Number(engineParams.duration);
     if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       effectiveDurationSec = fromParams;
@@ -322,7 +323,7 @@ export function Sbv1VideoDockModelPicker({
         rect={rect}
         placement="auto"
         estimatedHeight={280}
-        className={LIBTV_DOCK_POPOVER_CLASS}
+        className={LIBTV_DOCK_MODEL_POPOVER_CLASS}
       >
         <p className="px-3 pb-1.5 pt-0.5 text-[13px] font-medium text-white/75">
           选择模型

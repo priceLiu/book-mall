@@ -1,6 +1,9 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
-import type { ImageEngineNodeData, ImageNodeData } from "./types";
-import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import type { CanvasNodeRuntime, ImageEngineNodeData, ImageNodeData } from "./types";
+import {
+  pickRuntimeImagePreviewUrl,
+  pickRuntimeVideoUrl,
+} from "./task-media-url";
 
 export type Sbv1UpstreamRefLink = {
   id: string;
@@ -125,6 +128,55 @@ export function resolveSbv1UpstreamRefLinks(
         pushImage(child, edge.id);
       }
     }
+  }
+  return links;
+}
+
+/** 视频节点 runtime · Dock 缩略图（优先 poster，其次成片 URL） */
+export function pickVideoNodeDockPreviewUrl(
+  node: Pick<CanvasFlowNode, "data">,
+): string | undefined {
+  const d = node.data as {
+    runtime?: Pick<CanvasNodeRuntime, "posterUrl" | "ossUrl" | "ephemeralUrl">;
+    label?: string;
+  };
+  const poster = d.runtime?.posterUrl?.trim();
+  if (poster) return poster;
+  return (
+    pickRuntimeVideoUrl(d.runtime) ??
+    d.runtime?.ossUrl?.trim() ??
+    d.runtime?.ephemeralUrl?.trim() ??
+    undefined
+  );
+}
+
+/**
+ * sbv1-video-engine · in_motion_video 入边（视频 → 视频 / 动作参考）
+ * 与 HD 动作控制共用同一 handle，普通文生视频 Dock 也展示上游缩略图。
+ */
+export function resolveSbv1UpstreamMotionVideoLinks(
+  engineNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): Sbv1UpstreamRefLink[] {
+  const links: Sbv1UpstreamRefLink[] = [];
+  for (const e of edges) {
+    if (e.target !== engineNodeId || e.targetHandle !== "in_motion_video") {
+      continue;
+    }
+    const src = nodes.find((n) => n.id === e.source);
+    if (!src || src.type !== "sbv1-video-engine") continue;
+    const label =
+      (src.data as { label?: string }).label?.trim() ||
+      `视频 ${links.length + 1}`;
+    links.push({
+      id: `sbv1-motion-${src.id}`,
+      index: links.length + 1,
+      label,
+      previewUrl: pickVideoNodeDockPreviewUrl(src),
+      sourceNodeId: src.id,
+      edgeId: e.id,
+    });
   }
   return links;
 }

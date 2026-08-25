@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { LibtvGridSplitCropSprite } from "@/components/canvas/libtv-grid-split-crop-sprite";
 import type { MentionableItem } from "./MentionsTextarea";
+import { mentionPreviewShouldUseVideo } from "@/lib/canvas/mention-preview-media";
 
 const PREVIEW_W = 360;
 const PREVIEW_IMAGE_H = 360;
@@ -75,9 +76,7 @@ export function MentionHoverPreviewPortal({
     return null;
   }
 
-  const isVideo =
-    !item.gridSplitCrop &&
-    /\.(mp4|webm|mov)(\?|$)/i.test(item.previewUrl);
+  const isVideo = !item.gridSplitCrop && mentionPreviewShouldUseVideo(item);
   const { left, top } = computePreviewPosition(
     anchorRect,
     PREVIEW_W,

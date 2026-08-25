@@ -91,6 +91,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pro2MediaRole?: string;
     pro2ControllerNodeId?: string;
     label?: string;
+    mediaFit?: boolean;
+    mediaFitKey?: string;
   };
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const isPro2VideoBoardCell =
@@ -190,9 +192,16 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??
     undefined;
   const hasVideo = Boolean(videoUrl);
+  const isUploadNaturalFit = Boolean(
+    d.mediaFit &&
+      d.mediaFitKey?.startsWith("upload|") &&
+      (d.runtime?.ephemeralUrl?.trim() || d.runtime?.ossUrl?.trim()),
+  );
   const stageVideoFit: "cover" | "contain" = isPro2VideoBoardCell
     ? "cover"
-    : "contain";
+    : isUploadNaturalFit
+      ? "cover"
+      : "contain";
   const stageVideoFitClass =
     stageVideoFit === "cover" ? "object-cover" : "object-contain";
 
@@ -622,7 +631,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             edition: nodeEdition,
           })}
         >
-          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="nodrag relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Video className="size-3.5 shrink-0 text-white/70" />
               <LibtvEditableNodeTitle

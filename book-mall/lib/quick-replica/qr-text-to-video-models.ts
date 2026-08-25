@@ -78,6 +78,13 @@ export const QR_TEXT_TO_VIDEO_MODELS: QrTextToVideoModelDef[] = [
     maxRefImages: 10,
     paramProfile: "wan_t2v",
   },
+  {
+    modelKey: "wan3.0-video-prime",
+    label: "万相 3.0 优速版",
+    subtitle: "更快生成 · 文生 / 图生 / 参考生视频 · 最长 30s",
+    maxRefImages: 10,
+    paramProfile: "wan_t2v",
+  },
 ];
 
 export const QR_DEFAULT_TEXT_TO_VIDEO_MODEL_KEY = "grok-imagine/image-to-video";

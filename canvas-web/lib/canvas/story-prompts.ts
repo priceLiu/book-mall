@@ -269,6 +269,7 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "grok-imagine/image-to-video",
   "grok-imagine-video-1-5-preview",
   "wan3.0-video",
+  "wan3.0-video-prime",
   "MiniMax/MiniMax-H3-t2v",
   "MiniMax/MiniMax-H3-i2v",
   "MiniMax/MiniMax-H3-fl2v",
@@ -297,6 +298,7 @@ export const STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS = [
   "wan2.6-r2v",
   "wan2.6-r2v-flash",
   "wan3.0-video",
+  "wan3.0-video-prime",
 ] as const;
 
 /** 影视专业版 · 火山方舟 Seedance 图生视频（Gateway · VOLCENGINE） */

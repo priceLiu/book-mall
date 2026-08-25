@@ -46,6 +46,14 @@ describe("routeGatewayModel · 百炼 R2V", () => {
     expect(isBailianR2vGatewayModel("wan3.0-video")).toBe(false);
   });
 
+  it("wan3.0-video-prime 走 DASHSCOPE 视频（非百炼 R2V）", () => {
+    expect(routeGatewayModel("wan3.0-video-prime")).toEqual({
+      providerKind: "DASHSCOPE",
+      requestKind: "VIDEO",
+    });
+    expect(isBailianR2vGatewayModel("wan3.0-video-prime")).toBe(false);
+  });
+
   it("happyhorse-1.1-r2v 走 BAILIAN", () => {
     expect(routeGatewayModel("happyhorse-1.1-r2v")).toEqual({
       providerKind: "BAILIAN",

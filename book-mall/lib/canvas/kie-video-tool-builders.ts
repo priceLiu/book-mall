@@ -5,6 +5,7 @@ import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volce
 import {
   buildDashscopeSbv1T2vVideoBody,
   buildDashscopeWan30Media,
+  isDashscopeWan30VideoModel,
 } from "@/lib/canvas/dashscope-sbv1-t2v";
 import {
   buildDashscopeKlingV3VideoBody,
@@ -260,7 +261,7 @@ export function buildQrTextToVideoCreateArgs(args: {
     });
   }
 
-  if (model === "wan3.0-video") {
+  if (isDashscopeWan30VideoModel(model)) {
     const media = buildDashscopeWan30Media({
       firstFrameUrl: imageUrls[0],
       lastFrameUrl: imageUrls.length >= 2 ? imageUrls[1] : undefined,
@@ -271,10 +272,10 @@ export function buildQrTextToVideoCreateArgs(args: {
       aspectRatio: args.aspectRatio ?? "16:9",
       resolution: args.resolution ?? "720P",
       durationSec: args.duration ?? 15,
-      modelKey: "wan3.0-video",
+      modelKey: model,
       media,
     });
-    return { model: "wan3.0-video", input: body };
+    return { model, input: body };
   }
 
   if (model === "wan/2-7-text-to-video") {

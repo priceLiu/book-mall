@@ -233,7 +233,7 @@ export async function runSbv1VideoEngineNode(
     (isDashscopeT2v && hasReferenceImages)
   ) {
     params.ratio = aspectRatio;
-    if (modelKey === "wan3.0-video") {
+  if (modelKey === "wan3.0-video" || modelKey === "wan3.0-video-prime") {
       params.resolution = /^480p$/i.test(resolution)
         ? "480P"
         : /^1080p$/i.test(resolution)

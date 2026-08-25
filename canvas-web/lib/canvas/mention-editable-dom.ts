@@ -3,6 +3,7 @@ import {
   INLINE_MENTION_BADGE_GAP_PX,
   INLINE_MENTION_THUMB_PX,
 } from "@/lib/canvas/mention-inline-thumb-metrics";
+import { createMentionPreviewThumbEl } from "@/lib/canvas/mention-preview-media";
 import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
 
 /** 存储字符串里的 mention token：@<nodeId> */
@@ -64,15 +65,9 @@ export function createMentionBadge(
   badge.style.verticalAlign = "middle";
 
   if (item?.previewUrl) {
-    const img = document.createElement("img");
-    img.src = item.previewUrl;
-    img.alt = "";
-    img.draggable = false;
-    img.referrerPolicy = "no-referrer";
-    img.className = "shrink-0 rounded-[4px] object-cover";
-    img.style.width = `${INLINE_MENTION_THUMB_PX}px`;
-    img.style.height = `${INLINE_MENTION_THUMB_PX}px`;
-    badge.appendChild(img);
+    badge.appendChild(
+      createMentionPreviewThumbEl(item, INLINE_MENTION_THUMB_PX),
+    );
   }
 
   const label = document.createElement("span");

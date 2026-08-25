@@ -73,8 +73,13 @@ import { pro2NodeAbsolutePosition } from "@/lib/canvas/pro2-selection-bbox";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
-import { fitLibtvUploadedImageNaturalSize } from "@/lib/canvas/libtv-media-aspect-preset-apply";
-import { fitGenericImageNodeNaturalSize } from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { scheduleCanvasVideoUpload, canvasVideoPreviewLabel } from "@/lib/canvas/canvas-video-preview-upload";
+import {
+  fitGenericImageNodeNaturalSize,
+  fitLibtvUploadedImageNaturalSize,
+  fitLibtvUploadedVideoNaturalSize,
+} from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { buildSbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-spawn-nodes";
 import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
@@ -124,6 +129,7 @@ import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import {
   allImageFilesFromDataTransfer,
+  allVideoFilesFromDataTransfer,
   resolveClipboardImageFiles,
   isEditablePasteTarget,
   getLastPointerClient,
@@ -1246,6 +1252,52 @@ function FlowCanvasInner({
     [addNode, base, updateNodeData, pro2FloatingInspector, sbv1Canvas],
   );
 
+  /** 上传本地视频并在指定位置创建 sbv1-video-engine 节点（LibTV 画布）。 */
+  const ingestVideoFile = useCallback(
+    (
+      file: File,
+      position: { x: number; y: number },
+      labelOverride?: string,
+    ) => {
+      if (!libtvCanvas) {
+        canvasNotify({
+          title: "无法添加视频",
+          message: "本地视频拖入仅支持分镜视频 / 影视专业版画布",
+          variant: "info",
+        });
+        return null;
+      }
+      const blobUrl = URL.createObjectURL(file);
+      const id = addNode(
+        "sbv1-video-engine",
+        position,
+        buildSbv1VideoEngineNodeData({
+          label: labelOverride ?? canvasVideoPreviewLabel(file),
+          aspectRatio: "auto",
+          uploading: true,
+          runtime: { ephemeralUrl: blobUrl },
+        }),
+      );
+      scheduleCanvasVideoUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+        onUploadError: (message) => {
+          canvasNotify({
+            title: "视频上传失败",
+            message,
+            variant: "error",
+          });
+        },
+      });
+      queueMicrotask(() => fitLibtvUploadedVideoNaturalSize(id, blobUrl));
+      return id;
+    },
+    [addNode, base, libtvCanvas, updateNodeData],
+  );
+
   const liftGroupChildrenExtent = useCallback(
     (draggedNodeId: string) => {
       setRfNodes((prev) => {
@@ -1816,17 +1868,33 @@ function FlowCanvasInner({
       }
 
       const palette = event.dataTransfer.getData("application/canvas-node-type");
+      const droppedVideos = allVideoFilesFromDataTransfer(event.dataTransfer);
       const droppedImages = allImageFilesFromDataTransfer(event.dataTransfer);
-      if (!palette && droppedImages.length > 0) {
+      if (!palette && (droppedImages.length > 0 || droppedVideos.length > 0)) {
         event.preventDefault();
         const position = screenToFlowPosition({
           x: event.clientX,
           y: event.clientY,
         });
+        let offset = 0;
+        droppedVideos.forEach((f) => {
+          ingestVideoFile(
+            f,
+            {
+              x: position.x + offset * 28,
+              y: position.y + offset * 28,
+            },
+            droppedVideos.length === 1 ? "拖入的视频" : `拖入视频 ${offset + 1}`,
+          );
+          offset += 1;
+        });
         droppedImages.forEach((f, i) => {
           ingestImageFile(
             f,
-            { x: position.x + i * 28, y: position.y + i * 28 },
+            {
+              x: position.x + (offset + i) * 28,
+              y: position.y + (offset + i) * 28,
+            },
             droppedImages.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
           );
         });
@@ -1858,15 +1926,25 @@ function FlowCanvasInner({
       }
 
       const files = allImageFilesFromDataTransfer(event.dataTransfer);
+      const videos = allVideoFilesFromDataTransfer(event.dataTransfer);
+      let offset = 0;
+      videos.forEach((f) => {
+        ingestVideoFile(
+          f,
+          { x: position.x + offset * 28, y: position.y + offset * 28 },
+          videos.length === 1 ? "拖入的视频" : `拖入视频 ${offset + 1}`,
+        );
+        offset += 1;
+      });
       files.forEach((f, i) => {
         ingestImageFile(
           f,
-          { x: position.x + i * 28, y: position.y + i * 28 },
+          { x: position.x + (offset + i) * 28, y: position.y + (offset + i) * 28 },
           files.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
         );
       });
     },
-    [addNode, ingestImageFile, screenToFlowPosition],
+    [addNode, ingestImageFile, ingestVideoFile, screenToFlowPosition],
   );
 
   // ── 复制 / 剪切 / 粘贴：节点 + 图片
@@ -1988,12 +2066,48 @@ function FlowCanvasInner({
       // 服务端 sharp 统一处理）。提前 canvas 重编码会丢色彩配置导致变暗、并多一次有损往返。
       // 预览用的规范化由 ingestImageFile / onFile 各自完成。
       let imageFiles = allImageFilesFromDataTransfer(dt);
+      const videoFiles = allVideoFilesFromDataTransfer(dt);
       if (!imageFiles.length) {
         imageFiles = await resolveClipboardImageFiles(dt);
       }
 
       // 文本输入中（含 Dock 粘贴区 contenteditable）不抢图片粘贴，避免粘贴文案时误生图节点
       if (isEditablePasteTarget(event.target)) {
+        return;
+      }
+
+      if (videoFiles.length > 0 && libtvCanvas) {
+        event.preventDefault();
+        const ptr = getLastPointerClient();
+        const wrap = wrapRef.current;
+        const rect = wrap?.getBoundingClientRect?.();
+        const pointerInWrap = Boolean(
+          rect &&
+            ptr.x >= rect.left &&
+            ptr.x <= rect.right &&
+            ptr.y >= rect.top &&
+            ptr.y <= rect.bottom,
+        );
+        const clientX = pointerInWrap
+          ? ptr.x
+          : rect
+            ? rect.left + rect.width / 2
+            : 0;
+        const clientY = pointerInWrap
+          ? ptr.y
+          : rect
+            ? rect.top + rect.height / 2
+            : 0;
+        const center = rect
+          ? screenToFlowPosition({ x: clientX, y: clientY })
+          : { x: 240, y: 160 };
+        videoFiles.forEach((f, i) => {
+          ingestVideoFile(
+            f,
+            { x: center.x + i * 28, y: center.y + i * 28 },
+            videoFiles.length === 1 ? "粘贴的视频" : `粘贴视频 ${i + 1}`,
+          );
+        });
         return;
       }
 
@@ -2056,7 +2170,7 @@ function FlowCanvasInner({
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [ingestImageFile, pasteFromClipboard, screenToFlowPosition]);
+  }, [ingestImageFile, ingestVideoFile, libtvCanvas, pasteFromClipboard, screenToFlowPosition]);
 
   /** Cmd+C / Cmd+X：选中节点入剪贴板。 */
   useEffect(() => {

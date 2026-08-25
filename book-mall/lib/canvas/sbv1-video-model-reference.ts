@@ -54,6 +54,7 @@ const DASHSCOPE_T2V_KEYS = new Set([
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
   "wan3.0-video",
+  "wan3.0-video-prime",
   "happyhorse-1.0-t2v",
   "happyhorse-1.1-t2v",
 ]);
@@ -150,7 +151,7 @@ export function getSbv1VideoModelRefCaps(
     };
   }
 
-  if (k === "wan3.0-video") {
+  if (k === "wan3.0-video" || k === "wan3.0-video-prime") {
     return {
       supportedModes: ["omni", "first_last"],
       refApi: "bailian_r2v_media",

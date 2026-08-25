@@ -40,6 +40,7 @@ import type {
 import {
   clampSbv1ReferenceMode,
   getSbv1VideoModelRefCaps,
+  isSbv1Wan30VideoModel,
 } from "@/lib/canvas/sbv1-video-model-reference";
 import {
   isSbv1MotionControlModelKey,
@@ -80,6 +81,7 @@ const SBV1_DOCK_EXTRA_VIDEO_MODEL_KEYS = [
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan3.0-video",
+  "wan3.0-video-prime",
   ...STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS,
 ] as const;
 
@@ -267,7 +269,7 @@ export function Sbv1VideoGenerateSettingsModal({
 
   const effectiveDurationSec = useMemo(() => {
     if (smartMulti) return 0;
-    const maxDur = modelKey === "wan3.0-video" ? 30 : 15;
+    const maxDur = isSbv1Wan30VideoModel(modelKey) ? 30 : 15;
     const fromParams = Number(engineParams.duration);
     if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       return fromParams;
@@ -695,7 +697,7 @@ export function sbv1VideoSettingsTriggerLabel(
 ): string {
   const engineKey = data.engine?.modelKey?.trim();
   const smartMulti = data.referenceMode === "smart_multi";
-  const maxDur = engineKey === "wan3.0-video" ? 30 : 15;
+  const maxDur = isSbv1Wan30VideoModel(engineKey) ? 30 : 15;
   const durationLabel =
     !smartMulti && data.durationSec >= 3 && data.durationSec <= maxDur
       ? ` · ${data.durationSec}s`

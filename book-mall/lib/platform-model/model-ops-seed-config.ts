@@ -86,6 +86,7 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "wan2.6-r2v",
     "wan2.6-r2v-flash",
     "wan3.0-video",
+    "wan3.0-video-prime",
   ],
   "sbv1-image": [
     "qwen-image-3.0-pro",
@@ -120,6 +121,7 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "wan2.6-t2v",
     "wan2.7-t2v",
     "wan3.0-video",
+    "wan3.0-video-prime",
     "kling-2.6/motion-control",
     "kling-3.0/motion-control",
     "MiniMax/MiniMax-H3-t2v",
@@ -194,6 +196,7 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "wan2.6-r2v",
     "wan2.6-r2v-flash",
     "wan3.0-video",
+    "wan3.0-video-prime",
     "MiniMax/MiniMax-H3-t2v",
     "MiniMax/MiniMax-H3-i2v",
     "MiniMax/MiniMax-H3-fl2v",

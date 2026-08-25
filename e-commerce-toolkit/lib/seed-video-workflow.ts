@@ -1243,12 +1243,13 @@ export function filterVideoModelsForMode(
   modelKeys: string[],
   direct: boolean,
 ): string[] {
-  const wan30 = "wan3.0-video";
+  const wan30Keys = new Set(["wan3.0-video", "wan3.0-video-prime"]);
+  const isWan30 = (k: string) => wan30Keys.has(k);
   if (direct) {
     // 方案①整图成片：种草素材须走 R2V；同时保留 wan3.0 t2v / Seedance 备选
     return modelKeys.filter(
       (k) =>
-        k === wan30 ||
+        isWan30(k) ||
         k.includes("seedance") ||
         k.includes("t2v") ||
         k.includes("r2v") ||
@@ -1257,7 +1258,7 @@ export function filterVideoModelsForMode(
   }
   return modelKeys.filter(
     (k) =>
-      k !== wan30 &&
+      !isWan30(k) &&
       (k.includes("r2v") ||
         k.includes("i2v") ||
         k.includes("kling") ||

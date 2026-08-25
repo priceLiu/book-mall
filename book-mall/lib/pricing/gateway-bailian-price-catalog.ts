@@ -98,6 +98,7 @@ export const GATEWAY_ALI_PRICE_BY_MODEL_KEY: Record<string, GatewayAliPriceSpec>
 
   // —— 万相 3.0 ——
   "wan3.0-video": { kind: "video", yuanPerSecondByTier: { "480P": 0.3, "720P": 0.6, "1080P": 1.2 }, section: "万相3.0-视频生成" },
+  "wan3.0-video-prime": { kind: "video", yuanPerSecondByTier: { "480P": 0.45, "720P": 0.9, "1080P": 1.8 }, section: "万相3.0-视频生成" },
 
   // —— 万相 2.2 数字人 ——
   "wan2.2-s2v": { kind: "video", yuanPerSecondByTier: { "480P": 0.5, "720P": 0.9 }, section: "万相-数字人" },

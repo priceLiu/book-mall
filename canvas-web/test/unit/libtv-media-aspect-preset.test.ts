@@ -199,5 +199,23 @@ describe("libtv-media-aspect-preset", () => {
         data: { aspectRatio: "16:9" },
       }),
     ).toBe(false);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "sbv1-video-engine",
+        data: {
+          uploading: true,
+          aspectRatio: "16:9",
+          runtime: { ephemeralUrl: "blob:video" },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "sbv1-video-engine",
+        data: {
+          runtime: { status: "done", ossUrl: "https://cdn.example/v.mp4" },
+        },
+      }),
+    ).toBe(true);
   });
 });

@@ -1,6 +1,15 @@
 import { useEffect, useRef, type DragEventHandler } from "react";
 
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
+const VIDEO_EXT = /\.(mp4|webm|mov|mkv|avi)$/i;
+
+const CLIPBOARD_VIDEO_TYPES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+]);
 
 const CLIPBOARD_IMAGE_TYPES = new Set([
   "public.png",
@@ -20,8 +29,22 @@ function isImageClipboardItemType(type: string): boolean {
   return CLIPBOARD_IMAGE_TYPES.has(t);
 }
 
+function isVideoClipboardItemType(type: string): boolean {
+  const t = type.toLowerCase();
+  if (t.startsWith("video/")) return true;
+  return CLIPBOARD_VIDEO_TYPES.has(t);
+}
+
+function isClipboardVideoFile(file: File): boolean {
+  if (file.size <= 0) return false;
+  if (file.type.startsWith("video/")) return true;
+  if (!file.type && VIDEO_EXT.test(file.name)) return true;
+  return false;
+}
+
 function isClipboardImageFile(file: File): boolean {
   if (file.size <= 0) return false;
+  if (isClipboardVideoFile(file)) return false;
   if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
     return true;
   }
@@ -29,6 +52,36 @@ function isClipboardImageFile(file: File): boolean {
   /** Windows 截图/部分浏览器粘贴：type 为空但仍是有效位图 */
   if (!file.type && file.size > 0) return true;
   return false;
+}
+
+/** 从剪贴板或拖放 DataTransfer 中取全部视频文件 */
+export function allVideoFilesFromDataTransfer(
+  dt: DataTransfer | null | undefined,
+): File[] {
+  if (!dt) return [];
+  const out: File[] = [];
+  const seen = new Set<string>();
+  const push = (f: File | null) => {
+    if (!f || !isClipboardVideoFile(f)) return;
+    const key = `${f.size}:${f.lastModified}:${f.type || "unknown"}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(f);
+  };
+  const fromFiles = Array.from(dt.files).filter(isClipboardVideoFile);
+  if (fromFiles.length > 0) {
+    for (const f of fromFiles) push(f);
+    return out;
+  }
+  if (dt.items) {
+    for (const item of Array.from(dt.items)) {
+      if (item.kind !== "file") continue;
+      const type = item.type ?? "";
+      if (!isVideoClipboardItemType(type) && type !== "") continue;
+      push(item.getAsFile());
+    }
+  }
+  return out;
 }
 
 /** 从剪贴板或拖放 DataTransfer 中取全部图片文件 */

@@ -200,14 +200,40 @@ function isContentSafetyRejection(blob: string): boolean {
     blob.includes("appear to be unsafe") ||
     blob.includes("generated images appear") ||
     blob.includes("image may contain") ||
+    blob.includes("inappropriate content") ||
+    blob.includes("datainspectionfailed") ||
+    blob.includes("green net") ||
     blob.includes("moderation") ||
     blob.includes("安全") ||
     blob.includes("违规")
   );
 }
 
-function contentSafetyRejectionMessage(): string {
-  return "内容被安全策略拦截，请修改提示词或参考图后重试。";
+/** 百炼 DashScope 绿网 · 区分输入审核 vs 成片输出审核 */
+function dashscopeGreenNetMessage(raw: string): string | null {
+  const blob = raw.toLowerCase();
+  if (
+    !blob.includes("green net") &&
+    !blob.includes("datainspectionfailed") &&
+    !blob.includes("inappropriate content")
+  ) {
+    return null;
+  }
+  if (blob.includes("(output)") || blob.includes("output data")) {
+    return "生成的视频未通过百炼内容安全审核（绿网）。请调整提示词、参考图或镜头/动作描述后重试；儿童角色类参考图偶发误拦，可换参考图或简化描述。";
+  }
+  if (
+    blob.includes("(input)") ||
+    blob.includes("image input") ||
+    blob.includes("image (input)")
+  ) {
+    return "参考图或提示词未通过百炼内容安全审核（绿网）。请更换参考图或修改描述后重试。";
+  }
+  return "内容未通过百炼内容安全审核（绿网）。请修改提示词或参考图后重试。";
+}
+
+function contentSafetyRejectionMessage(raw?: string): string {
+  return dashscopeGreenNetMessage(raw ?? "") ?? "内容被安全策略拦截，请修改提示词或参考图后重试。";
 }
 
 function networkFailureMessage(modelKey?: string | null): string {
@@ -294,7 +320,7 @@ export function formatCanvasTaskError(
   }
 
   if (isContentSafetyRejection(blob)) {
-    return contentSafetyRejectionMessage();
+    return contentSafetyRejectionMessage(msg || failMessage || "");
   }
 
   if (

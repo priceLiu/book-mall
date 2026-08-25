@@ -28,8 +28,24 @@ describe("wan3.0-video Gateway All-in-One", () => {
     ]);
   });
 
+  it("registers wan3.0-video-prime on the canonical registry", () => {
+    const def = GATEWAY_CANONICAL_REGISTRY.find(
+      (c) => c.canonicalModelKey === "wan3.0-video-prime",
+    );
+    expect(def).toBeDefined();
+    expect(def?.role).toBe("VIDEO");
+    expect(def?.description).toMatch(/优速版/);
+    expect(def?.routes).toEqual([
+      { vendor: "aliyun", modelKey: "wan3.0-video-prime", providerKind: "DASHSCOPE" },
+    ]);
+  });
+
   it("routes to DashScope video (not Bailian R2V)", () => {
     expect(routeGatewayModel("wan3.0-video")).toEqual({
+      providerKind: "DASHSCOPE",
+      requestKind: "VIDEO",
+    });
+    expect(routeGatewayModel("wan3.0-video-prime")).toEqual({
       providerKind: "DASHSCOPE",
       requestKind: "VIDEO",
     });
@@ -45,20 +61,33 @@ describe("wan3.0-video Gateway All-in-One", () => {
         modelKey: "wan3.0-video",
       }),
     ).toEqual(["image-to-video"]);
+    expect(
+      marketTaskTagsForModel({
+        canonicalKey: "wan3.0-video-prime",
+        mediaKind: "IMAGE_TO_VIDEO",
+        requestKind: "VIDEO",
+        role: "VIDEO",
+        modelKey: "wan3.0-video-prime",
+      }),
+    ).toEqual(["image-to-video"]);
   });
 
   it("is on canvas / ecom / QuickReplica scene shelves", () => {
-    expect(CANVAS_SCENE_MODEL_KEYS["pro2-video"]).toContain("wan3.0-video");
-    expect(CANVAS_SCENE_MODEL_KEYS["sbv1-video"]).toContain("wan3.0-video");
-    expect(ECOM_SCENE_MODEL_KEYS["ecom-storyboard-video"]).toContain("wan3.0-video");
-    expect(QUICK_REPLICA_SCENE_MODEL_KEYS["qr-t2v"]).toContain("wan3.0-video");
+    for (const key of ["wan3.0-video", "wan3.0-video-prime"] as const) {
+      expect(CANVAS_SCENE_MODEL_KEYS["pro2-video"]).toContain(key);
+      expect(CANVAS_SCENE_MODEL_KEYS["sbv1-video"]).toContain(key);
+      expect(ECOM_SCENE_MODEL_KEYS["ecom-storyboard-video"]).toContain(key);
+      expect(QUICK_REPLICA_SCENE_MODEL_KEYS["qr-t2v"]).toContain(key);
+    }
   });
 
   it("is selectable in ecom storyboard and QuickReplica catalogs", () => {
-    expect(STORYBOARD_VIDEO_MODELS).toContain("wan3.0-video");
-    expect(QR_TEXT_TO_VIDEO_MODELS.map((m) => m.modelKey)).toContain("wan3.0-video");
-    expect(BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS.map((m) => m.modelKey)).toContain(
-      "wan3.0-video",
-    );
+    for (const key of ["wan3.0-video", "wan3.0-video-prime"] as const) {
+      expect(STORYBOARD_VIDEO_MODELS).toContain(key);
+      expect(QR_TEXT_TO_VIDEO_MODELS.map((m) => m.modelKey)).toContain(key);
+      expect(BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS.map((m) => m.modelKey)).toContain(
+        key,
+      );
+    }
   });
 });

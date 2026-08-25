@@ -10,11 +10,14 @@ import {
   normalizeCanvasUploadImageBuffer,
   sniffImageMimeFromBuffer,
 } from "@/lib/canvas/canvas-image-upload-normalize";
+import { remuxMp4Faststart } from "@/lib/canvas/video-poster-ffmpeg";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
-const MAX_BYTES = 30 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const ACCEPTED_IMAGE_MIME = new Set([
   "image/jpeg",
   "image/jpg",
@@ -41,6 +44,13 @@ const ACCEPTED_TEXT_MIME = new Set([
   "text/markdown",
   "application/octet-stream",
 ]);
+const ACCEPTED_VIDEO_MIME = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+]);
 
 function extForMime(m: string, fileName?: string): string {
   const lower = (fileName ?? "").toLowerCase();
@@ -57,6 +67,13 @@ function extForMime(m: string, fileName?: string): string {
     if (m.includes("ogg")) return "ogg";
     if (m.includes("aac") || m.includes("m4a") || m.includes("mp4")) return "m4a";
     if (m.includes("webm")) return "webm";
+  }
+  if (m.startsWith("video/")) {
+    if (m.includes("mp4")) return "mp4";
+    if (m.includes("webm")) return "webm";
+    if (m.includes("quicktime")) return "mov";
+    if (m.includes("matroska")) return "mkv";
+    if (m.includes("msvideo")) return "avi";
   }
   return "bin";
 }
@@ -86,6 +103,20 @@ function isTextUpload(mime: string, fileName: string): boolean {
     return true;
   }
   return ACCEPTED_TEXT_MIME.has(mime.toLowerCase());
+}
+
+function isVideoUpload(mime: string, fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+  if (
+    lower.endsWith(".mp4") ||
+    lower.endsWith(".webm") ||
+    lower.endsWith(".mov") ||
+    lower.endsWith(".mkv") ||
+    lower.endsWith(".avi")
+  ) {
+    return true;
+  }
+  return ACCEPTED_VIDEO_MIME.has(mime.toLowerCase());
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -121,12 +152,6 @@ export async function POST(request: NextRequest) {
       { status: 400, headers: jsonHeaders(request) },
     );
   }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json(
-      { error: "FILE_TOO_LARGE", message: `max ${MAX_BYTES} bytes` },
-      { status: 413, headers: jsonHeaders(request) },
-    );
-  }
   const fileName = file.name.trim();
   let buf = Buffer.from(await file.arrayBuffer());
   let mime = inferCanvasUploadImageMime(
@@ -138,14 +163,27 @@ export async function POST(request: NextRequest) {
     if (sniffed) mime = sniffed;
   }
   const textUpload = isTextUpload(mime, fileName);
-  const audioUpload = isAudioUpload(mime, fileName);
+  const videoUpload = !textUpload && isVideoUpload(mime, fileName);
+  const audioUpload = !textUpload && !videoUpload && isAudioUpload(mime, fileName);
   const imageUpload =
     !textUpload &&
     !audioUpload &&
+    !videoUpload &&
     (ACCEPTED_IMAGE_MIME.has(mime) ||
       mime.startsWith("image/") ||
       /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fileName));
-  if (!textUpload && !audioUpload && !imageUpload) {
+  const maxBytes = videoUpload
+    ? MAX_VIDEO_BYTES
+    : audioUpload
+      ? MAX_AUDIO_BYTES
+      : MAX_IMAGE_BYTES;
+  if (file.size > maxBytes) {
+    return NextResponse.json(
+      { error: "FILE_TOO_LARGE", message: `max ${maxBytes} bytes` },
+      { status: 413, headers: jsonHeaders(request) },
+    );
+  }
+  if (!textUpload && !audioUpload && !imageUpload && !videoUpload) {
     return NextResponse.json(
       { error: "UNSUPPORTED_MIME", mime: file.type || mime },
       { status: 415, headers: jsonHeaders(request) },
@@ -169,6 +207,23 @@ export async function POST(request: NextRequest) {
       uploadBuf = Buffer.from(normalized.buf);
       uploadMime = normalized.contentType;
       uploadExt = normalized.ext;
+    } else if (videoUpload) {
+      uploadExt = extForMime(mime, fileName);
+      uploadMime =
+        mime.startsWith("video/") && mime !== "application/octet-stream"
+          ? mime
+          : uploadExt === "mp4"
+            ? "video/mp4"
+            : uploadExt === "webm"
+              ? "video/webm"
+              : uploadExt === "mov"
+                ? "video/quicktime"
+                : "video/mp4";
+      if (uploadExt === "mp4" || uploadMime === "video/mp4") {
+        uploadBuf = Buffer.from(
+          (await remuxMp4Faststart(uploadBuf, uploadExt)) ?? uploadBuf,
+        );
+      }
     }
     const ossUrl = await uploadCanvasUserBuffer({
       buf: uploadBuf,
@@ -180,7 +235,11 @@ export async function POST(request: NextRequest) {
           ? "audio/mpeg"
           : uploadMime,
       userId: guard.user.id,
-      ext: textUpload || audioUpload ? extForMime(mime, fileName) : uploadExt,
+      ext:
+        textUpload || audioUpload || videoUpload
+          ? extForMime(mime, fileName)
+          : uploadExt,
+      preferBucketUrl: videoUpload ? true : undefined,
     });
     return NextResponse.json(
       { ossUrl },

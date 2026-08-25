@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/MentionsTextarea";
 import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
@@ -25,7 +26,7 @@ import {
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
-import { pickDefaultSbv1ImageEngine } from "@/lib/canvas/sbv1-image-models";
+import { pickDefaultSbv1ImageEngine, resolveDockImageEnginePick } from "@/lib/canvas/sbv1-image-models";
 import {
   pickDefaultPro2FrameImageEngine,
   PRO2_FRAME_IMAGE_MODEL_KEYS,
@@ -180,6 +181,7 @@ function LibtvImageInputDockBody({
   );
 
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
+  const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
 
   const storeNode = useMemo(() => {
     return nodes.find((n) => n.id === dockNodeId) ?? null;
@@ -212,12 +214,19 @@ function LibtvImageInputDockBody({
 
   const settingsData = (storeNode?.data ?? {}) as Sbv1ImageNodeData;
   const dockInput = settingsData.dockInput ?? "";
+  const [livePrompt, setLivePrompt] = useState(dockInput);
+  useEffect(() => {
+    setLivePrompt(dockInput);
+  }, [dockInput, dockNodeId]);
   const dockRefImages = settingsData.dockRefImages ?? [];
   const previewUrl = settingsData.ossUrl ?? settingsData.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const isRunning = isLibtvMediaGenerating(
     (storeNode?.data ?? {}) as { uploading?: boolean; runtime?: { status?: string } },
   );
+
+  const isFrameFreestanding =
+    pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
 
   const engine = isFramePipelineCell
     ? frameBatchImage?.providerId && frameBatchImage?.modelKey
@@ -229,6 +238,31 @@ function LibtvImageInputDockBody({
       : undefined
     : settingsData.engine;
   const modelKey = normalizeModelKey(engine?.modelKey);
+  const resolvedEngine = useMemo(() => {
+    if (isFramePipelineCell && frameBatchImage?.providerId) {
+      return {
+        providerId: frameBatchImage.providerId,
+        modelKey: frameBatchImage.modelKey ?? "",
+        params: frameBatchImage.params ?? {},
+      };
+    }
+    return resolveDockImageEnginePick(settingsData.engine, providers, () =>
+      isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
+        ? pickDefaultPro2FrameImageEngine(providers)
+        : pickDefaultSbv1ImageEngine(providers),
+    );
+  }, [
+    isFramePipelineCell,
+    frameBatchImage,
+    settingsData.engine,
+    providers,
+    isFrameFreestanding,
+    pro2Data.pro2MediaRole,
+  ]);
+  const hasEngine = Boolean(
+    resolvedEngine?.providerId?.trim() &&
+      normalizeModelKey(resolvedEngine.modelKey),
+  );
   const outputCount = settingsData.outputCount ?? 1;
   const pickerData = useMemo((): Sbv1ImageNodeData => {
     if (!isFramePipelineCell || !frameBatchImage?.providerId) {
@@ -251,8 +285,6 @@ function LibtvImageInputDockBody({
     settingsData.resolution ?? "2K",
   );
 
-  const isFrameFreestanding =
-    pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
   const showVisualStylePackBar =
     isPro2 &&
     Boolean(pro2Data.pro2HubNodeId) &&
@@ -273,10 +305,11 @@ function LibtvImageInputDockBody({
         return;
       }
     }
-    const seed =
+    const seed = resolveDockImageEnginePick(settingsData.engine, providers, () =>
       isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
         ? pickDefaultPro2FrameImageEngine(providers)
-        : pickDefaultSbv1ImageEngine(providers);
+        : pickDefaultSbv1ImageEngine(providers),
+    );
     if (!seed) return;
     if (isFramePipelineCell && framePipelineController) {
       updateNodeData(framePipelineController.id, { batchImage: seed });
@@ -364,6 +397,7 @@ function LibtvImageInputDockBody({
   const onPromptChange = useCallback(
     (value: string, _refs?: string[], meta?: { commit?: boolean }) => {
       if (!storeNode) return;
+      setLivePrompt(value);
       updateNodeData(
         storeNode.id,
         { dockInput: value },
@@ -397,27 +431,32 @@ function LibtvImageInputDockBody({
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
     if (isRunning) return;
 
-    let runEngine = engine;
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+    const revertPending = () =>
+      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
+    const latestNode = latestNodes.find((n) => n.id === storeNode.id);
+    const latestData = (latestNode?.data ?? {}) as Sbv1ImageNodeData;
+
+    let runEngine = resolveDockImageEnginePick(latestData.engine, providers, () =>
+      pro2Data.pro2MediaRole === "frame"
+        ? pickDefaultPro2FrameImageEngine(providers)
+        : pickDefaultSbv1ImageEngine(providers),
+    );
     if (!runEngine?.providerId?.trim()) {
       if (pro2Data.pro2MediaRole === "scene") {
-        const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, nodes);
+        const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, latestNodes);
         if (fromHub) {
           runEngine = fromHub;
           updateNodeData(storeNode.id, pro2BatchImageToImageNodePatch(fromHub));
         }
       }
     }
-    if (!runEngine?.providerId?.trim()) {
-      const seed =
-        pro2Data.pro2MediaRole === "frame"
-          ? pickDefaultPro2FrameImageEngine(providers)
-          : pickDefaultSbv1ImageEngine(providers);
-      if (seed) {
-        runEngine = seed;
-        updateNodeData(storeNode.id, { engine: seed });
-      }
-    }
-    if (!runEngine?.providerId?.trim() || !normalizeModelKey(runEngine?.modelKey)) {
+    if (!runEngine?.providerId?.trim() || !normalizeModelKey(runEngine.modelKey)) {
+      revertPending();
       await alert({
         title: "请选择模型",
         message:
@@ -426,19 +465,27 @@ function LibtvImageInputDockBody({
       });
       return;
     }
-    const freshDockInput =
-      (
-        useCanvasStore.getState().nodes.find((n) => n.id === storeNode.id)
-          ?.data as Sbv1ImageNodeData | undefined
-      )?.dockInput ?? dockInput;
-    const prompt = freshDockInput.trim();
-    const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+    if (!latestData.engine?.providerId?.trim()) {
+      updateNodeData(storeNode.id, { engine: runEngine });
+    }
+
+    const latestUpstreamLinks = resolvePro2DockUpstreamLinks(
+      storeNode.id,
+      nodeType,
+      latestNodes,
+      latestEdges,
+    );
+    const prompt = String(latestData.dockInput ?? livePrompt).trim();
+    const linkedStyle = resolvePro2DockStyleFromUpstream(latestUpstreamLinks);
+    const latestPreviewUrl =
+      latestData.ossUrl ?? latestData.blobUrl ?? "";
     const hasRefs =
-      hasImage ||
-      upstreamLinks.some((l) => l.previewUrl) ||
-      Boolean(settingsData.dockStyleRef?.imageUrl) ||
+      Boolean(latestPreviewUrl) ||
+      latestUpstreamLinks.some((l) => l.previewUrl) ||
+      Boolean(latestData.dockStyleRef?.imageUrl) ||
       Boolean(linkedStyle);
     if (!prompt && !hasRefs) {
+      revertPending();
       await alert({
         title: "请输入提示词",
         message: "可直接文字生图，或上传/连接图片后输入编辑指令。",
@@ -447,6 +494,7 @@ function LibtvImageInputDockBody({
       return;
     }
     if (!base) {
+      revertPending();
       await alert({
         title: "画布未就绪",
         message: "请刷新页面后重试。",
@@ -455,10 +503,9 @@ function LibtvImageInputDockBody({
       return;
     }
 
-    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     const queued = busEnqueueStoryRun({ nodeId: storeNode.id, forceFresh: true });
     if (!queued) {
-      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+      revertPending();
       await alert({
         title: "无法开始生成",
         message: "该节点已有进行中的生成任务，请稍候完成后再试。",
@@ -467,23 +514,24 @@ function LibtvImageInputDockBody({
     }
   }, [
     storeNode,
-    engine,
     providers,
-    nodes,
     pro2Data.pro2MediaRole,
     pro2Data.pro2HubNodeId,
     updateNodeData,
     setNodeRuntime,
-    dockInput,
-    hasImage,
-    upstreamLinks,
-    settingsData.dockStyleRef,
+    livePrompt,
+    nodeType,
     base,
     alert,
     isRunning,
   ]);
 
-  const onRun = isPipelineCell ? onRunPipeline : () => void onRunFreestanding();
+  const runWithCommittedPrompt = useCallback(() => {
+    promptCommitRef.current?.flushDraft();
+    void onRunFreestanding();
+  }, [onRunFreestanding]);
+
+  const onRun = isPipelineCell ? onRunPipeline : runWithCommittedPrompt;
 
   const onImagePatch = useCallback(
     (patch: Partial<Sbv1ImageNodeData>) => {
@@ -549,14 +597,14 @@ function LibtvImageInputDockBody({
     isPipelineCell &&
     Boolean(pro2Data.pro2ControllerNodeId && pro2Data.pro2RowKey) &&
     !isRunning &&
-    (Boolean(dockInput.trim()) || hasImage) &&
-    (isFramePipelineCell ? Boolean(engine?.providerId && modelKey) : true);
+    (Boolean(livePrompt.trim()) || hasImage) &&
+    (isFramePipelineCell ? hasEngine : true);
 
   const canSendFreestanding =
     showModelPicker &&
-    Boolean(engine?.providerId && modelKey) &&
+    hasEngine &&
     !isRunning &&
-    (Boolean(dockInput.trim()) ||
+    (Boolean(livePrompt.trim()) ||
       hasImage ||
       upstreamLinks.some((l) => l.previewUrl) ||
       Boolean(styleRef?.imageUrl) ||
@@ -647,6 +695,7 @@ function LibtvImageInputDockBody({
           <MentionsEditable
             key={storeNode.id}
             sourceId={storeNode.id}
+            commitHandleRef={promptCommitRef}
             className={cn(
               PRO2_DOCK_TEXTAREA_CLASS,
               RF_FORM_CONTROL,

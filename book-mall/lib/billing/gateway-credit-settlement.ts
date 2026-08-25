@@ -187,7 +187,7 @@ export function computeChargeCredits(input: {
 }
 
 const ASR_CANONICAL_KEYS = new Set(["qwen3-asr-flash-filetrans", "qwen3-asr-flash"]);
-const WAN30_MODEL_KEYS = new Set(["wan3.0-video"]);
+const WAN30_MODEL_KEYS = new Set(["wan3.0-video", "wan3.0-video-prime"]);
 
 function isAsrCanonical(key: string | null | undefined): boolean {
   if (!key) return false;

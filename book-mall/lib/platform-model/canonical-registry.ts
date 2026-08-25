@@ -555,6 +555,23 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "wan3.0-video-prime",
+    displayName: "Wan 3.0 Video Prime",
+    description:
+      "万相 3.0 优速版 · 能力对齐标准版，生成速度更快 · 文生/图生/参考生视频 · 480P–1080P · 最长 30s",
+    mediaKind: "IMAGE_TO_VIDEO",
+    role: "VIDEO",
+    requestKind: "VIDEO",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 32,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "wan3.0-video-prime", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
     canonicalModelKey: "qwen3-asr-flash-filetrans",
     displayName: "Qwen3 ASR Flash Filetrans",
     description: "百炼 · 文件/URL 语音转写",

@@ -366,6 +366,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   dashVideo("wan2.7-t2v", 62),
   dashVideo("wan2.7-t2v-2026-04-25", 63),
   dashVideo("wan3.0-video", 631),
+  dashVideo("wan3.0-video-prime", 632),
   // 数字人对口型（我的 AI 空间 · 合成台）：形象图 + 人声音频 → 口播视频；厂商同时处理中任务数为 1
   {
     canonicalModelKey: "wan2.2-s2v",

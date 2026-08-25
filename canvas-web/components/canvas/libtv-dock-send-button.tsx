@@ -22,26 +22,20 @@ export function LibtvDockSendButton({
   const { sendBtnPx, sendIconPx } = useLibtvDockToolbarMetrics();
   const faded = Boolean(disabled || loading);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
-    e.stopPropagation();
+  const activate = () => {
     if (loading || disabled) return;
-    // 在 pointerdown 发送：mousedown preventDefault 会吞掉 click；blur 竞态也会吞 click
-    e.preventDefault();
     flushCanvasTextDrafts();
     onClick();
   };
 
   return (
-    // 外层负边距扩大可点区域；capture 先 flush 草稿（disabled 原生钮收不到事件）
-    <span
-      className="relative -m-2 inline-flex shrink-0 p-2"
-      onPointerDownCapture={flushCanvasTextDrafts}
-    >
+    // 外层负边距扩大可点区域
+    <span className="relative -m-2 inline-flex shrink-0 p-2">
       <button
         type="button"
         aria-disabled={faded}
         title={title}
+        data-libtv-dock-interactive=""
         className={cn(
           "nodrag relative z-10 flex shrink-0 touch-manipulation items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90",
           faded && "opacity-40",
@@ -50,7 +44,16 @@ export function LibtvDockSendButton({
           className,
         )}
         style={{ width: sendBtnPx, height: sendBtnPx }}
-        onPointerDown={handlePointerDown}
+        onMouseDown={(e) => {
+          if (e.button !== 0) return;
+          e.stopPropagation();
+          // 须在 blur 提交前 flush；勿 preventDefault，否则配合 Dock footer capture 会吞掉 click
+          if (!loading && !disabled) flushCanvasTextDrafts();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          activate();
+        }}
       >
         {loading ? (
           <Loader2

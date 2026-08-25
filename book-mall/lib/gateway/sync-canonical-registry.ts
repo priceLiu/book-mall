@@ -211,16 +211,20 @@ const WAN30_VIDEO_SHELF_SCOPES: Array<{ appTag: string; sceneKey: string }> = [
   { appTag: "tool", sceneKey: "" },
 ];
 
+const WAN30_VIDEO_SHELF_MODEL_KEYS = ["wan3.0-video", "wan3.0-video-prime"] as const;
+
 async function ensureWan30VideoShelves(): Promise<void> {
   if (wan30VideoShelvesEnsured) return;
   await prisma.appModelShelf.createMany({
-    data: WAN30_VIDEO_SHELF_SCOPES.map((scope) => ({
-      appTag: scope.appTag,
-      sceneKey: scope.sceneKey,
-      canonicalModelKey: "wan3.0-video",
-      status: "ACTIVE" as const,
-      sortOrder: 0,
-    })),
+    data: WAN30_VIDEO_SHELF_MODEL_KEYS.flatMap((canonicalModelKey) =>
+      WAN30_VIDEO_SHELF_SCOPES.map((scope) => ({
+        appTag: scope.appTag,
+        sceneKey: scope.sceneKey,
+        canonicalModelKey,
+        status: "ACTIVE" as const,
+        sortOrder: 0,
+      })),
+    ),
     skipDuplicates: true,
   });
   invalidateGatewayModelListCache();

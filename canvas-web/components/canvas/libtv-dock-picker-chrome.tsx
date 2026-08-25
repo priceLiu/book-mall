@@ -3,9 +3,14 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** 浮动 Dock 底栏 · 模型/参数锚点 Popover 容器（z ≥ 1600 · 高于节点顶栏 z-1500） */
-export const LIBTV_DOCK_POPOVER_CLASS =
-  "nodrag nowheel max-h-[min(420px,70vh)] w-[min(22rem,calc(100vw-24px))] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-0 outline-none";
+const LIBTV_DOCK_POPOVER_SHELL =
+  "nodrag nowheel max-h-[min(420px,70vh)] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-0 outline-none";
+
+/** 浮动 Dock 底栏 · 模型选择 Popover（较宽，容纳 displayName + modelKey + 类型标签） */
+export const LIBTV_DOCK_MODEL_POPOVER_CLASS = `${LIBTV_DOCK_POPOVER_SHELL} w-[min(28rem,calc(100vw-24px))] min-w-[20rem]`;
+
+/** 浮动 Dock 底栏 · 通用锚点 Popover（参数段、高清视频等） */
+export const LIBTV_DOCK_POPOVER_CLASS = `${LIBTV_DOCK_POPOVER_SHELL} w-[min(22rem,calc(100vw-24px))]`;
 
 /** 参数 Popover · 更宽更高，容纳 Gateway schema + 参考模式，尽量避免滚动条 */
 export const LIBTV_DOCK_PARAMS_POPOVER_CLASS =

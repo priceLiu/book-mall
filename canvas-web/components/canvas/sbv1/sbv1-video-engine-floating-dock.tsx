@@ -6,7 +6,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1VideoEngineDockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "@/lib/canvas/pro2-video-board-dock-links";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
-import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
@@ -108,6 +108,11 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     [nodeId, nodes, edges],
   );
 
+  const motionVideoLinks = useMemo(
+    () => resolveSbv1UpstreamMotionVideoLinks(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
+  );
+
   const upstreamTextLinks = useMemo(
     () => resolveSbv1UpstreamTextLinks(nodeId, nodes, edges),
     [nodeId, nodes, edges],
@@ -120,8 +125,16 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
         upstreamTextLinks,
         pro2BoardDockLinks,
         nodes,
+        undefined,
+        motionVideoLinks,
       ),
-    [upstreamLinks, upstreamTextLinks, pro2BoardDockLinks, nodes],
+    [
+      upstreamLinks,
+      upstreamTextLinks,
+      pro2BoardDockLinks,
+      nodes,
+      motionVideoLinks,
+    ],
   );
 
   const dockUpstreamForChips = useMemo(() => {

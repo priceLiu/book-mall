@@ -31,7 +31,7 @@ export function resolvePro2StarterDockLinkLabel(
 
 export type Pro2DockUpstreamLink = {
   id: string;
-  kind: "outline" | "image" | "text";
+  kind: "outline" | "image" | "text" | "video";
   label: string;
   previewUrl?: string;
   previewMd?: string;

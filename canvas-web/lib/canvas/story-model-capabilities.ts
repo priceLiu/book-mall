@@ -70,6 +70,7 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "wan2.7-t2v": ["video_t2v"],
   "wan2.7-t2v-2026-04-25": ["video_t2v"],
   "wan3.0-video": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
+  "wan3.0-video-prime": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
   "MiniMax/MiniMax-H3-t2v": ["video_t2v"],
   "MiniMax/MiniMax-H3-i2v": ["video_i2v"],
   "MiniMax/MiniMax-H3-fl2v": ["video_i2v"],

@@ -231,3 +231,35 @@ export function pickDefaultSbv1ImageEngine(
   }
   return null;
 }
+
+/** Dock 发送钮 · 补齐仅有 modelKey、缺 providerId 的 engine（默认数据常见） */
+export function resolveDockImageEnginePick(
+  engine: CanvasEnginePick | undefined,
+  providers: CanvasProviderDto[],
+  fallback?: () => CanvasEnginePick | null,
+): CanvasEnginePick | null {
+  const modelKey = engine?.modelKey?.trim();
+  const providerId = engine?.providerId?.trim();
+  if (providerId && modelKey) {
+    return {
+      providerId,
+      modelKey,
+      params: engine?.params ?? {},
+    };
+  }
+  if (modelKey) {
+    for (const provider of providers.filter((p) => p.active)) {
+      const model = provider.models.find(
+        (m) => m.enabled && m.modelKey === modelKey,
+      );
+      if (model) {
+        return {
+          providerId: provider.id,
+          modelKey: model.modelKey,
+          params: engine?.params ?? {},
+        };
+      }
+    }
+  }
+  return fallback?.() ?? null;
+}

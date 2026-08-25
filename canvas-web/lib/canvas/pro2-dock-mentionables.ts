@@ -15,11 +15,14 @@ export function buildPro2DockMentionables(
   for (const link of upstreamLinks) {
     if (seen.has(link.id)) continue;
     seen.add(link.id);
-    if (link.kind === "image" && link.previewUrl) {
+    if (
+      (link.kind === "image" || link.kind === "video") &&
+      link.previewUrl
+    ) {
       items.push({
         id: link.id,
         label: link.label,
-        kind: "image",
+        kind: link.kind === "video" ? "video" : "image",
         previewUrl: link.previewUrl,
       });
     } else {

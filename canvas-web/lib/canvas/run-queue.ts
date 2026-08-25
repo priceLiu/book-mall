@@ -36,7 +36,7 @@ import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
 import { pro2DockMentionRefCatalog, resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
 import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "./resolve-dock-run-prompt";
-import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "./sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
 import { buildSbv1VideoEngineDockUpstreamLinks } from "./sbv1-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "./pro2-video-board-dock-links";
@@ -1424,15 +1424,25 @@ export function useCanvasRunner(
             resolveSbv1UpstreamRefLinks(nodeId, latestNodes, latestEdges),
             resolveSbv1UpstreamTextLinks(nodeId, latestNodes, latestEdges),
             boardLinks,
+            resolveSbv1UpstreamMotionVideoLinks(
+              nodeId,
+              latestNodes,
+              latestEdges,
+            ),
           );
           const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
             nodeId,
             latestNodes,
             latestEdges,
           );
+          const sbv1ModelKeyForPrompt = String(
+            (vdForPrompt as { engine?: { modelKey?: string } }).engine?.modelKey ??
+              "",
+          ).trim();
           const runPrompt = resolveSbv1VideoEngineRunPrompt(
             effectivePrompt,
             upstreamForMention,
+            { modelKey: sbv1ModelKeyForPrompt || undefined },
           );
           if (runPrompt) {
             runData = {

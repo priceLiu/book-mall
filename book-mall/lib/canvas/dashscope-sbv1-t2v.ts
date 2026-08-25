@@ -1,12 +1,14 @@
 /**
  * 分镜视频 1.0 · DashScope 原生文生视频（wan / HappyHorse）
  */
+import { isDashscopeWan30VideoModelKey } from "@/lib/gateway/dashscope-client";
 
 export const DASHSCOPE_SBV1_WAN_T2V_MODEL_KEYS = [
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
   "wan3.0-video",
+  "wan3.0-video-prime",
 ] as const;
 
 export const DASHSCOPE_HAPPYHORSE_T2V_MODEL_KEYS = [
@@ -28,7 +30,7 @@ export type DashscopeSbv1T2vModelKey =
   (typeof DASHSCOPE_SBV1_T2V_MODEL_KEYS)[number];
 
 export function isDashscopeWan30VideoModel(modelKey: string): boolean {
-  return modelKey.trim() === "wan3.0-video";
+  return isDashscopeWan30VideoModelKey(modelKey);
 }
 
 export function isDashscopeHappyhorseTextToVideoModel(modelKey: string): boolean {
@@ -137,7 +139,7 @@ export function buildDashscopeWan30VideoBody(opts: {
   const prompt = opts.prompt.trim();
   const media = (opts.media ?? []).filter((m) => m.url.trim().length > 0);
   if (!prompt && media.length === 0) {
-    throw new Error("prompt or media required for wan3.0-video");
+    throw new Error("prompt or media required for wan3.0-video / wan3.0-video-prime");
   }
   const duration = Math.min(30, Math.max(2, Math.floor(opts.durationSec)));
   const parameters: Record<string, unknown> = {

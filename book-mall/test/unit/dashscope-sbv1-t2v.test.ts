@@ -22,6 +22,7 @@ describe("dashscopeSbv1T2vModelToR2v", () => {
 describe("wan3.0-video", () => {
   it("is registered as DashScope T2V", () => {
     expect(isDashscopeSbv1TextToVideoModel("wan3.0-video")).toBe(true);
+    expect(isDashscopeSbv1TextToVideoModel("wan3.0-video-prime")).toBe(true);
   });
 
   it("builds wan3 body with 480P and 30s cap", () => {

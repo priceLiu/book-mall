@@ -35,6 +35,7 @@ import {
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-label";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
@@ -48,7 +49,6 @@ import {
   type CanvasPortraitNodeFields,
 } from "@/lib/canvas/portrait-node-data";
 import { resolvePro2VideoBoardCellDefaultPrompt } from "@/lib/canvas/pro2-video-board-dock-links";
-import { pickRuntimeVideoUrl } from "@/lib/canvas/task-media-url";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
@@ -122,50 +122,17 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const canvasEdges = useCanvasStore((s) => s.edges);
 
   const isHdVideo = isSbv1HdVideoNode(data);
-  const hasMotionVideo = useMemo(() => {
-    if (!isHdVideo) return false;
-    for (const e of canvasEdges) {
-      if (e.target !== nodeId || e.targetHandle !== "in_motion_video") continue;
-      const src = canvasNodes.find((n) => n.id === e.source);
-      if (!src || src.type !== "sbv1-video-engine") continue;
-      const url = String(
-        pickRuntimeVideoUrl(
-          (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
-            .runtime,
-        ) ?? "",
-      ).trim();
-      if (/^https?:\/\//.test(url)) return true;
-    }
-    return false;
-  }, [isHdVideo, nodeId, canvasEdges, canvasNodes]);
 
-  const hdMotionVideoLinks = useMemo((): Sbv1UpstreamRefLink[] => {
-    if (!isHdVideo) return [];
-    const links: Sbv1UpstreamRefLink[] = [];
-    for (const e of canvasEdges) {
-      if (e.target !== nodeId || e.targetHandle !== "in_motion_video") continue;
-      const src = canvasNodes.find((n) => n.id === e.source);
-      if (!src || src.type !== "sbv1-video-engine") continue;
-      const previewUrl = pickRuntimeVideoUrl(
-        (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
-          .runtime,
-      );
-      links.push({
-        id: `sbv1-motion-${src.id}`,
-        index: links.length + 1,
-        label: "上游视频",
-        previewUrl,
-        sourceNodeId: src.id,
-        edgeId: e.id,
-      });
-    }
-    return links;
-  }, [isHdVideo, nodeId, canvasEdges, canvasNodes]);
+  const motionVideoLinks = useMemo(
+    () => resolveSbv1UpstreamMotionVideoLinks(nodeId, canvasNodes, canvasEdges),
+    [nodeId, canvasNodes, canvasEdges],
+  );
+  const hasMotionVideo = motionVideoLinks.some((l) => l.previewUrl?.trim());
 
-  const dockRefLinks = useMemo(() => {
-    if (!isHdVideo) return upstreamLinks;
-    return [...hdMotionVideoLinks, ...upstreamLinks];
-  }, [isHdVideo, hdMotionVideoLinks, upstreamLinks]);
+  const dockRefLinks = useMemo(
+    () => [...motionVideoLinks, ...upstreamLinks],
+    [motionVideoLinks, upstreamLinks],
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
@@ -296,7 +263,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     previewResolution,
   );
 
-  const hasRefs = upstreamLinks.some((l) => l.previewUrl);
+  const hasRefs = dockRefLinks.some((l) => l.previewUrl?.trim());
   const hasPrompt = Boolean(livePrompt.trim());
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(livePrompt),
@@ -687,7 +654,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               }}
               onPaste={onPaste}
               mentionPickerTitle="参考图 · ←→ Enter 插入"
-              mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
+              mentionPickerEmptyHint="暂无已连接参考，请先连线或上传图片/视频。"
               mentionInlineThumb
               mentionEdition="sbv1"
             />

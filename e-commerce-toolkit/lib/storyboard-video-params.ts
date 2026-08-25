@@ -56,7 +56,8 @@ export function resolveStoryboardBailianR2vMaxRefImages(modelKey: string): numbe
 }
 
 export function isStoryboardWan30VideoModel(modelKey: string): boolean {
-  return modelKey.trim() === "wan3.0-video";
+  const k = modelKey.trim();
+  return k === "wan3.0-video" || k === "wan3.0-video-prime";
 }
 
 export type StoryboardVideoDurationRange = {

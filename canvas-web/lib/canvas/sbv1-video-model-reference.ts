@@ -168,11 +168,21 @@ const SINGLE_I2V_KEYS = new Set([
 
 const KIE_MULTI_REF_KEYS = new Set(["bytedance/seedance-2"]);
 
+const DASHSCOPE_WAN30_VIDEO_MODEL_KEYS = new Set([
+  "wan3.0-video",
+  "wan3.0-video-prime",
+]);
+
+export function isSbv1Wan30VideoModel(modelKey: string): boolean {
+  return DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(modelKey.trim());
+}
+
 const DASHSCOPE_T2V_KEYS = new Set([
   "wan2.6-t2v",
   "wan2.7-t2v",
   "wan2.7-t2v-2026-04-25",
   "wan3.0-video",
+  "wan3.0-video-prime",
   "happyhorse-1.0-t2v",
   "happyhorse-1.1-t2v",
 ]);
@@ -302,7 +312,7 @@ export function getSbv1VideoModelRefCaps(
     };
   }
 
-  if (k === "wan3.0-video") {
+  if (DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(k)) {
     return {
       supportedModes: ["omni", "first_last"],
       refApi: "bailian_r2v_media",
@@ -426,7 +436,7 @@ export function getSbv1VideoDockModeChips(
     ];
   }
 
-  if (k === "wan3.0-video") {
+  if (DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(k)) {
     return [
       chip("t2v"),
       chip("i2v"),
@@ -530,7 +540,7 @@ export function resolveSbv1VideoModelRefLinkBlock(args: {
     }
     return { blocked: false };
   }
-  if (modelKey === "wan3.0-video") return { blocked: false };
+  if (DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(modelKey)) return { blocked: false };
   const r2vKey = DASHSCOPE_T2V_TO_R2V[modelKey];
   return {
     blocked: true,
