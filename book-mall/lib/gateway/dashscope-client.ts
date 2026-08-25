@@ -3,6 +3,11 @@
  * 自 tool-web 上移至 book-mall，供 Gateway 与 tool-gateway-client 共用。
  */
 
+import {
+  readVendorRequestIdFromHeaders,
+  readVendorRequestIdFromJson,
+} from "@/lib/gateway/vendor-request-id";
+
 export const WANX_TEXT2IMAGE_PLUS_MODEL = "wanx2.1-t2i-plus";
 /** 支持 content 多图 + text 参考生成（分镜垫图） */
 export const WAN27_IMAGE_MODEL = "wan2.7-image";
@@ -335,6 +340,41 @@ export function isDashscopeAsrNoSpeechOutcome(
     blob.includes("NO_SPEECH") ||
     blob.includes("NO_VALID_AUDIO")
   );
+}
+
+type DashscopeAsyncCreateOk = { ok: true; taskId: string; requestId?: string };
+type DashscopeAsyncCreateErr = { ok: false; error: string };
+
+function parseDashscopeAsyncCreateResponse(
+  res: Response,
+  json: Record<string, unknown>,
+  httpFallback: string,
+): DashscopeAsyncCreateOk | DashscopeAsyncCreateErr {
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string"
+          ? json.message
+          : typeof json.code === "string"
+            ? json.code
+            : httpFallback,
+    };
+  }
+  const output = json.output as { task_id?: string } | undefined;
+  const taskId = output?.task_id?.trim();
+  if (!taskId) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string" ? json.message : "接口未返回 task_id",
+    };
+  }
+  const requestId =
+    readVendorRequestIdFromJson(json) ??
+    readVendorRequestIdFromHeaders(res.headers) ??
+    undefined;
+  return { ok: true, taskId, ...(requestId ? { requestId } : {}) };
 }
 
 export async function dashscopeGetTask(opts: {
@@ -686,7 +726,7 @@ export async function dashscopeCreateVideoTask(opts: {
   model: string;
   body: Record<string, unknown>;
   baseUrl?: string | null;
-}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+}): Promise<DashscopeAsyncCreateOk | DashscopeAsyncCreateErr> {
   const resolved = resolveDashscopeVideoCreateUrl({
     model: opts.model,
     apiKey: opts.apiKey,
@@ -705,25 +745,11 @@ export async function dashscopeCreateVideoTask(opts: {
   });
 
   const json = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    return {
-      ok: false,
-      error:
-        typeof json.message === "string"
-          ? json.message
-          : `创建视频任务失败（HTTP ${res.status}）`,
-    };
-  }
-  const output = json.output as { task_id?: string } | undefined;
-  const taskId = output?.task_id?.trim();
-  if (!taskId) {
-    return {
-      ok: false,
-      error:
-        typeof json.message === "string" ? json.message : "接口未返回 task_id",
-    };
-  }
-  return { ok: true, taskId };
+  return parseDashscopeAsyncCreateResponse(
+    res,
+    json,
+    `创建视频任务失败（HTTP ${res.status}）`,
+  );
 }
 
 /**

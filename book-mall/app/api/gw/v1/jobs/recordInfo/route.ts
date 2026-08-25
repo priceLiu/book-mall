@@ -48,6 +48,7 @@ import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-cre
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import type { GatewayRequestLog } from "@prisma/client";
 import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
+import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
 
 async function syncDashscopePollToGatewayLog(input: {
   log: GatewayRequestLog;
@@ -82,6 +83,8 @@ async function syncDashscopePollToGatewayLog(input: {
         model: log.model,
       });
     } else {
+      const vendorRequestId =
+        readVendorRequestIdFromJson(baseSummary) ?? undefined;
       await finalizeRequestLog(log.id, {
         status: "SUCCEEDED",
         durationMs: log.submittedAt
@@ -91,6 +94,7 @@ async function syncDashscopePollToGatewayLog(input: {
         resultSummary: baseSummary,
         externalTaskId: taskId,
         model: log.model,
+        ...(vendorRequestId ? { vendorRequestId } : {}),
       });
     }
     return;
@@ -117,6 +121,8 @@ async function syncDashscopePollToGatewayLog(input: {
         model: log.model,
       });
     } else {
+      const vendorRequestId =
+        readVendorRequestIdFromJson(resultSummary) ?? undefined;
       await finalizeRequestLog(log.id, {
         status: "FAILED",
         durationMs: log.submittedAt
@@ -126,6 +132,8 @@ async function syncDashscopePollToGatewayLog(input: {
         failMessage: out.message ?? out.code ?? "failed",
         externalTaskId: taskId,
         model: log.model,
+        resultSummary,
+        ...(vendorRequestId ? { vendorRequestId } : {}),
       });
     }
     return;

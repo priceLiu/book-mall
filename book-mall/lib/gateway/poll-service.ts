@@ -861,7 +861,11 @@ export async function submitBailianR2vJobForLog(opts: {
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
-    data: { externalTaskId: created.taskId, status: "RUNNING" },
+    data: {
+      externalTaskId: created.taskId,
+      status: "RUNNING",
+      ...(created.requestId ? { vendorRequestId: created.requestId } : {}),
+    },
   });
   return created.taskId;
 }
@@ -1100,7 +1104,11 @@ export async function submitDashscopeVideoJobForLog(opts: {
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
-    data: { externalTaskId: created.taskId, status: "RUNNING" },
+    data: {
+      externalTaskId: created.taskId,
+      status: "RUNNING",
+      ...(created.requestId ? { vendorRequestId: created.requestId } : {}),
+    },
   });
   return created.taskId;
 }

@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isGatewayLogTerminalStatus } from "@/lib/gateway/log-progress";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
+import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
 import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 import {
   attachDashscopeTimingToSummary,
@@ -105,11 +106,14 @@ export async function finalizeDashscopeAsyncRequestLog(
     resultSummaryBase,
     fallbackNowMs,
   });
+  const vendorRequestId =
+    readVendorRequestIdFromJson(resultSummaryBase) ?? undefined;
   await finalizeRequestLog(logId, {
     ...patch,
     status,
     durationMs: metrics.durationMs,
     completedAt: new Date(metrics.completedAtMs),
     resultSummary: metrics.resultSummary,
+    ...(vendorRequestId ? { vendorRequestId } : {}),
   });
 }

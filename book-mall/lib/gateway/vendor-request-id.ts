@@ -53,8 +53,12 @@ export function readVendorRequestIdFromJson(
 export function resolveGatewayLogVendorRequestId(input: {
   vendorRequestId?: string | null;
   failMessage?: string | null;
+  /** 异步任务终态 / 轮询 raw 常含顶层 request_id */
+  resultSummary?: unknown;
 }): string | null {
   const stored = input.vendorRequestId?.trim();
   if (stored) return stored;
+  const fromSummary = readVendorRequestIdFromJson(input.resultSummary);
+  if (fromSummary) return fromSummary;
   return extractVendorRequestIdFromText(input.failMessage);
 }

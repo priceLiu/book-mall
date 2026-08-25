@@ -164,6 +164,7 @@ export async function mapGatewayRequestLogsToResponseRows(
         vendorRequestId: resolveGatewayLogVendorRequestId({
           vendorRequestId: l.vendorRequestId,
           failMessage: l.failMessage,
+          resultSummary: l.resultSummary,
         }),
         promptTokens,
         completionTokens,
