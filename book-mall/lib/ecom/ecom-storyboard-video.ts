@@ -817,6 +817,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     ? await runDashscopeWan30VideoJob({
         userId: opts.userId,
         projectId: opts.projectId,
+        modelKey,
         prompt,
         firstFrameUrl: panelFirstFrame,
         referenceImageUrls: refUrls,
