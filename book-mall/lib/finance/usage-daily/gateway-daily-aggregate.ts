@@ -5,6 +5,7 @@ import type { GatewayClientSource, GatewayProviderKind } from "@prisma/client";
 
 import { clientPageToToolKey, clientPageToToolLabel } from "@/lib/finance/client-page-tool";
 import { estimateGatewayLogNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
+import { GATEWAY_USAGE_LOG_SELECT } from "@/lib/gateway/gateway-token-usage-aggregate";
 import {
   normalizeGatewayCredentialChannel,
   channelKeyLabel,
@@ -64,16 +65,11 @@ export async function aggregateGatewayDaily(
       ...(input.providerKind ? { providerKind: input.providerKind } : {}),
     },
     select: {
+      ...GATEWAY_USAGE_LOG_SELECT,
       submittedAt: true,
-      status: true,
       clientSource: true,
-      clientPage: true,
-      model: true,
-      canonicalModelKey: true,
       channelSnapshot: true,
       credentialAliasSnapshot: true,
-      promptTokens: true,
-      completionTokens: true,
       costSnapshotYuan: true,
       estimatedVendorCostYuan: true,
     },
@@ -106,9 +102,7 @@ export async function aggregateGatewayDaily(
   for (const log of logs) {
     const day = shanghaiDayKey(log.submittedAt);
     const succeeded = log.status === "SUCCEEDED";
-    const cost = succeeded
-      ? estimateGatewayLogNetCostYuan({ ...log, status: log.status })
-      : 0;
+    const cost = succeeded ? estimateGatewayLogNetCostYuan(log) : 0;
     const prompt = log.promptTokens ?? 0;
     const completion = log.completionTokens ?? 0;
 
