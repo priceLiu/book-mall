@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchToolsSession } from "@/lib/tools-introspect";
+import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 import { canvasLoginHref } from "@/lib/portal-auth-links";
 
 export const dynamic = "force-dynamic";
@@ -24,5 +25,5 @@ export default async function LoginPage({
   const token = cookies().get("tools_token")?.value;
   const session = await fetchToolsSession(token);
   if (session.active) redirect(target);
-  redirect(canvasLoginHref(target));
+  redirect(canvasLoginHref(target, getBookMallBaseUrlServer()));
 }

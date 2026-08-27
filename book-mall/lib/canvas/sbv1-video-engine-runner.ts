@@ -22,6 +22,7 @@ import {
 } from "./dashscope-sbv1-t2v";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
+import { runCanvasS2vVideoNode } from "./canvas-s2v-runner";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
@@ -34,6 +35,12 @@ export async function runSbv1VideoEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
+  const pro2PresetKind = String(data.pro2PresetKind ?? "").trim();
+
+  if (pro2PresetKind === "lip-sync-broadcast") {
+    return runCanvasS2vVideoNode(args);
+  }
+
   const engine = (data.engine as Record<string, unknown> | undefined) ?? {};
   const providerId = String(engine.providerId ?? data.providerId ?? "");
   const modelKey = String(engine.modelKey ?? data.modelKey ?? "");
@@ -68,6 +75,23 @@ export async function runSbv1VideoEngineNode(
   const hasPortraitRefs = portraitRefs.length > 0;
   /** Seedance：已入库 asset://；其它模型：仅 OSS HTTPS */
   const imageInputs = httpsImageUrls(args.node.imageInputs ?? []);
+  const audioInputs = (args.node.audioInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u.trim()),
+  );
+
+  if (pro2PresetKind === "reference-audio-to-video") {
+    if (imageInputs.length === 0) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "参考音生视频需要至少一张参考图",
+      );
+    }
+    if (audioInputs.length > 0) {
+      params.reference_audio_urls = audioInputs.slice(0, 1);
+      params.generate_audio = false;
+      params.generateAudio = false;
+    }
+  }
 
   if (!providerId || !modelKey) {
     throw new CanvasProjectError(
@@ -147,6 +171,12 @@ export async function runSbv1VideoEngineNode(
     !hasReferenceImages;
 
   if (
+    pro2PresetKind === "reference-audio-to-video" &&
+    imageInputs.length > 0 &&
+    audioInputs.length > 0
+  ) {
+    // 参考音模式：有图 + 参考音频即可，prompt 可选
+  } else if (
     !promptRaw &&
     imageInputs.length === 0 &&
     !hasPortraitRefs &&

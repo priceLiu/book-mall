@@ -205,6 +205,8 @@ export type CanvasRunNodeInput = {
   data: Record<string, unknown>;
   /** 上游图片节点解析的 OSS / blob URL 列表（按端口顺序） */
   imageInputs?: string[];
+  /** 上游音频节点解析的 OSS HTTPS URL 列表 */
+  audioInputs?: string[];
   /** 上游文本节点解析的字符串（按端口顺序，已 join） */
   textInputs?: string[];
   /** 火山私域人像库 asset:// 引用（来自上游 LibTV 图片节点入库） */

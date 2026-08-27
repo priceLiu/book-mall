@@ -7,6 +7,7 @@ import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import {
   ImageIcon,
   Maximize2,
+  Mic,
   Music,
   Play,
   RefreshCw,
@@ -90,14 +91,15 @@ import type { StoryProVideoRow } from "@/lib/canvas/story-pro-workspace-types";
 type VideoTryAction = {
   id: Pro2VideoShortcutPresetId;
   label: string;
-  icon: typeof ImageIcon | typeof Video | typeof Music;
+  icon: typeof ImageIcon | typeof Video | typeof Music | typeof Mic;
 };
 
 const VIDEO_TRY_ACTIONS: VideoTryAction[] = [
   { id: "image-ref-to-video", label: "图(参考)生视频", icon: ImageIcon },
   { id: "text-to-video-from-video", label: "文生视频", icon: Video },
   { id: "video-to-video", label: "视频生视频", icon: Play },
-  { id: "image-audio-to-video", label: "图片音频合成视频", icon: Music },
+  { id: "lip-sync-broadcast", label: "对口型口播", icon: Mic },
+  { id: "reference-audio-to-video", label: "参考音生视频", icon: Music },
 ];
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {

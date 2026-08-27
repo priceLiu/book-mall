@@ -19,6 +19,10 @@ import {
 import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
 import { buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
 import { buildPro2AudioNodeData } from "./pro2-spawn-nodes";
+import {
+  GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+} from "./system-providers";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
@@ -33,14 +37,39 @@ export type Pro2VideoShortcutPresetId =
   | "image-ref-to-video"
   | "text-to-video-from-video"
   | "video-to-video"
-  | "image-audio-to-video";
+  | "lip-sync-broadcast"
+  | "reference-audio-to-video";
 
 const VIDEO_PRESET_LABEL: Record<Pro2VideoShortcutPresetId, string> = {
   "image-ref-to-video": "预设 - 图(参考)生视频",
   "text-to-video-from-video": "预设 - 文生视频",
   "video-to-video": "预设 - 视频生视频",
-  "image-audio-to-video": "预设 - 图片音频合成视频",
+  "lip-sync-broadcast": "预设 - 对口型口播",
+  "reference-audio-to-video": "预设 - 参考音生视频",
 };
+
+const LIP_SYNC_AUDIO_ENGINE = {
+  providerId: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  modelKey: "MiniMax/speech-2.8-hd",
+  params: { voice_id: "" },
+} as const;
+
+const REF_AUDIO_AUDIO_ENGINE = {
+  providerId: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  modelKey: "MiniMax/speech-2.8-hd",
+  params: { voice_id: "male-qn-qingse" },
+} as const;
+
+const REF_AUDIO_VIDEO_ENGINE = {
+  providerId: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+  modelKey: "doubao-seedance-2.0",
+  params: {
+    resolution: "720p",
+    generate_audio: false,
+    ratio: "16:9",
+    duration: 15,
+  },
+} as const;
 
 const PRESET_LABEL: Record<Pro2ShortcutPresetId, string> = {
   "image-to-prompt": "预设 - 图片反推提示词",
@@ -576,8 +605,40 @@ export function attachPro2VideoShortcutPreset(
     return;
   }
 
-  const stackLeft = vx - Math.max(imageW, audioW) - gap;
-  const stackTop = vy + Math.max(0, (videoH - imageH - audioH - 24) / 2);
+  if (
+    preset === "lip-sync-broadcast" ||
+    preset === "reference-audio-to-video"
+  ) {
+    attachImageAudioVideoPreset(videoId, preset, vx, vy, videoH, gap, store, {
+      imageW,
+      imageH,
+      audioW,
+      audioH,
+    });
+    return;
+  }
+
+  selectPro2NodeAfterSpawn(store.setNodes, videoId);
+}
+
+function attachImageAudioVideoPreset(
+  videoId: string,
+  preset: "lip-sync-broadcast" | "reference-audio-to-video",
+  vx: number,
+  vy: number,
+  videoH: number,
+  gap: number,
+  store: AttachStarterStore,
+  dims: {
+    imageW: number;
+    imageH: number;
+    audioW: number;
+    audioH: number;
+  },
+): void {
+  const stackLeft = vx - Math.max(dims.imageW, dims.audioW) - gap;
+  const stackTop =
+    vy + Math.max(0, (videoH - dims.imageH - dims.audioH - 24) / 2);
   const imageId = store.addNode(
     "story-pro2-image",
     { x: stackLeft, y: stackTop },
@@ -586,14 +647,37 @@ export function attachPro2VideoShortcutPreset(
       pro2PresetKind: preset,
     }),
   );
+  const audioOverrides =
+    preset === "lip-sync-broadcast"
+      ? {
+          pro2PresetKind: preset,
+          engine: { ...LIP_SYNC_AUDIO_ENGINE },
+        }
+      : {
+          pro2PresetKind: preset,
+          engine: { ...REF_AUDIO_AUDIO_ENGINE },
+        };
   const audioId = store.addNode(
     "story-pro2-audio",
-    { x: stackLeft, y: stackTop + imageH + 24 },
+    { x: stackLeft, y: stackTop + dims.imageH + 24 },
     buildPro2AudioNodeData({
       label: "音频",
-      pro2PresetKind: preset,
+      ...audioOverrides,
     }),
   );
+  const videoOverrides =
+    preset === "reference-audio-to-video"
+      ? {
+          pro2PresetKind: preset,
+          referenceMode: "omni" as const,
+          dockInputMode: "omni" as const,
+          engine: { ...REF_AUDIO_VIDEO_ENGINE },
+        }
+      : {
+          pro2PresetKind: preset,
+          resolution: "720p" as const,
+        };
+  store.updateNodeData(videoId, videoOverrides);
   if (!imageId || !audioId) return;
   store.setEdges((prev) => [
     ...prev,

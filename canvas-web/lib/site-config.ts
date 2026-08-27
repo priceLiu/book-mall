@@ -35,7 +35,10 @@ export function getCanvasWebOrigin(): string {
 }
 
 export function getBookMallOrigin(): string {
-  const raw = process.env.NEXT_PUBLIC_BOOK_MALL_URL ?? "http://localhost:3000";
+  const raw =
+    process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
+    process.env.MAIN_SITE_ORIGIN?.trim() ||
+    (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "");
   return raw.replace(/\/$/, "");
 }
 

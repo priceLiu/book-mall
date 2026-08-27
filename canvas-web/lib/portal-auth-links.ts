@@ -6,14 +6,26 @@ import { getMainSiteOrigin } from "@/lib/site-origin";
 
 const APP = "canvas" as const;
 
-export function canvasLoginHref(redirectPath = "/projects"): string {
-  const book = getMainSiteOrigin();
+function resolveBookPortalOrigin(bookOrigin?: string | null): string | null {
+  const explicit = bookOrigin?.trim();
+  if (explicit) return explicit;
+  return getMainSiteOrigin();
+}
+
+export function canvasLoginHref(
+  redirectPath = "/projects",
+  bookOrigin?: string | null,
+): string {
+  const book = resolveBookPortalOrigin(bookOrigin);
   if (!book) return "/sso-error?reason=missing_main_origin";
   return buildBookPortalLoginHref(book, APP, redirectPath);
 }
 
-export function canvasRegisterHref(redirectPath = "/projects"): string {
-  const book = getMainSiteOrigin();
+export function canvasRegisterHref(
+  redirectPath = "/projects",
+  bookOrigin?: string | null,
+): string {
+  const book = resolveBookPortalOrigin(bookOrigin);
   if (!book) return "/sso-error?reason=missing_main_origin";
   return buildBookPortalRegisterHref(book, APP, redirectPath);
 }

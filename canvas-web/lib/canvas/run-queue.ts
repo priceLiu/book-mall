@@ -1271,6 +1271,7 @@ export function useCanvasRunner(
         let imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId, {
           rowKey: job.rowKey,
         });
+        let audioInputs: string[] = [];
         let portraitAssetRefs: ReturnType<
           typeof resolvePortraitAssetRefsFromUpstream
         > = [];
@@ -1335,6 +1336,7 @@ export function useCanvasRunner(
           }
           sbv1VideoResolved = resolved;
           imageInputs = resolved.imageInputs;
+          audioInputs = resolved.audioInputs;
           portraitAssetRefs = resolved.portraitAssetRefs;
         } else {
           portraitAssetRefs = resolvePortraitAssetRefsFromUpstream(
@@ -1703,6 +1705,7 @@ export function useCanvasRunner(
             modelKey,
             data: runData,
             imageInputs,
+            audioInputs,
             textInputs: mergedTextInputs,
             portraitAssetRefs,
           },

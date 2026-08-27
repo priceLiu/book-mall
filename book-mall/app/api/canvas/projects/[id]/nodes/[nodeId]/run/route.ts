@@ -76,6 +76,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         modelKey?: string;
         data?: Record<string, unknown>;
         imageInputs?: string[];
+        audioInputs?: string[];
         textInputs?: string[];
         portraitAssetRefs?: Array<{
           url: string;
@@ -151,6 +152,12 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       >,
       imageInputs: Array.isArray(node.imageInputs)
         ? node.imageInputs.filter((u): u is string => typeof u === "string")
+        : [],
+      audioInputs: Array.isArray(node.audioInputs)
+        ? node.audioInputs.filter(
+            (u): u is string =>
+              typeof u === "string" && /^https?:\/\//.test(u.trim()),
+          )
         : [],
       textInputs: Array.isArray(node.textInputs)
         ? node.textInputs.filter((u): u is string => typeof u === "string")

@@ -25,8 +25,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const bookMallBaseUrl = getBookMallBaseUrlServer() || getBookMallOrigin();
-  const bookOrigin = getMainSiteOrigin() || bookMallBaseUrl || null;
+  const bookMallBaseUrl =
+    getBookMallBaseUrlServer() || getMainSiteOrigin() || getBookMallOrigin();
+  const bookOrigin = bookMallBaseUrl || null;
 
   return (
     <html lang="zh-CN" suppressHydrationWarning>

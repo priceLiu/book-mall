@@ -11,7 +11,6 @@ import {
 } from "@/lib/session-revoked";
 import { bookMallReEnterHref } from "@/lib/platform-sso-links";
 import { canvasLoginHref } from "@/lib/portal-auth-links";
-import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
   buildSilentReEnterHref,
   shouldAttemptSilentSso,
@@ -139,7 +138,8 @@ function SessionRevokedPoller({
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const bookMallBase = useBookMallBaseUrl();
-  const mainOrigin = getMainSiteOrigin() || bookMallBase || null;
+  /** 优先用根 layout 服务端注入的主站 origin；客户端读不到运行时 MAIN_SITE_ORIGIN */
+  const mainOrigin = bookMallBase?.trim() || null;
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,8 +167,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       typeof window !== "undefined"
         ? window.location.pathname + window.location.search
         : "/projects";
-    return canvasLoginHref(path || "/projects");
-  }, []);
+    return canvasLoginHref(path || "/projects", mainOrigin);
+  }, [mainOrigin]);
 
   const redirectToSso = useCallback(() => {
     const reEnter = reEnterHref();

@@ -39,6 +39,15 @@ import {
   LibtvTtsDockModelPicker,
   LibtvTtsDockParamsPicker,
 } from "./libtv-audio-dock-pickers";
+import { LibtvTtsDockVoicePicker } from "./libtv-tts-voice-picker";
+import { LibtvQrAudioDockModelPicker } from "./libtv-qr-audio-dock-model-picker";
+import {
+  fetchLibtvQrAudioCatalog,
+} from "@/lib/canvas/libtv-qr-audio-catalog-client";
+import {
+  isMinimaxSpeechModelKey,
+  pickDefaultQrVoiceoverEngine,
+} from "@/lib/canvas/libtv-qr-audio-models";
 
 /** Pro2 音频节点 · 底部浮动输入坞（ElevenLabs TTS） */
 export function LibtvAudioInputDock() {
@@ -50,7 +59,7 @@ export function LibtvAudioInputDock() {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
 
-  const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
+  const [dockMenu, setDockMenu] = useState<"model" | "params" | "voice" | null>(null);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-audio");
   const suppressDock = useLibtvShouldSuppressFloatingDock();
@@ -65,8 +74,16 @@ export function LibtvAudioInputDock() {
 
   const { placement, hidden: dockHidden } = useLibtvFloatingDock(dockNodeId);
 
-  const d = (storeNode?.data ?? {}) as LibtvAudioNodeData;
+  const d = (storeNode?.data ?? {}) as LibtvAudioNodeData & {
+    pro2PresetKind?: string;
+  };
   const engine = d.engine ?? { providerId: "", modelKey: "", params: {} };
+  const isLipSyncPreset = String(d.pro2PresetKind ?? "") === "lip-sync-broadcast";
+  const isRefAudioPreset =
+    String(d.pro2PresetKind ?? "") === "reference-audio-to-video";
+  const isQrVoicePreset = isLipSyncPreset || isRefAudioPreset;
+  const isMinimaxEngine = isMinimaxSpeechModelKey(engine.modelKey ?? "");
+  const voiceId = String(engine.params?.voice_id ?? engine.params?.voice ?? "");
   const dockInput = String(d.dockInput ?? "");
   const isRunning = isLibtvMediaGenerating(d);
 
@@ -113,18 +130,52 @@ export function LibtvAudioInputDock() {
     const liveData = (live?.data ?? {}) as LibtvAudioNodeData;
     const prompt = String(liveData.dockInput ?? "").trim();
     let runEngine = liveData.engine;
-    if (!runEngine?.providerId?.trim()) {
-      const seed = pickDefaultPro2TtsEngine(providers);
-      if (seed) {
-        runEngine = seed;
-        updateNodeData(storeNode.id, { engine: seed });
+    if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
+      if (isQrVoicePreset && base) {
+        try {
+          const catalog = await fetchLibtvQrAudioCatalog(base);
+          const seed = pickDefaultQrVoiceoverEngine(catalog.models, {
+            modelKey: catalog.defaults.modelKey,
+            voiceId: catalog.defaults.voiceId,
+          });
+          if (seed) {
+            runEngine = seed;
+            updateNodeData(storeNode.id, { engine: seed });
+          }
+        } catch {
+          /* fall through */
+        }
+      }
+      if (!runEngine?.providerId?.trim()) {
+        const seed = pickDefaultPro2TtsEngine(providers);
+        if (seed) {
+          runEngine = seed;
+          updateNodeData(storeNode.id, { engine: seed });
+        }
       }
     }
     if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
       revert();
       await alert({
         title: "请选择模型",
-        message: "请先在语音模型中选择 Qwen3 TTS、ElevenLabs 或其它 Gateway TTS 模型。",
+        message: isQrVoicePreset
+          ? "请先在 Dock 选择快速复制旁白模型（MiniMax / ElevenLabs）。"
+          : "请先在语音模型中选择 Qwen3 TTS、ElevenLabs 或其它 Gateway TTS 模型。",
+        variant: "warning",
+      });
+      return;
+    }
+    if (
+      isQrVoicePreset &&
+      isMinimaxSpeechModelKey(runEngine.modelKey ?? "") &&
+      !String(runEngine.params?.voice_id ?? runEngine.params?.voice ?? "").trim()
+    ) {
+      revert();
+      await alert({
+        title: "请选择音色",
+        message: isLipSyncPreset
+          ? "对口型口播需要先在 Dock 选择音色，再输入台词生成音频。"
+          : "参考音生视频需要选择音色并生成参考音频后再生成视频。",
         variant: "warning",
       });
       return;
@@ -159,6 +210,8 @@ export function LibtvAudioInputDock() {
   }, [
     storeNode,
     isRunning,
+    isQrVoicePreset,
+    isLipSyncPreset,
     providers,
     base,
     alert,
@@ -180,36 +233,70 @@ export function LibtvAudioInputDock() {
       footer={
         <Pro2DockToolbar className="gap-2">
           <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
-            <LibtvTtsDockModelPicker
-              providerId={engine.providerId ?? ""}
-              modelKey={engine.modelKey ?? ""}
-              params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
-              externalProviders={providers}
-              disabled={isRunning}
-              open={dockMenu === "model"}
-              onOpenChange={(next) => setDockMenu(next ? "model" : null)}
-              onChange={(next) => {
-                updateNodeData(storeNode.id, { engine: next });
-              }}
-            />
-            <LibtvTtsDockParamsPicker
-              providerId={engine.providerId ?? ""}
-              modelKey={engine.modelKey ?? ""}
-              params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
-              externalProviders={providers}
-              disabled={isRunning}
-              open={dockMenu === "params"}
-              onOpenChange={(next) => setDockMenu(next ? "params" : null)}
-              onChange={(nextParams) => {
-                updateNodeData(storeNode.id, {
-                  engine: {
-                    providerId: engine.providerId ?? "",
-                    modelKey: engine.modelKey ?? "",
-                    params: nextParams,
-                  },
-                });
-              }}
-            />
+            {isRefAudioPreset ? (
+              <LibtvQrAudioDockModelPicker
+                modelKey={engine.modelKey ?? ""}
+                voiceId={voiceId}
+                disabled={isRunning}
+                open={dockMenu === "model"}
+                onOpenChange={(next) => setDockMenu(next ? "model" : null)}
+                onChange={(next) => {
+                  updateNodeData(storeNode.id, { engine: next });
+                }}
+              />
+            ) : !isLipSyncPreset ? (
+              <LibtvTtsDockModelPicker
+                providerId={engine.providerId ?? ""}
+                modelKey={engine.modelKey ?? ""}
+                params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
+                externalProviders={providers}
+                disabled={isRunning}
+                open={dockMenu === "model"}
+                onOpenChange={(next) => setDockMenu(next ? "model" : null)}
+                onChange={(next) => {
+                  updateNodeData(storeNode.id, { engine: next });
+                }}
+              />
+            ) : null}
+            {isQrVoicePreset && isMinimaxEngine ? (
+              <LibtvTtsDockVoicePicker
+                voiceId={voiceId}
+                disabled={isRunning}
+                open={dockMenu === "voice"}
+                onOpenChange={(next) => setDockMenu(next ? "voice" : null)}
+                onSelectVoice={(nextVoiceId) => {
+                  updateNodeData(storeNode.id, {
+                    engine: {
+                      providerId: engine.providerId ?? "",
+                      modelKey: engine.modelKey ?? "",
+                      params: {
+                        ...(engine.params ?? {}),
+                        voice_id: nextVoiceId,
+                      },
+                    },
+                  });
+                }}
+              />
+            ) : !isQrVoicePreset ? (
+              <LibtvTtsDockParamsPicker
+                providerId={engine.providerId ?? ""}
+                modelKey={engine.modelKey ?? ""}
+                params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
+                externalProviders={providers}
+                disabled={isRunning}
+                open={dockMenu === "params"}
+                onOpenChange={(next) => setDockMenu(next ? "params" : null)}
+                onChange={(nextParams) => {
+                  updateNodeData(storeNode.id, {
+                    engine: {
+                      providerId: engine.providerId ?? "",
+                      modelKey: engine.modelKey ?? "",
+                      params: nextParams,
+                    },
+                  });
+                }}
+              />
+            ) : null}
           </div>
           <LibtvDockCreditsLabel
             credits={estCredits?.credits}

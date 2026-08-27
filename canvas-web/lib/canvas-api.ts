@@ -1102,6 +1102,7 @@ export async function runCanvasNode(
       modelKey?: string;
       data: Record<string, unknown>;
       imageInputs?: string[];
+      audioInputs?: string[];
       textInputs?: string[];
       portraitAssetRefs?: Array<{
         url: string;

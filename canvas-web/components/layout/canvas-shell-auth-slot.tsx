@@ -3,9 +3,9 @@
 import { Loader2 } from "lucide-react";
 import { navigatePortalLogout } from "@private/federated-portal-logout";
 
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasShellSession } from "@/lib/canvas/use-canvas-shell-session";
 import { canvasLoginHref, canvasRegisterHref } from "@/lib/portal-auth-links";
-import { getBookAccountUrl } from "@/lib/site-origin";
 import { clearCachedToolsSession } from "@/lib/tools-session-client-cache";
 
 function handleCanvasLogout() {
@@ -14,7 +14,10 @@ function handleCanvasLogout() {
 }
 
 export function CanvasShellAuthSlot() {
-  const bookAccountUrl = getBookAccountUrl();
+  const bookMallBase = useBookMallBaseUrl();
+  const bookAccountUrl = bookMallBase
+    ? `${bookMallBase.replace(/\/$/, "")}/account`
+    : null;
   const { loading, session } = useCanvasShellSession();
 
   if (loading) {
@@ -29,10 +32,16 @@ export function CanvasShellAuthSlot() {
   if (!session.active) {
     return (
       <div className="flex shrink-0 items-center gap-2">
-        <a href={canvasLoginHref()} className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
+        <a
+          href={canvasLoginHref("/projects", bookMallBase)}
+          className="twenty-btn-ghost !px-3 !py-1.5 !text-xs"
+        >
           登录
         </a>
-        <a href={canvasRegisterHref()} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
+        <a
+          href={canvasRegisterHref("/projects", bookMallBase)}
+          className="twenty-btn-accent !px-3 !py-1.5 !text-xs"
+        >
           注册
         </a>
       </div>

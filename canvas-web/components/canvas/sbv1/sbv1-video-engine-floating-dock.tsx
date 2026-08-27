@@ -33,6 +33,11 @@ import {
 import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { SBV1_VIDEO_DOCK_PLACEMENT_OPTS } from "@/lib/canvas/sbv1-video-dock-placement";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
+import {
+  focusSbv1UpstreamAudioNode,
+  promptSbv1EmptyUpstreamAudio,
+  sbv1HasEmptyUpstreamAudio,
+} from "@/lib/canvas/sbv1-upstream-audio-empty-prompt";
 
 /** 分镜视频 1.0 · 视频引擎浮动输入坞（选中节点时显示在节点下方） */
 export function Sbv1VideoEngineFloatingDock() {
@@ -73,7 +78,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   hidden: boolean;
 }) {
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -232,6 +237,32 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
+    const pro2PresetKind = String(
+      (latestData as { pro2PresetKind?: string }).pro2PresetKind ?? "",
+    ).trim();
+    if (
+      sbv1HasEmptyUpstreamAudio(
+        nodeId,
+        latestNodes,
+        latestEdges,
+        resolved.audioInputs,
+        pro2PresetKind,
+      )
+    ) {
+      const choice = await promptSbv1EmptyUpstreamAudio({
+        pro2PresetKind,
+        confirm,
+      });
+      if (choice === "generate-audio") {
+        revertPending();
+        focusSbv1UpstreamAudioNode(nodeId, latestNodes, latestEdges);
+        return;
+      }
+      if (choice === "cancel") {
+        revertPending();
+        return;
+      }
+    }
     const refCount =
       resolved.imageInputs.length + resolved.portraitAssetRefs.length;
     const refWarning = resolveSbv1VideoModelRefRunWarning({
@@ -292,7 +323,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
         variant: "warning",
       });
     }
-  }, [nodeId, base, alert, updateNodeData, setNodeRuntime, hasVideo]);
+  }, [nodeId, base, alert, confirm, updateNodeData, setNodeRuntime, hasVideo]);
 
   return (
     <Sbv1VideoEngineChatInput

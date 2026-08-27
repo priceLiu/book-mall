@@ -14,6 +14,7 @@ import {
   isSbv1VideoEngineRefImageNode,
   resolveSbv1UpstreamRefLinks,
 } from "./sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamAudioUrls } from "./sbv1-upstream-audio-links";
 import {
   getSbv1VideoDockModeChips,
   isDashscopeSbv1TextToVideoModel,
@@ -32,6 +33,7 @@ export type ResolveSbv1VideoEngineInputsResult =
       imageInputs: string[];
       portraitAssetRefs: PortraitAssetRefPayload[];
       videoInputs: string[];
+      audioInputs: string[];
     }
   | { ok: false; error: string };
 
@@ -189,6 +191,17 @@ export function resolveSbv1VideoEngineInputs(
 ): ResolveSbv1VideoEngineInputsResult {
   const prompt = String(opts.prompt ?? "").trim();
   const referenceMode = opts.referenceMode ?? "omni";
+  const pro2PresetKind = String(
+    (nodes.find((n) => n.id === engineNodeId)?.data as { pro2PresetKind?: string })
+      ?.pro2PresetKind ?? "",
+  ).trim();
+  const isLipSyncPreset = pro2PresetKind === "lip-sync-broadcast";
+  const isRefAudioPreset = pro2PresetKind === "reference-audio-to-video";
+  const audioInputs = resolveSbv1UpstreamAudioUrls(
+    engineNodeId,
+    nodes,
+    edges,
+  );
   const modelKey = opts.modelKey?.trim() ?? "";
   const usePortraitLibrary = sbv1VideoModelUsesPortraitLibrary(
     modelKey,
@@ -255,6 +268,47 @@ export function resolveSbv1VideoEngineInputs(
   const styleHttps = resolveNonSbv1ImageHttpsInputs(nodes, edges, engineNodeId);
   const videoInputs = resolveMotionVideoInputs(nodes, edges, engineNodeId);
 
+  if (isLipSyncPreset) {
+    const lipImages: string[] = [];
+    for (const slot of slots) {
+      if (slot.kind === "oss") lipImages.push(slot.url);
+    }
+    const dedupedImages = [...new Set([...lipImages, ...styleHttps])];
+    if (dedupedImages.length === 0) {
+      return { ok: false, error: "对口型口播需要连接一张人物参考图。" };
+    }
+    return {
+      ok: true,
+      imageInputs: dedupedImages.slice(0, 1),
+      portraitAssetRefs: [],
+      videoInputs,
+      audioInputs: audioInputs.slice(0, 1),
+    };
+  }
+
+  if (isRefAudioPreset) {
+    const portraitAssetRefs: PortraitAssetRefPayload[] = [];
+    const imageHttps: string[] = [];
+    for (const slot of slots) {
+      if (slot.kind === "asset") {
+        portraitAssetRefs.push(portraitRefWithRole(slot.url, "reference_image"));
+      } else {
+        imageHttps.push(slot.url);
+      }
+    }
+    const dedupedImages = [...new Set([...imageHttps, ...styleHttps])];
+    if (dedupedImages.length === 0 && portraitAssetRefs.length === 0) {
+      return { ok: false, error: "参考音生视频需要连接至少一张参考图。" };
+    }
+    return {
+      ok: true,
+      imageInputs: dedupedImages,
+      portraitAssetRefs: dedupePortraitAssetRefs(portraitAssetRefs),
+      videoInputs,
+      audioInputs: audioInputs.slice(0, 1),
+    };
+  }
+
   if (referenceMode === "first_last") {
     if (slots.length < 1 && !allowTextToVideo) {
       return {
@@ -300,6 +354,7 @@ export function resolveSbv1VideoEngineInputs(
       imageInputs: [...new Set([...imageInputs, ...styleHttps])],
       portraitAssetRefs: dedupePortraitAssetRefs(portraitAssetRefs),
       videoInputs,
+      audioInputs: [],
     };
   }
 
@@ -345,5 +400,6 @@ export function resolveSbv1VideoEngineInputs(
     imageInputs: dedupedImages,
     portraitAssetRefs: dedupedAssets,
     videoInputs,
+    audioInputs: [],
   };
 }
