@@ -28,6 +28,20 @@ export type Pro2ShortcutPresetId =
   | "text-to-video"
   | "text-to-music";
 
+/** 视频节点空态 · 左侧添加上游快捷预设 */
+export type Pro2VideoShortcutPresetId =
+  | "image-ref-to-video"
+  | "text-to-video-from-video"
+  | "video-to-video"
+  | "image-audio-to-video";
+
+const VIDEO_PRESET_LABEL: Record<Pro2VideoShortcutPresetId, string> = {
+  "image-ref-to-video": "预设 - 图(参考)生视频",
+  "text-to-video-from-video": "预设 - 文生视频",
+  "video-to-video": "预设 - 视频生视频",
+  "image-audio-to-video": "预设 - 图片音频合成视频",
+};
+
 const PRESET_LABEL: Record<Pro2ShortcutPresetId, string> = {
   "image-to-prompt": "预设 - 图片反推提示词",
   "video-to-prompt": "预设 - 视频反推提示词",
@@ -459,4 +473,144 @@ function attachTextToMusicPreset(
     },
   ]);
   selectPro2NodeAfterSpawn(store.setNodes, starterId);
+}
+
+/** 在已有空视频节点左侧挂载快捷预设（上游在左、视频锚点在右） */
+export function attachPro2VideoShortcutPreset(
+  videoId: string,
+  preset: Pro2VideoShortcutPresetId,
+  nodes: CanvasFlowNode[],
+  store: AttachStarterStore,
+): void {
+  const video = nodes.find((n) => n.id === videoId);
+  if (!video || video.type !== "sbv1-video-engine") return;
+
+  const gap = 56;
+  const vx = video.position.x;
+  const vy = video.position.y;
+  const videoW = video.width ?? SBV1_VIDEO_ENGINE_WIDTH;
+  const videoH = video.height ?? SBV1_VIDEO_ENGINE_HEIGHT;
+  const textW = PRO2_TEXT_NODE_WIDTH;
+  const imageW = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
+  const imageH = LIBTV_SQUARE_IMAGE_NODE_HEIGHT;
+  const audioW = LIBTV_AUDIO_TRACK_NODE_WIDTH;
+  const audioH = LIBTV_AUDIO_TRACK_NODE_HEIGHT;
+
+  store.updateNodeData(videoId, { pro2PresetKind: preset });
+
+  if (preset === "image-ref-to-video") {
+    const imageId = store.addNode(
+      "story-pro2-image",
+      {
+        x: vx - imageW - gap,
+        y: vy + Math.max(0, (videoH - imageH) / 2),
+      },
+      buildPro2ImageNodeData({
+        label: "图片",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!imageId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${imageId}-${videoId}`,
+        source: imageId,
+        target: videoId,
+        sourceHandle: "image",
+        targetHandle: "in_ref",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    return;
+  }
+
+  if (preset === "text-to-video-from-video") {
+    const textId = store.addNode(
+      "story-pro2-starter",
+      {
+        x: vx - textW - gap,
+        y: vy + Math.max(0, (videoH - PRO2_TEXT_NODE_HEIGHT) / 2),
+      },
+      buildPro2GeneralTextNodeData({ pro2PresetKind: preset }),
+    );
+    if (!textId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${textId}-${videoId}`,
+        source: textId,
+        target: videoId,
+        sourceHandle: "text",
+        targetHandle: "in_text",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    return;
+  }
+
+  if (preset === "video-to-video") {
+    const upstreamVideoId = store.addNode(
+      "sbv1-video-engine",
+      {
+        x: vx - videoW - gap,
+        y: vy,
+      },
+      buildSbv1VideoEngineNodeData({
+        label: "视频",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!upstreamVideoId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${upstreamVideoId}-${videoId}`,
+        source: upstreamVideoId,
+        target: videoId,
+        sourceHandle: "out_video",
+        targetHandle: "in_motion_video",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    return;
+  }
+
+  const stackLeft = vx - Math.max(imageW, audioW) - gap;
+  const stackTop = vy + Math.max(0, (videoH - imageH - audioH - 24) / 2);
+  const imageId = store.addNode(
+    "story-pro2-image",
+    { x: stackLeft, y: stackTop },
+    buildPro2ImageNodeData({
+      label: "图片",
+      pro2PresetKind: preset,
+    }),
+  );
+  const audioId = store.addNode(
+    "story-pro2-audio",
+    { x: stackLeft, y: stackTop + imageH + 24 },
+    buildPro2AudioNodeData({
+      label: "音频",
+      pro2PresetKind: preset,
+    }),
+  );
+  if (!imageId || !audioId) return;
+  store.setEdges((prev) => [
+    ...prev,
+    {
+      id: `e-${imageId}-${videoId}`,
+      source: imageId,
+      target: videoId,
+      sourceHandle: "image",
+      targetHandle: "in_ref",
+    },
+    {
+      id: `e-${audioId}-${videoId}`,
+      source: audioId,
+      target: videoId,
+      sourceHandle: "audio",
+      targetHandle: "in_ref",
+    },
+  ]);
+  selectPro2NodeAfterSpawn(store.setNodes, videoId);
 }

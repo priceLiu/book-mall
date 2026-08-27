@@ -7,7 +7,7 @@ import { ExternalLink, Layers } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { UnifiedProjectAssetsView } from "@/components/canvas/unified-project-assets-view";
 import {
-  listMyCanvasProjects,
+  listAllMyCanvasProjects,
   type CanvasProjectSummary,
 } from "@/lib/canvas-api";
 import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
@@ -22,7 +22,7 @@ function Inner() {
     if (!base?.trim()) return;
     setLoading(true);
     try {
-      const list = await listMyCanvasProjects(base);
+      const list = await listAllMyCanvasProjects(base);
       setProjects(list);
       setProjectId((prev) => {
         if (prev && list.some((p) => p.id === prev)) return prev;

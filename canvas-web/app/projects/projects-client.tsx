@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -9,6 +9,7 @@ import {
   CanvasListCover,
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
+import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import {
   CanvasProjectOpenLink,
   CanvasProjectOpeningOverlay,
@@ -67,6 +68,12 @@ import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
 import { PortalSubmitDialog } from "@/components/home/portal-submit-dialog";
 import { cn } from "@/lib/utils";
 
+/** 首屏条数：约 3 行 × 5 列（xl） */
+const PROJECTS_FIRST_PAGE_SIZE = 15;
+const PROJECTS_LOAD_MORE_SIZE = 15;
+/** 管理员门户操作 · 列表首屏后再拉，避免与首屏抢连接 */
+const PROJECTS_SECONDARY_DEFER_MS = 1200;
+
 type StarterPick =
   | { kind: "blank" }
   | { kind: "builtin"; id: string }
@@ -103,7 +110,13 @@ function Inner() {
     edition: CanvasProjectEdition;
   } | null>(null);
   const [userTemplates, setUserTemplates] = useState<CanvasTemplateRecord[]>([]);
+  const [userTemplatesLoading, setUserTemplatesLoading] = useState(false);
+  const userTemplatesLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const [creating, setCreating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +138,16 @@ function Inner() {
   const [openingProjectId, setOpeningProjectId] = useState<string | null>(null);
   const [scriptPackageLoading, setScriptPackageLoading] = useState(false);
 
+  const fetchProjectsPage = useCallback(
+    async (cursor: string | null, limit: number) => {
+      if (!base) {
+        throw new Error("未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布列表。");
+      }
+      return listMyCanvasProjects(base, { limit, cursor });
+    },
+    [base],
+  );
+
   const load = useCallback(async () => {
     if (!base) {
       setLoading(false);
@@ -134,31 +157,85 @@ function Inner() {
     setLoading(true);
     setError(null);
     try {
-      const list = await listMyCanvasProjects(base);
-      setProjects(Array.isArray(list) ? list : []);
-      // 禁止列表加载后批量 GET 全量 canvas JSON：会打满远端连接池
-      // （日志里单项目 6s+、列表 12s），导致打开画布 / introspect 一起饿死。
-      // 仅 hover / pointerdown 预取当前点的项目（prefetchCanvasProject）。
-      setLoading(false);
-      void listCanvasTemplates(base)
-        .then((tpl) => {
-          setUserTemplates(
-            (Array.isArray(tpl) ? tpl : []).filter((t) => !t.builtin),
-          );
-        })
-        .catch(() => undefined);
+      const page = await fetchProjectsPage(null, PROJECTS_FIRST_PAGE_SIZE);
+      setProjects(page.projects);
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
       setError(null);
     } catch (e) {
       const raw = e instanceof Error ? e.message : "加载失败";
       setError(formatCanvasApiError(raw));
+      setProjects([]);
+      setNextCursor(null);
+      setHasMore(false);
     } finally {
       setLoading(false);
+    }
+  }, [base, fetchProjectsPage]);
+
+  const loadMore = useCallback(async () => {
+    if (!base || !hasMore || !nextCursor || loadingMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchProjectsPage(nextCursor, PROJECTS_LOAD_MORE_SIZE);
+      setProjects((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        const merged = [...prev];
+        for (const p of page.projects) {
+          if (!seen.has(p.id)) merged.push(p);
+        }
+        return merged;
+      });
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    } catch {
+      // 加载更多失败时不打断已展示列表
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    base,
+    fetchProjectsPage,
+    hasMore,
+    loading,
+    loadingMore,
+    nextCursor,
+  ]);
+
+  const ensureUserTemplates = useCallback(async () => {
+    if (!base?.trim() || userTemplatesLoadedRef.current) return;
+    userTemplatesLoadedRef.current = true;
+    setUserTemplatesLoading(true);
+    try {
+      const tpl = await listCanvasTemplates(base);
+      setUserTemplates(
+        (Array.isArray(tpl) ? tpl : []).filter((t) => !t.builtin),
+      );
+    } catch {
+      userTemplatesLoadedRef.current = false;
+    } finally {
+      setUserTemplatesLoading(false);
     }
   }, [base]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const el = loadMoreSentinelRef.current;
+    if (!el || !hasMore || loading || loadingMore) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void loadMore();
+        }
+      },
+      { root: null, rootMargin: "480px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore, loading, loadingMore]);
 
   /** 路由未跳转成功时，避免「正在打开画布…」遮罩一直盖住列表 */
   useEffect(() => {
@@ -190,10 +267,6 @@ function Inner() {
     }
   }, [base, isAdmin]);
 
-  useEffect(() => {
-    void refreshPortalFeaturedIds();
-  }, [refreshPortalFeaturedIds]);
-
   const refreshPortalCaseIds = useCallback(async () => {
     if (!base?.trim() || !isAdmin) {
       setPortalCaseIds(new Set());
@@ -214,8 +287,13 @@ function Inner() {
   }, [base, isAdmin]);
 
   useEffect(() => {
-    void refreshPortalCaseIds();
-  }, [refreshPortalCaseIds]);
+    if (!isAdmin || loading || !base?.trim()) return;
+    const timer = window.setTimeout(() => {
+      void refreshPortalFeaturedIds();
+      void refreshPortalCaseIds();
+    }, PROJECTS_SECONDARY_DEFER_MS);
+    return () => window.clearTimeout(timer);
+  }, [isAdmin, loading, base, refreshPortalFeaturedIds, refreshPortalCaseIds]);
 
   const onTogglePortalCase = useCallback(
     async (id: string, caseFlag: boolean) => {
@@ -298,6 +376,7 @@ function Inner() {
     setCreateStep(2);
     setPro2ScriptPackageOnly(true);
     setPickerOpen(true);
+    void ensureUserTemplates();
     void (async () => {
       setScriptPackageLoading(true);
       try {
@@ -310,7 +389,7 @@ function Inner() {
         setScriptPackageLoading(false);
       }
     })();
-  }, [base]);
+  }, [base, ensureUserTemplates]);
 
   const onOpenPicker = useCallback((edition: CanvasProjectEdition) => {
     setPickerEdition(edition);
@@ -326,7 +405,8 @@ function Inner() {
     setName("");
     resetCreateWizard();
     setPickerOpen(true);
-  }, [resetCreateWizard]);
+    void ensureUserTemplates();
+  }, [resetCreateWizard, ensureUserTemplates]);
 
   const pro2Projects = useMemo(
     () =>
@@ -646,10 +726,7 @@ function Inner() {
       ) : null}
 
       {loading ? (
-        <div className="flex items-center gap-2 py-12 text-sm text-[var(--canvas-muted)]">
-          <Loader2 className="size-4 animate-spin" />
-          加载中…
-        </div>
+        <CanvasListSkeleton sections={1} cardsPerSection={10} />
       ) : projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-12 text-center text-sm text-[var(--canvas-muted)]">
           还没有画布。请使用上方按钮创建影视专业版或分镜视频画布。
@@ -660,6 +737,7 @@ function Inner() {
             title="分镜视频 1.0"
             edition="sbv1"
             projects={sbv1Projects}
+            mayLoadMore={hasMore}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
@@ -681,6 +759,7 @@ function Inner() {
             title="影视专业版 2.0"
             edition="pro2"
             projects={pro2Projects}
+            mayLoadMore={hasMore}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
@@ -702,6 +781,7 @@ function Inner() {
             title="影视专业版"
             edition="pro"
             projects={proProjects}
+            mayLoadMore={hasMore}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             duplicatingId={duplicatingId}
@@ -721,6 +801,22 @@ function Inner() {
           />
         </div>
       )}
+
+      {!loading && hasMore ? (
+        <div
+          ref={loadMoreSentinelRef}
+          className="flex items-center justify-center py-8 text-sm text-[var(--canvas-muted)]"
+        >
+          {loadingMore ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              加载更多…
+            </>
+          ) : (
+            <span className="text-white/30">向下滚动加载更多画布</span>
+          )}
+        </div>
+      ) : null}
 
       {pickerOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -879,7 +975,12 @@ function Inner() {
                 </ul>
               </div>
 
-              {filteredUserTemplates.length > 0 ? (
+              {userTemplatesLoading ? (
+                <div className="flex items-center gap-2 py-2 text-[12px] text-white/50">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  加载个人模板…
+                </div>
+              ) : filteredUserTemplates.length > 0 ? (
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
                     我保存的模板 · {canvasEditionLabel(pickerEdition)}
@@ -976,10 +1077,12 @@ function ProjectsSection({
   onOpenSubmit,
   openingProjectId,
   onOpeningProject,
+  mayLoadMore = false,
 }: {
   title: string;
   edition: CanvasProjectEdition;
   projects: CanvasProjectSummary[];
+  mayLoadMore?: boolean;
   onDelete: (id: string, label: string, collaborationLocked?: boolean) => void | Promise<void>;
   onDuplicate: (id: string, label: string) => void | Promise<void>;
   duplicatingId: string | null;
@@ -1021,7 +1124,9 @@ function ProjectsSection({
 
       {projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)]/60 px-6 py-10 text-center text-sm text-[var(--canvas-muted)]">
-          此分区暂无画布。
+          {mayLoadMore
+            ? "此分区项目可能在下方，继续向下滚动加载更多。"
+            : "此分区暂无画布。"}
         </div>
       ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>

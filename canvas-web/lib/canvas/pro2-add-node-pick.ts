@@ -3,6 +3,7 @@
 import { flowPositionAtScreenPoint, flowPositionAtViewportCenter } from "./viewport-placement";
 import {
   buildPro2ImageNodeData,
+  buildPro2PromptNodeData,
   buildPro2StarterNodeData,
   buildPro2TagNodeData,
   buildPro2ThreeViewNodeData,
@@ -39,6 +40,7 @@ export type Pro2AddNodePickStore = {
   addNode: (
     type:
       | "story-pro2-starter"
+      | "story-pro2-prompt"
       | "story-pro2-tag"
       | "story-pro2-image"
       | "story-pro2-script-hub"
@@ -197,6 +199,13 @@ export async function handlePro2ToolbarAddNodePick(
   if (itemId === "tag" && nodeType === "story-pro2-tag") {
     const pos = spawnPosition("story-pro2-tag", options);
     const id = addNode("story-pro2-tag", pos, buildPro2TagNodeData());
+    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
+  if (itemId === "prompt" && nodeType === "story-pro2-prompt") {
+    const pos = spawnPosition("story-pro2-prompt", options);
+    const id = addNode("story-pro2-prompt", pos, buildPro2PromptNodeData());
     if (id) selectPro2NodeAfterSpawn(setNodes, id);
     return;
   }
@@ -393,6 +402,7 @@ export async function handlePro2SideAddNodePick(
     itemId === "video" ||
     itemId === "video-compose" ||
     nodeType === "story-pro2-starter" ||
+    nodeType === "story-pro2-prompt" ||
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-script-hub" ||
     nodeType === "story-pro2-three-view" ||

@@ -66,8 +66,8 @@ export function RecentProjectsSection() {
     }
     setLoading(true);
     try {
-      const list = await listMyCanvasProjects(base);
-      const sorted = [...list].sort(
+      const page = await listMyCanvasProjects(base, { limit: RECENT_LIMIT });
+      const sorted = [...page.projects].sort(
         (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       );
       setProjects(sorted.slice(0, RECENT_LIMIT));

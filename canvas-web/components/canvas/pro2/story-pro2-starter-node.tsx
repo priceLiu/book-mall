@@ -3,7 +3,6 @@
 import { useCallback, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
 import {
-  AlignLeft,
   FileText,
   GripVertical,
   ImageIcon,
@@ -84,8 +83,9 @@ import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
-  LibtvTryActionRow,
 } from "../libtv-thin-node-try-row";
+import { LibtvEmptyTryStage } from "../libtv-empty-try-stage";
+import { LibtvNodeLinkedStage } from "../libtv-node-stage-logo";
 
 type StarterTryAction =
   | { id: "write"; label: string; icon: typeof PenLine; kind: "write" }
@@ -545,41 +545,20 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
             </Pro2NodeScrollArea>
           </div>
         ) : displayState === "connected" ? (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col items-center justify-center gap-2 px-4 text-center",
-            )}
-          >
-            <AlignLeft className="size-8 text-white/20" />
-            <p className="text-[11px] text-white/45">{linkedMessage}</p>
-          </div>
+          <LibtvNodeLinkedStage
+            stageIcon={FileText}
+            message={linkedMessage}
+          />
         ) : (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col px-3 pb-3 pt-2",
-            )}
-          >
-            <div className="mb-3 flex justify-center pt-1">
-              <AlignLeft className="size-8 text-white/20" />
-            </div>
-            <p className="mb-2 text-[11px] text-white/45">尝试：</p>
-            <ul className="space-y-0.5">
-              {STARTER_TRY_ACTIONS.map((action) => (
-                <li key={action.id}>
-                  <LibtvTryActionRow
-                    icon={action.icon}
-                    label={action.label}
-                    onClick={() => onTryAction(action)}
-                  />
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[10px] leading-relaxed text-white/35">
-              在故事脚本生成中创作并发布剧本后，可在公告条参与制作任务；本节点也可用于提示词与下游生图/生视频。
-            </p>
-          </div>
+          <LibtvEmptyTryStage
+            stageIcon={FileText}
+            actions={STARTER_TRY_ACTIONS.map((action) => ({
+              id: action.id,
+              label: action.label,
+              icon: action.icon,
+              onClick: () => onTryAction(action),
+            }))}
+          />
         )}
       </div>
     </div>

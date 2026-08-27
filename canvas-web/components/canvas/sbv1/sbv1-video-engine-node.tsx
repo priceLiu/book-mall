@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
-import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
+import {
+  ImageIcon,
+  Maximize2,
+  Music,
+  Play,
+  RefreshCw,
+  Video,
+} from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
@@ -49,6 +56,13 @@ import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit
 import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
+import {
+  attachPro2VideoShortcutPreset,
+  type Pro2VideoShortcutPresetId,
+} from "@/lib/canvas/pro2-spawn-shortcut-presets";
+import { LibtvEmptyTryStage } from "../libtv-empty-try-stage";
+import { LibtvNodeLinkedStage } from "../libtv-node-stage-logo";
+import { libtvVideoEngineNodeIsLinked } from "@/lib/canvas/pro2-thin-node-display-state";
 import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
@@ -72,6 +86,19 @@ import {
   pro2VideoBoardRowRuntime,
 } from "@/lib/canvas/pro2-video-board-cell-task";
 import type { StoryProVideoRow } from "@/lib/canvas/story-pro-workspace-types";
+
+type VideoTryAction = {
+  id: Pro2VideoShortcutPresetId;
+  label: string;
+  icon: typeof ImageIcon | typeof Video | typeof Music;
+};
+
+const VIDEO_TRY_ACTIONS: VideoTryAction[] = [
+  { id: "image-ref-to-video", label: "图(参考)生视频", icon: ImageIcon },
+  { id: "text-to-video-from-video", label: "文生视频", icon: Video },
+  { id: "video-to-video", label: "视频生视频", icon: Play },
+  { id: "image-audio-to-video", label: "图片音频合成视频", icon: Music },
+];
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
@@ -539,6 +566,39 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     }
   }, [duplicateNode, id, rfSetNodes]);
 
+  const isLinked = useMemo(
+    () => libtvVideoEngineNodeIsLinked(id, edges),
+    [edges, id],
+  );
+
+  const linkedMessage = useMemo(() => {
+    const hasIncoming = edges.some(
+      (e) =>
+        e.target === id &&
+        (e.targetHandle === "in_text" ||
+          e.targetHandle === "in_ref" ||
+          e.targetHandle === "in_motion_video" ||
+          e.targetHandle == null),
+    );
+    if (hasIncoming) {
+      return "已连接上游节点，选中本节点编辑 prompt 并生成";
+    }
+    return "已连接下游节点，上传或生成视频";
+  }, [edges, id]);
+
+  const onTryVideoPreset = useCallback(
+    (preset: Pro2VideoShortcutPresetId) => {
+      attachPro2VideoShortcutPreset(id, preset, nodes, {
+        addNode: (type, position, nodeData) =>
+          addNode(type as never, position, nodeData),
+        setEdges,
+        setNodes,
+        updateNodeData,
+      });
+    },
+    [id, nodes, addNode, setEdges, setNodes, updateNodeData],
+  );
+
   return (
     <>
       <div
@@ -729,7 +789,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : isPro2VideoBoardCell ? (
               <div
                 className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4"
                 onDoubleClick={(e) => {
@@ -738,19 +798,41 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               >
                 <Pro2MediaNodeEmptyState
                   icon={Video}
-                  label={
-                    isPro2VideoBoardCell
-                      ? "添加或生成视频"
-                      : "选中本节点，在下方编辑 prompt 并生成"
-                  }
+                  label="添加或生成视频"
                   className="min-h-0 pb-0"
                   passNodeDrag
                 />
-                {isPro2VideoBoardCell && !selected ? (
+                {!selected ? (
                   <p className="mt-3 text-[10px] text-white/35">
                     选中节点以编辑提示词
                   </p>
                 ) : null}
+              </div>
+            ) : isLinked ? (
+              <div
+                className="absolute inset-0 flex min-h-0 flex-col"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <LibtvNodeLinkedStage stageIcon={Video} message={linkedMessage} />
+              </div>
+            ) : (
+              <div
+                className="absolute inset-0 flex min-h-0 flex-col"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <LibtvEmptyTryStage
+                  stageIcon={Video}
+                  actions={VIDEO_TRY_ACTIONS.map((action) => ({
+                    id: action.id,
+                    label: action.label,
+                    icon: action.icon,
+                    onClick: () => onTryVideoPreset(action.id),
+                  }))}
+                />
               </div>
             )}
           </div>

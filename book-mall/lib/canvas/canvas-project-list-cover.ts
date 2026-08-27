@@ -193,3 +193,46 @@ export function projectListCoverSummaryFields(canvas: unknown): {
   }
   return {};
 }
+
+export type MetaListCover = {
+  thumbnailUrl?: string;
+  coverMediaKind?: ProjectListCoverKind;
+  coverVideoUrl?: string;
+  coverPosterUrl?: string;
+};
+
+export function readListCoverFromMeta(meta: unknown): MetaListCover | null {
+  if (!meta || typeof meta !== "object") return null;
+  const raw = (meta as { listCover?: unknown }).listCover;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const coverMediaKind =
+    o.coverMediaKind === "video" || o.coverMediaKind === "image"
+      ? o.coverMediaKind
+      : undefined;
+  const thumbnailUrl =
+    typeof o.thumbnailUrl === "string" ? o.thumbnailUrl.trim() : "";
+  const coverVideoUrl =
+    typeof o.coverVideoUrl === "string" ? o.coverVideoUrl.trim() : "";
+  const coverPosterUrl =
+    typeof o.coverPosterUrl === "string" ? o.coverPosterUrl.trim() : "";
+  if (!coverMediaKind && !thumbnailUrl && !coverVideoUrl) return null;
+  return {
+    thumbnailUrl: thumbnailUrl || undefined,
+    coverMediaKind,
+    coverVideoUrl: coverVideoUrl || undefined,
+    coverPosterUrl: coverPosterUrl || undefined,
+  };
+}
+
+/** 保存画布时写入 meta.listCover，列表查询无需再拉全量 canvas */
+export function embedListCoverInCanvas(canvas: unknown): unknown {
+  if (!canvas || typeof canvas !== "object") return canvas;
+  const cover = projectListCoverSummaryFields(canvas);
+  const base = canvas as { meta?: Record<string, unknown> };
+  const meta = { ...(base.meta ?? {}) };
+  if (cover.thumbnailUrl || cover.coverMediaKind) {
+    meta.listCover = cover;
+  }
+  return { ...base, meta };
+}

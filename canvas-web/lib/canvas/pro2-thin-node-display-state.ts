@@ -18,6 +18,27 @@ export function pro2ThinNodeIsLinked(
   );
 }
 
+/** 视频合成节点 · 有入边或出边即视为已连线（含快捷预设生成的上游节点） */
+export function libtvVideoEngineNodeIsLinked(
+  nodeId: string,
+  edges: CanvasFlowEdge[],
+): boolean {
+  return edges.some((e) => {
+    if (e.target === nodeId) {
+      return (
+        e.targetHandle === "in_text" ||
+        e.targetHandle === "in_ref" ||
+        e.targetHandle === "in_motion_video" ||
+        e.targetHandle == null
+      );
+    }
+    if (e.source === nodeId) {
+      return e.sourceHandle === "out_video" || e.sourceHandle == null;
+    }
+    return false;
+  });
+}
+
 export function resolveLibtvThinNodeDisplayState(input: {
   hasGeneratedContent: boolean;
   isGenerating: boolean;

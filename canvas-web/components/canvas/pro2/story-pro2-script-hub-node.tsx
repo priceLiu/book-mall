@@ -10,7 +10,6 @@ import {
 import { PRO2_RIGHT_ADD_MENU, PRO2_STARTER_LEFT_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import type { NodeProps } from "@xyflow/react";
 import {
-  AlignLeft,
   BookOpen,
   FileText,
   GripVertical,
@@ -26,6 +25,7 @@ import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { LibtvNodeLinkedStage } from "../libtv-node-stage-logo";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
@@ -594,17 +594,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
             />
           </div>
         ) : hubStageVariant === "connected" ? (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-white/45",
-              isGenerating && "pointer-events-none",
-            )}
-          >
-            <AlignLeft className="size-8 text-white/20" />
-            <p>{linkedMessage.title}</p>
-            <p className="text-[10px] text-white/35">{linkedMessage.hint}</p>
-          </div>
+          <LibtvNodeLinkedStage
+            stageIcon={BookOpen}
+            message={linkedMessage.title}
+            className={isGenerating ? "pointer-events-none" : undefined}
+          />
         ) : (
           <div
             className={cn(
@@ -613,9 +607,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
               isGenerating && "pointer-events-none",
             )}
           >
-            <div className="mb-3 flex justify-center pt-1">
-              <AlignLeft className="size-8 text-white/20" />
-            </div>
             <p className="mb-2 text-[11px] text-white/45">尝试：</p>
             <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
               <div className="min-w-0">
@@ -635,7 +626,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
                   ))}
                 </ul>
               </div>
-              <div className="min-w-0 border-l border-white/10 pl-3">
+              <div className="min-w-0 pl-1">
                 <p className="mb-2 text-[11px] text-white/45">提示词模板</p>
                 <ul className="space-y-0.5">
                   {PRO2_SCRIPT_CATEGORY_PRESETS.map((preset) => (

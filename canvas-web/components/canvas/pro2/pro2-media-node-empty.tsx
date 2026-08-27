@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LibtvNodeStageLogo } from "../libtv-node-stage-logo";
 
 /** 2.0 媒体节点（图片 / 三视图 / 视频）· 统一暗色空状态 */
 export function Pro2MediaNodeEmptyState({
@@ -24,7 +25,7 @@ export function Pro2MediaNodeEmptyState({
         className,
       )}
     >
-      <Icon className="size-28 text-white/20" strokeWidth={1.25} />
+      <LibtvNodeStageLogo icon={Icon} />
       <span className="text-[11px] text-white/45">{label}</span>
     </div>
   );

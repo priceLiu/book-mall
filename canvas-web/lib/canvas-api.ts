@@ -295,14 +295,50 @@ async function call<T>(
 
 // ── projects ──
 
+export type CanvasProjectListPage = {
+  projects: CanvasProjectSummary[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
 export async function listMyCanvasProjects(
   base: string,
-): Promise<CanvasProjectSummary[]> {
-  const j = await call<{ projects: CanvasProjectSummary[] }>(
+  opts?: { limit?: number; cursor?: string | null },
+): Promise<CanvasProjectListPage> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.cursor) params.set("cursor", opts.cursor);
+  const qs = params.toString();
+  const j = await call<CanvasProjectListPage>(
     base,
-    "/api/canvas/projects",
+    `/api/canvas/projects${qs ? `?${qs}` : ""}`,
   );
-  return Array.isArray(j.projects) ? j.projects : [];
+  return {
+    projects: Array.isArray(j.projects) ? j.projects : [],
+    nextCursor: j.nextCursor ?? null,
+    hasMore: Boolean(j.hasMore),
+  };
+}
+
+/** 需要全量列表的入口（资产页 / 剧本包扫描）· 分页合并，避免单次 200 条 */
+export async function listAllMyCanvasProjects(
+  base: string,
+  opts?: { pageSize?: number; maxItems?: number },
+): Promise<CanvasProjectSummary[]> {
+  const pageSize = opts?.pageSize ?? 50;
+  const maxItems = opts?.maxItems ?? 200;
+  const out: CanvasProjectSummary[] = [];
+  let cursor: string | null = null;
+  while (out.length < maxItems) {
+    const page = await listMyCanvasProjects(base, {
+      limit: pageSize,
+      cursor,
+    });
+    out.push(...page.projects);
+    if (!page.hasMore || !page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+  return out.slice(0, maxItems);
 }
 
 export type PortalFeaturedProjectSummary = CanvasProjectSummary & {

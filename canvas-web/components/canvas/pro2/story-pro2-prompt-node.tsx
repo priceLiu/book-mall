@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { AlignLeft, GripVertical, MessageSquareText } from "lucide-react";
+import { GripVertical, MessageSquareText } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -35,7 +35,6 @@ import {
   spawnLibtvNeighborFromAnchor,
 } from "@/lib/canvas/libtv-side-spawn";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
-import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { cn } from "@/lib/utils";
 import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
@@ -47,6 +46,7 @@ import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import { LIBTV_PLAIN_TEXT_WRAP_CLASS } from "@/lib/canvas/libtv-plain-text-display";
 import { LIBTV_NODE_STAGE_DRAG_CLASS } from "../libtv-thin-node-try-row";
+import { LibtvNodeLinkedStage, LibtvNodeStageLogo } from "../libtv-node-stage-logo";
 
 function pro2PromptHasContent(data: StoryPro2PromptNodeData): boolean {
   return Boolean(data.generatedText?.trim() || data.prompt?.trim());
@@ -85,7 +85,6 @@ export function StoryPro2PromptNode({ id, data, selected }: NodeProps) {
   const showSidePlus = Boolean(
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
-  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
 
   const nodeLabel = useMemo(() => {
     const custom = d.label?.trim();
@@ -235,17 +234,10 @@ export function StoryPro2PromptNode({ id, data, selected }: NodeProps) {
             </Pro2NodeScrollArea>
           </div>
         ) : displayState === "connected" ? (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col items-center justify-center gap-2 px-4 text-center",
-            )}
-          >
-            <AlignLeft className="size-8 text-white/20" />
-            <p className="text-[11px] text-white/45">
-              已链接上游 · 在下方 Dock 输入提示词后发送
-            </p>
-          </div>
+          <LibtvNodeLinkedStage
+            stageIcon={MessageSquareText}
+            message="已链接上游 · 在下方 Dock 输入提示词后发送"
+          />
         ) : (
           <div
             className={cn(
@@ -253,13 +245,10 @@ export function StoryPro2PromptNode({ id, data, selected }: NodeProps) {
               "flex flex-col items-center justify-center gap-2 px-4 text-center",
             )}
           >
-            <AlignLeft className="size-8 text-white/20" />
+            <LibtvNodeStageLogo icon={MessageSquareText} />
             <p className="text-[11px] text-white/45">
               纯文本提示词节点 · 可链接任意上游，@ 引用后调用 LLM
             </p>
-            {soleSelected ? (
-              <p className="text-[10px] text-white/35">在下方 Dock 编写并发送</p>
-            ) : null}
           </div>
         )}
       </div>

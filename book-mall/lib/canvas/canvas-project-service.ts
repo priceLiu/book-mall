@@ -9,7 +9,7 @@ import {
 } from "@/lib/canvas/canvas-project-access";
 import {
   canvasProjectEditionFromGraph,
-  canvasProjectEditionFromListHints,
+  canvasProjectEditionFromMeta,
   canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
@@ -28,8 +28,9 @@ import {
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
 import { isPortalFilmShowcaseProject } from "@/lib/canvas/sbv1-film-showcase";
 import {
-  LIST_COVER_MEDIA_NODE_TYPES,
+  embedListCoverInCanvas,
   projectListCoverSummaryFields,
+  readListCoverFromMeta,
 } from "@/lib/canvas/canvas-project-list-cover";
 import {
   applyCanvasDelta,
@@ -177,89 +178,125 @@ type CanvasProjectListRow = {
   description: string;
   thumbnailUrl: string;
   meta: unknown;
-  nodeTypes: string[] | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-function parseListNodeTypes(raw: unknown): string[] | null {
-  if (!Array.isArray(raw)) return null;
-  return raw.filter((t): t is string => typeof t === "string");
+export type CanvasProjectListPage = {
+  projects: CanvasProjectSummary[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+const DEFAULT_LIST_PAGE_SIZE = 20;
+const MAX_LIST_PAGE_SIZE = 50;
+
+function clampListLimit(limit: number | undefined): number {
+  if (!limit || !Number.isFinite(limit)) return DEFAULT_LIST_PAGE_SIZE;
+  return Math.min(Math.max(Math.floor(limit), 1), MAX_LIST_PAGE_SIZE);
 }
 
-function rowNeedsListCoverEnrichment(row: CanvasProjectListRow): boolean {
-  const types = parseListNodeTypes(row.nodeTypes);
-  if (!types?.length) return false;
-  return types.some((t) => LIST_COVER_MEDIA_NODE_TYPES.has(t));
+function encodeListCursor(updatedAt: Date, id: string): string {
+  return Buffer.from(`${updatedAt.toISOString()}|${id}`, "utf8").toString(
+    "base64url",
+  );
+}
+
+function decodeListCursor(raw: string | null | undefined): {
+  updatedAt: Date;
+  id: string;
+} | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  try {
+    const decoded = Buffer.from(trimmed, "base64url").toString("utf8");
+    const sep = decoded.lastIndexOf("|");
+    if (sep <= 0) return null;
+    const iso = decoded.slice(0, sep);
+    const id = decoded.slice(sep + 1);
+    if (!id) return null;
+    const updatedAt = new Date(iso);
+    if (Number.isNaN(updatedAt.getTime())) return null;
+    return { updatedAt, id };
+  } catch {
+    return null;
+  }
 }
 
 function listRowToSummary(row: CanvasProjectListRow): CanvasProjectSummary {
-  const nodeTypes = parseListNodeTypes(row.nodeTypes);
+  const listCover = readListCoverFromMeta(row.meta);
+  const storedThumb = row.thumbnailUrl?.trim() ?? "";
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    thumbnailUrl: row.thumbnailUrl?.trim() ?? "",
-    edition: canvasProjectEditionFromListHints(row.meta, nodeTypes),
+    thumbnailUrl: listCover?.thumbnailUrl ?? storedThumb,
+    edition: canvasProjectEditionFromMeta(row.meta),
+    coverMediaKind: listCover?.coverMediaKind,
+    coverVideoUrl: listCover?.coverVideoUrl,
+    coverPosterUrl: listCover?.coverPosterUrl,
     collaborationLocked: canvasProjectHasCollaboration(row.meta),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
+function isVisibleListRow(row: CanvasProjectListRow): boolean {
+  return !isRetiredLegacyPro2FromListHints(row.meta, null);
+}
+
+/** 列表页 · 分页 + 仅读 meta（不扫 nodes、不二次拉全量 canvas） */
 export async function listCanvasProjectsForUser(
   userId: string,
-): Promise<CanvasProjectSummary[]> {
-  const rows = await prisma.$queryRaw<CanvasProjectListRow[]>`
-    SELECT
-      cp.id,
-      cp.name,
-      cp.description,
-      cp."thumbnailUrl",
-      cp.canvas->'meta' AS meta,
-      (
-        SELECT COALESCE(jsonb_agg(elem->>'type'), '[]'::jsonb)
-        FROM jsonb_array_elements(
-          CASE
-            WHEN jsonb_typeof(cp.canvas->'nodes') = 'array'
-            THEN cp.canvas->'nodes'
-            ELSE '[]'::jsonb
-          END
-        ) AS elem
-      ) AS "nodeTypes",
-      cp."createdAt",
-      cp."updatedAt"
-    FROM "CanvasProject" cp
-    WHERE cp."userId" = ${userId}
-      AND cp."deletedAt" IS NULL
-    ORDER BY cp."updatedAt" DESC
-    LIMIT 200
-  `;
-  const filtered = rows.filter(
-    (_, i) =>
-      !isRetiredLegacyPro2FromListHints(
-        rows[i]!.meta,
-        parseListNodeTypes(rows[i]!.nodeTypes),
-      ),
-  );
+  opts?: { limit?: number; cursor?: string | null },
+): Promise<CanvasProjectListPage> {
+  const limit = clampListLimit(opts?.limit);
+  const cursor = decodeListCursor(opts?.cursor);
 
-  const enrichIds = filtered
-    .filter((row) => rowNeedsListCoverEnrichment(row))
-    .map((row) => row.id);
-  const canvasRows =
-    enrichIds.length > 0
-      ? await prisma.canvasProject.findMany({
-          where: { id: { in: enrichIds } },
-          select: { id: true, canvas: true },
-        })
-      : [];
-  const canvasById = new Map(canvasRows.map((row) => [row.id, row.canvas]));
+  const rows = cursor
+    ? await prisma.$queryRaw<CanvasProjectListRow[]>`
+        SELECT
+          cp.id,
+          cp.name,
+          cp.description,
+          cp."thumbnailUrl",
+          cp.canvas->'meta' AS meta,
+          cp."createdAt",
+          cp."updatedAt"
+        FROM "CanvasProject" cp
+        WHERE cp."userId" = ${userId}
+          AND cp."deletedAt" IS NULL
+          AND (
+            cp."updatedAt" < ${cursor.updatedAt}
+            OR (cp."updatedAt" = ${cursor.updatedAt} AND cp.id < ${cursor.id})
+          )
+        ORDER BY cp."updatedAt" DESC, cp.id DESC
+        LIMIT ${limit + 1}
+      `
+    : await prisma.$queryRaw<CanvasProjectListRow[]>`
+        SELECT
+          cp.id,
+          cp.name,
+          cp.description,
+          cp."thumbnailUrl",
+          cp.canvas->'meta' AS meta,
+          cp."createdAt",
+          cp."updatedAt"
+        FROM "CanvasProject" cp
+        WHERE cp."userId" = ${userId}
+          AND cp."deletedAt" IS NULL
+        ORDER BY cp."updatedAt" DESC, cp.id DESC
+        LIMIT ${limit + 1}
+      `;
 
-  return filtered.map((row) => {
-    const summary = listRowToSummary(row);
-    const canvas = canvasById.get(row.id);
-    return canvas ? enrichSummaryWithListCover(summary, canvas) : summary;
-  });
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const projects = pageRows.filter(isVisibleListRow).map(listRowToSummary);
+  const last = pageRows.at(-1);
+  const nextCursor =
+    hasMore && last ? encodeListCursor(last.updatedAt, last.id) : null;
+
+  return { projects, nextCursor, hasMore };
 }
 
 function defaultCanvasProjectName(now = new Date()): string {
@@ -287,7 +324,7 @@ export async function createCanvasProjectForUser(
   const description = (args.description ?? "").toString();
   let canvas =
     args.canvas && typeof args.canvas === "object"
-      ? args.canvas
+      ? embedListCoverInCanvas(args.canvas)
       : { schemaVersion: 1, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
   if (canvasProjectEditionFromGraph(canvas) === "pro2") {
     canvas = withPro2ScriptFormatV13Meta(
@@ -371,18 +408,19 @@ export async function updateCanvasProjectForUser(
   }
   if (patch.canvasDelta !== undefined) {
     assertCanvasDeltaBaseUpdatedAt(patch.canvasDelta.baseUpdatedAt, p.updatedAt);
-    const mergedCanvas = mergePersistedMediaIntoCanvasGraph(
-      applyCanvasDelta(p.canvas, patch.canvasDelta),
-      p.canvas,
+    const mergedCanvas = embedListCoverInCanvas(
+      mergePersistedMediaIntoCanvasGraph(
+        applyCanvasDelta(p.canvas, patch.canvasDelta),
+        p.canvas,
+      ),
     );
     data.canvas = mergedCanvas as Prisma.InputJsonValue;
   } else if (patch.canvas !== undefined) {
     if (!patch.canvas || typeof patch.canvas !== "object") {
       throw new CanvasProjectError("INVALID_INPUT", "canvas must be object");
     }
-    const mergedCanvas = mergePersistedMediaIntoCanvasGraph(
-      patch.canvas,
-      p.canvas,
+    const mergedCanvas = embedListCoverInCanvas(
+      mergePersistedMediaIntoCanvasGraph(patch.canvas, p.canvas),
     );
     data.canvas = mergedCanvas as Prisma.InputJsonValue;
   }
