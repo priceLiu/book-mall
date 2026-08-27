@@ -117,6 +117,7 @@ export function PortalFilmCasesSection() {
                       kind={item.kind}
                       posterUrl={item.posterUrl}
                       placeholderLetter={item.projectName}
+                      calm={preview != null}
                     />
                   </div>
                   <ShowcaseMediaKindBadge kind={item.kind} />

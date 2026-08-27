@@ -1,9 +1,16 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { Copy, Loader2, X } from "lucide-react";
 
 import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
 import type { CanvasGraph } from "@/lib/canvas/types";
+import {
+  PORTAL_PREVIEW_MODAL_BACKDROP_CLASS,
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 
 type Props = {
   name: string;
@@ -29,23 +36,29 @@ export function TemplatePreviewDialog({
   onCopy,
   copying,
 }: Props) {
-  return (
+  const mounted = useClientPortalMounted();
+  useModalBodyScrollLock(true);
+  useModalEscapeClose(onClose);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className={PORTAL_PREVIEW_MODAL_BACKDROP_CLASS}
       role="dialog"
       aria-modal
       aria-label={`预览：${name}`}
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface)]"
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 px-1 pb-3 pt-1">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-white">{name}</p>
             {description ? (
-              <p className="truncate text-xs text-white/45">{description}</p>
+              <p className="truncate text-xs text-white/55">{description}</p>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -66,7 +79,7 @@ export function TemplatePreviewDialog({
             ) : null}
             <button
               type="button"
-              className="rounded-lg p-1.5 text-white/60 transition hover:bg-white/8 hover:text-white"
+              className="rounded-lg p-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
               aria-label="关闭"
               onClick={onClose}
             >
@@ -75,7 +88,7 @@ export function TemplatePreviewDialog({
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
+        <div className="min-h-0 flex-1 overflow-auto">
           {mediaKind === "video" && thumbnailUrl?.trim() ? (
             <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
               <video
@@ -95,11 +108,12 @@ export function TemplatePreviewDialog({
               url={thumbnailUrl}
               name={name}
               graph={graph}
-              className="w-full"
+              className="w-full border-0"
             />
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

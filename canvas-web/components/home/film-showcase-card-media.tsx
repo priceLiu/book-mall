@@ -12,6 +12,8 @@ type Props = {
   kind: "image" | "video";
   posterUrl?: string;
   placeholderLetter?: string;
+  /** 弹层打开等场景：仅展示静态封面，禁用悬停播放 */
+  calm?: boolean;
 };
 
 function MediaPlaceholder({ letter, hint }: { letter?: string; hint?: string }) {
@@ -32,6 +34,7 @@ export function FilmShowcaseCardMedia({
   kind,
   posterUrl,
   placeholderLetter,
+  calm = false,
 }: Props) {
   const { ref, active } = useLazyMediaActive<HTMLDivElement>("360px");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -75,6 +78,17 @@ export function FilmShowcaseCardMedia({
         ) : (
           <MediaPlaceholder letter={placeholderLetter} />
         )
+      ) : kind === "video" && calm && poster ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={poster}
+          alt=""
+          aria-hidden
+          className={PROJECT_COVER_MEDIA_FILL_CLASS}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+        />
       ) : kind === "video" ? (
         <video
           ref={videoRef}
@@ -84,11 +98,11 @@ export function FilmShowcaseCardMedia({
           muted
           playsInline
           loop
-          preload="metadata"
-          onMouseEnter={onEnter}
-          onMouseLeave={onLeave}
-          onFocus={onEnter}
-          onBlur={onLeave}
+          preload={calm ? "none" : "metadata"}
+          onMouseEnter={calm ? undefined : onEnter}
+          onMouseLeave={calm ? undefined : onLeave}
+          onFocus={calm ? undefined : onEnter}
+          onBlur={calm ? undefined : onLeave}
           onError={() => setFailed(true)}
         />
       ) : (
