@@ -56,7 +56,7 @@ export function Pro2VideoBoardCell({
         "nodrag relative flex min-h-[140px] w-full flex-col overflow-hidden rounded-xl border bg-[#141418] text-left transition",
         focused
           ? "border-white shadow-[0_0_0_1.5px_#FFFFFF]"
-          : "border-[#A2A2A2]",
+          : "border-white/[0.08]",
       )}
       onClick={(e) => {
         e.stopPropagation();

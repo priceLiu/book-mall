@@ -139,6 +139,7 @@ export default defineConfig({
       "test/unit/libtv-grid-split-hd.test.ts",
       "test/unit/libtv-plain-text-display.test.ts",
       "test/unit/libtv-node-border.test.ts",
+      "test/unit/canvas-block-browser-nav.test.ts",
       "test/unit/libtv-canvas-node-pick.test.ts",
       "test/unit/libtv-markdown-inline-style.test.ts",
       "test/unit/libtv-markdown-format.test.ts",

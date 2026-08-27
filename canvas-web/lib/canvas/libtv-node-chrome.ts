@@ -109,8 +109,8 @@ export function libtvMediaNodeHeightForWidth(width: number): number {
 /** 整卡拖动光标（须配合无 dragHandle 节点） */
 export const LIBTV_CARD_DRAG_CLASS = "cursor-grab active:cursor-grabbing";
 
-/** LibTV 节点壳层交互描边 · 默认 #A2A2A2；选中时亮边加粗向外扩；hover 不改变描边 */
-export const LIBTV_NODE_BORDER_DEFAULT_COLOR = "#A2A2A2";
+/** LibTV 节点壳层交互描边 · 默认极浅白边（与输入坞一致）；选中时亮边加粗向外扩；hover 不改变描边 */
+export const LIBTV_NODE_BORDER_DEFAULT_COLOR = "rgba(255, 255, 255, 0.08)";
 export const LIBTV_NODE_BORDER_HOVER_COLOR = "#FFFFFF";
 export const LIBTV_NODE_BORDER_DEFAULT_WIDTH = 1.5;
 /** 选中时视觉目标描边（含向外扩的一圈）· 布局仍用 DEFAULT_WIDTH */

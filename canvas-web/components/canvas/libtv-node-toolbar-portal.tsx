@@ -54,6 +54,7 @@ export function LibtvNodeToolbarPortal({
   return createPortal(
     <LibtvToolbarPortaledContext.Provider value={true}>
       <div
+        data-canvas-block-nav-gesture
         className="libtv-node-toolbar-portal pointer-events-none fixed z-[1500] flex max-w-[92vw] justify-center"
         style={{
           left: placement.x,
