@@ -49,10 +49,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   const videoUrl =
     (sessionVideoUrl && isMediaRenderSessionLocalUrl(sessionVideoUrl)
       ? sessionVideoUrl
-      : null) ??
-    persistedOssUrl ||
-    sessionVideoUrl ||
-    "";
+      : null) ?? (persistedOssUrl || sessionVideoUrl || "");
   const posterUrl =
     d.posterUrl?.trim() || d.mediaRenderResult?.posterUrl?.trim() || undefined;
   const hasVideo = Boolean(videoUrl);
