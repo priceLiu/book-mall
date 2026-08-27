@@ -37,15 +37,22 @@ export class GatewayV1KieTaskError extends Error {
 export async function runGatewayV1KieCreateTask(opts: {
   auth: ResolvedGatewayApiKeyAuth;
   body: {
+    /** KIE 上游 model（createTask API 字段） */
     model: string;
+    /** Gateway 登记 modelKey；缺省时与 model 相同 */
+    gatewayModelKey?: string | null;
     input: Record<string, unknown>;
     callBackUrl?: string | null;
   };
   logMeta?: GatewayV1LogMeta;
 }): Promise<{ taskId: string; logId: string; providerKind: "KIE" }> {
-  const model = opts.body.model.trim();
-  if (!model) {
+  const kieUpstreamModel = opts.body.model.trim();
+  const gatewayModelKey = (opts.body.gatewayModelKey ?? kieUpstreamModel).trim();
+  if (!kieUpstreamModel) {
     throw new GatewayV1KieTaskError(400, "model required");
+  }
+  if (!gatewayModelKey) {
+    throw new GatewayV1KieTaskError(400, "gatewayModelKey required");
   }
   if (!opts.body.input || typeof opts.body.input !== "object") {
     throw new GatewayV1KieTaskError(400, "input required");
@@ -53,7 +60,7 @@ export async function runGatewayV1KieCreateTask(opts: {
 
   let route;
   try {
-    route = routeGatewayModel(model);
+    route = routeGatewayModel(gatewayModelKey);
   } catch (e) {
     if (e instanceof UnknownGatewayModelError) {
       throw new GatewayV1KieTaskError(400, e.message);
@@ -63,7 +70,7 @@ export async function runGatewayV1KieCreateTask(opts: {
   if (route.providerKind !== "KIE") {
     throw new GatewayV1KieTaskError(
       400,
-      `Model ${model} is not a KIE async job`,
+      `Model ${gatewayModelKey} is not a KIE async job`,
     );
   }
 
@@ -101,12 +108,12 @@ export async function runGatewayV1KieCreateTask(opts: {
       userId: opts.auth.userId,
       apiKeyId: opts.auth.id,
       credentialId,
-      model,
+      model: gatewayModelKey,
       endpoint: "/v1/jobs/createTask",
       providerKind: "KIE",
       requestKind: route.requestKind,
       clientSource,
-      inputSummary: buildGatewayInputSummary(model, inputForLog),
+      inputSummary: buildGatewayInputSummary(gatewayModelKey, inputForLog),
       ...logMetaToRequestLogFields(opts.logMeta ?? {}),
     });
   } catch (e) {
@@ -118,7 +125,7 @@ export async function runGatewayV1KieCreateTask(opts: {
     const taskId = await submitKieJobForLog({
       logId: log.id,
       credentialId,
-      model,
+      model: kieUpstreamModel,
       input: inputForLog,
       callBackUrl: opts.body.callBackUrl ?? null,
     });
@@ -137,7 +144,7 @@ export async function runGatewayV1KieCreateTask(opts: {
         status: "FAILED",
         durationMs: 0,
         failMessage: msg.slice(0, 500),
-        model,
+        model: gatewayModelKey,
       }).catch(() => undefined);
     }
     throw new GatewayV1KieTaskError(502, msg);

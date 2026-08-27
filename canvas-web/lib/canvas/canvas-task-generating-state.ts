@@ -55,6 +55,13 @@ export function resolveLibtvMediaGeneratingState(
 
   // 终态优先：避免 uploading 残留导致 Gateway 已成功仍扫光
   if (s === "done" || s === "error" || s === "idle") {
+    if (s === "done" && data.uploading) {
+      return {
+        isGenerating: true,
+        reason: "uploading",
+        boundTaskId: rt?.taskId,
+      };
+    }
     return { isGenerating: false, reason: "idle" };
   }
 

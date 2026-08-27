@@ -515,6 +515,7 @@ export async function submitCanvasNodeTask(
   const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);
   try {
     const job = await canvasGwCreateKieJob(args.userId, {
+      gatewayModelKey: (args.node.modelKey ?? "").trim(),
       model: built.model,
       input: built.input as Record<string, unknown>,
       callBackUrl,
@@ -2173,6 +2174,7 @@ export async function runCanvasPollWorker(opts?: {
 
       const job = await Promise.race([
         canvasGwCreateKieJob(task.project.userId, {
+          gatewayModelKey: task.model,
           model: createArgs.model,
           input: createArgs.input as Record<string, unknown>,
           callBackUrl,

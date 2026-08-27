@@ -104,6 +104,7 @@ import {
 import {
   commitLibtvMediaRunPendingPatch,
   isLibtvFreestandingImageNode,
+  libtvMediaRunPendingRuntimePartial,
   resolveLibtvImageEngineFromNodeData,
 } from "./libtv-image-node-run";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
@@ -1102,12 +1103,7 @@ export function useCanvasRunner(
       !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
       !commitLibtvMediaRunPendingPatch(node, updateNodeData)
     ) {
-      setNodeRuntime(job.nodeId, {
-        status: "pending",
-        taskId: undefined,
-        failCode: undefined,
-        failMessage: undefined,
-      });
+      setNodeRuntime(job.nodeId, libtvMediaRunPendingRuntimePartial());
     }
     queueRef.current.push({ ...job, forceFresh: seq.forceFresh });
     drainRef.current();
@@ -2213,12 +2209,7 @@ export function useCanvasRunner(
           !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
           !commitLibtvMediaRunPendingPatch(node, updateNodeData)
         ) {
-          setNodeRuntime(job.nodeId, {
-            status: "pending",
-            taskId: undefined,
-            failCode: undefined,
-            failMessage: undefined,
-          });
+          setNodeRuntime(job.nodeId, libtvMediaRunPendingRuntimePartial());
         }
       }
       queueRef.current.push(job);

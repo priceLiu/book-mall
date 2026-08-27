@@ -83,6 +83,7 @@ import {
   buildVolcengineSeedreamImageCall,
   isVolcengineSeedreamImageModelKey,
 } from "@/lib/gateway/volcengine-chat-models";
+import { ensureCanvasVendorImageUrls } from "@/lib/canvas/ensure-vendor-image-url";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
   buildCanvasRefVideoKieInput,
@@ -866,9 +867,13 @@ export async function runImageEngineNode(
 
       if (isVolcengineSeedream) {
         const promptText = clipPrompt(expandedPrompt);
+        const vendorImageUrls =
+          imageUrls.length > 0
+            ? await ensureCanvasVendorImageUrls(userId, imageUrls)
+            : [];
         const call = buildVolcengineSeedreamImageCall({
           prompt: promptText,
-          imageUrls,
+          imageUrls: vendorImageUrls,
           params,
         });
         const { images, logId } = await canvasGwVolcengineImageGenerations(
@@ -890,6 +895,9 @@ export async function runImageEngineNode(
           throw new Error("火山方舟 Seedream 未返回可用图像");
         }
         const ephemeralUrl = url || `data:image/png;base64,${b64}`;
+        const resultImageUrls = images
+          .map((i) => i.url?.trim())
+          .filter((u): u is string => Boolean(u));
         const updated = await prisma.canvasGenerationTask.update({
           where: { id: created.id },
           data: {
@@ -903,7 +911,7 @@ export async function runImageEngineNode(
               params,
               providerId,
               modelKey,
-              imageUrls,
+              imageUrls: vendorImageUrls.length > 0 ? vendorImageUrls : imageUrls,
               clientPage: gwClientPage,
               syncGatewaySubmit: true,
               gatewayLogId: logId,
@@ -912,6 +920,7 @@ export async function runImageEngineNode(
             } as Prisma.InputJsonValue,
             resultPayload: {
               imageCount: images.length,
+              ...(resultImageUrls.length ? { imageUrls: resultImageUrls } : {}),
             } as Prisma.InputJsonValue,
           },
         });
@@ -961,6 +970,7 @@ export async function runImageEngineNode(
       }
 
       const job = await canvasGwCreateKieJob(userId, {
+        gatewayModelKey: modelKey,
         model,
         input: input as Record<string, unknown>,
         callBackUrl,
@@ -2227,6 +2237,7 @@ export async function runVideoEngineNode(
             canvasTaskId: claimedTask.id,
           })
       : await canvasGwCreateKieJob(userId, {
+          gatewayModelKey: effectiveModelKey,
           model,
           input: input as Record<string, unknown>,
           callBackUrl,
@@ -2358,6 +2369,7 @@ export async function runKieAudioEngineNode(
 
   try {
     const job = await canvasGwCreateKieJob(userId, {
+      gatewayModelKey: modelKey,
       model: modelKey,
       input: kieInput,
       callBackUrl,
@@ -2822,6 +2834,7 @@ export async function runRefVideoEngineNode(
     }
 
     const job = await canvasGwCreateKieJob(userId, {
+      gatewayModelKey: modelKey,
       model,
       input: input as Record<string, unknown>,
       callBackUrl,

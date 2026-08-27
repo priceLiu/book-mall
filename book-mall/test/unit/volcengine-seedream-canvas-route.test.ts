@@ -18,7 +18,7 @@ describe("Volcengine Seedream 5.0 canvas routing", () => {
     });
   });
 
-  it("builds 2K size and optional reference image", () => {
+  it("builds 2K size and optional reference image(s)", () => {
     expect(
       buildVolcengineSeedreamImageCall({
         prompt: "portrait",
@@ -38,6 +38,23 @@ describe("Volcengine Seedream 5.0 canvas routing", () => {
       prompt: "edit",
       image: "https://cdn.example/ref.png",
       parameters: { size: "4K", n: 2, watermark: false },
+    });
+    expect(
+      buildVolcengineSeedreamImageCall({
+        prompt: "multi",
+        imageUrls: [
+          "https://cdn.example/a.png",
+          "https://cdn.example/b.png",
+        ],
+        params: { resolution: "2K", n: 1 },
+      }),
+    ).toEqual({
+      prompt: "multi",
+      image: [
+        "https://cdn.example/a.png",
+        "https://cdn.example/b.png",
+      ],
+      parameters: { size: "2K", n: 1, watermark: false },
     });
   });
 });

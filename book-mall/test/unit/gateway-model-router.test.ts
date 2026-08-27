@@ -93,6 +93,29 @@ describe("routeGatewayModel · MiniMax H3", () => {
   });
 });
 
+describe("routeGatewayModel · KIE Seedream / GPT-Image 上游路径", () => {
+  it("seedream/5-lite-image-to-image 走 KIE 生图", () => {
+    expect(routeGatewayModel("seedream/5-lite-image-to-image")).toEqual({
+      providerKind: "KIE",
+      requestKind: "IMAGE",
+    });
+  });
+
+  it("gpt-image/1.5-image-to-image 走 KIE 生图", () => {
+    expect(routeGatewayModel("gpt-image/1.5-image-to-image")).toEqual({
+      providerKind: "KIE",
+      requestKind: "IMAGE",
+    });
+  });
+
+  it("seedream-5-lite 仍走 Gateway 登记 key", () => {
+    expect(routeGatewayModel("seedream-5-lite")).toEqual({
+      providerKind: "KIE",
+      requestKind: "IMAGE",
+    });
+  });
+});
+
 describe("routeGatewayModel · Kimi", () => {
   it("kimi-k3 走百炼代销（非 Moonshot 直连）", () => {
     expect(routeGatewayModel("kimi-k3")).toEqual({

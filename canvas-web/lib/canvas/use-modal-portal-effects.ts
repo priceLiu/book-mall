@@ -6,6 +6,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 export const CANVAS_MODAL_BACKDROP_CLASS =
   "canvas-modal-backdrop fixed inset-0 flex items-center justify-center bg-black/78 p-4";
 
+/** 全屏画布弹层：顶栏固定 + 内容区撑满视口（勿叠加 items-center 居中类） */
+export const CANVAS_MODAL_FULLSCREEN_SHELL_CLASS =
+  "canvas-modal-backdrop pointer-events-auto fixed inset-0 flex h-[100dvh] w-screen flex-col items-stretch justify-start overflow-hidden bg-black/78";
+
 /** 门户首页 · 预览弹层：纯色半透明遮罩（勿加 canvas-modal-backdrop / backdrop-blur） */
 export const PORTAL_PREVIEW_MODAL_BACKDROP_CLASS =
   "fixed inset-0 z-[1200] flex min-h-[100dvh] w-screen items-center justify-center bg-black/70 p-4 sm:p-6";

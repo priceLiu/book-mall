@@ -9,7 +9,7 @@ import {
 } from "./canvas-generation-cancel-messages";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { isCanvasManagedOssUrl } from "./canvas-managed-oss-url";
-import { pickTaskResultMediaUrl } from "./task-media-url";
+import { pickTaskImagePreviewUrl, pickTaskResultMediaUrl } from "./task-media-url";
 
 function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
   const direct = task.posterUrl?.trim();
@@ -30,10 +30,11 @@ export function sbv1ImagePatchFromTask(
   task: CanvasTaskRecord,
 ): Record<string, unknown> | null {
   if (task.status === "SUCCEEDED") {
+    const previewUrl = pickTaskImagePreviewUrl(task);
+    if (!previewUrl) return null;
     const hadImage = Boolean(prev.ossUrl?.trim() || prev.blobUrl?.trim());
     const taskOss = task.ossUrl?.trim();
     const managedOss = isCanvasManagedOssUrl(taskOss) ? taskOss : undefined;
-    const runtimeOss = managedOss ?? taskOss ?? undefined;
     return {
       ...(managedOss
         ? {
@@ -47,7 +48,7 @@ export function sbv1ImagePatchFromTask(
       runtime: {
         status: "done",
         taskId: task.id,
-        ossUrl: runtimeOss,
+        ossUrl: managedOss ?? previewUrl,
         ephemeralUrl: task.ephemeralUrl ?? undefined,
         failCode: undefined,
         failMessage: undefined,
@@ -80,9 +81,8 @@ export function sbv1ImagePatchFromTask(
   }
 
   if (IMAGE_INFLIGHT_STATUSES.has(task.status)) {
-    const hadUpload = Boolean(prev.uploading);
     return {
-      ...(hadUpload ? { uploading: true } : {}),
+      uploading: true,
       uploadError: undefined,
       runtime: {
         status:

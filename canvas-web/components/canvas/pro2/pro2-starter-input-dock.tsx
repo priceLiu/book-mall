@@ -452,21 +452,19 @@ function Pro2StarterInputDockBody({
               style={{ fontSize: dockTextFontPx }}
             >
               {isStoryOutlineMode ? (
-                <>
-                  <button
-                    type="button"
-                    className="nodrag rounded-md p-1.5 text-white/35 hover:bg-white/6 hover:text-white/60"
-                    title="翻译（预留）"
-                    disabled
-                  >
-                    <Languages style={{ width: sendIconPx, height: sendIconPx }} />
-                  </button>
-                  <Pro2LlmDockCreditsBadge
-                    modelKey={d.modelKey}
-                    fontPx={dockTextFontPx}
-                  />
-                </>
+                <button
+                  type="button"
+                  className="nodrag rounded-md p-1.5 text-white/35 hover:bg-white/6 hover:text-white/60"
+                  title="翻译（预留）"
+                  disabled
+                >
+                  <Languages style={{ width: sendIconPx, height: sendIconPx }} />
+                </button>
               ) : null}
+              <Pro2LlmDockCreditsBadge
+                modelKey={d.modelKey}
+                fontPx={dockTextFontPx}
+              />
               <button
                 type="button"
                 disabled={

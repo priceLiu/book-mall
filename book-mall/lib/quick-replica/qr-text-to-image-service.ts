@@ -109,7 +109,11 @@ export async function qrCreateTextToImageJob(
 
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    body: { model: routedModel, input },
+    body: {
+      model: routedModel,
+      gatewayModelKey,
+      input,
+    },
     meta: gatewayV1ClientMeta(CLIENT_SOURCE, {
       clientPage: CLIENT_PAGE,
       bookUserId: userId,

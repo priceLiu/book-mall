@@ -177,6 +177,7 @@ async function submitCanvasVideoToGateway(
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", task.id);
   const job = await canvasGwCreateKieJob(userId, {
+    gatewayModelKey: String(payload.modelKey ?? task.model),
     model: String(payload.kieModel ?? task.model),
     input: (payload.kieInput as Record<string, unknown>) ?? {},
     callBackUrl,

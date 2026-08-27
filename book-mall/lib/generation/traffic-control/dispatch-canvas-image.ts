@@ -35,6 +35,7 @@ import {
   buildVolcengineSeedreamImageCall,
   isVolcengineSeedreamImageModelKey,
 } from "@/lib/gateway/volcengine-chat-models";
+import { ensureCanvasVendorImageUrls } from "@/lib/canvas/ensure-vendor-image-url";
 import {
   scheduleCanvasBufferOssBackfill,
   scheduleCanvasKieImageOssBackfill,
@@ -161,9 +162,13 @@ async function submitCanvasImageToGateway(
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
 
   if (isVolcengineSeedreamImageModelKey(modelKey)) {
+    const vendorImageUrls =
+      imageUrls.length > 0
+        ? await ensureCanvasVendorImageUrls(userId, imageUrls)
+        : [];
     const call = buildVolcengineSeedreamImageCall({
       prompt,
-      imageUrls,
+      imageUrls: vendorImageUrls,
       params,
     });
     const { images, logId } = await canvasGwVolcengineImageGenerations(userId, {
@@ -181,6 +186,8 @@ async function submitCanvasImageToGateway(
     if (!url && !b64) {
       throw new Error("火山方舟 Seedream 未返回可用图像");
     }
+    const storedImageUrls =
+      vendorImageUrls.length > 0 ? vendorImageUrls : imageUrls;
     return {
       taskId: logId,
       logId,
@@ -190,7 +197,7 @@ async function submitCanvasImageToGateway(
         params,
         providerId,
         modelKey,
-        imageUrls,
+        imageUrls: storedImageUrls,
         clientPage,
         gatewayLogId: logId,
         providerKind: "VOLCENGINE",
@@ -393,6 +400,7 @@ async function submitCanvasImageToGateway(
     params,
   });
   const job = await canvasGwCreateKieJob(userId, {
+    gatewayModelKey: modelKey,
     model,
     input: kieInput as Record<string, unknown>,
     callBackUrl,

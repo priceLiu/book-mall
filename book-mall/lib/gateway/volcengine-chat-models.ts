@@ -218,7 +218,7 @@ export function buildVolcengineSeedreamImageCall(args: {
   params?: Record<string, unknown>;
 }): {
   prompt: string;
-  image?: string;
+  image?: string | string[];
   parameters: { size: string; n: number; watermark: false };
 } {
   const params = args.params ?? {};
@@ -230,9 +230,11 @@ export function buildVolcengineSeedreamImageCall(args: {
       ? resolution
       : "2K");
   const n = Math.min(4, Math.max(1, Number(params.n ?? 1) || 1));
-  const image = (args.imageUrls ?? []).find(
-    (u) => typeof u === "string" && /^https?:\/\//.test(u),
+  const urls = (args.imageUrls ?? []).filter(
+    (u) => typeof u === "string" && /^https?:\/\//.test(u.trim()),
   );
+  const image: string | string[] | undefined =
+    urls.length > 1 ? urls : urls[0];
   return {
     prompt: args.prompt,
     ...(image ? { image } : {}),

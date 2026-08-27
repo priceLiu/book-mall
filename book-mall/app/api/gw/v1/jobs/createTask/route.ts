@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
 
   let body: {
     model?: string;
+    gatewayModelKey?: string;
     input?: Record<string, unknown>;
     callBackUrl?: string | null;
     bailian?: {
@@ -135,14 +136,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const model = body.model?.trim() ?? "";
-  if (!model) {
+  const kieUpstreamModel = body.model?.trim() ?? "";
+  const gatewayModelKey = body.gatewayModelKey?.trim() || kieUpstreamModel;
+  if (!kieUpstreamModel) {
     return NextResponse.json({ error: "model required" }, { status: 400 });
   }
+  /** 路由 / 凭证 / 非 KIE 分支使用的登记 modelKey */
+  const model = gatewayModelKey;
 
   let route;
   try {
-    route = routeGatewayModel(model);
+    route = routeGatewayModel(gatewayModelKey);
   } catch (e) {
     if (e instanceof UnknownGatewayModelError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
@@ -194,7 +198,8 @@ export async function POST(request: NextRequest) {
       const created = await runGatewayV1KieCreateTask({
         auth,
         body: {
-          model,
+          model: kieUpstreamModel,
+          gatewayModelKey,
           input: body.input,
           callBackUrl: body.callBackUrl ?? null,
         },

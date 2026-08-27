@@ -243,7 +243,7 @@ export async function gatewayV1VolcengineImageGenerations(
     body: {
       model: string;
       prompt: string;
-      image?: string;
+      image?: string | string[];
       parameters?: Record<string, unknown>;
     };
   },

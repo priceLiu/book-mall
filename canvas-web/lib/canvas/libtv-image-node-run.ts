@@ -69,10 +69,18 @@ export function libtvMediaRunPendingRuntime(): CanvasNodeRuntime {
   return {
     status: "pending",
     taskId: undefined,
+    ossUrl: undefined,
+    ephemeralUrl: undefined,
+    posterUrl: undefined,
     failCode: undefined,
     failMessage: undefined,
     dismissedFailTaskId: undefined,
   };
+}
+
+/** setNodeRuntime 合并写 pending 时须清掉上一轮 runtime 媒体 URL，避免误判 idle */
+export function libtvMediaRunPendingRuntimePartial(): Partial<CanvasNodeRuntime> {
+  return libtvMediaRunPendingRuntime();
 }
 
 export function libtvMediaRunIdlePatch(): Record<string, unknown> {

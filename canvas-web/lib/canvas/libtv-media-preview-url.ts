@@ -1,12 +1,18 @@
 /** LibTV 媒体节点 · 预览 URL（粘贴/上传：本地 blob 优先；生成中：ephemeral 优先于未就绪 OSS） */
 
 import { isCanvasManagedOssUrl } from "./canvas-managed-oss-url";
+import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 
 export function resolveLibtvMediaPreviewUrl(data: {
   ossUrl?: string;
   blobUrl?: string;
   ephemeralUrl?: string;
   uploading?: boolean;
+  runtime?: {
+    status?: string;
+    ossUrl?: string;
+    ephemeralUrl?: string;
+  } | null;
   /** OSS 加载失败时强制回退 blob */
   preferBlob?: boolean;
   /** OSS 加载失败时回退 ephemeral（生成结果厂商 URL） */
@@ -18,6 +24,20 @@ export function resolveLibtvMediaPreviewUrl(data: {
   const ossHttp = oss && /^https?:\/\//i.test(oss) ? oss : "";
   const ephemeralHttp =
     ephemeral && /^https?:\/\//i.test(ephemeral) ? ephemeral : "";
+  const rt = data.runtime;
+  const runtimePreview = pickRuntimeImagePreviewUrl(rt ?? undefined);
+  if (
+    runtimePreview &&
+    ossHttp &&
+    runtimePreview !== ossHttp &&
+    !data.preferBlob &&
+    (data.uploading ||
+      rt?.status === "done" ||
+      rt?.status === "running" ||
+      rt?.status === "pending")
+  ) {
+    return runtimePreview;
+  }
   if (data.preferBlob && blob) return blob;
   if (data.preferEphemeral && ephemeralHttp) return ephemeralHttp;
   if (ossHttp && !data.preferBlob && isCanvasManagedOssUrl(ossHttp)) {

@@ -14,7 +14,9 @@ import {
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
+import { parseUsageFromUnknown } from "@/lib/gateway/gateway-token-metrics";
 import {
+  buildVolcengineImageLogResultSummary,
   volcengineImageGenerations,
   type VolcengineImageGenerationsParams,
 } from "@/lib/gateway/volcengine-image-generations-proxy";
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
   let body: {
     model?: string;
     prompt?: string;
-    image?: string;
+    image?: string | string[];
     parameters?: VolcengineImageGenerationsParams;
   };
   try {
@@ -62,6 +64,12 @@ export async function POST(request: NextRequest) {
     logMeta.clientSource ?? request.headers.get("x-gateway-client"),
   );
 
+  const imageUrlsForLog = Array.isArray(body.image)
+    ? body.image.filter((u) => typeof u === "string" && u.trim())
+    : body.image?.trim()
+      ? [body.image.trim()]
+      : [];
+
   let log;
   try {
     log = await createRequestLog({
@@ -75,7 +83,8 @@ export async function POST(request: NextRequest) {
       clientSource,
       inputSummary: buildGatewayInputSummary(model, {
         prompt: prompt.slice(0, 200),
-        referenceImageCount: body.image ? 1 : 0,
+        referenceImageCount: imageUrlsForLog.length,
+        ...(imageUrlsForLog.length ? { imageUrls: imageUrlsForLog } : {}),
         n: body.parameters?.n ?? 1,
         size: body.parameters?.size,
       }),
@@ -112,7 +121,11 @@ export async function POST(request: NextRequest) {
     await finalizeRequestLog(log.id, {
       status: "SUCCEEDED",
       durationMs: Date.now() - started,
-      resultSummary: { imageCount: result.images.length },
+      resultSummary: buildVolcengineImageLogResultSummary(
+        result.raw,
+        result.images,
+      ),
+      usage: parseUsageFromUnknown(result.raw),
       model,
     });
     return NextResponse.json({

@@ -41,13 +41,13 @@ describe("resolveLibtvMediaGeneratingState", () => {
     ).toBe(true);
   });
 
-  it("done runtime stops generating even if uploading flag stale", () => {
+  it("done runtime with stale uploading still generating until patch clears uploading", () => {
     expect(
       resolveLibtvMediaGeneratingState({
         uploading: true,
         runtime: { status: "done", ossUrl: "https://cdn/x.png" },
       }).isGenerating,
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

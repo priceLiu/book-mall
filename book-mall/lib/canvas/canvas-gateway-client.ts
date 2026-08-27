@@ -251,7 +251,10 @@ export type CanvasGwJobResult = {
 export async function canvasGwCreateKieJob(
   userId: string,
   opts: {
-    model: string;
+    /** Gateway 登记 modelKey（路由 / 计费 / 日志） */
+    gatewayModelKey: string;
+    /** KIE createTask 上游 model；缺省与 gatewayModelKey 相同 */
+    model?: string;
     input: Record<string, unknown>;
     callBackUrl?: string | null;
     clientPage?: string;
@@ -261,7 +264,9 @@ export async function canvasGwCreateKieJob(
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
-  const route = routeGatewayModel(opts.model);
+  const gatewayModelKey = opts.gatewayModelKey.trim();
+  const kieUpstreamModel = (opts.model ?? gatewayModelKey).trim();
+  const route = routeGatewayModel(gatewayModelKey);
   const credentialId = pickCredentialForKind(auth.credentials, "KIE");
   if (!credentialId) {
     throw new CanvasProjectError(
@@ -278,7 +283,8 @@ export async function canvasGwCreateKieJob(
   });
 
   const body = {
-    model: opts.model,
+    model: kieUpstreamModel,
+    gatewayModelKey,
     input: {
       ...opts.input,
       ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
@@ -494,7 +500,7 @@ export async function canvasGwVolcengineImageGenerations(
   opts: {
     model: string;
     prompt: string;
-    image?: string;
+    image?: string | string[];
     parameters?: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;

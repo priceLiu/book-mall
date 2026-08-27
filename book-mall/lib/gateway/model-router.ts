@@ -357,6 +357,13 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "KIE", requestKind: "CHAT" };
   }
 
+  if (
+    m.startsWith("seedream/") ||
+    m.startsWith("gpt-image/")
+  ) {
+    return { providerKind: "KIE", requestKind: "IMAGE" };
+  }
+
   if (KIE_JOB_PREFIXES.some((p) => m.includes(p))) {
     if (m.includes("doubao") && m.includes("seedance")) {
       return { providerKind: "VOLCENGINE", requestKind: "VIDEO" };

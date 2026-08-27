@@ -39,8 +39,10 @@ export function Pro2TextNodeOutlineEditorHost() {
     [node, d, nodes, edges],
   );
   const isGeneral = textPurpose === "general";
+  const uploadedMd = d.uploadedScriptMd?.trim() ?? "";
   const outlineMd =
     d.generatedOutlineMd?.trim() ||
+    uploadedMd ||
     (isGeneral ? d.themeInput?.trim() : "") ||
     "";
 
@@ -65,7 +67,8 @@ export function Pro2TextNodeOutlineEditorHost() {
       updateNodeData(node.id, {
         generatedOutlineMd: md,
         generatedOutlineHistory: history,
-        ...(isGeneral ? { themeInput: md.slice(0, 8000) } : {}),
+        ...(d.uploadedScriptMd?.trim() ? { uploadedScriptMd: md } : {}),
+        ...(isGeneral ? { themeInput: md } : {}),
       });
       const hub = findStoryPro2ScriptHubForStarter(
         nodes,

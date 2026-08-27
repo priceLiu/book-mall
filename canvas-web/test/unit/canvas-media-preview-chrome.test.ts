@@ -4,6 +4,7 @@ import {
   readElementShortSide,
   resolveCanvasMediaPreviewChrome,
 } from "@/lib/canvas/canvas-media-preview-chrome";
+import { resolveLibtvMediaPreviewUrl } from "@/lib/canvas/libtv-media-preview-url";
 
 describe("resolveCanvasMediaPreviewChrome", () => {
   it("uses canvas baseline at 200px short side", () => {
@@ -26,5 +27,18 @@ describe("resolveCanvasMediaPreviewChrome", () => {
 
   it("readElementShortSide falls back when no element", () => {
     expect(readElementShortSide(null)).toBe(200);
+  });
+});
+
+describe("resolveLibtvMediaPreviewUrl", () => {
+  it("prefers runtime ephemeral when data.ossUrl is stale after regen", () => {
+    const url = resolveLibtvMediaPreviewUrl({
+      ossUrl: "https://bucket.oss-cn-shanghai.aliyuncs.com/canvas/old.png",
+      runtime: {
+        status: "done",
+        ephemeralUrl: "https://vendor.example/new.png",
+      },
+    });
+    expect(url).toBe("https://vendor.example/new.png");
   });
 });
