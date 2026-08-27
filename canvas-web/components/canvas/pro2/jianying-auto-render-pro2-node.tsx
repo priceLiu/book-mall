@@ -23,6 +23,7 @@ import {
   SBV1_NODE_OUTER_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
 import { isMediaRenderJobInflight } from "@/lib/canvas/media-render-in-flight";
+import { isMediaRenderSessionLocalUrl } from "@/lib/canvas/media-render-session-url";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
@@ -42,9 +43,16 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const renderInFlight = isMediaRenderJobInflight(d.mediaRenderInFlight);
-  // 本地成片先写 videoUrl；勿被旧的 mediaRenderResult.downloadUrl（OSS）挡住刷新
+  const sessionVideoUrl = d.videoUrl?.trim() || "";
+  const persistedOssUrl = d.mediaRenderResult?.downloadUrl?.trim() || "";
+  // 会话本地成片优先；否则用最新 OSS（复制工作流后旧 videoUrl 可能仍是源项目 URL）
   const videoUrl =
-    d.videoUrl?.trim() || d.mediaRenderResult?.downloadUrl?.trim() || "";
+    (sessionVideoUrl && isMediaRenderSessionLocalUrl(sessionVideoUrl)
+      ? sessionVideoUrl
+      : null) ??
+    persistedOssUrl ||
+    sessionVideoUrl ||
+    "";
   const posterUrl =
     d.posterUrl?.trim() || d.mediaRenderResult?.posterUrl?.trim() || undefined;
   const hasVideo = Boolean(videoUrl);

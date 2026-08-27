@@ -117,6 +117,7 @@ export type CanvasNodeType =
   | "story-frame-column"
   | "story-video-column"
   | "story-pro2-starter"
+  | "story-pro2-prompt"
   | "story-pro2-tag"
   | "story-pro2-image"
   | "story-pro2-three-view"
@@ -174,6 +175,7 @@ export type CanvasContentNodeType =
   | "story-frame-column"
   | "story-video-column"
   | "story-pro2-starter"
+  | "story-pro2-prompt"
   | "story-pro2-tag"
   | "story-pro2-image"
   | "story-pro2-three-view"
@@ -230,6 +232,7 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "story-frame-column",
   "story-video-column",
   "story-pro2-starter",
+  "story-pro2-prompt",
   "story-pro2-tag",
   "story-pro2-image",
   "story-pro2-three-view",
@@ -734,6 +737,15 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     pipelineStage: "idle",
   } as Record<string, unknown>,
+  "story-pro2-prompt": {
+    prompt: "",
+    generatedText: "",
+    pro2TextPurpose: "general",
+    providerId: "",
+    modelKey: "",
+    params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+    dockRefImages: [],
+  } as Record<string, unknown>,
   "story-pro2-tag": {
     body: "",
     label: "",
@@ -987,6 +999,10 @@ export const NODE_DEFAULT_SIZE: Record<
     width: PRO2_TEXT_NODE_WIDTH,
     height: PRO2_TEXT_NODE_HEIGHT,
   },
+  "story-pro2-prompt": {
+    width: PRO2_TEXT_NODE_WIDTH,
+    height: PRO2_TEXT_NODE_HEIGHT,
+  },
   "story-pro2-tag": {
     width: PRO2_TAG_NODE_WIDTH,
     height: PRO2_TAG_NODE_HEIGHT,
@@ -1126,6 +1142,7 @@ export const NODE_OUTPUT_KIND: Record<
   "story-frame-column": "image",
   "story-video-column": "video",
   "story-pro2-starter": "text",
+  "story-pro2-prompt": "text",
   "story-pro2-tag": "none",
   "story-pro2-image": "image",
   "story-pro2-three-view": "image",

@@ -10,7 +10,9 @@ import {
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
+import { hydrateCanvasHomeSnapshotClient } from "@/lib/canvas-home-snapshot.client";
 import type { CanvasHomeSnapshotPayload } from "@/lib/canvas-home-snapshot-types";
+import { isCanvasHomeSnapshotEmpty } from "@/lib/canvas-home-snapshot-types";
 import type {
   CanvasTemplateRecord,
   PortalCaseProjectSummary,
@@ -19,6 +21,7 @@ import type {
 } from "@/lib/canvas-api";
 
 const VIEWER_FETCH_TIMEOUT_MS = 25_000;
+const PORTAL_HYDRATE_TIMEOUT_MS = 30_000;
 
 function viewerFetchSignal(): AbortSignal | undefined {
   if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
@@ -27,9 +30,17 @@ function viewerFetchSignal(): AbortSignal | undefined {
   return undefined;
 }
 
+function portalHydrateSignal(): AbortSignal | undefined {
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
+    return AbortSignal.timeout(PORTAL_HYDRATE_TIMEOUT_MS);
+  }
+  return undefined;
+}
+
 type PortalHomeContextValue = {
   viewerUserId: string | null;
   viewerLoading: boolean;
+  portalContentLoading: boolean;
   featured: PortalFeaturedProjectSummary[];
   templates: CanvasTemplateRecord[];
   cases: PortalCaseProjectSummary[];
@@ -38,7 +49,7 @@ type PortalHomeContextValue = {
 
 const PortalHomeContext = createContext<PortalHomeContextValue | null>(null);
 
-/** 门户首页 · 发现/视频墙等读静态快照；仅 viewer-session 走实时 API */
+/** 门户首页 · SSR 快照 + 客户端兜底；viewer-session 走实时 API */
 export function PortalHomeProvider({
   children,
   snapshot,
@@ -49,6 +60,16 @@ export function PortalHomeProvider({
   const base = useBookMallBaseUrl();
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [viewerLoading, setViewerLoading] = useState(true);
+  const [portalPayload, setPortalPayload] =
+    useState<CanvasHomeSnapshotPayload>(snapshot);
+  const [portalContentLoading, setPortalContentLoading] = useState(() =>
+    isCanvasHomeSnapshotEmpty(snapshot),
+  );
+
+  useEffect(() => {
+    setPortalPayload(snapshot);
+    setPortalContentLoading(isCanvasHomeSnapshotEmpty(snapshot));
+  }, [snapshot]);
 
   useEffect(() => {
     if (!base?.trim()) {
@@ -63,15 +84,36 @@ export function PortalHomeProvider({
       .finally(() => setViewerLoading(false));
   }, [base]);
 
+  useEffect(() => {
+    if (!base?.trim() || !isCanvasHomeSnapshotEmpty(snapshot)) return;
+    let cancelled = false;
+    setPortalContentLoading(true);
+    void hydrateCanvasHomeSnapshotClient(
+      base,
+      snapshot,
+      portalHydrateSignal(),
+    )
+      .then((next) => {
+        if (!cancelled) setPortalPayload(next);
+      })
+      .finally(() => {
+        if (!cancelled) setPortalContentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [base, snapshot]);
+
   return (
     <PortalHomeContext.Provider
       value={{
         viewerUserId,
         viewerLoading,
-        featured: snapshot.featured,
-        templates: snapshot.templates,
-        cases: snapshot.cases,
-        filmShowcase: snapshot.filmShowcase,
+        portalContentLoading,
+        featured: portalPayload.featured,
+        templates: portalPayload.templates,
+        cases: portalPayload.cases,
+        filmShowcase: portalPayload.filmShowcase,
       }}
     >
       {children}

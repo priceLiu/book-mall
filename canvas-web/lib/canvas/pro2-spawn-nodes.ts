@@ -21,6 +21,8 @@ import { findStoryPro2ScriptHubForStarter } from "./spawn-story-pro2-workspace";
 
 import { buildPro2StarterNodeData } from "./pro2-starter-node-data";
 export { buildPro2StarterNodeData } from "./pro2-starter-node-data";
+import { buildPro2PromptNodeData } from "./pro2-prompt-node-data";
+export { buildPro2PromptNodeData } from "./pro2-prompt-node-data";
 
 export function buildPro2TagNodeData(
   overrides?: Record<string, unknown>,

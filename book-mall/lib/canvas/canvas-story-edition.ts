@@ -15,6 +15,7 @@ const STORY_PRO_NODE_TYPES = new Set([
 
 const STORY_PRO2_NODE_TYPES = new Set([
   "story-pro2-starter",
+  "story-pro2-prompt",
   "story-pro2-script-hub",
   "story-pro2-style",
   "story-pro2-style-asset",

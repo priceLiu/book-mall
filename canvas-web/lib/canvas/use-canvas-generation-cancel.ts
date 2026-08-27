@@ -73,13 +73,15 @@ function cancelJobsForNode(node: CanvasFlowNode): CanvasCancelGenerationJob[] {
     return jobs.length ? jobs : [{ nodeId: node.id }];
   }
 
-  if (node.type === "story-pro2-starter" || node.type === "story-pro-starter") {
+  if (node.type === "story-pro2-starter" || node.type === "story-pro2-prompt" || node.type === "story-pro-starter") {
     const rt = (node.data as { themeOutlineRuntime?: { taskId?: string } })
       .themeOutlineRuntime;
     return [
       {
         nodeId: node.id,
-        ...resolveStarterCancelScope(node),
+        ...(node.type === "story-pro2-prompt"
+          ? ({ mediaKind: "generalText" } as const)
+          : resolveStarterCancelScope(node)),
         taskId: rt?.taskId?.trim(),
       },
     ];

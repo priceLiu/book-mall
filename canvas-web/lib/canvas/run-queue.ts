@@ -292,6 +292,7 @@ function shouldReleaseStoryRunInflight(
   if (
     node &&
     (node.type === "story-pro2-starter" ||
+      node.type === "story-pro2-prompt" ||
       node.type === "story-pro-starter" ||
       (node.type === "story-pro2-script-hub" &&
         (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
@@ -413,6 +414,9 @@ function promptForDockMentionFilter(
   if (node.type === "story-pro2-starter") {
     return String(d.themeInput ?? "");
   }
+  if (node.type === "story-pro2-prompt") {
+    return String(d.prompt ?? "");
+  }
   if (node.type === "story-pro2-script-hub") {
     return String(d.dockInput ?? "");
   }
@@ -478,6 +482,7 @@ function mentionCatalogForNode(
 
   if (
     node.type === "story-pro2-starter" ||
+    node.type === "story-pro2-prompt" ||
     node.type === "story-pro2-script-hub" ||
     node.type === "story-pro2-image" ||
     node.type === "story-pro2-three-view"
@@ -822,6 +827,10 @@ function resolveTextInputs(
       const d = p.data as unknown as StoryComicStarterNodeData;
       const sp = d.systemPrompt?.trim() || d.theme?.trim();
       if (sp) out.push(sp);
+    } else if (p.type === "story-pro2-prompt") {
+      const d = p.data as import("./story-pro2-workspace-types").StoryPro2PromptNodeData;
+      const text = d.generatedText?.trim() || d.prompt?.trim();
+      if (text) out.push(text);
     } else if (p.type === "story-pro2-starter") {
       const d = p.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
       const script = resolveStoryProStarterScriptInput(nodes, edges, pid);
@@ -1356,6 +1365,7 @@ export function useCanvasRunner(
 
         if (
           node.type === "story-pro2-starter" ||
+          node.type === "story-pro2-prompt" ||
           node.type === "story-pro-starter"
         ) {
           const links = resolvePro2DockUpstreamLinks(
@@ -1364,15 +1374,20 @@ export function useCanvasRunner(
             state.nodes,
             state.edges,
           );
+          const promptField =
+            node.type === "story-pro2-prompt" ? "prompt" : "themeInput";
           const dockPrompt = String(
-            (runData as { themeInput?: string }).themeInput ?? "",
+            (runData as Record<string, unknown>)[promptField] ?? "",
           );
-          const { prompt: cleanedPrompt } = resolveDockRunPrompt(
+          const { prompt: cleanedPrompt, extraText } = resolveDockRunPrompt(
             dockPrompt,
             links,
           );
           if (cleanedPrompt !== dockPrompt) {
-            runData = { ...runData, themeInput: cleanedPrompt };
+            runData = { ...runData, [promptField]: cleanedPrompt };
+          }
+          if (extraText.length) {
+            mergedTextInputs = [...extraText, ...mergedTextInputs];
           }
         }
         if (
@@ -2103,7 +2118,9 @@ export function useCanvasRunner(
         .getState()
         .nodes.find((n) => n.id === job.nodeId);
       const outlineRt =
-        node?.type === "story-pro2-starter" || node?.type === "story-pro-starter"
+        node?.type === "story-pro2-starter" ||
+        node?.type === "story-pro2-prompt" ||
+        node?.type === "story-pro-starter"
           ? (node.data as { themeOutlineRuntime?: CanvasNodeRuntime })
               .themeOutlineRuntime
           : undefined;
@@ -2371,7 +2388,11 @@ export function useCanvasRunner(
         if (job.mediaKind === "video") return row?.videoRuntime?.taskId?.trim();
         return row?.runtime?.taskId?.trim();
       }
-      if (node.type === "story-pro2-starter" || node.type === "story-pro-starter") {
+      if (
+        node.type === "story-pro2-starter" ||
+        node.type === "story-pro2-prompt" ||
+        node.type === "story-pro-starter"
+      ) {
         return (
           node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
         ).themeOutlineRuntime?.taskId?.trim();

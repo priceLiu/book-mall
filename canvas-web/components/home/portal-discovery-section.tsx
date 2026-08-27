@@ -99,6 +99,7 @@ export function PortalDiscoverySection() {
   const base = useBookMallBaseUrl();
   const {
     viewerUserId,
+    portalContentLoading,
     featured: featuredProjects,
     templates: publicTemplates,
     cases,
@@ -303,9 +304,16 @@ export function PortalDiscoverySection() {
       {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-          暂无匹配内容。
-        </p>
+        portalContentLoading ? (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-sm text-white/45">
+            <Loader2 className="size-4 animate-spin" />
+            加载发现内容…
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
+            暂无匹配内容。
+          </p>
+        )
       ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {

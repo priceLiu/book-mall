@@ -112,6 +112,12 @@ describe("buildSubtitlesFilterExpr", () => {
     ).toContain("FontSize=13");
   });
 
+  it("applies explicit fontSize override", () => {
+    expect(
+      buildSubtitlesFilterExpr("/tmp/subs.srt", { font, fontSize: 9 }),
+    ).toContain("FontSize=9");
+  });
+
   it("escapes colon in subtitle path for ffmpeg", () => {
     expect(escapeFfmpegSubtitlesPath("C:/tmp/subs.srt")).toBe(
       "C\\:/tmp/subs.srt",

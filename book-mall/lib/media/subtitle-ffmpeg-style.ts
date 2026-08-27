@@ -4,11 +4,11 @@ import { tmpdir } from "os";
 import { basename, dirname, join } from "path";
 
 import {
-  SUBTITLE_ASS_FONT_SIZE,
   type SubtitleBurnInStyle,
   type SubtitleFontKey,
   type SubtitleSizeKey,
   normalizeSubtitleBurnInStyle,
+  resolveSubtitleAssFontSize,
 } from "@private/media-render-subtitle-style/subtitle-style-options";
 
 /**
@@ -341,6 +341,7 @@ export type SubtitleForceStyleOverrides = {
   MarginV?: number;
   fontKey?: SubtitleFontKey;
   sizeKey?: SubtitleSizeKey;
+  fontSize?: number;
 };
 
 export function buildSubtitleBurnInFilterOverrides(
@@ -351,6 +352,7 @@ export function buildSubtitleBurnInFilterOverrides(
   return {
     fontKey: normalized.fontKey,
     sizeKey: normalized.sizeKey,
+    fontSize: resolveSubtitleAssFontSize(normalized),
     ...extra,
   };
 }
@@ -367,6 +369,7 @@ export function buildSubtitlesFilterExpr(
   const style = normalizeSubtitleBurnInStyle({
     fontKey: overrides?.fontKey,
     sizeKey: overrides?.sizeKey,
+    fontSize: overrides?.fontSize,
   });
   const font =
     overrides?.font ??
@@ -375,7 +378,10 @@ export function buildSubtitlesFilterExpr(
     });
   const isolate = overrides?.isolateFontsDir ?? !overrides?.font;
   const fontsDir = isolate ? isolateSubtitleFontsDir(font) : font.fontsDir;
-  const fontSize = SUBTITLE_ASS_FONT_SIZE[style.sizeKey];
+  const fontSize =
+    overrides?.fontSize != null && Number.isFinite(overrides.fontSize)
+      ? Math.round(overrides.fontSize)
+      : resolveSubtitleAssFontSize(style);
   const forceStyle = [
     `FontName=${font.fontName}`,
     `FontSize=${fontSize}`,

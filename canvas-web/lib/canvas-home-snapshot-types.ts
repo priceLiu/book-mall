@@ -41,3 +41,14 @@ export function emptyCanvasHomeSnapshotPayload(): CanvasHomeSnapshotPayload {
     filmShowcase: [],
   };
 }
+
+export function isCanvasHomeSnapshotEmpty(
+  payload: CanvasHomeSnapshotPayload,
+): boolean {
+  return (
+    payload.featured.length === 0 &&
+    payload.templates.length === 0 &&
+    payload.cases.length === 0 &&
+    payload.filmShowcase.length === 0
+  );
+}

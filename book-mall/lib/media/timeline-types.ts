@@ -36,6 +36,7 @@ export const renderProfileSchema = z.object({
         .object({
           fontKey: z.enum(SUBTITLE_FONT_KEYS).default("heiti"),
           sizeKey: z.enum(SUBTITLE_SIZE_KEYS).default("large"),
+          fontSize: z.number().min(6).max(36).optional(),
         })
         .optional(),
     })

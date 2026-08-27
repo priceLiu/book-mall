@@ -58,6 +58,7 @@ import {
   resolveLibtvFloatingDockSelection,
 } from "@/lib/canvas/libtv-floating-dock-selection";
 import { cloneCanvasNodeData } from "@/lib/canvas/clone-node-data";
+import { remapClonedNodeData } from "@/lib/canvas/remap-cloned-graph-refs";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
   isPro2StyledGroup,
@@ -148,6 +149,7 @@ import { Pro2SelectionToolbar } from "./pro2/pro2-selection-toolbar";
 import { Pro2SelectionBatchConnectLayer } from "./pro2/pro2-selection-batch-connect";
 import { LibtvSideConnectLayer } from "./pro2/libtv-side-connect-layer";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
+import { Pro2PromptInputDock } from "./pro2/pro2-prompt-input-dock";
 import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
 import { LibtvImageInputDock } from "./libtv-image-input-dock";
 import { LibtvAudioInputDock } from "./libtv-audio-input-dock";
@@ -2019,6 +2021,7 @@ function FlowCanvasInner({
 
       const idMap = new Map<string, string>();
       let lastNewId = "";
+      const pasted: { oldId: string; newId: string }[] = [];
       for (const n of payload.nodes) {
         const newId = addNode(
           (n.type ?? "text") as CanvasNodeType,
@@ -2029,7 +2032,20 @@ function FlowCanvasInner({
           { ...cloneCanvasNodeData(n.data as Record<string, unknown>) },
         );
         idMap.set(n.id, newId);
+        pasted.push({ oldId: n.id, newId });
         lastNewId = newId;
+      }
+      const updateNodeData = useCanvasStore.getState().updateNodeData;
+      for (const { oldId, newId } of pasted) {
+        const raw = payload.nodes.find((n) => n.id === oldId)?.data as
+          | Record<string, unknown>
+          | undefined;
+        if (!raw) continue;
+        const remapped = remapClonedNodeData(
+          cloneCanvasNodeData(raw),
+          idMap,
+        );
+        updateNodeData(newId, remapped, { commit: true });
       }
       if (lastNewId) {
         queueMicrotask(() => {
@@ -2428,6 +2444,7 @@ function FlowCanvasInner({
       {pro2FloatingInspector ? (
         <>
           <Pro2StarterInputDock />
+          <Pro2PromptInputDock />
           <Pro2ScriptInputDock />
           <Pro2FrameCellInputDock />
           <Pro2ThreeViewInputDock />

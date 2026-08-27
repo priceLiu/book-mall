@@ -307,19 +307,19 @@ export function JianyingMediaRenderActions({
 
       updateNodeData(nodeId, {
         ...preserveAutoRenderNodeMediaFitPatch(nodeId, {
-          ...(keepSessionPreview
-            ? {}
-            : {
-                videoUrl: ossDownloadUrl,
-                ...(posterUrl ? { posterUrl } : {}),
-              }),
+          videoUrl: ossDownloadUrl,
+          ...(posterUrl ? { posterUrl } : {}),
           mediaRenderInFlight: null,
           mediaFit: false,
           mediaFitKey: undefined,
           mediaRenderResult,
         }),
       });
-      if (keepSessionPreview && currentVideoUrl) {
+      if (
+        keepSessionPreview &&
+        currentVideoUrl &&
+        isMediaRenderSessionLocalUrl(currentVideoUrl, jobId)
+      ) {
         updateNodeData(
           nodeId,
           preserveAutoRenderNodeMediaFitPatch(nodeId, {
@@ -725,6 +725,12 @@ export function JianyingMediaRenderActions({
     setExpiresAt(null);
     setProgress(0);
     setStepLabel("提交任务…");
+    // 新任务开始前清掉复制画布带来的旧成片 URL，避免播放仍指向源项目 OSS
+    updateNodeData(nodeId, {
+      videoUrl: undefined,
+      posterUrl: undefined,
+      mediaRenderResult: null,
+    });
     // 不在此处 refresh：BFF 代理会静默续签；introspect 在 DB 拥堵时可达 5～13s，会假死在「提交任务」
     // 会话态占位（已从落盘剥离）；仅用于节点扫光与 Dock 进度
     updateNodeData(

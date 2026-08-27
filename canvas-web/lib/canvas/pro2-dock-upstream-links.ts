@@ -14,6 +14,9 @@ import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
 } from "./story-pro-workspace-types";
+import type { StoryPro2PromptNodeData } from "./story-pro2-workspace-types";
+import type { TextNodeData } from "./types";
+import { tagRichTextToPlainText } from "./tag-rich-text-migrate";
 
 /** 上游文本/大纲 chip 与 @ 引用展示名 · 优先节点标题 */
 export function resolvePro2StarterDockLinkLabel(
@@ -129,6 +132,48 @@ function linkFromSource(
     return null;
   }
 
+  if (source.type === "story-pro2-prompt") {
+    const d = source.data as unknown as StoryPro2PromptNodeData;
+    const generated = d.generatedText?.trim();
+    const prompt = d.prompt?.trim();
+    const text = generated || prompt;
+    if (!text) return null;
+    return {
+      id: `up-text-${source.id}`,
+      kind: "text",
+      label: d.label?.trim() || "提示词",
+      previewMd: text,
+      sourceNodeId: source.id,
+    };
+  }
+
+  if (source.type === "story-pro2-tag") {
+    const d = source.data as { body?: string; label?: string };
+    const plain = tagRichTextToPlainText(d.body ?? "").trim();
+    if (!plain) return null;
+    return {
+      id: `up-text-${source.id}`,
+      kind: "text",
+      label: d.label?.trim() || "标签",
+      previewMd: plain.slice(0, 800),
+      sourceNodeId: source.id,
+    };
+  }
+
+  if (source.type === "text") {
+    const d = source.data as unknown as TextNodeData;
+    const text =
+      d.runtime?.textOutput?.trim() || d.text?.trim() || "";
+    if (!text) return null;
+    return {
+      id: `up-text-${source.id}`,
+      kind: "text",
+      label: "文本",
+      previewMd: text.slice(0, 800),
+      sourceNodeId: source.id,
+    };
+  }
+
   if (source.type === "story-pro2-script-hub") {
     const d = source.data as unknown as StoryProScriptHubNodeData;
     const outline = d.outlineMd?.trim();
@@ -200,7 +245,10 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
 
 const TEXT_UPSTREAM_SOURCE_TYPES = new Set([
   "story-pro2-starter",
+  "story-pro2-prompt",
   "story-pro2-script-hub",
+  "story-pro2-tag",
+  "text",
 ]);
 
 function edgeMatchesDockInput(

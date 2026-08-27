@@ -3,10 +3,11 @@
 import {
   DEFAULT_SUBTITLE_STYLE,
   SUBTITLE_FONT_OPTIONS,
-  SUBTITLE_SIZE_OPTIONS,
+  SUBTITLE_FONT_SIZE_MAX,
+  SUBTITLE_FONT_SIZE_MIN,
+  resolveSubtitleAssFontSize,
   type SubtitleBurnInStyle,
   type SubtitleFontKey,
-  type SubtitleSizeKey,
 } from "./subtitle-style-options";
 
 export type SubtitleBurnInFieldsVariant = "canvas-dark" | "ecom-light" | "book-account";
@@ -20,8 +21,7 @@ const VARIANT_CLASS: Record<
     select: string;
     radioGroup: string;
     radioLabel: string;
-    sizeBtn: string;
-    sizeBtnActive: string;
+    numberInput: string;
   }
 > = {
   "canvas-dark": {
@@ -32,9 +32,8 @@ const VARIANT_CLASS: Record<
       "nodrag h-8 rounded-md border border-white/20 bg-black/30 px-2 text-[13px] text-white disabled:opacity-40",
     radioGroup: "mt-1.5 space-y-1 border-0 p-0 pl-6 text-[13px] text-white/75",
     radioLabel: "flex items-center gap-1.5",
-    sizeBtn:
-      "nodrag rounded-md border border-white/20 px-2.5 py-1 text-[12px] text-white/70 hover:bg-white/5 disabled:opacity-40",
-    sizeBtnActive: "border-white/40 bg-white/10 text-white",
+    numberInput:
+      "nodrag h-8 w-[68px] rounded-md border border-white/20 bg-black/30 px-2 text-[13px] text-white disabled:opacity-40",
   },
   "ecom-light": {
     wrap: "space-y-2",
@@ -44,9 +43,8 @@ const VARIANT_CLASS: Record<
       "h-8 rounded-lg border border-[#d2d2d7] bg-white px-2 text-xs text-[#1d1d1f] disabled:opacity-40",
     radioGroup: "mt-1.5 space-y-1 border-0 p-0 pl-5 text-xs text-[#6e6e73]",
     radioLabel: "flex items-center gap-1.5",
-    sizeBtn:
-      "rounded-lg border border-[#d2d2d7] px-2.5 py-1 text-xs text-[#6e6e73] hover:bg-[#f5f5f7] disabled:opacity-40",
-    sizeBtnActive: "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]",
+    numberInput:
+      "h-8 w-[68px] rounded-lg border border-[#d2d2d7] bg-white px-2 text-xs text-[#1d1d1f] disabled:opacity-40",
   },
   "book-account": {
     wrap: "space-y-2",
@@ -56,9 +54,8 @@ const VARIANT_CLASS: Record<
       "h-8 rounded-md border border-[#d0d7de] bg-white px-2 text-xs text-[#1f2328] disabled:opacity-40",
     radioGroup: "mt-1.5 space-y-1 border-0 p-0 pl-5 text-xs text-[#656d76]",
     radioLabel: "flex items-center gap-1.5",
-    sizeBtn:
-      "rounded-md border border-[#d0d7de] px-2.5 py-1 text-xs text-[#656d76] hover:bg-[#f6f8fa] disabled:opacity-40",
-    sizeBtnActive: "border-[#0969da] bg-[#f0f6ff] text-[#0969da]",
+    numberInput:
+      "h-8 w-[68px] rounded-md border border-[#d0d7de] bg-white px-2 text-xs text-[#1f2328] disabled:opacity-40",
   },
 };
 
@@ -100,9 +97,22 @@ export function SubtitleBurnInFields({
     onStyleChange({ ...style, fontKey });
   };
 
-  const setSizeKey = (sizeKey: SubtitleSizeKey) => {
-    onStyleChange({ ...style, sizeKey });
+  const displayFontSize = resolveSubtitleAssFontSize(style);
+
+  const setFontSize = (raw: number) => {
+    if (!Number.isFinite(raw)) return;
+    onStyleChange({
+      ...style,
+      fontSize: Math.min(
+        SUBTITLE_FONT_SIZE_MAX,
+        Math.max(SUBTITLE_FONT_SIZE_MIN, Math.round(raw)),
+      ),
+    });
   };
+
+  const numberInputClass = compact && variant === "canvas-dark"
+    ? `${v.numberInput} h-7 text-[12px]`
+    : v.numberInput;
 
   const modeFieldsetClass = compact
     ? "flex flex-wrap items-center gap-x-4 gap-y-1 border-0 p-0 pl-6 text-[12px] text-white/70"
@@ -171,24 +181,19 @@ export function SubtitleBurnInFields({
               ))}
             </select>
           </label>
-          <div className={`flex items-center gap-2 ${v.label}`}>
+          <label className={`flex items-center gap-2 ${v.label}`}>
             <span className={v.fieldLabel}>字号</span>
-            <div className="flex flex-wrap gap-1">
-              {SUBTITLE_SIZE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  disabled={disabled}
-                  className={`${v.sizeBtn} ${
-                    style.sizeKey === opt.value ? v.sizeBtnActive : ""
-                  }`.trim()}
-                  onClick={() => setSizeKey(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
+            <input
+              type="number"
+              min={SUBTITLE_FONT_SIZE_MIN}
+              max={SUBTITLE_FONT_SIZE_MAX}
+              step={1}
+              value={displayFontSize}
+              disabled={disabled}
+              className={numberInputClass}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+            />
+          </label>
         </div>
       ) : null}
     </div>

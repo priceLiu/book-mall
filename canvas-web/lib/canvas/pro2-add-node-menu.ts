@@ -15,6 +15,7 @@ import {
   Sparkles,
   Tag,
   Type,
+  MessageSquareText,
   User,
   Video,
   Wind,
@@ -45,6 +46,13 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
     icon: Type,
     enabled: true,
     nodeType: "story-pro2-starter",
+  },
+  {
+    id: "prompt",
+    label: "提示词",
+    icon: MessageSquareText,
+    enabled: true,
+    nodeType: "story-pro2-prompt",
   },
   {
     id: "tag",

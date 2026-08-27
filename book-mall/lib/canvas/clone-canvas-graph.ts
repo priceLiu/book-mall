@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
 
+import { remapClonedNodeData } from "@/lib/canvas/remap-cloned-graph-refs";
+
 function newNodeId(): string {
   return `n_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 }
@@ -30,8 +32,15 @@ export function cloneCanvasGraphForDuplicate(src: unknown): unknown {
       };
       const newId = newNodeId();
       idMap.set(node.id, newId);
-      const data = node.data ? { ...node.data } : {};
+      return { ...node, id: newId };
+    })
+    .map((node) => {
+      const data = remapClonedNodeData(
+        node.data ? { ...node.data } : {},
+        idMap,
+      );
       delete data.activeTaskId;
+      delete data.mediaRenderInFlight;
       const rt = data.runtime as
         | { status?: string; taskId?: string; [key: string]: unknown }
         | undefined;
@@ -40,7 +49,7 @@ export function cloneCanvasGraphForDuplicate(src: unknown): unknown {
         delete nextRt.taskId;
         data.runtime = nextRt;
       }
-      return { ...node, id: newId, data };
+      return { ...node, data };
     })
     .map((node) => {
       if (!node.parentId) return node;

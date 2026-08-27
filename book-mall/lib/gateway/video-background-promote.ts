@@ -15,7 +15,6 @@ const ASYNC_VIDEO_PROVIDER_KINDS = [
   "VOLCENGINE",
   "DASHSCOPE",
   "BAILIAN",
-  "BAILIAN_R2V",
   "KIE",
   "MINIMAX",
 ] as const;

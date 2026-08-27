@@ -2,6 +2,7 @@
  * 画布门户首页 · 从 book-mall 读取静态快照（服务端）。
  */
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+import { getBookMallOrigin } from "@/lib/site-config";
 import {
   isCanvasHomeSnapshotPayload,
   type CanvasHomeSnapshotFetchResult,
@@ -10,7 +11,7 @@ import {
 export type { CanvasHomeSnapshotPayload, CanvasHomeSnapshotFetchResult } from "@/lib/canvas-home-snapshot-types";
 
 export async function fetchCanvasHomeSnapshotServer(): Promise<CanvasHomeSnapshotFetchResult | null> {
-  const base = getBookMallBaseUrlServer();
+  const base = getBookMallBaseUrlServer() || getBookMallOrigin();
   if (!base) return null;
 
   try {

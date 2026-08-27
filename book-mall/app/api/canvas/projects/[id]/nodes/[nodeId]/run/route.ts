@@ -37,6 +37,7 @@ import {
   runStoryProScriptHubSection,
   runStoryProStarterThemeOutline,
   runStoryProStarterGeneralText,
+  runStoryProPromptGeneralText,
   runStoryProStarterTextToMusic,
   runStoryProStyleDraft,
   runStoryProTtsRow,
@@ -216,6 +217,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       mediaKind === "themeOutline"
     ) {
       result = await runStoryProStarterThemeOutline({ ...baseArgs, forceFresh });
+    } else if (
+      node.type === "story-pro2-prompt" &&
+      mediaKind === "generalText"
+    ) {
+      result = await runStoryProPromptGeneralText({ ...baseArgs, forceFresh });
     } else if (
       runnerType === "story-pro-starter" &&
       mediaKind === "generalText"

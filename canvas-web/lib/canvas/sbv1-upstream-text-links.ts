@@ -75,6 +75,7 @@ export function resolveSbv1UpstreamTextLinks(
     const source = nodes.find((n) => n.id === e.source);
     const isTextSource =
       source?.type === "story-pro2-starter" ||
+      source?.type === "story-pro2-prompt" ||
       source?.type === "story-pro2-script-hub";
     if (!isTextSource) return false;
     return (
@@ -89,23 +90,34 @@ export function resolveSbv1UpstreamTextLinks(
     const source = nodes.find((n) => n.id === edge.source);
     if (!source) continue;
     const isStarter = source.type === "story-pro2-starter";
+    const isPrompt = source.type === "story-pro2-prompt";
     const isHub = source.type === "story-pro2-script-hub";
-    if (!isStarter && !isHub) continue;
+    if (!isStarter && !isPrompt && !isHub) continue;
     index += 1;
     const fullText = isStarter
       ? textFullFromStarter(nodes, edges, source.id)
-      : textFullFromScriptHub(source);
+      : isPrompt
+        ? (() => {
+            const pd = source.data as {
+              generatedText?: string;
+              prompt?: string;
+            };
+            return pd.generatedText?.trim() || pd.prompt?.trim() || "";
+          })()
+        : textFullFromScriptHub(source);
     links.push({
       id: `sbv1-text-${source.id}`,
       index,
-      label: `文本 ${index}`,
+      label: isPrompt ? `提示词 ${index}` : `文本 ${index}`,
       preview: isStarter
         ? textPreviewFromStarter(nodes, edges, source.id)
         : fullText
           ? fullText.length > 48
             ? `${fullText.slice(0, 48)}…`
             : fullText
-          : "故事脚本生成",
+          : isPrompt
+            ? "提示词"
+            : "故事脚本生成",
       fullText,
       sourceNodeId: source.id,
       edgeId: edge.id,

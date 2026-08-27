@@ -121,6 +121,7 @@ export default defineConfig({
       "test/unit/jianying-from-workspace.test.ts",
       "test/unit/jianying-auto-render-node-size.test.ts",
       "test/unit/jianying-auto-render-media-fit.test.ts",
+      "test/unit/remap-cloned-graph-refs.test.ts",
       "test/unit/media-render-inflight-persist.test.ts",
       "test/unit/media-render-session-url.test.ts",
       "test/unit/sbv1-media-group-layout.test.ts",

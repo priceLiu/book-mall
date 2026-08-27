@@ -6,10 +6,14 @@
  */
 
 import { nanoid } from "nanoid";
+import { remapClonedNodeData } from "./remap-cloned-graph-refs";
 import { stripRuntimeForTemplate } from "./sanitize";
 import type { CanvasGraph } from "./types";
 
-function remapGraphIds(src: CanvasGraph): CanvasGraph {
+function remapGraphIds(
+  src: CanvasGraph,
+  options?: { rewriteNodeDataRefs?: boolean },
+): CanvasGraph {
   const idMap = new Map<string, string>();
   const nodes = src.nodes.map((n) => {
     const newId = `n_${nanoid(8)}`;
@@ -23,6 +27,16 @@ function remapGraphIds(src: CanvasGraph): CanvasGraph {
     }
     return { ...n, parentId };
   });
+  const nodesWithData =
+    options?.rewriteNodeDataRefs === false
+      ? nodes
+      : nodes.map((n) => ({
+          ...n,
+          data: remapClonedNodeData(
+            (n.data ?? {}) as Record<string, unknown>,
+            idMap,
+          ),
+        }));
   const edges = src.edges.map((e) => ({
     ...e,
     id: `e_${nanoid(8)}`,
@@ -31,7 +45,7 @@ function remapGraphIds(src: CanvasGraph): CanvasGraph {
   }));
   return {
     ...src,
-    nodes,
+    nodes: nodesWithData,
     edges,
   };
 }
@@ -49,28 +63,36 @@ export function cloneGraphForNewProject(src: CanvasGraph): CanvasGraph {
 /** 复制画布：保留媒体与内容，重分配 nodeId / edgeId，并清理进行中的任务态。 */
 export function cloneGraphForDuplicate(src: CanvasGraph): CanvasGraph {
   const idMap = new Map<string, string>();
-  const nodes = src.nodes.map((n) => {
-    const newId = `n_${nanoid(8)}`;
-    idMap.set(n.id, newId);
-    const data = { ...(n.data ?? {}) } as Record<string, unknown>;
-    delete data.activeTaskId;
-    const rt = data.runtime as
-      | { status?: string; taskId?: string; [key: string]: unknown }
-      | undefined;
-    if (rt && (rt.status === "running" || rt.status === "pending")) {
-      const nextRt = { ...rt, status: "idle" as const };
-      delete nextRt.taskId;
-      data.runtime = nextRt;
-    }
-    return { ...n, id: newId, data };
-  }).map((n) => {
-    if (!n.parentId) return n;
-    const parentId = idMap.get(n.parentId);
-    if (!parentId) {
-      return { ...n, parentId: undefined, extent: undefined };
-    }
-    return { ...n, parentId };
-  });
+  for (const n of src.nodes) {
+    idMap.set(n.id, `n_${nanoid(8)}`);
+  }
+  const nodes = src.nodes
+    .map((n) => {
+      const newId = idMap.get(n.id)!;
+      let data = remapClonedNodeData(
+        { ...(n.data ?? {}) } as Record<string, unknown>,
+        idMap,
+      );
+      delete data.activeTaskId;
+      delete data.mediaRenderInFlight;
+      const rt = data.runtime as
+        | { status?: string; taskId?: string; [key: string]: unknown }
+        | undefined;
+      if (rt && (rt.status === "running" || rt.status === "pending")) {
+        const nextRt = { ...rt, status: "idle" as const };
+        delete nextRt.taskId;
+        data.runtime = nextRt;
+      }
+      return { ...n, id: newId, data };
+    })
+    .map((n) => {
+      if (!n.parentId) return n;
+      const parentId = idMap.get(n.parentId);
+      if (!parentId) {
+        return { ...n, parentId: undefined, extent: undefined };
+      }
+      return { ...n, parentId };
+    });
   const edges = src.edges.map((e) => ({
     ...e,
     id: `e_${nanoid(8)}`,

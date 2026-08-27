@@ -11,8 +11,14 @@ describe("portal-public-read", () => {
     expect(CANVAS_PORTAL_PUBLIC_GET_PATHS).toContain(
       "api/public/static-snapshots/canvas-home",
     );
-    expect(CANVAS_PORTAL_PUBLIC_GET_PATHS).not.toContain(
+    expect(CANVAS_PORTAL_PUBLIC_GET_PATHS).toContain(
       "api/canvas/projects/portal-featured",
+    );
+    expect(CANVAS_PORTAL_PUBLIC_GET_PATHS).toContain(
+      "api/canvas/projects/portal-cases",
+    );
+    expect(CANVAS_PORTAL_PUBLIC_GET_PATHS).toContain(
+      "api/canvas/projects/portal-film-showcase",
     );
   });
 

@@ -5,6 +5,7 @@ import {
   buildPro2AudioNodeData,
   buildPro2GeneralTextNodeData,
   buildPro2ImageNodeData,
+  buildPro2PromptNodeData,
   buildPro2StarterNodeData,
   buildPro2ThreeViewNodeData,
   spawnPro2ScriptHubFromSource,
@@ -57,7 +58,9 @@ export type LibtvSideSpawnStore = {
 function spawnWidth(nodeType: string, anchor: CanvasFlowNode): number {
   if (nodeType === "sbv1-video-engine") return SBV1_VIDEO_ENGINE_WIDTH;
   if (nodeType === "story-pro2-three-view") return PRO2_CHARACTER_THREE_VIEW_WIDTH;
-  if (nodeType === "story-pro2-starter") return PRO2_TEXT_NODE_MIN_WIDTH;
+  if (nodeType === "story-pro2-starter" || nodeType === "story-pro2-prompt") {
+    return PRO2_TEXT_NODE_MIN_WIDTH;
+  }
   if (nodeType === "story-pro2-script-hub") {
     return anchor.width ?? PRO2_TEXT_NODE_MIN_WIDTH;
   }
@@ -124,6 +127,31 @@ export function spawnLibtvNeighborFromAnchor(
     if (!newId) return "";
     const targetHandle =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
+      anchor.type === "story-pro2-script-hub"
+        ? "in_text"
+        : "in_image";
+    pushEdge(setEdges, {
+      id: `e-${nanoid(6)}`,
+      source: side === "left" ? newId : anchorId,
+      target: side === "left" ? anchorId : newId,
+      sourceHandle: side === "left" ? "text" : anchorSourceHandle(anchor),
+      targetHandle: side === "left" ? targetHandle : "in_text",
+    });
+    selectPro2NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "story-pro2-prompt") {
+    const newId = addNode(
+      "story-pro2-prompt",
+      { x: position.x, y: position.y },
+      buildPro2PromptNodeData(),
+    );
+    if (!newId) return "";
+    const targetHandle =
+      anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub"
         ? "in_text"
         : "in_image";
@@ -143,6 +171,7 @@ export function spawnLibtvNeighborFromAnchor(
     if (!newId) return "";
     const anchorIsText =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub";
     pushEdge(setEdges, {
       id: `e-${nanoid(6)}`,
@@ -174,6 +203,7 @@ export function spawnLibtvNeighborFromAnchor(
     if (!newId) return "";
     const anchorIsText =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub";
     if (
       anchor.type === "story-pro2-image" ||
@@ -228,6 +258,7 @@ export function spawnLibtvNeighborFromAnchor(
       anchor.type === "sbv1-image";
     const anchorIsText =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub";
     if (anchorIsImage) {
       pushEdge(setEdges, {
@@ -329,6 +360,7 @@ export function spawnLibtvNeighborFromAnchor(
     if (!newId) return "";
     const anchorIsText =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub";
     if (anchorIsText) {
       pushEdge(setEdges, {
@@ -382,6 +414,7 @@ export function spawnLibtvNeighborFromAnchor(
 export function isLibtvSideSpawnNodeType(nodeType?: string): boolean {
   return (
     nodeType === "story-pro2-starter" ||
+    nodeType === "story-pro2-prompt" ||
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-three-view" ||
     nodeType === "story-pro2-3d-desk" ||
@@ -398,6 +431,7 @@ export function resolveLibtvSideSpawnNodeType(
 ): string | undefined {
   if (nodeType && isLibtvSideSpawnNodeType(nodeType)) return nodeType;
   if (itemId === "text") return "story-pro2-starter";
+  if (itemId === "prompt") return "story-pro2-prompt";
   if (itemId === "image") return "story-pro2-image";
   if (itemId === "three-view") return "story-pro2-three-view";
   if (itemId === "3d-desk") return "story-pro2-3d-desk";

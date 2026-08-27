@@ -103,7 +103,9 @@ export function storyRunPendingPatch(
   ctx?: StoryRunContext,
 ): Record<string, unknown> | null {
   if (
-    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    (node.type === "story-pro2-starter" ||
+      node.type === "story-pro2-prompt" ||
+      node.type === "story-pro-starter") &&
     ctx?.mediaKind === "generalText"
   ) {
     if (
@@ -221,7 +223,9 @@ export function storyRunCancelPatch(
 ): Record<string, unknown> | null {
   const idle = canvasIdleRuntimeAfterUserCancel(taskId);
   if (
-    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    (node.type === "story-pro2-starter" ||
+      node.type === "story-pro2-prompt" ||
+      node.type === "story-pro-starter") &&
     (ctx?.mediaKind === "generalText" || ctx?.mediaKind === "themeOutline")
   ) {
     return { themeOutlineRuntime: idle };
@@ -484,6 +488,8 @@ export function storyApplyTaskResult(
 
   const isStarterTextNode =
     node.type === "story-pro2-starter" || node.type === "story-pro-starter";
+  const isPromptTextNode = node.type === "story-pro2-prompt";
+  const isGeneralLlmTextNode = isStarterTextNode || isPromptTextNode;
   const isOutlineTextNode =
     isStarterTextNode &&
     isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>);
@@ -491,7 +497,7 @@ export function storyApplyTaskResult(
   const starterMediaKind =
     ctx?.mediaKind === "themeOutline" || ctx?.mediaKind === "generalText"
       ? ctx.mediaKind
-      : isStarterTextNode ||
+      : isGeneralLlmTextNode ||
           (node.type === "story-pro2-script-hub" &&
             (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
               true)
@@ -550,8 +556,9 @@ export function storyApplyTaskResult(
     return;
   }
 
-  if (isStarterTextNode && starterMediaKind === "generalText") {
+  if (isGeneralLlmTextNode && starterMediaKind === "generalText") {
     if (
+      isStarterTextNode &&
       isOutlineTextNode &&
       task.status !== "SUCCEEDED" &&
       task.status !== "FAILED" &&
@@ -565,10 +572,14 @@ export function storyApplyTaskResult(
     if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
     if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
-      patch.generatedOutlineMd = task.textOutput.trim();
-      if (isOutlineTextNode) {
-        patch.pipelineStage = "llm_done";
-        patch.starterMode = "generate";
+      if (isPromptTextNode) {
+        patch.generatedText = task.textOutput.trim();
+      } else if (isStarterTextNode) {
+        patch.generatedOutlineMd = task.textOutput.trim();
+        if (isOutlineTextNode) {
+          patch.pipelineStage = "llm_done";
+          patch.starterMode = "generate";
+        }
       }
     }
     updateNodeData(node.id, patch);

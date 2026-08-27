@@ -109,6 +109,23 @@ export type StoryPro2TagNodeData = {
   label?: string;
 };
 
+/** 2.0 提示词节点 · 纯文本 LLM（@ 引用上游 + Dock 输入） */
+export type StoryPro2PromptNodeData = {
+  label?: string;
+  prompt?: string;
+  generatedText?: string;
+  pro2TextPurpose?: "general";
+  providerId?: string;
+  modelKey?: string;
+  params?: Record<string, unknown>;
+  dockRefImages?: import("./story-ref-image").StoryRefImage[];
+  themeOutlineRuntime?: import("./types").CanvasNodeRuntime;
+  generalTextSystemPrompt?: string;
+  pro2PresetKind?: string;
+  imageEngine?: import("./types").CanvasEnginePick;
+  videoEngine?: import("./types").CanvasEnginePick;
+};
+
 /** 检视面板内编辑用（与 pro 字段同构） */
 export type StoryPro2StarterInspectorData = StoryPro2StarterNodeData;
 export type StoryPro2StyleInspectorData = StoryPro2StyleNodeData;

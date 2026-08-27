@@ -257,6 +257,7 @@ export function reconcileStaleInflightRuntimes(
   for (const node of nodes) {
     if (
       node.type === "story-pro2-starter" ||
+      node.type === "story-pro2-prompt" ||
       node.type === "story-pro-starter" ||
       (node.type === "story-pro2-script-hub" &&
         (node.data as { scriptStudioMode?: boolean }).scriptStudioMode === true)

@@ -8,14 +8,21 @@ export type SubtitleSizeKey = (typeof SUBTITLE_SIZE_KEYS)[number];
 
 export type SubtitleBurnInStyle = {
   fontKey: SubtitleFontKey;
+  /** 兼容旧配置；未设 fontSize 时用作回退 */
   sizeKey: SubtitleSizeKey;
+  /** ASS 脚本 FontSize（PlayResY=288）；优先于 sizeKey */
+  fontSize?: number;
 };
 
-/** 与 libass 默认视觉对齐：大 = 当前烧录效果 */
+/** 与 libass 默认视觉对齐：大 = 历史默认烧录效果 */
 export const DEFAULT_SUBTITLE_STYLE: SubtitleBurnInStyle = {
   fontKey: "heiti",
   sizeKey: "large",
+  fontSize: 14,
 };
+
+export const SUBTITLE_FONT_SIZE_MIN = 6;
+export const SUBTITLE_FONT_SIZE_MAX = 36;
 
 export const SUBTITLE_FONT_OPTIONS: ReadonlyArray<{
   value: SubtitleFontKey;
@@ -56,15 +63,42 @@ export function isSubtitleSizeKey(v: unknown): v is SubtitleSizeKey {
   );
 }
 
+function clampSubtitleFontSize(n: number): number {
+  const rounded = Math.round(n);
+  return Math.min(
+    SUBTITLE_FONT_SIZE_MAX,
+    Math.max(SUBTITLE_FONT_SIZE_MIN, rounded),
+  );
+}
+
+/** 解析最终 ASS FontSize：fontSize 优先，否则回退 sizeKey 映射 */
+export function resolveSubtitleAssFontSize(
+  style: SubtitleBurnInStyle,
+): number {
+  if (
+    typeof style.fontSize === "number" &&
+    Number.isFinite(style.fontSize)
+  ) {
+    return clampSubtitleFontSize(style.fontSize);
+  }
+  return SUBTITLE_ASS_FONT_SIZE[style.sizeKey];
+}
+
 export function normalizeSubtitleBurnInStyle(
   raw?: Partial<SubtitleBurnInStyle> | null,
 ): SubtitleBurnInStyle {
-  return {
-    fontKey: isSubtitleFontKey(raw?.fontKey)
-      ? raw.fontKey
-      : DEFAULT_SUBTITLE_STYLE.fontKey,
-    sizeKey: isSubtitleSizeKey(raw?.sizeKey)
-      ? raw.sizeKey
-      : DEFAULT_SUBTITLE_STYLE.sizeKey,
-  };
+  const fontKey = isSubtitleFontKey(raw?.fontKey)
+    ? raw.fontKey
+    : DEFAULT_SUBTITLE_STYLE.fontKey;
+  const sizeKey = isSubtitleSizeKey(raw?.sizeKey)
+    ? raw.sizeKey
+    : DEFAULT_SUBTITLE_STYLE.sizeKey;
+  const out: SubtitleBurnInStyle = { fontKey, sizeKey };
+  if (
+    typeof raw?.fontSize === "number" &&
+    Number.isFinite(raw.fontSize)
+  ) {
+    out.fontSize = clampSubtitleFontSize(raw.fontSize);
+  }
+  return out;
 }

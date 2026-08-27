@@ -256,6 +256,25 @@ export async function runStoryProStarterGeneralText(
   });
 }
 
+/** 2.0 提示词节点 · general LLM（复用 starter 管线，读 prompt 字段） */
+export async function runStoryProPromptGeneralText(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const data = args.node.data ?? {};
+  const prompt = typeof data.prompt === "string" ? data.prompt : "";
+  return runStoryProStarterGeneralText({
+    ...args,
+    node: {
+      ...args.node,
+      data: {
+        ...data,
+        themeInput: prompt,
+        pro2TextPurpose: "general",
+      },
+    },
+  });
+}
+
 /** 2.0 文本节点 · 文字生音乐（Suno API · KIE） */
 export async function runStoryProStarterTextToMusic(
   args: RunEngineNodeArgs,
