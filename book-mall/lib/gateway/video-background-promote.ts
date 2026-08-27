@@ -1,8 +1,8 @@
 /**
  * 画布异步视频 · ≥15min 转入持续后台生成（释放交通槽，保持 RUNNING + 继续 poll）。
- * 覆盖火山 / DashScope / 百炼 R2V / KIE / MiniMax 等 Gateway VIDEO 任务。
+ * 覆盖火山 / DashScope / 百炼（含 R2V，日志 providerKind 为 BAILIAN）/ KIE / MiniMax 等 Gateway VIDEO 任务。
  */
-import type { Prisma } from "@prisma/client";
+import type { GatewayProviderKind, Prisma } from "@prisma/client";
 
 import {
   attachVideoBackgroundGeneration,
@@ -11,13 +11,14 @@ import {
 import { VIDEO_BACKGROUND_UI_MS } from "@/lib/gateway/video-task-wait-policy";
 import { prisma } from "@/lib/prisma";
 
-const ASYNC_VIDEO_PROVIDER_KINDS = [
+/** Prisma `GatewayProviderKind` 枚举值；勿写 BAILIAN_R2V（非 DB 枚举，R2V 任务记为 BAILIAN）。 */
+const ASYNC_VIDEO_PROVIDER_KINDS: GatewayProviderKind[] = [
   "VOLCENGINE",
   "DASHSCOPE",
   "BAILIAN",
   "KIE",
   "MINIMAX",
-] as const;
+];
 
 export async function promoteVideoTasksToBackgroundGeneration(
   nowMs: number = Date.now(),
@@ -30,7 +31,7 @@ export async function promoteVideoTasksToBackgroundGeneration(
       requestKind: "VIDEO",
       externalTaskId: { not: null },
       submittedAt: { lt: submittedCutoff },
-      providerKind: { in: [...ASYNC_VIDEO_PROVIDER_KINDS] },
+      providerKind: { in: ASYNC_VIDEO_PROVIDER_KINDS },
     },
     select: {
       id: true,
