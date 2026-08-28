@@ -23,7 +23,8 @@ import {
 } from "@/lib/canvas/download-media-url";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
 import {
-  LIBTV_IMAGE_EDIT_MENU,
+  LIBTV_IMAGE_DIRECT_EDIT_MENU,
+  LIBTV_IMAGE_EDIT_WORKFLOW_MENU,
   type LibtvImageEditMenuId,
 } from "@/lib/canvas/libtv-image-toolbar-edit";
 import {
@@ -338,7 +339,19 @@ export function Pro2ImageNodeToolbar({
             minWidth={240}
           >
             <div className="max-h-[min(420px,60vh)] overflow-y-auto">
-              {LIBTV_IMAGE_EDIT_MENU.map((item) => (
+              {LIBTV_IMAGE_DIRECT_EDIT_MENU.map((item) => (
+                <Pro2ToolbarDropdownItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => {
+                    dropdowns.close();
+                    onEditPick?.(item.id);
+                  }}
+                />
+              ))}
+              <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+              {LIBTV_IMAGE_EDIT_WORKFLOW_MENU.map((item) => (
                 <Pro2ToolbarDropdownItem
                   key={item.id}
                   icon={item.icon}

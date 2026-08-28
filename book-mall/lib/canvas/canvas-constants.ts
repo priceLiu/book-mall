@@ -86,6 +86,22 @@ export function getCanvasBackgroundVideoTimeoutMin(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 90;
 }
 
+/** DashScope 同步 multimodal 出图（qwen-image-3.0-pro / z-image-turbo / qwen-image-edit*） */
+export function isCanvasDashscopeSyncImageTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  if (payload.dashscopeJobKind === "multimodal-image-sync") return true;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  if (kind !== "image-engine" && kind !== "three-view-engine") return false;
+  return (
+    payload.providerKind === "DASHSCOPE" &&
+    payload.syncGatewaySubmit === true &&
+    typeof payload.gatewayLogId === "string" &&
+    payload.gatewayLogId.trim().length > 0
+  );
+}
+
 /** 画布异步视频引擎任务（可转入后台生成 / 延长 poll）。 */
 export function isCanvasAsyncVideoEngineTaskPayload(
   payload: Record<string, unknown> | null | undefined,

@@ -38,30 +38,69 @@ export function blockCanvasBrowserNavMouse(event: MouseEvent): void {
   }
 }
 
-/** 在 document capture 阶段安装侧键拦截；返回卸载函数。 */
+/** 在 document / window capture 阶段安装侧键拦截；返回卸载函数。 */
 export function installCanvasBrowserNavBlock(): () => void {
   const onMouse = (event: MouseEvent) => blockCanvasBrowserNavMouse(event);
-  const captureOpts: AddEventListenerOptions = { capture: true };
   const capturePassiveFalse: AddEventListenerOptions = {
     capture: true,
     passive: false,
   };
+  const captureOpts: AddEventListenerOptions = { capture: true, passive: false };
 
-  document.addEventListener("pointerdown", onMouse, capturePassiveFalse);
-  document.addEventListener("mousedown", onMouse, capturePassiveFalse);
-  document.addEventListener("mouseup", onMouse, captureOpts);
-  document.addEventListener("pointerup", onMouse, captureOpts);
-  document.addEventListener("auxclick", onMouse, captureOpts);
-  document.addEventListener("click", onMouse, captureOpts);
+  const targets: Array<[EventTarget, AddEventListenerOptions]> = [
+    [document, capturePassiveFalse],
+    [window, capturePassiveFalse],
+  ];
+  const eventNames = [
+    "pointerdown",
+    "mousedown",
+    "mouseup",
+    "pointerup",
+    "auxclick",
+    "click",
+  ] as const;
+
+  for (const [target, opts] of targets) {
+    for (const name of eventNames) {
+      target.addEventListener(name, onMouse as EventListener, opts);
+    }
+  }
 
   return () => {
-    document.removeEventListener("pointerdown", onMouse, capturePassiveFalse);
-    document.removeEventListener("mousedown", onMouse, capturePassiveFalse);
-    document.removeEventListener("mouseup", onMouse, captureOpts);
-    document.removeEventListener("pointerup", onMouse, captureOpts);
-    document.removeEventListener("auxclick", onMouse, captureOpts);
-    document.removeEventListener("click", onMouse, captureOpts);
+    for (const [target, opts] of targets) {
+      for (const name of eventNames) {
+        target.removeEventListener(name, onMouse as EventListener, opts);
+      }
+    }
   };
+}
+
+/** 画布编辑页：拦截浏览器 history.back/forward（侧键 / 触控板手势兜底）。 */
+export function installCanvasHistoryPopstateTrap(): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  const pushTrap = () => {
+    if (!isCanvasEditorPageNavBlockActive()) return;
+    try {
+      window.history.pushState(
+        { __canvasEditorNavTrap: true },
+        "",
+        window.location.href,
+      );
+    } catch {
+      /* quota / sandbox */
+    }
+  };
+
+  pushTrap();
+
+  const onPopState = () => {
+    if (!isCanvasEditorPageNavBlockActive()) return;
+    pushTrap();
+  };
+
+  window.addEventListener("popstate", onPopState);
+  return () => window.removeEventListener("popstate", onPopState);
 }
 
 /** 画布项目页：锁 html 滚动 + 全页拦截鼠标侧键；返回卸载函数。 */
@@ -70,7 +109,9 @@ export function installCanvasEditorPageNavGuards(): () => void {
     document.documentElement.setAttribute(CANVAS_EDITOR_PAGE_HTML_ATTR, "");
   }
   const uninstallBlock = installCanvasBrowserNavBlock();
+  const uninstallHistoryTrap = installCanvasHistoryPopstateTrap();
   return () => {
+    uninstallHistoryTrap();
     uninstallBlock();
     if (typeof document !== "undefined") {
       document.documentElement.removeAttribute(CANVAS_EDITOR_PAGE_HTML_ATTR);

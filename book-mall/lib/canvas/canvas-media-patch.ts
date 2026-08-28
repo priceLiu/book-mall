@@ -157,8 +157,24 @@ export async function patchCanvasProjectNodeMediaFromTask(
   if (!node) return false;
 
   const nodeType = opts?.nodeType ?? node.type;
+  const nodeData = node.data as {
+    ossUrl?: string;
+    uploading?: boolean;
+    runtime?: { taskId?: string; status?: string; ossUrl?: string };
+  };
+  const managedTaskOss = isCanvasManagedOssUrl(task.ossUrl);
+  const needsManagedOssUpgrade =
+    managedTaskOss &&
+    (!isCanvasManagedOssUrl(nodeData?.ossUrl) ||
+      Boolean(nodeData?.uploading) ||
+      nodeData?.runtime?.status === "pending" ||
+      nodeData?.runtime?.status === "running" ||
+      nodeData?.runtime?.status === "queued");
   // 节点已展示本任务成片 → 跳过整图写回，避免无谓 bump updatedAt 与增量 autosave 抢写
-  if (canvasNodeShowsPersistedMedia(canvas, task.nodeId, task.id)) {
+  if (
+    canvasNodeShowsPersistedMedia(canvas, task.nodeId, task.id) &&
+    !needsManagedOssUpgrade
+  ) {
     return false;
   }
   const existingTaskId = node.data?.runtime?.taskId?.trim();

@@ -110,6 +110,8 @@ const child = spawn(concurrentlyBin, args, {
     ...process.env,
     /** 子进程非交互；poll-loop 等脚本依赖 */
     CI: process.env.CI ?? "1",
+    /** 本地 dev 勿连 registry.npmjs.org 查 Next 版本（弱网/超时会刷 TypeError: fetch failed） */
+    NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED ?? "1",
   },
 });
 

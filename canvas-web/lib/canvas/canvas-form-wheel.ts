@@ -105,7 +105,6 @@ export function isCanvasViewportWheelTarget(target: EventTarget | null): boolean
 export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean {
   const { target } = nativeEvent;
   if (!(target instanceof Element)) return false;
-  if (nativeEvent.ctrlKey || nativeEvent.metaKey) return false;
   if (target.closest(CANVAS_NATIVE_SCROLL_SELECTOR)) return false;
   if (target.closest(LIBTV_INPUT_DOCK_SELECTOR)) return false;
 
@@ -113,8 +112,11 @@ export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean
   const inEditor = isCanvasEditorWheelTarget(target);
   const inViewport = !!target.closest(CANVAS_VIEWPORT_WHEEL_ROOT);
 
-  // 编辑页内任意横向滑动手势：禁止触发浏览器历史导航
+  // 编辑页内任意横向滑动手势：禁止触发浏览器历史导航（含 Ctrl+滚轮 / pinch 缩放时）
   if (horizontal && inEditor) return true;
+
+  // 缩放滚轮（Ctrl/Meta）仅放行纵向；横向已在上方拦截
+  if (nativeEvent.ctrlKey || nativeEvent.metaKey) return false;
 
   if (!inViewport) return false;
   if (target.closest(".nowheel") && !horizontal) return false;

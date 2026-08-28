@@ -31,6 +31,7 @@ import {
   getCanvasUserInflightMax,
   getGenerationPollBatch,
   isCanvasBailianR2vVideoTaskPayload,
+  isCanvasDashscopeSyncImageTaskPayload,
   isCanvasDashscopeVideoTaskPayload,
   isCanvasKieVideoTaskPayload,
   isCanvasVolcengineVideoTaskPayload,
@@ -1307,7 +1308,10 @@ async function pollOneSubmittedCanvasTask(
   const kieTaskId =
     linked?.kieTaskId ?? task.kieTaskId?.trim() ?? "";
 
-  if (!gatewayLogId || !kieTaskId) {
+  if (
+    !gatewayLogId ||
+    (!kieTaskId && !isCanvasDashscopeSyncImageTaskPayload(payload))
+  ) {
     await prisma.canvasGenerationTask.update({
       where: { id: task.id },
       data: {
@@ -1467,11 +1471,17 @@ async function pollOneSubmittedCanvasTask(
       gatewayLog.providerKind === "DASHSCOPE"
     ) {
       const summary = (gatewayLog.resultSummary ?? {}) as Record<string, unknown>;
-      if (summary.sync === true && summary.output) {
-        await applyCanvasDashscopeImagePollResult(
-          task.id,
-          summary.output as DashscopeTaskOutput,
-        );
+      const dashOutput =
+        summary.output &&
+        typeof summary.output === "object" &&
+        !Array.isArray(summary.output)
+          ? (summary.output as DashscopeTaskOutput)
+          : null;
+      const dashOutputSucceeded =
+        dashOutput &&
+        isDashscopeTaskSuccess(String(dashOutput.task_status ?? ""));
+      if ((summary.sync === true || dashOutputSucceeded) && dashOutput) {
+        await applyCanvasDashscopeImagePollResult(task.id, dashOutput);
         const after = await prisma.canvasGenerationTask.findUnique({
           where: { id: task.id },
           select: { status: true },
@@ -1680,6 +1690,11 @@ function finishSubmittedPollDelta(
 }
 
 /** 推进单条 SUBMITTED 任务（供并行 poll worker 调用）。 */
+function canPollSubmittedCanvasTask(task: SubmittedCanvasPollTask): boolean {
+  if (task.kieTaskId?.trim()) return true;
+  return isCanvasDashscopeSyncImageTaskPayload(taskInputPayload(task));
+}
+
 async function advanceOneSubmittedCanvasTask(
   task: SubmittedCanvasPollTask,
   now: number,
@@ -1690,7 +1705,7 @@ async function advanceOneSubmittedCanvasTask(
     failed: 0,
     timedOut: 0,
   };
-  if (!task.kieTaskId) return delta;
+  if (!canPollSubmittedCanvasTask(task)) return delta;
   if (!shouldPollSubmittedNow(task)) {
     delta.scanned = 0;
     return delta;

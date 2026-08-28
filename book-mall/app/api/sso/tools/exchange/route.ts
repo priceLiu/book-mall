@@ -14,8 +14,25 @@ import {
   loadActiveSsoClient,
 } from "@/lib/sso-client-scope";
 import { withApiDbGuard } from "@/lib/http/api-db-error";
+import { isSsoAuthorizationCodeReplayAllowed } from "@/lib/sso-authorization-code";
 
 export const dynamic = "force-dynamic";
+
+async function exchangeTokenResponse(userId: string) {
+  const issued = await issueToolsAccessTokenForUser(userId);
+  if (!issued.ok) {
+    return NextResponse.json(
+      { error: issued.error, ...(issued.code ? { code: issued.code } : {}) },
+      { status: issued.status },
+    );
+  }
+  return NextResponse.json({
+    access_token: issued.accessToken,
+    expires_in: issued.expiresIn,
+    token_type: "Bearer",
+    token_subtype: issued.tokenSubtype,
+  });
+}
 
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
@@ -40,7 +57,14 @@ export const POST = withApiDbGuard(async (req) => {
     where: { code },
   });
   const now = new Date();
-  if (!row || row.consumedAt || row.expiresAt < now) {
+  if (!row || row.expiresAt < now) {
+    return NextResponse.json({ error: "无效或已过期的授权码" }, { status: 400 });
+  }
+
+  if (row.consumedAt) {
+    if (isSsoAuthorizationCodeReplayAllowed(row, now)) {
+      return exchangeTokenResponse(row.userId);
+    }
     return NextResponse.json({ error: "无效或已过期的授权码" }, { status: 400 });
   }
 
@@ -108,11 +132,6 @@ export const POST = withApiDbGuard(async (req) => {
     );
   }
 
-  await prisma.ssoAuthorizationCode.update({
-    where: { id: row.id },
-    data: { consumedAt: now },
-  });
-
   const issued = await issueToolsAccessTokenForUser(row.userId);
   if (!issued.ok) {
     return NextResponse.json(
@@ -120,6 +139,11 @@ export const POST = withApiDbGuard(async (req) => {
       { status: issued.status },
     );
   }
+
+  await prisma.ssoAuthorizationCode.update({
+    where: { id: row.id },
+    data: { consumedAt: now },
+  });
 
   return NextResponse.json({
     access_token: issued.accessToken,

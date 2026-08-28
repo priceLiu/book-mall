@@ -43,6 +43,7 @@ export function getGatewayModelTypeLabels(args: {
     const isDedicatedEdit =
       k.includes("image-edit") ||
       k === "google/nano-banana-edit" ||
+      k === "wan2.7-image-pro" ||
       (k.includes("nano-banana") && k.includes("-edit")) ||
       k.includes("i2i") ||
       k.includes("img2img");

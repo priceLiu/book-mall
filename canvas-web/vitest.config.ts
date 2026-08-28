@@ -117,6 +117,7 @@ export default defineConfig({
       "test/unit/pro2-dock-upstream-label.test.ts",
       "test/unit/resolve-dock-run-prompt.test.ts",
       "test/unit/libtv-dock-scale.test.ts",
+      "test/unit/libtv-floating-dock-selection.test.ts",
       "test/unit/sbv1-upstream-ref-links.test.ts",
       "test/unit/jianying-from-workspace.test.ts",
       "test/unit/jianying-auto-render-node-size.test.ts",

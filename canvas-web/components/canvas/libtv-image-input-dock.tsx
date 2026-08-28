@@ -28,6 +28,10 @@ import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultSbv1ImageEngine, resolveDockImageEnginePick } from "@/lib/canvas/sbv1-image-models";
 import {
+  canvasImageEditModelLabel,
+  canvasImageEditRequiresRefs,
+} from "@/lib/canvas/canvas-image-edit-models";
+import {
   pickDefaultPro2FrameImageEngine,
   PRO2_FRAME_IMAGE_MODEL_KEYS,
 } from "@/lib/canvas/pro2-frame-batch-image";
@@ -39,9 +43,14 @@ import {
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
-import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
-import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
-import { isLibtvPro2ImageDockNodeType } from "@/lib/canvas/libtv-pro2-image-dock-types";
+import {
+  resolveLibtvSoleSelectedNodeId,
+  useLibtvShouldSuppressFloatingDock,
+} from "@/lib/canvas/libtv-floating-dock-selection";
+import {
+  isLibtvPro2ImageDockNodeType,
+  LIBTV_PRO2_IMAGE_DOCK_NODE_TYPES,
+} from "@/lib/canvas/libtv-pro2-image-dock-types";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -128,21 +137,32 @@ function framePromptPlaceholder(role?: string): string {
 export function LibtvImageInputDock() {
   const rfNodes = useNodes();
   const suppressDock = useLibtvShouldSuppressFloatingDock();
+  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
+  const pinnedType = useCanvasStore((s) => s.libtvFloatingDockNodeType);
+  const pinned = useMemo(
+    () => ({ nodeId: pinnedId, nodeType: pinnedType }),
+    [pinnedId, pinnedType],
+  );
+
   const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
   const pro2DockNodeId = useMemo(() => {
     if (suppressDock) return null;
-    const sel = resolveLibtvFloatingDockSelection(rfNodes);
-    if (!sel || !isLibtvPro2ImageDockNodeType(sel.nodeType)) return null;
-    const rf = rfNodes.find((n) => n.id === sel.nodeId);
-    if (
-      sel.nodeType === "story-pro2-image" &&
-      (rf?.data as { pro2MediaRole?: string })?.pro2MediaRole ===
-        "character-three-view"
-    ) {
-      return null;
+    for (const nodeType of LIBTV_PRO2_IMAGE_DOCK_NODE_TYPES) {
+      const id = resolveLibtvSoleSelectedNodeId(rfNodes, nodeType, pinned);
+      if (!id) continue;
+      if (nodeType === "story-pro2-image") {
+        const rf = rfNodes.find((n) => n.id === id);
+        if (
+          (rf?.data as { pro2MediaRole?: string })?.pro2MediaRole ===
+          "character-three-view"
+        ) {
+          continue;
+        }
+      }
+      return id;
     }
-    return sel.nodeId;
-  }, [rfNodes, suppressDock]);
+    return null;
+  }, [rfNodes, suppressDock, pinned]);
 
   const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
   const { placement, hidden: dockHidden, active: dockActive } =
@@ -489,6 +509,21 @@ function LibtvImageInputDockBody({
       await alert({
         title: "请输入提示词",
         message: "可直接文字生图，或上传/连接图片后输入编辑指令。",
+        variant: "warning",
+      });
+      return;
+    }
+    const editModelKey = normalizeModelKey(runEngine.modelKey);
+    if (
+      canvasImageEditRequiresRefs(editModelKey, {
+        imageMode: String(latestData.imageMode ?? ""),
+      }) &&
+      !hasRefs
+    ) {
+      revertPending();
+      await alert({
+        title: "需要参考图",
+        message: `${canvasImageEditModelLabel(editModelKey)} 须连接上游图片或上传参考图后再生成。`,
         variant: "warning",
       });
       return;

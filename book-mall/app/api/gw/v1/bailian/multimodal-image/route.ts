@@ -13,6 +13,7 @@ import {
   mapGatewayPreCreateLogError,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
+import { finalizeDashscopeSyncWallClockRequestLog } from "@/lib/gateway/log-dashscope-timing-persist";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import {
   DASHSCOPE_MULTIMODAL_IMAGE_GEN_MODELS,
@@ -122,10 +123,11 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ error: result.error, logId: log.id }, { status: 502 });
     }
-    await finalizeRequestLog(log.id, {
+    await finalizeDashscopeSyncWallClockRequestLog(log.id, {
+      vendorCallStartedAtMs: started,
+      vendorCallEndedAtMs: Date.now(),
       status: "SUCCEEDED",
-      durationMs: Date.now() - started,
-      resultSummary: { imageCount: result.imageUrls.length },
+      resultSummaryBase: { imageCount: result.imageUrls.length },
       model,
     });
     return NextResponse.json({

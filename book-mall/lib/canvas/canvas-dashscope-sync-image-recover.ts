@@ -7,20 +7,26 @@ import type { Prisma } from "@prisma/client";
 import {
   applyCanvasDashscopeImagePollResult,
 } from "@/lib/canvas/canvas-task-service";
-import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
+import { patchCanvasProjectNodeMediaFromTask } from "@/lib/canvas/canvas-media-patch";
+import {
+  isDashscopeTaskSuccess,
+  type DashscopeTaskOutput,
+} from "@/lib/gateway/dashscope-client";
 import { prisma } from "@/lib/prisma";
 
-function readSyncOutput(
+function readDashscopeImageOutput(
   resultSummary: unknown,
 ): DashscopeTaskOutput | null {
   if (!resultSummary || typeof resultSummary !== "object" || Array.isArray(resultSummary)) {
     return null;
   }
   const summary = resultSummary as Record<string, unknown>;
-  if (summary.sync !== true) return null;
   const output = summary.output;
   if (!output || typeof output !== "object" || Array.isArray(output)) return null;
-  return output as DashscopeTaskOutput;
+  const typed = output as DashscopeTaskOutput;
+  if (summary.sync === true) return typed;
+  if (isDashscopeTaskSuccess(String(typed.task_status ?? ""))) return typed;
+  return null;
 }
 
 /** 从 Gateway 日志回收同步 DashScope 出图并写回节点。 */
@@ -60,7 +66,7 @@ export async function recoverCanvasDashscopeSyncImageFromGateway(
   });
   if (!log || log.status !== "SUCCEEDED") return "noop";
 
-  const output = readSyncOutput(log.resultSummary);
+  const output = readDashscopeImageOutput(log.resultSummary);
   if (!output) return "noop";
 
   const externalTaskId = log.externalTaskId?.trim() || log.id;
@@ -94,4 +100,27 @@ export async function recoverCanvasDashscopeSyncImageFromGateway(
   if (after?.status === "SUCCEEDED") return "succeeded";
   if (after?.status === "FAILED") return "failed";
   return "noop";
+}
+
+/** SUCCEEDED 任务 · 将 managed OSS / runtime 终态写回 story-pro2-image 等节点。 */
+export async function recoverCanvasDashscopeImageDisplayFromTask(
+  taskId: string,
+): Promise<"succeeded" | "failed" | "noop"> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      status: true,
+      projectId: true,
+      nodeId: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      completedAt: true,
+      resultPayload: true,
+    },
+  });
+  if (!task || task.status !== "SUCCEEDED") return "noop";
+  if (!(task.ossUrl?.trim() || task.ephemeralUrl?.trim())) return "noop";
+  const patched = await patchCanvasProjectNodeMediaFromTask(task);
+  return patched ? "succeeded" : "noop";
 }

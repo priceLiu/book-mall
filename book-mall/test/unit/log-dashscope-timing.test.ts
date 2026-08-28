@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { parseDashscopeDatetimeMs } from "@/lib/gateway/dashscope-client";
 import {
   computeDashscopeTimingBreakdown,
+  buildDashscopeSyncWallClockTrace,
+  buildDashscopeTerminalFinalizeMetrics,
   mergeDashscopeTimingTrace,
+  resolveDashscopeVendorNativeTimingForLogRow,
 } from "@/lib/gateway/log-dashscope-timing";
 
 const SUBMITTED_MS = Date.parse("2026-04-25T14:59:00.000+08:00");
@@ -81,5 +84,34 @@ describe("dashscope timing breakdown", () => {
     expect(breakdown.queueMs).toBe(scheduledMs - SUBMITTED_MS);
     expect(breakdown.generateMs).toBe(45_000);
     expect(breakdown.pollDelayMs).toBe(0);
+  });
+
+  it("sync multimodal HTTP uses wall-clock trace for vendor columns", () => {
+    const submittedAtMs = Date.parse("2026-08-28T05:15:06.385Z");
+    const vendorStart = submittedAtMs + 120;
+    const vendorEnd = vendorStart + 40_661;
+    const trace = buildDashscopeSyncWallClockTrace({
+      vendorCallStartedAtMs: vendorStart,
+      vendorCallEndedAtMs: vendorEnd,
+    });
+    const metrics = buildDashscopeTerminalFinalizeMetrics({
+      trace,
+      status: "SUCCEEDED",
+      submittedAt: new Date(submittedAtMs),
+      resultSummaryBase: { sync: true, imageCount: 1 },
+      fallbackNowMs: vendorEnd,
+    });
+
+    expect(metrics.breakdown.queueMs).toBe(120);
+    expect(metrics.breakdown.generateMs).toBe(40_661);
+    expect(metrics.resultSummary._gateway).toBeTruthy();
+
+    const vendorNative = resolveDashscopeVendorNativeTimingForLogRow({
+      providerKind: "DASHSCOPE",
+      requestKind: "IMAGE",
+      resultSummary: metrics.resultSummary,
+    });
+    expect(vendorNative.vendorNativeGenerateMs).toBe(40_661);
+    expect(vendorNative.vendorNativeDurationMs).toBe(40_661);
   });
 });

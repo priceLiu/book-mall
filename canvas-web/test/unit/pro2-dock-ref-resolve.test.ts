@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveDockRefsForRun } from "@/lib/canvas/pro2-dock-ref-catalog";
+import { resolveDockRefsForRun, resolveDockImageUrlsForRun } from "@/lib/canvas/pro2-dock-ref-catalog";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
 
 const upstream: Pro2DockUpstreamLink[] = [
@@ -39,5 +39,15 @@ describe("resolveDockRefsForRun", () => {
       { id: "paste-1", label: "粘贴", url: "https://cdn.example/p.png" },
     ]);
     expect(refs).toHaveLength(3);
+  });
+});
+
+describe("resolveDockImageUrlsForRun", () => {
+  it("includes all dock refs even when prompt @ mentions only one", () => {
+    const urls = resolveDockImageUrlsForRun(upstream, []);
+    expect(urls).toEqual([
+      "https://cdn.example/a.png",
+      "https://cdn.example/b.png",
+    ]);
   });
 });

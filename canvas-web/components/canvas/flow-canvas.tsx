@@ -1632,10 +1632,8 @@ function FlowCanvasInner({
       if (count >= 2) {
         store.setLibtvFloatingDockSelection(null, null);
         store.setPro2FrameDockFocus(null);
-      } else if (count === 0) {
-        store.setLibtvFloatingDockSelection(null, null);
-        store.setPro2FrameDockFocus(null);
       }
+      // count === 0 时勿清 pin：RF sync/zoom 可能瞬时空选，Dock 靠 store pin 兜底；空白点击由 onPaneClick 清 pin
     },
     [],
   );

@@ -18,6 +18,7 @@ import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
 import { MINIMAX_VIDEO_KNOWN_MODELS_CANVAS } from "./providers/minimax-video";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
+import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { listModelsForApp, type RegistryModelRow } from "@/lib/gateway/model-registry";
 import {
   GATEWAY_BAILIAN_PROVIDER_ID,
@@ -71,6 +72,8 @@ const PROVIDER_KIND_TO_ID: Partial<Record<GatewayProviderKind, string>> = {
   DEEPSEEK: GATEWAY_DEEPSEEK_PROVIDER_ID,
   MOONSHOT: GATEWAY_MOONSHOT_PROVIDER_ID,
   BAILIAN: GATEWAY_BAILIAN_PROVIDER_ID,
+  /** 万相 / 千问图像等与百炼共用 DashScope Key，画布统一归「百炼」分组 */
+  DASHSCOPE: GATEWAY_BAILIAN_PROVIDER_ID,
   VOLCENGINE: GATEWAY_VOLCENGINE_PROVIDER_ID,
   HUNYUAN: GATEWAY_HUNYUAN_PROVIDER_ID,
   TOPAZ: GATEWAY_TOPAZ_PROVIDER_ID,
@@ -163,6 +166,70 @@ export type BuildCanvasRegistryProvidersOpts = {
   role?: CanvasModelRole;
 };
 
+function knownBailianImageToModelDto(
+  providerId: string,
+  meta: (typeof BAILIAN_IMAGE_KNOWN_MODELS)[number],
+  sortOrder: number,
+): CanvasProviderDto["models"][0] {
+  return {
+    id: `${providerId}::${meta.modelKey}`,
+    modelKey: meta.modelKey,
+    displayName: meta.displayName,
+    role: meta.role,
+    description: meta.description ?? null,
+    paramsSchema: meta.paramsSchema ?? null,
+    defaultParams: meta.defaultParams ?? null,
+    enabled: true,
+    sortOrder,
+  };
+}
+
+/** 注册表 / 平台上架漏项时，兜底百炼图像清单（含 qwen-image-3.0-pro）。 */
+export function mergeKnownBailianImageModelsForCanvas(
+  providers: CanvasProviderDto[],
+  opts: { role?: CanvasModelRole },
+): CanvasProviderDto[] {
+  if (opts.role && opts.role !== "IMAGE") return providers;
+
+  const presentKeys = new Set<string>();
+  for (const p of providers) {
+    for (const m of p.models) presentKeys.add(m.modelKey);
+  }
+
+  const missing = BAILIAN_IMAGE_KNOWN_MODELS.filter(
+    (m) => m.role === "IMAGE" && !presentKeys.has(m.modelKey),
+  );
+  if (missing.length === 0) return providers;
+
+  const now = new Date().toISOString();
+  const out = providers.map((p) =>
+    p.id === GATEWAY_BAILIAN_PROVIDER_ID
+      ? { ...p, models: [...p.models] }
+      : p,
+  );
+  let bailian = out.find((p) => p.id === GATEWAY_BAILIAN_PROVIDER_ID);
+  if (!bailian) {
+    bailian = {
+      ...buildProviderShell(GATEWAY_BAILIAN_PROVIDER_ID, now),
+      models: [],
+    };
+    out.push(bailian);
+  }
+
+  const baseSort = bailian.models.length;
+  for (let i = 0; i < missing.length; i++) {
+    bailian.models.push(
+      knownBailianImageToModelDto(
+        GATEWAY_BAILIAN_PROVIDER_ID,
+        missing[i]!,
+        baseSort + i,
+      ),
+    );
+  }
+  bailian.models.sort((a, b) => a.sortOrder - b.sortOrder);
+  return out;
+}
+
 /** 由统一注册表构建 Canvas 虚拟 Provider 列表。 */
 export async function buildCanvasProvidersFromRegistry(
   userId: string,
@@ -197,5 +264,18 @@ export async function buildCanvasProvidersFromRegistry(
     p.models.sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
-  return [...byProvider.values()];
+  let providers = [...byProvider.values()];
+
+  const canUseDashscopeImage =
+    persona === "PLATFORM_CREDIT" ||
+    isGatewayProviderBound(boundKinds, "DASHSCOPE") ||
+    isGatewayProviderBound(boundKinds, "BAILIAN");
+
+  if (canUseDashscopeImage) {
+    providers = mergeKnownBailianImageModelsForCanvas(providers, {
+      role: opts?.role,
+    });
+  }
+
+  return providers;
 }

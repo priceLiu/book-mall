@@ -665,6 +665,19 @@ export async function dispatchCanvasImageQueuedTask(
       return "skipped";
     }
 
+    if (job.payloadPatch.dashscopeJobKind === "multimodal-image-sync") {
+      const { recoverCanvasDashscopeSyncImageFromGateway } = await import(
+        "@/lib/canvas/canvas-dashscope-sync-image-recover"
+      );
+      await recoverCanvasDashscopeSyncImageFromGateway(task.id).catch((e) => {
+        console.warn(
+          "[canvas-dispatch] sync dashscope image recover failed",
+          task.id.slice(0, 12),
+          e instanceof Error ? e.message : e,
+        );
+      });
+    }
+
     await deps.releaseGatewayVideoTrafficSlotIfOccupying({
       logId: job.logId,
       scopeKey,

@@ -34,7 +34,7 @@ import { parseReferencedIds } from "./dock-mention-parse";
 import type { StoryRefImage } from "./story-ref-image";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
-import { pro2DockMentionRefCatalog, resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
+import { pro2DockMentionRefCatalog, resolveDockImageUrlsForRun } from "./pro2-dock-ref-catalog";
 import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "./resolve-dock-run-prompt";
 import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "./sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
@@ -586,18 +586,13 @@ function resolveImageInputs(
   const dockRefImages = (
     (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
   ) as StoryRefImage[];
-  const mentioned = parseReferencedIds(prompt);
-  if (mentioned.length > 0) {
-    const refs = resolveDockRefsForRun(prompt, links, dockRefImages);
-    const urls = refs
-      .map((r) => r.url)
-      .filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
-    return Array.from(new Set(urls));
-  }
-
-  const catalog = pro2DockMentionRefCatalog(links, dockRefImages);
-  if (!catalog.length) return raw;
-  return dockMentionRefUrlsForPrompt(prompt, catalog);
+  const fromDock = resolveDockImageUrlsForRun(links, dockRefImages);
+  const merged = Array.from(new Set([...fromDock, ...raw])).filter(
+    (u) =>
+      typeof u === "string" &&
+      (u.startsWith("blob:") || /^https?:\/\//.test(u.trim())),
+  );
+  return merged.length > 0 ? merged : raw;
 }
 
 function resolveSbv1ImageRunData(

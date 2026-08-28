@@ -43,6 +43,33 @@ export function buildGatewayInputSummary(
   };
 }
 
+/** DashScope multimodal content · `{ image: "https://…" }` 或 OpenAI 式 `{ type, image_url }` */
+function extractDashscopeContentImageUrls(content: unknown): string[] {
+  if (!Array.isArray(content)) return [];
+  const urls: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const b = block as Record<string, unknown>;
+    if (typeof b.image === "string" && /^https?:\/\//.test(b.image.trim())) {
+      urls.push(b.image.trim());
+      continue;
+    }
+    if (b.type === "image_url") {
+      const imageUrl = b.image_url;
+      const url =
+        imageUrl && typeof imageUrl === "object"
+          ? (imageUrl as Record<string, unknown>).url
+          : typeof imageUrl === "string"
+            ? imageUrl
+            : undefined;
+      if (typeof url === "string" && /^https?:\/\//.test(url.trim())) {
+        urls.push(url.trim());
+      }
+    }
+  }
+  return urls;
+}
+
 /**
  * DashScope createTask · 写入 GatewayRequestLog.inputSummary 的请求快照。
  * video 任务的 prompt/media/parameters 在 body.dashscope.videoBody，须展开后再记日志。
@@ -73,10 +100,12 @@ export function buildDashscopeCreateTaskInputForLog(
       ...(parameters ? { parameters } : {}),
     };
   }
+  const contentImageUrls = extractDashscopeContentImageUrls(ds.content);
   return {
     jobKind: ds.jobKind,
     prompt: ds.prompt,
     content: ds.content,
+    ...(contentImageUrls.length > 0 ? { imageUrls: contentImageUrls } : {}),
     size: ds.size,
     n: ds.n,
     aspectRatio: ds.aspectRatio,

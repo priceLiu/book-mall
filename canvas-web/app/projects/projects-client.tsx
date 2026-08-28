@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import {
+  CanvasCreditsToastHost,
+  showCanvasSuccessToast,
+} from "@/components/canvas/canvas-credits-toast-host";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   CanvasListCover,
@@ -321,22 +325,17 @@ function Inner() {
       });
       markRecentProjectsStale();
       if (result.appliedImmediately) {
-        await dialogs.alert({
-          title: "已发布",
-          message:
-            kind === "CASE" && submitTarget.edition === "sbv1"
-              ? "作品已发布到首页「视频作品」。"
-              : "作品已按所选类型对外展示。",
-          variant: "success",
-        });
+        showCanvasSuccessToast(
+          kind === "CASE" && submitTarget.edition === "sbv1"
+            ? "已发布 · 作品已发布到首页「视频作品」"
+            : "已发布 · 作品已按所选类型对外展示",
+        );
         if (kind === "FEATURED") await refreshPortalFeaturedIds();
         if (kind === "CASE") await refreshPortalCaseIds();
       } else {
-        await dialogs.alert({
-          title: "已提交",
-          message: "管理员审核通过后将展示在首页相应位置。",
-          variant: "success",
-        });
+        showCanvasSuccessToast(
+          "已提交 · 管理员审核通过后将展示在首页相应位置",
+        );
       }
     },
     [base, dialogs, submitTarget, refreshPortalFeaturedIds, refreshPortalCaseIds],
@@ -1055,6 +1054,7 @@ function Inner() {
       />
 
       <CanvasProjectOpeningOverlay visible={Boolean(openingProjectId)} />
+      <CanvasCreditsToastHost />
     </div>
   );
 }

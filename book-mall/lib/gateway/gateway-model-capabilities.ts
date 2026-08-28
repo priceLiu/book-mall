@@ -70,6 +70,7 @@ export function marketTaskTagsForModel(input: {
     return ["image-to-image"];
   }
   if (k === "wan2.6-image") return ["text-to-image", "image-to-image"];
+  if (k === "wan2.7-image-pro") return ["text-to-image", "image-to-image"];
   if (k === "google/nano-banana") return ["text-to-image", "image-to-image"];
   if (k === "4o-image") return ["text-to-image", "image-to-image"];
   if (k === "nano-banana-2") return ["text-to-image", "image-to-image"];

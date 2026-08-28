@@ -3,12 +3,10 @@
 import { useMemo, useRef } from "react";
 import { useNodes } from "@xyflow/react";
 import {
-  countLibtvSelectedNonGroupNodes,
-  resolveLibtvFloatingDockSelection,
+  resolveLibtvSoleSelectedNodeId,
 } from "./libtv-floating-dock-selection";
 import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 import { useCanvasStore } from "./store";
-import { libtvDetailEditorOpenForNode } from "./libtv-detail-editor-open";
 import {
   useLibtvDockFlowPlacement,
   useStableLibtvDockFlowPlacement,
@@ -21,25 +19,24 @@ type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]
 /**
  * LibTV 浮动 Dock · 某类型节点的选中 id（全局单选互斥）
  *
- * 仅当 React Flow 全局唯一选中节点类型匹配时才返回 id（不靠 store pin 单独挂 Dock）。
+ * 优先 RF 唯一选中；sync/zoom 时 RF 选中可能闪断，回退 store pin。
  */
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
   const marqueeSelecting = useCanvasMarqueeSelecting();
+  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
+  const pinnedType = useCanvasStore((s) => s.libtvFloatingDockNodeType);
 
-  const rfGlobal = useMemo(
-    () => resolveLibtvFloatingDockSelection(rfNodes),
-    [rfNodes],
+  return useMemo(
+    () =>
+      resolveLibtvSoleSelectedNodeId(
+        rfNodes,
+        nodeType,
+        { nodeId: pinnedId, nodeType: pinnedType },
+        { marqueeSelecting },
+      ),
+    [rfNodes, nodeType, pinnedId, pinnedType, marqueeSelecting],
   );
-
-  if (marqueeSelecting) return null;
-  if (countLibtvSelectedNonGroupNodes(rfNodes) >= 2) return null;
-  if (!rfGlobal || rfGlobal.nodeType !== nodeType) return null;
-
-  const nodeId = rfGlobal.nodeId;
-  if (!nodeId) return null;
-  if (libtvDetailEditorOpenForNode(nodeId)) return null;
-  return nodeId;
 }
 
 /**

@@ -78,9 +78,10 @@ export const BAILIAN_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "wan2.7-image-pro",
-    displayName: "万相 2.7 Pro · 多图参考",
+    displayName: "万相 2.7 Pro · 编辑 / 多图参考",
     role: "IMAGE",
-    description: "通义万相 2.7 Pro · 更高画质 · 支持多图参考生图。",
+    description:
+      "通义万相 2.7 Pro · 文生图 / 多图参考图生图 / 图像编辑（须参考图 + 编辑指令）。",
     paramsSchema: WAN_IMAGE_RESOLUTION_SCHEMA,
     defaultParams: { resolution: "2K" },
   },

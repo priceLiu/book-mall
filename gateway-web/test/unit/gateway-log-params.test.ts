@@ -63,4 +63,21 @@ describe("extractLogInputImages", () => {
     expect(images[0]?.url).toBe("https://cdn.example/a.png");
     expect(images[0]?.previewable).toBe(true);
   });
+
+  it("reads DashScope multimodal content image blocks", () => {
+    const images = extractLogInputImages({
+      model: "qwen-image-edit",
+      input: {
+        jobKind: "multimodal-image-sync",
+        content: [
+          { image: "https://cdn.example/ref-a.png" },
+          { image: "https://cdn.example/ref-b.png" },
+          { text: "edit prompt" },
+        ],
+      },
+    });
+    expect(images).toHaveLength(2);
+    expect(images[0]?.url).toBe("https://cdn.example/ref-a.png");
+    expect(images[1]?.url).toBe("https://cdn.example/ref-b.png");
+  });
 });

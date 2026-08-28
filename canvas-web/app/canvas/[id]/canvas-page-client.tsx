@@ -16,7 +16,10 @@ import {
   canvasGraphRedo,
   canvasGraphUndo,
 } from "@/lib/canvas/canvas-graph-undo-redo";
-import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
+import {
+  CanvasCreditsToastHost,
+  showCanvasSuccessToast,
+} from "@/components/canvas/canvas-credits-toast-host";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
 import { Pro2ProductionGateToolbarLink } from "@/components/canvas/pro2/pro2-production-gate-banner";
@@ -1469,30 +1472,25 @@ function Inner({ projectId }: { projectId: string }) {
         });
         if (result.appliedImmediately) {
           markRecentProjectsStale();
-          await dialogs.alert({
-            title: "已发布",
-            message:
-              kind === "PUBLIC_TEMPLATE" || kind === "TEMPLATE"
-                ? "工作流模板已发布，可在首页「模板」查看。"
-                : kind === "FEATURED"
-                  ? "作品已发布到首页「精选」。"
-                  : kind === "CASE"
-                    ? project?.edition === "sbv1"
-                      ? "作品已发布到首页「视频作品」。"
-                      : "作品已发布到首页「案例」。"
-                    : "作品已按所选类型对外展示。",
-            variant: "success",
-          });
+          showCanvasSuccessToast(
+            kind === "PUBLIC_TEMPLATE" || kind === "TEMPLATE"
+              ? "已发布 · 工作流模板已发布，可在首页「模板」查看"
+              : kind === "FEATURED"
+                ? "已发布 · 作品已发布到首页「精选」"
+                : kind === "CASE"
+                  ? project?.edition === "sbv1"
+                    ? "已发布 · 作品已发布到首页「视频作品」"
+                    : "已发布 · 作品已发布到首页「案例」"
+                  : "已发布 · 作品已按所选类型对外展示",
+          );
           if (kind === "PUBLIC_TEMPLATE" || kind === "TEMPLATE") {
             setTemplatesRefreshKey((k) => k + 1);
           }
         } else {
           markRecentProjectsStale();
-          await dialogs.alert({
-            title: "已提交",
-            message: "管理员审核通过后将展示在首页相应位置。",
-            variant: "success",
-          });
+          showCanvasSuccessToast(
+            "已提交 · 管理员审核通过后将展示在首页相应位置",
+          );
         }
       } catch (e) {
         await dialogs.alert({

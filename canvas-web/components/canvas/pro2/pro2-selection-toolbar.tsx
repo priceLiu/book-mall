@@ -71,7 +71,7 @@ export function Pro2SelectionToolbar({
   const storeNodes = useCanvasStore((s) => s.nodes);
   const [saving, setSaving] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
-  const [groupName, setGroupName] = useState("未命名分组");
+  const [groupName, setGroupName] = useState("");
   const [groupColor, setGroupColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
 
   useEffect(() => {
@@ -80,6 +80,7 @@ export function Pro2SelectionToolbar({
       return;
     }
     document.documentElement.dataset.canvasToolbarPopoverOpen = "true";
+    setGroupName(`未命名分组 ${new Date().toLocaleTimeString().slice(0, 5)}`);
     return () => {
       delete document.documentElement.dataset.canvasToolbarPopoverOpen;
     };
@@ -281,6 +282,7 @@ export function Pro2SelectionToolbar({
       pro2Styled: true,
     });
     setGroupOpen(false);
+    setGroupName("");
   };
 
   return createPortal(

@@ -44,19 +44,25 @@ describe("buildDashscopeCreateTaskInputForLog", () => {
     expect(summary.input.parameters).toMatchObject({ duration: 15 });
   });
 
-  it("keeps wanx jobKind fields for non-video dashscope jobs", () => {
+  it("flattens multimodal content images into imageUrls for log Images column", () => {
     expect(
       buildDashscopeCreateTaskInputForLog({
-        jobKind: "wanx",
-        prompt: "cat",
-        n: 1,
+        jobKind: "multimodal-image-sync",
+        content: [
+          { image: "https://cdn.example/a.png" },
+          { text: "prompt" },
+        ],
       }),
     ).toEqual({
-      jobKind: "wanx",
-      prompt: "cat",
-      content: undefined,
+      jobKind: "multimodal-image-sync",
+      prompt: undefined,
+      content: [
+        { image: "https://cdn.example/a.png" },
+        { text: "prompt" },
+      ],
+      imageUrls: ["https://cdn.example/a.png"],
       size: undefined,
-      n: 1,
+      n: undefined,
       aspectRatio: undefined,
       resolution: undefined,
       contentOrder: undefined,

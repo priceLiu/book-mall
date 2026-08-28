@@ -8,6 +8,7 @@ import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display
 import { recoverCanvasTextLlmFromGateway } from "@/lib/canvas/canvas-text-llm-recover";
 import { recoverCanvasDashscopeSyncImageFromGateway } from "@/lib/canvas/canvas-dashscope-sync-image-recover";
 import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
+import { isCanvasDashscopeSyncImageTaskPayload } from "@/lib/canvas/canvas-constants";
 
 const SUBMITTED_INCOMPLETE_MS = 3 * 60 * 1000;
 /** 视觉 LLM 可能需十余秒；异步 execute 允许更长窗口，勿与视频 kieTaskId 混判 */
@@ -81,6 +82,24 @@ export async function reconcileCanvasInflightZombies(opts?: {
   for (const t of submitIncompleteFailed) {
     const dashscope = await recoverCanvasDashscopeSyncImageFromGateway(t.id);
     if (dashscope === "succeeded") {
+      summary.imageKieRecovered += 1;
+    }
+  }
+
+  const syncDashscopeSubmitted = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "SUBMITTED",
+      kind: "IMAGE",
+      ...projectFilter,
+    },
+    orderBy: { updatedAt: "asc" },
+    take: limit,
+    select: { id: true, inputPayload: true },
+  });
+  for (const t of syncDashscopeSubmitted) {
+    if (!isCanvasDashscopeSyncImageTaskPayload(taskPayload(t))) continue;
+    const dashscope = await recoverCanvasDashscopeSyncImageFromGateway(t.id);
+    if (dashscope === "succeeded" || dashscope === "failed") {
       summary.imageKieRecovered += 1;
     }
   }

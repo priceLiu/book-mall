@@ -9,6 +9,7 @@ import { routeGatewayModel } from "@/lib/gateway/model-router";
 const IMAGE_EDIT_MODEL_KEYS = [
   "qwen-image-edit",
   "qwen-image-edit-max",
+  "wan2.7-image-pro",
   "wan2.6-image",
   "google/nano-banana-edit",
 ] as const;
@@ -28,6 +29,14 @@ describe("Gateway image-edit models", () => {
     expect(keys.has("qwen-image-edit")).toBe(true);
     expect(keys.has("qwen-image-edit-max")).toBe(true);
     expect(keys.has("wan2.6-image")).toBe(true);
+    expect(keys.has("wan2.7-image-pro")).toBe(true);
+  });
+
+  it("routes wan2.7-image-pro to DashScope IMAGE", () => {
+    expect(routeGatewayModel("wan2.7-image-pro")).toEqual({
+      providerKind: "DASHSCOPE",
+      requestKind: "IMAGE",
+    });
   });
 
   it("routes image-edit models to DashScope / KIE IMAGE", () => {

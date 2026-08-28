@@ -135,6 +135,11 @@ function extractContentImages(
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
     const b = block as Record<string, unknown>;
+    if (typeof b.image === "string" && isLogImageRef(b.image)) {
+      imgIdx += 1;
+      push(String(b.image), imageLabel(imgIdx, "reference"), "reference");
+      continue;
+    }
     if (b.type !== "image_url") continue;
     const imageUrl = b.image_url;
     const url =

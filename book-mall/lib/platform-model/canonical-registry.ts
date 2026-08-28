@@ -253,6 +253,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "wan2.7-image-pro",
     displayName: "Wan 2.7 Image Pro",
+    description: "通义万相 2.7 Pro · 文生图 / 多图参考 / 图像编辑",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",

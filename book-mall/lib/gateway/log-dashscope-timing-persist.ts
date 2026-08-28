@@ -8,6 +8,7 @@ import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
 import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 import {
   attachDashscopeTimingToSummary,
+  buildDashscopeSyncWallClockTrace,
   buildDashscopeTerminalFinalizeMetrics,
   bumpDashscopePeakPollDelay,
   computeDashscopeTimingBreakdown,
@@ -85,6 +86,46 @@ type DashscopeFinalizePatch = Omit<
   Parameters<typeof finalizeRequestLog>[1],
   "status" | "durationMs" | "resultSummary" | "completedAt"
 >;
+
+/** 百炼 multimodal-generation 同步 HTTP 终态：墙钟 trace + 阶段拆分。 */
+export async function finalizeDashscopeSyncWallClockRequestLog(
+  logId: string,
+  input: {
+    vendorCallStartedAtMs: number;
+    vendorCallEndedAtMs: number;
+    status: "SUCCEEDED" | "FAILED";
+    resultSummaryBase: unknown;
+  } & DashscopeFinalizePatch,
+): Promise<void> {
+  const log = await prisma.gatewayRequestLog.findUnique({
+    where: { id: logId },
+    select: { submittedAt: true },
+  });
+  if (!log) return;
+
+  const { vendorCallStartedAtMs, vendorCallEndedAtMs, status, resultSummaryBase, ...patch } =
+    input;
+  const trace =
+    status === "SUCCEEDED"
+      ? buildDashscopeSyncWallClockTrace({
+          vendorCallStartedAtMs,
+          vendorCallEndedAtMs,
+        })
+      : mergeDashscopeTimingTrace(null, {
+          status: "failed",
+          output: {},
+          polledAtMs: vendorCallEndedAtMs,
+        });
+
+  await finalizeDashscopeAsyncRequestLog(logId, {
+    submittedAt: log.submittedAt,
+    status,
+    trace,
+    resultSummaryBase,
+    fallbackNowMs: vendorCallEndedAtMs,
+    ...patch,
+  });
+}
 
 /** 百炼 / DashScope 异步终态：按 trace 冻结 completedAt / durationMs / 阶段拆分。 */
 export async function finalizeDashscopeAsyncRequestLog(

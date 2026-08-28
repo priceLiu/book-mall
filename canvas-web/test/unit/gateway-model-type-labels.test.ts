@@ -33,6 +33,15 @@ describe("getGatewayModelTypeLabels · IMAGE", () => {
       }),
     ).toEqual(["文生图", "图生图"]);
   });
+
+  it("labels wan2.7-image-pro as 图片编辑", () => {
+    expect(
+      getGatewayModelTypeLabels({
+        modelKey: "wan2.7-image-pro",
+        role: "IMAGE",
+      }),
+    ).toEqual(["图片编辑"]);
+  });
 });
 
 describe("getGatewayModelTypeLabels · LLM", () => {
@@ -61,6 +70,8 @@ describe("SBV1_IMAGE_MODEL_KEYS", () => {
   it("includes image-edit models for the image node picker", () => {
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("qwen-image-edit");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("qwen-image-edit-max");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("qwen-image-3.0-pro");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("wan2.7-image-pro");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("wan2.6-image");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("google/nano-banana-edit");
   });

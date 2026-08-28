@@ -784,6 +784,10 @@ export async function runImageEngineNode(
             } as Prisma.InputJsonValue,
           },
         });
+        const { recoverCanvasDashscopeSyncImageFromGateway } = await import(
+          "@/lib/canvas/canvas-dashscope-sync-image-recover"
+        );
+        await recoverCanvasDashscopeSyncImageFromGateway(updated.id).catch(() => undefined);
         return { reused: false, task: updated };
       }
 

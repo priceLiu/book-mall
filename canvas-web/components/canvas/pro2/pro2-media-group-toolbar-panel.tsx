@@ -18,6 +18,7 @@ import {
 import { useMemo, useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { showCanvasSuccessToast } from "@/components/canvas/canvas-credits-toast-host";
 import { extractGroupSubgraph } from "@/lib/canvas/extract-group-subgraph";
 import { shareWorkflowAsTemplate } from "@/lib/canvas/share-workflow";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -223,13 +224,11 @@ export function Pro2MediaGroupToolbarPanel({
         sourceLabel: defaultName,
         visibility: sharePublic ? "public" : "private",
       });
-      await alert({
-        title: sharePublic ? "已公开分享" : "已保存模板",
-        message: sharePublic
-          ? "工作流已出现在首页社区模板区。"
-          : "可在「我的模板」中复用。",
-        variant: "success",
-      });
+      showCanvasSuccessToast(
+        sharePublic
+          ? "已公开分享 · 工作流已出现在首页社区模板区"
+          : "已保存模板 · 可在「我的模板」中复用",
+      );
     } catch (e) {
       await alert({
         title: "分享失败",

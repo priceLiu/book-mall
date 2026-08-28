@@ -20,47 +20,25 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
   const userId = input.userId?.trim() || null;
   const isProbe = Boolean(input.isProbe);
 
-  await prisma.$transaction(async (tx) => {
-    const daily = await tx.siteTrafficDaily.findUnique({
-      where: { dateCst_appKey: { dateCst, appKey: input.appKey } },
-      select: { id: true },
-    });
-    if (daily) {
-      await tx.siteTrafficDaily.update({
-        where: { id: daily.id },
-        data: {
-          pageViews: { increment: 1 },
-          ...(isProbe ? { probeViews: { increment: 1 } } : {}),
-        },
-      });
-    } else {
-      await tx.siteTrafficDaily.create({
-        data: {
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.siteTrafficDaily.upsert({
+        where: { dateCst_appKey: { dateCst, appKey: input.appKey } },
+        create: {
           dateCst,
           appKey: input.appKey,
           pageViews: 1,
           probeViews: isProbe ? 1 : 0,
         },
-      });
-    }
-
-    const ipRow = await tx.siteTrafficIpDaily.findUnique({
-      where: { dateCst_appKey_ip: { dateCst, appKey: input.appKey, ip } },
-      select: { id: true, userId: true },
-    });
-    if (ipRow) {
-      await tx.siteTrafficIpDaily.update({
-        where: { id: ipRow.id },
-        data: {
-          hitCount: { increment: 1 },
-          lastSeenAt: at,
-          ...(isProbe ? { probeHitCount: { increment: 1 } } : {}),
-          ...(userId && !ipRow.userId ? { userId } : {}),
+        update: {
+          pageViews: { increment: 1 },
+          ...(isProbe ? { probeViews: { increment: 1 } } : {}),
         },
       });
-    } else {
-      await tx.siteTrafficIpDaily.create({
-        data: {
+
+      await tx.siteTrafficIpDaily.upsert({
+        where: { dateCst_appKey_ip: { dateCst, appKey: input.appKey, ip } },
+        create: {
           dateCst,
           appKey: input.appKey,
           ip,
@@ -70,7 +48,25 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
           lastSeenAt: at,
           userId,
         },
+        update: {
+          hitCount: { increment: 1 },
+          lastSeenAt: at,
+          ...(isProbe ? { probeHitCount: { increment: 1 } } : {}),
+        },
       });
-    }
-  });
+
+      if (userId) {
+        await tx.siteTrafficIpDaily.updateMany({
+          where: {
+            dateCst,
+            appKey: input.appKey,
+            ip,
+            userId: null,
+          },
+          data: { userId },
+        });
+      }
+    },
+    { timeout: 15_000 },
+  );
 }

@@ -123,6 +123,28 @@ export function readDashscopeTimingBreakdown(
   return null;
 }
 
+/**
+ * 百炼 multimodal-generation 同步 HTTP（qwen-image-edit / qwen-image-3.0-pro / z-image-turbo）：
+ * 厂商不回 submit_time / scheduled_time，用上游 HTTP 墙钟合成 trace 供日志页厂商分列展示。
+ */
+export function buildDashscopeSyncWallClockTrace(input: {
+  vendorCallStartedAtMs: number;
+  vendorCallEndedAtMs: number;
+}): DashscopeTimingTrace {
+  const start = input.vendorCallStartedAtMs;
+  const end = input.vendorCallEndedAtMs;
+  return {
+    kind: "dashscope_timing",
+    vendorSubmitAtMs: start,
+    vendorScheduledAtMs: start,
+    vendorEndAtMs: end,
+    firstRunningAtMs: start,
+    firstSucceededPolledAtMs: end,
+    lastStatus: "succeeded",
+    lastPolledAtMs: end,
+  };
+}
+
 export function mergeDashscopeTimingTrace(
   existing: DashscopeTimingTrace | null,
   input: {

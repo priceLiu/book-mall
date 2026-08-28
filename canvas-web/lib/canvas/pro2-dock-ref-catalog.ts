@@ -1,7 +1,7 @@
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import type { StoryRefImage } from "./story-ref-image";
 import type { DockMentionRef } from "./dock-mention-ref-urls";
-import { dockActiveRefIdsFromPrompt } from "./dock-mention-ref-urls";
+import { dockActiveRefIdsFromPrompt, dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
 
 /** 上游 chip + 粘贴参考图 → @ 目录（同步到 row.refImages / run 过滤） */
 export function pro2DockRefImageCatalog(
@@ -39,7 +39,7 @@ export function pro2DockMentionRefCatalog(
 
 /**
  * Dock 参考图解析：有 @ 时仅选中项；无 @ 时 catalog 全部带入模型。
- * 供生图 imageInputs、脚本 merge、分镜 kickoff 等共用。
+ * 供脚本 merge、分镜 kickoff 等；图片节点生图请用 resolveDockImageUrlsForRun。
  */
 export function resolveDockRefsForRun(
   prompt: string,
@@ -63,4 +63,16 @@ export function resolveDockRefUrlsForRun(
   return resolveDockRefsForRun(prompt, upstreamLinks, dockRefImages)
     .map((r) => r.url)
     .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u));
+}
+
+/**
+ * 图片节点生图 run：始终带入 Dock 全部参考图（上游 chip + 粘贴）。
+ * prompt 内 @ 仅影响文案指代（resolveDockRunPrompt），不过滤 imageInputs。
+ */
+export function resolveDockImageUrlsForRun(
+  upstreamLinks: Pro2DockUpstreamLink[],
+  dockRefImages: StoryRefImage[] = [],
+): string[] {
+  const catalog = pro2DockMentionRefCatalog(upstreamLinks, dockRefImages);
+  return dockMentionRefUrlsForPrompt("", catalog);
 }

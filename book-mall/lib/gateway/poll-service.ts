@@ -44,6 +44,7 @@ import {
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 import { finalizeRequestLog } from "./proxy-common";
+import { finalizeDashscopeSyncWallClockRequestLog } from "./log-dashscope-timing-persist";
 import {
   qwenImageEditGenerate,
   type QwenImageEditContentItem,
@@ -1035,14 +1036,16 @@ export async function submitDashscopeMultimodalImageSyncForLog(opts: {
     })),
   };
 
+  const ended = Date.now();
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
     data: { externalTaskId: opts.logId, status: "RUNNING" },
   });
-  await finalizeRequestLog(opts.logId, {
+  await finalizeDashscopeSyncWallClockRequestLog(opts.logId, {
+    vendorCallStartedAtMs: started,
+    vendorCallEndedAtMs: ended,
     status: "SUCCEEDED",
-    durationMs: Date.now() - started,
-    resultSummary: {
+    resultSummaryBase: {
       sync: true,
       output,
       imageUrls: result.imageUrls,
