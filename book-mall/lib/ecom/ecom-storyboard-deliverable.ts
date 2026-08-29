@@ -262,11 +262,10 @@ function coerceDeliverablePanels(raw: unknown): unknown {
         camera: coercePanelTextField(p.camera),
         dialogue: coercePanelTextField(p.dialogue),
         emotion: coercePanelTextField(p.emotion),
-      imagePrompt: coercePanelTextField(p.imagePrompt),
-      scenePrompt: coercePanelTextField(p.scenePrompt),
-      protagonistBeat: coercePanelTextField(p.protagonistBeat),
-      productBeat: coercePanelTextField(p.productBeat),
-      videoPromptEn: coercePanelTextField(p.videoPromptEn),
+        imagePrompt: coercePanelTextField(p.imagePrompt),
+        protagonistBeat: coercePanelTextField(p.protagonistBeat),
+        productBeat: coercePanelTextField(p.productBeat),
+        videoPromptEn: coercePanelTextField(p.videoPromptEn),
       };
     });
     return s;

@@ -593,11 +593,12 @@ export function resolveFashionDeliverable(project: StoryboardProject): FashionDe
     ? (project.meta!.deliverable as FashionDeliverable)
     : null;
   if (metaDeliverable?.sellpoints?.length) {
+    const chatSellpoints = merged.sellpoints;
     if (
       metaDeliverable.sellpointsLocked ||
       wf.fashionSellpointsEdited ||
       metaDeliverable.sellpoints.some((sp) => {
-        const prev = merged.sellpoints.find((d) => d.id === sp.id);
+        const prev = chatSellpoints.find((d) => d.id === sp.id);
         return sp.text.trim() !== (prev?.text ?? "").trim();
       })
     ) {
@@ -638,7 +639,7 @@ function countFashionStoryboardVersions(d: FashionDeliverable | null | undefined
 }
 
 export function listFashionStoryboardVersionKeys(
-  d: FashionDeliverable | null | undefined,
+  d: Pick<FashionDeliverable, "storyboardVersions"> | null | undefined,
 ): FashionVersionKey[] {
   const versions = d?.storyboardVersions ?? {};
   return (["A", "B", "C", "D", "E"] as FashionVersionKey[]).filter((k) => {

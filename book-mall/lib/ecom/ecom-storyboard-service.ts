@@ -52,6 +52,14 @@ export type EcomStoryboardProjectDto = {
       planMode?: "quick" | "custom" | "default_a";
       scenePreset?: string;
       scenePresetCustom?: string;
+      vertical?: "fashion_apparel" | "bags";
+      fashionPhase?: string;
+      /** 角色参考：AI 生成 / 用户上传（服装电商路径 B） */
+      fashionCharacterMode?: "ai" | "upload";
+      fashionProduceSetupPending?: boolean;
+      fashionImageModelKey?: string;
+      fashionSellpointsEdited?: boolean;
+      fashionStoryboardPanelsEdited?: boolean;
     };
   } | null;
   createdAt: string;

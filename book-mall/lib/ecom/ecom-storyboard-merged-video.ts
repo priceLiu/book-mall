@@ -16,6 +16,7 @@ type StoryboardMetaLike = {
   workflow?: {
     renderJobId?: string;
     videoMode?: string;
+    [key: string]: unknown;
   };
 } | null;
 

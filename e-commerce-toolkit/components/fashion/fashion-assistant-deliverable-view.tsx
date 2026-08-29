@@ -28,7 +28,9 @@ function storyboardVersionCount(d: FashionDeliverable | null | undefined): numbe
   return listFashionStoryboardVersionKeys(d).length;
 }
 
-function hasOpsPackContent(d: FashionDeliverable | null | undefined): boolean {
+function hasOpsPackContent(
+  d: Pick<FashionDeliverable, "opsPack"> | null | undefined,
+): boolean {
   const ops = d?.opsPack;
   if (!ops) return false;
   return Boolean(

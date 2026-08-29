@@ -593,7 +593,7 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
         runningRef.current.delete(jobId);
       }
     },
-    [alert, persist, abortInFlightUploads, registerAbortController, unregisterAbortController],
+    [alert, persist, registerAbortController, unregisterAbortController],
   );
 
   runJobRef.current = (jobId: string) => {
