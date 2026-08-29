@@ -113,7 +113,9 @@
 | `productInteraction` | 枚举 | `none` \| `hold` \| `wear` \| `use` \| `apply` \| `display` \| `unbox` |
 | `productVisibility` | 枚举 | `off` \| `hint` \| `partial` \| `hero` |
 | `sellpointTags` | `string[]` | 引用 `productSellingPoints[].id`，无则 `[]` |
-| `imagePrompt` | `string` | 完整中文生图指令 |
+| `imagePrompt` | `string` | 完整中文生图指令（≥40字） |
+| `scenePrompt` | `string` | 生图/生视频共用的场景描述 prompt（≥40字） |
+| `videoPromptEn` | `string` | 单镜视频 motion prompt（≥40字） |
 | `protagonistBeat`, `productBeat` | `string?` | 检核用，可选 |
 
 ### 4.3 `cast.appearance` 品类规则

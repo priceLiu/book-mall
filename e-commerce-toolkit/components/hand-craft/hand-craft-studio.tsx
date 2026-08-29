@@ -25,6 +25,7 @@ import {
 } from "@/lib/ecom-hand-craft-api";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import { inferCurrentStepId } from "@/lib/hand-craft-workflow";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -36,7 +37,7 @@ export function HandCraftStudio() {
   const [project, setProject] = useState<HandCraftProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState("qwen3.5-flash");
+  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
   const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
   const [concurrencyLimit, setConcurrencyLimit] = useState(1);
   const [modelsLoading, setModelsLoading] = useState(true);

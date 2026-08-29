@@ -7,6 +7,41 @@ import type {
 import { isFashionDeliverable } from "@/lib/fashion-types";
 import { normalizeFashionOpsPack } from "@/lib/fashion-ops-pack-format";
 
+function deriveScenePrompt(sceneDesc: string, scenePromptRaw?: string): string {
+  const explicit = scenePromptRaw?.trim();
+  if (explicit && explicit.length >= 20) return explicit;
+  const desc = sceneDesc.trim();
+  if (desc && desc !== "—") {
+    return desc.length >= 20
+      ? desc
+      : `${desc}，写实自然光，与服装品类匹配的环境与道具`;
+  }
+  return explicit || "都市室内或户外场景，自然光，与服装展示匹配";
+}
+
+function deriveVideoPrompt(
+  cameraMove: string,
+  modelAction: string,
+  sceneDesc: string,
+  garmentFocus: string,
+  videoPromptRaw?: string,
+): string {
+  const explicit = videoPromptRaw?.trim();
+  if (explicit && explicit.length >= 20) return explicit;
+  return `${cameraMove || "固定"}运镜，${modelAction}，场景${sceneDesc}，服装展示重点${garmentFocus}，UGC质感连贯动作`;
+}
+
+function deriveImagePrompt(
+  scenePrompt: string,
+  modelAction: string,
+  garmentFocus: string,
+  imagePromptRaw?: string,
+): string {
+  const explicit = imagePromptRaw?.trim();
+  if (explicit && explicit.length >= 20) return explicit;
+  return `竖版9:16，写实UGC摄影。场景：${scenePrompt}。模特${modelAction}，展示${garmentFocus}，以参考图1服装为准，禁止画面文字。`;
+}
+
 const FASHION_FENCE_RE = /```fashion-deliverable\s*([\s\S]*?)```/i;
 const GENERIC_FENCE_RE = /```(?:json)?\s*([\s\S]*?)```/i;
 
@@ -17,23 +52,45 @@ function coerceFashionPanels(raw: unknown): FashionPanelRow[] {
       if (!p || typeof p !== "object") return null;
       const panel = p as Record<string, unknown>;
       const index = typeof panel.index === "number" ? panel.index : i + 1;
+      const sceneDesc = String(panel.sceneDesc ?? "");
+      const modelAction = String(panel.modelAction ?? "");
+      const garmentFocus = String(panel.garmentFocus ?? "");
+      const cameraMove = String(panel.cameraMove ?? "固定");
+      const scenePrompt = deriveScenePrompt(
+        sceneDesc,
+        typeof panel.scenePrompt === "string" ? panel.scenePrompt : undefined,
+      );
       return {
         index: Math.min(6, Math.max(1, index)) as FashionPanelRow["index"],
         shotScale: String(panel.shotScale ?? "中景"),
         durationSec: typeof panel.durationSec === "number" ? panel.durationSec : 4,
-        cameraMove: String(panel.cameraMove ?? ""),
-        sceneDesc: String(panel.sceneDesc ?? ""),
-        modelAction: String(panel.modelAction ?? ""),
-        garmentFocus: String(panel.garmentFocus ?? ""),
+        cameraMove,
+        sceneDesc,
+        scenePrompt,
+        modelAction,
+        garmentFocus,
         dialogue: typeof panel.dialogue === "string" ? panel.dialogue : undefined,
         toneTexture: typeof panel.toneTexture === "string" ? panel.toneTexture : undefined,
         sellpointIds: Array.isArray(panel.sellpointIds)
           ? panel.sellpointIds.map(String)
           : [],
-        imagePrompt:
-          typeof panel.imagePrompt === "string" && panel.imagePrompt.trim()
-            ? panel.imagePrompt.trim()
-            : "竖版9:16，写实UGC摄影，服装展示，禁止画面文字。",
+        imagePrompt: deriveImagePrompt(
+          scenePrompt,
+          modelAction,
+          garmentFocus,
+          typeof panel.imagePrompt === "string" ? panel.imagePrompt : undefined,
+        ),
+        videoPrompt: deriveVideoPrompt(
+          cameraMove,
+          modelAction,
+          sceneDesc,
+          garmentFocus,
+          typeof panel.videoPrompt === "string"
+            ? panel.videoPrompt
+            : typeof panel.videoPromptEn === "string"
+              ? panel.videoPromptEn
+              : undefined,
+        ),
       };
     })
     .filter(Boolean) as FashionPanelRow[];

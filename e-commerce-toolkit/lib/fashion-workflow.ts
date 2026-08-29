@@ -13,6 +13,10 @@ import type {
 } from "@/lib/fashion-types";
 import { isFashionDeliverable } from "@/lib/fashion-types";
 import type { StoryboardProject, StoryboardChatMessage } from "@/lib/storyboard-types";
+import {
+  STORYBOARD_GENERATE_FULL_VIDEO_CHOICE,
+  hasSheetImagesReady,
+} from "@/lib/storyboard-workflow";
 
 export const FASHION_PRODUCT_REF_ACK = "已上传产品图";
 export const FASHION_CUSTOM_DIMENSION_CHOICE = "自定义";
@@ -134,6 +138,12 @@ export type FashionWorkflowMeta = {
   fashionSellpointsEdited?: boolean;
   /** 用户在中栏修改过已定稿分镜表，resolve 时以 meta.deliverable 为准 */
   fashionStoryboardPanelsEdited?: boolean;
+  /** 路径 B 进入 produce 后，须先选生图模型与角色参考方式 */
+  fashionProduceSetupPending?: boolean;
+  /** 服装路径 B 成片阶段选定的生图模型 */
+  fashionImageModelKey?: string;
+  /** 角色参考：AI 生成 / 用户上传 */
+  fashionCharacterMode?: "ai" | "upload";
 };
 
 export type FashionChoice = {
@@ -146,6 +156,61 @@ export type FashionChoice = {
 
 export function isFashionProject(project: StoryboardProject): boolean {
   return project.meta?.workflow?.vertical === "fashion_apparel";
+}
+
+/** 七维参数拼接为故事版「项目关键词」 */
+export function buildFashionProjectKeywords(
+  deliverable: Pick<FashionDeliverable, "dimensions"> | null | undefined,
+): string {
+  const d = deliverable?.dimensions ?? {};
+  return [
+    d.styleCategory,
+    d.styleAttribute,
+    d.platform,
+    d.customScene,
+  ]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function fashionProduceImageModelKey(project: StoryboardProject): string | undefined {
+  const wf = getFashionWorkflowMeta(project);
+  return wf.fashionImageModelKey?.trim() || undefined;
+}
+
+export function fashionCharacterMode(
+  project: StoryboardProject,
+): "ai" | "upload" | undefined {
+  return getFashionWorkflowMeta(project).fashionCharacterMode;
+}
+
+export function isFashionProduceSetupReady(project: StoryboardProject): boolean {
+  const d = resolveFashionDeliverable(project);
+  if (d?.outputMode !== "direct_video") return true;
+  const wf = getFashionWorkflowMeta(project);
+  if (wf.fashionProduceSetupPending === false) return true;
+  return wf.fashionCharacterMode === "ai" || wf.fashionCharacterMode === "upload";
+}
+
+/** sheet 脚本字段缺失但 deliverable 有内容时需 re-sync */
+export function fashionSheetNeedsScriptResync(project: StoryboardProject): boolean {
+  const d = resolveFashionDeliverable(project);
+  if (d?.outputMode !== "direct_video" || !project.sheet?.panels?.length) return false;
+  const key = d.selectedVersion;
+  if (!key) return false;
+  const panels = d.storyboardVersions?.[key]?.panels;
+  if (!panels?.length) return false;
+  const sheetEmpty = project.sheet.panels.some(
+    (p) =>
+      !p.scene?.trim() ||
+      p.scene === "—" ||
+      !p.dialogue?.trim(),
+  );
+  const deliverableHasScript = panels.some(
+    (p) => Boolean(p.sceneDesc?.trim() && p.sceneDesc !== "—") || Boolean(p.dialogue?.trim()),
+  );
+  return sheetEmpty && deliverableHasScript;
 }
 
 export function isLegacyStoryboardProject(project: StoryboardProject): boolean {
@@ -1102,8 +1167,28 @@ export function isFashionPendingStoryboardGeneration(
   );
 }
 
+function inferFashionProduceVideoChoices(project: StoryboardProject): FashionChoice[] {
+  if (!isFashionInProduce(project)) return [];
+  const d = resolveFashionDeliverable(project);
+  if (d?.outputMode !== "direct_video") return [];
+  if (!hasSheetImagesReady(project)) return [];
+  return [
+    {
+      id: "fashion-gen-full-video",
+      title: STORYBOARD_GENERATE_FULL_VIDEO_CHOICE,
+      description: "在模型选择弹层中确认视频模型与成片时长（超过 15s 请选万相 3.0）",
+      message: STORYBOARD_GENERATE_FULL_VIDEO_CHOICE,
+      recommended: true,
+    },
+  ];
+}
+
 export function inferFashionChoices(project: StoryboardProject): FashionChoice[] {
   if (isLegacyStoryboardProject(project)) return [];
+
+  const produceVideoChoices = inferFashionProduceVideoChoices(project);
+  if (produceVideoChoices.length > 0) return produceVideoChoices;
+
   if (isFashionInProduce(project)) return [];
 
   if (isAwaitingFashionProductRef(project)) {
@@ -1303,9 +1388,18 @@ export function fashionMetaAfterLlmFailure(
     };
   }
   if (trigger.includes("storyboards")) {
+    const prevFashion = isFashionDeliverable(prevDeliverable)
+      ? (prevDeliverable as FashionDeliverable)
+      : null;
+    const hadVersions =
+      prevFashion?.storyboardVersions &&
+      Object.keys(prevFashion.storyboardVersions).length > 0;
     return {
       deliverable: prevDeliverable,
-      workflow: { ...prevWf, fashionPhase: "voiceover_pick" },
+      workflow: {
+        ...prevWf,
+        fashionPhase: hadVersions ? "storyboard_pick" : "voiceover_pick",
+      },
     };
   }
   if (trigger.includes("ops")) {
@@ -1454,16 +1548,16 @@ export function fashionWorkflowPatchForChoice(
       deliverable.selectedVoiceoverId ??
       parseFashionVoiceoverPickFromChat(project.chatHistory);
     if (!voiceoverId) return null;
-    const hadVersions = listFashionStoryboardVersionKeys(deliverable).length > 0;
+    const versionKeys = listFashionStoryboardVersionKeys(deliverable);
     return {
       deliverable: {
         ...deliverable,
         selectedVoiceoverId: voiceoverId,
-        ...(hadVersions ? { storyboardVersions: {}, selectedVersion: null } : {}),
+        selectedVersion: null,
       },
       workflow: {
         ...wf,
-        fashionPhase: hadVersions ? "storyboard_pick" : "voiceover_pick",
+        fashionPhase: versionKeys.length > 0 ? "storyboard_pick" : "voiceover_pick",
       },
       llmTrigger: FASHION_AI_STORYBOARDS,
     };
@@ -1594,7 +1688,7 @@ export function fashionWorkflowPatchForChoice(
         outputMode: "script_compose",
         storyboardLocked: true,
       },
-      workflow: { ...wf, fashionPhase: "produce" },
+      workflow: { ...wf, fashionPhase: "produce", fashionProduceSetupPending: false },
       syncSheet: true,
     };
   }
@@ -1615,7 +1709,11 @@ export function fashionWorkflowPatchForChoice(
         outputMode: "direct_video",
         storyboardLocked: true,
       },
-      workflow: { ...wf, fashionPhase: "produce" },
+      workflow: {
+        ...wf,
+        fashionPhase: "produce",
+        fashionProduceSetupPending: true,
+      },
       syncSheet: true,
     };
   }

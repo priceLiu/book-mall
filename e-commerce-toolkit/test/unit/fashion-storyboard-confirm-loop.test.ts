@@ -87,6 +87,40 @@ describe("fashion storyboard confirm → ops loop", () => {
     expect((rollback.deliverable as FashionDeliverable).storyboardLocked).toBe(true);
   });
 
+  it("storyboards LLM failure rollback keeps storyboard_pick when versions exist", () => {
+    const prevDeliverable = fashionProject({
+      storyboardVersions: {
+        A: {
+          id: "A",
+          title: "A版",
+          panels: Array.from({ length: 6 }, (_, i) => ({
+            index: (i + 1) as 1 | 2 | 3 | 4 | 5 | 6,
+            shotScale: "中景",
+            durationSec: 4,
+            cameraMove: "固定",
+            sceneDesc: "场景",
+            modelAction: "动作",
+            garmentFocus: "展示",
+            sellpointIds: ["SP01"],
+            imagePrompt: "prompt",
+          })),
+        },
+      },
+    }).meta!.deliverable;
+    const rollback = fashionMetaAfterLlmFailure(
+      "fashion-step:storyboards-generate",
+      { deliverable: prevDeliverable, workflow: { fashionPhase: "storyboard_pick" } },
+      {
+        deliverable: { storyboardVersions: {}, selectedVersion: null },
+        workflow: { fashionPhase: "voiceover_pick" },
+      },
+    );
+    expect((rollback.deliverable as FashionDeliverable).storyboardVersions?.A?.panels).toHaveLength(
+      6,
+    );
+    expect(rollback.workflow.fashionPhase).toBe("storyboard_pick");
+  });
+
   it("version A pick ignores stale locked/outputMode and shows confirm step", () => {
     const project = fashionProject(
       {

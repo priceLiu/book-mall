@@ -19,7 +19,32 @@ export type EcomStoryboardGatewayModel = {
   sortOrder?: number;
 };
 
-export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = "qwen3.5-flash";
+/** 电商工具箱 · 助手对话默认 LLM（须 Gateway 绑定 DEEPSEEK 凭证） */
+export const ECOM_DEFAULT_ASSISTANT_CHAT_MODEL = "deepseek-v4-pro";
+
+export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
+
+/** DeepSeek 助手默认生成参数（长 JSON / A–E 分镜须足够 max_tokens） */
+export const ECOM_DEEPSEEK_CHAT_DEFAULT_PARAMS = {
+  max_tokens: 24_000,
+  temperature: 0.7,
+} as const;
+
+/** 按 modelKey 解析电商助手 Chat 上游参数（DeepSeek 走长文超时 + 足够输出 token） */
+export function resolveEcomAssistantChatParams(
+  modelKey: string,
+): Record<string, unknown> {
+  const m = modelKey.trim().toLowerCase();
+  if (
+    m === "deepseek-v4-pro" ||
+    m === "deepseek-v4-flash" ||
+    m.startsWith("deepseek")
+  ) {
+    return { ...ECOM_DEEPSEEK_CHAT_DEFAULT_PARAMS };
+  }
+  return {};
+}
+
 export const ECOM_DEFAULT_VISION_MODEL = "qwen3.8-max";
 export const ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL = "wan2.7-image";
 export const ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL = "doubao-seedance-2.0";

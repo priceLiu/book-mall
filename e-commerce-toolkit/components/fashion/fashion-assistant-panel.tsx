@@ -79,6 +79,10 @@ import {
   resolveFashionDeliverable,
   resolveFashionStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
+import {
+  isGenerateAllImagesChoice,
+  isGenerateFullVideoChoice,
+} from "@/lib/storyboard-workflow";
 import type {
   StoryboardChatMessage,
   StoryboardGatewayModel,
@@ -388,6 +392,7 @@ export function FashionAssistantPanel({
       userContent: string,
       hideUserBubble = false,
       skipStreamingToggle = false,
+      suppressErrorAlert = false,
     ) => {
       const userMsg: StoryboardChatMessage = {
         id: `user-${Date.now()}${hideUserBubble ? "-internal" : ""}`,
@@ -422,11 +427,13 @@ export function FashionAssistantPanel({
         await persistMessages(cleaned);
         await onDeliverableReady?.();
       } catch (e) {
-        await onAlert({
-          title: "助手请求失败",
-          message: e instanceof Error ? e.message : "请稍后重试",
-          variant: "error",
-        });
+        if (!suppressErrorAlert) {
+          await onAlert({
+            title: "助手请求失败",
+            message: e instanceof Error ? e.message : "请稍后重试",
+            variant: "error",
+          });
+        }
         throw e;
       } finally {
         setStreaming(false);
@@ -439,6 +446,15 @@ export function FashionAssistantPanel({
   const handleChoice = useCallback(
     async (message: string) => {
       if (legacyReadonly || isBusy) return;
+
+      if (isGenerateAllImagesChoice(message)) {
+        onRequestGenerateAllImages?.();
+        return;
+      }
+      if (isGenerateFullVideoChoice(message)) {
+        onRequestGenerateFullVideo?.();
+        return;
+      }
 
       const phaseNow = getFashionPhase(effectiveProject);
       const dNow = resolveFashionDeliverable(effectiveProject);
@@ -519,7 +535,7 @@ export function FashionAssistantPanel({
 
           if (llmTrigger && typeof llmTrigger === "string") {
             try {
-              await runStream(next, llmTrigger, true, true);
+              await runStream(next, llmTrigger, true, true, true);
               setDeliverableOverride(null);
               setWorkflowOverride({});
               await onDeliverableReady?.();
@@ -585,12 +601,6 @@ export function FashionAssistantPanel({
               setDeliverableOverride(null);
               setWorkflowOverride({});
               await onDeliverableReady?.(refreshed);
-              if (
-                resolveFashionDeliverable(refreshed)?.outputMode === "direct_video" &&
-                refreshed.sheet
-              ) {
-                queueMicrotask(() => onRequestGenerateAllImages?.());
-              }
             } catch (e) {
               const detail = e instanceof Error ? e.message : "分镜表同步失败";
               setMessages(history);
@@ -651,6 +661,7 @@ export function FashionAssistantPanel({
       runStream,
       onDeliverableReady,
       onRequestGenerateAllImages,
+      onRequestGenerateFullVideo,
       onAlert,
     ],
   );

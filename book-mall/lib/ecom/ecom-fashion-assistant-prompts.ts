@@ -83,6 +83,17 @@ export function buildFashionDeliverableContextBlock(
       );
       if (vo) payload.selectedVoiceover = vo;
     }
+    if (phase === "storyboards") {
+      const existingVersions = deliverable.storyboardVersions ?? {};
+      const versionKeys = Object.keys(existingVersions).filter(
+        (k) => existingVersions[k]?.panels?.length || existingVersions[k]?.title,
+      );
+      if (versionKeys.length > 0) {
+        payload.existingStoryboardVersions = existingVersions;
+        payload.storyboardRegenerateHint =
+          `已有 ${versionKeys.join("、")} 版分镜；请补全缺失的 A–E 版本，保留已有版本的 panels 与 title，勿清空已有版本。`;
+      }
+    }
   }
   if (phase === "ops" && deliverable.selectedVersion) {
     payload.selectedVersion = deliverable.selectedVersion;
@@ -111,7 +122,10 @@ export function buildFashionAssistantSystemPrompt(
 
     storyboards: `【当前任务：A–E 五套分镜】
 基于选定口播 + 定稿卖点，生成 storyboardVersions A/B/C/D/E，每版 6 镜。
-panels 字段：index, shotScale, durationSec, cameraMove, sceneDesc, modelAction, garmentFocus, dialogue, toneTexture, sellpointIds, imagePrompt
+panels 字段：index, shotScale, durationSec, cameraMove, sceneDesc, scenePrompt, modelAction, garmentFocus, dialogue, toneTexture, sellpointIds, imagePrompt, videoPrompt
+scenePrompt：≥40字，生图/生视频共用；只写环境/光线/道具；用户上传场景图时写机位局部差异。
+imagePrompt：≥40字，完整静帧（含场景+人物+服装+卖点）。
+videoPrompt：≥40字，单镜视频 motion（运镜+动作连续性）。
 同时生成 coverageChecklist（核心+视觉卖点验收）。
 E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 

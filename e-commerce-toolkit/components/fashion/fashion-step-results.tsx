@@ -90,6 +90,10 @@ export function FashionStepResults({
           <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
             可直接修改各镜字段，保存后继续；定稿请在右侧助手点击「确认分镜，生成运营包」。
           </p>
+        ) : deliverable.storyboardLocked && inProduce && inDirectVideoProduce ? (
+          <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
+            分镜已定稿；本表仅供查阅，主编辑与成片请在上方「故事版 · 成片工作区」进行。
+          </p>
         ) : deliverable.storyboardLocked ? (
           <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
             分镜已定稿，如需修改请返回重新选版（运营包生成前）。
@@ -157,7 +161,9 @@ export function FashionStepResults({
         </StepSection>
       ) : null}
 
-      {!inDirectVideoProduce ? panelsTableSection : null}
+      {(inProduce && inDirectVideoProduce) || !inDirectVideoProduce
+        ? panelsTableSection
+        : null}
 
       {panels.length > 0 && deliverable.selectedVersion && deliverable.sellpoints.length && !inDirectVideoProduce ? (
         <StepSection title="12.3 · 卖点覆盖率验收清单">
@@ -189,13 +195,15 @@ export function FashionStepResults({
 
         {inDirectVideoProduce ? (
           <>
-            {panelsTableSection}
             <StepSection title="故事版 · 成片工作区">
               {produceWorkspace ?? (
                 <p className="text-sm text-[#86868b]">
                   正在同步故事版…若长时间无内容，请点工作区内的「重新同步故事版」。
                 </p>
               )}
+            </StepSection>
+            <StepSection title="各镜头分镜图与单镜视频">
+              {imagesSlot ?? <span className="text-sm text-[#86868b]">—</span>}
             </StepSection>
             <StepSection title="成片">
               {videoSlot ?? <span className="text-sm text-[#86868b]">分镜图就绪后可在此合成视频</span>}

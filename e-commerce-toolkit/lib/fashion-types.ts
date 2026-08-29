@@ -22,12 +22,16 @@ export type FashionPanelRow = {
   durationSec: number;
   cameraMove: string;
   sceneDesc: string;
+  /** 生图/生视频共用的场景描述 prompt */
+  scenePrompt: string;
   modelAction: string;
   garmentFocus: string;
   dialogue?: string;
   toneTexture?: string;
   sellpointIds: string[];
   imagePrompt: string;
+  /** 单镜视频 motion prompt */
+  videoPrompt: string;
 };
 
 export type FashionStoryboardVersion = {

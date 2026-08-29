@@ -22,8 +22,18 @@ export function fromCanvasJianyingFrames(
 }
 
 /** 电商分镜表 → Timeline v1 */
-export function fromEcomStoryboardSheet(sheet: StoryboardSheet): MediaTimelineV1 {
-  const panels = sheet.panels.slice().sort((a, b) => a.index - b.index);
+export function fromEcomStoryboardSheet(
+  sheet: StoryboardSheet,
+  opts?: { panelIndexes?: number[] },
+): MediaTimelineV1 {
+  const indexFilter =
+    opts?.panelIndexes && opts.panelIndexes.length > 0
+      ? new Set(opts.panelIndexes)
+      : null;
+  const panels = sheet.panels
+    .slice()
+    .sort((a, b) => a.index - b.index)
+    .filter((p) => !indexFilter || indexFilter.has(p.index));
   const clips = panels
     .filter((p) => Boolean(p.videoUrl?.trim() && /^https?:\/\//.test(p.videoUrl!.trim())))
     .map((p, i) => ({

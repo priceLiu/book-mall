@@ -34,16 +34,26 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   let profile = parseRenderProfile(null);
+  let panelIndexes: number[] | undefined;
   try {
-    const raw = await req.json().catch(() => ({}));
+    const raw = (await req.json().catch(() => ({}))) as {
+      profile?: unknown;
+      panelIndexes?: unknown;
+    };
     profile = parseRenderProfile(raw.profile);
+    if (Array.isArray(raw.panelIndexes)) {
+      panelIndexes = raw.panelIndexes
+        .map((n) => (typeof n === "number" ? Math.round(n) : NaN))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      if (panelIndexes.length === 0) panelIndexes = undefined;
+    }
   } catch {
     /* use default */
   }
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const timeline = fromEcomStoryboardSheet(project.sheet);
+    const timeline = fromEcomStoryboardSheet(project.sheet, { panelIndexes });
     if (timeline.clips.length < 2) {
       return NextResponse.json(
         { error: "请至少为 2 个镜头生成分镜视频后再合并" },

@@ -85,6 +85,9 @@ function coercePanels(raw: unknown): unknown {
         camera: coercePanelTextField(p.camera),
         dialogue: coercePanelTextField(p.dialogue),
         emotion: coercePanelTextField(p.emotion),
+        scenePrompt: coercePanelTextField(p.scenePrompt),
+        imagePrompt: coercePanelTextField(p.imagePrompt),
+        videoPromptEn: coercePanelTextField(p.videoPromptEn),
         sellpointTags: p.sellpointTags ?? [],
       };
     });

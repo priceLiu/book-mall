@@ -43,6 +43,8 @@ export const storyboardSheetSchema = z.object({
         timeline: z.string().optional(),
         shotType: z.string().min(1),
         scene: z.string().min(1),
+        /** 生图/生视频共用的场景描述 prompt（无场景参考图时为主约束） */
+        scenePrompt: z.string().optional(),
         action: z.string().min(1),
         dialogue: z.string().optional(),
         camera: z.string().optional(),

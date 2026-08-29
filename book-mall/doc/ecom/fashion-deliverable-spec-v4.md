@@ -75,12 +75,14 @@ type FashionPanelRow = {
   durationSec: number;   // 3–7，0.5 精度
   cameraMove: string;    // 第七章枚举
   sceneDesc: string;     // 12–25 字
+  scenePrompt: string;   // ≥40 字，生图/生视频共用
   modelAction: string;   // 10–22 字
   garmentFocus: string;
   dialogue: string;      // 单镜 12–25 字，全片 ≤100
   toneTexture: string;
   sellpointIds: string[];
-  imagePrompt: string;
+  imagePrompt: string;   // ≥40 字
+  videoPrompt: string;   // ≥40 字，单镜视频 motion
 };
 ```
 
@@ -114,4 +116,4 @@ vertical: "fashion_apparel";
 
 ## 9. 与 StoryboardSheet 映射
 
-`fashionVersionToSheet()` 将选定版本的 6 镜映射为 `StoryboardSheet.panels[]`（scene/action/dialogue/imagePrompt/durationHintSec）。
+`fashionVersionToSheet()` 将选定版本的 6 镜映射为 `StoryboardSheet.panels[]`（scene/scenePrompt/action/dialogue/imagePrompt/videoPromptEn/durationHintSec）。

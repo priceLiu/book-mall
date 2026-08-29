@@ -266,8 +266,8 @@ function identitySlots(references: StoryboardReference[]): StoryboardVideoRefSlo
 }
 
 /**
- * 身份参考优先级：产品 → 场景 → 角色。
- * 万相 2.7 仅 5 张时，场景优先于第二张角色图，避免「场景不对」。
+ * 身份参考优先级：产品 → 角色 → 场景。
+ * 人物一致优先于场景参考；余量不足时先丢场景，保留角色参考。
  */
 function identitySlotsPrioritized(
   references: StoryboardReference[],
@@ -284,14 +284,6 @@ function identitySlotsPrioritized(
         : "产品图（包装外观须一致）",
     });
   }
-  for (const [i, s] of getStoryboardSceneRefs(references).entries()) {
-    const name = s.label?.trim();
-    out.push({
-      role: "scene",
-      url: s.ossUrl.trim(),
-      label: name ? `场景参考「${name}」` : `场景参考${i + 1}`,
-    });
-  }
   for (const [i, c] of getStoryboardCharacterRefs(references).entries()) {
     const name = c.label?.trim();
     out.push({
@@ -300,6 +292,14 @@ function identitySlotsPrioritized(
       label: name
         ? `角色「${name}」（五官发型穿搭须一致）`
         : `角色参考${i + 1}（五官发型穿搭须一致）`,
+    });
+  }
+  for (const [i, s] of getStoryboardSceneRefs(references).entries()) {
+    const name = s.label?.trim();
+    out.push({
+      role: "scene",
+      url: s.ossUrl.trim(),
+      label: name ? `场景参考「${name}」` : `场景参考${i + 1}`,
     });
   }
   return out;

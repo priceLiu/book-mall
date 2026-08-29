@@ -40,6 +40,7 @@ import {
   INTERACTIVE_WORKFLOW_CHOICE,
   MAIN_REF_PROMPT_WORKFLOW_CHOICE,
 } from "@/lib/product-design-workflow";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -83,7 +84,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
-  const [chatModelKey, setChatModelKey] = useState("qwen3.5-flash");
+  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
   const [visionModelKey, setVisionModelKey] = useState("qwen3.8-max");
   const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
   const [loading, setLoading] = useState(true);

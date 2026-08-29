@@ -28,7 +28,10 @@ const FIELDS: Array<{
   { key: "timeline", label: "时间轴" },
   { key: "shotType", label: "景别" },
   { key: "camera", label: "运镜" },
-  { key: "visual", label: "画面内容", multiline: true },
+  { key: "visual", label: "画面内容（导演表）", multiline: true },
+  { key: "scenePrompt", label: "场景 Prompt（生图/生视频）", multiline: true },
+  { key: "imagePrompt", label: "生图 Prompt", multiline: true },
+  { key: "videoPromptEn", label: "生视频 Prompt", multiline: true },
   { key: "emotion", label: "情绪" },
   { key: "dialogue", label: "口播台词", multiline: true },
 ];

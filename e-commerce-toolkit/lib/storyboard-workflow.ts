@@ -279,6 +279,31 @@ export function characterRefStepDone(project: StoryboardProject): boolean {
   );
 }
 
+export function hasStoryboardCharacterRef(project: StoryboardProject): boolean {
+  return project.references.some(
+    (r) => r.role === "character" && /^https?:\/\//.test(r.ossUrl?.trim() ?? ""),
+  );
+}
+
+/** 本次生图是否会先自动生成角色参考图（尚无 character ref 时） */
+export function willStoryboardAutoGenCharacter(
+  project: StoryboardProject,
+  fashionCharMode?: "ai" | "upload",
+): boolean {
+  const wf = project.meta?.workflow ?? {};
+  if (wf.skippedCharacter) return false;
+  if (hasStoryboardCharacterRef(project)) return false;
+  return (
+    Boolean(wf.autoGenCharacter) ||
+    Boolean(wf.characterPresetKey) ||
+    fashionCharMode === "ai" ||
+    wf.fashionCharacterMode === "ai"
+  );
+}
+
+export const STORYBOARD_CHARACTER_REF_REQUIRED_MESSAGE =
+  "各镜头人物一致须绑定角色参考图。请在左侧上传角色图，或在流程中完成「角色图」步骤（选择自动生成），再重新生成分镜图与视频。";
+
 export function hasSceneReference(project: StoryboardProject): boolean {
   return project.references.some((r) => r.role === "scene" || r.role === "other");
 }
@@ -796,6 +821,15 @@ export function workflowPatchForChoice(
     text === "万相 2.6 Flash"
   ) {
     return { videoModelKey: "wan2.6-r2v-flash" };
+  }
+  if (
+    text === "wan3.0-video" ||
+    text === "wan3.0-video-prime" ||
+    text === "万相 3.0" ||
+    text === "Wan 3.0" ||
+    text === "万相3.0"
+  ) {
+    return { videoModelKey: "wan3.0-video" };
   }
   return null;
 }

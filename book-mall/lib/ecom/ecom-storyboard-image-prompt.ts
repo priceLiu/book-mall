@@ -2,7 +2,13 @@ import {
   type CharacterPresetKey,
   resolveCharacterPresetAppearance,
 } from "@/lib/ecom/ecom-storyboard-character-presets";
+import {
+  mergeSceneIntoImagePrompt,
+  resolvePanelSceneText,
+} from "@/lib/ecom/ecom-storyboard-scene-prompt";
+import { getStoryboardSceneRefs } from "@/lib/ecom/ecom-storyboard-refs";
 import type { StoryboardReference, StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
+import { getStoryboardCharacterRefs } from "@/lib/ecom/ecom-storyboard-refs";
 import {
   resolveScenePresetImageHint,
   resolveScenePresetLabel,
@@ -25,6 +31,8 @@ export type StoryboardImagePromptContext = {
   /** 全片须为同一人物：来自 LLM cast、系统预设或品类默认 */
   characterAppearance?: string;
   characterPresetKey?: string;
+  /** 全片场景锚点（服装 customScene / 策划 scenarioExpansion） */
+  globalSceneAnchor?: string;
 };
 
 const CHAT_PRODUCT_NAME_FILTERS = [
@@ -155,6 +163,8 @@ export function buildStoryboardImagePromptContext(project: {
       productName?: string;
       params?: Record<string, string>;
       cast?: Array<{ name: string; role: string; appearance?: string }>;
+      creativeBrief?: { scenarioExpansion?: string };
+      dimensions?: { customScene?: string };
     };
     workflow?: {
       productCategory?: string;
@@ -227,6 +237,10 @@ export function buildStoryboardImagePromptContext(project: {
     aspectRatio: aspect,
     characterAppearance,
     characterPresetKey,
+    globalSceneAnchor:
+      deliverable?.dimensions?.customScene?.trim() ||
+      deliverable?.creativeBrief?.scenarioExpansion?.trim() ||
+      undefined,
   };
 }
 
@@ -404,8 +418,10 @@ export function resolveStoryboardPanelImagePrompt(
   );
 
   if (panel.imagePrompt?.trim()) {
+    const sceneText = resolvePanelSceneText(panel, refs, ctx);
+    const merged = mergeSceneIntoImagePrompt(panel.imagePrompt.trim(), sceneText);
     return appendStoryboardImagePromptSuffix({
-      basePrompt: panel.imagePrompt.trim(),
+      basePrompt: merged,
       aspectRatio: ctx?.aspectRatio,
       sendsProductRef,
       refGuide,
@@ -451,15 +467,26 @@ export function buildStoryboardPanelImagePrompt(
       : isFashionWear && ctx?.characterAppearance?.trim()
         ? `同一人物全片一致（面部发型体型与设定一致，主推款外观以参考图1为准）：${ctx.characterAppearance.trim()}。`
         : "";
-  const presetLine = ctx?.scenePresetImageHint?.trim()
-    ? `环境预设（${ctx.scenePresetLabel ?? ctx.scenePresetKey}）：${ctx.scenePresetImageHint.trim()}。`
-    : "";
+  const presetLine =
+    !getStoryboardSceneRefs(refs).length && ctx?.scenePresetImageHint?.trim()
+      ? `环境预设（${ctx.scenePresetLabel ?? ctx.scenePresetKey}）：${ctx.scenePresetImageHint.trim()}。`
+      : "";
+  const sceneText = resolvePanelSceneText(panel, refs, ctx);
   const moodLine = panel.dialogue?.trim()
     ? `表演情绪（勿渲染为画面文字）：${panel.dialogue.trim()}。`
     : "";
   const productRefLine = sendsProductRef
     ? "须严格还原参考图1的产品包装（外形、标签、配色、材质），禁止替换为无关商品。"
     : "";
+  const characterRefUrls = new Set(
+    getStoryboardCharacterRefs(refs).map((r) => r.ossUrl.trim()),
+  );
+  const characterRefIndex =
+    refUrls?.findIndex((u) => characterRefUrls.has(u.trim())) ?? -1;
+  const characterRefLine =
+    characterRefIndex >= 0
+      ? `人物面部、发型、体型与服装须与参考图${characterRefIndex + 1}完全一致，禁止换脸或换人。`
+      : "";
   const editPrefix = sendsProductRef
     ? "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下分镜描述生成画面。"
     : "";
@@ -468,9 +495,10 @@ export function buildStoryboardPanelImagePrompt(
     editPrefix,
     "电商短视频分镜静帧，写实摄影，UGC 质感，",
     charLine,
+    characterRefLine,
     presetLine,
     `镜头 ${panel.index}，${panel.shotType}，运镜 ${panel.camera ?? "固定"}。`,
-    `场景与背景须严格符合：${panel.scene}。`,
+    `场景与背景须严格符合：${sceneText}。`,
     `人物动作：${panel.action}。`,
     `情绪：${panel.emotion ?? "自然"}。`,
     moodLine,
@@ -487,13 +515,12 @@ export function buildStoryboardPanelImagePrompt(
   return built;
 }
 
-/** 有参考图写入 multimodal content 时与画布编辑一致：不再把 refGuide 重复拼进文本 */
+/** 分镜多图参考：refGuide 须与 multimodal 图序对齐，一并写入文本以锁定角色/产品指代 */
 export function buildStoryboardPanelInvokePrompt(opts: {
   refGuide: string;
   panelPrompt: string;
   refCount: number;
 }): string {
-  if (opts.refCount > 0) return opts.panelPrompt;
   const guide = opts.refGuide.trim();
   if (!guide) return opts.panelPrompt;
   return `${guide}\n\n${opts.panelPrompt}`;

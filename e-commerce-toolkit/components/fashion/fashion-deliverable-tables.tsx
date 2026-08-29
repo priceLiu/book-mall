@@ -61,12 +61,14 @@ function FashionEditableTextCell({
   editable,
   saving,
   editTitle = "编辑",
+  rows = 2,
   onSave,
 }: {
   value: string;
   editable?: boolean;
   saving?: boolean;
   editTitle?: string;
+  rows?: number;
   onSave: (text: string) => void | Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -96,7 +98,7 @@ function FashionEditableTextCell({
       <div className="min-w-[12rem] space-y-1">
         <textarea
           className="w-full rounded-lg border border-[#0071e3]/40 bg-white px-2 py-1.5 text-sm text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
-          rows={2}
+          rows={rows}
           value={draft}
           disabled={saving}
           autoFocus
@@ -319,7 +321,7 @@ export function FashionPanelsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[48rem] border-collapse text-xs">
+      <table className="w-full min-w-[72rem] border-collapse text-xs">
         <thead>
           <tr className="border-b border-[#e8e8ed] text-left text-[#6e6e73]">
             {[
@@ -328,6 +330,9 @@ export function FashionPanelsTable({
               "时长",
               "运镜",
               "场景",
+              "场景Prompt",
+              "生图Prompt",
+              "生视频Prompt",
               "动作",
               "展示重点",
               "口播",
@@ -396,6 +401,47 @@ export function FashionPanelsTable({
                   />
                 ) : (
                   escCell(p.sceneDesc)
+                )}
+              </td>
+              <td className="px-1 py-2 max-w-[10rem]">
+                {editable ? (
+                  <FashionEditableTextCell
+                    value={escCell(p.scenePrompt)}
+                    editable
+                    saving={saving}
+                    editTitle="编辑场景 Prompt"
+                    onSave={(text) => patchPanel(p.index, { scenePrompt: text })}
+                  />
+                ) : (
+                  escCell(p.scenePrompt)
+                )}
+              </td>
+              <td className="px-1 py-2 max-w-[12rem]">
+                {editable ? (
+                  <FashionEditableTextCell
+                    value={escCell(p.imagePrompt)}
+                    editable
+                    saving={saving}
+                    rows={4}
+                    editTitle="编辑生图 Prompt"
+                    onSave={(text) => patchPanel(p.index, { imagePrompt: text })}
+                  />
+                ) : (
+                  escCell(p.imagePrompt)
+                )}
+              </td>
+              <td className="px-1 py-2 max-w-[12rem]">
+                {editable ? (
+                  <FashionEditableTextCell
+                    value={escCell(p.videoPrompt)}
+                    editable
+                    saving={saving}
+                    rows={4}
+                    editTitle="编辑生视频 Prompt"
+                    onSave={(text) => patchPanel(p.index, { videoPrompt: text })}
+                  />
+                ) : (
+                  escCell(p.videoPrompt)
                 )}
               </td>
               <td className="px-1 py-2 max-w-[8rem]">

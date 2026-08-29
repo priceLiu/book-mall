@@ -6,6 +6,7 @@ import {
 import {
   fashionVersionToSheet,
   isFashionWorkflow,
+  mergeFashionSheetWithExisting,
   readMetaFashionDeliverable,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
@@ -38,27 +39,33 @@ export async function syncEcomStoryboardSheetFromMeta(
     if (deliverable?.selectedVersion) {
       const sheet = fashionVersionToSheet(deliverable);
       if (sheet) {
+        const mergedSheet = mergeFashionSheetWithExisting(sheet, project.sheet);
         const deliverableToSave = {
           ...deliverable,
           outputMode: existingDeliverable?.outputMode ?? deliverable.outputMode,
           opsPack: existingDeliverable?.opsPack ?? deliverable.opsPack,
           storyboardLocked: true,
         };
+        const existingWf =
+          (project.meta?.workflow as Record<string, unknown> | undefined) ?? {};
         await updateEcomStoryboardProject(userId, projectId, {
-          sheet,
+          sheet: mergedSheet,
           status: "sheet_ready",
           meta: {
             ...project.meta,
             deliverable: deliverableToSave,
             workflow: {
-              ...((project.meta?.workflow as Record<string, unknown> | undefined) ?? {}),
+              ...existingWf,
               vertical: "fashion_apparel",
               fashionPhase: deliverableToSave.outputMode ? "produce" : "output_mode",
+              ...(deliverableToSave.outputMode === "direct_video"
+                ? { fashionProduceSetupPending: true }
+                : {}),
             },
           },
         });
         return {
-          sheet,
+          sheet: mergedSheet,
           deliverable: null,
           selectedSchemeIndex: 0,
         };

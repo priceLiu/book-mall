@@ -101,7 +101,7 @@ describe("buildStoryboardPanelImagePrompt", () => {
     expect(prompt).toContain("竖版 9:16");
   });
 
-  it("prefers panel.imagePrompt when present", () => {
+  it("prefers panel.imagePrompt and merges scenePrompt", () => {
     const ctx = buildStoryboardImagePromptContext({
       meta: { deliverable: { productName: "灰紫冲锋衣" } },
       settings: { aspectRatio: "9:16" },
@@ -111,6 +111,7 @@ describe("buildStoryboardPanelImagePrompt", () => {
         index: 2,
         shotType: "中景",
         scene: "街边",
+        scenePrompt: "雨后街边，冷色反光地面，都市通勤背景",
         action: "拉拉链",
         imagePrompt: "竖版9:16，写实UGC。女生穿灰紫冲锋衣拉拉链，以参考图1为准。",
         productInteraction: "wear",
@@ -133,21 +134,62 @@ describe("buildStoryboardPanelImagePrompt", () => {
       "图1为产品包装参考",
     );
     expect(prompt).toContain("灰紫冲锋衣拉拉链");
+    expect(prompt).toContain("雨后街边");
     expect(prompt).not.toContain("场景与背景须严格符合");
+  });
+
+  it("uses scene ref constraint when scene image uploaded", () => {
+    const ctx = buildStoryboardImagePromptContext({
+      meta: { deliverable: { productName: "灰紫冲锋衣" } },
+      settings: { aspectRatio: "9:16" },
+    });
+    const prompt = resolveStoryboardPanelImagePrompt(
+      {
+        index: 1,
+        shotType: "近景",
+        scene: "试衣镜前",
+        scenePrompt: "靠近全身镜，暖色顶光",
+        action: "整理衣领",
+        imagePrompt: "竖版9:16，写实UGC，女生整理衣领",
+      },
+      {
+        overview: { title: "方案A", logline: "test" },
+        cast: [],
+        panels: [],
+      },
+      [
+        {
+          id: "p1",
+          label: "产品",
+          role: "product",
+          ossUrl: "https://cdn.example.com/p.png",
+        },
+        {
+          id: "s1",
+          label: "场景",
+          role: "scene",
+          ossUrl: "https://cdn.example.com/scene.jpg",
+        },
+      ],
+      ctx,
+      ["https://cdn.example.com/p.png", "https://cdn.example.com/scene.jpg"],
+      "图1为产品；图2为场景",
+    );
+    expect(prompt).toContain("场景参考图一致");
   });
 });
 
 describe("buildStoryboardPanelInvokePrompt", () => {
-  it("omits refGuide when refs are in multimodal content", () => {
+  it("includes refGuide alongside multimodal refs so image roles are explicit", () => {
     const panelPrompt = "场景：大雨屋檐";
-    const refGuide = "图1为产品包装参考";
+    const refGuide = "图1为产品包装参考；图2为角色参考，人物面部、发型、体型与服装须与参考图完全一致";
     expect(
       buildStoryboardPanelInvokePrompt({
         refGuide,
         panelPrompt,
-        refCount: 1,
+        refCount: 2,
       }),
-    ).toBe(panelPrompt);
+    ).toBe(`${refGuide}\n\n${panelPrompt}`);
   });
 
   it("keeps refGuide for text-only generation", () => {

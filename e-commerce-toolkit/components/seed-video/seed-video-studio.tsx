@@ -22,6 +22,7 @@ import {
   updateSeedVideoProject,
   uploadSeedVideoRef,
 } from "@/lib/ecom-seed-video-api";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { commitFormalScriptFromRows } from "@/lib/seed-video-formal-script-commit";
 import {
@@ -50,7 +51,7 @@ export function SeedVideoStudio() {
   const [project, setProject] = useState<SeedVideoProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState("qwen3.8-max");
+  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
   const [videoModelKey, setVideoModelKey] = useState("wan2.7-r2v");
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);

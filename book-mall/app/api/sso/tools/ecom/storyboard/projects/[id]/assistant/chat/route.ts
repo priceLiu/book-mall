@@ -114,9 +114,20 @@ export async function POST(req: Request, ctx: Ctx) {
       async start(controller) {
         const reader = upstream.getReader();
         let sseBuffer = "";
+        let streamInterrupted = false;
+        let streamErrorMessage = "";
         try {
           while (true) {
-            const { done, value } = await reader.read();
+            let done = false;
+            let value: Uint8Array | undefined;
+            try {
+              ({ done, value } = await reader.read());
+            } catch (readError) {
+              streamInterrupted = true;
+              streamErrorMessage =
+                readError instanceof Error ? readError.message : "助手流式响应异常";
+              break;
+            }
             if (done) break;
             sseBuffer += decoder.decode(value, { stream: true });
             const lines = sseBuffer.split("\n");
@@ -139,6 +150,14 @@ export async function POST(req: Request, ctx: Ctx) {
                 /* ignore */
               }
             }
+          }
+
+          if (streamInterrupted && fullText.trim().length > 0) {
+            controller.enqueue(
+              encoder.encode(
+                `\n\n【流中断：${streamErrorMessage}；已保留部分生成内容】`,
+              ),
+            );
           }
 
           const history: StoryboardChatMessage[] = [
@@ -251,6 +270,15 @@ export async function POST(req: Request, ctx: Ctx) {
               merged.sellpoints = prevFashion.sellpoints;
               merged.sellpointsLocked = true;
             }
+            if (
+              fashionPromptPhase === "storyboards" &&
+              prevFashion?.storyboardVersions
+            ) {
+              merged.storyboardVersions = {
+                ...(prevFashion.storyboardVersions ?? {}),
+                ...(merged.storyboardVersions ?? {}),
+              };
+            }
             const versionKey = merged.selectedVersion ?? undefined;
             const systemMarkdown = renderFashionDeliverableMarkdown(merged, {
               versionKey,
@@ -319,7 +347,15 @@ export async function POST(req: Request, ctx: Ctx) {
 
           controller.close();
         } catch (e) {
-          controller.error(e);
+          if (fullText.trim().length === 0) {
+            controller.error(e);
+          } else {
+            try {
+              controller.close();
+            } catch {
+              /* ignore */
+            }
+          }
         } finally {
           reader.releaseLock();
         }

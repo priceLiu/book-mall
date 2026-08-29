@@ -36,6 +36,8 @@ export type StoryboardPanel = {
   timeline?: string;
   shotType: string;
   scene: string;
+  /** 生图/生视频共用的场景描述 prompt */
+  scenePrompt?: string;
   action: string;
   dialogue?: string;
   camera?: string;
@@ -150,6 +152,12 @@ export type StoryboardProject = {
     workflow?: {
       vertical?: "fashion_apparel" | "bags";
       fashionPhase?: FashionPhase;
+      /** 路径 B 进入 produce 后，须先选生图模型与角色参考方式 */
+      fashionProduceSetupPending?: boolean;
+      /** 服装路径 B 成片阶段选定的生图模型 */
+      fashionImageModelKey?: string;
+      /** 角色参考：AI 生成 / 用户上传 */
+      fashionCharacterMode?: "ai" | "upload";
       dimensionStep?: number;
       productName?: string;
       phase?: "planning" | "finalized" | "refs" | "image" | "video" | "done";
@@ -197,6 +205,11 @@ export type StoryboardProject = {
       };
       /** 分镜图生成中（刷新后可恢复 busy 态） */
       pendingPanelImages?: Record<
+        string,
+        { startedAt: string; modelKey?: string }
+      >;
+      /** 单镜视频生成中（刷新后可恢复 busy 态） */
+      pendingPanelVideos?: Record<
         string,
         { startedAt: string; modelKey?: string }
       >;

@@ -141,6 +141,7 @@ export function StoryboardSchemePanelsTable({
             <th className="px-3 py-2 font-medium">时间轴</th>
             <th className="px-3 py-2 font-medium">景别</th>
             <th className="px-3 py-2 font-medium">场景</th>
+            <th className="px-3 py-2 font-medium">场景Prompt</th>
             <th className="px-3 py-2 font-medium">动作</th>
             <th className="px-3 py-2 font-medium">产品交互</th>
             <th className="px-3 py-2 font-medium">卖点</th>
@@ -157,6 +158,7 @@ export function StoryboardSchemePanelsTable({
               <td className="px-3 py-2 text-[#6e6e73]">{formatPanelCellText(p.timeline)}</td>
               <td className="px-3 py-2">{formatPanelCellText(p.shotType)}</td>
               <td className="px-3 py-2">{formatPanelCellText(p.scene)}</td>
+              <td className="px-3 py-2 max-w-[10rem]">{formatPanelCellText(p.scenePrompt)}</td>
               <td className="px-3 py-2">{formatPanelCellText(p.action)}</td>
               <td className="px-3 py-2">
                 {formatProductInteractionLabel(p.productInteraction)}

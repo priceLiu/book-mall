@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildFashionProjectKeywords,
   extractFashionDeliverable,
   fashionDeliverableSchema,
   fashionVersionToSheet,
   FASHION_SCHEMA_VERSION,
   inferFashionPhaseFromDeliverable,
   mergeFashionDeliverablePatch,
+  mergeFashionSheetWithExisting,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
+import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
 
 const PANEL_FIXTURE = (index: number) => ({
@@ -17,13 +20,17 @@ const PANEL_FIXTURE = (index: number) => ({
   durationSec: 4,
   cameraMove: "固定",
   sceneDesc: "都市通勤街头清晨",
+  scenePrompt:
+    "清晨都市通勤街角，柔和侧光，浅灰人行道与玻璃幕墙背景，写实自然光环境",
   modelAction: "整理衣领转身",
   garmentFocus: "腰线与垂坠感",
   dialogue: "通勤一件搞定",
   toneTexture: "冷调高级质感",
   sellpointIds: ["S01"],
   imagePrompt:
-    "竖版9:16，写实UGC。都市通勤，女生整理衣领，以参考图1为准。禁止画面文字。",
+    "竖版9:16，写实UGC。场景：清晨都市通勤街角。女生整理衣领，以参考图1为准。禁止画面文字。",
+  videoPrompt:
+    "固定运镜，模特整理衣领后自然转身，展示腰线垂坠，清晨街角环境连贯",
 });
 
 const V4_FIXTURE = {
@@ -101,6 +108,48 @@ describe("fashionDeliverable v4 schema", () => {
     expect(sheet?.panels).toHaveLength(6);
     expect(sheet?.panels[0]?.scene).toContain("都市");
     expect(sheet?.panels[0]?.imagePrompt).toContain("参考图1");
+  });
+
+  it("fashionVersionToSheet maps scenePrompt and videoPromptEn", () => {
+    const sheet = fashionVersionToSheet(V4_FIXTURE);
+    expect(sheet?.panels[0]?.scenePrompt).toContain("都市通勤");
+    expect(sheet?.panels[0]?.videoPromptEn).toContain("运镜");
+  });
+
+  it("fashionVersionToSheet maps toneTexture to emotion and dialogue", () => {
+    const sheet = fashionVersionToSheet(V4_FIXTURE);
+    expect(sheet?.panels[0]?.emotion).toBe("冷调高级质感");
+    expect(sheet?.panels[0]?.dialogue).toBe("通勤一件搞定");
+  });
+
+  it("mergeFashionSheetWithExisting preserves imageUrl and videoUrl", () => {
+    const existing: StoryboardSheet = {
+      overview: { title: "Old", logline: "Old" },
+      panels: [
+        {
+          index: 1,
+          scene: "Old scene",
+          imageUrl: "https://example.com/img.png",
+          videoUrl: "https://example.com/v.mp4",
+        },
+      ],
+      totalDurationHintSec: 4,
+    };
+    const incoming: StoryboardSheet = {
+      overview: { title: "New", logline: "New logline" },
+      panels: [{ index: 1, scene: "New scene" }],
+      totalDurationHintSec: 4,
+    };
+    const merged = mergeFashionSheetWithExisting(incoming, existing);
+    expect(merged.panels[0]?.scene).toBe("New scene");
+    expect(merged.panels[0]?.imageUrl).toBe("https://example.com/img.png");
+    expect(merged.panels[0]?.videoUrl).toBe("https://example.com/v.mp4");
+  });
+
+  it("buildFashionProjectKeywords joins seven-dimension fields", () => {
+    expect(buildFashionProjectKeywords(V4_FIXTURE)).toBe(
+      "连衣裙 · 职场办公 · 抖音 · 都市通勤",
+    );
   });
 
   it("renderFashionDeliverableMarkdown includes tables", () => {

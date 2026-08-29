@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import { ECOM_DEFAULT_ASSISTANT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+
 export const ECOM_SEED_VIDEO_TOOL_KEY = "ecom-toolkit__seed-video";
 export const ECOM_SEED_VIDEO_MODULE = "seed-video";
-/** 策划助手须理解素材图，默认用支持图片理解的 LLM（非 qwen3.5-flash） */
-export const ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL = "qwen3.8-max";
+/** 策划助手默认 DeepSeek V4 Pro（Gateway 须绑定 DEEPSEEK 凭证） */
+export const ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
 /** 方案②逐镜成片默认参考生视频（与 createTask · BAILIAN R2V 一致） */
 export const ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL = "wan2.7-r2v";
 /** 用户未在 Prompt 中说明时长时的默认目标成片秒数 */

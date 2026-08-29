@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+import { ECOM_DEFAULT_ASSISTANT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+
 import type { MediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
 
 export const ECOM_MEDIA_DECOMPOSE_TOOL_KEY = "ecom-toolkit__media-decompose";
 export const ECOM_MEDIA_DECOMPOSE_MODULE = "media-decompose";
-export const ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL = "qwen3.8-max";
+export const ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
 
 export type MediaDecomposeKind = "image" | "video";
 export type MediaDecomposeSource = "upload" | "url" | "asset";

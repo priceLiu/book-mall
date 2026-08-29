@@ -1,14 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { Eye, Film, ImageIcon, Loader2, Pencil, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { ImageIcon } from "lucide-react";
 
+import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
 import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
-import {
-  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
-  ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
-} from "@/components/media/ecom-media-library-tile";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 
@@ -17,58 +14,78 @@ type Props = {
   aspectRatio?: "16:9" | "9:16";
   imageUrl?: string | null;
   busy?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onRegenerateImage?: () => void;
   onRegenerateVideo?: () => void;
   onPreviewImage?: () => void;
+  onPreviewImagePrompt?: () => void;
   onPreviewPanelVideo?: () => void;
   onEditScript?: () => void;
 };
-
-function stopClick(e: React.MouseEvent) {
-  e.stopPropagation();
-}
 
 export function StoryboardPanelCard({
   panel,
   aspectRatio = "9:16",
   imageUrl,
   busy,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
   onRegenerateImage,
-  onRegenerateVideo,
   onPreviewImage,
+  onPreviewImagePrompt,
   onPreviewPanelVideo,
-  onEditScript,
 }: Props) {
-  const [hover, setHover] = useState(false);
   const hasPanelVideo = Boolean(panel.videoUrl);
-
   const cardWidth = storyboardPanelCardWidth(aspectRatio);
 
   return (
     <article
-      className="group relative flex shrink-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm"
+      className={cn(
+        "group relative flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
+        selected ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25" : "border-[#e8e8ed]",
+      )}
       style={{ width: cardWidth }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onClick={
+        selectable && onToggleSelect
+          ? (e) => {
+              const t = e.target as HTMLElement;
+              if (t.closest("button, a, input, label")) return;
+              onToggleSelect();
+            }
+          : undefined
+      }
     >
+      {selectable && onToggleSelect ? (
+        <label
+          className="absolute left-2 top-2 z-20 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-1.5 py-0.5 shadow-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            aria-label={`选择镜头 ${panel.index}`}
+            className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
+          />
+        </label>
+      ) : null}
       <div
         className={cn(
           "relative w-full bg-[#f5f5f7]",
           storyboardPreviewAspectClass(aspectRatio),
+          imageUrl && !busy && "group/image",
         )}
       >
-        {busy ? (
-          <div className="flex h-full items-center justify-center gap-2 text-sm text-[#6e6e73]">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            生成中…
-          </div>
-        ) : imageUrl ? (
+        {imageUrl ? (
           <Image src={imageUrl} alt={`镜头${panel.index}`} fill className="object-cover" unoptimized />
         ) : (
           <button
             type="button"
             title="生成此镜头分镜图"
-            disabled={!onRegenerateImage}
+            disabled={!onRegenerateImage || busy}
             className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#86868b] transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
             onClick={() => onRegenerateImage?.()}
           >
@@ -76,62 +93,14 @@ export function StoryboardPanelCard({
             <span className="text-xs">待生成</span>
           </button>
         )}
+        {busy ? <EcomMediaGeneratingBusy className="absolute inset-0 h-full w-full" /> : null}
 
-        {hover && !busy ? (
-          <div className="absolute inset-0 flex max-w-full flex-wrap items-center justify-center gap-1.5 overflow-hidden px-1 bg-black/45 backdrop-blur-[1px] sm:gap-2">
-            {imageUrl && onPreviewImage ? (
-              <button
-                type="button"
-                title="放大预览"
-                className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
-                onClick={(e) => {
-                  stopClick(e);
-                  onPreviewImage();
-                }}
-              >
-                <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-            ) : null}
-            {onRegenerateImage ? (
-              <button
-                type="button"
-                title="重新生图"
-                className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
-                onClick={(e) => {
-                  stopClick(e);
-                  onRegenerateImage();
-                }}
-              >
-                <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-            ) : null}
-            {onEditScript ? (
-              <button
-                type="button"
-                title="修改分镜"
-                className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
-                onClick={(e) => {
-                  stopClick(e);
-                  onEditScript();
-                }}
-              >
-                <Pencil className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-            ) : null}
-            {onRegenerateVideo && imageUrl ? (
-              <button
-                type="button"
-                title="生成镜头视频"
-                className={cn(ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS, "bg-[#0071e3] text-white hover:bg-[#0077ed]")}
-                onClick={(e) => {
-                  stopClick(e);
-                  onRegenerateVideo();
-                }}
-              >
-                <Film className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-            ) : null}
-          </div>
+        {imageUrl && !busy ? (
+          <StoryboardPanelImageHoverActions
+            onPreview={onPreviewImage}
+            onRegenerate={onRegenerateImage}
+            onPreviewPrompt={onPreviewImagePrompt}
+          />
         ) : null}
       </div>
 
@@ -142,13 +111,13 @@ export function StoryboardPanelCard({
             <span className="ml-1 font-normal text-[#86868b]">{panel.timeline}</span>
           ) : null}
         </p>
-        {hasPanelVideo ? (
+        {hasPanelVideo && onPreviewPanelVideo ? (
           <button
             type="button"
             className="text-[10px] font-medium text-[#34c759] hover:underline"
             onClick={(e) => {
               e.stopPropagation();
-              onPreviewPanelVideo?.();
+              onPreviewPanelVideo();
             }}
           >
             有视频

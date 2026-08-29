@@ -28,6 +28,11 @@ import {
   updateStoryboardProject,
   uploadStoryboardRef,
 } from "@/lib/ecom-storyboard-api";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
+import {
+  resolveStoryboardVideoFullSheetDurationRange,
+  resolveSheetTotalDurationHintSec,
+} from "@/lib/storyboard-video-params";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { isFashionProject, isLegacyStoryboardProject } from "@/lib/fashion-workflow";
 import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
@@ -80,7 +85,7 @@ export function StoryboardStudio() {
   const [refBusy, setRefBusy] = useState(false);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [settings, setSettings] = useState<StoryboardSettingsValue>({
-    chatModelKey: "qwen3.5-flash",
+    chatModelKey: ECOM_DEFAULT_CHAT_MODEL_KEY,
     imageModelKey: "wan2.7-image",
     videoModelKey: "doubao-seedance-2.0",
     aspectRatio: "9:16",
@@ -107,16 +112,24 @@ export function StoryboardStudio() {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
-    const d =
+    const videoModelKey =
+      (p.meta?.workflow?.videoModelKey as string | undefined) ??
+      (typeof p.settings?.videoModelKey === "string" ? p.settings.videoModelKey : undefined) ??
+      "doubao-seedance-2.0";
+    const fromSettings =
       typeof p.settings?.durationSec === "number" ? p.settings.durationSec : 15;
-    setDurationSec(Math.max(4, Math.min(15, d)));
+    const fromSheet = resolveSheetTotalDurationHintSec(p.sheet);
+    const durationBase = fromSheet ?? fromSettings;
+    const durationMax = resolveStoryboardVideoFullSheetDurationRange(videoModelKey).max;
+    const clampedDuration = Math.max(4, Math.min(durationMax, durationBase));
+    setDurationSec(clampedDuration);
     if (p.settings?.aspectRatio === "16:9" || p.settings?.aspectRatio === "9:16") {
       setAspectRatio(p.settings.aspectRatio);
       setVideoAspectRatio(p.settings.aspectRatio);
     }
     setSettings((prev) => ({
       ...prev,
-      durationSec: Math.max(4, Math.min(15, d)),
+      durationSec: clampedDuration,
       aspectRatio:
         p.settings?.aspectRatio === "16:9" || p.settings?.aspectRatio === "9:16"
           ? p.settings.aspectRatio
@@ -155,6 +168,17 @@ export function StoryboardStudio() {
         title: p.sheet?.overview.title ?? null,
         prompt: null,
         ossUrl: p.videoOssUrl,
+        thumbnailUrl: null,
+        createdAt: p.updatedAt,
+      });
+    } else if (p.meta?.deliverableSnapshot?.videoUrl?.trim()) {
+      setVideoAsset({
+        id: p.meta.deliverableSnapshot.renderJobId ?? "",
+        module: "storyboard-micro-drama",
+        kind: "video",
+        title: p.sheet?.overview.title ?? null,
+        prompt: null,
+        ossUrl: p.meta.deliverableSnapshot.videoUrl.trim(),
         thumbnailUrl: null,
         createdAt: p.updatedAt,
       });

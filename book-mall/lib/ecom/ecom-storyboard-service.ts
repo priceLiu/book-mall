@@ -8,6 +8,8 @@ import {
   type StoryboardDeliverable,
 } from "@/lib/ecom/ecom-storyboard-deliverable";
 import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
+import { applyStoryboardSheetReconcile } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
+import { resolveStoryboardMergedVideoUrl } from "@/lib/ecom/ecom-storyboard-merged-video";
 import {
   ECOM_STORYBOARD_MODULE,
   sanitizeStoryboardChatMessages,
@@ -246,22 +248,38 @@ export async function getEcomStoryboardProject(
 
   const repaired = repairStoryboardMetaAndSheet(meta, sheet);
   if (repaired.dirty) {
+    meta = repaired.meta;
+    sheet = repaired.sheet;
+  }
+
+  const reconciled = await applyStoryboardSheetReconcile(
+    userId,
+    projectId,
+    sheet,
+    meta,
+  );
+  if (repaired.dirty || reconciled.dirty) {
+    const nextSheet = reconciled.sheet ?? sheet;
+    const nextMeta = reconciled.meta ?? meta;
     const updated = await prisma.ecomStoryboardProject.update({
       where: { id: projectId },
       data: {
-        ...(repaired.sheet ? { sheet: repaired.sheet as Prisma.InputJsonValue } : {}),
-        ...(repaired.meta ? { meta: repaired.meta as Prisma.InputJsonValue } : {}),
+        ...(nextSheet ? { sheet: nextSheet as Prisma.InputJsonValue } : {}),
+        ...(nextMeta ? { meta: nextMeta as Prisma.InputJsonValue } : {}),
       },
     });
     row = updated;
   }
 
   const videoMap = await loadVideoOssUrlMap(userId, [row.videoAssetId]);
-  return rowToDto(
-    row,
-    row.videoAssetId ? videoMap.get(row.videoAssetId) ?? null : null,
-    opts,
-  );
+  const assetVideoUrl = row.videoAssetId
+    ? videoMap.get(row.videoAssetId) ?? null
+    : null;
+  const metaForVideo = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  const mergedVideoUrl =
+    assetVideoUrl ??
+    (await resolveStoryboardMergedVideoUrl(userId, projectId, metaForVideo));
+  return rowToDto(row, mergedVideoUrl, opts);
 }
 
 export async function updateEcomStoryboardProject(

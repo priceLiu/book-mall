@@ -27,6 +27,14 @@ import {
   ecomGwPollVolcengine,
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { buildStoryboardImagePromptContext } from "@/lib/ecom/ecom-storyboard-image-prompt";
+import type { PanelScenePromptContext } from "@/lib/ecom/ecom-storyboard-scene-prompt";
+import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
+import { mergeStoryboardPanelMediaByIndex } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
+import {
+  clearStoryboardPanelVideosPending,
+  markStoryboardPanelVideosPending,
+} from "@/lib/ecom/ecom-storyboard-pending-videos";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import {
@@ -142,6 +150,21 @@ function readPendingFullVideoJob(meta: unknown): PendingFullVideoJob | null {
     startedAt: typeof j.startedAt === "string" ? j.startedAt : new Date().toISOString(),
     prompt: typeof j.prompt === "string" ? j.prompt : "",
     taskKey: typeof j.taskKey === "string" ? j.taskKey : "",
+  };
+}
+
+async function resolveVideoSceneCtx(
+  userId: string,
+  projectId: string,
+): Promise<PanelScenePromptContext | undefined> {
+  const project = await getEcomStoryboardProject(userId, projectId);
+  if (!project) return undefined;
+  const ctx = buildStoryboardImagePromptContext(project);
+  return {
+    scenePresetKey: ctx.scenePresetKey,
+    scenePresetLabel: ctx.scenePresetLabel,
+    scenePresetImageHint: ctx.scenePresetImageHint,
+    globalSceneAnchor: ctx.globalSceneAnchor,
   };
 }
 
@@ -322,6 +345,16 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
         ? 4
         : 4;
   const durationCap = refPlan.rules.apiMaxDurationSec ?? 15;
+  if (opts.durationSec != null) {
+    const requested = Math.round(opts.durationSec);
+    if (requested > durationCap) {
+      throw new Error(
+        requested > 15
+          ? `成片时长 ${requested}s 超过模型「${modelKey}」上限 ${durationCap}s，请改选万相 3.0（wan3.0-video）或缩短时长。`
+          : `成片时长 ${requested}s 超过模型「${modelKey}」上限 ${durationCap}s，请缩短时长或更换模型。`,
+      );
+    }
+  }
   const durationSec = Math.max(
     durationMin,
     Math.min(durationCap, Math.round(opts.durationSec ?? 10)),
@@ -366,9 +399,11 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     .slice(0, refPlan.rules.maxTotalImages);
   const videoImageUrl = firstFrameUrl;
 
-  const prompt = buildEcomStoryboardVideoPrompt(sheet, opts.brief, undefined, {
+  const sceneCtx = await resolveVideoSceneCtx(opts.userId, opts.projectId);
+  const prompt = buildEcomStoryboardVideoPrompt(sheet, opts.brief, opts.references, {
     refSlots: refPlan.slots,
     refRules: refPlan.rules,
+    sceneCtx,
   });
   const ratio =
     opts.ratio?.trim() || opts.aspectRatio?.trim() || "9:16";
@@ -836,17 +871,26 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   const panelDurationCap = isStoryboardWan30VideoModel(modelKey)
     ? 30
     : 8;
+  const requestedPanelSec = Math.round(
+    typeof opts.durationSec === "number"
+      ? opts.durationSec
+      : (panel.durationHintSec ?? 3),
+  );
+  if (opts.durationSec != null && requestedPanelSec > panelDurationCap) {
+    throw new Error(
+      requestedPanelSec > 15
+        ? `单镜时长 ${requestedPanelSec}s 超过模型「${modelKey}」上限 ${panelDurationCap}s，请改选万相 3.0（wan3.0-video）。`
+        : `单镜时长 ${requestedPanelSec}s 超过模型「${modelKey}」上限 ${panelDurationCap}s，请缩短时长或更换模型。`,
+    );
+  }
   const durationSec = Math.max(
     2,
-    Math.min(
-      panelDurationCap,
-      Math.round(
-        typeof opts.durationSec === "number"
-          ? opts.durationSec
-          : (panel.durationHintSec ?? 3),
-      ),
-    ),
+    Math.min(panelDurationCap, requestedPanelSec),
   );
+
+  await markStoryboardPanelVideosPending(opts.projectId, [panel.index], modelKey);
+
+  try {
   const panelRefPlan = resolveStoryboardPanelVideoRefPlan({
     modelKey,
     references: opts.references,
@@ -862,9 +906,12 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     normalizedMap.set(raw, sizedUrl);
   }
   const norm = (u: string) => normalizedMap.get(u) ?? u;
+  const sceneCtx = await resolveVideoSceneCtx(opts.userId, opts.projectId);
   const prompt = buildEcomStoryboardPanelVideoPrompt(panel, sheet, opts.brief, {
     refSlots: panelRefPlan.slots,
     refRules: panelRefPlan.rules,
+    references: opts.references,
+    sceneCtx,
   });
   const refUrls = panelRefPlan.referenceImageUrls.map(norm);
   const panelFirstFrame = norm(panelRefPlan.firstFrameUrl);
@@ -922,11 +969,17 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     );
   }
 
-  const updatedPanels = sheet.panels.map((p) =>
+  const patchPanels = sheet.panels.map((p) =>
     p.index === panel.index ? { ...p, videoUrl: ossUrl } : p,
   );
+  const latest = await getEcomStoryboardProject(opts.userId, opts.projectId);
+  const baseSheet = latest?.sheet ?? sheet;
+  const mergedPanels = mergeStoryboardPanelMediaByIndex(
+    baseSheet.panels,
+    patchPanels,
+  );
   await updateEcomStoryboardProject(opts.userId, opts.projectId, {
-    sheet: { ...sheet, panels: updatedPanels },
+    sheet: { ...baseSheet, panels: mergedPanels },
     status: "image_ready",
   });
 
@@ -953,7 +1006,13 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     projectId: opts.projectId,
   }).catch(() => undefined);
 
+  await clearStoryboardPanelVideosPending(opts.projectId, [panel.index]);
+
   return { videoUrl: ossUrl, panelIndex: panel.index, chargePoints: null };
+  } catch (e) {
+    await clearStoryboardPanelVideosPending(opts.projectId, [panel.index]);
+    throw e;
+  }
 }
 
 export async function ecomMergeStoryboardPanelVideos(opts: {

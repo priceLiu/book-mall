@@ -70,6 +70,7 @@ import {
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
 } from "@/lib/ecom/ecom-storyboard-service";
+import { mergeStoryboardPanelMediaByIndex } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
 
 function isTransientPollError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -603,6 +604,8 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
   aspectRatio?: "16:9" | "9:16";
   imageSize?: string;
   autoGenCharacter?: boolean;
+  /** 仅自动生成角色参考图，不生成分镜图 */
+  characterOnly?: boolean;
   /** 仅重生成指定镜头；省略则生成全部镜头 */
   panelIndex?: number;
 }): Promise<{
@@ -648,9 +651,11 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
     !wf.skippedCharacter &&
     (opts.autoGenCharacter ||
       Boolean(wf.autoGenCharacter) ||
-      Boolean(wf.characterPresetKey));
+      Boolean(wf.characterPresetKey) ||
+      wf.fashionCharacterMode === "ai");
   if (shouldAutoGenCharacter) {
     const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
+    const productRef = requireStoryboardProductRef(references);
     const charResult = await generateOneImage({
       userId: opts.userId,
       projectId: opts.projectId,
@@ -659,6 +664,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       action: "image",
       imageSize,
       aspectRatio,
+      refImg: productRef.ossUrl.trim(),
       meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
     });
 
@@ -670,6 +676,13 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       buf,
     });
     references = [...references, ref];
+  }
+
+  if (opts.characterOnly) {
+    if (!references.some((r) => r.role === "character")) {
+      throw new Error("角色参考图生成失败，请检查脚本中的角色描述，或改用手动上传角色图");
+    }
+    return { references, sheet, chargePoints: null };
   }
 
   const { productRefUrl, extraRefUrls } = resolveStoryboardImageGenRefs(references);
@@ -775,10 +788,10 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
 
       const latest = await getEcomStoryboardProject(opts.userId, opts.projectId);
       const baseSheet = latest?.sheet ?? lastSavedSheet;
-      const mergedPanels = baseSheet.panels.map((p) => {
-        const updated = updatedPanels.find((up) => up.index === p.index);
-        return updated?.imageUrl ? { ...p, imageUrl: updated.imageUrl } : p;
-      });
+      const mergedPanels = mergeStoryboardPanelMediaByIndex(
+        baseSheet.panels,
+        updatedPanels,
+      );
       lastSavedSheet = { ...baseSheet, panels: mergedPanels };
       const partialReady = mergedPanels.every((p) => Boolean(p.imageUrl));
 
@@ -800,15 +813,10 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
     const latest = await getEcomStoryboardProject(opts.userId, opts.projectId);
     if (latest?.sheet?.panels?.length) {
       baseSheet = latest.sheet;
-      const generatedUrls = new Map<number, string>();
-      for (const panel of panelsToGen) {
-        const updated = updatedPanels.find((p) => p.index === panel.index);
-        if (updated?.imageUrl) generatedUrls.set(panel.index, updated.imageUrl);
-      }
-      mergedPanels = latest.sheet.panels.map((p) => {
-        const url = generatedUrls.get(p.index);
-        return url ? { ...p, imageUrl: url } : p;
-      });
+      mergedPanels = mergeStoryboardPanelMediaByIndex(
+        latest.sheet.panels,
+        updatedPanels,
+      );
     }
   }
 

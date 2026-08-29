@@ -28,9 +28,12 @@ import {
   isStoryboardBailianR2vModel,
   isStoryboardKling30KieVideoModel,
   isStoryboardWan30VideoModel,
+  isStoryboardWan27BailianR2vModel,
   isStoryboardWanR2vModel,
   resolveStoryboardVideoFullSheetDurationRange,
   resolveStoryboardVideoPanelDurationRange,
+  storyboardFullSheetDurationMismatchMessage,
+  storyboardPanelDurationMismatchMessage,
   type StoryboardVideoAspectRatio,
   type StoryboardVideoDurationRange,
 } from "@/lib/storyboard-video-params";
@@ -359,12 +362,14 @@ export function StoryboardModelPickerDialog({
 
   const [draftKey, setDraftKey] = useState(value);
   const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
+  const [confirmBlockMessage, setConfirmBlockMessage] = useState<string | null>(null);
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
       setDraftKey(value);
       setMediaFilter("all");
+      setConfirmBlockMessage(null);
     }
     wasOpenRef.current = open;
   }, [open, value]);
@@ -396,6 +401,27 @@ export function StoryboardModelPickerDialog({
   const panelDurationMin = panelDurationRange.min;
   const panelDurationMax = panelDurationRange.max;
 
+  const longDurationHintMessage = useMemo(() => {
+    if (mode !== "video") return null;
+    if (
+      showFullDuration &&
+      durationSec > 15 &&
+      !isStoryboardWan30VideoModel(draftKey) &&
+      !isStoryboardWan27BailianR2vModel(draftKey)
+    ) {
+      return `成片 ${durationSec}s 超过 15s，建议选择「万相 3.0」或「万相 2.7 R2V」。`;
+    }
+    if (
+      showPanelDuration &&
+      panelDurationSec != null &&
+      panelDurationSec > 15 &&
+      !isStoryboardWan30VideoModel(draftKey)
+    ) {
+      return `单镜 ${panelDurationSec}s 超过 15s，建议选择「万相 3.0」。`;
+    }
+    return null;
+  }, [mode, showFullDuration, showPanelDuration, durationSec, panelDurationSec, draftKey]);
+
   useEffect(() => {
     if (mode !== "video") return;
     if (showFullDuration && onDurationChange) {
@@ -421,7 +447,24 @@ export function StoryboardModelPickerDialog({
     onPanelDurationChange,
   ]);
 
+  useEffect(() => {
+    setConfirmBlockMessage(null);
+  }, [draftKey, durationSec, panelDurationSec, mode, showFullDuration, showPanelDuration]);
+
   function handleConfirm() {
+    if (mode === "video") {
+      const mismatch =
+        showFullDuration && onDurationChange
+          ? storyboardFullSheetDurationMismatchMessage(draftKey, durationSec)
+          : showPanelDuration && panelDurationSec != null
+            ? storyboardPanelDurationMismatchMessage(draftKey, panelDurationSec)
+            : null;
+      if (mismatch) {
+        setConfirmBlockMessage(mismatch);
+        return;
+      }
+    }
+    setConfirmBlockMessage(null);
     onConfirm(draftKey);
     if (draftKey !== value) onChange(draftKey);
   }
@@ -671,6 +714,18 @@ export function StoryboardModelPickerDialog({
                         <span>{fullDurationMax}s</span>
                       </div>
                     </label>
+                  ) : null}
+
+                  {longDurationHintMessage ? (
+                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                      {longDurationHintMessage}
+                    </p>
+                  ) : null}
+
+                  {confirmBlockMessage ? (
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+                      {confirmBlockMessage}
+                    </p>
                   ) : null}
 
                   {showWanR2vExtras ? (

@@ -61,7 +61,9 @@ export async function POST(req: Request, ctx: Ctx) {
   const autoGenCharacter =
     body.autoGenCharacter === true ||
     wf.autoGenCharacter === true ||
-    Boolean(wf.characterPresetKey);
+    Boolean(wf.characterPresetKey) ||
+    wf.fashionCharacterMode === "ai";
+  const characterOnly = body.characterOnly === true;
   const panelIndex =
     typeof body.panelIndex === "number" && Number.isFinite(body.panelIndex)
       ? Math.trunc(body.panelIndex)
@@ -83,6 +85,7 @@ export async function POST(req: Request, ctx: Ctx) {
       aspectRatio,
       imageSize,
       autoGenCharacter,
+      characterOnly,
       panelIndex,
     });
 

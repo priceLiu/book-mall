@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { derivePanelScenePrompt } from "./ecom-storyboard-scene-prompt";
 import type { StoryboardSheet } from "./ecom-storyboard-types";
 import { parseStoryboardSheet } from "./ecom-storyboard-types";
 import type { StoryboardChatMessage } from "./ecom-storyboard-types";
@@ -83,12 +84,16 @@ export const fashionPanelRowSchema = z.object({
   durationSec: z.number().positive(),
   cameraMove: z.string().min(1),
   sceneDesc: z.string().min(1),
+  /** 生图/生视频共用的场景描述 prompt（≥40 字，含环境/光线/道具） */
+  scenePrompt: z.string().min(20),
   modelAction: z.string().min(1),
   garmentFocus: z.string().min(1),
   dialogue: z.string().optional(),
   toneTexture: z.string().optional(),
   sellpointIds: z.array(z.string()).default([]),
-  imagePrompt: z.string().min(10),
+  imagePrompt: z.string().min(20),
+  /** 单镜视频 motion prompt */
+  videoPrompt: z.string().min(20),
 });
 
 export const fashionStoryboardVersionSchema = z.object({
@@ -185,6 +190,32 @@ function coerceFashionPanels(raw: unknown): unknown {
         : typeof p.productBeat === "string" && p.productBeat.trim()
           ? p.productBeat.trim()
           : "服装展示";
+    const scenePromptRaw =
+      typeof p.scenePrompt === "string" && p.scenePrompt.trim()
+        ? p.scenePrompt.trim()
+        : derivePanelScenePrompt({ scene: sceneDesc, scenePrompt: undefined });
+    const scenePrompt =
+      scenePromptRaw.length >= 20
+        ? scenePromptRaw
+        : `${sceneDesc}，写实自然光，与服装品类匹配的环境与道具`;
+    const imagePromptRaw =
+      typeof p.imagePrompt === "string" && p.imagePrompt.trim()
+        ? p.imagePrompt.trim()
+        : "";
+    const imagePrompt =
+      imagePromptRaw.length >= 20
+        ? imagePromptRaw
+        : `竖版9:16，写实UGC摄影。场景：${scenePrompt}。模特${modelAction}，展示${garmentFocus}，以参考图1服装为准，禁止画面文字。`;
+    const videoPromptRaw =
+      typeof p.videoPrompt === "string" && p.videoPrompt.trim()
+        ? p.videoPrompt.trim()
+        : typeof p.videoPromptEn === "string" && p.videoPromptEn.trim()
+          ? p.videoPromptEn.trim()
+          : "";
+    const videoPrompt =
+      videoPromptRaw.length >= 20
+        ? videoPromptRaw
+        : `${p.cameraMove ?? "固定"}运镜，${modelAction}，场景${sceneDesc}，服装展示重点${garmentFocus}，UGC质感连贯动作`;
     return {
       ...p,
       index,
@@ -205,13 +236,12 @@ function coerceFashionPanels(raw: unknown): unknown {
             ? p.camera.trim()
             : "固定",
       sceneDesc,
+      scenePrompt,
       modelAction,
       garmentFocus,
       sellpointIds: coerceSellpointIds(p.sellpointIds),
-      imagePrompt:
-        typeof p.imagePrompt === "string" && p.imagePrompt.trim()
-          ? p.imagePrompt.trim()
-          : "竖版9:16，写实UGC摄影，服装展示，禁止画面文字。",
+      imagePrompt,
+      videoPrompt,
     };
   });
 }
@@ -522,6 +552,14 @@ export function mergeFashionDeliverablePatch(
         ...(base.storyboardVersions ?? {}),
         ...(patch.storyboardVersions ?? {}),
       };
+      for (const [key, version] of Object.entries(base.storyboardVersions ?? {})) {
+        const incoming = patch.storyboardVersions?.[key as keyof typeof patch.storyboardVersions];
+        const incomingPanels = incoming?.panels?.length ?? 0;
+        const savedPanels = version?.panels?.length ?? 0;
+        if (savedPanels > 0 && incomingPanels === 0) {
+          merged[key as keyof typeof merged] = version;
+        }
+      }
       if (
         base.storyboardLocked &&
         base.selectedVersion &&
@@ -719,6 +757,43 @@ export function resolveFashionDeliverableForProject(project: {
   return stripPrematureFashionDeliverableFields(merged);
 }
 
+/** 七维参数拼接为故事版「项目关键词」 */
+export function buildFashionProjectKeywords(
+  deliverable: Pick<FashionDeliverable, "dimensions">,
+): string {
+  const d = deliverable.dimensions ?? {};
+  return [
+    d.styleCategory,
+    d.styleAttribute,
+    d.platform,
+    d.customScene,
+  ]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** re-sync 时保留已生成分镜图/视频，只更新脚本字段 */
+export function mergeFashionSheetWithExisting(
+  newSheet: StoryboardSheet,
+  existingSheet: StoryboardSheet | null | undefined,
+): StoryboardSheet {
+  if (!existingSheet?.panels?.length) return newSheet;
+  const byIndex = new Map(existingSheet.panels.map((p) => [p.index, p]));
+  return {
+    ...newSheet,
+    panels: newSheet.panels.map((p) => {
+      const prev = byIndex.get(p.index);
+      if (!prev) return p;
+      return {
+        ...p,
+        imageUrl: prev.imageUrl,
+        videoUrl: prev.videoUrl,
+      };
+    }),
+  };
+}
+
 export function fashionVersionToSheet(
   deliverable: FashionDeliverable,
   versionKey?: FashionVersionKey,
@@ -750,19 +825,23 @@ export function fashionVersionToSheet(
       const index = typeof p.index === "number" ? p.index : idx + 1;
       const scene = p.sceneDesc?.trim() || "—";
       const action = p.modelAction?.trim() || scene;
+      const globalAnchor = deliverable.dimensions?.customScene?.trim();
+      const scenePrompt =
+        p.scenePrompt?.trim() ||
+        derivePanelScenePrompt({ scene, scenePrompt: undefined }, globalAnchor);
       return {
         index,
         timeline: undefined,
         shotType: p.shotScale?.trim() || "中景",
         scene,
+        scenePrompt: scenePrompt || undefined,
         action,
         dialogue: p.dialogue?.trim() || undefined,
         camera: p.cameraMove?.trim() || "固定",
         durationHintSec: p.durationSec > 0 ? p.durationSec : 4,
         sellpointTags: p.sellpointIds ?? [],
-        imagePrompt:
-          p.imagePrompt?.trim() ||
-          "竖版9:16，写实UGC摄影，服装展示，禁止画面文字。",
+        imagePrompt: p.imagePrompt?.trim() || undefined,
+        videoPromptEn: p.videoPrompt?.trim() || undefined,
         productInteraction: "wear" as const,
         productVisibility: "hero" as const,
         productBeat: p.garmentFocus?.trim() || "服装展示",

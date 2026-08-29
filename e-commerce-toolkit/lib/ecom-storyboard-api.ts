@@ -198,12 +198,22 @@ export async function streamStoryboardChat(opts: {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let full = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const piece = decoder.decode(value, { stream: true });
-    full += piece;
-    opts.onChunk(full);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const piece = decoder.decode(value, { stream: true });
+      full += piece;
+      opts.onChunk(full);
+    }
+  } catch (readError) {
+    const msg = readError instanceof Error ? readError.message : String(readError);
+    if (/network error|failed to fetch|load failed|aborted|abort/i.test(msg)) {
+      throw new Error(
+        "助手流式连接中断（可能是生成内容过长或服务超时）。请稍后重试「重新生成分镜」；若仍失败请检查 Gateway 聊天模型是否可用。",
+      );
+    }
+    throw readError instanceof Error ? readError : new Error(msg);
   }
   return full;
 }
@@ -265,6 +275,7 @@ export async function generateStoryboardSheetImage(
     aspectRatio?: "16:9" | "9:16";
     imageSize?: string;
     autoGenCharacter?: boolean;
+    characterOnly?: boolean;
     panelIndex?: number;
   },
 ): Promise<{
@@ -479,14 +490,17 @@ export type EcomMediaRenderProfileInput = {
 
 export async function renderStoryboardPanelVideos(
   projectId: string,
-  opts?: { profile?: EcomMediaRenderProfileInput },
+  opts?: { profile?: EcomMediaRenderProfileInput; panelIndexes?: number[] },
 ): Promise<MediaRenderJobDto> {
+  const body: Record<string, unknown> = {};
+  if (opts?.profile) body.profile = opts.profile;
+  if (opts?.panelIndexes?.length) body.panelIndexes = opts.panelIndexes;
   const data = await ecomBookFetch(
     `api/sso/tools/ecom/storyboard/projects/${projectId}/video/render`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(opts?.profile ? { profile: opts.profile } : {}),
+      body: JSON.stringify(body),
     },
   );
   return data.job as MediaRenderJobDto;

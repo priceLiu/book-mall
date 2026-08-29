@@ -14,6 +14,7 @@ import {
   type UsageFromResponse,
 } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { resolveEcomAssistantChatParams } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { buildGatewayStreamChatResultSummary } from "@/lib/gateway/log-result-summary";
 import {
   gatewayV1ChatCompletionsStream,
@@ -319,6 +320,7 @@ export async function ecomGwChatStream(
     messages: opts.messages,
     stream: true,
     stream_options: { include_usage: true },
+    ...resolveEcomAssistantChatParams(model),
     ...(opts.params ?? {}),
   };
 

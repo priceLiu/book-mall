@@ -1,5 +1,8 @@
 /** 故事版 · 百炼参考生视频（R2V）模型参数 */
 
+import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+
 export const STORYBOARD_BAILIAN_R2V_MODELS = [
   "happyhorse-1.0-r2v",
   "happyhorse-1.1-r2v",
@@ -169,4 +172,131 @@ export function bailianResolutionFromStoryboard(
   resolution: "720p" | "1080p",
 ): "720P" | "1080P" {
   return resolution === "720p" ? "720P" : "1080P";
+}
+
+/** 整图成片 · 支持超过 15s 的模型（按推荐顺序） */
+export const STORYBOARD_LONG_FULL_SHEET_VIDEO_MODEL_KEYS = [
+  "wan3.0-video",
+  "wan3.0-video-prime",
+  "wan2.7-r2v",
+] as const;
+
+export type StoryboardSheetDurationSource = {
+  totalDurationHintSec?: number;
+  panels?: Array<{ durationHintSec?: number }>;
+};
+
+/** 从 sheet 解析建议总时长（优先 totalDurationHintSec，否则各镜 durationHintSec 之和） */
+export function resolveSheetTotalDurationHintSec(
+  sheet?: StoryboardSheetDurationSource | null,
+): number | null {
+  if (!sheet) return null;
+  if (
+    typeof sheet.totalDurationHintSec === "number" &&
+    sheet.totalDurationHintSec > 0
+  ) {
+    return Math.round(sheet.totalDurationHintSec);
+  }
+  const panels = sheet.panels ?? [];
+  if (panels.length === 0) return null;
+  const sum = panels.reduce((acc, p) => {
+    const hint = p.durationHintSec;
+    return acc + (typeof hint === "number" && hint > 0 ? hint : 0);
+  }, 0);
+  return sum > 0 ? Math.round(sum) : null;
+}
+
+export function clampStoryboardFullSheetDurationSec(
+  durationSec: number,
+  modelKey: string,
+): number {
+  const range = resolveStoryboardVideoFullSheetDurationRange(modelKey);
+  return Math.max(range.min, Math.min(range.max, Math.round(durationSec)));
+}
+
+export function storyboardFullSheetDurationMismatchMessage(
+  modelKey: string,
+  durationSec: number,
+): string | null {
+  const range = resolveStoryboardVideoFullSheetDurationRange(modelKey);
+  const d = Math.round(durationSec);
+  if (d > range.max) {
+    if (
+      d > 15 &&
+      !isStoryboardWan30VideoModel(modelKey) &&
+      !isStoryboardWan27BailianR2vModel(modelKey)
+    ) {
+      return `当前模型最长 ${range.max}s，成片需 ${d}s。请改选「万相 3.0」或「万相 2.7 R2V」。`;
+    }
+    return `当前模型最长 ${range.max}s，请缩短成片时长或更换模型。`;
+  }
+  if (d < range.min) {
+    return `当前模型最短 ${range.min}s，请调长成片时长。`;
+  }
+  return null;
+}
+
+export function storyboardPanelDurationMismatchMessage(
+  modelKey: string,
+  durationSec: number,
+): string | null {
+  const range = resolveStoryboardVideoPanelDurationRange(modelKey);
+  const d = Math.round(durationSec);
+  if (d > range.max) {
+    if (d > 15 && !isStoryboardWan30VideoModel(modelKey)) {
+      return `单镜 ${d}s 超过当前模型上限 ${range.max}s，请改选万相 3.0。`;
+    }
+    return `单镜时长超过模型上限 ${range.max}s，请缩短或更换模型。`;
+  }
+  if (d < range.min) {
+    return `单镜最短 ${range.min}s，请调长时长。`;
+  }
+  return null;
+}
+
+/**
+ * 整图成片：按目标时长推荐视频模型（>15s 优先万相 3.0 / 2.7 R2V）。
+ */
+export function pickStoryboardVideoModelForFullSheetDuration(
+  models: StoryboardGatewayModel[],
+  durationSec: number,
+  preferred: string,
+): string {
+  const d = Math.round(durationSec);
+  const preferredRange = resolveStoryboardVideoFullSheetDurationRange(preferred);
+  if (d >= preferredRange.min && d <= preferredRange.max) {
+    return pickBoundStoryboardModelKey(models, preferred);
+  }
+  for (const key of STORYBOARD_LONG_FULL_SHEET_VIDEO_MODEL_KEYS) {
+    const range = resolveStoryboardVideoFullSheetDurationRange(key);
+    if (d >= range.min && d <= range.max && models.some((m) => m.modelKey === key)) {
+      return pickBoundStoryboardModelKey(models, key);
+    }
+  }
+  return pickBoundStoryboardModelKey(models, preferred);
+}
+
+/** 将 Gateway / 厂商视频错误转为用户可读说明（区分凭证 vs 余额） */
+export function formatStoryboardVideoGenError(message: string): string {
+  const text = message.trim();
+  if (!text) return "镜头视频生成失败";
+  const authLike =
+    text.includes("UPSTREAM_AUTH_FAILED") ||
+    text.includes("API key doesn't exist") ||
+    text.includes("AuthenticationError") ||
+    text.includes("凭证无效") ||
+    text.includes("401") ||
+    text.includes("403");
+  if (authLike) {
+    return "火山方舟 API Key 无效或不存在（不是余额/充值问题）。请在 Gateway 控制台 → 模型管理 → 火山凭证，检查 Seedance 所用 ark API Key 是否已正确配置并绑定到当前模型。";
+  }
+  const balanceLike =
+    text.includes("UPSTREAM_INSUFFICIENT_BALANCE") ||
+    text.includes("余额不足") ||
+    text.includes("欠费") ||
+    text.includes("Insufficient Balance");
+  if (balanceLike) {
+    return "厂商账户余额不足或欠费。请在火山引擎控制台为 Gateway 绑定的凭证充值后重试，或改用其它已绑定凭证/模型。";
+  }
+  return text;
 }

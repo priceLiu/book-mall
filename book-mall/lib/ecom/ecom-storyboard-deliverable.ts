@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { derivePanelScenePrompt } from "./ecom-storyboard-scene-prompt";
 import { parseStoryboardSheet, type StoryboardSheet } from "./ecom-storyboard-types";
 
 /** @see book-mall/doc/ecom/storyboard-deliverable-spec-v2.md */
@@ -32,6 +33,8 @@ export const storyboardPanelSchema = z.object({
   shotType: z.string().min(1),
   camera: z.string().optional(),
   scene: z.string().min(1),
+  /** 生图/生视频共用的场景描述 prompt */
+  scenePrompt: z.string().optional(),
   action: z.string().min(1),
   emotion: z.string().optional(),
   dialogue: z.string().optional(),
@@ -130,7 +133,9 @@ export const storyboardDeliverableV2PanelSchema = storyboardPanelSchema.extend({
   productInteraction: storyboardProductInteractionSchema,
   productVisibility: storyboardProductVisibilitySchema,
   sellpointTags: z.array(z.string()),
+  scenePrompt: z.string().min(20),
   imagePrompt: z.string().min(20),
+  videoPromptEn: z.string().min(20),
 });
 
 export const storyboardDeliverableV2SchemeSchema = storyboardSchemeSchema.extend({
@@ -189,6 +194,8 @@ export function normalizeStoryboardDeliverableV2(
       dialogue: coercePanelTextField(p.dialogue) ?? p.dialogue,
       emotion: coercePanelTextField(p.emotion) ?? p.emotion,
       imagePrompt: coercePanelTextField(p.imagePrompt) ?? p.imagePrompt,
+      scenePrompt: coercePanelTextField(p.scenePrompt) ?? p.scenePrompt,
+      videoPromptEn: coercePanelTextField(p.videoPromptEn) ?? p.videoPromptEn,
       sellpointTags: p.sellpointTags ?? [],
     })),
   }));
@@ -240,19 +247,26 @@ function coerceDeliverablePanels(raw: unknown): unknown {
         typeof p.action === "string" && p.action.trim() ? p.action.trim() : scene;
       const shotType =
         typeof p.shotType === "string" && p.shotType.trim() ? p.shotType.trim() : "中景";
+      const scenePromptRaw = coercePanelTextField(p.scenePrompt);
+      const scenePrompt =
+        scenePromptRaw && scenePromptRaw.length >= 20
+          ? scenePromptRaw
+          : derivePanelScenePrompt({ scene, scenePrompt: scenePromptRaw });
       return {
         ...p,
         scene,
+        scenePrompt,
         action,
         shotType,
         timeline: coercePanelTextField(p.timeline),
         camera: coercePanelTextField(p.camera),
         dialogue: coercePanelTextField(p.dialogue),
         emotion: coercePanelTextField(p.emotion),
-        imagePrompt: coercePanelTextField(p.imagePrompt),
-        protagonistBeat: coercePanelTextField(p.protagonistBeat),
-        productBeat: coercePanelTextField(p.productBeat),
-        videoPromptEn: coercePanelTextField(p.videoPromptEn),
+      imagePrompt: coercePanelTextField(p.imagePrompt),
+      scenePrompt: coercePanelTextField(p.scenePrompt),
+      protagonistBeat: coercePanelTextField(p.protagonistBeat),
+      productBeat: coercePanelTextField(p.productBeat),
+      videoPromptEn: coercePanelTextField(p.videoPromptEn),
       };
     });
     return s;
@@ -367,6 +381,7 @@ export function schemeToSheet(
       timeline: p.timeline,
       shotType: p.shotType,
       scene: p.scene,
+      scenePrompt: p.scenePrompt?.trim() || undefined,
       action: p.action,
       dialogue: p.dialogue,
       camera: p.camera,

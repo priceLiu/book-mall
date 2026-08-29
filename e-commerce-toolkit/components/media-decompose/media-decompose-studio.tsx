@@ -23,6 +23,7 @@ import {
 } from "@/lib/ecom-media-decompose-api";
 import { fetchSeedVideoModels, getSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import type { MediaDecomposeChatModel, MediaDecomposeProject } from "@/lib/media-decompose-types";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { resolveSeedVideoVideoModelKey } from "@/lib/seed-video-workflow";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
@@ -34,7 +35,7 @@ export function MediaDecomposeStudio() {
   const { alert, doubleConfirm } = useDialogs();
   const [project, setProject] = useState<MediaDecomposeProject | null>(null);
   const [chatModels, setChatModels] = useState<MediaDecomposeChatModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState("qwen3.8-max");
+  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [needLogin, setNeedLogin] = useState(false);
