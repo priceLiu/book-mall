@@ -343,6 +343,7 @@ export function inferFashionPhaseFromDeliverable(
   existingPhase?: string,
 ): string {
   if (!d.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+  if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
   if (!d.selectedVoiceoverId) return "voiceover_pick";
   if (!d.selectedVersion) return "storyboard_pick";
   if (!d.storyboardLocked) return "storyboard_confirm";
@@ -420,7 +421,7 @@ export function mergeFashionDeliverablePatch(
     selectedVoiceoverId:
       patch.selectedVoiceoverId != null && patch.selectedVoiceoverId !== ""
         ? patch.selectedVoiceoverId
-        : base.selectedVoiceoverId,
+        : (base.selectedVoiceoverId ?? null),
     storyboardVersions: (() => {
       const merged = {
         ...(base.storyboardVersions ?? {}),
@@ -462,11 +463,28 @@ export function mergeFashionDeliverablePatch(
 function parseFashionVoiceoverPickFromChat(
   chatHistory: StoryboardChatMessage[],
 ): string | null {
+  let voiceoversReady = false;
   let picked: string | null = null;
   for (const msg of chatHistory) {
-    if (msg.role !== "user") continue;
-    const m = msg.content.trim().match(/^选择口播\s*(V\d+)/);
-    if (m?.[1]) picked = m[1];
+    if (msg.role === "user") {
+      const trimmed = msg.content.trim();
+      if (trimmed === "确认卖点清单" || trimmed === "重新生成口播文案") {
+        voiceoversReady = false;
+        picked = null;
+        continue;
+      }
+      if (voiceoversReady) {
+        const m = trimmed.match(/^选择口播\s*(V\d+)/);
+        if (m?.[1]) picked = m[1];
+      }
+      continue;
+    }
+    if (msg.role === "assistant") {
+      const parsed = extractFashionDeliverable(msg.content);
+      if ((parsed?.voiceovers?.length ?? 0) > 0) {
+        voiceoversReady = true;
+      }
+    }
   }
   return picked;
 }
@@ -529,9 +547,13 @@ export function resolveFashionDeliverableForProject(project: {
     null;
 
   const voiceoverId =
-    parseFashionVoiceoverPickFromChat(chatHistory) ?? merged.selectedVoiceoverId ?? null;
-  if (voiceoverId) {
+    parseFashionVoiceoverPickFromChat(chatHistory) ??
+    ((merged.voiceovers?.length ?? 0) > 0 ? merged.selectedVoiceoverId : null) ??
+    null;
+  if (voiceoverId && merged.voiceovers.some((v) => v.id === voiceoverId)) {
     merged = { ...merged, selectedVoiceoverId: voiceoverId };
+  } else {
+    merged = { ...merged, selectedVoiceoverId: null };
   }
 
   if (versionKey) {

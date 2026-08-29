@@ -176,9 +176,13 @@ export async function POST(req: Request, ctx: Ctx) {
             const prevFashion = existingMeta.deliverable as
               | Parameters<typeof mergeFashionDeliverablePatch>[0]
               | undefined;
+            const llmFashionPatch =
+              fashionPromptPhase === "voiceovers" && !prevFashion?.selectedVoiceoverId
+                ? { ...fashionDeliverable, selectedVoiceoverId: null }
+                : fashionDeliverable;
             const merged = mergeFashionDeliverablePatch(
               prevFashion,
-              fashionDeliverable,
+              llmFashionPatch,
               typeof existingMeta.productName === "string"
                 ? existingMeta.productName
                 : fashionDeliverable.productName,

@@ -17,6 +17,7 @@ export function useCanvasGraphSnapshot(): {
 } {
   const revision = useCanvasGraphRevision();
   return useMemo(() => {
+    void revision;
     const s = useCanvasStore.getState();
     return { nodes: s.nodes, edges: s.edges };
   }, [revision]);

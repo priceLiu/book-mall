@@ -25,6 +25,7 @@ export const FASHION_LOCK_SELLPOINTS = "确认卖点清单";
 export const FASHION_OUTPUT_SCRIPT = "分镜脚本交付";
 export const FASHION_OUTPUT_VIDEO = "故事版一键成片";
 export const FASHION_REGENERATE_SELLPOINTS = "重新生成卖点";
+export const FASHION_REGENERATE_VOICEOVERS = "重新生成口播文案";
 export const FASHION_REGENERATE_STORYBOARDS = "重新生成分镜";
 export const FASHION_GENERATE_STORYBOARDS_LABEL = "生成 A–E 分镜方案";
 export const FASHION_CONFIRM_STORYBOARD = "确认分镜，生成运营包";
@@ -77,6 +78,12 @@ export function fashionBusyStatusForUserMessage(message: string): FashionBusySta
     return {
       title: "正在重新生成分镜",
       detail: "AI 正在重新输出 A–E 五套分镜脚本，请稍候…",
+    };
+  }
+  if (trimmed === FASHION_REGENERATE_VOICEOVERS) {
+    return {
+      title: "正在重新生成口播",
+      detail: "AI 正在重新输出 6 套口播文案，请稍候…",
     };
   }
   if (trimmed === FASHION_OUTPUT_SCRIPT || trimmed === FASHION_OUTPUT_VIDEO) {
@@ -153,16 +160,44 @@ export function isLegacyStoryboardProject(project: StoryboardProject): boolean {
   );
 }
 
-function parseFashionVoiceoverPickFromChat(
+/** 口播选版须出现在最近一次卖点定稿且 assistant 已返回 voiceovers 之后 */
+export function parseFashionVoiceoverPickFromChat(
   chatHistory: StoryboardChatMessage[],
 ): string | null {
+  let voiceoversReady = false;
   let picked: string | null = null;
   for (const msg of chatHistory) {
-    if (msg?.role !== "user") continue;
-    const m = msg.content.trim().match(/^选择口播\s*(V\d+)/);
-    if (m?.[1]) picked = m[1];
+    if (msg?.role === "user") {
+      const trimmed = msg.content.trim();
+      if (trimmed === FASHION_LOCK_SELLPOINTS || trimmed === FASHION_REGENERATE_VOICEOVERS) {
+        voiceoversReady = false;
+        picked = null;
+        continue;
+      }
+      if (voiceoversReady) {
+        const m = trimmed.match(/^选择口播\s*(V\d+)/);
+        if (m?.[1]) picked = m[1];
+      }
+      continue;
+    }
+    if (msg?.role === "assistant") {
+      const parsed = extractFashionDeliverableFromText(msg.content);
+      if ((parsed?.voiceovers?.length ?? 0) > 0) {
+        voiceoversReady = true;
+      }
+    }
   }
   return picked;
+}
+
+export function hasFashionVoiceoversInChat(chatHistory: StoryboardChatMessage[]): boolean {
+  for (let i = chatHistory.length - 1; i >= 0; i--) {
+    const msg = chatHistory[i];
+    if (msg?.role !== "assistant") continue;
+    const parsed = extractFashionDeliverableFromText(msg.content);
+    if ((parsed?.voiceovers?.length ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 function parseFashionVersionPickFromChat(
@@ -247,10 +282,11 @@ function applyFashionDeliverablePhaseGuards(
     };
   }
 
+  const voiceoversReady = (next.voiceovers?.length ?? 0) > 0;
   const voiceoverPickedFromChat = parseFashionVoiceoverPickFromChat(project.chatHistory);
-  if (voiceoverPickedFromChat) {
+  if (voiceoversReady && voiceoverPickedFromChat) {
     next = { ...next, selectedVoiceoverId: voiceoverPickedFromChat };
-  } else if (next.selectedVoiceoverId) {
+  } else {
     next = { ...next, selectedVoiceoverId: null };
   }
 
@@ -536,6 +572,7 @@ export function inferFashionPhaseFromState(project: StoryboardProject): FashionP
     hasMeaningfulOpsPack(d);
   if (!pastDimensions && !dimensionsComplete(project)) return "dimensions";
   if (!d?.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+  if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
   if (!d.selectedVoiceoverId) return "voiceover_pick";
   if (!d.selectedVersion) return "storyboard_pick";
   if (!d.storyboardLocked) return "storyboard_confirm";
@@ -818,11 +855,20 @@ export function isAwaitingFashionSellpoints(project: StoryboardProject): boolean
   );
 }
 
+export function isAwaitingFashionVoiceoverGeneration(project: StoryboardProject): boolean {
+  const d = resolveFashionDeliverable(project);
+  return Boolean(
+    d?.sellpointsLocked &&
+      (d.voiceovers?.length ?? 0) === 0 &&
+      !d.selectedVoiceoverId,
+  );
+}
+
 export function isAwaitingFashionVoiceoverPick(project: StoryboardProject): boolean {
   const d = resolveFashionDeliverable(project);
   return Boolean(
     d?.sellpointsLocked &&
-      d.voiceovers.length >= 1 &&
+      (d.voiceovers?.length ?? 0) >= 1 &&
       !d.selectedVoiceoverId &&
       listFashionStoryboardVersionKeys(d).length === 0,
   );
@@ -914,7 +960,9 @@ export function parseFashionVoiceoverPick(
   }
 
   const matched = trimmed.match(/^选择口播\s*(V\d+)/);
-  return matched?.[1] ?? null;
+  const id = matched?.[1] ?? null;
+  if (!id) return null;
+  return d?.voiceovers.some((v) => v.id === id) ? id : null;
 }
 
 export function parseFashionVersionKeyFromUserMessage(
@@ -960,7 +1008,9 @@ export function isFashionPendingStoryboardGeneration(
   const d = resolveFashionDeliverable(project);
   return Boolean(
     d?.sellpointsLocked &&
+      (d.voiceovers?.length ?? 0) > 0 &&
       d.selectedVoiceoverId &&
+      d.voiceovers.some((v) => v.id === d.selectedVoiceoverId) &&
       !d.selectedVersion &&
       listFashionStoryboardVersionKeys(d).length === 0,
   );
@@ -1008,6 +1058,18 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
         },
       ];
     }
+  }
+
+  if (isAwaitingFashionVoiceoverGeneration(project)) {
+    return [
+      {
+        id: "regen-voiceovers",
+        title: FASHION_REGENERATE_VOICEOVERS,
+        description: "上次口播生成未完成或失败，点此重新生成 6 套口播文案",
+        message: FASHION_REGENERATE_VOICEOVERS,
+        recommended: true,
+      },
+    ];
   }
 
   if (isAwaitingFashionSellpoints(project)) {
@@ -1112,6 +1174,22 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
   return [];
 }
 
+export function fashionLlmFailureAssistantMessage(trigger: string): string {
+  if (trigger.includes("voiceovers")) {
+    return "口播文案生成失败（网络或服务中断）。卖点已定稿，请点击下方「重新生成口播文案」重试。";
+  }
+  if (trigger.includes("storyboards")) {
+    return "分镜脚本生成失败（网络或服务中断）。口播已选定，请点击下方「生成 A–E 分镜方案」重试。";
+  }
+  if (trigger.includes("sellpoints")) {
+    return "卖点生成失败（网络或服务中断），请点「AI 自动生成卖点」或「重新生成卖点」重试。";
+  }
+  if (trigger.includes("ops")) {
+    return "运营包生成失败（网络或服务中断），请重新点击「确认分镜，生成运营包」。";
+  }
+  return "生成失败（网络或服务中断），请重试上一步操作。";
+}
+
 export function fashionWorkflowPatchForChoice(
   project: StoryboardProject,
   message: string,
@@ -1173,7 +1251,10 @@ export function fashionWorkflowPatchForChoice(
     };
   }
 
-  if (message === FASHION_LOCK_SELLPOINTS && deliverable) {
+  if (
+    (message === FASHION_LOCK_SELLPOINTS || message === FASHION_REGENERATE_VOICEOVERS) &&
+    deliverable
+  ) {
     const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
       ? (project.meta!.deliverable as FashionDeliverable)
       : null;
@@ -1191,10 +1272,17 @@ export function fashionWorkflowPatchForChoice(
         ...deliverable,
         sellpoints,
         sellpointsLocked: true,
+        voiceovers: [],
+        selectedVoiceoverId: null,
+        storyboardVersions: {},
+        selectedVersion: null,
+        storyboardLocked: false,
+        opsPack: undefined,
+        outputMode: null,
       },
       workflow: {
         ...wf,
-        fashionPhase: "voiceover_pick",
+        fashionPhase: "sellpoints",
         fashionSellpointsEdited: false,
       },
       llmTrigger: FASHION_AI_VOICEOVERS,
@@ -1202,7 +1290,7 @@ export function fashionWorkflowPatchForChoice(
   }
 
   const voiceoverId = parseFashionVoiceoverPick(project, message);
-  if (voiceoverId && deliverable) {
+  if (voiceoverId && deliverable?.voiceovers.some((v) => v.id === voiceoverId)) {
     return {
       deliverable: { ...deliverable, selectedVoiceoverId: voiceoverId },
       workflow: { ...wf, fashionPhase: "storyboard_pick" },
@@ -1303,6 +1391,9 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
   }
   if (isAwaitingFashionSellpoints(project)) {
     return "输入卖点关键词，或点选「AI自动生成卖点」";
+  }
+  if (isAwaitingFashionVoiceoverGeneration(project)) {
+    return "口播文案生成未完成，请点「重新生成口播文案」";
   }
   if (isAwaitingFashionVoiceoverPick(project)) {
     return "请点选一套口播文案继续";

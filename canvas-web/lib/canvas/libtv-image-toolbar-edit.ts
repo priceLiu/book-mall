@@ -113,7 +113,12 @@ function editTargetHandle(nodeType: CanvasNodeType): string {
   return "in_image";
 }
 
-function targetSpec(menuId: LibtvImageEditMenuId): EditTargetSpec {
+type LibtvImageEditWorkflowMenuId = Exclude<
+  LibtvImageEditMenuId,
+  CanvasImageEditModelKey
+>;
+
+function targetSpec(menuId: LibtvImageEditWorkflowMenuId): EditTargetSpec {
   switch (menuId) {
     case "character-face-three-view":
       return {

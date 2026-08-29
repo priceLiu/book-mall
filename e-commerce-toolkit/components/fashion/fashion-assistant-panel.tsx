@@ -49,6 +49,7 @@ import {
   fashionAssistantPlaceholder,
   fashionBusyStatusForLlmTrigger,
   fashionBusyStatusForUserMessage,
+  fashionLlmFailureAssistantMessage,
   fashionNeedsProductRefAutoAdvance,
   fashionWorkflowPatchForChoice,
   inferFashionChoices,
@@ -228,10 +229,13 @@ export function FashionAssistantPanel({
     };
     const canAdvancePhase =
       !wfPhase || (phaseRank[inferredPhase] ?? 0) > (phaseRank[wfPhase] ?? 0);
+    const phaseDeliverableReady =
+      inferredPhase !== "voiceover_pick" ||
+      (resolved.voiceovers?.length ?? 0) > 0;
     const needsRepair =
       !metaOk ||
       (wfPhase === "voiceover_pick" && resolved.selectedVoiceoverId) ||
-      (canAdvancePhase && inferredPhase !== wfPhase) ||
+      (canAdvancePhase && phaseDeliverableReady && inferredPhase !== wfPhase) ||
       (inferredPhase === "storyboard_pick" &&
         isFashionDeliverable(project.meta?.deliverable) &&
         Boolean((project.meta!.deliverable as FashionDeliverable).selectedVersion) &&
@@ -405,6 +409,7 @@ export function FashionAssistantPanel({
           message: e instanceof Error ? e.message : "请稍后重试",
           variant: "error",
         });
+        throw e;
       } finally {
         setStreaming(false);
         setStreamText("");
@@ -480,8 +485,46 @@ export function FashionAssistantPanel({
           }
 
           if (llmTrigger && typeof llmTrigger === "string") {
-            await runStream(next, llmTrigger, true, true);
-            await onDeliverableReady?.();
+            try {
+              await runStream(next, llmTrigger, true, true);
+              await onDeliverableReady?.();
+            } catch {
+              const failureMsg: StoryboardChatMessage = {
+                id: `err-${Date.now()}`,
+                role: "assistant",
+                content: fashionLlmFailureAssistantMessage(llmTrigger),
+                createdAt: new Date().toISOString(),
+              };
+              const failedHistory = [...next, failureMsg];
+              setMessages(failedHistory);
+              setWorkflowOverride({});
+              setDeliverableOverride(null);
+              const rolled = await updateStoryboardProject(projectId, {
+                chatHistory: failedHistory,
+                meta: {
+                  ...project.meta,
+                  ...(metaPatch.deliverable
+                    ? {
+                        deliverable:
+                          metaPatch.deliverable as NonNullable<
+                            StoryboardProject["meta"]
+                          >["deliverable"],
+                      }
+                    : {}),
+                  workflow: {
+                    ...(project.meta?.workflow ?? {}),
+                    ...(metaPatch.workflow as Record<string, unknown>),
+                    fashionPhase: llmTrigger.includes("voiceovers")
+                      ? "sellpoints"
+                      : ((metaPatch.workflow as { fashionPhase?: string } | undefined)
+                          ?.fashionPhase ??
+                          (project.meta?.workflow as { fashionPhase?: string } | undefined)
+                            ?.fashionPhase),
+                  },
+                },
+              });
+              await onDeliverableReady?.(rolled);
+            }
             return;
           }
 
