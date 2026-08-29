@@ -2,9 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowUp,
   ImageIcon,
-  Loader2,
 } from "lucide-react";
 import {
   type MentionableItem,
@@ -34,6 +32,7 @@ import {
 } from "@/lib/canvas/sbv1-video-models";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-label";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
@@ -113,8 +112,6 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const modeChipFontPx = Math.max(10, chipFontPx - 4);
   const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
   const creditsFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
-  const sendBtnPx = 44;
-  const sendIconPx = 18;
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -557,23 +554,16 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               : undefined
           }
         />
-        <button
-          type="button"
+        <LibtvDockSendButton
           disabled={!canSend}
-          title={isGenerating ? "生成中" : sendTitle ?? (isHdVideo ? "生成高清视频" : "生成视频")}
-          className="nodrag flex shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ width: sendBtnPx, height: sendBtnPx }}
+          loading={isGenerating}
+          title={
+            isGenerating
+              ? "生成中"
+              : sendTitle ?? (isHdVideo ? "生成高清视频" : "生成视频")
+          }
           onClick={runWithCommittedPrompt}
-        >
-          {isGenerating ? (
-            <Loader2
-              className="animate-spin"
-              style={{ width: sendIconPx, height: sendIconPx }}
-            />
-          ) : (
-            <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-          )}
-        </button>
+        />
       </div>
     </Pro2DockToolbar>
   );

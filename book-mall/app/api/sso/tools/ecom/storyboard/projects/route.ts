@@ -48,7 +48,11 @@ export async function POST(req: Request) {
       body.brief && typeof body.brief === "object"
         ? (body.brief as Record<string, unknown>)
         : undefined;
-    const project = await createEcomStoryboardProject(auth.userId, { title, brief });
+    const meta =
+      body.meta && typeof body.meta === "object"
+        ? (body.meta as Record<string, unknown>)
+        : undefined;
+    const project = await createEcomStoryboardProject(auth.userId, { title, brief, meta });
     return NextResponse.json({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";

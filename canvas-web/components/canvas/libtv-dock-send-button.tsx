@@ -2,10 +2,11 @@
 
 import { ArrowUp, Loader2 } from "lucide-react";
 import { flushCanvasTextDrafts } from "@/lib/canvas/flush-text-drafts";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
 
-/** Dock 底栏 · 发送/生成钮（白底箭头） */
+/** Dock 底栏 · 发送/生成钮（emerald 正圆 · 与画布磁吸 Dock 上传图标同色） */
 export function LibtvDockSendButton({
   disabled,
   loading,
@@ -37,10 +38,11 @@ export function LibtvDockSendButton({
         title={title}
         data-libtv-dock-interactive=""
         className={cn(
-          "nodrag relative z-10 flex shrink-0 touch-manipulation items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90",
+          LIBTV_INPUT_DOCK_SEND_BTN_CLASS,
+          "relative z-10 touch-manipulation",
           faded && "opacity-40",
           loading ? "cursor-wait" : disabled ? "cursor-not-allowed" : "",
-          "before:absolute before:-inset-3 before:rounded-2xl before:content-['']",
+          "before:absolute before:-inset-3 before:rounded-full before:content-['']",
           className,
         )}
         style={{ width: sendBtnPx, height: sendBtnPx }}

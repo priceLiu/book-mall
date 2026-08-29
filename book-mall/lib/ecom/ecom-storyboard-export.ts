@@ -4,6 +4,12 @@ import {
   getEcomStoryboardProject,
   type EcomStoryboardProjectDto,
 } from "@/lib/ecom/ecom-storyboard-service";
+import { renderDeliverableMarkdown } from "@/lib/ecom/ecom-storyboard-deliverable-render";
+import {
+  isFashionDeliverable,
+  isFashionWorkflow,
+} from "@/lib/ecom/ecom-fashion-deliverable";
+import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
 import type { StoryboardChatMessage } from "@/lib/ecom/ecom-storyboard-types";
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -47,6 +53,26 @@ function buildChatHistoryMarkdown(messages: StoryboardChatMessage[]): string {
 }
 
 function buildStoryboardSheetMarkdown(project: EcomStoryboardProjectDto): string {
+  const metaRecord = (project.meta as Record<string, unknown> | null) ?? {};
+  if (isFashionWorkflow(metaRecord)) {
+    const deliverable = project.meta?.deliverable;
+    if (isFashionDeliverable(deliverable)) {
+      return renderFashionDeliverableMarkdown(deliverable, {
+        versionKey: deliverable.selectedVersion ?? undefined,
+        includeAllVersions: !deliverable.selectedVersion,
+      });
+    }
+  }
+
+  const deliverable = project.meta?.deliverable;
+  if (deliverable?.schemes?.length) {
+    const idx = project.meta?.selectedSchemeIndex ?? 0;
+    return renderDeliverableMarkdown(deliverable, {
+      schemeIndex: idx,
+      includeAllSchemes: true,
+    });
+  }
+
   const sheet = project.sheet;
   const deliverableMd = project.meta?.deliverableMarkdown?.trim();
   if (!sheet) return deliverableMd ?? "";
@@ -71,16 +97,15 @@ function buildStoryboardSheetMarkdown(project: EcomStoryboardProjectDto): string
     lines.push("");
   }
   lines.push("## 分镜表", "");
-  lines.push("| 镜号 | 景别 | 场景 | 动作 | 台词 | 时长(s) |");
-  lines.push("| --- | --- | --- | --- | --- | --- |");
+  lines.push(
+    "| 镜号 | 景别 | 场景 | 动作 | 产品交互 | 台词 | 时长(s) |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+  );
   for (const p of sheet.panels) {
     const esc = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
     lines.push(
-      `| ${p.index} | ${esc(p.shotType)} | ${esc(p.scene)} | ${esc(p.action)} | ${esc(p.dialogue ?? "")} | ${p.durationHintSec ?? ""} |`,
+      `| ${p.index} | ${esc(p.shotType)} | ${esc(p.scene)} | ${esc(p.action)} | ${esc(p.productInteraction ?? "")} | ${esc(p.dialogue ?? "")} | ${p.durationHintSec ?? ""} |`,
     );
-  }
-  if (deliverableMd) {
-    lines.push("", "---", "", "## 助手策划原文", "", deliverableMd);
   }
   return lines.join("\n");
 }

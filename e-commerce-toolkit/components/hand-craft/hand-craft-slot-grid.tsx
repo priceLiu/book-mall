@@ -6,6 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import {
+  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
+  ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
+  ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS,
+  ECOM_SLOT_HOVER_OVERLAY_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { ProductDesignPromptDialog } from "@/components/product-design/product-design-prompt-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
@@ -23,10 +29,6 @@ import {
   productDesignRatioFrameClass,
 } from "@/lib/product-design-ratio-display";
 import { cn } from "@/lib/utils";
-
-const SLOT_ICON_BTN =
-  "flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50";
-const SLOT_ICON = "h-8 w-8";
 
 type Props = {
   project: HandCraftProject;
@@ -354,72 +356,69 @@ function HandCraftSlotPreview({
             sizes="(max-width: 1024px) 33vw, 280px"
             unoptimized
           />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100"
-          />
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-3 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100 sm:gap-4">
+          <div aria-hidden className={ECOM_SLOT_HOVER_OVERLAY_CLASS} />
+          <div className={ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS}>
             {onPreview ? (
               <button
                 type="button"
                 title="预览"
                 disabled={actionDisabled}
-                className={cn(SLOT_ICON_BTN, "pointer-events-auto")}
+                className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
                 onClick={onPreview}
               >
-                <Eye className={SLOT_ICON} />
+                <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
               </button>
             ) : null}
             <button
               type="button"
               title="重新生成"
               disabled={actionDisabled}
-              className={cn(SLOT_ICON_BTN, "pointer-events-auto")}
+              className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
               onClick={onGenerate}
             >
-              <RefreshCw className={SLOT_ICON} />
+              <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
             </button>
             {onDownload ? (
               <button
                 type="button"
                 title="下载"
                 disabled={actionDisabled}
-                className={cn(SLOT_ICON_BTN, "pointer-events-auto")}
+                className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
                 onClick={onDownload}
               >
-                <Download className={SLOT_ICON} />
+                <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
               </button>
             ) : null}
             <button
               type="button"
               title="编辑画面说明"
               disabled={actionDisabled}
-              className={cn(SLOT_ICON_BTN, "pointer-events-auto")}
+              className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
               onClick={onEditPrompt}
             >
-              <FileText className={SLOT_ICON} />
+              <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
             </button>
           </div>
         </>
       ) : (
-        <div className="flex h-full min-h-[6rem] items-center justify-center gap-5 sm:gap-6">
+        <div className="flex h-full min-h-[6rem] flex-wrap items-center justify-center gap-1.5 px-1 sm:gap-2">
           <button
             type="button"
             title="编辑画面说明"
             disabled={actionDisabled}
-            className={SLOT_ICON_BTN}
+            className={ECOM_SLOT_HOVER_ACTION_BTN_CLASS}
             onClick={onEditPrompt}
           >
-            <FileText className={SLOT_ICON} />
+            <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
           <button
             type="button"
             title="生成"
             disabled={actionDisabled}
-            className={SLOT_ICON_BTN}
+            className={ECOM_SLOT_HOVER_ACTION_BTN_CLASS}
             onClick={onGenerate}
           >
-            <Sparkles className={SLOT_ICON} />
+            <Sparkles className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         </div>
       )}

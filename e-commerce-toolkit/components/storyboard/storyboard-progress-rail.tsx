@@ -21,8 +21,8 @@ export type StoryboardStepId =
   | "video";
 
 const STEPS: { id: StoryboardStepId; label: string }[] = [
-  { id: "plan", label: "策划" },
   { id: "product", label: "产品图" },
+  { id: "plan", label: "策划" },
   { id: "character", label: "角色图" },
   { id: "refs", label: "场景图" },
   { id: "script", label: "分镜脚本" },
@@ -57,21 +57,22 @@ function resolveStepState(
   const productDone = hasProduct;
   const characterDone = hasCharacter || Boolean(wf.skippedCharacter);
   const refsDone =
-    hasOtherRef ||
-    Boolean(wf.scenePreset) ||
-    Boolean(wf.scenePresetCustom) ||
-    Boolean(wf.skippedRefs);
+    !wf.awaitingSceneApplyMode &&
+    (hasOtherRef ||
+      Boolean(wf.scenePreset) ||
+      Boolean(wf.scenePresetCustom) ||
+      Boolean(wf.skippedRefs));
 
-  let active: StoryboardStepId = "plan";
+  let active: StoryboardStepId = "product";
   if (hasVideo) active = "video";
   else if (hasImages) active = "video";
   else if (hasScript) active = "images";
   else if (hasDeliverable) {
-    if (!productDone) active = "product";
-    else if (!characterDone) active = "character";
+    if (!characterDone) active = "character";
     else if (!refsDone) active = "refs";
     else active = "script";
-  }
+  } else if (!productDone) active = "product";
+  else active = "plan";
 
   const doneMap: Record<StoryboardStepId, boolean> = {
     plan: hasDeliverable,

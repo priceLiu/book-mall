@@ -274,8 +274,9 @@ export const LIBTV_INPUT_DOCK_SHELL_CLASS =
 export const LIBTV_INPUT_DOCK_DIVIDER = "border-white/[0.06]";
 export const LIBTV_INPUT_DOCK_TOOLBAR_ICON_CLASS =
   "nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40";
+/** 与画布磁吸 Dock「上传」图标同色（pro2-canvas-toolbar · emerald-400） */
 export const LIBTV_INPUT_DOCK_SEND_BTN_CLASS =
-  "nodrag flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40";
+  "nodrag flex shrink-0 items-center justify-center rounded-full bg-emerald-400 text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40";
 /** 输入坞内 textarea · 无边框（字号随画布 zoom · 见 libtvDockPromptFontScreenMetrics） */
 export const LIBTV_INPUT_DOCK_TEXTAREA_CLASS =
   "nodrag w-full resize-none border-0 bg-transparent text-[length:var(--libtv-dock-prompt-font,15px)] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";

@@ -6,8 +6,12 @@ import {
   ecomRatioToImageSize,
   type EcomImageRatio,
 } from "@/lib/ecom/ecom-platform-spec";
-import { resolveKlingV3Resolution } from "@/lib/ecom/ecom-storyboard-gen-params";
-import { isDashscopeMultimodalImageGenModel, isZImageTurboModel } from "@/lib/gateway/qwen-image-edit-proxy";
+import { resolveKlingV3Resolution, resolveStoryboardWan27JobSize } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { isDashscopeMultimodalImageGenModel, isQwenImageEditModel, isZImageTurboModel } from "@/lib/gateway/qwen-image-edit-proxy";
+import {
+  assertEcomStoryboardImageEditRefs,
+  ecomStoryboardImageEditMaxRefs,
+} from "@/lib/ecom/ecom-storyboard-image-edit";
 import {
   isStoryboardDashscopeImageModel,
   isStoryboardKieImageModel,
@@ -126,9 +130,10 @@ async function generateMultimodalSyncImage(opts: {
     !isZImageTurboModel(opts.modelKey) && opts.refImageUrls.length > 0
       ? await ensureStoryboardRefImagesForWan27({
           userId: opts.userId,
-          urls: opts.refImageUrls.slice(0, 3),
+          urls: opts.refImageUrls.slice(0, ecomStoryboardImageEditMaxRefs(opts.modelKey)),
         })
       : [];
+  assertEcomStoryboardImageEditRefs(opts.modelKey, refs.length);
   const content: Array<{ text: string } | { image: string }> =
     refs.length > 0
       ? [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
@@ -140,7 +145,9 @@ async function generateMultimodalSyncImage(opts: {
     parameters: {
       size: ecomRatioToImageSize(opts.ratio),
       n: 1,
-      prompt_extend: !isZImageTurboModel(opts.modelKey),
+      prompt_extend: isQwenImageEditModel(opts.modelKey)
+        ? true
+        : !isZImageTurboModel(opts.modelKey),
       watermark: false,
     },
     clientPage,
@@ -162,6 +169,7 @@ export async function generateEcomImage(opts: {
   if (!prompt) {
     throw new Error("生图 Prompt 为空，请先完成视觉分析");
   }
+  assertEcomStoryboardImageEditRefs(opts.modelKey, opts.refImageUrls.length);
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
 
@@ -236,7 +244,11 @@ export async function generateEcomImage(opts: {
     kind: "wan27-image",
     model: apiModel,
     content,
-    size: wan26 ? undefined : size,
+    size: resolveStoryboardWan27JobSize({
+      wan26,
+      refCount: refs.length,
+      wan27Size: size,
+    }),
     n: 1,
     contentOrder: wan26 ? "text-first" : "images-first",
     clientPage,

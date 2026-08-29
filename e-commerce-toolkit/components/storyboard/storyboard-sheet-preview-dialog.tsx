@@ -22,6 +22,7 @@ type Props = {
   projectKeywords?: string;
   producer?: string;
   title?: string;
+  sheetHeading?: string;
 };
 
 /** 完整分镜图预览：各镜头/参考图可点击放大 */
@@ -35,6 +36,7 @@ export function StoryboardSheetPreviewDialog({
   projectKeywords,
   producer,
   title = "完整分镜图",
+  sheetHeading,
 }: Props) {
   const [imagePreview, setImagePreview] = useState<{
     src: string;
@@ -57,6 +59,7 @@ export function StoryboardSheetPreviewDialog({
               productHighlight={productHighlight}
               projectKeywords={projectKeywords}
               producer={producer}
+              sheetHeading={sheetHeading}
               exportRootId="storyboard-sheet-preview"
               variant="preview"
               onPreviewImage={(src, imgTitle) =>

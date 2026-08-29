@@ -7,6 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
+import { FashionAssistantPanel } from "@/components/fashion/fashion-assistant-panel";
 import { StoryboardAssistantPanel } from "@/components/storyboard/storyboard-assistant-panel";
 import { StoryboardContentPanel } from "@/components/storyboard/storyboard-content-panel";
 import { StoryboardProSheetView } from "@/components/storyboard/storyboard-pro-sheet-view";
@@ -28,6 +29,8 @@ import {
   uploadStoryboardRef,
 } from "@/lib/ecom-storyboard-api";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import { isFashionProject, isLegacyStoryboardProject } from "@/lib/fashion-workflow";
+import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import { inferCollectUploadRole, type StoryboardUploadRole } from "@/lib/storyboard-workflow";
 import type { StoryboardReference } from "@/lib/storyboard-types";
 import type {
@@ -45,7 +48,16 @@ async function resolveFallbackStoryboardProject(): Promise<{
   if (summaries.length > 0) {
     return { id: summaries[0]!.id };
   }
-  const created = await createStoryboardProject({ title: "微剧故事版" });
+  const created = await createStoryboardProject({
+    title: "服装专业版",
+    meta: {
+      workflow: {
+        vertical: "fashion_apparel",
+        fashionPhase: "product_ref",
+        dimensionStep: 0,
+      },
+    },
+  });
   return { id: created.id, project: created };
 }
 
@@ -221,6 +233,7 @@ export function StoryboardStudio() {
 
         if (cancelled) return;
         await reload(resolved.id, resolved.project);
+        if (!cancelled) setLoading(false);
       } catch (e) {
         if (!cancelled) {
           if (isEcomUnauthorizedError(e)) {
@@ -292,8 +305,17 @@ export function StoryboardStudio() {
   async function handleNewProject() {
     setLoading(true);
     try {
-      const created = await createStoryboardProject({ title: "微剧故事版" });
-      await reload(created.id);
+      const created = await createStoryboardProject({
+        title: "服装专业版",
+        meta: {
+          workflow: {
+            vertical: "fashion_apparel",
+            fashionPhase: "product_ref",
+            dimensionStep: 0,
+          },
+        },
+      });
+      applyProject(created);
     } catch (e) {
       await alert({
         title: "新建失败",
@@ -428,31 +450,59 @@ export function StoryboardStudio() {
           <StoryboardProgressRail project={project} hasVideo={Boolean(videoAsset)} />
         }
         assistant={
-          <StoryboardAssistantPanel
-            project={project}
-            chatModels={chatModels}
-            imageModels={imageModels}
-            videoModels={videoModels}
-            settings={settings}
-            durationSec={durationSec}
-            composerWide={assistantWide}
-            onComposerWideChange={setAssistantWide}
-            onStreamingChange={setAssistantStreaming}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onDeliverableReady={async () => {
-              await reload(project.id);
-            }}
-            onRequestGenerateAllImages={() =>
-              setGenerateAllImagesToken((t) => t + 1)
-            }
-            onRequestGenerateFullVideo={() =>
-              setGenerateFullVideoToken((t) => t + 1)
-            }
-            onRequestMergePanelVideos={() =>
-              setMergePanelVideosToken((t) => t + 1)
-            }
-            onAlert={alert}
-          />
+          isFashionProject(project) ? (
+            <FashionAssistantPanel
+              project={project}
+              chatModels={chatModels}
+              settings={settings}
+              composerWide={assistantWide}
+              onComposerWideChange={setAssistantWide}
+              onStreamingChange={setAssistantStreaming}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDeliverableReady={async (updated) => {
+                if (updated) applyProject(updated);
+                else await reload(project.id);
+              }}
+              onRequestGenerateAllImages={() =>
+                setGenerateAllImagesToken((t) => t + 1)
+              }
+              onRequestGenerateFullVideo={() =>
+                setGenerateFullVideoToken((t) => t + 1)
+              }
+              onRequestMergePanelVideos={() =>
+                setMergePanelVideosToken((t) => t + 1)
+              }
+              onAlert={alert}
+            />
+          ) : (
+            <StoryboardAssistantPanel
+              project={project}
+              chatModels={chatModels}
+              imageModels={imageModels}
+              videoModels={videoModels}
+              settings={settings}
+              durationSec={durationSec}
+              composerWide={assistantWide}
+              onComposerWideChange={setAssistantWide}
+              onStreamingChange={setAssistantStreaming}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDeliverableReady={async (updated) => {
+                if (updated) applyProject(updated);
+                else await reload(project.id);
+              }}
+              onRequestGenerateAllImages={() =>
+                setGenerateAllImagesToken((t) => t + 1)
+              }
+              onRequestGenerateFullVideo={() =>
+                setGenerateFullVideoToken((t) => t + 1)
+              }
+              onRequestMergePanelVideos={() =>
+                setMergePanelVideosToken((t) => t + 1)
+              }
+              onAlert={alert}
+              legacyReadonly={isLegacyStoryboardProject(project)}
+            />
+          )
         }
       >
         <StoryboardContentPanel
@@ -613,16 +663,16 @@ export function StoryboardStudio() {
           <StoryboardProSheetView
             sheet={(exportSheet ?? project.sheet)!}
             references={project.references}
-            productName={project.meta?.deliverable?.productName}
+            productName={asStoryboardDeliverable(project.meta?.deliverable)?.productName}
             productHighlight={
               (exportSheet ?? project.sheet)?.overview.productHighlight ??
-              (typeof project.meta?.deliverable?.params?.卖点 === "string"
-                ? project.meta.deliverable.params.卖点
+              (typeof asStoryboardDeliverable(project.meta?.deliverable)?.params?.卖点 === "string"
+                ? asStoryboardDeliverable(project.meta?.deliverable)!.params!.卖点
                 : undefined)
             }
             projectKeywords={
-              (typeof project.meta?.deliverable?.params?.关键词 === "string"
-                ? project.meta.deliverable.params.关键词
+              (typeof asStoryboardDeliverable(project.meta?.deliverable)?.params?.关键词 === "string"
+                ? asStoryboardDeliverable(project.meta?.deliverable)!.params!.关键词
                 : undefined) ??
               project.meta?.deliverable?.productName ??
               undefined

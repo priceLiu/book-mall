@@ -164,6 +164,21 @@ export function HandCraftContentPanel({
     [onProjectChange, project.id, stopGenPoll],
   );
 
+  useEffect(() => {
+    if (generating) return;
+    for (const step of HAND_CRAFT_STEPS) {
+      if (step.kind === "compose") continue;
+      const state = stepState(project, step.id);
+      if (state.status !== "generating") continue;
+      const pending = state.slots.filter((s) => !s.imageUrl).map((s) => s.index);
+      if (pending.length === 0) continue;
+      setGenerating({ stepId: step.id, indexes: pending });
+      setBusy(`${step.label} 生成中…`);
+      startGenPoll(step.id, pending);
+      break;
+    }
+  }, [generating, project, project.id, startGenPoll]);
+
   const runGenerate = useCallback(
     async (stepId: HandCraftStepId, indexes: number[], modelKey: string) => {
       const meta = handCraftStep(stepId);

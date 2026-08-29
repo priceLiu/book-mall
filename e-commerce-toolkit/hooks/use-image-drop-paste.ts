@@ -6,6 +6,7 @@ import {
   extractImageFileFromClipboard,
   extractMediaFilesFromClipboard,
   extractMediaFilesFromDataTransfer,
+  normalizePastedImageFile,
   validateImageFile,
   validateImageOrVideoFile,
   type ImageUploadError,
@@ -14,6 +15,8 @@ import {
 type Options = {
   enabled?: boolean;
   multiple?: boolean;
+  /** 监听 document paste；多热区并存时可由父级统一处理 */
+  listenPaste?: boolean;
   /** 同时接受拖放 / 粘贴的视频文件（拆图拆视频） */
   allowVideo?: boolean;
   onFiles: (files: File[]) => void | Promise<void>;
@@ -27,6 +30,7 @@ type Options = {
 export function useImageDropPaste({
   enabled = true,
   multiple = false,
+  listenPaste = true,
   allowVideo = false,
   onFiles,
   onError,
@@ -47,12 +51,14 @@ export function useImageDropPaste({
         ? validateImageOrVideoFile
         : validateImageFile;
       for (const file of raw) {
-        const err = validate(file);
+        const candidate =
+          allowVideo && file.type.startsWith("video/") ? file : normalizePastedImageFile(file);
+        const err = validate(candidate);
         if (err) {
           onError?.(err.title, err.message);
           continue;
         }
-        accepted.push(file);
+        accepted.push(candidate);
         if (!multiple) break;
       }
       if (accepted.length > 0) await onFilesRef.current(accepted);
@@ -70,7 +76,7 @@ export function useImageDropPaste({
   }, [hovered, focused]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !listenPaste) return;
 
     function onPaste(e: ClipboardEvent) {
       if (!isPasteTargetActive()) return;
@@ -90,7 +96,7 @@ export function useImageDropPaste({
 
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
-  }, [allowVideo, enabled, ingestFiles, isPasteTargetActive, multiple]);
+  }, [allowVideo, enabled, ingestFiles, isPasteTargetActive, listenPaste, multiple]);
 
   const onDragOver = useCallback(
     (e: DragEvent) => {

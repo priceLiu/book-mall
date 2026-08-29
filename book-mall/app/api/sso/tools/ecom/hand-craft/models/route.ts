@@ -38,7 +38,13 @@ export async function GET(req: Request) {
 
   const [chatModels, imageModels] = await Promise.all([
     listModelsForApp({ appTag: "ecom", role: "LLM", persona, boundKinds }),
-    listModelsForApp({ appTag: "ecom", role: "IMAGE", persona, boundKinds }),
+    listModelsForApp({
+      appTag: "ecom",
+      sceneKey: "ecom-storyboard-image",
+      role: "IMAGE",
+      persona,
+      boundKinds,
+    }),
   ]);
 
   const allImageModels = registryRowsToEcomModels(imageModels);

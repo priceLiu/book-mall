@@ -188,7 +188,11 @@ export async function listEcomStoryboardProjectSummaries(
 
 export async function createEcomStoryboardProject(
   userId: string,
-  opts?: { title?: string; brief?: Record<string, unknown> },
+  opts?: {
+    title?: string;
+    brief?: Record<string, unknown>;
+    meta?: Record<string, unknown>;
+  },
 ): Promise<EcomStoryboardProjectDto> {
   const row = await prisma.ecomStoryboardProject.create({
     data: {
@@ -201,6 +205,7 @@ export async function createEcomStoryboardProject(
         durationSec: 10,
         aspectRatio: "9:16",
       } as Prisma.InputJsonValue,
+      ...(opts?.meta ? { meta: opts.meta as Prisma.InputJsonValue } : {}),
     },
   });
   return rowToDto(row);
@@ -301,7 +306,16 @@ export async function updateEcomStoryboardProject(
   if (patch.sheetPngUrl !== undefined) data.sheetPngUrl = patch.sheetPngUrl;
   if (patch.meta !== undefined) {
     const prev = (existing.meta as Record<string, unknown> | null) ?? {};
-    data.meta = { ...prev, ...patch.meta } as Prisma.InputJsonValue;
+    const patchMeta = patch.meta as Record<string, unknown>;
+    const prevWorkflow = (prev.workflow as Record<string, unknown> | undefined) ?? {};
+    const patchWorkflow = patchMeta.workflow as Record<string, unknown> | undefined;
+    data.meta = {
+      ...prev,
+      ...patchMeta,
+      ...(patchWorkflow
+        ? { workflow: { ...prevWorkflow, ...patchWorkflow } }
+        : {}),
+    } as Prisma.InputJsonValue;
   }
 
   const row = await prisma.ecomStoryboardProject.update({

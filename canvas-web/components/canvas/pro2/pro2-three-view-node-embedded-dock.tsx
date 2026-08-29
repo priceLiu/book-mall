@@ -10,6 +10,7 @@ import { scopePro2CharacterSyncGroupForThreeViewNode } from "@/lib/canvas/pro2-g
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks, resolvePro2DockStyleFromUpstream, pro2DockStyleShownAsChip, pro2DockUpstreamLinksForChips } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -302,7 +303,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
             <button
               type="button"
               disabled={!canRegenerate || isRunning}
-              className="nodrag flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-8 shrink-0")}
               title={canRegenerate ? "重新生成三视图" : "请先选择生图模型并填写提示词"}
               onClick={onRegenerate}
             >

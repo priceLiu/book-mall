@@ -22,8 +22,22 @@ export function aspectRatioForWanxSize(size: string): "16:9" | "9:16" {
   return "9:16";
 }
 
+function normalizeTimelineLabel(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value) && value.length >= 2) return `${value[0]}-${value[1]}s`;
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const start = record.start ?? record.from;
+    const end = record.end ?? record.to;
+    if (start != null && end != null) return `${start}-${end}s`;
+  }
+  return String(value).trim();
+}
+
 export function buildPanelTimelineMap(
-  panels: Array<{ index: number; timeline?: string; durationHintSec?: number }>,
+  panels: Array<{ index: number; timeline?: unknown; durationHintSec?: number }>,
   totalDurationHintSec?: number,
 ): Map<number, string> {
   const out = new Map<number, string>();
@@ -37,9 +51,10 @@ export function buildPanelTimelineMap(
       : 3;
 
   for (const panel of panels) {
-    if (panel.timeline?.trim()) {
-      out.set(panel.index, panel.timeline.trim());
-      const match = panel.timeline.match(/(\d+)\s*[-–~]\s*(\d+)/);
+    const timeline = normalizeTimelineLabel(panel.timeline);
+    if (timeline) {
+      out.set(panel.index, timeline);
+      const match = timeline.match(/(\d+)\s*[-–~]\s*(\d+)/);
       cursor = match ? Number(match[2]) : cursor + (panel.durationHintSec ?? defaultPer);
       continue;
     }

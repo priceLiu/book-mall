@@ -76,6 +76,7 @@ export async function listStoryboardProjectSummaries(): Promise<
 export async function createStoryboardProject(opts?: {
   title?: string;
   brief?: Record<string, unknown>;
+  meta?: StoryboardProject["meta"];
 }): Promise<StoryboardProject> {
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/projects", {
     method: "POST",

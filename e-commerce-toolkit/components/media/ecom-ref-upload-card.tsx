@@ -42,6 +42,8 @@ type Props = {
   multiple?: boolean;
   /** 拖放 / 粘贴同时接受视频（拆图拆视频） */
   allowVideo?: boolean;
+  /** 为 false 时仅拖放，粘贴由父级热区统一处理 */
+  listenPaste?: boolean;
 };
 
 function EcomRefVideoThumb({
@@ -104,16 +106,20 @@ export function EcomRefUploadCard({
   onPreviewItem,
   removeLabel = "删除",
   onTitleClick,
+  onMouseEnterCard,
+  onMouseLeaveCard,
   inputRef,
   toolbarPrefix,
   accept = IMAGE_UPLOAD_ACCEPT,
   multiple = true,
   allowVideo = false,
+  listenPaste = true,
 }: Props) {
   const { dragOver, pasteReady, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy,
     multiple,
     allowVideo,
+    listenPaste,
     onFiles: onUploadFiles,
   });
 
@@ -138,8 +144,14 @@ export function EcomRefUploadCard({
         !highlight && suggested && "border-[#0071e3]/45 bg-white ring-1 ring-[#0071e3]/15",
         !highlight && !suggested && "border-[#e8e8ed] bg-white",
       )}
-      onMouseEnter={dropZoneProps.onMouseEnter}
-      onMouseLeave={dropZoneProps.onMouseLeave}
+      onMouseEnter={() => {
+        dropZoneProps.onMouseEnter?.();
+        onMouseEnterCard?.();
+      }}
+      onMouseLeave={() => {
+        dropZoneProps.onMouseLeave?.();
+        onMouseLeaveCard?.();
+      }}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <TitleTag

@@ -11,10 +11,16 @@ type Props = {
   projectKeywords?: string;
   producer?: string;
   exportRootId?: string;
+  /** 表头标题，默认「微短剧带货分镜制作」 */
+  sheetHeading?: string;
   /** export：固定 1920 宽供 html2canvas；preview：可滚动放大预览 */
   variant?: "export" | "preview";
   /** preview 模式下点击镜头/参考图放大 */
   onPreviewImage?: (src: string, title: string) => void;
+  /** 成片工作区：镜头位可点击单镜生图 */
+  interactive?: boolean;
+  generatingPanelIndexes?: ReadonlySet<number>;
+  onGeneratePanel?: (panelIndex: number) => void;
 };
 
 function SheetImage({
@@ -83,8 +89,12 @@ export function StoryboardProSheetView({
   projectKeywords,
   producer,
   exportRootId = "storyboard-sheet-export",
+  sheetHeading = "微短剧带货分镜制作",
   variant = "export",
   onPreviewImage,
+  interactive = false,
+  generatingPanelIndexes,
+  onGeneratePanel,
 }: Props) {
   const isPreview = variant === "preview";
   /** 导出 PNG 须满足火山图生视频宽高比 ≤2.50（1920/768≈2.5） */
@@ -149,7 +159,7 @@ export function StoryboardProSheetView({
                 textAlign: "center",
               }}
             >
-              微短剧带货分镜制作
+              {sheetHeading}
             </td>
           </tr>
           <tr>
@@ -265,6 +275,25 @@ export function StoryboardProSheetView({
                   previewable={isPreview}
                   onPreview={onPreviewImage}
                 />
+              ) : interactive && onGeneratePanel ? (
+                <button
+                  type="button"
+                  disabled={generatingPanelIndexes?.has(panel.index)}
+                  onClick={() => onGeneratePanel(panel.index)}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    background: "transparent",
+                    cursor: generatingPanelIndexes?.has(panel.index)
+                      ? "wait"
+                      : "pointer",
+                    fontSize: 11,
+                    color: "#0071e3",
+                  }}
+                >
+                  {generatingPanelIndexes?.has(panel.index) ? "生成中…" : "点击生成分镜图"}
+                </button>
               ) : (
                 <span style={{ fontSize: 11, color: "#86868b" }}>待生成</span>
               )}

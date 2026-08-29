@@ -23,6 +23,12 @@ import {
 } from "@/lib/ecom-product-design-api";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import {
+  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
+  ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
+  ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS,
+  ECOM_SLOT_HOVER_OVERLAY_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { ProductDesignRefUploader } from "@/components/product-design/product-design-ref-uploader";
 import { ProductDesignGenSlotWorkspace } from "@/components/product-design/product-design-gen-slot-workspace";
 import { fetchAssetById } from "@/lib/ecom-api";
@@ -326,6 +332,27 @@ export function ProductDesignContentPanel({
     },
     [onProjectChange, project.id, stopGenPoll],
   );
+
+  useEffect(() => {
+    if (generatingTarget || project.status !== "generating") return;
+    for (const target of ["main", "detail"] as const) {
+      const items =
+        target === "main" ? project.design?.mainImages : project.design?.detailPages;
+      if (!items?.length) continue;
+      const pending = items.filter((i) => !i.imageUrl).map((i) => i.index);
+      if (pending.length === 0) continue;
+      setGeneratingTarget({ target, indexes: pending });
+      startGenPoll(target, pending);
+      break;
+    }
+  }, [
+    generatingTarget,
+    project.design?.detailPages,
+    project.design?.mainImages,
+    project.id,
+    project.status,
+    startGenPoll,
+  ]);
 
   const [draftVisionKey, setDraftVisionKey] = useState(visionModelKey);
   const [draftModelKey, setDraftModelKey] = useState(imageModelKey);
@@ -2319,8 +2346,7 @@ function ImageCardHoverActions({
   onRegenerate?: () => void;
   regenerateDisabled?: boolean;
 }) {
-  const btnClass =
-    "pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 group-hover/image:pointer-events-auto";
+  const btnClass = cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-none group-hover/image:pointer-events-auto");
 
   return (
     <>
@@ -2334,7 +2360,7 @@ function ImageCardHoverActions({
             onPreview();
           }}
         >
-          <Eye className="h-3.5 w-3.5" />
+          <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
         </button>
       ) : null}
       {onRegenerate ? (
@@ -2348,7 +2374,7 @@ function ImageCardHoverActions({
             onRegenerate();
           }}
         >
-          <RefreshCw className="h-3.5 w-3.5" />
+          <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
         </button>
       ) : null}
       {onDownload ? (
@@ -2361,7 +2387,7 @@ function ImageCardHoverActions({
             onDownload();
           }}
         >
-          <Download className="h-3.5 w-3.5" />
+          <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
         </button>
       ) : null}
       {onViewPrompt ? (
@@ -2374,7 +2400,7 @@ function ImageCardHoverActions({
             onViewPrompt();
           }}
         >
-          <FileText className="h-3.5 w-3.5" />
+          <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
         </button>
       ) : null}
     </>
@@ -2436,13 +2462,8 @@ function ProductDesignCardImage({
       )}
       {src && !generating && hoverActions ? (
         <>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100"
-          />
-          <div className="pointer-events-none absolute inset-0 z-20 flex max-w-full items-center justify-center gap-1.5 overflow-hidden px-1 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100 sm:gap-2">
-            {hoverActions}
-          </div>
+          <div aria-hidden className={ECOM_SLOT_HOVER_OVERLAY_CLASS} />
+          <div className={ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS}>{hoverActions}</div>
         </>
       ) : null}
       {badge}

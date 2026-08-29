@@ -91,7 +91,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | 比例 | `LIBTV_DOCK_ASPECT_W` : `LIBTV_DOCK_ASPECT_H` | **16 : 6** | 固定宽高比 |
 | 长宽尺度 | `LIBTV_DOCK_SIZE_FACTOR` | **0.9** | flow 长宽同比 −10% |
 | flow 宽 | `LIBTV_DOCK_FLOW_WIDTH` | **1296**（1440×0.9） | flow 坐标基准宽（固定） |
-| flow 高 | `LIBTV_DOCK_FLOW_HEIGHT` | **486** | = 宽 × 6/16 |
+| flow 高 | `LIBTV_DOCK_FLOW_HEIGHT` | **482** | = 宽 × 6/16 × 1.15（输入区加高） |
 | 基准放大 | `LIBTV_DOCK_BASE_SCALE` | **1.4** | 未展开时屏幕 +40% |
 | 展开放大 | `LIBTV_DOCK_EXPAND_FACTOR` | **1.5** | 点击展开仅 **增高 prompt 输入区** +50%（顶栏缩略图 / 字号 / 屏宽不变） |
 | 100% 屏宽 | `LIBTV_DOCK_SCREEN_W_BASE` | **~1512px** | zoom=1 目标屏幕宽 |

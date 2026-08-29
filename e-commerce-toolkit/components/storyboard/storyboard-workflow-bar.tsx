@@ -9,6 +9,7 @@ import {
   generateStoryboardVideo,
   syncStoryboardSheet,
 } from "@/lib/ecom-storyboard-api";
+import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import type { StoryboardGatewayModel, StoryboardProject } from "@/lib/storyboard-types";
 
 type Props = {
@@ -44,7 +45,7 @@ export function StoryboardWorkflowBar({
   onVideoReady,
   onAlert,
 }: Props) {
-  const schemes = project.meta?.deliverable?.schemes ?? [];
+  const schemes = asStoryboardDeliverable(project.meta?.deliverable)?.schemes ?? [];
   const hasSheet = Boolean(project.sheet) || schemes.length > 0;
   const [imageModel, setImageModel] = useState(
     project.meta?.workflow?.imageModelKey ?? "wan2.7-image",

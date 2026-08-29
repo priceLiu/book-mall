@@ -35,6 +35,17 @@ export function resolveWan26ImageSize(_opts?: {
   return "2K";
 }
 
+/** 与 canvas dispatch-canvas-image 一致：wan2.7 有参考图时不传 pixel size，由 API 默认 2K */
+export function resolveStoryboardWan27JobSize(opts: {
+  wan26: boolean;
+  refCount: number;
+  wan27Size: string;
+}): string | undefined {
+  if (opts.wan26) return resolveWan26ImageSize();
+  if (opts.refCount > 0) return undefined;
+  return opts.wan27Size;
+}
+
 export function resolveWanxImageSize(opts: {
   aspectRatio?: "16:9" | "9:16";
   imageSize?: string;
@@ -62,8 +73,22 @@ export function bailianResolutionFromEcom(
 }
 
 /** 根据各镜 durationHintSec 推算时间轴文案 */
+function normalizeTimelineLabel(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value) && value.length >= 2) return `${value[0]}-${value[1]}s`;
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const start = record.start ?? record.from;
+    const end = record.end ?? record.to;
+    if (start != null && end != null) return `${start}-${end}s`;
+  }
+  return String(value).trim();
+}
+
 export function buildPanelTimelineLabel(
-  panels: Array<{ index: number; timeline?: string; durationHintSec?: number }>,
+  panels: Array<{ index: number; timeline?: unknown; durationHintSec?: number }>,
   totalDurationHintSec?: number,
 ): Map<number, string> {
   const out = new Map<number, string>();
@@ -77,9 +102,10 @@ export function buildPanelTimelineLabel(
       : 3;
 
   for (const panel of panels) {
-    if (panel.timeline?.trim()) {
-      out.set(panel.index, panel.timeline.trim());
-      const match = panel.timeline.match(/(\d+)\s*[-–~]\s*(\d+)/);
+    const timeline = normalizeTimelineLabel(panel.timeline);
+    if (timeline) {
+      out.set(panel.index, timeline);
+      const match = timeline.match(/(\d+)\s*[-–~]\s*(\d+)/);
       if (match) {
         cursor = Number(match[2]);
       } else {

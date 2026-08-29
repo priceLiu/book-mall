@@ -5,6 +5,10 @@ import { Eye, Film, ImageIcon, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
+import {
+  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
+  ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 
@@ -61,64 +65,70 @@ export function StoryboardPanelCard({
         ) : imageUrl ? (
           <Image src={imageUrl} alt={`镜头${panel.index}`} fill className="object-cover" unoptimized />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-[#86868b]">
+          <button
+            type="button"
+            title="生成此镜头分镜图"
+            disabled={!onRegenerateImage}
+            className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#86868b] transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
+            onClick={() => onRegenerateImage?.()}
+          >
             <ImageIcon className="h-8 w-8 opacity-40" />
             <span className="text-xs">待生成</span>
-          </div>
+          </button>
         )}
 
         {hover && !busy ? (
-          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/45 backdrop-blur-[1px]">
+          <div className="absolute inset-0 flex max-w-full flex-wrap items-center justify-center gap-1.5 overflow-hidden px-1 bg-black/45 backdrop-blur-[1px] sm:gap-2">
             {imageUrl && onPreviewImage ? (
               <button
                 type="button"
                 title="放大预览"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow"
+                className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
                 onClick={(e) => {
                   stopClick(e);
                   onPreviewImage();
                 }}
               >
-                <Eye className="h-3.5 w-3.5" />
+                <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
               </button>
             ) : null}
             {onRegenerateImage ? (
               <button
                 type="button"
                 title="重新生图"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow"
+                className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
                 onClick={(e) => {
                   stopClick(e);
                   onRegenerateImage();
                 }}
               >
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
               </button>
             ) : null}
             {onEditScript ? (
               <button
                 type="button"
                 title="修改分镜"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow"
+                className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
                 onClick={(e) => {
                   stopClick(e);
                   onEditScript();
                 }}
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
               </button>
             ) : null}
             {onRegenerateVideo && imageUrl ? (
               <button
                 type="button"
                 title="生成镜头视频"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white shadow"
+                className={cn(ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS, "bg-[#0071e3] text-white hover:bg-[#0077ed]")}
                 onClick={(e) => {
                   stopClick(e);
                   onRegenerateVideo();
                 }}
               >
-                <Film className="h-3.5 w-3.5" />
+                <Film className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
               </button>
             ) : null}
           </div>

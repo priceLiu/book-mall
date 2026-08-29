@@ -41,6 +41,20 @@ const CHAT_PRODUCT_NAME_FILTERS = [
   "其他通用",
 ];
 
+/** 参数收集占位项，不能写入生图 Prompt */
+const STORYBOARD_PRODUCT_PARAM_PLACEHOLDERS = new Set([
+  "沿用产品名作卖点",
+  "无额外产品信息",
+  "输入卖点",
+]);
+
+function isStoryboardPlaceholderProductText(value?: string | null): boolean {
+  const s = value?.trim();
+  if (!s) return true;
+  if (STORYBOARD_PRODUCT_PARAM_PLACEHOLDERS.has(s)) return true;
+  return CHAT_PRODUCT_NAME_FILTERS.some((x) => s.includes(x)) || s.startsWith("方案");
+}
+
 type CategoryVisual = {
   style: string;
   lighting: string;
@@ -125,10 +139,12 @@ function resolveProductLabel(
     ctx?.productHighlight?.trim() ||
     ctx?.productName?.trim() ||
     sheet.overview.productHighlight?.trim();
-  if (fromCtx && !fromCtx.startsWith("方案")) return fromCtx;
+  if (fromCtx && !isStoryboardPlaceholderProductText(fromCtx)) return fromCtx;
   const title = sheet.overview.title?.trim();
-  if (title && !title.startsWith("方案")) return title;
-  return sheet.overview.logline?.trim() || "featured product";
+  if (title && !isStoryboardPlaceholderProductText(title)) return title;
+  const logline = sheet.overview.logline?.trim();
+  if (logline && !isStoryboardPlaceholderProductText(logline)) return logline;
+  return "主推产品";
 }
 
 /** 从项目 meta / deliverable / chat 组装生图上下文（book-mall 侧） */
@@ -171,7 +187,8 @@ export function buildStoryboardImagePromptContext(project: {
     rawSellpoint &&
     rawSellpoint.length < 200 &&
     !rawSellpoint.includes("storyboard-deliverable") &&
-    !rawSellpoint.startsWith("参数已确认")
+    !rawSellpoint.startsWith("参数已确认") &&
+    !isStoryboardPlaceholderProductText(rawSellpoint)
       ? rawSellpoint
       : undefined;
 
@@ -292,73 +309,194 @@ export function buildStoryboardCompositeImagePrompt(
     .join(" ");
 }
 
-/** 与 wan2.7 多图 content 顺序一致：产品 → 角色 → 场景 */
-export function buildStoryboardPanelRefGuide(
+/** 与 wan2.7 多图 content 顺序一致：产品 → 角色 → 场景（须与实际上传 URL 列表对齐） */
+export function buildStoryboardPanelRefGuideForUrls(
+  refUrls: string[],
   refs: StoryboardReference[],
   ctx?: StoryboardImagePromptContext,
 ): string {
   const visual = categoryVisual(ctx);
+  const urlToRole = new Map<string, StoryboardReference["role"]>();
+  for (const ref of refs) {
+    const url = ref.ossUrl?.trim();
+    if (url && /^https?:\/\//.test(url)) {
+      urlToRole.set(url, ref.role);
+    }
+  }
+
+  const parts: string[] = [];
+  refUrls.forEach((rawUrl, i) => {
+    const url = rawUrl.trim();
+    const role = urlToRole.get(url) ?? "other";
+    const n = i + 1;
+    if (role === "product") {
+      parts.push(
+        `图${n}为产品包装参考，画面中须自然露出该产品，包装形态、Logo、配色与材质须与参考图一致`,
+      );
+    } else if (role === "character") {
+      parts.push(
+        `图${n}为角色参考，人物面部、发型、体型与服装须与参考图完全一致`,
+      );
+    } else {
+      parts.push(`图${n}为场景参考，${visual.sceneRefHint}`);
+    }
+  });
+  return parts.join("；");
+}
+
+/** @deprecated 请使用 buildStoryboardPanelRefGuideForUrls，与 slice 后的 refUrls 对齐 */
+export function buildStoryboardPanelRefGuide(
+  refs: StoryboardReference[],
+  ctx?: StoryboardImagePromptContext,
+): string {
   const products = refs.filter((r) => r.role === "product");
   const characters = refs.filter((r) => r.role === "character");
   const scenes = refs.filter((r) => r.role === "scene" || r.role === "other");
+  const urls = [
+    ...products.map((r) => r.ossUrl.trim()),
+    ...characters.map((r) => r.ossUrl.trim()),
+    ...scenes.map((r) => r.ossUrl.trim()),
+  ].filter((u) => u && /^https?:\/\//.test(u));
+  return buildStoryboardPanelRefGuideForUrls(urls, refs, ctx);
+}
 
-  let idx = 1;
-  const parts: string[] = [];
-  if (products.length) {
-    parts.push(`图${idx}为产品包装参考，画面中须自然露出该产品`);
-    idx += products.length;
+export function appendStoryboardImagePromptSuffix(opts: {
+  basePrompt: string;
+  aspectRatio?: "16:9" | "9:16";
+  sendsProductRef?: boolean;
+  refGuide?: string;
+  refCount?: number;
+}): string {
+  const aspectZh = opts.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
+  const parts: string[] = [opts.basePrompt.trim()];
+  if (
+    opts.sendsProductRef &&
+    !opts.basePrompt.includes("参考图") &&
+    !opts.basePrompt.includes("图像编辑")
+  ) {
+    parts.unshift("根据参考图进行图像编辑：保持产品包装与参考图一致，按以下描述生成画面。");
   }
-  for (let i = 0; i < characters.length; i++) {
-    parts.push(
-      `图${idx + i}为角色参考${characters.length > 1 ? i + 1 : ""}，人物面部、发型、体型与服装须与参考图一致`,
-    );
+  if (!opts.basePrompt.includes(aspectZh) && !opts.basePrompt.includes("画幅")) {
+    parts.push(`${aspectZh} 画幅。`);
   }
-  idx += characters.length;
-  for (let i = 0; i < scenes.length; i++) {
-    parts.push(`图${idx + i}为场景参考，${visual.sceneRefHint}`);
+  if (!opts.basePrompt.includes("严禁") && !opts.basePrompt.includes("禁止")) {
+    parts.push(STORYBOARD_NO_DIALOGUE_IN_IMAGE);
   }
-  return parts.join("；");
+  return parts.filter(Boolean).join("");
+}
+
+/** 优先 panel.imagePrompt（v2），否则模板拼装（legacy） */
+export function resolveStoryboardPanelImagePrompt(
+  panel: StoryboardSheet["panels"][0],
+  sheet: StoryboardSheet,
+  refs: StoryboardReference[],
+  ctx?: StoryboardImagePromptContext,
+  refUrls?: string[],
+  refGuide?: string,
+): string {
+  const productRefUrl = refs.find(
+    (r) => r.role === "product" && r.ossUrl?.trim().startsWith("http"),
+  )?.ossUrl?.trim();
+  const refCount = refUrls?.length ?? 0;
+  const sendsProductRef = Boolean(
+    productRefUrl &&
+      (refUrls?.length ? refUrls.some((u) => u.trim() === productRefUrl) : true),
+  );
+
+  if (panel.imagePrompt?.trim()) {
+    return appendStoryboardImagePromptSuffix({
+      basePrompt: panel.imagePrompt.trim(),
+      aspectRatio: ctx?.aspectRatio,
+      sendsProductRef,
+      refGuide,
+      refCount,
+    });
+  }
+
+  return buildStoryboardPanelImagePrompt(panel, sheet, refs, ctx, refUrls, refGuide);
 }
 
 export function buildStoryboardPanelImagePrompt(
   panel: StoryboardSheet["panels"][0],
   sheet: StoryboardSheet,
-  _refs: StoryboardReference[],
+  refs: StoryboardReference[],
   ctx?: StoryboardImagePromptContext,
+  refUrls?: string[],
+  refGuide?: string,
 ): string {
-  const visual = categoryVisual(ctx);
-  const voiceoverHint = panel.dialogue?.trim()
-    ? `表演情绪参考（勿渲染为画面文字）：${panel.dialogue.trim()}`
-    : "";
+  const productRefUrl = refs.find(
+    (r) => r.role === "product" && r.ossUrl?.trim().startsWith("http"),
+  )?.ossUrl?.trim();
+  const sendsProductRef = Boolean(
+    productRefUrl &&
+      (refUrls?.length ? refUrls.some((u) => u.trim() === productRefUrl) : true),
+  );
+
+  const productLabel = resolveProductLabel(sheet, ctx);
   const exposure = exposureHint(ctx?.exposure);
-  const styleHint = videoStyleHint(ctx?.videoStyle);
-  const presetHint = ctx?.scenePresetImageHint
-    ? `preset environment (${ctx.scenePresetLabel ?? ctx.scenePresetKey}): ${ctx.scenePresetImageHint}, all shots must use this environment unless panel scene explicitly differs`
+  const exposureZh =
+    exposure.includes("centered prominently")
+      ? "产品居中突出、包装清晰可辨"
+      : exposure.includes("subtly visible")
+        ? "产品自然融入画面、弱露出"
+        : "产品自然融入场景";
+  const aspectZh = ctx?.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
+  const isFashionWear =
+    ctx?.productCategory === "fashion" &&
+    sendsProductRef &&
+    (panel.productInteraction === "wear" || panel.productVisibility === "hero");
+  const charLine =
+    ctx?.characterAppearance?.trim() && !isFashionWear
+      ? `同一人物全片一致：${ctx.characterAppearance.trim()}。`
+      : isFashionWear && ctx?.characterAppearance?.trim()
+        ? `同一人物全片一致（面部发型体型与设定一致，主推款外观以参考图1为准）：${ctx.characterAppearance.trim()}。`
+        : "";
+  const presetLine = ctx?.scenePresetImageHint?.trim()
+    ? `环境预设（${ctx.scenePresetLabel ?? ctx.scenePresetKey}）：${ctx.scenePresetImageHint.trim()}。`
+    : "";
+  const moodLine = panel.dialogue?.trim()
+    ? `表演情绪（勿渲染为画面文字）：${panel.dialogue.trim()}。`
+    : "";
+  const productRefLine = sendsProductRef
+    ? "须严格还原参考图1的产品包装（外形、标签、配色、材质），禁止替换为无关商品。"
+    : "";
+  const editPrefix = sendsProductRef
+    ? "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下分镜描述生成画面。"
     : "";
 
-  const charConsistency = characterConsistencyHint(ctx);
-
-  return [
-    "Single photorealistic storyboard frame for Chinese e-commerce UGC micro-drama,",
-    visual.style + ",",
-    styleHint + ",",
-    charConsistency,
-    presetHint,
-    `shot ${panel.index}, ${panel.shotType}, camera ${panel.camera ?? "static"},`,
-    `scene (background and location must match exactly): ${panel.scene},`,
-    `action: ${panel.action},`,
-    `emotion: ${panel.emotion ?? "natural"},`,
-    voiceoverHint,
-    `product: ${resolveProductLabel(sheet, ctx)},`,
-    exposure,
-    aspectLabel(ctx?.aspectRatio),
-    visual.lighting + ",",
-    "clean composition, no watermark, no panel borders,",
-    "do not invent kitchen or cleaning scene unless scene description says so",
+  const built = [
+    editPrefix,
+    "电商短视频分镜静帧，写实摄影，UGC 质感，",
+    charLine,
+    presetLine,
+    `镜头 ${panel.index}，${panel.shotType}，运镜 ${panel.camera ?? "固定"}。`,
+    `场景与背景须严格符合：${panel.scene}。`,
+    `人物动作：${panel.action}。`,
+    `情绪：${panel.emotion ?? "自然"}。`,
+    moodLine,
+    `主推产品：${productLabel}，${exposureZh}。`,
+    productRefLine,
+    `${aspectZh} 画幅。`,
+    "构图干净，无水印，无边框，",
+    "禁止擅自改成厨房、家清或无关场景（除非场景描述如此）。",
     STORYBOARD_NO_DIALOGUE_IN_IMAGE,
   ]
     .filter(Boolean)
-    .join(" ");
+    .join("");
+
+  return built;
+}
+
+/** 有参考图写入 multimodal content 时与画布编辑一致：不再把 refGuide 重复拼进文本 */
+export function buildStoryboardPanelInvokePrompt(opts: {
+  refGuide: string;
+  panelPrompt: string;
+  refCount: number;
+}): string {
+  if (opts.refCount > 0) return opts.panelPrompt;
+  const guide = opts.refGuide.trim();
+  if (!guide) return opts.panelPrompt;
+  return `${guide}\n\n${opts.panelPrompt}`;
 }
 
 export function buildCharacterRefPrompt(

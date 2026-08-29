@@ -26,7 +26,13 @@ export async function GET(req: Request) {
   if (persona === "PLATFORM_CREDIT") {
     const [chatModels, imageModels, videoModels] = await Promise.all([
       listModelsForApp({ appTag: "ecom", role: "LLM", persona: "PLATFORM_CREDIT", boundKinds: [] }),
-      listModelsForApp({ appTag: "ecom", role: "IMAGE", persona: "PLATFORM_CREDIT", boundKinds: [] }),
+      listModelsForApp({
+        appTag: "ecom",
+        sceneKey: "ecom-storyboard-image",
+        role: "IMAGE",
+        persona: "PLATFORM_CREDIT",
+        boundKinds: [],
+      }),
       listModelsForApp({ appTag: "ecom", role: "VIDEO", persona: "PLATFORM_CREDIT", boundKinds: [] }),
     ]);
     return NextResponse.json({
@@ -47,7 +53,13 @@ export async function GET(req: Request) {
 
   const [chatModels, imageModels, videoModels] = await Promise.all([
     listModelsForApp({ appTag: "ecom", role: "LLM", persona: "BYOK", boundKinds }),
-    listModelsForApp({ appTag: "ecom", role: "IMAGE", persona: "BYOK", boundKinds }),
+    listModelsForApp({
+      appTag: "ecom",
+      sceneKey: "ecom-storyboard-image",
+      role: "IMAGE",
+      persona: "BYOK",
+      boundKinds,
+    }),
     listModelsForApp({ appTag: "ecom", role: "VIDEO", persona: "BYOK", boundKinds }),
   ]);
 

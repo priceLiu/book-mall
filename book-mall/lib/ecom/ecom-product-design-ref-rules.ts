@@ -3,6 +3,10 @@ import {
   isStoryboardKlingImageModel,
   isWan26ImageModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
+import {
+  ecomStoryboardImageEditMaxRefs,
+  isEcomStoryboardImageEditModel,
+} from "@/lib/ecom/ecom-storyboard-image-edit";
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
 import type { ProductDesignReferenceRole } from "@/lib/ecom/ecom-product-design-types";
 
@@ -20,6 +24,9 @@ export function getVisionMaxInputImages(modelKey: string): number {
 /** IMAGE 生图模型参考图上限（含产品实拍） */
 export function getImageGenMaxRefs(modelKey: string): number {
   const key = modelKey.trim();
+  if (isEcomStoryboardImageEditModel(key)) {
+    return ecomStoryboardImageEditMaxRefs(key);
+  }
   if (isStoryboardKieImageModel(key)) return 8;
   if (isStoryboardKlingImageModel(key)) return 10;
   if (isWan26ImageModel(key)) return 5;

@@ -15,6 +15,7 @@ import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/MentionsTextarea";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -295,7 +296,7 @@ function Pro2PromptInputDockBody({
             <button
               type="button"
               disabled={isGenerating || !canSend}
-              className="nodrag flex items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS)}
               style={{ width: sendBtnPx, height: sendBtnPx }}
               title="生成"
               onClick={() => void onSend()}

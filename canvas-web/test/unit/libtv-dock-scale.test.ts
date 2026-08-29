@@ -24,10 +24,10 @@ import {
 } from "@/lib/canvas/libtv-dock-scale";
 
 describe("libtvDockHeightForWidth", () => {
-  it("keeps 16:6 aspect with size factor", () => {
+  it("keeps 16:6 aspect with size factor and input height boost", () => {
     expect(LIBTV_DOCK_FLOW_WIDTH).toBe(Math.round(1440 * LIBTV_DOCK_SIZE_FACTOR));
-    expect(libtvDockHeightForWidth(LIBTV_DOCK_FLOW_WIDTH)).toBe(486);
-    expect(libtvDockHeightForWidth(640)).toBe(240);
+    expect(libtvDockHeightForWidth(LIBTV_DOCK_FLOW_WIDTH)).toBe(482);
+    expect(libtvDockHeightForWidth(640)).toBe(238);
   });
 });
 

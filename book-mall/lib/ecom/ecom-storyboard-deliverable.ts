@@ -2,6 +2,30 @@ import { z } from "zod";
 
 import { parseStoryboardSheet, type StoryboardSheet } from "./ecom-storyboard-types";
 
+/** @see book-mall/doc/ecom/storyboard-deliverable-spec-v2.md */
+export const storyboardProductInteractionSchema = z.enum([
+  "none",
+  "hold",
+  "wear",
+  "use",
+  "apply",
+  "display",
+  "unbox",
+]);
+
+export const storyboardProductVisibilitySchema = z.enum([
+  "off",
+  "hint",
+  "partial",
+  "hero",
+]);
+
+export const storyboardSellingPointSourceSchema = z.enum([
+  "user",
+  "inferred",
+  "painpoint",
+]);
+
 export const storyboardPanelSchema = z.object({
   index: z.number().int().positive(),
   timeline: z.string().optional(),
@@ -15,6 +39,12 @@ export const storyboardPanelSchema = z.object({
   videoPromptEn: z.string().optional(),
   imageUrl: z.string().optional(),
   videoUrl: z.string().optional(),
+  productInteraction: storyboardProductInteractionSchema.optional(),
+  productVisibility: storyboardProductVisibilitySchema.optional(),
+  sellpointTags: z.array(z.string()).optional(),
+  imagePrompt: z.string().optional(),
+  protagonistBeat: z.string().optional(),
+  productBeat: z.string().optional(),
 });
 
 export const storyboardSchemeSchema = z.object({
@@ -32,29 +62,228 @@ const storyboardCastMemberSchema = z.object({
   appearance: z.string().optional(),
 });
 
+const storyboardSellingPointSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  source: storyboardSellingPointSourceSchema,
+});
+
+const storyboardCreativeBriefSchema = z.object({
+  audienceHook: z.string().min(1),
+  viralStructure: z.string().min(1),
+  scenarioExpansion: z.string().min(1),
+});
+
+const storyboardAnalysisStructuredSchema = z.object({
+  audience: z
+    .array(
+      z.object({
+        segment: z.string().min(1),
+        description: z.string().min(1),
+      }),
+    )
+    .min(1),
+  painPoints: z
+    .array(
+      z.object({
+        level: z.string().min(1),
+        description: z.string().min(1),
+      }),
+    )
+    .min(1),
+  strategies: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        hook3s: z.string().min(1),
+        middle: z.string().min(1),
+        closing: z.string().min(1),
+      }),
+    )
+    .min(1),
+});
+
+/** @deprecated v0.1 — 只读 legacy */
+const storyboardAnalysisLegacyMarkdownSchema = z.object({
+  audienceMarkdown: z.string(),
+  painPointsMarkdown: z.string(),
+  strategiesMarkdown: z.string(),
+});
+
+export const storyboardAnalysisSchema = z.union([
+  storyboardAnalysisStructuredSchema,
+  storyboardAnalysisLegacyMarkdownSchema,
+]);
+
 export const storyboardDeliverableSchema = z.object({
   productName: z.string().optional(),
   params: z.record(z.string()).optional(),
-  /** 全片主角外貌设定（无上传角色图时供生图保持一致） */
+  productSellingPoints: z.array(storyboardSellingPointSchema).optional(),
+  creativeBrief: storyboardCreativeBriefSchema.optional(),
   cast: z.array(storyboardCastMemberSchema).optional(),
-  analysis: z
-    .object({
-      audienceMarkdown: z.string(),
-      painPointsMarkdown: z.string(),
-      strategiesMarkdown: z.string(),
-    })
-    .optional(),
+  analysis: storyboardAnalysisSchema.optional(),
   schemes: z.array(storyboardSchemeSchema).optional(),
+});
+
+/** v2 新交付校验（LLM 输出须满足） */
+export const storyboardDeliverableV2PanelSchema = storyboardPanelSchema.extend({
+  productInteraction: storyboardProductInteractionSchema,
+  productVisibility: storyboardProductVisibilitySchema,
+  sellpointTags: z.array(z.string()),
+  imagePrompt: z.string().min(20),
+});
+
+export const storyboardDeliverableV2SchemeSchema = storyboardSchemeSchema.extend({
+  panels: z.array(storyboardDeliverableV2PanelSchema).min(1),
+});
+
+export const storyboardDeliverableV2Schema = storyboardDeliverableSchema.extend({
+  productSellingPoints: z.array(storyboardSellingPointSchema).min(1),
+  analysis: storyboardAnalysisStructuredSchema,
+  schemes: z.array(storyboardDeliverableV2SchemeSchema).min(1),
 });
 
 export type StoryboardDeliverable = z.infer<typeof storyboardDeliverableSchema>;
 export type StoryboardScheme = z.infer<typeof storyboardSchemeSchema>;
+export type StoryboardPanel = z.infer<typeof storyboardPanelSchema>;
+export type StoryboardSellingPoint = z.infer<typeof storyboardSellingPointSchema>;
+export type StoryboardProductInteraction = z.infer<
+  typeof storyboardProductInteractionSchema
+>;
+export type StoryboardProductVisibility = z.infer<
+  typeof storyboardProductVisibilitySchema
+>;
+export type StoryboardAnalysisStructured = z.infer<
+  typeof storyboardAnalysisStructuredSchema
+>;
+
+export function isLegacyAnalysisMarkdown(
+  analysis: StoryboardDeliverable["analysis"],
+): analysis is z.infer<typeof storyboardAnalysisLegacyMarkdownSchema> {
+  if (!analysis || typeof analysis !== "object") return false;
+  return "audienceMarkdown" in analysis;
+}
+
+export function isStructuredAnalysis(
+  analysis: StoryboardDeliverable["analysis"],
+): analysis is StoryboardAnalysisStructured {
+  if (!analysis || typeof analysis !== "object") return false;
+  return "audience" in analysis && Array.isArray(analysis.audience);
+}
+
+export function isStoryboardDeliverableV2(
+  deliverable: StoryboardDeliverable,
+): boolean {
+  return storyboardDeliverableV2Schema.safeParse(deliverable).success;
+}
+
+export function normalizeStoryboardDeliverableV2(
+  raw: StoryboardDeliverable,
+): StoryboardDeliverable {
+  const schemes = raw.schemes?.map((scheme) => ({
+    ...scheme,
+    panels: scheme.panels.map((p) => ({
+      ...p,
+      timeline: coercePanelTextField(p.timeline) ?? p.timeline,
+      camera: coercePanelTextField(p.camera) ?? p.camera,
+      dialogue: coercePanelTextField(p.dialogue) ?? p.dialogue,
+      emotion: coercePanelTextField(p.emotion) ?? p.emotion,
+      imagePrompt: coercePanelTextField(p.imagePrompt) ?? p.imagePrompt,
+      sellpointTags: p.sellpointTags ?? [],
+    })),
+  }));
+  return { ...raw, schemes };
+}
+
+function coercePanelTextField(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (Array.isArray(value) && value.length >= 2) {
+    return `${value[0]}-${value[1]}s`;
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const start = record.start ?? record.from ?? record.begin;
+    const end = record.end ?? record.to;
+    if (start != null && end != null) return `${start}-${end}s`;
+  }
+  const text = String(value).trim();
+  return text || undefined;
+}
+
+function coerceDeliverablePanels(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const obj = raw as Record<string, unknown>;
+  const schemes = obj.schemes;
+  if (!Array.isArray(schemes)) return raw;
+  obj.schemes = schemes.map((scheme) => {
+    if (!scheme || typeof scheme !== "object") return scheme;
+    const s = scheme as Record<string, unknown>;
+    const panels = s.panels;
+    if (!Array.isArray(panels)) return scheme;
+    s.panels = panels.map((panel) => {
+      if (!panel || typeof panel !== "object") return panel;
+      const p = panel as Record<string, unknown>;
+      const scene =
+        typeof p.scene === "string" && p.scene.trim()
+          ? p.scene.trim()
+          : typeof p.action === "string"
+            ? p.action.trim()
+            : "场景";
+      const action =
+        typeof p.action === "string" && p.action.trim() ? p.action.trim() : scene;
+      const shotType =
+        typeof p.shotType === "string" && p.shotType.trim() ? p.shotType.trim() : "中景";
+      return {
+        ...p,
+        scene,
+        action,
+        shotType,
+        timeline: coercePanelTextField(p.timeline),
+        camera: coercePanelTextField(p.camera),
+        dialogue: coercePanelTextField(p.dialogue),
+        emotion: coercePanelTextField(p.emotion),
+        imagePrompt: coercePanelTextField(p.imagePrompt),
+        protagonistBeat: coercePanelTextField(p.protagonistBeat),
+        productBeat: coercePanelTextField(p.productBeat),
+        videoPromptEn: coercePanelTextField(p.videoPromptEn),
+      };
+    });
+    return s;
+  });
+  return obj;
+}
+
+function tryParseDeliverableCandidate(jsonRaw: string): StoryboardDeliverable | null {
+  try {
+    const parsed = coerceDeliverablePanels(JSON.parse(jsonRaw));
+    const result = storyboardDeliverableSchema.safeParse(parsed);
+    if (result.success) return normalizeStoryboardDeliverableV2(result.data);
+  } catch {
+    /* */
+  }
+  return null;
+}
 
 export function stripDeliverableFence(text: string): string {
-  return text
+  let out = text
     .replace(/```storyboard-deliverable[\s\S]*?```/gi, "")
+    .replace(/```json[\s\S]*?```/gi, "")
+    .replace(/```[\s\S]*?```/g, "")
     .replace(/<!--STORYBOARD_JSON[\s\S]*?STORYBOARD_JSON-->/gi, "")
     .trim();
+
+  const jsonStart = out.search(/\{\s*"productName"|\{\s*"schemes"|\{\s*"analysis"/);
+  if (jsonStart >= 0) {
+    out = out.slice(0, jsonStart).trim();
+  }
+  return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export function extractStoryboardDeliverable(text: string): StoryboardDeliverable | null {
@@ -63,25 +292,23 @@ export function extractStoryboardDeliverable(text: string): StoryboardDeliverabl
   const comment = trimmed.match(/<!--STORYBOARD_JSON\s*([\s\S]*?)\s*STORYBOARD_JSON-->/i);
   const jsonRaw = fenced?.[1]?.trim() ?? comment?.[1]?.trim();
   if (jsonRaw) {
-    try {
-      const parsed = JSON.parse(jsonRaw);
-      const result = storyboardDeliverableSchema.safeParse(parsed);
-      if (result.success) return result.data;
-    } catch {
-      /* fall through */
-    }
+    const parsed = tryParseDeliverableCandidate(jsonRaw);
+    if (parsed) return parsed;
   }
 
   const generic = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (generic?.[1]) {
-    try {
-      const parsed = JSON.parse(generic[1].trim());
-      const result = storyboardDeliverableSchema.safeParse(parsed);
-      if (result.success) return result.data;
-    } catch {
-      /* */
-    }
+    const parsed = tryParseDeliverableCandidate(generic[1].trim());
+    if (parsed) return parsed;
   }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const parsed = tryParseDeliverableCandidate(trimmed.slice(start, end + 1));
+    if (parsed) return parsed;
+  }
+
   return null;
 }
 
@@ -89,6 +316,12 @@ function pickProductHighlight(
   scheme: StoryboardScheme,
   deliverable?: StoryboardDeliverable,
 ): string | undefined {
+  const fromSellpoints = deliverable?.productSellingPoints
+    ?.map((sp) => sp.text.trim())
+    .filter(Boolean)
+    .join("；");
+  if (fromSellpoints) return fromSellpoints;
+
   const params = deliverable?.params ?? {};
   const fromParams =
     (typeof params.产品信息 === "string" &&
@@ -142,6 +375,12 @@ export function schemeToSheet(
       videoPromptEn: p.videoPromptEn,
       imageUrl: p.imageUrl || undefined,
       videoUrl: p.videoUrl || undefined,
+      productInteraction: p.productInteraction,
+      productVisibility: p.productVisibility,
+      sellpointTags: p.sellpointTags,
+      imagePrompt: p.imagePrompt?.trim() || undefined,
+      protagonistBeat: p.protagonistBeat?.trim() || undefined,
+      productBeat: p.productBeat?.trim() || undefined,
     })),
     totalDurationHintSec: scheme.totalDurationHintSec ?? 10,
   };

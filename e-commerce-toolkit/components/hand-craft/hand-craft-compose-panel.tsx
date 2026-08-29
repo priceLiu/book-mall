@@ -6,6 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import {
+  ECOM_HOVER_PREVIEW_BTN_SIZE_CLASS,
+  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
+  ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS,
+  ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
+  ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS,
+  ECOM_SLOT_HOVER_OVERLAY_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { uploadHandCraftComposePng } from "@/lib/ecom-hand-craft-api";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
@@ -22,8 +30,14 @@ import {
 } from "@/components/hand-craft/hand-craft-sheet-view";
 import { cn } from "@/lib/utils";
 
-const ICON_BTN =
-  "flex h-12 w-12 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50";
+const COMPOSE_ICON_BTN = cn(
+  ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
+  "inline-flex items-center justify-center",
+);
+const COMPOSE_PREVIEW_BTN = cn(
+  "inline-flex items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50",
+  ECOM_HOVER_PREVIEW_BTN_SIZE_CLASS,
+);
 
 type Props = {
   project: HandCraftProject;
@@ -294,30 +308,30 @@ export function HandCraftComposePanel({
                         alt={page.title}
                         className="block w-full h-auto"
                       />
-                      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[#e8e8ed] bg-white/95 p-2 backdrop-blur-sm">
+                      <div className="sticky bottom-0 flex flex-wrap justify-end gap-1.5 border-t border-[#e8e8ed] bg-white/95 p-2 backdrop-blur-sm sm:gap-2">
                         {onPreviewImage ? (
                           <button
                             type="button"
                             title="全屏预览"
-                            className={cn(ICON_BTN, "h-10 w-10")}
+                            className={COMPOSE_PREVIEW_BTN}
                             onClick={() => onPreviewImage(output.imageUrl, page.title)}
                           >
-                            <Eye className="h-5 w-5" />
+                            <Eye className={ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS} />
                           </button>
                         ) : null}
                         <button
                           type="button"
                           title="下载"
-                          className={cn(ICON_BTN, "h-10 w-10")}
+                          className={COMPOSE_ICON_BTN}
                           onClick={() => void handleDownload(page.index)}
                         >
-                          <Download className="h-5 w-5" />
+                          <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
                         </button>
                         <button
                           type="button"
                           title="重新拼版"
                           disabled={locked}
-                          className={cn(ICON_BTN, "h-10 w-10")}
+                          className={COMPOSE_ICON_BTN}
                           onClick={() => void composePages([page.index])}
                         >
                           <span className="text-[10px] font-semibold">重拼</span>
@@ -334,34 +348,31 @@ export function HandCraftComposePanel({
                         sizes="(max-width: 1024px) 33vw, 280px"
                         unoptimized
                       />
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100"
-                      />
-                      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-3 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100">
+                      <div aria-hidden className={ECOM_SLOT_HOVER_OVERLAY_CLASS} />
+                      <div className={ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS}>
                         {onPreviewImage ? (
                           <button
                             type="button"
                             title="预览"
-                            className={cn(ICON_BTN, "pointer-events-auto")}
+                            className={cn(COMPOSE_PREVIEW_BTN, "pointer-events-auto")}
                             onClick={() => onPreviewImage(output.imageUrl, page.title)}
                           >
-                            <Eye className="h-5 w-5" />
+                            <Eye className={ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS} />
                           </button>
                         ) : null}
                         <button
                           type="button"
                           title="下载"
-                          className={cn(ICON_BTN, "pointer-events-auto")}
+                          className={cn(COMPOSE_ICON_BTN, "pointer-events-auto")}
                           onClick={() => void handleDownload(page.index)}
                         >
-                          <Download className="h-5 w-5" />
+                          <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
                         </button>
                         <button
                           type="button"
                           title="重新拼版"
                           disabled={locked}
-                          className={cn(ICON_BTN, "pointer-events-auto")}
+                          className={cn(COMPOSE_ICON_BTN, "pointer-events-auto")}
                           onClick={() => void composePages([page.index])}
                         >
                           <span className="text-[11px] font-semibold">重拼</span>

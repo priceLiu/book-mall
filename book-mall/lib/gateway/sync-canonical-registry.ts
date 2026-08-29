@@ -146,6 +146,7 @@ export async function syncGatewayCanonicalRegistryToDb(): Promise<{
 const IMAGE_EDIT_SHELF_CANONICALS = [
   "qwen-image-edit",
   "qwen-image-edit-max",
+  "qwen-image-3.0-pro",
   "wan2.7-image-pro",
   "wan2.6-image",
   "google-nano-banana-i2i",

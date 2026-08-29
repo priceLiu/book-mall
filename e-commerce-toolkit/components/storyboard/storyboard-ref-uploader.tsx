@@ -4,9 +4,11 @@ import { useCallback, useRef, useState } from "react";
 
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
+import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type { StoryboardReference } from "@/lib/storyboard-types";
 import type { StoryboardUploadRole } from "@/lib/storyboard-workflow";
+import { cn } from "@/lib/utils";
 
 type Props = {
   references: StoryboardReference[];
@@ -32,7 +34,7 @@ const ROLE_SECTIONS: Array<{
     title: "产品图",
     refRole: "product",
     emptyHint:
-      "不上传也可继续策划。上传后分镜与出图更贴近真实商品；支持 Ctrl+V / ⌘V 粘贴。",
+      "上传或粘贴产品图后，助手将自动检测并进入七维参数采集。",
   },
   {
     role: "character",
@@ -85,13 +87,43 @@ export function StoryboardRefUploader({
     }
   }
 
+  const activeRefRole =
+    ROLE_SECTIONS.find((s) => s.role === activeRole)?.refRole ?? "product";
+  const activeRefRoleRef = useRef(activeRefRole);
+  activeRefRoleRef.current = activeRefRole;
+
+  const {
+    pasteReady: sectionPasteReady,
+    dropZoneProps: sectionPasteProps,
+    focusZone: focusSectionPaste,
+  } = useImageDropPaste({
+    enabled: !busy,
+    multiple: true,
+    listenPaste: true,
+    onFiles: (files) => void handleFiles(files, activeRefRoleRef.current),
+  });
+
   return (
-    <div className="space-y-2">
+    <div
+      {...sectionPasteProps}
+      className={cn(
+        "space-y-2 rounded-lg outline-none transition-shadow",
+        sectionPasteReady && "ring-2 ring-[#0071e3]/20",
+      )}
+      onMouseEnter={(e) => {
+        sectionPasteProps.onMouseEnter?.();
+        e.currentTarget.focus({ preventScroll: true });
+      }}
+      onMouseLeave={sectionPasteProps.onMouseLeave}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
           素材图
         </span>
-        <span className="text-[10px] text-[#86868b]">{IMAGE_UPLOAD_DROP_HINT}</span>
+        <span className="text-[10px] text-[#86868b]">
+          {IMAGE_UPLOAD_DROP_HINT}
+          {sectionPasteReady ? " · 粘贴至当前选中项" : ""}
+        </span>
       </div>
 
       {ROLE_SECTIONS.map(({ role, title, refRole, emptyHint }) => (
@@ -99,6 +131,7 @@ export function StoryboardRefUploader({
           key={role}
           title={title}
           suggested={activeRole === role}
+          listenPaste={false}
           items={references
             .filter((r) => r.role === refRole)
             .map((r) => ({ id: r.id, ossUrl: r.ossUrl, label: r.label }))}
@@ -120,6 +153,10 @@ export function StoryboardRefUploader({
           onRemove={onRemove}
           removeLabel={`删除${title}`}
           onTitleClick={() => onActiveRoleChange?.(role)}
+          onMouseEnterCard={() => {
+            onActiveRoleChange?.(role);
+            focusSectionPaste();
+          }}
           inputRef={(el) => {
             inputRefs.current[role] = el;
           }}

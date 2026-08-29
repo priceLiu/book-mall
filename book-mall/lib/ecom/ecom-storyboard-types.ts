@@ -51,6 +51,14 @@ export const storyboardSheetSchema = z.object({
         videoPromptEn: z.string().optional(),
         imageUrl: z.string().optional(),
         videoUrl: z.string().optional(),
+        productInteraction: z
+          .enum(["none", "hold", "wear", "use", "apply", "display", "unbox"])
+          .optional(),
+        productVisibility: z.enum(["off", "hint", "partial", "hero"]).optional(),
+        sellpointTags: z.array(z.string()).optional(),
+        imagePrompt: z.string().optional(),
+        protagonistBeat: z.string().optional(),
+        productBeat: z.string().optional(),
       }),
     )
     .min(1),

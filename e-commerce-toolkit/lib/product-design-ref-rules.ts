@@ -24,7 +24,8 @@ export function getVisionMaxInputImagesClient(modelKey: string): number {
 }
 
 export function getImageGenMaxRefsClient(modelKey: string): number {
-  const key = modelKey.trim();
+  const key = modelKey.trim().toLowerCase();
+  if (/qwen-image-edit|qwen-image-3\.0-pro/i.test(key)) return 3;
   if (/seedream|nano-banana|flux|kie/i.test(key)) return 8;
   if (/kling/i.test(key)) return 10;
   if (/wan2\.[67]|wanx/i.test(key)) return 5;

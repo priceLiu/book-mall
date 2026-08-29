@@ -91,6 +91,12 @@ export function isStoryboardKieImageModel(modelKey: string): boolean {
   return k.includes("nano-banana") || k === "nanobanana";
 }
 
+/** 分镜生图须传入参考图；纯文生图模型不可用 */
+export function isStoryboardRefCapableImageModel(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k !== "z-image-turbo" && k !== "z-image";
+}
+
 export function isStoryboardDashscopeImageModel(modelKey: string): boolean {
   const k = modelKey.trim().toLowerCase();
   return (

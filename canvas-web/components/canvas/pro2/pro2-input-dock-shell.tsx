@@ -267,8 +267,8 @@ export function Pro2DockHeader({
         className={cn(
           "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto overflow-y-visible",
           compact
-            ? "gap-1 px-2 py-1"
-            : "min-h-[44px] gap-1.5 px-3 py-1.5",
+            ? "gap-2 px-4 py-3"
+            : "min-h-[44px] gap-2 px-4 py-2.5",
         )}
         style={
           minHeightPx != null
@@ -298,7 +298,7 @@ export function Pro2DockRefRow({ children }: { children: ReactNode }) {
   return (
     <div
       className={cn(
-        "nodrag flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-1",
+        "nodrag flex min-h-[44px] shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5",
         LIBTV_INPUT_DOCK_DIVIDER,
       )}
     >

@@ -1,14 +1,26 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import Image from "next/image";
 import type { ReactNode } from "react";
 
+import {
+  StoryboardAnalysisTables,
+  StoryboardCreativeBrief,
+  StoryboardDeliverableSectionBlock,
+  StoryboardSchemePanelsTable,
+  StoryboardSellingPointsList,
+} from "@/components/storyboard/storyboard-deliverable-tables";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { characterPresetLabelFromKey } from "@/lib/storyboard-character-presets";
-import { resolveScenePresetByKey } from "@/lib/storyboard-scene-presets";
+import {
+  isLegacyAnalysisMarkdown,
+  isStructuredAnalysis,
+} from "@/lib/storyboard-deliverable-labels";
+import { extractStoryboardDeliverableFromText, asStoryboardDeliverable, looksLikeRawDeliverableJson } from "@/lib/storyboard-deliverable-parse";
+import { resolveScenePresetByKey, formatSceneCustomDisplay } from "@/lib/storyboard-scene-presets";
+import { isAwaitingSchemePick, resolveSelectedSchemeIndex, userPickedScheme } from "@/lib/storyboard-workflow";
 import type {
-  StoryboardPanel,
+  StoryboardDeliverable,
   StoryboardProject,
   StoryboardReference,
   StoryboardScheme,
@@ -78,89 +90,51 @@ function RefImagesBlock({
   );
 }
 
-function ScriptPanelsTable({
-  panels,
-  editable,
-  onEditPanel,
-}: {
-  panels: StoryboardPanel[];
-  editable?: boolean;
-  onEditPanel?: (index: number) => void;
-}) {
-  if (panels.length === 0) return <Dash />;
-
-  return (
-    <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
-      <table className="w-full min-w-[720px] border-collapse text-left text-xs">
-        <thead>
-          <tr className="bg-[#1d1d1f] text-white">
-            <th className="px-3 py-2 font-medium">镜号</th>
-            <th className="px-3 py-2 font-medium">时间轴</th>
-            <th className="px-3 py-2 font-medium">景别</th>
-            <th className="px-3 py-2 font-medium">画面内容</th>
-            <th className="px-3 py-2 font-medium">口播台词</th>
-            <th className="px-3 py-2 font-medium">运镜</th>
-            <th className="px-3 py-2 font-medium">情绪</th>
-            {editable ? <th className="px-3 py-2 font-medium">操作</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {panels.map((p, i) => (
-            <tr key={`panel-${p.index}-${i}`} className="border-t border-[#e8e8ed] align-top">
-              <td className="px-3 py-2 font-medium">{p.index}</td>
-              <td className="px-3 py-2 text-[#6e6e73]">{p.timeline?.trim() || "--"}</td>
-              <td className="px-3 py-2">{p.shotType?.trim() || "--"}</td>
-              <td className="px-3 py-2">
-                {[p.scene, p.action].filter(Boolean).join(" · ") || "--"}
-              </td>
-              <td className="px-3 py-2">{p.dialogue?.trim() || "--"}</td>
-              <td className="px-3 py-2">{p.camera?.trim() || "--"}</td>
-              <td className="px-3 py-2">{p.emotion?.trim() || "--"}</td>
-              {editable ? (
-                <td className="px-3 py-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-[#d2d2d7] px-2 py-1 text-[11px] text-[#1d1d1f] hover:border-[#0071e3] hover:text-[#0071e3]"
-                    onClick={() => onEditPanel?.(p.index)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                    修改
-                  </button>
-                </td>
-              ) : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function resolveFinalized(
-  project: StoryboardProject,
-): {
+function resolveFinalized(project: StoryboardProject): {
   scheme: StoryboardScheme | null;
   sheet: StoryboardSheet | null;
-  markdown: string | null;
+  legacyMarkdown: string | null;
+  parsedDeliverable?: StoryboardDeliverable;
 } {
-  const schemes = project.meta?.deliverable?.schemes ?? [];
-  const selectedIndex = project.meta?.selectedSchemeIndex ?? 0;
-  const scheme = schemes[selectedIndex] ?? schemes[0] ?? null;
+  const metaDeliverable = asStoryboardDeliverable(project.meta?.deliverable);
+  const schemes = metaDeliverable?.schemes ?? [];
+  const selectedIndex = resolveSelectedSchemeIndex(project);
+  const awaitingPick = isAwaitingSchemePick(project);
+  const pickScheme = (idx: number) =>
+    awaitingPick ? null : schemes[idx] ?? schemes[0] ?? null;
+  const scheme = pickScheme(selectedIndex);
   const sheet = project.sheet;
-  const markdown =
-    !sheet && !scheme ? (project.meta?.deliverableMarkdown?.trim() || null) : null;
-  return { scheme, sheet, markdown };
+
+  let parsedDeliverable = metaDeliverable;
+  const rawMd = project.meta?.deliverableMarkdown?.trim();
+  if (!parsedDeliverable?.schemes?.length && rawMd && looksLikeRawDeliverableJson(rawMd)) {
+    parsedDeliverable = extractStoryboardDeliverableFromText(rawMd) ?? parsedDeliverable;
+  }
+
+  const legacyMarkdown =
+    !sheet && !scheme && rawMd && !looksLikeRawDeliverableJson(rawMd) ? rawMd : null;
+
+  const schemeFromParsed = awaitingPick
+    ? null
+    : scheme ??
+      parsedDeliverable?.schemes?.[selectedIndex] ??
+      parsedDeliverable?.schemes?.[0] ??
+      null;
+
+  return {
+    scheme: schemeFromParsed,
+    sheet,
+    legacyMarkdown,
+    parsedDeliverable,
+  };
 }
 
 type Props = {
   project: StoryboardProject;
   references: StoryboardReference[];
   onPreviewImage?: (src: string, title: string) => void;
-  /** 分镜图区块（卡片与操作） */
   imagesSlot?: ReactNode;
-  /** 成片区块 */
   videoSlot?: ReactNode;
-  /** 已定稿 sheet 时可编辑分镜脚本 */
   onEditScriptPanel?: (panelIndex: number) => void;
 };
 
@@ -173,17 +147,27 @@ export function StoryboardStepResults({
   videoSlot,
   onEditScriptPanel,
 }: Props) {
-  const deliverable = project.meta?.deliverable;
-  const analysis = deliverable?.analysis;
+  const deliverableFromMeta = asStoryboardDeliverable(project.meta?.deliverable);
   const wf = project.meta?.workflow ?? {};
-  const { scheme, sheet, markdown } = resolveFinalized(project);
+  const { scheme, sheet, legacyMarkdown, parsedDeliverable } = resolveFinalized(project);
+  const deliverable = deliverableFromMeta ?? parsedDeliverable;
+  const analysis = deliverable?.analysis;
 
   const productRefs = references.filter((r) => r.role === "product");
   const characterRefs = references.filter((r) => r.role === "character");
   const otherRefs = references.filter((r) => r.role === "scene" || r.role === "other");
 
-  const scriptPanels = sheet?.panels ?? scheme?.panels ?? [];
-  const hasFinalizedPlan = Boolean(sheet || scheme || markdown);
+  const schemes = deliverable?.schemes ?? [];
+  const selectedIndex = resolveSelectedSchemeIndex(project);
+  const schemeFromPick =
+    userPickedScheme(project) && !project.sheet
+      ? schemes[selectedIndex] ?? schemes[0]
+      : null;
+  const scriptPanels =
+    sheet?.panels ?? scheme?.panels ?? schemeFromPick?.panels ?? [];
+  const awaitingSchemePick = isAwaitingSchemePick(project);
+  const allSchemes = deliverable?.schemes ?? [];
+  const hasFinalizedPlan = Boolean(sheet || scheme || legacyMarkdown || deliverable?.schemes?.length);
   const productName = deliverable?.productName?.trim();
   const params = deliverable?.params ?? {};
   const paramEntries = Object.entries(params).filter(([, v]) => typeof v === "string" && v.trim());
@@ -193,6 +177,7 @@ export function StoryboardStepResults({
   const schemeStrategy = scheme?.strategy;
   const productHighlight =
     sheet?.overview.productHighlight ??
+    deliverable?.productSellingPoints?.map((sp) => sp.text).join("；") ??
     (typeof params.卖点 === "string" ? params.卖点 : undefined) ??
     (typeof params["核心卖点"] === "string" ? params["核心卖点"] : undefined);
 
@@ -208,7 +193,36 @@ export function StoryboardStepResults({
   return (
     <div className="space-y-6">
       <StepSection title="策划定稿">
-        {analysis ? (
+        {awaitingSchemePick && allSchemes.length > 1 ? (
+          <p className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-4 py-3 text-sm text-[#0071e3]">
+            共 {allSchemes.length} 套方案已生成，请在<strong className="font-semibold">左侧助手区</strong>
+            点选一套后继续（无需在此重复选择）。
+          </p>
+        ) : null}
+
+        {!awaitingSchemePick ? (
+          <>
+        {deliverable?.creativeBrief ? (
+          <div className="mb-6 border-b border-[#e8e8ed] pb-6">
+            <StoryboardDeliverableSectionBlock title="创意简报">
+              <StoryboardCreativeBrief brief={deliverable.creativeBrief} />
+            </StoryboardDeliverableSectionBlock>
+          </div>
+        ) : null}
+
+        {deliverable?.productSellingPoints?.length ? (
+          <div className="mb-6 border-b border-[#e8e8ed] pb-6">
+            <StoryboardDeliverableSectionBlock title="产品卖点">
+              <StoryboardSellingPointsList sellpoints={deliverable.productSellingPoints} />
+            </StoryboardDeliverableSectionBlock>
+          </div>
+        ) : null}
+
+        {analysis && isStructuredAnalysis(analysis) ? (
+          <div className="mb-6 border-b border-[#e8e8ed] pb-6">
+            <StoryboardAnalysisTables analysis={analysis} />
+          </div>
+        ) : analysis && isLegacyAnalysisMarkdown(analysis) ? (
           <div className="mb-6 space-y-5 border-b border-[#e8e8ed] pb-6">
             <div>
               <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表1 · 人群画像</h3>
@@ -260,16 +274,25 @@ export function StoryboardStepResults({
                 )
               }
             />
-            {markdown ? (
+            {legacyMarkdown ? (
               <div className="pt-4">
-                <h4 className="mb-2 text-xs font-semibold text-[#6e6e73]">助手交付原文</h4>
-                <StoryboardMarkdownBlock markdown={markdown} />
+                <h4 className="mb-2 text-xs font-semibold text-[#6e6e73]">
+                  历史交付原文（legacy）
+                </h4>
+                <StoryboardMarkdownBlock markdown={legacyMarkdown} />
               </div>
+            ) : null}
+            {!sheet && deliverable?.schemes?.length && !scheme ? (
+              <p className="pt-2 text-xs text-[#86868b]">
+                策划 JSON 已解析，请刷新或重新打开项目以同步定稿 sheet。
+              </p>
             ) : null}
           </div>
         ) : (
           <Dash />
         )}
+          </>
+        ) : null}
       </StepSection>
 
       <StepSection title="产品图">
@@ -299,9 +322,9 @@ export function StoryboardStepResults({
           <div>
             <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">场景参考</h3>
             {wf.scenePreset === "custom" && wf.scenePresetCustom ? (
-              <>
-                <p className="text-sm text-[#1d1d1f]">自定义场景：{wf.scenePresetCustom}</p>
-              </>
+              <p className="text-sm text-[#1d1d1f]">
+                自定义场景：{formatSceneCustomDisplay(wf.scenePresetCustom)}
+              </p>
             ) : (
               <>
                 <p className="text-sm text-[#1d1d1f]">
@@ -330,8 +353,9 @@ export function StoryboardStepResults({
             修改并保存后，生成全部分镜图将按最新脚本执行。
           </p>
         ) : null}
-        <ScriptPanelsTable
+        <StoryboardSchemePanelsTable
           panels={scriptPanels}
+          sellpoints={deliverable?.productSellingPoints}
           editable={Boolean(onEditScriptPanel && sheet)}
           onEditPanel={onEditScriptPanel}
         />

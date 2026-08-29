@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import {
+  buildFashionAssistantSystemPrompt,
+  buildFashionDeliverableContextBlock,
+  resolveFashionPromptPhase,
+} from "@/lib/ecom/ecom-fashion-assistant-prompts";
+import {
+  extractFashionDeliverable,
+  inferFashionPhaseFromDeliverable,
+  isFashionDeliverable,
+  isFashionWorkflow,
+  mergeFashionDeliverablePatch,
+  stripFashionDeliverableFence,
+} from "@/lib/ecom/ecom-fashion-deliverable";
+import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
 import { buildStoryboardAssistantSystemPrompt } from "@/lib/ecom/ecom-storyboard-assistant-prompts";
 import {
   extractStoryboardDeliverable,
-  schemeToSheet,
   stripDeliverableFence,
 } from "@/lib/ecom/ecom-storyboard-deliverable";
-import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
+import { renderDeliverableMarkdown } from "@/lib/ecom/ecom-storyboard-deliverable-render";
 import {
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
@@ -65,7 +78,24 @@ export async function POST(req: Request, ctx: Ctx) {
     typeof body.modelKey === "string" && body.modelKey.trim()
       ? body.modelKey.trim()
       : ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
-  const systemPrompt = buildStoryboardAssistantSystemPrompt();
+  const existingMeta =
+    (project.meta as Record<string, unknown> | null) ?? {};
+  const isFashion = isFashionWorkflow(existingMeta);
+  const lastUserTurn = turns[turns.length - 1]!.content.trim();
+  const fashionPromptPhase = isFashion ? resolveFashionPromptPhase(lastUserTurn) : "general";
+  const prevFashionDeliverable =
+    isFashion && isFashionDeliverable(existingMeta.deliverable)
+      ? existingMeta.deliverable
+      : null;
+  let systemPrompt = isFashion
+    ? buildFashionAssistantSystemPrompt(fashionPromptPhase)
+    : buildStoryboardAssistantSystemPrompt();
+  if (prevFashionDeliverable && fashionPromptPhase !== "sellpoints" && fashionPromptPhase !== "general") {
+    systemPrompt += buildFashionDeliverableContextBlock(
+      prevFashionDeliverable,
+      fashionPromptPhase,
+    );
+  }
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -128,41 +158,156 @@ export async function POST(req: Request, ctx: Ctx) {
           ];
 
           let deliverable = extractStoryboardDeliverable(fullText);
-          const displayMarkdown = stripDeliverableFence(fullText);
-          if (!deliverable?.schemes?.length && displayMarkdown.length > 200) {
-            const parsed = parseStoryboardSchemesFromMarkdown(displayMarkdown);
-            if (parsed.length > 0) {
-              deliverable = { ...(deliverable ?? {}), schemes: parsed };
-            }
-          }
-          const existingMeta =
-            (project.meta as Record<string, unknown> | null) ?? {};
+          const fashionDeliverable = isFashion
+            ? extractFashionDeliverable(fullText)
+            : null;
+          const briefText = isFashion
+            ? stripFashionDeliverableFence(fullText)
+            : stripDeliverableFence(fullText);
+          const existingWorkflow =
+            (existingMeta.workflow as Record<string, unknown> | undefined) ?? {};
+          const isSceneAdjust = lastUserTurn.startsWith("场景参考已确认 |");
+          const schemeAlreadyPicked = existingWorkflow.schemePicked === true;
           const patch: Parameters<typeof updateEcomStoryboardProject>[2] = {
             chatHistory: history,
           };
 
-          if (deliverable) {
-            const selectedIndex =
-              typeof existingMeta.selectedSchemeIndex === "number"
+          if (isFashion && fashionDeliverable) {
+            const prevFashion = existingMeta.deliverable as
+              | Parameters<typeof mergeFashionDeliverablePatch>[0]
+              | undefined;
+            const merged = mergeFashionDeliverablePatch(
+              prevFashion,
+              fashionDeliverable,
+              typeof existingMeta.productName === "string"
+                ? existingMeta.productName
+                : fashionDeliverable.productName,
+            );
+            if (
+              existingWorkflow.fashionSellpointsEdited === true &&
+              prevFashion?.sellpoints?.length &&
+              !prevFashion.sellpointsLocked
+            ) {
+              merged.sellpoints = prevFashion.sellpoints;
+            }
+            if (
+              prevFashion?.selectedVersion &&
+              prevFashion.storyboardVersions?.[prevFashion.selectedVersion]?.panels?.length
+            ) {
+              const key = prevFashion.selectedVersion;
+              const savedPanels = prevFashion.storyboardVersions![key]!.panels!;
+              merged.storyboardVersions = {
+                ...(merged.storyboardVersions ?? {}),
+                [key]: {
+                  ...(merged.storyboardVersions?.[key] ??
+                    prevFashion.storyboardVersions?.[key] ?? {
+                      id: key,
+                      title: `${key}版`,
+                      panels: [],
+                    }),
+                  panels: savedPanels,
+                },
+              };
+              merged.selectedVersion = key;
+            } else if (
+              existingWorkflow.fashionStoryboardPanelsEdited === true &&
+              prevFashion?.selectedVersion
+            ) {
+              const key = prevFashion.selectedVersion;
+              const savedPanels = prevFashion.storyboardVersions?.[key]?.panels;
+              if (savedPanels?.length) {
+                merged.storyboardVersions = {
+                  ...(merged.storyboardVersions ?? {}),
+                  [key]: {
+                    ...(merged.storyboardVersions?.[key] ??
+                      prevFashion.storyboardVersions?.[key] ?? {
+                        id: key,
+                        title: `${key}版`,
+                        panels: [],
+                      }),
+                    panels: savedPanels,
+                  },
+                };
+                merged.selectedVersion = key;
+              }
+            }
+            if (prevFashion?.storyboardLocked && prevFashion.selectedVersion) {
+              const key = prevFashion.selectedVersion;
+              const lockedVersion = prevFashion.storyboardVersions?.[key];
+              if (lockedVersion?.panels?.length) {
+                merged.storyboardVersions = {
+                  ...(merged.storyboardVersions ?? {}),
+                  [key]: lockedVersion,
+                };
+                merged.selectedVersion = key;
+                merged.storyboardLocked = true;
+              }
+            }
+            if (prevFashion?.sellpointsLocked && prevFashion.sellpoints?.length) {
+              merged.sellpoints = prevFashion.sellpoints;
+              merged.sellpointsLocked = true;
+            }
+            const versionKey = merged.selectedVersion ?? undefined;
+            const systemMarkdown = renderFashionDeliverableMarkdown(merged, {
+              versionKey,
+              includeAllVersions: !versionKey,
+            });
+            const fashionPhase = inferFashionPhaseFromDeliverable(
+              merged,
+              existingWorkflow.fashionPhase as string | undefined,
+            );
+            patch.meta = {
+              ...existingMeta,
+              deliverable: merged,
+              deliverableMarkdown: systemMarkdown || briefText,
+              workflow: {
+                ...existingWorkflow,
+                vertical: "fashion_apparel",
+                fashionPhase,
+                ...(merged.sellpointsLocked ? { fashionSellpointsEdited: false } : {}),
+                ...(merged.storyboardLocked ? { fashionStoryboardPanelsEdited: false } : {}),
+                ...(merged.opsPack ? { fashionStoryboardPanelsEdited: false } : {}),
+              },
+            };
+            patch.status = "deliverable_ready";
+          } else if (deliverable) {
+            const schemes = deliverable.schemes ?? [];
+            const multiScheme = schemes.length > 1;
+            const selectedIndex = multiScheme
+              ? schemeAlreadyPicked &&
+                typeof existingMeta.selectedSchemeIndex === "number"
                 ? existingMeta.selectedSchemeIndex
-                : 0;
-            const scheme = deliverable.schemes?.[selectedIndex] ?? deliverable.schemes?.[0];
+                : undefined
+              : 0;
+            const systemMarkdown = renderDeliverableMarkdown(deliverable, {
+              schemeIndex: selectedIndex ?? 0,
+              includeAllSchemes: multiScheme && !schemeAlreadyPicked,
+            });
             patch.meta = {
               ...existingMeta,
               deliverable,
-              deliverableMarkdown: displayMarkdown,
-              selectedSchemeIndex: scheme ? selectedIndex : 0,
+              deliverableMarkdown: systemMarkdown || briefText,
+              ...(selectedIndex !== undefined
+                ? { selectedSchemeIndex: selectedIndex }
+                : multiScheme
+                  ? { selectedSchemeIndex: undefined }
+                  : { selectedSchemeIndex: 0 }),
+              workflow: {
+                ...existingWorkflow,
+                schemePicked: multiScheme ? schemeAlreadyPicked : true,
+                phase:
+                  multiScheme && !schemeAlreadyPicked
+                    ? "planning"
+                    : existingWorkflow.phase ?? "refs",
+                awaitingCustomSceneInput: false,
+                ...(isSceneAdjust ? { awaitingSceneApplyMode: false } : {}),
+              },
             };
-            if (scheme) {
-              patch.sheet = schemeToSheet(scheme, deliverable);
-              patch.status = "sheet_ready";
-            } else {
-              patch.status = "deliverable_ready";
-            }
-          } else if (displayMarkdown.length > 200) {
+            patch.status = "deliverable_ready";
+          } else if (briefText.length > 200) {
             patch.meta = {
               ...existingMeta,
-              deliverableMarkdown: displayMarkdown,
+              deliverableMarkdown: briefText,
             };
           }
 

@@ -5,6 +5,7 @@ import { ArrowUp, Loader2, MapPin, Upload } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
@@ -202,7 +203,7 @@ export function Sbv1ImageNodeEmbeddedDock({
           <button
             type="button"
             disabled
-            className="nodrag flex size-8 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-8")}
             title="发送（即将推出）"
           >
             {isRunning ? (

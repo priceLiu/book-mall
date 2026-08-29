@@ -25,10 +25,11 @@ export const IMAGE_OR_VIDEO_UPLOAD_ACCEPT = `${IMAGE_UPLOAD_ACCEPT},video/mp4,vi
 export type ImageUploadError = { title: string; message: string };
 
 export function validateImageFile(file: File): ImageUploadError | null {
-  if (!IMAGE_UPLOAD_MIME_TYPES.has(file.type)) {
+  const normalized = normalizePastedImageFile(file);
+  if (!IMAGE_UPLOAD_MIME_TYPES.has(normalized.type)) {
     return { title: "格式不支持", message: "请上传 JPG、PNG 或 WebP 图片" };
   }
-  if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+  if (normalized.size > IMAGE_UPLOAD_MAX_BYTES) {
     return { title: "文件过大", message: "图片最大 10MB" };
   }
   return null;
@@ -63,29 +64,56 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 function mimeMatchesUploadKinds(type: string, allowVideo: boolean): boolean {
+  if (!type) return true; // macOS 截图等粘贴项常无 MIME
   if (type.startsWith("image/")) return true;
   return allowVideo && type.startsWith("video/");
+}
+
+/** 剪贴板 / 拖放图片常无 type，补全为 png 以便校验与上传 */
+export function normalizePastedImageFile(file: File): File {
+  if (file.type && IMAGE_UPLOAD_MIME_TYPES.has(file.type)) return file;
+  const base = file.name?.replace(/\.[^.]+$/, "") || `paste-${Date.now()}`;
+  const name = /\.(jpe?g|png|webp)$/i.test(file.name) ? file.name : `${base}.png`;
+  const type =
+    /\.jpe?g$/i.test(name) ? "image/jpeg" : /\.webp$/i.test(name) ? "image/webp" : "image/png";
+  return new File([file], name, { type, lastModified: file.lastModified });
+}
+
+function collectFilesFromDataTransfer(
+  data: DataTransfer,
+  opts?: { allowVideo?: boolean },
+): File[] {
+  const allowVideo = Boolean(opts?.allowVideo);
+  const out: File[] = [];
+  const seen = new Set<string>();
+
+  const push = (file: File | null) => {
+    if (!file) return;
+    const key = `${file.name}:${file.size}:${file.lastModified}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (!mimeMatchesUploadKinds(file.type, allowVideo)) return;
+    out.push(file.type.startsWith("image/") || !file.type ? normalizePastedImageFile(file) : file);
+  };
+
+  if (data.files?.length) {
+    for (const file of Array.from(data.files)) push(file);
+  }
+  if (out.length === 0 && data.items?.length) {
+    for (const item of Array.from(data.items)) {
+      if (item.kind !== "file") continue;
+      if (!mimeMatchesUploadKinds(item.type, allowVideo)) continue;
+      push(item.getAsFile());
+    }
+  }
+  return out;
 }
 
 export function extractMediaFilesFromDataTransfer(
   dt: DataTransfer,
   opts?: { allowVideo?: boolean },
 ): File[] {
-  const allowVideo = Boolean(opts?.allowVideo);
-  const out: File[] = [];
-  if (dt.files?.length) {
-    for (const file of Array.from(dt.files)) {
-      if (mimeMatchesUploadKinds(file.type, allowVideo)) out.push(file);
-    }
-  }
-  if (out.length === 0 && dt.items?.length) {
-    for (const item of Array.from(dt.items)) {
-      if (!mimeMatchesUploadKinds(item.type, allowVideo)) continue;
-      const file = item.getAsFile();
-      if (file) out.push(file);
-    }
-  }
-  return out;
+  return collectFilesFromDataTransfer(dt, opts);
 }
 
 export function extractImageFilesFromDataTransfer(dt: DataTransfer): File[] {
@@ -95,13 +123,8 @@ export function extractImageFilesFromDataTransfer(dt: DataTransfer): File[] {
 export function extractImageFileFromClipboard(
   clipboard: DataTransfer | null,
 ): File | null {
-  if (!clipboard?.items?.length) return null;
-  for (const item of Array.from(clipboard.items)) {
-    if (!item.type.startsWith("image/")) continue;
-    const file = item.getAsFile();
-    if (file) return file;
-  }
-  return null;
+  const files = clipboard ? collectFilesFromDataTransfer(clipboard) : [];
+  return files[0] ?? null;
 }
 
 /** 从剪贴板事件提取图片 File（支持多图粘贴，对齐 QuickReplica） */
@@ -116,17 +139,8 @@ export function extractMediaFilesFromClipboard(
   opts?: { allowVideo?: boolean },
 ): File[] {
   const data = "clipboardData" in event ? event.clipboardData : null;
-  if (!data?.items?.length) return [];
-
-  const allowVideo = Boolean(opts?.allowVideo);
-  const files: File[] = [];
-  for (const item of Array.from(data.items)) {
-    if (item.kind !== "file") continue;
-    if (!mimeMatchesUploadKinds(item.type, allowVideo)) continue;
-    const file = item.getAsFile();
-    if (file) files.push(file);
-  }
-  return files;
+  if (!data) return [];
+  return collectFilesFromDataTransfer(data, opts);
 }
 
 export async function filesToDataUrls(

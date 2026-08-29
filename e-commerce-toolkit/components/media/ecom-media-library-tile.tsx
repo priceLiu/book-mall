@@ -16,17 +16,39 @@ import { useIntersectionVisible } from "@/lib/use-intersection-visible";
 export const ECOM_LIBRARY_MEDIA_GRID_CLASS =
   "grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5";
 
+/** 悬停操作钮 · 随卡片宽度缩放（14%），禁止固定 rem 窄屏 flex 压扁 */
+export const ECOM_HOVER_ACTION_BTN_SIZE_CLASS =
+  "aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0";
+
+/** 悬停预览钮 · 略大于次要操作 */
+export const ECOM_HOVER_PREVIEW_BTN_SIZE_CLASS =
+  "aspect-square w-[clamp(1.75rem,16%,2.5rem)] max-w-10 shrink-0";
+
 /** 缩略图悬停 · 预览 Eye（全站统一，见 design/MEDIA.md） */
 export const ECOM_MEDIA_TILE_PREVIEW_BTN_CLASS =
-  "inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
+  "inline-flex aspect-square w-[clamp(1.75rem,16%,2.5rem)] max-w-10 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
 
 export const ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS = "h-5 w-5";
 
 /** 缩略图悬停 · 下载 / 删除等次要操作 */
 export const ECOM_MEDIA_TILE_ACTION_BTN_CLASS =
-  "inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
+  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
 
 export const ECOM_MEDIA_TILE_ACTION_ICON_CLASS = "h-4 w-4";
+
+/** 成图槽位悬停 · 主图 / 手伴等（ring 样式） */
+export const ECOM_SLOT_HOVER_ACTION_BTN_CLASS =
+  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50";
+
+/** 成图槽位悬停 · 分镜等（shadow 样式） */
+export const ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS =
+  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow transition hover:bg-white";
+
+export const ECOM_SLOT_HOVER_OVERLAY_CLASS =
+  "pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100";
+
+export const ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS =
+  "pointer-events-none absolute inset-0 z-20 flex max-w-full flex-wrap items-center justify-center gap-1.5 overflow-hidden px-1 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100 sm:gap-2";
 
 type Props = {
   kind: "image" | "video";
@@ -180,7 +202,7 @@ export function EcomMediaLibraryTile({
 
       <div
         className={cn(
-          "absolute inset-0 z-[1] flex items-center justify-center gap-2",
+          "absolute inset-0 z-[1] flex max-w-full flex-wrap items-center justify-center gap-1.5 overflow-hidden px-1 sm:gap-2",
           "bg-black/0 opacity-0 transition duration-150",
           "group-hover:bg-black/45 group-hover:opacity-100",
           "group-focus-within:bg-black/45 group-focus-within:opacity-100",

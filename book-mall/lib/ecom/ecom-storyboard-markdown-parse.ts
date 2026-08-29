@@ -158,7 +158,7 @@ function splitSchemeBlocks(markdown: string): Array<{ title: string; body: strin
   return blocks;
 }
 
-/** 从助手 Markdown 交付文本解析分镜方案（无 JSON 围栏时的兜底） */
+/** @deprecated v0.1 legacy — 仅用于无 JSON deliverable 的旧项目只读解析。新交付走 JSON 唯一真源，见 storyboard-deliverable-spec-v2.md */
 export function parseStoryboardSchemesFromMarkdown(markdown: string): StoryboardScheme[] {
   const text = markdown.trim();
   if (!text) return [];

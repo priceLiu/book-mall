@@ -12,6 +12,7 @@ import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
 import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { findPro2FrameImageNodeForRow } from "@/lib/canvas/pro2-spawn-frame-image-group";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
@@ -120,7 +121,7 @@ export function Pro2FrameCellInputDock() {
           <button
             type="button"
             disabled={running || !prompt.trim()}
-            className="nodrag flex size-9 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-9")}
             title="重新生成该镜分镜图"
             onClick={onRegenerate}
           >
