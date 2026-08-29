@@ -2,6 +2,7 @@ import {
   LIBTV_IMAGE_NODE_HEADER_HEIGHT,
   LIBTV_MEDIA_FIT_VERSION,
   LIBTV_MEDIA_ASPECT_PRESET_SIZE_VERSION,
+  LIBTV_AUDIO_TRACK_LAYOUT_VERSION,
 } from "./libtv-node-chrome";
 import {
   computeLibtvMediaAspectPresetSize,
@@ -139,10 +140,20 @@ function isLegacyPro2AudioNodeBox(width: number, height: number): boolean {
 
 function pro2AudioTrackBoxNeedsMigrate(node: CanvasFlowNode): boolean {
   if (node.type !== "story-pro2-audio") return false;
-  const d = node.data as { manualSize?: boolean };
+  const d = node.data as {
+    manualSize?: boolean;
+    audioTrackLayoutVersion?: number;
+  };
   if (d.manualSize) return false;
+  if ((d.audioTrackLayoutVersion ?? 0) < LIBTV_AUDIO_TRACK_LAYOUT_VERSION) {
+    return true;
+  }
   const box = readNodeMeasuredBox(node);
-  return isLegacyPro2AudioNodeBox(box.width, box.height);
+  return (
+    box.width !== PRO2_AUDIO_NODE_WIDTH ||
+    box.height !== PRO2_AUDIO_NODE_HEIGHT ||
+    isLegacyPro2AudioNodeBox(box.width, box.height)
+  );
 }
 
 /**
@@ -344,7 +355,13 @@ export function reconcileLibtvMediaNodeBoxSizes(
           width: expected.width,
           height: expected.height,
         },
-        data: { ...n.data, manualSize: false },
+        data: {
+          ...n.data,
+          manualSize: false,
+          ...(n.type === "story-pro2-audio"
+            ? { audioTrackLayoutVersion: LIBTV_AUDIO_TRACK_LAYOUT_VERSION }
+            : {}),
+        },
       } as CanvasFlowNode;
     }
 

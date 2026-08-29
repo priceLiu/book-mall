@@ -746,13 +746,17 @@ export function StoryboardContentPanel({
       .then((updated) => {
         onProjectChange(updated);
       })
-      .catch(() => {
-        /* 用户可在工作区手动重试 */
+      .catch(async (e) => {
+        await onAlert({
+          title: "故事版同步失败",
+          message: e instanceof Error ? e.message : "请在中栏点「重新同步故事版」重试",
+          variant: "error",
+        });
       })
       .finally(() => {
         fashionSheetSyncRef.current = false;
       });
-  }, [project.id, project.sheet, fashionOutputMode, onProjectChange, project]);
+  }, [project.id, project.sheet, fashionOutputMode, onProjectChange, onAlert, project]);
 
   const generateAllImagesTokenRef = useRef(0);
   useEffect(() => {

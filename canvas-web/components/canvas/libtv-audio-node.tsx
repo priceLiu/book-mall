@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { AlertTriangle, Music, Pause, Play } from "lucide-react";
@@ -8,13 +8,10 @@ import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   LIBTV_CARD_DRAG_CLASS,
-  LIBTV_MEDIA_CARD_SHELL_CLASS,
-  LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_NODE_HANDLE_CLASS,
   LIBTV_NODE_OUTER_CLASS,
   LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
   LIBTV_NODE_SIDE_PLUS_SIZE,
-  libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import {
   libtvMediaPreviewCanFallbackToBlob,
@@ -35,99 +32,76 @@ import {
   isLibtvMediaGenerating,
 } from "./libtv-media-generating-state";
 import type { LibtvAudioNodeData } from "@/lib/canvas/libtv-audio-task-apply";
-import { LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT } from "@/lib/canvas/libtv-node-chrome";
+import {
+  LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT,
+  LIBTV_AUDIO_WAVEFORM_RIBBON_SRC,
+} from "@/lib/canvas/libtv-node-chrome";
 
-function formatAudioTime(sec: number): string {
-  if (!Number.isFinite(sec) || sec < 0) return "00:00";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+const LIBTV_AUDIO_WAVEFORM_IMG_CLASS =
+  "pointer-events-none h-full w-full select-none object-cover object-center";
 
-function buildAudioWavePath(
-  width: number,
-  height: number,
-  amplitude: number,
-  cycles: number,
-): string {
-  const mid = height / 2;
-  const steps = 200;
-  let d = "";
-  for (let i = 0; i <= steps; i += 1) {
-    const x = (i / steps) * width;
-    const y = mid + amplitude * Math.sin((i / steps) * Math.PI * 2 * cycles);
-    d += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
-  }
-  return d;
-}
-
-const AUDIO_WAVE_VIEW_W = 800;
-const AUDIO_WAVE_VIEW_H = 40;
-const AUDIO_WAVE_PATH = buildAudioWavePath(AUDIO_WAVE_VIEW_W, AUDIO_WAVE_VIEW_H, 12, 5);
-
-/** 横向录音波形 · 连续波浪线 */
-function LibtvAudioWaveLine({
+/** 波形装饰图 · 铺满节点宽度，高度随音轨区 */
+function LibtvAudioWaveRibbon({
   progress = 0,
   className,
 }: {
   progress?: number;
   className?: string;
 }) {
-  const clipId = useId();
   const lit = Math.min(1, Math.max(0, progress));
+  const showProgress = lit > 0 && lit < 1;
 
   return (
-    <svg
-      viewBox={`0 0 ${AUDIO_WAVE_VIEW_W} ${AUDIO_WAVE_VIEW_H}`}
-      preserveAspectRatio="none"
-      className={cn("block h-full w-full", className)}
+    <div
+      className={cn("relative h-full w-full min-w-0 overflow-hidden", className)}
+      data-libtv-audio-wave="ribbon"
       aria-hidden
     >
-      <defs>
-        <clipPath id={clipId}>
-          <rect x={0} y={0} width={AUDIO_WAVE_VIEW_W * lit} height={AUDIO_WAVE_VIEW_H} />
-        </clipPath>
-      </defs>
-      <path
-        d={AUDIO_WAVE_PATH}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-white/22"
+      <img
+        src={LIBTV_AUDIO_WAVEFORM_RIBBON_SRC}
+        alt=""
+        draggable={false}
+        className={cn(
+          LIBTV_AUDIO_WAVEFORM_IMG_CLASS,
+          showProgress && "opacity-35",
+        )}
       />
-      {lit > 0 ? (
-        <path
-          d={AUDIO_WAVE_PATH}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          clipPath={`url(#${clipId})`}
-          className="text-white/80"
+      {showProgress ? (
+        <img
+          src={LIBTV_AUDIO_WAVEFORM_RIBBON_SRC}
+          alt=""
+          draggable={false}
+          className={cn(
+            "absolute inset-0",
+            LIBTV_AUDIO_WAVEFORM_IMG_CLASS,
+          )}
+          style={{
+            clipPath: `inset(0 ${100 - lit * 100}% 0 0)`,
+          }}
         />
       ) : null}
-    </svg>
+    </div>
   );
 }
 
-/** 空态 · 横向长波浪占位 */
+/** 空态 · 波形图铺满节点 */
 function LibtvAudioTrackEmptyState() {
   return (
     <div
-      className="flex h-full min-h-0 flex-1 items-center px-4 py-2"
+      className="flex h-full min-h-0 w-full flex-1 items-stretch px-3 pb-2 pt-0"
+      style={{ height: LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT }}
       title="输入旁白并选择模型生成"
     >
-      <div
-        className="w-full text-white/70"
-        style={{ height: LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT - 8 }}
-      >
-        <LibtvAudioWaveLine progress={0} />
-      </div>
+      <LibtvAudioWaveRibbon className="min-h-0 flex-1" />
     </div>
   );
+}
+
+function formatAudioTime(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) return "00:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function LibtvAudioWaveform({
@@ -163,10 +137,10 @@ function LibtvAudioWaveform({
   const progress = duration > 0 ? current / duration : 0;
 
   return (
-    <div className="flex min-h-0 flex-1 items-center gap-2 px-3 py-2">
+    <div className="flex min-h-0 w-full flex-1 items-center gap-2 px-3 pb-2 pt-0">
       <button
         type="button"
-        className="nodrag flex size-7 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
+        className="nodrag flex size-7 shrink-0 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20"
         onClick={onTogglePlay}
         aria-label={playing ? "暂停" : "播放"}
       >
@@ -177,13 +151,13 @@ function LibtvAudioWaveform({
         )}
       </button>
       <div
-        className="relative min-w-0 flex-1 rounded-lg bg-black/30 px-2 py-1.5 text-white/70"
-        style={{ height: LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT - 4 }}
+        className="relative min-w-0 flex-1"
+        style={{ height: LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT }}
       >
-        <LibtvAudioWaveLine progress={progress} />
+        <LibtvAudioWaveRibbon progress={progress} className="h-full w-full" />
         <span
-          className="pointer-events-none absolute bottom-1 top-1 w-px bg-rose-500/90"
-          style={{ left: `${Math.min(100, progress * 100)}%` }}
+          className="pointer-events-none absolute bottom-2 top-2 z-10 w-px bg-emerald-300/95"
+          style={{ left: `${Math.min(100, Math.max(0, progress * 100))}%` }}
         />
       </div>
       <span className="shrink-0 text-[10px] tabular-nums text-white/55">
@@ -372,26 +346,18 @@ export function LibtvAudioNode({
 
       <div
         className={cn(
-          LIBTV_MEDIA_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
-          "min-h-0 flex-1",
+          "flex min-h-0 flex-1 flex-col overflow-visible bg-transparent shadow-none",
         )}
-        style={libtvNodeBorderStyle({
-          selected,
-          hovered,
-          edition: "pro2",
-        })}
       >
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Music className={cn("size-3.5 shrink-0", "text-white/70")} />
-            <LibtvEditableNodeTitle
-              nodeId={id}
-              defaultLabel="音频"
-              textClassName="text-[12px] font-medium text-white/90"
-            />
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5 px-3 pb-1.5 pt-2">
+          <Music className="size-3.5 shrink-0 text-emerald-400" />
+          <LibtvEditableNodeTitle
+            nodeId={id}
+            defaultLabel="音频"
+            textClassName="text-[12px] font-medium text-white/90"
+          />
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <Pro2CrewTaskStatusBadge nodeId={id} />
             <LibtvNodeHeaderActions
               showPreview={hasAudio}
@@ -401,9 +367,7 @@ export function LibtvAudioNode({
             />
           </div>
         </div>
-        <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative min-h-0 flex-1")}>
-          {renderStage()}
-        </div>
+        <div className="relative min-h-0 w-full flex-1">{renderStage()}</div>
       </div>
     </div>
   );

@@ -83,15 +83,25 @@ export const LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH = 220;
 export const LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT = 220;
 
 /**
- * LibTV 音频轨节点（Pro2 · 横条 · 比 16:9 横版略宽，便于展示长波形）
- * 宽 840 × 高 96（标题 44 + 波形区 52）
+ * LibTV 音频轨节点（Pro2 · 横条 · 波形图）
+ * 宽 460 × 高 104（标题 44 + 波形区 60）
  */
-export const LIBTV_AUDIO_TRACK_NODE_WIDTH = 840;
-export const LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT = 52;
+export const LIBTV_AUDIO_TRACK_NODE_WIDTH = 460;
+export const LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT = 60;
 export const LIBTV_AUDIO_TRACK_NODE_HEIGHT =
   LIBTV_IMAGE_NODE_HEADER_HEIGHT + LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT;
-export const LIBTV_AUDIO_TRACK_NODE_MIN_WIDTH = 360;
-export const LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT = 72;
+export const LIBTV_AUDIO_TRACK_NODE_MIN_WIDTH = 220;
+export const LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT = 84;
+/** 音轨 UI 版本 · hydrate 时强制迁移外框 */
+export const LIBTV_AUDIO_TRACK_LAYOUT_VERSION = 7;
+
+/** 空态/预览 · 波形装饰图（public/libtv） */
+export const LIBTV_AUDIO_WAVEFORM_RIBBON_SRC =
+  "/libtv/audio-waveform-grid.png";
+
+/** 音频节点强调色 · 与画布磁吸 Dock「上传」图标同色（emerald-400） */
+export const LIBTV_AUDIO_ACCENT_COLOR = "#34d399";
+export const LIBTV_AUDIO_ACCENT_MUTED_COLOR = "rgba(52, 211, 153, 0.35)";
 
 /**
  * LibTV 横版视频媒体卡（Pro2 分镜视频组格 · sbv1 视频合成 · ≈3:2）
@@ -126,10 +136,11 @@ const LIBTV_NODE_BORDER_SELECTED_PRO2 = "#FFFFFF";
 const LIBTV_NODE_BORDER_SELECTED_SBV1 = "#22d3ee";
 const LIBTV_NODE_BORDER_SELECTED_NEUTRAL = "#FFFFFF";
 
-export type LibtvNodeBorderEdition = "pro2" | "sbv1" | "neutral";
+export type LibtvNodeBorderEdition = "pro2" | "sbv1" | "neutral" | "audio";
 
 function libtvNodeSelectedRingColor(edition: LibtvNodeBorderEdition): string {
   if (edition === "sbv1") return LIBTV_NODE_BORDER_SELECTED_SBV1;
+  if (edition === "audio") return LIBTV_AUDIO_ACCENT_COLOR;
   if (edition === "neutral") return LIBTV_NODE_BORDER_SELECTED_NEUTRAL;
   return LIBTV_NODE_BORDER_SELECTED_PRO2;
 }

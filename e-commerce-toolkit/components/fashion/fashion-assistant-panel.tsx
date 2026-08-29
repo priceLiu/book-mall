@@ -41,9 +41,13 @@ import type { FashionDeliverable } from "@/lib/fashion-types";
 import { isFashionDeliverable } from "@/lib/fashion-types";
 import {
   FASHION_AI_SELLPOINTS_CHOICE,
+  FASHION_OUTPUT_SCRIPT,
+  FASHION_OUTPUT_VIDEO,
   FASHION_WELCOME,
+  getFashionPhase,
   buildFashionProductRefAutoAdvance,
   applyFashionMetaAuthorityToDeliverable,
+  buildFashionDeliverableWithVersionPanels,
   buildFashionStoryboardPickChoices,
   buildFashionWorkflowChoiceMessageLabels,
   currentFashionDimensionStep,
@@ -66,11 +70,14 @@ import {
   isAwaitingFashionVoiceoverPick,
   isFashionDimensionCollecting,
   isFashionDimensionRevisionAllowed,
+  isFashionInProduce,
+  isFashionPendingOpsGeneration,
   isFashionPendingStoryboardGeneration,
   isFashionStoryboardConfirmUserMessage,
   isLegacyStoryboardProject,
   parseFashionVersionKeyFromUserMessage,
   resolveFashionDeliverable,
+  resolveFashionStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
 import type {
   StoryboardChatMessage,
@@ -433,6 +440,16 @@ export function FashionAssistantPanel({
     async (message: string) => {
       if (legacyReadonly || isBusy) return;
 
+      const phaseNow = getFashionPhase(effectiveProject);
+      const dNow = resolveFashionDeliverable(effectiveProject);
+      if (
+        phaseNow === "produce" &&
+        dNow?.outputMode &&
+        (message === FASHION_OUTPUT_SCRIPT || message === FASHION_OUTPUT_VIDEO)
+      ) {
+        return;
+      }
+
       setPendingChoice(message);
       setBusyStatus(fashionBusyStatusForUserMessage(message));
 
@@ -474,15 +491,16 @@ export function FashionAssistantPanel({
           let patchedProject: StoryboardProject | undefined;
 
           if (metaPatch.deliverable || metaPatch.workflow) {
+            const baseMeta = effectiveProject.meta ?? project.meta;
             const nextWorkflow = {
-              ...(project.meta?.workflow ?? {}),
+              ...(baseMeta?.workflow ?? {}),
               vertical: "fashion_apparel" as const,
               ...(metaPatch.workflow as Record<string, unknown>),
             };
             patchedProject = await updateStoryboardProject(projectId, {
               chatHistory: next,
               meta: {
-                ...project.meta,
+                ...baseMeta,
                 ...(metaPatch.deliverable
                   ? { deliverable: metaPatch.deliverable as NonNullable<StoryboardProject["meta"]>["deliverable"] }
                   : {}),
@@ -502,6 +520,8 @@ export function FashionAssistantPanel({
           if (llmTrigger && typeof llmTrigger === "string") {
             try {
               await runStream(next, llmTrigger, true, true);
+              setDeliverableOverride(null);
+              setWorkflowOverride({});
               await onDeliverableReady?.();
             } catch {
               const failureMsg: StoryboardChatMessage = {
@@ -534,21 +554,53 @@ export function FashionAssistantPanel({
               detail: "正在将定稿分镜写入左侧工作台…",
             });
             try {
+              const patchDeliverable = isFashionDeliverable(metaPatch.deliverable)
+                ? (metaPatch.deliverable as FashionDeliverable)
+                : null;
+              const versionKey = patchDeliverable?.selectedVersion;
+              if (versionKey && patchDeliverable) {
+                const withPanels = buildFashionDeliverableWithVersionPanels(
+                  effectiveProject,
+                  patchDeliverable,
+                  versionKey,
+                );
+                const panels = resolveFashionStoryboardPanelsForVersion(
+                  effectiveProject,
+                  versionKey,
+                  withPanels,
+                );
+                if (!panels?.length) {
+                  throw new Error(
+                    "定稿分镜缺少分镜表数据，请在中栏 12.1 确认分镜表已保存后再选择成片方式",
+                  );
+                }
+                patchedProject = await updateStoryboardProject(projectId, {
+                  meta: {
+                    ...(patchedProject ?? project).meta,
+                    deliverable: withPanels,
+                  },
+                });
+              }
               const refreshed = await syncStoryboardSheet(projectId);
+              setDeliverableOverride(null);
+              setWorkflowOverride({});
               await onDeliverableReady?.(refreshed);
               if (
                 resolveFashionDeliverable(refreshed)?.outputMode === "direct_video" &&
                 refreshed.sheet
               ) {
-                onRequestGenerateAllImages?.();
+                queueMicrotask(() => onRequestGenerateAllImages?.());
               }
             } catch (e) {
               const detail = e instanceof Error ? e.message : "分镜表同步失败";
+              setMessages(history);
+              await persistMessages(history);
               if (patchedProject) {
                 const prevDeliverable = isFashionDeliverable(patchedProject.meta?.deliverable)
                   ? (patchedProject.meta!.deliverable as FashionDeliverable)
                   : null;
                 const rolled = await updateStoryboardProject(projectId, {
+                  chatHistory: history,
                   meta: {
                     ...patchedProject.meta,
                     deliverable: prevDeliverable
@@ -611,8 +663,7 @@ export function FashionAssistantPanel({
   }, [input, isBusy, legacyReadonly, handleChoice]);
 
   const deliverable = resolveFashionDeliverable(effectiveProject);
-  const inProduce =
-    effectiveProject.meta?.workflow?.fashionPhase === "produce" && deliverable?.outputMode;
+  const inProduce = isFashionInProduce(effectiveProject);
   const awaitingCustomDimension = isAwaitingFashionCustomDimensionInput(effectiveProject);
   const isDimensionCollecting = isFashionDimensionCollecting(effectiveProject);
   const currentDimStep = currentFashionDimensionStep(effectiveProject);
@@ -633,8 +684,11 @@ export function FashionAssistantPanel({
   const awaitingOutputMode = isAwaitingFashionOutputMode(effectiveProject);
   const awaitingVoiceoverPick = isAwaitingFashionVoiceoverPick(effectiveProject);
   const pendingStoryboardGen = isFashionPendingStoryboardGeneration(effectiveProject);
+  const pendingOpsGen = isFashionPendingOpsGeneration(effectiveProject);
   const sellpointChoiceSubtitle = awaitingStoryboardPick
     ? "已生成分镜方案，请点选 A–E 版继续；不足 5 套可选「重新生成分镜」"
+    : pendingOpsGen
+      ? "分镜已定稿，运营包生成未完成或失败，请重新生成"
     : awaitingStoryboardConfirm
       ? "左侧 12.1 分镜表可编辑并保存，确认后生成运营包"
     : awaitingOutputMode
@@ -887,6 +941,8 @@ export function FashionAssistantPanel({
               title={
                 awaitingStoryboardPick
                   ? "选择分镜方案"
+                  : pendingOpsGen
+                    ? "生成运营包"
                   : awaitingStoryboardConfirm
                     ? "确认定稿分镜"
                   : awaitingOutputMode
@@ -938,25 +994,13 @@ export function FashionAssistantPanel({
 
         {inProduce && !isBusy ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-            <p className="text-sm text-[#1d1d1f]">
-              {deliverable?.outputMode === "direct_video"
-                ? "故事版已定稿。请在中栏「故事版 · 成片工作区」逐镜或一键生成分镜图，完成后可生成整图视频或分镜合成。"
-                : "分镜已定稿，可生成分镜图与导出交付。"}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <EcomButtonPrimary type="button" onClick={() => onRequestGenerateAllImages?.()}>
-                生成分镜图
-              </EcomButtonPrimary>
-              {deliverable?.outputMode === "direct_video" ? (
-                <>
-                  <EcomButtonSecondary type="button" onClick={() => onRequestGenerateFullVideo?.()}>
-                    整图视频
-                  </EcomButtonSecondary>
-                  <EcomButtonSecondary type="button" onClick={() => onRequestMergePanelVideos?.()}>
-                    分镜合成
-                  </EcomButtonSecondary>
-                </>
-              ) : null}
+            <div className="rounded-2xl border border-[#34c759]/25 bg-[#f6fff8] p-4 shadow-sm">
+              <p className="text-sm font-semibold text-[#1d1d1f]">策划流程已完成</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-[#6e6e73]">
+                {deliverable?.outputMode === "direct_video"
+                  ? "路径 B 已选定。请在中栏顶部「故事版 · 成片工作区」一键生图，完成后在同一区域合成整图视频或分镜视频。右侧无需再点「故事版一键成片」。"
+                  : "路径 A 已选定。请在中栏顶部「分镜图」生成各镜图片并导出交付。右侧无需重复选择成片方式。"}
+              </p>
             </div>
           </div>
         ) : null}

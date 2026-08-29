@@ -167,17 +167,46 @@ function coerceFashionPanels(raw: unknown): unknown {
     if (!panel || typeof panel !== "object") return panel;
     const p = panel as Record<string, unknown>;
     const index = typeof p.index === "number" ? p.index : idx + 1;
+    const sceneDesc =
+      typeof p.sceneDesc === "string" && p.sceneDesc.trim()
+        ? p.sceneDesc.trim()
+        : typeof p.scene === "string" && p.scene.trim()
+          ? p.scene.trim()
+          : "—";
+    const modelAction =
+      typeof p.modelAction === "string" && p.modelAction.trim()
+        ? p.modelAction.trim()
+        : typeof p.action === "string" && p.action.trim()
+          ? p.action.trim()
+          : sceneDesc;
+    const garmentFocus =
+      typeof p.garmentFocus === "string" && p.garmentFocus.trim()
+        ? p.garmentFocus.trim()
+        : typeof p.productBeat === "string" && p.productBeat.trim()
+          ? p.productBeat.trim()
+          : "服装展示";
     return {
       ...p,
       index,
       shotScale:
         typeof p.shotScale === "string" && p.shotScale.trim()
           ? p.shotScale.trim()
-          : SHOT_SCALE_BY_INDEX[index] ?? "中景",
+          : typeof p.shotType === "string" && p.shotType.trim()
+            ? p.shotType.trim()
+            : SHOT_SCALE_BY_INDEX[index] ?? "中景",
       durationSec:
         typeof p.durationSec === "number" && p.durationSec > 0
           ? roundDuration(p.durationSec)
           : 4,
+      cameraMove:
+        typeof p.cameraMove === "string" && p.cameraMove.trim()
+          ? p.cameraMove.trim()
+          : typeof p.camera === "string" && p.camera.trim()
+            ? p.camera.trim()
+            : "固定",
+      sceneDesc,
+      modelAction,
+      garmentFocus,
       sellpointIds: coerceSellpointIds(p.sellpointIds),
       imagePrompt:
         typeof p.imagePrompt === "string" && p.imagePrompt.trim()
@@ -280,10 +309,74 @@ function tryParseFashionCandidate(jsonRaw: string): FashionDeliverable | null {
     }
     const result = fashionDeliverableSchema.safeParse(parsed);
     if (result.success) return result.data;
+    if (
+      parsed.schemaVersion === FASHION_SCHEMA_VERSION ||
+      parsed.vertical === "fashion_apparel"
+    ) {
+      return parsed as FashionDeliverable;
+    }
   } catch {
     /* */
   }
   return null;
+}
+
+export function readMetaFashionDeliverable(raw: unknown): FashionDeliverable | null {
+  if (!raw || typeof raw !== "object") return null;
+  const coerced = coerceFashionDeliverable(
+    JSON.parse(JSON.stringify(raw)),
+  ) as Record<string, unknown>;
+  const result = fashionDeliverableSchema.safeParse(coerced);
+  if (result.success) return result.data;
+  if (
+    coerced.schemaVersion === FASHION_SCHEMA_VERSION ||
+    coerced.vertical === "fashion_apparel"
+  ) {
+    return coerced as FashionDeliverable;
+  }
+  return null;
+}
+
+export function hasFashionStoryboardConfirmInChat(
+  chatHistory: StoryboardChatMessage[],
+): boolean {
+  return chatHistory.some(
+    (m) =>
+      m.role === "user" &&
+      (m.content.trim() === "确认分镜，生成运营包" ||
+        m.content.trim() === "重新生成运营包"),
+  );
+}
+
+function isStoryboardConfirmAfterLastVersionPick(
+  chatHistory: StoryboardChatMessage[],
+): boolean {
+  let lastVersionIdx = -1;
+  let lastConfirmIdx = -1;
+  for (let i = 0; i < chatHistory.length; i++) {
+    const msg = chatHistory[i];
+    if (msg?.role !== "user") continue;
+    const trimmed = msg.content.trim();
+    if (/^选择分镜\s*[A-E]版/.test(trimmed)) lastVersionIdx = i;
+    if (
+      trimmed === "确认分镜，生成运营包" ||
+      trimmed === "重新生成运营包"
+    ) {
+      lastConfirmIdx = i;
+    }
+  }
+  return lastConfirmIdx >= 0 && lastConfirmIdx > lastVersionIdx;
+}
+
+function hasFashionOutputModeChoiceInChat(
+  chatHistory: StoryboardChatMessage[],
+): boolean {
+  return chatHistory.some(
+    (m) =>
+      m.role === "user" &&
+      (m.content.trim() === "分镜脚本交付" ||
+        m.content.trim() === "故事版一键成片"),
+  );
 }
 
 export function stripFashionDeliverableFence(text: string): string {
@@ -360,9 +453,6 @@ export function inferFashionPhaseFromDeliverable(
 function stripPrematureFashionDeliverableFields(d: FashionDeliverable): FashionDeliverable {
   if (!d.storyboardLocked) {
     return { ...d, opsPack: undefined, outputMode: null };
-  }
-  if (!hasMeaningfulOpsPack(d)) {
-    return { ...d, outputMode: null };
   }
   return d;
 }
@@ -442,7 +532,7 @@ export function mergeFashionDeliverablePatch(
       return merged;
     })(),
     selectedVersion:
-      patch.selectedVersion != null && patch.selectedVersion !== ""
+      patch.selectedVersion != null
         ? patch.selectedVersion
         : (base.selectedVersion ?? null),
     storyboardLocked: base.storyboardLocked || Boolean(patch.storyboardLocked),
@@ -512,9 +602,7 @@ export function resolveFashionDeliverableForProject(project: {
   chatHistory?: StoryboardChatMessage[];
 }): FashionDeliverable | null {
   const meta = (project.meta as Record<string, unknown> | null) ?? {};
-  const metaDeliverable = isFashionDeliverable(meta.deliverable)
-    ? (meta.deliverable as FashionDeliverable)
-    : null;
+  const metaDeliverable = readMetaFashionDeliverable(meta.deliverable);
   const markdown =
     typeof meta.deliverableMarkdown === "string" ? meta.deliverableMarkdown : "";
 
@@ -534,6 +622,7 @@ export function resolveFashionDeliverableForProject(project: {
   if (!merged) return null;
 
   const wf = (meta.workflow as Record<string, unknown> | undefined) ?? {};
+  const storyboardConfirmed = isStoryboardConfirmAfterLastVersionPick(chatHistory);
 
   if (metaDeliverable?.sellpoints?.length) {
     if (metaDeliverable.sellpointsLocked || wf.fashionSellpointsEdited === true) {
@@ -567,9 +656,8 @@ export function resolveFashionDeliverableForProject(project: {
     let panels =
       Boolean(metaVersion?.panels?.length) &&
       (metaDeliverable?.selectedVersion === versionKey ||
-        metaDeliverable?.storyboardLocked === true ||
-        wf.fashionStoryboardPanelsEdited === true ||
-        Boolean(metaDeliverable?.outputMode))
+        storyboardConfirmed ||
+        wf.fashionStoryboardPanelsEdited === true)
         ? metaVersion!.panels
         : mergedVersion?.panels?.length
           ? mergedVersion.panels
@@ -592,7 +680,7 @@ export function resolveFashionDeliverableForProject(project: {
       merged = {
         ...merged,
         selectedVersion: versionKey,
-        storyboardLocked: metaDeliverable?.storyboardLocked || merged.storyboardLocked,
+        storyboardLocked: storyboardConfirmed,
         storyboardVersions: {
           ...(merged.storyboardVersions ?? {}),
           [versionKey]: {
@@ -604,6 +692,28 @@ export function resolveFashionDeliverableForProject(project: {
     } else {
       merged = { ...merged, selectedVersion: versionKey };
     }
+  }
+
+  if (storyboardConfirmed) {
+    merged = { ...merged, storyboardLocked: true };
+  } else {
+    merged = {
+      ...merged,
+      storyboardLocked: false,
+      opsPack: undefined,
+      outputMode: null,
+    };
+  }
+
+  if (
+    storyboardConfirmed &&
+    metaDeliverable &&
+    hasMeaningfulOpsPack(metaDeliverable)
+  ) {
+    merged = { ...merged, opsPack: metaDeliverable!.opsPack };
+  }
+  if (hasFashionOutputModeChoiceInChat(chatHistory) && metaDeliverable?.outputMode) {
+    merged = { ...merged, outputMode: metaDeliverable.outputMode };
   }
 
   return stripPrematureFashionDeliverableFields(merged);
@@ -618,48 +728,58 @@ export function fashionVersionToSheet(
   const version = deliverable.storyboardVersions?.[key];
   if (!version?.panels?.length) return null;
 
-  const sellpointMap = new Map(
-    deliverable.sellpoints.map((sp) => [sp.id, sp.text]),
-  );
-  const highlight = deliverable.sellpoints
+  const sellpoints = deliverable.sellpoints ?? [];
+  const sellpointMap = new Map(sellpoints.map((sp) => [sp.id, sp.text]));
+  const highlight = sellpoints
     .filter((sp) => sp.layer === "core")
     .map((sp) => sp.text)
     .join("；");
 
+  const voiceovers = deliverable.voiceovers ?? [];
   const sheet = {
     overview: {
       title: version.title || `服装分镜 ${key} 版`,
       logline:
         version.summary?.trim() ||
-        deliverable.voiceovers.find((v) => v.id === deliverable.selectedVoiceoverId)
-          ?.narrative ||
+        voiceovers.find((v) => v.id === deliverable.selectedVoiceoverId)?.narrative ||
         deliverable.productName,
       productHighlight: highlight || undefined,
     },
     cast: [],
-    panels: version.panels.map((p) => ({
-      index: p.index,
-      timeline: undefined,
-      shotType: p.shotScale,
-      scene: p.sceneDesc,
-      action: p.modelAction,
-      dialogue: p.dialogue,
-      camera: p.cameraMove,
-      durationHintSec: p.durationSec,
-      sellpointTags: p.sellpointIds,
-      imagePrompt: p.imagePrompt,
-      productInteraction: "wear" as const,
-      productVisibility: "hero" as const,
-      productBeat: p.garmentFocus,
-      emotion: p.toneTexture,
-    })),
+    panels: version.panels.map((p, idx) => {
+      const index = typeof p.index === "number" ? p.index : idx + 1;
+      const scene = p.sceneDesc?.trim() || "—";
+      const action = p.modelAction?.trim() || scene;
+      return {
+        index,
+        timeline: undefined,
+        shotType: p.shotScale?.trim() || "中景",
+        scene,
+        action,
+        dialogue: p.dialogue?.trim() || undefined,
+        camera: p.cameraMove?.trim() || "固定",
+        durationHintSec: p.durationSec > 0 ? p.durationSec : 4,
+        sellpointTags: p.sellpointIds ?? [],
+        imagePrompt:
+          p.imagePrompt?.trim() ||
+          "竖版9:16，写实UGC摄影，服装展示，禁止画面文字。",
+        productInteraction: "wear" as const,
+        productVisibility: "hero" as const,
+        productBeat: p.garmentFocus?.trim() || "服装展示",
+        emotion: p.toneTexture?.trim() || undefined,
+      };
+    }),
     totalDurationHintSec:
       version.totalDurationSec ??
-      version.panels.reduce((sum, p) => sum + p.durationSec, 0),
+      version.panels.reduce((sum, p) => sum + (p.durationSec > 0 ? p.durationSec : 4), 0),
   };
 
   void sellpointMap;
-  return parseStoryboardSheet(sheet);
+  try {
+    return parseStoryboardSheet(sheet);
+  } catch {
+    return null;
+  }
 }
 
 export function isFashionWorkflow(meta: Record<string, unknown> | null | undefined): boolean {

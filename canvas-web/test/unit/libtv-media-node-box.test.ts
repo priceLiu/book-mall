@@ -6,6 +6,11 @@ import {
   resolveLibtvMediaNodeBoxSize,
   libtvMediaNodesNeedViewportReflow,
 } from "@/lib/canvas/libtv-media-node-size";
+import {
+  LIBTV_AUDIO_TRACK_LAYOUT_VERSION,
+  LIBTV_AUDIO_TRACK_NODE_HEIGHT,
+  LIBTV_AUDIO_TRACK_NODE_WIDTH,
+} from "@/lib/canvas/libtv-node-chrome";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 const mixedGroupNodes = (): CanvasFlowNode[] => [
@@ -89,5 +94,30 @@ describe("reconcileLibtvMediaNodeBoxSizes", () => {
 
     expect(render.width).toBe(expected.width);
     expect(render.height).toBe(expected.height);
+  });
+
+  it("migrates legacy story-pro2-audio track to v7 layout size", () => {
+    const before: CanvasFlowNode[] = [
+      {
+        id: "a1",
+        type: "story-pro2-audio",
+        position: { x: 0, y: 0 },
+        data: { label: "音效设计", audioTrackLayoutVersion: 0 },
+        width: 920,
+        height: 104,
+      },
+    ];
+    expect(libtvMediaNodesNeedViewportReflow(before)).toBe(true);
+    const after = reconcileLibtvMediaNodeBoxSizes(before);
+    const audio = after[0]!;
+    expect(audio.width).toBe(LIBTV_AUDIO_TRACK_NODE_WIDTH);
+    expect(audio.height).toBe(LIBTV_AUDIO_TRACK_NODE_HEIGHT);
+    expect(
+      (audio.data as { audioTrackLayoutVersion?: number }).audioTrackLayoutVersion,
+    ).toBe(LIBTV_AUDIO_TRACK_LAYOUT_VERSION);
+    expect(resolveLibtvMediaNodeBoxSize(audio)).toEqual({
+      width: LIBTV_AUDIO_TRACK_NODE_WIDTH,
+      height: LIBTV_AUDIO_TRACK_NODE_HEIGHT,
+    });
   });
 });

@@ -267,6 +267,73 @@ ${JSON.stringify({
     expect(inferFashionPhaseFromDeliverable(ready)).toBe("output_mode");
   });
 
+  it("resolve does not restore outputMode without explicit path choice in chat", () => {
+    const metaDeliverable = {
+      ...V4_FIXTURE,
+      selectedVersion: "A" as const,
+      storyboardLocked: true,
+      outputMode: "direct_video" as const,
+      opsPack: { titles: ["标题1"] },
+      storyboardVersions: {
+        A: {
+          id: "A" as const,
+          title: "A版",
+          panels: Array.from({ length: 6 }, (_, i) => PANEL_FIXTURE(i + 1)),
+        },
+      },
+    };
+    const resolved = resolveFashionDeliverableForProject({
+      meta: { deliverable: metaDeliverable, workflow: { vertical: "fashion_apparel" } },
+      chatHistory: [],
+    });
+    expect(resolved?.outputMode).toBeNull();
+    expect(resolved?.opsPack).toBeUndefined();
+    expect(resolved?.storyboardLocked).toBe(false);
+  });
+
+  it("resolve restores outputMode after user picks path in chat", () => {
+    const metaDeliverable = {
+      ...V4_FIXTURE,
+      selectedVersion: "A" as const,
+      storyboardLocked: true,
+      outputMode: "direct_video" as const,
+      opsPack: { titles: ["标题1"] },
+      storyboardVersions: {
+        A: {
+          id: "A" as const,
+          title: "A版",
+          panels: Array.from({ length: 6 }, (_, i) => PANEL_FIXTURE(i + 1)),
+        },
+      },
+    };
+    const resolved = resolveFashionDeliverableForProject({
+      meta: { deliverable: metaDeliverable, workflow: { vertical: "fashion_apparel" } },
+      chatHistory: [
+        {
+          id: "u1",
+          role: "user",
+          content: "选择分镜 A版：A版",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "u2",
+          role: "user",
+          content: "确认分镜，生成运营包",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "u3",
+          role: "user",
+          content: "故事版一键成片",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+    expect(resolved?.outputMode).toBe("direct_video");
+    expect(resolved?.opsPack?.titles).toEqual(["标题1"]);
+    expect(resolved?.storyboardLocked).toBe(true);
+  });
+
   it("resolveFashionDeliverableForProject merges chat pick and locked meta panels", () => {
     const metaDeliverable = {
       ...V4_FIXTURE,
@@ -301,5 +368,56 @@ ${JSON.stringify({
     expect(resolved?.selectedVersion).toBe("A");
     expect(resolved?.storyboardVersions?.A?.panels[0]?.sceneDesc).toBe("定稿场景");
     expect(fashionVersionToSheet(resolved!)?.panels).toHaveLength(6);
+  });
+
+  it("resolveFashionDeliverableForProject lenient meta + chat confirm builds sheet", () => {
+    const partialPanels = Array.from({ length: 6 }, (_, i) => ({
+      index: i + 1,
+      shotScale: "中景",
+      durationSec: 4,
+    }));
+    const resolved = resolveFashionDeliverableForProject({
+      meta: {
+        deliverable: {
+          schemaVersion: FASHION_SCHEMA_VERSION,
+          vertical: "fashion_apparel",
+          productName: "测试款",
+          dimensions: {},
+          sellpoints: V4_FIXTURE.sellpoints,
+          sellpointsLocked: true,
+          voiceovers: V4_FIXTURE.voiceovers,
+          selectedVoiceoverId: "V01",
+          storyboardVersions: {
+            C: {
+              id: "C",
+              title: "情绪氛围式",
+              panels: partialPanels,
+            },
+          },
+          selectedVersion: "C",
+          storyboardLocked: false,
+          coverageChecklist: [],
+          outputMode: "direct_video",
+        },
+        workflow: { vertical: "fashion_apparel" },
+      },
+      chatHistory: [
+        {
+          id: "u1",
+          role: "user",
+          content: "选择分镜 C版：情绪氛围式",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "u2",
+          role: "user",
+          content: "确认分镜，生成运营包",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+    expect(resolved?.selectedVersion).toBe("C");
+    expect(resolved?.storyboardLocked).toBe(true);
+    expect(fashionVersionToSheet(resolved!)?.panels.length).toBeGreaterThan(0);
   });
 });

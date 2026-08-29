@@ -6,6 +6,7 @@ import {
 import {
   fashionVersionToSheet,
   isFashionWorkflow,
+  readMetaFashionDeliverable,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
 import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
@@ -29,6 +30,7 @@ export async function syncEcomStoryboardSheetFromMeta(
 
   const metaRecord = (project.meta as Record<string, unknown> | null) ?? {};
   if (isFashionWorkflow(metaRecord)) {
+    const existingDeliverable = readMetaFashionDeliverable(metaRecord.deliverable);
     const deliverable = resolveFashionDeliverableForProject({
       meta: metaRecord,
       chatHistory: project.chatHistory,
@@ -36,12 +38,23 @@ export async function syncEcomStoryboardSheetFromMeta(
     if (deliverable?.selectedVersion) {
       const sheet = fashionVersionToSheet(deliverable);
       if (sheet) {
+        const deliverableToSave = {
+          ...deliverable,
+          outputMode: existingDeliverable?.outputMode ?? deliverable.outputMode,
+          opsPack: existingDeliverable?.opsPack ?? deliverable.opsPack,
+          storyboardLocked: true,
+        };
         await updateEcomStoryboardProject(userId, projectId, {
           sheet,
           status: "sheet_ready",
           meta: {
             ...project.meta,
-            deliverable,
+            deliverable: deliverableToSave,
+            workflow: {
+              ...((project.meta?.workflow as Record<string, unknown> | undefined) ?? {}),
+              vertical: "fashion_apparel",
+              fashionPhase: deliverableToSave.outputMode ? "produce" : "output_mode",
+            },
           },
         });
         return {
@@ -51,7 +64,12 @@ export async function syncEcomStoryboardSheetFromMeta(
         };
       }
       throw new Error(
-        `定稿分镜 ${deliverable.selectedVersion} 版缺少完整 6 镜数据，请在中栏保存分镜表后重新选择故事版`,
+        `定稿分镜 ${deliverable.selectedVersion} 版缺少分镜表数据，请在中栏 12.1 确认分镜表已保存后重试`,
+      );
+    }
+    if (deliverable) {
+      throw new Error(
+        "未找到已定稿的分镜版本，请先在助手确认分镜并生成运营包后再选择成片方式",
       );
     }
     return { sheet: project.sheet, deliverable: null, selectedSchemeIndex: 0 };

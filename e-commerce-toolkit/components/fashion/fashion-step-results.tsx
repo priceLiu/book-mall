@@ -16,7 +16,7 @@ import {
   resolveFashionDeliverable,
   resolveFashionStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
-import type { FashionPanelRow, FashionSellpoint, FashionVersionKey } from "@/lib/fashion-types";
+import type { FashionPanelRow, FashionSellpoint } from "@/lib/fashion-types";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 
 function StepSection({ title, children }: { title: string; children: ReactNode }) {
@@ -79,9 +79,34 @@ export function FashionStepResults({
   );
   const panelsEditable = isFashionStoryboardPanelsEditable(project);
   const inDirectVideoProduce = deliverable.outputMode === "direct_video";
+  const inProduce = Boolean(deliverable.outputMode);
 
-  return (
-    <div className="space-y-4">
+  const panelsTableSection =
+    panels.length > 0 && deliverable.selectedVersion ? (
+      <StepSection
+        title={`12.1 · 分镜脚本表${versionKey ? `（${versionKey}版${deliverable.storyboardLocked ? " · 已定稿" : ""}）` : ""}`}
+      >
+        {panelsEditable ? (
+          <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
+            可直接修改各镜字段，保存后继续；定稿请在右侧助手点击「确认分镜，生成运营包」。
+          </p>
+        ) : deliverable.storyboardLocked ? (
+          <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
+            分镜已定稿，如需修改请返回重新选版（运营包生成前）。
+          </p>
+        ) : null}
+        <FashionPanelsTable
+          panels={panels}
+          sellpoints={deliverable.sellpoints}
+          editable={panelsEditable && Boolean(onSavePanels)}
+          saving={panelsSaving}
+          onSavePanels={onSavePanels}
+        />
+      </StepSection>
+    ) : null;
+
+  const archiveSections = (
+    <>
       <StepSection title="产品参数档案">
         <FashionParamsTable dimensions={deliverable.dimensions} />
       </StepSection>
@@ -132,6 +157,71 @@ export function FashionStepResults({
         </StepSection>
       ) : null}
 
+      {!inDirectVideoProduce ? panelsTableSection : null}
+
+      {panels.length > 0 && deliverable.selectedVersion && deliverable.sellpoints.length && !inDirectVideoProduce ? (
+        <StepSection title="12.3 · 卖点覆盖率验收清单">
+          <FashionCoverageTable sellpoints={deliverable.sellpoints} panels={panels} />
+        </StepSection>
+      ) : null}
+
+      {deliverable.opsPack ? (
+        <StepSection title="运营素材包">
+          <FashionOpsPackBlock ops={deliverable.opsPack} />
+        </StepSection>
+      ) : null}
+    </>
+  );
+
+  if (inProduce) {
+    return (
+      <div className="space-y-4">
+        <StepSection title="成片制作（当前步骤）">
+          <p className="text-sm text-[#1d1d1f]">
+            {deliverable.outputMode === "script_compose"
+              ? "路径 A：分镜脚本交付 — 生成各镜分镜图后可导出 HTML/ZIP 自行剪辑。"
+              : "路径 B：故事版一键成片 — 在下方故事版工作区生图，完成后合成视频。"}
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-[#86868b]">
+            七维 → 卖点 → 口播 → 分镜 → 运营包 已全部完成；策划交付物见本页下方「查阅区」。
+          </p>
+        </StepSection>
+
+        {inDirectVideoProduce ? (
+          <>
+            {panelsTableSection}
+            <StepSection title="故事版 · 成片工作区">
+              {produceWorkspace ?? (
+                <p className="text-sm text-[#86868b]">
+                  正在同步故事版…若长时间无内容，请点工作区内的「重新同步故事版」。
+                </p>
+              )}
+            </StepSection>
+            <StepSection title="成片">
+              {videoSlot ?? <span className="text-sm text-[#86868b]">分镜图就绪后可在此合成视频</span>}
+            </StepSection>
+          </>
+        ) : (
+          <>
+            {panelsTableSection}
+            <StepSection title="分镜图">
+              {imagesSlot ?? <span className="text-sm text-[#86868b]">—</span>}
+            </StepSection>
+          </>
+        )}
+
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold text-[#86868b]">策划交付物（查阅）</h2>
+          {archiveSections}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {archiveSections}
+
       {awaitingVersionPick && versionKeys.length > 0 ? (
         <StepSection title="分镜方案（待选定）">
           <p className="mb-3 text-sm text-[#6e6e73]">
@@ -152,74 +242,6 @@ export function FashionStepResults({
               );
             })}
           </ul>
-        </StepSection>
-      ) : null}
-
-      {panels.length > 0 && deliverable.selectedVersion && !inDirectVideoProduce ? (
-        <StepSection
-          title={`12.1 · 分镜脚本表${versionKey ? `（${versionKey}版${deliverable.storyboardLocked ? " · 已定稿" : ""}）` : ""}`}
-        >
-          {panelsEditable ? (
-            <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
-              可直接修改各镜字段，保存后继续；定稿请在右侧助手点击「确认分镜，生成运营包」。
-            </p>
-          ) : deliverable.storyboardLocked ? (
-            <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
-              分镜已定稿，如需修改请返回重新选版（运营包生成前）。
-            </p>
-          ) : null}
-          <FashionPanelsTable
-            panels={panels}
-            sellpoints={deliverable.sellpoints}
-            editable={panelsEditable && Boolean(onSavePanels)}
-            saving={panelsSaving}
-            onSavePanels={onSavePanels}
-          />
-        </StepSection>
-      ) : null}
-
-      {panels.length > 0 && deliverable.selectedVersion && deliverable.sellpoints.length && !inDirectVideoProduce ? (
-        <StepSection title="12.3 · 卖点覆盖率验收清单">
-          <FashionCoverageTable
-            sellpoints={deliverable.sellpoints}
-            panels={panels}
-          />
-        </StepSection>
-      ) : null}
-
-      {inDirectVideoProduce ? (
-        <StepSection title="故事版 · 成片工作区">
-          {produceWorkspace ?? (
-            <p className="text-sm text-[#86868b]">
-              故事版同步中…请在右侧确认「故事版一键成片」后刷新；若长时间无内容，请重新点选成片方式。
-            </p>
-          )}
-        </StepSection>
-      ) : null}
-
-      {deliverable.opsPack ? (
-        <StepSection title="运营素材包">
-          <FashionOpsPackBlock ops={deliverable.opsPack} />
-        </StepSection>
-      ) : null}
-
-      {deliverable.outputMode ? (
-        <StepSection title="成片方式">
-          <p className="text-sm text-[#1d1d1f]">
-            {deliverable.outputMode === "script_compose"
-              ? "路径 A：分镜脚本交付（导出 + 分镜图）"
-              : "路径 B：故事版一键成片（分镜图 + 视频）"}
-          </p>
-        </StepSection>
-      ) : null}
-
-      {deliverable.outputMode === "script_compose" ? (
-        <StepSection title="分镜图">{imagesSlot ?? <span className="text-sm text-[#86868b]">—</span>}</StepSection>
-      ) : null}
-
-      {deliverable.outputMode === "direct_video" ? (
-        <StepSection title="成片">
-          {videoSlot ?? <span className="text-sm text-[#86868b]">—</span>}
         </StepSection>
       ) : null}
     </div>
