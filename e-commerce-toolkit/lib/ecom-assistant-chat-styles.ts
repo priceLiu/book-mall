@@ -5,6 +5,10 @@ export const ECOM_ASSISTANT_BUBBLE_CLASS =
 
 export const ECOM_ASSISTANT_USER_BUBBLE_CLASS = "bg-[#0071e3] text-white";
 
+/** 用户短回复气泡（与产品主图助手一致：宽度随内容，上限 95%） */
+export const ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE =
+  "max-w-[95%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed";
+
 export const ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE =
   "max-w-[95%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed";
 

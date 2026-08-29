@@ -118,6 +118,17 @@ const FASHION_POST_DIMENSION_USER_MESSAGES = new Set([
   "已上传产品图",
 ]);
 
+function isFashionDimensionReviseMessage(text: string): boolean {
+  return text.trim().startsWith("修改七维·");
+}
+
+function parseFashionDimensionReviseStepIndex(text: string): number | null {
+  if (!isFashionDimensionReviseMessage(text)) return null;
+  const label = text.trim().slice("修改七维·".length);
+  const idx = FASHION_DIMENSION_STEPS.findIndex((s) => s.label === label);
+  return idx >= 0 ? idx : null;
+}
+
 function isFashionPostDimensionUserMessage(text: string): boolean {
   const trimmed = text.trim();
   if (FASHION_POST_DIMENSION_USER_MESSAGES.has(trimmed)) return true;
@@ -139,6 +150,14 @@ export function buildFashionDimensionMessageLabels(
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
     if (!trimmed || trimmed === "已上传产品图") continue;
+
+    const reviseStep = parseFashionDimensionReviseStepIndex(trimmed);
+    if (reviseStep != null) {
+      dimStep = reviseStep;
+      awaitingCustom = false;
+      continue;
+    }
+
     if (dimStep >= FASHION_DIMENSION_STEPS.length) break;
     if (isFashionPostDimensionUserMessage(trimmed)) break;
 
@@ -177,6 +196,17 @@ export function buildFashionDimensionsFromChat(
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
     if (!trimmed || trimmed === "已上传产品图") continue;
+
+    const reviseStep = parseFashionDimensionReviseStepIndex(trimmed);
+    if (reviseStep != null) {
+      dimStep = reviseStep;
+      awaitingCustom = false;
+      for (let i = reviseStep; i < FASHION_DIMENSION_STEPS.length; i++) {
+        delete dimensions[FASHION_DIMENSION_STEPS[i]!.key];
+      }
+      continue;
+    }
+
     if (dimStep >= FASHION_DIMENSION_STEPS.length) break;
     if (isFashionPostDimensionUserMessage(trimmed)) break;
 

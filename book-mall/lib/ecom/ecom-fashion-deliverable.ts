@@ -345,9 +345,14 @@ export function inferFashionPhaseFromDeliverable(
   if (!d.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
   if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
   if (!d.selectedVoiceoverId) return "voiceover_pick";
+  const storyboardVersionCount = (["A", "B", "C", "D", "E"] as const).filter((k) => {
+    const v = d.storyboardVersions?.[k];
+    return Boolean(v?.panels?.length || v?.title?.trim() || v?.summary?.trim());
+  }).length;
+  if (storyboardVersionCount === 0) return "voiceover_pick";
   if (!d.selectedVersion) return "storyboard_pick";
   if (!d.storyboardLocked) return "storyboard_confirm";
-  if (!hasMeaningfulOpsPack(d)) return "ops_pack";
+  if (!hasMeaningfulOpsPack(d)) return "storyboard_confirm";
   if (!d.outputMode) return "output_mode";
   return "produce";
 }

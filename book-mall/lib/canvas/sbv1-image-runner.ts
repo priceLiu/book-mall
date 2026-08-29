@@ -121,11 +121,12 @@ export async function runSbv1ImageNode(
   }
 
   const isHdGridSplit = Boolean(data.pro2HdFromGridSplit);
-  const pendingGridCrop =
+  const pendingGridCrop = Boolean(
     isHdGridSplit &&
-    data.gridSplitCrop &&
-    typeof data.gridSplitCrop === "object" &&
-    data.gridSplitFrameCrop !== true;
+      data.gridSplitCrop &&
+      typeof data.gridSplitCrop === "object" &&
+      data.gridSplitFrameCrop !== true,
+  );
   const selfUrl =
     !isHdGridSplit &&
     typeof data.ossUrl === "string" &&

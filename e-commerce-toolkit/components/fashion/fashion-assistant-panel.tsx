@@ -12,6 +12,7 @@ import {
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
+  ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE,
 } from "@/lib/ecom-assistant-chat-styles";
 import {
   getStoryboardProject,
@@ -50,8 +51,11 @@ import {
   fashionBusyStatusForLlmTrigger,
   fashionBusyStatusForUserMessage,
   fashionLlmFailureAssistantMessage,
+  fashionMetaAfterLlmFailure,
   fashionNeedsProductRefAutoAdvance,
+  fashionReviseDimensionChoiceLabel,
   fashionWorkflowPatchForChoice,
+  FASHION_REVISE_DIMENSION_PREFIX,
   inferFashionChoices,
   inferFashionPhaseFromState,
   isAwaitingFashionCustomDimensionInput,
@@ -61,6 +65,7 @@ import {
   isAwaitingFashionStoryboardPick,
   isAwaitingFashionVoiceoverPick,
   isFashionDimensionCollecting,
+  isFashionDimensionRevisionAllowed,
   isFashionPendingStoryboardGeneration,
   isFashionStoryboardConfirmUserMessage,
   isLegacyStoryboardProject,
@@ -330,11 +335,17 @@ export function FashionAssistantPanel({
 
   const awaitingStoryboardPick = isAwaitingFashionStoryboardPick(effectiveProject);
   const awaitingStoryboardConfirm = isAwaitingFashionStoryboardConfirm(effectiveProject);
+  const canReviseDimensions = isFashionDimensionRevisionAllowed(effectiveProject);
 
   const displayMessages = useMemo(
     () =>
       messages.filter(
-        (m) => !(m.role === "user" && isFashionInternalLlmTrigger(m.content)),
+        (m) =>
+          !(m.role === "user" && isFashionInternalLlmTrigger(m.content)) &&
+          !(
+            m.role === "user" &&
+            m.content.trim().startsWith(FASHION_REVISE_DIMENSION_PREFIX)
+          ),
       ),
     [messages],
   );
@@ -436,6 +447,10 @@ export function FashionAssistantPanel({
       setMessages(next);
 
       try {
+        const preMeta = {
+          deliverable: project.meta?.deliverable,
+          workflow: { ...(project.meta?.workflow ?? {}) } as Record<string, unknown>,
+        };
         const patchResult = fashionWorkflowPatchForChoice(effectiveProject, message);
         if (patchResult) {
           const { llmTrigger, syncSheet, ...metaPatch } = patchResult;
@@ -499,28 +514,13 @@ export function FashionAssistantPanel({
               setMessages(failedHistory);
               setWorkflowOverride({});
               setDeliverableOverride(null);
+              const rollback = fashionMetaAfterLlmFailure(llmTrigger, preMeta, metaPatch);
               const rolled = await updateStoryboardProject(projectId, {
                 chatHistory: failedHistory,
                 meta: {
                   ...project.meta,
-                  ...(metaPatch.deliverable
-                    ? {
-                        deliverable:
-                          metaPatch.deliverable as NonNullable<
-                            StoryboardProject["meta"]
-                          >["deliverable"],
-                      }
-                    : {}),
-                  workflow: {
-                    ...(project.meta?.workflow ?? {}),
-                    ...(metaPatch.workflow as Record<string, unknown>),
-                    fashionPhase: llmTrigger.includes("voiceovers")
-                      ? "sellpoints"
-                      : ((metaPatch.workflow as { fashionPhase?: string } | undefined)
-                          ?.fashionPhase ??
-                          (project.meta?.workflow as { fashionPhase?: string } | undefined)
-                            ?.fashionPhase),
-                  },
+                  ...(rollback.deliverable != null ? { deliverable: rollback.deliverable } : {}),
+                  workflow: rollback.workflow,
                 },
               });
               await onDeliverableReady?.(rolled);
@@ -716,24 +716,38 @@ export function FashionAssistantPanel({
             <div
               key={m.id}
               className={cn(
-                "mb-3 max-w-[95%]",
-                m.role === "user" ? "ml-auto" : "mr-auto",
+                "mb-3 flex w-full flex-col",
+                m.role === "user" ? "items-end" : "items-start",
               )}
             >
               {choiceMeta ? (
-                <div className="mb-1 text-right">
+                <div className="mb-1 max-w-[95%] text-right">
                   <p className="text-[11px] font-semibold text-[#1d1d1f]">{choiceMeta.label}</p>
                   <p className="text-[10px] text-[#86868b]">{choiceMeta.detail}</p>
                 </div>
               ) : dimMeta ? (
-                <div className="mb-1 text-right">
-                  <p className="text-[11px] font-semibold text-[#1d1d1f]">{dimMeta.label}</p>
-                  <p className="text-[10px] text-[#86868b]">七维参数 · {dimMeta.progress}</p>
+                <div className="mb-1 max-w-[95%] text-right">
+                  {canReviseDimensions ? (
+                    <button
+                      type="button"
+                      className="text-[11px] font-medium text-[#0071e3] underline decoration-[#0071e3]/45 underline-offset-2 hover:decoration-[#0071e3] disabled:opacity-50"
+                      disabled={isBusy}
+                      onClick={() =>
+                        void handleChoice(fashionReviseDimensionChoiceLabel(dimMeta.stepIndex))
+                      }
+                    >
+                      {dimMeta.label}
+                    </button>
+                  ) : (
+                    <span className="text-[11px] font-medium text-[#0071e3]">{dimMeta.label}</span>
+                  )}
                 </div>
               ) : null}
               <div
                 className={cn(
-                  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                  m.role === "user"
+                    ? ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE
+                    : ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
                   m.role === "user" ? ECOM_ASSISTANT_USER_BUBBLE_CLASS : ECOM_ASSISTANT_BUBBLE_CLASS,
                 )}
               >
@@ -752,7 +766,7 @@ export function FashionAssistantPanel({
                     <p className="text-sm text-[#86868b]">正在生成…</p>
                   ) : null
                 ) : (
-                  m.content
+                  <p className="whitespace-pre-wrap">{m.content}</p>
                 )}
               </div>
               {userStoryboardKey && userStoryboardVersion?.panels?.length ? (
