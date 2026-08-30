@@ -284,13 +284,7 @@ export function StoryboardStudio() {
   useEffect(() => {
     if (!project) return;
     setUploadRole(inferCollectUploadRole(project));
-  }, [
-    project?.id,
-    project?.chatHistory,
-    project?.sheet,
-    project?.meta?.workflow,
-    project?.meta?.deliverable,
-  ]);
+  }, [project]);
 
   const capturePng = useCallback(async () => {
     await new Promise<void>((r) => {

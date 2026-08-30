@@ -32,7 +32,9 @@ import {
 } from "@/lib/fashion-dimensions";
 import {
   buildProDimensionMessageLabels,
+  buildProDimensionsFromChat,
   getDimensionSteps,
+  mergeProDimensionSources,
   proDimensionPrompt,
   proDimensionStepProgress,
 } from "@/lib/pro-vertical/dimensions";
@@ -324,6 +326,34 @@ export function FashionAssistantPanel({
         : (wfPhase as typeof inferredPhase);
     void (async () => {
       try {
+        if (isProDeliverable(resolved)) {
+          const metaPro = isProDeliverable(project.meta?.deliverable)
+            ? (project.meta!.deliverable as ProDeliverable)
+            : null;
+          const deliverable: ProDeliverable = {
+            ...resolved,
+            dimensions: mergeProDimensionSources(
+              "bags",
+              resolved.dimensions,
+              metaPro?.dimensions,
+              buildProDimensionsFromChat("bags", history),
+            ),
+          };
+          const updated = await updateStoryboardProject(projectId, {
+            meta: {
+              ...project.meta,
+              deliverable,
+              workflow: {
+                ...(project.meta?.workflow ?? {}),
+                vertical: "bags",
+                proPhase: nextPhase,
+              },
+            },
+          });
+          await onDeliverableReady?.(updated);
+          return;
+        }
+        if (!isFashionDeliverable(resolved)) return;
         const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
           ? (project.meta!.deliverable as FashionDeliverable)
           : null;

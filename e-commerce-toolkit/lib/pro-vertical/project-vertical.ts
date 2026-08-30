@@ -1,5 +1,6 @@
 import type { StoryboardProject } from "@/lib/storyboard-types";
-import { isProVerticalId, type ProVerticalId } from "@/lib/pro-vertical/registry";
+import { isProVerticalId } from "@/lib/pro-vertical/registry";
+import type { ProVerticalId } from "@/lib/pro-vertical/types";
 
 function workflowOf(project: StoryboardProject): Record<string, unknown> {
   return (project.meta?.workflow ?? {}) as Record<string, unknown>;
@@ -26,7 +27,8 @@ function isLegacyGenericStoryboard(project: StoryboardProject): boolean {
 
 export function getProjectVertical(project: StoryboardProject): ProVerticalId | null {
   const v = project.meta?.workflow?.vertical;
-  return isProVerticalId(typeof v === "string" ? v : null) ? v : null;
+  if (typeof v !== "string") return null;
+  return isProVerticalId(v) ? v : null;
 }
 
 export function isProVerticalProject(project: StoryboardProject): boolean {

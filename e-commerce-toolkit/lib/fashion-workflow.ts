@@ -796,7 +796,11 @@ function countFashionStoryboardVersions(d: FashionDeliverable | null | undefined
 }
 
 export function listFashionStoryboardVersionKeys(
-  d: Pick<FashionDeliverable, "storyboardVersions"> | null | undefined,
+  d:
+    | Pick<FashionDeliverable, "storyboardVersions">
+    | Pick<ProDeliverable, "storyboardVersions">
+    | null
+    | undefined,
 ): FashionVersionKey[] {
   const versions = d?.storyboardVersions ?? {};
   return (["A", "B", "C", "D", "E"] as FashionVersionKey[]).filter((k) => {
@@ -2009,7 +2013,9 @@ export function fashionWorkflowPatchForChoice(
       return null;
     }
     const key = deliverable.selectedVersion;
-    const withPanels = buildFashionDeliverableWithVersionPanels(project, deliverable, key);
+    const withPanels = isBagsProject(project)
+      ? deliverable
+      : buildFashionDeliverableWithVersionPanels(project, deliverable as FashionDeliverable, key);
     return {
       deliverable: {
         ...withPanels,
@@ -2033,7 +2039,9 @@ export function fashionWorkflowPatchForChoice(
       return null;
     }
     const key = deliverable.selectedVersion;
-    const withPanels = buildFashionDeliverableWithVersionPanels(project, deliverable, key);
+    const withPanels = isBagsProject(project)
+      ? deliverable
+      : buildFashionDeliverableWithVersionPanels(project, deliverable as FashionDeliverable, key);
     return {
       deliverable: {
         ...withPanels,

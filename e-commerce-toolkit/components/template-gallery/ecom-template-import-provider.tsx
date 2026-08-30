@@ -158,7 +158,7 @@ export function useEcomTemplateImport() {
 }
 
 export function EcomTemplateImportProvider({ children }: { children: ReactNode }) {
-  const { alert, toast } = useDialogs();
+  const { toast } = useDialogs();
   const [jobs, setJobs] = useState<PersistedImportJob[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const onEntryRef = useRef<((entry: EcomTemplateGalleryEntry) => void) | undefined>();
@@ -593,7 +593,7 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
         runningRef.current.delete(jobId);
       }
     },
-    [alert, persist, registerAbortController, toast, unregisterAbortController],
+    [persist, registerAbortController, toast, unregisterAbortController],
   );
 
   runJobRef.current = (jobId: string) => {

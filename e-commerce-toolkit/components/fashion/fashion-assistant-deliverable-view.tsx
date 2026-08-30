@@ -11,11 +11,17 @@ import {
   stripFashionDeliverableFence,
 } from "@/lib/fashion-deliverable-parse";
 import type { FashionDeliverable } from "@/lib/fashion-types";
+import { isFashionDeliverable } from "@/lib/fashion-types";
+import type { ProDeliverable } from "@/lib/pro-vertical/types";
+import { isProDeliverable } from "@/lib/pro-vertical/types";
+import { listProStoryboardVersionKeys } from "@/lib/pro-vertical/deliverable-parse";
 import { listFashionStoryboardVersionKeys } from "@/lib/fashion-workflow";
+
+type VerticalDeliverable = FashionDeliverable | ProDeliverable;
 
 type Props = {
   content: string;
-  projectDeliverable?: FashionDeliverable | null;
+  projectDeliverable?: VerticalDeliverable | null;
   /** 仅在等待用户选分镜版本时展示蓝色提示 */
   showStoryboardPickHint?: boolean;
   /** 已定稿版本、等待用户确认时展示 */
@@ -24,12 +30,14 @@ type Props = {
   showBrief?: boolean;
 };
 
-function storyboardVersionCount(d: FashionDeliverable | null | undefined): number {
+function storyboardVersionCount(d: VerticalDeliverable | null | undefined): number {
+  if (!d) return 0;
+  if (isProDeliverable(d)) return listProStoryboardVersionKeys(d).length;
   return listFashionStoryboardVersionKeys(d).length;
 }
 
 function hasOpsPackContent(
-  d: Pick<FashionDeliverable, "opsPack"> | null | undefined,
+  d: Pick<VerticalDeliverable, "opsPack"> | null | undefined,
 ): boolean {
   const ops = d?.opsPack;
   if (!ops) return false;
@@ -62,7 +70,7 @@ export function FashionAssistantDeliverableView({
 }: Props) {
   const parsed = extractFashionDeliverableFromText(content);
   const merged =
-    parsed && projectDeliverable
+    parsed && projectDeliverable && isFashionDeliverable(projectDeliverable)
       ? mergeFashionDeliverableState(projectDeliverable, parsed)
       : projectDeliverable ?? parsed;
   /** 展示以 projectDeliverable（含用户保存）为准，避免历史 assistant JSON 覆盖 */

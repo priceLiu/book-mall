@@ -18,7 +18,9 @@ import {
   getProjectVertical,
 } from "@/lib/fashion-workflow";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
+import { isProDeliverable } from "@/lib/pro-vertical/types";
 import type { FashionPanelRow, FashionSellpoint } from "@/lib/fashion-types";
+import { isFashionDeliverable } from "@/lib/fashion-types";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 
 function StepSection({ title, children }: { title: string; children: ReactNode }) {
@@ -66,7 +68,11 @@ export function FashionStepResults({
   const versionKey = deliverable.selectedVersion ?? null;
   const resolvedPanels =
     versionKey != null
-      ? resolveFashionStoryboardPanelsForVersion(project, versionKey, deliverable)
+      ? isFashionDeliverable(deliverable)
+        ? resolveFashionStoryboardPanelsForVersion(project, versionKey, deliverable)
+        : isProDeliverable(deliverable)
+          ? deliverable.storyboardVersions?.[versionKey]?.panels
+          : undefined
       : undefined;
   const versionMeta = versionKey ? deliverable.storyboardVersions?.[versionKey] : undefined;
   const panels =

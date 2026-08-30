@@ -5,7 +5,10 @@ import { useEffect, useState } from "react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { FashionPanelRow, FashionSellpoint, FashionVersionKey } from "@/lib/fashion-types";
+import type { ProPanelRow } from "@/lib/pro-vertical/types";
 import { normalizeFashionOpsPack } from "@/lib/fashion-ops-pack-format";
+
+type StoryboardPanelRow = FashionPanelRow | ProPanelRow;
 import { nextFashionSellpointId } from "@/lib/fashion-workflow";
 import { cn } from "@/lib/utils";
 
@@ -279,7 +282,7 @@ export function FashionStoryboardResultBlock({
 }: {
   versionKey: FashionVersionKey;
   title?: string;
-  panels: FashionPanelRow[];
+  panels: StoryboardPanelRow[];
   sellpoints?: FashionSellpoint[];
   locked?: boolean;
 }) {
@@ -303,7 +306,7 @@ export function FashionPanelsTable({
   saving = false,
   onSavePanels,
 }: {
-  panels: FashionPanelRow[];
+  panels: StoryboardPanelRow[];
   sellpoints?: FashionSellpoint[];
   panelFocusLabel?: string;
   editable?: boolean;
@@ -316,7 +319,7 @@ export function FashionPanelsTable({
   function patchPanel(index: FashionPanelRow["index"], patch: Partial<FashionPanelRow>) {
     if (!onSavePanels) return;
     const next = panels.map((p) => (p.index === index ? { ...p, ...patch } : p));
-    void onSavePanels(next);
+    void onSavePanels(next as FashionPanelRow[]);
   }
 
   function parseSellpointIds(raw: string): string[] {
@@ -521,7 +524,7 @@ export function FashionCoverageTable({
   panels,
 }: {
   sellpoints: FashionSellpoint[];
-  panels: FashionPanelRow[];
+  panels: StoryboardPanelRow[];
 }) {
   const coreVisual = sellpoints.filter((sp) => sp.layer !== "aux");
   if (!coreVisual.length) return null;
