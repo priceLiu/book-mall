@@ -1179,7 +1179,7 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
 
     const status = task.output.task_status;
     if (isDashscopeAsrNoSpeechOutcome(status, task.output.code, task.output.message)) {
-      return { ok: true, sentences: [] };
+      return { ok: true, sentences: [], billableAudioDurationSec: null };
     }
     if (isDashscopeTaskFailed(status)) {
       const msg =
@@ -1187,7 +1187,7 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
         task.output.code?.trim() ||
         "ASR 任务失败";
       if (isDashscopeAsrNoSpeechOutcome(status, task.output.code, msg)) {
-        return { ok: true, sentences: [] };
+        return { ok: true, sentences: [], billableAudioDurationSec: null };
       }
       return { ok: false, error: msg };
     }
@@ -1205,7 +1205,7 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
         ? result.transcription_url.trim()
         : "";
     if (!transcriptionUrl) {
-      return { ok: true, sentences: [] };
+      return { ok: true, sentences: [], billableAudioDurationSec: null };
     }
 
     let res: Response;

@@ -1,5 +1,5 @@
 import { getProVerticalConfig } from "@/lib/ecom/pro-vertical/registry";
-import type { ProDeliverable, ProPanelRow, ProVersionKey } from "./ecom-pro-deliverable";
+import type { ProDeliverable, ProPanelRow, ProStoryboardVersion, ProVersionKey } from "./ecom-pro-deliverable";
 
 function escMdCell(text: unknown): string {
   const normalized =
@@ -79,7 +79,7 @@ export function renderProVoiceoversMarkdown(deliverable: ProDeliverable): string
 }
 
 export function renderProPanelsTableMarkdown(
-  version: NonNullable<ProDeliverable["storyboardVersions"]>[ProVersionKey],
+  version: ProStoryboardVersion,
   deliverable: ProDeliverable,
 ): string {
   const config = getProVerticalConfig(deliverable.vertical);

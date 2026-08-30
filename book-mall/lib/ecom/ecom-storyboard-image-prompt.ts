@@ -7,6 +7,7 @@ import {
   resolvePanelSceneText,
 } from "@/lib/ecom/ecom-storyboard-scene-prompt";
 import { getStoryboardCharacterRefs, getStoryboardProductRefs, getStoryboardSceneRefs } from "@/lib/ecom/ecom-storyboard-refs";
+import type { StoryboardReference, StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 import {
   resolveScenePresetImageHint,
   resolveScenePresetLabel,

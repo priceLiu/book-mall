@@ -97,7 +97,8 @@ export function buildStoryboardWorkflowSnapshot(
 export function buildStoryboardDeliverablePreviewFromWorkflow(
   snap: StoryboardWorkflowSnapshot,
 ): StoryboardDeliverableSnapshot {
-  const deliverableSnap = snap.meta?.deliverableSnapshot as
+  const metaRecord = snap.meta as Record<string, unknown> | null | undefined;
+  const deliverableSnap = metaRecord?.deliverableSnapshot as
     | StoryboardDeliverableSnapshot
     | undefined;
 

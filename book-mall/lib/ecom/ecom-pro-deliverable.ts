@@ -20,8 +20,8 @@ import {
   getProVerticalConfig,
   isProVerticalId,
   resolveWorkflowVertical,
-  type ProVerticalId,
 } from "@/lib/ecom/pro-vertical/registry";
+import type { ProVerticalId } from "@/lib/ecom/pro-vertical/types";
 import { PRO_SHOT_SCALE_BY_INDEX } from "@/lib/ecom/pro-vertical/shared-enums";
 
 /** @see book-mall/doc/ecom/pro-deliverable-spec-v1.md */
@@ -116,6 +116,7 @@ export const proDeliverableSchema = z.object({
 
 export type ProDeliverable = z.infer<typeof proDeliverableSchema>;
 export type ProPanelRow = z.infer<typeof proPanelRowSchema>;
+export type ProStoryboardVersion = z.infer<typeof proStoryboardVersionSchema>;
 export type ProVersionKey = z.infer<typeof proVersionKeySchema>;
 
 function roundDuration(sec: number): number {

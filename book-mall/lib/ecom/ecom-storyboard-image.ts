@@ -671,6 +671,9 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       wf.fashionCharacterMode === "ai" ||
       wf.proCharacterMode === "ai");
 
+  let updatedPanels = [...sheet.panels];
+  let lastSavedSheet: StoryboardSheet = sheet;
+
   try {
     if (shouldAutoGenCharacter) {
       const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
@@ -713,9 +716,6 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       references,
       promptCtx,
     );
-
-    let updatedPanels = [...sheet.panels];
-    let lastSavedSheet: StoryboardSheet = sheet;
 
     for (const panel of panelsToGen) {
       const prompt = resolveStoryboardPanelImagePrompt(

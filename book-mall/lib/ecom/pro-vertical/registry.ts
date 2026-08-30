@@ -26,7 +26,8 @@ export function resolveWorkflowVertical(
   workflow: Record<string, unknown> | undefined | null,
 ): ProVerticalId | null {
   const raw = workflow?.vertical;
-  return isProVerticalId(typeof raw === "string" ? raw : null) ? raw : null;
+  const id = typeof raw === "string" ? raw : null;
+  return isProVerticalId(id) ? id : null;
 }
 
 export function isProVerticalWorkflow(
