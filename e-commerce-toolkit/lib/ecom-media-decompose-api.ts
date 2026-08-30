@@ -51,6 +51,10 @@ export async function getMediaDecomposeProject(id: string): Promise<MediaDecompo
   return data.project as MediaDecomposeProject;
 }
 
+export async function deleteMediaDecomposeProject(id: string): Promise<void> {
+  await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
+}
+
 export async function updateMediaDecomposeProject(
   id: string,
   patch: Partial<{ title: string; settings: MediaDecomposeSettings }>,

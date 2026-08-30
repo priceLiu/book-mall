@@ -100,8 +100,10 @@ import type {
   StoryboardSheet,
 } from "@/lib/storyboard-types";
 import {
+  listOrphanStoryboardPendingPanelImageIndices,
   listStoryboardPendingPanelImageIndices,
   listStoryboardPendingPanelVideoIndices,
+  readStoryboardPendingPanelImages,
   resolveActiveStoryboardPanelImageBusyIndices,
   resolveActiveStoryboardPanelVideoBusyIndices,
 } from "@/lib/storyboard-pending-panels";
@@ -264,6 +266,10 @@ export function StoryboardContentPanel({
   const [regeneratingPanels, setRegeneratingPanels] = useState<number[]>(() =>
     listStoryboardPendingPanelImageIndices(project.meta),
   );
+  const [imageGenInFlight, setImageGenInFlight] = useState(false);
+  const [imageGenWatchIndices, setImageGenWatchIndices] = useState<number[]>(() =>
+    listStoryboardPendingPanelImageIndices(project.meta),
+  );
   const [panelVidBusyPanels, setPanelVidBusyPanels] = useState<number[]>(() =>
     listStoryboardPendingPanelVideoIndices(project.meta),
   );
@@ -296,12 +302,18 @@ export function StoryboardContentPanel({
       resolveActiveStoryboardPanelImageBusyIndices({
         regeneratingPanels,
         pendingPanelIndices,
-        inFlightWatchIndices: [],
-        imageGenInFlight: false,
+        inFlightWatchIndices: imageGenWatchIndices,
+        imageGenInFlight,
         panels: project.sheet?.panels ?? [],
       }),
     );
-  }, [pendingPanelIndices, regeneratingPanels, project.sheet?.panels]);
+  }, [
+    pendingPanelIndices,
+    regeneratingPanels,
+    imageGenWatchIndices,
+    imageGenInFlight,
+    project.sheet?.panels,
+  ]);
 
   const activePanelVideoPanels = useMemo(() => {
     return new Set(
@@ -464,6 +476,7 @@ export function StoryboardContentPanel({
       await handleGenerateImagesBatch(batchIndexes, modelKey, charMode ?? undefined);
       return;
     }
+    clearPanelImageStripSelection();
     await handleGenerateImage(panelIndex, modelKey, charMode ?? undefined);
   }
 
@@ -502,7 +515,14 @@ export function StoryboardContentPanel({
   }
 
   function syncImageGenInFlightFlag() {
-    imageGenInFlightRef.current = imageGenInFlightCountRef.current > 0;
+    const inFlight = imageGenInFlightCountRef.current > 0;
+    imageGenInFlightRef.current = inFlight;
+    setImageGenInFlight(inFlight);
+  }
+
+  function syncImageGenWatchIndicesState() {
+    const next = [...imageGenWatchRef.current].sort((a, b) => a - b);
+    setImageGenWatchIndices(next);
   }
 
   function beginPanelImageGenWatch(
@@ -514,10 +534,88 @@ export function StoryboardContentPanel({
     imageGenWatchRef.current = [...new Set([...imageGenWatchRef.current, ...indexes])].sort(
       (a, b) => a - b,
     );
+    syncImageGenWatchIndicesState();
     setRegeneratingPanels((prev) =>
       [...new Set([...prev, ...indexes])].sort((a, b) => a - b),
     );
     if (opts?.fullSheet) setImgBusy(true);
+  }
+
+  function reconcilePanelImageGenBusyFromProject(fresh: StoryboardProject) {
+    const panels = fresh.sheet?.panels ?? [];
+    const inFlight = imageGenInFlightCountRef.current > 0;
+
+    imageGenWatchRef.current = imageGenWatchRef.current.filter((idx) => {
+      if (panels.some((p) => p.index === idx && Boolean(p.imageUrl?.trim()))) {
+        return false;
+      }
+      return inFlight;
+    });
+
+    if (imageGenWatchRef.current.length === 0) {
+      imageGenInFlightCountRef.current = 0;
+    }
+    syncImageGenInFlightFlag();
+    syncImageGenWatchIndicesState();
+
+    const pending = listStoryboardPendingPanelImageIndices(fresh.meta);
+    const active = resolveActiveStoryboardPanelImageBusyIndices({
+      regeneratingPanels: [],
+      pendingPanelIndices: pending,
+      inFlightWatchIndices: imageGenWatchRef.current,
+      imageGenInFlight: inFlight,
+      panels,
+    });
+    setRegeneratingPanels(active);
+
+    const total = panels.length;
+    setImgBusy(
+      inFlight && imageGenWatchRef.current.length >= total && total > 0
+        ? true
+        : pending.length > 0 && total > 0 && pending.length >= total && inFlight,
+    );
+  }
+
+  async function clearStalePanelImagePendingIfNeeded(
+    input: StoryboardProject,
+  ): Promise<StoryboardProject> {
+    let fresh = input;
+    try {
+      fresh = await getStoryboardProject(input.id);
+    } catch {
+      /* 沿用本地快照 */
+    }
+
+    const panels = fresh.sheet?.panels ?? [];
+    const inFlight = imageGenInFlightCountRef.current > 0;
+    const orphanIndices = listOrphanStoryboardPendingPanelImageIndices(
+      fresh.meta,
+      panels,
+      {
+        imageGenInFlight: inFlight,
+        inFlightWatchIndices: imageGenWatchRef.current,
+      },
+    );
+    if (orphanIndices.length === 0) return fresh;
+
+    const pendingMap = { ...readStoryboardPendingPanelImages(fresh.meta) };
+    for (const idx of orphanIndices) {
+      delete pendingMap[String(idx)];
+    }
+    const wf = { ...(fresh.meta?.workflow ?? {}) } as Record<string, unknown>;
+    if (Object.keys(pendingMap).length === 0) {
+      delete wf.pendingPanelImages;
+    } else {
+      wf.pendingPanelImages = pendingMap;
+    }
+    await updateStoryboardProject(fresh.id, {
+      meta: { ...fresh.meta, workflow: wf },
+    });
+    try {
+      return await getStoryboardProject(fresh.id);
+    } catch {
+      return fresh;
+    }
   }
 
   function endPanelImageGenWatch(
@@ -529,12 +627,15 @@ export function StoryboardContentPanel({
       (idx) => !completedIndexes.includes(idx),
     );
     syncImageGenInFlightFlag();
+    syncImageGenWatchIndicesState();
 
-    const pending = refreshed
-      ? listStoryboardPendingPanelImageIndices(refreshed.meta)
-      : [];
-    const total =
-      refreshed?.sheet?.panels.length ?? project.sheet?.panels.length ?? 0;
+    if (refreshed) {
+      reconcilePanelImageGenBusyFromProject(refreshed);
+      return;
+    }
+
+    const pending = listStoryboardPendingPanelImageIndices(project.meta);
+    const total = project.sheet?.panels.length ?? 0;
 
     setRegeneratingPanels((prev) => {
       const next = new Set(prev);
@@ -548,6 +649,7 @@ export function StoryboardContentPanel({
 
     if (imageGenInFlightCountRef.current === 0) {
       setImgBusy(total > 0 && pending.length >= total);
+      if (pending.length === 0) setImgBusy(false);
     }
   }
 
@@ -570,47 +672,10 @@ export function StoryboardContentPanel({
     if (imageGenPollLockRef.current) return;
     imageGenPollLockRef.current = true;
     try {
-      const fresh = await getStoryboardProject(project.id);
+      let fresh = await getStoryboardProject(project.id);
+      fresh = await clearStalePanelImagePendingIfNeeded(fresh);
       onProjectChange(fresh);
-      const pending = listStoryboardPendingPanelImageIndices(fresh.meta);
-      const inFlight = imageGenInFlightCountRef.current > 0;
-      const watch = new Set<number>([
-        ...imageGenWatchRef.current,
-        ...pending,
-      ]);
-      if (watch.size === 0 && !inFlight) return;
-
-      const total = fresh.sheet?.panels.length ?? 0;
-      const batchWatch = total > 0 && imageGenWatchRef.current.length >= total;
-      const stillRunning = inFlight || pending.length > 0;
-
-      const active = new Set<number>(pending);
-      if (inFlight) {
-        for (const idx of imageGenWatchRef.current) active.add(idx);
-      }
-      for (const idx of regeneratingPanelsRef.current) {
-        if (inFlight && imageGenWatchRef.current.includes(idx)) active.add(idx);
-      }
-      for (const idx of [...active]) {
-        const done = fresh.sheet?.panels.some(
-          (p) => p.index === idx && Boolean(p.imageUrl),
-        );
-        if (
-          done &&
-          !imageGenWatchRef.current.includes(idx) &&
-          !pending.includes(idx)
-        ) {
-          active.delete(idx);
-        }
-      }
-      setRegeneratingPanels([...active].sort((a, b) => a - b));
-
-      if (!stillRunning) {
-        imageGenWatchRef.current = [];
-        setImgBusy(false);
-      } else {
-        setImgBusy(batchWatch || (total > 0 && pending.length >= total));
-      }
+      reconcilePanelImageGenBusyFromProject(fresh);
     } catch {
       /* ignore transient poll errors */
     } finally {
@@ -623,6 +688,7 @@ export function StoryboardContentPanel({
     imageGenInFlightCountRef.current = 0;
     syncImageGenInFlightFlag();
     imageGenWatchRef.current = pending;
+    syncImageGenWatchIndicesState();
     setRegeneratingPanels(pending);
     const total = project.sheet?.panels.length ?? 0;
     setImgBusy(total > 0 && pending.length >= total);
@@ -630,14 +696,11 @@ export function StoryboardContentPanel({
   }, [project.id, syncGeneratingPanelImages]);
 
   useEffect(() => {
-    const pending = listStoryboardPendingPanelImageIndices(project.meta);
-    if (pending.length === 0) return;
-    setRegeneratingPanels((prev) =>
-      [...new Set([...prev, ...pending])].sort((a, b) => a - b),
-    );
-    const total = project.sheet?.panels.length ?? 0;
-    if (total > 0 && pending.length >= total) setImgBusy(true);
-  }, [project.meta, project.sheet?.panels.length]);
+    reconcilePanelImageGenBusyFromProject(project);
+    void clearStalePanelImagePendingIfNeeded(project).then((updated) => {
+      reconcilePanelImageGenBusyFromProject(updated);
+    });
+  }, [project.meta, project.sheet?.panels]);
 
   useEffect(() => {
     const pendingCount = pendingPanelIndices.length;
@@ -734,6 +797,10 @@ export function StoryboardContentPanel({
       else next.add(panelIndex);
       return next;
     });
+  }
+
+  function clearPanelImageStripSelection() {
+    setPanelImageStripSelected(new Set());
   }
 
   function togglePanelVideoStripSelect(panelIndex: number) {
@@ -968,7 +1035,8 @@ export function StoryboardContentPanel({
       if (
         isProVerticalProject(project) &&
         charMode === "upload" &&
-        !hasCharRef
+        !hasCharRef &&
+        isCharacterRefRequired(project)
       ) {
         const message = "已选择「上传角色图」，请先在左侧素材区上传角色参考图。";
         if (!runtimeOpts?.quietError) {
@@ -996,8 +1064,12 @@ export function StoryboardContentPanel({
         ? [panelIndex]
         : (project.sheet?.panels.map((p) => p.index) ?? []);
     if (!runtimeOpts?.deferBusy) {
+      clearPanelImageStripSelection();
       beginPanelImageGenWatch(watchIndexes, {
-        fullSheet: typeof panelIndex !== "number",
+        fullSheet:
+          typeof panelIndex !== "number" &&
+          watchIndexes.length > 0 &&
+          watchIndexes.length >= (project.sheet?.panels.length ?? 0),
       });
     }
     const mayInlineGenCharacter =
@@ -1111,6 +1183,7 @@ export function StoryboardContentPanel({
       .filter((n) => Number.isFinite(n) && n > 0)
       .sort((a, b) => a - b);
     if (queue.length === 0) return;
+    clearPanelImageStripSelection();
     if (queue.length === 1) {
       await handleGenerateImage(queue[0], modelKeyOverride, fashionCharModeOverride);
       return;
@@ -1210,42 +1283,43 @@ export function StoryboardContentPanel({
       }
     }
 
-    beginPanelImageGenWatch(queue, { fullSheet: true });
+    const totalPanels = project.sheet?.panels.length ?? 0;
+    beginPanelImageGenWatch(queue, {
+      fullSheet: totalPanels > 0 && queue.length >= totalPanels,
+    });
     const failures: { index: number; message: string }[] = [];
     let latestPanels = project.sheet?.panels ?? [];
     try {
-      await Promise.all(
-        queue.map(async (panelIndex) => {
-          const result = await handleGenerateImage(
-            panelIndex,
-            modelKey,
-            charMode ?? undefined,
-            {
-              deferBusy: true,
-              quietSuccess: true,
-              quietError: true,
-              skipProjectUpdate: true,
-              skipComposite: true,
-              skipAutoRefresh: true,
-              autoGenCharacterOverride: false,
-              skipSheetReadyCheck: true,
-              skipCharacterRefCheck: true,
-              batchInner: true,
-            },
-          );
-          if (result?.ok) {
-            try {
-              const refreshed = await getStoryboardProject(project.id);
-              onProjectChange(refreshed);
-              latestPanels = refreshed.sheet?.panels ?? latestPanels;
-            } catch {
-              /* ignore transient reload errors */
-            }
-          } else {
-            failures.push({ index: panelIndex, message: result?.error ?? "生成失败" });
+      for (const panelIndex of queue) {
+        const result = await handleGenerateImage(
+          panelIndex,
+          modelKey,
+          charMode ?? undefined,
+          {
+            deferBusy: true,
+            quietSuccess: true,
+            quietError: true,
+            skipProjectUpdate: true,
+            skipComposite: true,
+            skipAutoRefresh: true,
+            autoGenCharacterOverride: false,
+            skipSheetReadyCheck: true,
+            skipCharacterRefCheck: true,
+            batchInner: true,
+          },
+        );
+        if (result?.ok) {
+          try {
+            const refreshed = await getStoryboardProject(project.id);
+            onProjectChange(refreshed);
+            latestPanels = refreshed.sheet?.panels ?? latestPanels;
+          } catch {
+            /* ignore transient reload errors */
           }
-        }),
-      );
+        } else {
+          failures.push({ index: panelIndex, message: result?.error ?? "生成失败" });
+        }
+      }
       try {
         const refreshed = await getStoryboardProject(project.id);
         onProjectChange(refreshed);
@@ -2130,6 +2204,7 @@ export function StoryboardContentPanel({
             );
             return;
           }
+          clearPanelImageStripSelection();
           if (panelIndexes && panelIndexes.length > 0) {
             openImagePicker(undefined, panelIndexes);
             return;
@@ -2833,6 +2908,7 @@ export function StoryboardContentPanel({
             if (mode === "image") {
               const fashionCharMode =
                 fashionResolvedCharModeRef.current ?? fashionCharacterMode(project);
+              clearPanelImageStripSelection();
               if (batch && batch.length > 0) {
                 await handleGenerateImagesBatch(batch, modelKey, fashionCharMode ?? undefined);
               } else {

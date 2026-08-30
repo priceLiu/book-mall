@@ -258,6 +258,15 @@ export function resolveReconciliationUsage(log: ReconciliationLogRow): Reconcili
     };
   }
 
+  if (model.includes("embedding")) {
+    return {
+      unitKind: "KTOKEN",
+      tokenDirection: "none",
+      amount: resolveReconciliationKTokens(log),
+      tierRaw,
+    };
+  }
+
   return { unitKind: "CALL", tokenDirection: "none", amount: 1, tierRaw };
 }
 

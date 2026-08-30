@@ -65,6 +65,10 @@ export async function getSeedVideoProject(id: string): Promise<SeedVideoProject>
   return data.project as SeedVideoProject;
 }
 
+export async function deleteSeedVideoProject(id: string): Promise<void> {
+  await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
+}
+
 export async function updateSeedVideoProject(
   id: string,
   patch: Partial<{

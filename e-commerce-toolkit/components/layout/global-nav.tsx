@@ -10,6 +10,9 @@ export function GlobalNav() {
         <Link href="/" className="font-semibold tracking-tight">
           电商工具箱
         </Link>
+        <Link href="/workflows/drafts" className="opacity-80 hover:opacity-100">
+          我的工作流
+        </Link>
         <Link href="/library" className="opacity-80 hover:opacity-100">
           我的资产
         </Link>

@@ -737,6 +737,52 @@ const SEED_ITEMS: {
     sortOrder: 650,
     listKind: "PENDING",
   },
+  // —— 20260830 阿里对账复核 · 见 docs/对帐20260830.md ——
+  {
+    title: "RECON-20260830 ASR 源文件时长 ffprobe 历史回填",
+    description:
+      "202608 ASR：forward 写 sourceAudioDurationSec；aggregator 按 fileUrl 去重；历史可选 backfill-asr --probe-urls。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 660,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 Embedding 入库 Gateway 日志",
+    description:
+      "text-embedding-v3 MISSING_PLATFORM：platformEmbedTextsInProcess 已改 createRequestLog；下次 assistant:index 可对账。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 661,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 HappyHorse 1080P +32s 抽样",
+    description:
+      "厂商 204s=32 条；平台 251s=39 条。末批未入 CSV 的 logId 见 docs/对帐20260830.md §5；非平台重复计费。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 662,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 wan2.2-s2v 非 Gateway 缺口",
+    description:
+      "失败终态写 audio 秒数；aggregator 含 FAILED + 按 audio_url 去重 → 平台 50s vs 厂商 59.3s（余 ~9s 待核）。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 663,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 对账总表复核（202608 CSV）",
+    description:
+      "已 force 重跑 reconciliation v2 + refreshPlatformMasterBaseline；Finance /admin/reconciliation 可查看 41 行总表。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 664,
+    listKind: "PENDING",
+    completed: true,
+  },
 ];
 
 async function main() {

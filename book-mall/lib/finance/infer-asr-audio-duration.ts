@@ -100,5 +100,6 @@ export function mergeAsrAudioDurationIntoResultSummary(
     resultSummary && typeof resultSummary === "object" && !Array.isArray(resultSummary)
       ? { ...(resultSummary as Record<string, unknown>) }
       : {};
-  return { ...base, audioDurationSec: Math.max(1, Math.round(audioDurationSec)) };
+  const sec = Math.max(1, Math.round(audioDurationSec));
+  return { ...base, audioDurationSec: sec, sourceAudioDurationSec: sec };
 }

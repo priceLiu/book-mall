@@ -33,7 +33,7 @@ import {
   parseProCategoryPick,
   proCategoryChoiceLabel,
 } from "@/lib/pro-vertical/categories";
-import type { ProDeliverable, ProVerticalId } from "@/lib/pro-vertical/types";
+import type { ProDeliverable, ProPanelRow, ProVerticalId } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import {
   extractFashionDeliverableFromText,
@@ -188,14 +188,17 @@ export function fashionLlmTriggerSucceeded(
   trigger: string,
   project: StoryboardProject,
 ): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = resolveProVerticalDeliverable(project);
   if (!d) return false;
   if (trigger.includes("sellpoints")) return (d.sellpoints?.length ?? 0) > 0;
   if (trigger.includes("voiceovers")) return (d.voiceovers?.length ?? 0) > 0;
   if (trigger.includes("storyboards")) {
+    if (isProDeliverable(d) && d.vertical !== "fashion_apparel") {
+      return listProStoryboardVersionKeys(d).length > 0;
+    }
     return listFashionStoryboardVersionKeys(d).length > 0;
   }
-  if (trigger.includes("ops")) return hasMeaningfulOpsPack(d);
+  if (trigger.includes("ops")) return hasMeaningfulDeliverableOpsPack(d);
   return true;
 }
 
@@ -328,7 +331,7 @@ export function isFashionProduceSetupReady(project: StoryboardProject): boolean 
 
 /** sheet 脚本字段缺失但 deliverable 有内容时需 re-sync */
 export function fashionSheetNeedsScriptResync(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (d?.outputMode !== "direct_video" || !project.sheet?.panels?.length) return false;
   const key = d.selectedVersion;
   if (!key) return false;
@@ -381,7 +384,9 @@ export function parseFashionVoiceoverPickFromChat(
       continue;
     }
     if (msg?.role === "assistant") {
-      const parsed = extractFashionDeliverableFromText(msg.content);
+      const parsed =
+        extractFashionDeliverableFromText(msg.content) ??
+        extractProDeliverableFromText(msg.content);
       if ((parsed?.voiceovers?.length ?? 0) > 0) {
         voiceoversReady = true;
       }
@@ -644,12 +649,180 @@ export function applyFashionMetaAuthorityToDeliverable(
   return next;
 }
 
+function applyProDeliverablePhaseGuards(
+  deliverable: ProDeliverable,
+  project: StoryboardProject,
+): ProDeliverable {
+  let next = deliverable;
+  const metaDeliverable = isProDeliverable(project.meta?.deliverable)
+    ? (project.meta!.deliverable as ProDeliverable)
+    : null;
+  const wf = getFashionWorkflowMeta(project);
+  const wfPhase = wf.proPhase ?? wf.fashionPhase ?? "product_ref";
+
+  if (!next.sellpointsLocked) {
+    return {
+      ...next,
+      voiceovers: [],
+      selectedVoiceoverId: null,
+      storyboardVersions: {},
+      selectedVersion: null,
+      coverageChecklist: [],
+      opsPack: undefined,
+      outputMode: null,
+    };
+  }
+
+  const voiceoversReady = (next.voiceovers?.length ?? 0) > 0;
+  const voiceoverPickedFromChat = parseFashionVoiceoverPickFromChat(project.chatHistory);
+  if (voiceoversReady && voiceoverPickedFromChat) {
+    next = { ...next, selectedVoiceoverId: voiceoverPickedFromChat };
+  } else if (metaDeliverable?.selectedVoiceoverId) {
+    next = { ...next, selectedVoiceoverId: metaDeliverable.selectedVoiceoverId };
+  } else {
+    next = { ...next, selectedVoiceoverId: null };
+  }
+
+  if (!next.selectedVoiceoverId) {
+    return {
+      ...next,
+      storyboardVersions: {},
+      selectedVersion: null,
+      coverageChecklist: [],
+      opsPack: undefined,
+      outputMode: null,
+    };
+  }
+
+  if (!next.storyboardLocked) {
+    next = { ...next, opsPack: undefined, outputMode: null };
+  } else if (!hasMeaningfulProOpsPack(next)) {
+    next = { ...next, outputMode: null };
+  }
+
+  const versionPickedFromChat = parseFashionVersionPickFromChat(project.chatHistory);
+  const wfPhaseRank = FASHION_PHASE_RANK[wfPhase] ?? 0;
+  const metaVersionAuthoritative =
+    Boolean(metaDeliverable?.selectedVersion) &&
+    wfPhaseRank >= FASHION_PHASE_RANK.storyboard_confirm;
+
+  if (versionPickedFromChat) {
+    next = { ...next, selectedVersion: versionPickedFromChat };
+  } else if (metaVersionAuthoritative && metaDeliverable?.selectedVersion) {
+    next = { ...next, selectedVersion: metaDeliverable.selectedVersion };
+  } else if (
+    next.selectedVersion &&
+    listProStoryboardVersionKeys(next).length > 0 &&
+    !next.storyboardLocked
+  ) {
+    next = { ...next, selectedVersion: null };
+  }
+
+  if (!next.selectedVersion) {
+    return {
+      ...next,
+      coverageChecklist: [],
+      opsPack: undefined,
+      outputMode: null,
+    };
+  }
+
+  if (isStoryboardConfirmAfterLastVersionPick(project)) {
+    next = { ...next, storyboardLocked: true };
+  } else {
+    next = {
+      ...next,
+      storyboardLocked: false,
+      opsPack: undefined,
+      outputMode: null,
+    };
+  }
+
+  return next;
+}
+
+function applyProMetaAuthorityToDeliverable(
+  resolved: ProDeliverable,
+  project: StoryboardProject,
+): ProDeliverable {
+  const metaDeliverable = isProDeliverable(project.meta?.deliverable)
+    ? (project.meta!.deliverable as ProDeliverable)
+    : null;
+  if (!metaDeliverable) return resolved;
+
+  const wf = getFashionWorkflowMeta(project);
+  let next: ProDeliverable = { ...resolved };
+
+  if (metaDeliverable.sellpoints?.length) {
+    if (metaDeliverable.sellpointsLocked || wf.proSellpointsEdited) {
+      next = {
+        ...next,
+        sellpoints: metaDeliverable.sellpoints,
+        sellpointsLocked: metaDeliverable.sellpointsLocked || next.sellpointsLocked,
+      };
+    }
+  }
+
+  const storyboardAuthoritative = isStoryboardConfirmAfterLastVersionPick(project);
+
+  const versionKey =
+    (next.selectedVersion ??
+      metaDeliverable.selectedVersion ??
+      parseFashionVersionPickFromChat(project.chatHistory)) as FashionVersionKey | null | undefined;
+  if (versionKey) {
+    const panels = resolveProStoryboardPanelsForVersion(project, versionKey, next);
+    if (panels?.length) {
+      const versionMeta =
+        metaDeliverable.storyboardVersions?.[versionKey] ??
+        next.storyboardVersions?.[versionKey] ?? {
+          id: versionKey,
+          title: `${versionKey}版`,
+          panels: [],
+        };
+      next = {
+        ...next,
+        selectedVersion: versionKey,
+        storyboardLocked:
+          storyboardAuthoritative &&
+          (metaDeliverable.storyboardLocked || next.storyboardLocked),
+        storyboardVersions: {
+          ...(next.storyboardVersions ?? {}),
+          [versionKey]: { ...versionMeta, panels },
+        },
+      };
+    } else if (
+      metaDeliverable.selectedVersion === versionKey &&
+      getFashionPhase(project) === "storyboard_confirm"
+    ) {
+      next = {
+        ...next,
+        selectedVersion: versionKey,
+        storyboardLocked:
+          storyboardAuthoritative &&
+          (metaDeliverable.storyboardLocked || next.storyboardLocked),
+      };
+    }
+  }
+
+  if (storyboardAuthoritative && metaDeliverable.storyboardLocked) {
+    next.storyboardLocked = true;
+  }
+  if (storyboardAuthoritative && hasMeaningfulProOpsPack(metaDeliverable)) {
+    next.opsPack = metaDeliverable.opsPack;
+  }
+  if (hasFashionOutputModeChoiceInChat(project) && metaDeliverable.outputMode) {
+    next.outputMode = metaDeliverable.outputMode;
+  }
+
+  return next;
+}
+
 export function resolveFashionStoryboardPanelsForVersion(
   project: StoryboardProject,
   versionKey: FashionVersionKey,
   deliverable?: FashionDeliverable | null,
 ): FashionPanelRow[] | undefined {
-  const d = deliverable ?? resolveFashionDeliverable(project);
+  const d = deliverable ?? workflowDeliverable(project);
   const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
     ? (project.meta!.deliverable as FashionDeliverable)
     : null;
@@ -683,6 +856,45 @@ export function resolveFashionStoryboardPanelsForVersion(
   return undefined;
 }
 
+export function resolveProStoryboardPanelsForVersion(
+  project: StoryboardProject,
+  versionKey: FashionVersionKey,
+  deliverable?: ProDeliverable | null,
+): ProPanelRow[] | undefined {
+  const d = deliverable ?? (workflowDeliverable(project) as ProDeliverable | null);
+  const metaDeliverable = isProDeliverable(project.meta?.deliverable)
+    ? (project.meta!.deliverable as ProDeliverable)
+    : null;
+  const wf = getFashionWorkflowMeta(project);
+
+  const metaPanels = metaDeliverable?.storyboardVersions?.[versionKey]?.panels;
+  const metaVersionSelected = metaDeliverable?.selectedVersion === versionKey;
+  const storyboardConfirmed =
+    isStoryboardConfirmAfterLastVersionPick(project) ||
+    wf.proStoryboardPanelsEdited;
+  if (
+    metaPanels?.length &&
+    (metaVersionSelected ||
+      storyboardConfirmed ||
+      getFashionPhase(project) === "storyboard_confirm")
+  ) {
+    return metaPanels;
+  }
+  if (d?.storyboardVersions?.[versionKey]?.panels?.length) {
+    return d.storyboardVersions[versionKey]!.panels;
+  }
+  if (metaPanels?.length) return metaPanels;
+
+  for (let i = project.chatHistory.length - 1; i >= 0; i--) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "assistant") continue;
+    const parsed = extractProDeliverableFromText(msg.content);
+    const panels = parsed?.storyboardVersions?.[versionKey]?.panels;
+    if (panels?.length) return panels;
+  }
+  return undefined;
+}
+
 export function buildFashionDeliverableWithVersionPanels(
   project: StoryboardProject,
   deliverable: FashionDeliverable,
@@ -691,6 +903,33 @@ export function buildFashionDeliverableWithVersionPanels(
   const panels = resolveFashionStoryboardPanelsForVersion(project, versionKey, deliverable);
   const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
     ? (project.meta!.deliverable as FashionDeliverable)
+    : null;
+  const versionMeta =
+    deliverable.storyboardVersions?.[versionKey] ??
+    metaDeliverable?.storyboardVersions?.[versionKey] ?? {
+      id: versionKey,
+      title: `${versionKey}版`,
+      panels: [],
+    };
+  if (!panels?.length) return deliverable;
+  return {
+    ...deliverable,
+    selectedVersion: versionKey,
+    storyboardVersions: {
+      ...(deliverable.storyboardVersions ?? {}),
+      [versionKey]: { ...versionMeta, panels },
+    },
+  };
+}
+
+export function buildProDeliverableWithVersionPanels(
+  project: StoryboardProject,
+  deliverable: ProDeliverable,
+  versionKey: FashionVersionKey,
+): ProDeliverable {
+  const panels = resolveProStoryboardPanelsForVersion(project, versionKey, deliverable);
+  const metaDeliverable = isProDeliverable(project.meta?.deliverable)
+    ? (project.meta!.deliverable as ProDeliverable)
     : null;
   const versionMeta =
     deliverable.storyboardVersions?.[versionKey] ??
@@ -800,9 +1039,28 @@ export function resolveProVerticalDeliverable(
         buildProDimensionsFromChat(vertical, project.chatHistory),
       ),
     };
+
+    merged = applyProDeliverablePhaseGuards(merged, project);
+    merged = applyProMetaAuthorityToDeliverable(merged, project);
+
+    if (
+      !merged.storyboardLocked &&
+      merged.selectedVersion &&
+      isStoryboardConfirmAfterLastVersionPick(project)
+    ) {
+      merged = { ...merged, storyboardLocked: true };
+    }
+
     return merged;
   }
   return resolveFashionDeliverable(project);
+}
+
+/** 工作流阶段判断：服装 + Pro 品类（包包/3C）统一读 deliverable */
+function workflowDeliverable(
+  project: StoryboardProject,
+): FashionDeliverable | ProDeliverable | null {
+  return resolveProVerticalDeliverable(project);
 }
 
 function countFashionStoryboardVersions(d: FashionDeliverable | null | undefined): number {
@@ -854,7 +1112,7 @@ export function inferFashionPhaseFromState(project: StoryboardProject): FashionP
     if (!d.outputMode) return "output_mode";
     return "produce";
   }
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (!hasFashionProductRef(project)) return "product_ref";
   // 已进入卖点之后，禁止因 dimensions 字段被 LLM 冲掉而回退到七维
   const pastDimensions =
@@ -1121,7 +1379,7 @@ function buildFashionDimensionStepPatch(
 export function currentFashionDimensionStep(project: StoryboardProject): number {
   const wf = getFashionWorkflowMeta(project);
   if (typeof wf.dimensionStep === "number") return wf.dimensionStep;
-  const d = resolveFashionDeliverable(project)?.dimensions ?? {};
+  const d = workflowDeliverable(project)?.dimensions ?? {};
   for (let i = 0; i < FASHION_DIMENSION_STEPS.length; i++) {
     const key = FASHION_DIMENSION_STEPS[i]!.key;
     if (!d[key]?.trim()) return i;
@@ -1151,8 +1409,8 @@ export function normalizeFashionSellpointsForSave(
 export function buildFashionSellpointsSavePatch(
   project: StoryboardProject,
   sellpoints: FashionSellpoint[],
-): { deliverable: FashionDeliverable; workflow: Record<string, unknown> } | null {
-  const current = resolveFashionDeliverable(project);
+): { deliverable: FashionDeliverable | ProDeliverable; workflow: Record<string, unknown> } | null {
+  const current = workflowDeliverable(project);
   if (!current || current.sellpointsLocked) return null;
   const normalized = normalizeFashionSellpointsForSave(sellpoints);
   if (!normalized.length) return null;
@@ -1162,19 +1420,20 @@ export function buildFashionSellpointsSavePatch(
     deliverable: { ...current, sellpoints: normalized },
     workflow: {
       ...wf,
-      vertical: "fashion_apparel",
-      fashionPhase: "sellpoints",
-      fashionSellpointsEdited: true,
+      ...phaseWorkflowPatch(project, "sellpoints"),
+      ...(usesProPhase(project)
+        ? { proSellpointsEdited: true }
+        : { fashionSellpointsEdited: true }),
     },
   };
 }
 
 export function isFashionStoryboardPanelsEditable(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return Boolean(
     d?.selectedVersion &&
       !d.storyboardLocked &&
-      !hasMeaningfulOpsPack(d) &&
+      !hasMeaningfulDeliverableOpsPack(d) &&
       !d.outputMode &&
       isAwaitingFashionStoryboardConfirm(project),
   );
@@ -1184,7 +1443,7 @@ export function buildFashionStoryboardPanelsSavePatch(
   project: StoryboardProject,
   panels: FashionPanelRow[],
 ): { deliverable: FashionDeliverable; workflow: Record<string, unknown> } | null {
-  const resolved = resolveFashionDeliverable(project);
+  const resolved = workflowDeliverable(project);
   const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
     ? (project.meta!.deliverable as FashionDeliverable)
     : null;
@@ -1224,7 +1483,7 @@ export function buildFashionStoryboardPanelsSavePatch(
 }
 
 export function isAwaitingFashionSellpoints(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return (
     dimensionsComplete(project) &&
     !d?.sellpointsLocked &&
@@ -1233,7 +1492,7 @@ export function isAwaitingFashionSellpoints(project: StoryboardProject): boolean
 }
 
 export function isAwaitingFashionVoiceoverGeneration(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return Boolean(
     d?.sellpointsLocked &&
       (d.voiceovers?.length ?? 0) === 0 &&
@@ -1242,7 +1501,7 @@ export function isAwaitingFashionVoiceoverGeneration(project: StoryboardProject)
 }
 
 export function isAwaitingFashionVoiceoverPick(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return Boolean(
     d?.sellpointsLocked &&
       (d.voiceovers?.length ?? 0) >= 1 &&
@@ -1290,28 +1549,28 @@ function isStoryboardConfirmAfterLastVersionPick(project: StoryboardProject): bo
 }
 
 export function isFashionPendingOpsGeneration(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
-  if (!d?.selectedVersion || d.outputMode || hasMeaningfulOpsPack(d)) return false;
+  const d = workflowDeliverable(project);
+  if (!d?.selectedVersion || d.outputMode || hasMeaningfulDeliverableOpsPack(d)) return false;
   if (getFashionPhase(project) !== "storyboard_confirm") return false;
   return Boolean(d.storyboardLocked || isStoryboardConfirmAfterLastVersionPick(project));
 }
 
 export function isAwaitingFashionStoryboardConfirm(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (!d?.selectedVersion || d.outputMode || d.storyboardLocked) return false;
   if (isStoryboardConfirmAfterLastVersionPick(project)) return false;
   return getFashionPhase(project) === "storyboard_confirm";
 }
 
 export function isAwaitingFashionStoryboardPick(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (!d || d.selectedVersion || d.outputMode || d.storyboardLocked) return false;
   if (listFashionStoryboardVersionKeys(d).length === 0) return false;
   return getFashionPhase(project) === "storyboard_pick";
 }
 
 export function buildFashionStoryboardPickChoices(project: StoryboardProject): FashionChoice[] {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   const versions = d?.storyboardVersions ?? {};
   const keys = listFashionStoryboardVersionKeys(d);
   const choices = keys.map((k) => {
@@ -1337,16 +1596,16 @@ export function buildFashionStoryboardPickChoices(project: StoryboardProject): F
 }
 
 export function isAwaitingFashionOpsConfirm(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return Boolean(
     d?.selectedVersion &&
-      hasMeaningfulOpsPack(d) &&
+      hasMeaningfulDeliverableOpsPack(d) &&
       getFashionPhase(project) === "ops_pack",
   );
 }
 
 export function isFashionInProduce(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   const wf = getFashionWorkflowMeta(project);
   const wfPhase = wf.fashionPhase ?? wf.proPhase;
   const metaOut = isFashionDeliverable(project.meta?.deliverable)
@@ -1362,11 +1621,11 @@ export function isFashionInProduce(project: StoryboardProject): boolean {
 
 export function isAwaitingFashionOutputMode(project: StoryboardProject): boolean {
   if (isFashionInProduce(project)) return false;
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return Boolean(
     d?.selectedVersion &&
       d.storyboardLocked &&
-      hasMeaningfulOpsPack(d) &&
+      hasMeaningfulDeliverableOpsPack(d) &&
       !d.outputMode &&
       getFashionPhase(project) === "output_mode",
   );
@@ -1387,7 +1646,7 @@ export function parseFashionVoiceoverPick(
   project: StoryboardProject,
   message: string,
 ): string | null {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   const trimmed = message.trim();
   if (!trimmed.startsWith("选择口播")) return null;
 
@@ -1421,7 +1680,7 @@ export function parseFashionVersionPick(
   project: StoryboardProject,
   message: string,
 ): FashionVersionKey | null {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   const trimmed = message.trim();
   if (!trimmed.startsWith("选择分镜")) return null;
 
@@ -1444,7 +1703,7 @@ export function parseFashionVersionPick(
 export function isFashionPendingStoryboardGeneration(
   project: StoryboardProject,
 ): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   return Boolean(
     d?.sellpointsLocked &&
       (d.voiceovers?.length ?? 0) > 0 &&
@@ -1457,7 +1716,7 @@ export function isFashionPendingStoryboardGeneration(
 
 function inferFashionProduceVideoChoices(project: StoryboardProject): FashionChoice[] {
   if (!isFashionInProduce(project)) return [];
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (d?.outputMode !== "direct_video") return [];
   if (!hasSheetImagesReady(project)) return [];
   return [
@@ -1529,7 +1788,7 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
   }
 
   if (isAwaitingFashionSellpoints(project)) {
-    const d = resolveFashionDeliverable(project);
+    const d = workflowDeliverable(project);
     if (!d?.sellpoints?.length) return [];
     return [
       {
@@ -1547,7 +1806,7 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
   }
 
   if (isAwaitingFashionVoiceoverPick(project)) {
-    return (resolveFashionDeliverable(project)?.voiceovers ?? []).map((v) => ({
+    return (workflowDeliverable(project)?.voiceovers ?? []).map((v) => ({
       id: v.id,
       title: v.type,
       description: v.narrative,
@@ -1573,7 +1832,7 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
   }
 
   if (isAwaitingFashionStoryboardConfirm(project)) {
-    const d = resolveFashionDeliverable(project);
+    const d = workflowDeliverable(project);
     const key = d?.selectedVersion;
     const title = key ? d?.storyboardVersions?.[key]?.title : undefined;
     return [
@@ -1595,7 +1854,7 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     ];
   }
 
-  const dPendingStoryboards = resolveFashionDeliverable(project);
+  const dPendingStoryboards = workflowDeliverable(project);
   if (isFashionPendingStoryboardGeneration(project)) {
     return [
       {
@@ -1639,7 +1898,26 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
   return [];
 }
 
-export function fashionLlmFailureAssistantMessage(trigger: string): string {
+export function fashionLlmFailureAssistantMessage(
+  trigger: string,
+  cause?: unknown,
+): string {
+  const causeMsg = cause instanceof Error ? cause.message.trim() : "";
+  if (causeMsg && !/fetch|network|Failed to fetch|ECONNREF|timeout/i.test(causeMsg)) {
+    if (trigger.includes("sellpoints")) {
+      return `卖点生成未完成：${causeMsg}。请点「AI 自动生成卖点」或「重新生成卖点」重试。`;
+    }
+    if (trigger.includes("voiceovers")) {
+      return `口播文案生成未完成：${causeMsg}。请点击「重新生成口播文案」重试。`;
+    }
+    if (trigger.includes("storyboards")) {
+      return `分镜脚本生成未完成：${causeMsg}。请点击「生成 A–E 分镜方案」重试。`;
+    }
+    if (trigger.includes("ops")) {
+      return `运营包生成未完成：${causeMsg}。请重新点击「确认分镜，生成运营包」。`;
+    }
+    return `${causeMsg}。请重试上一步操作。`;
+  }
   if (trigger.includes("voiceovers")) {
     return "口播文案生成失败（网络或服务中断）。卖点已定稿，请点击下方「重新生成口播文案」重试。";
   }
@@ -1740,7 +2018,7 @@ export function parseFashionReviseDimensionStep(message: string): number | null 
 }
 
 export function isFashionDimensionRevisionAllowed(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (d?.sellpointsLocked) return false;
   const phase = getFashionPhase(project);
   return phase === "dimensions" || phase === "sellpoints";
@@ -1905,12 +2183,13 @@ export function fashionWorkflowPatchForChoice(
     (message === FASHION_LOCK_SELLPOINTS || message === FASHION_REGENERATE_VOICEOVERS) &&
     deliverable
   ) {
-    const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
-      ? (project.meta!.deliverable as FashionDeliverable)
-      : null;
+    const metaRaw = project.meta?.deliverable;
+    const metaDeliverable =
+      isProDeliverable(metaRaw) || isFashionDeliverable(metaRaw) ? metaRaw : null;
+    const sellpointsEdited = Boolean(wf.proSellpointsEdited || wf.fashionSellpointsEdited);
     const sellpoints =
       metaDeliverable?.sellpoints?.length &&
-      (wf.fashionSellpointsEdited ||
+      (sellpointsEdited ||
         metaDeliverable.sellpoints.some((sp) => {
           const prev = deliverable.sellpoints.find((d) => d.id === sp.id);
           return sp.text.trim() !== (prev?.text ?? "").trim();
@@ -2036,7 +2315,7 @@ export function fashionWorkflowPatchForChoice(
     }
     const key = deliverable.selectedVersion;
     const withPanels = usesProPhase(project)
-      ? deliverable
+      ? buildProDeliverableWithVersionPanels(project, deliverable as ProDeliverable, key)
       : buildFashionDeliverableWithVersionPanels(project, deliverable as FashionDeliverable, key);
     return {
       deliverable: {
@@ -2044,7 +2323,13 @@ export function fashionWorkflowPatchForChoice(
         outputMode: "script_compose",
         storyboardLocked: true,
       },
-      workflow: { ...wf, fashionPhase: "produce", fashionProduceSetupPending: false },
+      workflow: {
+        ...wf,
+        ...phaseWorkflowPatch(project, "produce"),
+        ...(usesProPhase(project)
+          ? { proProduceSetupPending: false }
+          : { fashionProduceSetupPending: false }),
+      },
       syncSheet: true,
     };
   }
@@ -2062,7 +2347,7 @@ export function fashionWorkflowPatchForChoice(
     }
     const key = deliverable.selectedVersion;
     const withPanels = usesProPhase(project)
-      ? deliverable
+      ? buildProDeliverableWithVersionPanels(project, deliverable as ProDeliverable, key)
       : buildFashionDeliverableWithVersionPanels(project, deliverable as FashionDeliverable, key);
     return {
       deliverable: {
@@ -2072,8 +2357,10 @@ export function fashionWorkflowPatchForChoice(
       },
       workflow: {
         ...wf,
-        fashionPhase: "produce",
-        fashionProduceSetupPending: true,
+        ...phaseWorkflowPatch(project, "produce"),
+        ...(usesProPhase(project)
+          ? { proProduceSetupPending: true }
+          : { fashionProduceSetupPending: true }),
       },
       syncSheet: true,
     };
@@ -2108,7 +2395,7 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
     return "请点选一套口播文案继续";
   }
   if (isAwaitingFashionStoryboardPick(project)) {
-    const count = listFashionStoryboardVersionKeys(resolveFashionDeliverable(project)).length;
+    const count = listFashionStoryboardVersionKeys(workflowDeliverable(project)).length;
     return count < 5
       ? `请点选 ${count} 套分镜方案继续，或选「重新生成分镜」补全 A–E 版`
       : "请点选 A–E 分镜方案继续";
@@ -2119,7 +2406,7 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
   if (isAwaitingFashionOutputMode(project)) {
     return "请选择成片方式：分镜脚本交付，或故事版一键成片";
   }
-  const d = resolveFashionDeliverable(project);
+  const d = workflowDeliverable(project);
   if (getFashionPhase(project) === "produce" && d?.outputMode) {
     return d.outputMode === "direct_video"
       ? "策划已完成；请在中栏「故事版 · 成片工作区」生图与合成，无需再点右侧选项"

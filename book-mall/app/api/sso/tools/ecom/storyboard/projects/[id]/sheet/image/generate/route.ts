@@ -62,7 +62,8 @@ export async function POST(req: Request, ctx: Ctx) {
     body.autoGenCharacter === true ||
     wf.autoGenCharacter === true ||
     Boolean(wf.characterPresetKey) ||
-    wf.fashionCharacterMode === "ai";
+    wf.fashionCharacterMode === "ai" ||
+    wf.proCharacterMode === "ai";
   const characterOnly = body.characterOnly === true;
   const panelIndex =
     typeof body.panelIndex === "number" && Number.isFinite(body.panelIndex)

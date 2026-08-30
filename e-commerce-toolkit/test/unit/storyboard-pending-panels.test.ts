@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  listOrphanStoryboardPendingPanelImageIndices,
   resolveActiveStoryboardPanelImageBusyIndices,
   resolveActiveStoryboardPanelVideoBusyIndices,
 } from "@/lib/storyboard-pending-panels";
@@ -36,16 +37,55 @@ describe("resolveActiveStoryboardPanelImageBusyIndices", () => {
     ).toEqual([2]);
   });
 
-  it("keeps pending when image not yet on sheet", () => {
+  it("drops orphan meta pending when HTTP is not in flight and sheet has no image", () => {
     expect(
       resolveActiveStoryboardPanelImageBusyIndices({
-        regeneratingPanels: [3],
-        pendingPanelIndices: [3],
+        regeneratingPanels: [],
+        pendingPanelIndices: [1, 2, 3],
         inFlightWatchIndices: [],
         imageGenInFlight: false,
-        panels,
+        panels: [
+          { index: 1, imageUrl: null },
+          { index: 2, imageUrl: null },
+          { index: 3, imageUrl: null },
+        ],
       }),
-    ).toEqual([3]);
+    ).toEqual([]);
+  });
+
+  it("selective batch in flight ignores stale pending outside watch", () => {
+    expect(
+      resolveActiveStoryboardPanelImageBusyIndices({
+        regeneratingPanels: [1, 2, 3],
+        pendingPanelIndices: [1, 2, 3, 4, 5, 6],
+        inFlightWatchIndices: [1, 2, 3],
+        imageGenInFlight: true,
+        panels: [
+          { index: 1, imageUrl: null },
+          { index: 2, imageUrl: null },
+          { index: 3, imageUrl: null },
+          { index: 4, imageUrl: null },
+          { index: 5, imageUrl: null },
+          { index: 6, imageUrl: null },
+        ],
+      }),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it("listOrphanStoryboardPendingPanelImageIndices finds stale meta pending", () => {
+    const orphans = listOrphanStoryboardPendingPanelImageIndices(
+      {
+        workflow: {
+          pendingPanelImages: {
+            "1": { startedAt: "2020-01-01T00:00:00.000Z" },
+            "2": { startedAt: new Date().toISOString() },
+          },
+        },
+      },
+      [{ index: 1, imageUrl: null }, { index: 2, imageUrl: null }],
+      { imageGenInFlight: false, inFlightWatchIndices: [] },
+    );
+    expect(orphans).toEqual([1, 2]);
   });
 });
 

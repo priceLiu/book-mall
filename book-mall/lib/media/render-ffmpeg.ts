@@ -117,6 +117,28 @@ export async function ffprobeDurationSec(filePath: string): Promise<number> {
   return sec;
 }
 
+/** 优先音频流时长（ASR 对账）；无音轨时退回容器时长。 */
+export async function ffprobeAudioDurationSec(filePath: string): Promise<number> {
+  try {
+    const stdout = await runFfprobe([
+      "-v",
+      "error",
+      "-select_streams",
+      "a:0",
+      "-show_entries",
+      "stream=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ]);
+    const sec = Number.parseFloat(stdout.trim());
+    if (Number.isFinite(sec) && sec > 0) return sec;
+  } catch {
+    // fall through
+  }
+  return ffprobeDurationSec(filePath);
+}
+
 export async function ffprobeVideoSize(
   filePath: string,
 ): Promise<{ w: number; h: number }> {

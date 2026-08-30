@@ -6,6 +6,7 @@ import {
   mergeProDeliverablePatch,
   normalizeToProDeliverable,
   proVersionToSheet,
+  resolveProDeliverableForProject,
 } from "@/lib/ecom/ecom-pro-deliverable";
 import { FASHION_SCHEMA_VERSION } from "@/lib/ecom/ecom-fashion-deliverable";
 
@@ -118,6 +119,28 @@ describe("ecom-pro-deliverable · bags", () => {
     expect(sheet?.panels).toHaveLength(6);
     expect(sheet?.panels[0]?.productBeat).toBe("包型轮廓与五金");
     expect(sheet?.overview.logline).toBe("通勤救场");
+  });
+
+  it("resolveProDeliverableForProject merges meta version panels for sheet sync", () => {
+    const deliverable = {
+      ...BAGS_FIXTURE,
+      outputMode: "script_compose" as const,
+      storyboardLocked: true,
+    };
+    const resolved = resolveProDeliverableForProject({
+      meta: {
+        workflow: { vertical: "bags", proPhase: "produce" },
+        deliverable,
+      },
+      chatHistory: [
+        { role: "user", content: "选择分镜 A版：A版·痛点救场" },
+        { role: "user", content: "确认分镜，生成运营包" },
+        { role: "user", content: "分镜脚本交付" },
+      ],
+    });
+    expect(resolved?.selectedVersion).toBe("A");
+    expect(resolved?.storyboardVersions?.A?.panels).toHaveLength(6);
+    expect(proVersionToSheet(resolved!)).not.toBeNull();
   });
 });
 

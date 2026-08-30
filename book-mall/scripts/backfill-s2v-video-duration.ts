@@ -27,12 +27,12 @@ async function main() {
 
   const logs = await prisma.gatewayRequestLog.findMany({
     where: {
-      status: "SUCCEEDED",
       ...(since ? { submittedAt: { gte: since } } : {}),
       OR: [
         { model: "wan2.2-s2v" },
         { canonicalModelKey: "wan2.2-s2v" },
       ],
+      status: { in: ["SUCCEEDED", "FAILED"] },
     },
     select: {
       id: true,

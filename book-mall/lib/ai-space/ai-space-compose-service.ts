@@ -333,6 +333,10 @@ async function runS2vStage(taskId: string): Promise<void> {
       durationMs: Date.now() - started,
       failCode: "UPSTREAM_ERROR",
       failMessage: created.error,
+      resultSummary:
+        audio.durationSec > 0
+          ? mergeS2vDurationIntoResultSummary(null, audio.durationSec)
+          : undefined,
       model: S2V_MODEL_KEY,
     });
     await failTask(taskId, friendlyS2vFailure(undefined, created.error));
@@ -377,7 +381,10 @@ async function runS2vStage(taskId: string): Promise<void> {
           durationMs: Date.now() - started,
           failCode: "UPSTREAM_ERROR",
           failMessage: "厂商任务成功但未返回 video_url",
-          resultSummary: buildGatewayTaskResultSummary(polled.raw),
+          resultSummary: mergeS2vDurationIntoResultSummary(
+            buildGatewayTaskResultSummary(polled.raw),
+            audio.durationSec,
+          ),
           externalTaskId: created.taskId,
           model: S2V_MODEL_KEY,
         });
@@ -427,9 +434,13 @@ async function runS2vStage(taskId: string): Promise<void> {
         durationMs: Date.now() - started,
         failCode: polled.output.code?.trim() || "UPSTREAM_ERROR",
         failMessage: msg,
-        resultSummary: buildGatewayTaskResultSummary(polled.raw),
+        resultSummary: mergeS2vDurationIntoResultSummary(
+          buildGatewayTaskResultSummary(polled.raw),
+          audio.durationSec,
+        ),
         externalTaskId: created.taskId,
         model: S2V_MODEL_KEY,
+        pricingTierRaw: options.resolution,
       });
       await failTask(taskId, friendlyS2vFailure(polled.output.code, msg));
       return;

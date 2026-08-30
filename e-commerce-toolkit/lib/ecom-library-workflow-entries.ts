@@ -1,5 +1,4 @@
 import type {
-  EcomLibraryAssetGroup,
   EcomLibraryHandCraftBundle,
   EcomLibraryMediaDecomposeBundle,
   EcomLibraryProductDesignBundle,
@@ -65,19 +64,6 @@ export type LibraryWorkflowEntry =
       bundle: EcomLibraryMediaDecomposeBundle;
     };
 
-function thumbnailFromAssetGroup(group: EcomLibraryAssetGroup): string | null {
-  for (const asset of group.assets) {
-    if (asset.kind !== "video") {
-      const candidate = asset.thumbnailUrl ?? asset.ossUrl;
-      if (candidate?.trim()) return candidate.trim();
-    }
-  }
-  for (const asset of group.assets) {
-    if (asset.thumbnailUrl?.trim()) return asset.thumbnailUrl.trim();
-  }
-  return group.assets[0]?.ossUrl?.trim() ?? null;
-}
-
 function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowEntry[] {
   const entries: LibraryWorkflowEntry[] = [];
 
@@ -140,48 +126,9 @@ function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowE
   return entries;
 }
 
-/** 工作流 Tab：已保存 bundle + 微剧故事版进行中项目（与视频 Tab 资产分组对齐） */
+/** 工作流 Tab：已保存 bundle（进行中项目见「我的工作流 · 暂存」） */
 export function buildWorkflowTabEntries(section: EcomLibrarySection): LibraryWorkflowEntry[] {
   const entries = bundleEntriesFromSection(section);
-
-  if (section.moduleId !== "storyboard-micro-drama") {
-    entries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-    return entries;
-  }
-
-  const coveredProjectIds = new Set(
-    entries
-      .filter((e): e is Extract<LibraryWorkflowEntry, { kind: "storyboard" }> => e.kind === "storyboard")
-      .map((e) => e.bundle.projectId),
-  );
-
-  const groups =
-    section.assetGroups.length > 0
-      ? section.assetGroups
-      : section.assets.length > 0
-        ? [{ projectId: null, projectName: "未命名项目", assets: section.assets }]
-        : [];
-
-  for (const group of groups) {
-    const projectId = group.projectId?.trim();
-    if (!projectId || coveredProjectIds.has(projectId)) continue;
-    const imageCount = group.assets.filter((a) => a.kind !== "video").length;
-    const videoCount = group.assets.filter((a) => a.kind === "video").length;
-    const parts: string[] = ["进行中的项目"];
-    if (imageCount > 0) parts.push(`${imageCount} 张图`);
-    if (videoCount > 0) parts.push(`${videoCount} 个视频`);
-    entries.push({
-      kind: "storyboard-draft",
-      key: `sb-draft:${projectId}`,
-      projectName: group.projectName,
-      projectId,
-      thumbnailUrl: thumbnailFromAssetGroup(group),
-      hasVideo: videoCount > 0,
-      meta: parts.join(" · "),
-      sortKey: group.assets[0]?.createdAt ?? "",
-    });
-  }
-
   entries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
   return entries;
 }

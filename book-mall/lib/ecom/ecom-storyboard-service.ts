@@ -351,11 +351,13 @@ export async function updateEcomStoryboardProject(
     } as Prisma.InputJsonValue;
   }
 
-  const row = await prisma.ecomStoryboardProject.update({
+  await prisma.ecomStoryboardProject.update({
     where: { id: projectId },
     data,
   });
-  return rowToDto(row);
+  const refreshed = await getEcomStoryboardProject(userId, projectId);
+  if (!refreshed) throw new Error("项目不存在");
+  return refreshed;
 }
 
 export async function deleteEcomStoryboardProject(

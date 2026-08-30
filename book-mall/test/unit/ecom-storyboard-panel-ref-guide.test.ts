@@ -56,6 +56,26 @@ describe("buildStoryboardPanelRefGuideForUrls", () => {
     );
   });
 
+  it("labels each product ref when multiple product urls sent", () => {
+    const guide = buildStoryboardPanelRefGuideForUrls(
+      [
+        "https://cdn.example.com/product.jpg",
+        "https://cdn.example.com/product2.jpg",
+      ],
+      [
+        ...refs,
+        {
+          id: "p2",
+          label: "产品2",
+          role: "product",
+          ossUrl: "https://cdn.example.com/product2.jpg",
+        },
+      ],
+    );
+    expect(guide).toContain("图1为产品包装参考");
+    expect(guide).toContain("图2为产品包装参考");
+  });
+
   it("fashion apparel uses garment color guide for product and splits character clothing", () => {
     const fashionCtx = buildStoryboardImagePromptContext({
       meta: { workflow: { vertical: "fashion_apparel" } },

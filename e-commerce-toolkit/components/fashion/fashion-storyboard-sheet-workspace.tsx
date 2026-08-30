@@ -151,7 +151,11 @@ export function FashionStoryboardSheetWorkspace({
             type="button"
             size="sm"
             disabled={busy || selectedList.length === 0}
-            onClick={() => onGenerateSelected(selectedList)}
+            onClick={() => {
+              const indexes = selectedList;
+              setSelectedPanels(new Set());
+              onGenerateSelected(indexes);
+            }}
           >
             生成选中镜{selectedList.length > 0 ? `（${selectedList.length}）` : ""}
           </EcomButtonSecondary>
@@ -159,7 +163,10 @@ export function FashionStoryboardSheetWorkspace({
             type="button"
             size="sm"
             disabled={busy}
-            onClick={onGenerateAll}
+            onClick={() => {
+              setSelectedPanels(new Set());
+              onGenerateAll();
+            }}
           >
             {busy ? (
               <>

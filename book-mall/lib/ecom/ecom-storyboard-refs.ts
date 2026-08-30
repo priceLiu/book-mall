@@ -11,11 +11,25 @@ function isHttpUrl(url: string | undefined): url is string {
   return Boolean(url?.trim() && /^https?:\/\//.test(url.trim()));
 }
 
-/** 产品图（必填） */
+/** 全部产品图（上传顺序，去重 URL） */
+export function getStoryboardProductRefs(refs: StoryboardReference[]): StoryboardReference[] {
+  const seen = new Set<string>();
+  const out: StoryboardReference[] = [];
+  for (const ref of refs) {
+    if (ref.role !== "product" || !isHttpUrl(ref.ossUrl)) continue;
+    const url = ref.ossUrl.trim();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(ref);
+  }
+  return out;
+}
+
+/** 首张产品图（兼容旧调用） */
 export function getStoryboardProductRef(
   refs: StoryboardReference[],
 ): StoryboardReference | null {
-  return refs.find((r) => r.role === "product" && isHttpUrl(r.ossUrl)) ?? null;
+  return getStoryboardProductRefs(refs)[0] ?? null;
 }
 
 export function requireStoryboardProductRef(
@@ -49,24 +63,28 @@ export function getStoryboardSceneRefs(refs: StoryboardReference[]): StoryboardR
  * - 角色图、场景图：仅在上传时包含
  */
 export function resolveStoryboardModelRefUrls(refs: StoryboardReference[]): {
+  /** @deprecated 使用 productUrls；首张产品图 */
   productUrl: string;
+  productUrls: string[];
   characterUrl?: string;
   sceneUrls: string[];
-  /** 按产品 → 角色 → 场景顺序，供多图模型使用 */
+  /** 按产品（全部）→ 角色 → 场景顺序，供多图模型使用 */
   allUrls: string[];
 } {
-  const product = requireStoryboardProductRef(refs);
+  const products = getStoryboardProductRefs(refs);
+  if (products.length === 0) throw new StoryboardProductRefRequiredError();
   const characters = getStoryboardCharacterRefs(refs);
   const scenes = getStoryboardSceneRefs(refs);
 
-  const productUrl = product.ossUrl.trim();
+  const productUrls = products.map((p) => p.ossUrl.trim());
+  const productUrl = productUrls[0]!;
   const characterUrls = characters.map((c) => c.ossUrl.trim());
   const characterUrl = characterUrls[0];
   const sceneUrls = scenes.map((s) => s.ossUrl.trim());
 
-  const allUrls = [productUrl, ...characterUrls, ...sceneUrls];
+  const allUrls = [...productUrls, ...characterUrls, ...sceneUrls];
 
-  return { productUrl, characterUrl, sceneUrls, allUrls };
+  return { productUrl, productUrls, characterUrl, sceneUrls, allUrls };
 }
 
 /**
@@ -100,12 +118,21 @@ export function resolveStoryboardFullVideoRefs(opts: {
   return { firstFrameUrl, referenceImageUrls, allUrls };
 }
 
-/** 生图：产品垫图 + 可选附加参考（角色/场景） */
+/** 生图：全部产品图 + 角色 + 场景（调用方按模型上限 slice） */
 export function resolveStoryboardImageGenRefs(refs: StoryboardReference[]): {
+  /** @deprecated 使用 productRefUrls；首张产品图 */
   productRefUrl: string;
+  productRefUrls: string[];
+  /** 除首张产品外的参考（角色/场景/其余产品） */
   extraRefUrls: string[];
+  /** 送入模型的完整 URL 列表：产品（全部）→ 角色 → 场景 */
+  refImageUrls: string[];
 } {
-  const { productUrl, allUrls } = resolveStoryboardModelRefUrls(refs);
-  const extraRefUrls = allUrls.slice(1);
-  return { productRefUrl: productUrl, extraRefUrls };
+  const { productUrl, productUrls, allUrls } = resolveStoryboardModelRefUrls(refs);
+  return {
+    productRefUrl: productUrl,
+    productRefUrls: productUrls,
+    extraRefUrls: allUrls.slice(1),
+    refImageUrls: allUrls,
+  };
 }

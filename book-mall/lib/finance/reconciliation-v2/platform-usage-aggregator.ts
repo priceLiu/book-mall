@@ -8,10 +8,13 @@ import { canonicalKeysByAliases } from "@/lib/model-catalog/resolve";
 import { resolveReconciliationVendorCode } from "@/lib/finance/infer-vendor-code";
 import { resolveDeepseekReconciliationModelKey } from "@/lib/pricing/deepseek-v4-pricing";
 
+import { isS2vModelKey } from "@/lib/finance/infer-s2v-video-seconds";
+
 import {
   buildJoinKey,
   resolveReconciliationKTokensDirection,
   resolveReconciliationUsage,
+  resolveReconciliationVideoSeconds,
   type ReconciliationLogRow,
 } from "./billable-units";
 import type { PlatformUsageLine, TokenDirection, UnitKind } from "./types";
@@ -43,6 +46,113 @@ function monthFromDate(d: Date): string {
 function logInPeriod(submittedAt: Date, period: ReconciliationPeriod): boolean {
   const day = calendarDateFromIso(submittedAt.toISOString());
   return dateInPeriod(day, period);
+}
+
+function asrFileUrlFromInput(inputSummary: unknown): string | null {
+  if (!inputSummary || typeof inputSummary !== "object") return null;
+  const root = inputSummary as Record<string, unknown>;
+  const input = root.input;
+  if (!input || typeof input !== "object") return null;
+  const row = input as Record<string, unknown>;
+  const url = String(row.fileUrl ?? row.audioUrl ?? "").trim();
+  return /^https?:\/\//.test(url) ? url : null;
+}
+
+function isAsrFiletransLog(log: {
+  model?: string | null;
+  canonicalModelKey?: string | null;
+}): boolean {
+  const m = `${log.model ?? ""} ${log.canonicalModelKey ?? ""}`.toLowerCase();
+  return m.includes("asr") || m.includes("filetrans");
+}
+
+function s2vAudioUrlFromInput(inputSummary: unknown): string | null {
+  if (!inputSummary || typeof inputSummary !== "object") return null;
+  const root = inputSummary as Record<string, unknown>;
+  const outer = root.input;
+  if (!outer || typeof outer !== "object") return null;
+  const inner = (outer as Record<string, unknown>).input;
+  if (inner && typeof inner === "object") {
+    const row = inner as Record<string, unknown>;
+    const url = String(row.audio_url ?? row.audioUrl ?? "").trim();
+    if (/^https?:\/\//.test(url)) return url;
+  }
+  const flat = outer as Record<string, unknown>;
+  const url = String(flat.audio_url ?? flat.audioUrl ?? "").trim();
+  return /^https?:\/\//.test(url) ? url : null;
+}
+
+function isS2vBillableLog(log: {
+  model?: string | null;
+  canonicalModelKey?: string | null;
+}): boolean {
+  return isS2vModelKey(log.canonicalModelKey ?? log.model);
+}
+
+/** S2V 同一 audio_url 多次尝试时，对账取 billable 最大秒数（贴近阿里按源音频/成片计费）。 */
+function buildS2vReconciliationWinnerLogIds(
+  logs: Array<{
+    id: string;
+    submittedAt: Date | null;
+    model?: string | null;
+    canonicalModelKey?: string | null;
+    inputSummary?: unknown;
+    resultSummary?: unknown;
+    status?: ReconciliationLogRow["status"];
+    requestKind?: ReconciliationLogRow["requestKind"];
+    billingCategory?: ReconciliationLogRow["billingCategory"];
+    pricingTierRaw?: string | null;
+  }>,
+): Set<string> {
+  const byUrl = new Map<string, { id: string; sec: number; at: number }>();
+  for (const log of logs) {
+    if (!isS2vBillableLog(log)) continue;
+    const url = s2vAudioUrlFromInput(log.inputSummary);
+    if (!url) continue;
+    const sec = resolveReconciliationVideoSeconds(log as ReconciliationLogRow);
+    if (sec <= 0) continue;
+    const at = log.submittedAt?.getTime() ?? 0;
+    const cur = byUrl.get(url);
+    if (!cur || sec > cur.sec || (sec === cur.sec && at >= cur.at)) {
+      byUrl.set(url, { id: log.id, sec, at });
+    }
+  }
+  return new Set([...byUrl.values()].map((v) => v.id));
+}
+
+/** ASR 同一 fileUrl 多次 Gateway 调用时，对账只计 billable 最大的一条（贴近阿里按文件计费）。 */
+function buildAsrReconciliationWinnerLogIds(
+  logs: Array<{
+    id: string;
+    submittedAt: Date | null;
+    model?: string | null;
+    canonicalModelKey?: string | null;
+    inputSummary?: unknown;
+    resultSummary?: unknown;
+    status?: ReconciliationLogRow["status"];
+    requestKind?: ReconciliationLogRow["requestKind"];
+    billingCategory?: ReconciliationLogRow["billingCategory"];
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    totalTokens?: number | null;
+    hasTokenUsage?: boolean | null;
+    pricingTierRaw?: string | null;
+  }>,
+): Set<string> {
+  const byUrl = new Map<string, { id: string; sec: number; at: number }>();
+  for (const log of logs) {
+    if (!isAsrFiletransLog(log)) continue;
+    const url = asrFileUrlFromInput(log.inputSummary);
+    if (!url) continue;
+    const sec = resolveReconciliationUsage(log as ReconciliationLogRow).amount;
+    if (sec <= 0) continue;
+    const at = log.submittedAt?.getTime() ?? 0;
+    const cur = byUrl.get(url);
+    if (!cur || sec > cur.sec || (sec === cur.sec && at >= cur.at)) {
+      byUrl.set(url, { id: log.id, sec, at });
+    }
+  }
+  return new Set([...byUrl.values()].map((v) => v.id));
 }
 
 export type AggregatePlatformUsageInput = {
@@ -78,7 +188,13 @@ export async function aggregatePlatformUsageForReconciliation(
   const logs = await prisma.gatewayRequestLog.findMany({
     where: {
       submittedAt: { gte: from, lte: to },
-      status: "SUCCEEDED",
+      OR: [
+        { status: "SUCCEEDED" },
+        {
+          status: "FAILED",
+          OR: [{ model: "wan2.2-s2v" }, { canonicalModelKey: "wan2.2-s2v" }],
+        },
+      ],
       ...(input.userIds?.length ? { actorBookUserId: { in: input.userIds } } : {}),
     },
     select: {
@@ -243,6 +359,9 @@ export async function aggregatePlatformUsageForReconciliation(
 
   const agg = new Map<string, PlatformUsageLine & { _logIds: string[] }>();
 
+  const asrWinnerLogIds = buildAsrReconciliationWinnerLogIds(logs);
+  const s2vWinnerLogIds = buildS2vReconciliationWinnerLogIds(logs);
+
   const resolvedModelKeys = logs.map((log) => resolveLogModelKey(log));
   const vendorCodeMap = await buildReconciliationVendorCodeMap(
     [...new Set(resolvedModelKeys)],
@@ -251,6 +370,17 @@ export async function aggregatePlatformUsageForReconciliation(
 
   for (const log of logs) {
     if (!log.submittedAt || !logInPeriod(log.submittedAt, period)) continue;
+    if (log.status === "FAILED") {
+      const modelKey = log.canonicalModelKey ?? log.model ?? "";
+      if (!isS2vModelKey(modelKey)) continue;
+      if (resolveReconciliationVideoSeconds(log as ReconciliationLogRow) <= 0) continue;
+    }
+    if (isAsrFiletransLog(log) && asrFileUrlFromInput(log.inputSummary)) {
+      if (!asrWinnerLogIds.has(log.id)) continue;
+    }
+    if (isS2vBillableLog(log) && s2vAudioUrlFromInput(log.inputSummary)) {
+      if (!s2vWinnerLogIds.has(log.id)) continue;
+    }
     const row = log as ReconciliationLogRow;
     const usage = resolveReconciliationUsage(row);
     const rawModelKey = resolveLogModelKey(log);
@@ -265,10 +395,13 @@ export async function aggregatePlatformUsageForReconciliation(
         ? resolveDeepseekReconciliationModelKey(rawModelKey)
         : rawModelKey;
     const tierForJoin = vendorCode === "deepseek" ? null : usage.tierRaw;
+    const isEmbeddingModel = modelKey.toLowerCase().includes("embedding");
 
     const directions: TokenDirection[] =
       usage.unitKind === "KTOKEN"
-        ? (() => {
+        ? isEmbeddingModel
+          ? ["none"]
+          : (() => {
             const d = tokenDirectionForLog(row, usage.unitKind);
             if (d !== "none") return [d];
             const pt = log.promptTokens ?? 0;

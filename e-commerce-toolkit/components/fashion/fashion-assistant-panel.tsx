@@ -50,7 +50,7 @@ import {
   stripProDeliverableFence,
 } from "@/lib/pro-vertical/deliverable-parse";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
-import { getProjectVertical, isAwaitingProCategoryPick, isNonFashionProVertical } from "@/lib/pro-vertical/project-vertical";
+import { getProjectVertical, isAwaitingProCategoryPick, isNonFashionProVertical, usesProPhase } from "@/lib/pro-vertical/project-vertical";
 import type { ProDeliverable } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import {
@@ -70,6 +70,7 @@ import {
   buildFashionProductRefAutoAdvance,
   applyFashionMetaAuthorityToDeliverable,
   buildFashionDeliverableWithVersionPanels,
+  buildProDeliverableWithVersionPanels,
   buildFashionStoryboardPickChoices,
   buildFashionWorkflowChoiceMessageLabels,
   currentFashionDimensionStep,
@@ -104,6 +105,7 @@ import {
   resolveProVerticalDeliverable,
   isProVerticalProject,
   resolveFashionStoryboardPanelsForVersion,
+  resolveProStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
 import {
   isGenerateAllImagesChoice,
@@ -314,8 +316,11 @@ export function FashionAssistantPanel({
       (wfPhase === "voiceover_pick" && resolved.selectedVoiceoverId) ||
       (canAdvancePhase && phaseDeliverableReady && inferredPhase !== wfPhase) ||
       (inferredPhase === "storyboard_pick" &&
-        isFashionDeliverable(project.meta?.deliverable) &&
-        Boolean((project.meta!.deliverable as FashionDeliverable).selectedVersion) &&
+        (isFashionDeliverable(project.meta?.deliverable) ||
+          isProDeliverable(project.meta?.deliverable)) &&
+        Boolean(
+          (project.meta!.deliverable as FashionDeliverable | ProDeliverable).selectedVersion,
+        ) &&
         !resolved.opsPack &&
         !resolved.selectedVersion);
     if (!needsRepair) return;
@@ -713,7 +718,7 @@ export function FashionAssistantPanel({
               const failureMsg: StoryboardChatMessage = {
                 id: `err-${Date.now()}`,
                 role: "assistant",
-                content: fashionLlmFailureAssistantMessage(llmTrigger),
+                content: fashionLlmFailureAssistantMessage(llmTrigger, e),
                 createdAt: new Date().toISOString(),
               };
               const failedHistory = [...next, failureMsg];
@@ -742,19 +747,33 @@ export function FashionAssistantPanel({
             try {
               const patchDeliverable = isFashionDeliverable(metaPatch.deliverable)
                 ? (metaPatch.deliverable as FashionDeliverable)
-                : null;
+                : isProDeliverable(metaPatch.deliverable)
+                  ? (metaPatch.deliverable as ProDeliverable)
+                  : null;
               const versionKey = patchDeliverable?.selectedVersion;
               if (versionKey && patchDeliverable) {
-                const withPanels = buildFashionDeliverableWithVersionPanels(
-                  effectiveProject,
-                  patchDeliverable,
-                  versionKey,
-                );
-                const panels = resolveFashionStoryboardPanelsForVersion(
-                  effectiveProject,
-                  versionKey,
-                  withPanels,
-                );
+                const withPanels = isProDeliverable(patchDeliverable)
+                  ? buildProDeliverableWithVersionPanels(
+                      effectiveProject,
+                      patchDeliverable,
+                      versionKey,
+                    )
+                  : buildFashionDeliverableWithVersionPanels(
+                      effectiveProject,
+                      patchDeliverable,
+                      versionKey,
+                    );
+                const panels = isProDeliverable(withPanels)
+                  ? resolveProStoryboardPanelsForVersion(
+                      effectiveProject,
+                      versionKey,
+                      withPanels,
+                    )
+                  : resolveFashionStoryboardPanelsForVersion(
+                      effectiveProject,
+                      versionKey,
+                      withPanels,
+                    );
                 if (!panels?.length) {
                   throw new Error(
                     "定稿分镜缺少分镜表数据，请在中栏 12.1 确认分镜表已保存后再选择成片方式",
@@ -778,7 +797,9 @@ export function FashionAssistantPanel({
               if (patchedProject) {
                 const prevDeliverable = isFashionDeliverable(patchedProject.meta?.deliverable)
                   ? (patchedProject.meta!.deliverable as FashionDeliverable)
-                  : null;
+                  : isProDeliverable(patchedProject.meta?.deliverable)
+                    ? (patchedProject.meta!.deliverable as ProDeliverable)
+                    : null;
                 const rolled = await updateStoryboardProject(projectId, {
                   chatHistory: history,
                   meta: {
@@ -788,7 +809,9 @@ export function FashionAssistantPanel({
                       : patchedProject.meta?.deliverable,
                     workflow: {
                       ...(patchedProject.meta?.workflow ?? {}),
-                      fashionPhase: "output_mode",
+                      ...(usesProPhase(patchedProject)
+                        ? { proPhase: "output_mode" }
+                        : { fashionPhase: "output_mode" }),
                     },
                   },
                 });

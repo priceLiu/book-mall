@@ -49,6 +49,7 @@ import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas
 import type { GatewayRequestLog } from "@prisma/client";
 import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
+import { dashscopeVideoFinalizeExtras } from "@/lib/gateway/dashscope-video-finalize-extras";
 
 async function syncDashscopePollToGatewayLog(input: {
   log: GatewayRequestLog;
@@ -65,13 +66,15 @@ async function syncDashscopePollToGatewayLog(input: {
 
   if (isDashscopeTaskSuccess(status)) {
     const baseSummary = buildGatewayTaskResultSummary(raw, output);
+    const videoExtras = dashscopeVideoFinalizeExtras(log, baseSummary);
     const { resultSummary } = await persistDashscopeTimingOnPoll({
       log,
       vendorStatus: status,
       vendorOutput: output,
-      resultSummaryOverride: baseSummary,
+      resultSummaryOverride: videoExtras.resultSummary,
     });
     const trace = readDashscopeTimingTrace(resultSummary);
+    const tierRaw = videoExtras.pricingTierRaw;
     if (trace) {
       await finalizeDashscopeAsyncRequestLog(log.id, {
         submittedAt: log.submittedAt,
@@ -81,6 +84,7 @@ async function syncDashscopePollToGatewayLog(input: {
         fallbackNowMs: polledAtMs,
         externalTaskId: taskId,
         model: log.model,
+        pricingTierRaw: tierRaw,
       });
     } else {
       const vendorRequestId =
@@ -91,9 +95,10 @@ async function syncDashscopePollToGatewayLog(input: {
           ? polledAtMs - log.submittedAt.getTime()
           : 0,
         completedAt: new Date(polledAtMs),
-        resultSummary: baseSummary,
+        resultSummary: videoExtras.resultSummary,
         externalTaskId: taskId,
         model: log.model,
+        pricingTierRaw: tierRaw,
         ...(vendorRequestId ? { vendorRequestId } : {}),
       });
     }

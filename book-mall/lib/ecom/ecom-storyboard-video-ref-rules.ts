@@ -13,7 +13,7 @@ import {
 import type { StoryboardReference } from "@/lib/ecom/ecom-storyboard-types";
 import {
   getStoryboardCharacterRefs,
-  getStoryboardProductRef,
+  getStoryboardProductRefs,
   getStoryboardSceneRefs,
 } from "@/lib/ecom/ecom-storyboard-refs";
 import {
@@ -273,15 +273,17 @@ function identitySlotsPrioritized(
   references: StoryboardReference[],
 ): StoryboardVideoRefSlot[] {
   const out: StoryboardVideoRefSlot[] = [];
-  const product = getStoryboardProductRef(references);
-  if (product) {
+  const products = getStoryboardProductRefs(references);
+  for (const [i, product] of products.entries()) {
     const name = product.label?.trim();
     out.push({
       role: "product",
       url: product.ossUrl.trim(),
       label: name
         ? `产品图「${name}」（包装外观须一致）`
-        : "产品图（包装外观须一致）",
+        : products.length > 1
+          ? `产品图${i + 1}（包装外观须一致）`
+          : "产品图（包装外观须一致）",
     });
   }
   for (const [i, c] of getStoryboardCharacterRefs(references).entries()) {

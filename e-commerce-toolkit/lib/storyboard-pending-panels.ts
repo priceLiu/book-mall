@@ -38,11 +38,49 @@ export function readStoryboardPendingPanelImages(
 
 export function listStoryboardPendingPanelImageIndices(
   meta: StoryboardProject["meta"],
+  opts?: { maxAgeMs?: number; now?: number },
 ): number[] {
-  return Object.keys(readStoryboardPendingPanelImages(meta))
-    .map((k) => Number.parseInt(k, 10))
-    .filter((n) => Number.isFinite(n) && n > 0)
+  const map = readStoryboardPendingPanelImages(meta);
+  const now = opts?.now ?? Date.now();
+  const maxAgeMs = opts?.maxAgeMs;
+  return Object.entries(map)
+    .map(([key, entry]) => ({
+      index: Number.parseInt(key, 10),
+      startedAt: entry.startedAt,
+    }))
+    .filter(({ index, startedAt }) => {
+      if (!Number.isFinite(index) || index <= 0) return false;
+      if (maxAgeMs == null) return true;
+      const t = new Date(startedAt).getTime();
+      if (Number.isNaN(t)) return false;
+      return now - t <= maxAgeMs;
+    })
+    .map(({ index }) => index)
     .sort((a, b) => a - b);
+}
+
+/** 无进行中 HTTP 时，meta pending 但 sheet 无图视为过期 */
+export function listOrphanStoryboardPendingPanelImageIndices(
+  meta: StoryboardProject["meta"],
+  panels: readonly { index: number; imageUrl?: string | null }[],
+  opts: { imageGenInFlight: boolean; inFlightWatchIndices: readonly number[] },
+): number[] {
+  const map = readStoryboardPendingPanelImages(meta);
+  const orphans: number[] = [];
+  for (const [key, entry] of Object.entries(map)) {
+    const index = Number.parseInt(key, 10);
+    if (!Number.isFinite(index) || index <= 0) continue;
+    const hasImage = panels.some(
+      (p) => p.index === index && Boolean(p.imageUrl?.trim()),
+    );
+    if (hasImage) {
+      orphans.push(index);
+      continue;
+    }
+    if (opts.imageGenInFlight || opts.inFlightWatchIndices.includes(index)) continue;
+    orphans.push(index);
+  }
+  return orphans.sort((a, b) => a - b);
 }
 
 export function isStoryboardPanelImagePending(
@@ -122,6 +160,9 @@ export function resolveActiveStoryboardPanelImageBusyIndices(opts: {
   if (opts.imageGenInFlight) {
     for (const idx of opts.inFlightWatchIndices) set.add(idx);
   }
+  /** 局部批量：仅 watch/regenerating 中的镜展示生成中，忽略无关 meta pending */
+  const selectiveInFlight =
+    opts.imageGenInFlight && opts.inFlightWatchIndices.length > 0;
   for (const idx of opts.pendingPanelIndices) {
     if (
       opts.inFlightWatchIndices.includes(idx) ||
@@ -133,6 +174,9 @@ export function resolveActiveStoryboardPanelImageBusyIndices(opts: {
       (p) => p.index === idx && Boolean(p.imageUrl?.trim()),
     );
     if (hasImage) set.delete(idx);
+    else if (selectiveInFlight || !opts.imageGenInFlight) {
+      set.delete(idx);
+    }
   }
   for (const idx of opts.regeneratingPanels) {
     if (opts.inFlightWatchIndices.includes(idx)) continue;

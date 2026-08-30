@@ -1106,6 +1106,29 @@ export function parseAsrSentencesFromTranscriptionJson(
   return out;
 }
 
+/** 阿里 ASR 按源音频文件时长计费；优先 original_duration_in_milliseconds。 */
+export function parseAsrBillableAudioDurationSecFromTranscriptionJson(
+  raw: unknown,
+): number | null {
+  const root = raw as Record<string, unknown> | null;
+  const transcripts = root?.transcripts;
+  if (!Array.isArray(transcripts) || transcripts.length === 0) return null;
+  const first = transcripts[0] as Record<string, unknown>;
+  const props = first?.audio_info as Record<string, unknown> | undefined;
+  const durationMs = Number(
+    props?.original_duration_in_milliseconds ??
+      first?.content_duration_in_milliseconds ??
+      0,
+  );
+  if (Number.isFinite(durationMs) && durationMs > 0) {
+    return Math.max(1, Math.ceil(durationMs / 1000));
+  }
+  const sentences = parseAsrSentencesFromTranscriptionJson(raw);
+  if (sentences.length === 0) return null;
+  const maxMs = Math.max(...sentences.map((s) => s.endMs));
+  return Math.max(1, Math.ceil(maxMs / 1000));
+}
+
 export async function dashscopeCreateAsrFiletransTask(opts: {
   apiKey: string;
   fileUrl: string;
@@ -1136,7 +1159,11 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
   pollIntervalMs?: number;
   maxWaitMs?: number;
 }): Promise<
-  | { ok: true; sentences: DashscopeAsrSentence[] }
+  | {
+      ok: true;
+      sentences: DashscopeAsrSentence[];
+      billableAudioDurationSec: number | null;
+    }
   | { ok: false; error: string }
 > {
   const pollIntervalMs = opts.pollIntervalMs ?? 2000;
@@ -1198,6 +1225,8 @@ export async function dashscopeFetchAsrTranscriptionSentences(opts: {
     return {
       ok: true,
       sentences: parseAsrSentencesFromTranscriptionJson(json),
+      billableAudioDurationSec:
+        parseAsrBillableAudioDurationSecFromTranscriptionJson(json),
     };
   }
 
@@ -1209,7 +1238,11 @@ export async function dashscopeTranscribePublicFileUrl(opts: {
   fileUrl: string;
   model?: string;
 }): Promise<
-  | { ok: true; sentences: DashscopeAsrSentence[] }
+  | {
+      ok: true;
+      sentences: DashscopeAsrSentence[];
+      billableAudioDurationSec: number | null;
+    }
   | { ok: false; error: string }
 > {
   const created = await dashscopeCreateAsrFiletransTask(opts);

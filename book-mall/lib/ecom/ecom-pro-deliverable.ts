@@ -19,6 +19,7 @@ import {
 import {
   getProVerticalConfig,
   isProVerticalId,
+  resolveWorkflowVertical,
   type ProVerticalId,
 } from "@/lib/ecom/pro-vertical/registry";
 import { PRO_SHOT_SCALE_BY_INDEX } from "@/lib/ecom/pro-vertical/shared-enums";
@@ -534,6 +535,161 @@ export function resolveProPromptPhase(lastUserTurn: string): string {
   if (lastUserTurn.includes("storyboards")) return "storyboards";
   if (lastUserTurn.includes("ops")) return "ops";
   return "general";
+}
+
+function parseProVersionPickFromChat(chatHistory: StoryboardChatMessage[]): ProVersionKey | null {
+  let picked: ProVersionKey | null = null;
+  for (const msg of chatHistory) {
+    if (msg.role !== "user") continue;
+    const m = msg.content.trim().match(/^选择分镜\s*([A-E])版/);
+    if (m?.[1]) picked = m[1] as ProVersionKey;
+  }
+  return picked;
+}
+
+function isProStoryboardConfirmAfterLastVersionPick(
+  chatHistory: StoryboardChatMessage[],
+): boolean {
+  let lastVersionIdx = -1;
+  let lastConfirmIdx = -1;
+  for (let i = 0; i < chatHistory.length; i++) {
+    const msg = chatHistory[i];
+    if (msg?.role !== "user") continue;
+    const trimmed = msg.content.trim();
+    if (/^选择分镜\s*[A-E]版/.test(trimmed)) lastVersionIdx = i;
+    if (trimmed === "确认分镜，生成运营包" || trimmed === "重新生成运营包") {
+      lastConfirmIdx = i;
+    }
+  }
+  return lastConfirmIdx >= 0 && lastConfirmIdx > lastVersionIdx;
+}
+
+function hasProOutputModeChoiceInChat(chatHistory: StoryboardChatMessage[]): boolean {
+  return chatHistory.some(
+    (m) =>
+      m.role === "user" &&
+      (m.content.trim() === "分镜脚本交付" || m.content.trim() === "故事版一键成片"),
+  );
+}
+
+/** 合并 meta + 会话 + 定稿标记，供 Pro vertical sheet 同步与成片使用 */
+export function resolveProDeliverableForProject(project: {
+  meta?: Record<string, unknown> | null;
+  chatHistory?: StoryboardChatMessage[];
+}): ProDeliverable | null {
+  const meta = (project.meta as Record<string, unknown> | null) ?? {};
+  const vertical = resolveWorkflowVertical(
+    (meta.workflow as Record<string, unknown> | undefined) ?? {},
+  );
+  if (!vertical || vertical === "fashion_apparel") return null;
+
+  const metaDeliverable = normalizeToProDeliverable(meta.deliverable);
+  let merged: ProDeliverable | null = metaDeliverable;
+
+  const chatHistory = project.chatHistory ?? [];
+  for (const msg of chatHistory) {
+    if (msg.role !== "assistant") continue;
+    const parsed = extractProDeliverable(msg.content, vertical);
+    if (!parsed) continue;
+    merged = merged
+      ? mergeProDeliverablePatch(merged, parsed, vertical, merged.productName)
+      : parsed;
+  }
+
+  if (!merged) return null;
+
+  const wf = (meta.workflow as Record<string, unknown> | undefined) ?? {};
+  const storyboardConfirmed = isProStoryboardConfirmAfterLastVersionPick(chatHistory);
+
+  if (metaDeliverable?.sellpoints?.length) {
+    if (metaDeliverable.sellpointsLocked || wf.proSellpointsEdited === true) {
+      merged = {
+        ...merged,
+        sellpoints: metaDeliverable.sellpoints,
+        sellpointsLocked: metaDeliverable.sellpointsLocked || merged.sellpointsLocked,
+      };
+    }
+  }
+
+  const versionKey =
+    metaDeliverable?.selectedVersion ??
+    parseProVersionPickFromChat(chatHistory) ??
+    merged.selectedVersion ??
+    null;
+
+  const voiceoverId =
+    merged.selectedVoiceoverId ??
+    metaDeliverable?.selectedVoiceoverId ??
+    null;
+  if (voiceoverId && merged.voiceovers.some((v) => v.id === voiceoverId)) {
+    merged = { ...merged, selectedVoiceoverId: voiceoverId };
+  } else if (metaDeliverable?.selectedVoiceoverId) {
+    merged = { ...merged, selectedVoiceoverId: metaDeliverable.selectedVoiceoverId };
+  }
+
+  if (versionKey) {
+    const metaVersion = metaDeliverable?.storyboardVersions?.[versionKey];
+    const mergedVersion = merged.storyboardVersions?.[versionKey];
+    let panels =
+      Boolean(metaVersion?.panels?.length) &&
+      (metaDeliverable?.selectedVersion === versionKey ||
+        storyboardConfirmed ||
+        wf.proStoryboardPanelsEdited === true)
+        ? metaVersion!.panels
+        : mergedVersion?.panels?.length
+          ? mergedVersion.panels
+          : metaVersion?.panels;
+
+    if (!panels?.length) {
+      for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const msg = chatHistory[i];
+        if (msg?.role !== "assistant") continue;
+        const parsed = extractProDeliverable(msg.content, vertical);
+        const chatPanels = parsed?.storyboardVersions?.[versionKey]?.panels;
+        if (chatPanels?.length) {
+          panels = chatPanels;
+          break;
+        }
+      }
+    }
+
+    if (panels?.length) {
+      merged = {
+        ...merged,
+        selectedVersion: versionKey,
+        storyboardLocked: storyboardConfirmed,
+        storyboardVersions: {
+          ...(merged.storyboardVersions ?? {}),
+          [versionKey]: {
+            ...(mergedVersion ?? metaVersion ?? { id: versionKey, title: `${versionKey}版` }),
+            panels,
+          },
+        },
+      };
+    } else {
+      merged = { ...merged, selectedVersion: versionKey };
+    }
+  }
+
+  if (storyboardConfirmed) {
+    merged = { ...merged, storyboardLocked: true };
+  } else if (!merged.storyboardLocked) {
+    merged = {
+      ...merged,
+      storyboardLocked: false,
+      opsPack: undefined,
+      outputMode: null,
+    };
+  }
+
+  if (storyboardConfirmed && metaDeliverable && hasMeaningfulOpsPack(metaDeliverable)) {
+    merged = { ...merged, opsPack: metaDeliverable.opsPack };
+  }
+  if (hasProOutputModeChoiceInChat(chatHistory) && metaDeliverable?.outputMode) {
+    merged = { ...merged, outputMode: metaDeliverable.outputMode };
+  }
+
+  return merged;
 }
 
 /** 统一读取：fashion 走 legacy，非 fashion Pro vertical 走 pro-v1 */

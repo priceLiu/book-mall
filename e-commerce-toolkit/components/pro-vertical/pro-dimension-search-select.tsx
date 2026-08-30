@@ -7,7 +7,11 @@ import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { FASHION_CUSTOM_DIMENSION_CHOICE } from "@/lib/fashion-workflow";
 import { cn } from "@/lib/utils";
 
-import { filterDimensionOptions } from "@/lib/pro-vertical/dimension-search";
+import {
+  DIMENSION_SEARCH_DEFAULT_VISIBLE,
+  dimensionOptionsHasMore,
+  filterDimensionOptions,
+} from "@/lib/pro-vertical/dimension-search";
 
 type ProDimensionSearchSelectProps = {
   label: string;
@@ -27,6 +31,10 @@ export function ProDimensionSearchSelect({
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => filterDimensionOptions(options, query), [options, query]);
+  const showMoreHint = useMemo(
+    () => dimensionOptionsHasMore(options, query),
+    [options, query],
+  );
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -41,6 +49,11 @@ export function ProDimensionSearchSelect({
           className="w-full rounded-xl border border-[#d2d2d7] bg-white py-2.5 pl-9 pr-3 text-sm text-[#1d1d1f] outline-none ring-[#0071e3] placeholder:text-[#86868b] focus:border-[#0071e3] focus:ring-2"
         />
       </div>
+      {showMoreHint ? (
+        <p className="text-[11px] text-[#86868b]">
+          默认展示 {DIMENSION_SEARCH_DEFAULT_VISIBLE} 项，输入关键词可搜索全部 {options.length} 项
+        </p>
+      ) : null}
       <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-[#e8e8ed] bg-white p-1">
         {filtered.length === 0 ? (
           <p className="px-3 py-4 text-center text-xs text-[#86868b]">无匹配项，可尝试其他关键词或选「自定义」</p>

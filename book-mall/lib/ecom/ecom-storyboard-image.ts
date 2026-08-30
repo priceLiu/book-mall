@@ -645,6 +645,22 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
 
   let references = [...opts.references];
 
+  const panelsToGen =
+    typeof opts.panelIndex === "number"
+      ? sheet.panels.filter((p) => p.index === opts.panelIndex)
+      : sheet.panels;
+  if (!opts.characterOnly && panelsToGen.length === 0) {
+    throw new Error(
+      typeof opts.panelIndex === "number"
+        ? `找不到镜头 ${opts.panelIndex}`
+        : "分镜表为空，无法生图",
+    );
+  }
+  const panelIndexesToGen = panelsToGen.map((p) => p.index);
+  if (!opts.characterOnly) {
+    await markStoryboardPanelImagesPending(opts.projectId, panelIndexesToGen, modelKey);
+  }
+
   const hasCharacterRef = references.some((r) => r.role === "character");
   const shouldAutoGenCharacter =
     !hasCharacterRef &&
@@ -652,65 +668,55 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
     (opts.autoGenCharacter ||
       Boolean(wf.autoGenCharacter) ||
       Boolean(wf.characterPresetKey) ||
-      wf.fashionCharacterMode === "ai");
-  if (shouldAutoGenCharacter) {
-    const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
-    const productRef = requireStoryboardProductRef(references);
-    const charResult = await generateOneImage({
-      userId: opts.userId,
-      projectId: opts.projectId,
-      modelKey,
-      prompt: charPrompt,
-      action: "image",
-      imageSize,
-      aspectRatio,
-      refImg: productRef.ossUrl.trim(),
-      meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
-    });
-
-    const bufRes = await fetch(charResult.ossUrl);
-    const buf = Buffer.from(await bufRes.arrayBuffer());
-    const ref = await addStoryboardReferenceUpload(opts.userId, opts.projectId, {
-      label: "自动生成角色",
-      role: "character",
-      buf,
-    });
-    references = [...references, ref];
-  }
-
-  if (opts.characterOnly) {
-    if (!references.some((r) => r.role === "character")) {
-      throw new Error("角色参考图生成失败，请检查脚本中的角色描述，或改用手动上传角色图");
-    }
-    return { references, sheet, chargePoints: null };
-  }
-
-  const { productRefUrl, extraRefUrls } = resolveStoryboardImageGenRefs(references);
-  const refImageUrls = [productRefUrl, ...extraRefUrls];
-  assertEcomStoryboardImageEditRefs(modelKey, refImageUrls.length);
-  const maxRefs = ecomStoryboardImageEditMaxRefs(modelKey);
-  const panelRefUrls = refImageUrls.slice(0, maxRefs);
-  const refGuide = buildStoryboardPanelRefGuideForUrls(
-    panelRefUrls,
-    references,
-    promptCtx,
-  );
-
-  const panelsToGen =
-    typeof opts.panelIndex === "number"
-      ? sheet.panels.filter((p) => p.index === opts.panelIndex)
-      : sheet.panels;
-  if (panelsToGen.length === 0) {
-    throw new Error(`找不到镜头 ${opts.panelIndex}`);
-  }
-
-  const panelIndexesToGen = panelsToGen.map((p) => p.index);
-  await markStoryboardPanelImagesPending(opts.projectId, panelIndexesToGen, modelKey);
-
-  let updatedPanels = [...sheet.panels];
-  let lastSavedSheet: StoryboardSheet = sheet;
+      wf.fashionCharacterMode === "ai" ||
+      wf.proCharacterMode === "ai");
 
   try {
+    if (shouldAutoGenCharacter) {
+      const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
+      const productRef = requireStoryboardProductRef(references);
+      const charResult = await generateOneImage({
+        userId: opts.userId,
+        projectId: opts.projectId,
+        modelKey,
+        prompt: charPrompt,
+        action: "image",
+        imageSize,
+        aspectRatio,
+        refImg: productRef.ossUrl.trim(),
+        meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
+      });
+
+      const bufRes = await fetch(charResult.ossUrl);
+      const buf = Buffer.from(await bufRes.arrayBuffer());
+      const ref = await addStoryboardReferenceUpload(opts.userId, opts.projectId, {
+        label: "自动生成角色",
+        role: "character",
+        buf,
+      });
+      references = [...references, ref];
+    }
+
+    if (opts.characterOnly) {
+      if (!references.some((r) => r.role === "character")) {
+        throw new Error("角色参考图生成失败，请检查脚本中的角色描述，或改用手动上传角色图");
+      }
+      return { references, sheet, chargePoints: null };
+    }
+
+    const { refImageUrls, productRefUrls } = resolveStoryboardImageGenRefs(references);
+    assertEcomStoryboardImageEditRefs(modelKey, refImageUrls.length);
+    const maxRefs = ecomStoryboardImageEditMaxRefs(modelKey);
+    const panelRefUrls = refImageUrls.slice(0, maxRefs);
+    const refGuide = buildStoryboardPanelRefGuideForUrls(
+      panelRefUrls,
+      references,
+      promptCtx,
+    );
+
+    let updatedPanels = [...sheet.panels];
+    let lastSavedSheet: StoryboardSheet = sheet;
+
     for (const panel of panelsToGen) {
       const prompt = resolveStoryboardPanelImagePrompt(
         panel,
@@ -782,6 +788,8 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
             modelKey,
             kind: "storyboard_panel",
             panelIndex: panel.index,
+            productRefCount: productRefUrls.length,
+            refImageCount: panelRefUrls.length,
           },
         },
       });

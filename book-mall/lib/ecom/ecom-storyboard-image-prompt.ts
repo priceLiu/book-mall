@@ -6,9 +6,7 @@ import {
   mergeSceneIntoImagePrompt,
   resolvePanelSceneText,
 } from "@/lib/ecom/ecom-storyboard-scene-prompt";
-import { getStoryboardSceneRefs } from "@/lib/ecom/ecom-storyboard-refs";
-import type { StoryboardReference, StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
-import { getStoryboardCharacterRefs } from "@/lib/ecom/ecom-storyboard-refs";
+import { getStoryboardCharacterRefs, getStoryboardProductRefs, getStoryboardSceneRefs } from "@/lib/ecom/ecom-storyboard-refs";
 import {
   resolveScenePresetImageHint,
   resolveScenePresetLabel,
@@ -17,6 +15,36 @@ import {
 /** 分镜静帧禁止渲染口播/对白为画面文字 */
 export const STORYBOARD_NO_DIALOGUE_IN_IMAGE =
   "严禁在画面中出现任何对白字幕、台词文字、气泡对话框、口播文案叠字或横幅标语；口播内容仅作表演指导，不得渲染为可见文字";
+
+function storyboardHttpProductRefUrls(refs: StoryboardReference[]): string[] {
+  return getStoryboardProductRefs(refs).map((r) => r.ossUrl.trim());
+}
+
+/** 当前送入模型的 refUrls 是否包含任意产品图 */
+function sendsStoryboardProductRefs(
+  refs: StoryboardReference[],
+  refUrls?: string[],
+): boolean {
+  const products = storyboardHttpProductRefUrls(refs);
+  if (!products.length) return false;
+  if (!refUrls?.length) return true;
+  const sent = new Set(refUrls.map((u) => u.trim()));
+  return products.some((u) => sent.has(u));
+}
+
+/** Prompt 用：产品参考在 refUrls 中的序号（1-based），如「1、2」 */
+function formatStoryboardProductRefNumbers(
+  refUrls: string[] | undefined,
+  refs: StoryboardReference[],
+): string {
+  if (!refUrls?.length) return "1";
+  const productSet = new Set(storyboardHttpProductRefUrls(refs));
+  const nums = refUrls
+    .map((u, i) => (productSet.has(u.trim()) ? i + 1 : -1))
+    .filter((n) => n > 0);
+  if (!nums.length) return "1";
+  return nums.join("、");
+}
 
 export type StoryboardImagePromptContext = {
   productCategory?: string;
@@ -334,8 +362,8 @@ export function buildStoryboardCompositeImagePrompt(
     )
     .join("; ");
 
-  const productRef = refs.find((r) => r.role === "product");
-  const charRef = refs.find((r) => r.role === "character");
+  const productRef = getStoryboardProductRefs(refs)[0];
+  const charRef = getStoryboardCharacterRefs(refs)[0];
 
   const refHint = [
     productRef ? "include product reference styling from uploaded product image" : "",
@@ -378,6 +406,9 @@ export function buildStoryboardPanelRefGuideForUrls(
   }
 
   const parts: string[] = [];
+  const productNums = formatStoryboardProductRefNumbers(refUrls, refs);
+  const productGuideLabel =
+    productNums.includes("、") ? `图${productNums}产品参考` : `图${productNums}产品参考`;
   refUrls.forEach((rawUrl, i) => {
     const url = rawUrl.trim();
     const role = urlToRole.get(url) ?? "other";
@@ -393,9 +424,9 @@ export function buildStoryboardPanelRefGuideForUrls(
     } else if (role === "character") {
       parts.push(
         isFashionApparelContext(ctx)
-          ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；服装款式与颜色以图1产品参考为准，勿照搬本图服装`
+          ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；服装款式与颜色以${productGuideLabel}为准，勿照搬本图服装`
           : isBagsContext(ctx)
-            ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；背携包包须与图1产品参考一致，勿换款改色`
+            ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；背携包包须与${productGuideLabel}一致，勿换款改色`
             : `图${n}为角色参考，人物面部、发型、体型与服装须与参考图完全一致`,
       );
     } else {
@@ -427,12 +458,15 @@ export function appendStoryboardImagePromptSuffix(opts: {
   sendsProductRef?: boolean;
   refGuide?: string;
   refCount?: number;
+  /** 产品参考在 refUrls 中的序号，如「1」或「1、2」 */
+  productRefNums?: string;
   productCategory?: string;
 }): string {
   const aspectZh = opts.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
   const fashion = isFashionApparelContext({ productCategory: opts.productCategory });
   const bags = isBagsContext({ productCategory: opts.productCategory });
   const digital3c = isDigital3cContext({ productCategory: opts.productCategory });
+  const productNums = opts.productRefNums?.trim() || "1";
   const parts: string[] = [opts.basePrompt.trim()];
   if (
     opts.sendsProductRef &&
@@ -456,10 +490,10 @@ export function appendStoryboardImagePromptSuffix(opts: {
   ) {
     parts.push(
       fashion
-        ? "若文字描述中的服装颜色/款式与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。"
+        ? `若文字描述中的服装颜色/款式与参考图${productNums}不一致，一律以参考图${productNums}为准，禁止擅自改色或换款。`
         : bags
-          ? "若文字描述中的包型/颜色与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。"
-          : "若文字描述中的产品外观/颜色与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。",
+          ? `若文字描述中的包型/颜色与参考图${productNums}不一致，一律以参考图${productNums}为准，禁止擅自改色或换款。`
+          : `若文字描述中的产品外观/颜色与参考图${productNums}不一致，一律以参考图${productNums}为准，禁止擅自改色或换款。`,
     );
   }
   if (!opts.basePrompt.includes(aspectZh) && !opts.basePrompt.includes("画幅")) {
@@ -480,14 +514,9 @@ export function resolveStoryboardPanelImagePrompt(
   refUrls?: string[],
   refGuide?: string,
 ): string {
-  const productRefUrl = refs.find(
-    (r) => r.role === "product" && r.ossUrl?.trim().startsWith("http"),
-  )?.ossUrl?.trim();
+  const sendsProductRef = sendsStoryboardProductRefs(refs, refUrls);
+  const productRefNums = formatStoryboardProductRefNumbers(refUrls, refs);
   const refCount = refUrls?.length ?? 0;
-  const sendsProductRef = Boolean(
-    productRefUrl &&
-      (refUrls?.length ? refUrls.some((u) => u.trim() === productRefUrl) : true),
-  );
 
   if (panel.imagePrompt?.trim()) {
     const sceneText = resolvePanelSceneText(panel, refs, ctx);
@@ -498,6 +527,7 @@ export function resolveStoryboardPanelImagePrompt(
       sendsProductRef,
       refGuide,
       refCount,
+      productRefNums,
       productCategory: ctx?.productCategory,
     });
   }
@@ -513,13 +543,9 @@ export function buildStoryboardPanelImagePrompt(
   refUrls?: string[],
   refGuide?: string,
 ): string {
-  const productRefUrl = refs.find(
-    (r) => r.role === "product" && r.ossUrl?.trim().startsWith("http"),
-  )?.ossUrl?.trim();
-  const sendsProductRef = Boolean(
-    productRefUrl &&
-      (refUrls?.length ? refUrls.some((u) => u.trim() === productRefUrl) : true),
-  );
+  const sendsProductRef = sendsStoryboardProductRefs(refs, refUrls);
+  const productRefNums = formatStoryboardProductRefNumbers(refUrls, refs);
+  const refCount = refUrls?.length ?? 0;
 
   const productLabel = resolveProductLabel(sheet, ctx);
   const exposure = exposureHint(ctx?.exposure);
@@ -541,7 +567,7 @@ export function buildStoryboardPanelImagePrompt(
     ctx?.characterAppearance?.trim() && !isFashionWear
       ? `同一人物全片一致：${ctx.characterAppearance.trim()}。`
       : isFashionWear && ctx?.characterAppearance?.trim()
-        ? `同一人物全片一致（面部发型体型与设定一致，主推款外观以参考图1为准）：${ctx.characterAppearance.trim()}。`
+        ? `同一人物全片一致（面部发型体型与设定一致，主推款外观以参考图${productRefNums}为准）：${ctx.characterAppearance.trim()}。`
         : "";
   const presetLine =
     !getStoryboardSceneRefs(refs).length && ctx?.scenePresetImageHint?.trim()
@@ -553,8 +579,8 @@ export function buildStoryboardPanelImagePrompt(
     : "";
   const productRefLine = sendsProductRef
     ? fashion
-      ? "须严格还原参考图1的服装款式、颜色、面料、剪裁与细节，禁止替换为其他颜色或款式。"
-      : "须严格还原参考图1的产品包装（外形、标签、配色、材质），禁止替换为无关商品。"
+      ? `须严格还原参考图${productRefNums}的服装款式、颜色、面料、剪裁与细节，禁止替换为其他颜色或款式。`
+      : `须严格还原参考图${productRefNums}的产品包装（外形、标签、配色、材质），禁止替换为无关商品。`
     : "";
   const characterRefUrls = new Set(
     getStoryboardCharacterRefs(refs).map((r) => r.ossUrl.trim()),
@@ -564,7 +590,7 @@ export function buildStoryboardPanelImagePrompt(
   const characterRefLine =
     characterRefIndex >= 0
       ? fashion && sendsProductRef
-        ? `人物面部、发型、体型须与参考图${characterRefIndex + 1}一致；穿着的服装款式、颜色与细节须严格以参考图1产品图为准，禁止换脸或换人。`
+        ? `人物面部、发型、体型须与参考图${characterRefIndex + 1}一致；穿着的服装款式、颜色与细节须严格以参考图${productRefNums}产品图为准，禁止换脸或换人。`
         : `人物面部、发型、体型与服装须与参考图${characterRefIndex + 1}完全一致，禁止换脸或换人。`
       : "";
   const editPrefix = sendsProductRef

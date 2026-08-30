@@ -44,7 +44,7 @@ describe("buildWorkflowTabEntries", () => {
     expect(entries[0]?.kind).toBe("storyboard");
   });
 
-  it("adds draft storyboard project when assets exist without saved bundle", () => {
+  it("does not add draft storyboard projects (see 我的工作流 · 暂存)", () => {
     const section = emptySection({
       assetGroups: [
         {
@@ -67,13 +67,7 @@ describe("buildWorkflowTabEntries", () => {
         },
       ],
     });
-    const entries = buildWorkflowTabEntries(section);
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({
-      kind: "storyboard-draft",
-      projectId: "p2",
-      projectName: "女装风衣项目",
-    });
+    expect(buildWorkflowTabEntries(section)).toHaveLength(0);
   });
 
   it("does not duplicate draft when bundle already covers project", () => {

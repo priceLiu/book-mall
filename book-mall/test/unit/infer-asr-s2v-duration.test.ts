@@ -14,9 +14,9 @@ describe("inferAsrAudioDurationSecFromLog", () => {
     expect(
       inferAsrAudioDurationSecFromLog({
         model: "qwen3-asr-flash-filetrans",
-        resultSummary: { audioDurationSec: 42, segmentCount: 3 },
+        resultSummary: { audioDurationSec: 42, sourceAudioDurationSec: 55, segmentCount: 3 },
       }),
-    ).toBe(42);
+    ).toBe(55);
   });
 
   it("infers from segments endMs", () => {

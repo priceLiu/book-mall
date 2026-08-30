@@ -129,6 +129,8 @@ export function resolveBillableAudioSecondsFromLog(
     if (!canonical.includes("asr")) return null;
   }
   const result = resultRecord(resultSummary);
+  const fromSource = positiveInt(result?.sourceAudioDurationSec);
+  if (fromSource != null) return fromSource;
   const fromResult = positiveInt(result?.audioDurationSec);
   if (fromResult != null) return fromResult;
   const usage = result?.usage;

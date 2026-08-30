@@ -4,19 +4,40 @@
  * 用法：
  *   pnpm exec dotenv -e .env.local -- tsx scripts/backfill-asr-audio-duration.ts --dry
  *   pnpm exec dotenv -e .env.local -- tsx scripts/backfill-asr-audio-duration.ts --apply
- *   pnpm exec dotenv -e .env.local -- tsx scripts/backfill-asr-audio-duration.ts --apply --since=2026-07-01
+ *   pnpm exec dotenv -e .env.local -- tsx scripts/backfill-asr-audio-duration.ts --apply --since=2026-08-01 --probe-urls
  */
 import {
   inferAsrAudioDurationSecFromLog,
   mergeAsrAudioDurationIntoResultSummary,
 } from "@/lib/finance/infer-asr-audio-duration";
+import { ffprobeAudioDurationSec } from "@/lib/media/render-ffmpeg";
 import { prisma } from "@/lib/prisma";
 
 const APPLY = process.argv.includes("--apply");
+const PROBE_URLS = process.argv.includes("--probe-urls");
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit?.slice(name.length + 3);
+}
+
+function readAsrFileUrl(inputSummary: unknown): string | null {
+  if (!inputSummary || typeof inputSummary !== "object") return null;
+  const root = inputSummary as Record<string, unknown>;
+  const input = root.input;
+  if (!input || typeof input !== "object") return null;
+  const row = input as Record<string, unknown>;
+  const url = String(row.fileUrl ?? row.audioUrl ?? "").trim();
+  return /^https?:\/\//.test(url) ? url : null;
+}
+
+async function probeFileDurationSec(fileUrl: string): Promise<number | null> {
+  try {
+    const sec = await ffprobeAudioDurationSec(fileUrl);
+    return Math.max(1, Math.round(sec));
+  } catch {
+    return null;
+  }
 }
 
 async function main() {
@@ -24,7 +45,9 @@ async function main() {
   const since = sinceStr ? new Date(`${sinceStr}T00:00:00+08:00`) : undefined;
   const limit = Number(arg("limit") ?? "500");
 
-  console.log(`MODE: ${APPLY ? "APPLY" : "DRY"} · since=${sinceStr ?? "all"} · limit=${limit}`);
+  console.log(
+    `MODE: ${APPLY ? "APPLY" : "DRY"} · since=${sinceStr ?? "all"} · limit=${limit} · probe-urls=${PROBE_URLS}`,
+  );
 
   const logs = await prisma.gatewayRequestLog.findMany({
     where: {
@@ -51,13 +74,22 @@ async function main() {
   let skipped = 0;
 
   for (const log of logs) {
-    const inferred = inferAsrAudioDurationSecFromLog(log);
+    let inferred = inferAsrAudioDurationSecFromLog(log);
+    if (PROBE_URLS) {
+      const fileUrl = readAsrFileUrl(log.inputSummary);
+      if (fileUrl) {
+        const probed = await probeFileDurationSec(fileUrl);
+        if (probed != null && (inferred == null || probed > inferred)) {
+          inferred = probed;
+        }
+      }
+    }
     if (inferred == null) {
       skipped += 1;
       continue;
     }
     const result = log.resultSummary as Record<string, unknown> | null;
-    const existing = result?.audioDurationSec;
+    const existing = result?.sourceAudioDurationSec ?? result?.audioDurationSec;
     if (existing != null && Number(existing) === inferred) {
       skipped += 1;
       continue;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { derivePanelScenePrompt } from "./ecom-storyboard-scene-prompt";
+import { mergeStoryboardPanelMediaByIndex } from "./ecom-storyboard-sheet-reconcile";
 import type { StoryboardSheet } from "./ecom-storyboard-types";
 import { parseStoryboardSheet } from "./ecom-storyboard-types";
 import type { StoryboardChatMessage } from "./ecom-storyboard-types";
@@ -789,18 +790,9 @@ export function mergeFashionSheetWithExisting(
   existingSheet: StoryboardSheet | null | undefined,
 ): StoryboardSheet {
   if (!existingSheet?.panels?.length) return newSheet;
-  const byIndex = new Map(existingSheet.panels.map((p) => [p.index, p]));
   return {
     ...newSheet,
-    panels: newSheet.panels.map((p) => {
-      const prev = byIndex.get(p.index);
-      if (!prev) return p;
-      return {
-        ...p,
-        imageUrl: prev.imageUrl,
-        videoUrl: prev.videoUrl,
-      };
-    }),
+    panels: mergeStoryboardPanelMediaByIndex(newSheet.panels, existingSheet.panels),
   };
 }
 

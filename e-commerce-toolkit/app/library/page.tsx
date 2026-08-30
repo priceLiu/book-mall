@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Link2, RotateCcw } from "lucide-react";
@@ -125,7 +126,11 @@ function LibraryTabBar({
       </div>
       {active === "workflows" ? (
         <p className="mt-2 text-[11px] text-[#6e6e73]">
-          已保存的工作流可「复制打开」换参考图再生成；进行中的微剧项目也会出现在此，点「打开」继续编辑。
+          已保存的工作流可「复制打开」换参考图再生成。进行中的项目请至
+          <Link href="/workflows/drafts" className="mx-1 text-[#0071e3] hover:underline">
+            我的工作流 · 暂存
+          </Link>
+          继续编辑。
         </p>
       ) : (
         <p className="mt-2 text-[11px] text-[#6e6e73]">

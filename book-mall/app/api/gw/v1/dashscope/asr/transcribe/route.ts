@@ -118,11 +118,18 @@ export async function POST(request: NextRequest) {
       endMs: s.endMs,
       text: s.text,
     }));
-    const audioDurationSec = audioDurationSecFromSentences(result.sentences);
+    const speechDurationSec = audioDurationSecFromSentences(result.sentences);
+    const audioDurationSec =
+      result.billableAudioDurationSec ?? speechDurationSec;
     await finalizeRequestLog(log.id, {
       status: "SUCCEEDED",
       durationMs: Date.now() - started,
-      resultSummary: { segmentCount: segments.length, audioDurationSec },
+      resultSummary: {
+        segmentCount: segments.length,
+        audioDurationSec,
+        sourceAudioDurationSec: audioDurationSec,
+        speechDurationSec,
+      },
       model,
     });
     return NextResponse.json({

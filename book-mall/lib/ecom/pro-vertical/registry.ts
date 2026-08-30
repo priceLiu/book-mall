@@ -37,4 +37,14 @@ export function isProVerticalWorkflow(
   return isProVerticalId(typeof wf.vertical === "string" ? wf.vertical : null);
 }
 
+/** 包包 / 3C 等非 fashion 的 Pro vertical（走 pro-v1 deliverable） */
+export function isNonFashionProWorkflow(
+  meta: Record<string, unknown> | null | undefined,
+): boolean {
+  const vertical = resolveWorkflowVertical(
+    (meta?.workflow as Record<string, unknown> | undefined) ?? {},
+  );
+  return vertical === "bags" || vertical === "digital_3c";
+}
+
 export { FASHION_APPAREL_CONFIG, BAGS_CONFIG, DIGITAL_3C_CONFIG };

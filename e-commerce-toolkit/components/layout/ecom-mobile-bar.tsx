@@ -15,9 +15,14 @@ export function EcomMobileBar({ bookOrigin }: { bookOrigin: string }) {
         <Link href="/" className="text-sm font-semibold text-[#1d1d1f]">
           电商工具箱
         </Link>
-        <Link href="/library" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
-          我的资产
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/workflows/drafts" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
+            我的工作流
+          </Link>
+          <Link href="/library" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
+            我的资产
+          </Link>
+        </div>
       </div>
       <div className="ecom-scrollbar-thin flex gap-3 overflow-x-auto border-t border-[#f0f0f2] px-4 py-2 text-xs text-[#6e6e73]">
         {portalItems.map((item) => (

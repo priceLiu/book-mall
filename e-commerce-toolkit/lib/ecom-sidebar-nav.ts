@@ -5,6 +5,7 @@ import {
   Clapperboard,
   Copy,
   Film,
+  FolderKanban,
   Video,
   Hammer,
   LayoutGrid,
@@ -218,6 +219,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
     group("电商", ShoppingBag, ecomChildren),
     group("营销", Target, marketingChildren),
     group("应用", Boxes, portalLinks),
+    link("我的工作流", "/workflows/drafts", FolderKanban),
     link("我的资产", "/library", Package),
     sep(),
     link("计费与账户", bookAccountHref(bookOrigin, "/account/billing"), Settings, {

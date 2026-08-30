@@ -6,9 +6,13 @@ import { findPlatformAdminApiKey } from "@/lib/gateway/platform-credential-pool"
 import { resolveGatewayApiKeyById } from "@/lib/gateway/api-key-service";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import {
+  createRequestLog,
+  finalizeRequestLog,
   forwardEmbeddings,
+  parseOpenAiUsage,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
+import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
   gatewayV1ChatCompletions,
   gatewayV1ChatCompletionsStream,
@@ -96,16 +100,16 @@ function parseEmbeddingResponse(
 }
 
 /**
- * 入库脚本专用：进程内直调 forwardEmbeddings，不经 book-mall HTTP 自调用。
- * 避免 dev 编译/路由 404 导致 `pnpm assistant:index` 失败。
+ * 入库脚本专用：进程内直调 forwardEmbeddings，并写入 GatewayRequestLog（对账可聚合）。
+ * 避免 dev 经 book-mall HTTP 自调用导致路由 404。
  */
 export async function platformEmbedTextsInProcess(
   inputs: string[],
-  opts: { model: string; dimensions?: number },
+  opts: { model: string; dimensions?: number; clientPage?: string },
 ): Promise<number[][]> {
   if (inputs.length === 0) return [];
   const key = await findPlatformAdminApiKey();
-  if (!key?.id) {
+  if (!key?.id || !key.userId) {
     throw new PlatformAssistantGatewayError(
       "平台 Gateway Key 未就绪，导览助手暂不可用",
       503,
@@ -131,18 +135,68 @@ export async function platformEmbedTextsInProcess(
     );
   }
 
-  const result = await forwardEmbeddings({
-    credentialId,
-    providerKind: route.providerKind,
-    body,
-  });
-  if (result.status < 200 || result.status >= 300) {
+  const { model: _modelField, ...restBody } = body;
+  const started = Date.now();
+  let log;
+  try {
+    log = await createRequestLog({
+      userId: key.userId,
+      apiKeyId: key.id,
+      credentialId,
+      model: opts.model,
+      endpoint: "/v1/embeddings",
+      providerKind: route.providerKind,
+      requestKind: "OTHER",
+      clientSource: "TOOL",
+      clientPage: opts.clientPage ?? "platform-assistant/index-embed",
+      inputSummary: buildGatewayInputSummary(opts.model, restBody),
+      actorBookUserId: key.userId,
+    });
+  } catch (e) {
     throw new PlatformAssistantGatewayError(
-      `embedding 失败 (HTTP ${result.status}): ${result.text.slice(0, 400)}`,
-      502,
+      e instanceof Error ? e.message : "创建 Gateway 日志失败",
+      503,
     );
   }
-  return parseEmbeddingResponse(result.text, inputs);
+
+  try {
+    const result = await forwardEmbeddings({
+      credentialId,
+      providerKind: route.providerKind,
+      body,
+    });
+    let usage;
+    try {
+      usage = parseOpenAiUsage(JSON.parse(result.text));
+    } catch {
+      usage = undefined;
+    }
+    await finalizeRequestLog(log.id, {
+      status: result.status >= 200 && result.status < 300 ? "SUCCEEDED" : "FAILED",
+      durationMs: result.durationMs || Date.now() - started,
+      usage,
+      model: opts.model,
+      failCode: result.status >= 300 ? "UPSTREAM_ERROR" : undefined,
+    });
+    if (result.status < 200 || result.status >= 300) {
+      throw new PlatformAssistantGatewayError(
+        `embedding 失败 (HTTP ${result.status}): ${result.text.slice(0, 400)}`,
+        502,
+      );
+    }
+    return parseEmbeddingResponse(result.text, inputs);
+  } catch (e) {
+    if (!(e instanceof PlatformAssistantGatewayError)) {
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: Date.now() - started,
+        failCode: "UPSTREAM_ERROR",
+        failMessage: e instanceof Error ? e.message : String(e),
+        model: opts.model,
+      }).catch(() => undefined);
+    }
+    throw e;
+  }
 }
 
 function isVendorInsufficientBalance(status: number, errText: string): boolean {

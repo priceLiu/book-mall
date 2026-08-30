@@ -10,6 +10,12 @@ import {
   readMetaFashionDeliverable,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
+import {
+  normalizeToProDeliverable,
+  proVersionToSheet,
+  resolveProDeliverableForProject,
+} from "@/lib/ecom/ecom-pro-deliverable";
+import { isNonFashionProWorkflow } from "@/lib/ecom/pro-vertical/registry";
 import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
 import {
   getEcomStoryboardProject,
@@ -60,6 +66,58 @@ export async function syncEcomStoryboardSheetFromMeta(
               fashionPhase: deliverableToSave.outputMode ? "produce" : "output_mode",
               ...(deliverableToSave.outputMode === "direct_video"
                 ? { fashionProduceSetupPending: true }
+                : {}),
+            },
+          },
+        });
+        return {
+          sheet: mergedSheet,
+          deliverable: null,
+          selectedSchemeIndex: 0,
+        };
+      }
+      throw new Error(
+        `定稿分镜 ${deliverable.selectedVersion} 版缺少分镜表数据，请在中栏 12.1 确认分镜表已保存后重试`,
+      );
+    }
+    if (deliverable) {
+      throw new Error(
+        "未找到已定稿的分镜版本，请先在助手确认分镜并生成运营包后再选择成片方式",
+      );
+    }
+    return { sheet: project.sheet, deliverable: null, selectedSchemeIndex: 0 };
+  }
+
+  if (isNonFashionProWorkflow(metaRecord)) {
+    const existingDeliverable = normalizeToProDeliverable(metaRecord.deliverable);
+    const deliverable = resolveProDeliverableForProject({
+      meta: metaRecord,
+      chatHistory: project.chatHistory,
+    });
+    if (deliverable?.selectedVersion) {
+      const sheet = proVersionToSheet(deliverable);
+      if (sheet) {
+        const mergedSheet = mergeFashionSheetWithExisting(sheet, project.sheet);
+        const deliverableToSave = {
+          ...deliverable,
+          outputMode: existingDeliverable?.outputMode ?? deliverable.outputMode,
+          opsPack: existingDeliverable?.opsPack ?? deliverable.opsPack,
+          storyboardLocked: true,
+        };
+        const existingWf =
+          (project.meta?.workflow as Record<string, unknown> | undefined) ?? {};
+        await updateEcomStoryboardProject(userId, projectId, {
+          sheet: mergedSheet,
+          status: "sheet_ready",
+          meta: {
+            ...project.meta,
+            deliverable: deliverableToSave,
+            workflow: {
+              ...existingWf,
+              vertical: deliverable.vertical,
+              proPhase: deliverableToSave.outputMode ? "produce" : "output_mode",
+              ...(deliverableToSave.outputMode === "direct_video"
+                ? { proProduceSetupPending: true }
                 : {}),
             },
           },
