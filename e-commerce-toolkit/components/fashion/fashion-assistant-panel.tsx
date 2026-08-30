@@ -714,7 +714,7 @@ export function FashionAssistantPanel({
               setDeliverableOverride(null);
               setWorkflowOverride({});
               await onDeliverableReady?.();
-            } catch {
+            } catch (e) {
               const failureMsg: StoryboardChatMessage = {
                 id: `err-${Date.now()}`,
                 role: "assistant",

@@ -4,10 +4,8 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 
 import { createHandCraftProject } from "@/lib/ecom-hand-craft-api";
 import { createMediaDecomposeProject } from "@/lib/ecom-media-decompose-api";
-import {
-  createProductDesignProject,
-  type EcomProjectModule,
-} from "@/lib/ecom-product-design-api";
+import { createProductDesignProject } from "@/lib/ecom-product-design-api";
+import type { EcomProjectModule } from "@/lib/product-design-types";
 import { createSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import { createStoryboardProject } from "@/lib/ecom-storyboard-api";
 import type { EcomWorkflowDraftKind } from "@/lib/ecom-workflow-drafts-api";

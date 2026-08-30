@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,6 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomHomeAssistant } from "@/components/layout/ecom-home-assistant";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import {
-  EcomMediaLibraryTile,
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
 } from "@/components/media/ecom-media-library-tile";
 import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
@@ -19,11 +19,11 @@ import {
   formatWorkflowDraftUpdatedAt,
   openWorkflowDraft,
   startNewWorkflowDraft,
-  type EcomWorkflowDraftKind,
 } from "@/lib/ecom-workflow-draft-navigation";
 import {
   listWorkflowDrafts,
   type EcomWorkflowDraftItem,
+  type EcomWorkflowDraftKind,
 } from "@/lib/ecom-workflow-drafts-api";
 
 type DraftTab = "all" | "ecom" | "video";
@@ -224,11 +224,11 @@ export default function WorkflowDraftsPage() {
           </div>
         </>
       }
-      assistant={<EcomHomeAssistant />}
+      assistant={<EcomHomeAssistant variant="library" />}
     >
       <div className="min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-6">
         {loading ? (
-          <EcomMediaSkeletonGrid count={6} />
+          <EcomMediaSkeletonGrid count={6} gridClass={ECOM_LIBRARY_MEDIA_GRID_CLASS} />
         ) : filtered.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-16 text-center">
             <FolderOpen className="mx-auto mb-3 h-8 w-8 text-[#c7c7cc]" />
@@ -263,13 +263,14 @@ export default function WorkflowDraftsPage() {
                         key={`${item.kind}:${item.projectId}`}
                         className="flex flex-col overflow-hidden rounded-2xl border border-[#e8e8ed] bg-white shadow-sm"
                       >
-                        <div className="aspect-[4/5] bg-[#f5f5f7]">
+                        <div className="relative aspect-[4/5] bg-[#f5f5f7]">
                           {item.thumbnailUrl ? (
-                            <EcomMediaLibraryTile
-                              kind="image"
+                            <Image
                               src={item.thumbnailUrl}
                               alt={item.title}
-                              className="h-full w-full rounded-none border-0"
+                              fill
+                              className="object-cover"
+                              unoptimized
                             />
                           ) : (
                             <div className="flex h-full items-center justify-center text-[11px] text-[#86868b]">

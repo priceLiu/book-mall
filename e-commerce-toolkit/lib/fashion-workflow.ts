@@ -822,7 +822,9 @@ export function resolveFashionStoryboardPanelsForVersion(
   versionKey: FashionVersionKey,
   deliverable?: FashionDeliverable | null,
 ): FashionPanelRow[] | undefined {
-  const d = deliverable ?? workflowDeliverable(project);
+  const rawDeliverable = deliverable ?? workflowDeliverable(project);
+  const d =
+    rawDeliverable && isFashionDeliverable(rawDeliverable) ? rawDeliverable : null;
   const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
     ? (project.meta!.deliverable as FashionDeliverable)
     : null;
@@ -1112,7 +1114,8 @@ export function inferFashionPhaseFromState(project: StoryboardProject): FashionP
     if (!d.outputMode) return "output_mode";
     return "produce";
   }
-  const d = workflowDeliverable(project);
+  const raw = workflowDeliverable(project);
+  const d = raw && isFashionDeliverable(raw) ? raw : null;
   if (!hasFashionProductRef(project)) return "product_ref";
   // 已进入卖点之后，禁止因 dimensions 字段被 LLM 冲掉而回退到七维
   const pastDimensions =
@@ -1447,7 +1450,9 @@ export function buildFashionStoryboardPanelsSavePatch(
   const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
     ? (project.meta!.deliverable as FashionDeliverable)
     : null;
-  const current = resolved ?? metaDeliverable;
+  const raw = resolved ?? metaDeliverable;
+  if (!raw || !isFashionDeliverable(raw)) return null;
+  const current = raw;
   const versionKey = current?.selectedVersion ?? metaDeliverable?.selectedVersion;
   if (!current || !versionKey || current.storyboardLocked || hasMeaningfulOpsPack(current) || current.outputMode) {
     return null;
