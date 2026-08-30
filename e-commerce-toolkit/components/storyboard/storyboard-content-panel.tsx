@@ -967,7 +967,12 @@ export function StoryboardContentPanel({
         try {
           const refreshed = await getStoryboardProject(project.id);
           if (
-            storyboardPanelHasMedia(refreshed.sheet?.panels ?? [], panelIndex, "image")
+            typeof panelIndex === "number" &&
+            storyboardPanelHasMedia(
+              refreshed.sheet?.panels ?? [],
+              panelIndex,
+              "image",
+            )
           ) {
             if (!runtimeOpts?.skipProjectUpdate) {
               onProjectChange(refreshed);
