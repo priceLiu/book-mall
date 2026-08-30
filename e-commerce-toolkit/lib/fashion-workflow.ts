@@ -1,5 +1,36 @@
 import { FASHION_DIMENSION_STEPS, buildFashionDimensionsFromChat, fashionDimensionPrompt, mergeFashionDimensionSources } from "@/lib/fashion-dimensions";
 import {
+  buildProDimensionsFromChat,
+  getDimensionSteps,
+  mergeProDimensionSources,
+  proDimensionPrompt,
+} from "@/lib/pro-vertical/dimensions";
+import {
+  extractProDeliverableFromText,
+  hasMeaningfulProOpsPack,
+  listProStoryboardVersionKeys,
+  mergeProDeliverableState,
+  readMetaProDeliverable,
+} from "@/lib/pro-vertical/deliverable-parse";
+import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
+import {
+  getProjectVertical,
+  hasProProductRef,
+  isAwaitingProCategoryPick,
+  isBagsProject,
+  isProModeProject,
+  isProVerticalProject,
+} from "@/lib/pro-vertical/project-vertical";
+import {
+  PRO_CATEGORY_OPTIONS,
+  PRO_CATEGORY_PICK_HINT,
+  PRO_GENERIC_WELCOME,
+  parseProCategoryPick,
+  proCategoryChoiceLabel,
+} from "@/lib/pro-vertical/categories";
+import type { ProDeliverable, ProVerticalId } from "@/lib/pro-vertical/types";
+import { isProDeliverable } from "@/lib/pro-vertical/types";
+import {
   extractFashionDeliverableFromText,
   mergeFashionDeliverableState,
 } from "@/lib/fashion-deliverable-parse";
@@ -35,6 +66,11 @@ export const FASHION_GENERATE_STORYBOARDS_LABEL = "生成 A–E 分镜方案";
 export const FASHION_CONFIRM_STORYBOARD = "确认分镜，生成运营包";
 export const FASHION_REGENERATE_OPS = "重新生成运营包";
 export const FASHION_REPICK_STORYBOARD = "重新选择分镜版本";
+
+export const PRO_AI_SELLPOINTS = "pro-step:sellpoints-generate";
+export const PRO_AI_VOICEOVERS = "pro-step:voiceovers-generate";
+export const PRO_AI_STORYBOARDS = "pro-step:storyboards-generate";
+export const PRO_AI_OPS = "pro-step:ops-generate";
 
 export type FashionBusyStatus = {
   title: string;
@@ -161,6 +197,7 @@ export function fashionLlmTriggerSucceeded(
 export type FashionWorkflowMeta = {
   vertical?: "fashion_apparel" | "bags";
   fashionPhase?: FashionPhase;
+  proPhase?: FashionPhase;
   dimensionStep?: number;
   productName?: string;
   initialProductRefAcknowledged?: boolean;
@@ -169,14 +206,19 @@ export type FashionWorkflowMeta = {
   awaitingFashionCustomDimension?: boolean;
   /** 用户在中栏表格手动改过卖点，resolve 时以 meta.deliverable 为准 */
   fashionSellpointsEdited?: boolean;
+  proSellpointsEdited?: boolean;
   /** 用户在中栏修改过已定稿分镜表，resolve 时以 meta.deliverable 为准 */
   fashionStoryboardPanelsEdited?: boolean;
+  proStoryboardPanelsEdited?: boolean;
   /** 路径 B 进入 produce 后，须先选生图模型与角色参考方式 */
   fashionProduceSetupPending?: boolean;
-  /** 服装路径 B 成片阶段选定的生图模型 */
+  proProduceSetupPending?: boolean;
+  /** 路径 B 成片阶段选定的生图模型 */
   fashionImageModelKey?: string;
+  proImageModelKey?: string;
   /** 角色参考：AI 生成 / 用户上传 */
   fashionCharacterMode?: "ai" | "upload";
+  proCharacterMode?: "ai" | "upload";
 };
 
 export type FashionChoice = {
@@ -188,7 +230,52 @@ export type FashionChoice = {
 };
 
 export function isFashionProject(project: StoryboardProject): boolean {
-  return project.meta?.workflow?.vertical === "fashion_apparel";
+  return getProjectVertical(project) === "fashion_apparel";
+}
+
+export {
+  isProVerticalProject,
+  isBagsProject,
+  getProjectVertical,
+  isProModeProject,
+  isAwaitingProCategoryPick,
+  hasProProductRef,
+};
+
+function dimensionStepsForProject(project: StoryboardProject) {
+  const vertical = getProjectVertical(project) ?? "fashion_apparel";
+  return getDimensionSteps(vertical);
+}
+
+function workflowPhaseKey(project: StoryboardProject): "fashionPhase" | "proPhase" {
+  if (isBagsProject(project)) return "proPhase";
+  if (isProModeProject(project) && !getProjectVertical(project)) return "proPhase";
+  return "fashionPhase";
+}
+
+function deliverableSchemaForProject(project: StoryboardProject): "pro-v1" | "fashion-v4" {
+  const vertical = getProjectVertical(project) ?? "fashion_apparel";
+  const config = getProVerticalConfig(vertical);
+  return config?.schemaVersion === "pro-v1" ? "pro-v1" : "fashion-v4";
+}
+
+function llmTriggerFor(
+  project: StoryboardProject,
+  step: "sellpoints" | "voiceovers" | "storyboards" | "ops",
+): string {
+  return isBagsProject(project) ? `pro-step:${step}-generate` : `fashion-step:${step}-generate`;
+}
+
+function phaseWorkflowPatch(project: StoryboardProject, phase: FashionPhase): Record<string, unknown> {
+  return { [workflowPhaseKey(project)]: phase };
+}
+
+function hasMeaningfulDeliverableOpsPack(
+  d: FashionDeliverable | ProDeliverable | null | undefined,
+): boolean {
+  if (!d) return false;
+  if (isProDeliverable(d) && d.vertical === "bags") return hasMeaningfulProOpsPack(d);
+  return hasMeaningfulOpsPack(d as FashionDeliverable);
 }
 
 /** 七维参数拼接为故事版「项目关键词」 */
@@ -247,6 +334,7 @@ export function fashionSheetNeedsScriptResync(project: StoryboardProject): boole
 }
 
 export function isLegacyStoryboardProject(project: StoryboardProject): boolean {
+  if (isProModeProject(project)) return false;
   if (isFashionProject(project)) return false;
   const d = project.meta?.deliverable;
   if (d && isFashionDeliverable(d)) return false;
@@ -368,6 +456,9 @@ function applyFashionDeliverablePhaseGuards(
   project: StoryboardProject,
 ): FashionDeliverable {
   let next = deliverable;
+  const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
+    ? (project.meta!.deliverable as FashionDeliverable)
+    : null;
 
   if (!next.sellpointsLocked) {
     return {
@@ -386,6 +477,8 @@ function applyFashionDeliverablePhaseGuards(
   const voiceoverPickedFromChat = parseFashionVoiceoverPickFromChat(project.chatHistory);
   if (voiceoversReady && voiceoverPickedFromChat) {
     next = { ...next, selectedVoiceoverId: voiceoverPickedFromChat };
+  } else if (metaDeliverable?.selectedVoiceoverId) {
+    next = { ...next, selectedVoiceoverId: metaDeliverable.selectedVoiceoverId };
   } else {
     next = { ...next, selectedVoiceoverId: null };
   }
@@ -420,9 +513,6 @@ function applyFashionDeliverablePhaseGuards(
   }
 
   const versionPickedFromChat = parseFashionVersionPickFromChat(project.chatHistory);
-  const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
-    ? (project.meta!.deliverable as FashionDeliverable)
-    : null;
   const wf = getFashionWorkflowMeta(project);
   const wfPhaseRank = FASHION_PHASE_RANK[wf.fashionPhase ?? "product_ref"] ?? 0;
   const metaVersionAuthoritative =
@@ -667,6 +757,40 @@ export function resolveFashionDeliverable(project: StoryboardProject): FashionDe
   return merged;
 }
 
+export function resolveProVerticalDeliverable(
+  project: StoryboardProject,
+): ProDeliverable | FashionDeliverable | null {
+  if (isBagsProject(project)) {
+    let merged: ProDeliverable | null = isProDeliverable(project.meta?.deliverable)
+      ? (project.meta!.deliverable as ProDeliverable)
+      : readMetaProDeliverable(project.meta?.deliverable);
+
+    for (const msg of project.chatHistory) {
+      if (msg?.role !== "assistant") continue;
+      const parsed = extractProDeliverableFromText(msg.content);
+      if (!parsed) continue;
+      merged = merged ? mergeProDeliverableState(merged, parsed) : parsed;
+    }
+    if (!merged) return null;
+
+    const vertical: ProVerticalId = "bags";
+    const metaDeliverable = isProDeliverable(project.meta?.deliverable)
+      ? (project.meta!.deliverable as ProDeliverable)
+      : null;
+    merged = {
+      ...merged,
+      dimensions: mergeProDimensionSources(
+        vertical,
+        merged.dimensions,
+        metaDeliverable?.dimensions,
+        buildProDimensionsFromChat(vertical, project.chatHistory),
+      ),
+    };
+    return merged;
+  }
+  return resolveFashionDeliverable(project);
+}
+
 function countFashionStoryboardVersions(d: FashionDeliverable | null | undefined): number {
   return listFashionStoryboardVersionKeys(d).length;
 }
@@ -687,6 +811,31 @@ export function listFashionStoryboardVersionKeys(
 }
 
 export function inferFashionPhaseFromState(project: StoryboardProject): FashionPhase {
+  if (isProModeProject(project) && !getProjectVertical(project)) {
+    if (!hasProProductRef(project)) return "product_ref";
+    return "category_pick";
+  }
+  if (isBagsProject(project)) {
+    const d = resolveProVerticalDeliverable(project) as ProDeliverable | null;
+    if (!hasFashionProductRef(project)) return "product_ref";
+    const pastDimensions =
+      Boolean(d?.sellpointsLocked) ||
+      (d?.sellpoints?.length ?? 0) > 0 ||
+      (d?.voiceovers?.length ?? 0) > 0 ||
+      listProStoryboardVersionKeys(d).length > 0 ||
+      Boolean(d?.selectedVersion) ||
+      hasMeaningfulProOpsPack(d ?? ({} as ProDeliverable));
+    if (!pastDimensions && !dimensionsComplete(project)) return "dimensions";
+    if (!d?.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+    if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
+    if (!d.selectedVoiceoverId) return "voiceover_pick";
+    if (listProStoryboardVersionKeys(d).length === 0) return "voiceover_pick";
+    if (!d.selectedVersion) return "storyboard_pick";
+    if (!d.storyboardLocked) return "storyboard_confirm";
+    if (!hasMeaningfulProOpsPack(d)) return "storyboard_confirm";
+    if (!d.outputMode) return "output_mode";
+    return "produce";
+  }
   const d = resolveFashionDeliverable(project);
   if (!hasFashionProductRef(project)) return "product_ref";
   // 已进入卖点之后，禁止因 dimensions 字段被 LLM 冲掉而回退到七维
@@ -716,30 +865,35 @@ export function getFashionWorkflowMeta(project: StoryboardProject): FashionWorkf
 
 const FASHION_PHASE_RANK: Record<FashionPhase, number> = {
   product_ref: 0,
-  dimensions: 1,
-  sellpoints: 2,
-  voiceover_pick: 3,
-  storyboard_pick: 4,
-  storyboard_confirm: 5,
-  ops_pack: 6,
-  output_mode: 7,
-  produce: 8,
-  done: 9,
+  category_pick: 1,
+  dimensions: 2,
+  sellpoints: 3,
+  voiceover_pick: 4,
+  storyboard_pick: 5,
+  storyboard_confirm: 6,
+  ops_pack: 7,
+  output_mode: 8,
+  produce: 9,
+  done: 10,
 };
 
 export function getFashionPhase(project: StoryboardProject): FashionPhase {
   const inferred = inferFashionPhaseFromState(project);
   const wf = getFashionWorkflowMeta(project);
-  if (!wf.fashionPhase || wf.fashionPhase === "product_ref") return inferred;
+  const phaseField = workflowPhaseKey(project);
+  const storedPhase = (phaseField === "proPhase" ? wf.proPhase : wf.fashionPhase) as
+    | FashionPhase
+    | undefined;
+  if (!storedPhase || storedPhase === "product_ref") return inferred;
 
   const inferredRank = FASHION_PHASE_RANK[inferred] ?? 0;
-  const wfRank = FASHION_PHASE_RANK[wf.fashionPhase] ?? 0;
+  const wfRank = FASHION_PHASE_RANK[storedPhase] ?? 0;
 
   // workflow 记录比实际状态超前（LLM 脏 JSON）时，以 inferred 回退
   if (wfRank > inferredRank) return inferred;
 
   if (inferredRank >= wfRank) return inferred;
-  return wf.fashionPhase;
+  return storedPhase;
 }
 
 export function isAwaitingFashionProductRef(project: StoryboardProject): boolean {
@@ -751,15 +905,69 @@ function hasFashionProductRef(project: StoryboardProject): boolean {
 }
 
 function dimensionsComplete(project: StoryboardProject): boolean {
-  const d = resolveFashionDeliverable(project)?.dimensions ?? {};
-  return FASHION_DIMENSION_STEPS.every((s) => Boolean(d[s.key]?.trim()));
+  const d = resolveProVerticalDeliverable(project)?.dimensions ?? {};
+  return dimensionStepsForProject(project).every((s) => Boolean(d[s.key]?.trim()));
 }
 
 export function fashionNeedsProductRefAutoAdvance(project: StoryboardProject): boolean {
   const product = project.references.find((r) => r.role === "product");
   if (!product) return false;
   const wf = getFashionWorkflowMeta(project);
+  const phase = wf.proPhase ?? wf.fashionPhase;
+  if (isAwaitingProCategoryPick(project)) {
+    return phase === "product_ref" || phase == null || phase === "category_pick";
+  }
+  if (isBagsProject(project)) {
+    return wf.proPhase === "product_ref" || wf.proPhase == null;
+  }
   return wf.fashionPhase === "product_ref" || wf.fashionPhase == null;
+}
+
+function buildProProductRefCategoryPickAdvance(
+  project: StoryboardProject,
+  opts?: { includeChat?: boolean },
+): {
+  chatHistory?: StoryboardChatMessage[];
+  workflow: Record<string, unknown>;
+} {
+  const wf = getFashionWorkflowMeta(project);
+  const phaseKey = workflowPhaseKey(project);
+  const workflow = {
+    ...wf,
+    proMode: true,
+    [phaseKey]: "category_pick" as const,
+    initialProductRefAcknowledged: true,
+  };
+  if (opts?.includeChat === false) {
+    return { workflow };
+  }
+  const base = project.chatHistory.filter(
+    (m) => m.id !== "welcome" && !m.id.startsWith("err-"),
+  );
+  const hasUserAck = base.some(
+    (m) => m.role === "user" && m.content.trim() === FASHION_PRODUCT_REF_ACK,
+  );
+  const hasAssistantHint = base.some(
+    (m) => m.role === "assistant" && m.content.includes("选择大类品类"),
+  );
+  const next: StoryboardChatMessage[] = [...base];
+  if (!hasUserAck) {
+    next.push({
+      id: `user-auto-ref-${Date.now()}`,
+      role: "user",
+      content: FASHION_PRODUCT_REF_ACK,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  if (!hasAssistantHint) {
+    next.push({
+      id: `assistant-cat-pick-${Date.now()}`,
+      role: "assistant",
+      content: PRO_CATEGORY_PICK_HINT,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return { chatHistory: next, workflow };
 }
 
 export function buildFashionProductRefAutoAdvance(
@@ -769,11 +977,16 @@ export function buildFashionProductRefAutoAdvance(
   chatHistory?: StoryboardChatMessage[];
   workflow: Record<string, unknown>;
 } {
+  if (isAwaitingProCategoryPick(project)) {
+    return buildProProductRefCategoryPickAdvance(project, opts);
+  }
   const wf = getFashionWorkflowMeta(project);
+  const vertical = getProjectVertical(project) ?? "fashion_apparel";
+  const config = getProVerticalConfig(vertical);
   const workflow = {
     ...wf,
-    vertical: "fashion_apparel" as const,
-    fashionPhase: "dimensions" as const,
+    vertical,
+    [workflowPhaseKey(project)]: "dimensions" as const,
     dimensionStep: 0,
     initialProductRefAcknowledged: true,
   };
@@ -804,8 +1017,7 @@ export function buildFashionProductRefAutoAdvance(
     next.push({
       id: `assistant-auto-ref-${Date.now()}`,
       role: "assistant",
-      content:
-        "已检测到产品图，无需再点确认。请从下方选择性别品类，开始七维参数采集。",
+      content: config?.productRefAdvanceHint ?? "已检测到产品图，请开始七维参数采集。",
       createdAt: new Date().toISOString(),
     });
   }
@@ -813,6 +1025,10 @@ export function buildFashionProductRefAutoAdvance(
 }
 
 export function isFashionDimensionCollecting(project: StoryboardProject): boolean {
+  if (isAwaitingProCategoryPick(project) || getFashionPhase(project) === "category_pick") {
+    return false;
+  }
+  if (!getProjectVertical(project)) return false;
   if (!hasFashionProductRef(project)) return false;
   return getFashionPhase(project) === "dimensions" && !dimensionsComplete(project);
 }
@@ -827,28 +1043,42 @@ function buildFashionDimensionStepPatch(
   value: string,
   extraWorkflow: Record<string, unknown> = {},
 ): Record<string, unknown> | null {
-  if (dimStep >= FASHION_DIMENSION_STEPS.length) return null;
-  const step = FASHION_DIMENSION_STEPS[dimStep]!;
+  const steps = dimensionStepsForProject(project);
+  if (dimStep >= steps.length) return null;
+  const step = steps[dimStep]!;
   const wf = getFashionWorkflowMeta(project);
+  const vertical = getProjectVertical(project) ?? "fashion_apparel";
+  const config = getProVerticalConfig(vertical);
   const metaDeliverable = isFashionDeliverable(project.meta?.deliverable)
     ? (project.meta!.deliverable as FashionDeliverable)
-    : null;
+    : isProDeliverable(project.meta?.deliverable)
+      ? (project.meta!.deliverable as ProDeliverable)
+      : null;
   const trimmed = value.trim();
   if (trimmed.length < 2) return null;
 
-  const nextDimensions = mergeFashionDimensionSources(
-    metaDeliverable?.dimensions,
-    buildFashionDimensionsFromChat(project.chatHistory),
-    { [step.key]: trimmed },
-  );
-  const deliverable = resolveFashionDeliverable(project);
+  const nextDimensions =
+    vertical === "bags"
+      ? mergeProDimensionSources(
+          vertical,
+          metaDeliverable?.dimensions,
+          buildProDimensionsFromChat(vertical, project.chatHistory),
+          { [step.key]: trimmed },
+        )
+      : mergeFashionDimensionSources(
+          metaDeliverable?.dimensions as FashionDeliverable["dimensions"],
+          buildFashionDimensionsFromChat(project.chatHistory),
+          { [step.key]: trimmed },
+        );
+  const deliverable = resolveProVerticalDeliverable(project);
   const nextStep = dimStep + 1;
-  const done = nextStep >= FASHION_DIMENSION_STEPS.length;
+  const done = nextStep >= steps.length;
+  const schema = deliverableSchemaForProject(project);
   return {
     deliverable: {
-      schemaVersion: "fashion-v4",
-      vertical: "fashion_apparel",
-      productName: wf.productName ?? project.title ?? "服装商品",
+      schemaVersion: schema,
+      vertical,
+      productName: wf.productName ?? project.title ?? config?.projectTitle ?? "商品",
       dimensions: nextDimensions,
       sellpoints: deliverable?.sellpoints ?? [],
       sellpointsLocked: false,
@@ -861,9 +1091,9 @@ function buildFashionDimensionStepPatch(
     },
     workflow: {
       ...wf,
-      vertical: "fashion_apparel",
-      fashionPhase: done ? "sellpoints" : "dimensions",
-      dimensionStep: done ? FASHION_DIMENSION_STEPS.length : nextStep,
+      vertical,
+      [workflowPhaseKey(project)]: done ? "sellpoints" : "dimensions",
+      dimensionStep: done ? steps.length : nextStep,
       awaitingFashionCustomDimension: false,
       ...extraWorkflow,
     },
@@ -1099,11 +1329,17 @@ export function isAwaitingFashionOpsConfirm(project: StoryboardProject): boolean
 
 export function isFashionInProduce(project: StoryboardProject): boolean {
   const d = resolveFashionDeliverable(project);
-  return (
-    getFashionPhase(project) === "produce" &&
-    Boolean(d?.outputMode) &&
-    hasFashionOutputModeChoiceInChat(project)
-  );
+  const wf = getFashionWorkflowMeta(project);
+  const wfPhase = wf.fashionPhase ?? wf.proPhase;
+  const metaOut = isFashionDeliverable(project.meta?.deliverable)
+    ? (project.meta!.deliverable as FashionDeliverable).outputMode
+    : isProDeliverable(project.meta?.deliverable)
+      ? (project.meta!.deliverable as ProDeliverable).outputMode
+      : null;
+  const outputMode = d?.outputMode ?? metaOut ?? null;
+  if (!outputMode) return false;
+  if (wfPhase === "produce" || wfPhase === "done") return true;
+  return getFashionPhase(project) === "produce" && hasFashionOutputModeChoiceInChat(project);
 }
 
 export function isAwaitingFashionOutputMode(project: StoryboardProject): boolean {
@@ -1229,10 +1465,21 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     return [];
   }
 
+  if (isAwaitingProCategoryPick(project) || getFashionPhase(project) === "category_pick") {
+    return PRO_CATEGORY_OPTIONS.map((cat) => ({
+      id: `pro-cat-${cat.id}`,
+      title: cat.label,
+      description: cat.description,
+      message: proCategoryChoiceLabel(cat.label),
+      recommended: cat.id === "fashion",
+    }));
+  }
+
   const dimStep = currentFashionDimensionStep(project);
-  if (isFashionDimensionCollecting(project) && dimStep < FASHION_DIMENSION_STEPS.length) {
+  const dimSteps = dimensionStepsForProject(project);
+  if (isFashionDimensionCollecting(project) && dimStep < dimSteps.length) {
     if (isAwaitingFashionCustomDimensionInput(project)) return [];
-    const step = FASHION_DIMENSION_STEPS[dimStep]!;
+    const step = dimSteps[dimStep]!;
     if (step.options) {
       return [
         ...step.options.map((opt) => ({
@@ -1533,7 +1780,32 @@ export function fashionWorkflowPatchForChoice(
   message: string,
 ): Record<string, unknown> | null {
   const wf = getFashionWorkflowMeta(project);
-  const deliverable = resolveFashionDeliverable(project);
+  const deliverable = resolveProVerticalDeliverable(project);
+  const vertical = getProjectVertical(project) ?? "fashion_apparel";
+
+  const categoryPick = parseProCategoryPick(message);
+  if (categoryPick) {
+    if (!categoryPick.available || !categoryPick.verticalId) return null;
+    const pickedVertical = categoryPick.verticalId;
+    const config = getProVerticalConfig(pickedVertical);
+    const phaseKey = pickedVertical === "bags" ? "proPhase" : "fashionPhase";
+    const otherPhaseKey = pickedVertical === "bags" ? "fashionPhase" : "proPhase";
+    return {
+      workflow: {
+        ...wf,
+        proMode: true,
+        vertical: pickedVertical,
+        [phaseKey]: "dimensions",
+        [otherPhaseKey]: undefined,
+        dimensionStep: 0,
+        initialProductRefAcknowledged: true,
+      },
+      projectTitle: config?.projectTitle,
+      assistantReply: config
+        ? `已切换至【${config.label}】。${config.productRefAdvanceHint}`
+        : undefined,
+    };
+  }
 
   if (message === FASHION_PRODUCT_REF_ACK) {
     if (!hasFashionProductRef(project)) return null;
@@ -1546,14 +1818,15 @@ export function fashionWorkflowPatchForChoice(
   }
 
   const dimStep = currentFashionDimensionStep(project);
-  if (isFashionDimensionCollecting(project) && dimStep < FASHION_DIMENSION_STEPS.length) {
-    const step = FASHION_DIMENSION_STEPS[dimStep]!;
+  const steps = dimensionStepsForProject(project);
+  if (isFashionDimensionCollecting(project) && dimStep < steps.length) {
+    const step = steps[dimStep]!;
 
     if (message === FASHION_CUSTOM_DIMENSION_CHOICE && step.options) {
       return {
         workflow: {
           ...wf,
-          vertical: "fashion_apparel",
+          vertical,
           awaitingFashionCustomDimension: true,
         },
       };
@@ -1572,8 +1845,11 @@ export function fashionWorkflowPatchForChoice(
 
   if (message === FASHION_AI_SELLPOINTS_CHOICE || message === FASHION_REGENERATE_SELLPOINTS) {
     return {
-      llmTrigger: FASHION_AI_SELLPOINTS,
-      workflow: { ...wf, fashionSellpointsEdited: false },
+      llmTrigger: llmTriggerFor(project, "sellpoints"),
+      workflow: {
+        ...wf,
+        ...(isBagsProject(project) ? { proSellpointsEdited: false } : { fashionSellpointsEdited: false }),
+      },
     };
   }
 
@@ -1582,7 +1858,9 @@ export function fashionWorkflowPatchForChoice(
       deliverable.selectedVoiceoverId ??
       parseFashionVoiceoverPickFromChat(project.chatHistory);
     if (!voiceoverId) return null;
-    const versionKeys = listFashionStoryboardVersionKeys(deliverable);
+    const versionKeys = isBagsProject(project)
+      ? listProStoryboardVersionKeys(deliverable as ProDeliverable)
+      : listFashionStoryboardVersionKeys(deliverable as FashionDeliverable);
     return {
       deliverable: {
         ...deliverable,
@@ -1591,9 +1869,9 @@ export function fashionWorkflowPatchForChoice(
       },
       workflow: {
         ...wf,
-        fashionPhase: versionKeys.length > 0 ? "storyboard_pick" : "voiceover_pick",
+        ...phaseWorkflowPatch(project, versionKeys.length > 0 ? "storyboard_pick" : "voiceover_pick"),
       },
-      llmTrigger: FASHION_AI_STORYBOARDS,
+      llmTrigger: llmTriggerFor(project, "storyboards"),
     };
   }
 
@@ -1628,10 +1906,10 @@ export function fashionWorkflowPatchForChoice(
       },
       workflow: {
         ...wf,
-        fashionPhase: "sellpoints",
-        fashionSellpointsEdited: false,
+        ...phaseWorkflowPatch(project, "sellpoints"),
+        ...(isBagsProject(project) ? { proSellpointsEdited: false } : { fashionSellpointsEdited: false }),
       },
-      llmTrigger: FASHION_AI_VOICEOVERS,
+      llmTrigger: llmTriggerFor(project, "voiceovers"),
     };
   }
 
@@ -1639,8 +1917,8 @@ export function fashionWorkflowPatchForChoice(
   if (voiceoverId && deliverable?.voiceovers.some((v) => v.id === voiceoverId)) {
     return {
       deliverable: { ...deliverable, selectedVoiceoverId: voiceoverId },
-      workflow: { ...wf, fashionPhase: "voiceover_pick" },
-      llmTrigger: FASHION_AI_STORYBOARDS,
+      workflow: { ...wf, ...phaseWorkflowPatch(project, "voiceover_pick") },
+      llmTrigger: llmTriggerFor(project, "storyboards"),
     };
   }
 
@@ -1656,8 +1934,10 @@ export function fashionWorkflowPatchForChoice(
       },
       workflow: {
         ...wf,
-        fashionPhase: "storyboard_confirm",
-        fashionStoryboardPanelsEdited: false,
+        ...phaseWorkflowPatch(project, "storyboard_confirm"),
+        ...(isBagsProject(project)
+          ? { proStoryboardPanelsEdited: false }
+          : { fashionStoryboardPanelsEdited: false }),
       },
     };
   }
@@ -1666,7 +1946,7 @@ export function fashionWorkflowPatchForChoice(
     (message === FASHION_CONFIRM_STORYBOARD || message === FASHION_REGENERATE_OPS) &&
     deliverable?.selectedVersion
   ) {
-    if (deliverable.storyboardLocked && hasMeaningfulOpsPack(deliverable)) {
+    if (deliverable.storyboardLocked && hasMeaningfulDeliverableOpsPack(deliverable)) {
       return null;
     }
     const phase = getFashionPhase(project);
@@ -1677,15 +1957,23 @@ export function fashionWorkflowPatchForChoice(
       return null;
     }
     const key = deliverable.selectedVersion;
-    const withPanels = buildFashionDeliverableWithVersionPanels(project, deliverable, key);
+    const withPanels = isBagsProject(project)
+      ? deliverable
+      : buildFashionDeliverableWithVersionPanels(project, deliverable as FashionDeliverable, key);
     return {
       deliverable: {
         ...withPanels,
         selectedVersion: key,
         storyboardLocked: true,
       },
-      workflow: { ...wf, fashionPhase: "storyboard_confirm", fashionStoryboardPanelsEdited: false },
-      llmTrigger: FASHION_AI_OPS,
+      workflow: {
+        ...wf,
+        ...phaseWorkflowPatch(project, "storyboard_confirm"),
+        ...(isBagsProject(project)
+          ? { proStoryboardPanelsEdited: false }
+          : { fashionStoryboardPanelsEdited: false }),
+      },
+      llmTrigger: llmTriggerFor(project, "ops"),
     };
   }
 
@@ -1700,17 +1988,23 @@ export function fashionWorkflowPatchForChoice(
       },
       workflow: {
         ...wf,
-        fashionPhase: "storyboard_pick",
-        fashionStoryboardPanelsEdited: false,
+        ...phaseWorkflowPatch(project, "storyboard_pick"),
+        ...(isBagsProject(project)
+          ? { proStoryboardPanelsEdited: false }
+          : { fashionStoryboardPanelsEdited: false }),
       },
     };
   }
 
   if (message === FASHION_OUTPUT_SCRIPT && deliverable?.selectedVersion) {
     const phase = getFashionPhase(project);
+    const wfPhase = wf.fashionPhase ?? wf.proPhase;
     if (
       deliverable.outputMode === "script_compose" &&
-      (phase === "produce" || phase === "done")
+      (phase === "produce" ||
+        phase === "done" ||
+        wfPhase === "produce" ||
+        wfPhase === "done")
     ) {
       return null;
     }
@@ -1728,11 +2022,14 @@ export function fashionWorkflowPatchForChoice(
   }
 
   if (message === FASHION_OUTPUT_VIDEO && deliverable?.selectedVersion) {
-    const phase = getFashionPhase(project);
-    if (
-      deliverable.outputMode === "direct_video" &&
-      (phase === "produce" || phase === "done")
-    ) {
+    const metaDeliverableOut = isFashionDeliverable(project.meta?.deliverable)
+      ? (project.meta!.deliverable as FashionDeliverable).outputMode
+      : isProDeliverable(project.meta?.deliverable)
+        ? (project.meta!.deliverable as ProDeliverable).outputMode
+        : null;
+    const committedOutputMode = deliverable.outputMode ?? metaDeliverableOut ?? null;
+    const wfPhase = wf.fashionPhase ?? wf.proPhase;
+    if (committedOutputMode === "direct_video" && (wfPhase === "produce" || wfPhase === "done")) {
       return null;
     }
     const key = deliverable.selectedVersion;
@@ -1758,6 +2055,9 @@ export function fashionWorkflowPatchForChoice(
 export function fashionAssistantPlaceholder(project: StoryboardProject): string {
   if (isLegacyStoryboardProject(project)) return "旧版项目只读，请新建服装专业项目";
   if (isAwaitingFashionProductRef(project)) return "请先在左侧素材区上传或粘贴产品图";
+  if (isAwaitingProCategoryPick(project) || getFashionPhase(project) === "category_pick") {
+    return "请在下方选择大类品类";
+  }
   const dimStep = currentFashionDimensionStep(project);
   if (isFashionDimensionCollecting(project)) {
     if (isAwaitingFashionCustomDimensionInput(project)) {
@@ -1798,6 +2098,5 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
   return "请点选上方选项继续";
 }
 
-export const FASHION_WELCOME = `你好，我是【服装AI短视频专业策划师】。
-
-请先在左侧素材区上传或粘贴产品图；检测到产品图后会自动进入七维参数采集。`;
+export const FASHION_WELCOME = PRO_GENERIC_WELCOME;
+export { PRO_GENERIC_WELCOME };

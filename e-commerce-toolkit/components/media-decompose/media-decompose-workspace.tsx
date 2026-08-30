@@ -16,6 +16,7 @@ import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-mark
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { defaultPromptForKind } from "@/lib/media-decompose-default-prompts";
 import {
   downloadMediaDecomposeExportZip,
@@ -92,6 +93,7 @@ export function MediaDecomposeWorkspace({
   onProjectUpdated,
 }: Props) {
   const router = useRouter();
+  const { toast } = useDialogs();
   const [prompt, setPrompt] = useState(
     project.settings.lastPrompt ?? defaultPromptForKind(project.media?.kind),
   );
@@ -159,9 +161,10 @@ export function MediaDecomposeWorkspace({
       );
       onProjectUpdated?.(refreshed);
       setSaveDialogOpen(false);
-      await onAlert({
+      toast({
         title: "已保存到资产库",
         message: "可在「我的资产 → 拆图拆视频」一键复用：换素材后继续拆解或复刻。",
+        variant: "success",
       });
     } catch (e) {
       await onAlert({

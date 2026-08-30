@@ -45,7 +45,8 @@ import {
 } from "@/components/fashion/fashion-character-ref-choice-dialog";
 import { StoryboardSaveDialog } from "@/components/storyboard/storyboard-save-dialog";
 import { StoryboardStepResults } from "@/components/storyboard/storyboard-step-results";
-import { isFashionProject, buildFashionSellpointsSavePatch, buildFashionStoryboardPanelsSavePatch, resolveFashionDeliverable, buildFashionProjectKeywords, isFashionProduceSetupReady, fashionCharacterMode, fashionSheetNeedsScriptResync } from "@/lib/fashion-workflow";
+import { isProVerticalProject, buildFashionSellpointsSavePatch, buildFashionStoryboardPanelsSavePatch, resolveProVerticalDeliverable, buildFashionProjectKeywords, isFashionProduceSetupReady, fashionCharacterMode, fashionSheetNeedsScriptResync, isBagsProject, getProjectVertical } from "@/lib/fashion-workflow";
+import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import type { FashionCharacterRefMode } from "@/components/fashion/fashion-storyboard-sheet-workspace";
 import type { FashionPanelRow, FashionSellpoint } from "@/lib/fashion-types";
 import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
@@ -101,13 +102,22 @@ import type {
 import {
   listStoryboardPendingPanelImageIndices,
   listStoryboardPendingPanelVideoIndices,
+  resolveActiveStoryboardPanelImageBusyIndices,
   resolveActiveStoryboardPanelVideoBusyIndices,
 } from "@/lib/storyboard-pending-panels";
+import { useBackgroundGeneration } from "@/components/generation";
+import {
+  BACKGROUND_DOCK_FOREGROUND_MS,
+  BACKGROUND_DOCK_FOREGROUND_POLL_MS,
+  STORYBOARD_FULL_VIDEO_EXPECTED_MS,
+} from "@/lib/generation/background-generation-policy";
 import { formatPanelPromptPreview } from "@/lib/storyboard-scene-prompt";
 
-/** 整图成片前端轮询：间隔 4s × 240 ≈ 16 分钟（视频生成常超 6 分钟） */
-const VIDEO_POLL_INTERVAL_MS = 4000;
-const VIDEO_POLL_MAX_ITERS = 240;
+/** 整图成片前台轮询（超时后移交右下角 Dock，Dock 继续 poll） */
+const VIDEO_POLL_INTERVAL_MS = BACKGROUND_DOCK_FOREGROUND_POLL_MS;
+const VIDEO_POLL_MAX_ITERS = Math.ceil(
+  BACKGROUND_DOCK_FOREGROUND_MS / BACKGROUND_DOCK_FOREGROUND_POLL_MS,
+);
 
 type Props = {
   project: StoryboardProject;
@@ -240,6 +250,7 @@ export function StoryboardContentPanel({
   });
   const [sheetPngBusy, setSheetPngBusy] = useState(false);
   const [vidBusy, setVidBusy] = useState(false);
+  const backgroundGen = useBackgroundGeneration();
   const [videoTaskStartedAt, setVideoTaskStartedAt] = useState<string | null>(null);
   const [videoPollCount, setVideoPollCount] = useState(0);
   const videoPollLock = useRef(false);
@@ -262,6 +273,8 @@ export function StoryboardContentPanel({
   const imageGenWatchRef = useRef<number[]>([]);
   /** 当前 tab 内 HTTP 生图请求进行中（重生成时旧 imageUrl 不能当作已完成） */
   const imageGenInFlightRef = useRef(false);
+  /** 并发/顺序多镜生图时避免 finally 互相覆盖 busy */
+  const imageGenInFlightCountRef = useRef(0);
   /** 本地发起的单镜视频（服务端 pending 写入前也保持 busy） */
   const panelVideoWatchRef = useRef<number[]>([]);
   const panelVideoInFlightRef = useRef(false);
@@ -279,9 +292,16 @@ export function StoryboardContentPanel({
   );
 
   const activeImageGenPanels = useMemo(() => {
-    const set = new Set<number>([...regeneratingPanels, ...pendingPanelIndices]);
-    return set;
-  }, [pendingPanelIndices, regeneratingPanels]);
+    return new Set(
+      resolveActiveStoryboardPanelImageBusyIndices({
+        regeneratingPanels,
+        pendingPanelIndices,
+        inFlightWatchIndices: [],
+        imageGenInFlight: false,
+        panels: project.sheet?.panels ?? [],
+      }),
+    );
+  }, [pendingPanelIndices, regeneratingPanels, project.sheet?.panels]);
 
   const activePanelVideoPanels = useMemo(() => {
     return new Set(
@@ -307,6 +327,7 @@ export function StoryboardContentPanel({
   const [fashionSheetSyncing, setFashionSheetSyncing] = useState(false);
   const [fashionSubmitBusy, setFashionSubmitBusy] = useState(false);
   const [fashionCharGenBusy, setFashionCharGenBusy] = useState(false);
+  const fashionCharGenInFlightCountRef = useRef(0);
   const pendingBatchPanelsRef = useRef<number[] | null>(null);
   const pendingBatchVideoPanelsRef = useRef<number[] | null>(null);
   const fashionImagePickerIntentRef = useRef<"generate" | "character">("generate");
@@ -470,12 +491,77 @@ export function StoryboardContentPanel({
         ...project.meta,
         workflow: {
           ...(project.meta?.workflow ?? {}),
-          vertical: "fashion_apparel",
+          vertical: getProjectVertical(project) ?? "fashion_apparel",
           ...patch,
         },
       },
     });
     onProjectChange(updated);
+  }
+
+  function syncImageGenInFlightFlag() {
+    imageGenInFlightRef.current = imageGenInFlightCountRef.current > 0;
+  }
+
+  function beginPanelImageGenWatch(
+    indexes: number[],
+    opts?: { fullSheet?: boolean },
+  ) {
+    imageGenInFlightCountRef.current += 1;
+    syncImageGenInFlightFlag();
+    imageGenWatchRef.current = [...new Set([...imageGenWatchRef.current, ...indexes])].sort(
+      (a, b) => a - b,
+    );
+    setRegeneratingPanels((prev) =>
+      [...new Set([...prev, ...indexes])].sort((a, b) => a - b),
+    );
+    if (opts?.fullSheet) setImgBusy(true);
+  }
+
+  function endPanelImageGenWatch(
+    completedIndexes: number[],
+    refreshed?: StoryboardProject,
+  ) {
+    imageGenInFlightCountRef.current = Math.max(0, imageGenInFlightCountRef.current - 1);
+    imageGenWatchRef.current = imageGenWatchRef.current.filter(
+      (idx) => !completedIndexes.includes(idx),
+    );
+    syncImageGenInFlightFlag();
+
+    const pending = refreshed
+      ? listStoryboardPendingPanelImageIndices(refreshed.meta)
+      : [];
+    const total =
+      refreshed?.sheet?.panels.length ?? project.sheet?.panels.length ?? 0;
+
+    setRegeneratingPanels((prev) => {
+      const next = new Set(prev);
+      for (const idx of completedIndexes) next.delete(idx);
+      for (const idx of pending) next.add(idx);
+      if (imageGenInFlightCountRef.current > 0) {
+        for (const idx of imageGenWatchRef.current) next.add(idx);
+      }
+      return [...next].sort((a, b) => a - b);
+    });
+
+    if (imageGenInFlightCountRef.current === 0) {
+      setImgBusy(total > 0 && pending.length >= total);
+    }
+  }
+
+  function beginFashionCharGenWatch() {
+    fashionCharGenInFlightCountRef.current += 1;
+    setFashionCharGenBusy(true);
+  }
+
+  function endFashionCharGenWatch() {
+    fashionCharGenInFlightCountRef.current = Math.max(
+      0,
+      fashionCharGenInFlightCountRef.current - 1,
+    );
+    if (fashionCharGenInFlightCountRef.current === 0) {
+      setFashionCharGenBusy(false);
+    }
   }
 
   const syncGeneratingPanelImages = useCallback(async () => {
@@ -485,26 +571,33 @@ export function StoryboardContentPanel({
       const fresh = await getStoryboardProject(project.id);
       onProjectChange(fresh);
       const pending = listStoryboardPendingPanelImageIndices(fresh.meta);
+      const inFlight = imageGenInFlightCountRef.current > 0;
       const watch = new Set<number>([
         ...imageGenWatchRef.current,
         ...pending,
       ]);
-      if (watch.size === 0 && !imageGenInFlightRef.current) return;
+      if (watch.size === 0 && !inFlight) return;
 
       const total = fresh.sheet?.panels.length ?? 0;
       const batchWatch = total > 0 && imageGenWatchRef.current.length >= total;
-      const stillRunning =
-        imageGenInFlightRef.current || pending.length > 0;
+      const stillRunning = inFlight || pending.length > 0;
 
       const active = new Set<number>(pending);
-      if (imageGenInFlightRef.current) {
+      if (inFlight) {
         for (const idx of imageGenWatchRef.current) active.add(idx);
+      }
+      for (const idx of regeneratingPanelsRef.current) {
+        if (inFlight && imageGenWatchRef.current.includes(idx)) active.add(idx);
       }
       for (const idx of [...active]) {
         const done = fresh.sheet?.panels.some(
           (p) => p.index === idx && Boolean(p.imageUrl),
         );
-        if (done && !imageGenInFlightRef.current) {
+        if (
+          done &&
+          !imageGenWatchRef.current.includes(idx) &&
+          !pending.includes(idx)
+        ) {
           active.delete(idx);
         }
       }
@@ -513,7 +606,6 @@ export function StoryboardContentPanel({
       if (!stillRunning) {
         imageGenWatchRef.current = [];
         setImgBusy(false);
-        setRegeneratingPanels([]);
       } else {
         setImgBusy(batchWatch || (total > 0 && pending.length >= total));
       }
@@ -526,6 +618,8 @@ export function StoryboardContentPanel({
 
   useEffect(() => {
     const pending = listStoryboardPendingPanelImageIndices(project.meta);
+    imageGenInFlightCountRef.current = 0;
+    syncImageGenInFlightFlag();
     imageGenWatchRef.current = pending;
     setRegeneratingPanels(pending);
     const total = project.sheet?.panels.length ?? 0;
@@ -762,7 +856,7 @@ export function StoryboardContentPanel({
   async function ensureSheetReady(): Promise<boolean> {
     if (project.sheet) return true;
 
-    if (isFashionProject(project)) {
+    if (isProVerticalProject(project)) {
       try {
         const updated = await syncStoryboardSheet(project.id);
         onProjectChange(updated);
@@ -855,8 +949,8 @@ export function StoryboardContentPanel({
         fashionResolvedCharModeRef.current ??
         fashionCharacterMode(project);
       if (
-        isFashionProject(project) &&
-        resolveFashionDeliverable(project)?.outputMode === "direct_video" &&
+        isProVerticalProject(project) &&
+        resolveProVerticalDeliverable(project)?.outputMode === "direct_video" &&
         !charMode
       ) {
         const message = "请通过生成分镜图流程选择「自行上传」或「AI 生成」角色参考。";
@@ -870,7 +964,7 @@ export function StoryboardContentPanel({
       }
       const hasCharRef = references.some((r) => r.role === "character");
       if (
-        isFashionProject(project) &&
+        isProVerticalProject(project) &&
         charMode === "upload" &&
         !hasCharRef
       ) {
@@ -900,28 +994,23 @@ export function StoryboardContentPanel({
         ? [panelIndex]
         : (project.sheet?.panels.map((p) => p.index) ?? []);
     if (!runtimeOpts?.deferBusy) {
-      imageGenWatchRef.current = watchIndexes;
-      imageGenInFlightRef.current = true;
-      setRegeneratingPanels(watchIndexes);
-      if (typeof panelIndex !== "number") {
-        setImgBusy(true);
-      }
+      beginPanelImageGenWatch(watchIndexes, {
+        fullSheet: typeof panelIndex !== "number",
+      });
     }
+    const mayInlineGenCharacter =
+      !runtimeOpts?.batchInner &&
+      !references.some((r) => r.role === "character");
+    let inlineCharGenStarted = false;
     try {
       if (!runtimeOpts?.skipSheetReadyCheck) {
         const ready = await ensureSheetReady();
         if (!ready) {
-          const message = isFashionProject(project)
+          const message = isProVerticalProject(project)
             ? "故事版分镜表尚未同步到工作台。请稍候自动同步完成，或刷新页面后在中间「故事版 · 成片工作区」点「生成全部分镜图」；仍失败请重新在右侧选择「故事版一键成片」。"
             : schemes.length > 1 && !project.meta?.workflow?.schemePicked
               ? "请先选定一套分镜方案（右侧或助手上方按钮），上传参考图并回复「定稿」后再生图。"
               : "当前仅有文本交付，缺少结构化分镜。请让助手重新输出完整方案，或回复「定稿」采用所选方案。";
-          if (!runtimeOpts?.deferBusy) {
-            imageGenWatchRef.current = [];
-            imageGenInFlightRef.current = false;
-            setRegeneratingPanels([]);
-            setImgBusy(false);
-          }
           if (!runtimeOpts?.quietError) {
             await onAlert({
               title: "无法生图",
@@ -932,12 +1021,16 @@ export function StoryboardContentPanel({
         }
       }
       const wf = project.meta?.workflow ?? {};
-      const fashionAutoChar = isFashionProject(project) && charMode === "ai";
+      const fashionAutoChar = isProVerticalProject(project) && charMode === "ai";
       const autoGenCharacter =
         runtimeOpts?.autoGenCharacterOverride ??
         (fashionAutoChar ||
           Boolean(wf.autoGenCharacter) ||
           Boolean(wf.characterPresetKey));
+      if (autoGenCharacter && mayInlineGenCharacter) {
+        beginFashionCharGenWatch();
+        inlineCharGenStarted = true;
+      }
       const { sheet: nextSheet, references: nextRefs } = await generateStoryboardSheetImage(
         project.id,
         {
@@ -992,27 +1085,16 @@ export function StoryboardContentPanel({
       }
       return { ok: false, error: message };
     } finally {
+      if (inlineCharGenStarted) {
+        endFashionCharGenWatch();
+      }
       if (!runtimeOpts?.skipAutoRefresh && !runtimeOpts?.deferBusy) {
-        imageGenInFlightRef.current = false;
         try {
           const refreshed = await getStoryboardProject(project.id);
           onProjectChange(refreshed);
-          const pending = listStoryboardPendingPanelImageIndices(refreshed.meta);
-          const total = refreshed.sheet?.panels.length ?? 0;
-          if (pending.length > 0) {
-            imageGenWatchRef.current = pending;
-            setRegeneratingPanels(pending);
-            setImgBusy(total > 0 && pending.length >= total);
-          } else {
-            imageGenWatchRef.current = [];
-            setRegeneratingPanels([]);
-            setImgBusy(false);
-          }
+          endPanelImageGenWatch(watchIndexes, refreshed);
         } catch {
-          if (!imageGenInFlightRef.current && imageGenWatchRef.current.length === 0) {
-            setImgBusy(false);
-            setRegeneratingPanels([]);
-          }
+          endPanelImageGenWatch(watchIndexes);
         }
       }
     }
@@ -1046,8 +1128,8 @@ export function StoryboardContentPanel({
       fashionResolvedCharModeRef.current ??
       fashionCharacterMode(project);
     if (
-      isFashionProject(project) &&
-      resolveFashionDeliverable(project)?.outputMode === "direct_video" &&
+      isProVerticalProject(project) &&
+      resolveProVerticalDeliverable(project)?.outputMode === "direct_video" &&
       !charMode
     ) {
       await onAlert({
@@ -1058,7 +1140,7 @@ export function StoryboardContentPanel({
     }
     const hasCharRef = references.some((r) => r.role === "character");
     if (
-      isFashionProject(project) &&
+      isProVerticalProject(project) &&
       charMode === "upload" &&
       !hasCharRef
     ) {
@@ -1076,7 +1158,7 @@ export function StoryboardContentPanel({
     if (!ready) {
       await onAlert({
         title: "无法生图",
-        message: isFashionProject(project)
+        message: isProVerticalProject(project)
           ? "故事版分镜表尚未同步到工作台。请稍候自动同步完成，或刷新页面后在中间「故事版 · 成片工作区」点「生成全部分镜图」；仍失败请重新在右侧选择「故事版一键成片」。"
           : schemes.length > 1 && !project.meta?.workflow?.schemePicked
             ? "请先选定一套分镜方案（右侧或助手上方按钮），上传参考图并回复「定稿」后再生图。"
@@ -1087,7 +1169,7 @@ export function StoryboardContentPanel({
 
     const modelKey = modelKeyOverride?.trim() || imageModel;
     const wf = project.meta?.workflow ?? {};
-    const fashionAutoChar = isFashionProject(project) && charMode === "ai";
+    const fashionAutoChar = isProVerticalProject(project) && charMode === "ai";
     const shouldAutoGenCharacter =
       !hasCharRef &&
       !wf.skippedCharacter &&
@@ -1096,6 +1178,7 @@ export function StoryboardContentPanel({
         Boolean(wf.characterPresetKey));
 
     if (shouldAutoGenCharacter) {
+      beginFashionCharGenWatch();
       try {
         const { references: nextRefs } = await generateStoryboardSheetImage(project.id, {
           modelKey,
@@ -1118,12 +1201,12 @@ export function StoryboardContentPanel({
           variant: "error",
         });
         return;
+      } finally {
+        endFashionCharGenWatch();
       }
     }
 
-    imageGenWatchRef.current = queue;
-    imageGenInFlightRef.current = true;
-    setRegeneratingPanels(queue);
+    beginPanelImageGenWatch(queue, { fullSheet: true });
     const failures: { index: number; message: string }[] = [];
     let latestPanels = project.sheet?.panels ?? [];
     try {
@@ -1170,10 +1253,13 @@ export function StoryboardContentPanel({
         /* 单镜已成功时仍尽量保留本地 sheet 更新 */
       }
     } finally {
-      imageGenInFlightRef.current = false;
-      imageGenWatchRef.current = [];
-      setRegeneratingPanels([]);
-      setImgBusy(false);
+      try {
+        const refreshed = await getStoryboardProject(project.id);
+        onProjectChange(refreshed);
+        endPanelImageGenWatch(queue, refreshed);
+      } catch {
+        endPanelImageGenWatch(queue);
+      }
       void syncGeneratingPanelImages();
     }
 
@@ -1184,9 +1270,10 @@ export function StoryboardContentPanel({
     );
     reconciledFailures.sort((a, b) => a.index - b.index);
     if (reconciledFailures.length === 0) {
-      await onAlert({
+      toast({
         title: "批量完成",
         message: `已生成 ${queue.length} 镜分镜图。`,
+        variant: "success",
       });
       return;
     }
@@ -1240,6 +1327,88 @@ export function StoryboardContentPanel({
     [onVideoReady],
   );
 
+  const fullVideoDockTaskId = useCallback(
+    (taskId: string) => `storyboard-full-video:${project.id}:${taskId}`,
+    [project.id],
+  );
+
+  const registerFullVideoBackgroundTask = useCallback(
+    (taskId: string, startedAt: string) => {
+      backgroundGen.registerTask({
+        id: fullVideoDockTaskId(taskId),
+        label: "整图成片生成",
+        hint: `${videoModel} · ${durationSec}s`,
+        startedAt,
+        expectedDurationMs: STORYBOARD_FULL_VIDEO_EXPECTED_MS,
+        poll: async () => {
+          const polled = await pollStoryboardFullVideoStatus(project.id);
+          if (polled.status === "succeeded") return { status: "succeeded" as const };
+          if (polled.status === "idle") {
+            return { status: "failed" as const, error: "任务已结束或未找到" };
+          }
+          return { status: "running" as const };
+        },
+        onSucceeded: async () => {
+          const polled = await pollStoryboardFullVideoStatus(project.id);
+          if (polled.status !== "succeeded") return;
+          const ossUrl = polled.videoOssUrl ?? polled.asset?.ossUrl;
+          if (!ossUrl) return;
+          if (project.videoAssetId === polled.asset.id) return;
+          onProjectChange({
+            ...project,
+            videoOssUrl: ossUrl,
+            videoAssetId: polled.asset.id,
+          });
+          videoPollDismissedTaskIdRef.current = null;
+          onVideoReady();
+          setVideoTaskStartedAt(null);
+          toast({
+            title: "整图成片已生成",
+            message: `${durationSec}s · ${videoResolution} 带货视频已保存，并已自动保存交付快照。`,
+            variant: "success",
+          });
+        },
+      });
+    },
+    [
+      backgroundGen,
+      durationSec,
+      fullVideoDockTaskId,
+      toast,
+      onProjectChange,
+      onVideoReady,
+      project,
+      videoModel,
+      videoResolution,
+    ],
+  );
+
+  useEffect(() => {
+    const pending = project.meta?.workflow?.pendingFullVideoJob;
+    if (!pending?.taskId || !pending.startedAt) return;
+    if (videoPollDismissedTaskIdRef.current === pending.taskId) return;
+    registerFullVideoBackgroundTask(pending.taskId, pending.startedAt);
+    if (
+      Date.now() - new Date(pending.startedAt).getTime() >=
+      BACKGROUND_DOCK_FOREGROUND_MS
+    ) {
+      backgroundGen.minimizeTask(fullVideoDockTaskId(pending.taskId));
+    }
+  }, [
+    backgroundGen,
+    fullVideoDockTaskId,
+    project.meta?.workflow?.pendingFullVideoJob?.taskId,
+    project.meta?.workflow?.pendingFullVideoJob?.startedAt,
+    registerFullVideoBackgroundTask,
+  ]);
+
+  const pendingFullVideoTaskId =
+    project.meta?.workflow?.pendingFullVideoJob?.taskId ?? null;
+  const inlineFullVideoBusy =
+    vidBusy &&
+    (!pendingFullVideoTaskId ||
+      !backgroundGen.isTaskMinimized(fullVideoDockTaskId(pendingFullVideoTaskId)));
+
   const pollFullVideoUntilDone = useCallback(async () => {
     if (videoPollLock.current) return;
     const activeTaskId = project.meta?.workflow?.pendingFullVideoJob?.taskId;
@@ -1262,6 +1431,14 @@ export function StoryboardContentPanel({
 
       for (let i = 0; i < VIDEO_POLL_MAX_ITERS; i++) {
         setVideoPollCount(i + 1);
+
+        if (
+          activeTaskId &&
+          backgroundGen.isTaskMinimized(fullVideoDockTaskId(activeTaskId))
+        ) {
+          setVidBusy(false);
+          return;
+        }
 
         if (i > 0 && i % 8 === 0) {
           if (!(await ensureEcomSessionFresh(90, { redirectOnFailure: true }))) {
@@ -1295,11 +1472,15 @@ export function StoryboardContentPanel({
             });
           }
           videoPollDismissedTaskIdRef.current = null;
+          if (activeTaskId) {
+            backgroundGen.dismissTask(fullVideoDockTaskId(activeTaskId));
+          }
           onVideoReady();
           setVideoTaskStartedAt(null);
-          await onAlert({
+          toast({
             title: "整图成片已生成",
             message: `${durationSec}s · ${videoResolution} 带货视频已保存，并已自动保存交付快照。`,
+            variant: "success",
           });
           return;
         }
@@ -1321,15 +1502,13 @@ export function StoryboardContentPanel({
           message: failMessage,
           variant: "error",
         });
-      } else if (!pollEnded) {
-        // 仅前端轮询超时：Gateway 任务仍在后台进行，结果可恢复，不算失败。
-        // 标记本任务不再自动轮询，由用户点「刷新」恢复（避免重复生成重复计费）。
-        videoPollDismissedTaskIdRef.current = activeTaskId ?? "__pending__";
+      } else if (!pollEnded && activeTaskId) {
+        backgroundGen.minimizeTask(fullVideoDockTaskId(activeTaskId));
         setVideoTaskStartedAt(null);
-        await onAlert({
-          title: "仍在生成中",
+        toast({
+          title: "已转入后台生成",
           message:
-            "视频生成耗时较长，任务仍在后台进行。完成后点「刷新」即可获取结果，无需重新生成（重复生成会重复计费）。",
+            "视频仍在厂商侧生成。您可继续编辑其他内容；进度见右下角「后台生成」，完成后将自动通知。无需重复提交（重复生成会重复计费）。",
         });
       }
     } catch (e) {
@@ -1352,9 +1531,11 @@ export function StoryboardContentPanel({
       }
     }
   }, [
+    backgroundGen,
     dismissVideoPoll,
     durationSec,
-    onAlert,
+    fullVideoDockTaskId,
+    toast,
     onProjectChange,
     onVideoReady,
     project,
@@ -1394,10 +1575,10 @@ export function StoryboardContentPanel({
   }, [onProjectChange, onVideoReady, pollFullVideoUntilDone, project.id, project.meta?.workflow?.pendingFullVideoJob, vidBusy]);
 
   const fashionSheetSyncRef = useRef(false);
-  const fashionOutputMode = resolveFashionDeliverable(project)?.outputMode;
+  const fashionOutputMode = resolveProVerticalDeliverable(project)?.outputMode;
 
   useEffect(() => {
-    if (!isFashionProject(project)) return;
+    if (!isProVerticalProject(project)) return;
     if (fashionOutputMode !== "direct_video" || project.sheet) return;
     if (fashionSheetSyncRef.current) return;
     fashionSheetSyncRef.current = true;
@@ -1429,8 +1610,8 @@ export function StoryboardContentPanel({
         if (!ready) return;
       }
       if (
-        isFashionProject(project) &&
-        resolveFashionDeliverable(project)?.outputMode === "direct_video"
+        isProVerticalProject(project) &&
+        resolveProVerticalDeliverable(project)?.outputMode === "direct_video"
       ) {
         beginFashionImageGeneration({});
         return;
@@ -1520,6 +1701,13 @@ export function StoryboardContentPanel({
             }
           : {}),
       });
+      registerFullVideoBackgroundTask(submitted.taskId, submitted.startedAt);
+      try {
+        const refreshed = await getStoryboardProject(project.id);
+        onProjectChange(refreshed);
+      } catch {
+        /* pending 已在服务端写入，Dock 仍可 poll */
+      }
       setVideoTaskStartedAt(submitted.startedAt);
       await pollFullVideoUntilDone();
     } catch (e) {
@@ -1584,9 +1772,10 @@ export function StoryboardContentPanel({
         onVideoReady();
       }
       if (!opts?.quietSuccess) {
-        await onAlert({
+        toast({
           title: "镜头视频已生成",
           message: `镜头 ${panelIndex} 视频已保存，交付快照已更新。≥2 镜可点「合并分镜视频」。`,
+          variant: "success",
         });
       }
       return { ok: true };
@@ -1603,9 +1792,10 @@ export function StoryboardContentPanel({
               onVideoReady();
             }
             if (!opts?.quietSuccess) {
-              await onAlert({
+              toast({
                 title: "镜头视频已生成",
                 message: `镜头 ${panelIndex} 视频已保存，交付快照已更新。≥2 镜可点「合并分镜视频」。`,
+                variant: "success",
               });
             }
             return { ok: true };
@@ -1697,9 +1887,10 @@ export function StoryboardContentPanel({
     );
     reconciledFailures.sort((a, b) => a.index - b.index);
     if (reconciledFailures.length === 0) {
-      await onAlert({
+      toast({
         title: "批量完成",
         message: `已生成 ${queue.length} 镜视频。≥2 镜可点「合并分镜视频」。`,
+        variant: "success",
       });
       return;
     }
@@ -1777,9 +1968,10 @@ export function StoryboardContentPanel({
     try {
       const { project: updated } = await saveStoryboardDeliverableSnapshot(project.id);
       onProjectChange(updated);
-      await onAlert({
+      toast({
         title: "快照已保存",
         message: "交付快照已更新，可点「交付查阅」预览全部图片与视频。",
+        variant: "success",
       });
     } catch (e) {
       await onAlert({
@@ -1920,12 +2112,12 @@ export function StoryboardContentPanel({
         activeImageGenPanels={activeImageGenPanels}
         panelVidBusyPanels={[...activePanelVideoPanels]}
         imgBusy={imgBusy}
-        vidBusy={vidBusy || activePanelVideoPanels.size > 0}
+        vidBusy={inlineFullVideoBusy || activePanelVideoPanels.size > 0}
         mergeBusy={mergeBusy}
         onGenerateAllImages={(panelIndexes) => {
           if (
-            isFashionProject(project) &&
-            resolveFashionDeliverable(project)?.outputMode === "direct_video"
+            isProVerticalProject(project) &&
+            resolveProVerticalDeliverable(project)?.outputMode === "direct_video"
           ) {
             beginFashionImageGeneration(
               panelIndexes && panelIndexes.length > 0
@@ -1944,8 +2136,8 @@ export function StoryboardContentPanel({
         onMergeSelectedVideos={(indexes) => void handleMergePanelVideos(indexes)}
         onGeneratePanelImage={(panelIndex) => {
           if (
-            isFashionProject(project) &&
-            resolveFashionDeliverable(project)?.outputMode === "direct_video"
+            isProVerticalProject(project) &&
+            resolveProVerticalDeliverable(project)?.outputMode === "direct_video"
           ) {
             beginFashionImageGeneration({ panelIndex });
             return;
@@ -1981,9 +2173,10 @@ export function StoryboardContentPanel({
     try {
       const snapshot = await saveStoryboardWorkflow(project.id, projectName);
       setSaveDialogOpen(false);
-      await onAlert({
+      toast({
         title: "工作流已保存",
         message: `「${snapshot.title}」已保存到「我的资产 · 微剧故事版」，可一键复用。`,
+        variant: "success",
       });
     } catch (e) {
       await onAlert({
@@ -1997,7 +2190,7 @@ export function StoryboardContentPanel({
   }
 
   const defaultSaveProjectName =
-    resolveFashionDeliverable(project)?.productName?.trim() ||
+    resolveProVerticalDeliverable(project)?.productName?.trim() ||
     deliverable?.productName?.trim() ||
     project.title?.trim() ||
     "微剧故事版";
@@ -2006,8 +2199,8 @@ export function StoryboardContentPanel({
     Boolean(project.sheet?.panels?.length) ||
     Boolean(project.meta?.deliverableMarkdown?.trim()) ||
     (project.chatHistory?.length ?? 0) > 0 ||
-    Boolean(resolveFashionDeliverable(project)?.sellpoints?.length) ||
-    Boolean(resolveFashionDeliverable(project)?.storyboardVersions);
+    Boolean(resolveProVerticalDeliverable(project)?.sellpoints?.length) ||
+    Boolean(resolveProVerticalDeliverable(project)?.storyboardVersions);
 
   async function handleExportZip() {
     setExportBusy(true);
@@ -2025,7 +2218,7 @@ export function StoryboardContentPanel({
   }
 
   async function handleRetryFashionSheetSync() {
-    if (!isFashionProject(project) || fashionSheetSyncing) return;
+    if (!isProVerticalProject(project) || fashionSheetSyncing) return;
     setFashionSheetSyncing(true);
     try {
       const updated = await syncStoryboardSheet(project.id);
@@ -2086,16 +2279,17 @@ export function StoryboardContentPanel({
           ...snapProject.meta,
           workflow: {
             ...(snapProject.meta?.workflow ?? {}),
-            vertical: "fashion_apparel",
+            vertical: getProjectVertical(project) ?? "fashion_apparel",
             fashionPhase: "done",
             fashionProduceSetupPending: false,
           },
         },
       });
       onProjectChange(updated);
-      await onAlert({
+      toast({
         title: "故事版已生成并提交",
         message: "完整分镜图与交付快照已保存，可在下方成片区合成视频。",
+        variant: "success",
       });
     } catch (e) {
       await onAlert({
@@ -2111,7 +2305,7 @@ export function StoryboardContentPanel({
   function openPanelPromptPreview(panelIndex: number) {
     const panel = project.sheet?.panels.find((p) => p.index === panelIndex);
     if (!panel) return;
-    const fashionD = isFashionProject(project) ? resolveFashionDeliverable(project) : null;
+    const fashionD = isProVerticalProject(project) ? resolveProVerticalDeliverable(project) : null;
     setPanelPromptPreview({
       title: `镜头 ${panel.index} · Prompt 预览`,
       prompt: formatPanelPromptPreview({
@@ -2132,7 +2326,7 @@ export function StoryboardContentPanel({
       return;
     }
     if (references.some((r) => r.role === "character")) {
-      await onAlert({
+      toast({
         title: "已有角色图",
         message: "左侧素材区已存在角色参考图，可直接生成分镜图。",
       });
@@ -2143,7 +2337,7 @@ export function StoryboardContentPanel({
       openImagePicker(undefined, undefined, "character");
       return;
     }
-    setFashionCharGenBusy(true);
+    beginFashionCharGenWatch();
     try {
       const { sheet: nextSheet, references: nextRefs } = await generateStoryboardSheetImage(
         project.id,
@@ -2160,9 +2354,10 @@ export function StoryboardContentPanel({
         sheet: nextSheet,
         references: nextRefs ?? project.references,
       });
-      await onAlert({
+      toast({
         title: "角色参考图已生成",
         message: "已写入左侧素材区「自动生成角色」，可继续生成分镜图。",
+        variant: "success",
       });
     } catch (e) {
       await onAlert({
@@ -2171,7 +2366,7 @@ export function StoryboardContentPanel({
         variant: "error",
       });
     } finally {
-      setFashionCharGenBusy(false);
+      endFashionCharGenWatch();
     }
   }
 
@@ -2189,7 +2384,7 @@ export function StoryboardContentPanel({
         return;
       }
       if (references.some((r) => r.role === "character")) {
-        await onAlert({
+        toast({
           title: "已有角色图",
           message: "左侧素材区已存在角色参考图，可直接生成分镜图。",
         });
@@ -2214,9 +2409,9 @@ export function StoryboardContentPanel({
     beginFashionImageGeneration({});
   }
 
-  const fashionDeliverableResolved = resolveFashionDeliverable(project);
+  const fashionDeliverableResolved = resolveProVerticalDeliverable(project);
   const fashionDirectVideoProduce =
-    isFashionProject(project) && fashionDeliverableResolved?.outputMode === "direct_video";
+    isProVerticalProject(project) && fashionDeliverableResolved?.outputMode === "direct_video";
   const fashionProjectKeywords = buildFashionProjectKeywords(fashionDeliverableResolved);
   const fashionCharMode = fashionCharacterMode(project);
   const fashionHasCharRef = references.some((r) => r.role === "character");
@@ -2224,8 +2419,8 @@ export function StoryboardContentPanel({
   const fashionAllPanelImages = hasAllPanelImages(project);
 
   useEffect(() => {
-    if (!isFashionProject(project)) return;
-    if (resolveFashionDeliverable(project)?.outputMode !== "direct_video") return;
+    if (!isProVerticalProject(project)) return;
+    if (resolveProVerticalDeliverable(project)?.outputMode !== "direct_video") return;
     if (!fashionSheetNeedsScriptResync(project)) return;
     if (fashionSheetResyncRef.current || fashionSheetSyncing) return;
     fashionSheetResyncRef.current = true;
@@ -2240,7 +2435,7 @@ export function StoryboardContentPanel({
   }, [project.id, project.sheet, project.meta, fashionSheetSyncing, onProjectChange]);
 
   const fashionProduceWorkspaceFallback =
-    resolveFashionDeliverable(project)?.outputMode === "direct_video" && !project.sheet ? (
+    resolveProVerticalDeliverable(project)?.outputMode === "direct_video" && !project.sheet ? (
       <div className="space-y-3">
         <p className="text-sm text-[#86868b]">
           正在将定稿分镜同步为故事版整页版式…若长时间无内容，请点下方按钮重试。
@@ -2359,10 +2554,17 @@ export function StoryboardContentPanel({
 
       <StoryboardTaskStatus
         className="mx-6 mb-2"
-        active={vidBusy}
+        active={inlineFullVideoBusy}
         title="整图成片生成中"
         surface="content"
         detail={`Gateway 视频任务进行中，通常需 3–8 分钟。${videoTaskStartedAt ? `已等待 ${formatTaskElapsed(videoTaskStartedAt)}` : ""}${videoPollCount > 0 ? ` · 轮询 ${videoPollCount} 次` : ""}。请勿重复提交。`}
+      />
+      <StoryboardTaskStatus
+        className="mx-6 mb-2"
+        active={fashionCharGenBusy}
+        surface="content"
+        title="AI 角色参考图生成中"
+        detail="Gateway 图像任务进行中，完成后写入左侧素材区；可关闭模型弹层。"
       />
       <StoryboardTaskStatus
         className="mx-6 mb-2"
@@ -2404,7 +2606,7 @@ export function StoryboardContentPanel({
           </div>
         ) : null}
 
-        {isFashionProject(project) ? (
+        {isProVerticalProject(project) ? (
           <FashionStepResults
             project={project}
             sellpointsSaving={fashionSellpointsSaving}
@@ -2412,7 +2614,7 @@ export function StoryboardContentPanel({
             panelsSaving={fashionPanelsSaving}
             onSavePanels={handleSaveFashionPanels}
             produceWorkspace={
-              resolveFashionDeliverable(project)?.outputMode === "direct_video" &&
+              resolveProVerticalDeliverable(project)?.outputMode === "direct_video" &&
               project.sheet ? (
                 <FashionStoryboardSheetWorkspace
                   sheet={project.sheet}
@@ -2441,6 +2643,7 @@ export function StoryboardContentPanel({
                   onOpenSheetPreview={() => setSheetPreviewOpen(true)}
                   onPreviewImage={openPanelImagePreview}
                   onPreviewPanelPrompt={openPanelPromptPreview}
+                  sheetHeading={`${getProVerticalConfig(getProjectVertical(project) ?? "fashion_apparel")?.label ?? "专业版"}分镜故事版`}
                 />
               ) : (
                 fashionProduceWorkspaceFallback
@@ -2448,7 +2651,7 @@ export function StoryboardContentPanel({
             }
             imagesSlot={
               project.sheet &&
-              resolveFashionDeliverable(project)?.outputMode === "script_compose"
+              resolveProVerticalDeliverable(project)?.outputMode === "script_compose"
                 ? panelMediaStrip
                 : undefined
             }
@@ -2586,10 +2789,11 @@ export function StoryboardContentPanel({
         }}
         confirming={
           pickerMode === "image"
-            ? imgBusy ||
+            ? fashionCharGenBusy ||
+              imgBusy ||
               (pendingPanelIndex != null && activeImageGenPanels.has(pendingPanelIndex))
             : pendingVideoTarget === "fullSheet"
-              ? vidBusy
+              ? inlineFullVideoBusy
               : pendingPanelIndex != null && panelVidBusyPanels.includes(pendingPanelIndex)
         }
         onConfirm={(modelKey) => {
@@ -2608,8 +2812,8 @@ export function StoryboardContentPanel({
           void (async () => {
             if (
               mode === "image" &&
-              isFashionProject(project) &&
-              resolveFashionDeliverable(project)?.outputMode === "direct_video"
+              isProVerticalProject(project) &&
+              resolveProVerticalDeliverable(project)?.outputMode === "direct_video"
             ) {
               await persistFashionProduceWorkflow({
                 fashionImageModelKey: modelKey,
@@ -2676,13 +2880,15 @@ export function StoryboardContentPanel({
               : undefined)
           }
           projectKeywords={
-            isFashionProject(project) &&
-            resolveFashionDeliverable(project)?.outputMode === "direct_video"
-              ? buildFashionProjectKeywords(resolveFashionDeliverable(project))
+            isProVerticalProject(project) &&
+            resolveProVerticalDeliverable(project)?.outputMode === "direct_video"
+              ? buildFashionProjectKeywords(resolveProVerticalDeliverable(project))
               : pickProjectKeywords()
           }
           sheetHeading={
-            isFashionProject(project) ? "服装专业版分镜故事版" : undefined
+            isProVerticalProject(project)
+              ? `${getProVerticalConfig(getProjectVertical(project) ?? "fashion_apparel")?.label ?? "专业版"}分镜故事版`
+              : undefined
           }
         />
       ) : null}

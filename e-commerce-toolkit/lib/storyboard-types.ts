@@ -159,7 +159,16 @@ export type StoryboardProject = {
     selectedSchemeIndex?: number;
     workflow?: {
       vertical?: "fashion_apparel" | "bags";
+      /** 电商专业版统一入口（品类在会话区选择） */
+      proMode?: boolean;
       fashionPhase?: FashionPhase;
+      proPhase?: FashionPhase;
+      /** 包包等 pro-v1 vertical 的卖点编辑标记 */
+      proSellpointsEdited?: boolean;
+      proStoryboardPanelsEdited?: boolean;
+      proProduceSetupPending?: boolean;
+      proImageModelKey?: string;
+      proCharacterMode?: "ai" | "upload";
       /** 路径 B 进入 produce 后，须先选生图模型与角色参考方式 */
       fashionProduceSetupPending?: boolean;
       /** 服装路径 B 成片阶段选定的生图模型 */

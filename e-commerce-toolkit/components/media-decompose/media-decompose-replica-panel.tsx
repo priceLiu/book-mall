@@ -90,7 +90,7 @@ export function MediaDecomposeReplicaPanel({
   onPreviewVideo,
   onAlert,
 }: Props) {
-  const { doubleConfirm } = useDialogs();
+  const { doubleConfirm, toast } = useDialogs();
   const shots = seedVideo.plan?.shots ?? [];
   const [localShots, setLocalShots] = useState<SeedVideoShot[]>(shots);
   const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
@@ -592,7 +592,11 @@ export function MediaDecomposeReplicaPanel({
         status: "done",
       });
       await onSeedVideoChange();
-      await onAlert({ title: "合成完成", message: "成片已就绪，可在下方预览。" });
+      toast({
+        title: "合成完成",
+        message: "成片已就绪，可在下方预览。",
+        variant: "success",
+      });
     } catch (e) {
       setRenderProgress((prev) =>
         prev ? { ...prev, phase: "failed", progressLabel: e instanceof Error ? e.message : "合成失败" } : prev,

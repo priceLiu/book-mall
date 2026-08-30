@@ -31,7 +31,7 @@ import {
 import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
 
 export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
-  const { confirm, doubleConfirm, alert } = useDialogs();
+  const { confirm, doubleConfirm, alert, toast } = useDialogs();
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,9 +128,10 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
     try {
       await pinAssetToAiSpace(asset.id);
       setPinnedAssetIds((prev) => new Set(prev).add(asset.id));
-      await alert({
+      toast({
         title: "已展示到 AI 空间",
         message: "可在「个人中心 → 我的 AI 空间」查看与布置。空间只保存指向，不复制文件。",
+        variant: "success",
       });
     } catch (e) {
       await alert({

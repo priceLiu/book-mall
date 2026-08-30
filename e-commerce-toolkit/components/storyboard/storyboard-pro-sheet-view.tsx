@@ -299,7 +299,7 @@ export function StoryboardProSheetView({
               style={{
                 height: panelImgHeight,
                 borderBottom: "1px solid #1d1d1f",
-                background: "#e8e8ed",
+                background: generating ? "#000" : "#e8e8ed",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -359,7 +359,10 @@ export function StoryboardProSheetView({
                 <span style={{ fontSize: 11, color: "#86868b" }}>待生成</span>
               ) : null}
               {generating ? (
-                <EcomMediaGeneratingBusy className="z-[1] rounded-none" />
+                <EcomMediaGeneratingBusy
+                  className="z-[1] rounded-none"
+                  background="black"
+                />
               ) : null}
             </div>
             <table

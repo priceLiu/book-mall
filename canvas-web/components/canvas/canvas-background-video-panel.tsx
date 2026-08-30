@@ -43,6 +43,7 @@ function syncTaskCount(count: number) {
   );
 }
 
+/** 画布 · 后台视频列表（dark 变体，规范见 docs/generation-background-dock.md） */
 export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
   const [mounted, setMounted] = useState(false);

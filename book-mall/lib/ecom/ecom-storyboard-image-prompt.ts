@@ -107,6 +107,12 @@ const CATEGORY_VISUAL: Record<string, CategoryVisual> = {
     sceneRefHint: "场景光线、环境与道具风格须与参考一致",
     characterHint: "friendly Chinese UGC creator, natural expression",
   },
+  bags: {
+    style: "Chinese e-commerce handbag and bag UGC micro-drama",
+    lighting: "urban lifestyle or boutique display lighting matching carry scene",
+    sceneRefHint: "场景光线、背携/展示环境与道具风格须与参考一致",
+    characterHint: "stylish commuter or lifestyle creator showcasing bag",
+  },
 };
 
 function normalizeCategory(key?: string): string {
@@ -117,6 +123,10 @@ function normalizeCategory(key?: string): string {
 
 function isFashionApparelContext(ctx?: StoryboardImagePromptContext): boolean {
   return normalizeCategory(ctx?.productCategory) === "fashion";
+}
+
+function isBagsContext(ctx?: StoryboardImagePromptContext): boolean {
+  return normalizeCategory(ctx?.productCategory) === "bags";
 }
 
 function categoryVisual(ctx?: StoryboardImagePromptContext): CategoryVisual {
@@ -234,11 +244,14 @@ export function buildStoryboardImagePromptContext(project: {
   const fashionVertical =
     wf?.vertical === "fashion_apparel" ||
     deliverable?.vertical === "fashion_apparel";
+  const bagsVertical = wf?.vertical === "bags" || deliverable?.vertical === "bags";
 
   return {
     productCategory: fashionVertical
       ? "fashion"
-      : (wf?.productCategory ?? params?.品类),
+      : bagsVertical
+        ? "bags"
+        : (wf?.productCategory ?? params?.品类),
     productName,
     productHighlight: productHighlight ?? productName,
     videoStyle: params?.视频风格?.trim(),
@@ -359,13 +372,17 @@ export function buildStoryboardPanelRefGuideForUrls(
       parts.push(
         isFashionApparelContext(ctx)
           ? `图${n}为服装产品参考，模特须穿着与该参考图完全一致的款式、颜色、面料与细节，禁止擅自改色或换款`
-          : `图${n}为产品包装参考，画面中须自然露出该产品，包装形态、Logo、配色与材质须与参考图一致`,
+          : isBagsContext(ctx)
+            ? `图${n}为包包产品参考，包型、颜色、五金与材质须与参考图完全一致，禁止擅自改色或换款`
+            : `图${n}为产品包装参考，画面中须自然露出该产品，包装形态、Logo、配色与材质须与参考图一致`,
       );
     } else if (role === "character") {
       parts.push(
         isFashionApparelContext(ctx)
           ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；服装款式与颜色以图1产品参考为准，勿照搬本图服装`
-          : `图${n}为角色参考，人物面部、发型、体型与服装须与参考图完全一致`,
+          : isBagsContext(ctx)
+            ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；背携包包须与图1产品参考一致，勿换款改色`
+            : `图${n}为角色参考，人物面部、发型、体型与服装须与参考图完全一致`,
       );
     } else {
       parts.push(`图${n}为场景参考，${visual.sceneRefHint}`);
@@ -400,6 +417,7 @@ export function appendStoryboardImagePromptSuffix(opts: {
 }): string {
   const aspectZh = opts.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
   const fashion = isFashionApparelContext({ productCategory: opts.productCategory });
+  const bags = isBagsContext({ productCategory: opts.productCategory });
   const parts: string[] = [opts.basePrompt.trim()];
   if (
     opts.sendsProductRef &&
@@ -409,16 +427,20 @@ export function appendStoryboardImagePromptSuffix(opts: {
     parts.unshift(
       fashion
         ? "根据参考图进行图像编辑：模特穿着须与产品参考图一致，按以下描述生成画面。"
-        : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下描述生成画面。",
+        : bags
+          ? "根据参考图进行图像编辑：背携/展示包包须与产品参考图一致，按以下描述生成画面。"
+          : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下描述生成画面。",
     );
   }
   if (
-    fashion &&
+    (fashion || bags) &&
     opts.sendsProductRef &&
     !opts.basePrompt.includes("改色")
   ) {
     parts.push(
-      "若文字描述中的服装颜色/款式与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。",
+      fashion
+        ? "若文字描述中的服装颜色/款式与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。"
+        : "若文字描述中的包型/颜色与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。",
     );
   }
   if (!opts.basePrompt.includes(aspectZh) && !opts.basePrompt.includes("画幅")) {

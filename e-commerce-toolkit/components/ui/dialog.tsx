@@ -26,6 +26,16 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/** 全站 Dialog 右上角关闭钮（与图片预览 lightbox 一致） */
+export const ECOM_DIALOG_CLOSE_BUTTON_CLASS = cn(
+  "absolute right-4 top-4 z-20",
+  "flex h-8 w-8 items-center justify-center",
+  "rounded-full border-0 bg-black/75 text-white opacity-100 backdrop-blur-sm",
+  "shadow-md transition-colors",
+  "hover:bg-black hover:opacity-100",
+  "focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-0",
+);
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -43,10 +53,10 @@ const DialogContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close
         type="button"
-        className="absolute right-4 top-4 rounded-sm text-[var(--ecom-ink)] opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--ecom-primary)] focus:ring-offset-2"
+        className={ECOM_DIALOG_CLOSE_BUTTON_CLASS}
         aria-label="关闭"
       >
-        <X className="h-4 w-4" />
+        <X className="h-4 w-4 stroke-[2.5]" />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>

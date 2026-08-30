@@ -220,7 +220,7 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 |---------|-------------|
 | 主操作 | `EcomButtonPrimary` · `BUTTON.md` |
 | 次操作 | `EcomButtonSecondary` · `BUTTON.md` |
-| 确认/提示 | `useDialogs()` · `DIALOG.md` |
+| 确认/提示 | `useDialogs()` · `DIALOG.md`（成功/完成 → **toast**；错误 → alert） |
 | 助手聊天 | `StoryboardAssistantPanel` 模式 · `CHAT.md` |
 | 助手快捷 | `StoryboardAssistantChoices` / `STORYBOARD_ASSISTANT_CHOICE_CLASS` |
 | 工作台布局 | `EcomWorkspaceLayout` · `LAYOUT.md` |
@@ -232,6 +232,7 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 | 参考上传 | `EcomRefUploadCard` → 模块薄封装 · `MEDIA.md` |
 | 从资产库选取 | `EcomAssetPickerDialog` · `MEDIA.md` |
 | 任务状态 | `StoryboardTaskStatus` |
+| 后台长任务 Dock | `BackgroundGenerationProvider` + `BackgroundGenerationDock` · [全站规范](../../docs/generation-background-dock.md) |
 | 导出分镜版式 | `StoryboardProSheetView`（印刷风格，内联样式例外） |
 
 ---
@@ -249,6 +250,7 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 | [TABLE.md](./TABLE.md) | 表格与字段行 |
 | [MEDIA.md](./MEDIA.md) | 图片展示、上传、预览、资产选取 |
 | [VIDEO.md](./VIDEO.md) | 视频展示与预览 |
+| [../../docs/generation-background-dock.md](../../docs/generation-background-dock.md) | 后台生成 Dock（全站） |
 
 ---
 

@@ -56,7 +56,7 @@ export function StoryboardResultCard({
         )}
       >
         {busy ? (
-          <EcomMediaGeneratingBusy label="成片生成中…" />
+          <EcomMediaGeneratingBusy background="black" label="成片生成中…" />
         ) : hasVideo ? (
           <>
             <video

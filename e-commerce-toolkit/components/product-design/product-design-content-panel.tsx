@@ -245,7 +245,7 @@ export function ProductDesignContentPanel({
   onRefreshModels,
 }: Props) {
   const router = useRouter();
-  const { alert, confirm } = useDialogs();
+  const { alert, confirm, toast } = useDialogs();
   const design = project.design;
   const scrollRootRef = useRef<HTMLDivElement>(null);
   const activeTrack = resolveActiveTrack(project);
@@ -737,9 +737,10 @@ export function ProductDesignContentPanel({
       } else if (target === "main") {
         const mains = afterItems;
         if (mains.length > 0 && mains.every((m) => m.imageUrl)) {
-          await alert({
+          toast({
             title: "主图生成完成",
             message: "全部主图已生成。请在中间工作区选择详情页制作方式，继续详情页流程。",
+            variant: "success",
           });
         }
       }
@@ -1329,9 +1330,10 @@ export function ProductDesignContentPanel({
     try {
       const snapshot = await saveProductDesignWorkflow(project.id, productName);
       setSaveDialogOpen(false);
-      await alert({
+      toast({
         title: "已保存到资产库",
         message: `「${snapshot.title}」已保存。可在「我的资产」对应类目下一键复用。`,
+        variant: "success",
       });
     } catch (e) {
       await alert({

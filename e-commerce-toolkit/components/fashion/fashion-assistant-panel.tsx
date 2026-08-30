@@ -24,13 +24,31 @@ import { FashionAssistantDeliverableView } from "@/components/fashion/fashion-as
 import { FashionStoryboardResultBlock } from "@/components/fashion/fashion-deliverable-tables";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import {
-  FASHION_DIMENSION_STEPS,
   buildFashionDimensionMessageLabels,
   buildFashionDimensionsFromChat,
   fashionDimensionPrompt,
   fashionDimensionStepProgress,
   mergeFashionDimensionSources,
 } from "@/lib/fashion-dimensions";
+import {
+  buildProDimensionMessageLabels,
+  getDimensionSteps,
+  proDimensionPrompt,
+  proDimensionStepProgress,
+} from "@/lib/pro-vertical/dimensions";
+import {
+  parseProCategoryPick,
+  PRO_GENERIC_WELCOME,
+} from "@/lib/pro-vertical/categories";
+import {
+  extractProDeliverableFromText,
+  isProInternalLlmTrigger,
+  stripProDeliverableFence,
+} from "@/lib/pro-vertical/deliverable-parse";
+import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
+import { getProjectVertical, isAwaitingProCategoryPick, isBagsProject } from "@/lib/pro-vertical/project-vertical";
+import type { ProDeliverable } from "@/lib/pro-vertical/types";
+import { isProDeliverable } from "@/lib/pro-vertical/types";
 import {
   extractFashionDeliverableFromText,
   isFashionInternalLlmTrigger,
@@ -79,7 +97,8 @@ import {
   isFashionStoryboardConfirmUserMessage,
   isLegacyStoryboardProject,
   parseFashionVersionKeyFromUserMessage,
-  resolveFashionDeliverable,
+  resolveProVerticalDeliverable,
+  isProVerticalProject,
   resolveFashionStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
 import {
@@ -131,11 +150,15 @@ export function FashionAssistantPanel({
   onComposerWideChange,
 }: Props) {
   const projectId = project.id;
+  const vertical = getProjectVertical(project);
+  const verticalConfig = vertical ? getProVerticalConfig(vertical) : null;
+  const dimensionSteps = vertical ? getDimensionSteps(vertical) : [];
+  const welcomeText = verticalConfig?.welcomeMessage ?? PRO_GENERIC_WELCOME;
   const legacyReadonly = isLegacyStoryboardProject(project);
   const [messages, setMessages] = useState<StoryboardChatMessage[]>(
     project.chatHistory.length
       ? project.chatHistory
-      : [{ id: "welcome", role: "assistant", content: FASHION_WELCOME, createdAt: new Date().toISOString() }],
+      : [{ id: "welcome", role: "assistant", content: welcomeText, createdAt: new Date().toISOString() }],
   );
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -144,7 +167,9 @@ export function FashionAssistantPanel({
   const [, setStreamTick] = useState(0);
   const [activeLlmTrigger, setActiveLlmTrigger] = useState<string | null>(null);
   const [workflowOverride, setWorkflowOverride] = useState<Record<string, unknown>>({});
-  const [deliverableOverride, setDeliverableOverride] = useState<FashionDeliverable | null>(null);
+  const [deliverableOverride, setDeliverableOverride] = useState<
+    FashionDeliverable | ProDeliverable | null
+  >(null);
   const [pendingChoice, setPendingChoice] = useState<string | null>(null);
   const [busyStatus, setBusyStatus] = useState<{ title: string; detail: string } | null>(null);
   const [refAutoAdvancing, setRefAutoAdvancing] = useState(false);
@@ -175,7 +200,7 @@ export function FashionAssistantPanel({
 
   useEffect(() => {
     if (streaming || pendingChoice) return;
-    if (deliverableOverride && isFashionDeliverable(project.meta?.deliverable)) {
+    if (deliverableOverride && (isFashionDeliverable(project.meta?.deliverable) || isProDeliverable(project.meta?.deliverable))) {
       setDeliverableOverride(null);
     }
   }, [project.meta?.deliverable, streaming, pendingChoice, deliverableOverride]);
@@ -197,7 +222,7 @@ export function FashionAssistantPanel({
 
     const advance = buildFashionProductRefAutoAdvance(project);
     setRefAutoAdvancing(true);
-    setBusyStatus({ title: "检测产品图", detail: "已识别产品图，正在进入七维参数采集…" });
+    setBusyStatus({ title: "检测产品图", detail: "已识别产品图，请在下方选择大类品类…" });
     void (async () => {
       try {
         const updated = await updateStoryboardProject(projectId, {
@@ -241,13 +266,18 @@ export function FashionAssistantPanel({
     const history = messages.filter(
       (m) => m.id !== "welcome" && m.id !== "streaming" && !m.id.startsWith("err-"),
     );
-    const hasMetaDeliverable = isFashionDeliverable(project.meta?.deliverable);
+    const hasMetaDeliverable =
+      isFashionDeliverable(project.meta?.deliverable) ||
+      isProDeliverable(project.meta?.deliverable);
     const hasChatDeliverable = history.some(
-      (m) => m.role === "assistant" && extractFashionDeliverableFromText(m.content),
+      (m) =>
+        m.role === "assistant" &&
+        (extractFashionDeliverableFromText(m.content) ||
+          extractProDeliverableFromText(m.content)),
     );
     if (!hasMetaDeliverable && !hasChatDeliverable) return;
 
-    const resolved = resolveFashionDeliverable({ ...project, chatHistory: history });
+    const resolved = resolveProVerticalDeliverable({ ...project, chatHistory: history });
     if (!resolved) return;
     const metaOk = hasMetaDeliverable;
     const inferredPhase = inferFashionPhaseFromState({
@@ -255,8 +285,9 @@ export function FashionAssistantPanel({
       chatHistory: history,
       meta: { ...project.meta, deliverable: resolved },
     });
-    const wfPhase = (project.meta?.workflow as { fashionPhase?: string } | undefined)
-      ?.fashionPhase;
+    const wfPhase = (
+      project.meta?.workflow as { fashionPhase?: string; proPhase?: string } | undefined
+    )?.[isBagsProject(project) ? "proPhase" : "fashionPhase"];
     const phaseRank: Record<string, number> = {
       product_ref: 0,
       dimensions: 1,
@@ -336,7 +367,7 @@ export function FashionAssistantPanel({
   const effectiveProject = useMemo<StoryboardProject>(() => {
     const resolvedDeliverable =
       deliverableOverride ??
-      resolveFashionDeliverable({
+      resolveProVerticalDeliverable({
         ...project,
         chatHistory: messages.filter(
           (m) => m.id !== "welcome" && m.id !== "streaming" && !m.id.startsWith("err-"),
@@ -353,7 +384,7 @@ export function FashionAssistantPanel({
         deliverable: resolvedDeliverable,
         workflow: {
           ...(project.meta?.workflow ?? {}),
-          vertical: "fashion_apparel",
+          ...(vertical ? { vertical } : {}),
           ...workflowOverride,
         },
       },
@@ -370,6 +401,9 @@ export function FashionAssistantPanel({
     return [];
   }, [effectiveProject, legacyReadonly]);
 
+  const awaitingCategoryPick =
+    isAwaitingProCategoryPick(effectiveProject) ||
+    getFashionPhase(effectiveProject) === "category_pick";
   const awaitingStoryboardPick = isAwaitingFashionStoryboardPick(effectiveProject);
   const awaitingStoryboardConfirm = isAwaitingFashionStoryboardConfirm(effectiveProject);
   const canReviseDimensions = isFashionDimensionRevisionAllowed(effectiveProject);
@@ -378,7 +412,7 @@ export function FashionAssistantPanel({
     () =>
       messages.filter(
         (m) =>
-          !(m.role === "user" && isFashionInternalLlmTrigger(m.content)) &&
+          !(m.role === "user" && (isFashionInternalLlmTrigger(m.content) || isProInternalLlmTrigger(m.content))) &&
           !(
             m.role === "user" &&
             m.content.trim().startsWith(FASHION_REVISE_DIMENSION_PREFIX)
@@ -388,8 +422,11 @@ export function FashionAssistantPanel({
   );
 
   const dimensionMessageLabels = useMemo(
-    () => buildFashionDimensionMessageLabels(displayMessages),
-    [displayMessages],
+    () =>
+      vertical && isBagsProject(project)
+        ? buildProDimensionMessageLabels(vertical, displayMessages)
+        : buildFashionDimensionMessageLabels(displayMessages),
+    [displayMessages, project, vertical],
   );
 
   const workflowChoiceLabels = useMemo(
@@ -420,7 +457,10 @@ export function FashionAssistantPanel({
       skipStreamingToggle = false,
       suppressErrorAlert = false,
     ) => {
-      const llmTrigger = isFashionInternalLlmTrigger(userContent) ? userContent : null;
+      const llmTrigger =
+        isFashionInternalLlmTrigger(userContent) || isProInternalLlmTrigger(userContent)
+          ? userContent
+          : null;
       const userMsg: StoryboardChatMessage = {
         id: `user-${Date.now()}${hideUserBubble ? "-internal" : ""}`,
         role: "user",
@@ -495,6 +535,15 @@ export function FashionAssistantPanel({
     async (message: string) => {
       if (legacyReadonly || isBusy) return;
 
+      const category = parseProCategoryPick(message);
+      if (category && !category.available) {
+        await onAlert({
+          title: "品类即将上线",
+          message: `「${category.label}」专业流程正在接入中，请先选择服装或包包继续。`,
+        });
+        return;
+      }
+
       if (isGenerateAllImagesChoice(message)) {
         onRequestGenerateAllImages?.();
         return;
@@ -505,7 +554,7 @@ export function FashionAssistantPanel({
       }
 
       const phaseNow = getFashionPhase(effectiveProject);
-      const dNow = resolveFashionDeliverable(effectiveProject);
+      const dNow = resolveProVerticalDeliverable(effectiveProject);
       if (
         phaseNow === "produce" &&
         dNow?.outputMode &&
@@ -534,7 +583,32 @@ export function FashionAssistantPanel({
         };
         const patchResult = fashionWorkflowPatchForChoice(effectiveProject, message);
         if (patchResult) {
-          const { llmTrigger, syncSheet, ...metaPatch } = patchResult;
+          const {
+            llmTrigger,
+            syncSheet,
+            assistantReply,
+            projectTitle,
+            ...metaPatch
+          } = patchResult as Record<string, unknown> & {
+            llmTrigger?: string;
+            syncSheet?: boolean;
+            assistantReply?: string;
+            projectTitle?: string;
+          };
+
+          let nextHistory = next;
+          if (typeof assistantReply === "string" && assistantReply.trim()) {
+            nextHistory = [
+              ...next,
+              {
+                id: `assistant-${Date.now()}`,
+                role: "assistant" as const,
+                content: assistantReply.trim(),
+                createdAt: new Date().toISOString(),
+              },
+            ];
+            setMessages(nextHistory);
+          }
 
           if (metaPatch.workflow) {
             setWorkflowOverride((prev) => ({
@@ -558,13 +632,16 @@ export function FashionAssistantPanel({
 
           if (metaPatch.deliverable || metaPatch.workflow) {
             const baseMeta = effectiveProject.meta ?? project.meta;
+            const patchWorkflow = metaPatch.workflow as Record<string, unknown> | undefined;
             const nextWorkflow = {
               ...(baseMeta?.workflow ?? {}),
-              vertical: "fashion_apparel" as const,
-              ...(metaPatch.workflow as Record<string, unknown>),
+              ...patchWorkflow,
             };
             patchedProject = await updateStoryboardProject(projectId, {
-              chatHistory: next,
+              chatHistory: nextHistory,
+              ...(typeof projectTitle === "string" && projectTitle.trim()
+                ? { title: projectTitle.trim() }
+                : {}),
               meta: {
                 ...baseMeta,
                 ...(metaPatch.deliverable
@@ -578,7 +655,16 @@ export function FashionAssistantPanel({
             }
             if (metaPatch.deliverable && isFashionDeliverable(patchedProject.meta?.deliverable)) {
               setDeliverableOverride(patchedProject.meta!.deliverable as FashionDeliverable);
+            } else if (metaPatch.deliverable && isProDeliverable(patchedProject.meta?.deliverable)) {
+              setDeliverableOverride(patchedProject.meta!.deliverable as ProDeliverable);
             }
+          } else if (nextHistory !== next) {
+            patchedProject = await updateStoryboardProject(projectId, {
+              chatHistory: nextHistory,
+              ...(typeof projectTitle === "string" && projectTitle.trim()
+                ? { title: projectTitle.trim() }
+                : {}),
+            });
           } else {
             await persistMessages(next);
           }
@@ -724,18 +810,21 @@ export function FashionAssistantPanel({
     await handleChoice(trimmed);
   }, [input, isBusy, legacyReadonly, handleChoice]);
 
-  const deliverable = resolveFashionDeliverable(effectiveProject);
+  const deliverable = resolveProVerticalDeliverable(effectiveProject);
   const inProduce = isFashionInProduce(effectiveProject);
   const awaitingCustomDimension = isAwaitingFashionCustomDimensionInput(effectiveProject);
   const isDimensionCollecting = isFashionDimensionCollecting(effectiveProject);
   const currentDimStep = currentFashionDimensionStep(effectiveProject);
-  const currentDimStepDef = FASHION_DIMENSION_STEPS[currentDimStep];
-  const dimStepProgress = fashionDimensionStepProgress(currentDimStep);
+  const currentDimStepDef = dimensionSteps[currentDimStep];
+  const dimStepProgress =
+    vertical && isBagsProject(project)
+      ? proDimensionStepProgress(vertical, currentDimStep)
+      : fashionDimensionStepProgress(currentDimStep);
   const showDimensionStepPrompt =
     !legacyReadonly && isDimensionCollecting && !isBusy && Boolean(currentDimStepDef);
   const customDimensionHint = useMemo(() => {
     if (!awaitingCustomDimension) return "";
-    const step = FASHION_DIMENSION_STEPS[currentDimStep];
+    const step = dimensionSteps[currentDimStep];
     return step ? `请在下方输入${step.label}（2 字以上）` : "请在下方输入自定义内容";
   }, [awaitingCustomDimension, currentDimStep]);
   const showSellpointGeneratePrompt =
@@ -776,7 +865,7 @@ export function FashionAssistantPanel({
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#fbfbfd]">
       <EcomAssistantPanelHeader
-        title="服装专业版助手"
+        title={`${verticalConfig?.label ?? "专业版"}助手`}
         subtitle="V4.4 · 七维 → 卖点 → 口播 → 分镜"
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
@@ -792,7 +881,7 @@ export function FashionAssistantPanel({
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {legacyReadonly ? (
           <div className={cn(ECOM_ASSISTANT_BUBBLE_CLASS, "mb-3")}>
-            此为旧版微剧故事版项目，仅支持只读浏览。请新建「服装专业版」项目继续创作。
+            此为旧版微剧故事版项目，仅支持只读浏览。请新建「{verticalConfig?.label ?? "专业版"}」项目继续创作。
           </div>
         ) : null}
 
@@ -1010,7 +1099,9 @@ export function FashionAssistantPanel({
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <SeedVideoAssistantChoiceCards
               title={
-                awaitingStoryboardPick
+                awaitingCategoryPick
+                  ? "选择大类品类"
+                  : awaitingStoryboardPick
                   ? "选择分镜方案"
                   : pendingOpsGen
                     ? "生成运营包"
@@ -1028,7 +1119,11 @@ export function FashionAssistantPanel({
                         : `请选择${currentDimStepDef.label}`
                       : "请选择"
               }
-              subtitle={sellpointChoiceSubtitle}
+              subtitle={
+                awaitingCategoryPick
+                  ? "选定后系统将自动切换专业流程，并引导七维参数采集"
+                  : sellpointChoiceSubtitle
+              }
               choices={choices.map((c) => ({
                 id: c.id,
                 label: c.title,

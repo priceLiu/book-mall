@@ -5,6 +5,8 @@ import { useEffect } from "react";
 
 import { ModalPortal } from "@/components/common/modal-portal";
 import { EcomVideoPlayer } from "@/components/media/ecom-video-player";
+import { ECOM_DIALOG_CLOSE_BUTTON_CLASS } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 /** 对齐 canvas `StoryMediaPreviewModal`：全屏黑底 lightbox + 自适应视频框 */
 export function EcomVideoPreviewDialog({
@@ -61,10 +63,11 @@ export function EcomVideoPreviewDialog({
             </a>
             <button
               type="button"
-              className="rounded p-1 text-white/70 hover:bg-white/10"
+              className={cn(ECOM_DIALOG_CLOSE_BUTTON_CLASS, "static shrink-0")}
               onClick={() => onOpenChange(false)}
+              aria-label="关闭"
             >
-              <X className="size-5" />
+              <X className="h-4 w-4 stroke-[2.5]" />
             </button>
           </div>
         </div>

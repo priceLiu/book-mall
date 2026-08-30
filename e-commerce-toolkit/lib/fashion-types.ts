@@ -25,7 +25,9 @@ export type FashionPanelRow = {
   /** 生图/生视频共用的场景描述 prompt */
   scenePrompt: string;
   modelAction: string;
+  /** @deprecated 读入兼容；新 vertical 用 productFocus */
   garmentFocus: string;
+  productFocus?: string;
   dialogue?: string;
   toneTexture?: string;
   sellpointIds: string[];
@@ -78,6 +80,7 @@ export type FashionDeliverable = {
 
 export type FashionPhase =
   | "product_ref"
+  | "category_pick"
   | "dimensions"
   | "sellpoints"
   | "voiceover_pick"

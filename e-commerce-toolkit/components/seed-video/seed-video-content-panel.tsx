@@ -16,6 +16,7 @@ import { SeedVideoRefUploader } from "@/components/seed-video/seed-video-ref-upl
 import { SeedVideoShotTable } from "@/components/seed-video/seed-video-shot-table";
 import { SeedVideoStoryboardDraftEditor } from "@/components/seed-video/seed-video-storyboard-draft-editor";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   generateSeedVideoDirect,
   generateSeedVideoShot,
@@ -153,6 +154,7 @@ export function SeedVideoContentPanel({
   openProductionAfterSyncToken = 0,
 }: Props) {
   const router = useRouter();
+  const { toast } = useDialogs();
   const workspace = useMemo(
     () => resolveSeedVideoMiddleWorkspaceContent(project),
     [project],
@@ -1040,9 +1042,10 @@ export function SeedVideoContentPanel({
       const videoUrl = await waitForRenderJob(jobId, startedAt);
       await persistRenderFinalVideo(jobId, videoUrl);
       await onProjectChange();
-      await onAlert({
+      toast({
         title: "合成完成",
         message: "最终成片已就绪，可在下方「成片视频」区域预览。",
+        variant: "success",
       });
     } catch (e) {
       await onAlert({
@@ -1163,9 +1166,10 @@ export function SeedVideoContentPanel({
       await saveSeedVideoDeliverableSnapshot(project.id, workName);
       setSaveDialogOpen(false);
       await onProjectChange();
-      await onAlert({
+      toast({
         title: "已保存到资产库",
         message: "可在「我的资产 → 种草视频」一键复用：换参考图后直接生成。",
+        variant: "success",
       });
     } catch (e) {
       await onAlert({

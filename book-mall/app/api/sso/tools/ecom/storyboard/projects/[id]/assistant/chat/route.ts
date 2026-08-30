@@ -2,6 +2,21 @@ import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  buildProAssistantSystemPrompt,
+  buildProDeliverableContextBlock,
+  resolveProPromptPhase,
+} from "@/lib/ecom/ecom-pro-assistant-prompts";
+import {
+  extractProDeliverable,
+  inferProPhaseFromDeliverable,
+  isProDeliverable,
+  mergeProDeliverablePatch,
+  pickProOpsMergePatch,
+  stripProDeliverableFence,
+} from "@/lib/ecom/ecom-pro-deliverable";
+import { renderProDeliverableMarkdown } from "@/lib/ecom/ecom-pro-deliverable-render";
+import { resolveWorkflowVertical } from "@/lib/ecom/pro-vertical/registry";
+import {
   buildFashionAssistantSystemPrompt,
   buildFashionDeliverableContextBlock,
   resolveFashionPromptPhase,
@@ -81,20 +96,38 @@ export async function POST(req: Request, ctx: Ctx) {
       : ECOM_STORYBOARD_DEFAULT_CHAT_MODEL;
   const existingMeta =
     (project.meta as Record<string, unknown> | null) ?? {};
+  const workflowVertical = resolveWorkflowVertical(
+    existingMeta.workflow as Record<string, unknown> | undefined,
+  );
   const isFashion = isFashionWorkflow(existingMeta);
+  const isBags = workflowVertical === "bags";
+  const isProBags = isBags;
   const lastUserTurn = turns[turns.length - 1]!.content.trim();
   const fashionPromptPhase = isFashion ? resolveFashionPromptPhase(lastUserTurn) : "general";
+  const proPromptPhase = isProBags ? resolveProPromptPhase(lastUserTurn) : "general";
   const prevFashionDeliverable =
     isFashion && isFashionDeliverable(existingMeta.deliverable)
       ? existingMeta.deliverable
       : null;
+  const prevProDeliverable =
+    isProBags && isProDeliverable(existingMeta.deliverable)
+      ? existingMeta.deliverable
+      : null;
   let systemPrompt = isFashion
     ? buildFashionAssistantSystemPrompt(fashionPromptPhase)
-    : buildStoryboardAssistantSystemPrompt();
+    : isProBags
+      ? buildProAssistantSystemPrompt("bags", proPromptPhase)
+      : buildStoryboardAssistantSystemPrompt();
   if (prevFashionDeliverable && fashionPromptPhase !== "sellpoints" && fashionPromptPhase !== "general") {
     systemPrompt += buildFashionDeliverableContextBlock(
       prevFashionDeliverable,
       fashionPromptPhase,
+    );
+  }
+  if (prevProDeliverable && proPromptPhase !== "sellpoints" && proPromptPhase !== "general") {
+    systemPrompt += buildProDeliverableContextBlock(
+      prevProDeliverable as Record<string, unknown>,
+      proPromptPhase,
     );
   }
 
@@ -181,9 +214,12 @@ export async function POST(req: Request, ctx: Ctx) {
           const fashionDeliverable = isFashion
             ? extractFashionDeliverable(fullText)
             : null;
+          const proDeliverable = isProBags ? extractProDeliverable(fullText, "bags") : null;
           const briefText = isFashion
             ? stripFashionDeliverableFence(fullText)
-            : stripDeliverableFence(fullText);
+            : isProBags
+              ? stripProDeliverableFence(fullText)
+              : stripDeliverableFence(fullText);
           const existingWorkflow =
             (existingMeta.workflow as Record<string, unknown> | undefined) ?? {};
           const isSceneAdjust = lastUserTurn.startsWith("场景参考已确认 |");
@@ -304,6 +340,68 @@ export async function POST(req: Request, ctx: Ctx) {
                 ...(merged.sellpointsLocked ? { fashionSellpointsEdited: false } : {}),
                 ...(merged.storyboardLocked ? { fashionStoryboardPanelsEdited: false } : {}),
                 ...(merged.opsPack ? { fashionStoryboardPanelsEdited: false } : {}),
+              },
+            };
+            patch.status = "deliverable_ready";
+          } else if (isProBags && proDeliverable) {
+            const prevPro = existingMeta.deliverable as
+              | Parameters<typeof mergeProDeliverablePatch>[0]
+              | undefined;
+            let llmProPatch: Partial<typeof proDeliverable> =
+              proPromptPhase === "voiceovers" && !prevPro?.selectedVoiceoverId
+                ? { ...proDeliverable, selectedVoiceoverId: null }
+                : proDeliverable;
+            llmProPatch = pickProOpsMergePatch(llmProPatch, {
+              opsPhase: proPromptPhase === "ops",
+              storyboardLocked: Boolean(prevPro?.storyboardLocked),
+            });
+            const merged = mergeProDeliverablePatch(
+              prevPro,
+              llmProPatch,
+              "bags",
+              typeof existingMeta.productName === "string"
+                ? existingMeta.productName
+                : proDeliverable.productName,
+            );
+            if (
+              existingWorkflow.proSellpointsEdited === true &&
+              prevPro?.sellpoints?.length &&
+              !prevPro.sellpointsLocked
+            ) {
+              merged.sellpoints = prevPro.sellpoints;
+            }
+            if (prevPro?.storyboardLocked && prevPro.selectedVersion) {
+              const key = prevPro.selectedVersion;
+              const lockedVersion = prevPro.storyboardVersions?.[key];
+              if (lockedVersion?.panels?.length) {
+                merged.storyboardVersions = {
+                  ...(merged.storyboardVersions ?? {}),
+                  [key]: lockedVersion,
+                };
+                merged.selectedVersion = key;
+                merged.storyboardLocked = true;
+              }
+            }
+            if (prevPro?.sellpointsLocked && prevPro.sellpoints?.length) {
+              merged.sellpoints = prevPro.sellpoints;
+              merged.sellpointsLocked = true;
+            }
+            const versionKey = merged.selectedVersion ?? undefined;
+            const systemMarkdown = renderProDeliverableMarkdown(merged, {
+              versionKey,
+              includeAllVersions: !versionKey,
+            });
+            const proPhase = inferProPhaseFromDeliverable(merged);
+            patch.meta = {
+              ...existingMeta,
+              deliverable: merged,
+              deliverableMarkdown: systemMarkdown || briefText,
+              workflow: {
+                ...existingWorkflow,
+                vertical: "bags",
+                proPhase,
+                ...(merged.sellpointsLocked ? { proSellpointsEdited: false } : {}),
+                ...(merged.storyboardLocked ? { proStoryboardPanelsEdited: false } : {}),
               },
             };
             patch.status = "deliverable_ready";

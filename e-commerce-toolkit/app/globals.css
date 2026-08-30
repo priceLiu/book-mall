@@ -163,6 +163,19 @@ body {
   pointer-events: none;
 }
 
+/* 纯黑底故事版 / 成片预览：扫光略加强，避免被半透明遮罩盖住 */
+.ecom-media-generating-sweep-on-black::after {
+  z-index: 8;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(41, 151, 255, 0.32) 48%,
+    rgba(255, 255, 255, 0.14) 52%,
+    rgba(41, 151, 255, 0.32) 56%,
+    transparent 70%
+  );
+}
+
 .ecom-upload-progress {
   height: 4px;
   border-radius: 999px;

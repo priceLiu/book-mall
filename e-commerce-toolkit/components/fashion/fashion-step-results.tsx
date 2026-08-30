@@ -13,9 +13,11 @@ import {
   isAwaitingFashionStoryboardPick,
   isFashionStoryboardPanelsEditable,
   listFashionStoryboardVersionKeys,
-  resolveFashionDeliverable,
   resolveFashionStoryboardPanelsForVersion,
+  resolveProVerticalDeliverable,
+  getProjectVertical,
 } from "@/lib/fashion-workflow";
+import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import type { FashionPanelRow, FashionSellpoint } from "@/lib/fashion-types";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 
@@ -49,7 +51,8 @@ export function FashionStepResults({
   panelsSaving = false,
   onSavePanels,
 }: Props) {
-  const deliverable = resolveFashionDeliverable(project);
+  const deliverable = resolveProVerticalDeliverable(project);
+  const verticalConfig = getProVerticalConfig(getProjectVertical(project) ?? "fashion_apparel");
   if (!deliverable) {
     return (
       <div className="rounded-xl border border-dashed border-[#e8e8ed] bg-white p-8 text-center text-sm text-[#86868b]">
@@ -102,6 +105,7 @@ export function FashionStepResults({
         <FashionPanelsTable
           panels={panels}
           sellpoints={deliverable.sellpoints}
+          panelFocusLabel={verticalConfig?.panelFocusLabel ?? "展示重点"}
           editable={panelsEditable && Boolean(onSavePanels)}
           saving={panelsSaving}
           onSavePanels={onSavePanels}
@@ -112,7 +116,13 @@ export function FashionStepResults({
   const archiveSections = (
     <>
       <StepSection title="产品参数档案">
-        <FashionParamsTable dimensions={deliverable.dimensions} />
+        <FashionParamsTable
+          dimensions={deliverable.dimensions}
+          dimensionLabels={verticalConfig?.dimensionSteps.map((s) => ({
+            key: s.key,
+            label: s.label,
+          }))}
+        />
       </StepSection>
 
       {deliverable.sellpoints.length > 0 ? (

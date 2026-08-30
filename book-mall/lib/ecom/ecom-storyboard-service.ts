@@ -54,6 +54,13 @@ export type EcomStoryboardProjectDto = {
       scenePresetCustom?: string;
       vertical?: "fashion_apparel" | "bags";
       fashionPhase?: string;
+      proMode?: boolean;
+      proPhase?: string;
+      proSellpointsEdited?: boolean;
+      proStoryboardPanelsEdited?: boolean;
+      proProduceSetupPending?: boolean;
+      proImageModelKey?: string;
+      proCharacterMode?: "ai" | "upload";
       /** 角色参考：AI 生成 / 用户上传（服装电商路径 B） */
       fashionCharacterMode?: "ai" | "upload";
       fashionProduceSetupPending?: boolean;

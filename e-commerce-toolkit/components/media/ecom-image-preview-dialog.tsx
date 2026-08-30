@@ -17,18 +17,6 @@ import type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
 
 export type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
 
-/** 大图预览右上角关闭钮（覆写 DialogContent 自带的那颗） */
-const PREVIEW_CLOSE_BUTTON_CLASS = [
-  "[&>button]:absolute [&>button]:right-4 [&>button]:top-4 [&>button]:z-20",
-  "[&>button]:flex [&>button]:h-8 [&>button]:w-8 [&>button]:items-center [&>button]:justify-center",
-  "[&>button]:rounded-full [&>button]:border-0 [&>button]:bg-black/75",
-  "[&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-sm",
-  "[&>button]:shadow-md [&>button]:transition-colors",
-  "[&>button]:hover:bg-black [&>button]:hover:opacity-100",
-  "[&>button]:focus:outline-none [&>button]:focus:ring-2 [&>button]:focus:ring-white/40 [&>button]:focus:ring-offset-0",
-  "[&>button_svg]:h-4 [&>button_svg]:w-4 [&>button_svg]:stroke-[2.5]",
-].join(" ");
-
 /** 先缩略图占位，原图加载完成后 crossfade 换上 */
 function EcomPreviewImageStage({
   src,
@@ -284,7 +272,6 @@ export function EcomImagePreviewDialog({
           "flex h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-hidden border-0 bg-black/90 p-0 shadow-none sm:rounded-none",
           "translate-x-[-50%] translate-y-[-50%]",
           showStrip ? "flex-row items-stretch" : "items-center justify-center",
-          PREVIEW_CLOSE_BUTTON_CLASS,
         )}
         onClick={(e) => {
           if (e.target === e.currentTarget) onOpenChange(false);

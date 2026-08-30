@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { BackgroundGenerationProvider } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { FashionAssistantPanel } from "@/components/fashion/fashion-assistant-panel";
@@ -34,7 +35,7 @@ import {
   resolveSheetTotalDurationHintSec,
 } from "@/lib/storyboard-video-params";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
-import { isFashionProject, isLegacyStoryboardProject } from "@/lib/fashion-workflow";
+import { isLegacyStoryboardProject, isProVerticalProject } from "@/lib/fashion-workflow";
 import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import { inferCollectUploadRole, type StoryboardUploadRole } from "@/lib/storyboard-workflow";
 import type { StoryboardReference } from "@/lib/storyboard-types";
@@ -54,11 +55,11 @@ async function resolveFallbackStoryboardProject(): Promise<{
     return { id: summaries[0]!.id };
   }
   const created = await createStoryboardProject({
-    title: "服装专业版",
+    title: "电商专业版",
     meta: {
       workflow: {
-        vertical: "fashion_apparel",
-        fashionPhase: "product_ref",
+        proMode: true,
+        proPhase: "product_ref",
         dimensionStep: 0,
       },
     },
@@ -330,11 +331,11 @@ export function StoryboardStudio() {
     setLoading(true);
     try {
       const created = await createStoryboardProject({
-        title: "服装专业版",
+        title: "电商专业版",
         meta: {
           workflow: {
-            vertical: "fashion_apparel",
-            fashionPhase: "product_ref",
+            proMode: true,
+            proPhase: "product_ref",
             dimensionStep: 0,
           },
         },
@@ -467,6 +468,7 @@ export function StoryboardStudio() {
   }
 
   return (
+    <BackgroundGenerationProvider>
     <>
       <EcomWorkspaceLayout
         assistantWide={assistantWide}
@@ -474,7 +476,7 @@ export function StoryboardStudio() {
           <StoryboardProgressRail project={project} hasVideo={Boolean(videoAsset)} />
         }
         assistant={
-          isFashionProject(project) ? (
+          isProVerticalProject(project) ? (
             <FashionAssistantPanel
               project={project}
               chatModels={chatModels}
@@ -682,6 +684,7 @@ export function StoryboardStudio() {
         }}
       />
 
+
       {(exportSheet ?? project.sheet) ? (
         <div className="pointer-events-none fixed -left-[9999px] top-0 z-0" aria-hidden>
           <StoryboardProSheetView
@@ -705,5 +708,6 @@ export function StoryboardStudio() {
         </div>
       ) : null}
     </>
+    </BackgroundGenerationProvider>
   );
 }

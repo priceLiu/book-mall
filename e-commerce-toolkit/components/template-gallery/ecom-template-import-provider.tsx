@@ -158,7 +158,7 @@ export function useEcomTemplateImport() {
 }
 
 export function EcomTemplateImportProvider({ children }: { children: ReactNode }) {
-  const { alert } = useDialogs();
+  const { alert, toast } = useDialogs();
   const [jobs, setJobs] = useState<PersistedImportJob[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const onEntryRef = useRef<((entry: EcomTemplateGalleryEntry) => void) | undefined>();
@@ -577,10 +577,10 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
             s.cancelled > 0 ? `已停止 ${s.cancelled}` : null,
           ].filter(Boolean);
 
-          void alert({
+          toast({
             title: "模板导入完成",
             message: `共 ${s.total} 项：${parts.join("，")}`,
-            variant: s.failed > 0 ? "error" : "default",
+            variant: s.failed > 0 ? "error" : "success",
           });
         }
       } catch (e) {
@@ -593,7 +593,7 @@ export function EcomTemplateImportProvider({ children }: { children: ReactNode }
         runningRef.current.delete(jobId);
       }
     },
-    [alert, persist, registerAbortController, unregisterAbortController],
+    [alert, persist, registerAbortController, toast, unregisterAbortController],
   );
 
   runJobRef.current = (jobId: string) => {

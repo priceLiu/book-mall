@@ -34,6 +34,7 @@ type Props = {
   onOpenSheetPreview?: () => void;
   onPreviewImage?: (src: string, title: string) => void;
   onPreviewPanelPrompt?: (panelIndex: number) => void;
+  sheetHeading?: string;
 };
 
 /**
@@ -64,6 +65,7 @@ export function FashionStoryboardSheetWorkspace({
   onOpenSheetPreview,
   onPreviewImage,
   onPreviewPanelPrompt,
+  sheetHeading = "服装专业版分镜故事版",
 }: Props) {
   const [selectedPanels, setSelectedPanels] = useState<Set<number>>(() => new Set());
   const busy = imgBusy || activeImageGenPanels.size > 0 || submitBusy || resyncBusy || charGenBusy;
@@ -191,7 +193,7 @@ export function FashionStoryboardSheetWorkspace({
           productName={productName}
           productHighlight={productHighlight}
           projectKeywords={projectKeywords}
-          sheetHeading="服装专业版分镜故事版"
+          sheetHeading={sheetHeading}
           exportRootId="fashion-storyboard-sheet-workspace"
           variant="preview"
           interactive

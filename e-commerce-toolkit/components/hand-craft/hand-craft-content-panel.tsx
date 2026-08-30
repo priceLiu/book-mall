@@ -98,7 +98,7 @@ export function HandCraftContentPanel({
   focusStepId = null,
 }: Props) {
   const router = useRouter();
-  const { alert, confirm } = useDialogs();
+  const { alert, confirm, toast } = useDialogs();
   const scrollRootRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [draftModelKey, setDraftModelKey] = useState(imageModelKey);
@@ -346,9 +346,10 @@ export function HandCraftContentPanel({
     try {
       const snapshot = await saveHandCraftWorkflow(project.id, ipName);
       setSaveDialogOpen(false);
-      await alert({
+      toast({
         title: "已保存到资产库",
         message: `「${snapshot.title}」已保存。可在「我的资产 · 手伴创作」一键复用。`,
+        variant: "success",
       });
     } catch (e) {
       await alert({

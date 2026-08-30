@@ -22,18 +22,23 @@ const LAYER_LABELS: Record<string, string> = {
 
 export function FashionParamsTable({
   dimensions,
+  dimensionLabels,
 }: {
   dimensions: Partial<Record<string, string>>;
+  /** 七维列 label；未传时用服装默认 */
+  dimensionLabels?: Array<{ key: string; label: string }>;
 }) {
-  const rows = [
-    ["性别品类", dimensions.genderCategory],
-    ["款式品类", dimensions.styleCategory],
-    ["风格属性", dimensions.styleAttribute],
-    ["档次定位", dimensions.tier],
-    ["自定义场景", dimensions.customScene],
-    ["发布平台", dimensions.platform],
-    ["输出语言", dimensions.outputLanguage],
-  ];
+  const rows = dimensionLabels?.length
+    ? dimensionLabels.map(({ key, label }) => [label, dimensions[key]] as const)
+    : [
+        ["性别品类", dimensions.genderCategory],
+        ["款式品类", dimensions.styleCategory],
+        ["风格属性", dimensions.styleAttribute],
+        ["档次定位", dimensions.tier],
+        ["自定义场景", dimensions.customScene],
+        ["发布平台", dimensions.platform],
+        ["输出语言", dimensions.outputLanguage],
+      ];
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[20rem] border-collapse text-sm">
@@ -293,12 +298,14 @@ export function FashionStoryboardResultBlock({
 export function FashionPanelsTable({
   panels,
   sellpoints,
+  panelFocusLabel = "展示重点",
   editable = false,
   saving = false,
   onSavePanels,
 }: {
   panels: FashionPanelRow[];
   sellpoints?: FashionSellpoint[];
+  panelFocusLabel?: string;
   editable?: boolean;
   saving?: boolean;
   onSavePanels?: (panels: FashionPanelRow[]) => void | Promise<void>;
@@ -334,7 +341,7 @@ export function FashionPanelsTable({
               "生图Prompt",
               "生视频Prompt",
               "动作",
-              "展示重点",
+              panelFocusLabel,
               "口播",
               "卖点ID",
             ].map((h) => (
@@ -460,14 +467,19 @@ export function FashionPanelsTable({
               <td className="px-1 py-2 max-w-[8rem]">
                 {editable ? (
                   <FashionEditableTextCell
-                    value={escCell(p.garmentFocus)}
+                    value={escCell(p.productFocus ?? p.garmentFocus ?? "")}
                     editable
                     saving={saving}
                     editTitle="编辑展示重点"
-                    onSave={(text) => patchPanel(p.index, { garmentFocus: text })}
+                    onSave={(text) =>
+                      patchPanel(p.index, {
+                        productFocus: text,
+                        garmentFocus: text,
+                      })
+                    }
                   />
                 ) : (
-                  escCell(p.garmentFocus)
+                  escCell(p.productFocus ?? p.garmentFocus ?? "")
                 )}
               </td>
               <td className="px-1 py-2 max-w-[8rem]">
