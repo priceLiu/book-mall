@@ -9,6 +9,7 @@ import {
   inferFashionPhaseFromDeliverable,
   mergeFashionDeliverablePatch,
   mergeFashionSheetWithExisting,
+  pickFashionOpsMergePatch,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
 import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
@@ -174,6 +175,42 @@ describe("fashionDeliverable v4 schema", () => {
       "痛点救场型：痛点救场",
       "Solution type：Solution",
     ]);
+  });
+
+  it("pickFashionOpsMergePatch drops storyboard regen when locked ops phase", () => {
+    const llmPatch = {
+      ...V4_FIXTURE,
+      storyboardVersions: {
+        B: {
+          id: "B" as const,
+          title: "LLM 误吐 B 版",
+          panels: [1, 2, 3, 4, 5, 6].map(PANEL_FIXTURE),
+        },
+      },
+      selectedVersion: "B" as const,
+      opsPack: undefined,
+    };
+    const picked = pickFashionOpsMergePatch(llmPatch, {
+      opsPhase: true,
+      storyboardLocked: true,
+    });
+    expect(picked).toEqual({});
+    const base = mergeFashionDeliverablePatch(null, {
+      ...V4_FIXTURE,
+      storyboardLocked: true,
+    });
+    const merged = mergeFashionDeliverablePatch(base, picked);
+    expect(merged.selectedVersion).toBe("A");
+    expect(merged.storyboardVersions?.B).toBeUndefined();
+
+    const withOps = pickFashionOpsMergePatch(
+      { ...llmPatch, opsPack: { titles: ["新标题"] } },
+      { opsPhase: true, storyboardLocked: true },
+    );
+    expect(withOps).toEqual({ opsPack: { titles: ["新标题"] } });
+    const mergedOps = mergeFashionDeliverablePatch(base, withOps);
+    expect(mergedOps.opsPack?.titles).toEqual(["新标题"]);
+    expect(mergedOps.selectedVersion).toBe("A");
   });
 
   it("ignores LLM preselectedVersion when storyboards arrive without opsPack", () => {

@@ -55,6 +55,24 @@ describe("buildStoryboardPanelRefGuideForUrls", () => {
       "图1为产品包装参考，画面中须自然露出该产品，包装形态、Logo、配色与材质须与参考图一致",
     );
   });
+
+  it("fashion apparel uses garment color guide for product and splits character clothing", () => {
+    const fashionCtx = buildStoryboardImagePromptContext({
+      meta: { workflow: { vertical: "fashion_apparel" } },
+    });
+    expect(fashionCtx.productCategory).toBe("fashion");
+
+    const urls = [
+      "https://cdn.example.com/product.jpg",
+      "https://cdn.example.com/char.jpg",
+    ];
+    const guide = buildStoryboardPanelRefGuideForUrls(urls, refs, fashionCtx);
+    expect(guide).toContain("图1为服装产品参考");
+    expect(guide).toContain("禁止擅自改色或换款");
+    expect(guide).toContain("图2为角色参考");
+    expect(guide).toContain("服装款式与颜色以图1产品参考为准");
+    expect(guide).not.toContain("图2为角色参考，人物面部、发型、体型与服装须与参考图完全一致");
+  });
 });
 
 describe("buildStoryboardPanelImagePrompt", () => {
@@ -136,6 +154,85 @@ describe("buildStoryboardPanelImagePrompt", () => {
     expect(prompt).toContain("灰紫冲锋衣拉拉链");
     expect(prompt).toContain("雨后街边");
     expect(prompt).not.toContain("场景与背景须严格符合");
+  });
+
+  it("fashion panel prompt prioritizes product ref color over script text", () => {
+    const ctx = buildStoryboardImagePromptContext({
+      meta: { workflow: { vertical: "fashion_apparel" } },
+      settings: { aspectRatio: "9:16" },
+    });
+    const prompt = resolveStoryboardPanelImagePrompt(
+      {
+        index: 1,
+        shotType: "全景",
+        scene: "商场中庭",
+        action: "模特行走",
+        imagePrompt: "竖版9:16，写实UGC。女生穿浅灰色连衣裙在商场行走。",
+        productInteraction: "wear",
+      },
+      {
+        overview: { title: "轻奢连衣裙", logline: "test" },
+        cast: [],
+        panels: [],
+      },
+      [
+        {
+          id: "p1",
+          label: "产品",
+          role: "product",
+          ossUrl: "https://cdn.example.com/p.png",
+        },
+        {
+          id: "c1",
+          label: "角色",
+          role: "character",
+          ossUrl: "https://cdn.example.com/c.png",
+        },
+      ],
+      ctx,
+      ["https://cdn.example.com/p.png", "https://cdn.example.com/c.png"],
+      "图1为服装产品参考；图2为角色参考",
+    );
+    expect(prompt).toContain("禁止擅自改色或换款");
+    expect(prompt).toContain("浅灰色连衣裙");
+  });
+
+  it("fashion legacy prompt locks garment to product ref when character ref present", () => {
+    const ctx = buildStoryboardImagePromptContext({
+      meta: { workflow: { vertical: "fashion_apparel" } },
+      settings: { aspectRatio: "9:16" },
+    });
+    const prompt = buildStoryboardPanelImagePrompt(
+      {
+        index: 1,
+        shotType: "全景",
+        scene: "商场中庭",
+        action: "模特行走",
+        emotion: "自信",
+      },
+      {
+        overview: { title: "轻奢连衣裙", logline: "test" },
+        cast: [],
+        panels: [],
+      },
+      [
+        {
+          id: "p1",
+          label: "产品",
+          role: "product",
+          ossUrl: "https://cdn.example.com/p.png",
+        },
+        {
+          id: "c1",
+          label: "角色",
+          role: "character",
+          ossUrl: "https://cdn.example.com/c.png",
+        },
+      ],
+      ctx,
+      ["https://cdn.example.com/p.png", "https://cdn.example.com/c.png"],
+    );
+    expect(prompt).toContain("服装款式、颜色与细节须严格以参考图1产品图为准");
   });
 
   it("uses scene ref constraint when scene image uploaded", () => {

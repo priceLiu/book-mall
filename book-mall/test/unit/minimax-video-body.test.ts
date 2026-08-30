@@ -26,7 +26,7 @@ describe("buildMinimaxVideoSubmitBody", () => {
     expect(content[0]?.type).toBe("text");
   });
 
-  it("i2v adds first_frame image", () => {
+  it("i2v adds first_frame image when no reference images", () => {
     const body = buildMinimaxVideoSubmitBody({
       modelKey: "MiniMax/MiniMax-H3-i2v",
       input: {
@@ -41,6 +41,26 @@ describe("buildMinimaxVideoSubmitBody", () => {
       true,
     );
     expect(body.resolution).toBe("768P");
+  });
+
+  it("i2v merges first_frame into reference_image when refs present", () => {
+    const body = buildMinimaxVideoSubmitBody({
+      modelKey: "MiniMax/MiniMax-H3-i2v",
+      input: {
+        prompt: "动起来",
+        image_url: "https://example.com/sheet.png",
+        reference_image_urls: ["https://example.com/product.png"],
+        resolution: "768P",
+        duration: 6,
+      },
+    });
+    const content = body.content as Array<{ type: string; role?: string }>;
+    const images = content.filter((c) => c.type === "image_url");
+    expect(images).toHaveLength(2);
+    expect(images.every((c) => c.role === "reference_image")).toBe(true);
+    expect(
+      content.some((c) => c.type === "image_url" && c.role === "first_frame"),
+    ).toBe(false);
   });
 });
 

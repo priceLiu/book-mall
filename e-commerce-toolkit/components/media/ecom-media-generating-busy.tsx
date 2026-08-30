@@ -16,7 +16,7 @@ type Props = {
  */
 export function EcomMediaGeneratingBusy({ className, label }: Props) {
   return (
-    <div className={cn("absolute inset-0 z-30", className)}>
+    <div className={cn("absolute inset-0 z-10", className)}>
       <div className="relative size-full overflow-hidden ecom-media-generating-sweep">
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 py-8 text-center">
           <span className="flex size-12 items-center justify-center rounded-full border border-[#0071e3]/45 bg-black/55 text-[#2997ff] shadow-lg backdrop-blur-sm sm:size-[3.25rem]">

@@ -229,13 +229,13 @@ export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideo
     return {
       modelKey: key,
       provider: "minimax",
-      strategy: "volcengine_sheet_plus_identity",
+      strategy: "minimax_reference_pack",
       maxTotalImages: 9,
       supportsFullSheet: true,
-      hasFirstFrameRole: true,
+      hasFirstFrameRole: false,
       apiMaxDurationSec: 15,
       strategyNote:
-        "MiniMax H3 图生/首尾帧：first_frame=故事版；reference_image=身份参考。",
+        "MiniMax H3 图生视频：故事版 + 产品/角色/场景均作 reference_image（不可与 first_frame 混用）。",
     };
   }
 

@@ -250,6 +250,9 @@ export function StoryboardContentPanel({
   const imageGenWatchRef = useRef<number[]>([]);
   /** 当前 tab 内 HTTP 生图请求进行中（重生成时旧 imageUrl 不能当作已完成） */
   const imageGenInFlightRef = useRef(false);
+  /** 本地发起的单镜视频（服务端 pending 写入前也保持 busy） */
+  const panelVideoWatchRef = useRef<number[]>([]);
+  const panelVideoInFlightRef = useRef(false);
   const regeneratingPanelsRef = useRef(regeneratingPanels);
   regeneratingPanelsRef.current = regeneratingPanels;
 
@@ -267,6 +270,11 @@ export function StoryboardContentPanel({
     const set = new Set<number>([...regeneratingPanels, ...pendingPanelIndices]);
     return set;
   }, [pendingPanelIndices, regeneratingPanels]);
+
+  const activePanelVideoPanels = useMemo(() => {
+    const set = new Set<number>([...panelVidBusyPanels, ...pendingPanelVideoIndices]);
+    return set;
+  }, [panelVidBusyPanels, pendingPanelVideoIndices]);
   const imageModel = settings.imageModelKey;
   const videoModel = settings.videoModelKey;
   const [editPanelIndex, setEditPanelIndex] = useState<number | null>(null);
@@ -449,38 +457,35 @@ export function StoryboardContentPanel({
       const pending = listStoryboardPendingPanelImageIndices(fresh.meta);
       const watch = new Set<number>([
         ...imageGenWatchRef.current,
-        ...regeneratingPanelsRef.current,
         ...pending,
       ]);
-      if (watch.size === 0) return;
-
-      const stillRunning =
-        imageGenInFlightRef.current ||
-        pending.length > 0 ||
-        imageGenWatchRef.current.some((idx) => pending.includes(idx));
-
-      setRegeneratingPanels((prev) => {
-        const next = new Set([...prev, ...pending, ...watch]);
-        for (const idx of watch) {
-          const done = fresh.sheet?.panels.some(
-            (p) => p.index === idx && Boolean(p.imageUrl),
-          );
-          if (done && !pending.includes(idx)) next.delete(idx);
-        }
-        return [...next].sort((a, b) => a - b);
-      });
+      if (watch.size === 0 && !imageGenInFlightRef.current) return;
 
       const total = fresh.sheet?.panels.length ?? 0;
+      const batchWatch = total > 0 && imageGenWatchRef.current.length >= total;
+      const stillRunning =
+        imageGenInFlightRef.current || pending.length > 0;
+
+      const active = new Set<number>(pending);
+      if (imageGenInFlightRef.current) {
+        for (const idx of imageGenWatchRef.current) active.add(idx);
+      }
+      for (const idx of [...active]) {
+        const done = fresh.sheet?.panels.some(
+          (p) => p.index === idx && Boolean(p.imageUrl),
+        );
+        if (done && !pending.includes(idx) && !imageGenInFlightRef.current) {
+          active.delete(idx);
+        }
+      }
+      setRegeneratingPanels([...active].sort((a, b) => a - b));
+
       if (!stillRunning) {
         imageGenWatchRef.current = [];
         setImgBusy(false);
         setRegeneratingPanels([]);
       } else {
-        const batchWatch =
-          imageGenWatchRef.current.length >= total && total > 0;
-        if (batchWatch || pending.length > 0) {
-          setImgBusy(true);
-        }
+        setImgBusy(batchWatch || (total > 0 && pending.length >= total));
       }
     } catch {
       /* ignore transient poll errors */
@@ -530,13 +535,29 @@ export function StoryboardContentPanel({
       const fresh = await getStoryboardProject(project.id);
       onProjectChange(fresh);
       const pending = listStoryboardPendingPanelVideoIndices(fresh.meta);
-      const done = new Set(
-        (fresh.sheet?.panels ?? [])
-          .filter((p) => Boolean(p.videoUrl?.trim()))
-          .map((p) => p.index),
-      );
-      const stillBusy = pending.filter((idx) => !done.has(idx));
-      setPanelVidBusyPanels(stillBusy.length > 0 ? pending : []);
+      const watch = new Set<number>([...panelVideoWatchRef.current, ...pending]);
+      if (watch.size === 0 && !panelVideoInFlightRef.current) return;
+
+      const stillRunning = panelVideoInFlightRef.current || pending.length > 0;
+
+      const active = new Set<number>(pending);
+      if (panelVideoInFlightRef.current) {
+        for (const idx of panelVideoWatchRef.current) active.add(idx);
+      }
+      for (const idx of [...active]) {
+        const done = fresh.sheet?.panels.some(
+          (p) => p.index === idx && Boolean(p.videoUrl?.trim()),
+        );
+        if (done && !pending.includes(idx) && !panelVideoInFlightRef.current) {
+          active.delete(idx);
+        }
+      }
+      setPanelVidBusyPanels([...active].sort((a, b) => a - b));
+
+      if (!stillRunning) {
+        panelVideoWatchRef.current = [];
+        setPanelVidBusyPanels([]);
+      }
     } catch {
       /* ignore transient poll errors */
     } finally {
@@ -546,6 +567,7 @@ export function StoryboardContentPanel({
 
   useEffect(() => {
     const pending = listStoryboardPendingPanelVideoIndices(project.meta);
+    panelVideoWatchRef.current = pending;
     setPanelVidBusyPanels(pending);
     void syncGeneratingPanelVideos();
   }, [project.id, syncGeneratingPanelVideos]);
@@ -1233,6 +1255,8 @@ export function StoryboardContentPanel({
     }
     const effectiveModel = opts?.modelKeyOverride?.trim() || videoModel;
     if (!opts?.deferBusy) {
+      panelVideoWatchRef.current = [panelIndex];
+      panelVideoInFlightRef.current = true;
       setPanelVidBusyPanels((prev) =>
         prev.includes(panelIndex) ? prev : [...prev, panelIndex],
       );
@@ -1274,7 +1298,12 @@ export function StoryboardContentPanel({
       return { ok: false, error: message };
     } finally {
       if (!opts?.deferBusy) {
+        panelVideoInFlightRef.current = false;
+        panelVideoWatchRef.current = panelVideoWatchRef.current.filter(
+          (i) => i !== panelIndex,
+        );
         setPanelVidBusyPanels((prev) => prev.filter((i) => i !== panelIndex));
+        void syncGeneratingPanelVideos();
       }
     }
   }
@@ -1290,6 +1319,8 @@ export function StoryboardContentPanel({
     if (!(await ensureCharacterRefForMediaGen(charMode))) {
       return;
     }
+    panelVideoWatchRef.current = queue;
+    panelVideoInFlightRef.current = true;
     setPanelVidBusyPanels(queue);
     const failures: { index: number; message: string }[] = [];
     try {
@@ -1302,7 +1333,6 @@ export function StoryboardContentPanel({
             modelKeyOverride,
             skipProjectUpdate: true,
           });
-          setPanelVidBusyPanels((prev) => prev.filter((i) => i !== panelIndex));
           if (result.ok) {
             try {
               const refreshed = await getStoryboardProject(project.id);
@@ -1325,7 +1355,9 @@ export function StoryboardContentPanel({
         /* 单镜已成功时仍尽量保留本地 sheet 更新 */
       }
     } finally {
-      setPanelVidBusyPanels([]);
+      panelVideoInFlightRef.current = false;
+      panelVideoWatchRef.current = [];
+      void syncGeneratingPanelVideos();
     }
     failures.sort((a, b) => a.index - b.index);
     if (failures.length === 0) {
@@ -1541,7 +1573,7 @@ export function StoryboardContentPanel({
         selectedPanels={panelStripSelected}
         onTogglePanelSelect={togglePanelStripSelect}
         activeImageGenPanels={activeImageGenPanels}
-        panelVidBusyPanels={panelVidBusyPanels}
+        panelVidBusyPanels={[...activePanelVideoPanels]}
         imgBusy={imgBusy}
         vidBusy={vidBusy || panelVidBusyPanels.length > 0}
         mergeBusy={mergeBusy}
@@ -1797,6 +1829,8 @@ export function StoryboardContentPanel({
   }
 
   const fashionDeliverableResolved = resolveFashionDeliverable(project);
+  const fashionDirectVideoProduce =
+    isFashionProject(project) && fashionDeliverableResolved?.outputMode === "direct_video";
   const fashionProjectKeywords = buildFashionProjectKeywords(fashionDeliverableResolved);
   const fashionCharMode = fashionCharacterMode(project);
   const fashionHasCharRef = references.some((r) => r.role === "character");
@@ -1839,7 +1873,7 @@ export function StoryboardContentPanel({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
       <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
-        <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="sticky top-0 z-30 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
@@ -1949,7 +1983,18 @@ export function StoryboardContentPanel({
       />
       <StoryboardTaskStatus
         className="mx-6 mb-2"
-        active={mergeBusy}
+        active={!fashionDirectVideoProduce && activePanelVideoPanels.size > 0}
+        surface="content"
+        title={
+          activePanelVideoPanels.size === 1
+            ? `镜头 ${[...activePanelVideoPanels][0]} 单镜视频生成中`
+            : `镜头 ${[...activePanelVideoPanels].sort((a, b) => a - b).join("、")} 单镜视频生成中`
+        }
+        detail="Gateway 视频任务进行中，通常每镜 3–8 分钟。进度显示于下方「单镜视频」区；可关闭模型弹层。"
+      />
+      <StoryboardTaskStatus
+        className="mx-6 mb-2"
+        active={!fashionDirectVideoProduce && mergeBusy}
         surface="content"
         title="合并分镜视频中"
         detail="云端合成各镜头视频（含转场），通常需 1–5 分钟…"
@@ -2007,14 +2052,12 @@ export function StoryboardContentPanel({
             }
             imagesSlot={
               project.sheet &&
-              (resolveFashionDeliverable(project)?.outputMode === "script_compose" ||
-                resolveFashionDeliverable(project)?.outputMode === "direct_video")
+              resolveFashionDeliverable(project)?.outputMode === "script_compose"
                 ? panelMediaStrip
                 : undefined
             }
             videoSlot={
-              resolveFashionDeliverable(project)?.outputMode === "direct_video" &&
-              project.sheet ? (
+              fashionDirectVideoProduce && project.sheet ? (
                 <StoryboardDeliverableSection
                   durationSec={durationSec}
                   panelVideoCount={panelVideoCount}
@@ -2028,7 +2071,8 @@ export function StoryboardContentPanel({
                   projectKeywords={pickProjectKeywords()}
                   videoUrl={resolvedVideoUrl}
                   hasSheetImages={hasSheetImages}
-                  canMergePanels={canMergePanels}
+                  canMergePanels={false}
+                  fullSheetOnly
                   vidBusy={vidBusy}
                   imageGenBusy={imgBusy}
                   sheetPngBusy={sheetPngBusy}

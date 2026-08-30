@@ -118,12 +118,25 @@ export function buildDashscopeWan30Media(opts: {
   const refs = (opts.referenceImageUrls ?? [])
     .map((u) => u.trim())
     .filter((u) => u.length > 0 && u !== first && u !== last);
+
+  // 万相 3.0 API：first_frame 仅可与 last_frame 同用，不可与 reference_image 混传。
+  if (refs.length > 0) {
+    const seen = new Set<string>();
+    const allRefs: string[] = [];
+    for (const url of [first, ...refs]) {
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      allRefs.push(url);
+    }
+    return allRefs.slice(0, 10).map((url) => ({
+      type: "reference_image" as const,
+      url,
+    }));
+  }
+
   const media: DashscopeWan30MediaItem[] = [];
   if (first) media.push({ type: "first_frame", url: first });
   if (last) media.push({ type: "last_frame", url: last });
-  for (const url of refs) {
-    media.push({ type: "reference_image", url });
-  }
   return media.slice(0, 10);
 }
 

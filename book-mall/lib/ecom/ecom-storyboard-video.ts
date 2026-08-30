@@ -459,14 +459,14 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     const minimaxRes = minimaxResolutionFromEcom(resolution);
     const mode = spec?.mode;
     const refUrlsForMinimax =
-      mode === "r2v" || mode === "s2v"
+      mode === "r2v" || mode === "s2v" || mode === "i2v"
         ? refPlan.slots.map((s) => norm(s.url))
         : normalizedReferenceImageUrls;
     const { input } = buildCanvasVideoMinimaxInput({
       modelKey,
       prompt,
       imageUrl:
-        mode === "t2v" || mode === "r2v" || mode === "s2v"
+        mode === "t2v" || mode === "r2v" || mode === "s2v" || mode === "i2v"
           ? undefined
           : firstFrameUrl,
       referenceImageUrls: refUrlsForMinimax,

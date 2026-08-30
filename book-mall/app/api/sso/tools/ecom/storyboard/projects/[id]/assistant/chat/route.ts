@@ -12,6 +12,7 @@ import {
   isFashionDeliverable,
   isFashionWorkflow,
   mergeFashionDeliverablePatch,
+  pickFashionOpsMergePatch,
   stripFashionDeliverableFence,
 } from "@/lib/ecom/ecom-fashion-deliverable";
 import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
@@ -195,10 +196,14 @@ export async function POST(req: Request, ctx: Ctx) {
             const prevFashion = existingMeta.deliverable as
               | Parameters<typeof mergeFashionDeliverablePatch>[0]
               | undefined;
-            const llmFashionPatch =
+            let llmFashionPatch: Partial<typeof fashionDeliverable> =
               fashionPromptPhase === "voiceovers" && !prevFashion?.selectedVoiceoverId
                 ? { ...fashionDeliverable, selectedVoiceoverId: null }
                 : fashionDeliverable;
+            llmFashionPatch = pickFashionOpsMergePatch(llmFashionPatch, {
+              opsPhase: fashionPromptPhase === "ops",
+              storyboardLocked: Boolean(prevFashion?.storyboardLocked),
+            });
             const merged = mergeFashionDeliverablePatch(
               prevFashion,
               llmFashionPatch,

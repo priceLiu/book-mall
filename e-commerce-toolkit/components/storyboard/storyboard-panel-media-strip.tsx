@@ -88,9 +88,9 @@ export function StoryboardPanelMediaStrip({
     [videoTargetIndexes, panelVidBusyPanels],
   );
 
-  const allSelectedVideoBusy =
-    videoTargetIndexes.length > 0 &&
-    videoTargetIndexes.every((index) => panelVidBusyPanels.includes(index));
+  const anySelectedVideoBusy = videoActionTargets.some((index) =>
+    panelVidBusyPanels.includes(index),
+  );
 
   const panelVideoCount = useMemo(
     () => sheet.panels.filter((p) => Boolean(p.videoUrl?.trim())).length,
@@ -98,7 +98,6 @@ export function StoryboardPanelMediaStrip({
   );
 
   const imageStripBusy = imgBusy || activeImageGenPanels.size > 0;
-  const videoStripBusy = vidBusy || panelVidBusyPanels.length > 0;
   const generateVideoDisabled = videoActionTargets.length === 0;
   const hasMergedVideo = Boolean(mergedVideoUrl?.trim());
   const mergedExpiresLabel =
@@ -132,7 +131,7 @@ export function StoryboardPanelMediaStrip({
               disabled={generateVideoDisabled}
               onClick={() => onGenerateSelectedVideos(videoActionTargets)}
             >
-              {allSelectedVideoBusy ? (
+              {anySelectedVideoBusy ? (
                 <>
                   <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
                   生成视频中…
@@ -156,7 +155,7 @@ export function StoryboardPanelMediaStrip({
               selectable
               selected={selectedPanels.has(panel.index)}
               onToggleSelect={() => onTogglePanelSelect(panel.index)}
-              busy={imageStripBusy || activeImageGenPanels.has(panel.index)}
+              busy={activeImageGenPanels.has(panel.index)}
               onRegenerateImage={() => onGeneratePanelImage(panel.index)}
               onPreviewImage={
                 panel.imageUrl && onPreviewImage
@@ -211,7 +210,7 @@ export function StoryboardPanelMediaStrip({
               selectable
               selected={selectedPanels.has(panel.index)}
               onToggleSelect={() => onTogglePanelSelect(panel.index)}
-              busy={videoStripBusy && panelVidBusyPanels.includes(panel.index)}
+              busy={panelVidBusyPanels.includes(panel.index)}
               onPreview={
                 panel.videoUrl && onPreviewPanelVideo
                   ? () => onPreviewPanelVideo(panel.index, panel.videoUrl!)

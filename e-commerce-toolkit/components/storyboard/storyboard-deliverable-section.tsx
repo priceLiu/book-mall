@@ -46,6 +46,8 @@ type Props = {
   onReloadProject: () => void;
   onMergePanelVideos: () => void;
   onPreviewVideo: (src: string, title?: string) => void;
+  /** 路径 B：故事版工作区已负责生图，此处仅整页预览 + 一键成片 */
+  fullSheetOnly?: boolean;
 };
 
 /** 成片区：工具条 + 分镜图/成片双栏（左只读预览，右视频播放器） */
@@ -81,6 +83,7 @@ export function StoryboardDeliverableSection({
   onReloadProject,
   onMergePanelVideos,
   onPreviewVideo,
+  fullSheetOnly = false,
 }: Props) {
   const resolvedVideo = isStoryboardVideoUrl(videoUrl) ? videoUrl!.trim() : null;
   const [mergeSettingsOpen, setMergeSettingsOpen] = useState(false);
@@ -89,8 +92,9 @@ export function StoryboardDeliverableSection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3">
         <p className="text-xs text-[#6e6e73]">
-          整图成片 {durationSec}s · 已生成 {panelVideoCount} 镜单镜视频
-          {canMergePanels ? " · 可合并" : ""}
+          {fullSheetOnly
+            ? `一键成片 ${durationSec}s · 故事版宫格与分镜脚本一并提交视频模型`
+            : `整图成片 ${durationSec}s · 已生成 ${panelVideoCount} 镜单镜视频${canMergePanels ? " · 可合并" : ""}`}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <EcomButtonSecondary size="sm" type="button" onClick={onReloadProject} title="从服务器重新加载项目">
@@ -111,9 +115,11 @@ export function StoryboardDeliverableSection({
           >
             {snapshotBusy ? "保存中…" : "保存交付快照"}
           </EcomButtonSecondary>
-          <EcomButtonSecondary size="sm" type="button" disabled={!hasSheetImages} onClick={onOpenImagePicker}>
-            重新生图
-          </EcomButtonSecondary>
+          {!fullSheetOnly ? (
+            <EcomButtonSecondary size="sm" type="button" disabled={!hasSheetImages} onClick={onOpenImagePicker}>
+              重新生图
+            </EcomButtonSecondary>
+          ) : null}
           <EcomButtonPrimary
             size="sm"
             type="button"
@@ -121,7 +127,7 @@ export function StoryboardDeliverableSection({
             onClick={onGenerateFullVideo}
           >
             <Film className="h-3.5 w-3.5 shrink-0" />
-            {vidBusy ? "生成中…" : "生成完整视频"}
+            {vidBusy ? "生成中…" : fullSheetOnly ? "一键成片" : "生成完整视频"}
           </EcomButtonPrimary>
         </div>
       </div>
@@ -140,10 +146,18 @@ export function StoryboardDeliverableSection({
             panelAspectRatio={panelAspectRatio}
             imageGenBusy={imageGenBusy}
             sheetPngBusy={sheetPngBusy}
-            emptyHint="请先生成分镜图"
+            emptyHint={fullSheetOnly ? "请先在故事版工作区生成各镜分镜图" : "请先生成分镜图"}
             onPreview={sheet ? onOpenSheetPreview : undefined}
-            onRegenerateImage={hasSheetImages ? onOpenImagePicker : undefined}
-            onGenerateVideo={hasSheetImages && !vidBusy ? onGenerateFullVideo : undefined}
+            onRegenerateImage={
+              fullSheetOnly ? undefined : hasSheetImages ? onOpenImagePicker : undefined
+            }
+            onGenerateVideo={
+              fullSheetOnly
+                ? undefined
+                : hasSheetImages && !vidBusy
+                  ? onGenerateFullVideo
+                  : undefined
+            }
             onDownloadPng={
               sheetPngUrl?.trim()
                 ? () => {
@@ -156,8 +170,12 @@ export function StoryboardDeliverableSection({
                   }
                 : undefined
             }
-            primaryActionLabel={!hasSheetImages ? "生成分镜图" : undefined}
-            onPrimaryAction={!hasSheetImages ? onOpenImagePicker : undefined}
+            primaryActionLabel={
+              fullSheetOnly || hasSheetImages ? undefined : "生成分镜图"
+            }
+            onPrimaryAction={
+              fullSheetOnly || hasSheetImages ? undefined : onOpenImagePicker
+            }
           />
         </div>
 
@@ -166,10 +184,20 @@ export function StoryboardDeliverableSection({
             label="完整视频"
             aspectRatio={videoAspectRatio}
             videoSrc={resolvedVideo}
-            emptyHint="整图成片或合并分镜视频"
+            emptyHint={
+              fullSheetOnly
+                ? "故事版 6 镜图就绪后，一键提交 Gateway 视频模型"
+                : "整图成片或合并分镜视频"
+            }
             busy={vidBusy}
             disabled={!hasSheetImages && !canMergePanels}
-            primaryActionLabel={hasSheetImages && !resolvedVideo ? "整图成片" : undefined}
+            primaryActionLabel={
+              hasSheetImages && !resolvedVideo
+                ? fullSheetOnly
+                  ? "一键成片"
+                  : "整图成片"
+                : undefined
+            }
             onPrimaryAction={hasSheetImages && !resolvedVideo ? onGenerateFullVideo : undefined}
             secondaryActionLabel={canMergePanels ? "合并分镜视频" : undefined}
             onSecondaryAction={canMergePanels ? onMergePanelVideos : undefined}

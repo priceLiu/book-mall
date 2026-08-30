@@ -262,6 +262,9 @@ export function StoryboardProSheetView({
               minWidth: isPreview ? 220 : 0,
               width: isPreview ? 220 : undefined,
               borderRight: i < sheet.panels.length - 1 ? "1px solid #1d1d1f" : undefined,
+              position: "relative",
+              isolation: "isolate",
+              overflow: "hidden",
             }}
           >
             <div
@@ -355,7 +358,9 @@ export function StoryboardProSheetView({
               ) : !generating ? (
                 <span style={{ fontSize: 11, color: "#86868b" }}>待生成</span>
               ) : null}
-              {generating ? <EcomMediaGeneratingBusy /> : null}
+              {generating ? (
+                <EcomMediaGeneratingBusy className="z-[1] rounded-none" />
+              ) : null}
             </div>
             <table
               style={{

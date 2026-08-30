@@ -449,7 +449,7 @@ export function isFashionDeliverable(raw: unknown): raw is FashionDeliverable {
   return fashionDeliverableSchema.safeParse(raw).success;
 }
 
-function hasMeaningfulOpsPack(d: FashionDeliverable): boolean {
+export function hasMeaningfulOpsPack(d: FashionDeliverable): boolean {
   const ops = d.opsPack;
   if (!ops) return false;
   return Boolean(
@@ -497,6 +497,16 @@ function sanitizePreLockFashionDeliverable(d: FashionDeliverable): FashionDelive
     selectedVersion: null,
     coverageChecklist: [],
   };
+}
+
+/** ops 阶段且分镜已锁：LLM 常误吐整包 deliverable，合并时只采纳 opsPack */
+export function pickFashionOpsMergePatch(
+  patch: Partial<FashionDeliverable>,
+  opts: { storyboardLocked: boolean; opsPhase: boolean },
+): Partial<FashionDeliverable> {
+  if (!opts.opsPhase || !opts.storyboardLocked) return patch;
+  if (patch.opsPack == null) return {};
+  return { opsPack: patch.opsPack };
 }
 
 export function mergeFashionDeliverablePatch(

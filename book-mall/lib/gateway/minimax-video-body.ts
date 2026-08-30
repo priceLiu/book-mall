@@ -94,14 +94,20 @@ export function buildMinimaxVideoSubmitBody(opts: {
     pickUrls(opts.input, "referenceAudioUrls"),
   );
 
-  const hasReferenceRoles =
+  const useReferenceOnlyMode =
     refImages.length > 0 || refVideos.length > 0 || refAudios.length > 0;
 
-  if (hasReferenceRoles) {
+  if (useReferenceOnlyMode) {
     if (imageUrl || lastFrameUrl) {
-      throw new Error(
-        "MiniMax H3：reference_* 与 first_frame/last_frame 不可混用",
-      );
+      const seen = new Set<string>();
+      const mergedRefImages: string[] = [];
+      for (const url of [imageUrl, ...refImages]) {
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
+        mergedRefImages.push(url);
+      }
+      refImages.length = 0;
+      refImages.push(...mergedRefImages);
     }
     for (const url of refImages) {
       content.push({

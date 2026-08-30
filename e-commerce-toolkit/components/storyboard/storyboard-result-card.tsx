@@ -2,6 +2,7 @@
 
 import { Clapperboard, Eye, Film, Loader2 } from "lucide-react";
 
+import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { STORYBOARD_PREVIEW_MIN_H, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import { isStoryboardVideoUrl } from "@/lib/storyboard-media";
 import { cn } from "@/lib/utils";
@@ -55,10 +56,7 @@ export function StoryboardResultCard({
         )}
       >
         {busy ? (
-          <div className="flex h-full min-h-[200px] items-center justify-center gap-2 text-sm text-[#6e6e73]">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            成片生成中…
-          </div>
+          <EcomMediaGeneratingBusy label="成片生成中…" />
         ) : hasVideo ? (
           <>
             <video

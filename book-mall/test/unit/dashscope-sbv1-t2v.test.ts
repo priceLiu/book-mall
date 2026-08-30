@@ -56,7 +56,7 @@ describe("wan3.0-video", () => {
     ]);
   });
 
-  it("keeps first_frame and extra refs as reference_image", () => {
+  it("uses reference_image only when identity refs accompany first frame", () => {
     const media = buildDashscopeWan30Media({
       firstFrameUrl: "https://oss.example/first.png",
       referenceImageUrls: [
@@ -65,7 +65,7 @@ describe("wan3.0-video", () => {
       ],
     });
     expect(media).toEqual([
-      { type: "first_frame", url: "https://oss.example/first.png" },
+      { type: "reference_image", url: "https://oss.example/first.png" },
       { type: "reference_image", url: "https://oss.example/product.png" },
     ]);
   });

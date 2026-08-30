@@ -38,6 +38,23 @@ const FASHION_JSON_SHAPE = `\`\`\`fashion-deliverable
 }
 \`\`\``;
 
+/** ops 阶段：仅 opsPack，避免 LLM 误读完整 deliverable 后重吐分镜 */
+const FASHION_OPS_JSON_SHAPE = `\`\`\`fashion-deliverable
+{
+  "schemaVersion": "fashion-v4",
+  "vertical": "fashion_apparel",
+  "productName": "产品名",
+  "dimensions": { "outputLanguage": "中文" },
+  "opsPack": {
+    "titles": ["标题1", "标题2", "..."],
+    "coverWords": ["词1", "词2"],
+    "tags": ["#标签1", "#标签2"],
+    "xiaohongshuBody": "小红书正文…",
+    "detailBullets": ["卖点1", "卖点2"]
+  }
+}
+\`\`\``;
+
 export type FashionPromptPhase =
   | "sellpoints"
   | "voiceovers"
@@ -130,15 +147,17 @@ videoPrompt：≥40字，单镜视频 motion（运镜+动作连续性）。
 E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 
     ops: `【当前任务：运营素材包】
-生成 opsPack：titles(10条分层标题)、coverWords、tags、xiaohongshuBody、detailBullets。
+分镜已定稿锁定；**禁止**输出 storyboardVersions / coverageChecklist / voiceovers / sellpoints / selectedVersion。
+仅输出 brief 摘要 + 下方 JSON；JSON **必须**含完整 opsPack：
+- titles：10 条分层标题
+- coverWords、tags、xiaohongshuBody、detailBullets
 语言与 dimensions.outputLanguage 一致。`,
 
     general: `【通用】按用户消息推进；内部 trigger 消息以 fashion-step: 开头时只输出对应 phase JSON。`,
   };
 
-  return [FASHION_CORE, phaseBlock[phase], "【JSON 结构参考】", FASHION_JSON_SHAPE].join(
-    "\n\n",
-  );
+  const jsonShape = phase === "ops" ? FASHION_OPS_JSON_SHAPE : FASHION_JSON_SHAPE;
+  return [FASHION_CORE, phaseBlock[phase], "【JSON 结构参考】", jsonShape].join("\n\n");
 }
 
 export function resolveFashionPromptPhase(lastUserTurn: string): FashionPromptPhase {

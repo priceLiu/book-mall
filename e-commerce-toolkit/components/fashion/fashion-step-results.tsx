@@ -185,8 +185,8 @@ export function FashionStepResults({
         <StepSection title="成片制作（当前步骤）">
           <p className="text-sm text-[#1d1d1f]">
             {deliverable.outputMode === "script_compose"
-              ? "路径 A：分镜脚本交付 — 生成各镜分镜图后可导出 HTML/ZIP 自行剪辑。"
-              : "路径 B：故事版一键成片 — 在下方故事版工作区生图，完成后合成视频。"}
+              ? "路径 A：分镜脚本交付 — 在下方分镜图/单镜视频区逐镜生成，可导出或合并。"
+              : "路径 B：故事版一键成片 — 在故事版工作区生成各镜分镜图，完成后在「一键成片」提交整页故事版至视频模型。"}
           </p>
           <p className="mt-2 text-xs leading-relaxed text-[#86868b]">
             七维 → 卖点 → 口播 → 分镜 → 运营包 已全部完成；策划交付物见本页下方「查阅区」。
@@ -202,17 +202,18 @@ export function FashionStepResults({
                 </p>
               )}
             </StepSection>
-            <StepSection title="各镜头分镜图与单镜视频">
-              {imagesSlot ?? <span className="text-sm text-[#86868b]">—</span>}
-            </StepSection>
-            <StepSection title="成片">
-              {videoSlot ?? <span className="text-sm text-[#86868b]">分镜图就绪后可在此合成视频</span>}
+            <StepSection title="一键成片">
+              {videoSlot ?? (
+                <span className="text-sm text-[#86868b]">
+                  故事版 6 镜分镜图就绪后，在此整图提交视频模型生成成片。
+                </span>
+              )}
             </StepSection>
           </>
         ) : (
           <>
             {panelsTableSection}
-            <StepSection title="分镜图">
+            <StepSection title="分镜图与单镜视频">
               {imagesSlot ?? <span className="text-sm text-[#86868b]">—</span>}
             </StepSection>
           </>
