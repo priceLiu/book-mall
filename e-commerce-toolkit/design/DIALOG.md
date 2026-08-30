@@ -6,6 +6,7 @@
 
 - 组件：`components/ui/dialog.tsx`（Radix）
 - 业务封装：`components/dialogs/dialog-provider.tsx` → `useDialogs()`
+- 非阻塞提示：`components/dialogs/ecom-toast.tsx` → `useDialogs().toast()`（右下角，约 6s 自动消失）
 - 视觉：白底卡片、黑字标题、灰字说明、右上 **X**、底栏右对齐 **取消 + 主按钮**
 
 ## 主色（黑白蓝）
@@ -24,10 +25,11 @@
 ## 用法
 
 ```tsx
-const { confirm, alert, doubleConfirm } = useDialogs();
+const { confirm, alert, toast, doubleConfirm } = useDialogs();
 
 if (!(await confirm({ title: "…", message: "…" }))) return;
-await alert({ title: "…", message: "…" });
+await alert({ title: "…", message: "…" }); // 须用户点「知道了」
+toast({ title: "…", message: "…" }); // 成功类轻提示，无需确认
 ```
 
 自定义内容：

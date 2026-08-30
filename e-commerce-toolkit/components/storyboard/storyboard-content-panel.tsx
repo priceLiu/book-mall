@@ -317,7 +317,7 @@ export function StoryboardContentPanel({
     ((mode: FashionCharacterRefChoice | null) => void) | null
   >(null);
   const [fashionCharChoiceOpen, setFashionCharChoiceOpen] = useState(false);
-  const { confirm, doubleConfirm } = useDialogs();
+  const { confirm, doubleConfirm, toast } = useDialogs();
   const [exportBusy, setExportBusy] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveWorkflowBusy, setSaveWorkflowBusy] = useState(false);
@@ -1850,9 +1850,10 @@ export function StoryboardContentPanel({
       } catch {
         /* 本地状态已更新，刷新失败不阻断 */
       }
-      await onAlert({
+      toast({
         title: "合并完成",
         message: `各镜头已云端合成（含转场）。成片请在 ${expiresLabel} 前下载，到期将自动清理；购买容量包可延期保留。`,
+        variant: "success",
       });
     } catch (e) {
       await onAlert({

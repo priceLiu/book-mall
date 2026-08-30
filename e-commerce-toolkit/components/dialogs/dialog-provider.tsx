@@ -18,6 +18,11 @@ import {
   EcomDialogCancelButton,
   EcomDialogPrimaryButton,
 } from "@/components/ui/dialog";
+import {
+  EcomToastHost,
+  useEcomToastQueue,
+  type ToastOpts,
+} from "@/components/dialogs/ecom-toast";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 
 type ConfirmOpts = {
@@ -37,6 +42,7 @@ type AlertOpts = {
 type DialogContextValue = {
   confirm: (opts: ConfirmOpts) => Promise<boolean>;
   alert: (opts: AlertOpts) => Promise<void>;
+  toast: (opts: ToastOpts) => void;
   doubleConfirm: (opts: {
     title: string;
     message: string;
@@ -75,6 +81,7 @@ type ModalState =
 
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<ModalState>(null);
+  const { toasts, toast, dismiss } = useEcomToastQueue();
 
   const confirm = useCallback((opts: ConfirmOpts) => {
     return new Promise<boolean>((resolve) => {
@@ -104,8 +111,8 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ confirm, alert, doubleConfirm }),
-    [confirm, alert, doubleConfirm],
+    () => ({ confirm, alert, toast, doubleConfirm }),
+    [confirm, alert, toast, doubleConfirm],
   );
 
   useEffect(() => {
@@ -232,6 +239,8 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
           </DialogContent>
         ) : null}
       </Dialog>
+
+      <EcomToastHost toasts={toasts} onDismiss={dismiss} />
     </DialogContext.Provider>
   );
 }
