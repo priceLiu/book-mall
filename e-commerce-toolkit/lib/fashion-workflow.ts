@@ -117,12 +117,45 @@ export function fashionBusyStatusForLlmTrigger(trigger: string): FashionBusyStat
     return fashionBusyStatusForUserMessage(FASHION_LOCK_SELLPOINTS);
   }
   if (trigger.includes("storyboards")) {
-    return { title: "正在生成分镜", detail: "AI 正在输出五套分镜脚本与验收清单…" };
+    return {
+      title: "正在生成分镜",
+      detail: "AI 正在输出 A–E 五套分镜 JSON（体积较大，通常需 2–8 分钟）…",
+    };
   }
   if (trigger.includes("ops")) {
     return { title: "正在生成运营包", detail: "AI 正在生成标题、标签与详情文案…" };
   }
   return { title: "生成中", detail: "AI 正在处理，请稍候…" };
+}
+
+/** 内部 LLM 步骤 · 流式总时长上限 */
+export function fashionLlmStreamTimeoutMs(trigger: string): number {
+  if (trigger.includes("storyboards")) return 12 * 60_000;
+  if (trigger.includes("ops")) return 8 * 60_000;
+  if (trigger.includes("voiceovers")) return 6 * 60_000;
+  return 5 * 60_000;
+}
+
+/** 流式无新内容超过该时长则判定卡住 */
+export function fashionLlmStreamIdleTimeoutMs(trigger: string): number {
+  if (trigger.includes("storyboards")) return 3 * 60_000;
+  return 2 * 60_000;
+}
+
+/** 流结束后校验服务端是否已写入预期 deliverable 字段 */
+export function fashionLlmTriggerSucceeded(
+  trigger: string,
+  project: StoryboardProject,
+): boolean {
+  const d = resolveFashionDeliverable(project);
+  if (!d) return false;
+  if (trigger.includes("sellpoints")) return (d.sellpoints?.length ?? 0) > 0;
+  if (trigger.includes("voiceovers")) return (d.voiceovers?.length ?? 0) > 0;
+  if (trigger.includes("storyboards")) {
+    return listFashionStoryboardVersionKeys(d).length > 0;
+  }
+  if (trigger.includes("ops")) return hasMeaningfulOpsPack(d);
+  return true;
 }
 
 export type FashionWorkflowMeta = {

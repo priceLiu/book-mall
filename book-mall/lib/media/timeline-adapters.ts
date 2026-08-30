@@ -40,10 +40,7 @@ export function fromEcomStoryboardSheet(
       order: i,
       videoUrl: p.videoUrl!.trim(),
       subtitle: p.dialogue?.trim() || undefined,
-      durationSec:
-        p.durationHintSec && p.durationHintSec > 0
-          ? p.durationHintSec
-          : undefined,
+      // 合并时由 ffprobe 取实际成片时长，勿用 durationHintSec（脚本预估常短于 Gateway 成片）
     }));
   return { version: 1, clips };
 }

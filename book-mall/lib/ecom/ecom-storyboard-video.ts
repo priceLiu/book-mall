@@ -970,7 +970,19 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   }
 
   const patchPanels = sheet.panels.map((p) =>
-    p.index === panel.index ? { ...p, videoUrl: ossUrl } : p,
+    p.index === panel.index
+      ? {
+          ...p,
+          videoUrl: ossUrl,
+          videoGen: {
+            modelKey,
+            durationSec,
+            resolution,
+            aspectRatio: opts.aspectRatio ?? "9:16",
+            generatedAt: new Date().toISOString(),
+          },
+        }
+      : p,
   );
   const latest = await getEcomStoryboardProject(opts.userId, opts.projectId);
   const baseSheet = latest?.sheet ?? sheet;
@@ -997,6 +1009,10 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
         modelKey,
         kind: "panel_video",
         taskId,
+        durationSec,
+        resolution,
+        aspectRatio: opts.aspectRatio ?? "9:16",
+        generatedAt: new Date().toISOString(),
       },
     },
   });

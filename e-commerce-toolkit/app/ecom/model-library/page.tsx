@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import { EcomMediaLibraryTile } from "@/components/media/ecom-media-library-tile";
 import { EcomScrollLoadFooter } from "@/components/media/ecom-scroll-load-footer";
 import { shuffleByIdForDisplay } from "@/lib/ecom-random-order";
@@ -62,9 +66,6 @@ export default function ModelLibraryPage() {
   );
   const [gender, setGender] = useState<GenderFilter>(ALL);
   const [age, setAge] = useState<AgeFilter>(ALL);
-  const [preview, setPreview] = useState<{ src: string; title?: string } | null>(
-    null,
-  );
   /** 0 = 未洗牌，与服务端渲染顺序一致，避免水合不一致 */
   const [shuffleSeed, setShuffleSeed] = useState(0);
 
@@ -113,6 +114,19 @@ export default function ModelLibraryPage() {
     () => models.slice(0, visibleCount),
     [models, visibleCount],
   );
+
+  const modelPreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        visibleModels.map((m) => ({ url: m.ossUrl, title: m.name })),
+      ),
+    [visibleModels],
+  );
+  const {
+    preview: modelImagePreview,
+    openPreview: openModelImagePreview,
+    closePreview: closeModelImagePreview,
+  } = useEcomImagePreview(modelPreviewItems);
 
   const empty = allModels.length === 0;
   const loaded = visibleModels.length;
@@ -198,7 +212,7 @@ export default function ModelLibraryPage() {
                         kind="image"
                         src={m.ossUrl}
                         alt={m.name}
-                        onPreview={() => setPreview({ src: m.ossUrl, title: m.name })}
+                        onPreview={() => openModelImagePreview(m.ossUrl, m.name)}
                       />
                     </li>
                   ))}
@@ -216,16 +230,11 @@ export default function ModelLibraryPage() {
         </div>
       </EcomWorkspaceLayout>
 
-      {preview ? (
-        <EcomImagePreviewDialog
-          src={preview.src}
-          title={preview.title}
-          open
-          onOpenChange={(open) => {
-            if (!open) setPreview(null);
-          }}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={modelImagePreview}
+        galleryItems={modelPreviewItems}
+        onClose={closeModelImagePreview}
+      />
     </>
   );
 }

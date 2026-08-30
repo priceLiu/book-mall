@@ -12,6 +12,11 @@ import {
   parseStoryboardSheet,
   type StoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
+import {
+  mergeStoryboardPanelVideoGen,
+  parseStoryboardPanelVideoGenFromAssetMeta,
+  type StoryboardPanelVideoAssetRecord,
+} from "@/lib/ecom/ecom-storyboard-panel-video-gen";
 
 /** 按镜号合并 imageUrl / videoUrl，保留 base 脚本字段；incoming 中多出的镜追加到末尾 */
 export function mergeStoryboardPanelMediaByIndex(
@@ -35,6 +40,91 @@ export function mergeStoryboardPanelMediaByIndex(
     merged.push(incoming);
   }
   return merged.sort((a, b) => a.index - b.index);
+}
+
+/** 合并前从 ecomAsset 补全 sheet 上缺失的 panel videoUrl / videoGen（避免 timeline 漏镜） */
+export async function enrichStoryboardSheetVideoUrlsForMerge(
+  userId: string,
+  projectId: string,
+  sheet: StoryboardSheet,
+): Promise<StoryboardSheet> {
+  const latestVideos = await loadLatestStoryboardPanelVideoRecords(
+    userId,
+    projectId,
+  );
+  if (latestVideos.size === 0) return sheet;
+  let changed = false;
+  const panels = sheet.panels.map((p) => {
+    const record = latestVideos.get(p.index);
+    if (!record) return p;
+    const nextUrl = p.videoUrl?.trim() || record.url;
+    const nextGen = mergeStoryboardPanelVideoGen(p.videoGen, {
+      modelKey: record.modelKey,
+      durationSec: record.durationSec,
+      resolution: record.resolution,
+      aspectRatio: record.aspectRatio,
+      generatedAt: record.generatedAt,
+    });
+    const urlChanged = nextUrl !== p.videoUrl?.trim();
+    const genChanged =
+      JSON.stringify(nextGen ?? null) !== JSON.stringify(p.videoGen ?? null);
+    if (!urlChanged && !genChanged) return p;
+    changed = true;
+    return {
+      ...p,
+      ...(nextUrl ? { videoUrl: nextUrl } : {}),
+      ...(nextGen ? { videoGen: nextGen } : {}),
+    };
+  });
+  return changed ? { ...sheet, panels } : sheet;
+}
+
+export async function loadLatestStoryboardPanelVideoRecords(
+  userId: string,
+  projectId: string,
+): Promise<Map<number, StoryboardPanelVideoAssetRecord>> {
+  const assets = await prisma.ecomAsset.findMany({
+    where: {
+      userId,
+      module: ECOM_STORYBOARD_MODULE,
+      kind: "video",
+      meta: {
+        path: ["projectId"],
+        equals: projectId,
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 80,
+    select: { ossUrl: true, meta: true, createdAt: true },
+  });
+
+  const map = new Map<number, StoryboardPanelVideoAssetRecord>();
+  for (const asset of assets) {
+    const meta = asset.meta as Record<string, unknown> | null;
+    if (meta?.kind !== "panel_video") continue;
+    const panelIndex =
+      typeof meta.panelIndex === "number" ? Math.trunc(meta.panelIndex) : NaN;
+    if (!Number.isFinite(panelIndex) || panelIndex <= 0) continue;
+    if (map.has(panelIndex)) continue;
+    const url = asset.ossUrl?.trim();
+    if (!url || !/^https?:\/\//.test(url)) continue;
+    const gen =
+      parseStoryboardPanelVideoGenFromAssetMeta(meta) ??
+      (typeof meta.modelKey === "string" && meta.modelKey.trim()
+        ? {
+            modelKey: meta.modelKey.trim(),
+            durationSec: 3,
+            generatedAt: asset.createdAt.toISOString(),
+          }
+        : null);
+    if (!gen) continue;
+    map.set(panelIndex, {
+      url,
+      ...gen,
+      generatedAt: gen.generatedAt ?? asset.createdAt.toISOString(),
+    });
+  }
+  return map;
 }
 
 export async function loadLatestStoryboardPanelImageUrls(
@@ -75,32 +165,10 @@ export async function loadLatestStoryboardPanelVideoUrls(
   userId: string,
   projectId: string,
 ): Promise<Map<number, string>> {
-  const assets = await prisma.ecomAsset.findMany({
-    where: {
-      userId,
-      module: ECOM_STORYBOARD_MODULE,
-      kind: "video",
-      meta: {
-        path: ["projectId"],
-        equals: projectId,
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 80,
-    select: { ossUrl: true, meta: true },
-  });
-
+  const records = await loadLatestStoryboardPanelVideoRecords(userId, projectId);
   const map = new Map<number, string>();
-  for (const asset of assets) {
-    const meta = asset.meta as Record<string, unknown> | null;
-    if (meta?.kind !== "panel_video") continue;
-    const panelIndex =
-      typeof meta.panelIndex === "number" ? Math.trunc(meta.panelIndex) : NaN;
-    if (!Number.isFinite(panelIndex) || panelIndex <= 0) continue;
-    if (map.has(panelIndex)) continue;
-    const url = asset.ossUrl?.trim();
-    if (!url || !/^https?:\/\//.test(url)) continue;
-    map.set(panelIndex, url);
+  for (const [index, record] of records) {
+    map.set(index, record.url);
   }
   return map;
 }
@@ -130,9 +198,9 @@ export async function reconcileStoryboardSheetPanelImages(opts: {
     };
   }
 
-  const [latestImages, latestVideos] = await Promise.all([
+  const [latestImages, latestVideoRecords] = await Promise.all([
     loadLatestStoryboardPanelImageUrls(opts.userId, opts.projectId),
-    loadLatestStoryboardPanelVideoUrls(opts.userId, opts.projectId),
+    loadLatestStoryboardPanelVideoRecords(opts.userId, opts.projectId),
   ]);
 
   let dirty = false;
@@ -145,11 +213,22 @@ export async function reconcileStoryboardSheetPanelImages(opts: {
         next = { ...next, imageUrl };
       }
     }
-    if (!next.videoUrl?.trim()) {
-      const videoUrl = latestVideos.get(p.index);
-      if (videoUrl) {
+    const videoRecord = latestVideoRecords.get(p.index);
+    if (!next.videoUrl?.trim() && videoRecord?.url) {
+      dirty = true;
+      next = { ...next, videoUrl: videoRecord.url };
+    }
+    if (!next.videoGen?.modelKey && videoRecord) {
+      const mergedGen = mergeStoryboardPanelVideoGen(undefined, {
+        modelKey: videoRecord.modelKey,
+        durationSec: videoRecord.durationSec,
+        resolution: videoRecord.resolution,
+        aspectRatio: videoRecord.aspectRatio,
+        generatedAt: videoRecord.generatedAt,
+      });
+      if (mergedGen) {
         dirty = true;
-        next = { ...next, videoUrl };
+        next = { ...next, videoGen: mergedGen };
       }
     }
     return next;

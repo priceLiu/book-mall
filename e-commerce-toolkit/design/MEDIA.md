@@ -1,7 +1,8 @@
 # 电商工具箱 · 图片、上传与预览
 
 > 母规范：`SYSTEM.md` §8。视频见 `VIDEO.md`。  
-> **全站须按本文组件映射实现**；禁止各模块自写缩略图、预览弹层或上传条。
+> **全站须按本文组件映射实现**；禁止各模块自写缩略图、预览弹层或上传条。  
+> **全站升级计划**：[`docs/图片预览升级.md`](../../docs/图片预览升级.md)（Phase 2：canvas-web / tool-web 等待接入）
 
 ---
 
@@ -14,6 +15,8 @@
 | **资产库 / 模块结果网格** | `EcomMediaLibraryTile` | `components/media/ecom-media-library-tile.tsx` |
 | 网格容器 class | `ECOM_LIBRARY_MEDIA_GRID_CLASS` | 同上 export |
 | **单张图片放大预览** | `EcomImagePreviewDialog` | `components/media/ecom-image-preview-dialog.tsx` |
+| **预览状态 Hook / Host** | `useEcomImagePreview` · `EcomImagePreviewHost` | `components/media/ecom-image-preview-host.tsx` |
+| **预览工具类型** | `lib/media/ecom-image-preview.ts` | 同步至各子应用 |
 | **多张图片轮播预览**（成图槽位画廊） | `ProductDesignGalleryPreviewDialog` | `components/product-design/product-design-gallery-preview-dialog.tsx` |
 | **参考图上传卡片** | `EcomRefUploadCard` | `components/media/ecom-ref-upload-card.tsx` |
 | **上传区 56px 缩略** | `EcomRefImageThumb` | `components/media/ecom-ref-image-thumb.tsx` |
@@ -185,12 +188,12 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 
 | 类型 | 组件 | 何时使用 |
 |------|------|----------|
-| **单张** | `EcomImagePreviewDialog` | 资产库、模板区、Picker Eye、分镜单图 |
-| **多张轮播** | `ProductDesignGalleryPreviewDialog` | 手伴 / 主图槽位「画廊预览」、同组多成图切换 |
+| **单张** | `EcomImagePreviewDialog` | 资产库、模板区、模特库、Picker Eye、分镜单图 |
+| **同页多图** | `EcomImagePreviewDialog` + `items` / `useEcomImagePreview` | 分镜各镜、模板区当前列表、资产库筛选结果等 |
 
-### 单张：`EcomImagePreviewDialog`
+### 单张 / 多图：`EcomImagePreviewDialog`
 
-全站统一 **全屏暗底 lightbox** + **滚轮缩放 / 拖拽平移**（见 `.cursor/rules/image-preview-zoom-pan.mdc`）：
+全站统一 **全屏暗底 lightbox** + **滚轮缩放 / 拖拽平移** + **可选右侧竖列缩略条**（≥2 张时显示）：
 
 - 容器：`h-[100dvh] w-screen bg-black/90 border-0`
 - 先 OSS 缩略占位 → 原图加载后 crossfade；加载中 indeterminate 进度条
@@ -199,22 +202,38 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 - `<img draggable={false}>` + stage `onDragStart` preventDefault
 
 ```tsx
+import {
+  EcomImagePreviewDialog,
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+  mapPreviewItemsFromEntries,
+} from "@/components/media";
+
+// 推荐：同页多图
+const items = useMemo(
+  () => mapPreviewItemsFromEntries(assets.map((a) => ({ url: a.ossUrl, title: a.title }))),
+  [assets],
+);
+const { preview, openPreview, closePreview } = useEcomImagePreview(items);
+
+<EcomImagePreviewHost preview={preview} galleryItems={items} onClose={closePreview} />;
+
+// 或直接挂载 Dialog
 <EcomImagePreviewDialog
   src={ossUrl}
-  thumbSrc={thumbnailUrl}
+  items={items}
+  initialIndex={2}
   open={open}
   onOpenChange={setOpen}
-  title="资产名或镜头号"
+  title="镜头 3"
 />
 ```
 
 **禁止** `window.open`、白底小窗、或无缩放的手写弹层。
 
-### 多张：`ProductDesignGalleryPreviewDialog`
+### 兼容：`ProductDesignGalleryPreviewDialog`
 
-- 全屏黑底 `bg-black/95`；顶栏标题 + 可选「下载」
-- 左侧主图 `object-contain`；右侧竖条缩略条（`items.length > 1`）
-- 键盘 `←` / `→` 切换；**不含**滚轮缩放（成图审查场景）
+内部已委托 `EcomImagePreviewDialog`（含缩放 + 缩略条）。新代码请直接用 `@/components/media`。
 
 ### 参考条悬停浮层：`EcomRefImageThumb`
 

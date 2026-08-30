@@ -13,6 +13,8 @@ type Props = {
   className?: string;
   /** chrome = 深色助手栏；content = 浅色主内容区 */
   surface?: "chrome" | "content";
+  /** 生成中扫光（对齐 EcomMediaGeneratingBusy） */
+  sweep?: boolean;
 };
 
 /** 助手区 / 内容区任务状态卡 */
@@ -23,6 +25,7 @@ export function StoryboardTaskStatus({
   active,
   className,
   surface = "chrome",
+  sweep = false,
 }: Props) {
   const [open, setOpen] = useState(true);
   if (!active) return null;
@@ -36,6 +39,7 @@ export function StoryboardTaskStatus({
         isContent
           ? "border-[#e8e8ed] bg-[var(--ecom-content-highlight)]"
           : "border-[var(--ecom-chrome-accent)]/35 bg-[var(--ecom-chrome-accent)]/15",
+        sweep && "ecom-media-generating-sweep",
         className,
       )}
     >

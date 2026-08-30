@@ -16,6 +16,11 @@ import {
   parseStoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import {
+  findStoryboardWorkflowSnapshotInProjectMeta,
+  stripStoryboardSheetGeneratedMedia,
+  type StoryboardWorkflowSnapshot,
+} from "@/lib/ecom/ecom-storyboard-workflow-snapshot";
 
 function rowToDto(row: {
   id: string;
@@ -88,6 +93,47 @@ export async function createStoryboardProjectFromSnapshot(
   return rowToDto(row);
 }
 
+/** 从完整工作流快照创建新项目（保留策划与会话，去掉已生成成图/成片） */
+export async function createStoryboardProjectFromWorkflowSnapshot(
+  userId: string,
+  snap: StoryboardWorkflowSnapshot,
+): Promise<EcomStoryboardProjectDto> {
+  const prevMeta = snap.meta ?? {};
+  const prevWorkflow = prevMeta.workflow ?? {};
+  const row = await prisma.ecomStoryboardProject.create({
+    data: {
+      userId,
+      title: snap.projectName?.trim()?.slice(0, 120) || snap.title.slice(0, 120),
+      module: ECOM_STORYBOARD_MODULE,
+      status: "draft",
+      brief: (snap.brief ?? {}) as Prisma.InputJsonValue,
+      settings: (snap.settings ?? {
+        durationSec: 15,
+        aspectRatio: "9:16",
+      }) as Prisma.InputJsonValue,
+      references: snap.references as Prisma.InputJsonValue,
+      chatHistory: snap.chatHistory as Prisma.InputJsonValue,
+      sheet: stripStoryboardSheetGeneratedMedia(snap.sheet) as Prisma.InputJsonValue,
+      sheetPngUrl: null,
+      meta: {
+        ...prevMeta,
+        workflow: {
+          ...prevWorkflow,
+          pendingFullVideoJob: undefined,
+          pendingPanelImageJobs: undefined,
+          pendingPanelVideoJobs: undefined,
+        },
+        reusedFrom: {
+          savedAt: snap.savedAt,
+          title: snap.title,
+          at: new Date().toISOString(),
+        },
+      } as Prisma.InputJsonValue,
+    },
+  });
+  return rowToDto(row);
+}
+
 /** 打开已有项目，或将历史快照复用到新项目 */
 export async function reuseStoryboardLibraryItem(
   userId: string,
@@ -103,6 +149,12 @@ export async function reuseStoryboardLibraryItem(
     return source;
   }
 
+  const meta = source.meta as Record<string, unknown> | null;
+  const workflowSnap = findStoryboardWorkflowSnapshotInProjectMeta(meta, savedAt);
+  if (workflowSnap) {
+    return createStoryboardProjectFromWorkflowSnapshot(userId, workflowSnap);
+  }
+
   const latest = source.meta as
     | (EcomStoryboardProjectDto["meta"] & {
         deliverableSnapshot?: StoryboardDeliverableSnapshot;
@@ -112,7 +164,6 @@ export async function reuseStoryboardLibraryItem(
     return source;
   }
 
-  const meta = source.meta as Record<string, unknown> | null;
   const snap = findStoryboardSnapshotInProjectMeta(meta, savedAt);
   if (!snap) {
     throw new Error("找不到该版本快照");

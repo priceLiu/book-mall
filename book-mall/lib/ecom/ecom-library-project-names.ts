@@ -1,5 +1,6 @@
 import type { MediaDecomposeDeliverableSnapshot } from "@/lib/ecom/ecom-media-decompose-snapshot";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import type { StoryboardWorkflowSnapshot } from "@/lib/ecom/ecom-storyboard-workflow-snapshot";
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
 import type { ProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
 import type { HandCraftWorkflowSnapshot } from "@/lib/ecom/ecom-hand-craft-snapshot";
@@ -31,6 +32,9 @@ export function buildProjectNameLookup(
   }
   for (const row of storyboardRows) {
     const meta = row.meta as Record<string, unknown> | null;
+    const workflowSnap = meta?.workflowSnapshot as StoryboardWorkflowSnapshot | undefined;
+    if (workflowSnap?.projectName?.trim()) map.set(row.id, workflowSnap.projectName.trim());
+    else if (workflowSnap?.title?.trim()) map.set(row.id, workflowSnap.title.trim());
     const snap = meta?.deliverableSnapshot as StoryboardDeliverableSnapshot | undefined;
     if (snap?.productName?.trim()) map.set(row.id, snap.productName.trim());
     else if (snap?.title?.trim()) map.set(row.id, snap.title.trim());

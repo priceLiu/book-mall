@@ -158,8 +158,8 @@ CSS 变量定义：`app/globals.css`。语义表：`COLORS.md`、token 全集：
 | 场景 | 规范 |
 |------|------|
 | 列表 / 网格缩略 | `EcomMediaLibraryTile` + `ECOM_LIBRARY_MEDIA_GRID_CLASS` |
-| 单张图片放大 | `EcomImagePreviewDialog`（全屏暗底 + 缩放平移） |
-| 多张成图轮播 | `ProductDesignGalleryPreviewDialog` |
+| 单张图片放大 | `EcomImagePreviewDialog` / `useEcomImagePreview`（全屏暗底 + 缩放平移 + 可选右侧缩略条） |
+| 同页多图切换 | `@/components/media` · `items` + `EcomImagePreviewHost` · `MEDIA.md` |
 | 视频缩略 / 预览 | `EcomMediaLibraryTile kind="video"` → `EcomVideoPreviewDialog` |
 | 参考图上传 | **`EcomRefUploadCard`**（我的资产 + 上传 + 拖放粘贴） |
 | 从资产库选取 | **`EcomAssetPickerDialog`** |
@@ -226,8 +226,8 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 | 工作台布局 | `EcomWorkspaceLayout` · `LAYOUT.md` |
 | 数据表 | `TABLE.md` 模式 A |
 | 图片网格 / 缩略 | `EcomMediaLibraryTile` · `MEDIA.md` §0 |
-| 单张图片预览 | `EcomImagePreviewDialog` · `MEDIA.md` |
-| 多张成图预览 | `ProductDesignGalleryPreviewDialog` · `MEDIA.md` |
+| 单张 / 多图预览 | `EcomImagePreviewDialog` · `useEcomImagePreview` · `MEDIA.md` |
+| 成图槽位画廊（兼容） | `ProductDesignGalleryPreviewDialog`（内部委托统一预览） |
 | 视频列表 / 预览 | `EcomMediaLibraryTile` + `EcomVideoPreviewDialog` · `VIDEO.md` |
 | 参考上传 | `EcomRefUploadCard` → 模块薄封装 · `MEDIA.md` |
 | 从资产库选取 | `EcomAssetPickerDialog` · `MEDIA.md` |

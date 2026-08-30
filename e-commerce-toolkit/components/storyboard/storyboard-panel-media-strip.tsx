@@ -12,14 +12,17 @@ import type { StoryboardPanel, StoryboardSheet } from "@/lib/storyboard-types";
 type Props = {
   sheet: StoryboardSheet;
   aspectRatio: "16:9" | "9:16";
-  selectedPanels: ReadonlySet<number>;
-  onTogglePanelSelect: (panelIndex: number) => void;
+  selectedImagePanels: ReadonlySet<number>;
+  onToggleImagePanelSelect: (panelIndex: number) => void;
+  selectedVideoPanels: ReadonlySet<number>;
+  onToggleVideoPanelSelect: (panelIndex: number) => void;
   activeImageGenPanels: ReadonlySet<number>;
   panelVidBusyPanels: readonly number[];
   imgBusy?: boolean;
   vidBusy?: boolean;
   mergeBusy?: boolean;
-  onGenerateAllImages: () => void;
+  /** 无勾选时生成全部；有勾选时仅生成选中镜 */
+  onGenerateAllImages: (panelIndexes?: number[]) => void;
   onGenerateSelectedVideos: (panelIndexes: number[]) => void;
   onMergeSelectedVideos: (panelIndexes: number[]) => void;
   onGeneratePanelImage: (panelIndex: number) => void;
@@ -35,8 +38,10 @@ type Props = {
 export function StoryboardPanelMediaStrip({
   sheet,
   aspectRatio,
-  selectedPanels,
-  onTogglePanelSelect,
+  selectedImagePanels,
+  onToggleImagePanelSelect,
+  selectedVideoPanels,
+  onToggleVideoPanelSelect,
   activeImageGenPanels,
   panelVidBusyPanels,
   imgBusy = false,
@@ -54,9 +59,14 @@ export function StoryboardPanelMediaStrip({
   onPreviewPanelVideo,
   onRegeneratePanelVideo,
 }: Props) {
-  const selectedList = useMemo(
-    () => [...selectedPanels].sort((a, b) => a - b),
-    [selectedPanels],
+  const selectedImageList = useMemo(
+    () => [...selectedImagePanels].sort((a, b) => a - b),
+    [selectedImagePanels],
+  );
+
+  const selectedVideoList = useMemo(
+    () => [...selectedVideoPanels].sort((a, b) => a - b),
+    [selectedVideoPanels],
   );
 
   const panelByIndex = useMemo(() => {
@@ -67,21 +77,25 @@ export function StoryboardPanelMediaStrip({
 
   const videoTargetIndexes = useMemo(
     () =>
-      selectedList.filter((index) => {
+      selectedImageList.filter((index) => {
         const p = panelByIndex.get(index);
         return Boolean(p?.imageUrl?.trim());
       }),
-    [selectedList, panelByIndex],
+    [selectedImageList, panelByIndex],
   );
 
-  const mergeTargetIndexes = useMemo(
-    () =>
-      selectedList.filter((index) => {
-        const p = panelByIndex.get(index);
-        return Boolean(p?.videoUrl?.trim());
-      }),
-    [selectedList, panelByIndex],
-  );
+  /** 无勾选时合并全部已有单镜视频；有勾选时仅合并选中镜（须 ≥2 且已有 videoUrl） */
+  const mergeTargetIndexes = useMemo(() => {
+    const withVideo = sheet.panels
+      .filter((p) => Boolean(p.videoUrl?.trim()))
+      .map((p) => p.index)
+      .sort((a, b) => a - b);
+    if (selectedVideoList.length === 0) return withVideo;
+    return selectedVideoList.filter((index) => {
+      const p = panelByIndex.get(index);
+      return Boolean(p?.videoUrl?.trim());
+    });
+  }, [selectedVideoList, panelByIndex, sheet.panels]);
 
   const videoActionTargets = useMemo(
     () => videoTargetIndexes.filter((index) => !panelVidBusyPanels.includes(index)),
@@ -121,9 +135,15 @@ export function StoryboardPanelMediaStrip({
               size="sm"
               type="button"
               disabled={imageStripBusy}
-              onClick={onGenerateAllImages}
+              onClick={() =>
+                onGenerateAllImages(
+                  selectedImageList.length > 0 ? selectedImageList : undefined,
+                )
+              }
             >
-              生成全部分镜图
+              {selectedImageList.length > 0
+                ? `生成分镜图（${selectedImageList.length}）`
+                : "生成全部分镜图"}
             </EcomButtonSecondary>
             <EcomButtonSecondary
               size="sm"
@@ -153,8 +173,8 @@ export function StoryboardPanelMediaStrip({
               aspectRatio={aspectRatio}
               imageUrl={panel.imageUrl}
               selectable
-              selected={selectedPanels.has(panel.index)}
-              onToggleSelect={() => onTogglePanelSelect(panel.index)}
+              selected={selectedImagePanels.has(panel.index)}
+              onToggleSelect={() => onToggleImagePanelSelect(panel.index)}
               busy={activeImageGenPanels.has(panel.index)}
               onRegenerateImage={() => onGeneratePanelImage(panel.index)}
               onPreviewImage={
@@ -197,7 +217,7 @@ export function StoryboardPanelMediaStrip({
           </div>
         </div>
         <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
-          合并须勾选至少 2 镜且对应单镜视频已生成；成片显示在下方「合并成片」区。
+          未勾选时合并全部已有单镜视频；勾选后仅合并选中镜（至少 2 镜且已生成）。成片显示在下方「合并成片」区。
         </p>
         <div className="flex flex-wrap gap-4">
           {sheet.panels.map((panel, i) => (
@@ -208,8 +228,8 @@ export function StoryboardPanelMediaStrip({
               videoUrl={panel.videoUrl}
               posterUrl={panel.imageUrl}
               selectable
-              selected={selectedPanels.has(panel.index)}
-              onToggleSelect={() => onTogglePanelSelect(panel.index)}
+              selected={selectedVideoPanels.has(panel.index)}
+              onToggleSelect={() => onToggleVideoPanelSelect(panel.index)}
               busy={panelVidBusyPanels.includes(panel.index)}
               onPreview={
                 panel.videoUrl && onPreviewPanelVideo

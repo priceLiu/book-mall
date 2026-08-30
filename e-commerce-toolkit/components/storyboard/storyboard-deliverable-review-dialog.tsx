@@ -2,9 +2,14 @@
 
 import Image from "next/image";
 import { Eye } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  buildStoryboardPanelPreviewItems,
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import {
   Dialog,
@@ -39,10 +44,32 @@ export function StoryboardDeliverableReviewDialog({
   onPreviewVideo,
 }: Props) {
   const [sheetPreviewOpen, setSheetPreviewOpen] = useState(false);
-  const [imagePreview, setImagePreview] = useState<{ src: string; title: string } | null>(null);
 
   const products = snapshot.references.filter((r) => r.role === "product");
   const characters = snapshot.references.filter((r) => r.role === "character");
+
+  const snapshotImagePreviewItems = useMemo(() => {
+    const refEntries = [...products, ...characters]
+      .filter((r) => r.ossUrl?.trim())
+      .map((r) => ({
+        url: r.ossUrl,
+        title: `${r.role === "product" ? "产品" : "角色"} · ${r.label}`,
+      }));
+    const panelEntries = buildStoryboardPanelPreviewItems(snapshot.sheet.panels).map((p) => ({
+      url: p.src,
+      title: `${p.title} 分镜图`,
+    }));
+    const pngEntry = snapshot.sheetPngUrl?.trim()
+      ? [{ url: snapshot.sheetPngUrl, title: "完整分镜图 PNG" }]
+      : [];
+    return mapPreviewItemsFromEntries([...refEntries, ...panelEntries, ...pngEntry]);
+  }, [snapshot.sheet.panels, snapshot.sheetPngUrl, products, characters]);
+
+  const {
+    preview: deliverableImagePreview,
+    openPreview: openDeliverableImagePreview,
+    closePreview: closeDeliverableImagePreview,
+  } = useEcomImagePreview(snapshotImagePreviewItems);
 
   return (
     <>
@@ -76,12 +103,12 @@ export function StoryboardDeliverableReviewDialog({
                 <RefPreviewCard
                   title="产品图"
                   refs={products}
-                  onPreview={(src, title) => setImagePreview({ src, title })}
+                  onPreview={(src, title) => openDeliverableImagePreview(src, title)}
                 />
                 <RefPreviewCard
                   title="角色图"
                   refs={characters}
-                  onPreview={(src, title) => setImagePreview({ src, title })}
+                  onPreview={(src, title) => openDeliverableImagePreview(src, title)}
                 />
               </div>
             </section>
@@ -117,7 +144,10 @@ export function StoryboardDeliverableReviewDialog({
                   type="button"
                   className="mt-2 text-xs text-[#6e6e73] underline-offset-2 hover:text-[#1d1d1f] hover:underline"
                   onClick={() =>
-                    setImagePreview({ src: snapshot.sheetPngUrl!, title: "完整分镜图 PNG" })
+                    openDeliverableImagePreview(
+                      snapshot.sheetPngUrl!,
+                      "完整分镜图 PNG",
+                    )
                   }
                 >
                   查看合成 PNG
@@ -136,10 +166,10 @@ export function StoryboardDeliverableReviewDialog({
                       className="relative mb-1 h-[72px] w-full overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] disabled:opacity-50"
                       onClick={() =>
                         panel.imageUrl &&
-                        setImagePreview({
-                          src: panel.imageUrl,
-                          title: `镜头 ${panel.index} 分镜图`,
-                        })
+                        openDeliverableImagePreview(
+                          panel.imageUrl,
+                          `镜头 ${panel.index} 分镜图`,
+                        )
                       }
                     >
                       {panel.imageUrl ? (
@@ -205,16 +235,11 @@ export function StoryboardDeliverableReviewDialog({
         title={`交付快照 · ${snapshot.title}`}
       />
 
-      {imagePreview ? (
-        <EcomImagePreviewDialog
-          src={imagePreview.src}
-          title={imagePreview.title}
-          open
-          onOpenChange={(o) => {
-            if (!o) setImagePreview(null);
-          }}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={deliverableImagePreview}
+        galleryItems={snapshotImagePreviewItems}
+        onClose={closeDeliverableImagePreview}
+      />
     </>
   );
 }

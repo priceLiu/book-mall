@@ -4,6 +4,11 @@ import {
   type StoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import {
+  buildStoryboardDeliverablePreviewFromWorkflow,
+  collectStoryboardWorkflowSnapshotsFromMeta,
+  type StoryboardWorkflowSnapshot,
+} from "@/lib/ecom/ecom-storyboard-workflow-snapshot";
 import type { MediaDecomposeDeliverableSnapshot } from "@/lib/ecom/ecom-media-decompose-snapshot";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
@@ -189,25 +194,6 @@ function moduleIdFromAssetModule(module: string): string {
   if (module.startsWith("video-")) return module;
   if (module.startsWith("brand-")) return module.replace(/^brand-/, "");
   return module;
-}
-
-function collectSnapshotsFromMeta(
-  projectId: string,
-  meta: Record<string, unknown> | null | undefined,
-): StoryboardDeliverableSnapshot[] {
-  const out: StoryboardDeliverableSnapshot[] = [];
-  const latest = meta?.deliverableSnapshot as StoryboardDeliverableSnapshot | undefined;
-  const history = Array.isArray(meta?.deliverableSnapshotHistory)
-    ? (meta!.deliverableSnapshotHistory as StoryboardDeliverableSnapshot[])
-    : [];
-  const seen = new Set<string>();
-  for (const snap of [latest, ...history]) {
-    if (!snap?.savedAt || !snap.sheet?.panels?.length) continue;
-    if (seen.has(snap.savedAt)) continue;
-    seen.add(snap.savedAt);
-    out.push(snap);
-  }
-  return out;
 }
 
 function collectProductDesignSnapshotsFromMeta(
@@ -454,22 +440,40 @@ function snapshotToBundle(
   projectId: string,
   snap: StoryboardDeliverableSnapshot,
   deliverableMarkdown?: string,
+  workflowSnapshot?: StoryboardWorkflowSnapshot,
 ): EcomLibraryStoryboardBundle {
   const markdown =
     snap.deliverableMarkdown?.trim() ||
     deliverableMarkdown?.trim() ||
+    workflowSnapshot?.meta?.deliverableMarkdown?.trim() ||
     "";
   const thumb =
     snap.sheetPngUrl?.trim() ||
+    workflowSnapshot?.sheetPngUrl?.trim() ||
     snap.references.find((r) => r.role === "product")?.ossUrl ||
     snap.sheet.panels.find((p) => p.imageUrl)?.imageUrl ||
+    workflowSnapshot?.references.find((r) => r.role === "product")?.ossUrl ||
     null;
+  const panelCount =
+    snap.sheet.panels.length ||
+    workflowSnapshot?.sheet?.panels.length ||
+    0;
   return {
     projectId,
     savedAt: snap.savedAt,
-    title: snap.title || "微剧故事版",
-    panelCount: snap.sheet.panels.length,
-    hasScript: markdown.length > 80,
+    title: snap.title || workflowSnapshot?.title || "微剧故事版",
+    panelCount,
+    hasScript:
+      markdown.length > 80 ||
+      Boolean(
+        workflowSnapshot?.meta?.deliverable &&
+          typeof workflowSnapshot.meta.deliverable === "object" &&
+          Array.isArray(
+            (workflowSnapshot.meta.deliverable as { sellpoints?: unknown[] }).sellpoints,
+          ) &&
+          ((workflowSnapshot.meta.deliverable as { sellpoints?: unknown[] }).sellpoints
+            ?.length ?? 0) > 0,
+      ),
     hasVideo: Boolean(snap.videoUrl?.trim() || snap.panelVideos.length > 0),
     thumbnailUrl: thumb,
     snapshot: {
@@ -560,7 +564,26 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const meta = (row.meta as Record<string, unknown> | null) ?? null;
     const markdown =
       typeof meta?.deliverableMarkdown === "string" ? meta.deliverableMarkdown : undefined;
-    for (const snap of collectSnapshotsFromMeta(row.id, meta)) {
+    const seen = new Set<string>();
+    for (const workflowSnap of collectStoryboardWorkflowSnapshotsFromMeta(meta)) {
+      seen.add(workflowSnap.savedAt);
+      bundles.push(
+        snapshotToBundle(
+          row.id,
+          buildStoryboardDeliverablePreviewFromWorkflow(workflowSnap),
+          markdown,
+          workflowSnap,
+        ),
+      );
+    }
+    const latest = meta?.deliverableSnapshot as StoryboardDeliverableSnapshot | undefined;
+    const history = Array.isArray(meta?.deliverableSnapshotHistory)
+      ? (meta!.deliverableSnapshotHistory as StoryboardDeliverableSnapshot[])
+      : [];
+    for (const snap of [latest, ...history]) {
+      if (!snap?.savedAt || !snap.sheet?.panels?.length) continue;
+      if (seen.has(snap.savedAt)) continue;
+      seen.add(snap.savedAt);
       bundles.push(snapshotToBundle(row.id, snap, markdown));
     }
   }

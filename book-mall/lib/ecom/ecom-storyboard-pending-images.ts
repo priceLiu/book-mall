@@ -52,22 +52,30 @@ async function patchStoryboardWorkflowMeta(
   projectId: string,
   mutate: (workflow: Record<string, unknown>) => void,
 ): Promise<void> {
-  const existing = await prisma.ecomStoryboardProject.findFirst({
-    where: { id: projectId },
-    select: { meta: true },
-  });
-  if (!existing) throw new Error("项目不存在");
-  const prevMeta = (existing.meta as Record<string, unknown> | null) ?? {};
-  const workflow = {
-    ...((prevMeta.workflow as Record<string, unknown> | undefined) ?? {}),
-  };
-  mutate(workflow);
-  await prisma.ecomStoryboardProject.update({
-    where: { id: projectId },
-    data: {
-      meta: { ...prevMeta, workflow } as Prisma.InputJsonValue,
-    },
-  });
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const existing = await prisma.ecomStoryboardProject.findFirst({
+      where: { id: projectId },
+      select: { meta: true, updatedAt: true },
+    });
+    if (!existing) throw new Error("项目不存在");
+    const prevMeta = (existing.meta as Record<string, unknown> | null) ?? {};
+    const workflow = {
+      ...((prevMeta.workflow as Record<string, unknown> | undefined) ?? {}),
+    };
+    mutate(workflow);
+    const nextMeta = { ...prevMeta, workflow };
+    const updated = await prisma.ecomStoryboardProject.updateMany({
+      where: { id: projectId, updatedAt: existing.updatedAt },
+      data: {
+        meta: nextMeta as Prisma.InputJsonValue,
+      },
+    });
+    if (updated.count === 1) return;
+    if (attempt === maxAttempts - 1) {
+      throw new Error("工作流状态更新冲突，请稍后重试");
+    }
+  }
 }
 
 export async function markStoryboardPanelImagesPending(

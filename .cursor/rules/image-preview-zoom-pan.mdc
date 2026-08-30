@@ -6,6 +6,8 @@ alwaysApply: false
 
 # 图片放大预览 · 缩放与平移（全平台统一）
 
+> 升级计划 SSOT：[`docs/图片预览升级.md`](../docs/图片预览升级.md)（Phase 1 已完成 · Phase 2 PV-201～204 待接入）
+
 凡「点击图片 → 弹出大图查看」的场景（媒体库、模板区、模特库、画布节点、项目资产、我的衣柜、管理后台资源库…），**必须**是同一套交互。用户在任一子站学会的手势，在其它子站必须同样生效。
 
 ## 规范实现（唯一事实源）
@@ -14,9 +16,11 @@ alwaysApply: false
 |---|---|
 | `e-commerce-toolkit/lib/media/use-image-zoom-pan.ts` | `useImageZoomPan(resetKey)` — 缩放状态、滚轮、拖拽、边界钳制 |
 | `e-commerce-toolkit/components/media/image-zoom-controls.tsx` | `ImageZoomControls` — 右下角缩小 / 百分比 / 放大 / 还原 |
-| `e-commerce-toolkit/components/media/ecom-image-preview-dialog.tsx` | 参考装配（全屏暗底 + stage + 控件） |
+| `e-commerce-toolkit/lib/media/ecom-image-preview.ts` | 多图预览类型与 `mapPreviewItemsFromEntries` 等工具（`sync-image-zoom-pan.mjs` 同步） |
+| `e-commerce-toolkit/components/media/ecom-image-preview-dialog.tsx` | 参考装配（全屏暗底 + stage + 缩略条 + 控件） |
+| `e-commerce-toolkit/components/media/ecom-image-preview-host.tsx` | `useEcomImagePreview` + `EcomImagePreviewHost` |
 
-两个规范文件由 `node scripts/sync-image-zoom-pan.mjs` **逐字复制**到其余子应用的同名路径。
+三个规范文件由 `node scripts/sync-image-zoom-pan.mjs` **逐字复制**到其余子应用的同名路径。
 
 - 改行为 → 改 e-commerce-toolkit 的原件 → `node scripts/sync-image-zoom-pan.mjs`
 - CI / 提交前 → `node scripts/sync-image-zoom-pan.mjs --check`
@@ -79,12 +83,12 @@ el.addEventListener("wheel", onWheel, { passive: false });
 
 | 应用 | 预览层 |
 |---|---|
-| e-commerce-toolkit | `EcomImagePreviewDialog`（模板区 / 模特库 / 我的资产 / 分镜等 8 处共用） |
+| e-commerce-toolkit | `EcomImagePreviewDialog` + `useEcomImagePreview` / `EcomImagePreviewHost`（分镜 / 资产库 / 模板区 / 模特库 / Picker / 工作区等；≥2 张时右侧竖列缩略条） |
 | canvas-web | `MediaPreviewLightbox`（`media-hover-box.tsx`）· `StoryMediaPreviewModal`（`story-column-media-panel.tsx`） |
 | story-web | `MediaLightbox` |
 | tool-web | 我的图片库 · 我的衣柜 · Visual Lab |
 | quick-replica-web | `QrFullscreenImagePreview`（模板卡 / 参考图 / 作品预览；悬停 Eye，点击全屏 contain + 右下角 +/-） |
-| book-mall | `AdminMediaThumb`（管理后台模板区 / 模特库列表；悬停浮出大图，点击进全屏） |
+| book-mall | `FullscreenImagePreview`（管理后台；含缩略条，与工具箱同款交互）· `AdminMediaThumb` |
 
 新增预览入口时优先复用上表组件；确需新写，按「规范实现」挂钩子，并补进本表与 `scripts/sync-image-zoom-pan.mjs` 的 `TARGET_APPS`。
 

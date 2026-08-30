@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  buildStoryboardPanelPreviewItems,
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+} from "@/components/media";
 import {
   Dialog,
   DialogContent,
@@ -38,10 +42,15 @@ export function StoryboardSheetPreviewDialog({
   title = "完整分镜图",
   sheetHeading,
 }: Props) {
-  const [imagePreview, setImagePreview] = useState<{
-    src: string;
-    title: string;
-  } | null>(null);
+  const panelImagePreviewItems = useMemo(
+    () => buildStoryboardPanelPreviewItems(sheet.panels),
+    [sheet.panels],
+  );
+  const {
+    preview: imagePreview,
+    openPreview: openPanelImagePreview,
+    closePreview: closeImagePreview,
+  } = useEcomImagePreview(panelImagePreviewItems);
 
   return (
     <>
@@ -62,24 +71,17 @@ export function StoryboardSheetPreviewDialog({
               sheetHeading={sheetHeading}
               exportRootId="storyboard-sheet-preview"
               variant="preview"
-              onPreviewImage={(src, imgTitle) =>
-                setImagePreview({ src, title: imgTitle })
-              }
+              onPreviewImage={openPanelImagePreview}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      {imagePreview ? (
-        <EcomImagePreviewDialog
-          src={imagePreview.src}
-          open
-          onOpenChange={(next) => {
-            if (!next) setImagePreview(null);
-          }}
-          title={imagePreview.title}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={imagePreview}
+        galleryItems={panelImagePreviewItems}
+        onClose={closeImagePreview}
+      />
     </>
   );
 }

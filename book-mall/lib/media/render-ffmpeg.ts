@@ -204,6 +204,19 @@ export function resolveMixTtsEnabled(profile: RenderProfile): boolean {
   return profile.audio?.mixTts !== false;
 }
 
+/**
+ * 合并成片以 ffprobe 实测时长为准；脚本 durationHintSec 仅作探测失败时的兜底。
+ * 若误用 hint 短于实际成片，attachSilentAudio 的 -t 会把每镜截断。
+ */
+export function resolveMediaClipDurationSec(
+  probedSec: number,
+  hintSec?: number,
+): number {
+  if (Number.isFinite(probedSec) && probedSec > 0.05) return probedSec;
+  if (hintSec != null && Number.isFinite(hintSec) && hintSec > 0) return hintSec;
+  return 3;
+}
+
 function buildVoiceoverAudioFilter(durationSec: number): string {
   const dur = durationSec.toFixed(3);
   return `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur=${dur},atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`;
@@ -213,9 +226,9 @@ function buildVoiceoverAudioFilter(durationSec: number): string {
 async function attachVoiceoverToNormalizedClip(args: {
   videoPath: string;
   audioUrl: string;
-  durationSec: number;
   outPath: string;
 }): Promise<void> {
+  const durationSec = await ffprobeDurationSec(args.videoPath);
   const audioPath = join(join(args.videoPath, ".."), `voice-${args.outPath.split("/").pop()}`);
   await fetchToFile(
     args.audioUrl,
@@ -223,7 +236,7 @@ async function attachVoiceoverToNormalizedClip(args: {
     MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
   );
   try {
-    const dur = args.durationSec.toFixed(3);
+    const dur = durationSec.toFixed(3);
     await runFfmpeg([
       "-y",
       "-i",
@@ -231,7 +244,7 @@ async function attachVoiceoverToNormalizedClip(args: {
       "-i",
       audioPath,
       "-filter_complex",
-      buildVoiceoverAudioFilter(args.durationSec),
+      buildVoiceoverAudioFilter(durationSec),
       "-map",
       "0:v",
       "-map",
@@ -246,8 +259,7 @@ async function attachVoiceoverToNormalizedClip(args: {
       "2",
       "-b:a",
       "128k",
-      "-t",
-      dur,
+      "-shortest",
       args.outPath,
     ]);
   } finally {
@@ -255,12 +267,13 @@ async function attachVoiceoverToNormalizedClip(args: {
   }
 }
 
+/** 无音轨镜头：按视频实际时长补静音轨（不截断视频） */
 async function attachSilentAudioToNormalizedClip(args: {
   videoPath: string;
-  durationSec: number;
   outPath: string;
 }): Promise<void> {
-  const dur = args.durationSec.toFixed(3);
+  const durationSec = await ffprobeDurationSec(args.videoPath);
+  const dur = durationSec.toFixed(3);
   await runFfmpeg([
     "-y",
     "-i",
@@ -285,10 +298,84 @@ async function attachSilentAudioToNormalizedClip(args: {
     "2",
     "-b:a",
     "128k",
-    "-t",
-    dur,
+    "-shortest",
     args.outPath,
   ]);
+}
+
+/** 保留厂商原生音轨，统一为 xfade/concat 可混流的 AAC 立体声 */
+async function remuxVideoWithNormalizedAudio(
+  inputPath: string,
+  outPath: string,
+): Promise<void> {
+  await runFfmpeg([
+    "-y",
+    "-i",
+    inputPath,
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-b:a",
+    "128k",
+    outPath,
+  ]);
+}
+
+/** 合并前：每镜必有音轨；有 TTS 用 TTS，否则保留原生，再否则补静音 */
+async function prepareClipsForMerge(args: {
+  normPaths: string[];
+  probed: ProbedClip[];
+  mixTts: boolean;
+  tmp: string;
+  onProgress?: (pct: number, label: string) => void;
+}): Promise<{ paths: string[]; durations: number[] }> {
+  const paths: string[] = [];
+  const durations: number[] = [];
+  for (let i = 0; i < args.normPaths.length; i++) {
+    const normPath = args.normPaths[i]!;
+    const outPath = join(args.tmp, `merge-ready-${i}.mp4`);
+    const audioUrl = args.probed[i]?.audioUrl?.trim();
+    args.onProgress?.(
+      66 + Math.round((i / Math.max(args.normPaths.length, 1)) * 4),
+      audioUrl
+        ? `混入第 ${i + 1}/${args.normPaths.length} 镜口播音轨`
+        : `准备第 ${i + 1}/${args.normPaths.length} 镜音轨`,
+    );
+    if (args.mixTts && audioUrl) {
+      await attachVoiceoverToNormalizedClip({
+        videoPath: normPath,
+        audioUrl,
+        outPath,
+      });
+    } else if (await clipHasAudio(normPath)) {
+      await remuxVideoWithNormalizedAudio(normPath, outPath);
+    } else {
+      await attachSilentAudioToNormalizedClip({
+        videoPath: normPath,
+        outPath,
+      });
+    }
+    paths.push(outPath);
+    durations.push(await ffprobeDurationSec(outPath));
+  }
+  return { paths, durations };
+}
+
+export function estimateMergedDurationSec(
+  durations: number[],
+  transitionSec: number,
+): number {
+  if (durations.length <= 1) return durations[0] ?? 0;
+  if (transitionSec <= 0) return durations.reduce((a, b) => a + b, 0);
+  return (
+    durations.reduce((a, b) => a + b, 0) -
+    transitionSec * Math.max(0, durations.length - 1)
+  );
 }
 
 async function normalizeClip(
@@ -446,6 +533,9 @@ async function renderXfade(
   const withAudio = (await Promise.all(normPaths.map((p) => clipHasAudio(p)))).every(
     Boolean,
   );
+  if (!withAudio && normPaths.length > 1) {
+    throw new Error("合并失败：部分镜头缺少音轨，请重试或联系支持");
+  }
   const { filter, videoLabel, audioLabel } = buildXfadeFilterChain(
     durations,
     transitionSec,
@@ -859,10 +949,8 @@ export async function runFfmpegMediaRender(args: {
         rawPath,
         MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
       );
-      const durationSec =
-        clip.durationSec && clip.durationSec > 0
-          ? clip.durationSec
-          : await ffprobeDurationSec(rawPath);
+      const probedSec = await ffprobeDurationSec(rawPath);
+      const durationSec = resolveMediaClipDurationSec(probedSec, clip.durationSec);
       const size = await ffprobeVideoSize(rawPath);
       sourceSizes.push(size);
       probed.push({
@@ -881,15 +969,10 @@ export async function runFfmpegMediaRender(args: {
     const durations = probed.map((p) => p.durationSec);
     const transitionSec =
       profile.transition.type === "xfade" ? profile.transition.durationSec : 0;
-    const totalEstimate =
-      transitionSec > 0 && probed.length > 1
-        ? durations.reduce((a, b) => a + b, 0) -
-          transitionSec * (probed.length - 1)
-        : durations.reduce((a, b) => a + b, 0);
-
-    if (totalEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC) {
+    const roughEstimate = estimateMergedDurationSec(durations, transitionSec);
+    if (roughEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC * 1.2) {
       throw new Error(
-        `成片时长 ${Math.round(totalEstimate)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
+        `成片时长 ${Math.round(roughEstimate)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
       );
     }
 
@@ -915,41 +998,24 @@ export async function runFfmpegMediaRender(args: {
     }
 
     const mixTts = resolveMixTtsEnabled(profile);
-    if (mixTts) {
-      const voicedPaths: string[] = [];
-      let anyVoice = false;
-      for (let i = 0; i < probed.length; i++) {
-        const audioUrl = probed[i]!.audioUrl?.trim();
-        args.onProgress?.(
-          66 + Math.round((i / Math.max(probed.length, 1)) * 4),
-          audioUrl
-            ? `混入第 ${i + 1}/${probed.length} 镜口播音轨`
-            : `补齐第 ${i + 1}/${probed.length} 镜静音轨`,
-        );
-        const voicedPath = join(tmp, `norm-voiced-${i}.mp4`);
-        if (audioUrl) {
-          anyVoice = true;
-          await attachVoiceoverToNormalizedClip({
-            videoPath: normPaths[i]!,
-            audioUrl,
-            durationSec: probed[i]!.durationSec,
-            outPath: voicedPath,
-          });
-        } else {
-          await attachSilentAudioToNormalizedClip({
-            videoPath: normPaths[i]!,
-            durationSec: probed[i]!.durationSec,
-            outPath: voicedPath,
-          });
-        }
-        voicedPaths.push(voicedPath);
-      }
-      if (anyVoice) {
-        normPaths.splice(0, normPaths.length, ...voicedPaths);
-      }
+    const { paths: mergePaths, durations: mergeDurations } =
+      await prepareClipsForMerge({
+        normPaths,
+        probed,
+        mixTts,
+        tmp,
+        onProgress: (pct, label) => args.onProgress?.(pct, label),
+      });
+    normPaths.splice(0, normPaths.length, ...mergePaths);
+
+    const totalEstimate = estimateMergedDurationSec(mergeDurations, transitionSec);
+    if (totalEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC) {
+      throw new Error(
+        `成片时长 ${Math.round(totalEstimate)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
+      );
     }
 
-    const srtFrames = timelineToSrtFrames(timeline, durations);
+    const srtFrames = timelineToSrtFrames(timeline, mergeDurations);
     let srtContent: string | undefined;
     if (profile.subtitle.mode === "script") {
       srtContent = buildMergedSrt(srtFrames, {
@@ -991,7 +1057,7 @@ export async function runFfmpegMediaRender(args: {
         if (segments.length === 0 && clip.subtitle?.trim()) {
           const durMs = Math.max(
             500,
-            Math.round((durations[i] ?? 3) * 1000),
+            Math.round((mergeDurations[i] ?? 3) * 1000),
           );
           segments = [
             {
@@ -1003,7 +1069,7 @@ export async function runFfmpegMediaRender(args: {
         }
         clipSegments.push(segments);
       }
-      srtContent = buildAsrSubtitleSrt(clipSegments, durations, {
+      srtContent = buildAsrSubtitleSrt(clipSegments, mergeDurations, {
         transitionType: profile.transition.type,
         transitionSec,
       });
@@ -1033,7 +1099,7 @@ export async function runFfmpegMediaRender(args: {
           ? "拼接镜头并烧录字幕"
           : "拼接镜头";
     args.onProgress?.(72, xfadeLabel);
-    await renderXfade(normPaths, durations, profile, outPath, srtPath);
+    await renderXfade(normPaths, mergeDurations, profile, outPath, srtPath);
     args.onProgress?.(85, "编码完成，准备保存");
 
     const fastPath = join(tmp, "merged-faststart.mp4");

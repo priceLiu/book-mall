@@ -21,6 +21,7 @@ const SOURCE_APP = "e-commerce-toolkit";
 const FILES = [
   "lib/media/use-image-zoom-pan.ts",
   "components/media/image-zoom-controls.tsx",
+  "lib/media/ecom-image-preview.ts",
 ];
 
 /** 已接入统一预览的子应用；新应用接入时加到这里 */

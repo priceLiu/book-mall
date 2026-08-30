@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Dialog,
@@ -10,7 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import {
   EcomMediaLibraryTile,
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
@@ -53,7 +57,25 @@ export function EcomAssetPickerDialog({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+
+  const pickerImagePreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        assets
+          .filter((a) => a.kind === "image")
+          .map((a) => ({
+            url: a.ossUrl,
+            title: a.title ?? "资产图",
+            thumbUrl: a.thumbnailUrl,
+          })),
+      ),
+    [assets],
+  );
+  const {
+    preview: pickerImagePreview,
+    openPreview: openPickerImagePreview,
+    closePreview: closePickerImagePreview,
+  } = useEcomImagePreview(pickerImagePreviewItems);
 
   useEffect(() => {
     if (!open) {
@@ -161,7 +183,10 @@ export function EcomAssetPickerDialog({
                     selected={active}
                     onSelect={() => toggle(asset.id)}
                     onPreview={() =>
-                      setPreviewSrc(asset.thumbnailUrl ?? asset.ossUrl)
+                      openPickerImagePreview(
+                        asset.ossUrl,
+                        asset.title ?? "资产图",
+                      )
                     }
                   />
                 );
@@ -186,15 +211,11 @@ export function EcomAssetPickerDialog({
       </DialogContent>
     </Dialog>
 
-    {previewSrc ? (
-      <EcomImagePreviewDialog
-        src={previewSrc}
-        open
-        onOpenChange={(open) => {
-          if (!open) setPreviewSrc(null);
-        }}
-      />
-    ) : null}
+    <EcomImagePreviewHost
+      preview={pickerImagePreview}
+      galleryItems={pickerImagePreviewItems}
+      onClose={closePickerImagePreview}
+    />
   </>
   );
 }

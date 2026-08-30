@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ECOM_STORYBOARD_MODULE } from "@/lib/ecom/ecom-storyboard-types";
 import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
+import { enrichStoryboardSheetVideoUrlsForMerge } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
 import { fromEcomStoryboardSheet } from "@/lib/media/timeline-adapters";
 import { MediaRenderUnavailableError } from "@/lib/media/ffmpeg-preflight";
 import {
@@ -53,7 +54,20 @@ export async function POST(req: Request, ctx: Ctx) {
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const timeline = fromEcomStoryboardSheet(project.sheet, { panelIndexes });
+    const sheetForMerge = await enrichStoryboardSheetVideoUrlsForMerge(
+      auth.userId,
+      projectId,
+      project.sheet,
+    );
+    const timeline = fromEcomStoryboardSheet(sheetForMerge, { panelIndexes });
+    const sheetVideoCount = sheetForMerge.panels.filter((p) =>
+      Boolean(p.videoUrl?.trim()),
+    ).length;
+    if (!panelIndexes && timeline.clips.length < sheetVideoCount) {
+      console.warn(
+        `[storyboard-merge] project=${projectId} timeline clips=${timeline.clips.length} sheetVideos=${sheetVideoCount} genRecorded=${sheetForMerge.panels.filter((p) => p.videoGen?.modelKey).length}`,
+      );
+    }
     if (timeline.clips.length < 2) {
       return NextResponse.json(
         { error: "请至少为 2 个镜头生成分镜视频后再合并" },

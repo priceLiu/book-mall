@@ -99,3 +99,26 @@ export function isStoryboardPanelVideoPending(
 ): boolean {
   return Boolean(readStoryboardPendingPanelVideos(meta)[panelKey(panelIndex)]);
 }
+
+/**
+ * 合并本地 busy 与 meta pending。
+ * sheet 已有 videoUrl、且仅 stale pending（不在 panelVidBusyPanels）时不展示生成中。
+ */
+export function resolveActiveStoryboardPanelVideoBusyIndices(opts: {
+  panelVidBusyPanels: readonly number[];
+  pendingPanelVideoIndices: readonly number[];
+  panels: readonly { index: number; videoUrl?: string | null }[];
+}): number[] {
+  const set = new Set<number>([
+    ...opts.panelVidBusyPanels,
+    ...opts.pendingPanelVideoIndices,
+  ]);
+  for (const idx of opts.pendingPanelVideoIndices) {
+    if (opts.panelVidBusyPanels.includes(idx)) continue;
+    const hasVideo = opts.panels.some(
+      (p) => p.index === idx && Boolean(p.videoUrl?.trim()),
+    );
+    if (hasVideo) set.delete(idx);
+  }
+  return [...set].sort((a, b) => a - b);
+}

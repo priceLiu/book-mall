@@ -7,7 +7,11 @@ import { ChevronDown, ChevronRight, Layers, RotateCcw } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomHomeAssistant } from "@/components/layout/ecom-home-assistant";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import {
   EcomMediaLibraryTile,
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
@@ -366,9 +370,6 @@ export default function LibraryPage() {
   const [totalAssets, setTotalAssets] = useState(0);
   const [totalBundles, setTotalBundles] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [previewImage, setPreviewImage] = useState<{ src: string; title?: string } | null>(
-    null,
-  );
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
     null,
   );
@@ -431,6 +432,29 @@ export default function LibraryPage() {
       }))
       .filter((x) => x.sections.length > 0);
   }, [sections, activeTab]);
+
+  const libraryImagePreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        filteredSectionsByDomain.flatMap(({ sections: domainSections }) =>
+          domainSections.flatMap((section) =>
+            section.assets
+              .filter((asset) => asset.kind === "image")
+              .map((asset) => ({
+                url: asset.ossUrl,
+                title: asset.title ?? section.title,
+                thumbUrl: asset.thumbnailUrl,
+              })),
+          ),
+        ),
+      ),
+    [filteredSectionsByDomain],
+  );
+  const {
+    preview: libraryImagePreview,
+    openPreview: openLibraryImagePreview,
+    closePreview: closeLibraryImagePreview,
+  } = useEcomImagePreview(libraryImagePreviewItems);
 
   const workflowSections = useMemo(() => {
     return DOMAIN_ORDER.flatMap((domain) =>
@@ -684,7 +708,9 @@ export default function LibraryPage() {
                   onDeleteAsset={onDeleteAsset}
                   onPinAsset={onPinAsset}
                   pinnedAssetIds={pinnedAssetIds}
-                  onPreviewImage={(src, title) => setPreviewImage({ src, title })}
+                  onPreviewImage={(src, title) =>
+                    openLibraryImagePreview(src, title ?? "资产")
+                  }
                   onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
                   onReviewStoryboardBundle={(snap) => setReviewSnapshot(snap)}
                   onReuseStoryboardBundle={onReuseStoryboardBundle}
@@ -713,7 +739,9 @@ export default function LibraryPage() {
                         onDeleteAsset={onDeleteAsset}
                         onPinAsset={onPinAsset}
                         pinnedAssetIds={pinnedAssetIds}
-                        onPreviewImage={(src, title) => setPreviewImage({ src, title })}
+                        onPreviewImage={(src, title) =>
+                    openLibraryImagePreview(src, title ?? "资产")
+                  }
                         onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
                         onReviewStoryboardBundle={(snap) => setReviewSnapshot(snap)}
                         onReuseStoryboardBundle={onReuseStoryboardBundle}
@@ -732,16 +760,11 @@ export default function LibraryPage() {
         </div>
       </EcomWorkspaceLayout>
 
-      {previewImage ? (
-        <EcomImagePreviewDialog
-          src={previewImage.src}
-          title={previewImage.title}
-          open
-          onOpenChange={(open) => {
-            if (!open) setPreviewImage(null);
-          }}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={libraryImagePreview}
+        galleryItems={libraryImagePreviewItems}
+        onClose={closeLibraryImagePreview}
+      />
 
       {previewVideo ? (
         <EcomVideoPreviewDialog

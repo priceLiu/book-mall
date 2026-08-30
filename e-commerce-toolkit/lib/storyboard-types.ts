@@ -46,6 +46,14 @@ export type StoryboardPanel = {
   videoPromptEn?: string;
   imageUrl?: string;
   videoUrl?: string;
+  /** 最近一次单镜视频生成参数（模型选择器确认值，合并/重生成可读） */
+  videoGen?: {
+    modelKey: string;
+    durationSec: number;
+    resolution?: string;
+    aspectRatio?: "16:9" | "9:16";
+    generatedAt?: string;
+  };
   productInteraction?: StoryboardProductInteraction;
   productVisibility?: StoryboardProductVisibility;
   sellpointTags?: string[];

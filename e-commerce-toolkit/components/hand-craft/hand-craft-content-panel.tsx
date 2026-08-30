@@ -10,7 +10,10 @@ import { HandCraftComposePanel } from "@/components/hand-craft/hand-craft-compos
 import { HandCraftRefUploader } from "@/components/hand-craft/hand-craft-ref-uploader";
 import { HandCraftSaveDialog } from "@/components/hand-craft/hand-craft-save-dialog";
 import { HandCraftSlotGrid } from "@/components/hand-craft/hand-craft-slot-grid";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+} from "@/components/media";
 import {
   ProductDesignGalleryPreviewDialog,
   type ProductDesignGalleryPreviewItem,
@@ -108,10 +111,11 @@ export function HandCraftContentPanel({
     indexes: number[];
   } | null>(null);
   const [composeBusy, setComposeBusy] = useState(false);
-  const [composePreview, setComposePreview] = useState<{
-    src: string;
-    title: string;
-  } | null>(null);
+  const {
+    preview: composeImagePreview,
+    openPreview: openComposeImagePreview,
+    closePreview: closeComposeImagePreview,
+  } = useEcomImagePreview();
   const [galleryPreview, setGalleryPreview] = useState<{
     items: ProductDesignGalleryPreviewItem[];
     initialIndex: number;
@@ -502,7 +506,7 @@ export function HandCraftContentPanel({
                     generateRequest?.stepId === step.id ? generateRequest : null
                   }
                   onBusyChange={setComposeBusy}
-                  onPreviewImage={(src, title) => setComposePreview({ src, title })}
+                  onPreviewImage={(src, title) => openComposeImagePreview(src, title)}
                 />
               ) : (
                 <HandCraftSlotGrid
@@ -578,13 +582,9 @@ export function HandCraftContentPanel({
         }}
       />
 
-      <EcomImagePreviewDialog
-        src={composePreview?.src ?? ""}
-        open={Boolean(composePreview)}
-        onOpenChange={(open) => {
-          if (!open) setComposePreview(null);
-        }}
-        title={composePreview?.title ?? "拼版预览"}
+      <EcomImagePreviewHost
+        preview={composeImagePreview}
+        onClose={closeComposeImagePreview}
       />
 
       <ProductDesignGalleryPreviewDialog

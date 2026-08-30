@@ -55,6 +55,9 @@ import {
   fashionBusyStatusForLlmTrigger,
   fashionBusyStatusForUserMessage,
   fashionLlmFailureAssistantMessage,
+  fashionLlmStreamIdleTimeoutMs,
+  fashionLlmStreamTimeoutMs,
+  fashionLlmTriggerSucceeded,
   fashionMetaAfterLlmFailure,
   fashionNeedsProductRefAutoAdvance,
   fashionReviseDimensionChoiceLabel,
@@ -89,6 +92,14 @@ import type {
   StoryboardProject,
 } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
+
+function formatStreamElapsed(startedAt: number | null): string {
+  if (startedAt == null) return "";
+  const sec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`;
+}
 
 type Props = {
   project: StoryboardProject;
@@ -129,6 +140,9 @@ export function FashionAssistantPanel({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [streamStartedAt, setStreamStartedAt] = useState<number | null>(null);
+  const [, setStreamTick] = useState(0);
+  const [activeLlmTrigger, setActiveLlmTrigger] = useState<string | null>(null);
   const [workflowOverride, setWorkflowOverride] = useState<Record<string, unknown>>({});
   const [deliverableOverride, setDeliverableOverride] = useState<FashionDeliverable | null>(null);
   const [pendingChoice, setPendingChoice] = useState<string | null>(null);
@@ -144,8 +158,20 @@ export function FashionAssistantPanel({
     setDeliverableOverride(null);
     setPendingChoice(null);
     setBusyStatus(null);
+    setActiveLlmTrigger(null);
+    setStreamStartedAt(null);
     productAutoAckRef.current = null;
   }, [projectId]);
+
+  useEffect(() => {
+    if (!streaming) {
+      setStreamStartedAt(null);
+      return;
+    }
+    setStreamStartedAt((prev) => prev ?? Date.now());
+    const id = window.setInterval(() => setStreamTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [streaming]);
 
   useEffect(() => {
     if (streaming || pendingChoice) return;
@@ -394,6 +420,7 @@ export function FashionAssistantPanel({
       skipStreamingToggle = false,
       suppressErrorAlert = false,
     ) => {
+      const llmTrigger = isFashionInternalLlmTrigger(userContent) ? userContent : null;
       const userMsg: StoryboardChatMessage = {
         id: `user-${Date.now()}${hideUserBubble ? "-internal" : ""}`,
         role: "user",
@@ -407,12 +434,16 @@ export function FashionAssistantPanel({
       if (!skipStreamingToggle) {
         setStreaming(true);
         setStreamText("");
+        setStreamStartedAt(Date.now());
       }
+      if (llmTrigger) setActiveLlmTrigger(llmTrigger);
       try {
         const acc = await streamStoryboardChat({
           projectId,
           modelKey: settings.chatModelKey,
           messages: base.filter((m) => m.id !== "welcome" && !m.id.startsWith("err-")),
+          maxDurationMs: llmTrigger ? fashionLlmStreamTimeoutMs(llmTrigger) : undefined,
+          idleTimeoutMs: llmTrigger ? fashionLlmStreamIdleTimeoutMs(llmTrigger) : undefined,
           onChunk: (chunk) => {
             setStreamText(chunk);
           },
@@ -425,6 +456,21 @@ export function FashionAssistantPanel({
         };
         const cleaned = hideUserBubble ? [...history, assistantMsg] : [...base, assistantMsg];
         await persistMessages(cleaned);
+
+        if (llmTrigger) {
+          const fresh = await getStoryboardProject(projectId);
+          if (!fashionLlmTriggerSucceeded(llmTrigger, fresh)) {
+            const parsed = extractFashionDeliverableFromText(acc);
+            const hint =
+              llmTrigger.includes("storyboards") && parsed?.storyboardVersions
+                ? "模型返回了分镜内容但 JSON 未完整解析"
+                : "模型已回复但未写入预期数据";
+            throw new Error(
+              `${hint}。请点「重新生成分镜」重试；若多次失败请更换 Gateway 聊天模型或缩短口播脚本。`,
+            );
+          }
+        }
+
         await onDeliverableReady?.();
       } catch (e) {
         if (!suppressErrorAlert) {
@@ -438,6 +484,8 @@ export function FashionAssistantPanel({
       } finally {
         setStreaming(false);
         setStreamText("");
+        setStreamStartedAt(null);
+        setActiveLlmTrigger(null);
       }
     },
     [projectId, settings.chatModelKey, persistMessages, onDeliverableReady, onAlert],
@@ -502,6 +550,8 @@ export function FashionAssistantPanel({
             setBusyStatus(fashionBusyStatusForLlmTrigger(llmTrigger));
             setStreaming(true);
             setStreamText("");
+            setStreamStartedAt(Date.now());
+            setActiveLlmTrigger(llmTrigger);
           }
 
           let patchedProject: StoryboardProject | undefined;
@@ -642,6 +692,7 @@ export function FashionAssistantPanel({
 
         setStreaming(true);
         setStreamText("");
+        setStreamStartedAt(Date.now());
         setBusyStatus({ title: "思考中", detail: "助手正在理解您的补充说明…" });
         await runStream(next, message, false, true);
       } finally {
@@ -881,12 +932,21 @@ export function FashionAssistantPanel({
         {isBusy && busyStatus ? (
           <StoryboardTaskStatus
             active
+            sweep={streaming}
             title={streaming && streamText ? "生成中" : busyStatus.title}
             detail={
               streaming
-                ? streamText
-                  ? "内容流式输出中，完成后自动进入下一步…"
-                  : `${busyStatus.detail}（正在连接 AI…）`
+                ? (() => {
+                    const elapsed = formatStreamElapsed(streamStartedAt);
+                    const chars = streamText.length;
+                    if (streamText) {
+                      const isStoryboards = activeLlmTrigger?.includes("storyboards");
+                      return isStoryboards
+                        ? `分镜 JSON 流式输出中（已 ${chars.toLocaleString()} 字${elapsed ? ` · ${elapsed}` : ""}）。A–E 五套分镜体积较大，通常需 2–8 分钟；完成后自动进入选版。`
+                        : `内容流式输出中（已 ${chars.toLocaleString()} 字${elapsed ? ` · ${elapsed}` : ""}）。完成后自动进入下一步…`;
+                    }
+                    return `${busyStatus.detail}${elapsed ? `（已等待 ${elapsed}）` : "（正在连接 AI…）"}`;
+                  })()
                 : busyStatus.detail
             }
             className="mx-0 mb-3"

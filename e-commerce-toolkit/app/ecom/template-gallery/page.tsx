@@ -4,7 +4,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ChevronDown, ImageIcon, Upload, Video } from "lucide-react";
 
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
 import { EcomScrollLoadFooter } from "@/components/media/ecom-scroll-load-footer";
 import { EcomTemplateGalleryTile } from "@/components/media/ecom-template-gallery-tile";
@@ -89,11 +93,6 @@ function TemplateGalleryPageInner() {
   const [importOpen, setImportOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const categoryRowRef = useRef<HTMLDivElement>(null);
-  const [imagePreview, setImagePreview] = useState<{
-    src: string;
-    thumbSrc?: string;
-    title?: string;
-  } | null>(null);
   const [videoPreview, setVideoPreview] = useState<{
     src: string;
     title?: string;
@@ -243,6 +242,25 @@ function TemplateGalleryPageInner() {
     () => templates.slice(0, visibleCount),
     [templates, visibleCount],
   );
+
+  const templateImagePreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        visibleTemplates
+          .filter((t) => t.mediaKind === "image")
+          .map((t) => ({
+            url: t.ossUrl,
+            title: t.title,
+            thumbUrl: t.thumbUrl,
+          })),
+      ),
+    [visibleTemplates],
+  );
+  const {
+    preview: imagePreviewState,
+    openPreview: openTemplateImagePreview,
+    closePreview: closeTemplateImagePreview,
+  } = useEcomImagePreview(templateImagePreviewItems);
 
   // 刷新后恢复滚动位置（仅一次）
   useEffect(() => {
@@ -499,11 +517,11 @@ function TemplateGalleryPageInner() {
                               poster: entry.thumbUrl || undefined,
                             });
                           } else {
-                            setImagePreview({
-                              src: entry.ossUrl,
-                              thumbSrc: entry.thumbUrl,
-                              title: entry.title,
-                            });
+                            openTemplateImagePreview(
+                              entry.ossUrl,
+                              entry.title,
+                              templateImagePreviewItems,
+                            );
                           }
                         }}
                       />
@@ -534,17 +552,11 @@ function TemplateGalleryPageInner() {
 
       <EcomTemplateImportPanel />
 
-      {imagePreview ? (
-        <EcomImagePreviewDialog
-          src={imagePreview.src}
-          thumbSrc={imagePreview.thumbSrc}
-          title="模板预览"
-          open
-          onOpenChange={(open) => {
-            if (!open) setImagePreview(null);
-          }}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={imagePreviewState}
+        galleryItems={templateImagePreviewItems}
+        onClose={closeTemplateImagePreview}
+      />
 
       {videoPreview ? (
         <EcomVideoPreviewDialog

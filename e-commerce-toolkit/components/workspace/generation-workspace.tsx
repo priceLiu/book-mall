@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import {
   EcomMediaLibraryTile,
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
@@ -38,9 +42,6 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
     null,
   );
-  const [previewImage, setPreviewImage] = useState<{ src: string; title?: string } | null>(
-    null,
-  );
   const [pinnedAssetIds, setPinnedAssetIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -67,6 +68,25 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "加载失败"));
   }, [load]);
+
+  const moduleImagePreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        assets
+          .filter((a) => a.kind === "image")
+          .map((a) => ({
+            url: a.ossUrl,
+            title: a.title ?? "资产",
+            thumbUrl: a.thumbnailUrl,
+          })),
+      ),
+    [assets],
+  );
+  const {
+    preview: moduleImagePreview,
+    openPreview: openModuleImagePreview,
+    closePreview: closeModuleImagePreview,
+  } = useEcomImagePreview(moduleImagePreviewItems);
 
   async function handleGenerate() {
     if (!prompt.trim()) {
@@ -225,10 +245,7 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
                       onPreview={() =>
                         isVideo
                           ? setPreviewVideo({ src: a.ossUrl, title: a.title ?? undefined })
-                          : setPreviewImage({
-                              src: a.thumbnailUrl ?? a.ossUrl,
-                              title: a.title ?? undefined,
-                            })
+                          : openModuleImagePreview(a.ossUrl, a.title ?? "资产")
                       }
                       onDownload={() =>
                         void downloadMediaUrl(
@@ -259,16 +276,11 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
         />
       ) : null}
 
-      {previewImage ? (
-        <EcomImagePreviewDialog
-          src={previewImage.src}
-          title={previewImage.title}
-          open
-          onOpenChange={(open) => {
-            if (!open) setPreviewImage(null);
-          }}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={moduleImagePreview}
+        galleryItems={moduleImagePreviewItems}
+        onClose={closeModuleImagePreview}
+      />
     </>
   );
 }

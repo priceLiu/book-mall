@@ -166,56 +166,87 @@ export async function streamStoryboardChat(opts: {
   messages: StoryboardChatMessage[];
   modelKey: string;
   onChunk: (text: string) => void;
+  /** 流式总时长上限（默认 6 分钟） */
+  maxDurationMs?: number;
+  /** 无新 chunk 超过该时长则中断（默认 2 分钟） */
+  idleTimeoutMs?: number;
 }): Promise<string> {
-  const res = await fetch(
-    `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${opts.projectId}/assistant/chat`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
-        modelKey: opts.modelKey,
-      }),
-    },
-  );
-  if (res.status === 401) {
-    throw new EcomUnauthorizedError("未登录");
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    let err = `请求失败 (${res.status})`;
-    try {
-      const j = JSON.parse(text) as { error?: string };
-      if (j.error) err = j.error;
-    } catch {
-      /* */
+  const maxDurationMs = opts.maxDurationMs ?? 6 * 60_000;
+  const idleTimeoutMs = opts.idleTimeoutMs ?? 2 * 60_000;
+  const controller = new AbortController();
+  const maxTimer = setTimeout(() => controller.abort(), maxDurationMs);
+  let lastActivityAt = Date.now();
+  const idleTimer = setInterval(() => {
+    if (Date.now() - lastActivityAt > idleTimeoutMs) {
+      controller.abort();
     }
-    throw new Error(err);
-  }
-  if (!res.body) throw new Error("无响应流");
+  }, 5000);
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let full = "";
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const piece = decoder.decode(value, { stream: true });
-      full += piece;
-      opts.onChunk(full);
+    const res = await fetch(
+      `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${opts.projectId}/assistant/chat`,
+      {
+        method: "POST",
+        credentials: "include",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+          modelKey: opts.modelKey,
+        }),
+      },
+    );
+    if (res.status === 401) {
+      throw new EcomUnauthorizedError("未登录");
     }
-  } catch (readError) {
-    const msg = readError instanceof Error ? readError.message : String(readError);
-    if (/network error|failed to fetch|load failed|aborted|abort/i.test(msg)) {
-      throw new Error(
-        "助手流式连接中断（可能是生成内容过长或服务超时）。请稍后重试「重新生成分镜」；若仍失败请检查 Gateway 聊天模型是否可用。",
-      );
+    if (!res.ok) {
+      const text = await res.text();
+      let err = `请求失败 (${res.status})`;
+      try {
+        const j = JSON.parse(text) as { error?: string };
+        if (j.error) err = j.error;
+      } catch {
+        /* */
+      }
+      throw new Error(err);
     }
-    throw readError instanceof Error ? readError : new Error(msg);
+    if (!res.body) throw new Error("无响应流");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        lastActivityAt = Date.now();
+        const piece = decoder.decode(value, { stream: true });
+        full += piece;
+        opts.onChunk(full);
+      }
+    } catch (readError) {
+      const msg = readError instanceof Error ? readError.message : String(readError);
+      if (readError instanceof Error && readError.name === "AbortError") {
+        const idleSec = Math.round(idleTimeoutMs / 1000);
+        const maxSec = Math.round(maxDurationMs / 1000);
+        throw new Error(
+          full.trim().length > 0
+            ? `助手流式响应超时（${full.length} 字已接收）。请点「重新生成分镜」重试；若多次失败请换 Gateway 聊天模型或缩短口播脚本。`
+            : `助手流式响应超时（${idleSec}s 无新内容或总时长超过 ${maxSec}s）。请稍后重试。`,
+        );
+      }
+      if (/network error|failed to fetch|load failed|aborted|abort/i.test(msg)) {
+        throw new Error(
+          "助手流式连接中断（可能是生成内容过长或服务超时）。请稍后重试「重新生成分镜」；若仍失败请检查 Gateway 聊天模型是否可用。",
+        );
+      }
+      throw readError instanceof Error ? readError : new Error(msg);
+    }
+    return full;
+  } finally {
+    clearTimeout(maxTimer);
+    clearInterval(idleTimer);
   }
-  return full;
 }
 
 export async function uploadStoryboardSheetPng(
@@ -451,6 +482,30 @@ export async function saveStoryboardDeliverableSnapshot(
     snapshot: data.snapshot,
     project: data.project as StoryboardProject,
   };
+}
+
+export type StoryboardWorkflowSnapshot = {
+  savedAt: string;
+  title: string;
+  projectName?: string;
+};
+
+/** 保存完整工作流镜像到资产库（微剧故事版类目） */
+export async function saveStoryboardWorkflow(
+  projectId: string,
+  projectName: string,
+): Promise<StoryboardWorkflowSnapshot> {
+  const trimmed = projectName.trim();
+  if (!trimmed) throw new Error("请填写项目名");
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/save`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectName: trimmed }),
+    },
+  );
+  return data.snapshot as StoryboardWorkflowSnapshot;
 }
 
 /** 一键复用：打开已有项目或从历史快照创建新项目 */

@@ -9,7 +9,12 @@ import {
   MEDIA_RENDER_MAX_CLIPS,
   validateTimelineLimits,
 } from "@/lib/media/render-limits";
-import { timelineToSrtFrames, resolveMixTtsEnabled } from "@/lib/media/render-ffmpeg";
+import {
+  estimateMergedDurationSec,
+  resolveMediaClipDurationSec,
+  timelineToSrtFrames,
+  resolveMixTtsEnabled,
+} from "@/lib/media/render-ffmpeg";
 import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 
 describe("media render adapters", () => {
@@ -47,6 +52,7 @@ describe("media render adapters", () => {
     const tl = fromEcomStoryboardSheet(sheet);
     expect(tl.clips).toHaveLength(1);
     expect(tl.clips[0]?.subtitle).toBe("hi");
+    expect(tl.clips[0]?.durationSec).toBeUndefined();
   });
 });
 
@@ -66,6 +72,21 @@ describe("render limits", () => {
       clips: [{ order: 0, videoUrl: "http://insecure.mp4" }],
     });
     expect(err?.code).toBe("INVALID_VIDEO_URL");
+  });
+});
+
+describe("estimateMergedDurationSec", () => {
+  it("subtracts xfade overlap between clips", () => {
+    expect(estimateMergedDurationSec([5, 5, 5], 0.6)).toBeCloseTo(13.8);
+    expect(estimateMergedDurationSec([5, 5], 0)).toBe(10);
+  });
+});
+
+describe("resolveMediaClipDurationSec", () => {
+  it("prefers ffprobe over script hint so merge does not trim clips", () => {
+    expect(resolveMediaClipDurationSec(7.8, 3)).toBe(7.8);
+    expect(resolveMediaClipDurationSec(0, 5)).toBe(5);
+    expect(resolveMediaClipDurationSec(0, 0)).toBe(3);
   });
 });
 
