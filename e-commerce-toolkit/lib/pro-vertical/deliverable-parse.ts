@@ -1,19 +1,30 @@
-import type { ProDeliverable, ProPanelRow, ProVersionKey } from "@/lib/pro-vertical/types";
+import type { ProDeliverable, ProPanelRow, ProVersionKey, ProVerticalId } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
+import { isProVerticalId } from "@/lib/pro-vertical/registry";
 
 const PRO_FENCE_RE = /```pro-deliverable\s*([\s\S]*?)```/i;
 const FASHION_FENCE_RE = /```fashion-deliverable\s*([\s\S]*?)```/i;
 const GENERIC_FENCE_RE = /```(?:json)?\s*([\s\S]*?)```/i;
 
-function deriveScenePrompt(sceneDesc: string, vertical: "bags" | "fashion_apparel"): string {
+function productFocusFallback(vertical: ProVerticalId): string {
+  if (vertical === "bags") return "包包展示";
+  if (vertical === "digital_3c") return "产品功能展示";
+  return "服装展示";
+}
+
+function deriveScenePrompt(sceneDesc: string, vertical: ProVerticalId): string {
   const desc = sceneDesc.trim();
-  if (desc && desc !== "—" && desc.length >= 20) return desc;
   const suffix =
-    vertical === "bags" ? "与包袋品类匹配的环境与道具" : "与服装品类匹配的环境与道具";
+    vertical === "bags"
+      ? "与包袋品类匹配的环境与道具"
+      : vertical === "digital_3c"
+        ? "与数码产品品类匹配的环境与道具"
+        : "与服装品类匹配的环境与道具";
+  if (desc && desc !== "—" && desc.length >= 20) return desc;
   return desc && desc !== "—" ? `${desc}，写实自然光，${suffix}` : `都市室内场景，自然光，${suffix}`;
 }
 
-function coerceProPanels(raw: unknown, vertical: "bags" | "fashion_apparel"): ProPanelRow[] {
+function coerceProPanels(raw: unknown, vertical: ProVerticalId): ProPanelRow[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((p, i) => {
@@ -23,7 +34,7 @@ function coerceProPanels(raw: unknown, vertical: "bags" | "fashion_apparel"): Pr
       const sceneDesc = String(panel.sceneDesc ?? "—");
       const modelAction = String(panel.modelAction ?? sceneDesc);
       const productFocus = String(
-        panel.productFocus ?? panel.garmentFocus ?? (vertical === "bags" ? "包包展示" : "服装展示"),
+        panel.productFocus ?? panel.garmentFocus ?? productFocusFallback(vertical),
       );
       const cameraMove = String(panel.cameraMove ?? "固定");
       const scenePrompt = deriveScenePrompt(sceneDesc, vertical);
@@ -52,19 +63,24 @@ function coerceProPanels(raw: unknown, vertical: "bags" | "fashion_apparel"): Pr
     .filter(Boolean) as ProPanelRow[];
 }
 
-function tryParseProCandidate(jsonRaw: string): ProDeliverable | null {
+function tryParseProCandidate(jsonRaw: string, fallbackVertical?: ProVerticalId): ProDeliverable | null {
   try {
     const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
-    if (parsed.vertical !== "bags" && parsed.schemaVersion !== "pro-v1") return null;
+    const rawVertical = typeof parsed.vertical === "string" ? parsed.vertical : undefined;
+    const vertical: ProVerticalId =
+      isProVerticalId(rawVertical) && rawVertical !== "fashion_apparel"
+        ? rawVertical
+        : fallbackVertical ?? "bags";
+    if (parsed.schemaVersion !== "pro-v1" && rawVertical !== vertical) return null;
     parsed.schemaVersion = "pro-v1";
-    parsed.vertical = "bags";
+    parsed.vertical = vertical;
     const versions = parsed.storyboardVersions as Record<string, unknown> | undefined;
     if (versions) {
       for (const key of ["A", "B", "C", "D", "E"]) {
         const v = versions[key];
         if (!v || typeof v !== "object") continue;
         const vo = v as Record<string, unknown>;
-        vo.panels = coerceProPanels(vo.panels, "bags");
+        vo.panels = coerceProPanels(vo.panels, vertical);
       }
     }
     return parsed as ProDeliverable;
@@ -73,19 +89,22 @@ function tryParseProCandidate(jsonRaw: string): ProDeliverable | null {
   }
 }
 
-export function extractProDeliverableFromText(text: string): ProDeliverable | null {
+export function extractProDeliverableFromText(
+  text: string,
+  vertical?: ProVerticalId,
+): ProDeliverable | null {
   const trimmed = text.trim();
   for (const re of [PRO_FENCE_RE, FASHION_FENCE_RE, GENERIC_FENCE_RE]) {
     const m = trimmed.match(re);
     if (m?.[1]) {
-      const parsed = tryParseProCandidate(m[1].trim());
+      const parsed = tryParseProCandidate(m[1].trim(), vertical);
       if (parsed) return parsed;
     }
   }
   const start = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
   if (start >= 0 && end > start) {
-    return tryParseProCandidate(trimmed.slice(start, end + 1));
+    return tryParseProCandidate(trimmed.slice(start, end + 1), vertical);
   }
   return null;
 }
@@ -128,7 +147,7 @@ export function mergeProDeliverableState(
 export function readMetaProDeliverable(raw: unknown): ProDeliverable | null {
   if (!isProDeliverable(raw)) return null;
   const o = raw as ProDeliverable;
-  if (o.vertical !== "bags") return null;
+  if (o.vertical === "fashion_apparel") return null;
   return o;
 }
 

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { mergeStoryboardPanelMediaByIndex } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
 import { prisma } from "@/lib/prisma";
 import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import type { StoryboardReference, StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
@@ -23,6 +24,68 @@ export type StoryboardDeliverableSnapshot = {
   renderExpiresAt?: string;
   panelVideos: Array<{ index: number; videoUrl: string }>;
 };
+
+function panelVideosFromSheet(sheet: StoryboardSheet): StoryboardDeliverableSnapshot["panelVideos"] {
+  return sheet.panels
+    .filter((p) => Boolean(p.videoUrl?.trim()))
+    .map((p) => ({ index: p.index, videoUrl: p.videoUrl!.trim() }));
+}
+
+/** 合并多个快照来源的分镜图/视频/参考图（工作流保存早于成片时使用） */
+export function mergeStoryboardDeliverableSnapshotMedia(
+  base: StoryboardDeliverableSnapshot,
+  sources: Array<StoryboardDeliverableSnapshot | null | undefined>,
+): StoryboardDeliverableSnapshot {
+  let sheet = base.sheet;
+  let references = base.references;
+  let sheetPngUrl = base.sheetPngUrl;
+  let videoUrl = base.videoUrl;
+  let videoMode = base.videoMode;
+  let videoAssetId = base.videoAssetId;
+  let renderJobId = base.renderJobId;
+  let renderExpiresAt = base.renderExpiresAt;
+  let panelVideos = base.panelVideos;
+  let projectKeywords = base.projectKeywords;
+
+  for (const src of sources) {
+    if (!src) continue;
+    if (src.sheet?.panels?.length) {
+      sheet = {
+        ...sheet,
+        panels: mergeStoryboardPanelMediaByIndex(sheet.panels, src.sheet.panels),
+      };
+    }
+    if (src.references.length > 0 && references.length === 0) {
+      references = src.references;
+    }
+    sheetPngUrl = sheetPngUrl ?? src.sheetPngUrl;
+    videoUrl = videoUrl ?? src.videoUrl;
+    videoMode = videoMode ?? src.videoMode;
+    videoAssetId = videoAssetId ?? src.videoAssetId;
+    renderJobId = renderJobId ?? src.renderJobId;
+    renderExpiresAt = renderExpiresAt ?? src.renderExpiresAt;
+    projectKeywords = projectKeywords ?? src.projectKeywords;
+    if (panelVideos.length === 0 && src.panelVideos.length > 0) {
+      panelVideos = src.panelVideos;
+    }
+  }
+
+  const mergedPanelVideos = panelVideos.length > 0 ? panelVideos : panelVideosFromSheet(sheet);
+
+  return {
+    ...base,
+    sheet,
+    references,
+    sheetPngUrl,
+    videoUrl,
+    videoMode,
+    videoAssetId,
+    renderJobId,
+    renderExpiresAt,
+    projectKeywords,
+    panelVideos: mergedPanelVideos,
+  };
+}
 
 export function buildStoryboardDeliverableSnapshot(opts: {
   sheet: StoryboardSheet;

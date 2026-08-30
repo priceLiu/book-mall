@@ -6,6 +6,7 @@ import {
 } from "@/lib/ecom/ecom-storyboard-service";
 import {
   buildStoryboardDeliverableSnapshot,
+  mergeStoryboardDeliverableSnapshotMedia,
   type StoryboardDeliverableSnapshot,
 } from "@/lib/ecom/ecom-storyboard-snapshot";
 import type {
@@ -96,16 +97,29 @@ export function buildStoryboardWorkflowSnapshot(
 export function buildStoryboardDeliverablePreviewFromWorkflow(
   snap: StoryboardWorkflowSnapshot,
 ): StoryboardDeliverableSnapshot {
+  const deliverableSnap = snap.meta?.deliverableSnapshot as
+    | StoryboardDeliverableSnapshot
+    | undefined;
+
   if (snap.sheet) {
     const deliverable = snap.meta?.deliverable;
-    return buildStoryboardDeliverableSnapshot({
+    const built = buildStoryboardDeliverableSnapshot({
       sheet: snap.sheet,
       references: snap.references,
       sheetPngUrl: snap.sheetPngUrl,
       productName: deliverable?.productName ?? snap.projectName,
       productHighlight: snap.sheet.overview.productHighlight,
+      projectKeywords: deliverableSnap?.projectKeywords,
       deliverableMarkdown: snap.meta?.deliverableMarkdown,
     });
+    return mergeStoryboardDeliverableSnapshotMedia(
+      {
+        ...built,
+        savedAt: snap.savedAt,
+        title: snap.title,
+      },
+      [deliverableSnap],
+    );
   }
   return {
     savedAt: snap.savedAt,

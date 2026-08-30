@@ -51,5 +51,6 @@ describe("pro category pick flow", () => {
 
   it("parses category choice labels", () => {
     expect(parseProCategoryPick(proCategoryChoiceLabel("包包"))?.verticalId).toBe("bags");
+    expect(parseProCategoryPick(proCategoryChoiceLabel("3C 数码"))?.verticalId).toBe("digital_3c");
   });
 });

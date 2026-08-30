@@ -484,6 +484,22 @@ export async function saveStoryboardDeliverableSnapshot(
   };
 }
 
+/** 资产库「查看交付包」：拉取合并当前成图/成片后的快照 */
+export async function fetchStoryboardLibraryDeliverable(
+  projectId: string,
+  opts?: { savedAt?: string; title?: string },
+): Promise<import("@/lib/storyboard-types").StoryboardDeliverableSnapshot> {
+  const params = new URLSearchParams();
+  if (opts?.savedAt?.trim()) params.set("savedAt", opts.savedAt.trim());
+  if (opts?.title?.trim()) params.set("title", opts.title.trim());
+  const qs = params.toString();
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/deliverable/snapshot${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+  );
+  return data.snapshot as import("@/lib/storyboard-types").StoryboardDeliverableSnapshot;
+}
+
 export type StoryboardWorkflowSnapshot = {
   savedAt: string;
   title: string;

@@ -1,10 +1,12 @@
 import { FASHION_APPAREL_CONFIG } from "@/lib/ecom/pro-vertical/configs/fashion-apparel";
 import { BAGS_CONFIG } from "@/lib/ecom/pro-vertical/configs/bags";
+import { DIGITAL_3C_CONFIG } from "@/lib/ecom/pro-vertical/configs/digital_3c";
 import type { ProVerticalConfig, ProVerticalId } from "@/lib/ecom/pro-vertical/types";
 
 const REGISTRY: Record<ProVerticalId, ProVerticalConfig> = {
   fashion_apparel: FASHION_APPAREL_CONFIG,
   bags: BAGS_CONFIG,
+  digital_3c: DIGITAL_3C_CONFIG,
 };
 
 export function listProVerticals(): ProVerticalConfig[] {
@@ -35,4 +37,4 @@ export function isProVerticalWorkflow(
   return isProVerticalId(typeof wf.vertical === "string" ? wf.vertical : null);
 }
 
-export { FASHION_APPAREL_CONFIG, BAGS_CONFIG };
+export { FASHION_APPAREL_CONFIG, BAGS_CONFIG, DIGITAL_3C_CONFIG };

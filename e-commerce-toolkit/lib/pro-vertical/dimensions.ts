@@ -6,14 +6,34 @@ export function getDimensionSteps(vertical: ProVerticalId): DimensionStepDef[] {
   return getProVerticalConfig(vertical)?.dimensionSteps ?? [...FASHION_DIMENSION_STEPS];
 }
 
+export function resolveDimensionStepOptions(
+  vertical: ProVerticalId,
+  step: DimensionStepDef,
+  parentDimensions: Partial<Record<string, string>>,
+): readonly string[] {
+  if (step.subOptionsMap && step.parentKey) {
+    const parent = parentDimensions[step.parentKey]?.trim();
+    if (parent && step.subOptionsMap[parent]) return step.subOptionsMap[parent]!;
+    return step.subOptionsMap["通用"] ?? ["通用"];
+  }
+  return step.options ?? [];
+}
+
 export function proDimensionPrompt(vertical: ProVerticalId, stepIndex: number): string {
   const steps = getDimensionSteps(vertical);
   const step = steps[stepIndex];
   if (!step) return "请选择参数";
   if (step.freeText) {
     const hint =
-      vertical === "bags" ? "通勤、出差、旅行" : "都市通勤、周末露营";
+      vertical === "bags"
+        ? "通勤、出差、旅行"
+        : vertical === "digital_3c"
+          ? "通勤、办公、差旅、游戏"
+          : "都市通勤、周末露营";
     return `请输入${step.label}（如：${hint}）`;
+  }
+  if (step.ui === "searchSelect") {
+    return `请搜索并选择${step.label}，或选「自定义」后在下方输入`;
   }
   return `请选择${step.label}`;
 }

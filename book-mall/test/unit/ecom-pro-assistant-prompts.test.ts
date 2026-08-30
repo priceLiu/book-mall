@@ -26,3 +26,13 @@ describe("ecom-pro-assistant-prompts · bags", () => {
     expect(resolveProPromptPhase("pro-step:ops-generate")).toBe("ops");
   });
 });
+
+describe("ecom-pro-assistant-prompts · digital_3c", () => {
+  it("storyboards phase includes 3C version titles and mirror roles", () => {
+    const prompt = buildProAssistantSystemPrompt("digital_3c", "storyboards");
+    expect(prompt).toContain('"digital_3c"');
+    expect(prompt).toContain("开箱惊艳");
+    expect(prompt).toContain("六镜职能");
+    expect(prompt).toContain("productFocus");
+  });
+});

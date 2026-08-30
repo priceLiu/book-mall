@@ -19,6 +19,7 @@
 |----------|-------|---------------|
 | `fashion_apparel` | 服装专业版 | `fashion-v4` |
 | `bags` | 包包专业版 | — |
+| `digital_3c` | 3C数码专业版 | — |
 
 配置：`book-mall/lib/ecom/pro-vertical/registry.ts`
 
@@ -27,7 +28,7 @@
 ```typescript
 type ProDeliverableV1 = {
   schemaVersion: "pro-v1";
-  vertical: "fashion_apparel" | "bags"; // 扩展见 registry
+  vertical: "fashion_apparel" | "bags" | "digital_3c"; // 扩展见 registry
   productName: string;
   dimensions: Record<string, string>;
   sellpoints: ProSellpoint[];
@@ -87,6 +88,18 @@ UI 列 label 由 `VerticalConfig.panelFocusLabel` 决定（如「包包展示重
 | styleCategory | 包型品类（托特包、斜挎包…） |
 | styleAttribute | 同共享 enum |
 | tier | 同共享 |
+| customScene | 使用场景（自由输入） |
+| platform | 同共享 |
+| outputLanguage | 同共享 |
+
+### digital_3c
+
+| key | 说明 |
+|-----|------|
+| productCategory | 产品大类（可搜索） |
+| productSubCategory | 产品细项（随大类级联） |
+| designLanguage | 设计语言 |
+| tier | 档次 |
 | customScene | 使用场景（自由输入） |
 | platform | 同共享 |
 | outputLanguage | 同共享 |

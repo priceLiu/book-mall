@@ -1,6 +1,6 @@
 import type { StoryboardProject } from "@/lib/storyboard-types";
-import { isProVerticalId } from "@/lib/pro-vertical/registry";
-import type { ProVerticalId } from "@/lib/pro-vertical/types";
+import { getProVerticalConfig, isProVerticalId } from "@/lib/pro-vertical/registry";
+import type { CharacterRefPolicy, ProVerticalId } from "@/lib/pro-vertical/types";
 
 function workflowOf(project: StoryboardProject): Record<string, unknown> {
   return (project.meta?.workflow ?? {}) as Record<string, unknown>;
@@ -37,6 +37,27 @@ export function isProVerticalProject(project: StoryboardProject): boolean {
 
 export function isBagsProject(project: StoryboardProject): boolean {
   return getProjectVertical(project) === "bags";
+}
+
+/** 非服装 Pro vertical（包包、3C 数码等 pro-v1 品类） */
+export function isNonFashionProVertical(project: StoryboardProject): boolean {
+  const v = getProjectVertical(project);
+  return v != null && v !== "fashion_apparel";
+}
+
+/** 工作流阶段字段走 proPhase / pro-step 前缀 */
+export function usesProPhase(project: StoryboardProject): boolean {
+  return isNonFashionProVertical(project) || (isProModeProject(project) && !getProjectVertical(project));
+}
+
+export function getProjectCharacterRefPolicy(project: StoryboardProject): CharacterRefPolicy {
+  const vertical = getProjectVertical(project);
+  if (!vertical) return "required";
+  return getProVerticalConfig(vertical)?.characterRefPolicy ?? "required";
+}
+
+export function isCharacterRefRequired(project: StoryboardProject): boolean {
+  return getProjectCharacterRefPolicy(project) === "required";
 }
 
 export function isFashionVerticalProject(project: StoryboardProject): boolean {

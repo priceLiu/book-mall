@@ -41,8 +41,9 @@ export const PRO_CATEGORY_OPTIONS: ProCategoryOption[] = [
   {
     id: "digital_3c",
     label: "3C 数码",
-    available: false,
-    description: "即将上线",
+    verticalId: "digital_3c",
+    available: true,
+    description: "七维参数 · 卖点口播 · 六镜分镜 · 功能演示",
   },
 ];
 

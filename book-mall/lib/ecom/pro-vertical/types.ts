@@ -1,6 +1,6 @@
 /** Pro Vertical 专业版带货 · 配置类型 */
 
-export type ProVerticalId = "fashion_apparel" | "bags";
+export type ProVerticalId = "fashion_apparel" | "bags" | "digital_3c";
 
 export type ProPhase =
   | "product_ref"
@@ -19,6 +19,9 @@ export type DimensionStepDef = {
   label: string;
   options?: readonly string[];
   freeText?: boolean;
+  ui?: "chips" | "searchSelect";
+  parentKey?: string;
+  subOptionsMap?: Record<string, readonly string[]>;
 };
 
 export type MirrorRoleDef = {

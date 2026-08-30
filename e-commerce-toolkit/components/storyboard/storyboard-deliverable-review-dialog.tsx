@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Eye } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -19,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { StoryboardSheetLiveThumb } from "@/components/storyboard/storyboard-sheet-live-thumb";
 import { StoryboardSheetPreviewDialog } from "@/components/storyboard/storyboard-sheet-preview-dialog";
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
 
 type Props = {
@@ -173,12 +173,11 @@ export function StoryboardDeliverableReviewDialog({
                       }
                     >
                       {panel.imageUrl ? (
-                        <Image
-                          src={panel.imageUrl}
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={buildEcomOssThumbUrl(panel.imageUrl)}
                           alt={`镜头${panel.index}`}
-                          fill
-                          className="object-cover"
-                          unoptimized
+                          className="absolute inset-0 size-full object-cover"
                         />
                       ) : (
                         <span className="text-[10px] text-[#86868b]">无图</span>
@@ -263,7 +262,12 @@ function RefPreviewCard({
           className="relative mb-1 h-[88px] w-full overflow-hidden rounded-md border border-[#e8e8ed] bg-[#f5f5f7]"
           onClick={() => onPreview(primary.ossUrl, `${title} · ${primary.label}`)}
         >
-          <Image src={primary.ossUrl} alt={primary.label} fill className="object-cover" unoptimized />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={buildEcomOssThumbUrl(primary.ossUrl)}
+            alt={primary.label}
+            className="absolute inset-0 size-full object-cover"
+          />
         </button>
       ) : (
         <div className="mb-1 flex h-[88px] items-center justify-center rounded-md border border-dashed border-[#d2d2d7] text-[10px] text-[#86868b]">

@@ -1,12 +1,15 @@
 /** Pro Vertical 前端 deliverable 类型（与 book-mall pro-v1 对齐） */
 
-export type ProVerticalId = "fashion_apparel" | "bags";
+export type ProVerticalId = "fashion_apparel" | "bags" | "digital_3c";
 
 export type DimensionStepDef = {
   key: string;
   label: string;
   options?: readonly string[];
   freeText?: boolean;
+  ui?: "chips" | "searchSelect";
+  parentKey?: string;
+  subOptionsMap?: Record<string, readonly string[]>;
 };
 
 export type MirrorRoleDef = {
@@ -106,7 +109,7 @@ export type ProOpsPack = {
 
 export type ProDeliverable = {
   schemaVersion: "pro-v1" | "fashion-v4";
-  vertical: "fashion_apparel" | "bags";
+  vertical: "fashion_apparel" | "bags" | "digital_3c";
   productName: string;
   dimensions: Partial<Record<string, string>>;
   sellpoints: ProSellpoint[];
@@ -136,7 +139,7 @@ export type ProPhase =
 export function isProDeliverable(raw: unknown): raw is ProDeliverable {
   if (!raw || typeof raw !== "object") return false;
   const o = raw as Record<string, unknown>;
-  if (o.schemaVersion === "pro-v1" && (o.vertical === "bags" || o.vertical === "fashion_apparel"))
+  if (o.schemaVersion === "pro-v1" && (o.vertical === "bags" || o.vertical === "fashion_apparel" || o.vertical === "digital_3c"))
     return true;
   return o.schemaVersion === "fashion-v4" && o.vertical === "fashion_apparel";
 }

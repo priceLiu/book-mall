@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildProDimensionsFromChat } from "@/lib/pro-vertical/dimensions";
+import { buildProDimensionsFromChat, resolveDimensionStepOptions } from "@/lib/pro-vertical/dimensions";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import { getProjectVertical } from "@/lib/pro-vertical/project-vertical";
 import type { StoryboardProject } from "@/lib/storyboard-types";
@@ -51,5 +51,27 @@ describe("pro-vertical workflow · bags dimensions", () => {
     ]);
     expect(dims.genderCategory).toBe("女包");
     expect(dims.styleCategory).toBe("托特包");
+  });
+});
+
+describe("pro-vertical workflow · digital_3c dimensions", () => {
+  it("digital_3c config exposes searchable category steps and subOptions", () => {
+    const config = getProVerticalConfig("digital_3c");
+    expect(config?.label).toBe("3C数码专业版");
+    expect(config?.panelFocusLabel).toBe("产品展示重点");
+    expect(config?.characterRefPolicy).toBe("optional");
+    expect(config?.dimensionSteps).toHaveLength(7);
+    expect(config?.dimensionSteps[0]?.ui).toBe("searchSelect");
+    expect(config?.dimensionSteps[0]?.key).toBe("productCategory");
+    expect(config?.dimensionSteps[1]?.parentKey).toBe("productCategory");
+    expect(config?.dimensionSteps[1]?.subOptionsMap?.手机).toContain("旗舰机");
+  });
+
+  it("resolveDimensionStepOptions filters sub category by parent", () => {
+    const config = getProVerticalConfig("digital_3c")!;
+    const subStep = config.dimensionSteps[1]!;
+    const opts = resolveDimensionStepOptions("digital_3c", subStep, { productCategory: "手机" });
+    expect(opts).toContain("旗舰机");
+    expect(opts).not.toContain("游戏本");
   });
 });

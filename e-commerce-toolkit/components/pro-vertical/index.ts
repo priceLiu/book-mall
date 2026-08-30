@@ -1,4 +1,5 @@
-/** Pro Vertical UI · 薄 re-export（实现仍在 fashion/*，零行为变更） */
+export { filterDimensionOptions } from "@/lib/pro-vertical/dimension-search";
+export { ProDimensionSearchSelect } from "@/components/pro-vertical/pro-dimension-search-select";
 export { FashionAssistantPanel as ProAssistantPanel } from "@/components/fashion/fashion-assistant-panel";
 export { FashionAssistantDeliverableView as ProDeliverableView } from "@/components/fashion/fashion-assistant-deliverable-view";
 export {

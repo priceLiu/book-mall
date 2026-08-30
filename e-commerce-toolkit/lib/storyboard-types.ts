@@ -158,7 +158,7 @@ export type StoryboardProject = {
     deliverableMarkdown?: string;
     selectedSchemeIndex?: number;
     workflow?: {
-      vertical?: "fashion_apparel" | "bags";
+      vertical?: "fashion_apparel" | "bags" | "digital_3c";
       /** 电商专业版统一入口（品类在会话区选择） */
       proMode?: boolean;
       fashionPhase?: FashionPhase;

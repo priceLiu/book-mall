@@ -100,23 +100,24 @@ export async function POST(req: Request, ctx: Ctx) {
     existingMeta.workflow as Record<string, unknown> | undefined,
   );
   const isFashion = isFashionWorkflow(existingMeta);
-  const isBags = workflowVertical === "bags";
-  const isProBags = isBags;
+  const isProVertical =
+    workflowVertical != null && workflowVertical !== "fashion_apparel";
+  const proVerticalId = isProVertical ? workflowVertical : null;
   const lastUserTurn = turns[turns.length - 1]!.content.trim();
   const fashionPromptPhase = isFashion ? resolveFashionPromptPhase(lastUserTurn) : "general";
-  const proPromptPhase = isProBags ? resolveProPromptPhase(lastUserTurn) : "general";
+  const proPromptPhase = isProVertical ? resolveProPromptPhase(lastUserTurn) : "general";
   const prevFashionDeliverable =
     isFashion && isFashionDeliverable(existingMeta.deliverable)
       ? existingMeta.deliverable
       : null;
   const prevProDeliverable =
-    isProBags && isProDeliverable(existingMeta.deliverable)
+    isProVertical && isProDeliverable(existingMeta.deliverable)
       ? existingMeta.deliverable
       : null;
   let systemPrompt = isFashion
     ? buildFashionAssistantSystemPrompt(fashionPromptPhase)
-    : isProBags
-      ? buildProAssistantSystemPrompt("bags", proPromptPhase)
+    : isProVertical && proVerticalId
+      ? buildProAssistantSystemPrompt(proVerticalId, proPromptPhase)
       : buildStoryboardAssistantSystemPrompt();
   if (prevFashionDeliverable && fashionPromptPhase !== "sellpoints" && fashionPromptPhase !== "general") {
     systemPrompt += buildFashionDeliverableContextBlock(
@@ -214,10 +215,13 @@ export async function POST(req: Request, ctx: Ctx) {
           const fashionDeliverable = isFashion
             ? extractFashionDeliverable(fullText)
             : null;
-          const proDeliverable = isProBags ? extractProDeliverable(fullText, "bags") : null;
+          const proDeliverable =
+            isProVertical && proVerticalId
+              ? extractProDeliverable(fullText, proVerticalId)
+              : null;
           const briefText = isFashion
             ? stripFashionDeliverableFence(fullText)
-            : isProBags
+            : isProVertical
               ? stripProDeliverableFence(fullText)
               : stripDeliverableFence(fullText);
           const existingWorkflow =
@@ -343,7 +347,7 @@ export async function POST(req: Request, ctx: Ctx) {
               },
             };
             patch.status = "deliverable_ready";
-          } else if (isProBags && proDeliverable) {
+          } else if (isProVertical && proVerticalId && proDeliverable) {
             const prevPro = existingMeta.deliverable as
               | Parameters<typeof mergeProDeliverablePatch>[0]
               | undefined;
@@ -358,7 +362,7 @@ export async function POST(req: Request, ctx: Ctx) {
             const merged = mergeProDeliverablePatch(
               prevPro,
               llmProPatch,
-              "bags",
+              proVerticalId,
               typeof existingMeta.productName === "string"
                 ? existingMeta.productName
                 : proDeliverable.productName,
@@ -398,7 +402,7 @@ export async function POST(req: Request, ctx: Ctx) {
               deliverableMarkdown: systemMarkdown || briefText,
               workflow: {
                 ...existingWorkflow,
-                vertical: "bags",
+                vertical: proVerticalId,
                 proPhase,
                 ...(merged.sellpointsLocked ? { proSellpointsEdited: false } : {}),
                 ...(merged.storyboardLocked ? { proStoryboardPanelsEdited: false } : {}),

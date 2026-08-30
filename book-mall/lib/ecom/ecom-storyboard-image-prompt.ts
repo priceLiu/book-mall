@@ -113,6 +113,12 @@ const CATEGORY_VISUAL: Record<string, CategoryVisual> = {
     sceneRefHint: "场景光线、背携/展示环境与道具风格须与参考一致",
     characterHint: "stylish commuter or lifestyle creator showcasing bag",
   },
+  digital_3c: {
+    style: "Chinese e-commerce 3C digital gadget UGC micro-drama, tech aesthetic",
+    lighting: "modern desk setup, screen glow, unboxing flat lay or lifestyle tech scene",
+    sceneRefHint: "场景光线、数码展示环境与道具风格须与参考一致",
+    characterHint: "optional hands-on demo presenter or product-only hero shot",
+  },
 };
 
 function normalizeCategory(key?: string): string {
@@ -127,6 +133,10 @@ function isFashionApparelContext(ctx?: StoryboardImagePromptContext): boolean {
 
 function isBagsContext(ctx?: StoryboardImagePromptContext): boolean {
   return normalizeCategory(ctx?.productCategory) === "bags";
+}
+
+function isDigital3cContext(ctx?: StoryboardImagePromptContext): boolean {
+  return normalizeCategory(ctx?.productCategory) === "digital_3c";
 }
 
 function categoryVisual(ctx?: StoryboardImagePromptContext): CategoryVisual {
@@ -245,13 +255,17 @@ export function buildStoryboardImagePromptContext(project: {
     wf?.vertical === "fashion_apparel" ||
     deliverable?.vertical === "fashion_apparel";
   const bagsVertical = wf?.vertical === "bags" || deliverable?.vertical === "bags";
+  const digital3cVertical =
+    wf?.vertical === "digital_3c" || deliverable?.vertical === "digital_3c";
 
   return {
     productCategory: fashionVertical
       ? "fashion"
       : bagsVertical
         ? "bags"
-        : (wf?.productCategory ?? params?.品类),
+        : digital3cVertical
+          ? "digital_3c"
+          : (wf?.productCategory ?? params?.品类),
     productName,
     productHighlight: productHighlight ?? productName,
     videoStyle: params?.视频风格?.trim(),
@@ -418,6 +432,7 @@ export function appendStoryboardImagePromptSuffix(opts: {
   const aspectZh = opts.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
   const fashion = isFashionApparelContext({ productCategory: opts.productCategory });
   const bags = isBagsContext({ productCategory: opts.productCategory });
+  const digital3c = isDigital3cContext({ productCategory: opts.productCategory });
   const parts: string[] = [opts.basePrompt.trim()];
   if (
     opts.sendsProductRef &&
@@ -429,18 +444,22 @@ export function appendStoryboardImagePromptSuffix(opts: {
         ? "根据参考图进行图像编辑：模特穿着须与产品参考图一致，按以下描述生成画面。"
         : bags
           ? "根据参考图进行图像编辑：背携/展示包包须与产品参考图一致，按以下描述生成画面。"
-          : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下描述生成画面。",
+          : digital3c
+            ? "根据参考图进行图像编辑：数码产品外观须与产品参考图一致，按以下描述生成画面。"
+            : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下描述生成画面。",
     );
   }
   if (
-    (fashion || bags) &&
+    (fashion || bags || digital3c) &&
     opts.sendsProductRef &&
     !opts.basePrompt.includes("改色")
   ) {
     parts.push(
       fashion
         ? "若文字描述中的服装颜色/款式与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。"
-        : "若文字描述中的包型/颜色与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。",
+        : bags
+          ? "若文字描述中的包型/颜色与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。"
+          : "若文字描述中的产品外观/颜色与参考图1不一致，一律以参考图1为准，禁止擅自改色或换款。",
     );
   }
   if (!opts.basePrompt.includes(aspectZh) && !opts.basePrompt.includes("画幅")) {

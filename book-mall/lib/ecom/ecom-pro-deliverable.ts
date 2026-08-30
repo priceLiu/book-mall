@@ -94,7 +94,7 @@ export const proOpsPackSchema = z.object({
 
 export const proOutputModeSchema = z.enum(["script_compose", "direct_video"]);
 
-export const proVerticalIdSchema = z.enum(["fashion_apparel", "bags"]);
+export const proVerticalIdSchema = z.enum(["fashion_apparel", "bags", "digital_3c"]);
 
 export const proDeliverableSchema = z.object({
   schemaVersion: z.literal(PRO_SCHEMA_VERSION),
@@ -161,7 +161,7 @@ function coerceProPanels(raw: unknown, vertical: ProVerticalId): unknown {
     const scenePrompt =
       scenePromptRaw.length >= 20
         ? scenePromptRaw
-        : `${sceneDesc}，写实自然光，与${vertical === "bags" ? "包袋" : "产品"}品类匹配的环境与道具`;
+        : `${sceneDesc}，写实自然光，与${vertical === "bags" ? "包袋" : vertical === "digital_3c" ? "数码产品" : "产品"}品类匹配的环境与道具`;
     const imagePromptRaw =
       typeof p.imagePrompt === "string" && p.imagePrompt.trim() ? p.imagePrompt.trim() : "";
     const imagePrompt =
@@ -295,7 +295,7 @@ export function stripProDeliverableFence(text: string): string {
     .replace(/```[\s\S]*?```/g, "")
     .trim();
   const jsonStart = out.search(
-    /\{\s*"schemaVersion"\s*:\s*"(?:pro-v1|fashion-v4)"|\{\s*"vertical"\s*:\s*"(?:fashion_apparel|bags)"/,
+    /\{\s*"schemaVersion"\s*:\s*"(?:pro-v1|fashion-v4)"|\{\s*"vertical"\s*:\s*"(?:fashion_apparel|bags|digital_3c)"/,
   );
   if (jsonStart >= 0) out = out.slice(0, jsonStart).trim();
   return out.replace(/\n{3,}/g, "\n\n").trim();
@@ -536,7 +536,7 @@ export function resolveProPromptPhase(lastUserTurn: string): string {
   return "general";
 }
 
-/** 统一读取：fashion 走 legacy，bags 走 pro-v1 */
+/** 统一读取：fashion 走 legacy，非 fashion Pro vertical 走 pro-v1 */
 export function readUnifiedProDeliverable(
   meta: Record<string, unknown> | null | undefined,
 ): ProDeliverable | FashionDeliverable | null {
@@ -544,7 +544,7 @@ export function readUnifiedProDeliverable(
   if (wf.vertical === "fashion_apparel") {
     return readMetaFashionDeliverable(meta?.deliverable) ?? null;
   }
-  if (wf.vertical === "bags") {
+  if (wf.vertical === "bags" || wf.vertical === "digital_3c") {
     return normalizeToProDeliverable(meta?.deliverable) ?? null;
   }
   return null;

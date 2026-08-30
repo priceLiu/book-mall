@@ -45,7 +45,7 @@ import {
 } from "@/components/fashion/fashion-character-ref-choice-dialog";
 import { StoryboardSaveDialog } from "@/components/storyboard/storyboard-save-dialog";
 import { StoryboardStepResults } from "@/components/storyboard/storyboard-step-results";
-import { isProVerticalProject, buildFashionSellpointsSavePatch, buildFashionStoryboardPanelsSavePatch, resolveProVerticalDeliverable, buildFashionProjectKeywords, isFashionProduceSetupReady, fashionCharacterMode, fashionSheetNeedsScriptResync, isBagsProject, getProjectVertical } from "@/lib/fashion-workflow";
+import { isProVerticalProject, buildFashionSellpointsSavePatch, buildFashionStoryboardPanelsSavePatch, resolveProVerticalDeliverable, buildFashionProjectKeywords, isFashionProduceSetupReady, fashionCharacterMode, fashionSheetNeedsScriptResync, isCharacterRefRequired, getProjectVertical } from "@/lib/fashion-workflow";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import type { FashionCharacterRefMode } from "@/components/fashion/fashion-storyboard-sheet-workspace";
 import type { FashionPanelRow, FashionSellpoint } from "@/lib/fashion-types";
@@ -371,6 +371,7 @@ export function StoryboardContentPanel({
   async function ensureFashionCharacterModeForGenerate(): Promise<
     FashionCharacterRefChoice | null
   > {
+    if (!isCharacterRefRequired(project)) return null;
     const existing = fashionCharacterMode(project);
     if (existing) return existing;
     return new Promise((resolve) => {
@@ -382,6 +383,7 @@ export function StoryboardContentPanel({
   async function ensureCharacterRefForMediaGen(
     fashionCharMode?: FashionCharacterRefChoice,
   ): Promise<boolean> {
+    if (!isCharacterRefRequired(project)) return true;
     const wf = project.meta?.workflow ?? {};
     if (hasStoryboardCharacterRef(project)) return true;
     if (willStoryboardAutoGenCharacter(project, fashionCharMode)) return true;
@@ -428,10 +430,10 @@ export function StoryboardContentPanel({
     }
 
     const charMode = await ensureFashionCharacterModeForGenerate();
-    if (!charMode) return;
-    fashionResolvedCharModeRef.current = charMode;
+    if (isCharacterRefRequired(project) && !charMode) return;
+    if (charMode) fashionResolvedCharModeRef.current = charMode;
 
-    if (fashionCharacterMode(project) !== charMode) {
+    if (charMode && fashionCharacterMode(project) !== charMode) {
       await persistFashionProduceWorkflow({
         fashionCharacterMode: charMode,
         ...(charMode === "ai" || references.some((r) => r.role === "character")
@@ -444,7 +446,7 @@ export function StoryboardContentPanel({
     }
 
     const hasCharRef = references.some((r) => r.role === "character");
-    if (charMode === "upload" && !hasCharRef) {
+    if (charMode === "upload" && !hasCharRef && isCharacterRefRequired(project)) {
       await onAlert({
         title: "请上传角色图",
         message: "已选择「自行上传」。请在左侧素材区上传角色参考图，上传完成后再次点击生成分镜图。",
@@ -459,10 +461,10 @@ export function StoryboardContentPanel({
     }
 
     if (batchIndexes && batchIndexes.length > 0) {
-      await handleGenerateImagesBatch(batchIndexes, modelKey, charMode);
+      await handleGenerateImagesBatch(batchIndexes, modelKey, charMode ?? undefined);
       return;
     }
-    await handleGenerateImage(panelIndex, modelKey, charMode);
+    await handleGenerateImage(panelIndex, modelKey, charMode ?? undefined);
   }
 
   function beginFashionImageGeneration(opts: {
@@ -1130,7 +1132,8 @@ export function StoryboardContentPanel({
     if (
       isProVerticalProject(project) &&
       resolveProVerticalDeliverable(project)?.outputMode === "direct_video" &&
-      !charMode
+      !charMode &&
+      isCharacterRefRequired(project)
     ) {
       await onAlert({
         title: "请先选择角色参考方式",
@@ -1142,7 +1145,8 @@ export function StoryboardContentPanel({
     if (
       isProVerticalProject(project) &&
       charMode === "upload" &&
-      !hasCharRef
+      !hasCharRef &&
+      isCharacterRefRequired(project)
     ) {
       await onAlert({
         title: "缺少角色图",

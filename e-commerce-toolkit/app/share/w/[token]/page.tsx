@@ -48,7 +48,18 @@ export default function EcomWorkflowSharePage({
       setError(data.error ?? "请先登录后再领取");
       return;
     }
-    if (data.redirectPath) router.replace(data.redirectPath);
+    if (data.redirectPath) {
+      try {
+        const url = new URL(data.redirectPath, window.location.origin);
+        const projectId = url.searchParams.get("projectId")?.trim();
+        if (projectId) {
+          sessionStorage.setItem("ecom-storyboard-active-project", projectId);
+        }
+      } catch {
+        /* ignore malformed redirect */
+      }
+      router.replace(data.redirectPath);
+    }
   }, [token, router]);
 
   return (

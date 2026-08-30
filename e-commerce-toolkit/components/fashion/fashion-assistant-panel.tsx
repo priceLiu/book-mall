@@ -37,7 +37,9 @@ import {
   mergeProDimensionSources,
   proDimensionPrompt,
   proDimensionStepProgress,
+  resolveDimensionStepOptions,
 } from "@/lib/pro-vertical/dimensions";
+import { ProDimensionSearchSelect } from "@/components/pro-vertical/pro-dimension-search-select";
 import {
   parseProCategoryPick,
   PRO_GENERIC_WELCOME,
@@ -48,7 +50,7 @@ import {
   stripProDeliverableFence,
 } from "@/lib/pro-vertical/deliverable-parse";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
-import { getProjectVertical, isAwaitingProCategoryPick, isBagsProject } from "@/lib/pro-vertical/project-vertical";
+import { getProjectVertical, isAwaitingProCategoryPick, isNonFashionProVertical } from "@/lib/pro-vertical/project-vertical";
 import type { ProDeliverable } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import {
@@ -289,7 +291,7 @@ export function FashionAssistantPanel({
     });
     const wfPhase = (
       project.meta?.workflow as { fashionPhase?: string; proPhase?: string } | undefined
-    )?.[isBagsProject(project) ? "proPhase" : "fashionPhase"];
+    )?.[isNonFashionProVertical(project) ? "proPhase" : "fashionPhase"];
     const phaseRank: Record<string, number> = {
       product_ref: 0,
       dimensions: 1,
@@ -327,16 +329,18 @@ export function FashionAssistantPanel({
     void (async () => {
       try {
         if (isProDeliverable(resolved)) {
+          const proVertical = getProjectVertical(project) ?? resolved.vertical;
           const metaPro = isProDeliverable(project.meta?.deliverable)
             ? (project.meta!.deliverable as ProDeliverable)
             : null;
           const deliverable: ProDeliverable = {
             ...resolved,
+            vertical: proVertical,
             dimensions: mergeProDimensionSources(
-              "bags",
+              proVertical,
               resolved.dimensions,
               metaPro?.dimensions,
-              buildProDimensionsFromChat("bags", history),
+              buildProDimensionsFromChat(proVertical, history),
             ),
           };
           const updated = await updateStoryboardProject(projectId, {
@@ -345,7 +349,7 @@ export function FashionAssistantPanel({
               deliverable,
               workflow: {
                 ...(project.meta?.workflow ?? {}),
-                vertical: "bags",
+                vertical: proVertical,
                 proPhase: nextPhase,
               },
             },
@@ -453,7 +457,7 @@ export function FashionAssistantPanel({
 
   const dimensionMessageLabels = useMemo(
     () =>
-      vertical && isBagsProject(project)
+      vertical && isNonFashionProVertical(project)
         ? buildProDimensionMessageLabels(vertical, displayMessages)
         : buildFashionDimensionMessageLabels(displayMessages),
     [displayMessages, project, vertical],
@@ -847,11 +851,22 @@ export function FashionAssistantPanel({
   const currentDimStep = currentFashionDimensionStep(effectiveProject);
   const currentDimStepDef = dimensionSteps[currentDimStep];
   const dimStepProgress =
-    vertical && isBagsProject(project)
+    vertical && isNonFashionProVertical(project)
       ? proDimensionStepProgress(vertical, currentDimStep)
       : fashionDimensionStepProgress(currentDimStep);
+  const searchSelectOptions =
+    vertical && currentDimStepDef?.ui === "searchSelect"
+      ? resolveDimensionStepOptions(vertical, currentDimStepDef, {
+          ...(deliverable?.dimensions ?? {}),
+          ...buildProDimensionsFromChat(vertical, effectiveProject.chatHistory),
+        })
+      : [];
   const showDimensionStepPrompt =
     !legacyReadonly && isDimensionCollecting && !isBusy && Boolean(currentDimStepDef);
+  const showSearchDimensionSelect =
+    showDimensionStepPrompt &&
+    currentDimStepDef?.ui === "searchSelect" &&
+    !awaitingCustomDimension;
   const customDimensionHint = useMemo(() => {
     if (!awaitingCustomDimension) return "";
     const step = dimensionSteps[currentDimStep];
@@ -1081,7 +1096,9 @@ export function FashionAssistantPanel({
                     {currentDimStepDef!.label}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
-                    {fashionDimensionPrompt(currentDimStep)}
+                    {vertical && isNonFashionProVertical(project)
+                      ? proDimensionPrompt(vertical, currentDimStep)
+                      : fashionDimensionPrompt(currentDimStep)}
                   </p>
                   {currentDimStepDef!.freeText ? (
                     <p className="mt-2 text-xs text-[#86868b]">
@@ -1096,6 +1113,16 @@ export function FashionAssistantPanel({
                 </span>
               </div>
             </div>
+            {showSearchDimensionSelect ? (
+              <div className="mt-3">
+                <ProDimensionSearchSelect
+                  label={currentDimStepDef!.label}
+                  options={searchSelectOptions}
+                  disabled={isBusy}
+                  onSelect={(value) => void handleChoice(value)}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1125,7 +1152,7 @@ export function FashionAssistantPanel({
           </div>
         ) : null}
 
-        {!legacyReadonly && choices.length > 0 && !isBusy ? (
+        {!legacyReadonly && choices.length > 0 && !isBusy && !showSearchDimensionSelect ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <SeedVideoAssistantChoiceCards
               title={

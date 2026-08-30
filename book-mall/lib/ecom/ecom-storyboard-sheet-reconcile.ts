@@ -79,6 +79,11 @@ export async function enrichStoryboardSheetVideoUrlsForMerge(
   return changed ? { ...sheet, panels } : sheet;
 }
 
+function assetMetaProjectId(meta: Record<string, unknown> | null): string | null {
+  const id = meta?.projectId;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
 export async function loadLatestStoryboardPanelVideoRecords(
   userId: string,
   projectId: string,
@@ -88,19 +93,16 @@ export async function loadLatestStoryboardPanelVideoRecords(
       userId,
       module: ECOM_STORYBOARD_MODULE,
       kind: "video",
-      meta: {
-        path: ["projectId"],
-        equals: projectId,
-      },
     },
     orderBy: { createdAt: "desc" },
-    take: 80,
+    take: 200,
     select: { ossUrl: true, meta: true, createdAt: true },
   });
 
   const map = new Map<number, StoryboardPanelVideoAssetRecord>();
   for (const asset of assets) {
     const meta = asset.meta as Record<string, unknown> | null;
+    if (assetMetaProjectId(meta) !== projectId) continue;
     if (meta?.kind !== "panel_video") continue;
     const panelIndex =
       typeof meta.panelIndex === "number" ? Math.trunc(meta.panelIndex) : NaN;
@@ -136,19 +138,16 @@ export async function loadLatestStoryboardPanelImageUrls(
       userId,
       module: ECOM_STORYBOARD_MODULE,
       kind: "image",
-      meta: {
-        path: ["projectId"],
-        equals: projectId,
-      },
     },
     orderBy: { createdAt: "desc" },
-    take: 80,
+    take: 200,
     select: { ossUrl: true, meta: true },
   });
 
   const map = new Map<number, string>();
   for (const asset of assets) {
     const meta = asset.meta as Record<string, unknown> | null;
+    if (assetMetaProjectId(meta) !== projectId) continue;
     if (meta?.kind !== "storyboard_panel") continue;
     const panelIndex =
       typeof meta.panelIndex === "number" ? Math.trunc(meta.panelIndex) : NaN;

@@ -4,6 +4,8 @@ import {
   type StoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import { mergeStoryboardDeliverableSnapshotMedia } from "@/lib/ecom/ecom-storyboard-snapshot";
+import { reconcileStoryboardSheetPanelImages } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
 import {
   buildStoryboardDeliverablePreviewFromWorkflow,
   collectStoryboardWorkflowSnapshotsFromMeta,
@@ -458,10 +460,13 @@ function snapshotToBundle(
     snap.sheet.panels.length ||
     workflowSnapshot?.sheet?.panels.length ||
     0;
+  const hasPanelVideo =
+    snap.panelVideos.length > 0 ||
+    snap.sheet.panels.some((p) => Boolean(p.videoUrl?.trim()));
   return {
     projectId,
     savedAt: snap.savedAt,
-    title: snap.title || workflowSnapshot?.title || "微剧故事版",
+    title: workflowSnapshot?.title || snap.title || "微剧故事版",
     panelCount,
     hasScript:
       markdown.length > 80 ||
@@ -474,13 +479,46 @@ function snapshotToBundle(
           ((workflowSnapshot.meta.deliverable as { sellpoints?: unknown[] }).sellpoints
             ?.length ?? 0) > 0,
       ),
-    hasVideo: Boolean(snap.videoUrl?.trim() || snap.panelVideos.length > 0),
+    hasVideo: Boolean(snap.videoUrl?.trim() || hasPanelVideo),
     thumbnailUrl: thumb,
     snapshot: {
       ...snap,
       deliverableMarkdown: markdown || snap.deliverableMarkdown,
     },
   };
+}
+
+export { resolveStoryboardLibraryDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-library-deliverable";
+
+/** 列表页轻量 enrich：每个项目只做一次资产回填，避免 N 次 getProject 拖垮接口 */
+async function enrichStoryboardRowSnapshots(
+  userId: string,
+  projectId: string,
+  snapshots: StoryboardDeliverableSnapshot[],
+  meta: Record<string, unknown> | null,
+): Promise<StoryboardDeliverableSnapshot[]> {
+  if (snapshots.length === 0) return [];
+  const deliverableLatest = meta?.deliverableSnapshot as StoryboardDeliverableSnapshot | undefined;
+  let merged = snapshots.map((snap) =>
+    mergeStoryboardDeliverableSnapshotMedia(snap, [deliverableLatest]),
+  );
+  const baseSheet = merged[0]?.sheet;
+  if (!baseSheet?.panels?.length) return merged;
+
+  const reconciled = await reconcileStoryboardSheetPanelImages({
+    userId,
+    projectId,
+    sheet: baseSheet,
+    meta,
+  });
+  if (!reconciled.sheet) return merged;
+
+  return merged.map((snap) =>
+    mergeStoryboardDeliverableSnapshotMedia(snap, [
+      { ...snap, sheet: reconciled.sheet! },
+      deliverableLatest,
+    ]),
+  );
 }
 
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
@@ -565,16 +603,17 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const markdown =
       typeof meta?.deliverableMarkdown === "string" ? meta.deliverableMarkdown : undefined;
     const seen = new Set<string>();
+    const rowItems: Array<{
+      preview: StoryboardDeliverableSnapshot;
+      workflowSnap?: StoryboardWorkflowSnapshot;
+    }> = [];
+
     for (const workflowSnap of collectStoryboardWorkflowSnapshotsFromMeta(meta)) {
       seen.add(workflowSnap.savedAt);
-      bundles.push(
-        snapshotToBundle(
-          row.id,
-          buildStoryboardDeliverablePreviewFromWorkflow(workflowSnap),
-          markdown,
-          workflowSnap,
-        ),
-      );
+      rowItems.push({
+        preview: buildStoryboardDeliverablePreviewFromWorkflow(workflowSnap),
+        workflowSnap,
+      });
     }
     const latest = meta?.deliverableSnapshot as StoryboardDeliverableSnapshot | undefined;
     const history = Array.isArray(meta?.deliverableSnapshotHistory)
@@ -584,7 +623,19 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       if (!snap?.savedAt || !snap.sheet?.panels?.length) continue;
       if (seen.has(snap.savedAt)) continue;
       seen.add(snap.savedAt);
-      bundles.push(snapshotToBundle(row.id, snap, markdown));
+      rowItems.push({ preview: snap });
+    }
+
+    const enriched = await enrichStoryboardRowSnapshots(
+      userId,
+      row.id,
+      rowItems.map((item) => item.preview),
+      meta,
+    );
+    for (let i = 0; i < rowItems.length; i += 1) {
+      const item = rowItems[i]!;
+      const snap = enriched[i] ?? item.preview;
+      bundles.push(snapshotToBundle(row.id, snap, markdown, item.workflowSnap));
     }
   }
   bundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));

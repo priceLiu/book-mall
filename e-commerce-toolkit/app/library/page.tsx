@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Layers, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Link2, RotateCcw } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomHomeAssistant } from "@/components/layout/ecom-home-assistant";
@@ -20,6 +20,8 @@ import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
+import { StoryboardLibraryDeliverablePanel } from "@/components/storyboard/storyboard-library-deliverable-panel";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomPublishDialog } from "@/components/publish/ecom-publish-dialog";
 import {
   deleteAsset,
@@ -44,7 +46,12 @@ import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
 import { isStoryboardImageUrl, isStoryboardVideoUrl } from "@/lib/storyboard-media";
 import { reuseSeedVideoProject } from "@/lib/ecom-seed-video-api";
-import { reuseStoryboardProject } from "@/lib/ecom-storyboard-api";
+import {
+  buildWorkflowTabEntries,
+  countWorkflowTabEntries,
+  type LibraryWorkflowEntry,
+} from "@/lib/ecom-library-workflow-entries";
+import { reuseStoryboardProject, fetchStoryboardLibraryDeliverable } from "@/lib/ecom-storyboard-api";
 import type { EcomProjectModule } from "@/lib/product-design-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
 
@@ -118,7 +125,7 @@ function LibraryTabBar({
       </div>
       {active === "workflows" ? (
         <p className="mt-2 text-[11px] text-[#6e6e73]">
-          在工具内点「保存」后，完整 Prompt / 参考图 / 脚本会出现在此；点「一键复用」可换参考图再生成。
+          已保存的工作流可「复制打开」换参考图再生成；进行中的微剧项目也会出现在此，点「打开」继续编辑。
         </p>
       ) : (
         <p className="mt-2 text-[11px] text-[#6e6e73]">
@@ -213,8 +220,6 @@ type LibraryProjectEntry =
       sortKey: string;
       bundle: EcomLibraryMediaDecomposeBundle;
     };
-
-type LibraryWorkflowEntry = Exclude<LibraryProjectEntry, { kind: "assets" }>;
 
 function thumbnailFromAssetGroup(group: EcomLibraryAssetGroup): string | null {
   for (const asset of group.assets) {
@@ -370,6 +375,7 @@ export default function LibraryPage() {
   const [totalAssets, setTotalAssets] = useState(0);
   const [totalBundles, setTotalBundles] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
     null,
   );
@@ -378,13 +384,21 @@ export default function LibraryPage() {
   const [reuseBusy, setReuseBusy] = useState<string | null>(null);
   const [pinnedAssetIds, setPinnedAssetIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<LibraryTab>("all");
+  const [shareStoryboard, setShareStoryboard] = useState<{
+    projectId: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
+    setLoadError(null);
     listLibrarySections()
       .then((data) => {
         setSections(data.sections);
         setTotalAssets(data.totalAssets);
         setTotalBundles(data.totalBundles);
+      })
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : "加载失败");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -397,15 +411,9 @@ export default function LibraryPage() {
       brand: 0,
       workflows: 0,
     };
+    counts.workflows = countWorkflowTabEntries(sections);
     for (const section of sections) {
       const mediaCount = section.assets.length;
-      const bundleCount =
-        section.storyboardBundles.length +
-        section.productDesignBundles.length +
-        section.seedVideoBundles.length +
-        section.handCraftBundles.length +
-        section.mediaDecomposeBundles.length;
-      counts.workflows += bundleCount;
       if (section.domainLabel === "电商") counts.ecom += mediaCount;
       if (section.domainLabel === "视频") counts.video += mediaCount;
       if (section.domainLabel === "品牌") counts.brand += mediaCount;
@@ -456,18 +464,21 @@ export default function LibraryPage() {
     closePreview: closeLibraryImagePreview,
   } = useEcomImagePreview(libraryImagePreviewItems);
 
-  const workflowSections = useMemo(() => {
-    return DOMAIN_ORDER.flatMap((domain) =>
-      sections
-        .filter((s) => s.domainLabel === domain)
-        .map((section) => {
-          const entries = buildSectionProjectEntries(section).filter(
-            (e): e is LibraryWorkflowEntry => e.kind !== "assets",
-          );
-          return entries.length > 0 ? { section, entries } : null;
-        })
-        .filter((x): x is { section: EcomLibrarySection; entries: LibraryWorkflowEntry[] } => x !== null),
-    );
+  const workflowSectionsByDomain = useMemo(() => {
+    const map = new Map<string, Array<{ section: EcomLibrarySection; entries: LibraryWorkflowEntry[] }>>();
+    for (const domain of DOMAIN_ORDER) {
+      for (const section of sections.filter((s) => s.domainLabel === domain)) {
+        const entries = buildWorkflowTabEntries(section);
+        if (entries.length === 0) continue;
+        const list = map.get(domain) ?? [];
+        list.push({ section, entries });
+        map.set(domain, list);
+      }
+    }
+    return DOMAIN_ORDER.filter((d) => (map.get(d)?.length ?? 0) > 0).map((domain) => ({
+      domain,
+      sections: map.get(domain)!,
+    }));
   }, [sections]);
 
   async function onPinAsset(a: EcomAsset) {
@@ -594,8 +605,36 @@ export default function LibraryPage() {
     }
   }
 
+  async function onReviewStoryboardBundle(bundle: EcomLibraryStoryboardBundle) {
+    try {
+      const snapshot = await fetchStoryboardLibraryDeliverable(bundle.projectId, {
+        savedAt: bundle.savedAt,
+        title: bundle.title,
+      });
+      setReviewSnapshot(snapshot);
+    } catch (e) {
+      await alert({
+        title: "交付包加载失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
+  async function onOpenStoryboardProject(projectId: string) {
+    setReuseBusy(`sb-open:${projectId}`);
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(STORYBOARD_STORAGE_KEY, projectId);
+      }
+      router.push("/ecom/storyboard/micro-drama");
+    } finally {
+      setReuseBusy(null);
+    }
+  }
+
   async function onReuseStoryboardBundle(bundle: EcomLibraryStoryboardBundle) {
-    const key = `${bundle.projectId}:${bundle.savedAt}`;
+    const key = `sb-copy:${bundle.projectId}:${bundle.savedAt}`;
     setReuseBusy(key);
     try {
       const project = await reuseStoryboardProject(bundle.projectId, bundle.savedAt);
@@ -605,7 +644,7 @@ export default function LibraryPage() {
       router.push("/ecom/storyboard/micro-drama");
     } catch (e) {
       await alert({
-        title: "复用失败",
+        title: "复制打开失败",
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
@@ -658,7 +697,7 @@ export default function LibraryPage() {
   const empty =
     !loading &&
     (activeTab === "workflows"
-      ? workflowSections.length === 0
+      ? workflowSectionsByDomain.length === 0
       : filteredSectionsByDomain.length === 0);
 
   return (
@@ -691,6 +730,8 @@ export default function LibraryPage() {
               count={10}
               gridClass={ECOM_LIBRARY_MEDIA_GRID_CLASS}
             />
+          ) : loadError ? (
+            <p className="mt-6 text-sm text-red-600">{loadError}</p>
           ) : empty ? (
             <p className="mt-6 text-sm text-[#6e6e73]">
               {activeTab === "workflows"
@@ -699,27 +740,36 @@ export default function LibraryPage() {
             </p>
           ) : activeTab === "workflows" ? (
             <div className="mt-6 space-y-10">
-              {workflowSections.map(({ section, entries }) => (
-                <LibrarySectionBlock
-                  key={section.moduleId}
-                  section={section}
-                  projectEntries={entries}
-                  reuseBusy={reuseBusy}
-                  onDeleteAsset={onDeleteAsset}
-                  onPinAsset={onPinAsset}
-                  pinnedAssetIds={pinnedAssetIds}
-                  onPreviewImage={(src, title) =>
-                    openLibraryImagePreview(src, title ?? "资产")
-                  }
-                  onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
-                  onReviewStoryboardBundle={(snap) => setReviewSnapshot(snap)}
-                  onReuseStoryboardBundle={onReuseStoryboardBundle}
-                  onReuseProductDesignBundle={onReuseProductDesignBundle}
-                  onReuseSeedVideoBundle={onReuseSeedVideoBundle}
-                  onReuseHandCraftBundle={onReuseHandCraftBundle}
-                  onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
-                  onOpenSeedVideoProject={onOpenSeedVideoProject}
-                />
+              {workflowSectionsByDomain.map(({ domain, sections: domainSections }) => (
+                <div key={domain} className="space-y-8">
+                  <h2 className="text-base font-semibold text-[#1d1d1f]">{domain}</h2>
+                  {domainSections.map(({ section, entries }) => (
+                    <LibrarySectionBlock
+                      key={section.moduleId}
+                      section={section}
+                      projectEntries={entries}
+                      reuseBusy={reuseBusy}
+                      onDeleteAsset={onDeleteAsset}
+                      onPinAsset={onPinAsset}
+                      pinnedAssetIds={pinnedAssetIds}
+                      onPreviewImage={(src, title) =>
+                        openLibraryImagePreview(src, title ?? "资产")
+                      }
+                      onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
+                      onReviewStoryboardBundle={onReviewStoryboardBundle}
+                      onReuseStoryboardBundle={onReuseStoryboardBundle}
+                      onOpenStoryboardProject={onOpenStoryboardProject}
+                      onShareStoryboardProject={(projectId, title) =>
+                        setShareStoryboard({ projectId, title })
+                      }
+                      onReuseProductDesignBundle={onReuseProductDesignBundle}
+                      onReuseSeedVideoBundle={onReuseSeedVideoBundle}
+                      onReuseHandCraftBundle={onReuseHandCraftBundle}
+                      onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
+                      onOpenSeedVideoProject={onOpenSeedVideoProject}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           ) : (
@@ -743,8 +793,12 @@ export default function LibraryPage() {
                     openLibraryImagePreview(src, title ?? "资产")
                   }
                         onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
-                        onReviewStoryboardBundle={(snap) => setReviewSnapshot(snap)}
+                        onReviewStoryboardBundle={onReviewStoryboardBundle}
                         onReuseStoryboardBundle={onReuseStoryboardBundle}
+                        onOpenStoryboardProject={onOpenStoryboardProject}
+                        onShareStoryboardProject={(projectId, title) =>
+                          setShareStoryboard({ projectId, title })
+                        }
                         onReuseProductDesignBundle={onReuseProductDesignBundle}
                         onReuseSeedVideoBundle={onReuseSeedVideoBundle}
                         onReuseHandCraftBundle={onReuseHandCraftBundle}
@@ -787,6 +841,15 @@ export default function LibraryPage() {
           onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
         />
       ) : null}
+
+      {shareStoryboard ? (
+        <WorkflowShareLinkDialog
+          projectId={shareStoryboard.projectId}
+          projectTitle={shareStoryboard.title}
+          open
+          onClose={() => setShareStoryboard(null)}
+        />
+      ) : null}
     </>
   );
 }
@@ -802,6 +865,8 @@ function LibrarySectionBlock({
   onPreviewVideo,
   onReviewStoryboardBundle,
   onReuseStoryboardBundle,
+  onOpenStoryboardProject,
+  onShareStoryboardProject,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
   onReuseHandCraftBundle,
@@ -809,15 +874,17 @@ function LibrarySectionBlock({
   onOpenSeedVideoProject,
 }: {
   section: EcomLibrarySection;
-  projectEntries: LibraryProjectEntry[];
+  projectEntries: Array<LibraryProjectEntry | LibraryWorkflowEntry>;
   reuseBusy: string | null;
   onDeleteAsset: (a: EcomAsset) => void;
   onPinAsset: (a: EcomAsset) => void;
   pinnedAssetIds: Set<string>;
   onPreviewImage: (src: string, title?: string) => void;
   onPreviewVideo: (src: string, title?: string) => void;
-  onReviewStoryboardBundle: (snap: StoryboardDeliverableSnapshot) => void;
+  onReviewStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
   onReuseStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
+  onOpenStoryboardProject: (projectId: string) => void;
+  onShareStoryboardProject: (projectId: string, title: string) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
@@ -849,6 +916,8 @@ function LibrarySectionBlock({
             onPreviewVideo={onPreviewVideo}
             onReviewStoryboardBundle={onReviewStoryboardBundle}
             onReuseStoryboardBundle={onReuseStoryboardBundle}
+            onOpenStoryboardProject={onOpenStoryboardProject}
+            onShareStoryboardProject={onShareStoryboardProject}
             onReuseProductDesignBundle={onReuseProductDesignBundle}
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
             onReuseHandCraftBundle={onReuseHandCraftBundle}
@@ -874,13 +943,15 @@ function LibraryProjectListItem({
   onPreviewVideo,
   onReviewStoryboardBundle,
   onReuseStoryboardBundle,
+  onOpenStoryboardProject,
+  onShareStoryboardProject,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
   onReuseHandCraftBundle,
   onReuseMediaDecomposeBundle,
   onOpenSeedVideoProject,
 }: {
-  entry: LibraryProjectEntry;
+  entry: LibraryProjectEntry | LibraryWorkflowEntry;
   section: EcomLibrarySection;
   expanded: boolean;
   onToggle: () => void;
@@ -890,8 +961,10 @@ function LibraryProjectListItem({
   pinnedAssetIds: Set<string>;
   onPreviewImage: (src: string, title?: string) => void;
   onPreviewVideo: (src: string, title?: string) => void;
-  onReviewStoryboardBundle: (snap: StoryboardDeliverableSnapshot) => void;
+  onReviewStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
   onReuseStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
+  onOpenStoryboardProject: (projectId: string) => void;
+  onShareStoryboardProject: (projectId: string, title: string) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
@@ -904,6 +977,8 @@ function LibraryProjectListItem({
       ? entry.bundle.hasVideo
       : entry.kind === "storyboard"
         ? entry.bundle.hasVideo
+        : entry.kind === "storyboard-draft"
+          ? entry.hasVideo
         : entry.kind === "media-decompose"
           ? entry.bundle.hasVideo
           : entry.kind === "assets"
@@ -911,6 +986,19 @@ function LibraryProjectListItem({
               entry.group.assets.every((a) => a.kind === "video")
             : false,
   );
+
+  const quickOpenStoryboard =
+    entry.kind === "storyboard-draft"
+      ? {
+          projectId: entry.projectId,
+          busy: reuseBusy === `sb-open:${entry.projectId}`,
+        }
+      : entry.kind === "storyboard"
+        ? {
+            projectId: entry.bundle.projectId,
+            busy: reuseBusy === `sb-open:${entry.bundle.projectId}`,
+          }
+        : null;
 
   return (
     <li className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm">
@@ -929,6 +1017,20 @@ function LibraryProjectListItem({
           <p className="truncate text-sm font-medium text-[#1d1d1f]">{entry.projectName}</p>
           <p className="truncate text-[11px] text-[#6e6e73]">{entry.meta}</p>
         </div>
+        {quickOpenStoryboard ? (
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#e8e8ed] bg-white px-2.5 text-[11px] font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+            disabled={quickOpenStoryboard.busy}
+            onClick={(e) => {
+              e.stopPropagation();
+              void onOpenStoryboardProject(quickOpenStoryboard.projectId);
+            }}
+          >
+            <ExternalLink className="h-3 w-3" />
+            {quickOpenStoryboard.busy ? "打开中…" : "打开"}
+          </button>
+        ) : null}
         {expanded ? (
           <ChevronDown className="h-4 w-4 shrink-0 text-[#86868b]" />
         ) : (
@@ -954,6 +1056,8 @@ function LibraryProjectListItem({
             onPreviewVideo={onPreviewVideo}
             onReviewStoryboardBundle={onReviewStoryboardBundle}
             onReuseStoryboardBundle={onReuseStoryboardBundle}
+            onOpenStoryboardProject={onOpenStoryboardProject}
+            onShareStoryboardProject={onShareStoryboardProject}
             onReuseProductDesignBundle={onReuseProductDesignBundle}
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
             onReuseHandCraftBundle={onReuseHandCraftBundle}
@@ -977,13 +1081,15 @@ function LibraryProjectExpandedContent({
   onPreviewVideo,
   onReviewStoryboardBundle,
   onReuseStoryboardBundle,
+  onOpenStoryboardProject,
+  onShareStoryboardProject,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
   onReuseHandCraftBundle,
   onReuseMediaDecomposeBundle,
   onOpenSeedVideoProject,
 }: {
-  entry: LibraryProjectEntry;
+  entry: LibraryProjectEntry | LibraryWorkflowEntry;
   section: EcomLibrarySection;
   reuseBusy: string | null;
   onDeleteAsset: (a: EcomAsset) => void;
@@ -991,8 +1097,10 @@ function LibraryProjectExpandedContent({
   pinnedAssetIds: Set<string>;
   onPreviewImage: (src: string, title?: string) => void;
   onPreviewVideo: (src: string, title?: string) => void;
-  onReviewStoryboardBundle: (snap: StoryboardDeliverableSnapshot) => void;
+  onReviewStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
   onReuseStoryboardBundle: (bundle: EcomLibraryStoryboardBundle) => void;
+  onOpenStoryboardProject: (projectId: string) => void;
+  onShareStoryboardProject: (projectId: string, title: string) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
@@ -1125,44 +1233,81 @@ function LibraryProjectExpandedContent({
     );
   }
 
-  if (entry.kind === "storyboard") {
-    const sbBundle = entry.bundle;
-    const busy = reuseBusy === `${sbBundle.projectId}:${sbBundle.savedAt}`;
+  if (entry.kind === "storyboard-draft") {
+    const openBusy = reuseBusy === `sb-open:${entry.projectId}`;
     return (
       <div className="space-y-3">
-        {thumb ? (
-          <div className="max-w-[140px]">
-            <EcomMediaLibraryTile
-              kind="image"
-              src={thumb}
-              alt={title}
-              onPreview={() => onPreviewImage(thumb, title)}
-              onDownload={() =>
-                void downloadMediaUrl(
-                  thumb,
-                  mediaDownloadFilename(title, "image", thumb),
-                )
-              }
-            />
-          </div>
-        ) : null}
+        <p className="text-xs text-[#6e6e73]">
+          该项目已有成图/成片，但尚未点「保存工作流」。可直接打开继续编辑，或在工作室顶栏保存后再一键复用。
+        </p>
+        <StoryboardLibraryDeliverablePanel
+          projectId={entry.projectId}
+          title={title}
+          onPreviewVideo={onPreviewVideo}
+          onPreviewImage={onPreviewImage}
+        />
+        <button
+          type="button"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+          disabled={openBusy}
+          onClick={() => onOpenStoryboardProject(entry.projectId)}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          {openBusy ? "打开中…" : "打开项目"}
+        </button>
+      </div>
+    );
+  }
+
+  if (entry.kind === "storyboard") {
+    const sbBundle = entry.bundle;
+    const copyBusy = reuseBusy === `sb-copy:${sbBundle.projectId}:${sbBundle.savedAt}`;
+    const openBusy = reuseBusy === `sb-open:${sbBundle.projectId}`;
+    return (
+      <div className="space-y-3">
+        <StoryboardLibraryDeliverablePanel
+          projectId={sbBundle.projectId}
+          title={title}
+          initialSnapshot={sbBundle.snapshot}
+          savedAt={sbBundle.savedAt}
+          bundleTitle={sbBundle.title}
+          onPreviewVideo={onPreviewVideo}
+          onPreviewImage={onPreviewImage}
+        />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+            disabled={openBusy}
+            onClick={() => onOpenStoryboardProject(sbBundle.projectId)}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            {openBusy ? "打开中…" : "打开项目"}
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+            disabled={copyBusy}
+            onClick={() => onReuseStoryboardBundle(sbBundle)}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            {copyBusy ? "复制中…" : "复制打开"}
+          </button>
+          <button
+            type="button"
             className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
-            onClick={() => onReviewStoryboardBundle(sbBundle.snapshot)}
+            onClick={() => onReviewStoryboardBundle(sbBundle)}
           >
             <Layers className="h-3.5 w-3.5" />
             查看交付包
           </button>
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
-            disabled={busy}
-            onClick={() => onReuseStoryboardBundle(sbBundle)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            onClick={() => onShareStoryboardProject(sbBundle.projectId, title)}
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            {busy ? "复用中…" : "一键复用"}
+            <Link2 className="h-3.5 w-3.5" />
+            分享工作流
           </button>
         </div>
       </div>

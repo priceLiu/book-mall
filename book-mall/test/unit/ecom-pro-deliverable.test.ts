@@ -120,3 +120,25 @@ describe("ecom-pro-deliverable · bags", () => {
     expect(sheet?.overview.logline).toBe("通勤救场");
   });
 });
+
+describe("ecom-pro-deliverable · digital_3c", () => {
+  it("extracts pro-deliverable fence for digital_3c", () => {
+    const fixture = {
+      ...BAGS_FIXTURE,
+      vertical: "digital_3c" as const,
+      dimensions: {
+        productCategory: "手机",
+        productSubCategory: "旗舰机",
+        designLanguage: "极简科技",
+        tier: "高端旗舰",
+        customScene: "通勤",
+        platform: "抖音",
+        outputLanguage: "中文",
+      },
+    };
+    const text = `已生成卖点。\n\`\`\`pro-deliverable\n${JSON.stringify(fixture)}\n\`\`\``;
+    const parsed = extractProDeliverable(text, "digital_3c");
+    expect(parsed?.vertical).toBe("digital_3c");
+    expect(parsed?.dimensions.productCategory).toBe("手机");
+  });
+});
