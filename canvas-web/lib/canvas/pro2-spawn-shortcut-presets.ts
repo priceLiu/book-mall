@@ -6,12 +6,15 @@ import {
 } from "./libtv-node-chrome";
 import {
   buildPro2ImageNodeData,
+  buildPro2ScriptHubNodeData,
   buildPro2StarterNodeData,
   buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import {
   PRO2_IMAGE_NODE_HEIGHT,
+  PRO2_SCRIPT_NODE_HEIGHT,
+  PRO2_SCRIPT_NODE_WIDTH,
   PRO2_TEXT_NODE_HEIGHT,
   PRO2_TEXT_NODE_MIN_WIDTH,
   PRO2_TEXT_NODE_WIDTH,
@@ -29,6 +32,7 @@ import { flowPositionAtViewportCenter } from "./viewport-placement";
 export type Pro2ShortcutPresetId =
   | "image-to-prompt"
   | "video-to-prompt"
+  | "video-film-pull"
   | "text-to-video"
   | "text-to-music";
 
@@ -74,6 +78,7 @@ const REF_AUDIO_VIDEO_ENGINE = {
 const PRESET_LABEL: Record<Pro2ShortcutPresetId, string> = {
   "image-to-prompt": "预设 - 图片反推提示词",
   "video-to-prompt": "预设 - 视频反推提示词",
+  "video-film-pull": "预设 - 视频拉片",
   "text-to-video": "预设 - 文生视频",
   "text-to-music": "预设 - 文字生音乐",
 };
@@ -224,6 +229,56 @@ export function spawnPro2ShortcutPreset(
       selectPro2NodeAfterSpawn(store.setNodes, textId);
     });
     return { groupId, focusNodeId: textId };
+  }
+
+  if (preset === "video-film-pull") {
+    const hubW = PRO2_SCRIPT_NODE_WIDTH;
+    const totalW = videoW + gap + hubW;
+    const maxH = Math.max(SBV1_VIDEO_ENGINE_HEIGHT, PRO2_SCRIPT_NODE_HEIGHT);
+    const y = center.y - maxH / 2;
+    const videoId = store.addNode(
+      "sbv1-video-engine",
+      { x: center.x - totalW / 2, y },
+      buildSbv1VideoEngineNodeData({
+        label: "源视频",
+        pro2PresetKind: preset,
+      }),
+    );
+    const hubId = store.addNode(
+      "story-pro2-script-hub",
+      { x: center.x - totalW / 2 + videoW + gap, y },
+      buildPro2ScriptHubNodeData({ label: "拉片制作包" }),
+    );
+    if (!videoId || !hubId) {
+      return { groupId: null, focusNodeId: videoId || hubId };
+    }
+    const groupId = store.createGroupContaining([videoId, hubId], {
+      label: PRESET_LABEL[preset],
+      ...SHORTCUT_GROUP_OPTS,
+    });
+    queueMicrotask(() => {
+      store.setNodes((prev) =>
+        prev.map((n) =>
+          n.id === videoId
+            ? {
+                ...n,
+                data: { ...(n.data as Record<string, unknown>), filmPullScriptHubId: hubId },
+              }
+            : n,
+        ) as typeof prev,
+      );
+      relayoutShortcutPresetGroup(
+        store.setNodes,
+        groupId,
+        [
+          { id: videoId, width: videoW, height: SBV1_VIDEO_ENGINE_HEIGHT },
+          { id: hubId, width: hubW, height: PRO2_SCRIPT_NODE_HEIGHT },
+        ],
+        gap,
+      );
+      selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    });
+    return { groupId, focusNodeId: videoId };
   }
 
   if (preset === "video-to-prompt") {

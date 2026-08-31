@@ -9,6 +9,7 @@ import {
   ECOM_MODEL_SHOT_TOOL_KEY,
   type ModelShotPoseItem,
 } from "@/lib/ecom/ecom-model-shot-types";
+import { touchCatalogLockOnProjectUse } from "@/lib/ecom/ecom-catalog-lock";
 import {
   getEcomModelShotProject,
   updateEcomModelShotProject,
@@ -140,6 +141,10 @@ export async function generateModelShotImages(opts: {
 
   const finalProject = await getEcomModelShotProject(opts.userId, opts.projectId);
   if (!finalProject) throw new Error("项目不存在");
+
+  if (generated > 0) {
+    await touchCatalogLockOnProjectUse(finalProject);
+  }
 
   if (claimed.length > 0 && generated === 0 && failures.length >= claimed.length) {
     throw new Error(

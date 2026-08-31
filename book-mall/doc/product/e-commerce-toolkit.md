@@ -26,6 +26,17 @@
 - 模型：Vision LLM（拆视频须 video-understanding）；Gateway `image_url` / `video_url`
 - toolKey：`ecom-toolkit__media-decompose`（`decompose`）；数据表 `EcomMediaDecomposeProject`
 
+### 专业拉片（工业化逐镜 · 换角成片）
+
+> 需求与 JSON 契约：[`doc/拉片/`](../拉片/requirements.md)（`ecom-film-pull-prompts.ts` 运行时读取 `skill.md`）
+
+- 入口：`/ecom/film-pull`；**电商**侧栏（紧挨拆图拆视频）；**全屏上下分屏 Studio**（上：阶段条 + 分镜表/成片；下：Dock 上传 + 操作）
+- V1：**≤60s** 单次拉片；>60s 分段仅 schema/`analyzeMode` 预留
+- M1：上传 → Vision 拉片 JSON → 分镜表审校 → 导出 JSON/ZIP
+- M2：角色 ref → 渲染脚本 → 逐镜 R2V → MediaRender 合成成片
+- Canvas：Pro2 底栏预设「视频拉片」→ 拉片 → `POST export/pro2` 导入 Script Hub 制作包
+- toolKey：`ecom-toolkit__film-pull`；数据表 `EcomFilmPullProject`
+
 ### 手伴创作（线稿 → 潮玩盲盒 IP 全案）
 
 > SOP 与助手话术真源：[`doc/手伴/skill.md`](../手伴/skill.md)（`ecom-hand-craft-prompts.ts` 运行时读取）
@@ -56,14 +67,15 @@
 - 交付：成图自动入库「我的资产 · 手伴创作」；`GET .../export` 出 ZIP（每步一个目录 + 交付清单 + 助手对话）
 - toolKey：`ecom-toolkit__hand-craft`（`generate` / `compose`）；数据表 `EcomHandCraftProject`
 
-### 服装模特图（多姿势上身展示）
+### 服装模特图（多姿势上身展示 · V2）
 
 > 需求与方案：`doc/模特姿势/requirements.md`、`doc/模特姿势/solution.md`；助手话术：`doc/模特姿势/skill.md`
 
-- 入口：`/ecom/model-shot`；布局：**进度轨 + 中栏工作区 + 右栏助手**（交互对齐微剧故事版折叠/悬浮输入）
-- 平台共享 catalog：**姿势库 / 道具库 / 场景库**（Prisma + JSON seed；Book `/admin/templates?tab=ecom` 管理）；**模特**复用模特库
-- 流程：Step0 服装（必填）→ 模特 → 场景 → 道具 → 元信息 → 服务端 **pose-picker** 产出 6～8 条 → 中栏确认 plan → R2V 批量出图
-- 出图：支持参考图的 IMAGE 模型；ref 顺序 服装 → 模特 → 场景；`plan.status=confirmed` 门禁
+- 入口：`/ecom/model-shot`；资产库：`/ecom/shoot-catalog`（场景/道具/姿势；系统只读 + 我的 CRUD）
+- 布局：**进度轨 + 中栏工作区 + 右栏助手**（交互对齐微剧故事版折叠/悬浮输入）
+- Catalog：**姿势/道具/场景**（platform 由 Book `/admin/templates?tab=ecom` 管理；user 由 shoot-catalog）；**模特**复用模特库
+- 流程：服装（必填）→ 模特 → 场景（可选）→ 道具两选项（不需要 / 稍后表填）→ 元信息 → **pose-picker（风格+场景 tags）** → 姿势表填道具 → 确认 plan → R2V 出图
+- 出图：ref 顺序 服装 → 模特 → 场景；`plan.status=confirmed` 门禁；用户 catalog 引用后锁定
 - toolKey：`ecom-toolkit__model-shot`（`chat` / `tryon`）；数据表 `EcomModelShotProject`
 
 ## 2. 计费双轨（readme §6）

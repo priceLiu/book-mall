@@ -56,8 +56,12 @@ export type ModelShotPoseItem = {
   poseDescription?: string;
   /** 本条场景文案，可逐条覆盖项目默认 */
   sceneText?: string;
-  /** 本条道具文案，可逐条覆盖项目默认；空字符串表示无道具 */
+  /** 场景库 catalogId */
+  sceneCatalogId?: string;
+  /** 本条道具文案；空字符串表示无道具 */
   propText?: string;
+  /** 道具库 catalogId */
+  propCatalogId?: string;
   prompt: string;
   imageUrl?: string;
   assetId?: string;
@@ -84,6 +88,8 @@ export type ModelShotMeta = {
     propPick?: boolean;
     summaryAcknowledged?: boolean;
   };
+  /** V2：用户选择稍后在姿势表填道具 */
+  propDeferred?: boolean;
   workflow?: {
     phase?: ModelShotPhase;
     pendingPoseImages?: Record<
@@ -115,7 +121,9 @@ const poseItemSchema = z.object({
   title: z.string().optional(),
   poseDescription: z.string().optional(),
   sceneText: z.string().optional(),
+  sceneCatalogId: z.string().optional(),
   propText: z.string().optional(),
+  propCatalogId: z.string().optional(),
   prompt: z.string().default(""),
   imageUrl: z.string().optional(),
   assetId: z.string().optional(),
@@ -194,11 +202,23 @@ export function refByRole(
   return refs.find((r) => r.role === role);
 }
 
-/** 场景 / 道具步骤是否已完成（含显式跳过 source=none） */
+/** 道具采集步骤是否完成（V2：仅两选项，不在此选具体道具） */
+export function isModelShotPropStepDone(
+  refs: ModelShotReference[],
+  meta?: ModelShotMeta | null,
+): boolean {
+  const ref = refByRole(refs, "prop");
+  if (ref?.source === "none") return true;
+  if (meta?.propDeferred) return true;
+  return false;
+}
+
+/** 场景步骤是否已完成（含显式跳过 source=none） */
 export function isModelShotOptionalRefDone(
   refs: ModelShotReference[],
   role: "scene" | "prop",
 ): boolean {
+  if (role === "prop") return false;
   const ref = refByRole(refs, role);
   if (!ref) return false;
   if (ref.source === "none") return true;

@@ -6,6 +6,7 @@ import {
   listAllSceneLibraryEntriesFromDb,
   upsertSceneLibraryEntry,
 } from "@/lib/ecom/ecom-scene-library-service";
+import { tagsForArchetype, isSceneArchetype } from "@/lib/ecom/model-shot/scene-pose-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,17 @@ export async function POST(request: Request) {
   if (!id || !name || !visualPrompt) {
     return NextResponse.json({ error: "id/name/visualPrompt 必填" }, { status: 400 });
   }
+  const tags =
+    body.tags && typeof body.tags === "object" && !Array.isArray(body.tags)
+      ? (body.tags as Record<string, unknown>)
+      : typeof body.archetype === "string" && isSceneArchetype(body.archetype)
+        ? tagsForArchetype(body.archetype)
+        : undefined;
   const entry = await upsertSceneLibraryEntry({
     id,
     name,
     visualPrompt,
+    tags,
     enabled: body.enabled !== false,
     sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
   });

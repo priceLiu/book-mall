@@ -101,6 +101,10 @@ export type Sbv1VideoEngineNodeData = {
   realPersonLivenessAt?: string;
   runtime?: CanvasNodeRuntime;
   uploading?: boolean;
+  /** 快捷预设 · 专业拉片 */
+  pro2PresetKind?: string;
+  filmPullProjectId?: string;
+  filmPullScriptHubId?: string;
 };
 
 export const SBV1_DEFAULT_VIDEO_ENGINE_DATA: Sbv1VideoEngineNodeData = {

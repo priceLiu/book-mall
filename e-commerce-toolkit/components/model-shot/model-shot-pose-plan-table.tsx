@@ -1,19 +1,32 @@
 "use client";
 
-import { Pencil } from "lucide-react";
-import { useState } from "react";
+import { BookOpen, Pencil } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 
+import {
+  EcomCatalogPickerDialog,
+  type CatalogPickerEntry,
+} from "@/components/model-shot/ecom-catalog-picker-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { fetchEcomPropLibraryCatalog } from "@/lib/ecom-prop-library-api";
+import type { EcomPropLibraryEntry } from "@/lib/ecom-prop-library/types";
+import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
+import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import type { ModelShotPlan, ModelShotPoseItem } from "@/lib/model-shot-types";
 
-type PoseItemPatch = {
+export type PoseItemPatch = {
   poseDescription: string;
   sceneText: string;
   propText: string;
+  sceneCatalogId?: string | null;
+  propCatalogId?: string | null;
+  applySceneToAll?: boolean;
+  applyPropToAll?: boolean;
 };
 
 type Props = {
   plan: ModelShotPlan;
+  defaultSceneLabel?: string | null;
   onPatchItem: (index: number, patch: PoseItemPatch) => Promise<void>;
   onConfirmPlan: () => Promise<void>;
   onGeneratePoses: () => Promise<void>;
@@ -21,6 +34,8 @@ type Props = {
   canGeneratePoses?: boolean;
   confirmed?: boolean;
 };
+
+type PickerKind = "scene" | "prop" | null;
 
 function displayPoseDescription(item: ModelShotPoseItem): string {
   if (item.poseDescription?.trim()) return item.poseDescription.trim();
@@ -42,11 +57,34 @@ function toDraft(item: ModelShotPoseItem): PoseItemPatch {
     poseDescription: item.poseDescription?.trim() || item.prompt?.trim() || "",
     sceneText: item.sceneText ?? "",
     propText: item.propText ?? "",
+    sceneCatalogId: item.sceneCatalogId ?? null,
+    propCatalogId: item.propCatalogId ?? null,
+  };
+}
+
+function sceneToPickerEntry(entry: EcomSceneLibraryEntry): CatalogPickerEntry {
+  return {
+    id: entry.id,
+    name: entry.name,
+    subtitle: entry.visualPrompt,
+    scope: entry.scope,
+    lockedAt: entry.lockedAt,
+  };
+}
+
+function propToPickerEntry(entry: EcomPropLibraryEntry): CatalogPickerEntry {
+  return {
+    id: entry.id,
+    name: entry.name,
+    subtitle: entry.visualDescription,
+    scope: entry.scope,
+    lockedAt: entry.lockedAt,
   };
 }
 
 export function ModelShotPosePlanTable({
   plan,
+  defaultSceneLabel,
   onPatchItem,
   onConfirmPlan,
   onGeneratePoses,
@@ -60,6 +98,93 @@ export function ModelShotPosePlanTable({
     sceneText: "",
     propText: "",
   });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerKind, setPickerKind] = useState<PickerKind>(null);
+  const [pickerTargetIndex, setPickerTargetIndex] = useState<number>(1);
+  const [applyToAll, setApplyToAll] = useState(false);
+  const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
+  const [propCatalog, setPropCatalog] = useState<EcomPropLibraryEntry[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+
+  const pickerEntries = useMemo((): CatalogPickerEntry[] => {
+    if (pickerKind === "scene") return sceneCatalog.map(sceneToPickerEntry);
+    if (pickerKind === "prop") return propCatalog.map(propToPickerEntry);
+    return [];
+  }, [pickerKind, sceneCatalog, propCatalog]);
+
+  const openPicker = useCallback(
+    async (kind: "scene" | "prop", index: number, all = false) => {
+      setPickerKind(kind);
+      setPickerTargetIndex(index);
+      setApplyToAll(all);
+      setCatalogLoading(true);
+      setPickerOpen(true);
+      try {
+        if (kind === "scene") {
+          const catalog = await fetchEcomSceneLibraryCatalog();
+          const list = catalog.scenes.length
+            ? catalog.scenes
+            : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
+          setSceneCatalog(list);
+        } else {
+          const catalog = await fetchEcomPropLibraryCatalog();
+          const list = catalog.props.length
+            ? catalog.props
+            : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
+          setPropCatalog(list);
+        }
+      } finally {
+        setCatalogLoading(false);
+      }
+    },
+    [],
+  );
+
+  const handlePickerPick = useCallback(
+    async (entry: CatalogPickerEntry) => {
+      if (!pickerKind) return;
+      const index = pickerTargetIndex;
+      const item = plan.items.find((i) => i.index === index) ?? plan.items[0];
+      if (!item) return;
+
+      if (pickerKind === "scene") {
+        const scene = sceneCatalog.find((s) => s.id === entry.id);
+        const sceneText = scene?.visualPrompt ?? entry.subtitle;
+        if (editIndex === index) {
+          setDraft((prev) => ({
+            ...prev,
+            sceneText,
+            sceneCatalogId: entry.id,
+          }));
+          return;
+        }
+        await onPatchItem(index, {
+          ...toDraft(item),
+          sceneText,
+          sceneCatalogId: entry.id,
+          applySceneToAll: applyToAll,
+        });
+      } else {
+        const prop = propCatalog.find((p) => p.id === entry.id);
+        const propText = prop?.visualDescription ?? entry.subtitle;
+        if (editIndex === index) {
+          setDraft((prev) => ({
+            ...prev,
+            propText,
+            propCatalogId: entry.id,
+          }));
+          return;
+        }
+        await onPatchItem(index, {
+          ...toDraft(item),
+          propText,
+          propCatalogId: entry.id,
+          applyPropToAll: applyToAll,
+        });
+      }
+    },
+    [applyToAll, editIndex, onPatchItem, pickerKind, pickerTargetIndex, plan.items, propCatalog, sceneCatalog],
+  );
 
   if (plan.items.length === 0) {
     return (
@@ -74,6 +199,8 @@ export function ModelShotPosePlanTable({
     );
   }
 
+  const firstIndex = plan.items[0]?.index ?? 1;
+
   return (
     <section className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -85,6 +212,11 @@ export function ModelShotPosePlanTable({
             共 {plan.items.length} 条 · 状态：
             {plan.status === "confirmed" ? "已确认，可逐张出图" : "待确认"}
           </p>
+          {defaultSceneLabel ? (
+            <p className="mt-1 text-[11px] text-[#424245]">
+              默认场景：<span className="font-medium">{defaultSceneLabel}</span>
+            </p>
+          ) : null}
           {confirmed ? (
             <p className="mt-1 text-[11px] text-[#86868b]">
               修改并保存后，下方生成模特图将按最新脚本执行。
@@ -92,6 +224,20 @@ export function ModelShotPosePlanTable({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <EcomButtonSecondary
+            type="button"
+            disabled={busy}
+            onClick={() => void openPicker("scene", firstIndex, true)}
+          >
+            场景应用到全部
+          </EcomButtonSecondary>
+          <EcomButtonSecondary
+            type="button"
+            disabled={busy}
+            onClick={() => void openPicker("prop", firstIndex, true)}
+          >
+            道具应用到全部
+          </EcomButtonSecondary>
           <EcomButtonSecondary type="button" disabled={busy} onClick={() => void onGeneratePoses()}>
             重新生成
           </EcomButtonSecondary>
@@ -146,6 +292,15 @@ export function ModelShotPosePlanTable({
                               setDraft((prev) => ({ ...prev, sceneText: e.target.value }))
                             }
                           />
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                            disabled={busy}
+                            onClick={() => void openPicker("scene", item.index, false)}
+                          >
+                            <BookOpen className="h-3 w-3" />
+                            从词库选择
+                          </button>
                         </label>
                         <label className="block space-y-1">
                           <span className="text-[10px] font-medium text-[#86868b]">道具</span>
@@ -158,6 +313,15 @@ export function ModelShotPosePlanTable({
                               setDraft((prev) => ({ ...prev, propText: e.target.value }))
                             }
                           />
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                            disabled={busy}
+                            onClick={() => void openPicker("prop", item.index, false)}
+                          >
+                            <BookOpen className="h-3 w-3" />
+                            从词库选择
+                          </button>
                         </label>
                       </div>
                     </td>
@@ -195,11 +359,29 @@ export function ModelShotPosePlanTable({
                       <p className="line-clamp-4 whitespace-pre-wrap text-[#424245]">
                         {displaySceneText(item)}
                       </p>
+                      <button
+                        type="button"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                        disabled={busy}
+                        onClick={() => void openPicker("scene", item.index, false)}
+                      >
+                        <BookOpen className="h-3 w-3" />
+                        词库
+                      </button>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <p className="line-clamp-4 whitespace-pre-wrap text-[#424245]">
                         {displayPropText(item)}
                       </p>
+                      <button
+                        type="button"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                        disabled={busy}
+                        onClick={() => void openPicker("prop", item.index, false)}
+                      >
+                        <BookOpen className="h-3 w-3" />
+                        词库
+                      </button>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <button
@@ -222,6 +404,24 @@ export function ModelShotPosePlanTable({
           </tbody>
         </table>
       </div>
+
+      <EcomCatalogPickerDialog
+        open={pickerOpen}
+        title={
+          catalogLoading
+            ? "加载词库…"
+            : pickerKind === "scene"
+              ? applyToAll
+                ? "选择场景 · 应用到全部"
+                : "选择场景"
+              : applyToAll
+                ? "选择道具 · 应用到全部"
+                : "选择道具"
+        }
+        entries={catalogLoading ? [] : pickerEntries}
+        onOpenChange={setPickerOpen}
+        onPick={handlePickerPick}
+      />
     </section>
   );
 }

@@ -68,6 +68,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "light",
   },
   {
+    id: "film-pull",
+    title: "专业拉片",
+    tagline: "工业化逐镜拉片 · 换角 · 合成成片",
+    href: "/ecom/film-pull",
+    kind: "video",
+    toolKey: "ecom-toolkit__film-pull",
+    action: "analyze",
+    tile: "dark",
+  },
+  {
     id: "seed-video",
     title: "图片生种草视频",
     tagline: "素材策划 + 30s 种草短视频成片",

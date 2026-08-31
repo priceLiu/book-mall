@@ -6,6 +6,7 @@ import {
   getSceneLibraryEntry,
   upsertSceneLibraryEntry,
 } from "@/lib/ecom/ecom-scene-library-service";
+import { tagsForArchetype, isSceneArchetype } from "@/lib/ecom/model-shot/scene-pose-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  const tags =
+    typeof body.archetype === "string" && isSceneArchetype(body.archetype)
+      ? tagsForArchetype(body.archetype)
+      : body.tags && typeof body.tags === "object" && !Array.isArray(body.tags)
+        ? (body.tags as Record<string, unknown>)
+        : existing.tags;
+
   const saved = await upsertSceneLibraryEntry({
     ...existing,
     name: typeof body.name === "string" ? body.name : existing.name,
     visualPrompt: typeof body.visualPrompt === "string" ? body.visualPrompt : existing.visualPrompt,
+    tags,
     enabled: typeof body.enabled === "boolean" ? body.enabled : existing.enabled,
     sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : existing.sortOrder,
   });

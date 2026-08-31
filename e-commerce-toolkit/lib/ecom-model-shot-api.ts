@@ -142,6 +142,10 @@ export async function patchModelShotPoseItem(
     poseDescription?: string;
     sceneText?: string;
     propText?: string;
+    sceneCatalogId?: string | null;
+    propCatalogId?: string | null;
+    applySceneToAll?: boolean;
+    applyPropToAll?: boolean;
   },
 ): Promise<ModelShotProject> {
   const res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/refs/upload`, {

@@ -7,6 +7,7 @@ import type {
 import {
   hasGarmentReference,
   isModelShotOptionalRefDone,
+  isModelShotPropStepDone,
   refByRole,
 } from "@/lib/model-shot-types";
 import {
@@ -50,7 +51,7 @@ export function deriveModelShotPhaseFromState(project: ModelShotProject): ModelS
   if (!hasGarmentReference(project.references)) return "garment";
   if (!refByRole(project.references, "model")) return "model";
   if (!isModelShotOptionalRefDone(project.references, "scene")) return "scene";
-  if (!isModelShotOptionalRefDone(project.references, "prop")) return "prop";
+  if (!isModelShotPropStepDone(project.references, project.meta)) return "prop";
   if (!isModelShotMetaPhaseComplete(project)) return "meta";
   return "poses";
 }
@@ -236,12 +237,9 @@ export function resolveModelShotWelcomeMessage(project: ModelShotProject): strin
 
 **第二步 · 关于场景/背景**：请选择确定方式（可跳过）：`;
     case "prop": {
-      const sceneSkipped = refByRole(project.references, "scene")?.source === "none";
       return `${WELCOME_INTRO}
 
-${sceneSkipped ? "场景已跳过。" : "场景已就绪。"}
-
-**第三步 · 关于手持道具**：请选择（可不需要）：`;
+**第三步 · 道具** — 不在此选择具体道具，请点选一项：`;
     }
     case "meta": {
       const sub = inferMetaSubStep(project);
@@ -349,15 +347,10 @@ export function inferAssistantChoices(project: ModelShotProject): string[] {
         `${MODEL_SHOT_SCENE_MODE_PREFIX}AI生成（中栏）`,
       ];
     case "prop":
-      if (propRef) return [];
-      if (wizard.propPick) {
-        return stablePropChoiceLabels(project.id);
-      }
+      if (isModelShotPropStepDone(project.references, project.meta)) return [];
       return [
         `${MODEL_SHOT_PROP_MODE_PREFIX}不需要道具`,
-        `${MODEL_SHOT_PROP_MODE_PREFIX}上传参考图`,
-        `${MODEL_SHOT_PROP_MODE_PREFIX}词库推荐`,
-        `${MODEL_SHOT_PROP_MODE_PREFIX}AI生成（中栏）`,
+        `${MODEL_SHOT_PROP_MODE_PREFIX}稍后在姿势表填写`,
       ];
     case "meta": {
       const sub = inferMetaSubStep(project);
@@ -390,10 +383,13 @@ export function inferAssistantChoices(project: ModelShotProject): string[] {
 
 /** 本地跳过步骤时的固定助手回复（不调 LLM） */
 export const MODEL_SHOT_SKIP_SCENE_ASSISTANT_REPLY =
-  "好的，场景已跳过，出图时由模型自由发挥背景。如需道具可上传或选择；不需要可点「不需要道具」。";
+  "好的，场景已跳过，出图时由模型自由发挥背景。接下来请选择 **道具** 方式（不需要 / 稍后表内填写）。";
 
 export const MODEL_SHOT_SKIP_PROP_ASSISTANT_REPLY =
-  "好的，本次不使用道具。接下来补 **3 项元信息**（风格 → 用途 → 张数），请逐项点选。";
+  "好的，本次不使用道具。接下来补 **元信息**（风格 → 用途 → 张数），请逐项点选。";
+
+export const MODEL_SHOT_PROP_DEFER_ASSISTANT_REPLY =
+  "好的，道具请在 **姿势计划表** 的道具列从词库点选（可应用到全部）。接下来补 **元信息**。";
 
 export const MODEL_SHOT_META_STYLE_REPLY =
   "已记录风格。请继续选择 **主要用途**（电商主图 / 种草 / lookbook / 社媒广告）。";
@@ -432,14 +428,8 @@ export function modelModeAssistantReply(choice: string, projectId: string): stri
   if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}不需要道具`) {
     return MODEL_SHOT_SKIP_PROP_ASSISTANT_REPLY;
   }
-  if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}上传参考图`) {
-    return `请在中栏 **道具图** 上传道具参考。`;
-  }
-  if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}词库推荐`) {
-    return `结合当前风格，为您推荐以下道具，请选 1 个：\n\n${formatPropRecommendList(projectId)}`;
-  }
-  if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}AI生成（中栏）`) {
-    return `请在中栏道具图区域点击 **「AI生成」**，从内置词库切换提示词后生成道具参考图。`;
+  if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}稍后在姿势表填写`) {
+    return MODEL_SHOT_PROP_DEFER_ASSISTANT_REPLY;
   }
   return null;
 }
@@ -449,7 +439,7 @@ export function modelArchetypeAssistantReply(archetype: ModelShotModelArchetype)
 }
 
 export function scenePickAssistantReply(name: string): string {
-  return `收到，已选定场景「**${name}**」。\n\n**第三步 · 关于手持道具** — 请选择：`;
+  return `收到，已选定场景「**${name}**」。\n\n**第三步 · 道具** — 请选择「不需要道具」或「稍后在姿势表填写」：`;
 }
 
 export function propPickAssistantReply(name: string): string {

@@ -80,13 +80,6 @@ const ROLE_SECTIONS: Array<{
     aiGenerate: true,
     emptyHint: "可选。拖放 / 粘贴 / 我的资产，或 AI 生成场景参考图；也可跳过，由模型自由发挥背景。",
   },
-  {
-    role: "prop",
-    title: "道具图",
-    refRole: "prop",
-    aiGenerate: true,
-    emptyHint: "可选。拖放 / 粘贴 / 我的资产，或 AI 生成道具参考图。",
-  },
 ];
 
 function ModelShotRefOverlays({

@@ -1,6 +1,7 @@
 # 服装模特图 · 技术方案
 
 - **创建日期**：2026-08-31
+- **更新**：2026-08-31（V2）
 - **需求**：[requirements.md](./requirements.md)
 
 ## 1. 架构
@@ -8,6 +9,7 @@
 ```mermaid
 flowchart LR
   Admin[Book Admin CRUD] --> CatalogDB[(Pose/Prop/Scene)]
+  UserLib[User shoot-catalog] --> CatalogDB
   Seed[seed scripts] --> CatalogDB
   CatalogDB --> Picker[pose-picker]
   Studio[ModelShotStudio] --> Assistant[AssistantPanel]
@@ -18,6 +20,7 @@ flowchart LR
   GenAPI --> ImgGW[Gateway IMAGE R2V]
   Picker --> Plan[plan.items]
   Plan --> Content
+  Lock[touchCatalogLock] --> CatalogDB
 ```
 
 ## 2. 数据模型
@@ -27,61 +30,58 @@ flowchart LR
 | 列 | 内容 |
 |----|------|
 | brief | platform, industry, styles[], poseCount |
-| references | garment, model, scene, prop |
-| plan | `{ status, items: [{ index, poseId, category, prompt, imageUrl? }] }` |
-| meta | `{ phase, lastAssistantRaw }` |
+| references | garment, model, scene（无 prop 参考） |
+| plan | `{ status, items: [{ index, poseId, category, poseDescription, sceneText, propText, sceneCatalogId?, propCatalogId?, prompt, imageUrl? }] }` |
+| meta | `{ phase, wizard, lastAssistantRaw }` |
 
-### Catalog 表
+### Catalog 表（V2 扩展）
 
-- `EcomPoseLibraryEntry` — category A-M, baseDescription, tags
-- `EcomPropLibraryEntry` — name, visualDescription, conflictTags, ossUrl?
-- `EcomSceneLibraryEntry` — name, visualPrompt, tags
+- `scope`: `platform` \| `user`（默认 platform）
+- `userId`: 用户条目必填
+- `lockedAt`: 首次被确认计划/成图引用时写入
 
-模式同 [`ecom-model-library-service.ts`](../../lib/ecom/ecom-model-library-service.ts)。
+| 表 | 字段 |
+|----|------|
+| EcomPoseLibraryEntry | category, baseDescription, tags |
+| EcomPropLibraryEntry | name, visualDescription, conflictTags, ossUrl? |
+| EcomSceneLibraryEntry | name, visualPrompt, tags.archetype |
 
-## 3. pose-picker（Hybrid）
+## 3. pose-picker（Hybrid V2）
 
-1. LLM 负责对话采集 brief
-2. 用户确认后 `POST .../poses/generate` 调用服务端 picker
-3. picker：规则一抽库 → 规则二微调 → 规则三否决 → prompt-assembler
+1. LLM 负责对话采集 brief（不含道具）
+2. `POST .../poses/generate` 调用服务端 picker
+3. picker：风格抽库 → **场景 tags 加权/禁止** → 微调 → 道具否决（仅 platform prop catalog，V2 采集无 prop 时跳过）
 
 ## 4. Prompt 拼装
 
-`prompt-assembler.ts` 按 skill.md 占位符表填充：模特锁定、场景、道具、负面约束、平台倾向。
+`prompt-assembler.ts`：模特锁定、场景、道具（表内 propText）、负面约束、平台倾向。
 
 ## 5. 出图
 
-- `ecom-model-shot-image.ts`：ref 顺序 garment → model → scene
-- `generateEcomImage` + `EcomAsset` module=`model-shot`
+- ref 顺序 garment → model → scene
 - 仅 `plan.status === confirmed` 可出图
+- 确认/成图成功后 `touchCatalogLockOnProjectUse`
 
 ## 6. API 清单
 
-前缀：`/api/sso/tools/ecom/model-shot/`
+前缀：`/api/sso/tools/ecom/model-shot/`（项目）  
+前缀：`/api/sso/tools/ecom/{pose,prop,scene}-library/`（catalog 读 + 用户 CRUD）
 
 | 路由 | 方法 |
 |------|------|
-| models | GET |
-| projects | GET, POST |
-| projects/[id] | GET, PATCH, DELETE |
-| projects/[id]/assistant/chat | POST stream |
-| projects/[id]/sync | POST |
-| projects/[id]/poses/generate | POST |
-| projects/[id]/plan/confirm | POST |
-| projects/[id]/poses/[index]/prompt | PATCH |
-| projects/[id]/image/generate | POST |
-| projects/[id]/refs/upload | POST |
-| projects/[id]/refs/attach | POST |
+| `{pose,prop,scene}-library/catalog` | GET（platform + user） |
+| `{pose,prop,scene}-library/entries` | POST, PATCH, DELETE（user scope） |
+| model-shot/projects/... | 同 Phase 1 |
 
-## 7. 前端组件
+## 7. 前端
 
-参照 hand-craft：`model-shot-studio`、`model-shot-assistant-panel`（`EcomAssistantCollapsibleLayout`）、`model-shot-content-panel`。
+- `model-shot-studio` + 姿势表 picker
+- `/ecom/shoot-catalog` 用户资产库
 
 ## 8. 参照模块
 
 | 能力 | 参照 |
 |------|------|
 | Studio 壳 | hand-craft |
-| Chat API | hand-craft/assistant/chat |
-| Catalog | model-library |
-| 助手 UI | storyboard + CHAT.md |
+| 用户库页 | model-library |
+| Catalog CRUD | admin-ecom-catalog-libraries |

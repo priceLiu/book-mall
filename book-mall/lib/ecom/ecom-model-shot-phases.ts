@@ -8,6 +8,7 @@ import type {
 import {
   hasGarmentReference,
   isModelShotOptionalRefDone,
+  isModelShotPropStepDone,
   refByRole,
 } from "@/lib/ecom/ecom-model-shot-types";
 
@@ -44,7 +45,7 @@ export function deriveModelShotPhaseFromState(project: ModelShotProject): ModelS
   if (!hasGarmentReference(project.references)) return "garment";
   if (!refByRole(project.references, "model")) return "model";
   if (!isModelShotOptionalRefDone(project.references, "scene")) return "scene";
-  if (!isModelShotOptionalRefDone(project.references, "prop")) return "prop";
+  if (!isModelShotPropStepDone(project.references, project.meta)) return "prop";
   if (!isModelShotMetaPhaseComplete(project)) return "meta";
   return "poses";
 }

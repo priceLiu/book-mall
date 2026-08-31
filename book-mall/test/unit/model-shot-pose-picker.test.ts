@@ -54,6 +54,48 @@ describe("pickModelShotPoses", () => {
     const picked = pickModelShotPoses({ pool, styles: ["活泼"], count: 6, prop });
     expect(picked.some((p) => p.category === "H")).toBe(false);
   });
+
+  it("studio scene + 优雅 avoids H/L and favors A/J/K", () => {
+    const studioScene = {
+      id: "scene-02",
+      name: "极简高调影棚",
+      visualPrompt: "纯白影棚",
+      tags: { archetype: "studio" },
+      enabled: true,
+      sortOrder: 0,
+    };
+    const picked = pickModelShotPoses({
+      pool,
+      styles: ["优雅"],
+      count: 6,
+      prop: null,
+      scene: studioScene,
+    });
+    expect(picked.length).toBe(6);
+    expect(picked.some((p) => p.category === "H")).toBe(false);
+    expect(picked.some((p) => p.category === "L")).toBe(false);
+    expect(picked.filter((p) => ["A", "J", "K"].includes(p.category)).length).toBeGreaterThan(0);
+  });
+
+  it("outdoor beach scene + 活泼 includes B/H and excludes J", () => {
+    const beachScene = {
+      id: "scene-06",
+      name: "海滨日落沙滩",
+      visualPrompt: "金色沙滩",
+      tags: { archetype: "outdoor" },
+      enabled: true,
+      sortOrder: 0,
+    };
+    const picked = pickModelShotPoses({
+      pool,
+      styles: ["活泼"],
+      count: 6,
+      prop: null,
+      scene: beachScene,
+    });
+    expect(picked.some((p) => p.category === "B" || p.category === "H")).toBe(true);
+    expect(picked.some((p) => p.category === "J")).toBe(false);
+  });
 });
 
 describe("assembleModelShotPrompt", () => {

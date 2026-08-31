@@ -70,6 +70,19 @@ EcomAppShell（全屏）
 
 新长流程工具可复用此轨模式或简化为顶栏 stepper，色票与 `SYSTEM.md` §10 一致。
 
+## FilmPullStudio（专业拉片 · 上下分屏）
+
+不使用 `EcomWorkspaceLayout` 双栏；主区 `fullWidth`：
+
+```
+顶栏：标题 + 模型选择 + 项目列表
+├── FilmPullStepper（拉片 → 审校 → 换角 → 成片）
+├── 主区：分镜表 / 逐镜预览 / 成片（可滚动）
+└── FilmPullDock（底栏固定）：源视频 + 角色 ref + 主操作钮
+```
+
+长任务（批量出镜、合成成片）注册 `BackgroundGenerationProvider` 后台 Dock。
+
 ## 响应式
 
 - 侧栏：移动端 `EcomMobileBar` 代替固定侧栏

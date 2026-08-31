@@ -25,6 +25,7 @@ import {
 import type { ModelShotBrief, ModelShotChatMessage, ModelShotMeta, ModelShotProject } from "@/lib/model-shot-types";
 import {
   MODEL_SHOT_MODEL_MODE_PREFIX,
+  MODEL_SHOT_PROP_DEFER_ASSISTANT_REPLY,
   MODEL_SHOT_PROP_MODE_PREFIX,
   MODEL_SHOT_SCENE_MODE_PREFIX,
   parseModelArchetypeChoice,
@@ -42,10 +43,8 @@ import {
   parseMetaCountChoice,
   parseMetaStyleChoice,
   parseMetaUsageChoice,
-  parsePropChoiceLabel,
   parseSceneChoiceLabel,
   posePlanGenerateChoiceLabel,
-  propPickAssistantReply,
   resolveModelShotWelcomeMessage,
   scenePickAssistantReply,
   MODEL_SHOT_META_COUNT_REPLY,
@@ -384,27 +383,6 @@ export function ModelShotAssistantPanel({
         return;
       }
 
-      const propPreset = parsePropChoiceLabel(choice);
-      if (propPreset) {
-        await recordLocalTurn({
-          userText: choice,
-          assistantText: propPickAssistantReply(propPreset.name),
-          meta: { wizard: { propPick: false } },
-          beforeSave: () =>
-            attachModelShotReference(projectId, {
-              reference: {
-                id: `prop-text-${propPreset.id}`,
-                role: "prop",
-                source: "library",
-                catalogId: propPreset.id,
-                name: propPreset.name,
-                description: propPreset.visualDescription,
-              },
-            }).then(() => undefined),
-        });
-        return;
-      }
-
       const modelArchetype = parseModelArchetypeChoice(choice);
       if (modelArchetype) {
         await recordLocalTurn({
@@ -443,14 +421,6 @@ export function ModelShotAssistantPanel({
           });
           return;
         }
-        if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}词库推荐`) {
-          await recordLocalTurn({
-            userText: choice,
-            assistantText: modeReply,
-            meta: { wizard: { propPick: true } },
-          });
-          return;
-        }
         if (choice === `${MODEL_SHOT_SCENE_MODE_PREFIX}跳过场景`) {
           await recordLocalSkipTurn({
             userText: choice,
@@ -480,6 +450,14 @@ export function ModelShotAssistantPanel({
                   name: "不需要道具",
                 },
               }).then(() => undefined),
+          });
+          return;
+        }
+        if (choice === `${MODEL_SHOT_PROP_MODE_PREFIX}稍后在姿势表填写`) {
+          await recordLocalTurn({
+            userText: choice,
+            assistantText: modeReply ?? MODEL_SHOT_PROP_DEFER_ASSISTANT_REPLY,
+            meta: { propDeferred: true, wizard: { propPick: false } },
           });
           return;
         }

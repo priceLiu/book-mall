@@ -13,6 +13,9 @@ export default function EcomModulePage({
   if (params.module === "media-decompose") {
     redirect("/ecom/media-decompose");
   }
+  if (params.module === "film-pull") {
+    redirect("/ecom/film-pull");
+  }
   if (params.module === "model-shot") {
     redirect("/ecom/model-shot");
   }

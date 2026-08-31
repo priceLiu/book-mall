@@ -33,6 +33,7 @@ import {
 import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { SBV1_VIDEO_DOCK_PLACEMENT_OPTS } from "@/lib/canvas/sbv1-video-dock-placement";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
+import { FilmPullVideoDock } from "../pro2/film-pull-video-dock";
 import {
   focusSbv1UpstreamAudioNode,
   promptSbv1EmptyUpstreamAudio,
@@ -94,7 +95,12 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   const nodeData = (data ?? {}) as Sbv1VideoEngineNodeData & {
     pro2MediaRole?: string;
     pro2ControllerNodeId?: string;
+    pro2PresetKind?: string;
+    filmPullProjectId?: string;
+    filmPullScriptHubId?: string;
   };
+
+  const isFilmPullPreset = nodeData.pro2PresetKind === "video-film-pull";
 
   const isPro2VideoBoardCell =
     nodeData.pro2MediaRole === "video" &&
@@ -324,6 +330,25 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
     }
   }, [nodeId, base, alert, confirm, updateNodeData, setNodeRuntime, hasVideo]);
+
+  if (isFilmPullPreset) {
+    const videoUrl =
+      nodeData.runtime?.ossUrl?.trim() ||
+      succeededMediaUrl?.trim() ||
+      undefined;
+    return (
+      <FilmPullVideoDock
+        key={nodeId}
+        nodeId={nodeId}
+        filmPullProjectId={nodeData.filmPullProjectId}
+        filmPullScriptHubId={nodeData.filmPullScriptHubId}
+        videoUrl={videoUrl}
+        placement={placement}
+        hidden={hidden}
+        onPatch={onPatch}
+      />
+    );
+  }
 
   return (
     <Sbv1VideoEngineChatInput

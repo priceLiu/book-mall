@@ -392,6 +392,27 @@
 - **产品文档**：`doc/模特姿势/requirements.md`、`doc/plans/2026-08-ecom-model-shot-module.md`
 - **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
 
+---
+
+## 2026-08-31 — 服装模特图 V2 · 用户 Catalog + 场景匹配
+
+- **迁移目录**：`prisma/migrations/20260831140000_ecom_catalog_user_scope/`
+- **字段扩展**（三库同构）：
+  - `EcomPoseLibraryEntry` / `EcomPropLibraryEntry` / `EcomSceneLibraryEntry`：`scope`（platform|user，默认 platform）、`userId`、`lockedAt`
+- **plan JSON**（非列）：`ModelShotPoseItem.sceneCatalogId`、`propCatalogId`
+- **产品文档**：`doc/模特姿势/requirements.md` V2、`doc/plans/2026-08-ecom-model-shot-module.md` Phase 2
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
+## 2026-08-31 — 专业拉片（EcomFilmPullProject）
+
+- **迁移目录**：`prisma/migrations/20260831140000_ecom_film_pull_project/`
+- **新表**：`EcomFilmPullProject` — 拉片项目（media/settings/analyzeResult/renderScript/characterRefs/renderPlan/meta JSON；status 状态机）
+- **Platform API**：`/api/sso/tools/ecom/film-pull/*`（M1 拉片 + M2 换角成片 + export/pro2）
+- **产品文档**：`doc/拉片/requirements.md`、`doc/plans/2026-08-ecom-film-pull-module.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

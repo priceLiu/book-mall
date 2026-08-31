@@ -11,6 +11,7 @@ import {
 import { pickModelShotPoses, posesToPromptTexts } from "@/lib/ecom/model-shot/pose-picker";
 import { readPoseLibraryCatalogLive } from "@/lib/ecom/ecom-pose-library-service";
 import { getPropLibraryEntry } from "@/lib/ecom/ecom-prop-library-service";
+import { getSceneLibraryEntry } from "@/lib/ecom/ecom-scene-library-service";
 import {
   ECOM_MODEL_SHOT_MODULE,
   MODEL_SHOT_POSE_COUNT_DEFAULT,
@@ -188,22 +189,26 @@ export async function generateModelShotPosePlan(
   const catalog = await readPoseLibraryCatalogLive();
   const poseCount = project.brief?.poseCount ?? MODEL_SHOT_POSE_COUNT_DEFAULT;
   const styles = project.brief?.styles ?? ["优雅"];
-  const propRef = project.references.find((r) => r.role === "prop");
-  const prop =
-    propRef?.catalogId ? await getPropLibraryEntry(propRef.catalogId) : null;
+  const sceneRef = project.references.find((r) => r.role === "scene");
+  const scene =
+    sceneRef?.catalogId && sceneRef.source !== "none"
+      ? await getSceneLibraryEntry(sceneRef.catalogId)
+      : null;
 
   const picked = pickModelShotPoses({
-    pool: catalog.poses,
+    pool: catalog.poses.filter((p) => (p.scope ?? "platform") === "platform"),
     styles,
     count: poseCount,
-    prop,
+    scene,
   });
   const descriptions = posesToPromptTexts({ poses: picked, styles });
   const sceneText = resolveModelShotSceneText(project.references, project.brief);
-  const propText = resolveModelShotPropText(project.references);
+  const sceneCatalogId =
+    sceneRef?.catalogId && sceneRef.source !== "none" ? sceneRef.catalogId : undefined;
 
   const items: ModelShotPoseItem[] = picked.map((pose, i) => {
     const poseDescription = descriptions[i]!;
+    const propText = "";
     return {
       index: i + 1,
       poseId: pose.id,
@@ -211,7 +216,9 @@ export async function generateModelShotPosePlan(
       title: pose.title,
       poseDescription,
       sceneText,
+      sceneCatalogId,
       propText,
+      propCatalogId: undefined,
       prompt: assembleModelShotPrompt({
         poseDescription,
         brief: project.brief,

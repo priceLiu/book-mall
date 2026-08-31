@@ -161,6 +161,40 @@ export function isStoryboardSeedanceKieVideoModel(modelKey: string): boolean {
   return k === "bytedance/seedance-2" || k.includes("bytedance/seedance");
 }
 
+/** 弹层可调「生成配音/音效」的视频模型 */
+export function videoModelSupportsGenerateAudio(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  if (isStoryboardSeedanceKieVideoModel(k)) return true;
+  if (/doubao-seedance/i.test(k)) return true;
+  if (isStoryboardKling30KieVideoModel(k)) return true;
+  if (/kling.*3\.0/i.test(k)) return true;
+  if (/seedance-1\.5/i.test(k)) return true;
+  return false;
+}
+
+export function videoResolutionOptionsForModel(
+  modelKey: string,
+): Array<{ value: string; label: string }> {
+  const k = modelKey.trim().toLowerCase();
+  if (isStoryboardWan30VideoModel(k) || isStoryboardBailianR2vModel(k)) {
+    return [
+      { value: "720p", label: "720p" },
+      { value: "1080p", label: "1080p" },
+    ];
+  }
+  if (isStoryboardKling30KieVideoModel(k) || isStoryboardSeedanceKieVideoModel(k)) {
+    return [
+      { value: "720p", label: "720p" },
+      { value: "1080p", label: "1080p" },
+      { value: "2k", label: "2K" },
+    ];
+  }
+  return [
+    { value: "720p", label: "720p" },
+    { value: "1080p", label: "1080p" },
+  ];
+}
+
 export function aspectRatioFromR2vRatio(
   ratio: string,
 ): "16:9" | "9:16" | undefined {

@@ -97,6 +97,7 @@ function imageModuleIcon(id: string): LucideIcon {
   if (id === "seed-video") return Video;
   if (id === "hand-craft") return Blocks;
   if (id === "media-decompose") return ScanSearch;
+  if (id === "film-pull") return Clapperboard;
   return Shirt;
 }
 
@@ -159,6 +160,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
 
   const seedVideoMod = ECOM_MODULES.find((m) => m.id === "seed-video");
   const mediaDecomposeMod = ECOM_MODULES.find((m) => m.id === "media-decompose");
+  const filmPullMod = ECOM_MODULES.find((m) => m.id === "film-pull");
   const imageModLinks = imageMods.map((m) => link(m.title, m.href, imageModuleIcon(m.id)));
   const detailIdx = imageModLinks.findIndex((l) => l.href === "/ecom/detail-page-creation");
   if (seedVideoMod && detailIdx >= 0) {
@@ -178,6 +180,11 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
       0,
       link(mediaDecomposeMod.title, mediaDecomposeMod.href, ScanSearch),
     );
+  }
+  if (filmPullMod) {
+    const decomposeIdx = imageModLinks.findIndex((l) => l.href === "/ecom/media-decompose");
+    const insertAt = decomposeIdx >= 0 ? decomposeIdx + 1 : imageModLinks.length;
+    imageModLinks.splice(insertAt, 0, link(filmPullMod.title, filmPullMod.href, Clapperboard));
   }
 
   const ecomChildren: EcomSidebarNavLink[] = dedupeNavLinks([

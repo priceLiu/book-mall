@@ -74,7 +74,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const hasStructuredPatch =
     typeof body.poseDescription === "string" ||
     typeof body.sceneText === "string" ||
-    typeof body.propText === "string";
+    typeof body.propText === "string" ||
+    typeof body.sceneCatalogId === "string" ||
+    body.sceneCatalogId === null ||
+    typeof body.propCatalogId === "string" ||
+    body.propCatalogId === null ||
+    body.applySceneToAll === true ||
+    body.applyPropToAll === true;
 
   if (typeof body.prompt === "string" && !hasStructuredPatch) {
     const items = project.plan.items.map((item) =>
@@ -90,22 +96,55 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "请提供 prompt 或姿势/场景/道具字段" }, { status: 400 });
   }
 
-  const nextItem = {
-    ...target,
-    ...(typeof body.poseDescription === "string"
-      ? { poseDescription: body.poseDescription }
-      : {}),
-    ...(typeof body.sceneText === "string" ? { sceneText: body.sceneText } : {}),
-    ...(typeof body.propText === "string" ? { propText: body.propText } : {}),
-    promptEdited: true,
+  const sceneCatalogId =
+    typeof body.sceneCatalogId === "string"
+      ? body.sceneCatalogId
+      : body.sceneCatalogId === null
+        ? undefined
+        : undefined;
+  const propCatalogId =
+    typeof body.propCatalogId === "string"
+      ? body.propCatalogId
+      : body.propCatalogId === null
+        ? undefined
+        : undefined;
+
+  const patchOne = (item: typeof target) => {
+    const nextItem = {
+      ...item,
+      ...(typeof body.poseDescription === "string"
+        ? { poseDescription: body.poseDescription }
+        : {}),
+      ...(typeof body.sceneText === "string" ? { sceneText: body.sceneText } : {}),
+      ...(typeof body.propText === "string" ? { propText: body.propText } : {}),
+      ...(body.sceneCatalogId !== undefined ? { sceneCatalogId: sceneCatalogId ?? undefined } : {}),
+      ...(body.propCatalogId !== undefined ? { propCatalogId: propCatalogId ?? undefined } : {}),
+      promptEdited: true,
+    };
+    nextItem.prompt = rebuildModelShotItemPrompt({
+      item: nextItem,
+      brief: project.brief,
+      references: project.references,
+    });
+    return nextItem;
   };
-  nextItem.prompt = rebuildModelShotItemPrompt({
-    item: nextItem,
-    brief: project.brief,
-    references: project.references,
+
+  const applySceneAll = body.applySceneToAll === true;
+  const applyPropAll = body.applyPropToAll === true;
+  const items = project.plan.items.map((item) => {
+    if (applySceneAll || applyPropAll) {
+      const shouldPatch =
+        (applySceneAll &&
+          (typeof body.sceneText === "string" || body.sceneCatalogId !== undefined)) ||
+        (applyPropAll &&
+          (typeof body.propText === "string" || body.propCatalogId !== undefined));
+      if (!shouldPatch) return item;
+      return patchOne(item);
+    }
+    if (item.index !== index) return item;
+    return patchOne(item);
   });
 
-  const items = project.plan.items.map((item) => (item.index === index ? nextItem : item));
   const updated = await updateEcomModelShotProject(auth.userId, id, {
     plan: { ...project.plan, items },
   });

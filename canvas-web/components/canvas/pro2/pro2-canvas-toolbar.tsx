@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  Clapperboard,
   FileText,
   ImageIcon,
   Play,
@@ -145,6 +146,13 @@ export function Pro2CanvasToolbar({
         icon: <Video strokeWidth={1.75} />,
         color: "bg-gradient-to-br from-amber-400 to-orange-600",
         onClick: () => onShortcutPreset("video-to-prompt"),
+      },
+      {
+        id: "video-film-pull",
+        name: "视频拉片",
+        icon: <Clapperboard strokeWidth={1.75} />,
+        color: "bg-gradient-to-br from-indigo-400 to-violet-600",
+        onClick: () => onShortcutPreset("video-film-pull"),
       },
       {
         id: "text-to-video",

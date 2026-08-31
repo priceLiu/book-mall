@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -7,7 +8,10 @@ import { useBackgroundGeneration } from "@/components/generation";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { ModelShotPoseMediaStrip } from "@/components/model-shot/model-shot-pose-media-strip";
-import { ModelShotPosePlanTable } from "@/components/model-shot/model-shot-pose-plan-table";
+import {
+  ModelShotPosePlanTable,
+  type PoseItemPatch,
+} from "@/components/model-shot/model-shot-pose-plan-table";
 import { ModelShotRefUploader } from "@/components/model-shot/model-shot-ref-uploader";
 import {
   EcomImagePreviewHost,
@@ -660,11 +664,15 @@ export function ModelShotContentPanel({
     }
   }, [alert, onProjectChange, project.id]);
 
+  const defaultSceneLabel = useMemo(() => {
+    const sceneRef = project.references.find((r) => r.role === "scene");
+    if (!sceneRef) return null;
+    if (sceneRef.source === "none") return "跳过场景";
+    return sceneRef.name?.trim() || "已设场景";
+  }, [project.references]);
+
   const handlePatchItem = useCallback(
-    async (
-      index: number,
-      patch: { poseDescription: string; sceneText: string; propText: string },
-    ) => {
+    async (index: number, patch: PoseItemPatch) => {
       setBusy(true);
       try {
         await patchModelShotPoseItem(project.id, index, patch);
@@ -724,6 +732,11 @@ export function ModelShotContentPanel({
                   disabled={streaming || refBusy || busy}
                 />
               ) : null}
+              <Link href="/ecom/shoot-catalog">
+                <EcomButtonSecondary type="button" disabled={busy}>
+                  姿势场景道具库
+                </EcomButtonSecondary>
+              </Link>
               {onNewProject ? (
                 <EcomButtonSecondary type="button" disabled={busy} onClick={() => void onNewProject()}>
                   新建
@@ -766,6 +779,7 @@ export function ModelShotContentPanel({
           {project.plan.items.length > 0 ? (
             <ModelShotPosePlanTable
               plan={project.plan}
+              defaultSceneLabel={defaultSceneLabel}
               onPatchItem={handlePatchItem}
               onConfirmPlan={handleConfirmPlan}
               onGeneratePoses={handleGeneratePoses}

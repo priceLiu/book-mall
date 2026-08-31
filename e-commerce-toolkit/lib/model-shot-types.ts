@@ -42,7 +42,9 @@ export type ModelShotPoseItem = {
   title?: string;
   poseDescription?: string;
   sceneText?: string;
+  sceneCatalogId?: string;
   propText?: string;
+  propCatalogId?: string;
   prompt: string;
   imageUrl?: string;
   assetId?: string;
@@ -70,6 +72,7 @@ export type ModelShotMeta = {
     propPick?: boolean;
     summaryAcknowledged?: boolean;
   };
+  propDeferred?: boolean;
   workflow?: {
     phase?: ModelShotPhase;
     pendingPoseImages?: Record<
@@ -107,11 +110,23 @@ export function refByRole(
   return refs.find((r) => r.role === role);
 }
 
-/** 场景 / 道具步骤是否已完成（含显式跳过 source=none） */
+/** 道具采集步骤是否完成（V2） */
+export function isModelShotPropStepDone(
+  refs: ModelShotReference[],
+  meta?: ModelShotMeta | null,
+): boolean {
+  const ref = refByRole(refs, "prop");
+  if (ref?.source === "none") return true;
+  if (meta?.propDeferred) return true;
+  return false;
+}
+
+/** 场景步骤是否已完成 */
 export function isModelShotOptionalRefDone(
   refs: ModelShotReference[],
   role: "scene" | "prop",
 ): boolean {
+  if (role === "prop") return false;
   const ref = refByRole(refs, role);
   if (!ref) return false;
   if (ref.source === "none") return true;

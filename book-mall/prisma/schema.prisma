@@ -128,6 +128,7 @@ model User {
   ecomHandCraftProjects            EcomHandCraftProject[]
   ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
+  ecomFilmPullProjects             EcomFilmPullProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
   qrTemplates                      QrTemplate[]
@@ -815,6 +816,40 @@ model EcomMediaDecomposeProject {
   /// { rawText, structured?, parseError?, completedAt? }
   result      Json?
   meta        Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 专业拉片（工业化逐镜 + 换角成片）
+model EcomFilmPullProject {
+  id            String  @id @default(cuid())
+  userId        String
+  title         String?
+  module        String  @default("film-pull")
+  status        String  @default("draft")
+  settings      Json?
+  /// 源视频 { id, ossUrl, durationSec?, width?, height?, fps?, source, label? }
+  references    Json?
+  /// { rawText?, structured?, parseError?, completedAt? }
+  analyzeResult Json?
+  /// { rawText?, structured?, parseError?, completedAt? }
+  renderScript  Json?
+  /// [{ id, ossUrl, label? }]
+  characterRefs Json?
+  /// { shots: FilmPullRenderShot[] }
+  renderPlan    Json?
+  chatHistory   Json?
+  meta          Json?
 
   tenantId    String?
   ownerUserId String?
@@ -4125,6 +4160,9 @@ model EcomPoseLibraryEntry {
   title           String
   baseDescription String    @db.Text
   tags            Json?
+  scope           String    @default("platform")
+  userId          String?
+  lockedAt        DateTime?
   enabled         Boolean   @default(true)
   sortOrder       Int       @default(0)
   deletedAt       DateTime?
@@ -4132,6 +4170,7 @@ model EcomPoseLibraryEntry {
   updatedAt       DateTime  @updatedAt
 
   @@index([category, deletedAt])
+  @@index([scope, userId, deletedAt])
 }
 
 model EcomPropLibraryEntry {
@@ -4140,6 +4179,9 @@ model EcomPropLibraryEntry {
   visualDescription String    @db.Text
   conflictTags      Json?
   ossUrl            String?
+  scope             String    @default("platform")
+  userId            String?
+  lockedAt          DateTime?
   enabled           Boolean   @default(true)
   sortOrder         Int       @default(0)
   deletedAt         DateTime?
@@ -4147,6 +4189,7 @@ model EcomPropLibraryEntry {
   updatedAt         DateTime  @updatedAt
 
   @@index([deletedAt])
+  @@index([scope, userId, deletedAt])
 }
 
 model EcomSceneLibraryEntry {
@@ -4154,6 +4197,9 @@ model EcomSceneLibraryEntry {
   name         String
   visualPrompt String    @db.Text
   tags         Json?
+  scope        String    @default("platform")
+  userId       String?
+  lockedAt     DateTime?
   enabled      Boolean   @default(true)
   sortOrder    Int       @default(0)
   deletedAt    DateTime?
@@ -4161,6 +4207,7 @@ model EcomSceneLibraryEntry {
   updatedAt    DateTime  @updatedAt
 
   @@index([deletedAt])
+  @@index([scope, userId, deletedAt])
 }
 
 // ---------------------------------------------------------------------------

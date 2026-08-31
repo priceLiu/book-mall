@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { touchCatalogLockOnProjectUse } from "@/lib/ecom/ecom-catalog-lock";
 import {
   getEcomModelShotProject,
   updateEcomModelShotProject,
@@ -23,5 +24,6 @@ export async function POST(_req: Request, ctx: Ctx) {
     plan: { ...project.plan, status: "confirmed" },
     meta: { ...(project.meta ?? {}), phase: "generate" },
   });
+  if (updated) await touchCatalogLockOnProjectUse(updated);
   return NextResponse.json({ project: updated });
 }

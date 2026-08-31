@@ -39,9 +39,11 @@ const SEED_ITEMS: {
   },
   {
     title: "拉片",
-    description: "拉片学习与分镜拆解，辅助影视创作与镜头语言分析。",
-    docPath: "docs/拉片.md",
+    description:
+      "专业拉片（电商 /ecom/film-pull + Canvas 预设）：工业化逐镜分析、换角渲染、逐镜 R2V 合成成片。简版见拆图拆视频。",
+    docPath: "book-mall/doc/拉片/requirements.md",
     sortOrder: 55,
+    completed: true,
   },
   {
     title: "姿势 skill",

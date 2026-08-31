@@ -1,6 +1,12 @@
 import type { EcomPoseLibraryEntry } from "@/lib/ecom/ecom-pose-library-service";
 import type { EcomPropLibraryEntry } from "@/lib/ecom/ecom-prop-library-service";
+import type { EcomSceneLibraryEntry } from "@/lib/ecom/ecom-scene-library-service";
 
+import {
+  mergeStyleScenePriority,
+  resolveSceneArchetype,
+  sceneForbidsCategory,
+} from "./scene-pose-rules";
 import { applyStyleMicroAdjust } from "./style-micro-adjust";
 
 type StyleKey =
@@ -88,9 +94,11 @@ function passesVeto(opts: {
   pose: EcomPoseLibraryEntry;
   style: StyleKey;
   prop?: EcomPropLibraryEntry | null;
+  sceneArchetype: ReturnType<typeof resolveSceneArchetype>;
 }): boolean {
   const cat = opts.pose.category;
   if (FORBIDDEN[opts.style].includes(cat)) return false;
+  if (sceneForbidsCategory(opts.sceneArchetype, cat)) return false;
   if (opts.prop?.id && PROP_CATEGORY_BLOCK[opts.prop.id]?.includes(cat)) return false;
   if (opts.prop?.conflictTags?.includes("no-kneel") && cat === "D") return false;
   if (opts.prop?.conflictTags?.includes("no-jump") && (cat === "H" || cat === "L")) return false;
@@ -102,16 +110,20 @@ export function pickModelShotPoses(opts: {
   styles: string[];
   count: number;
   prop?: EcomPropLibraryEntry | null;
+  scene?: EcomSceneLibraryEntry | null;
 }): EcomPoseLibraryEntry[] {
   const style = resolveStyle(opts.styles);
+  const sceneArchetype = resolveSceneArchetype(opts.scene);
   const count = Math.max(6, Math.min(8, opts.count));
-  const priorityCats = PRIORITY[style];
+  const priorityCats = mergeStyleScenePriority(PRIORITY[style], sceneArchetype);
   const picked: EcomPoseLibraryEntry[] = [];
   const usedIds = new Set<string>();
-  const usedCats = new Set<string>();
 
+  const platformPool = opts.pool.filter((p) => p.enabled !== false);
   const candidates = shuffle(
-    opts.pool.filter((p) => p.enabled !== false && passesVeto({ pose: p, style, prop: opts.prop })),
+    platformPool.filter((p) =>
+      passesVeto({ pose: p, style, prop: opts.prop, sceneArchetype }),
+    ),
   );
 
   for (const cat of priorityCats) {
@@ -120,7 +132,6 @@ export function pickModelShotPoses(opts: {
     if (match) {
       picked.push(match);
       usedIds.add(match.id);
-      usedCats.add(match.category);
     }
   }
 
@@ -129,7 +140,6 @@ export function pickModelShotPoses(opts: {
     if (usedIds.has(p.id)) continue;
     picked.push(p);
     usedIds.add(p.id);
-    usedCats.add(p.category);
   }
 
   while (picked.length < count) {

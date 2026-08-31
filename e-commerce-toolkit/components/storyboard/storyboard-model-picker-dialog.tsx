@@ -20,11 +20,14 @@ import {
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   STORYBOARD_VIDEO_RESOLUTION_OPTIONS,
-  STORYBOARD_WANX_SIZE_OPTIONS,
-  aspectRatioForWanxSize,
   type StoryboardVideoResolution,
-  type StoryboardWanxSize,
 } from "@/lib/storyboard-gen-params";
+import {
+  imagePickerUsesAspectRatioOnly,
+  imageSizeOptionsForModel,
+  defaultImageSizeForModel,
+  aspectRatioForImageSize,
+} from "@/lib/storyboard-image-size-options";
 import {
   STORYBOARD_R2V_RATIO_OPTIONS,
   isStoryboardBailianR2vModel,
@@ -36,6 +39,8 @@ import {
   resolveStoryboardVideoPanelDurationRange,
   storyboardFullSheetDurationMismatchMessage,
   storyboardPanelDurationMismatchMessage,
+  videoModelSupportsGenerateAudio,
+  videoResolutionOptionsForModel,
   type StoryboardVideoAspectRatio,
   type StoryboardVideoDurationRange,
 } from "@/lib/storyboard-video-params";
@@ -68,8 +73,8 @@ type Props = {
   videoTarget?: "panel" | "fullSheet";
   aspectRatio?: StoryboardVideoAspectRatio;
   onAspectRatioChange?: (v: StoryboardVideoAspectRatio) => void;
-  imageSize?: StoryboardWanxSize;
-  onImageSizeChange?: (v: StoryboardWanxSize) => void;
+  imageSize?: string;
+  onImageSizeChange?: (v: string) => void;
   /** 尺寸由平台规则决定时（电商产品创作），以只读行替代尺寸下拉 */
   lockedImageSizeLabel?: string;
   /** 只读参数行标题，默认「输出比例」 */
@@ -111,6 +116,8 @@ type Props = {
   onVideoSeedChange?: (v: string) => void;
   videoPromptExtend?: boolean;
   onVideoPromptExtendChange?: (v: boolean) => void;
+  videoGenerateAudio?: boolean;
+  onVideoGenerateAudioChange?: (v: boolean) => void;
 };
 
 /** providerKind → 中文分组名（弹层标题用） */

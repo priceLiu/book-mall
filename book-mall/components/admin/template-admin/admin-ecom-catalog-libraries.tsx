@@ -20,6 +20,7 @@ type PropRow = {
   id: string;
   name: string;
   visualDescription: string;
+  conflictTags?: string[];
   ossUrl?: string;
   enabled?: boolean;
   sortOrder?: number;
@@ -29,9 +30,24 @@ type SceneRow = {
   id: string;
   name: string;
   visualPrompt: string;
+  tags?: Record<string, unknown>;
   enabled?: boolean;
   sortOrder?: number;
 };
+
+const SCENE_ARCHETYPE_OPTIONS = [
+  { value: "studio", label: "影棚" },
+  { value: "outdoor", label: "户外" },
+  { value: "street", label: "街拍" },
+  { value: "indoor_lifestyle", label: "室内生活" },
+  { value: "commercial", label: "商业" },
+];
+
+function sceneArchetypeFromTags(tags?: Record<string, unknown>): string {
+  if (!tags || typeof tags !== "object") return "studio";
+  const raw = tags.archetype;
+  return typeof raw === "string" ? raw : "studio";
+}
 
 function CatalogListShell({
   title,
@@ -270,6 +286,7 @@ export function PropLibraryAdmin() {
               <th className="px-2 py-2 align-top">ID</th>
               <th className="px-2 py-2 align-top">名称</th>
               <th className="px-2 py-2 align-top">描述</th>
+              <th className="px-2 py-2 align-top">冲突标签</th>
               <th className="px-2 py-2 align-top">操作</th>
             </tr>
           </thead>
@@ -279,6 +296,9 @@ export function PropLibraryAdmin() {
                 <td className="px-2 py-2">{r.id}</td>
                 <td className="px-2 py-2">{r.name}</td>
                 <td className="max-w-md px-2 py-2 text-muted-foreground">{r.visualDescription}</td>
+                <td className="px-2 py-2 text-muted-foreground">
+                  {r.conflictTags?.length ? r.conflictTags.join(", ") : "—"}
+                </td>
                 <td className="px-2 py-2">
                   <button type="button" className="text-[#0969da]" onClick={() => setForm(r)}>编辑</button>
                 </td>
@@ -294,6 +314,7 @@ export function PropLibraryAdmin() {
               <input className="w-full rounded border px-2 py-1" placeholder="id" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
               <input className="w-full rounded border px-2 py-1" placeholder="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <textarea className="min-h-[80px] w-full rounded border px-2 py-1" placeholder="visualDescription" value={form.visualDescription} onChange={(e) => setForm({ ...form, visualDescription: e.target.value })} />
+              <input className="w-full rounded border px-2 py-1" placeholder="conflictTags 逗号分隔" value={form.conflictTags?.join(", ") ?? ""} onChange={(e) => setForm({ ...form, conflictTags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
             </div>
             <div className="mt-3 flex justify-end gap-2">
               <button type="button" className="rounded border px-3 py-1" onClick={() => setForm(null)}>取消</button>
@@ -337,12 +358,13 @@ export function SceneLibraryAdmin() {
     setSaving(true);
     try {
       const isEdit = form.id && rows.some((r) => r.id === form.id);
+      const archetype = sceneArchetypeFromTags(form.tags);
       const res = await fetch(
         isEdit ? `/api/admin/ecom/scene-library/models/${encodeURIComponent(form.id)}` : "/api/admin/ecom/scene-library/models",
         {
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, archetype }),
         },
       );
       const data = (await res.json()) as { error?: string };
@@ -357,13 +379,14 @@ export function SceneLibraryAdmin() {
   }
 
   return (
-    <CatalogListShell title="场景库" loading={loading} error={error} onAdd={() => setForm({ id: "", name: "", visualPrompt: "", sortOrder: 0, enabled: true })}>
+    <CatalogListShell title="场景库" loading={loading} error={error} onAdd={() => setForm({ id: "", name: "", visualPrompt: "", tags: { archetype: "studio" }, sortOrder: 0, enabled: true })}>
       <div className="overflow-x-auto rounded border">
         <table className="min-w-[720px] w-full text-left text-xs">
           <thead className="bg-[#1d1d1f] text-white">
             <tr>
               <th className="px-2 py-2 align-top">ID</th>
               <th className="px-2 py-2 align-top">名称</th>
+              <th className="px-2 py-2 align-top">类型</th>
               <th className="px-2 py-2 align-top">visualPrompt</th>
               <th className="px-2 py-2 align-top">操作</th>
             </tr>
@@ -373,6 +396,7 @@ export function SceneLibraryAdmin() {
               <tr key={r.id} className="border-t align-top">
                 <td className="px-2 py-2">{r.id}</td>
                 <td className="px-2 py-2">{r.name}</td>
+                <td className="px-2 py-2">{sceneArchetypeFromTags(r.tags)}</td>
                 <td className="max-w-md px-2 py-2 text-muted-foreground">{r.visualPrompt}</td>
                 <td className="px-2 py-2">
                   <button type="button" className="text-[#0969da]" onClick={() => setForm(r)}>编辑</button>
@@ -388,6 +412,17 @@ export function SceneLibraryAdmin() {
             <div className="space-y-2 text-xs">
               <input className="w-full rounded border px-2 py-1" placeholder="id" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
               <input className="w-full rounded border px-2 py-1" placeholder="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <select
+                className="w-full rounded border px-2 py-1"
+                value={sceneArchetypeFromTags(form.tags)}
+                onChange={(e) => setForm({ ...form, tags: { archetype: e.target.value } })}
+              >
+                {SCENE_ARCHETYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
               <textarea className="min-h-[80px] w-full rounded border px-2 py-1" placeholder="visualPrompt" value={form.visualPrompt} onChange={(e) => setForm({ ...form, visualPrompt: e.target.value })} />
             </div>
             <div className="mt-3 flex justify-end gap-2">
