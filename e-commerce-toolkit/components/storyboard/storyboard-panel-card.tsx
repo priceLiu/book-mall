@@ -23,6 +23,9 @@ type Props = {
   onPreviewImagePrompt?: () => void;
   onPreviewPanelVideo?: () => void;
   onEditScript?: () => void;
+  /** 卡片序号前缀，默认「镜头」（故事版）；模特图模块传「姿势」 */
+  indexLabel?: string;
+  generateImageTitle?: string;
 };
 
 export function StoryboardPanelCard({
@@ -37,6 +40,8 @@ export function StoryboardPanelCard({
   onPreviewImage,
   onPreviewImagePrompt,
   onPreviewPanelVideo,
+  indexLabel = "镜头",
+  generateImageTitle = "生成此镜头分镜图",
 }: Props) {
   const hasPanelVideo = Boolean(panel.videoUrl);
   const cardWidth = storyboardPanelCardWidth(aspectRatio);
@@ -67,7 +72,7 @@ export function StoryboardPanelCard({
             type="checkbox"
             checked={selected}
             onChange={onToggleSelect}
-            aria-label={`选择镜头 ${panel.index}`}
+            aria-label={`选择${indexLabel} ${panel.index}`}
             className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
           />
         </label>
@@ -80,14 +85,17 @@ export function StoryboardPanelCard({
         )}
       >
         {imageUrl ? (
-          <Image src={imageUrl} alt={`镜头${panel.index}`} fill className="object-cover" unoptimized />
+          <Image src={imageUrl} alt={`${indexLabel}${panel.index}`} fill className="object-cover" unoptimized />
         ) : (
           <button
             type="button"
-            title="生成此镜头分镜图"
+            title={generateImageTitle}
             disabled={!onRegenerateImage || busy}
             className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#86868b] transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
-            onClick={() => onRegenerateImage?.()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRegenerateImage?.();
+            }}
           >
             <ImageIcon className="h-8 w-8 opacity-40" />
             <span className="text-xs">待生成</span>
@@ -106,7 +114,7 @@ export function StoryboardPanelCard({
 
       <div className="flex items-center justify-between px-3 py-2">
         <p className="text-xs font-semibold text-[#1d1d1f]">
-          镜头 {panel.index}
+          {indexLabel} {panel.index}
           {panel.timeline ? (
             <span className="ml-1 font-normal text-[#86868b]">{panel.timeline}</span>
           ) : null}

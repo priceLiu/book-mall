@@ -4,6 +4,7 @@ import { Images, Play, Plus, X } from "lucide-react";
 import type React from "react";
 
 import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
+import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
@@ -24,6 +25,9 @@ type Props = {
   busy?: boolean;
   /** 0–100 上传进度；null 表示不确定进度 */
   uploadProgress?: number | null;
+  /** AI 生图进行中（槽位扫光） */
+  generating?: boolean;
+  generatingLabel?: string;
   /** 助手步骤建议高亮（微剧故事版） */
   suggested?: boolean;
   onUploadFiles: (files: File[]) => void;
@@ -45,6 +49,24 @@ type Props = {
   /** 为 false 时仅拖放，粘贴由父级热区统一处理 */
   listenPaste?: boolean;
 };
+
+const REF_THUMB_SIZE = 56;
+
+function EcomRefGeneratingThumb({ label }: { label: string }) {
+  return (
+    <div
+      className="relative shrink-0 overflow-hidden rounded-md border border-[#d2d2d7] bg-[#ececee]"
+      style={{ width: REF_THUMB_SIZE, height: REF_THUMB_SIZE }}
+      aria-busy
+      aria-label={label}
+    >
+      <EcomMediaGeneratingBusy
+        className="absolute inset-0"
+        background="black"
+      />
+    </div>
+  );
+}
 
 function EcomRefVideoThumb({
   src,
@@ -98,6 +120,8 @@ export function EcomRefUploadCard({
   emptyHint,
   busy,
   uploadProgress = null,
+  generating = false,
+  generatingLabel = "AI 生成中…",
   suggested = false,
   onUploadFiles,
   onOpenFilePicker,
@@ -116,7 +140,7 @@ export function EcomRefUploadCard({
   listenPaste = true,
 }: Props) {
   const { dragOver, pasteReady, focusZone, dropZoneProps } = useImageDropPaste({
-    enabled: !busy,
+    enabled: !busy && !generating,
     multiple,
     allowVideo,
     listenPaste,
@@ -227,34 +251,66 @@ export function EcomRefUploadCard({
         </div>
       ) : null}
 
-      {items.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map((r) =>
-            r.kind === "video" ? (
-              <EcomRefVideoThumb
-                key={r.id}
-                src={r.ossUrl}
-                alt={r.label}
-                size={56}
-                onPreview={onPreviewItem ? () => onPreviewItem(r) : undefined}
-                onRemove={onRemove ? () => void onRemove(r.id) : undefined}
-                removeLabel={removeLabel}
-              />
-            ) : (
-              <EcomRefImageThumb
-                key={r.id}
-                src={r.ossUrl}
-                alt={r.label}
-                size={56}
-                onRemove={onRemove ? () => void onRemove(r.id) : undefined}
-                removeLabel={removeLabel}
-              />
-            ),
-          )}
-        </div>
-      ) : busy ? null : (
-        <p className="text-[10px] text-[#86868b]">{emptyHint}</p>
-      )}
+      <div className="relative min-h-[56px]">
+        {generating && items.length === 0 ? (
+          <EcomRefGeneratingThumb label={generatingLabel} />
+        ) : null}
+
+        {items.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {items.map((r) =>
+              r.kind === "video" ? (
+                <div
+                  key={r.id}
+                  className="relative shrink-0"
+                  style={{ width: REF_THUMB_SIZE, height: REF_THUMB_SIZE }}
+                >
+                  <EcomRefVideoThumb
+                    src={r.ossUrl}
+                    alt={r.label}
+                    size={REF_THUMB_SIZE}
+                    onPreview={onPreviewItem ? () => onPreviewItem(r) : undefined}
+                    onRemove={onRemove ? () => void onRemove(r.id) : undefined}
+                    removeLabel={removeLabel}
+                  />
+                  {generating ? (
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+                      <EcomMediaGeneratingBusy
+                        className="absolute inset-0"
+                        background="black"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  key={r.id}
+                  className="relative shrink-0"
+                  style={{ width: REF_THUMB_SIZE, height: REF_THUMB_SIZE }}
+                >
+                  <EcomRefImageThumb
+                    src={r.ossUrl}
+                    alt={r.label}
+                    size={REF_THUMB_SIZE}
+                    onRemove={onRemove ? () => void onRemove(r.id) : undefined}
+                    removeLabel={removeLabel}
+                  />
+                  {generating ? (
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+                      <EcomMediaGeneratingBusy
+                        className="absolute inset-0"
+                        background="black"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ),
+            )}
+          </div>
+        ) : !generating ? (
+          <p className="text-[10px] text-[#86868b]">{emptyHint}</p>
+        ) : null}
+      </div>
     </div>
   );
 }

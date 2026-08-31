@@ -34,7 +34,25 @@ export const ECOM_DIALOG_CLOSE_BUTTON_CLASS = cn(
   "shadow-md transition-colors",
   "hover:bg-black hover:opacity-100",
   "focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-0",
+  "disabled:pointer-events-none disabled:opacity-40",
 );
+
+/** 自定义 overlay / portal 弹层右上角关闭（与故事版 DialogContent 一致） */
+export function EcomDialogCloseButton({
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      className={cn(ECOM_DIALOG_CLOSE_BUTTON_CLASS, className)}
+      aria-label="关闭"
+      {...props}
+    >
+      <X className="h-4 w-4 stroke-[2.5]" />
+    </button>
+  );
+}
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
@@ -51,12 +69,8 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close
-        type="button"
-        className={ECOM_DIALOG_CLOSE_BUTTON_CLASS}
-        aria-label="关闭"
-      >
-        <X className="h-4 w-4 stroke-[2.5]" />
+      <DialogPrimitive.Close asChild>
+        <EcomDialogCloseButton />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>

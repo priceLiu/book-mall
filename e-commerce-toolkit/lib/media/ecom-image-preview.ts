@@ -69,3 +69,19 @@ export function buildStoryboardPanelPreviewItems(
       title: `镜头 ${p.index}`,
     }));
 }
+
+/** 模特姿势各姿势已生成图（与分镜预览同一套右侧缩略条） */
+export function buildModelShotPosePreviewItems(
+  items: readonly {
+    index: number;
+    imageUrl?: string | null;
+    title?: string | null;
+  }[],
+): EcomImagePreviewItem[] {
+  return items
+    .filter((p) => p.imageUrl?.trim())
+    .map((p) => ({
+      src: p.imageUrl!.trim(),
+      title: p.title?.trim() || `姿势 ${p.index}`,
+    }));
+}

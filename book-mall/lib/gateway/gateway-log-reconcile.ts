@@ -179,16 +179,42 @@ export async function reconcileStaleEcomChatGatewayLogs(
   return closed;
 }
 
-const ECOM_VIDEO_RECONCILE_LIMIT = 16;
+async function findEcomVideoAssetForGatewayLog(row: {
+  id: string;
+  externalTaskId: string | null;
+}): Promise<{ ossUrl: string; meta: unknown } | null> {
+  const byLogId = await prisma.ecomAsset.findFirst({
+    where: {
+      kind: "video",
+      meta: { path: ["logId"], equals: row.id },
+    },
+    select: { ossUrl: true, meta: true },
+  });
+  if (byLogId?.ossUrl?.trim()) return byLogId;
 
-/**
- * 电商分镜：业务已落库 video asset（meta.logId）但 Gateway 仍 RUNNING → 强制收口。
- * 作为 recordInfo logId 修复之外的兜底，清理历史孤儿日志。
- */
-export async function reconcileStaleEcomVideoGatewayLogs(
+  const taskId = row.externalTaskId?.trim();
+  if (!taskId) return null;
+
+  const byTaskId = await prisma.ecomAsset.findFirst({
+    where: {
+      kind: "video",
+      meta: { path: ["taskId"], equals: taskId },
+    },
+    select: { ossUrl: true, meta: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (byTaskId?.ossUrl?.trim()) return byTaskId;
+  return null;
+}
+
+const ECOM_VIDEO_RECONCILE_LIMIT = 48;
+const ECOM_VIDEO_RECONCILE_MIN_AGE_MS = 2 * 60 * 1000;
+const ECOM_VIDEO_RECONCILE_BATCHES = 3;
+
+async function reconcileStaleEcomVideoGatewayLogsOnce(
   nowMs: number,
 ): Promise<number> {
-  const cutoff = new Date(nowMs - 30 * 60 * 1000);
+  const cutoff = new Date(nowMs - ECOM_VIDEO_RECONCILE_MIN_AGE_MS);
   const rows = await prisma.gatewayRequestLog.findMany({
     where: {
       status: "RUNNING",
@@ -204,16 +230,7 @@ export async function reconcileStaleEcomVideoGatewayLogs(
 
   let closed = 0;
   for (const row of rows) {
-    const asset = await prisma.ecomAsset.findFirst({
-      where: {
-        kind: "video",
-        meta: {
-          path: ["logId"],
-          equals: row.id,
-        },
-      },
-      select: { ossUrl: true, meta: true },
-    });
+    const asset = await findEcomVideoAssetForGatewayLog(row);
     if (!asset?.ossUrl?.trim()) continue;
 
     const meta =
@@ -245,6 +262,22 @@ export async function reconcileStaleEcomVideoGatewayLogs(
         e instanceof Error ? e.message : String(e),
       );
     }
+  }
+  return closed;
+}
+
+/**
+ * 电商分镜：业务已落库 video asset（meta.logId / meta.taskId）但 Gateway 仍 RUNNING → 强制收口。
+ * 作为 recordInfo logId 修复之外的兜底，清理历史孤儿日志。
+ */
+export async function reconcileStaleEcomVideoGatewayLogs(
+  nowMs: number,
+): Promise<number> {
+  let closed = 0;
+  for (let i = 0; i < ECOM_VIDEO_RECONCILE_BATCHES; i += 1) {
+    const batch = await reconcileStaleEcomVideoGatewayLogsOnce(nowMs);
+    closed += batch;
+    if (batch < ECOM_VIDEO_RECONCILE_LIMIT) break;
   }
   return closed;
 }

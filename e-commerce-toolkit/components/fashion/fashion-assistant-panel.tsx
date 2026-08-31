@@ -15,6 +15,9 @@ import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
+  ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+  ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
+  ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
   ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE,
@@ -998,7 +1001,12 @@ export function FashionAssistantPanel({
     (!legacyReadonly && !isBusy && !streaming && choices.length > 0);
 
   const composerSection = (
-    <div className="border-t border-[#e8e8ed] bg-white p-3">
+    <div
+      className={cn(
+        ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+        ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
+      )}
+    >
       <div className="flex items-end gap-2">
         <textarea
           value={input}
@@ -1037,7 +1045,7 @@ export function FashionAssistantPanel({
   );
 
   const floatingComposerSection = (
-    <div className="p-0.5">
+    <div className={ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT}>
       <div className="flex items-end gap-2">
         <textarea
           value={input}

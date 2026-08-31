@@ -18,6 +18,10 @@ export type BackgroundGenerationTask = {
   minimized: boolean;
   poll: () => Promise<BackgroundGenerationPollResult>;
   onSucceeded?: () => void | Promise<void>;
+  onFailed?: () => void | Promise<void>;
+  /** 完成后在 Dock 展示「打开作品 / 查看结果」 */
+  openLabel?: string;
+  onOpen?: () => void | Promise<void>;
 };
 
 export type RegisterBackgroundGenerationTaskInput = Omit<

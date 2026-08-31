@@ -376,6 +376,22 @@
 
 ---
 
+---
+
+## 2026-08-31 — 服装模特图 + 姿势/道具/场景 Catalog
+
+- **迁移目录**：
+  - `prisma/migrations/20260831120000_ecom_pose_prop_scene_catalog/`
+  - `prisma/migrations/20260831130000_ecom_model_shot_project/`
+- **新表**：
+  - `EcomPoseLibraryEntry` — 姿势库（category A–M、baseDescription、tags）
+  - `EcomPropLibraryEntry` — 道具库（visualDescription、conflictTags、可选 ossUrl）
+  - `EcomSceneLibraryEntry` — 场景库（visualPrompt、tags）
+  - `EcomModelShotProject` — 服装模特图项目（brief/references/plan/chatHistory/meta JSON）
+- **Seed**：`pnpm ecom:seed-catalog`（扩展姿势/道具/场景 JSON）；`pnpm ecom:seed-pose-library` 等
+- **产品文档**：`doc/模特姿势/requirements.md`、`doc/plans/2026-08-ecom-model-shot-module.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

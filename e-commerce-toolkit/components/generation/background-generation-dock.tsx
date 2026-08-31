@@ -169,7 +169,7 @@ export function BackgroundGenerationDock({
             task.status === "succeeded"
               ? "已完成"
               : task.status === "failed"
-                ? task.error ?? "生成失败"
+                ? "生成失败"
                 : resolveBackgroundGenerationLabel(startedMs, now);
           const progress =
             task.status === "running" && task.expectedDurationMs
@@ -221,12 +221,23 @@ export function BackgroundGenerationDock({
                   ) : null}
                   <div
                     className={cn(
-                      "mt-1 text-[10px]",
+                      "mt-1 text-[10px] leading-snug",
                       variant === "light" ? "text-[#86868b]" : "text-zinc-500",
                     )}
                   >
                     已等待 {formatBackgroundGenerationAge(ageSec)} · {statusLabel}
                   </div>
+                  {task.status === "failed" && task.error ? (
+                    <div
+                      className={cn(
+                        "mt-1 line-clamp-3 text-[10px] leading-snug",
+                        variant === "light" ? "text-[#ff3b30]" : "text-red-400",
+                      )}
+                      title={task.error}
+                    >
+                      {task.error}
+                    </div>
+                  ) : null}
                   {task.status === "running" ? (
                     <div
                       className={cn(
@@ -244,20 +255,36 @@ export function BackgroundGenerationDock({
                     </div>
                   ) : null}
                 </div>
-                {task.status !== "running" ? (
-                  <button
-                    type="button"
-                    className={cn(
-                      "shrink-0 text-[10px]",
-                      variant === "light"
-                        ? "text-[#86868b] hover:text-[#1d1d1f]"
-                        : "text-zinc-500 hover:text-zinc-300",
-                    )}
-                    onClick={() => onDismiss(task.id)}
-                  >
-                    清除
-                  </button>
-                ) : null}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {task.status === "succeeded" && task.onOpen ? (
+                    <button
+                      type="button"
+                      className={cn(
+                        "text-[10px] font-medium",
+                        variant === "light"
+                          ? "text-[#0071e3] hover:text-[#0077ed]"
+                          : "text-orange-300 hover:text-orange-200",
+                      )}
+                      onClick={() => void task.onOpen?.()}
+                    >
+                      {task.openLabel ?? "打开作品"}
+                    </button>
+                  ) : null}
+                  {task.status !== "running" ? (
+                    <button
+                      type="button"
+                      className={cn(
+                        "text-[10px]",
+                        variant === "light"
+                          ? "text-[#86868b] hover:text-[#1d1d1f]"
+                          : "text-zinc-500 hover:text-zinc-300",
+                      )}
+                      onClick={() => onDismiss(task.id)}
+                    >
+                      清除
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </li>
           );

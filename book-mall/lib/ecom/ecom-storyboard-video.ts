@@ -683,10 +683,9 @@ async function runBailianR2vVideoJob(opts: {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   resolution?: EcomStoryboardVideoResolution;
-}): Promise<{ ossUrl: string; taskId: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
   const resolution = opts.resolution ?? "1080p";
-  const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
   const { taskId, logId } = await ecomGwCreateBailianR2vJob(opts.userId, {
     model: opts.modelKey,
     prompt: opts.prompt,
@@ -724,7 +723,7 @@ async function runBailianR2vVideoJob(opts: {
     contentType: "video/mp4",
   });
 
-  return { ossUrl, taskId, chargePoints: null };
+  return { ossUrl, taskId, logId, chargePoints: null };
 }
 
 async function runVolcengineVideoJob(opts: {
@@ -738,12 +737,11 @@ async function runVolcengineVideoJob(opts: {
   aspectRatio: "16:9" | "9:16";
   resolution?: EcomStoryboardVideoResolution;
   meta: Record<string, unknown>;
-}): Promise<{ ossUrl: string; taskId: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
   const resolution = opts.resolution ?? "1080p";
   const videoSr = videoSrFromResolution(resolution);
-  const workspaceId = randomUUID().slice(0, 8);
-  const taskKey = `ecom-sb-vid:${opts.projectId}:${workspaceId}`;
-  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const taskKey = `ecom-sb-vid:${opts.projectId}:${randomUUID().slice(0, 8)}`;
+  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
 
   const { body } = buildCanvasVideoVolcengineInput({
     modelKey: opts.modelKey,
@@ -789,7 +787,7 @@ async function runVolcengineVideoJob(opts: {
   });
 
 
-  return { ossUrl, taskId, chargePoints: null };
+  return { ossUrl, taskId, logId, chargePoints: null };
 }
 
 async function runDashscopeWan30VideoJob(opts: {
@@ -802,10 +800,9 @@ async function runDashscopeWan30VideoJob(opts: {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   resolution?: EcomStoryboardVideoResolution;
-}): Promise<{ ossUrl: string; taskId: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
   const resolution = opts.resolution ?? "720p";
-  const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
   const media = buildDashscopeWan30Media({
     firstFrameUrl: opts.firstFrameUrl,
     referenceImageUrls: opts.referenceImageUrls,
@@ -851,7 +848,7 @@ async function runDashscopeWan30VideoJob(opts: {
     buf,
     contentType: "video/mp4",
   });
-  return { ossUrl, taskId, chargePoints: null };
+  return { ossUrl, taskId, logId, chargePoints: null };
 }
 
 export async function ecomGenerateStoryboardPanelVideo(opts: {
@@ -932,10 +929,11 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
 
   let ossUrl: string;
   let taskId: string;
+  let logId: string;
   let chargePoints: number | null = null;
 
   if (provider === "bailian") {
-    ({ ossUrl, taskId, chargePoints } = await runBailianR2vVideoJob({
+    ({ ossUrl, taskId, logId, chargePoints } = await runBailianR2vVideoJob({
       userId: opts.userId,
       projectId: opts.projectId,
       modelKey,
@@ -946,7 +944,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
       resolution,
     }));
   } else if (provider === "dashscope" && isStoryboardWan30VideoModel(modelKey)) {
-    ({ ossUrl, taskId, chargePoints } = await runDashscopeWan30VideoJob({
+    ({ ossUrl, taskId, logId, chargePoints } = await runDashscopeWan30VideoJob({
       userId: opts.userId,
       projectId: opts.projectId,
       modelKey,
@@ -958,7 +956,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
       resolution,
     }));
   } else if (provider === "volcengine") {
-    ({ ossUrl, taskId, chargePoints } = await runVolcengineVideoJob({
+    ({ ossUrl, taskId, logId, chargePoints } = await runVolcengineVideoJob({
       userId: opts.userId,
       projectId: opts.projectId,
       modelKey,
@@ -1008,6 +1006,18 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     status: "image_ready",
   });
 
+  await ensureGatewayLogSucceededAfterVendorUrl({
+    logId,
+    taskId,
+    videoUrl: ossUrl,
+  }).catch((e) => {
+    console.warn(
+      "[ecom-storyboard-video] panel ensureGatewayLogSucceededAfterVendorUrl failed",
+      logId,
+      e instanceof Error ? e.message : String(e),
+    );
+  });
+
   await prisma.ecomAsset.create({
     data: {
       userId: opts.userId,
@@ -1022,6 +1032,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
         modelKey,
         kind: "panel_video",
         taskId,
+        logId,
         durationSec,
         resolution,
         aspectRatio: opts.aspectRatio ?? "9:16",

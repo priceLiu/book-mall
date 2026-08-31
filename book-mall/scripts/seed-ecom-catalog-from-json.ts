@@ -8,6 +8,18 @@ import {
   readModelLibraryCatalogJson,
   upsertModelLibraryEntry,
 } from "../lib/ecom/ecom-model-library-service";
+import {
+  readPoseLibraryCatalogJson,
+  upsertPoseLibraryEntry,
+} from "../lib/ecom/ecom-pose-library-service";
+import {
+  readPropLibraryCatalogJson,
+  upsertPropLibraryEntry,
+} from "../lib/ecom/ecom-prop-library-service";
+import {
+  readSceneLibraryCatalogJson,
+  upsertSceneLibraryEntry,
+} from "../lib/ecom/ecom-scene-library-service";
 
 async function main() {
   const templates = readTemplateGalleryCatalog().templates;
@@ -30,6 +42,24 @@ async function main() {
     if (mOk % 50 === 0 || mOk === models.length) {
       console.log(`[seed-ecom] models ${mOk}/${models.length}`);
     }
+  }
+
+  const poses = readPoseLibraryCatalogJson().poses;
+  console.log(`[seed-ecom] poses to upsert: ${poses.length}`);
+  for (const entry of poses) {
+    await upsertPoseLibraryEntry(entry);
+  }
+
+  const props = readPropLibraryCatalogJson().props;
+  console.log(`[seed-ecom] props to upsert: ${props.length}`);
+  for (const entry of props) {
+    await upsertPropLibraryEntry(entry);
+  }
+
+  const scenes = readSceneLibraryCatalogJson().scenes;
+  console.log(`[seed-ecom] scenes to upsert: ${scenes.length}`);
+  for (const entry of scenes) {
+    await upsertSceneLibraryEntry(entry);
   }
 }
 

@@ -10,7 +10,7 @@ import {
 } from "@/components/media";
 import { EcomMediaLibraryTile } from "@/components/media/ecom-media-library-tile";
 import { EcomScrollLoadFooter } from "@/components/media/ecom-scroll-load-footer";
-import { shuffleByIdForDisplay } from "@/lib/ecom-random-order";
+import { sortModelLibraryForDisplay } from "@/lib/ecom-model-library/display-order";
 import { useEcomScrollPagination } from "@/lib/use-ecom-scroll-pagination";
 import { listEcomModelLibraryEntries } from "@/lib/ecom-model-library/catalog";
 import { fetchEcomModelLibraryCatalog } from "@/lib/ecom-model-library-api";
@@ -55,11 +55,6 @@ function filterModels(
   });
 }
 
-/** 大码女整体沉底，组内与其余模特一样随机 */
-function isPlusFemale(model: EcomModelLibraryEntry): boolean {
-  return model.gender === "plus_female";
-}
-
 export default function ModelLibraryPage() {
   const [allModels, setAllModels] = useState<EcomModelLibraryEntry[]>(() =>
     listEcomModelLibraryEntries(),
@@ -89,12 +84,7 @@ export default function ModelLibraryPage() {
   }, []);
 
   const models = useMemo(
-    () =>
-      shuffleByIdForDisplay(
-        filterModels(allModels, gender, age),
-        shuffleSeed,
-        isPlusFemale,
-      ),
+    () => sortModelLibraryForDisplay(filterModels(allModels, gender, age), shuffleSeed),
     [allModels, gender, age, shuffleSeed],
   );
 

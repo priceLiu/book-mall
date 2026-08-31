@@ -1,12 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 
 import {
   ImageZoomControls,
   IMAGE_ZOOM_BUTTON_STEP,
 } from "@/components/media/image-zoom-controls";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  EcomDialogCloseButton,
+} from "@/components/ui/dialog";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import {
   useImageZoomPan,
@@ -205,6 +211,8 @@ export function EcomImagePreviewDialog({
   open,
   onOpenChange,
   title = "图片预览",
+  /** 经 portal 渲染全屏层，避免嵌套 Radix Dialog 时 Presence 无限更新 */
+  nativeOverlay = false,
 }: {
   src: string;
   thumbSrc?: string;
@@ -214,6 +222,7 @@ export function EcomImagePreviewDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title?: string;
+  nativeOverlay?: boolean;
 }) {
   const gallery = useMemo(() => {
     if (items && items.length > 0) return items;
@@ -260,56 +269,90 @@ export function EcomImagePreviewDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, gallery.length, goPrev, goNext]);
 
+  useEffect(() => {
+    if (!nativeOverlay || !open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [nativeOverlay, open, onOpenChange]);
+
   const dialogTitle =
     showStrip && gallery.length > 1
       ? `${active.title}（${activeIndex + 1} / ${gallery.length}）`
       : active.title;
 
+  const shellClassName = cn(
+    "flex h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-hidden border-0 bg-black/90 p-0 shadow-none sm:rounded-none",
+    showStrip ? "flex-row items-stretch" : "items-center justify-center",
+  );
+
+  const dismissOnBackdrop = (e: MouseEvent) => {
+    if (e.target === e.currentTarget) onOpenChange(false);
+  };
+
+  const previewBody = (
+    <>
+      <div
+        className={cn(
+          "relative flex min-h-0 min-w-0 flex-1 items-center justify-center",
+          showStrip ? "h-full" : "size-full",
+        )}
+        onClick={dismissOnBackdrop}
+      >
+        <EcomPreviewImageStage
+          src={active.src}
+          thumbSrc={active.thumbSrc}
+          alt={active.title}
+          stageProps={stageProps}
+          compact={showStrip}
+        />
+        <ImageZoomControls
+          zoom={zoom}
+          onZoomIn={() => zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+          onZoomOut={() => zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+          onReset={reset}
+        />
+      </div>
+
+      {showStrip ? (
+        <PreviewThumbnailStrip
+          items={gallery}
+          activeIndex={activeIndex}
+          onSelect={setActiveIndex}
+        />
+      ) : null}
+    </>
+  );
+
+  if (nativeOverlay) {
+    if (!open || typeof document === "undefined") return null;
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[300] flex items-stretch justify-center bg-black/90"
+        role="dialog"
+        aria-modal="true"
+        aria-label={dialogTitle}
+        onClick={dismissOnBackdrop}
+      >
+        <div className={cn(shellClassName, "relative size-full")} onClick={dismissOnBackdrop}>
+          <EcomDialogCloseButton onClick={() => onOpenChange(false)} />
+          {previewBody}
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn(
-          "flex h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-hidden border-0 bg-black/90 p-0 shadow-none sm:rounded-none",
-          "translate-x-[-50%] translate-y-[-50%]",
-          showStrip ? "flex-row items-stretch" : "items-center justify-center",
-        )}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) onOpenChange(false);
-        }}
+        className={cn(shellClassName, "translate-x-[-50%] translate-y-[-50%]")}
+        onClick={dismissOnBackdrop}
       >
         <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
-
-        <div
-          className={cn(
-            "relative flex min-h-0 min-w-0 flex-1 items-center justify-center",
-            showStrip ? "h-full" : "size-full",
-          )}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) onOpenChange(false);
-          }}
-        >
-          <EcomPreviewImageStage
-            src={active.src}
-            thumbSrc={active.thumbSrc}
-            alt={active.title}
-            stageProps={stageProps}
-            compact={showStrip}
-          />
-          <ImageZoomControls
-            zoom={zoom}
-            onZoomIn={() => zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
-            onZoomOut={() => zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
-            onReset={reset}
-          />
-        </div>
-
-        {showStrip ? (
-          <PreviewThumbnailStrip
-            items={gallery}
-            activeIndex={activeIndex}
-            onSelect={setActiveIndex}
-          />
-        ) : null}
+        {previewBody}
       </DialogContent>
     </Dialog>
   );

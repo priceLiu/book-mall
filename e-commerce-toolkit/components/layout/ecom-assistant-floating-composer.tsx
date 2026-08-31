@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
+import { ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS } from "@/lib/ecom-assistant-chat-styles";
 
 type Props = {
   open: boolean;
@@ -45,7 +46,7 @@ export function EcomAssistantFloatingComposer({
       <div
         role="button"
         tabIndex={0}
-        className="rounded-2xl border border-[#d2d2d7] bg-white p-2 shadow-[0_8px_32px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.04] transition-shadow hover:shadow-[0_12px_40px_rgba(0,0,0,0.16)]"
+        className={ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS}
         onClick={(e) => {
           if (e.target === e.currentTarget) onExpand();
         }}

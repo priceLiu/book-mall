@@ -1,0 +1,16 @@
+{
+  "props": [
+    { "id": "prop-01", "name": "黑色极简手提包", "visualDescription": "简约无logo，硬挺皮革材质，金属扣件，哑光质感，中号托特包型", "sortOrder": 1 },
+    { "id": "prop-02", "name": "拿铁咖啡杯", "visualDescription": "白色陶瓷杯，带有拉花图案，冒着热气，杯身有极简线条装饰", "sortOrder": 2 },
+    { "id": "prop-03", "name": "智能手机", "visualDescription": "黑色或白色直板手机，带有金属边框，屏幕亮起显示界面", "sortOrder": 3 },
+    { "id": "prop-04", "name": "复古相机", "visualDescription": "银黑色复古胶片相机，皮质挂绳，镜头深邃，有年代感", "sortOrder": 4 },
+    { "id": "prop-05", "name": "鲜花束", "visualDescription": "白色或粉色的玫瑰/雏菊，用牛皮纸或报纸包裹，花茎翠绿", "sortOrder": 5 },
+    { "id": "prop-06", "name": "墨镜", "visualDescription": "黑色大框墨镜，镜片反光，镜腿有金属装饰", "sortOrder": 6 },
+    { "id": "prop-07", "name": "宽檐礼帽", "visualDescription": "黑色或米色宽檐软呢帽，带同色系丝带装饰，优雅遮阳", "sortOrder": 7 },
+    { "id": "prop-08", "name": "皮手套", "visualDescription": "黑色或酒红色皮质长款手套，柔软光泽，手指线条修长", "sortOrder": 8 },
+    { "id": "prop-09", "name": "折叠扇", "visualDescription": "中式竹骨纸扇，扇面有水墨山水或花鸟图案，雅致清冷", "sortOrder": 9 },
+    { "id": "prop-10", "name": "透明雨伞", "visualDescription": "长柄透明伞，伞边有银色或黑色包边，伞柄弯曲，适合阴雨天氛围", "conflictTags": ["no-kneel", "no-head-back"], "sortOrder": 10 },
+    { "id": "prop-11", "name": "公文包", "visualDescription": "棕色或黑色皮质公文包，方形硬挺，有手提柄和锁扣", "conflictTags": ["no-jump", "no-outdoor-sport"], "sortOrder": 11 },
+    { "id": "prop-12", "name": "高脚酒杯", "visualDescription": "细长高脚，透明水晶玻璃杯，杯中有浅金色香槟或红宝石色红酒", "conflictTags": ["no-jump", "no-outdoor-sport"], "sortOrder": 12 }
+  ]
+}

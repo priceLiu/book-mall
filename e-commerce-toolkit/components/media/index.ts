@@ -10,6 +10,7 @@ export type {
 } from "@/lib/media/ecom-image-preview";
 export {
   buildEcomImagePreviewOpenState,
+  buildModelShotPosePreviewItems,
   buildStoryboardPanelPreviewItems,
   findEcomImagePreviewIndex,
   mapPreviewItemsFromEntries,

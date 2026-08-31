@@ -126,6 +126,7 @@ model User {
   ecomProductDesignProjects        EcomProductDesignProject[]
   ecomSeedVideoProjects            EcomSeedVideoProject[]
   ecomHandCraftProjects            EcomHandCraftProject[]
+  ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
@@ -761,6 +762,33 @@ model EcomHandCraftProject {
   meta        Json?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 服装模特图项目（多姿势编排 + 上身展示）
+model EcomModelShotProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("model-shot")
+  status      String  @default("draft")
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  plan        Json?
+  meta        Json?
+
   tenantId    String?
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)
@@ -4089,6 +4117,50 @@ model EcomModelLibraryEntry {
   updatedAt DateTime  @updatedAt
 
   @@index([gender, age, deletedAt])
+}
+
+model EcomPoseLibraryEntry {
+  id              String    @id
+  category        String
+  title           String
+  baseDescription String    @db.Text
+  tags            Json?
+  enabled         Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([category, deletedAt])
+}
+
+model EcomPropLibraryEntry {
+  id                String    @id
+  name              String
+  visualDescription String    @db.Text
+  conflictTags      Json?
+  ossUrl            String?
+  enabled           Boolean   @default(true)
+  sortOrder         Int       @default(0)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([deletedAt])
+}
+
+model EcomSceneLibraryEntry {
+  id           String    @id
+  name         String
+  visualPrompt String    @db.Text
+  tags         Json?
+  enabled      Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([deletedAt])
 }
 
 // ---------------------------------------------------------------------------

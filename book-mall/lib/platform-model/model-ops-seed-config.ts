@@ -203,6 +203,25 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "MiniMax/MiniMax-H3-r2v",
     "MiniMax/MiniMax-H3-s2v",
   ],
+  "ecom-model-shot-chat": [
+    "qwen3.8-max",
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+    "qwen-turbo",
+    "qwen3-vl-plus",
+  ],
+  "ecom-model-shot-image": [
+    "qwen-image-3.0-pro",
+    "z-image-turbo",
+    "qwen-image-edit",
+    "qwen-image-edit-max",
+    "wan2.7-image",
+    "wan2.7-image-pro",
+    "wan2.6-image",
+    "kling-3.0-image",
+    "nano-banana-pro",
+  ],
 } as const;
 
 export const SCENE_SHELF_SPECS: SceneShelfSpec[] = [

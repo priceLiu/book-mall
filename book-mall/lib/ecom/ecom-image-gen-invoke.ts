@@ -219,6 +219,24 @@ export async function generateEcomImage(opts: {
   const size = ecomRatioToImageSize(opts.ratio);
 
   if (opts.refImageUrls.length === 0) {
+    if (isStoryboardDashscopeImageModel(opts.modelKey)) {
+      const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
+      const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+        kind: "wan27-image",
+        model: apiModel,
+        content: [{ text: prompt }],
+        size: resolveStoryboardWan27JobSize({
+          wan26,
+          refCount: 0,
+          wan27Size: size,
+        }),
+        n: 1,
+        contentOrder: "text-first",
+        clientPage,
+      });
+      const vendorUrl = await pollDashscopeImage(opts.userId, taskId, logId);
+      return downloadAndUpload(opts.userId, vendorUrl);
+    }
     const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
       kind: "wanx",
       model: apiModel,

@@ -56,6 +56,16 @@
 - 交付：成图自动入库「我的资产 · 手伴创作」；`GET .../export` 出 ZIP（每步一个目录 + 交付清单 + 助手对话）
 - toolKey：`ecom-toolkit__hand-craft`（`generate` / `compose`）；数据表 `EcomHandCraftProject`
 
+### 服装模特图（多姿势上身展示）
+
+> 需求与方案：`doc/模特姿势/requirements.md`、`doc/模特姿势/solution.md`；助手话术：`doc/模特姿势/skill.md`
+
+- 入口：`/ecom/model-shot`；布局：**进度轨 + 中栏工作区 + 右栏助手**（交互对齐微剧故事版折叠/悬浮输入）
+- 平台共享 catalog：**姿势库 / 道具库 / 场景库**（Prisma + JSON seed；Book `/admin/templates?tab=ecom` 管理）；**模特**复用模特库
+- 流程：Step0 服装（必填）→ 模特 → 场景 → 道具 → 元信息 → 服务端 **pose-picker** 产出 6～8 条 → 中栏确认 plan → R2V 批量出图
+- 出图：支持参考图的 IMAGE 模型；ref 顺序 服装 → 模特 → 场景；`plan.status=confirmed` 门禁
+- toolKey：`ecom-toolkit__model-shot`（`chat` / `tryon`）；数据表 `EcomModelShotProject`
+
 ## 2. 计费双轨（readme §6）
 
 用户在 **个人中心 · 电商工具箱计费** 选择模式（默认 **BYOK 月费**，降低平台垫资）：

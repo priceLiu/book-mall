@@ -50,10 +50,13 @@ export function EcomImagePreviewHost({
   preview,
   galleryItems,
   onClose,
+  nativeOverlay = false,
 }: {
   preview: EcomImagePreviewOpenState | null;
   galleryItems?: readonly EcomImagePreviewItem[];
   onClose: () => void;
+  /** 嵌套在其它 Radix Dialog 内时须为 true，避免 Presence 循环 */
+  nativeOverlay?: boolean;
 }) {
   if (!preview) return null;
 
@@ -67,6 +70,7 @@ export function EcomImagePreviewHost({
       items={items}
       initialIndex={preview.initialIndex}
       open
+      nativeOverlay={nativeOverlay}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}

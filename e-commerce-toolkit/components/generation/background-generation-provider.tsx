@@ -14,7 +14,7 @@ import {
 import { BackgroundGenerationDock } from "@/components/generation/background-generation-dock";
 import {
   BACKGROUND_DOCK_FOREGROUND_MS,
-  BACKGROUND_DOCK_POLL_MS,
+  BACKGROUND_DOCK_FOREGROUND_POLL_MS,
 } from "@/lib/generation/background-generation-policy";
 import type {
   BackgroundGenerationTask,
@@ -123,7 +123,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
     return () => window.clearInterval(timer);
   }, []);
 
-  // Dock 轮询
+  // Dock 轮询（4s，与前台 busy 超时策略配套）
   useEffect(() => {
     const tick = async () => {
       if (pollLockRef.current) return;
@@ -146,6 +146,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
               );
               setDockExpanded(true);
             } else {
+              await task.onFailed?.();
               setTasks((prev) =>
                 prev.map((t) =>
                   t.id === task.id
@@ -170,7 +171,10 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
       }
     };
     void tick();
-    const id = window.setInterval(() => void tick(), BACKGROUND_DOCK_POLL_MS);
+    const id = window.setInterval(
+      () => void tick(),
+      BACKGROUND_DOCK_FOREGROUND_POLL_MS,
+    );
     return () => window.clearInterval(id);
   }, []);
 

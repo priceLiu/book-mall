@@ -80,7 +80,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   {
     id: "model-shot",
     title: "服装模特图",
-    tagline: "上身展示与试衣效果",
+    tagline: "多姿势模特图编排 + 上身展示",
     href: "/ecom/model-shot",
     kind: "image",
     toolKey: "ecom-toolkit__model-shot",

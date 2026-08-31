@@ -568,7 +568,9 @@ export async function dashscopeCreateWan27ImageTask(opts: {
 
   const model = opts.model?.trim() || WAN27_IMAGE_MODEL;
   const isWan26Image = model.toLowerCase().includes("wan2.6-image");
-  if (!isWan26Image && items.length < 2) {
+  const hasImage = items.some((c) => "image" in c);
+  // 多图参考须 text+image；纯文生图（仅 text）wan2.7 / wan2.7-pro 亦支持
+  if (hasImage && items.length < 2) {
     return { ok: false, error: "缺少有效输入" };
   }
 

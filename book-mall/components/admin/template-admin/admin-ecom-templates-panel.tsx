@@ -14,7 +14,13 @@ import {
 } from "@/lib/confirm-destructive-twice";
 import ECOM_TEMPLATE_CATEGORIES from "@/lib/ecom/ecom-template-categories.json";
 
-type EcomSub = "templates" | "models";
+import {
+  PoseLibraryAdmin,
+  PropLibraryAdmin,
+  SceneLibraryAdmin,
+} from "@/components/admin/template-admin/admin-ecom-catalog-libraries";
+
+type EcomSub = "templates" | "models" | "poses" | "props" | "scenes";
 
 type TemplateRow = {
   id: string;
@@ -198,7 +204,14 @@ const EMPTY_MODEL: ModelRow = {
 export function AdminEcomTemplatesPanel() {
   const router = useRouter();
   const search = useSearchParams();
-  const sub: EcomSub = search.get("ecom") === "models" ? "models" : "templates";
+  const ecomParam = search.get("ecom");
+  const sub: EcomSub =
+    ecomParam === "models" ||
+    ecomParam === "poses" ||
+    ecomParam === "props" ||
+    ecomParam === "scenes"
+      ? ecomParam
+      : "templates";
 
   function setSub(next: EcomSub) {
     const params = new URLSearchParams(search.toString());
@@ -207,25 +220,39 @@ export function AdminEcomTemplatesPanel() {
     router.replace(`/admin/templates?${params.toString()}`);
   }
 
+  const subTabs: Array<{ id: EcomSub; label: string }> = [
+    { id: "templates", label: "模板区" },
+    { id: "models", label: "模特库" },
+    { id: "poses", label: "姿势库" },
+    { id: "props", label: "道具库" },
+    { id: "scenes", label: "场景库" },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={`rounded-md px-3 py-1 text-xs ${sub === "templates" ? "bg-[#1f2328] text-white" : "border border-[#d0d7de]"}`}
-          onClick={() => setSub("templates")}
-        >
-          模板区
-        </button>
-        <button
-          type="button"
-          className={`rounded-md px-3 py-1 text-xs ${sub === "models" ? "bg-[#1f2328] text-white" : "border border-[#d0d7de]"}`}
-          onClick={() => setSub("models")}
-        >
-          模特库
-        </button>
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`rounded-md px-3 py-1 text-xs ${sub === t.id ? "bg-[#1f2328] text-white" : "border border-[#d0d7de]"}`}
+            onClick={() => setSub(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      {sub === "templates" ? <TemplatesAdmin /> : <ModelsAdmin />}
+      {sub === "templates" ? (
+        <TemplatesAdmin />
+      ) : sub === "models" ? (
+        <ModelsAdmin />
+      ) : sub === "poses" ? (
+        <PoseLibraryAdmin />
+      ) : sub === "props" ? (
+        <PropLibraryAdmin />
+      ) : (
+        <SceneLibraryAdmin />
+      )}
     </div>
   );
 }

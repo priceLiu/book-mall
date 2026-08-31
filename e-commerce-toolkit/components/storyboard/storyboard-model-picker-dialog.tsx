@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Cpu, Image as ImageIcon, Loader2, Video } from "lucide-react";
 
 import {
@@ -14,6 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EcomDialogCloseButton,
 } from "@/components/ui/dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
@@ -88,6 +90,11 @@ type Props = {
   onRetryLoadModels?: () => void | Promise<void>;
   /** 覆盖 DialogContent 容器 class */
   contentClassName?: string;
+  /**
+   * 使用 createPortal + 自定义 overlay，不经 Radix Dialog。
+   * 素材区粘贴热区与 Radix 焦点陷阱冲突时启用（如服装模特图）。
+   */
+  nativeOverlay?: boolean;
   /** 模型已确认、任务进行中：弹层内展示进度态 */
   running?: boolean;
   runningTitle?: string;
@@ -330,6 +337,7 @@ export function StoryboardModelPickerDialog({
   modelsEmptyHint,
   onRetryLoadModels,
   contentClassName,
+  nativeOverlay = false,
   running = false,
   runningTitle,
   runningDetail,
@@ -364,15 +372,19 @@ export function StoryboardModelPickerDialog({
   const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
   const [confirmBlockMessage, setConfirmBlockMessage] = useState<string | null>(null);
   const wasOpenRef = useRef(false);
+  const suppressBackdropCloseUntilRef = useRef(0);
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
       setDraftKey(value);
       setMediaFilter("all");
       setConfirmBlockMessage(null);
+      if (nativeOverlay) {
+        suppressBackdropCloseUntilRef.current = Date.now() + 450;
+      }
     }
     wasOpenRef.current = open;
-  }, [open, value]);
+  }, [open, value, nativeOverlay]);
 
   const visibleModels = useMemo(
     () => models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter)),
@@ -381,9 +393,11 @@ export function StoryboardModelPickerDialog({
 
   useEffect(() => {
     if (!open || visibleModels.length === 0) return;
-    if (visibleModels.some((m) => m.modelKey === draftKey)) return;
-    setDraftKey(pickBoundStoryboardModelKey(visibleModels, value || visibleModels[0]!.modelKey));
-  }, [open, visibleModels, draftKey, value]);
+    setDraftKey((current) => {
+      if (visibleModels.some((m) => m.modelKey === current)) return current;
+      return pickBoundStoryboardModelKey(visibleModels, value || visibleModels[0]!.modelKey);
+    });
+  }, [open, visibleModels, value]);
 
   const selectedModel = models.find((m) => m.modelKey === draftKey) ?? null;
   const isBailianR2v = mode === "video" && isStoryboardBailianR2vModel(draftKey);
@@ -451,6 +465,15 @@ export function StoryboardModelPickerDialog({
     setConfirmBlockMessage(null);
   }, [draftKey, durationSec, panelDurationSec, mode, showFullDuration, showPanelDuration]);
 
+  useEffect(() => {
+    if (!nativeOverlay || !open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !running && !confirming) onOpenChange(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [nativeOverlay, open, running, confirming, onOpenChange]);
+
   function handleConfirm() {
     if (mode === "video") {
       const mismatch =
@@ -497,81 +520,74 @@ export function StoryboardModelPickerDialog({
     ) && !filterEmpty;
 
   const ModeIcon = mode === "image" ? ImageIcon : Video;
+  const resolvedTitle = dialogTitle ?? pickerTitle(mode, panelIndex, videoTarget);
+  const panelClassName = cn(STORYBOARD_MODEL_PICKER_DIALOG_CLASS, contentClassName);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(STORYBOARD_MODEL_PICKER_DIALOG_CLASS, contentClassName)}
-      >
-        <DialogHeader className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 text-[15px]">
-            <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
-            {dialogTitle ?? pickerTitle(mode, panelIndex, videoTarget)}
-          </DialogTitle>
-          {subtitle ? <p className="text-[12px] text-[#86868b]">{subtitle}</p> : null}
-        </DialogHeader>
+  const header = (
+    <div className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#1d1d1f]">
+        <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
+        {resolvedTitle}
+      </h2>
+      {subtitle ? <p className="text-[12px] text-[#86868b]">{subtitle}</p> : null}
+    </div>
+  );
 
-        {running ? (
-          <div className="flex min-h-[min(36dvh,280px)] flex-1 flex-col items-center justify-center gap-4 px-5 py-10">
-            <Loader2 className="h-9 w-9 animate-spin text-[var(--ecom-primary)]" />
-            <div className="max-w-md text-center">
-              <p className="text-sm font-medium text-[#1d1d1f]">
-                {runningTitle ?? "处理中…"}
+  const body = running ? (
+    <div className="flex min-h-[min(36dvh,280px)] flex-1 flex-col items-center justify-center gap-4 px-5 py-10">
+      <Loader2 className="h-9 w-9 animate-spin text-[var(--ecom-primary)]" />
+      <div className="max-w-md text-center">
+        <p className="text-sm font-medium text-[#1d1d1f]">{runningTitle ?? "处理中…"}</p>
+        {runningDetail ? (
+          <p className="mt-1.5 text-xs leading-relaxed text-[#86868b]">{runningDetail}</p>
+        ) : null}
+      </div>
+      <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full max-w-xs">
+        <span />
+      </div>
+    </div>
+  ) : (
+    <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      {modelsLoading && models.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--ecom-primary)]" />
+          <p className="text-sm text-[#6e6e73]">正在加载 Gateway 生图模型…</p>
+        </div>
+      ) : !hasAnyModel ? (
+        <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[#86868b]">
+          <p>
+            {modelsEmptyHint ??
+              `暂无可用${mode === "image" ? "生图" : "视频"}模型，请先在 Gateway 绑定凭证。`}
+          </p>
+          {onRetryLoadModels ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              onClick={() => void onRetryLoadModels()}
+            >
+              重新加载模型
+            </EcomButtonSecondary>
+          ) : null}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
+          <div className="space-y-4">
+            <ModelMediaFilterBar
+              mode={mode}
+              models={models}
+              value={mediaFilter}
+              onChange={setMediaFilter}
+            />
+            {filterEmpty ? (
+              <p className="rounded-xl border border-dashed border-[#e8e8ed] px-4 py-10 text-center text-sm text-[#86868b]">
+                当前筛选下暂无模型，请切换类型或选择「全部」。
               </p>
-              {runningDetail ? (
-                <p className="mt-1.5 text-xs leading-relaxed text-[#86868b]">
-                  {runningDetail}
-                </p>
-              ) : null}
-            </div>
-            <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full max-w-xs">
-              <span />
-            </div>
-          </div>
-        ) : (
-        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {modelsLoading && models.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[var(--ecom-primary)]" />
-              <p className="text-sm text-[#6e6e73]">正在加载 Gateway 生图模型…</p>
-            </div>
-          ) : !hasAnyModel ? (
-            <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[#86868b]">
-              <p>
-                {modelsEmptyHint ??
-                  `暂无可用${mode === "image" ? "生图" : "视频"}模型，请先在 Gateway 绑定凭证。`}
-              </p>
-              {onRetryLoadModels ? (
-                <EcomButtonSecondary
-                  size="sm"
-                  type="button"
-                  onClick={() => void onRetryLoadModels()}
-                >
-                  重新加载模型
-                </EcomButtonSecondary>
-              ) : null}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
-              <div className="space-y-4">
-                <ModelMediaFilterBar
-                  mode={mode}
-                  models={models}
-                  value={mediaFilter}
-                  onChange={setMediaFilter}
-                />
-              {filterEmpty ? (
-                <p className="rounded-xl border border-dashed border-[#e8e8ed] px-4 py-10 text-center text-sm text-[#86868b]">
-                  当前筛选下暂无模型，请切换类型或选择「全部」。
-                </p>
-              ) : (
+            ) : (
               groups.map((g) => (
                 <section key={g.kind}>
                   {!platformFlat ? (
                     <header className="mb-2 flex items-center gap-2">
-                      <h3 className="text-[12px] font-semibold text-[#1d1d1f]">
-                        {g.kind}
-                      </h3>
+                      <h3 className="text-[12px] font-semibold text-[#1d1d1f]">{g.kind}</h3>
                     </header>
                   ) : null}
                   <div className="flex flex-col gap-2">
@@ -589,201 +605,278 @@ export function StoryboardModelPickerDialog({
                   </div>
                 </section>
               ))
-              )}
-              </div>
+            )}
+          </div>
 
-              <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4 lg:sticky lg:top-0">
-                <p className="mb-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#1d1d1f]">
-                  <Cpu className="h-3.5 w-3.5 text-[#86868b]" />
-                  模型参数
-                  <span className="font-normal text-[#86868b]">
-                    {selectedModel?.displayName ?? draftKey}
-                  </span>
-                  {mode === "video" && selectedModel ? (
-                    <span className="rounded bg-[#e8f1ff] px-1.5 py-0.5 text-[10px] font-medium text-[#0058c7]">
-                      {formatStoryboardVideoModelTypeLabel(selectedModel.modelKey)}
-                    </span>
-                  ) : null}
-                  {mode === "image" && selectedModel ? (
-                    <span className="rounded bg-[#fff4e5] px-1.5 py-0.5 text-[10px] font-medium text-[#b25e09]">
-                      {formatStoryboardImageModelTypeLabel(selectedModel.modelKey, selectedModel.role)}
-                    </span>
-                  ) : null}
-                </p>
+          <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4 lg:sticky lg:top-0">
+            <p className="mb-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#1d1d1f]">
+              <Cpu className="h-3.5 w-3.5 text-[#86868b]" />
+              模型参数
+              <span className="font-normal text-[#86868b]">
+                {selectedModel?.displayName ?? draftKey}
+              </span>
+              {mode === "video" && selectedModel ? (
+                <span className="rounded bg-[#e8f1ff] px-1.5 py-0.5 text-[10px] font-medium text-[#0058c7]">
+                  {formatStoryboardVideoModelTypeLabel(selectedModel.modelKey)}
+                </span>
+              ) : null}
+              {mode === "image" && selectedModel ? (
+                <span className="rounded bg-[#fff4e5] px-1.5 py-0.5 text-[10px] font-medium text-[#b25e09]">
+                  {formatStoryboardImageModelTypeLabel(selectedModel.modelKey, selectedModel.role)}
+                </span>
+              ) : null}
+            </p>
 
-                <div className="space-y-4">
-                  {showImageSize && lockedImageSizeLabel ? (
-                    <div className="space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">{lockedFieldLabel}</span>
-                      <p className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#1d1d1f]">
-                        {lockedImageSizeLabel}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {showImageSize && !lockedImageSizeLabel ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">输出分辨率（尺寸）</span>
-                      <select
-                        className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
-                        value={imageSize}
-                        onChange={(e) => {
-                          const next = e.target.value as StoryboardWanxSize;
-                          onImageSizeChange?.(next);
-                          onAspectRatioChange?.(aspectRatioForWanxSize(next));
-                        }}
-                      >
-                        {STORYBOARD_WANX_SIZE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-
-                  {showAspect ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">画面比例</span>
-                      <select
-                        className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
-                        value={aspectRatio}
-                        onChange={(e) =>
-                          onAspectRatioChange?.(e.target.value as StoryboardVideoAspectRatio)
-                        }
-                      >
-                        <option value="9:16">9:16 竖屏</option>
-                        <option value="16:9">16:9 横屏</option>
-                        {isKling30 ? <option value="1:1">1:1</option> : null}
-                      </select>
-                    </label>
-                  ) : null}
-
-                  {showR2vRatio ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">画布比例（百炼 R2V）</span>
-                      <select
-                        className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
-                        value={videoR2vRatio}
-                        onChange={(e) => onVideoR2vRatioChange?.(e.target.value)}
-                      >
-                        {STORYBOARD_R2V_RATIO_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-
-                  {showResolution ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">视频分辨率</span>
-                      <select
-                        className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
-                        value={videoResolution}
-                        onChange={(e) =>
-                          onVideoResolutionChange?.(e.target.value as StoryboardVideoResolution)
-                        }
-                      >
-                        {STORYBOARD_VIDEO_RESOLUTION_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-
-                  {showFullDuration ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">
-                        成片时长 {durationSec}s（{fullDurationRange.label}）
-                      </span>
-                      <input
-                        type="range"
-                        min={fullDurationMin}
-                        max={fullDurationMax}
-                        step={1}
-                        value={Math.min(fullDurationMax, Math.max(fullDurationMin, durationSec))}
-                        onChange={(e) => onDurationChange?.(Number(e.target.value))}
-                        className="w-full accent-[var(--ecom-primary)]"
-                      />
-                      <div className="flex justify-between text-[10px] text-[#86868b]">
-                        <span>{fullDurationMin}s</span>
-                        <span>{fullDurationMax}s</span>
-                      </div>
-                    </label>
-                  ) : null}
-
-                  {longDurationHintMessage ? (
-                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
-                      {longDurationHintMessage}
-                    </p>
-                  ) : null}
-
-                  {confirmBlockMessage ? (
-                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
-                      {confirmBlockMessage}
-                    </p>
-                  ) : null}
-
-                  {showWanR2vExtras ? (
-                    <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
-                      <input
-                        type="checkbox"
-                        checked={videoPromptExtend}
-                        onChange={(e) => onVideoPromptExtendChange?.(e.target.checked)}
-                        className="accent-[var(--ecom-primary)]"
-                      />
-                      <span>智能扩写提示词（万相 R2V）</span>
-                    </label>
-                  ) : null}
-
-                  {showR2vSeed ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">随机种子（可选）</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="留空则随机"
-                        className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
-                        value={videoSeed}
-                        onChange={(e) => onVideoSeedChange?.(e.target.value)}
-                      />
-                    </label>
-                  ) : null}
-
-                  {showPanelDuration ? (
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-[#6e6e73]">
-                        镜头时长 {panelDurationSec}s（{panelDurationRange.label}）
-                      </span>
-                      <input
-                        type="range"
-                        min={panelDurationMin}
-                        max={panelDurationMax}
-                        step={1}
-                        value={Math.min(
-                          panelDurationMax,
-                          Math.max(panelDurationMin, panelDurationSec ?? panelDurationMin),
-                        )}
-                        onChange={(e) => onPanelDurationChange?.(Number(e.target.value))}
-                        className="w-full accent-[var(--ecom-primary)]"
-                      />
-                      <div className="flex justify-between text-[10px] text-[#86868b]">
-                        <span>{panelDurationMin}s</span>
-                        <span>{panelDurationMax}s</span>
-                      </div>
-                    </label>
-                  ) : null}
+            <div className="space-y-4">
+              {showImageSize && lockedImageSizeLabel ? (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">{lockedFieldLabel}</span>
+                  <p className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#1d1d1f]">
+                    {lockedImageSizeLabel}
+                  </p>
                 </div>
-              </section>
-            </div>
-          )}
-        </div>
-        )}
+              ) : null}
 
+              {showImageSize && !lockedImageSizeLabel ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">输出分辨率（尺寸）</span>
+                  <select
+                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    value={imageSize}
+                    onChange={(e) => {
+                      const next = e.target.value as StoryboardWanxSize;
+                      onImageSizeChange?.(next);
+                      onAspectRatioChange?.(aspectRatioForWanxSize(next));
+                    }}
+                  >
+                    {STORYBOARD_WANX_SIZE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {showAspect ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">画面比例</span>
+                  <select
+                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    value={aspectRatio}
+                    onChange={(e) =>
+                      onAspectRatioChange?.(e.target.value as StoryboardVideoAspectRatio)
+                    }
+                  >
+                    <option value="9:16">9:16 竖屏</option>
+                    <option value="16:9">16:9 横屏</option>
+                    {isKling30 ? <option value="1:1">1:1</option> : null}
+                  </select>
+                </label>
+              ) : null}
+
+              {showR2vRatio ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">画布比例（百炼 R2V）</span>
+                  <select
+                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    value={videoR2vRatio}
+                    onChange={(e) => onVideoR2vRatioChange?.(e.target.value)}
+                  >
+                    {STORYBOARD_R2V_RATIO_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {showResolution ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">视频分辨率</span>
+                  <select
+                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    value={videoResolution}
+                    onChange={(e) =>
+                      onVideoResolutionChange?.(e.target.value as StoryboardVideoResolution)
+                    }
+                  >
+                    {STORYBOARD_VIDEO_RESOLUTION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {showFullDuration ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">
+                    成片时长 {durationSec}s（{fullDurationRange.label}）
+                  </span>
+                  <input
+                    type="range"
+                    min={fullDurationMin}
+                    max={fullDurationMax}
+                    step={1}
+                    value={Math.min(fullDurationMax, Math.max(fullDurationMin, durationSec))}
+                    onChange={(e) => onDurationChange?.(Number(e.target.value))}
+                    className="w-full accent-[var(--ecom-primary)]"
+                  />
+                  <div className="flex justify-between text-[10px] text-[#86868b]">
+                    <span>{fullDurationMin}s</span>
+                    <span>{fullDurationMax}s</span>
+                  </div>
+                </label>
+              ) : null}
+
+              {longDurationHintMessage ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                  {longDurationHintMessage}
+                </p>
+              ) : null}
+
+              {confirmBlockMessage ? (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+                  {confirmBlockMessage}
+                </p>
+              ) : null}
+
+              {showWanR2vExtras ? (
+                <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+                  <input
+                    type="checkbox"
+                    checked={videoPromptExtend}
+                    onChange={(e) => onVideoPromptExtendChange?.(e.target.checked)}
+                    className="accent-[var(--ecom-primary)]"
+                  />
+                  <span>智能扩写提示词（万相 R2V）</span>
+                </label>
+              ) : null}
+
+              {showR2vSeed ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">随机种子（可选）</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="留空则随机"
+                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    value={videoSeed}
+                    onChange={(e) => onVideoSeedChange?.(e.target.value)}
+                  />
+                </label>
+              ) : null}
+
+              {showPanelDuration ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">
+                    镜头时长 {panelDurationSec}s（{panelDurationRange.label}）
+                  </span>
+                  <input
+                    type="range"
+                    min={panelDurationMin}
+                    max={panelDurationMax}
+                    step={1}
+                    value={Math.min(
+                      panelDurationMax,
+                      Math.max(panelDurationMin, panelDurationSec ?? panelDurationMin),
+                    )}
+                    onChange={(e) => onPanelDurationChange?.(Number(e.target.value))}
+                    className="w-full accent-[var(--ecom-primary)]"
+                  />
+                  <div className="flex justify-between text-[10px] text-[#86868b]">
+                    <span>{panelDurationMin}s</span>
+                    <span>{panelDurationMax}s</span>
+                  </div>
+                </label>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+
+  const footer = (
+    <div className="flex shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3">
+      <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
+      <div className="flex items-center gap-2">
+        <EcomButtonSecondary
+          type="button"
+          size="sm"
+          onClick={() => onOpenChange(false)}
+          disabled={running}
+        >
+          {confirming ? "关闭" : "取消"}
+        </EcomButtonSecondary>
+        {!running ? (
+          <EcomButtonPrimary
+            type="button"
+            size="sm"
+            onClick={handleConfirm}
+            disabled={confirming || !canConfirm}
+          >
+            {confirming ? "生成中…" : action}
+          </EcomButtonPrimary>
+        ) : (
+          <EcomButtonPrimary type="button" size="sm" disabled>
+            {action}…
+          </EcomButtonPrimary>
+        )}
+      </div>
+    </div>
+  );
+
+  if (nativeOverlay) {
+    if (!open || typeof document === "undefined") return null;
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="storyboard-model-picker-title"
+        onClick={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (Date.now() < suppressBackdropCloseUntilRef.current) return;
+          if (running || confirming) return;
+          onOpenChange(false);
+        }}
+      >
+        <div
+          className={cn(panelClassName, "relative flex flex-col rounded-2xl bg-white shadow-2xl")}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <EcomDialogCloseButton
+            disabled={running || confirming}
+            onClick={() => onOpenChange(false)}
+          />
+          <div id="storyboard-model-picker-title">{header}</div>
+          {body}
+          {footer}
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={panelClassName}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
+          <DialogTitle className="flex items-center gap-2 text-[15px]">
+            <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
+            {resolvedTitle}
+          </DialogTitle>
+          {subtitle ? <p className="text-[12px] text-[#86868b]">{subtitle}</p> : null}
+        </DialogHeader>
+        {body}
         <DialogFooter className="shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3 sm:justify-between">
           <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
           <div className="flex items-center gap-2">

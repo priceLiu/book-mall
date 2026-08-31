@@ -13,6 +13,9 @@ export default function EcomModulePage({
   if (params.module === "media-decompose") {
     redirect("/ecom/media-decompose");
   }
+  if (params.module === "model-shot") {
+    redirect("/ecom/model-shot");
+  }
 
   const mod = ECOM_MODULES.find(
     (m) => m.href === `/ecom/${params.module}` && m.kind !== "video",
