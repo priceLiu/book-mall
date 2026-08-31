@@ -10,6 +10,7 @@ import {
   mergeFashionDeliverablePatch,
   mergeFashionSheetWithExisting,
   pickFashionOpsMergePatch,
+  pickFashionPhaseMergePatch,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
 import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
@@ -88,11 +89,31 @@ describe("fashionDeliverable v4 schema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("extracts from fashion-deliverable fence", () => {
+  it("extracts storyboards phase patch from fashion-deliverable fence", () => {
     const fenced = `\`\`\`fashion-deliverable\n${JSON.stringify(V4_FIXTURE)}\n\`\`\``;
-    const parsed = extractFashionDeliverable(fenced);
-    expect(parsed?.productName).toBe("灰紫针织连衣裙");
+    const parsed = extractFashionDeliverable(fenced, "storyboards");
     expect(parsed?.storyboardVersions?.A?.panels).toHaveLength(6);
+    expect(parsed?.productName).toBeUndefined();
+  });
+
+  it("extracts sellpoints phase patch without vertical", () => {
+    const payload = { sellpoints: V4_FIXTURE.sellpoints };
+    const text = `\`\`\`json\n${JSON.stringify(payload)}\n\`\`\``;
+    const parsed = extractFashionDeliverable(text, "sellpoints");
+    expect(parsed?.sellpoints).toHaveLength(2);
+    expect(parsed?.vertical).toBeUndefined();
+  });
+
+  it("pickFashionPhaseMergePatch strips stray fields on storyboards phase", () => {
+    const patch = pickFashionPhaseMergePatch(
+      {
+        storyboardVersions: V4_FIXTURE.storyboardVersions,
+        sellpointsLocked: false,
+      },
+      "storyboards",
+    );
+    expect(patch.sellpointsLocked).toBeUndefined();
+    expect(patch.storyboardVersions?.A?.panels).toHaveLength(6);
   });
 
   it("mergeFashionDeliverablePatch preserves dimensions", () => {
@@ -213,17 +234,15 @@ describe("fashionDeliverable v4 schema", () => {
     expect(mergedOps.selectedVersion).toBe("A");
   });
 
-  it("ignores LLM preselectedVersion when storyboards arrive without opsPack", () => {
+  it("storyboards phase patch omits selectedVersion (user picks later)", () => {
     const fenced = `\`\`\`fashion-deliverable
 ${JSON.stringify({
-  ...V4_FIXTURE,
+  storyboardVersions: V4_FIXTURE.storyboardVersions,
   selectedVersion: "A",
-  opsPack: undefined,
-  outputMode: null,
 })}
 \`\`\``;
-    const parsed = extractFashionDeliverable(fenced);
-    expect(parsed?.selectedVersion).toBeNull();
+    const parsed = extractFashionDeliverable(fenced, "storyboards");
+    expect(parsed?.selectedVersion).toBeUndefined();
     expect(parsed?.storyboardVersions?.A?.panels).toHaveLength(6);
   });
 

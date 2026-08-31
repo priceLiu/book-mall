@@ -1,12 +1,20 @@
 "use client";
 
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, PanelRightClose } from "lucide-react";
+
+import {
+  EcomAssistantIconButton,
+  ECOM_ASSISTANT_CONTROL_ICON_CLASS,
+} from "@/components/layout/ecom-assistant-icon-button";
 
 type Props = {
   title: string;
   subtitle?: string;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
+  /** 折叠助手为右下角输入框 */
+  onCollapse?: () => void;
+  collapseDisabled?: boolean;
   /** 展开钮左侧（如微剧「影片参数」） */
   trailing?: React.ReactNode;
 };
@@ -17,6 +25,8 @@ export function EcomAssistantPanelHeader({
   subtitle,
   composerWide = false,
   onComposerWideChange,
+  onCollapse,
+  collapseDisabled = false,
   trailing,
 }: Props) {
   return (
@@ -30,18 +40,27 @@ export function EcomAssistantPanelHeader({
       <div className="flex shrink-0 items-center gap-1.5">
         {trailing}
         {onComposerWideChange ? (
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]"
+          <EcomAssistantIconButton
+            variant="muted"
             title={composerWide ? "收窄会话区" : "加宽会话区"}
             onClick={() => onComposerWideChange(!composerWide)}
           >
             {composerWide ? (
-              <Minimize2 className="h-4 w-4" />
+              <Minimize2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
             ) : (
-              <Maximize2 className="h-4 w-4" />
+              <Maximize2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
             )}
-          </button>
+          </EcomAssistantIconButton>
+        ) : null}
+        {onCollapse ? (
+          <EcomAssistantIconButton
+            variant="muted"
+            title={collapseDisabled ? "生成中不可收起" : "收起至右下角输入框"}
+            disabled={collapseDisabled}
+            onClick={() => onCollapse()}
+          >
+            <PanelRightClose className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+          </EcomAssistantIconButton>
         ) : null}
       </div>
     </div>

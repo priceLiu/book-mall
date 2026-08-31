@@ -1,12 +1,17 @@
 "use client";
 
-import { Loader2, Send, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import type { StoryboardSettingsValue } from "@/components/storyboard/storyboard-settings-dialog";
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import { EcomAssistantFloatingComposer } from "@/components/layout/ecom-assistant-floating-composer";
+import {
+  EcomAssistantIconButton,
+  ECOM_ASSISTANT_CONTROL_ICON_CLASS,
+} from "@/components/layout/ecom-assistant-icon-button";
+import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
@@ -47,22 +52,23 @@ import {
 import {
   extractProDeliverableFromText,
   isProInternalLlmTrigger,
+  listProStoryboardVersionKeys,
   stripProDeliverableFence,
+  type ProLlmPhase,
 } from "@/lib/pro-vertical/deliverable-parse";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import { getProjectVertical, isAwaitingProCategoryPick, isNonFashionProVertical, usesProPhase } from "@/lib/pro-vertical/project-vertical";
 import type { ProDeliverable } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import {
+  extractFashionDeliverableFromLlmTrigger,
   extractFashionDeliverableFromText,
   isFashionInternalLlmTrigger,
-  stripFashionDeliverableFence,
 } from "@/lib/fashion-deliverable-parse";
 import { extractMediaFilesFromClipboard } from "@/lib/image-upload-utils";
 import type { FashionDeliverable } from "@/lib/fashion-types";
 import { isFashionDeliverable } from "@/lib/fashion-types";
 import {
-  FASHION_AI_SELLPOINTS_CHOICE,
   FASHION_OUTPUT_SCRIPT,
   FASHION_OUTPUT_VIDEO,
   FASHION_WELCOME,
@@ -91,6 +97,8 @@ import {
   isAwaitingFashionCustomDimensionInput,
   isAwaitingFashionOutputMode,
   isAwaitingFashionSellpoints,
+  isAwaitingSellpointModePick,
+  isAwaitingUserSellpointInput,
   isAwaitingFashionStoryboardConfirm,
   isAwaitingFashionStoryboardPick,
   isAwaitingFashionVoiceoverPick,
@@ -139,6 +147,8 @@ type Props = {
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 };
 
 export function FashionAssistantPanel({
@@ -154,6 +164,8 @@ export function FashionAssistantPanel({
   onAlert,
   composerWide = false,
   onComposerWideChange,
+  collapsed = false,
+  onCollapsedChange,
 }: Props) {
   const projectId = project.id;
   const vertical = getProjectVertical(project);
@@ -182,7 +194,30 @@ export function FashionAssistantPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const productAutoAckRef = useRef<string | null>(null);
   const metaRepairRef = useRef<string | null>(null);
+  const assistantRootRef = useRef<HTMLDivElement>(null);
   const isBusy = streaming || pendingChoice != null || refAutoAdvancing;
+
+  const tryCollapse = useCallback(() => {
+    if (streaming || isBusy) return;
+    onCollapsedChange?.(true);
+  }, [streaming, isBusy, onCollapsedChange]);
+
+  const tryExpand = useCallback(() => {
+    onCollapsedChange?.(false);
+  }, [onCollapsedChange]);
+
+  const handleAssistantBlur = useCallback(
+    (e: React.FocusEvent) => {
+      if (collapsed || streaming || isBusy) return;
+      const root = assistantRootRef.current;
+      if (!root) return;
+      const next = e.relatedTarget as Node | null;
+      if (next && root.contains(next)) return;
+      if (next && (next as HTMLElement).closest?.("[data-ecom-floating-composer]")) return;
+      onCollapsedChange?.(true);
+    },
+    [collapsed, streaming, isBusy, onCollapsedChange],
+  );
 
   useEffect(() => {
     setWorkflowOverride({});
@@ -191,6 +226,8 @@ export function FashionAssistantPanel({
     setBusyStatus(null);
     setActiveLlmTrigger(null);
     setStreamStartedAt(null);
+    setStreamText("");
+    setInput("");
     productAutoAckRef.current = null;
   }, [projectId]);
 
@@ -264,8 +301,13 @@ export function FashionAssistantPanel({
   ]);
 
   useEffect(() => {
-    if (!streaming && project.chatHistory.length) setMessages(project.chatHistory);
-  }, [project.chatHistory, streaming]);
+    if (streaming) return;
+    setMessages(
+      project.chatHistory.length
+        ? project.chatHistory
+        : [{ id: "welcome", role: "assistant", content: welcomeText, createdAt: new Date().toISOString() }],
+    );
+  }, [projectId, project.chatHistory, streaming, welcomeText]);
 
   useEffect(() => {
     if (legacyReadonly || isBusy) return;
@@ -539,9 +581,28 @@ export function FashionAssistantPanel({
         if (llmTrigger) {
           const fresh = await getStoryboardProject(projectId);
           if (!fashionLlmTriggerSucceeded(llmTrigger, fresh)) {
-            const parsed = extractFashionDeliverableFromText(acc);
+            const vertical = getProjectVertical(fresh);
+            const parsedFashion = llmTrigger
+              ? extractFashionDeliverableFromLlmTrigger(acc, llmTrigger)
+              : extractFashionDeliverableFromText(acc);
+            const proPhaseHint = llmTrigger.includes("sellpoints")
+              ? ("sellpoints" as ProLlmPhase)
+              : llmTrigger.includes("voiceovers")
+                ? "voiceovers"
+                : llmTrigger.includes("storyboards")
+                  ? "storyboards"
+                  : llmTrigger.includes("ops")
+                    ? "ops"
+                    : undefined;
+            const parsedPro =
+              vertical && isNonFashionProVertical(fresh)
+                ? extractProDeliverableFromText(acc, vertical, proPhaseHint)
+                : null;
+            const parsed = parsedPro ?? parsedFashion;
             const hint =
-              llmTrigger.includes("storyboards") && parsed?.storyboardVersions
+              llmTrigger.includes("storyboards") &&
+              (parsed?.storyboardVersions ||
+                (parsedPro && listProStoryboardVersionKeys(parsedPro).length > 0))
                 ? "模型返回了分镜内容但 JSON 未完整解析"
                 : "模型已回复但未写入预期数据";
             throw new Error(
@@ -895,11 +956,8 @@ export function FashionAssistantPanel({
     const step = dimensionSteps[currentDimStep];
     return step ? `请在下方输入${step.label}（2 字以上）` : "请在下方输入自定义内容";
   }, [awaitingCustomDimension, currentDimStep]);
-  const showSellpointGeneratePrompt =
-    !legacyReadonly &&
-    isAwaitingFashionSellpoints(effectiveProject) &&
-    !deliverable?.sellpoints?.length &&
-    !isBusy;
+  const showSellpointUserInputHint =
+    !legacyReadonly && isAwaitingUserSellpointInput(effectiveProject) && !isBusy;
   const awaitingOutputMode = isAwaitingFashionOutputMode(effectiveProject);
   const awaitingVoiceoverPick = isAwaitingFashionVoiceoverPick(effectiveProject);
   const pendingStoryboardGen = isFashionPendingStoryboardGeneration(effectiveProject);
@@ -916,8 +974,12 @@ export function FashionAssistantPanel({
       ? "口播已选定，请生成 A–E 分镜脚本后继续"
     : awaitingVoiceoverPick
       ? "请点选一套口播文案，系统将自动生成 A–E 分镜方案"
+    : isAwaitingSellpointModePick(effectiveProject)
+      ? "专业卖家通常自带卖点；也可让 AI 根据七维参数生成"
+    : isAwaitingUserSellpointInput(effectiveProject)
+      ? "在下方输入卖点（换行/分号分隔），或在左侧表格添加"
     : deliverable?.sellpoints?.length && !deliverable.sellpointsLocked
-      ? "确认定稿，或重新生成卖点"
+      ? "可选 AI 润色，或直接确认卖点定稿"
     : isDimensionCollecting && currentDimStepDef
       ? awaitingCustomDimension
         ? customDimensionHint
@@ -930,18 +992,104 @@ export function FashionAssistantPanel({
       ? customDimensionHint
       : "点选上方选项，或选「自定义」后在下方输入";
 
+  const needsAttention =
+    Boolean(pendingChoice) ||
+    refAutoAdvancing ||
+    (!legacyReadonly && !isBusy && !streaming && choices.length > 0);
+
+  const composerSection = (
+    <div className="border-t border-[#e8e8ed] bg-white p-3">
+      <div className="flex items-end gap-2">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={fashionAssistantPlaceholder(effectiveProject)}
+          disabled={legacyReadonly || isBusy}
+          rows={collapsed ? 1 : 2}
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7]"
+          onFocus={() => {
+            if (collapsed) tryExpand();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void handleSend();
+            }
+          }}
+          onPaste={(e) => {
+            if (extractMediaFilesFromClipboard(e).length > 0) {
+              e.preventDefault();
+            }
+          }}
+        />
+        {onOpenSettings && !collapsed ? (
+          <EcomAssistantIconButton title="影片参数" onClick={onOpenSettings}>
+            <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+          </EcomAssistantIconButton>
+        ) : null}
+        <EcomAssistantSendButton
+          disabled={legacyReadonly || isBusy || !input.trim()}
+          busy={isBusy}
+          onClick={() => void handleSend()}
+        />
+      </div>
+    </div>
+  );
+
+  const floatingComposerSection = (
+    <div className="p-0.5">
+      <div className="flex items-end gap-2">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={fashionAssistantPlaceholder(effectiveProject)}
+          disabled={legacyReadonly || isBusy}
+          rows={1}
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7]"
+          onFocus={() => tryExpand()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void handleSend();
+            }
+          }}
+          onPaste={(e) => {
+            if (extractMediaFilesFromClipboard(e).length > 0) {
+              e.preventDefault();
+            }
+          }}
+        />
+        <EcomAssistantSendButton
+          disabled={legacyReadonly || isBusy || !input.trim()}
+          busy={isBusy}
+          onClick={() => void handleSend()}
+        />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#fbfbfd]">
+    <>
+      <div
+        ref={assistantRootRef}
+        className={cn(
+          "flex h-full min-h-0 flex-col bg-[#fbfbfd]",
+          collapsed && "pointer-events-none invisible absolute h-0 w-0 overflow-hidden",
+        )}
+        onBlur={handleAssistantBlur}
+      >
       <EcomAssistantPanelHeader
         title={`${verticalConfig?.label ?? "专业版"}助手`}
         subtitle="V4.4 · 七维 → 卖点 → 口播 → 分镜"
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
+        onCollapse={onCollapsedChange ? tryCollapse : undefined}
+        collapseDisabled={streaming || isBusy}
         trailing={
           onOpenSettings ? (
-            <EcomButtonSecondary type="button" className="px-2" onClick={onOpenSettings}>
-              <Settings2 className="h-4 w-4" />
-            </EcomButtonSecondary>
+            <EcomAssistantIconButton title="影片参数" onClick={onOpenSettings}>
+              <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+            </EcomAssistantIconButton>
           ) : undefined
         }
       />
@@ -954,8 +1102,12 @@ export function FashionAssistantPanel({
         ) : null}
 
         {displayMessages.map((m, index) => {
-          const brief = m.role === "assistant" ? stripFashionDeliverableFence(m.content) : m.content;
-          const parsedFromMessage = extractFashionDeliverableFromText(m.content);
+          const parsedFromMessage =
+            extractFashionDeliverableFromText(m.content) ?? extractProDeliverableFromText(m.content);
+          const brief =
+            m.role === "assistant"
+              ? stripProDeliverableFence(m.content)
+              : m.content;
           const isLastAssistant =
             m.role === "assistant" && index === displayMessages.findLastIndex((x) => x.role === "assistant");
           const dimMeta = m.role === "user" ? dimensionMessageLabels.get(m.id) : undefined;
@@ -974,11 +1126,11 @@ export function FashionAssistantPanel({
           const showDeliverableView =
             m.role === "assistant" &&
             (Boolean(parsedFromMessage?.sellpoints?.length) ||
+              Boolean(parsedFromMessage?.voiceovers?.length) ||
               Boolean(
                 parsedFromMessage?.storyboardVersions &&
                   Object.keys(parsedFromMessage.storyboardVersions).length,
               ) ||
-              Boolean(stripFashionDeliverableFence(m.content).trim()) ||
               (isLastAssistant &&
                 Boolean(
                   deliverable?.sellpoints?.length ||
@@ -1073,14 +1225,15 @@ export function FashionAssistantPanel({
               "mb-3 mr-auto max-w-[95%]",
             )}
           >
-            {extractFashionDeliverableFromText(streamText) ? (
+            {extractFashionDeliverableFromText(streamText) ||
+            extractProDeliverableFromText(streamText) ? (
               <FashionAssistantDeliverableView
                 content={streamText}
                 projectDeliverable={deliverable}
               />
             ) : (
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#1d1d1f]">
-                {stripFashionDeliverableFence(streamText) || "正在生成…"}
+                {stripProDeliverableFence(streamText) || "正在生成…"}
               </p>
             )}
           </div>
@@ -1149,28 +1302,13 @@ export function FashionAssistantPanel({
           </div>
         ) : null}
 
-        {showSellpointGeneratePrompt ? (
+        {showSellpointUserInputHint ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <div className="rounded-2xl border border-[#e8e8ed] bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-[#1d1d1f]">七维参数已确认</p>
+              <p className="text-sm font-semibold text-[#1d1d1f]">填写您的卖点</p>
               <p className="mt-1 text-xs text-[#6e6e73]">
-                点击下方按钮由 AI 生成 5–8 条分层卖点；也可在输入框自行描述后发送。
+                在下方输入框发送（换行或分号分隔），或在左侧「卖点清单」点「添加卖点」。完成后可选 AI 润色，或直接确认定稿。
               </p>
-              <EcomButtonPrimary
-                type="button"
-                className="mt-4 w-full"
-                disabled={isBusy}
-                onClick={() => void handleChoice(FASHION_AI_SELLPOINTS_CHOICE)}
-              >
-                {pendingChoice === FASHION_AI_SELLPOINTS_CHOICE ? (
-                  <>
-                    <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                    正在生成…
-                  </>
-                ) : (
-                  "AI 自动生成卖点"
-                )}
-              </EcomButtonPrimary>
             </div>
           </div>
         ) : null}
@@ -1181,6 +1319,8 @@ export function FashionAssistantPanel({
               title={
                 awaitingCategoryPick
                   ? "选择大类品类"
+                  : isAwaitingSellpointModePick(effectiveProject)
+                    ? "选择卖点录入方式"
                   : awaitingStoryboardPick
                   ? "选择分镜方案"
                   : pendingOpsGen
@@ -1252,42 +1392,20 @@ export function FashionAssistantPanel({
         ) : null}
       </div>
 
-      <div className="border-t border-[#e8e8ed] bg-white p-3">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={fashionAssistantPlaceholder(effectiveProject)}
-            disabled={legacyReadonly || isBusy}
-            rows={2}
-            className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7]"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            onPaste={(e) => {
-              if (extractMediaFilesFromClipboard(e).length > 0) {
-                e.preventDefault();
-              }
-            }}
-          />
-          {onOpenSettings ? (
-            <EcomButtonSecondary type="button" className="shrink-0 px-2" onClick={onOpenSettings}>
-              <Settings2 className="h-4 w-4" />
-            </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonPrimary
-            type="button"
-            className="shrink-0"
-            disabled={legacyReadonly || isBusy || !input.trim()}
-            onClick={() => void handleSend()}
-          >
-            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </EcomButtonPrimary>
-        </div>
+      {!collapsed ? composerSection : null}
       </div>
-    </div>
+
+      {collapsed ? (
+        <EcomAssistantFloatingComposer
+          open
+          attentionBadge={needsAttention}
+          onExpand={tryExpand}
+        >
+          <div data-ecom-floating-composer onClick={(e) => e.stopPropagation()}>
+            {floatingComposerSection}
+          </div>
+        </EcomAssistantFloatingComposer>
+      ) : null}
+    </>
   );
 }

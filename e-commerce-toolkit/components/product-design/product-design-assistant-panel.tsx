@@ -1,9 +1,11 @@
 "use client";
 
-import { Loader2, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
@@ -180,6 +182,8 @@ type Props = {
   onChooseDetailWorkflow?: (mode: DetailWorkflowPath) => void;
   onBriefComplete?: () => void;
   onRegenerateMarketingPlans?: () => void;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 };
 
 export function ProductDesignAssistantPanel({
@@ -202,6 +206,8 @@ export function ProductDesignAssistantPanel({
   onChooseDetailWorkflow,
   onBriefComplete,
   onRegenerateMarketingPlans,
+  collapsed = false,
+  onCollapsedChange,
 }: Props) {
   const projectId = project.id;
   const chatHistory = project.chatHistory;
@@ -836,13 +842,65 @@ export function ProductDesignAssistantPanel({
 
   const assistantTitle = track === "detail" ? "电商详情页助手" : "电商主图助手";
 
+  const tryCollapse = useCallback(() => {
+    if (inputDisabled) return;
+    onCollapsedChange?.(true);
+  }, [inputDisabled, onCollapsedChange]);
+
+  const tryExpand = useCallback(() => {
+    onCollapsedChange?.(false);
+  }, [onCollapsedChange]);
+
+  const renderComposer = (compact: boolean) => (
+    <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
+      <div className="flex items-end gap-2">
+        <textarea
+          className="min-h-[2.5rem] flex-1 resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          rows={compact ? 1 : 3}
+          placeholder={
+            showChoiceBlock && choices.length > 0
+              ? "也可输入补充说明；点选上方选项可继续下一步…"
+              : "补充说明或让我修改某一步…"
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={inputDisabled}
+          onFocus={() => {
+            if (compact) tryExpand();
+            else onComposerWideChange?.(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+        />
+        <EcomAssistantSendButton
+          disabled={inputDisabled || !input.trim()}
+          busy={streaming}
+          onClick={handleSend}
+        />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
+    <EcomAssistantCollapsibleLayout
+      collapsed={collapsed}
+      onCollapsedChange={onCollapsedChange}
+      collapseBlocked={inputDisabled}
+      attentionBadge={showChoiceBlock && choices.length > 0}
+      composer={renderComposer(false)}
+      floatingComposer={renderComposer(true)}
+    >
       <EcomAssistantPanelHeader
         title={assistantTitle}
         subtitle={assistantSubtitle}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
+        onCollapse={onCollapsedChange ? tryCollapse : undefined}
+        collapseDisabled={inputDisabled}
       />
       <div
         ref={scrollRef}
@@ -959,42 +1017,6 @@ export function ProductDesignAssistantPanel({
           />
         ) : null}
       </div>
-
-      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
-        <textarea
-          className="mb-3 min-h-[4.5rem] w-full resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
-          rows={3}
-          placeholder={
-            showChoiceBlock && choices.length > 0
-              ? "也可输入补充说明；点选上方选项可继续下一步…"
-              : "补充说明或让我修改某一步…"
-          }
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={inputDisabled}
-          onFocus={() => onComposerWideChange?.(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-        />
-        <EcomButtonPrimary
-          size="sm"
-          type="button"
-          className="w-full"
-          disabled={inputDisabled || !input.trim()}
-          onClick={handleSend}
-        >
-          {streaming ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4 shrink-0" />
-          )}
-          发送
-        </EcomButtonPrimary>
-      </div>
-    </div>
+    </EcomAssistantCollapsibleLayout>
   );
 }

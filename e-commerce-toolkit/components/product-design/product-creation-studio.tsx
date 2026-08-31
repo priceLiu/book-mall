@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { ProductDesignAssistantPanel } from "@/components/product-design/product-design-assistant-panel";
 import { ProductDesignContentPanel } from "@/components/product-design/product-design-content-panel";
 import { ProductDesignProgressRail } from "@/components/product-design/product-design-progress-rail";
@@ -103,6 +104,8 @@ export function ProductCreationStudio({ module }: StudioProps) {
   const [regenerateMarketingPlansToken, setRegenerateMarketingPlansToken] = useState(0);
   const [focusStepId, setFocusStepId] = useState<ProductDesignStepId | null>(null);
   const [assistantWide, setAssistantWide] = useState(false);
+  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
+    useEcomStudioAssistantCollapse(assistantStreaming);
   const [importPickerOpen, setImportPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -566,6 +569,8 @@ export function ProductCreationStudio({ module }: StudioProps) {
   return (
     <EcomWorkspaceLayout
       assistantWide={assistantWide}
+      assistantCollapsed={assistantCollapsed}
+      onMainBlankPointerDown={handleMainBlankPointerDown}
       progress={
         <ProductDesignProgressRail
           project={project}
@@ -582,6 +587,8 @@ export function ProductCreationStudio({ module }: StudioProps) {
           visionModelKey={visionModelKey}
           composerWide={assistantWide}
           onComposerWideChange={setAssistantWide}
+          collapsed={assistantCollapsed}
+          onCollapsedChange={setAssistantCollapsed}
           onStreamingChange={setAssistantStreaming}
           onProjectChange={async () => {
             await reload(project.id);

@@ -133,3 +133,18 @@ UI 列 label 由 `VerticalConfig.panelFocusLabel` 决定（如「包包展示重
 
 - 统一前缀：`pro-step:sellpoints-generate` 等
 - 兼容：`fashion-step:*` 对 `fashion_apparel` 仍有效
+
+### 7.1 分阶段 Patch（LLM 输出约束）
+
+各 trigger 阶段 **只允许** 输出下列字段（`schemaVersion` / `vertical` 可省略，由服务端按项目 vertical 补全；**禁止** 输出其它顶层字段以免污染 meta）：
+
+| Trigger | 允许字段 |
+|---------|----------|
+| `pro-step:sellpoints-generate` | `sellpoints` |
+| `pro-step:voiceovers-generate` | `voiceovers` |
+| `pro-step:storyboards-generate` | `storyboardVersions`, `coverageChecklist` |
+| `pro-step:ops-generate` | `opsPack` |
+
+分镜阶段 `storyboardVersions` 每版 **必须 6 镜**（`panels.length === 6`）；解析失败即视为本阶段未完成，须重试。
+
+服务端：`extractProDeliverable(text, vertical, phase)` → Zod phase schema 校验 → `pickProPhaseMergePatch` → `mergeProDeliverablePatch`。

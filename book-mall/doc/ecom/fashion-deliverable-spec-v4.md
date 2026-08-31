@@ -90,12 +90,37 @@ type FashionPanelRow = {
 
 ## 7. LLM 分阶段 Trigger（内部，不展示气泡）
 
+### 7.0 卖点双路径（用户可见）
+
+| 用户选择 | 流程 |
+|---------|------|
+| **我来输入卖点** | 输入框/中栏表格录入 → 可选 **AI润色卖点** → **确认卖点清单**（可跳过润色） |
+| **AI自动生成卖点** | LLM 生成 → **确认卖点清单** / 重新生成 |
+
+`meta.workflow.sellpointInputMode`：`user` | `ai`
+
 | Trigger 前缀 | 阶段 | 写入字段 |
 |--------------|------|----------|
 | `fashion-step:sellpoints-generate` | 卖点 AI 生成 | sellpoints |
+| `fashion-step:sellpoints-polish` | 卖点润色（用户已录入） | sellpoints |
 | `fashion-step:voiceovers-generate` | 6 套口播 | voiceovers |
 | `fashion-step:storyboards-generate` | A–E 五套 | storyboardVersions, coverageChecklist |
 | `fashion-step:ops-generate` | 运营包 | opsPack |
+
+### 7.1 分阶段 Patch（LLM 输出约束）
+
+各 trigger 阶段 **只允许** 输出下列字段（`schemaVersion` / `vertical` 可省略；**禁止** 输出其它顶层字段以免污染 meta）：
+
+| Trigger | 允许字段 |
+|---------|----------|
+| `fashion-step:sellpoints-generate` | `sellpoints` |
+| `fashion-step:voiceovers-generate` | `voiceovers` |
+| `fashion-step:storyboards-generate` | `storyboardVersions`, `coverageChecklist` |
+| `fashion-step:ops-generate` | `opsPack` |
+
+分镜阶段 `storyboardVersions` 中 **每个出现的版本必须 6 镜**（`panels.length === 6`）；解析失败即视为本阶段未完成，须重试。
+
+服务端：`extractFashionDeliverable(text, phase)` → Zod phase schema 校验 → `pickFashionPhaseMergePatch` → `mergeFashionDeliverablePatch`。
 
 ## 8. workflow 状态（仅存于 meta.workflow）
 

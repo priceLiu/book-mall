@@ -76,6 +76,7 @@ async function fastGatewayRecordInfo(row: {
       gatewayV1RecordInfo({
         apiKeyId: row.apiKeyId,
         taskId: row.externalTaskId,
+        logId: row.id,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(

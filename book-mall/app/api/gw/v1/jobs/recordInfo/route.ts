@@ -18,7 +18,6 @@ import {
 import { readDashscopeTimingTrace } from "@/lib/gateway/log-dashscope-timing";
 import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
-import { prisma } from "@/lib/prisma";
 import {
   extractKieResultUrl,
   isKieRecordComplete,
@@ -50,6 +49,11 @@ import type { GatewayRequestLog } from "@prisma/client";
 import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
 import { dashscopeVideoFinalizeExtras } from "@/lib/gateway/dashscope-video-finalize-extras";
+import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
+import {
+  isGatewayLogTerminalStatus,
+  resolveGatewayLogForRecordInfo,
+} from "@/lib/gateway/gateway-log-record-info";
 
 async function syncDashscopePollToGatewayLog(input: {
   log: GatewayRequestLog;
@@ -169,13 +173,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "taskId required" }, { status: 400 });
   }
 
-  const log = await prisma.gatewayRequestLog.findFirst({
-    where: {
-      userId: auth.userId,
-      externalTaskId: taskId,
-    },
-    orderBy: { submittedAt: "desc" },
+  const logIdParam =
+    request.nextUrl.searchParams.get("logId")?.trim() ??
+    request.nextUrl.searchParams.get("log_id")?.trim();
+
+  const log = await resolveGatewayLogForRecordInfo({
+    authUserId: auth.userId,
+    taskId,
+    logId: logIdParam,
   });
+  if (logIdParam && !log) {
+    return NextResponse.json(
+      { error: "Gateway log not found or taskId mismatch" },
+      { status: 404 },
+    );
+  }
 
   const credentialId =
     log?.credentialId ?? auth.credentials[0]?.id ?? null;
@@ -402,6 +414,34 @@ export async function GET(request: NextRequest) {
     }
 
     if (providerKind === "VOLCENGINE") {
+      if (log && isGatewayLogTerminalStatus(log.status)) {
+        if (log.status === "SUCCEEDED") {
+          const cachedUrl = extractVolcengineVideoUrlFromGatewaySummary(
+            log.resultSummary,
+          );
+          if (cachedUrl) {
+            return NextResponse.json({
+              code: 200,
+              data: {
+                status: "succeeded",
+                content: { video_url: cachedUrl },
+              },
+              providerKind: "VOLCENGINE",
+            });
+          }
+        }
+        if (log.status === "FAILED") {
+          return NextResponse.json({
+            code: 200,
+            data: {
+              status: "failed",
+              error: log.failMessage ?? "failed",
+            },
+            providerKind: "VOLCENGINE",
+          });
+        }
+      }
+
       const cred = await getDecryptedCredentialApiKey(credentialId);
       if (!cred) {
         return NextResponse.json({ error: "Credential unavailable" }, { status: 400 });

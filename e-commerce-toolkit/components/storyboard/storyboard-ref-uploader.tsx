@@ -19,6 +19,8 @@ type Props = {
     role: StoryboardReference["role"],
   ) => Promise<void>;
   busy?: boolean;
+  uploadingRole?: StoryboardReference["role"] | null;
+  uploadProgress?: number | null;
   activeRole?: StoryboardUploadRole;
   onActiveRoleChange?: (role: StoryboardUploadRole) => void;
 };
@@ -56,6 +58,8 @@ export function StoryboardRefUploader({
   onRemove,
   onAttachAssets,
   busy,
+  uploadingRole = null,
+  uploadProgress = null,
   activeRole = "product",
   onActiveRoleChange,
 }: Props) {
@@ -137,6 +141,7 @@ export function StoryboardRefUploader({
             .map((r) => ({ id: r.id, ossUrl: r.ossUrl, label: r.label }))}
           emptyHint={emptyHint}
           busy={busy}
+          uploadProgress={uploadingRole === refRole ? uploadProgress : null}
           onUploadFiles={(files) => void handleFiles(files, refRole)}
           onOpenFilePicker={() => {
             onActiveRoleChange?.(role);

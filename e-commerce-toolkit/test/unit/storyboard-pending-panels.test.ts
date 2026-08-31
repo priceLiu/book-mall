@@ -4,6 +4,7 @@ import {
   listOrphanStoryboardPendingPanelImageIndices,
   resolveActiveStoryboardPanelImageBusyIndices,
   resolveActiveStoryboardPanelVideoBusyIndices,
+  resolveStoryboardMergeTargetIndexes,
 } from "@/lib/storyboard-pending-panels";
 
 describe("resolveActiveStoryboardPanelImageBusyIndices", () => {
@@ -111,9 +112,23 @@ describe("resolveActiveStoryboardPanelVideoBusyIndices", () => {
       resolveActiveStoryboardPanelVideoBusyIndices({
         panelVidBusyPanels: [2],
         pendingPanelVideoIndices: [2],
+        inFlightWatchIndices: [2],
+        videoGenInFlight: true,
         panels,
       }),
     ).toEqual([2]);
+  });
+
+  it("drops stale local busy when video exists and HTTP is not in flight", () => {
+    expect(
+      resolveActiveStoryboardPanelVideoBusyIndices({
+        panelVidBusyPanels: [1, 2],
+        pendingPanelVideoIndices: [],
+        inFlightWatchIndices: [],
+        videoGenInFlight: false,
+        panels,
+      }),
+    ).toEqual([]);
   });
 
   it("keeps pending when video not yet on sheet", () => {
@@ -124,5 +139,41 @@ describe("resolveActiveStoryboardPanelVideoBusyIndices", () => {
         panels,
       }),
     ).toEqual([3]);
+  });
+});
+
+describe("resolveStoryboardMergeTargetIndexes", () => {
+  const panels = [
+    { index: 1, videoUrl: "https://a/1.mp4" },
+    { index: 2, videoUrl: "https://a/2.mp4" },
+    { index: 3, videoUrl: "https://a/3.mp4" },
+    { index: 4, videoUrl: null },
+  ];
+
+  it("returns empty when nothing selected (no implicit merge-all)", () => {
+    expect(
+      resolveStoryboardMergeTargetIndexes({
+        selectedVideoPanels: [],
+        panels,
+      }),
+    ).toEqual([]);
+  });
+
+  it("merges only selected panels that already have videoUrl", () => {
+    expect(
+      resolveStoryboardMergeTargetIndexes({
+        selectedVideoPanels: [1, 3],
+        panels,
+      }),
+    ).toEqual([1, 3]);
+  });
+
+  it("drops selected panels without videoUrl", () => {
+    expect(
+      resolveStoryboardMergeTargetIndexes({
+        selectedVideoPanels: [2, 4],
+        panels,
+      }),
+    ).toEqual([2]);
   });
 });

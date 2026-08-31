@@ -29,6 +29,8 @@ type Props = {
   hasSheetImages: boolean;
   canMergePanels: boolean;
   vidBusy: boolean;
+  /** 成片预览区扫光；默认跟 vidBusy，可单独稳定（避免轮询抖动） */
+  videoOverlayBusy?: boolean;
   imageGenBusy: boolean;
   sheetPngBusy: boolean;
   mergeBusy: boolean;
@@ -66,6 +68,7 @@ export function StoryboardDeliverableSection({
   hasSheetImages,
   canMergePanels,
   vidBusy,
+  videoOverlayBusy,
   imageGenBusy,
   sheetPngBusy,
   mergeBusy,
@@ -87,6 +90,7 @@ export function StoryboardDeliverableSection({
 }: Props) {
   const resolvedVideo = isStoryboardVideoUrl(videoUrl) ? videoUrl!.trim() : null;
   const [mergeSettingsOpen, setMergeSettingsOpen] = useState(false);
+  const showVideoGenerating = videoOverlayBusy ?? vidBusy;
 
   return (
     <div className="space-y-4">
@@ -189,7 +193,7 @@ export function StoryboardDeliverableSection({
                 ? "故事版 6 镜图就绪后，一键提交 Gateway 视频模型"
                 : "整图成片或合并分镜视频"
             }
-            busy={vidBusy}
+            busy={showVideoGenerating}
             disabled={!hasSheetImages && !canMergePanels}
             primaryActionLabel={
               hasSheetImages && !resolvedVideo

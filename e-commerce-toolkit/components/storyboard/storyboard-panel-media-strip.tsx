@@ -8,6 +8,7 @@ import { StoryboardPanelCard } from "@/components/storyboard/storyboard-panel-ca
 import { StoryboardPanelVideoCard } from "@/components/storyboard/storyboard-panel-video-card";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { StoryboardPanel, StoryboardSheet } from "@/lib/storyboard-types";
+import { resolveStoryboardMergeTargetIndexes } from "@/lib/storyboard-pending-panels";
 
 type Props = {
   sheet: StoryboardSheet;
@@ -84,18 +85,15 @@ export function StoryboardPanelMediaStrip({
     [selectedImageList, panelByIndex],
   );
 
-  /** 无勾选时合并全部已有单镜视频；有勾选时仅合并选中镜（须 ≥2 且已有 videoUrl） */
-  const mergeTargetIndexes = useMemo(() => {
-    const withVideo = sheet.panels
-      .filter((p) => Boolean(p.videoUrl?.trim()))
-      .map((p) => p.index)
-      .sort((a, b) => a - b);
-    if (selectedVideoList.length === 0) return withVideo;
-    return selectedVideoList.filter((index) => {
-      const p = panelByIndex.get(index);
-      return Boolean(p?.videoUrl?.trim());
-    });
-  }, [selectedVideoList, panelByIndex, sheet.panels]);
+  /** 须勾选 ≥2 个已有 videoUrl 的单镜；未勾选时不默认合并全部 */
+  const mergeTargetIndexes = useMemo(
+    () =>
+      resolveStoryboardMergeTargetIndexes({
+        selectedVideoPanels: selectedVideoList,
+        panels: sheet.panels,
+      }),
+    [selectedVideoList, sheet.panels],
+  );
 
   const videoActionTargets = useMemo(
     () => videoTargetIndexes.filter((index) => !panelVidBusyPanels.includes(index)),
@@ -217,7 +215,7 @@ export function StoryboardPanelMediaStrip({
           </div>
         </div>
         <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
-          未勾选时合并全部已有单镜视频；勾选后仅合并选中镜（至少 2 镜且已生成）。成片显示在下方「合并成片」区。
+          勾选至少 2 个已生成的单镜视频后点「合并视频」；成片显示在下方「合并成片」区。
         </p>
         <div className="flex flex-wrap gap-4">
           {sheet.panels.map((panel, i) => (
@@ -270,6 +268,7 @@ export function StoryboardPanelMediaStrip({
             emptyLabel={mergeBusy ? "合并中…" : "待合并"}
             playSize="md"
             layout="gallery-workspace"
+            className="!bg-black"
             onPreview={
               hasMergedVideo && !mergeBusy && onPreviewMergedVideo
                 ? onPreviewMergedVideo

@@ -106,7 +106,9 @@ export type FashionDimensionMessageLabel = {
 };
 
 const FASHION_POST_DIMENSION_USER_MESSAGES = new Set([
+  "我来输入卖点",
   "AI自动生成卖点",
+  "AI润色卖点",
   "确认卖点清单",
   "重新生成口播文案",
   "重新生成卖点",

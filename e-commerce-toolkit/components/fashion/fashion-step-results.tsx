@@ -12,10 +12,12 @@ import {
 import {
   isAwaitingFashionStoryboardPick,
   isFashionStoryboardPanelsEditable,
+  isSellpointUserInputActive,
   listFashionStoryboardVersionKeys,
   resolveFashionStoryboardPanelsForVersion,
   resolveProVerticalDeliverable,
   getProjectVertical,
+  getSellpointInputMode,
 } from "@/lib/fashion-workflow";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
@@ -65,6 +67,12 @@ export function FashionStepResults({
 
   const awaitingVersionPick = isAwaitingFashionStoryboardPick(project);
   const versionKeys = listFashionStoryboardVersionKeys(deliverable);
+  const showSellpointsSection =
+    deliverable.sellpoints.length > 0 || isSellpointUserInputActive(project);
+  const sellpointsEditable =
+    !deliverable.sellpointsLocked &&
+    Boolean(onSaveSellpoints) &&
+    (isSellpointUserInputActive(project) || deliverable.sellpoints.length > 0);
   const versionKey = deliverable.selectedVersion ?? null;
   const resolvedPanels =
     versionKey != null
@@ -131,18 +139,30 @@ export function FashionStepResults({
         />
       </StepSection>
 
-      {deliverable.sellpoints.length > 0 ? (
+      {showSellpointsSection ? (
         <StepSection
-          title={deliverable.sellpointsLocked ? "定稿卖点清单" : "卖点清单（确认前可编辑）"}
+          title={
+            deliverable.sellpointsLocked
+              ? "定稿卖点清单"
+              : getSellpointInputMode(project) === "user"
+                ? "卖点清单（用户输入 · 确认前可编辑）"
+                : "卖点清单（确认前可编辑）"
+          }
         >
-          {!deliverable.sellpointsLocked ? (
+          {deliverable.sellpointsLocked ? (
             <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
-              可直接修改卖点文案与分层，保存后继续；定稿请在右侧助手点击「确认卖点清单」。
+              已定稿，仅供查阅与验收；如需修改请回到右侧助手重新走卖点流程。
             </p>
-          ) : null}
+          ) : (
+            <p className="mb-3 text-xs leading-relaxed text-[#6e6e73]">
+              {isSellpointUserInputActive(project)
+                ? "填写您的原始卖点；润色与确认在右侧会话区进行。定稿后将在此展示结构化清单。"
+                : "可直接修改卖点文案与分层，保存后继续；定稿请在右侧助手点击「确认卖点清单」。"}
+            </p>
+          )}
           <FashionSellpointsTable
             sellpoints={deliverable.sellpoints}
-            editable={!deliverable.sellpointsLocked && Boolean(onSaveSellpoints)}
+            editable={sellpointsEditable}
             saving={sellpointsSaving}
             onSaveSellpoints={onSaveSellpoints}
           />

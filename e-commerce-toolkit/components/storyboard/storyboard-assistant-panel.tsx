@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Send, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { StoryboardAssistantDeliverableView } from "@/components/storyboard/storyboard-assistant-deliverable-view";
@@ -67,7 +67,7 @@ import {
 } from "@/lib/storyboard-workflow";
 import type { StoryboardSettingsValue } from "@/components/storyboard/storyboard-settings-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   streamStoryboardChat,
   syncStoryboardSheet,
@@ -82,6 +82,12 @@ import type {
   StoryboardProject,
 } from "@/lib/storyboard-types";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import { EcomAssistantFloatingComposer } from "@/components/layout/ecom-assistant-floating-composer";
+import {
+  EcomAssistantIconButton,
+  ECOM_ASSISTANT_CONTROL_ICON_CLASS,
+} from "@/components/layout/ecom-assistant-icon-button";
+import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
@@ -119,6 +125,8 @@ type Props = {
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
   durationSec?: number;
   /** 旧版 v2 项目只读，禁用助手交互 */
   legacyReadonly?: boolean;
@@ -139,6 +147,8 @@ export function StoryboardAssistantPanel({
   onAlert,
   composerWide = false,
   onComposerWideChange,
+  collapsed = false,
+  onCollapsedChange,
   durationSec = 15,
   legacyReadonly = false,
 }: Props) {
@@ -154,15 +164,41 @@ export function StoryboardAssistantPanel({
   const [workflowOverride, setWorkflowOverride] = useState<Record<string, unknown>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const assistantRootRef = useRef<HTMLDivElement>(null);
+
+  const tryCollapse = useCallback(() => {
+    if (streaming) return;
+    onCollapsedChange?.(true);
+  }, [streaming, onCollapsedChange]);
+
+  const tryExpand = useCallback(() => {
+    onCollapsedChange?.(false);
+  }, [onCollapsedChange]);
+
+  const handleAssistantBlur = useCallback(
+    (e: React.FocusEvent) => {
+      if (collapsed || streaming) return;
+      const root = assistantRootRef.current;
+      if (!root) return;
+      const next = e.relatedTarget as Node | null;
+      if (next && root.contains(next)) return;
+      if (next && (next as HTMLElement).closest?.("[data-ecom-floating-composer]")) return;
+      onCollapsedChange?.(true);
+    },
+    [collapsed, streaming, onCollapsedChange],
+  );
 
   useEffect(() => {
     setWorkflowOverride({});
+    setPendingSchemePick(null);
+    setStreamText("");
+    setInput("");
   }, [projectId]);
 
   useEffect(() => {
     if (streaming) return;
-    if (chatHistory.length) setMessages(chatHistory);
-  }, [chatHistory, streaming]);
+    setMessages(chatHistory.length ? chatHistory : [WELCOME]);
+  }, [projectId, chatHistory, streaming]);
 
   useEffect(() => {
     onStreamingChange?.(streaming);
@@ -1038,23 +1074,86 @@ export function StoryboardAssistantPanel({
     project.meta?.deliverable?.productName?.trim() || productFromParams || "Skill 策划";
   const assistantSubtitle = `${durationSec}秒 · ${panelCount > 0 ? `${panelCount} 镜` : productLabel} · ${modelName}`;
 
+  const needsAttention =
+    Boolean(pendingSchemePick) ||
+    showSchemePickCards ||
+    (showPostPlanRefChoices && inlineChoices.length > 0);
+
+  const composerDisabled =
+    legacyReadonly ||
+    streaming ||
+    awaitingSceneApplyMode ||
+    (paramCollecting && !freeTextEnabled) ||
+    (awaitingInitialProductRef && !hasStoryboardProductRef(project));
+
+  const composerSection = (
+    <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
+      <div className="flex items-end gap-2">
+        <textarea
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          rows={collapsed ? 1 : 2}
+          placeholder={
+            showSchemePickCards
+              ? "也可输入补充说明；点选上方卡片可继续下一步…"
+              : showPostPlanRefChoices
+                ? "也可输入补充说明；点选上方按钮继续…"
+                : resolveAssistantComposerPlaceholder(effectiveProject)
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={composerDisabled}
+          onFocus={() => {
+            if (collapsed) tryExpand();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+        <EcomAssistantSendButton
+          disabled={composerDisabled || !input.trim()}
+          busy={streaming}
+          onClick={send}
+        />
+        {!collapsed ? (
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            disabled={streaming}
+            onClick={() => setMessages([WELCOME])}
+            className="shrink-0"
+          >
+            清空
+          </EcomButtonSecondary>
+        ) : null}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
+    <>
+      <div
+        ref={assistantRootRef}
+        className={cn(
+          "flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]",
+          collapsed && "pointer-events-none invisible absolute h-0 w-0 overflow-hidden",
+        )}
+        onBlur={handleAssistantBlur}
+      >
       <EcomAssistantPanelHeader
         title="微剧故事版助手"
         subtitle={assistantSubtitle}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
+        onCollapse={onCollapsedChange ? tryCollapse : undefined}
+        collapseDisabled={streaming}
         trailing={
           onOpenSettings ? (
-            <button
-              type="button"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]"
-              title="影片参数"
-              onClick={() => onOpenSettings()}
-            >
-              <Settings2 className="h-4 w-4" />
-            </button>
+            <EcomAssistantIconButton title="影片参数" onClick={() => onOpenSettings()}>
+              <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+            </EcomAssistantIconButton>
           ) : null
         }
       />
@@ -1168,66 +1267,20 @@ export function StoryboardAssistantPanel({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
-        <textarea
-          className="mb-3 w-full resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
-          rows={2}
-          placeholder={
-            showSchemePickCards
-              ? "也可输入补充说明；点选上方卡片可继续下一步…"
-              : showPostPlanRefChoices
-                ? "也可输入补充说明；点选上方按钮继续…"
-                : resolveAssistantComposerPlaceholder(effectiveProject)
-          }
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={
-            legacyReadonly ||
-            streaming ||
-            awaitingSceneApplyMode ||
-            (paramCollecting && !freeTextEnabled) ||
-            (awaitingInitialProductRef && !hasStoryboardProductRef(project))
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-        />
-        <div className="flex gap-2">
-          <EcomButtonPrimary
-            size="sm"
-            type="button"
-            className="flex-1"
-            disabled={
-              legacyReadonly ||
-              streaming ||
-              awaitingSceneApplyMode ||
-              (paramCollecting && !freeTextEnabled) ||
-              (awaitingInitialProductRef && !hasStoryboardProductRef(project)) ||
-              !input.trim()
-            }
-            onClick={send}
-          >
-            {streaming ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 shrink-0" />
-            )}
-            发送
-          </EcomButtonPrimary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={streaming}
-            onClick={() => setMessages([WELCOME])}
-          >
-            清空
-          </EcomButtonSecondary>
-        </div>
+      {!collapsed ? composerSection : null}
       </div>
 
-    </div>
+      {collapsed ? (
+        <EcomAssistantFloatingComposer
+          open
+          attentionBadge={needsAttention}
+          onExpand={tryExpand}
+        >
+          <div data-ecom-floating-composer onClick={(e) => e.stopPropagation()}>
+            {composerSection}
+          </div>
+        </EcomAssistantFloatingComposer>
+      ) : null}
+    </>
   );
 }

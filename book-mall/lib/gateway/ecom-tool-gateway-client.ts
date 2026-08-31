@@ -7,15 +7,10 @@ import {
   GatewayRequiredError,
   summarizeUpstreamFailMessage,
 } from "@/lib/gateway/book-gateway-link";
-import {
-  finalizeRequestLog,
-  parseOpenAiUsage,
-  pickCredentialForKind,
-  type UsageFromResponse,
-} from "@/lib/gateway/proxy-common";
+import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { resolveEcomAssistantChatParams } from "@/lib/gateway/ecom-storyboard-chat-models";
-import { buildGatewayStreamChatResultSummary } from "@/lib/gateway/log-result-summary";
+import { wrapChatStreamWithLogFinalize } from "@/lib/gateway/gateway-chat-stream-finalize";
 import {
   gatewayV1ChatCompletionsStream,
   gatewayV1ClientMeta,
@@ -209,6 +204,7 @@ export async function ecomGwPollDashscope(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId,
     meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const output = polled.data as DashscopeTaskOutput;
@@ -223,76 +219,6 @@ export async function ecomGwPollDashscope(
     return { status: "FAILED", failMessage };
   }
   return { status };
-}
-
-function wrapEcomChatStreamWithLogFinalize(
-  upstream: ReadableStream<Uint8Array>,
-  ctx: { logId: string; model: string; startedMs: number },
-): ReadableStream<Uint8Array> {
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let lastUsage: UsageFromResponse | undefined;
-  let failMessage: string | undefined;
-
-  return new ReadableStream({
-    async start(controller) {
-      const reader = upstream.getReader();
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          controller.enqueue(value);
-          buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split("\n");
-          buffer = parts.pop() ?? "";
-          for (const line of parts) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const payload = trimmed.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const json = JSON.parse(payload) as Record<string, unknown>;
-              const u = parseOpenAiUsage(json);
-              if (
-                u.totalTokens != null ||
-                u.promptTokens != null ||
-                u.completionTokens != null
-              ) {
-                lastUsage = u;
-              }
-              const err = json.error as { message?: string } | undefined;
-              if (typeof err?.message === "string") failMessage = err.message;
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-        await finalizeRequestLog(ctx.logId, {
-          status: failMessage ? "FAILED" : "SUCCEEDED",
-          durationMs: ctx.startedMs,
-          usage: lastUsage,
-          resultSummary: lastUsage
-            ? buildGatewayStreamChatResultSummary(lastUsage)
-            : undefined,
-          failCode: failMessage ? "STREAM_VENDOR_ERROR" : undefined,
-          failMessage,
-          model: ctx.model,
-        });
-        controller.close();
-      } catch (e) {
-        await finalizeRequestLog(ctx.logId, {
-          status: "FAILED",
-          durationMs: ctx.startedMs,
-          failCode: "STREAM_INTERRUPTED",
-          failMessage: (e as Error).message || "流式连接中断",
-          model: ctx.model,
-        });
-        controller.error(e);
-      } finally {
-        reader.releaseLock();
-      }
-    },
-  });
 }
 
 /** 电商故事版 · Gateway 流式 Chat */
@@ -345,10 +271,10 @@ export async function ecomGwChatStream(
   return {
     logId,
     status: result.status,
-    body: wrapEcomChatStreamWithLogFinalize(bodyStream, {
+    body: wrapChatStreamWithLogFinalize(bodyStream, {
       logId,
       model,
-      startedMs: 0,
+      startedAtMs: Date.now(),
     }),
   };
 }
@@ -422,6 +348,7 @@ export async function ecomGwPollMinimax(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId,
     meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const row = polled.data as MinimaxVideoTaskRow;
@@ -452,6 +379,7 @@ export async function ecomGwPollVolcengine(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId,
     meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;
@@ -510,6 +438,7 @@ export async function ecomGwPollKie(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId,
     meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const record = polled.data as import("@/lib/story/kie-client").KieRecordResponse;
@@ -580,6 +509,7 @@ export async function ecomGwPollBailianR2v(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId,
     meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const output = polled.data as BailianR2vTaskOutput;

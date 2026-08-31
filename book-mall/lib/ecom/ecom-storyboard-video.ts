@@ -63,6 +63,7 @@ import {
   type EcomStoryboardVideoResolution,
 } from "@/lib/ecom/ecom-storyboard-gen-params";
 import { persistStoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import { ensureGatewayLogSucceededAfterVendorUrl } from "@/lib/gateway/gateway-log-reconcile";
 import { updateEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import { requireStoryboardProductRef } from "@/lib/ecom/ecom-storyboard-refs";
 import {
@@ -267,6 +268,18 @@ async function finalizeFullVideoFromVendorUrl(opts: {
     videoAssetId: asset.id,
     videoMode: "full_sheet",
   }).catch(() => undefined);
+
+  await ensureGatewayLogSucceededAfterVendorUrl({
+    logId: opts.pending.logId,
+    taskId: opts.pending.taskId,
+    videoUrl: opts.videoUrl,
+  }).catch((e) => {
+    console.warn(
+      "[ecom-storyboard-video] ensureGatewayLogSucceededAfterVendorUrl failed",
+      opts.pending.logId,
+      e instanceof Error ? e.message : String(e),
+    );
+  });
 
   return { asset, chargePoints };
 }

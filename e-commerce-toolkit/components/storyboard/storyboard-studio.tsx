@@ -35,9 +35,10 @@ import {
   resolveSheetTotalDurationHintSec,
 } from "@/lib/storyboard-video-params";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
-import { isLegacyStoryboardProject, isProVerticalProject } from "@/lib/fashion-workflow";
+import { isLegacyStoryboardProject } from "@/lib/fashion-workflow";
 import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import { inferCollectUploadRole, type StoryboardUploadRole } from "@/lib/storyboard-workflow";
+import { isEcomMainBlankPointerTarget } from "@/lib/ecom-assistant-collapse";
 import type { StoryboardReference } from "@/lib/storyboard-types";
 import type {
   StoryboardGatewayModel,
@@ -84,6 +85,10 @@ export function StoryboardStudio() {
   );
   const [loading, setLoading] = useState(true);
   const [refBusy, setRefBusy] = useState(false);
+  const [uploadingRole, setUploadingRole] = useState<
+    "character" | "product" | "scene" | "other" | null
+  >(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [settings, setSettings] = useState<StoryboardSettingsValue>({
     chatModelKey: ECOM_DEFAULT_CHAT_MODEL_KEY,
@@ -106,7 +111,17 @@ export function StoryboardStudio() {
   const [generateFullVideoToken, setGenerateFullVideoToken] = useState(0);
   const [mergePanelVideosToken, setMergePanelVideosToken] = useState(0);
   const [assistantWide, setAssistantWide] = useState(false);
+  const [assistantCollapsed, setAssistantCollapsed] = useState(false);
   const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
+
+  const handleMainBlankPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (assistantCollapsed || assistantStreaming) return;
+      if (!isEcomMainBlankPointerTarget(e.target)) return;
+      setAssistantCollapsed(true);
+    },
+    [assistantCollapsed, assistantStreaming],
+  );
 
   const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
@@ -322,6 +337,14 @@ export function StoryboardStudio() {
   }, []);
 
   async function handleNewProject() {
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再新建项目。",
+        variant: "error",
+      });
+      return;
+    }
     setLoading(true);
     try {
       const created = await createStoryboardProject({
@@ -334,6 +357,13 @@ export function StoryboardStudio() {
           },
         },
       });
+      setGenerateAllImagesToken(0);
+      setGenerateFullVideoToken(0);
+      setMergePanelVideosToken(0);
+      setExportSheet(null);
+      setAssistantWide(false);
+      setAssistantCollapsed(false);
+      setVideoAsset(null);
       applyProject(created);
     } catch (e) {
       await alert({
@@ -368,6 +398,7 @@ export function StoryboardStudio() {
     setLoading(true);
     try {
       await reload(id);
+      setAssistantCollapsed(false);
     } catch (e) {
       await alert({
         title: "打开失败",
@@ -385,11 +416,26 @@ export function StoryboardStudio() {
   ) {
     if (!project) return;
     setRefBusy(true);
+    setUploadingRole(opts.role);
+    setUploadProgress(10);
+    const tick = window.setInterval(() => {
+      setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+    }, 180);
     try {
       await uploadStoryboardRef(project.id, file, opts);
+      setUploadProgress(100);
       await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "上传失败",
+        message: e instanceof Error ? e.message : "无法上传参考图",
+        variant: "error",
+      });
     } finally {
+      window.clearInterval(tick);
       setRefBusy(false);
+      setUploadingRole(null);
+      window.setTimeout(() => setUploadProgress(null), 450);
     }
   }
 
@@ -399,8 +445,14 @@ export function StoryboardStudio() {
   ) {
     if (!project) return;
     setRefBusy(true);
+    setUploadingRole(role);
+    setUploadProgress(10);
+    const tick = window.setInterval(() => {
+      setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+    }, 180);
     try {
       await attachStoryboardRefsFromAssets(project.id, { assetIds, role });
+      setUploadProgress(100);
       await reload(project.id);
     } catch (e) {
       await alert({
@@ -409,7 +461,10 @@ export function StoryboardStudio() {
         variant: "error",
       });
     } finally {
+      window.clearInterval(tick);
       setRefBusy(false);
+      setUploadingRole(null);
+      window.setTimeout(() => setUploadProgress(null), 450);
     }
   }
 
@@ -466,36 +521,15 @@ export function StoryboardStudio() {
     <>
       <EcomWorkspaceLayout
         assistantWide={assistantWide}
+        assistantCollapsed={assistantCollapsed}
+        onMainBlankPointerDown={handleMainBlankPointerDown}
         progress={
           <StoryboardProgressRail project={project} hasVideo={Boolean(videoAsset)} />
         }
         assistant={
-          isProVerticalProject(project) ? (
-            <FashionAssistantPanel
-              project={project}
-              chatModels={chatModels}
-              settings={settings}
-              composerWide={assistantWide}
-              onComposerWideChange={setAssistantWide}
-              onStreamingChange={setAssistantStreaming}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onDeliverableReady={async (updated) => {
-                if (updated) applyProject(updated);
-                else await reload(project.id);
-              }}
-              onRequestGenerateAllImages={() =>
-                setGenerateAllImagesToken((t) => t + 1)
-              }
-              onRequestGenerateFullVideo={() =>
-                setGenerateFullVideoToken((t) => t + 1)
-              }
-              onRequestMergePanelVideos={() =>
-                setMergePanelVideosToken((t) => t + 1)
-              }
-              onAlert={alert}
-            />
-          ) : (
+          isLegacyStoryboardProject(project) ? (
             <StoryboardAssistantPanel
+              key={project.id}
               project={project}
               chatModels={chatModels}
               imageModels={imageModels}
@@ -504,6 +538,8 @@ export function StoryboardStudio() {
               durationSec={durationSec}
               composerWide={assistantWide}
               onComposerWideChange={setAssistantWide}
+              collapsed={assistantCollapsed}
+              onCollapsedChange={setAssistantCollapsed}
               onStreamingChange={setAssistantStreaming}
               onOpenSettings={() => setSettingsOpen(true)}
               onDeliverableReady={async (updated) => {
@@ -520,12 +556,40 @@ export function StoryboardStudio() {
                 setMergePanelVideosToken((t) => t + 1)
               }
               onAlert={alert}
-              legacyReadonly={isLegacyStoryboardProject(project)}
+              legacyReadonly
+            />
+          ) : (
+            <FashionAssistantPanel
+              key={project.id}
+              project={project}
+              chatModels={chatModels}
+              settings={settings}
+              composerWide={assistantWide}
+              onComposerWideChange={setAssistantWide}
+              collapsed={assistantCollapsed}
+              onCollapsedChange={setAssistantCollapsed}
+              onStreamingChange={setAssistantStreaming}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDeliverableReady={async (updated) => {
+                if (updated) applyProject(updated);
+                else await reload(project.id);
+              }}
+              onRequestGenerateAllImages={() =>
+                setGenerateAllImagesToken((t) => t + 1)
+              }
+              onRequestGenerateFullVideo={() =>
+                setGenerateFullVideoToken((t) => t + 1)
+              }
+              onRequestMergePanelVideos={() =>
+                setMergePanelVideosToken((t) => t + 1)
+              }
+              onAlert={alert}
             />
           )
         }
       >
         <StoryboardContentPanel
+          key={project.id}
           project={project}
           references={project.references}
           durationSec={durationSec}
@@ -536,6 +600,8 @@ export function StoryboardStudio() {
           onShareWorkflow={() => setWorkflowShareOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           refBusy={refBusy}
+          uploadingRole={uploadingRole}
+          uploadProgress={uploadProgress}
           uploadRole={uploadRole}
           onUploadRoleChange={setUploadRole}
           onRefUpload={handleRefUpload}

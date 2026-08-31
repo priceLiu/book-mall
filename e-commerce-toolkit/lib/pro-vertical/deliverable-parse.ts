@@ -6,6 +6,9 @@ const PRO_FENCE_RE = /```pro-deliverable\s*([\s\S]*?)```/i;
 const FASHION_FENCE_RE = /```fashion-deliverable\s*([\s\S]*?)```/i;
 const GENERIC_FENCE_RE = /```(?:json)?\s*([\s\S]*?)```/i;
 
+/** 与 book-mall/doc/ecom/pro-deliverable-spec-v1.md §7.1 一致 */
+export type ProLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+
 function productFocusFallback(vertical: ProVerticalId): string {
   if (vertical === "bags") return "包包展示";
   if (vertical === "digital_3c") return "产品功能展示";
@@ -63,27 +66,121 @@ function coerceProPanels(raw: unknown, vertical: ProVerticalId): ProPanelRow[] {
     .filter(Boolean) as ProPanelRow[];
 }
 
-function tryParseProCandidate(jsonRaw: string, fallbackVertical?: ProVerticalId): ProDeliverable | null {
+function detectProPhaseFromPayload(parsed: Record<string, unknown>): ProLlmPhase | null {
+  if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
+    return "storyboards";
+  }
+  if (Array.isArray(parsed.voiceovers) && parsed.voiceovers.length > 0) return "voiceovers";
+  if (Array.isArray(parsed.sellpoints) && parsed.sellpoints.length > 0) return "sellpoints";
+  return null;
+}
+
+/** 分 phase 白名单字段，与 spec §7.1 / pickProPhaseMergePatch 一致 */
+export function pickProPhaseMergePatch(
+  patch: Partial<ProDeliverable>,
+  phase: ProLlmPhase,
+): Partial<ProDeliverable> {
+  switch (phase) {
+    case "sellpoints":
+      return patch.sellpoints?.length ? { sellpoints: patch.sellpoints } : {};
+    case "voiceovers":
+      return patch.voiceovers?.length ? { voiceovers: patch.voiceovers } : {};
+    case "storyboards": {
+      const next: Partial<ProDeliverable> = {};
+      if (patch.storyboardVersions && Object.keys(patch.storyboardVersions).length > 0) {
+        next.storyboardVersions = patch.storyboardVersions;
+      }
+      if (patch.coverageChecklist?.length) {
+        next.coverageChecklist = patch.coverageChecklist;
+      }
+      return next;
+    }
+    case "ops":
+      return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+  }
+}
+
+function storyboardsPhaseValid(
+  versions: ProDeliverable["storyboardVersions"],
+): versions is NonNullable<ProDeliverable["storyboardVersions"]> {
+  if (!versions) return false;
+  const keys = (["A", "B", "C", "D", "E"] as const).filter((k) => versions[k]);
+  if (keys.length === 0) return false;
+  return keys.every((k) => (versions[k]?.panels?.length ?? 0) === 6);
+}
+
+function coerceStoryboardVersionsInPatch(
+  parsed: Record<string, unknown>,
+  vertical: ProVerticalId,
+): ProDeliverable["storyboardVersions"] | undefined {
+  if (!parsed.storyboardVersions || typeof parsed.storyboardVersions !== "object") return undefined;
+  const obj = parsed.storyboardVersions as Record<string, unknown>;
+  const next: NonNullable<ProDeliverable["storyboardVersions"]> = {};
+  for (const key of ["A", "B", "C", "D", "E"] as const) {
+    const version = obj[key];
+    if (!version || typeof version !== "object") continue;
+    const v = version as Record<string, unknown>;
+    next[key] = {
+      id: key,
+      title: typeof v.title === "string" ? v.title : `${key}版`,
+      summary: typeof v.summary === "string" ? v.summary : undefined,
+      panels: coerceProPanels(v.panels, vertical),
+    };
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function validateProPhasePatch(
+  parsed: Record<string, unknown>,
+  vertical: ProVerticalId,
+  phase: ProLlmPhase,
+): Partial<ProDeliverable> | null {
+  switch (phase) {
+    case "sellpoints":
+      if (!Array.isArray(parsed.sellpoints) || parsed.sellpoints.length === 0) return null;
+      return { sellpoints: parsed.sellpoints as ProDeliverable["sellpoints"] };
+    case "voiceovers":
+      if (!Array.isArray(parsed.voiceovers) || parsed.voiceovers.length === 0) return null;
+      return { voiceovers: parsed.voiceovers as ProDeliverable["voiceovers"] };
+    case "storyboards": {
+      const storyboardVersions = coerceStoryboardVersionsInPatch(parsed, vertical);
+      if (!storyboardsPhaseValid(storyboardVersions)) return null;
+      const patch: Partial<ProDeliverable> = { storyboardVersions };
+      if (Array.isArray(parsed.coverageChecklist) && parsed.coverageChecklist.length > 0) {
+        patch.coverageChecklist = parsed.coverageChecklist as ProDeliverable["coverageChecklist"];
+      }
+      return patch;
+    }
+    case "ops":
+      if (parsed.opsPack == null || typeof parsed.opsPack !== "object") return null;
+      return { opsPack: parsed.opsPack as ProDeliverable["opsPack"] };
+  }
+}
+
+function tryParseProPhasePatch(
+  jsonRaw: string,
+  vertical: ProVerticalId,
+  phaseHint?: ProLlmPhase,
+): Partial<ProDeliverable> | null {
   try {
     const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
     const rawVertical = typeof parsed.vertical === "string" ? parsed.vertical : undefined;
-    const vertical: ProVerticalId =
-      isProVerticalId(rawVertical) && rawVertical !== "fashion_apparel"
-        ? rawVertical
-        : fallbackVertical ?? "bags";
-    if (parsed.schemaVersion !== "pro-v1" && rawVertical !== vertical) return null;
-    parsed.schemaVersion = "pro-v1";
-    parsed.vertical = vertical;
-    const versions = parsed.storyboardVersions as Record<string, unknown> | undefined;
-    if (versions) {
-      for (const key of ["A", "B", "C", "D", "E"]) {
-        const v = versions[key];
-        if (!v || typeof v !== "object") continue;
-        const vo = v as Record<string, unknown>;
-        vo.panels = coerceProPanels(vo.panels, vertical);
-      }
+    if (rawVertical != null && isProVerticalId(rawVertical) && rawVertical !== vertical) {
+      return null;
     }
-    return parsed as ProDeliverable;
+    if (
+      parsed.schemaVersion != null &&
+      parsed.schemaVersion !== "pro-v1" &&
+      parsed.schemaVersion !== "fashion-v4"
+    ) {
+      return null;
+    }
+    const phase = phaseHint ?? detectProPhaseFromPayload(parsed);
+    if (!phase) return null;
+    const patch = validateProPhasePatch(parsed, vertical, phase);
+    if (!patch) return null;
+    return pickProPhaseMergePatch(patch, phase);
   } catch {
     return null;
   }
@@ -92,19 +189,30 @@ function tryParseProCandidate(jsonRaw: string, fallbackVertical?: ProVerticalId)
 export function extractProDeliverableFromText(
   text: string,
   vertical?: ProVerticalId,
-): ProDeliverable | null {
+  phaseHint?: ProLlmPhase,
+): Partial<ProDeliverable> | null {
   const trimmed = text.trim();
   for (const re of [PRO_FENCE_RE, FASHION_FENCE_RE, GENERIC_FENCE_RE]) {
     const m = trimmed.match(re);
     if (m?.[1]) {
-      const parsed = tryParseProCandidate(m[1].trim(), vertical);
+      const parsed = tryParseProPhasePatch(m[1].trim(), vertical ?? "bags", phaseHint);
       if (parsed) return parsed;
     }
   }
-  const start = trimmed.indexOf("{");
+  const markers = [
+    /\{\s*"storyboardVersions"\s*:/,
+    /\{\s*"schemaVersion"\s*:\s*"pro-v1"/,
+    /\{\s*"vertical"\s*:\s*"(?:bags|digital_3c)"/,
+  ];
+  let jsonStart = -1;
+  for (const re of markers) {
+    const idx = trimmed.search(re);
+    if (idx >= 0 && (jsonStart < 0 || idx < jsonStart)) jsonStart = idx;
+  }
+  if (jsonStart < 0) jsonStart = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    return tryParseProCandidate(trimmed.slice(start, end + 1), vertical);
+  if (jsonStart >= 0 && end > jsonStart) {
+    return tryParseProPhasePatch(trimmed.slice(jsonStart, end + 1), vertical ?? "bags", phaseHint);
   }
   return null;
 }
@@ -130,17 +238,39 @@ export function mergeProDeliverableState(
   return {
     ...base,
     ...patch,
+    schemaVersion: "pro-v1",
+    vertical: base.vertical,
     dimensions: { ...base.dimensions, ...(patch.dimensions ?? {}) },
-    sellpoints: patch.sellpoints?.length ? patch.sellpoints : base.sellpoints,
+    sellpoints:
+      base.sellpointsLocked && base.sellpoints?.length
+        ? base.sellpoints
+        : patch.sellpoints?.length
+          ? patch.sellpoints
+          : base.sellpoints,
+    sellpointsLocked: base.sellpointsLocked || Boolean(patch.sellpointsLocked),
     voiceovers: patch.voiceovers?.length ? patch.voiceovers : base.voiceovers,
+    selectedVoiceoverId:
+      patch.selectedVoiceoverId != null && patch.selectedVoiceoverId !== ""
+        ? patch.selectedVoiceoverId
+        : base.selectedVoiceoverId,
     storyboardVersions: {
       ...(base.storyboardVersions ?? {}),
       ...(patch.storyboardVersions ?? {}),
     },
+    selectedVersion:
+      patch.selectedVersion != null ? patch.selectedVersion : base.selectedVersion,
+    storyboardLocked: base.storyboardLocked || Boolean(patch.storyboardLocked),
     coverageChecklist: patch.coverageChecklist?.length
       ? patch.coverageChecklist
       : base.coverageChecklist,
-    opsPack: patch.opsPack ?? base.opsPack,
+    opsPack:
+      base.storyboardLocked || patch.storyboardLocked
+        ? { ...(base.opsPack ?? {}), ...(patch.opsPack ?? {}) }
+        : base.opsPack,
+    outputMode:
+      base.storyboardLocked || patch.storyboardLocked
+        ? (patch.outputMode ?? base.outputMode)
+        : base.outputMode,
   };
 }
 

@@ -400,3 +400,14 @@ export function schemeToSheet(
   };
   return parseStoryboardSheet(sheet);
 }
+
+/** 旧版「通用故事版」v2 项目（schemes/analysis/paramCollect），已停用新建与助手写入 */
+export function isLegacyGenericStoryboardMeta(
+  meta: Record<string, unknown> | null | undefined,
+): boolean {
+  const wf = (meta?.workflow as Record<string, unknown> | undefined) ?? {};
+  if (wf.phase != null || wf.paramStep != null || wf.paramCollecting != null) return true;
+  const d = meta?.deliverable as Record<string, unknown> | undefined;
+  if (d?.schemes != null || d?.analysis != null) return true;
+  return false;
+}

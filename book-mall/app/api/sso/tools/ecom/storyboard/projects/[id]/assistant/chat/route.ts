@@ -12,7 +12,9 @@ import {
   isProDeliverable,
   mergeProDeliverablePatch,
   pickProOpsMergePatch,
+  pickProPhaseMergePatch,
   stripProDeliverableFence,
+  type ProDeliverable,
 } from "@/lib/ecom/ecom-pro-deliverable";
 import { renderProDeliverableMarkdown } from "@/lib/ecom/ecom-pro-deliverable-render";
 import { resolveWorkflowVertical } from "@/lib/ecom/pro-vertical/registry";
@@ -28,15 +30,17 @@ import {
   isFashionWorkflow,
   mergeFashionDeliverablePatch,
   pickFashionOpsMergePatch,
+  pickFashionPhaseMergePatch,
   stripFashionDeliverableFence,
+  type FashionDeliverable,
+  type FashionLlmPhase,
 } from "@/lib/ecom/ecom-fashion-deliverable";
 import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
-import { buildStoryboardAssistantSystemPrompt } from "@/lib/ecom/ecom-storyboard-assistant-prompts";
 import {
-  extractStoryboardDeliverable,
+  isLegacyGenericStoryboardMeta,
   stripDeliverableFence,
 } from "@/lib/ecom/ecom-storyboard-deliverable";
-import { renderDeliverableMarkdown } from "@/lib/ecom/ecom-storyboard-deliverable-render";
+import { isProVerticalWorkflow } from "@/lib/ecom/pro-vertical/registry";
 import {
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
@@ -48,6 +52,7 @@ import {
   type StoryboardChatMessage,
 } from "@/lib/ecom/ecom-storyboard-types";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
+import { ensureGatewayChatLogSucceededAfterStream } from "@/lib/gateway/gateway-log-reconcile";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -103,6 +108,15 @@ export async function POST(req: Request, ctx: Ctx) {
   const isProVertical =
     workflowVertical != null && workflowVertical !== "fashion_apparel";
   const proVerticalId = isProVertical ? workflowVertical : null;
+  const isLegacyGeneric =
+    !isFashion && !isProVertical && isLegacyGenericStoryboardMeta(existingMeta);
+  if (isLegacyGeneric) {
+    return NextResponse.json(
+      { error: "旧版通用故事版已停用，请新建电商专业版项目继续" },
+      { status: 410 },
+    );
+  }
+
   const lastUserTurn = turns[turns.length - 1]!.content.trim();
   const fashionPromptPhase = isFashion ? resolveFashionPromptPhase(lastUserTurn) : "general";
   const proPromptPhase = isProVertical ? resolveProPromptPhase(lastUserTurn) : "general";
@@ -118,7 +132,15 @@ export async function POST(req: Request, ctx: Ctx) {
     ? buildFashionAssistantSystemPrompt(fashionPromptPhase)
     : isProVertical && proVerticalId
       ? buildProAssistantSystemPrompt(proVerticalId, proPromptPhase)
-      : buildStoryboardAssistantSystemPrompt();
+      : buildFashionAssistantSystemPrompt("general");
+  if (
+    !isFashion &&
+    !isProVertical &&
+    !isProVerticalWorkflow(existingMeta) &&
+    (lastUserTurn.includes("fashion-step:") || lastUserTurn.includes("pro-step:"))
+  ) {
+    return NextResponse.json({ error: "请先在助手区选择品类大类" }, { status: 400 });
+  }
   if (prevFashionDeliverable && fashionPromptPhase !== "sellpoints" && fashionPromptPhase !== "general") {
     systemPrompt += buildFashionDeliverableContextBlock(
       prevFashionDeliverable,
@@ -140,6 +162,7 @@ export async function POST(req: Request, ctx: Ctx) {
       clientPage: ecomClientPage(auth.userId, projectId, ECOM_STORYBOARD_TOOL_KEY),
     });
 
+    const gatewayLogId = gw.logId;
     const upstream = gw.body;
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
@@ -211,13 +234,28 @@ export async function POST(req: Request, ctx: Ctx) {
             },
           ];
 
-          let deliverable = extractStoryboardDeliverable(fullText);
-          const fashionDeliverable = isFashion
-            ? extractFashionDeliverable(fullText)
+          const fashionPhaseHint: FashionLlmPhase | undefined =
+            fashionPromptPhase === "sellpoints" || fashionPromptPhase === "sellpoints_polish"
+              ? "sellpoints"
+              : fashionPromptPhase === "voiceovers" ||
+                  fashionPromptPhase === "storyboards" ||
+                  fashionPromptPhase === "ops"
+                ? fashionPromptPhase
+                : undefined;
+          const fashionDeliverablePatch = isFashion
+            ? extractFashionDeliverable(fullText, fashionPhaseHint)
             : null;
-          const proDeliverable =
+          const proPhaseHint =
+            proPromptPhase === "sellpoints" || proPromptPhase === "sellpoints_polish"
+              ? "sellpoints"
+              : proPromptPhase === "voiceovers" ||
+                  proPromptPhase === "storyboards" ||
+                  proPromptPhase === "ops"
+                ? proPromptPhase
+                : undefined;
+          const proDeliverablePatch =
             isProVertical && proVerticalId
-              ? extractProDeliverable(fullText, proVerticalId)
+              ? extractProDeliverable(fullText, proVerticalId, proPhaseHint)
               : null;
           const briefText = isFashion
             ? stripFashionDeliverableFence(fullText)
@@ -226,20 +264,25 @@ export async function POST(req: Request, ctx: Ctx) {
               : stripDeliverableFence(fullText);
           const existingWorkflow =
             (existingMeta.workflow as Record<string, unknown> | undefined) ?? {};
-          const isSceneAdjust = lastUserTurn.startsWith("场景参考已确认 |");
-          const schemeAlreadyPicked = existingWorkflow.schemePicked === true;
           const patch: Parameters<typeof updateEcomStoryboardProject>[2] = {
             chatHistory: history,
           };
 
-          if (isFashion && fashionDeliverable) {
+          if (
+            isFashion &&
+            fashionDeliverablePatch &&
+            Object.keys(fashionDeliverablePatch).length > 0
+          ) {
             const prevFashion = existingMeta.deliverable as
               | Parameters<typeof mergeFashionDeliverablePatch>[0]
               | undefined;
-            let llmFashionPatch: Partial<typeof fashionDeliverable> =
-              fashionPromptPhase === "voiceovers" && !prevFashion?.selectedVoiceoverId
-                ? { ...fashionDeliverable, selectedVoiceoverId: null }
-                : fashionDeliverable;
+            let llmFashionPatch: Partial<FashionDeliverable> = { ...fashionDeliverablePatch };
+            if (fashionPhaseHint) {
+              llmFashionPatch = pickFashionPhaseMergePatch(llmFashionPatch, fashionPhaseHint);
+            }
+            if (fashionPromptPhase === "voiceovers" && !prevFashion?.selectedVoiceoverId) {
+              llmFashionPatch = { ...llmFashionPatch, selectedVoiceoverId: null };
+            }
             llmFashionPatch = pickFashionOpsMergePatch(llmFashionPatch, {
               opsPhase: fashionPromptPhase === "ops",
               storyboardLocked: Boolean(prevFashion?.storyboardLocked),
@@ -249,7 +292,7 @@ export async function POST(req: Request, ctx: Ctx) {
               llmFashionPatch,
               typeof existingMeta.productName === "string"
                 ? existingMeta.productName
-                : fashionDeliverable.productName,
+                : prevFashion?.productName,
             );
             if (
               existingWorkflow.fashionSellpointsEdited === true &&
@@ -347,14 +390,25 @@ export async function POST(req: Request, ctx: Ctx) {
               },
             };
             patch.status = "deliverable_ready";
-          } else if (isProVertical && proVerticalId && proDeliverable) {
+          } else if (
+            isProVertical &&
+            proVerticalId &&
+            proDeliverablePatch &&
+            Object.keys(proDeliverablePatch).length > 0
+          ) {
             const prevPro = existingMeta.deliverable as
               | Parameters<typeof mergeProDeliverablePatch>[0]
               | undefined;
-            let llmProPatch: Partial<typeof proDeliverable> =
-              proPromptPhase === "voiceovers" && !prevPro?.selectedVoiceoverId
-                ? { ...proDeliverable, selectedVoiceoverId: null }
-                : proDeliverable;
+            let llmProPatch: Partial<ProDeliverable> = { ...proDeliverablePatch };
+            if (proPhaseHint) {
+              llmProPatch = pickProPhaseMergePatch(llmProPatch, proPhaseHint);
+            }
+            if (
+              proPhaseHint === "voiceovers" &&
+              !prevPro?.selectedVoiceoverId
+            ) {
+              llmProPatch = { ...llmProPatch, selectedVoiceoverId: null };
+            }
             llmProPatch = pickProOpsMergePatch(llmProPatch, {
               opsPhase: proPromptPhase === "ops",
               storyboardLocked: Boolean(prevPro?.storyboardLocked),
@@ -365,7 +419,7 @@ export async function POST(req: Request, ctx: Ctx) {
               proVerticalId,
               typeof existingMeta.productName === "string"
                 ? existingMeta.productName
-                : proDeliverable.productName,
+                : prevPro?.productName,
             );
             if (
               existingWorkflow.proSellpointsEdited === true &&
@@ -390,6 +444,12 @@ export async function POST(req: Request, ctx: Ctx) {
               merged.sellpoints = prevPro.sellpoints;
               merged.sellpointsLocked = true;
             }
+            if (proPromptPhase === "storyboards" && prevPro?.storyboardVersions) {
+              merged.storyboardVersions = {
+                ...(prevPro.storyboardVersions ?? {}),
+                ...(merged.storyboardVersions ?? {}),
+              };
+            }
             const versionKey = merged.selectedVersion ?? undefined;
             const systemMarkdown = renderProDeliverableMarkdown(merged, {
               versionKey,
@@ -409,41 +469,7 @@ export async function POST(req: Request, ctx: Ctx) {
               },
             };
             patch.status = "deliverable_ready";
-          } else if (deliverable) {
-            const schemes = deliverable.schemes ?? [];
-            const multiScheme = schemes.length > 1;
-            const selectedIndex = multiScheme
-              ? schemeAlreadyPicked &&
-                typeof existingMeta.selectedSchemeIndex === "number"
-                ? existingMeta.selectedSchemeIndex
-                : undefined
-              : 0;
-            const systemMarkdown = renderDeliverableMarkdown(deliverable, {
-              schemeIndex: selectedIndex ?? 0,
-              includeAllSchemes: multiScheme && !schemeAlreadyPicked,
-            });
-            patch.meta = {
-              ...existingMeta,
-              deliverable,
-              deliverableMarkdown: systemMarkdown || briefText,
-              ...(selectedIndex !== undefined
-                ? { selectedSchemeIndex: selectedIndex }
-                : multiScheme
-                  ? { selectedSchemeIndex: undefined }
-                  : { selectedSchemeIndex: 0 }),
-              workflow: {
-                ...existingWorkflow,
-                schemePicked: multiScheme ? schemeAlreadyPicked : true,
-                phase:
-                  multiScheme && !schemeAlreadyPicked
-                    ? "planning"
-                    : existingWorkflow.phase ?? "refs",
-                awaitingCustomSceneInput: false,
-                ...(isSceneAdjust ? { awaitingSceneApplyMode: false } : {}),
-              },
-            };
-            patch.status = "deliverable_ready";
-          } else if (briefText.length > 200) {
+          } else if (briefText.length > 200 && (isFashion || isProVertical)) {
             patch.meta = {
               ...existingMeta,
               deliverableMarkdown: briefText,
@@ -451,6 +477,18 @@ export async function POST(req: Request, ctx: Ctx) {
           }
 
           await updateEcomStoryboardProject(auth.userId, projectId, patch);
+
+          if (gatewayLogId) {
+            await ensureGatewayChatLogSucceededAfterStream({
+              logId: gatewayLogId,
+            }).catch((e) => {
+              console.warn(
+                "[storyboard-assistant-chat] gateway log finalize fallback failed",
+                gatewayLogId,
+                e instanceof Error ? e.message : e,
+              );
+            });
+          }
 
           controller.close();
         } catch (e) {

@@ -1,9 +1,11 @@
 "use client";
 
-import { Loader2, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
@@ -56,6 +58,8 @@ type Props = {
   /** 用户在会话里确认「生成本步」时，由中间工作区执行出图 / 拼版 */
   onRequestGenerateStep: (stepId: HandCraftStepId) => void;
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 };
 
 /**
@@ -76,6 +80,8 @@ export function HandCraftAssistantPanel({
   onCurrentStepChange,
   onRequestGenerateStep,
   onAlert,
+  collapsed = false,
+  onCollapsedChange,
 }: Props) {
   const chatHistory = project.chatHistory;
   const projectId = project.id;
@@ -280,13 +286,81 @@ export function HandCraftAssistantPanel({
     chatModels.find((m) => m.modelKey === chatModelKey)?.displayName ?? "助手模型";
   const stepMeta = handCraftStep(currentStepId);
 
+  const tryCollapse = useCallback(() => {
+    if (streaming) return;
+    onCollapsedChange?.(true);
+  }, [streaming, onCollapsedChange]);
+
+  const tryExpand = useCallback(() => {
+    onCollapsedChange?.(false);
+  }, [onCollapsedChange]);
+
+  const renderComposer = (compact: boolean) => (
+    <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
+      <div className="flex items-end gap-2">
+        <textarea
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          rows={compact ? 1 : composerWide ? 4 : 2}
+          placeholder={
+            sketchCount === 0
+              ? "请先在中间工作区上传手绘线稿…"
+              : "补充说明，例如「盲盒主题换成节日系列」…"
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={streaming || sketchCount === 0}
+          onFocus={() => {
+            if (compact) tryExpand();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void sendText(input);
+            }
+          }}
+        />
+        <EcomAssistantSendButton
+          disabled={streaming || sketchCount === 0 || !input.trim()}
+          busy={streaming}
+          onClick={() => void sendText(input)}
+        />
+      </div>
+      {!compact ? (
+        <div className="mt-2">
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            className="w-full"
+            disabled={streaming || sketchCount === 0}
+            onClick={() =>
+              void sendText(
+                `请开始第 ${stepMeta.no} 步「${stepMeta.label}」，先说明本步产出，再输出槽位说明表（序号｜标题｜画面说明）。`,
+              )
+            }
+          >
+            讲解本步
+          </EcomButtonSecondary>
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]">
+    <EcomAssistantCollapsibleLayout
+      collapsed={collapsed}
+      onCollapsedChange={onCollapsedChange}
+      collapseBlocked={streaming}
+      attentionBadge={showChoices}
+      composer={renderComposer(false)}
+      floatingComposer={renderComposer(true)}
+    >
       <EcomAssistantPanelHeader
         title="手伴创作助手"
         subtitle={`第 ${stepMeta.no}/10 步 · ${stepMeta.label} · ${modelName}`}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
+        onCollapse={onCollapsedChange ? tryCollapse : undefined}
+        collapseDisabled={streaming}
       />
 
       <div
@@ -357,55 +431,6 @@ export function HandCraftAssistantPanel({
           />
         ) : null}
       </div>
-
-      <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)] p-4">
-        <textarea
-          className="mb-3 w-full resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
-          rows={composerWide ? 4 : 2}
-          placeholder={
-            sketchCount === 0
-              ? "请先在中间工作区上传手绘线稿…"
-              : "补充说明，例如「盲盒主题换成节日系列」…"
-          }
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={streaming || sketchCount === 0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void sendText(input);
-            }
-          }}
-        />
-        <div className="flex gap-2">
-          <EcomButtonPrimary
-            size="sm"
-            type="button"
-            className="flex-1"
-            disabled={streaming || sketchCount === 0 || !input.trim()}
-            onClick={() => void sendText(input)}
-          >
-            {streaming ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 shrink-0" />
-            )}
-            发送
-          </EcomButtonPrimary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={streaming || sketchCount === 0}
-            onClick={() =>
-              void sendText(
-                `请开始第 ${stepMeta.no} 步「${stepMeta.label}」，先说明本步产出，再输出槽位说明表（序号｜标题｜画面说明）。`,
-              )
-            }
-          >
-            讲解本步
-          </EcomButtonSecondary>
-        </div>
-      </div>
-    </div>
+    </EcomAssistantCollapsibleLayout>
   );
 }

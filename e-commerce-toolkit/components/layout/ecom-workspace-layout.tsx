@@ -16,6 +16,10 @@ type Props = {
   fullWidth?: boolean;
   /** 助手栏展开至工作区半宽（输入区聚焦或手动展开） */
   assistantWide?: boolean;
+  /** 折叠为右下角悬浮输入框（故事版等） */
+  assistantCollapsed?: boolean;
+  /** 点击中栏空白时触发（由 studio 决定是否折叠） */
+  onMainBlankPointerDown?: (e: React.PointerEvent<HTMLElement>) => void;
 };
 
 /**
@@ -30,6 +34,8 @@ export function EcomWorkspaceLayout({
   contentClassName,
   fullWidth,
   assistantWide = false,
+  assistantCollapsed = false,
+  onMainBlankPointerDown,
 }: Props) {
   const hasAssistant = Boolean(assistant) && !fullWidth;
 
@@ -41,6 +47,7 @@ export function EcomWorkspaceLayout({
             "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white",
             contentClassName,
           )}
+          onPointerDown={onMainBlankPointerDown}
         >
           {children}
         </main>
@@ -53,11 +60,17 @@ export function EcomWorkspaceLayout({
       {hasAssistant ? (
         <aside
           className={cn(
-            "flex w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] md:h-full md:border-l md:border-t-0",
-            assistantWide
-              ? "md:w-1/2 md:min-w-0 md:max-w-[50%]"
-              : "md:w-[380px] md:min-w-[380px] md:max-w-[380px]",
+            "flex shrink-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] md:h-full md:border-l md:border-t-0",
+            assistantCollapsed
+              ? "hidden"
+              : cn(
+                  "w-full",
+                  assistantWide
+                    ? "md:w-1/2 md:min-w-0 md:max-w-[50%]"
+                    : "md:w-[380px] md:min-w-[380px] md:max-w-[380px]",
+                ),
           )}
+          data-ecom-assistant-root
         >
           {assistantHeader ? (
             <div className="shrink-0 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">

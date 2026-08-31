@@ -6,7 +6,7 @@
 import { getProVerticalConfig } from "@/lib/ecom/pro-vertical/registry";
 import type { ProVerticalId } from "@/lib/ecom/pro-vertical/types";
 
-export type ProPromptPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops" | "general";
+export type ProPromptPhase = "sellpoints" | "sellpoints_polish" | "voiceovers" | "storyboards" | "ops" | "general";
 
 function buildCoreBlock(vertical: ProVerticalId): string {
   const config = getProVerticalConfig(vertical);
@@ -84,6 +84,9 @@ export function buildProDeliverableContextBlock(
   if (Array.isArray(deliverable.sellpoints) && deliverable.sellpoints.length) {
     payload.sellpoints = deliverable.sellpoints;
     payload.sellpointsLocked = deliverable.sellpointsLocked ?? false;
+    if (phase === "sellpoints_polish") {
+      payload.userSellpoints = deliverable.sellpoints;
+    }
   }
   if (phase === "storyboards" || phase === "ops") {
     if (deliverable.selectedVoiceoverId) {
@@ -103,26 +106,33 @@ export function buildProAssistantSystemPrompt(
   const config = getProVerticalConfig(vertical);
   const focusField = "productFocus";
   const phaseBlock: Record<ProPromptPhase, string> = {
-    sellpoints: `【当前任务：卖点生成】
+    sellpoints: `【当前任务：卖点 AI 生成】
 根据七维参数生成 5–8 条卖点，编号 S01–S0N，分层 core/visual/aux。
 参考词库：${config?.sellpointVocabHint ?? ""}
 用户卖点不足 3 条时补充 supplemented 来源卖点。
-输出 JSON 仅更新 sellpoints 字段。`,
+输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
+
+    sellpoints_polish: `【当前任务：卖点润色（用户已提供原始卖点）】
+基于上下文 userSellpoints / sellpoints 清洗、去重、分层、精炼；**保持用户原意**，禁止捏造新品卖点。
+用户原条 source=user；AI 补充用 supplemented；不足 3 条可 supplemented。
+输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
 
     voiceovers: `【当前任务：6 套口播】
 固定 2 套：${config?.voiceoverTypes.slice(0, 2).join("、")}；动态 4 套适配场景。
 每套含 type、narrative、script；编号 V01–V06。
-输出 JSON 仅更新 voiceovers 字段。`,
+输出 JSON 仅含 voiceovers（可选 schemaVersion/vertical，其余字段勿输出）。`,
 
     storyboards: `【当前任务：A–E 五套分镜】
 基于选定口播 + 定稿卖点，生成 storyboardVersions A/B/C/D/E，每版 6 镜。
 panels 字段：index, shotScale, durationSec, cameraMove, sceneDesc, scenePrompt, modelAction, ${focusField}, dialogue, toneTexture, sellpointIds, imagePrompt, videoPrompt
 同时生成 coverageChecklist（核心+视觉卖点验收）。
+输出 JSON 仅含 storyboardVersions、coverageChecklist（可选 schemaVersion/vertical，禁止输出 sellpoints/voiceovers/opsPack）。
 E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 
     ops: `【当前任务：运营素材包】
 分镜已定稿锁定；禁止输出 storyboardVersions / coverageChecklist / voiceovers / sellpoints。
 仅输出 opsPack：titles（10条分层标题）、coverWords、tags、xiaohongshuBody、detailBullets。
+输出 JSON 仅含 opsPack（可选 schemaVersion/vertical）。
 语言与 dimensions.outputLanguage 一致。`,
 
     general: `【通用】按用户消息推进；内部 trigger 以 pro-step: 开头时只输出对应 phase JSON。`,
@@ -135,6 +145,7 @@ E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 }
 
 export function resolveProPromptPhase(lastUserTurn: string): ProPromptPhase {
+  if (lastUserTurn.includes("sellpoints-polish")) return "sellpoints_polish";
   if (lastUserTurn.includes("sellpoints")) return "sellpoints";
   if (lastUserTurn.includes("voiceovers")) return "voiceovers";
   if (lastUserTurn.includes("storyboards")) return "storyboards";

@@ -13,6 +13,7 @@ import {
 } from "@/lib/gateway/volcengine-stall-recover";
 import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
+import { reconcileStaleEcomVideoGatewayLogs, reconcileStaleEcomChatGatewayLogs } from "@/lib/gateway/gateway-log-reconcile";
 import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   createKieTaskWithKey,
@@ -206,6 +207,26 @@ export async function expireStaleGatewayLogs(): Promise<number> {
 
   const r3 = await reconcileStaleVolcengineVideoLogs(now);
 
+  let r3c = 0;
+  try {
+    r3c = await reconcileStaleEcomVideoGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleEcomVideoGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  let r3d = 0;
+  try {
+    r3d = await reconcileStaleEcomChatGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleEcomChatGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
   const asyncVideoCutoff = new Date(now - STALE_ASYNC_VIDEO_MS);
   const r3b = await prisma.gatewayRequestLog.updateMany({
     where: {
@@ -242,6 +263,8 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     r2b.count +
     r3a.count +
     r3 +
+    r3c +
+    r3d +
     r3b.count +
     r4
   );
@@ -475,6 +498,7 @@ async function pollGatewayLogWithTimeout(
       gatewayV1RecordInfo({
         apiKeyId: row.apiKeyId,
         taskId: row.externalTaskId,
+        logId: row.id,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(

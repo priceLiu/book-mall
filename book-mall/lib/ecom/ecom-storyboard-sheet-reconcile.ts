@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import {
   clearStoryboardPanelImagesPending,
@@ -10,6 +12,7 @@ import {
 import {
   ECOM_STORYBOARD_MODULE,
   parseStoryboardSheet,
+  storyboardSheetSchema,
   type StoryboardSheet,
 } from "@/lib/ecom/ecom-storyboard-types";
 import {
@@ -170,6 +173,54 @@ export async function loadLatestStoryboardPanelVideoUrls(
     map.set(index, record.url);
   }
   return map;
+}
+
+/** 并发分镜生图：按镜号写入 imageUrl，乐观锁重试避免互相覆盖 */
+export async function persistStoryboardPanelImageUrl(opts: {
+  userId: string;
+  projectId: string;
+  panelIndex: number;
+  imageUrl: string;
+}): Promise<void> {
+  const imageUrl = opts.imageUrl.trim();
+  if (!imageUrl) throw new Error("分镜图 URL 为空");
+  const panelIndex = Math.trunc(opts.panelIndex);
+  if (!Number.isFinite(panelIndex) || panelIndex <= 0) {
+    throw new Error("无效镜头序号");
+  }
+
+  const maxAttempts = 8;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const row = await prisma.ecomStoryboardProject.findFirst({
+      where: { id: opts.projectId, userId: opts.userId },
+      select: { sheet: true, updatedAt: true },
+    });
+    if (!row) throw new Error("项目不存在");
+    const sheet = storyboardSheetSchema.parse(row.sheet);
+    if (!sheet?.panels?.length) throw new Error("分镜表为空");
+    const target = sheet.panels.find((p) => p.index === panelIndex);
+    if (!target) throw new Error(`找不到镜头 ${panelIndex}`);
+
+    const mergedPanels = mergeStoryboardPanelMediaByIndex(sheet.panels, [
+      { ...target, imageUrl },
+    ]);
+    const allReady = mergedPanels.every((p) => Boolean(p.imageUrl?.trim()));
+    const nextSheet = storyboardSheetSchema.parse({ ...sheet, panels: mergedPanels });
+
+    const updated = await prisma.ecomStoryboardProject.updateMany({
+      where: {
+        id: opts.projectId,
+        userId: opts.userId,
+        updatedAt: row.updatedAt,
+      },
+      data: {
+        sheet: nextSheet as unknown as Prisma.InputJsonValue,
+        status: allReady ? "image_ready" : "image_partial",
+      },
+    });
+    if (updated.count === 1) return;
+  }
+  throw new Error("分镜图保存冲突，请刷新页面后重试");
 }
 
 export type ReconcileStoryboardSheetResult = {

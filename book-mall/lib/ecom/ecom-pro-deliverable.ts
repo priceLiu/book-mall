@@ -266,27 +266,121 @@ export function isProDeliverable(raw: unknown): raw is ProDeliverable {
   return proDeliverableSchema.safeParse(raw).success;
 }
 
-function tryParseProCandidate(jsonRaw: string, vertical: ProVerticalId): ProDeliverable | null {
+export type ProLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+
+const proPhaseEnvelopeSchema = z.object({
+  schemaVersion: z.literal(PRO_SCHEMA_VERSION).optional(),
+  vertical: proVerticalIdSchema.optional(),
+});
+
+const proSellpointsPhasePatchSchema = proPhaseEnvelopeSchema.extend({
+  sellpoints: z.array(proSellpointSchema).min(1),
+});
+
+const proVoiceoversPhasePatchSchema = proPhaseEnvelopeSchema.extend({
+  voiceovers: z.array(proVoiceoverSchema).min(1),
+});
+
+const proStoryboardsPhasePatchSchema = proPhaseEnvelopeSchema.extend({
+  storyboardVersions: z
+    .record(proVersionKeySchema, proStoryboardVersionSchema)
+    .refine((v) => Object.keys(v).length > 0, "storyboardVersions 不能为空"),
+  coverageChecklist: z.array(proCoverageRowSchema).optional(),
+});
+
+const proOpsPhasePatchSchema = proPhaseEnvelopeSchema.extend({
+  opsPack: proOpsPackSchema,
+});
+
+function schemaForProPhase(phase: ProLlmPhase) {
+  switch (phase) {
+    case "sellpoints":
+      return proSellpointsPhasePatchSchema;
+    case "voiceovers":
+      return proVoiceoversPhasePatchSchema;
+    case "storyboards":
+      return proStoryboardsPhasePatchSchema;
+    case "ops":
+      return proOpsPhasePatchSchema;
+  }
+}
+
+function detectProPhaseFromPayload(parsed: Record<string, unknown>): ProLlmPhase | null {
+  if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
+    return "storyboards";
+  }
+  if (Array.isArray(parsed.voiceovers) && parsed.voiceovers.length > 0) return "voiceovers";
+  if (Array.isArray(parsed.sellpoints) && parsed.sellpoints.length > 0) return "sellpoints";
+  return null;
+}
+
+/** 分 phase 合并：LLM 各阶段只允许写入 spec 声明的字段，禁止污染 meta */
+export function pickProPhaseMergePatch(
+  patch: Partial<ProDeliverable>,
+  phase: ProLlmPhase,
+): Partial<ProDeliverable> {
+  switch (phase) {
+    case "sellpoints":
+      return patch.sellpoints?.length ? { sellpoints: patch.sellpoints } : {};
+    case "voiceovers":
+      return patch.voiceovers?.length ? { voiceovers: patch.voiceovers } : {};
+    case "storyboards": {
+      const next: Partial<ProDeliverable> = {};
+      if (patch.storyboardVersions && Object.keys(patch.storyboardVersions).length > 0) {
+        next.storyboardVersions = patch.storyboardVersions;
+      }
+      if (patch.coverageChecklist?.length) {
+        next.coverageChecklist = patch.coverageChecklist;
+      }
+      return next;
+    }
+    case "ops":
+      return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+  }
+}
+
+function coerceStoryboardVersionsInPatch(
+  parsed: Record<string, unknown>,
+  vertical: ProVerticalId,
+): void {
+  if (!parsed.storyboardVersions || typeof parsed.storyboardVersions !== "object") return;
+  const obj = parsed.storyboardVersions as Record<string, unknown>;
+  for (const key of ["A", "B", "C", "D", "E"]) {
+    const version = obj[key];
+    if (!version || typeof version !== "object") continue;
+    const v = version as Record<string, unknown>;
+    obj[key] = { ...v, id: key, panels: coerceProPanels(v.panels, vertical) };
+  }
+}
+
+function tryParseProPhasePatch(
+  jsonRaw: string,
+  vertical: ProVerticalId,
+  phaseHint?: ProLlmPhase,
+): Partial<ProDeliverable> | null {
   try {
     const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
-    parsed.schemaVersion = PRO_SCHEMA_VERSION;
-    parsed.vertical = vertical;
-    if (parsed.storyboardVersions) {
-      const obj = parsed.storyboardVersions as Record<string, unknown>;
-      for (const key of ["A", "B", "C", "D", "E"]) {
-        const version = obj[key];
-        if (!version || typeof version !== "object") continue;
-        const v = version as Record<string, unknown>;
-        obj[key] = { ...v, id: key, panels: coerceProPanels(v.panels, vertical) };
-      }
+    const rawVertical = typeof parsed.vertical === "string" ? parsed.vertical : undefined;
+    if (rawVertical != null && isProVerticalId(rawVertical) && rawVertical !== vertical) {
+      return null;
     }
-    const result = proDeliverableSchema.safeParse(parsed);
-    if (result.success) return result.data;
-    if (parsed.vertical === vertical) return parsed as ProDeliverable;
+    if (
+      parsed.schemaVersion != null &&
+      parsed.schemaVersion !== PRO_SCHEMA_VERSION &&
+      parsed.schemaVersion !== "fashion-v4"
+    ) {
+      return null;
+    }
+    coerceStoryboardVersionsInPatch(parsed, vertical);
+    const phase = phaseHint ?? detectProPhaseFromPayload(parsed);
+    if (!phase) return null;
+    const result = schemaForProPhase(phase).safeParse(parsed);
+    if (!result.success) return null;
+    return pickProPhaseMergePatch(result.data as Partial<ProDeliverable>, phase);
   } catch {
-    /* */
+    return null;
   }
-  return null;
 }
 
 export function stripProDeliverableFence(text: string): string {
@@ -306,26 +400,47 @@ export function stripProDeliverableFence(text: string): string {
 export function extractProDeliverable(
   text: string,
   vertical: ProVerticalId = "bags",
-): ProDeliverable | null {
+  phaseHint?: ProLlmPhase,
+): Partial<ProDeliverable> | null {
   const trimmed = text.trim();
   for (const fence of [/```pro-deliverable\s*([\s\S]*?)```/i, /```fashion-deliverable\s*([\s\S]*?)```/i]) {
     const m = trimmed.match(fence);
     if (m?.[1]) {
-      const parsed = tryParseProCandidate(m[1].trim(), vertical);
+      const parsed = tryParseProPhasePatch(m[1].trim(), vertical, phaseHint);
       if (parsed) return parsed;
     }
   }
   const generic = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (generic?.[1]) {
-    const parsed = tryParseProCandidate(generic[1].trim(), vertical);
+    const parsed = tryParseProPhasePatch(generic[1].trim(), vertical, phaseHint);
     if (parsed) return parsed;
   }
-  const start = trimmed.indexOf("{");
+  const markers = [
+    /\{\s*"storyboardVersions"\s*:/,
+    /\{\s*"schemaVersion"\s*:\s*"pro-v1"/,
+    /\{\s*"vertical"\s*:\s*"(?:bags|digital_3c)"/,
+  ];
+  let jsonStart = -1;
+  for (const re of markers) {
+    const idx = trimmed.search(re);
+    if (idx >= 0 && (jsonStart < 0 || idx < jsonStart)) jsonStart = idx;
+  }
+  if (jsonStart < 0) jsonStart = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    return tryParseProCandidate(trimmed.slice(start, end + 1), vertical);
+  if (jsonStart >= 0 && end > jsonStart) {
+    return tryParseProPhasePatch(trimmed.slice(jsonStart, end + 1), vertical, phaseHint);
   }
   return null;
+}
+
+export function listProStoryboardVersionKeys(
+  d: Pick<ProDeliverable, "storyboardVersions"> | null | undefined,
+): ProVersionKey[] {
+  const versions = d?.storyboardVersions ?? {};
+  return (["A", "B", "C", "D", "E"] as ProVersionKey[]).filter((k) => {
+    const v = versions[k];
+    return Boolean(v?.panels?.length || v?.title?.trim());
+  });
 }
 
 export function hasMeaningfulOpsPack(d: ProDeliverable): boolean {

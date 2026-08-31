@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { SeedVideoAssistantPanel } from "@/components/seed-video/seed-video-assistant-panel";
 import { SeedVideoContentPanel } from "@/components/seed-video/seed-video-content-panel";
@@ -59,6 +60,8 @@ export function SeedVideoStudio() {
   const [needLogin, setNeedLogin] = useState(false);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantWide, setAssistantWide] = useState(false);
+  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
+    useEcomStudioAssistantCollapse(assistantStreaming);
   const [planningPrompt, setPlanningPrompt] = useState("");
   const [startPlanningToken, setStartPlanningToken] = useState(0);
   const [openProductionAfterSyncToken, setOpenProductionAfterSyncToken] = useState(0);
@@ -548,6 +551,8 @@ export function SeedVideoStudio() {
     <>
       <EcomWorkspaceLayout
         assistantWide={assistantWide}
+        assistantCollapsed={assistantCollapsed}
+        onMainBlankPointerDown={handleMainBlankPointerDown}
         progress={<SeedVideoProgressRail project={project} />}
         assistant={
           <SeedVideoAssistantPanel
@@ -559,6 +564,8 @@ export function SeedVideoStudio() {
             onAlert={alert}
             composerWide={assistantWide}
             onComposerWideChange={setAssistantWide}
+            collapsed={assistantCollapsed}
+            onCollapsedChange={setAssistantCollapsed}
             startPlanningToken={startPlanningToken}
             planningPrompt={planningPrompt}
             onEditStoryboard={() => void handleEditStoryboard()}

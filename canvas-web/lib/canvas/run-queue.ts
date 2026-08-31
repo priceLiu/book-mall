@@ -145,6 +145,9 @@ import {
   shouldApplyCanvasTaskRuntimePatch,
   shouldSkipStoryRowTaskApply,
   storyRunContextFromScope,
+  isAbandonedCanvasInflightTask,
+  isStaleServerInflightTask,
+  isServerInflightTaskStatus,
 } from "./task-pick";
 import {
   ingestCanvasProjectTasks,
@@ -889,6 +892,7 @@ export function useCanvasRunner(
   const deferredForceFreshRef = useRef<Map<string, QueueItem>>(new Map());
   const taskByNodeRef = useRef<Map<string, string>>(new Map());
   const jobByTaskRef = useRef<Map<string, QueueItem>>(new Map());
+  const tasksByIdRef = useRef<Map<string, CanvasTaskRecord>>(new Map());
   const terminalNotifiedRef = useRef<Set<string>>(new Set());
   const sequentialRef = useRef<{
     jobs: QueueItem[];
@@ -2107,7 +2111,30 @@ export function useCanvasRunner(
       const boundTaskId =
         taskByNodeRef.current.get(key) ??
         taskByNodeRef.current.get(job.nodeId);
-      if (boundTaskId) return false;
+      if (boundTaskId) {
+        const boundTask = tasksByIdRef.current.get(boundTaskId);
+        if (boundTask) {
+          const nodeTasks = [boundTask];
+          const staleBound =
+            boundTask.status === "FAILED" ||
+            boundTask.status === "CANCELLED" ||
+            boundTask.status === "SUCCEEDED" ||
+            isAbandonedCanvasInflightTask(boundTask) ||
+            isStaleServerInflightTask(boundTask, nodeTasks);
+          if (!staleBound) return false;
+        } else {
+          const node = useCanvasStore
+            .getState()
+            .nodes.find((n) => n.id === job.nodeId);
+          const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
+            ?.runtime;
+          const rtTaskId = rt?.taskId?.trim();
+          if (rtTaskId && rtTaskId === boundTaskId) return false;
+        }
+        taskByNodeRef.current.delete(key);
+        taskByNodeRef.current.delete(job.nodeId);
+        jobByTaskRef.current.delete(boundTaskId);
+      }
       const node = useCanvasStore
         .getState()
         .nodes.find((n) => n.id === job.nodeId);
@@ -2129,7 +2156,25 @@ export function useCanvasRunner(
       }
       const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
         ?.runtime;
-      if (rt?.taskId?.trim()) return false;
+      const rtTaskId = rt?.taskId?.trim();
+      if (rtTaskId) {
+        const rtTask = tasksByIdRef.current.get(rtTaskId);
+        if (
+          rtTask &&
+          (rtTask.status === "FAILED" ||
+            rtTask.status === "CANCELLED" ||
+            rtTask.status === "SUCCEEDED" ||
+            isAbandonedCanvasInflightTask(rtTask) ||
+            isStaleServerInflightTask(rtTask, [rtTask]))
+        ) {
+          // terminal / stale runtime binding — allow forceFresh retry
+        } else if (
+          !rtTask ||
+          isServerInflightTaskStatus(rtTask.status)
+        ) {
+          return false;
+        }
+      }
       releaseInflightKey(key);
       return true;
     },
@@ -2173,7 +2218,6 @@ export function useCanvasRunner(
         if (inflightRef.current.has(key)) {
           if (job.forceFresh) {
             deferredForceFreshRef.current.set(key, job);
-            return true;
           }
           return false;
         }
@@ -2988,6 +3032,9 @@ export function useCanvasRunner(
           return;
         }
         lastPollStale = false;
+        for (const t of tasks) {
+          tasksByIdRef.current.set(t.id, t);
+        }
         ingestCanvasProjectTasks(projectId, tasks);
         const nodesNow = useCanvasStore.getState().nodes;
         restoreServerInflightNodeRuntimes(

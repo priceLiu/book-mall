@@ -192,18 +192,35 @@ export function resolveActiveStoryboardPanelImageBusyIndices(opts: {
 export function resolveActiveStoryboardPanelVideoBusyIndices(opts: {
   panelVidBusyPanels: readonly number[];
   pendingPanelVideoIndices: readonly number[];
+  inFlightWatchIndices?: readonly number[];
+  videoGenInFlight?: boolean;
   panels: readonly { index: number; videoUrl?: string | null }[];
 }): number[] {
   const set = new Set<number>([
     ...opts.panelVidBusyPanels,
     ...opts.pendingPanelVideoIndices,
   ]);
-  for (const idx of opts.pendingPanelVideoIndices) {
-    if (opts.panelVidBusyPanels.includes(idx)) continue;
+  const inFlight = opts.videoGenInFlight ?? false;
+  const watch = opts.inFlightWatchIndices ?? [];
+  for (const idx of [...set]) {
     const hasVideo = opts.panels.some(
       (p) => p.index === idx && Boolean(p.videoUrl?.trim()),
     );
-    if (hasVideo) set.delete(idx);
+    if (!hasVideo) continue;
+    if (inFlight && watch.includes(idx)) continue;
+    set.delete(idx);
   }
   return [...set].sort((a, b) => a - b);
+}
+
+/** 合并成片：须用户勾选 ≥2 个已有 videoUrl 的单镜；未勾选时不默认合并全部 */
+export function resolveStoryboardMergeTargetIndexes(opts: {
+  selectedVideoPanels: readonly number[];
+  panels: readonly { index: number; videoUrl?: string | null }[];
+}): number[] {
+  if (opts.selectedVideoPanels.length === 0) return [];
+  const byIndex = new Map(opts.panels.map((p) => [p.index, p]));
+  return [...opts.selectedVideoPanels]
+    .sort((a, b) => a - b)
+    .filter((index) => Boolean(byIndex.get(index)?.videoUrl?.trim()));
 }

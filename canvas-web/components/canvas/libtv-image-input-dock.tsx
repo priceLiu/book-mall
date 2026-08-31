@@ -40,9 +40,11 @@ import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   isLibtvFreestandingImageNode,
   isLibtvPipelineImageCell,
+  isOrphanLibtvMediaInflight,
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
+import { clearCanvasNodeRunSession } from "@/lib/canvas/canvas-run-session";
 import {
   resolveLibtvSoleSelectedNodeId,
   useLibtvShouldSuppressFloatingDock,
@@ -244,6 +246,11 @@ function LibtvImageInputDockBody({
   const isRunning = isLibtvMediaGenerating(
     (storeNode?.data ?? {}) as { uploading?: boolean; runtime?: { status?: string } },
   );
+  const orphanInflight = Boolean(
+    storeNode &&
+      isOrphanLibtvMediaInflight((storeNode.data ?? {}) as Sbv1ImageNodeData),
+  );
+  const freestandingBlocked = isRunning && !orphanInflight;
 
   const isFrameFreestanding =
     pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
@@ -449,11 +456,18 @@ function LibtvImageInputDockBody({
 
   const onRunFreestanding = useCallback(async () => {
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
-    if (isRunning) return;
 
-    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
-    const revertPending = () =>
-      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+    const nodeData = (storeNode.data ?? {}) as Sbv1ImageNodeData;
+    const orphanInflight = isOrphanLibtvMediaInflight(nodeData);
+    if (isRunning && !orphanInflight) return;
+    if (orphanInflight) {
+      clearCanvasNodeRunSession(storeNode.id);
+      revertOptimisticLibtvMediaRunStart(
+        storeNode.id,
+        updateNodeData,
+        setNodeRuntime,
+      );
+    }
 
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -476,7 +490,6 @@ function LibtvImageInputDockBody({
       }
     }
     if (!runEngine?.providerId?.trim() || !normalizeModelKey(runEngine.modelKey)) {
-      revertPending();
       await alert({
         title: "请选择模型",
         message:
@@ -505,7 +518,6 @@ function LibtvImageInputDockBody({
       Boolean(latestData.dockStyleRef?.imageUrl) ||
       Boolean(linkedStyle);
     if (!prompt && !hasRefs) {
-      revertPending();
       await alert({
         title: "请输入提示词",
         message: "可直接文字生图，或上传/连接图片后输入编辑指令。",
@@ -520,7 +532,6 @@ function LibtvImageInputDockBody({
       }) &&
       !hasRefs
     ) {
-      revertPending();
       await alert({
         title: "需要参考图",
         message: `${canvasImageEditModelLabel(editModelKey)} 须连接上游图片或上传参考图后再生成。`,
@@ -529,7 +540,6 @@ function LibtvImageInputDockBody({
       return;
     }
     if (!base) {
-      revertPending();
       await alert({
         title: "画布未就绪",
         message: "请刷新页面后重试。",
@@ -540,7 +550,6 @@ function LibtvImageInputDockBody({
 
     const queued = busEnqueueStoryRun({ nodeId: storeNode.id, forceFresh: true });
     if (!queued) {
-      revertPending();
       await alert({
         title: "无法开始生成",
         message: "该节点已有进行中的生成任务，请稍候完成后再试。",
@@ -638,7 +647,7 @@ function LibtvImageInputDockBody({
   const canSendFreestanding =
     showModelPicker &&
     hasEngine &&
-    !isRunning &&
+    !freestandingBlocked &&
     (Boolean(livePrompt.trim()) ||
       hasImage ||
       upstreamLinks.some((l) => l.previewUrl) ||

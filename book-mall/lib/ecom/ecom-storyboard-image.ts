@@ -70,7 +70,10 @@ import {
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
 } from "@/lib/ecom/ecom-storyboard-service";
-import { mergeStoryboardPanelMediaByIndex } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
+import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
+import type { ProductDesignSettings } from "@/lib/ecom/ecom-product-design-types";
+import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import { persistStoryboardPanelImageUrl } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
 
 function isTransientPollError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -671,9 +674,6 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       wf.fashionCharacterMode === "ai" ||
       wf.proCharacterMode === "ai");
 
-  let updatedPanels = [...sheet.panels];
-  let lastSavedSheet: StoryboardSheet = sheet;
-
   try {
     if (shouldAutoGenCharacter) {
       const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
@@ -717,116 +717,126 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       promptCtx,
     );
 
-    for (const panel of panelsToGen) {
-      const prompt = resolveStoryboardPanelImagePrompt(
-        panel,
-        sheet,
-        references,
-        promptCtx,
-        panelRefUrls,
-        refGuide,
-      );
-      const imgResult = isStoryboardKieImageModel(modelKey)
-        ? await generatePanelImageWithKie({
-            userId: opts.userId,
-            projectId: opts.projectId,
-            modelKey,
-            prompt,
+    const panelGenFailures: { index: number; message: string }[] = [];
+    const concurrency =
+      panelsToGen.length > 1
+        ? await resolveEcomImageGenConcurrency(
+            opts.userId,
+            {} as ProductDesignSettings,
+          )
+        : 1;
+
+    await mapWithConcurrency(
+      panelsToGen,
+      async (panel) => {
+        try {
+          const prompt = resolveStoryboardPanelImagePrompt(
+            panel,
+            sheet,
+            references,
+            promptCtx,
+            panelRefUrls,
             refGuide,
-            aspectRatio,
-            panelIndex: panel.index,
-            refImageUrls: panelRefUrls,
-          })
-        : isStoryboardKlingImageModel(modelKey)
-          ? await generatePanelImageWithKling({
-              userId: opts.userId,
-              projectId: opts.projectId,
-              modelKey,
-              prompt,
-              refGuide,
-              aspectRatio,
-              panelIndex: panel.index,
-              refImageUrls: panelRefUrls,
-            })
-          : isDashscopeMultimodalImageGenModel(modelKey)
-            ? await generatePanelImageWithMultimodalSync({
+          );
+          const imgResult = isStoryboardKieImageModel(modelKey)
+            ? await generatePanelImageWithKie({
                 userId: opts.userId,
                 projectId: opts.projectId,
                 modelKey,
                 prompt,
                 refGuide,
-                wan27Size,
+                aspectRatio,
                 panelIndex: panel.index,
                 refImageUrls: panelRefUrls,
               })
-            : await generatePanelImageWithRefs({
-                userId: opts.userId,
+            : isStoryboardKlingImageModel(modelKey)
+              ? await generatePanelImageWithKling({
+                  userId: opts.userId,
+                  projectId: opts.projectId,
+                  modelKey,
+                  prompt,
+                  refGuide,
+                  aspectRatio,
+                  panelIndex: panel.index,
+                  refImageUrls: panelRefUrls,
+                })
+              : isDashscopeMultimodalImageGenModel(modelKey)
+                ? await generatePanelImageWithMultimodalSync({
+                    userId: opts.userId,
+                    projectId: opts.projectId,
+                    modelKey,
+                    prompt,
+                    refGuide,
+                    wan27Size,
+                    panelIndex: panel.index,
+                    refImageUrls: panelRefUrls,
+                  })
+                : await generatePanelImageWithRefs({
+                    userId: opts.userId,
+                    projectId: opts.projectId,
+                    modelKey,
+                    prompt,
+                    refGuide,
+                    wan27Size,
+                    panelIndex: panel.index,
+                    refImageUrls: panelRefUrls,
+                  });
+
+          await prisma.ecomAsset.create({
+            data: {
+              userId: opts.userId,
+              module: ECOM_STORYBOARD_MODULE,
+              kind: "image",
+              title: `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80),
+              prompt,
+              ossUrl: imgResult.ossUrl,
+              thumbnailUrl: imgResult.ossUrl,
+              meta: {
                 projectId: opts.projectId,
                 modelKey,
-                prompt,
-                refGuide,
-                wan27Size,
+                kind: "storyboard_panel",
                 panelIndex: panel.index,
-                refImageUrls: panelRefUrls,
-              });
+                productRefCount: productRefUrls.length,
+                refImageCount: panelRefUrls.length,
+              },
+            },
+          });
 
-      updatedPanels = updatedPanels.map((p) =>
-        p.index === panel.index ? { ...p, imageUrl: imgResult.ossUrl } : p,
-      );
-
-      await prisma.ecomAsset.create({
-        data: {
-          userId: opts.userId,
-          module: ECOM_STORYBOARD_MODULE,
-          kind: "image",
-          title: `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80),
-          prompt,
-          ossUrl: imgResult.ossUrl,
-          thumbnailUrl: imgResult.ossUrl,
-          meta: {
+          await persistStoryboardPanelImageUrl({
+            userId: opts.userId,
             projectId: opts.projectId,
-            modelKey,
-            kind: "storyboard_panel",
             panelIndex: panel.index,
-            productRefCount: productRefUrls.length,
-            refImageCount: panelRefUrls.length,
-          },
-        },
-      });
+            imageUrl: imgResult.ossUrl,
+          });
+          await clearStoryboardPanelImagesPending(opts.projectId, [panel.index]);
+        } catch (e) {
+          panelGenFailures.push({
+            index: panel.index,
+            message: e instanceof Error ? e.message : "生成失败",
+          });
+        }
+      },
+      concurrency,
+    );
 
-      const latest = await getEcomStoryboardProject(opts.userId, opts.projectId);
-      const baseSheet = latest?.sheet ?? lastSavedSheet;
-      const mergedPanels = mergeStoryboardPanelMediaByIndex(
-        baseSheet.panels,
-        updatedPanels,
-      );
-      lastSavedSheet = { ...baseSheet, panels: mergedPanels };
-      const partialReady = mergedPanels.every((p) => Boolean(p.imageUrl));
-
-      await updateEcomStoryboardProject(opts.userId, opts.projectId, {
-        sheet: lastSavedSheet,
-        references,
-        status: partialReady ? "image_ready" : "image_partial",
-      });
-      await clearStoryboardPanelImagesPending(opts.projectId, [panel.index]);
+    if (panelGenFailures.length > 0) {
+      const summary = panelGenFailures
+        .sort((a, b) => a.index - b.index)
+        .map((f) => `镜头 ${f.index}：${f.message}`)
+        .join("；");
+      throw new Error(summary);
     }
   } catch (e) {
     await clearStoryboardPanelImagesPending(opts.projectId, panelIndexesToGen);
     throw e;
   }
 
-  let mergedPanels = lastSavedSheet.panels;
-  let baseSheet = lastSavedSheet;
-  if (typeof opts.panelIndex === "number") {
-    const latest = await getEcomStoryboardProject(opts.userId, opts.projectId);
-    if (latest?.sheet?.panels?.length) {
-      baseSheet = latest.sheet;
-      mergedPanels = mergeStoryboardPanelMediaByIndex(
-        latest.sheet.panels,
-        updatedPanels,
-      );
-    }
+  const latestAfterGen = await getEcomStoryboardProject(opts.userId, opts.projectId);
+  if (!latestAfterGen?.sheet) {
+    throw new Error("项目不存在");
   }
+  const mergedPanels = latestAfterGen.sheet.panels;
+  const baseSheet = latestAfterGen.sheet;
 
   const updatedSheet: StoryboardSheet = { ...baseSheet, panels: mergedPanels };
   const allPanelsReady = mergedPanels.every((p) => Boolean(p.imageUrl));

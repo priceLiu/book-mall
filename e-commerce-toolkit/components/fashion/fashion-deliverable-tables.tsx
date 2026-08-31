@@ -103,9 +103,9 @@ function FashionEditableTextCell({
 
   if (editing) {
     return (
-      <div className="min-w-[12rem] space-y-1">
+      <div className="relative z-10 w-full min-w-0 max-w-full space-y-1">
         <textarea
-          className="w-full rounded-lg border border-[#0071e3]/40 bg-white px-2 py-1.5 text-sm text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
+          className="box-border w-full max-w-full min-w-0 resize-y rounded-lg border border-[#0071e3]/40 bg-white px-2 py-1.5 text-sm text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
           rows={rows}
           value={draft}
           disabled={saving}
@@ -122,7 +122,7 @@ function FashionEditableTextCell({
             }
           }}
         />
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           <EcomButtonPrimary
             size="sm"
             type="button"
@@ -151,8 +151,8 @@ function FashionEditableTextCell({
   }
 
   return (
-    <div className="group flex items-start gap-1">
-      <span className="min-w-0 flex-1">{value}</span>
+    <div className="group flex min-w-0 items-start gap-1">
+      <span className="min-w-0 flex-1 break-words">{value}</span>
       <button
         type="button"
         className="shrink-0 rounded p-1 text-[#86868b] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[#1d1d1f] group-hover:opacity-100"
@@ -177,7 +177,32 @@ export function FashionSellpointsTable({
   saving?: boolean;
   onSaveSellpoints?: (sellpoints: FashionSellpoint[]) => void | Promise<void>;
 }) {
-  if (!sellpoints.length) return <p className="text-sm text-[#86868b]">暂无卖点</p>;
+  if (!sellpoints.length && !editable) return <p className="text-sm text-[#86868b]">暂无卖点</p>;
+
+  function handleAddRow() {
+    if (!onSaveSellpoints) return;
+    const id = nextFashionSellpointId(sellpoints);
+    void onSaveSellpoints([
+      ...sellpoints,
+      { id, text: "新卖点", layer: "core", source: "user" },
+    ]);
+  }
+
+  if (!sellpoints.length && editable) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-[#86868b]">尚未添加卖点，请逐条填写您的核心卖点。</p>
+        <button
+          type="button"
+          className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-sm text-[#1d1d1f] hover:border-[#0071e3]"
+          disabled={saving}
+          onClick={handleAddRow}
+        >
+          添加卖点
+        </button>
+      </div>
+    );
+  }
 
   function patchSellpoint(id: string, patch: Partial<FashionSellpoint>) {
     if (!onSaveSellpoints) return;
@@ -190,15 +215,6 @@ export function FashionSellpointsTable({
       return merged;
     });
     void onSaveSellpoints(next);
-  }
-
-  function handleAddRow() {
-    if (!onSaveSellpoints) return;
-    const id = nextFashionSellpointId(sellpoints);
-    void onSaveSellpoints([
-      ...sellpoints,
-      { id, text: "新卖点", layer: "core", source: "user" },
-    ]);
   }
 
   return (
@@ -331,7 +347,21 @@ export function FashionPanelsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[72rem] border-collapse text-xs">
+      <table className="w-full min-w-[72rem] table-fixed border-collapse text-xs">
+        <colgroup>
+          <col className="w-10" />
+          <col className="w-16" />
+          <col className="w-12" />
+          <col className="w-16" />
+          <col className="w-32" />
+          <col className="w-40" />
+          <col className="w-48" />
+          <col className="w-48" />
+          <col className="w-32" />
+          <col className="w-32" />
+          <col className="w-32" />
+          <col className="w-24" />
+        </colgroup>
         <thead>
           <tr className="border-b border-[#e8e8ed] text-left text-[#6e6e73]">
             {[
@@ -357,8 +387,8 @@ export function FashionPanelsTable({
         <tbody>
           {panels.map((p) => (
             <tr key={p.index} className="border-b border-[#f0f0f2] align-top text-[#1d1d1f]">
-              <td className="px-1 py-2">{p.index}</td>
-              <td className="px-1 py-2">
+              <td className="min-w-0 px-1 py-2">{p.index}</td>
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.shotScale)}
@@ -371,7 +401,7 @@ export function FashionPanelsTable({
                   escCell(p.shotScale)
                 )}
               </td>
-              <td className="px-1 py-2">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={String(p.durationSec)}
@@ -387,7 +417,7 @@ export function FashionPanelsTable({
                   `${p.durationSec}s`
                 )}
               </td>
-              <td className="px-1 py-2">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.cameraMove)}
@@ -400,7 +430,7 @@ export function FashionPanelsTable({
                   escCell(p.cameraMove)
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[8rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.sceneDesc)}
@@ -413,7 +443,7 @@ export function FashionPanelsTable({
                   escCell(p.sceneDesc)
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[10rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.scenePrompt)}
@@ -426,7 +456,7 @@ export function FashionPanelsTable({
                   escCell(p.scenePrompt)
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[12rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.imagePrompt)}
@@ -440,7 +470,7 @@ export function FashionPanelsTable({
                   escCell(p.imagePrompt)
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[12rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.videoPrompt)}
@@ -454,7 +484,7 @@ export function FashionPanelsTable({
                   escCell(p.videoPrompt)
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[8rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.modelAction)}
@@ -467,7 +497,7 @@ export function FashionPanelsTable({
                   escCell(p.modelAction)
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[8rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.productFocus ?? p.garmentFocus ?? "")}
@@ -485,7 +515,7 @@ export function FashionPanelsTable({
                   escCell(p.productFocus ?? p.garmentFocus ?? "")
                 )}
               </td>
-              <td className="px-1 py-2 max-w-[8rem]">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.dialogue ?? "")}
@@ -498,7 +528,7 @@ export function FashionPanelsTable({
                   escCell(p.dialogue)
                 )}
               </td>
-              <td className="px-1 py-2">
+              <td className="min-w-0 px-1 py-2">
                 {editable ? (
                   <FashionEditableTextCell
                     value={p.sellpointIds.join("、")}

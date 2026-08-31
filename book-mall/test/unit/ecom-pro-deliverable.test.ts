@@ -67,12 +67,14 @@ const BAGS_FIXTURE = {
 };
 
 describe("ecom-pro-deliverable · bags", () => {
-  it("extracts pro-deliverable fence for bags", () => {
-    const text = `已生成卖点。\n\`\`\`pro-deliverable\n${JSON.stringify(BAGS_FIXTURE)}\n\`\`\``;
-    const parsed = extractProDeliverable(text, "bags");
-    expect(parsed?.vertical).toBe("bags");
-    expect(parsed?.schemaVersion).toBe(PRO_SCHEMA_VERSION);
-    expect(parsed?.storyboardVersions?.A?.panels[0]?.productFocus).toBe("包型轮廓与五金");
+  it("extracts sellpoints phase patch from pro-deliverable fence", () => {
+    const payload = {
+      sellpoints: BAGS_FIXTURE.sellpoints,
+    };
+    const text = `已生成卖点。\n\`\`\`pro-deliverable\n${JSON.stringify(payload)}\n\`\`\``;
+    const parsed = extractProDeliverable(text, "bags", "sellpoints");
+    expect(parsed?.sellpoints).toHaveLength(1);
+    expect(parsed?.vertical).toBeUndefined();
   });
 
   it("merges sellpoints patch without dropping dimensions", () => {
@@ -145,23 +147,44 @@ describe("ecom-pro-deliverable · bags", () => {
 });
 
 describe("ecom-pro-deliverable · digital_3c", () => {
-  it("extracts pro-deliverable fence for digital_3c", () => {
-    const fixture = {
-      ...BAGS_FIXTURE,
-      vertical: "digital_3c" as const,
-      dimensions: {
-        productCategory: "手机",
-        productSubCategory: "旗舰机",
-        designLanguage: "极简科技",
-        tier: "高端旗舰",
-        customScene: "通勤",
-        platform: "抖音",
-        outputLanguage: "中文",
+  it("extracts sellpoints phase patch for digital_3c", () => {
+    const payload = {
+      sellpoints: [{ id: "S01", text: "快充", layer: "core" as const, source: "ai" as const }],
+    };
+    const text = `已生成卖点。\n\`\`\`pro-deliverable\n${JSON.stringify(payload)}\n\`\`\``;
+    const parsed = extractProDeliverable(text, "digital_3c", "sellpoints");
+    expect(parsed?.sellpoints?.[0]?.text).toBe("快充");
+  });
+
+  it("parses storyboards phase patch without vertical when fallback is digital_3c", () => {
+    const panels = [1, 2, 3, 4, 5, 6].map((index) => ({
+      index,
+      shotScale: "中景",
+      durationSec: 4,
+      cameraMove: "慢推",
+      sceneDesc: "桌面展示手机核心功能界面与操作手势细节",
+      scenePrompt:
+        "桌面展示手机核心功能界面与操作手势细节，写实自然光，与数码产品品类匹配的环境与道具",
+      modelAction: "单手滑动屏幕演示功能",
+      productFocus: "产品功能展示",
+      sellpointIds: ["S01"],
+      imagePrompt:
+        "竖版9:16，写实UGC摄影。场景：桌面展示手机核心功能界面与操作手势细节，写实自然光，与数码产品品类匹配的环境与道具。模特单手滑动屏幕演示功能，展示产品功能展示，以参考图1产品为准，禁止画面文字。",
+      videoPrompt:
+        "慢推运镜，单手滑动屏幕演示功能，场景桌面展示手机核心功能界面与操作手势细节，产品功能展示，UGC质感连贯动作",
+    }));
+    const payload = {
+      storyboardVersions: {
+        A: {
+          id: "A",
+          title: "A版·功能演示",
+          panels,
+        },
       },
     };
-    const text = `已生成卖点。\n\`\`\`pro-deliverable\n${JSON.stringify(fixture)}\n\`\`\``;
-    const parsed = extractProDeliverable(text, "digital_3c");
-    expect(parsed?.vertical).toBe("digital_3c");
-    expect(parsed?.dimensions.productCategory).toBe("手机");
+    const text = `\`\`\`json\n${JSON.stringify(payload)}\n\`\`\``;
+    const parsed = extractProDeliverable(text, "digital_3c", "storyboards");
+    expect(parsed?.storyboardVersions?.A?.panels).toHaveLength(6);
+    expect(parsed?.vertical).toBeUndefined();
   });
 });

@@ -7,6 +7,9 @@ import type {
 import { isFashionDeliverable } from "@/lib/fashion-types";
 import { normalizeFashionOpsPack } from "@/lib/fashion-ops-pack-format";
 
+/** 与 book-mall/doc/ecom/fashion-deliverable-spec-v4.md §7.1 一致 */
+export type FashionLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+
 function deriveScenePrompt(sceneDesc: string, scenePromptRaw?: string): string {
   const explicit = scenePromptRaw?.trim();
   if (explicit && explicit.length >= 20) return explicit;
@@ -141,19 +144,92 @@ function coerceStoryboardVersions(
   return next;
 }
 
-function hasStoryboardVersionPayload(
-  versions: Partial<Record<FashionVersionKey, FashionStoryboardVersion>> | undefined,
-): boolean {
+function detectFashionPhaseFromPayload(parsed: Record<string, unknown>): FashionLlmPhase | null {
+  if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
+    return "storyboards";
+  }
+  if (Array.isArray(parsed.voiceovers) && parsed.voiceovers.length > 0) return "voiceovers";
+  if (Array.isArray(parsed.sellpoints) && parsed.sellpoints.length > 0) return "sellpoints";
+  return null;
+}
+
+/** 分 phase 白名单字段，与 spec §7.1 / pickFashionPhaseMergePatch 一致 */
+export function pickFashionPhaseMergePatch(
+  patch: Partial<FashionDeliverable>,
+  phase: FashionLlmPhase,
+): Partial<FashionDeliverable> {
+  switch (phase) {
+    case "sellpoints":
+      return patch.sellpoints?.length ? { sellpoints: patch.sellpoints } : {};
+    case "voiceovers":
+      return patch.voiceovers?.length ? { voiceovers: patch.voiceovers } : {};
+    case "storyboards": {
+      const next: Partial<FashionDeliverable> = {};
+      if (patch.storyboardVersions && Object.keys(patch.storyboardVersions).length > 0) {
+        next.storyboardVersions = patch.storyboardVersions;
+      }
+      if (patch.coverageChecklist?.length) {
+        next.coverageChecklist = patch.coverageChecklist;
+      }
+      return next;
+    }
+    case "ops":
+      return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+  }
+}
+
+function storyboardsPhaseValid(
+  versions: FashionDeliverable["storyboardVersions"],
+): versions is NonNullable<FashionDeliverable["storyboardVersions"]> {
   if (!versions) return false;
-  return (["A", "B", "C", "D", "E"] as FashionVersionKey[]).some((k) => {
-    const v = versions[k];
-    if (!v || typeof v !== "object") return false;
-    return (
-      (v.panels?.length ?? 0) > 0 ||
-      Boolean(v.title?.trim()) ||
-      Boolean(v.summary?.trim())
-    );
-  });
+  const keys = (["A", "B", "C", "D", "E"] as const).filter((k) => versions[k]);
+  if (keys.length === 0) return false;
+  return keys.every((k) => (versions[k]?.panels?.length ?? 0) === 6);
+}
+
+function validateFashionPhasePatch(
+  parsed: Record<string, unknown>,
+  phase: FashionLlmPhase,
+): Partial<FashionDeliverable> | null {
+  switch (phase) {
+    case "sellpoints":
+      if (!Array.isArray(parsed.sellpoints) || parsed.sellpoints.length === 0) return null;
+      return { sellpoints: parsed.sellpoints as FashionDeliverable["sellpoints"] };
+    case "voiceovers":
+      if (!Array.isArray(parsed.voiceovers) || parsed.voiceovers.length === 0) return null;
+      return { voiceovers: parsed.voiceovers as FashionDeliverable["voiceovers"] };
+    case "storyboards": {
+      const storyboardVersions = coerceStoryboardVersions(parsed.storyboardVersions);
+      if (!storyboardsPhaseValid(storyboardVersions)) return null;
+      const patch: Partial<FashionDeliverable> = { storyboardVersions };
+      if (Array.isArray(parsed.coverageChecklist) && parsed.coverageChecklist.length > 0) {
+        patch.coverageChecklist = parsed.coverageChecklist as FashionDeliverable["coverageChecklist"];
+      }
+      return patch;
+    }
+    case "ops":
+      if (parsed.opsPack == null || typeof parsed.opsPack !== "object") return null;
+      return { opsPack: parsed.opsPack as FashionDeliverable["opsPack"] };
+  }
+}
+
+function tryParseFashionPhasePatch(
+  jsonRaw: string,
+  phaseHint?: FashionLlmPhase,
+): Partial<FashionDeliverable> | null {
+  try {
+    const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
+    if (parsed.vertical != null && parsed.vertical !== "fashion_apparel") return null;
+    if (parsed.schemaVersion != null && parsed.schemaVersion !== "fashion-v4") return null;
+    const phase = phaseHint ?? detectFashionPhaseFromPayload(parsed);
+    if (!phase) return null;
+    const patch = validateFashionPhasePatch(parsed, phase);
+    if (!patch) return null;
+    return pickFashionPhaseMergePatch(patch, phase);
+  } catch {
+    return null;
+  }
 }
 
 function sanitizePreLockFashionDeliverable(d: FashionDeliverable): FashionDeliverable {
@@ -168,19 +244,11 @@ function sanitizePreLockFashionDeliverable(d: FashionDeliverable): FashionDelive
   };
 }
 
-function stripLlmPreselectedVersion(d: FashionDeliverable): FashionDeliverable {
-  if (hasStoryboardVersionPayload(d.storyboardVersions) && !d.opsPack && d.selectedVersion) {
-    return { ...d, selectedVersion: null };
+function stripPrematureFashionDeliverableFields(d: FashionDeliverable): FashionDeliverable {
+  if (!d.storyboardLocked) {
+    return { ...d, opsPack: undefined, outputMode: null };
   }
   return d;
-}
-
-function stripPrematureFashionDeliverableFields(d: FashionDeliverable): FashionDeliverable {
-  let next = d;
-  if (!next.storyboardLocked) {
-    next = { ...next, opsPack: undefined, outputMode: null };
-  }
-  return next;
 }
 
 function coerceFashionDeliverableLoose(raw: unknown): FashionDeliverable | null {
@@ -227,41 +295,42 @@ function coerceFashionDeliverableLoose(raw: unknown): FashionDeliverable | null 
         : null,
   };
   if (!isFashionDeliverable(coerced)) return null;
-  return sanitizePreLockFashionDeliverable(stripLlmPreselectedVersion(coerced));
+  return sanitizePreLockFashionDeliverable(coerced);
 }
 
-function tryParseFashionJson(jsonRaw: string): FashionDeliverable | null {
-  try {
-    const parsed = JSON.parse(jsonRaw) as unknown;
-    return coerceFashionDeliverableLoose(parsed);
-  } catch {
-    /* */
-  }
-  return null;
-}
-
-export function extractFashionDeliverableFromText(text: string): FashionDeliverable | null {
+export function extractFashionDeliverableFromText(
+  text: string,
+  phaseHint?: FashionLlmPhase,
+): Partial<FashionDeliverable> | null {
   const trimmed = text.trim();
-  const fashionFence = trimmed.match(FASHION_FENCE_RE);
-  if (fashionFence?.[1]) {
-    const parsed = tryParseFashionJson(fashionFence[1].trim());
-    if (parsed) return parsed;
-  }
-
-  const genericFence = trimmed.match(GENERIC_FENCE_RE);
-  if (genericFence?.[1]) {
-    const parsed = tryParseFashionJson(genericFence[1].trim());
-    if (parsed) return parsed;
-  }
-
-  const start = trimmed.search(
-    /\{\s*"schemaVersion"\s*:\s*"fashion-v4"|\{\s*"vertical"\s*:\s*"fashion_apparel"/,
-  );
-  if (start >= 0) {
-    const end = trimmed.lastIndexOf("}");
-    if (end > start) {
-      const parsed = tryParseFashionJson(trimmed.slice(start, end + 1));
+  for (const re of [FASHION_FENCE_RE, GENERIC_FENCE_RE]) {
+    const m = trimmed.match(re);
+    if (m?.[1]) {
+      const parsed = tryParseFashionPhasePatch(m[1].trim(), phaseHint);
       if (parsed) return parsed;
+    }
+  }
+  const markers = [
+    /\{\s*"storyboardVersions"\s*:/,
+    /\{\s*"schemaVersion"\s*:\s*"fashion-v4"/,
+    /\{\s*"vertical"\s*:\s*"fashion_apparel"/,
+  ];
+  let jsonStart = -1;
+  for (const re of markers) {
+    const idx = trimmed.search(re);
+    if (idx >= 0 && (jsonStart < 0 || idx < jsonStart)) jsonStart = idx;
+  }
+  if (jsonStart < 0) jsonStart = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (jsonStart >= 0 && end > jsonStart) {
+    const slice = trimmed.slice(jsonStart, end + 1);
+    const parsed = tryParseFashionPhasePatch(slice, phaseHint);
+    if (parsed) return parsed;
+    if (phaseHint) return null;
+    try {
+      return coerceFashionDeliverableLoose(JSON.parse(slice));
+    } catch {
+      return null;
     }
   }
   return null;
@@ -274,7 +343,7 @@ export function stripFashionDeliverableFence(text: string): string {
     .replace(/```[\s\S]*?```/g, "")
     .trim();
   const jsonStart = out.search(
-    /\{\s*"schemaVersion"\s*:\s*"fashion-v4"|\{\s*"vertical"\s*:\s*"fashion_apparel"/,
+    /\{\s*"schemaVersion"\s*:\s*"fashion-v4"|\{\s*"vertical"\s*:\s*"fashion_apparel"|\{\s*"storyboardVersions"\s*:/,
   );
   if (jsonStart >= 0) out = out.slice(0, jsonStart).trim();
   return out.replace(/\n{3,}/g, "\n\n").trim();
@@ -323,7 +392,6 @@ export function mergeFashionDeliverableState(
         : patch.sellpoints?.length
           ? patch.sellpoints
           : base.sellpoints,
-    // 一旦锁定，禁止 LLM 回写 false
     sellpointsLocked: base.sellpointsLocked || Boolean(patch.sellpointsLocked),
     voiceovers: patch.voiceovers?.length ? patch.voiceovers : base.voiceovers,
     selectedVoiceoverId:
@@ -352,4 +420,19 @@ export function mergeFashionDeliverableState(
 
 export function isFashionInternalLlmTrigger(text: string): boolean {
   return text.trim().startsWith("fashion-step:");
+}
+
+function resolveFashionLlmPhaseFromTrigger(trigger: string): FashionLlmPhase | undefined {
+  if (trigger.includes("sellpoints")) return "sellpoints";
+  if (trigger.includes("voiceovers")) return "voiceovers";
+  if (trigger.includes("storyboards")) return "storyboards";
+  if (trigger.includes("ops")) return "ops";
+  return undefined;
+}
+
+export function extractFashionDeliverableFromLlmTrigger(
+  text: string,
+  trigger: string,
+): Partial<FashionDeliverable> | null {
+  return extractFashionDeliverableFromText(text, resolveFashionLlmPhaseFromTrigger(trigger));
 }

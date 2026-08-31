@@ -34,7 +34,7 @@ export function canvasNodeRunSessionStartedAtMs(nodeId: string): number {
 }
 
 /** 本地 pending 尚无 taskId 时 · 勿被 reconcile 误清（runOne / Gateway 提交窗口） */
-const LIBTV_ORPHAN_RECONCILE_GRACE_MS = 120_000;
+const LIBTV_ORPHAN_RECONCILE_GRACE_MS = 60_000;
 
 export function shouldDeferLibtvOrphanReconcile(nodeId: string): boolean {
   if (!nodeId || !sessionStartedNodeIds.has(nodeId)) return false;

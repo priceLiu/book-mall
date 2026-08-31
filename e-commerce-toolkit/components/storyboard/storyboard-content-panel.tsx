@@ -132,6 +132,8 @@ type Props = {
   onShareWorkflow?: () => void;
   onOpenSettings?: () => void;
   refBusy?: boolean;
+  uploadingRole?: StoryboardReference["role"] | null;
+  uploadProgress?: number | null;
   uploadRole?: StoryboardUploadRole;
   onUploadRoleChange?: (role: StoryboardUploadRole) => void;
   onRefUpload: (
@@ -212,6 +214,8 @@ export function StoryboardContentPanel({
   onShareWorkflow,
   onOpenSettings,
   refBusy = false,
+  uploadingRole = null,
+  uploadProgress = null,
   uploadRole = "product",
   onUploadRoleChange,
   onRefUpload,
@@ -252,6 +256,9 @@ export function StoryboardContentPanel({
   });
   const [sheetPngBusy, setSheetPngBusy] = useState(false);
   const [vidBusy, setVidBusy] = useState(false);
+  const [dismissedFullVideoTaskId, setDismissedFullVideoTaskId] = useState<
+    string | null
+  >(null);
   const backgroundGen = useBackgroundGeneration();
   const [videoTaskStartedAt, setVideoTaskStartedAt] = useState<string | null>(null);
   const [videoPollCount, setVideoPollCount] = useState(0);
@@ -273,6 +280,10 @@ export function StoryboardContentPanel({
   const [panelVidBusyPanels, setPanelVidBusyPanels] = useState<number[]>(() =>
     listStoryboardPendingPanelVideoIndices(project.meta),
   );
+  const [panelVideoGenInFlight, setPanelVideoGenInFlight] = useState(false);
+  const [panelVideoWatchIndices, setPanelVideoWatchIndices] = useState<number[]>(() =>
+    listStoryboardPendingPanelVideoIndices(project.meta),
+  );
   const imageGenPollLockRef = useRef(false);
   const panelVideoPollLockRef = useRef(false);
   /** 本地发起的生图镜头（服务端 pending 写入前也保持 busy） */
@@ -284,6 +295,12 @@ export function StoryboardContentPanel({
   /** 本地发起的单镜视频（服务端 pending 写入前也保持 busy） */
   const panelVideoWatchRef = useRef<number[]>([]);
   const panelVideoInFlightRef = useRef(false);
+  const syncPanelVideoFlight = useCallback((watch: number[], inFlight: boolean) => {
+    panelVideoWatchRef.current = watch;
+    panelVideoInFlightRef.current = inFlight;
+    setPanelVideoWatchIndices(watch);
+    setPanelVideoGenInFlight(inFlight);
+  }, []);
   const regeneratingPanelsRef = useRef(regeneratingPanels);
   regeneratingPanelsRef.current = regeneratingPanels;
 
@@ -320,10 +337,18 @@ export function StoryboardContentPanel({
       resolveActiveStoryboardPanelVideoBusyIndices({
         panelVidBusyPanels,
         pendingPanelVideoIndices,
+        inFlightWatchIndices: panelVideoWatchIndices,
+        videoGenInFlight: panelVideoGenInFlight,
         panels: project.sheet?.panels ?? [],
       }),
     );
-  }, [panelVidBusyPanels, pendingPanelVideoIndices, project.sheet?.panels]);
+  }, [
+    panelVidBusyPanels,
+    pendingPanelVideoIndices,
+    panelVideoWatchIndices,
+    panelVideoGenInFlight,
+    project.sheet?.panels,
+  ]);
   const imageModel = settings.imageModelKey;
   const videoModel = settings.videoModelKey;
   const [editPanelIndex, setEditPanelIndex] = useState<number | null>(null);
@@ -466,7 +491,7 @@ export function StoryboardContentPanel({
       return;
     }
 
-    const modelKey = modelKeyOverride?.trim() || "";
+    const modelKey = modelKeyOverride?.trim() || imageModel?.trim() || "";
     if (!modelKey) {
       openImagePicker(panelIndex, batchIndexes, "generate");
       return;
@@ -725,41 +750,47 @@ export function StoryboardContentPanel({
       onProjectChange(fresh);
       const pending = listStoryboardPendingPanelVideoIndices(fresh.meta);
       const watch = new Set<number>([...panelVideoWatchRef.current, ...pending]);
-      if (watch.size === 0 && !panelVideoInFlightRef.current) return;
-
-      const stillRunning = panelVideoInFlightRef.current || pending.length > 0;
-
-      const active = new Set<number>(pending);
-      if (panelVideoInFlightRef.current) {
-        for (const idx of panelVideoWatchRef.current) active.add(idx);
-      }
-      for (const idx of [...active]) {
-        const done = fresh.sheet?.panels.some(
+      const panelHasVideo = (idx: number) =>
+        fresh.sheet?.panels.some(
           (p) => p.index === idx && Boolean(p.videoUrl?.trim()),
-        );
-        if (done && !panelVideoInFlightRef.current) {
-          active.delete(idx);
-        }
-      }
-      setPanelVidBusyPanels([...active].sort((a, b) => a - b));
+        ) ?? false;
 
+      const active = new Set<number>();
+      for (const idx of watch) {
+        if (!panelHasVideo(idx)) active.add(idx);
+      }
+
+      setPanelVidBusyPanels((prev) => {
+        const next = [...active].sort((a, b) => a - b);
+        if (
+          prev.length === next.length &&
+          prev.every((value, index) => value === next[index])
+        ) {
+          return prev;
+        }
+        return next;
+      });
+
+      const stillRunning = active.size > 0;
       if (!stillRunning) {
-        panelVideoWatchRef.current = [];
-        setPanelVidBusyPanels([]);
+        syncPanelVideoFlight([], false);
+        setPanelVidBusyPanels((prev) => (prev.length === 0 ? prev : []));
+      } else {
+        syncPanelVideoFlight([...active], panelVideoInFlightRef.current);
       }
     } catch {
       /* ignore transient poll errors */
     } finally {
       panelVideoPollLockRef.current = false;
     }
-  }, [onProjectChange, project.id]);
+  }, [onProjectChange, project.id, syncPanelVideoFlight]);
 
   useEffect(() => {
     const pending = listStoryboardPendingPanelVideoIndices(project.meta);
-    panelVideoWatchRef.current = pending;
+    syncPanelVideoFlight(pending, false);
     setPanelVidBusyPanels(pending);
     void syncGeneratingPanelVideos();
-  }, [project.id, syncGeneratingPanelVideos]);
+  }, [project.id, syncGeneratingPanelVideos, syncPanelVideoFlight]);
 
   useEffect(() => {
     const pending = listStoryboardPendingPanelVideoIndices(project.meta);
@@ -1290,36 +1321,38 @@ export function StoryboardContentPanel({
     const failures: { index: number; message: string }[] = [];
     let latestPanels = project.sheet?.panels ?? [];
     try {
-      for (const panelIndex of queue) {
-        const result = await handleGenerateImage(
-          panelIndex,
-          modelKey,
-          charMode ?? undefined,
-          {
-            deferBusy: true,
-            quietSuccess: true,
-            quietError: true,
-            skipProjectUpdate: true,
-            skipComposite: true,
-            skipAutoRefresh: true,
-            autoGenCharacterOverride: false,
-            skipSheetReadyCheck: true,
-            skipCharacterRefCheck: true,
-            batchInner: true,
-          },
-        );
-        if (result?.ok) {
-          try {
-            const refreshed = await getStoryboardProject(project.id);
-            onProjectChange(refreshed);
-            latestPanels = refreshed.sheet?.panels ?? latestPanels;
-          } catch {
-            /* ignore transient reload errors */
+      await Promise.all(
+        queue.map(async (panelIndex) => {
+          const result = await handleGenerateImage(
+            panelIndex,
+            modelKey,
+            charMode ?? undefined,
+            {
+              deferBusy: true,
+              quietSuccess: true,
+              quietError: true,
+              skipProjectUpdate: true,
+              skipComposite: true,
+              skipAutoRefresh: true,
+              autoGenCharacterOverride: false,
+              skipSheetReadyCheck: true,
+              skipCharacterRefCheck: true,
+              batchInner: true,
+            },
+          );
+          if (result?.ok) {
+            try {
+              const refreshed = await getStoryboardProject(project.id);
+              onProjectChange(refreshed);
+              latestPanels = refreshed.sheet?.panels ?? latestPanels;
+            } catch {
+              /* ignore transient reload errors */
+            }
+          } else {
+            failures.push({ index: panelIndex, message: result?.error ?? "生成失败" });
           }
-        } else {
-          failures.push({ index: panelIndex, message: result?.error ?? "生成失败" });
-        }
-      }
+        }),
+      );
       try {
         const refreshed = await getStoryboardProject(project.id);
         onProjectChange(refreshed);
@@ -1398,7 +1431,9 @@ export function StoryboardContentPanel({
 
   const dismissVideoPoll = useCallback(
     (taskId?: string | null) => {
-      videoPollDismissedTaskIdRef.current = taskId?.trim() || "__dismissed__";
+      const dismissed = taskId?.trim() || "__dismissed__";
+      videoPollDismissedTaskIdRef.current = dismissed;
+      setDismissedFullVideoTaskId(dismissed);
       setVideoTaskStartedAt(null);
       onVideoReady();
     },
@@ -1438,6 +1473,7 @@ export function StoryboardContentPanel({
             videoAssetId: polled.asset.id,
           });
           videoPollDismissedTaskIdRef.current = null;
+          setDismissedFullVideoTaskId(null);
           onVideoReady();
           setVideoTaskStartedAt(null);
           toast({
@@ -1482,10 +1518,19 @@ export function StoryboardContentPanel({
 
   const pendingFullVideoTaskId =
     project.meta?.workflow?.pendingFullVideoJob?.taskId ?? null;
-  const inlineFullVideoBusy =
-    vidBusy &&
-    (!pendingFullVideoTaskId ||
-      !backgroundGen.isTaskMinimized(fullVideoDockTaskId(pendingFullVideoTaskId)));
+  const fullVideoTaskMinimized = Boolean(
+    pendingFullVideoTaskId &&
+      backgroundGen.isTaskMinimized(fullVideoDockTaskId(pendingFullVideoTaskId)),
+  );
+  const showFullVideoGenerating = Boolean(
+    pendingFullVideoTaskId &&
+      dismissedFullVideoTaskId !== pendingFullVideoTaskId &&
+      videoPollDismissedTaskIdRef.current !== pendingFullVideoTaskId,
+  );
+  /** 卡片扫光：跟服务端 pending 走，不跟 vidBusy 抖，避免轮询重启时爆闪 */
+  const inlineFullVideoGenerating =
+    showFullVideoGenerating && !fullVideoTaskMinimized;
+  const inlineFullVideoBusy = inlineFullVideoGenerating;
 
   const pollFullVideoUntilDone = useCallback(async () => {
     if (videoPollLock.current) return;
@@ -1550,6 +1595,7 @@ export function StoryboardContentPanel({
             });
           }
           videoPollDismissedTaskIdRef.current = null;
+          setDismissedFullVideoTaskId(null);
           if (activeTaskId) {
             backgroundGen.dismissTask(fullVideoDockTaskId(activeTaskId));
           }
@@ -1624,10 +1670,18 @@ export function StoryboardContentPanel({
     const pending = project.meta?.workflow?.pendingFullVideoJob;
     if (!pending?.taskId || !pending.startedAt) return;
     if (videoPollDismissedTaskIdRef.current === pending.taskId) return;
-    if (vidBusy || videoPollLock.current) return;
+    if (videoPollLock.current) return;
+    if (backgroundGen.isTaskMinimized(fullVideoDockTaskId(pending.taskId))) return;
     setVideoTaskStartedAt(pending.startedAt);
     void pollFullVideoUntilDone();
-  }, [project.meta?.workflow?.pendingFullVideoJob?.taskId, pollFullVideoUntilDone, vidBusy]);
+  }, [
+    backgroundGen,
+    fullVideoDockTaskId,
+    pollFullVideoUntilDone,
+    project.id,
+    project.meta?.workflow?.pendingFullVideoJob?.taskId,
+    project.meta?.workflow?.pendingFullVideoJob?.startedAt,
+  ]);
 
   /** 刷新：重载项目；恢复分镜图 pending 轮询与整图成片任务 */
   const handleReloadProject = useCallback(async () => {
@@ -1648,6 +1702,7 @@ export function StoryboardContentPanel({
     const pendingVideo = project.meta?.workflow?.pendingFullVideoJob;
     if (pendingVideo?.taskId && !vidBusy && !videoPollLock.current) {
       videoPollDismissedTaskIdRef.current = null;
+      setDismissedFullVideoTaskId(null);
       void pollFullVideoUntilDone();
     }
   }, [onProjectChange, onVideoReady, pollFullVideoUntilDone, project.id, project.meta?.workflow?.pendingFullVideoJob, vidBusy]);
@@ -1766,6 +1821,7 @@ export function StoryboardContentPanel({
     setVideoPollCount(0);
     try {
       videoPollDismissedTaskIdRef.current = null;
+      setDismissedFullVideoTaskId(null);
       const submitted = await submitStoryboardFullVideo(project.id, {
         durationSec,
         aspectRatio: videoAspectRatio,
@@ -1826,8 +1882,7 @@ export function StoryboardContentPanel({
     }
     const effectiveModel = opts?.modelKeyOverride?.trim() || videoModel;
     if (!opts?.deferBusy) {
-      panelVideoWatchRef.current = [panelIndex];
-      panelVideoInFlightRef.current = true;
+      syncPanelVideoFlight([panelIndex], true);
       setPanelVidBusyPanels((prev) =>
         prev.includes(panelIndex) ? prev : [...prev, panelIndex],
       );
@@ -1856,6 +1911,13 @@ export function StoryboardContentPanel({
           variant: "success",
         });
       }
+      if (opts?.deferBusy) {
+        syncPanelVideoFlight(
+          panelVideoWatchRef.current.filter((i) => i !== panelIndex),
+          panelVideoInFlightRef.current,
+        );
+        setPanelVidBusyPanels((prev) => prev.filter((i) => i !== panelIndex));
+      }
       return { ok: true };
     } catch (e) {
       const raw = e instanceof Error ? e.message : "镜头视频生成失败";
@@ -1876,6 +1938,13 @@ export function StoryboardContentPanel({
                 variant: "success",
               });
             }
+            if (opts?.deferBusy) {
+              syncPanelVideoFlight(
+                panelVideoWatchRef.current.filter((i) => i !== panelIndex),
+                panelVideoInFlightRef.current,
+              );
+              setPanelVidBusyPanels((prev) => prev.filter((i) => i !== panelIndex));
+            }
             return { ok: true };
           }
         } catch {
@@ -1893,9 +1962,9 @@ export function StoryboardContentPanel({
       return { ok: false, error: message };
     } finally {
       if (!opts?.deferBusy) {
-        panelVideoInFlightRef.current = false;
-        panelVideoWatchRef.current = panelVideoWatchRef.current.filter(
-          (i) => i !== panelIndex,
+        syncPanelVideoFlight(
+          panelVideoWatchRef.current.filter((i) => i !== panelIndex),
+          false,
         );
         setPanelVidBusyPanels((prev) => prev.filter((i) => i !== panelIndex));
         await syncGeneratingPanelVideos();
@@ -1915,7 +1984,7 @@ export function StoryboardContentPanel({
       return;
     }
     panelVideoWatchRef.current = queue;
-    panelVideoInFlightRef.current = true;
+    syncPanelVideoFlight(queue, true);
     setPanelVidBusyPanels(queue);
     const failures: { index: number; message: string }[] = [];
     let latestPanels = project.sheet?.panels ?? [];
@@ -1953,8 +2022,7 @@ export function StoryboardContentPanel({
         /* 单镜已成功时仍尽量保留本地 sheet 更新 */
       }
     } finally {
-      panelVideoInFlightRef.current = false;
-      panelVideoWatchRef.current = [];
+      syncPanelVideoFlight([], false);
       setPanelVidBusyPanels([]);
       await syncGeneratingPanelVideos();
     }
@@ -2626,6 +2694,8 @@ export function StoryboardContentPanel({
             onRemove={onRefRemove}
             onAttachAssets={(assetIds, role) => Promise.resolve(onAttachAssets(assetIds, role))}
             busy={refBusy}
+            uploadingRole={uploadingRole}
+            uploadProgress={uploadProgress}
             activeRole={uploadRole}
             onActiveRoleChange={onUploadRoleChange}
           />
@@ -2751,7 +2821,8 @@ export function StoryboardContentPanel({
                   hasSheetImages={hasSheetImages}
                   canMergePanels={false}
                   fullSheetOnly
-                  vidBusy={vidBusy}
+                  vidBusy={showFullVideoGenerating}
+                  videoOverlayBusy={inlineFullVideoGenerating}
                   imageGenBusy={imgBusy}
                   sheetPngBusy={sheetPngBusy}
                   mergeBusy={mergeBusy}
@@ -2805,7 +2876,8 @@ export function StoryboardContentPanel({
                 videoUrl={resolvedVideoUrl}
                 hasSheetImages={hasSheetImages}
                 canMergePanels={canMergePanels}
-                vidBusy={vidBusy}
+                vidBusy={showFullVideoGenerating}
+                videoOverlayBusy={inlineFullVideoGenerating}
                 imageGenBusy={imgBusy}
                 sheetPngBusy={sheetPngBusy}
                 mergeBusy={mergeBusy}

@@ -43,7 +43,7 @@ export function StoryboardPanelVideoCard({
       )}
       style={{ width: cardWidth }}
       onClick={
-        selectable && onToggleSelect
+        selectable && onToggleSelect && hasVideo && !busy
           ? (e) => {
               const t = e.target as HTMLElement;
               if (t.closest("button, a, input, label")) return;
@@ -60,9 +60,10 @@ export function StoryboardPanelVideoCard({
           <input
             type="checkbox"
             checked={selected}
+            disabled={!hasVideo || busy}
             onChange={onToggleSelect}
             aria-label={`选择镜头 ${panel.index} 视频`}
-            className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
+            className="h-3.5 w-3.5 accent-[var(--ecom-primary)] disabled:cursor-not-allowed disabled:opacity-40"
           />
         </label>
       ) : null}

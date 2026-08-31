@@ -1,3 +1,4 @@
+import { parseProCategoryPick } from "@/lib/pro-vertical/categories";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import type { DimensionStepDef, ProVerticalId } from "@/lib/pro-vertical/types";
 import { FASHION_DIMENSION_STEPS } from "@/lib/fashion-dimensions";
@@ -45,7 +46,9 @@ export function proDimensionStepProgress(vertical: ProVerticalId, stepIndex: num
 }
 
 const POST_DIMENSION_USER_MESSAGES = new Set([
+  "我来输入卖点",
   "AI自动生成卖点",
+  "AI润色卖点",
   "确认卖点清单",
   "重新生成口播文案",
   "重新生成卖点",
@@ -97,6 +100,7 @@ export function buildProDimensionMessageLabels(
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
     if (!trimmed || trimmed === "已上传产品图") continue;
+    if (parseProCategoryPick(trimmed)) continue;
 
     const reviseStep = parseDimensionReviseStepIndex(trimmed, vertical);
     if (reviseStep != null) {
@@ -144,6 +148,7 @@ export function buildProDimensionsFromChat(
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
     if (!trimmed || trimmed === "已上传产品图") continue;
+    if (parseProCategoryPick(trimmed)) continue;
 
     const reviseStep = parseDimensionReviseStepIndex(trimmed, vertical);
     if (reviseStep != null) {

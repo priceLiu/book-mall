@@ -8,6 +8,7 @@ import { HandCraftAssistantPanel } from "@/components/hand-craft/hand-craft-assi
 import { HandCraftContentPanel } from "@/components/hand-craft/hand-craft-content-panel";
 import { HandCraftProgressRail } from "@/components/hand-craft/hand-craft-progress-rail";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
@@ -50,6 +51,8 @@ export function HandCraftStudio() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantWide, setAssistantWide] = useState(false);
+  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
+    useEcomStudioAssistantCollapse(assistantStreaming);
   const [currentStepId, setCurrentStepId] = useState<HandCraftStepId>("hero");
   const [focusStepId, setFocusStepId] = useState<HandCraftStepId | null>(null);
   const [generateRequest, setGenerateRequest] = useState<{
@@ -426,6 +429,8 @@ export function HandCraftStudio() {
   return (
     <EcomWorkspaceLayout
       assistantWide={assistantWide}
+      assistantCollapsed={assistantCollapsed}
+      onMainBlankPointerDown={handleMainBlankPointerDown}
       progress={
         <HandCraftProgressRail
           project={project}
@@ -442,6 +447,8 @@ export function HandCraftStudio() {
           chatModelKey={chatModelKey}
           composerWide={assistantWide}
           onComposerWideChange={setAssistantWide}
+          collapsed={assistantCollapsed}
+          onCollapsedChange={setAssistantCollapsed}
           onStreamingChange={setAssistantStreaming}
           onProjectChange={async () => {
             await reload(project.id);

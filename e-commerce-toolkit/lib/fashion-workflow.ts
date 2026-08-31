@@ -39,7 +39,7 @@ import {
   extractFashionDeliverableFromText,
   mergeFashionDeliverableState,
 } from "@/lib/fashion-deliverable-parse";
-import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
+import { parseUserSellpointText } from "@/lib/sellpoint-user-input";
 import type {
   FashionDeliverable,
   FashionPanelRow,
@@ -48,6 +48,7 @@ import type {
   FashionVersionKey,
 } from "@/lib/fashion-types";
 import { isFashionDeliverable } from "@/lib/fashion-types";
+import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import type { StoryboardProject, StoryboardChatMessage } from "@/lib/storyboard-types";
 import {
   STORYBOARD_GENERATE_FULL_VIDEO_CHOICE,
@@ -57,10 +58,13 @@ import {
 export const FASHION_PRODUCT_REF_ACK = "已上传产品图";
 export const FASHION_CUSTOM_DIMENSION_CHOICE = "自定义";
 export const FASHION_AI_SELLPOINTS = "fashion-step:sellpoints-generate";
+export const FASHION_AI_SELLPOINTS_POLISH = "fashion-step:sellpoints-polish";
 export const FASHION_AI_VOICEOVERS = "fashion-step:voiceovers-generate";
 export const FASHION_AI_STORYBOARDS = "fashion-step:storyboards-generate";
 export const FASHION_AI_OPS = "fashion-step:ops-generate";
+export const FASHION_USER_SELLPOINTS_CHOICE = "我来输入卖点";
 export const FASHION_AI_SELLPOINTS_CHOICE = "AI自动生成卖点";
+export const FASHION_AI_POLISH_SELLPOINTS = "AI润色卖点";
 export const FASHION_LOCK_SELLPOINTS = "确认卖点清单";
 export const FASHION_OUTPUT_SCRIPT = "分镜脚本交付";
 export const FASHION_OUTPUT_VIDEO = "故事版一键成片";
@@ -73,6 +77,7 @@ export const FASHION_REGENERATE_OPS = "重新生成运营包";
 export const FASHION_REPICK_STORYBOARD = "重新选择分镜版本";
 
 export const PRO_AI_SELLPOINTS = "pro-step:sellpoints-generate";
+export const PRO_AI_SELLPOINTS_POLISH = "pro-step:sellpoints-polish";
 export const PRO_AI_VOICEOVERS = "pro-step:voiceovers-generate";
 export const PRO_AI_STORYBOARDS = "pro-step:storyboards-generate";
 export const PRO_AI_OPS = "pro-step:ops-generate";
@@ -94,6 +99,18 @@ export function fashionBusyStatusForUserMessage(message: string): FashionBusySta
     return {
       title: "正在生成卖点",
       detail: "AI 正在分析七维参数并输出分层卖点，请稍候…",
+    };
+  }
+  if (trimmed === FASHION_AI_POLISH_SELLPOINTS) {
+    return {
+      title: "正在润色卖点",
+      detail: "AI 正在清洗、分层并精炼您的卖点，请稍候…",
+    };
+  }
+  if (trimmed === FASHION_USER_SELLPOINTS_CHOICE) {
+    return {
+      title: "录入卖点",
+      detail: "请在输入框或左侧表格填写您的卖点",
     };
   }
   if (trimmed.startsWith("选择口播")) {
@@ -151,6 +168,9 @@ export function fashionBusyStatusForUserMessage(message: string): FashionBusySta
 }
 
 export function fashionBusyStatusForLlmTrigger(trigger: string): FashionBusyStatus {
+  if (trigger.includes("sellpoints-polish")) {
+    return fashionBusyStatusForUserMessage(FASHION_AI_POLISH_SELLPOINTS);
+  }
   if (trigger.includes("sellpoints")) {
     return fashionBusyStatusForUserMessage(FASHION_AI_SELLPOINTS_CHOICE);
   }
@@ -202,10 +222,14 @@ export function fashionLlmTriggerSucceeded(
   return true;
 }
 
+export type SellpointInputMode = "user" | "ai";
+
 export type FashionWorkflowMeta = {
   vertical?: "fashion_apparel" | "bags" | "digital_3c";
   fashionPhase?: FashionPhase;
   proPhase?: FashionPhase;
+  /** 卖点录入方式：用户自带 / AI 生成 */
+  sellpointInputMode?: SellpointInputMode;
   dimensionStep?: number;
   productName?: string;
   initialProductRefAcknowledged?: boolean;
@@ -272,9 +296,107 @@ function deliverableSchemaForProject(project: StoryboardProject): "pro-v1" | "fa
 
 function llmTriggerFor(
   project: StoryboardProject,
-  step: "sellpoints" | "voiceovers" | "storyboards" | "ops",
+  step: "sellpoints" | "sellpoints-polish" | "voiceovers" | "storyboards" | "ops",
 ): string {
   return usesProPhase(project) ? `pro-step:${step}-generate` : `fashion-step:${step}-generate`;
+}
+
+const SELLPOINT_WORKFLOW_MESSAGES = new Set([
+  FASHION_USER_SELLPOINTS_CHOICE,
+  FASHION_AI_SELLPOINTS_CHOICE,
+  FASHION_AI_POLISH_SELLPOINTS,
+  FASHION_LOCK_SELLPOINTS,
+  FASHION_REGENERATE_SELLPOINTS,
+  FASHION_REGENERATE_VOICEOVERS,
+  FASHION_REGENERATE_STORYBOARDS,
+  FASHION_CONFIRM_STORYBOARD,
+  FASHION_REGENERATE_OPS,
+  FASHION_REPICK_STORYBOARD,
+  FASHION_OUTPUT_SCRIPT,
+  FASHION_OUTPUT_VIDEO,
+  FASHION_PRODUCT_REF_ACK,
+  FASHION_CUSTOM_DIMENSION_CHOICE,
+]);
+
+function isSellpointWorkflowMessage(message: string): boolean {
+  const trimmed = message.trim();
+  return (
+    SELLPOINT_WORKFLOW_MESSAGES.has(trimmed) ||
+    trimmed.startsWith("fashion-step:") ||
+    trimmed.startsWith("pro-step:") ||
+    trimmed.startsWith("选择品类·") ||
+    trimmed.startsWith("选择口播") ||
+    trimmed.startsWith("选择分镜") ||
+    trimmed.startsWith("修改七维·")
+  );
+}
+
+export function getSellpointInputMode(
+  project: StoryboardProject,
+): SellpointInputMode | undefined {
+  return getFashionWorkflowMeta(project).sellpointInputMode;
+}
+
+export function isAwaitingSellpointModePick(project: StoryboardProject): boolean {
+  if (!isAwaitingFashionSellpoints(project)) return false;
+  const d = workflowDeliverable(project);
+  if ((d?.sellpoints?.length ?? 0) > 0) return false;
+  return !getSellpointInputMode(project);
+}
+
+export function isAwaitingUserSellpointInput(project: StoryboardProject): boolean {
+  if (!isAwaitingFashionSellpoints(project)) return false;
+  const d = workflowDeliverable(project);
+  return getSellpointInputMode(project) === "user" && !(d?.sellpoints?.length);
+}
+
+export function isSellpointUserInputActive(project: StoryboardProject): boolean {
+  return (
+    isAwaitingFashionSellpoints(project) &&
+    getSellpointInputMode(project) === "user" &&
+    !workflowDeliverable(project)?.sellpointsLocked
+  );
+}
+
+/** 会话区 assistant JSON 中最新一版结构化卖点（AI 润色 / 定稿来源） */
+export function latestAssistantSellpointsFromChat(
+  project: StoryboardProject,
+): FashionSellpoint[] {
+  const vertical = getProjectVertical(project);
+  for (let i = project.chatHistory.length - 1; i >= 0; i--) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "assistant") continue;
+    const parsed =
+      vertical && isNonFashionProVertical(project)
+        ? extractProDeliverableFromText(msg.content, vertical)
+        : extractFashionDeliverableFromText(msg.content);
+    if (parsed?.sellpoints?.length) return parsed.sellpoints as FashionSellpoint[];
+  }
+  return [];
+}
+
+function shouldUseMetaSellpointsDraft(
+  project: StoryboardProject,
+  metaDeliverable: FashionDeliverable | ProDeliverable,
+  chatMergedSellpoints: FashionSellpoint[],
+): boolean {
+  if (metaDeliverable.sellpointsLocked) return false;
+  const wf = getFashionWorkflowMeta(project);
+  if (wf.fashionSellpointsEdited || wf.proSellpointsEdited) return true;
+  return metaDeliverable.sellpoints.some((sp) => {
+    const prev = chatMergedSellpoints.find((d) => d.id === sp.id);
+    return sp.text.trim() !== (prev?.text ?? "").trim();
+  });
+}
+
+function applyLockedSellpointsFromAssistantChat<T extends FashionDeliverable | ProDeliverable>(
+  project: StoryboardProject,
+  deliverable: T,
+): T {
+  if (!deliverable.sellpointsLocked) return deliverable;
+  const fromChat = latestAssistantSellpointsFromChat(project);
+  if (!fromChat.length) return deliverable;
+  return { ...deliverable, sellpoints: fromChat };
 }
 
 function phaseWorkflowPatch(project: StoryboardProject, phase: FashionPhase): Record<string, unknown> {
@@ -430,6 +552,14 @@ export function buildFashionWorkflowChoiceMessageLabels(
   for (const m of messages) {
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
+    const categoryPick = parseProCategoryPick(trimmed);
+    if (categoryPick) {
+      labels.set(m.id, {
+        label: "大类品类",
+        detail: `已选 ${categoryPick.label}`,
+      });
+      continue;
+    }
     const voiceover = trimmed.match(/^选择口播\s*(V\d+)(?:：(.*))?/);
     if (voiceover) {
       labels.set(m.id, {
@@ -451,6 +581,22 @@ export function buildFashionWorkflowChoiceMessageLabels(
         label: "分镜定稿",
         detail: "已确认分镜脚本，生成运营包",
       });
+      continue;
+    }
+    if (trimmed === FASHION_USER_SELLPOINTS_CHOICE) {
+      labels.set(m.id, { label: "卖点录入", detail: "我来输入卖点" });
+      continue;
+    }
+    if (trimmed === FASHION_AI_SELLPOINTS_CHOICE) {
+      labels.set(m.id, { label: "卖点录入", detail: "AI 自动生成卖点" });
+      continue;
+    }
+    if (trimmed === FASHION_AI_POLISH_SELLPOINTS) {
+      labels.set(m.id, { label: "卖点润色", detail: "AI 润色卖点" });
+      continue;
+    }
+    if (trimmed === FASHION_LOCK_SELLPOINTS) {
+      labels.set(m.id, { label: "卖点定稿", detail: "确认卖点清单" });
       continue;
     }
   }
@@ -586,11 +732,15 @@ export function applyFashionMetaAuthorityToDeliverable(
   let next: FashionDeliverable = { ...resolved };
 
   if (metaDeliverable.sellpoints?.length) {
-    if (metaDeliverable.sellpointsLocked || wf.fashionSellpointsEdited) {
+    if (metaDeliverable.sellpointsLocked) {
+      next = {
+        ...next,
+        sellpointsLocked: true,
+      };
+    } else if (shouldUseMetaSellpointsDraft(project, metaDeliverable, next.sellpoints)) {
       next = {
         ...next,
         sellpoints: metaDeliverable.sellpoints,
-        sellpointsLocked: metaDeliverable.sellpointsLocked || next.sellpointsLocked,
       };
     }
   }
@@ -754,11 +904,15 @@ function applyProMetaAuthorityToDeliverable(
   let next: ProDeliverable = { ...resolved };
 
   if (metaDeliverable.sellpoints?.length) {
-    if (metaDeliverable.sellpointsLocked || wf.proSellpointsEdited) {
+    if (metaDeliverable.sellpointsLocked) {
+      next = {
+        ...next,
+        sellpointsLocked: true,
+      };
+    } else if (shouldUseMetaSellpointsDraft(project, metaDeliverable, next.sellpoints)) {
       next = {
         ...next,
         sellpoints: metaDeliverable.sellpoints,
-        sellpointsLocked: metaDeliverable.sellpointsLocked || next.sellpointsLocked,
       };
     }
   }
@@ -960,7 +1114,7 @@ export function resolveFashionDeliverable(project: StoryboardProject): FashionDe
     if (msg?.role !== "assistant") continue;
     const parsed = extractFashionDeliverableFromText(msg.content);
     if (!parsed) continue;
-    merged = merged ? mergeFashionDeliverableState(merged, parsed) : parsed;
+    merged = merged ? mergeFashionDeliverableState(merged, parsed) : (parsed as FashionDeliverable);
   }
 
   if (!merged) return null;
@@ -971,18 +1125,15 @@ export function resolveFashionDeliverable(project: StoryboardProject): FashionDe
     : null;
   if (metaDeliverable?.sellpoints?.length) {
     const chatSellpoints = merged.sellpoints;
-    if (
-      metaDeliverable.sellpointsLocked ||
-      wf.fashionSellpointsEdited ||
-      metaDeliverable.sellpoints.some((sp) => {
-        const prev = chatSellpoints.find((d) => d.id === sp.id);
-        return sp.text.trim() !== (prev?.text ?? "").trim();
-      })
-    ) {
+    if (metaDeliverable.sellpointsLocked) {
+      merged = {
+        ...merged,
+        sellpointsLocked: true,
+      };
+    } else if (shouldUseMetaSellpointsDraft(project, metaDeliverable, chatSellpoints)) {
       merged = {
         ...merged,
         sellpoints: metaDeliverable.sellpoints,
-        sellpointsLocked: metaDeliverable.sellpointsLocked || merged.sellpointsLocked,
       };
     }
   }
@@ -1008,26 +1159,26 @@ export function resolveFashionDeliverable(project: StoryboardProject): FashionDe
     merged = { ...merged, storyboardLocked: true };
   }
 
-  return merged;
+  return applyLockedSellpointsFromAssistantChat(project, merged);
 }
 
 export function resolveProVerticalDeliverable(
   project: StoryboardProject,
 ): ProDeliverable | FashionDeliverable | null {
   if (isNonFashionProVertical(project)) {
+    const vertical = getProjectVertical(project)!;
     let merged: ProDeliverable | null = isProDeliverable(project.meta?.deliverable)
       ? (project.meta!.deliverable as ProDeliverable)
       : readMetaProDeliverable(project.meta?.deliverable);
 
     for (const msg of project.chatHistory) {
       if (msg?.role !== "assistant") continue;
-      const parsed = extractProDeliverableFromText(msg.content);
+      const parsed = extractProDeliverableFromText(msg.content, vertical);
       if (!parsed) continue;
-      merged = merged ? mergeProDeliverableState(merged, parsed) : parsed;
+      merged = merged ? mergeProDeliverableState(merged, parsed) : (parsed as ProDeliverable);
     }
     if (!merged) return null;
 
-    const vertical = getProjectVertical(project)!;
     const metaDeliverable = isProDeliverable(project.meta?.deliverable)
       ? (project.meta!.deliverable as ProDeliverable)
       : null;
@@ -1053,7 +1204,7 @@ export function resolveProVerticalDeliverable(
       merged = { ...merged, storyboardLocked: true };
     }
 
-    return merged;
+    return applyLockedSellpointsFromAssistantChat(project, merged);
   }
   return resolveFashionDeliverable(project);
 }
@@ -1424,6 +1575,7 @@ export function buildFashionSellpointsSavePatch(
     workflow: {
       ...wf,
       ...phaseWorkflowPatch(project, "sellpoints"),
+      sellpointInputMode: wf.sellpointInputMode ?? "user",
       ...(usesProPhase(project)
         ? { proSellpointsEdited: true }
         : { fashionSellpointsEdited: true }),
@@ -1792,9 +1944,44 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     ];
   }
 
+  if (isAwaitingSellpointModePick(project)) {
+    return [
+      {
+        id: "user-sellpoints",
+        title: FASHION_USER_SELLPOINTS_CHOICE,
+        description: "自带卖点：输入关键词/短句，或在左侧表格填写",
+        message: FASHION_USER_SELLPOINTS_CHOICE,
+        recommended: true,
+      },
+      {
+        id: "ai-sellpoints",
+        title: FASHION_AI_SELLPOINTS_CHOICE,
+        description: "根据七维参数自动生成 5–8 条分层卖点",
+        message: FASHION_AI_SELLPOINTS_CHOICE,
+      },
+    ];
+  }
+
   if (isAwaitingFashionSellpoints(project)) {
     const d = workflowDeliverable(project);
     if (!d?.sellpoints?.length) return [];
+    if (getSellpointInputMode(project) === "user") {
+      return [
+        {
+          id: "polish-sellpoints",
+          title: FASHION_AI_POLISH_SELLPOINTS,
+          description: "可选：清洗、分层、精炼您的卖点（保持原意）",
+          message: FASHION_AI_POLISH_SELLPOINTS,
+        },
+        {
+          id: "lock-sellpoints",
+          title: FASHION_LOCK_SELLPOINTS,
+          description: "跳过润色，直接定稿并生成口播",
+          message: FASHION_LOCK_SELLPOINTS,
+          recommended: true,
+        },
+      ];
+    }
     return [
       {
         id: "lock-sellpoints",
@@ -1909,6 +2096,9 @@ export function fashionLlmFailureAssistantMessage(
 ): string {
   const causeMsg = cause instanceof Error ? cause.message.trim() : "";
   if (causeMsg && !/fetch|network|Failed to fetch|ECONNREF|timeout/i.test(causeMsg)) {
+    if (trigger.includes("sellpoints-polish")) {
+      return `卖点润色未完成：${causeMsg}。请点「AI润色卖点」重试，或直接「确认卖点清单」跳过润色。`;
+    }
     if (trigger.includes("sellpoints")) {
       return `卖点生成未完成：${causeMsg}。请点「AI 自动生成卖点」或「重新生成卖点」重试。`;
     }
@@ -1928,6 +2118,9 @@ export function fashionLlmFailureAssistantMessage(
   }
   if (trigger.includes("storyboards")) {
     return "分镜脚本生成失败（网络或服务中断）。口播已选定，请点击下方「生成 A–E 分镜方案」重试。";
+  }
+  if (trigger.includes("sellpoints-polish")) {
+    return "卖点润色失败（网络或服务中断），请点「AI润色卖点」重试，或直接「确认卖点清单」跳过润色。";
   }
   if (trigger.includes("sellpoints")) {
     return "卖点生成失败（网络或服务中断），请点「AI 自动生成卖点」或「重新生成卖点」重试。";
@@ -1971,17 +2164,27 @@ export function fashionMetaAfterLlmFailure(
     };
   }
   if (trigger.includes("storyboards")) {
+    const phaseKey =
+      prevWf.proPhase != null ||
+      (typeof prevWf.vertical === "string" && prevWf.vertical !== "fashion_apparel")
+        ? "proPhase"
+        : "fashionPhase";
+    const prevPro = isProDeliverable(prevDeliverable)
+      ? (prevDeliverable as ProDeliverable)
+      : null;
     const prevFashion = isFashionDeliverable(prevDeliverable)
       ? (prevDeliverable as FashionDeliverable)
       : null;
-    const hadVersions =
-      prevFashion?.storyboardVersions &&
-      Object.keys(prevFashion.storyboardVersions).length > 0;
+    const hadVersions = prevPro
+      ? listProStoryboardVersionKeys(prevPro).length > 0
+      : prevFashion?.storyboardVersions
+        ? Object.keys(prevFashion.storyboardVersions).length > 0
+        : false;
     return {
       deliverable: prevDeliverable,
       workflow: {
         ...prevWf,
-        fashionPhase: hadVersions ? "storyboard_pick" : "voiceover_pick",
+        [phaseKey]: hadVersions ? "storyboard_pick" : "voiceover_pick",
       },
     };
   }
@@ -2152,13 +2355,82 @@ export function fashionWorkflowPatchForChoice(
     }
   }
 
+  if (isAwaitingSellpointModePick(project) && !isSellpointWorkflowMessage(message)) {
+    return {
+      assistantReply: "请先点选「我来输入卖点」或「AI自动生成卖点」，再开始填写。",
+    };
+  }
+
+  if (message === FASHION_USER_SELLPOINTS_CHOICE) {
+    return {
+      workflow: {
+        ...wf,
+        sellpointInputMode: "user",
+      },
+      assistantReply:
+        "请在下方输入框填写卖点（换行或分号分隔），或在左侧「卖点清单」表格点「添加卖点」。完成后可选「AI润色卖点」，或直接「确认卖点清单」。",
+    };
+  }
+
   if (message === FASHION_AI_SELLPOINTS_CHOICE || message === FASHION_REGENERATE_SELLPOINTS) {
     return {
       llmTrigger: llmTriggerFor(project, "sellpoints"),
       workflow: {
         ...wf,
+        sellpointInputMode: "ai",
         ...(usesProPhase(project) ? { proSellpointsEdited: false } : { fashionSellpointsEdited: false }),
       },
+    };
+  }
+
+  if (message === FASHION_AI_POLISH_SELLPOINTS) {
+    if (!(deliverable?.sellpoints?.length ?? 0)) return null;
+    return {
+      llmTrigger: llmTriggerFor(project, "sellpoints-polish"),
+      workflow: {
+        ...wf,
+        sellpointInputMode: "user",
+      },
+    };
+  }
+
+  if (
+    getSellpointInputMode(project) === "user" &&
+    isAwaitingFashionSellpoints(project) &&
+    !isSellpointWorkflowMessage(message)
+  ) {
+    const parsed = parseUserSellpointText(message);
+    if (!parsed.length || (deliverable?.sellpoints?.length ?? 0) > 0) return null;
+    const verticalId = getProjectVertical(project) ?? "fashion_apparel";
+    const schema = deliverableSchemaForProject(project);
+    const config = getProVerticalConfig(verticalId);
+    return {
+      deliverable: {
+        schemaVersion: schema,
+        vertical: verticalId,
+        productName:
+          wf.productName ??
+          deliverable?.productName ??
+          project.title ??
+          config?.projectTitle ??
+          "商品",
+        dimensions: deliverable?.dimensions ?? {},
+        sellpoints: parsed,
+        sellpointsLocked: false,
+        voiceovers: [],
+        selectedVoiceoverId: null,
+        storyboardVersions: {},
+        selectedVersion: null,
+        storyboardLocked: false,
+        coverageChecklist: [],
+        outputMode: null,
+      },
+      workflow: {
+        ...wf,
+        sellpointInputMode: "user",
+        ...(usesProPhase(project) ? { proSellpointsEdited: true } : { fashionSellpointsEdited: true }),
+      },
+      assistantReply: `已收录 ${parsed.length} 条卖点。可在左侧表格继续编辑；需要 AI 润色请点「AI润色卖点」，或直接「确认卖点清单」进入口播。`,
     };
   }
 
@@ -2191,16 +2463,14 @@ export function fashionWorkflowPatchForChoice(
     const metaRaw = project.meta?.deliverable;
     const metaDeliverable =
       isProDeliverable(metaRaw) || isFashionDeliverable(metaRaw) ? metaRaw : null;
-    const sellpointsEdited = Boolean(wf.proSellpointsEdited || wf.fashionSellpointsEdited);
+    const assistantSellpoints = latestAssistantSellpointsFromChat(project);
     const sellpoints =
-      metaDeliverable?.sellpoints?.length &&
-      (sellpointsEdited ||
-        metaDeliverable.sellpoints.some((sp) => {
-          const prev = deliverable.sellpoints.find((d) => d.id === sp.id);
-          return sp.text.trim() !== (prev?.text ?? "").trim();
-        }))
-        ? metaDeliverable.sellpoints
-        : deliverable.sellpoints;
+      assistantSellpoints.length > 0
+        ? assistantSellpoints
+        : metaDeliverable?.sellpoints?.length &&
+            (wf.proSellpointsEdited || wf.fashionSellpointsEdited)
+          ? metaDeliverable.sellpoints
+          : deliverable.sellpoints;
     return {
       deliverable: {
         ...deliverable,
@@ -2389,6 +2659,15 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
     const step = FASHION_DIMENSION_STEPS[dimStep];
     if (step?.freeText) return fashionDimensionPrompt(dimStep);
     return "请点选上方卡片，或选「自定义」后在下方输入";
+  }
+  if (isAwaitingSellpointModePick(project)) {
+    return "请选择：我来输入卖点，或 AI自动生成卖点";
+  }
+  if (isAwaitingUserSellpointInput(project)) {
+    return "输入卖点（换行/分号分隔），或在左侧表格添加";
+  }
+  if (isAwaitingFashionSellpoints(project) && getSellpointInputMode(project) === "user") {
+    return "可编辑左侧卖点表；选 AI润色 或 确认卖点清单";
   }
   if (isAwaitingFashionSellpoints(project)) {
     return "输入卖点关键词，或点选「AI自动生成卖点」";

@@ -252,7 +252,7 @@ export function EcomRefUploadCard({
             ),
           )}
         </div>
-      ) : (
+      ) : busy ? null : (
         <p className="text-[10px] text-[#86868b]">{emptyHint}</p>
       )}
     </div>

@@ -928,6 +928,7 @@ export async function canvasGwRecordInfo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId ?? undefined,
     meta: await canvasGwMeta(userId),
   });
 

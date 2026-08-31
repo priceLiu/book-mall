@@ -9,7 +9,7 @@ const FASHION_CORE = `你是【服装AI短视频专业策划师】，严格遵�
 【交付铁律】
 - 仅输出 brief 摘要 + \`\`\`fashion-deliverable JSON\`\`\`
 - **禁止输出 Markdown 表格**（12.1 分镜表、12.3 验收清单由系统从 JSON 渲染）
-- schemaVersion 必须为 "fashion-v4"，vertical 必须为 "fashion_apparel"
+- 分阶段 trigger 时 **可省略** schemaVersion / vertical（服务端按项目补全）；整包参考结构时须为 "fashion-v4" / "fashion_apparel"
 - 固定 6 镜；单镜时长 3–7 秒（0.5 精度）；全片口播 ≤100 字
 - 每镜必填 sellpointIds，覆盖全部核心+视觉卖点
 
@@ -57,6 +57,7 @@ const FASHION_OPS_JSON_SHAPE = `\`\`\`fashion-deliverable
 
 export type FashionPromptPhase =
   | "sellpoints"
+  | "sellpoints_polish"
   | "voiceovers"
   | "storyboards"
   | "ops"
@@ -91,6 +92,9 @@ export function buildFashionDeliverableContextBlock(
   if (deliverable.sellpoints?.length) {
     payload.sellpoints = deliverable.sellpoints;
     payload.sellpointsLocked = deliverable.sellpointsLocked ?? false;
+    if (phase === "sellpoints_polish") {
+      payload.userSellpoints = deliverable.sellpoints;
+    }
   }
   if (phase === "storyboards" || phase === "ops") {
     if (deliverable.selectedVoiceoverId) {
@@ -127,10 +131,18 @@ export function buildFashionAssistantSystemPrompt(
   phase: FashionPromptPhase = "general",
 ): string {
   const phaseBlock: Record<FashionPromptPhase, string> = {
-    sellpoints: `【当前任务：卖点生成】
+    sellpoints: `【当前任务：卖点 AI 生成】
 根据七维参数生成 5–8 条卖点，编号 S01–S0N，分层 core/visual/aux。
 用户卖点不足 3 条时补充 supplemented 来源卖点。
-输出 JSON 仅更新 sellpoints 字段（保留已有 dimensions/productName）。`,
+输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
+
+    sellpoints_polish: `【当前任务：卖点润色（用户已提供原始卖点）】
+基于上下文中的 userSellpoints / sellpoints：
+- 清洗、去重、归类、精炼，**保持用户原意**，禁止捏造未提及的新卖点
+- 编号 S01–S0N，分层 core/visual/aux
+- 用户原条目标记 source=user；仅 AI 补充的用 supplemented
+- 不足 3 条时可补充 supplemented，须 brief 说明
+输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
 
     voiceovers: `【当前任务：6 套口播】
 固定 2 套：痛点救场型、质感种草型；动态 4 套适配场景。
@@ -161,6 +173,7 @@ E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 }
 
 export function resolveFashionPromptPhase(lastUserTurn: string): FashionPromptPhase {
+  if (lastUserTurn.includes("fashion-step:sellpoints-polish")) return "sellpoints_polish";
   if (lastUserTurn.includes("fashion-step:sellpoints")) return "sellpoints";
   if (lastUserTurn.includes("fashion-step:voiceovers")) return "voiceovers";
   if (lastUserTurn.includes("fashion-step:storyboards")) return "storyboards";

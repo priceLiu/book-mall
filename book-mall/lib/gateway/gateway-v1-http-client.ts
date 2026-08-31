@@ -80,9 +80,10 @@ export async function gatewayV1CreateTask(
 }
 
 export async function gatewayV1RecordInfo(
-  opts: GatewayV1RequestOpts & { taskId: string },
+  opts: GatewayV1RequestOpts & { taskId: string; logId?: string },
 ): Promise<{ providerKind: string; data: unknown }> {
   const q = new URLSearchParams({ taskId: opts.taskId });
+  if (opts.logId?.trim()) q.set("logId", opts.logId.trim());
   const r = await gatewayV1Fetch(
     opts.apiKeyId,
     `jobs/recordInfo?${q.toString()}`,
