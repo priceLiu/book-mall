@@ -707,9 +707,12 @@ export function resolveProDeliverableForProject(project: {
     if (msg.role !== "assistant") continue;
     const parsed = extractProDeliverable(msg.content, vertical);
     if (!parsed) continue;
-    merged = merged
-      ? mergeProDeliverablePatch(merged, parsed, vertical, merged.productName)
-      : parsed;
+    merged = mergeProDeliverablePatch(
+      merged,
+      parsed,
+      vertical,
+      merged?.productName ?? parsed.productName,
+    );
   }
 
   if (!merged) return null;

@@ -778,18 +778,24 @@ export function resolveFashionDeliverableForProject(project: {
   const metaDeliverable = readMetaFashionDeliverable(meta.deliverable);
   const markdown =
     typeof meta.deliverableMarkdown === "string" ? meta.deliverableMarkdown : "";
+  const markdownPatch = markdown ? extractFashionDeliverable(markdown) : null;
 
   let merged: FashionDeliverable | null =
-    metaDeliverable ?? (markdown ? extractFashionDeliverable(markdown) : null);
+    metaDeliverable ??
+    (markdownPatch
+      ? mergeFashionDeliverablePatch(null, markdownPatch, markdownPatch.productName)
+      : null);
 
   const chatHistory = project.chatHistory ?? [];
   for (const msg of chatHistory) {
     if (msg.role !== "assistant") continue;
     const parsed = extractFashionDeliverable(msg.content);
     if (!parsed) continue;
-    merged = merged
-      ? mergeFashionDeliverablePatch(merged, parsed, merged.productName)
-      : parsed;
+    merged = mergeFashionDeliverablePatch(
+      merged,
+      parsed,
+      merged?.productName ?? parsed.productName,
+    );
   }
 
   if (!merged) return null;
